@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Tuple, Union
 from ..vendor.compact import StrEnum
 from ..vendor.dataclassesx import dataclass, field
 
-if TYPE_CHECKING:
-    from ..spec.ir import DerivedFieldIr, FieldIr, LookupStepIr, SourceIr
-
 # endregion
+
+if TYPE_CHECKING:
+    from ..spec.ir import LookupStepIr
 
 
 class OperatorType(StrEnum):
@@ -33,7 +33,7 @@ class LoadOperatorIr:
 
     operator_id: str
     operator_type: str
-    source: "SourceIr"
+    source_id: str
     field_keys: Tuple[str, ...]
     depends_on: Tuple[str, ...] = field(default_factory=tuple)
     is_primary: bool = False
@@ -45,9 +45,8 @@ class LoadRefOperatorIr:
 
     operator_id: str
     operator_type: str
-    source: "SourceIr"
+    source_id: str
     field_key: str
-    field_spec: "FieldIr"
     lookup_steps: "Tuple[LookupStepIr, ...]"
     depends_on: Tuple[str, ...] = field(default_factory=tuple)
     use_cache: bool = False
@@ -59,7 +58,7 @@ class ComputeOperatorIr:
 
     operator_id: str
     operator_type: str
-    field_spec: "DerivedFieldIr"
+    field_key: str
     input_fields: Tuple[str, ...]
     depends_on: Tuple[str, ...] = field(default_factory=tuple)
 

@@ -4,13 +4,11 @@ from typing import Any, Dict, List, Set
 import pytest
 
 from scalim.events import EVENT_LOADER_CALL
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager
 from scalim.ob.observer import Observer
 from scalim.planning import PlanBuilder
-from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import FieldIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import BindingIr, DemandIr, FieldIr, KeyIr, LoaderIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 
 
 class _LoaderCallObserver(Observer):
@@ -123,20 +121,24 @@ def _build_two_ref_plan() -> DemandIr:
             201: {"product_id": 201, "product_name": "B"},
         }
 
-    def _build_keys_params(field_name: str, param_name: str):  # type: ignore[no-untyped-def]
-        def _builder(ctx):  # type: ignore[no-untyped-def]
-            return (), {param_name: set(ctx.lookup_keys or set())}
+    def _build_keys_params(*, source_id: str, field_name: str, param_name: str) -> BindingIr:
+        return BindingIr(
+            key_field=field_name,
+            params_builder_ref=RuntimeHandleIdIr(handle_id="{}.params_builder.{}".format(source_id, field_name)),
+            mode="keys",
+            param_name=str(param_name),
+        )
 
-        return BindingIr(key_field=field_name, params_builder=_builder, mode="keys")
-
-    orders = MainSourceIr(source_id="orders", loader=_load_orders)
+    orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
 
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=LoaderIr(
-            callable=_load_customers,
-            bindings={"customer_id": _build_keys_params("customer_id", "customer_id_set")},
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={
+                "customer_id": _build_keys_params(source_id="customers", field_name="customer_id", param_name="customer_id_set"),
+            },
         ),
     )
 
@@ -144,8 +146,10 @@ def _build_two_ref_plan() -> DemandIr:
         source_id="products",
         key=KeyIr(key="product_id"),
         loader_spec=LoaderIr(
-            callable=_load_products,
-            bindings={"product_id": _build_keys_params("product_id", "product_id_set")},
+            callable_ref=RuntimeHandleIdIr(handle_id="products.loader"),
+            bindings={
+                "product_id": _build_keys_params(source_id="products", field_name="product_id", param_name="product_id_set"),
+            },
         ),
     )
 
@@ -170,10 +174,47 @@ def _build_two_ref_plan() -> DemandIr:
     return DemandIr.from_irs(sources=[customers, products], fields=fields, main_source=orders)
 
 
+def _build_two_ref_runtime_bindings() -> RuntimeBindings:
+    def _load_orders() -> List[Dict[str, Any]]:
+        return [
+            {"order_id": 0, "customer_id": 100, "product_id": 200},
+            {"order_id": 1, "customer_id": 101, "product_id": 201},
+        ]
+
+    def _load_customers(customer_id_set=None):  # type: ignore[no-untyped-def]
+        _ = customer_id_set
+        return {
+            100: {"customer_id": 100, "customer_name": "Alice"},
+            101: {"customer_id": 101, "customer_name": "Bob"},
+        }
+
+    def _load_products(product_id_set=None):  # type: ignore[no-untyped-def]
+        _ = product_id_set
+        return {
+            200: {"product_id": 200, "product_name": "A"},
+            201: {"product_id": 201, "product_name": "B"},
+        }
+
+    def _build_set_param(param_name: str):
+        def _builder(ctx):  # type: ignore[no-untyped-def]
+            return (), {param_name: set(ctx.lookup_keys or set())}
+
+        return _builder
+
+    bindings = RuntimeBindings()
+    bindings.main_source_loaders["orders"] = _load_orders
+    bindings.source_loaders["customers"] = _load_customers
+    bindings.source_loaders["products"] = _load_products
+    bindings.params_builders[("customers", "customer_id")] = _build_set_param("customer_id_set")
+    bindings.params_builders[("products", "product_id")] = _build_set_param("product_id_set")
+    return bindings
+
+
 def test_adaptive_capture_replay_replays_observer_events_on_main_thread_in_plan_order() -> None:
     from scalim.execution import ScalimEngine
 
     demand = _build_two_ref_plan()
+    runtime_bindings = _build_two_ref_runtime_bindings()
     plan = PlanBuilder(demand).build(targets=["order_id", "customer_name", "product_name"])
 
     expected: List[str] = []
@@ -185,7 +226,15 @@ def test_adaptive_capture_replay_replays_observer_events_on_main_thread_in_plan_
 
     observer = _LoaderCallObserver()
     manager = ObserverManager(observers=[observer])
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=10, parallel_mode="adaptive", max_workers=2, observer_manager=manager)
+    engine = ScalimEngine(
+        demand=demand,
+        plan=plan,
+        runtime_bindings=runtime_bindings,
+        batch_size=10,
+        parallel_mode="adaptive",
+        max_workers=2,
+        observer_manager=manager,
+    )
     rows = engine.run(
         main_rows=[
             {"order_id": 0, "customer_id": 100, "product_id": 200},
@@ -202,11 +251,20 @@ def test_adaptive_capture_overflow_is_diagnosable() -> None:
     from scalim.execution import ScalimEngine
 
     demand = _build_two_ref_plan()
+    runtime_bindings = _build_two_ref_runtime_bindings()
     plan = PlanBuilder(demand).build(targets=["order_id", "customer_name", "product_name"])
 
     observer = _LoaderCallObserver()
     manager = ObserverManager(observers=[observer], max_recorded_events=0, capture_overflow_policy="raise")
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=10, parallel_mode="adaptive", max_workers=2, observer_manager=manager)
+    engine = ScalimEngine(
+        demand=demand,
+        plan=plan,
+        runtime_bindings=runtime_bindings,
+        batch_size=10,
+        parallel_mode="adaptive",
+        max_workers=2,
+        observer_manager=manager,
+    )
 
     with pytest.raises(ScalimObserverCaptureOverflowError, match="capture recorded events overflow"):
         _ = engine.run(

@@ -1,4 +1,4 @@
-from typing import Dict, FrozenSet, List, Mapping, Optional, Union
+from typing import Dict, List, Mapping, Optional, Union
 
 from ....spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, SourceIr
 from .._internal.config_parsing.security import SecureComputeEngine
@@ -6,8 +6,7 @@ from ..schema_dsl.models import DemandConfig
 from ._internal.conversion_lookup import LookupCastRegistry, validate_source_id
 from ._internal.conversion_relations import StepInfo
 from ._internal.conversion_sources import ConfigToIRConversionSourceMixin
-from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimConversionError
-from .references import PythonReferenceResolver, SecurePythonReferenceResolver
+from .errors import ScalimConversionError
 
 
 def _validate_source_id(source_id: str, context: str) -> None:
@@ -20,9 +19,7 @@ del _non_public_exports
 
 
 class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
-    _resolver: Optional[PythonReferenceResolver]
     _compute_engine: Optional[SecureComputeEngine]
-    _lookup_casts: Optional[LookupCastRegistry]
     _sources_ir: Optional[Dict[str, SourceIr]]
     _main_source_ir: Optional[MainSourceIr]
     _relation_steps: Optional[Dict[str, List[StepInfo]]]
@@ -31,36 +28,13 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
     _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]]
     _init_vars: Optional[Mapping[str, object]]
 
-    @classmethod
-    def from_allowlist(
-        cls,
-        *,
-        allowed_modules: Optional[FrozenSet[str]] = None,
-        allowed_functions: Optional[FrozenSet[str]] = None,
-        compute_engine: Optional[SecureComputeEngine] = None,
-    ) -> "ConfigToIRConverter":
-        if not allowed_modules and not allowed_functions:
-            raise ScalimAllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
-        resolver = SecurePythonReferenceResolver(
-            allowed_modules=allowed_modules,
-            allowed_functions=allowed_functions,
-        )
-        return cls(resolver=resolver, compute_engine=compute_engine)
-
     def __init__(
         self,
-        resolver: Optional[PythonReferenceResolver] = None,
         compute_engine: Optional[SecureComputeEngine] = None,
         init_vars: Optional[Mapping[str, object]] = None,
     ) -> None:
-        resolved = resolver
-        if resolved is None or not resolved.has_allowlist():
-            raise ScalimAllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
-
-        self._resolver = resolved
         self._compute_engine = compute_engine or SecureComputeEngine()
         self._init_vars = init_vars
-        self._lookup_casts = LookupCastRegistry()
         self._sources_ir = {}
         self._main_source_ir = None
         self._relation_steps = {}

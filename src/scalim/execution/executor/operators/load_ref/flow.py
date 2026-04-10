@@ -150,7 +150,7 @@ def _apply_ref_extractor(
     data: object,
     transform_mode: str,
 ) -> object:
-    extractor = source.loader_spec.extractor
+    extractor = exec_ctx.runtime.runtime_bindings.get_loader_extractor(source.source_id)
     if extractor is None:
         return data
     try:
@@ -187,8 +187,9 @@ def _resolve_ref_field_value(
 
     data_key = field_spec.extract_expr or field_spec.data_key or field_key
     value: FieldValue = extract_field_segments(data, field_spec.extract_segments)
+    value_transform = exec_ctx.runtime.runtime_bindings.get_value_transform(field_spec.field_id)
     try:
-        return field_spec.apply_transform(value)
+        return value_transform(value) if value_transform is not None else value
     except Exception as exc:
         guardrails = exec_ctx.runtime.guardrails
         if not guardrails.enabled:

@@ -672,10 +672,15 @@ def _create_engine_with_cleanup(
     engine_factory: Optional[Callable[..., ScalimEngine]] = None,
 ) -> ScalimEngine:
     engine_cls = engine_factory or ScalimEngine
+    runtime_bindings = request.runtime_bindings
+    if runtime_bindings is None:
+        msg = "ExecutionRequest.runtime_bindings is required (missing runtime linking stage)"
+        raise ValueError(msg)
     try:
         return engine_cls(
             demand=demand_ir,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             hook_manager=hook_manager,
             observer_manager=observer_manager,
             guardrails=request.guardrails,

@@ -21,8 +21,15 @@ from scalim.ob.presets.logs import LoggingObserver
 from scalim.ob.presets.performance import PerformanceObserver
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan, PlanMetadata, Stage
-from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir import MainSourceIr
+from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.spec.ir import (
+    CallBySpecIr,
+    CallByValueIr,
+    DerivedFieldIr,
+    FieldIr,
+    MainSourceIr,
+    RuntimeHandleIdIr,
+)
 
 
 class _CaptureOnEventHook(BaseHook):
@@ -316,15 +323,27 @@ def test_hub_typed_helpers_return_when_unwanted() -> None:
 
 
 def _build_single_compute_plan() -> ExecutionPlan:
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.main_loader"))
     field_a = FieldIr(field_id="a", name="A", source=main_source)
     field_b = FieldIr(field_id="b", name="B", source=main_source)
-    derived_sum = DerivedFieldIr(field_id="sum", name="Sum", dependencies=("a", "b"), calculator=lambda a, b: a + b)  # type: ignore[no-any-return]
+    derived_sum = DerivedFieldIr(
+        field_id="sum",
+        name="Sum",
+        dependencies=("a", "b"),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.sum"),
+            args=(
+                CallByValueIr(kind="field", value="a"),
+                CallByValueIr(kind="field", value="b"),
+            ),
+            field_names=("a", "b"),
+        ),
+    )
 
     op = ComputeOperatorIr(
         operator_id="compute_sum",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=derived_sum,
+        field_key="sum",
         input_fields=("a", "b"),
     )
 
@@ -348,11 +367,18 @@ def _build_single_compute_plan() -> ExecutionPlan:
 
 def test_stage_span_timing_is_not_performed_when_unsubscribed() -> None:
     plan = _build_single_compute_plan()
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.main_loader"))
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.derived_calculators["sum"] = lambda a, b: a + b  # type: ignore[no-any-return]
 
     observer_manager = ObserverManager(observers=[LoggingObserver(logger=logging.getLogger("test"))], fallback_logger_enabled=False)
     runtime = ExecutionRuntime(
-        plan=plan, hook_manager=HookManager(fallback_logger_enabled=False), observer_manager=observer_manager, main_source=main_source
+        plan=plan,
+        hook_manager=HookManager(fallback_logger_enabled=False),
+        observer_manager=observer_manager,
+        main_source=main_source,
+        sources={},
+        runtime_bindings=runtime_bindings,
     )
 
     def _explode_perf_counter() -> float:

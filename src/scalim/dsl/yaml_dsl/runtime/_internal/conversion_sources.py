@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple
 
 from .....spec.ir import (
     DerivedFieldIr,
@@ -13,13 +13,21 @@ from .....spec.ir import (
     SourceNormalizeStepIr,
     SourceRefIr,
 )
+from .....spec.ir._fields import CallBySpecIr, CallByValueIr, ValueOpIr
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from .....typedefs import FieldValue, LoaderCallKwargs, RuntimeValue, SourceSpecIrCacheMode
-from ..._internal.config_parsing.call_by import CallByValue, ScalimCallByParseError, parse_call_by
+from .....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr
+from .....typedefs import FieldValue, SourceSpecIrCacheMode
+from ..._internal.config_parsing.call_by import ParsedCallBy, ScalimCallByParseError, parse_call_by
 from ..._internal.config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
 from ..._internal.config_parsing.security import SecureComputeEngine, is_constant_compute_expression
 from ...params_template import CompiledParamsTemplate, ScalimParamsTemplateCompileError, compile_params_template
+from ...reference_syntax import (
+    BUILTIN_CALLABLE_REFERENCE_PREFIX,
+    ScalimReferenceSyntaxError,
+    is_valid_builtin_callable_reference,
+    parse_python_reference,
+)
 from ...schema_dsl.models import (
     DemandConfig,
     DerivedFieldConfig,
@@ -31,19 +39,12 @@ from ...schema_dsl.models import (
     SourceFieldConfig,
 )
 from ..errors import ScalimConversionError
-from ..references import PythonReferenceResolver
-from .call_by_signature import validate_call_by_signature
-from .callable_preflight import (
-    validate_signature_accepts_any_candidate,
-    validate_signature_binds_kwargs_keys,
-)
 from .conversion_bindings import ConfigToIRConversionBindingMixin
 from .conversion_lookup import CALL_BY_CTX_KEY, validate_source_id
 from .conversion_relations import ConfigToIRConversionRelationMixin
 
 if TYPE_CHECKING:
     from .....spec.ir import LookupStepIr
-    from .....spec.ir.aliases import LoaderResultMapCallable, MainSourceRowIterableCallable
 
 
 _SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
@@ -52,7 +53,7 @@ _SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
     if value is None or isinstance(value, _SUPPORTED_FIELD_VALUE_TYPES):
         return value
-    msg = "Derived field '{}' {} returned unsupported type '{}'; expected int/float/Decimal/str/bool/None".format(
+    msg = "Derived field '{}' {} has unsupported value type '{}'; expected int/float/Decimal/str/bool/None".format(
         field_id,
         producer,
         type(value).__name__,
@@ -60,47 +61,64 @@ def _ensure_field_value(value: object, *, field_id: str, producer: str) -> Field
     raise TypeError(msg)
 
 
-def _require_call_by_context(field_values: Dict[str, RuntimeValue]) -> object:
-    ctx_value = field_values.get(CALL_BY_CTX_KEY)
-    if ctx_value is None:
-        msg = "call_by requires context, but '{}' is missing".format(CALL_BY_CTX_KEY)
-        raise ValueError(msg)
-    return ctx_value
+def _parse_callable_ref(reference: object, *, context_label: str) -> CallableRefIr:
+    raw = str(reference or "").strip()
+    if not raw:
+        msg = "{} must not be empty".format(context_label)
+        raise ScalimConversionError(msg)
+
+    if raw.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
+        if not is_valid_builtin_callable_reference(raw):
+            msg = "{} has invalid builtin callable reference: {!r}".format(context_label, raw)
+            raise ScalimConversionError(msg)
+        return BuiltinCallableIdIr(callable_id=raw[len(BUILTIN_CALLABLE_REFERENCE_PREFIX) :])
+
+    try:
+        parsed = parse_python_reference(raw)
+    except ScalimReferenceSyntaxError as exc:
+        raise ScalimConversionError(str(exc)) from None
+
+    return PythonReferenceIr(
+        reference=str(parsed.reference),
+        module_path=str(parsed.module_path),
+        attr_path=tuple(str(x) for x in parsed.attr_path),
+        style=str(parsed.style),
+    )
 
 
-def _resolve_call_by_ctx_attr(ctx: object, attr_name: str) -> RuntimeValue:
-    if not hasattr(ctx, attr_name):  # pragma: allow-dynattr dsl: call_by ctx attrs
-        msg = "call_by context missing attribute '{}'".format(attr_name)
-        raise AttributeError(msg)
-    return getattr(ctx, attr_name)  # pragma: allow-dynattr dsl: call_by ctx attrs
+def _convert_call_by_value_ir(value: object, *, field_id: str) -> CallByValueIr:
+    kind = getattr(value, "kind", None)  # pragma: allow-dynattr dsl: parsed call_by value contract
+    raw = getattr(value, "value", None)  # pragma: allow-dynattr dsl: parsed call_by value contract
+    kind_text = str(kind or "").strip()
+    if kind_text == "literal":
+        typed = _ensure_field_value(raw, field_id=field_id, producer="call_by literal")
+        return CallByValueIr(kind="literal", value=typed)
+    if kind_text == "field":
+        return CallByValueIr(kind="field", value=str(raw))
+    if kind_text == "ctx":
+        return CallByValueIr(kind="ctx", value="")
+    if kind_text == "ctx_attr":
+        return CallByValueIr(kind="ctx_attr", value=str(raw))
+    msg = "Derived field '{}' has unknown call_by value kind: {!r}".format(field_id, kind_text)
+    raise ScalimConversionError(msg)
 
 
-def _eval_call_by_value(*, field_id: str, value: CallByValue, field_values: Dict[str, RuntimeValue]) -> RuntimeValue:
-    kind = value.kind
-    if kind == "literal":
-        return _ensure_field_value(value.value, field_id=field_id, producer="call_by literal")
-    if kind == "field":
-        return field_values.get(str(value.value))
-    ctx = _require_call_by_context(field_values)
-    if kind == "ctx":
-        return ctx
-    if kind == "ctx_attr":
-        return _resolve_call_by_ctx_attr(ctx, str(value.value))
-    msg = "Unknown call_by value kind: {}".format(kind)  # pragma: no cover  # pragma: allow-no-cover invariant: exhaustive CallByValue kind
-    raise ValueError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: exhaustive CallByValue kind
+def _convert_parsed_call_by_spec(parsed: ParsedCallBy, *, field_id: str) -> CallBySpecIr:
+    ref = _parse_callable_ref(parsed.reference, context_label="derived_fields.{}.call_by reference".format(field_id))
+    args = tuple(_convert_call_by_value_ir(item, field_id=field_id) for item in parsed.args)
+    kwargs = tuple((str(key), _convert_call_by_value_ir(item, field_id=field_id)) for key, item in parsed.kwargs)
+    field_names = tuple(str(x) for x in parsed.field_names)
+    return CallBySpecIr(
+        reference=ref,
+        args=args,
+        kwargs=kwargs,
+        field_names=field_names,
+    )
 
 
 class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigToIRConversionRelationMixin):
-    _resolver: Optional[PythonReferenceResolver] = None
     _compute_engine: Optional[SecureComputeEngine] = None
     _init_vars: Optional[Mapping[str, object]] = None
-
-    def _require_resolver(self) -> PythonReferenceResolver:
-        resolver = self._resolver
-        if resolver is None:
-            msg = "Reference resolver is not initialized"
-            raise ScalimConversionError(msg)
-        return resolver
 
     def _require_compute_engine(self) -> SecureComputeEngine:
         compute_engine = self._compute_engine
@@ -124,10 +142,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "Main source 'loader' is required"
             raise ScalimConversionError(msg)
 
-        loader_fn = cast(  # pragma: allow-cast resolver callable typed narrowing
-            "MainSourceRowIterableCallable",
-            self._require_resolver().resolve(config.loader),
-        )
+        loader_ref = _parse_callable_ref(config.loader, context_label="main_source.loader")
         order_by = self._convert_main_source_order_by(config.order_by)
 
         init_vars = self._init_vars
@@ -142,22 +157,13 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         except ScalimParamsTemplateCompileError as exc:
             raise ScalimConversionError(str(exc)) from exc
 
-        # 编译期预检查: 仅基于顶层 `kwargs` 键做签名绑定校验(当签名可 `introspect` 时)。
-        validate_signature_binds_kwargs_keys(
-            location="main_source.params",
-            reference=str(config.loader),
-            fn=loader_fn,
-            kwargs_keys=template.top_level_mapping_string_keys(),
-            hint="main_source.params 的 kwargs keys 必须能绑定到 main_source.loader 的函数签名 (当可 introspect 时)",
-        )
-
-        params: LoaderCallKwargs = {}
+        params: Dict[str, object] = {}
         if not template.is_empty_mapping():
             params = template.render_kwargs(_build_main_source_context(config.source_id), path="main_source.params")
 
         return MainSourceIr(
             source_id=config.source_id,
-            loader=loader_fn,
+            loader_ref=loader_ref,
             params=params,
             order_by=order_by,
         )
@@ -178,21 +184,17 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
     def _convert_source(self, source_config: SourceConfig) -> SourceIr:
         validate_source_id(source_config.source_id, "Source")
-        loader_fn = cast(  # pragma: allow-cast resolver callable typed narrowing
-            "LoaderResultMapCallable",
-            self._require_resolver().resolve(source_config.loader),
-        )
+        loader_ref = _parse_callable_ref(source_config.loader, context_label="sources.{}.loader".format(source_config.source_id))
 
-        lookup_cast_fn = None
+        lookup_cast_spec = None
         if source_config.lookup_cast is not None:
-            is_multi = isinstance(source_config.key, tuple)
-            lookup_cast_fn = self._get_lookup_cast_fn(source_config.lookup_cast, is_multi=is_multi)
+            lookup_cast_spec = self._get_lookup_cast_spec(source_config.lookup_cast)
 
-        key_ir = KeyIr(key=source_config.key, cast=lookup_cast_fn)
+        key_ir = KeyIr(key=source_config.key, cast=lookup_cast_spec)
 
         normalize_ir = self._convert_source_normalize(source_config)
 
-        loader_ir = self._make_loader_ir(callable_ref=loader_fn)
+        loader_ir = self._make_loader_ir(callable_ref=loader_ref)
 
         cache_mode = SourceSpecIrCacheMode.NONE
         if source_config.cache_mode == "preload_forever":
@@ -200,7 +202,6 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         bind_ir = self._binding_from_params_template(
             source_config,
-            loader_fn=loader_fn,
             cache_mode=cache_mode,
         )
 
@@ -229,28 +230,28 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(source_id)
             raise ScalimConversionError(msg)
 
-        call_by_fn = self._convert_source_normalize_call_by_fn(norm, source_id=source_id)
+        call_by_ref = self._convert_source_normalize_call_by_ref(norm, source_id=source_id)
 
         if kind == "index_by_key":
-            return self._convert_source_normalize_index_by_key(source_config, norm=norm, call_by_fn=call_by_fn)
+            return self._convert_source_normalize_index_by_key(source_config, norm=norm, call_by_ref=call_by_ref)
         if kind == "take_first":
-            return self._convert_source_normalize_take_first(source_id=source_id, norm=norm, call_by_fn=call_by_fn)
+            return self._convert_source_normalize_take_first(source_id=source_id, norm=norm, call_by_ref=call_by_ref)
         if kind == "project_fields":
-            return self._convert_source_normalize_project_fields(source_id=source_id, norm=norm, call_by_fn=call_by_fn)
+            return self._convert_source_normalize_project_fields(source_id=source_id, norm=norm, call_by_ref=call_by_ref)
         if kind == "map_values":
-            return self._convert_source_normalize_map_values(source_id=source_id, norm=norm, call_by_fn=call_by_fn)
+            return self._convert_source_normalize_map_values(source_id=source_id, norm=norm, call_by_ref=call_by_ref)
 
         msg = "sources.{}.normalize.kind must be one of: index_by_key/take_first/project_fields/map_values".format(
             source_id
         )  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
         raise ScalimConversionError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: normalize kind validated above
 
-    def _convert_source_normalize_call_by_fn(
+    def _convert_source_normalize_call_by_ref(
         self,
         norm: NormalizeConfig,
         *,
         source_id: str,
-    ) -> Optional[Callable[..., object]]:
+    ) -> Optional[CallableRefIr]:
         if norm.call_by is None:
             return None
 
@@ -258,40 +259,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         if not call_by_ref:
             msg = "sources.{}.normalize.call_by must not be empty".format(source_id)
             raise ScalimConversionError(msg)
-        try:
-            fn = cast(  # pragma: allow-cast resolver callable typed narrowing
-                "Callable[..., object]",
-                self._require_resolver().resolve(call_by_ref),
-            )
-        except Exception as exc:
-            msg = "sources.{}.normalize.call_by failed to resolve reference '{}': {}".format(source_id, call_by_ref, str(exc))
-            raise ScalimConversionError(msg) from exc
-
-        # `normalize.call_by` 固定约束: 至少接受 `result` 位置参数,可选 `ctx`.
-        placeholder_result = object()
-        placeholder_ctx = object()
-        empty_kwargs: Dict[str, object] = {}
-        candidates = (
-            ("normalize.call_by(result, ctx)", (placeholder_result, placeholder_ctx), empty_kwargs),
-            ("normalize.call_by(result, ctx=ctx)", (placeholder_result,), {"ctx": placeholder_ctx}),
-            ("normalize.call_by(result)", (placeholder_result,), empty_kwargs),
-        )
-        validate_signature_accepts_any_candidate(
-            location="sources.{}.normalize.call_by".format(source_id),
-            reference=call_by_ref,
-            fn=fn,
-            candidates=candidates,
-            hint="normalize.call_by 必须至少接受 1 个位置参数 `result`, 并可选接受 `ctx` (第二位置参数或关键字参数)",
-        )
-
-        return fn
+        return _parse_callable_ref(call_by_ref, context_label="sources.{}.normalize.call_by".format(source_id))
 
     def _convert_source_normalize_index_by_key(
         self,
         source_config: SourceConfig,
         *,
         norm: NormalizeConfig,
-        call_by_fn: Optional[Callable[..., object]],
+        call_by_ref: Optional[CallableRefIr],
     ) -> SourceNormalizeIr:
         source_id = source_config.source_id
 
@@ -327,7 +302,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             key_field=key_field,
             on_conflict=on_conflict,
             on_none=on_none,
-            call_by=call_by_fn,
+            call_by_ref=call_by_ref,
         )
 
     def _convert_source_normalize_take_first(
@@ -335,20 +310,20 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         *,
         source_id: str,
         norm: NormalizeConfig,
-        call_by_fn: Optional[Callable[..., object]],
+        call_by_ref: Optional[CallableRefIr],
     ) -> SourceNormalizeIr:
         on_empty = str(norm.on_empty or "miss").strip() or "miss"
         if on_empty not in {"miss", "null", "error"}:
             msg = "sources.{}.normalize.on_empty must be one of: miss/null/error".format(source_id)
             raise ScalimConversionError(msg)
-        return SourceNormalizeIr(kind="take_first", on_empty=on_empty, call_by=call_by_fn)
+        return SourceNormalizeIr(kind="take_first", on_empty=on_empty, call_by_ref=call_by_ref)
 
     def _convert_source_normalize_project_fields(
         self,
         *,
         source_id: str,
         norm: NormalizeConfig,
-        call_by_fn: Optional[Callable[..., object]],
+        call_by_ref: Optional[CallableRefIr],
     ) -> SourceNormalizeIr:
         on_missing = str(norm.on_missing or "error").strip() or "error"
         if on_missing not in {"error", "null"}:
@@ -359,14 +334,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             norm.fields,
             config_path="sources.{}.normalize.fields".format(source_id),
         )
-        return SourceNormalizeIr(kind="project_fields", fields=fields, on_missing=on_missing, call_by=call_by_fn)
+        return SourceNormalizeIr(kind="project_fields", fields=fields, on_missing=on_missing, call_by_ref=call_by_ref)
 
     def _convert_source_normalize_map_values(
         self,
         *,
         source_id: str,
         norm: NormalizeConfig,
-        call_by_fn: Optional[Callable[..., object]],
+        call_by_ref: Optional[CallableRefIr],
     ) -> SourceNormalizeIr:
         steps = norm.steps
         if not steps:
@@ -377,7 +352,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         for idx, step in enumerate(steps):
             converted_steps.append(self._convert_source_normalize_step(step, source_id=source_id, idx=idx))
 
-        return SourceNormalizeIr(kind="map_values", steps=tuple(converted_steps), call_by=call_by_fn)
+        return SourceNormalizeIr(kind="map_values", steps=tuple(converted_steps), call_by_ref=call_by_ref)
 
     def _convert_source_normalize_step(
         self,
@@ -464,7 +439,6 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         self,
         source_config: SourceConfig,
         *,
-        loader_fn: "LoaderResultMapCallable",
         cache_mode: SourceSpecIrCacheMode,
     ) -> Optional["BindingIr"]:
         init_vars = self._init_vars
@@ -483,23 +457,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         if template.is_empty_mapping():
             return None
 
-        # 编译期预检查: 仅基于顶层 `kwargs` 键做签名绑定校验(当签名可 `introspect` 时)。
-        validate_signature_binds_kwargs_keys(
-            location="sources.{}.params".format(source_config.source_id),
-            reference=str(source_config.loader),
-            fn=loader_fn,
-            kwargs_keys=template.top_level_mapping_string_keys(),
-            hint="sources.*.params 的 kwargs keys 必须能绑定到 sources.*.loader 的函数签名 (当可 introspect 时)",
-        )
-
         return _binding_from_compiled_params_template(
             template,
             key_field=source_config.key,
             path="sources.{}.params".format(source_config.source_id),
         )
 
-    def _make_loader_ir(self, callable_ref: "LoaderResultMapCallable") -> LoaderIr:
-        return LoaderIr(callable=callable_ref, bindings={})
+    def _make_loader_ir(self, callable_ref: CallableRefIr) -> LoaderIr:
+        return LoaderIr(callable_ref=callable_ref, bindings={})
 
     def _resolve_field_source(self, *, from_source_id: str, field_id: str) -> SourceRefIr:
         if self._main_source_ir is not None and from_source_id == self._main_source_ir.source_id:
@@ -533,9 +498,9 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         source_ir = self._resolve_field_source(from_source_id=from_source_id, field_id=field_config.field_id)
 
-        transform: Optional[Callable[[FieldValue], FieldValue]] = None
+        value_ops: Tuple[ValueOpIr, ...] = ()
         if field_config.value_cast:
-            transform = self._get_value_cast_fn(field_config.value_cast)
+            value_ops = (self._get_value_cast_op(field_config.value_cast),)
 
         lookup_steps: Optional[Tuple["LookupStepIr", ...]] = None
         if isinstance(source_ir, SourceIr):
@@ -549,37 +514,31 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             extract_expr=extract_expr,
             extract_segments=extract_segments,
             is_primary=False,
-            transform=transform,
+            value_ops=value_ops,
             relation=None,
             lookup_steps=lookup_steps,
         )
 
-    def _wrap_compute_calculator(
-        self,
-        *,
-        field_id: str,
-        raw_calculator: Callable[..., object],
-    ) -> Callable[..., FieldValue]:
-        def calculator(*args: FieldValue, **field_values: FieldValue) -> FieldValue:
-            result = raw_calculator(*args, **field_values)
-            return _ensure_field_value(result, field_id=field_id, producer="compute")
-
-        return calculator
-
     def _convert_derived_field(self, derived_config: DerivedFieldConfig) -> DerivedFieldIr:
         call_ctx_key: Optional[str] = None
         is_constant_compute = False
-        calculator: Callable[..., FieldValue]
+        compute_expr = ""
+        call_by_spec: Optional[CallBySpecIr] = None
+
         if derived_config.compute:
-            raw_calculator = cast(  # pragma: allow-cast compute engine compile typed narrowing
-                "Callable[..., object]",
-                self._require_compute_engine().compile(derived_config.compute, derived_config.depends_on),
-            )
-            calculator = self._wrap_compute_calculator(field_id=derived_config.field_id, raw_calculator=raw_calculator)
-            if not derived_config.depends_on and is_constant_compute_expression(derived_config.compute):
+            compute_expr = str(derived_config.compute or "").strip()
+            # 静态校验: 不产生用户导入,仅验证表达式语法与安全约束.
+            _ = self._require_compute_engine().compile(compute_expr, derived_config.depends_on)
+            if not derived_config.depends_on and is_constant_compute_expression(compute_expr):
                 is_constant_compute = True
         elif derived_config.call_by:
-            calculator = self._compile_call_by(field_id=derived_config.field_id, call_by=derived_config.call_by)
+            try:
+                parsed = parse_call_by(derived_config.call_by)
+            except ScalimCallByParseError as exc:
+                msg = "Derived field '{}' has invalid call_by: {}".format(derived_config.field_id, exc)
+                raise ScalimConversionError(msg) from exc
+
+            call_by_spec = _convert_parsed_call_by_spec(parsed, field_id=derived_config.field_id)
             call_ctx_key = CALL_BY_CTX_KEY
         else:
             msg = "Derived field '{}' must declare 'compute' or 'call_by'".format(derived_config.field_id)
@@ -589,47 +548,11 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             field_id=derived_config.field_id,
             name=derived_config.name,
             dependencies=derived_config.depends_on,
-            calculator=calculator,
+            compute_expr=compute_expr,
+            call_by=call_by_spec,
             call_ctx_key=call_ctx_key,
             is_constant_compute=is_constant_compute,
         )
-
-    def _compile_call_by(self, *, field_id: str, call_by: str) -> Callable[..., FieldValue]:
-        try:
-            parsed = parse_call_by(call_by)
-        except ScalimCallByParseError as exc:
-            msg = "Derived field '{}' has invalid call_by: {}".format(field_id, exc)
-            raise ScalimConversionError(msg) from exc
-
-        try:
-            fn = cast(  # pragma: allow-cast resolver callable typed narrowing
-                "Callable[..., object]",
-                self._require_resolver().resolve(parsed.reference),
-            )
-        except Exception as exc:
-            msg = "Derived field '{}' failed to resolve call_by reference '{}': {}".format(field_id, parsed.reference, exc)
-            raise ScalimConversionError(msg) from exc
-
-        validate_call_by_signature(
-            location="派生字段 '{}'".format(field_id),
-            call_by=call_by,
-            parsed=parsed,
-            fn=fn,
-        )
-
-        def calculator(**field_values: RuntimeValue) -> FieldValue:
-            args: List[RuntimeValue] = []
-            for arg_value in parsed.args:
-                args.append(_eval_call_by_value(field_id=field_id, value=arg_value, field_values=field_values))
-
-            kwargs: Dict[str, RuntimeValue] = {}
-            for key, kw_value in parsed.kwargs:
-                kwargs[key] = _eval_call_by_value(field_id=field_id, value=kw_value, field_values=field_values)
-
-            result = fn(*args, **kwargs)
-            return _ensure_field_value(result, field_id=field_id, producer="call_by")
-
-        return calculator
 
 
 def _build_main_source_context(source_id: str) -> LoaderCallContextIr:
@@ -652,18 +575,14 @@ def _binding_from_compiled_params_template(
     elif template.directive_mode == "keys":
         as_mode = template.keys_as
 
-    def _builder(
-        ctx: LoaderCallContextIr, tmpl: CompiledParamsTemplate = template, p: str = path
-    ) -> Tuple[Tuple[RuntimeValue, ...], LoaderCallKwargs]:
-        return (), tmpl.render_kwargs(ctx, path=p)
-
     return BindingIr(
         key_field=key_field,
-        params_builder=_builder,
+        params_template=template,
         mode=mode,
         as_=as_mode,
         cache_mode=cache_mode,
         param_name=None,
+        template_path=path,
     )
 
 

@@ -27,11 +27,13 @@ def test_run_multi_root_workbook_writes_two_demands(tmp_path: Path) -> None:
         export_layout=ExportLayout(field_ids=("order_id", "amount"), header_names=None),
         output=OutputSpec(path=None),
         sink=None,
+        runtime_bindings=case_a.runtime_bindings,
     )
     req_b = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id", "customer_name"), header_names=None),
         output=OutputSpec(path=None),
         sink=None,
+        runtime_bindings=case_b.runtime_bindings,
     )
 
     results = run_multi_root_workbook(
@@ -71,7 +73,12 @@ class _FakeWorkbookSink:
 
 def test_run_multi_root_workbook_rejects_unknown_failure_policy(tmp_path: Path) -> None:
     case = build_minimal_ir_case()
-    req = ExecutionRequest(export_layout=ExportLayout(field_ids=("order_id",), header_names=None), output=OutputSpec(path=None), sink=None)
+    req = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=None,
+        runtime_bindings=case.runtime_bindings,
+    )
     with pytest.raises(ValueError, match="Unsupported failure_policy"):
         _ = run_multi_root_workbook(output_path=str(tmp_path / "x.xlsx"), runs=(("S", case.demand, req),), failure_policy="bad")
 
@@ -85,7 +92,12 @@ def test_run_multi_root_workbook_all_fail_wraps_sheet_error(monkeypatch, tmp_pat
     monkeypatch.setattr(wm_mod, "run_ir", _boom)
 
     case = build_minimal_ir_case()
-    req = ExecutionRequest(export_layout=ExportLayout(field_ids=("order_id",), header_names=None), output=OutputSpec(path=None), sink=None)
+    req = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=None,
+        runtime_bindings=case.runtime_bindings,
+    )
 
     with pytest.raises(wm_mod.ScalimMultiRootWorkbookRunError, match="Workbook sheet run failed"):
         _ = run_multi_root_workbook(output_path=str(tmp_path / "x.xlsx"), runs=(("SheetA", case.demand, req),), failure_policy="all_fail")
@@ -108,7 +120,12 @@ def test_run_multi_root_workbook_primary_only_continues_and_returns_results(monk
 
     case_a = build_minimal_ir_case()
     case_b = build_minimal_ir_case()
-    req = ExecutionRequest(export_layout=ExportLayout(field_ids=("order_id",), header_names=None), output=OutputSpec(path=None), sink=None)
+    req = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=None,
+        runtime_bindings=case_a.runtime_bindings,
+    )
 
     results = run_multi_root_workbook(
         output_path=str(tmp_path / "x.xlsx"),

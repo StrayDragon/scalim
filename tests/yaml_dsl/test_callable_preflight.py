@@ -5,10 +5,12 @@ import pytest
 
 from scalim.dsl.yaml_dsl import RunOptions, compile
 from scalim.dsl.yaml_dsl.params_template import CompiledParamsTemplate, LiteralNode
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
 from scalim.dsl.yaml_dsl.runtime._internal.callable_preflight import ScalimCallablePreflightError
 from scalim.dsl.yaml_dsl.runtime._internal.callable_preflight import (
     format_signature_bind_mismatch_message,
     validate_signature_accepts_any_candidate,
+    validate_signature_binds_kwargs_keys,
 )
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 
@@ -37,7 +39,7 @@ sources:
       call_by: "tests.fixtures.callable_preflight_mod:norm_kwonly_result"
 """
     yaml_path = _write(tmp_path, yaml_text)
-    with pytest.raises(ScalimCallablePreflightError) as excinfo:
+    with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
             options=RunOptions(
@@ -52,6 +54,18 @@ sources:
     msg = str(excinfo.value)
     assert "sources.s1.normalize.call_by" in msg
     assert "函数签名不匹配" in msg
+
+
+def test_validate_signature_binds_kwargs_keys_noops_on_empty_keys() -> None:
+    def _fn(**_kwargs):  # type: ignore[no-untyped-def]
+        return None
+
+    validate_signature_binds_kwargs_keys(
+        location="case",
+        reference="demo.fn",
+        fn=_fn,
+        kwargs_keys=(),
+    )
 
 
 @pytest.mark.parametrize(
@@ -110,9 +124,9 @@ sources:
     key: id
     params:
       bad_key: 1
-"""
+    """
     yaml_path = _write(tmp_path, yaml_text)
-    with pytest.raises(ScalimCallablePreflightError) as excinfo:
+    with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
             options=RunOptions(
@@ -144,9 +158,9 @@ sources:
     key: id
     params:
       field_keys: ["id"]
-"""
+    """
     yaml_path = _write(tmp_path, yaml_text)
-    with pytest.raises(ScalimCallablePreflightError) as excinfo:
+    with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
             options=RunOptions(
@@ -174,9 +188,9 @@ main_source:
   fields:
     order_id:
       extract: order_id
-"""
+    """
     yaml_path = _write(tmp_path, yaml_text)
-    with pytest.raises(ScalimCallablePreflightError) as excinfo:
+    with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
             options=RunOptions(

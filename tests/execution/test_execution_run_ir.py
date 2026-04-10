@@ -7,15 +7,14 @@ from scalim.events import EVENT_DIAGNOSTIC_WARNING
 from scalim.events import Event
 from scalim.execution.output_composition import OutputCompositionSpec, OutputTargetSpec
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.ob.observer import Observer
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim.sinks import BaseRowSink, BaseSink, IColumnSink, IRowSink
 from scalim.sinks import ColumnCSVSink
 from scalim.sinks import InMemoryColumnSink, InMemoryListSink, InMemoryRowSink
 from scalim.sinks._internal.rows import InMemoryRows
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import FieldIr
-from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 from scalim._internal.warningsx import ScalimExperimentalWarning
 from scalim.vendor.compact.typing_extensionsx import override
 
@@ -42,7 +41,7 @@ def test_tee_row_sink_write_batch_writes_to_both_sinks() -> None:
 
 
 def test_export_layout_from_demand_ir_skips_unknown_fields_when_building_name_map() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -88,7 +87,8 @@ def test_create_file_sink_rejects_unknown_format(tmp_path: Path) -> None:
 
 
 def test_run_ir_registers_viz_observer_and_writes_artifacts(tmp_path: Path) -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -101,6 +101,7 @@ def test_run_ir_registers_viz_observer_and_writes_artifacts(tmp_path: Path) -> N
         output=OutputSpec(),
         sink=sink,
         observability=ObservabilitySpec(viz_config=VizObserverConfig(output_path=str(events_path), snapshot_path=str(snapshot_path))),
+        runtime_bindings=runtime_bindings,
     )
 
     result = run_ir(demand_ir, request)
@@ -111,7 +112,8 @@ def test_run_ir_registers_viz_observer_and_writes_artifacts(tmp_path: Path) -> N
 
 
 def test_run_ir_total_rows_counts_even_without_output_or_sink() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}, {"order_id": 2}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}, {"order_id": 2}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -119,6 +121,7 @@ def test_run_ir_total_rows_counts_even_without_output_or_sink() -> None:
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
         sink=None,
+        runtime_bindings=runtime_bindings,
     )
     result = run_ir(demand_ir, request)
     assert result.total_rows == 2
@@ -129,7 +132,8 @@ def test_run_ir_passes_main_rows_to_engine_and_bypasses_loader() -> None:
     def _load_main_should_not_be_called():  # type: ignore[no-untyped-def]
         raise RuntimeError("loader should not be called")
 
-    main_source = MainSourceIr(source_id="orders", loader=_load_main_should_not_be_called)
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": _load_main_should_not_be_called})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -139,6 +143,7 @@ def test_run_ir_passes_main_rows_to_engine_and_bypasses_loader() -> None:
         output=OutputSpec(path=None),
         sink=sink,
         main_rows=[{"order_id": 1}, {"order_id": 2}],
+        runtime_bindings=runtime_bindings,
     )
     result = run_ir(demand_ir, request)
     assert sink.get_data() == [{"order_id": 1}, {"order_id": 2}]
@@ -146,7 +151,8 @@ def test_run_ir_passes_main_rows_to_engine_and_bypasses_loader() -> None:
 
 
 def test_run_ir_can_capture_in_memory_rows_without_output_or_sink() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}, {"order_id": 2}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}, {"order_id": 2}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -155,6 +161,7 @@ def test_run_ir_can_capture_in_memory_rows_without_output_or_sink() -> None:
         output=OutputSpec(path=None),
         sink=None,
         capture_in_memory_rows=True,
+        runtime_bindings=runtime_bindings,
     )
     result = run_ir(demand_ir, request)
     assert result.total_rows == 2
@@ -164,7 +171,8 @@ def test_run_ir_can_capture_in_memory_rows_without_output_or_sink() -> None:
 
 
 def test_run_ir_capture_in_memory_rows_uses_plan_target_fields_when_output_composition_enabled() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}, {"order_id": 2}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}, {"order_id": 2}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -186,6 +194,7 @@ def test_run_ir_capture_in_memory_rows_uses_plan_target_fields_when_output_compo
         sink=None,
         output_composition=output_composition,
         capture_in_memory_rows=True,
+        runtime_bindings=runtime_bindings,
     )
     result = run_ir(demand_ir, request)
     assert result.total_rows == 2
@@ -228,7 +237,8 @@ def test_prepare_engine_sink_closes_sink_and_observer_manager_on_capture_error()
 
 
 def test_run_ir_rejects_unknown_key_normalization() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -237,6 +247,7 @@ def test_run_ir_rejects_unknown_key_normalization() -> None:
         output=OutputSpec(path=None),
         sink=InMemoryListSink(),
         key_normalization="nope",  # type: ignore[arg-type]
+        runtime_bindings=runtime_bindings,
     )
     with pytest.raises(ValueError, match="Invalid key_normalization"):
         _ = run_ir(demand_ir, request)
@@ -251,7 +262,8 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
         def on_event(self, event: Event) -> None:
             self.events.append(event)
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -262,6 +274,7 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
         sink=InMemoryListSink(),
         components=[observer],
         key_normalization="auto_str",  # type: ignore[arg-type]
+        runtime_bindings=runtime_bindings,
     )
 
     _ = run_ir(demand_ir, request)
@@ -277,7 +290,8 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
 
 
 def test_run_ir_experimental_warning_is_visible_by_default_when_key_normalization_enabled() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -286,6 +300,7 @@ def test_run_ir_experimental_warning_is_visible_by_default_when_key_normalizatio
         output=OutputSpec(path=None),
         sink=InMemoryListSink(),
         key_normalization="auto_str",  # type: ignore[arg-type]
+        runtime_bindings=runtime_bindings,
     )
 
     with pytest.warns(ScalimExperimentalWarning) as record:
@@ -311,7 +326,8 @@ def test_run_ir_closes_sink_on_exception() -> None:
         def close(self) -> None:
             self.closed = True
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -320,6 +336,7 @@ def test_run_ir_closes_sink_on_exception() -> None:
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
         sink=sink,
+        runtime_bindings=runtime_bindings,
     )
 
     with pytest.raises(RuntimeError, match="boom"):
@@ -342,7 +359,8 @@ def test_run_ir_raises_when_sink_close_fails_after_successful_run() -> None:
             self.closed = True
             raise RuntimeError("close boom")
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -351,6 +369,7 @@ def test_run_ir_raises_when_sink_close_fails_after_successful_run() -> None:
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
         sink=sink,
+        runtime_bindings=runtime_bindings,
     )
 
     with pytest.raises(RuntimeError, match="close boom"):
@@ -374,7 +393,8 @@ def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
             self.closed = True
             raise RuntimeError("close boom")
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -383,6 +403,7 @@ def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
         sink=sink,
+        runtime_bindings=runtime_bindings,
     )
 
     with pytest.raises(RuntimeError, match="run boom"):
@@ -483,7 +504,8 @@ def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
         def close(self) -> None:
             self.closed = True
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [{"order_id": 1}])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
@@ -495,6 +517,7 @@ def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
         output=OutputSpec(path=None),
         sink=sink,
         components=[observer],
+        runtime_bindings=runtime_bindings,
     )
 
     with pytest.raises(RuntimeError, match="init boom"):

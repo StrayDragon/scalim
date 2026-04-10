@@ -1,11 +1,12 @@
 from typing import Any, Dict, List, Optional
 
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.guardrails import GuardrailsPolicy
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir import MainSourceIr, RuntimeHandleIdIr
 
 
 class _CaptureHook(BaseHook):
@@ -65,7 +66,7 @@ class _Target(object):
 
 
 def _make_main_source(source_id: str = "orders") -> MainSourceIr:
-    return MainSourceIr(source_id=source_id, loader=lambda: [])
+    return MainSourceIr(source_id=source_id, loader_ref=RuntimeHandleIdIr("main_source:{}".format(source_id)))
 
 
 def _raise_value_error(_value):  # type: ignore[no-untyped-def]
@@ -81,12 +82,28 @@ def _make_runtime(
     main_source: Optional[MainSourceIr],
     hook_manager: Optional[HookManager] = None,
     observer_manager: Optional[ObserverManager] = None,
+    sources: Optional[Dict[str, object]] = None,
+    runtime_bindings: Optional[RuntimeBindings] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     key_normalization: str = "raw",
 ) -> ExecutionRuntime:
     hook_manager = hook_manager or HookManager()
     observer_manager = observer_manager or ObserverManager()
-    return ExecutionRuntime(plan, hook_manager, observer_manager, main_source, guardrails=guardrails, key_normalization=key_normalization)  # type: ignore[arg-type]
+    runtime_bindings = runtime_bindings or RuntimeBindings()
+    if main_source is not None and str(main_source.source_id) not in runtime_bindings.main_source_loaders:
+        runtime_bindings.main_source_loaders[str(main_source.source_id)] = lambda: []
+
+    typed_sources = sources or {}
+    return ExecutionRuntime(
+        plan=plan,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        main_source=main_source,
+        sources=typed_sources,  # type: ignore[arg-type]
+        runtime_bindings=runtime_bindings,
+        guardrails=guardrails,
+        key_normalization=key_normalization,
+    )
 
 
 class _WantsInstrumentation(object):
@@ -102,9 +119,15 @@ class _WantsInstrumentation(object):
 
 
 class _Runtime(object):
-    def __init__(self, instrumentation: _WantsInstrumentation, batch_num: int = 1) -> None:
+    def __init__(
+        self,
+        instrumentation: _WantsInstrumentation,
+        batch_num: int = 1,
+        runtime_bindings: Optional[RuntimeBindings] = None,
+    ) -> None:
         self.instrumentation = instrumentation
         self.batch_num = batch_num
+        self.runtime_bindings = runtime_bindings or RuntimeBindings()
 
 
 __all__ = [

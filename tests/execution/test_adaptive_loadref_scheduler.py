@@ -7,15 +7,15 @@ from scalim.execution.adaptive import loadref_scheduler
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.pipeline.overrides import PipelineOverrides
 from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir import FieldIr
 from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 from scalim.utils.relation_signature import has_rows_binding
 from tests.support.testing_utils import InlineExecutor, NoOpLoadRefExecutor, RecordingLoadRefExecutor
 
@@ -45,22 +45,43 @@ def _make_loadref_op(
     to_source: SourceIr,
     lookup_steps: Tuple[LookupStepIr, ...],
 ) -> LoadRefOperatorIr:
-    field_spec = FieldIr(field_id=field_key, name=field_key, source=to_source)
     return LoadRefOperatorIr(
         operator_id="load_ref_{}".format(field_key),
         operator_type=OperatorType.LOAD_REF.value,
-        source=to_source,
+        source_id=to_source.source_id,
         field_key=field_key,
-        field_spec=field_spec,
         lookup_steps=lookup_steps,
     )
 
 
-def test_has_rows_binding_handles_missing_and_rows() -> None:
-    no_binding_source = SourceIr(source_id="s0", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+def _make_runtime(plan: ExecutionPlan, *, main_source=None, sources=None, runtime_bindings: RuntimeBindings = None) -> ExecutionRuntime:  # type: ignore[assignment]
+    return ExecutionRuntime(
+        plan,
+        HookManager(),
+        ObserverManager(),
+        main_source=main_source,
+        sources=sources or {},
+        runtime_bindings=runtime_bindings or RuntimeBindings(),
+    )
 
-    rows_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="rows")
-    rows_binding_source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+
+def test_has_rows_binding_handles_missing_and_rows() -> None:
+    no_binding_source = SourceIr(
+        source_id="s0",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s0.loader")),
+    )
+
+    rows_binding = BindingIr(
+        key_field="id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="s1.id.rows_binding"),
+        mode="rows",
+    )
+    rows_binding_source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
 
     op = _make_loadref_op(
         field_key="x",
@@ -79,7 +100,7 @@ def test_adaptive_scheduler_repr_and_empty_ops_returns() -> None:
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
     assert "AdaptiveLoadRefScheduler" in repr(scheduler)
 
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
     scheduler.execute_segment(
         [],
         context=BatchContext(),
@@ -93,8 +114,16 @@ def test_adaptive_scheduler_repr_and_empty_ops_returns() -> None:
 
 
 def test_adaptive_scheduler_rows_barrier_serializes_and_calls_after_operator() -> None:
-    rows_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="rows")
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    rows_binding = BindingIr(
+        key_field="id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="s1.id.rows_binding"),
+        mode="rows",
+    )
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
 
     op_rows = _make_loadref_op(
         field_key="rows",
@@ -111,7 +140,7 @@ def test_adaptive_scheduler_rows_barrier_serializes_and_calls_after_operator() -
         operators=(op_rows, op_keys),
         ref_loader_sequence=[(source, [("rows", ()), ("keys", ())])],
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = _make_runtime(plan, main_source=None)
 
     calls: List[str] = []
 
@@ -140,7 +169,11 @@ def test_adaptive_scheduler_rows_barrier_serializes_and_calls_after_operator() -
 
 
 def test_adaptive_scheduler_serial_fallback_executes_and_calls_after_operator() -> None:
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
     op1 = _make_loadref_op(
         field_key="a",
         to_source=source,
@@ -156,7 +189,7 @@ def test_adaptive_scheduler_serial_fallback_executes_and_calls_after_operator() 
         operators=(op1, op2),
         ref_loader_sequence=[(source, [("a", ()), ("b", ())])],
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = _make_runtime(plan, main_source=None)
 
     calls: List[str] = []
 
@@ -201,8 +234,16 @@ def test_adaptive_scheduler_exception_propagates_and_cancels_futures_best_effort
                 fut.set_exception(e)
             return fut
 
-    source_ok = SourceIr(source_id="s_ok", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
-    source_boom = SourceIr(source_id="s_boom", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source_ok = SourceIr(
+        source_id="s_ok",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s_ok.loader")),
+    )
+    source_boom = SourceIr(
+        source_id="s_boom",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s_boom.loader")),
+    )
     op1 = _make_loadref_op(
         field_key="ok",
         to_source=source_ok,
@@ -218,7 +259,7 @@ def test_adaptive_scheduler_exception_propagates_and_cancels_futures_best_effort
         operators=(op1, op2),
         ref_loader_sequence=[(source_ok, [("ok", ())]), (source_boom, [("boom", ())])],
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = _make_runtime(plan, main_source=None)
 
     class _BoomExecutor:
         def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
@@ -257,7 +298,11 @@ def test_adaptive_scheduler_skips_relation_already_executed_but_calls_after_oper
             fut.set_result(fn(*args, **kwargs))
             return fut
 
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
     steps = (LookupStepIr(from_field="id", to_source=source),)
     op1 = _make_loadref_op(field_key="a", to_source=source, lookup_steps=steps)
     op2 = _make_loadref_op(field_key="b", to_source=source, lookup_steps=steps)
@@ -266,7 +311,7 @@ def test_adaptive_scheduler_skips_relation_already_executed_but_calls_after_oper
         operators=(op1, op2),
         ref_loader_sequence=[(source, [("a", ()), ("b", ())])],
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = _make_runtime(plan, main_source=None)
     runtime.load_ref_group_executed.add(loadref_scheduler.build_relation_signature(steps))
 
     after_calls: List[str] = []
@@ -291,8 +336,16 @@ def test_adaptive_scheduler_skips_relation_already_executed_but_calls_after_oper
 
 
 def test_adaptive_scheduler_skips_some_ops_in_layer_commit_loop() -> None:
-    source_skipped = SourceIr(source_id="skipped", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
-    source_exec = SourceIr(source_id="exec", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source_skipped = SourceIr(
+        source_id="skipped",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="skipped.loader")),
+    )
+    source_exec = SourceIr(
+        source_id="exec",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="exec.loader")),
+    )
 
     steps_skipped = (LookupStepIr(from_field="id", to_source=source_skipped),)
     steps_exec = (LookupStepIr(from_field="id", to_source=source_exec),)
@@ -308,7 +361,7 @@ def test_adaptive_scheduler_skips_some_ops_in_layer_commit_loop() -> None:
             (source_exec, [("a", ()), ("b", ())]),
         ],
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = _make_runtime(plan, main_source=None)
     runtime.load_ref_group_executed.add(loadref_scheduler.build_relation_signature(steps_skipped))
 
     after_calls: List[str] = []
@@ -341,7 +394,11 @@ def test_adaptive_scheduler_relation_tasks_write_all_group_fields() -> None:
         loader_calls.append(True)
         return {1: {"a": "A", "b": "B"}}
 
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_loader))
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
     steps = (LookupStepIr(from_field="id", to_source=source),)
     op1 = _make_loadref_op(field_key="a", to_source=source, lookup_steps=steps)
     op2 = _make_loadref_op(field_key="b", to_source=source, lookup_steps=steps)
@@ -350,7 +407,15 @@ def test_adaptive_scheduler_relation_tasks_write_all_group_fields() -> None:
         operators=(op1, op2),
         ref_loader_sequence=[(source, [("a", ()), ("b", ())])],
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = _make_runtime(
+        plan,
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        sources={"s1": source},
+        runtime_bindings=RuntimeBindings(
+            main_source_loaders={"main": lambda: []},
+            source_loaders={"s1": _loader},
+        ),
+    )
 
     context = BatchContext()
     context.set_field_value("id", 0, 1)

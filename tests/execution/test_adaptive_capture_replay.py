@@ -8,6 +8,7 @@ from scalim.events import EVENT_BATCH_START, EVENT_LOADER_CALL
 from scalim.events._events import BatchStartEvent
 from scalim.execution.adaptive.capture import HookCaptureManager
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook, HookManager
 from scalim.planning import PlanBuilder
 from scalim.planning.operators import LoadRefOperatorIr
@@ -15,7 +16,7 @@ from scalim.sinks import InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 
 from tests.support.testing_utils import CI_TIMEOUT_S
 
@@ -141,25 +142,32 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
         def _builder(ctx):  # type: ignore[no-untyped-def]
             return (), {param_name: set(ctx.lookup_keys or set())}
 
-        return BindingIr(key_field=field_name, params_builder=_builder, mode="keys")
+        binding = BindingIr(
+            key_field=field_name,
+            params_builder_ref=RuntimeHandleIdIr(handle_id="{}.params_builder".format(param_name)),
+            mode="keys",
+        )
+        return binding, _builder
 
-    orders = MainSourceIr(source_id="orders", loader=_load_orders)
+    orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
 
+    customer_binding, customer_params_builder = _build_keys_params("customer_id", "customer_id_set")
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=LoaderIr(
-            callable=_load_customers,
-            bindings={"customer_id": _build_keys_params("customer_id", "customer_id_set")},
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={"customer_id": customer_binding},
         ),
     )
 
+    product_binding, product_params_builder = _build_keys_params("product_id", "product_id_set")
     products = SourceIr(
         source_id="products",
         key=KeyIr(key="product_id"),
         loader_spec=LoaderIr(
-            callable=_load_products,
-            bindings={"product_id": _build_keys_params("product_id", "product_id_set")},
+            callable_ref=RuntimeHandleIdIr(handle_id="products.loader"),
+            bindings={"product_id": product_binding},
         ),
     )
 
@@ -205,7 +213,24 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
     hooks = HookManager()
     hooks.register(_RecordingHook())
 
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=10, parallel_mode="adaptive", max_workers=2, hook_manager=hooks)
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"orders": _load_orders},
+        source_loaders={"customers": _load_customers, "products": _load_products},
+        params_builders={
+            ("customers", "customer_id"): customer_params_builder,
+            ("products", "product_id"): product_params_builder,
+        },
+    )
+
+    engine = ScalimEngine(
+        demand=demand,
+        plan=plan,
+        runtime_bindings=runtime_bindings,
+        batch_size=10,
+        parallel_mode="adaptive",
+        max_workers=2,
+        hook_manager=hooks,
+    )
     results = engine.run(main_rows=list(_load_orders()))
 
     assert {r["order_id"] for r in results} == {0, 1}
@@ -263,25 +288,32 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
         def _builder(ctx):  # type: ignore[no-untyped-def]
             return (), {param_name: set(ctx.lookup_keys or set())}
 
-        return BindingIr(key_field=field_name, params_builder=_builder, mode="keys")
+        binding = BindingIr(
+            key_field=field_name,
+            params_builder_ref=RuntimeHandleIdIr(handle_id="{}.params_builder".format(param_name)),
+            mode="keys",
+        )
+        return binding, _builder
 
-    orders = MainSourceIr(source_id="orders", loader=_load_orders)
+    orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
 
+    customer_binding, customer_params_builder = _build_keys_params("customer_id", "customer_id_set")
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=LoaderIr(
-            callable=_load_customers,
-            bindings={"customer_id": _build_keys_params("customer_id", "customer_id_set")},
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={"customer_id": customer_binding},
         ),
     )
 
+    product_binding, product_params_builder = _build_keys_params("product_id", "product_id_set")
     products = SourceIr(
         source_id="products",
         key=KeyIr(key="product_id"),
         loader_spec=LoaderIr(
-            callable=_load_products,
-            bindings={"product_id": _build_keys_params("product_id", "product_id_set")},
+            callable_ref=RuntimeHandleIdIr(handle_id="products.loader"),
+            bindings={"product_id": product_binding},
         ),
     )
 
@@ -332,7 +364,24 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
     hooks = HookManager()
     hooks.register(_OnEventHook())
 
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=10, parallel_mode="adaptive", max_workers=2, hook_manager=hooks)
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"orders": _load_orders},
+        source_loaders={"customers": _load_customers, "products": _load_products},
+        params_builders={
+            ("customers", "customer_id"): customer_params_builder,
+            ("products", "product_id"): product_params_builder,
+        },
+    )
+
+    engine = ScalimEngine(
+        demand=demand,
+        plan=plan,
+        runtime_bindings=runtime_bindings,
+        batch_size=10,
+        parallel_mode="adaptive",
+        max_workers=2,
+        hook_manager=hooks,
+    )
     sink = InMemoryRowSink()
     result = engine.run(main_rows=list(_load_orders()), sink=sink)
 

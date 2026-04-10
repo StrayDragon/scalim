@@ -10,10 +10,11 @@ from typing import List, Optional
 from scalim.execution import ScalimEngine
 
 try:
-    from scalim_misc.example_report_ir import build_order_report_model
+    from scalim_misc.example_report_ir import build_order_report_model, build_order_report_runtime_bindings
 except Exception as exc:
     pytest.skip("demo integration dependencies unavailable in this environment: {}".format(exc), allow_module_level=True)
 from scalim.planning import PlanBuilder
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.typedefs import RowData
 
 from tests.support.testing_utils import ColumnListSink, ListSink, StreamingListSink
@@ -32,6 +33,11 @@ def demo_model():
     return build_order_report_model()
 
 
+@pytest.fixture(scope="module")
+def demo_runtime_bindings() -> "RuntimeBindings":
+    return build_order_report_runtime_bindings()
+
+
 @pytest.fixture
 def plan_builder(demo_model):
     """创建 PlanBuilder"""
@@ -40,6 +46,7 @@ def plan_builder(demo_model):
 
 def _get_main_rows(
     demo_model,
+    runtime_bindings: "RuntimeBindings",
     limit: Optional[int] = None,
     order_ids: Optional[List[int]] = None,
 ) -> List[RowData]:
@@ -50,9 +57,9 @@ def _get_main_rows(
     if order_ids is not None:
         params["order_ids"] = order_ids
     if params:
-        rows = list(main_source.loader(**params))
+        rows = list(runtime_bindings.require_main_source_loader(main_source.source_id)(**params))
     else:
-        rows = list(main_source.loader())
+        rows = list(runtime_bindings.require_main_source_loader(main_source.source_id)())
     if limit is not None:
         return rows[:limit]
     return rows
@@ -140,13 +147,13 @@ class TestPlanBuilderRealData:
 class TestIREngineRealExecution:
     """IREngine 真实数据执行测试"""
 
-    def test_execute_simple_fields(self, demo_model) -> None:
+    def test_execute_simple_fields(self, demo_model, demo_runtime_bindings) -> None:
         """测试简单字段执行"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "amount"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -156,13 +163,13 @@ class TestIREngineRealExecution:
             assert "amount" in row
             assert isinstance(row["order_id"], int)
 
-    def test_execute_derived_field(self, demo_model) -> None:
+    def test_execute_derived_field(self, demo_model, demo_runtime_bindings) -> None:
         """测试派生字段执行"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "amount", "cost", "profit"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -173,13 +180,13 @@ class TestIREngineRealExecution:
             expected_profit = f"{amount - cost:.2f}"
             assert row["profit"] == expected_profit
 
-    def test_execute_relation_field(self, demo_model) -> None:
+    def test_execute_relation_field(self, demo_model, demo_runtime_bindings) -> None:
         """测试关联字段执行"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "customer_name"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -189,13 +196,13 @@ class TestIREngineRealExecution:
             if row["customer_name"]:
                 assert row["customer_name"].startswith("customer_")
 
-    def test_execute_multi_level_relation(self, demo_model) -> None:
+    def test_execute_multi_level_relation(self, demo_model, demo_runtime_bindings) -> None:
         """测试多级关联执行"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "country_name"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -205,13 +212,13 @@ class TestIREngineRealExecution:
             if row["country_name"]:
                 assert row["country_name"].startswith("country_")
 
-    def test_execute_multi_field_relation(self, demo_model) -> None:
+    def test_execute_multi_field_relation(self, demo_model, demo_runtime_bindings) -> None:
         """测试多字段关联执行"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "mapping_name"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -221,13 +228,13 @@ class TestIREngineRealExecution:
             if row["mapping_name"]:
                 assert row["mapping_name"].startswith("mapping_")
 
-    def test_execute_with_transform(self, demo_model) -> None:
+    def test_execute_with_transform(self, demo_model, demo_runtime_bindings) -> None:
         """测试字段转换执行"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "order_source"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -236,13 +243,13 @@ class TestIREngineRealExecution:
         for row in results:
             assert row["order_source"] in valid_sources
 
-    def test_execute_with_preload_cache(self, demo_model) -> None:
+    def test_execute_with_preload_cache(self, demo_model, demo_runtime_bindings) -> None:
         """测试预加载缓存 (FR003)"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "order_type_name"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 5))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 5))
 
         assert len(results) == 5
 
@@ -262,67 +269,67 @@ class TestIREngineRealExecution:
 class TestSinkModes:
     """不同 Sink 模式测试"""
 
-    def test_normal_sink(self, demo_model) -> None:
+    def test_normal_sink(self, demo_model, demo_runtime_bindings) -> None:
         """测试普通 Sink"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=3)
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=3)
         sink = ListSink()
 
-        results = engine.run(main_rows=_get_main_rows(demo_model, 6), sink=sink)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 6), sink=sink)
 
         assert results == []  # 使用 sink 时返回空
         assert sink.closed is True
         assert len(sink.rows) == 6
 
-    def test_streaming_sink(self, demo_model) -> None:
+    def test_streaming_sink(self, demo_model, demo_runtime_bindings) -> None:
         """测试流式 Sink"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=3)
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=3)
         sink = StreamingListSink()
 
-        results = engine.run(main_rows=_get_main_rows(demo_model, 6), sink=sink)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 6), sink=sink)
 
         assert results == []
         assert sink.closed is True
         assert len(sink.rows) == 6
 
-    def test_column_sink(self, demo_model) -> None:
+    def test_column_sink(self, demo_model, demo_runtime_bindings) -> None:
         """测试列式 Sink"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=3)
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=3)
         sink = ColumnListSink()
 
-        results = engine.run(main_rows=_get_main_rows(demo_model, 6), sink=sink)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 6), sink=sink)
 
         assert results == []
         assert sink.closed is True
         assert "order_id" in sink.columns
         assert "profit" in sink.columns
 
-    def test_sink_modes_consistency(self, demo_model) -> None:
+    def test_sink_modes_consistency(self, demo_model, demo_runtime_bindings) -> None:
         """测试不同 Sink 模式结果一致性"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit", "customer_name"])
-        main_rows = _get_main_rows(demo_model, 5)
+        main_rows = _get_main_rows(demo_model, demo_runtime_bindings, 5)
 
         # 普通模式
-        engine1 = ScalimEngine(demand=demo_model, plan=plan, batch_size=10)
+        engine1 = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=10)
         results1 = engine1.run(main_rows=main_rows)
 
         # 流式模式
-        engine2 = ScalimEngine(demand=demo_model, plan=plan, batch_size=10)
+        engine2 = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=10)
         streaming_sink = StreamingListSink()
         engine2.run(main_rows=main_rows, sink=streaming_sink)
         results2 = streaming_sink.rows
 
         # 列式模式
-        engine3 = ScalimEngine(demand=demo_model, plan=plan, batch_size=10)
+        engine3 = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=10)
         column_sink = ColumnListSink()
         engine3.run(main_rows=main_rows, sink=column_sink)
 
@@ -347,18 +354,18 @@ class TestSinkModes:
 class TestBatchProcessing:
     """批处理测试"""
 
-    def test_different_batch_sizes(self, demo_model) -> None:
+    def test_different_batch_sizes(self, demo_model, demo_runtime_bindings) -> None:
         """测试不同批次大小"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "amount"])
-        main_rows = _get_main_rows(demo_model, 10)
+        main_rows = _get_main_rows(demo_model, demo_runtime_bindings, 10)
 
         # 小批次
-        engine1 = ScalimEngine(demand=demo_model, plan=plan, batch_size=2)
+        engine1 = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=2)
         results1 = engine1.run(main_rows=main_rows)
 
         # 大批次
-        engine2 = ScalimEngine(demand=demo_model, plan=plan, batch_size=100)
+        engine2 = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=100)
         results2 = engine2.run(main_rows=main_rows)
 
         # 结果应该一致
@@ -368,22 +375,22 @@ class TestBatchProcessing:
             assert r1["order_id"] == r2["order_id"]
             assert r1["amount"] == r2["amount"]
 
-    def test_batch_size_one(self, demo_model) -> None:
+    def test_batch_size_one(self, demo_model, demo_runtime_bindings) -> None:
         """测试批次大小为 1"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id", "profit"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=1)
-        results = engine.run(main_rows=_get_main_rows(demo_model, 3))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=1)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, 3))
 
         assert len(results) == 3
 
-    def test_empty_input(self, demo_model) -> None:
+    def test_empty_input(self, demo_model, demo_runtime_bindings) -> None:
         """测试空输入"""
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=["order_id"])
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=10)
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=10)
         results = engine.run(main_rows=[])
 
         assert results == []
@@ -398,15 +405,15 @@ class TestBatchProcessing:
 class TestFullPipeline:
     """完整流程测试"""
 
-    def test_full_report_generation(self, demo_model) -> None:
+    def test_full_report_generation(self, demo_model, demo_runtime_bindings) -> None:
         """测试完整报表生成"""
         targets = ["order_id", "amount", "profit", "customer_name", "order_source", "country_name", "mapping_name", "order_type_name"]
 
         builder = PlanBuilder(demo_model)
         plan = builder.build(targets=targets)
 
-        engine = ScalimEngine(demand=demo_model, plan=plan, batch_size=5)
-        results = engine.run(main_rows=_get_main_rows(demo_model, order_ids=list(range(15))))
+        engine = ScalimEngine(demand=demo_model, plan=plan, runtime_bindings=demo_runtime_bindings, batch_size=5)
+        results = engine.run(main_rows=_get_main_rows(demo_model, demo_runtime_bindings, order_ids=list(range(15))))
 
         assert len(results) == 15
 

@@ -7,11 +7,12 @@ from typing import Mapping as TypingMapping
 from ....events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
 from ....planning.operators import LoadOperatorIr, SupportedOperatorIr
 from ....spec.ir import FieldIr, SourceIr
-from ....spec.ir._helpers import call_loader_with_binding, coerce_loader_result_mapping
+from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.binding import BindingIr, LoaderCallContextIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping
 from ....vendor.compact.typing_extensionsx import Protocol, TypeGuard, override
 from ...context import BatchContext
+from ...loader_call_params import build_loader_call_params
 from ...loader_retry import CALLSITE_LOAD, call_with_loader_retry
 from ..guardrails import build_loader_result_guardrail_payload, fail_guardrail
 from ..helpers.field_access import extract_field, extract_field_segments
@@ -47,7 +48,11 @@ class LoadOperatorExecutor(OperatorExecutor):
             return {}
         if not runtime.instrumentation.wants(EVENT_LOADER_CALL):
             return {}
-        _, call_kwargs = binding.build_params(loader_context)
+        _, call_kwargs = build_loader_call_params(
+            binding=binding,
+            context=loader_context,
+            runtime_bindings=runtime.runtime_bindings,
+        )
         return call_kwargs
 
     def _maybe_emit_loader_slim(
@@ -103,7 +108,7 @@ class LoadOperatorExecutor(OperatorExecutor):
             return MISSING
 
         data = result[row_id]
-        extractor = source.loader_spec.extractor
+        extractor = runtime.runtime_bindings.get_loader_extractor(source.source_id)
         if extractor is None:
             return data
 
@@ -138,8 +143,9 @@ class LoadOperatorExecutor(OperatorExecutor):
 
         data_key = field_spec.extract_expr or field_spec.data_key or field_key
         value: FieldValue = extract_field_segments(data, field_spec.extract_segments)
+        value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
         try:
-            return field_spec.apply_transform(value)
+            return value_transform(value) if value_transform is not None else value
         except Exception as exc:
             guardrails = runtime.guardrails
             if not guardrails.enabled:
@@ -242,7 +248,10 @@ class LoadOperatorExecutor(OperatorExecutor):
             return
 
         op = operator
-        source = op.source
+        source = runtime.sources.get(op.source_id)
+        if source is None:
+            msg = "Unknown source_id={!r} in operator {}".format(op.source_id, op.operator_id)
+            raise KeyError(msg)
         field_keys = list(op.field_keys)
 
         loader_context = LoaderCallContextIr(
@@ -254,12 +263,20 @@ class LoadOperatorExecutor(OperatorExecutor):
 
         key_field = source.key.key
         binding = source.get_binding(key_field)
-        loader_fn = source.loader_spec.callable
+        loader_fn = runtime.runtime_bindings.require_source_loader(source.source_id)
+
+        def _call_loader() -> object:
+            args, kwargs = build_loader_call_params(
+                binding=binding,
+                context=loader_context,
+                runtime_bindings=runtime.runtime_bindings,
+            )
+            return loader_fn(*args, **kwargs)
 
         loader_start = time.perf_counter()
         policy = runtime.loader_retry.resolve(source.source_id)
         result_raw: object = call_with_loader_retry(
-            call=lambda: call_loader_with_binding(binding, loader_context, loader_fn),
+            call=_call_loader,
             instrumentation=runtime.instrumentation,
             policy=policy,
             loader_name=source.source_id,
@@ -270,7 +287,8 @@ class LoadOperatorExecutor(OperatorExecutor):
 
         result_obj: object = result_raw
         if source.normalize is not None:
-            result_obj = source.normalize.apply(result_raw, source_id=source.source_id)
+            normalize_call_by = runtime.runtime_bindings.get_source_normalize_call_by(source.source_id)
+            result_obj = source.normalize.apply(result_raw, source_id=source.source_id, call_by=normalize_call_by)
 
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)
         skipped_none_rows: Optional[int] = None

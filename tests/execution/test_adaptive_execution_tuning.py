@@ -8,6 +8,7 @@ from scalim.events import EVENT_ADAPTIVE_SCHEDULER_DECISION
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.pipeline.overrides import PipelineOverrides
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
@@ -15,9 +16,8 @@ from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir import FieldIr
 from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, SourceIr
+from scalim.spec.ir import KeyIr, RuntimeHandleIdIr, SourceIr
 
 from scalim.execution.adaptive.policy import (
     PROCESS_FAILURE_FAIL_FAST,
@@ -45,7 +45,11 @@ def _loader_b() -> dict:
 
 
 def _make_source(source_id: str) -> SourceIr:
-    return SourceIr(source_id=source_id, key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_noop_loader))
+    return SourceIr(
+        source_id=source_id,
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="{}.loader".format(source_id))),
+    )
 
 
 def _make_loadref_op(
@@ -54,14 +58,35 @@ def _make_loadref_op(
     to_source: SourceIr,
     lookup_steps: Tuple[LookupStepIr, ...],
 ) -> LoadRefOperatorIr:
-    field_spec = FieldIr(field_id=field_key, name=field_key, source=to_source)
     return LoadRefOperatorIr(
         operator_id="load_ref_{}".format(field_key),
         operator_type=OperatorType.LOAD_REF.value,
-        source=to_source,
+        source_id=to_source.source_id,
         field_key=field_key,
-        field_spec=field_spec,
         lookup_steps=lookup_steps,
+    )
+
+
+def _make_runtime(
+    plan: ExecutionPlan,
+    *,
+    hook_manager: HookManager = None,  # type: ignore[assignment]
+    observer_manager: ObserverManager = None,  # type: ignore[assignment]
+    main_source=None,
+    sources=None,
+    runtime_bindings: RuntimeBindings = None,  # type: ignore[assignment]
+    parallel_mode: str = "seq",
+    max_workers: int = 0,
+) -> ExecutionRuntime:
+    return ExecutionRuntime(
+        plan,
+        hook_manager or HookManager(),
+        observer_manager or ObserverManager(),
+        main_source=main_source,
+        sources=sources or {},
+        runtime_bindings=runtime_bindings or RuntimeBindings(),
+        parallel_mode=parallel_mode,
+        max_workers=max_workers,
     )
 
 
@@ -107,7 +132,7 @@ def test_adaptive_tuning_validation_covers_additional_error_branches() -> None:
 def test_adaptive_policy_decisions_and_pool_selection() -> None:
     policy = AdaptivePolicy()
     plan = ExecutionPlan()
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     op = _make_loadref_op(
         field_key="a", to_source=_make_source("s1"), lookup_steps=(LookupStepIr(from_field="id", to_source=_make_source("s1")),)
@@ -235,7 +260,7 @@ def test_adaptive_scheduler_enforces_pool_limits() -> None:
         adaptive_loadref_executor_factory=lambda: _BlockingLoadRefExecutor(started, finish, current, lock),
     )
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=overrides)
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     from concurrent.futures import ThreadPoolExecutor
 
@@ -284,7 +309,7 @@ def test_adaptive_scheduler_threshold_lookup_keys_falls_back_to_serial() -> None
         plan,
         overrides=PipelineOverrides(adaptive_tuning=tuning, adaptive_loadref_executor_factory=lambda: RecordingLoadRefExecutor(calls)),
     )
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     ctx = BatchContext()
     ctx.set_field_value("id", 0, 1)
@@ -336,7 +361,7 @@ def test_adaptive_scheduler_policy_override_forces_serial() -> None:
         adaptive_loadref_executor_factory=lambda: RecordingLoadRefExecutor(calls),
     )
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=overrides)
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     scheduler.execute_segment(
         [op_a, op_b],
@@ -365,7 +390,7 @@ def test_adaptive_scheduler_unknown_pool_from_policy_raises() -> None:
 
     overrides = PipelineOverrides(adaptive_policy=_BadPoolPolicy())
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=overrides)
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     with pytest.raises(ValueError, match="unknown pool"):
         scheduler.execute_segment(
@@ -393,7 +418,7 @@ def test_adaptive_scheduler_decision_events_are_wants_gated() -> None:
         overrides=PipelineOverrides(adaptive_tuning=tuning, adaptive_loadref_executor_factory=NoOpLoadRefExecutor),
     )
 
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     scheduler.execute_segment(
         [op_a, op_b],
@@ -410,7 +435,7 @@ def test_adaptive_scheduler_decision_events_are_wants_gated() -> None:
         config=PerformanceConfig(metrics={"duration"}, report_format="none", include_scheduler_decisions=True),
     )
     observer_manager = ObserverManager(observers=[perf])
-    runtime = ExecutionRuntime(plan, HookManager(), observer_manager, main_source=None)
+    runtime = _make_runtime(plan, observer_manager=observer_manager, main_source=None)
 
     scheduler.execute_segment(
         [op_a, op_b],
@@ -450,7 +475,7 @@ def test_adaptive_scheduler_decision_events_reach_hooks_on_event() -> None:
     hook = _RecordingHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    runtime = ExecutionRuntime(plan, hook_manager, ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, hook_manager=hook_manager, main_source=None)
 
     assert runtime.instrumentation.wants(EVENT_ADAPTIVE_SCHEDULER_DECISION) is True
 
@@ -535,7 +560,7 @@ def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -
 
     perf = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none", include_scheduler_decisions=True))
     observer_manager = ObserverManager(observers=[perf])
-    runtime = ExecutionRuntime(plan, HookManager(), observer_manager, main_source=None, parallel_mode="adaptive", max_workers=3)
+    runtime = _make_runtime(plan, observer_manager=observer_manager, main_source=None, parallel_mode="adaptive", max_workers=3)
     runtime.batch_num = 1
 
     from concurrent.futures import ThreadPoolExecutor
@@ -618,7 +643,7 @@ def test_adaptive_scheduler_submit_task_failure_releases_tokens_and_propagates()
     op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
     plan = ExecutionPlan(operators=(op_a, op_b))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     with pytest.raises(RuntimeError, match="submit boom"):
         scheduler.execute_segment(
@@ -642,7 +667,7 @@ def test_commit_layer_results_skips_field_keys_in_commit_loop() -> None:
     op_exec = _make_loadref_op(field_key="exec", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
     plan = ExecutionPlan(operators=(op_skip, op_exec))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=None)
+    runtime = _make_runtime(plan, main_source=None)
 
     ctx = BatchContext()
     results_by_key = {
@@ -677,7 +702,11 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     from scalim.spec.ir import MainSourceIr
 
     source = _make_source("s1")
-    rows_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="rows")
+    rows_binding = BindingIr(
+        key_field="id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="s1.id.rows_binding"),
+        mode="rows",
+    )
     op_rows = _make_loadref_op(
         field_key="rows", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source, bind=rows_binding),)
     )
@@ -685,8 +714,11 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     plan = ExecutionPlan(operators=(op_rows, op_keys))
 
     perf = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none", include_scheduler_decisions=True))
-    runtime = ExecutionRuntime(
-        plan, HookManager(), ObserverManager(observers=[perf]), main_source=MainSourceIr(source_id="main", loader=lambda: [])
+    runtime = _make_runtime(
+        plan,
+        observer_manager=ObserverManager(observers=[perf]),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        runtime_bindings=RuntimeBindings(main_source_loaders={"main": lambda: []}),
     )
     runtime.batch_num = 1
 
@@ -743,7 +775,7 @@ def test_adaptive_scheduler_emits_threshold_serial_reason_when_subscribed() -> N
     plan = ExecutionPlan(operators=(op_a, op_b))
 
     perf = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none", include_scheduler_decisions=True))
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(observers=[perf]), main_source=None)
+    runtime = _make_runtime(plan, observer_manager=ObserverManager(observers=[perf]), main_source=None)
     runtime.batch_num = 1
 
     tuning = AdaptiveTuning(min_parallel_tasks_per_layer=3)

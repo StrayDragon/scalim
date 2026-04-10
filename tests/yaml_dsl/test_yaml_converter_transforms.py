@@ -7,10 +7,10 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYa
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
 from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_str
 from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_decimal
 from scalim.dsl.yaml_dsl.schema_dsl.models import LookupCastConfig
+from scalim.spec.ir import ValueOpIr
 from scalim.spec.ir.binding import LoaderCallContextIr
 from tests.support.yaml_fixtures import make_yaml_config
 
@@ -51,16 +51,14 @@ orders_to_customers: &orders_to_customers
     """,
     )
     config = _load_config(yaml_content)
-    converter = ConfigToIRConverter(
-        resolver=PythonReferenceResolver(allowed_modules=frozenset(["scalim_misc.example_report_ir"])),
-    )
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     bind = demand_ir.sources["customers"].bind
     assert bind is not None
 
     ctx = LoaderCallContextIr(is_ref_loader=True, lookup_keys={1, 2, 3})
-    _, kwargs = bind.params_builder(ctx)
+    _, kwargs = bind.build_params(ctx)
     assert isinstance(kwargs["ids"], list)
     assert kwargs["ids"] == [1, 2, 3]
 
@@ -96,16 +94,14 @@ orders_to_regions: &orders_to_regions
     """,
     )
     config = _load_config(yaml_content)
-    converter = ConfigToIRConverter(
-        resolver=PythonReferenceResolver(allowed_modules=frozenset(["scalim_misc.example_report_ir"])),
-    )
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     bind = demand_ir.sources["regions"].bind
     assert bind is not None
 
     ctx = LoaderCallContextIr(is_ref_loader=True, batch_rows=[{"region_id": 1}, {"region_id": 2}])
-    _, kwargs = bind.params_builder(ctx)
+    _, kwargs = bind.build_params(ctx)
     assert kwargs["rows"] == [{"region_id": 1}, {"region_id": 2}]
 
 
@@ -157,12 +153,11 @@ fields:
     )
     loader = YamlDemandLoader()
     config = loader.load_string(yaml_content)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     field = demand_ir.fields["order_id"]
-    assert field.transform is not None
-    assert field.transform(input_value) == expected
+    assert field.value_ops == (ValueOpIr(kind="cast", to=value_cast),)
 
 
 def test_value_cast_str_none_does_not_break_compute_if_falsy_guard() -> None:
@@ -204,10 +199,10 @@ def test_cast_decimal_variants_and_errors() -> None:
 
 
 def test_converter_private_value_cast_raises() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     with pytest.raises(ScalimConversionError, match="Unknown value_cast"):
-        converter._get_value_cast_fn("bad")
+        converter._get_value_cast_op("bad")
 
 
 def test_unknown_lookup_cast_raises() -> None:
@@ -246,8 +241,16 @@ orders_to_customers: &orders_to_customers
 
 
 def test_converter_private_lookup_cast_raises() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     lookup_cast = LookupCastConfig(name="bad", sep=None)
 
     with pytest.raises(ScalimConversionError, match="Unknown lookup_cast"):
-        converter._get_lookup_cast_fn(lookup_cast, is_multi=False)
+        converter._get_lookup_cast_spec(lookup_cast)
+
+
+def test_converter_private_lookup_cast_requires_name() -> None:
+    converter = ConfigToIRConverter()
+    lookup_cast = LookupCastConfig(name="", sep=None)
+
+    with pytest.raises(ScalimConversionError, match="lookup_cast.name is required"):
+        converter._get_lookup_cast_spec(lookup_cast)

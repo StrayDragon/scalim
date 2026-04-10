@@ -26,6 +26,7 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 
 
 def _dummy_main_loader(*_args, **_kwargs):  # type: ignore[no-untyped-def]
@@ -33,7 +34,7 @@ def _dummy_main_loader(*_args, **_kwargs):  # type: ignore[no-untyped-def]
 
 
 def _make_demand_ir(*, field_name_by_id=None) -> DemandIr:  # type: ignore[no-untyped-def]
-    main = MainSourceIr(source_id="orders", loader=_dummy_main_loader)
+    main = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     field_irs = []
     if field_name_by_id:
         for field_id, name in field_name_by_id.items():

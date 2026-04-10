@@ -94,7 +94,7 @@ sources:
 """
         loader = YamlDemandLoader()
         config = loader.load_string(yaml_content)
-        converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        converter = ConfigToIRConverter()
         demand_ir = converter.convert(config)
         binding = demand_ir.sources["customers"].bind
         assert binding is not None
@@ -131,7 +131,7 @@ sources:
 """
         loader = YamlDemandLoader()
         config = loader.load_string(yaml_content)
-        converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        converter = ConfigToIRConverter()
         demand_ir = converter.convert(config)
         binding = demand_ir.sources["customers"].bind
         assert binding is not None
@@ -145,23 +145,7 @@ class TestAllowlistRequired:
         with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
             run(str(yaml_path), options=RunOptions(allowed_modules=frozenset()))
 
-    def test_converter_requires_allowlist_by_default(self) -> None:
-        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
-            _ = ConfigToIRConverter()
-
-    def test_converter_rejects_resolver_without_allowlist(self) -> None:
-        from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
-
-        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
-            _ = ConfigToIRConverter(resolver=SecurePythonReferenceResolver())
-
-    def test_converter_from_allowlist_requires_non_empty_allowlist(self) -> None:
-        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
-            _ = ConfigToIRConverter.from_allowlist()
-        with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
-            _ = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset())
-
-    def test_converter_from_allowlist_builds_converter(self) -> None:
+    def test_converter_does_not_require_allowlist(self) -> None:
         yaml_content = """
 name: demo
 main_source:
@@ -174,7 +158,7 @@ sources: {}
 """
         loader = YamlDemandLoader()
         config = loader.load_string(yaml_content)
-        converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+        converter = ConfigToIRConverter()
         demand_ir = converter.convert(config)
         assert demand_ir.main_source.source_id == "orders"
 

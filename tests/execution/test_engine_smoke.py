@@ -29,7 +29,9 @@ def test_engine_computes_derived_and_relations(minimal_case) -> None:
         targets=["order_id", "profit", "customer_name", "country_name", "mapping_name", "order_type_name", "order_source"]
     )
     assert any(source.source_id == "order_types" and source.is_preload_forever() for source in plan.preload_sources)
-    results = ScalimEngine(demand=demand, plan=plan, batch_size=10).run(main_rows=minimal_case.main_rows())
+    results = ScalimEngine(demand=demand, plan=plan, runtime_bindings=minimal_case.runtime_bindings, batch_size=10).run(
+        main_rows=minimal_case.main_rows()
+    )
 
     assert len(results) == 2
     assert results[0]["order_id"] == 1
@@ -46,15 +48,15 @@ def test_sink_modes_consistent(minimal_case) -> None:
     plan = PlanBuilder(demand).build(targets=["order_id", "profit", "customer_name"])
     main_rows = minimal_case.main_rows()
 
-    engine_plain = ScalimEngine(demand=demand, plan=plan, batch_size=10)
+    engine_plain = ScalimEngine(demand=demand, plan=plan, runtime_bindings=minimal_case.runtime_bindings, batch_size=10)
     results_plain = engine_plain.run(main_rows=main_rows)
 
-    engine_streaming = ScalimEngine(demand=demand, plan=plan, batch_size=10)
+    engine_streaming = ScalimEngine(demand=demand, plan=plan, runtime_bindings=minimal_case.runtime_bindings, batch_size=10)
     streaming_sink = StreamingListSink()
     results_streaming = engine_streaming.run(main_rows=main_rows, sink=streaming_sink)
     assert results_streaming == []
 
-    engine_column = ScalimEngine(demand=demand, plan=plan, batch_size=10)
+    engine_column = ScalimEngine(demand=demand, plan=plan, runtime_bindings=minimal_case.runtime_bindings, batch_size=10)
     column_sink = ColumnListSink()
     results_column = engine_column.run(main_rows=main_rows, sink=column_sink)
     assert results_column == []
@@ -75,7 +77,9 @@ def test_sinks_close(minimal_case) -> None:
     main_rows = minimal_case.main_rows()
 
     sink = ListSink()
-    results = ScalimEngine(demand=demand, plan=plan, batch_size=10).run(main_rows=main_rows, sink=sink)
+    results = ScalimEngine(demand=demand, plan=plan, runtime_bindings=minimal_case.runtime_bindings, batch_size=10).run(
+        main_rows=main_rows, sink=sink
+    )
     assert results == []
     assert sink.closed is True
     assert len(sink.rows) == 2

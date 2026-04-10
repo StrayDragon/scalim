@@ -21,6 +21,8 @@ from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
 from ..spec.ir import SourceIr
 from ..spec.ir._workflow import WorkflowCachePoolIr
+from ..spec.ir.callable_refs import describe_callable_ref
+from ..spec.ir.lookup_casts import LookupCastSpecIr
 from ..typedefs import LoaderCallKwargs, LoaderResultMapping
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, field
@@ -88,40 +90,15 @@ def _canonical_json_dumps(value: object) -> str:
     )
 
 
-def _format_callable_reference(fn: object) -> str:
-    module = str(getattr(fn, "__module__", "") or "").strip()  # pragma: allow-dynattr metadata: callable metadata
-    qualname = str(getattr(fn, "__qualname__", "") or "").strip()  # pragma: allow-dynattr metadata: callable metadata
-    name = str(getattr(fn, "__name__", "") or "").strip()  # pragma: allow-dynattr metadata: callable metadata
-
-    if not module or module == "builtins":
-        return qualname or name or repr(fn)
-    if qualname and "." in qualname and "<locals>" not in qualname:
-        return "{}:{}".format(module, qualname)
-    entry = qualname or name
-    if entry:
-        return "{}.{}".format(module, entry)
-    return module
-
-
-def _lookup_cast_signature(cast_fn: object) -> Optional[Dict[str, object]]:
-    if cast_fn is None:
+def _lookup_cast_signature(cast_spec: Optional[LookupCastSpecIr]) -> Optional[Dict[str, object]]:
+    if cast_spec is None:
         return None
-    name = getattr(cast_fn, "scalim_lookup_cast_name", None)  # pragma: allow-dynattr plugin: lookup cast metadata
-    if isinstance(name, str) and name.strip():
-        payload: Dict[str, object] = {"name": str(name)}
-        meta = getattr(cast_fn, "scalim_lookup_cast_meta", None)  # pragma: allow-dynattr plugin: lookup cast metadata
-        if _is_dict(meta):
-            for k, v in meta.items():
-                if k == "name":
-                    continue
-                if isinstance(k, str) and k.strip():
-                    payload[str(k)] = _ensure_json_like(v, path="(lookup_cast)")
-        return payload
-
-    # 兜底: 尽量保持稳定且 `JSON-safe`.
-    return {
-        "callable": _format_callable_reference(cast_fn),
-    }
+    name = str(cast_spec.name or "").strip() or "auto"
+    payload: Dict[str, object] = {"name": name}
+    if name == "sep_first":
+        payload["sep"] = str(cast_spec.sep or ",")
+    _ = _ensure_json_like(payload, path="(lookup_cast)")
+    return _normalize_json_like(payload)  # pragma: allow-any-return signature payload json-like normalization
 
 
 @dataclass(frozen=True)
@@ -170,6 +147,7 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
             "on_conflict": norm.on_conflict,
             "on_empty": norm.on_empty,
             "on_missing": norm.on_missing,
+            "call_by_ref": None if norm.call_by_ref is None else describe_callable_ref(norm.call_by_ref),
             "fields": [
                 {
                     "name": rule.name,
@@ -186,7 +164,7 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
     signature = WorkflowCacheEntrySignature(
         kind="preload_forever",
         source_id=str(source.source_id),
-        loader_ref=_format_callable_reference(source.loader_spec.callable),
+        loader_ref=describe_callable_ref(source.loader_spec.callable_ref),
         rendered_params=params,
         normalize=normalize_dict,
         key=_normalize_json_like(_ensure_json_like(source.key.key, path="sources.{}.key".format(source.source_id))),

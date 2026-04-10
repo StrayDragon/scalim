@@ -6,10 +6,12 @@ import pytest
 from scalim_benchlib import BenchmarkRunner
 from scalim._project_constants import ENV_BENCH_MAX_WORKERS, ENV_BENCH_SCALE, ENV_BENCH_SCOPE
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DerivedFieldIr, FieldIr
 from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 
 
 def _bench_scale() -> str:
@@ -60,14 +62,18 @@ def _load_empty_orders() -> List[dict]:
 
 
 def _build_demand() -> DemandIr:
-    main_source = MainSourceIr(source_id="orders", loader=_load_empty_orders)
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     fields = [
         FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True),
         DerivedFieldIr(
             field_id="work",
             name="work",
             dependencies=("order_id",),
-            calculator=_cpu_work,
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="work.calculator"),
+                kwargs=(("order_id", CallByValueIr(kind="field", value="order_id")),),
+                field_names=("order_id",),
+            ),
         ),
     ]
     return DemandIr.from_irs(sources=[], fields=fields, main_source=main_source)
@@ -80,12 +86,16 @@ def _make_rows(row_count: int) -> List[dict]:
 def _make_runner(parallel_mode: str, row_count: int) -> Callable[[], int]:
     demand = _build_demand()
     plan = PlanBuilder(demand).build(targets=["work"])
+    runtime_bindings = RuntimeBindings(
+        derived_calculators={"work": _cpu_work},
+    )
     rows = _make_rows(row_count)
 
     def _run() -> int:
         engine = ScalimEngine(
             demand=demand,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             parallel_mode=parallel_mode,  # type: ignore[arg-type]
             batch_size=50,
             max_workers=_bench_max_workers(),

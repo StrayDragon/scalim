@@ -2,9 +2,8 @@ import pytest
 
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import DerivedFieldIr, FieldIr, LookupCastSpecIr
 
 
 def _load_config(yaml_content: str):
@@ -48,7 +47,7 @@ outputs:
     fields: [order_id, customer_name]
 """
     config = _load_config(yaml_content)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     field_ids = set(demand_ir.fields.keys())
@@ -98,11 +97,11 @@ sources:
     lookup_cast: {name: int}
 """
     config = _load_config(yaml_content)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     mapping_source = demand_ir.sources["mapping"]
-    assert mapping_source.key.cast(["1", "2"]) == (1, 2)
+    assert mapping_source.key.cast == LookupCastSpecIr(name="int", sep=None)
 
 
 def test_converter_keeps_order_by_fields_outside_output() -> None:
@@ -141,7 +140,7 @@ outputs:
     fields: [customer_name]
 """
     config = _load_config(yaml_content)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     assert "order_id" in demand_ir.fields
@@ -164,7 +163,7 @@ fields:
     compute: "1 + 2"
 """
     config = _load_config(yaml_content)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
 
     const_field = demand_ir.fields["const"]
@@ -173,7 +172,7 @@ fields:
 
 
 def test_converter_rejects_invalid_order_by_entry() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     with pytest.raises(ScalimConversionError, match="order_by contains invalid field"):
         converter._convert_main_source_order_by(("-",))

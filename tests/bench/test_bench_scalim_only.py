@@ -5,11 +5,13 @@ import pytest
 
 from scalim_benchlib import BenchmarkRunner
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import DerivedFieldIr, FieldIr
 from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 
 
 def _bench_scale() -> str:
@@ -39,7 +41,7 @@ def _bench_info(scenario: str, row_count: int) -> Dict[str, object]:
 
 
 def _build_demand() -> DemandIr:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     fields = [
         FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True),
         FieldIr(field_id="amount", name="amount", source=main_source),
@@ -48,7 +50,7 @@ def _build_demand() -> DemandIr:
             field_id="profit",
             name="profit",
             dependencies=("amount", "cost"),
-            calculator=lambda amount, cost: (amount or 0) - (cost or 0),
+            compute_expr="amount - cost",
         ),
     ]
     return DemandIr.from_irs(sources=[], fields=fields, main_source=main_source)
@@ -61,10 +63,13 @@ def _make_rows(row_count: int) -> List[dict]:
 def _make_pipeline_runner(row_count: int) -> Callable[[], int]:
     demand = _build_demand()
     plan = PlanBuilder(demand).build(targets=["order_id", "profit"])
+    runtime_bindings = RuntimeBindings(
+        derived_calculators={"profit": lambda amount, cost: (amount or 0) - (cost or 0)},
+    )
     rows = _make_rows(row_count)
 
     def _run() -> int:
-        engine = ScalimEngine(demand=demand, plan=plan, batch_size=50)
+        engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=50)
         with InMemoryRowSink() as sink:
             engine.run(main_rows=rows, sink=sink)
         return row_count

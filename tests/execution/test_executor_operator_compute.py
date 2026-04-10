@@ -8,10 +8,11 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeE
 from scalim.execution.context import BatchContext
 from scalim.execution.guardrails import ScalimGuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import HookManager
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir import DerivedFieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DerivedFieldIr, RuntimeHandleIdIr, ValueOpIr
 
 from tests.fixtures.executor_operator_fixtures import _CaptureHook, _make_runtime
 
@@ -20,11 +21,12 @@ def _make_runtime_with_hook(
     plan: ExecutionPlan,
     *,
     guardrails: Optional[GuardrailsPolicy] = None,
+    runtime_bindings: Optional[RuntimeBindings] = None,
 ):
     hook = _CaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    runtime = _make_runtime(plan, None, hook_manager=hook_manager, guardrails=guardrails)
+    runtime = _make_runtime(plan, None, hook_manager=hook_manager, guardrails=guardrails, runtime_bindings=runtime_bindings)
     return runtime, hook
 
 
@@ -40,19 +42,29 @@ def test_compute_operator_emits_errors_and_success() -> None:
         field_id="score",
         name="Score",
         dependencies=("amount",),
-        calculator=_compute,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.score"),
+            args=(CallByValueIr(kind="field", value="amount"),),
+            field_names=("amount",),
+        ),
     )
     operator = ComputeOperatorIr(
         operator_id="compute_score",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="score",
         input_fields=("amount",),
     )
 
     hook = _CaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    runtime = _make_runtime(ExecutionPlan(field_specs={"score": field_spec}), None, hook_manager=hook_manager)
+    runtime_bindings = RuntimeBindings(derived_calculators={"score": _compute})
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"score": field_spec}),
+        None,
+        hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
+    )
 
     context = BatchContext()
     context.set_field_value("amount", 1, 0)
@@ -83,16 +95,21 @@ def test_compute_operator_secure_compute_wants_gated_dependencies_payload(monkey
         field_id="sum",
         name="Sum",
         dependencies=("a", "b"),
-        calculator=calculator,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.sum"),
+            args=(CallByValueIr(kind="field", value="a"), CallByValueIr(kind="field", value="b")),
+            field_names=("a", "b"),
+        ),
     )
     operator = ComputeOperatorIr(
         operator_id="compute_sum",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="sum",
         input_fields=("a", "b"),
     )
 
-    runtime = _make_runtime(ExecutionPlan(field_specs={"sum": field_spec}), None)
+    runtime_bindings = RuntimeBindings(derived_calculators={"sum": calculator})
+    runtime = _make_runtime(ExecutionPlan(field_specs={"sum": field_spec}), None, runtime_bindings=runtime_bindings)
 
     context = BatchContext()
     context.set_field_value("a", 1, 1)
@@ -114,20 +131,33 @@ def test_compute_operator_secure_compute_emits_field_compute_and_formats_value()
         field_id="sum",
         name="Sum",
         dependencies=("a", "b"),
-        calculator=calculator,
-        value_formatter=lambda value: value * 10,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.sum"),
+            args=(CallByValueIr(kind="field", value="a"), CallByValueIr(kind="field", value="b")),
+            field_names=("a", "b"),
+        ),
+        value_ops=(ValueOpIr(kind="format", callable_ref=RuntimeHandleIdIr(handle_id="format.sum")),),
     )
     operator = ComputeOperatorIr(
         operator_id="compute_sum",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="sum",
         input_fields=("a", "b"),
     )
 
     hook = _CaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    runtime = _make_runtime(ExecutionPlan(field_specs={"sum": field_spec}), None, hook_manager=hook_manager)
+    runtime_bindings = RuntimeBindings(
+        derived_calculators={"sum": calculator},
+        value_transforms={"sum": (lambda value: value * 10)},
+    )
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"sum": field_spec}),
+        None,
+        hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
+    )
 
     context = BatchContext()
     context.set_field_value("a", 1, 1)
@@ -167,16 +197,25 @@ def test_compute_operator_secure_compute_expected_error_variants(
         field_id="sum",
         name="Sum",
         dependencies=("a", "b"),
-        calculator=calculator,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.sum"),
+            args=(CallByValueIr(kind="field", value="a"), CallByValueIr(kind="field", value="b")),
+            field_names=("a", "b"),
+        ),
     )
     operator = ComputeOperatorIr(
         operator_id="compute_sum",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="sum",
         input_fields=("a", "b"),
     )
 
-    runtime, hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"sum": field_spec}), guardrails=guardrails)
+    runtime_bindings = RuntimeBindings(derived_calculators={"sum": calculator})
+    runtime, hook = _make_runtime_with_hook(
+        ExecutionPlan(field_specs={"sum": field_spec}),
+        guardrails=guardrails,
+        runtime_bindings=runtime_bindings,
+    )
 
     context = BatchContext()
     context.set_field_value("a", 1, 1)
@@ -224,16 +263,25 @@ def test_compute_operator_secure_compute_unexpected_error_variants(
         field_id="div",
         name="Div",
         dependencies=("a", "b"),
-        calculator=calculator,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.div"),
+            args=(CallByValueIr(kind="field", value="a"), CallByValueIr(kind="field", value="b")),
+            field_names=("a", "b"),
+        ),
     )
     operator = ComputeOperatorIr(
         operator_id="compute_div",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="div",
         input_fields=("a", "b"),
     )
 
-    runtime, hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"div": field_spec}), guardrails=guardrails)
+    runtime_bindings = RuntimeBindings(derived_calculators={"div": calculator})
+    runtime, hook = _make_runtime_with_hook(
+        ExecutionPlan(field_specs={"div": field_spec}),
+        guardrails=guardrails,
+        runtime_bindings=runtime_bindings,
+    )
 
     context = BatchContext()
     context.set_field_value("a", 1, 1)
@@ -259,30 +307,37 @@ def test_compute_operator_secure_compute_unexpected_error_variants(
 
 def test_compute_operator_injects_ctx_when_configured_and_emits_deps_without_ctx() -> None:
     def _calc(amount, **kwargs):  # type: ignore[no-untyped-def]
-        ctx = kwargs["$ctx"]
+        _ = amount
+        ctx = kwargs["ctx"]
         return "{}:{}".format(ctx.row_id, ctx.batch_num)
 
     field_spec = DerivedFieldIr(
         field_id="score",
         name="Score",
         dependencies=("amount",),
-        calculator=_calc,
-        call_ctx_key="$ctx",
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.score"),
+            args=(CallByValueIr(kind="field", value="amount"),),
+            field_names=("amount",),
+        ),
+        call_ctx_key="ctx",
     )
     operator = ComputeOperatorIr(
         operator_id="compute_score",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="score",
         input_fields=("amount",),
     )
 
     hook = _CaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
+    runtime_bindings = RuntimeBindings(derived_calculators={"score": _calc})
     runtime = _make_runtime(
         ExecutionPlan(field_specs={"score": field_spec}, target_fields=["score"]),
         None,
         hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
     )
     runtime.batch_num = 7
 
@@ -308,19 +363,37 @@ def test_compute_operator_general_compute_guardrails_quiet_records_expected_and_
         _ = x
         raise RuntimeError("boom")
 
-    expected = DerivedFieldIr(field_id="expected", name="Expected", dependencies=("x",), calculator=_expected)
-    unexpected = DerivedFieldIr(field_id="unexpected", name="Unexpected", dependencies=("x",), calculator=_unexpected)
+    expected = DerivedFieldIr(
+        field_id="expected",
+        name="Expected",
+        dependencies=("x",),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.expected"),
+            args=(CallByValueIr(kind="field", value="x"),),
+            field_names=("x",),
+        ),
+    )
+    unexpected = DerivedFieldIr(
+        field_id="unexpected",
+        name="Unexpected",
+        dependencies=("x",),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.unexpected"),
+            args=(CallByValueIr(kind="field", value="x"),),
+            field_names=("x",),
+        ),
+    )
 
     op_expected = ComputeOperatorIr(
         operator_id="compute_expected",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=expected,
+        field_key="expected",
         input_fields=("x",),
     )
     op_unexpected = ComputeOperatorIr(
         operator_id="compute_unexpected",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=unexpected,
+        field_key="unexpected",
         input_fields=("x",),
     )
 
@@ -328,10 +401,12 @@ def test_compute_operator_general_compute_guardrails_quiet_records_expected_and_
     hook_manager = HookManager()
     hook_manager.register(hook)
     plan = ExecutionPlan(field_specs={"expected": expected, "unexpected": unexpected})
+    runtime_bindings = RuntimeBindings(derived_calculators={"expected": _expected, "unexpected": _unexpected})
     runtime = _make_runtime(
         plan,
         None,
         hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
         guardrails=GuardrailsPolicy(enabled=True, mode="quiet"),
     )
     context = BatchContext()
@@ -348,6 +423,7 @@ def test_compute_operator_general_compute_guardrails_quiet_records_expected_and_
         plan,
         None,
         hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
         guardrails=GuardrailsPolicy(enabled=True, mode="fast_fail"),
     )
     context = BatchContext()
@@ -369,20 +445,26 @@ def test_compute_operator_constant_compute_caches_result_and_emits_per_row() -> 
         field_id="const",
         name="Const",
         dependencies=(),
-        calculator=_compute,
+        call_by=CallBySpecIr(reference=RuntimeHandleIdIr(handle_id="derived.const")),
         is_constant_compute=True,
     )
     operator = ComputeOperatorIr(
         operator_id="compute_const",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="const",
         input_fields=(),
     )
 
     hook = _CaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    runtime = _make_runtime(ExecutionPlan(field_specs={"const": field_spec}), None, hook_manager=hook_manager)
+    runtime_bindings = RuntimeBindings(derived_calculators={"const": _compute})
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"const": field_spec}),
+        None,
+        hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
+    )
 
     context = BatchContext()
     ComputeOperatorExecutor().execute(operator, context, [1, 2, 3], runtime)
@@ -418,17 +500,18 @@ def test_compute_operator_constant_compute_errors_emit_per_row_and_compute_once(
         field_id="const",
         name="Const",
         dependencies=(),
-        calculator=_compute,
+        call_by=CallBySpecIr(reference=RuntimeHandleIdIr(handle_id="derived.const")),
         is_constant_compute=True,
     )
     operator = ComputeOperatorIr(
         operator_id="compute_const",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="const",
         input_fields=(),
     )
 
-    runtime, hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"const": field_spec}))
+    runtime_bindings = RuntimeBindings(derived_calculators={"const": _compute})
+    runtime, hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"const": field_spec}), runtime_bindings=runtime_bindings)
 
     context = BatchContext()
     ComputeOperatorExecutor().execute(operator, context, [1, 2, 3], runtime)
@@ -484,23 +567,25 @@ def test_compute_operator_constant_compute_errors_guardrails_variants(
         field_id="const",
         name="Const",
         dependencies=(),
-        calculator=_compute,
+        call_by=CallBySpecIr(reference=RuntimeHandleIdIr(handle_id="derived.const")),
         is_constant_compute=True,
     )
     operator = ComputeOperatorIr(
         operator_id="compute_const",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="const",
         input_fields=(),
     )
 
     hook = _CaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
+    runtime_bindings = RuntimeBindings(derived_calculators={"const": _compute})
     runtime = _make_runtime(
         ExecutionPlan(field_specs={"const": field_spec}),
         None,
         hook_manager=hook_manager,
+        runtime_bindings=runtime_bindings,
         guardrails=GuardrailsPolicy(enabled=True, mode=mode),  # type: ignore[arg-type]
     )
 
@@ -539,16 +624,21 @@ def test_compute_operator_non_constant_compute_is_not_cached() -> None:
         field_id="score",
         name="Score",
         dependencies=("amount",),
-        calculator=_compute,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.score"),
+            args=(CallByValueIr(kind="field", value="amount"),),
+            field_names=("amount",),
+        ),
     )
     operator = ComputeOperatorIr(
         operator_id="compute_score",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="score",
         input_fields=("amount",),
     )
 
-    runtime = _make_runtime(ExecutionPlan(field_specs={"score": field_spec}), None)
+    runtime_bindings = RuntimeBindings(derived_calculators={"score": _compute})
+    runtime = _make_runtime(ExecutionPlan(field_specs={"score": field_spec}), None, runtime_bindings=runtime_bindings)
     context = BatchContext()
     context.set_field_value("amount", 1, 10)
     context.set_field_value("amount", 2, 20)

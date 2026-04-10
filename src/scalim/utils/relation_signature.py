@@ -1,26 +1,24 @@
-from typing import FrozenSet, Optional, Tuple, Union
+from typing import FrozenSet, Optional, Tuple
 
-from .._internal.utils.converters import NamedLookupCast, auto_normalize_key
 from ..spec.ir import LookupStepIr
 from ..spec.ir.aliases import LookupKeySpec, NormalizedLookupKeySpec
 from ..spec.ir.binding import BindingIr
+from ..spec.ir.callable_refs import describe_callable_ref
+from ..spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ..typedefs import LookupKey
 
-LookupCastSignature = Tuple[str, Union[str, int]]
-BindingParamMarker = Union[str, int]
+LookupCastSignature = Tuple[str, str]
+BindingParamMarker = str
 BindingSignature = Tuple[str, str, str, str, NormalizedLookupKeySpec, BindingParamMarker]
 StepSignature = Tuple[str, Tuple[str, ...], NormalizedLookupKeySpec, Optional[LookupCastSignature], Optional[BindingSignature]]
 RelationSignature = Tuple[StepSignature, ...]
 LoadRefCacheKey = Tuple[StepSignature, FrozenSet[LookupKey]]
 
 
-def is_auto_lookup_cast(lookup_cast: object) -> bool:
-    if lookup_cast is auto_normalize_key:
-        return True
-    if isinstance(lookup_cast, NamedLookupCast) and lookup_cast.scalim_lookup_cast_name == "auto":
-        return True
-    # 兼容历史的私有标记字段.
-    return getattr(lookup_cast, "_scalim_lookup_cast_name", None) == "auto"  # pragma: allow-dynattr legacy: lookup_cast marker
+def is_auto_lookup_cast(lookup_cast: Optional[LookupCastSpecIr]) -> bool:
+    if lookup_cast is None:
+        return False
+    return str(lookup_cast.name or "").strip() == "auto"
 
 
 def normalize_key_field(key_field: LookupKeySpec) -> NormalizedLookupKeySpec:
@@ -31,21 +29,25 @@ def normalize_key_field(key_field: LookupKeySpec) -> NormalizedLookupKeySpec:
     return key_field
 
 
-def lookup_cast_signature(lookup_cast: Optional[object]) -> Optional[LookupCastSignature]:
+def lookup_cast_signature(lookup_cast: Optional[LookupCastSpecIr], *, is_multi: bool) -> Optional[LookupCastSignature]:
     if lookup_cast is None:
         return None
-    if lookup_cast is auto_normalize_key:
-        return ("auto", "auto_normalize_key")
-    if isinstance(lookup_cast, NamedLookupCast):
-        return ("named", lookup_cast.scalim_lookup_cast_name)
-    return ("callable", id(lookup_cast))
+    return ("spec", lookup_cast_id(lookup_cast, is_multi=is_multi))
 
 
 def build_binding_signature(binding: Optional[BindingIr]) -> Optional[BindingSignature]:
     if binding is None:
         return None
-    param_marker = binding.param_name if binding.param_name is not None else id(binding.params_builder)
-    return ("binding", binding.mode, binding.as_, binding.cache_mode, binding.key_field, param_marker)
+    marker = ""
+    if binding.params_builder_ref is not None:
+        marker = "params_builder_ref:{}".format(describe_callable_ref(binding.params_builder_ref))
+    elif binding.params_template is not None:
+        marker = "params_template:{}".format(str(binding.template_path or "(template)"))
+    else:
+        marker = "params:none"
+    if binding.param_name is not None:
+        marker = "{}:param={!r}".format(marker, binding.param_name)
+    return ("binding", binding.mode, binding.as_, binding.cache_mode, binding.key_field, marker)
 
 
 def resolve_step_binding(step: LookupStepIr) -> Optional[BindingIr]:
@@ -76,7 +78,8 @@ def can_group_by_relation(steps: Tuple[LookupStepIr, ...]) -> bool:
 
 def build_step_signature(step: LookupStepIr) -> StepSignature:
     to_key = normalize_key_field(step.get_to_key_or_source_key())
-    lookup_cast_sig = lookup_cast_signature(step.lookup_cast)
+    effective_cast = step.lookup_cast if step.lookup_cast is not None else step.to_source.key.cast
+    lookup_cast_sig = lookup_cast_signature(effective_cast, is_multi=step.is_multi_field())
     binding_signature = build_binding_signature(resolve_step_binding(step))
     return (
         step.to_source.source_id,

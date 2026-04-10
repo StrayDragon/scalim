@@ -46,18 +46,19 @@ from scalim.ob.presets.performance import (
     PerformanceObserver,
     PerformanceThresholds,
 )
+from scalim.execution.runtime_bindings import RuntimeBindings
 from tests.support.testing_utils import missing_optional_dependency
 
 
-def _get_main_rows(demand, limit: int = 3):
+def _get_main_rows(demand, runtime_bindings: RuntimeBindings, limit: int = 3):
     main_source = demand.main_source
     if main_source is None:
         return []
     params = dict(main_source.params or {})
     if params:
-        rows = list(main_source.loader(**params))
+        rows = list(runtime_bindings.require_main_source_loader(main_source.source_id)(**params))
     else:
-        rows = list(main_source.loader())
+        rows = list(runtime_bindings.require_main_source_loader(main_source.source_id)())
     return rows[:limit]
 
 
@@ -102,9 +103,9 @@ def test_event_catalog_includes_core_events() -> None:
         assert descriptor.payload_policy
 
 
-def test_performance_observer_basic(plan_builder, engine_factory) -> None:
+def test_performance_observer_basic(plan_builder, engine_factory, example_runtime_bindings) -> None:
     engine, observer = _build_engine_with_observer(plan_builder, engine_factory)
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows)
 
     metrics = observer.get_metrics()
@@ -115,14 +116,14 @@ def test_performance_observer_basic(plan_builder, engine_factory) -> None:
     assert metrics.throughput > 0
 
 
-def test_performance_observer_resets_metrics_each_run(plan_builder, engine_factory) -> None:
+def test_performance_observer_resets_metrics_each_run(plan_builder, engine_factory, example_runtime_bindings) -> None:
     engine, observer = _build_engine_with_observer(plan_builder, engine_factory)
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows)
     assert observer.metrics.total_rows == 3
     assert observer.metrics.batch_count == 2
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=1)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=1)
     engine.run(main_rows=main_rows)
     assert observer.metrics.total_rows == 1
     assert observer.metrics.batch_count == 1
@@ -175,7 +176,7 @@ def test_performance_observer_cache_metrics_counts() -> None:
     assert stats.cache_hit_rate == 0.5
 
 
-def test_performance_observer_console_output(plan_builder, engine_factory, caplog) -> None:
+def test_performance_observer_console_output(plan_builder, engine_factory, example_runtime_bindings, caplog) -> None:
     logger = logging.getLogger("scalim.tests.observer")
     engine, _observer = _build_engine_with_observer(
         plan_builder,
@@ -185,7 +186,7 @@ def test_performance_observer_console_output(plan_builder, engine_factory, caplo
         logger=logger,
     )
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     with caplog.at_level(logging.INFO, logger=logger.name):
         engine.run(main_rows=main_rows)
 
@@ -221,7 +222,7 @@ def test_performance_observer_print_summary_details(caplog) -> None:
     assert any("loader" in record.getMessage() for record in caplog.records)
 
 
-def test_performance_observer_json_output(plan_builder, engine_factory) -> None:
+def test_performance_observer_json_output(plan_builder, engine_factory, example_runtime_bindings) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = str(Path(tmpdir) / "perf_report.json")
 
@@ -232,7 +233,7 @@ def test_performance_observer_json_output(plan_builder, engine_factory) -> None:
             output_path=output_path,
         )
 
-        main_rows = _get_main_rows(plan_builder.demand, limit=3)
+        main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
         engine.run(main_rows=main_rows)
 
         assert Path(output_path).exists()
@@ -240,7 +241,7 @@ def test_performance_observer_json_output(plan_builder, engine_factory) -> None:
         assert "summary" in content
 
 
-def test_performance_observer_csv_output(plan_builder, engine_factory) -> None:
+def test_performance_observer_csv_output(plan_builder, engine_factory, example_runtime_bindings) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = str(Path(tmpdir) / "perf_report.csv")
 
@@ -251,7 +252,7 @@ def test_performance_observer_csv_output(plan_builder, engine_factory) -> None:
             output_path=output_path,
         )
 
-        main_rows = _get_main_rows(plan_builder.demand, limit=3)
+        main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
         engine.run(main_rows=main_rows)
 
         assert Path(output_path).exists()
@@ -260,7 +261,7 @@ def test_performance_observer_csv_output(plan_builder, engine_factory) -> None:
         assert "duration" in content
 
 
-def test_performance_observer_threshold_warning(plan_builder, engine_factory, caplog) -> None:
+def test_performance_observer_threshold_warning(plan_builder, engine_factory, example_runtime_bindings, caplog) -> None:
     logger = logging.getLogger("scalim.tests.threshold")
     thresholds = PerformanceThresholds(batch_duration_warn=0.0)
     engine, _observer = _build_engine_with_observer(
@@ -270,14 +271,14 @@ def test_performance_observer_threshold_warning(plan_builder, engine_factory, ca
         logger=logger,
     )
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     with caplog.at_level(logging.WARNING, logger=logger.name):
         engine.run(main_rows=main_rows)
 
     assert any("批次耗时超阈值" in record.getMessage() for record in caplog.records)
 
 
-def test_performance_observer_threshold_callback(plan_builder, engine_factory) -> None:
+def test_performance_observer_threshold_callback(plan_builder, engine_factory, example_runtime_bindings) -> None:
     exceeded_metrics = []
 
     def on_exceeded(metric_name: str, value: object) -> None:
@@ -291,17 +292,17 @@ def test_performance_observer_threshold_callback(plan_builder, engine_factory) -
     )
     _observer._on_threshold_exceeded = on_exceeded
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows)
 
     assert len(exceeded_metrics) > 0
     assert exceeded_metrics[0][0] == "batch_duration"
 
 
-def test_performance_observer_reset(plan_builder, engine_factory) -> None:
+def test_performance_observer_reset(plan_builder, engine_factory, example_runtime_bindings) -> None:
     engine, observer = _build_engine_with_observer(plan_builder, engine_factory)
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows)
     assert observer.get_metrics().batch_count > 0
 
@@ -572,13 +573,13 @@ def _has_psutil() -> bool:
     not _has_psutil(),
     reason="psutil not installed",
 )
-def test_performance_observer_with_memory(plan_builder, engine_factory) -> None:
+def test_performance_observer_with_memory(plan_builder, engine_factory, example_runtime_bindings) -> None:
     engine, observer = _build_engine_with_observer(
         plan_builder,
         engine_factory,
         metrics={"duration", "memory"},
     )
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows)
 
     metrics = observer.get_metrics()

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from .guardrails import GuardrailsPolicy
     from .loader_retry import LoaderRetryPolicies
     from .output_composition import OutputCompositionSpec, OutputTargetStats
+    from .runtime_bindings import RuntimeBindings
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,14 @@ class ExecutionRequest:
 
     loader_retry: Optional["LoaderRetryPolicies"] = None
     """可选:加载重试策略."""
+
+    runtime_bindings: Optional["RuntimeBindings"] = None
+    """可选:运行时绑定(`RuntimeBindings`).
+
+    说明:
+    - 静态 `IR`/`ExecutionPlan` 不得保存 `Python` 可调用对象;执行阶段所需函数对象通过 `RuntimeBindings` 注入(通常由“运行时链接”阶段产出).
+    - 当为 `None` 时,执行阶段无法解析加载器、派生字段计算等运行时函数.
+    """
 
     output_composition: Optional["OutputCompositionSpec"] = None
     """可选:多输出组合请求(`IR/Python-only`).

@@ -113,6 +113,7 @@ def test_run_ir_output_composition_workbook_detail_and_summary(tmp_path: Path) -
         sink=None,
         output_composition=spec,
         parallel_mode="seq",
+        runtime_bindings=case.runtime_bindings,
     )
 
     result = run_ir(case.demand, request)
@@ -162,6 +163,7 @@ def test_run_ir_output_composition_can_tee_to_row_sink(tmp_path: Path) -> None:
         sink=sink,
         output_composition=spec,
         parallel_mode="seq",
+        runtime_bindings=case.runtime_bindings,
     )
 
     result = run_ir(case.demand, request)
@@ -189,6 +191,7 @@ def test_run_ir_output_composition_rejects_column_sink_for_tee(tmp_path: Path) -
         sink=InMemoryColumnSink(["order_id"]),
         output_composition=spec,
         parallel_mode="seq",
+        runtime_bindings=case.runtime_bindings,
     )
 
     with pytest.raises(ValueError, match=r"output_composition only supports streaming row sinks"):
@@ -232,6 +235,7 @@ def test_output_composition_primary_only_disables_failed_derived(tmp_path: Path)
         sink=None,
         output_composition=spec,
         parallel_mode="seq",
+        runtime_bindings=case.runtime_bindings,
     )
     result = run_ir(case.demand, request)
 
@@ -271,6 +275,7 @@ def test_ranked_summary_orders_and_adds_rank(tmp_path: Path) -> None:
         sink=None,
         output_composition=spec,
         parallel_mode="seq",
+        runtime_bindings=case.runtime_bindings,
     )
 
     _ = run_ir(case.demand, request)

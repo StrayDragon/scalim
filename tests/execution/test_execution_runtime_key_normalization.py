@@ -1,27 +1,37 @@
 import pytest
 
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
+from scalim.spec.ir import KeyIr, LookupCastSpecIr, LookupStepIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir.lookup_casts import lookup_cast_id
 
 
 def _make_runtime(*, key_normalization: str) -> ExecutionRuntime:
     plan = ExecutionPlan(field_specs={})
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": lambda: []})
+    int_cast = LookupCastSpecIr(name="int")
+    runtime_bindings.lookup_key_casts[lookup_cast_id(int_cast, is_multi=False)] = lambda value: int(value) if value is not None else None
     return ExecutionRuntime(
         plan,
         HookManager(),
         ObserverManager(),
-        MainSourceIr(source_id="orders", loader=lambda: []),
+        main_source=MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader")),
+        sources={},
+        runtime_bindings=runtime_bindings,
         key_normalization=key_normalization,  # type: ignore[arg-type]
     )
 
 
-def _make_step(*, lookup_cast=None) -> LookupStepIr:  # type: ignore[no-untyped-def]
-    source = SourceIr(source_id="targets", key=KeyIr(key="target_id"), loader_spec=LoaderIr(callable=lambda: {}))
+def _make_step(*, lookup_cast: "LookupCastSpecIr | None" = None) -> LookupStepIr:
+    source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
+    )
     return LookupStepIr(from_field="fk", to_source=source, lookup_cast=lookup_cast)
 
 
@@ -45,7 +55,7 @@ def test_execution_runtime_normalize_lookup_key_status_auto_str_ok_type_error_an
 
 
 def test_execution_runtime_normalize_lookup_key_status_explicit_cast_precedence_and_force_str() -> None:
-    step = _make_step(lookup_cast=int)
+    step = _make_step(lookup_cast=LookupCastSpecIr(name="int"))
 
     runtime_auto = _make_runtime(key_normalization="auto_str")
     key, status, _message = runtime_auto.normalize_lookup_key_with_status("1", step)

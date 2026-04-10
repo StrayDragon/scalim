@@ -8,13 +8,14 @@ from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.pipeline.overrides import PipelineOverrides
 from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir import FieldIr, KeyIr, LookupStepIr, MainSourceIr, SourceIr
+from scalim.spec.ir import FieldIr, KeyIr, LookupStepIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 from scalim.spec.ir.binding import LoaderIr
 
 
@@ -37,23 +38,29 @@ def _main_loader() -> List[Dict[str, Any]]:
 
 
 def _make_source(source_id: str) -> SourceIr:
-    return SourceIr(source_id=source_id, key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_noop_loader))
+    return SourceIr(
+        source_id=source_id,
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="{}.loader".format(source_id))),
+    )
 
 
 def _make_loadref_op(*, field_key: str, to_source: SourceIr) -> LoadRefOperatorIr:
-    field_spec = FieldIr(field_id=field_key, name=field_key, source=to_source)
     return LoadRefOperatorIr(
         operator_id="load_ref_{}".format(field_key),
         operator_type=OperatorType.LOAD_REF.value,
-        source=to_source,
+        source_id=to_source.source_id,
         field_key=field_key,
-        field_spec=field_spec,
         lookup_steps=(LookupStepIr(from_field="id", to_source=to_source),),
     )
 
 
 def _build_plan(ops: Tuple[LoadRefOperatorIr, ...]) -> ExecutionPlan:
-    field_specs = {op.field_key: op.field_spec for op in ops}
+    field_specs = {}
+    for op in ops:
+        if not op.lookup_steps:
+            continue
+        field_specs[op.field_key] = FieldIr(field_id=op.field_key, name=op.field_key, source=op.lookup_steps[-1].to_source)
     return ExecutionPlan(
         operators=ops,
         field_specs=field_specs,
@@ -72,7 +79,7 @@ def test_adaptive_per_task_runtime_inherits_key_normalization_and_observability_
     op_a = _make_loadref_op(field_key="a", to_source=source_a)
     op_b = _make_loadref_op(field_key="b", to_source=source_b)
     plan = _build_plan((op_a, op_b))
-    main_source = MainSourceIr(source_id="orders", loader=_main_loader)
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
 
     preloaded_cache = {
         "s1": {"1": {"a": "A"}},
@@ -95,6 +102,8 @@ def test_adaptive_per_task_runtime_inherits_key_normalization_and_observability_
         HookManager(enable_debugging=True, fallback_logger_enabled=True),
         seq_observer_manager,
         main_source=main_source,
+        sources={"s1": source_a, "s2": source_b},
+        runtime_bindings=RuntimeBindings(main_source_loaders={"orders": _main_loader}),
         parallel_mode="seq",
         max_workers=0,
         key_normalization=key_normalization,  # type: ignore[arg-type]
@@ -155,6 +164,8 @@ def test_adaptive_per_task_runtime_inherits_key_normalization_and_observability_
         adaptive_hook_manager,
         adaptive_observer_manager,
         main_source=main_source,
+        sources={"s1": source_a, "s2": source_b},
+        runtime_bindings=RuntimeBindings(main_source_loaders={"orders": _main_loader}),
         parallel_mode="adaptive",
         max_workers=2,
         key_normalization=key_normalization,  # type: ignore[arg-type]

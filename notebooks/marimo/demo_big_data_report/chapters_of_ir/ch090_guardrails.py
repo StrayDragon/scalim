@@ -5,10 +5,24 @@ from typing import Any, Dict, List, Optional, Sequence
 from scalim.events import EVENT_ERROR
 from scalim.execution import ScalimEngine
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, ScalimGuardrailViolationError
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver
 from scalim.planning import PlanBuilder
-from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, KeyIr, LoaderIr, MainSourceIr, SourceIr
+from scalim.spec.ir import (
+    BindingIr,
+    CallBySpecIr,
+    CallByValueIr,
+    DemandIr,
+    DerivedFieldIr,
+    FieldIr,
+    KeyIr,
+    LoaderIr,
+    MainSourceIr,
+    RuntimeHandleIdIr,
+    SourceIr,
+    ValueOpIr,
+)
 from scalim_misc.demo_big_data_report.guardrails_demo_loaders import (
     load_guardrails_demo_main_rows,
     load_guardrails_demo_ref_table,
@@ -33,15 +47,44 @@ class _ErrorCollector(EventDispatchObserver):
 
 
 def _build_demand() -> DemandIr:
-    main_source = MainSourceIr(source_id="main", loader=load_guardrails_demo_main_rows)
-    ref_source = SourceIr(source_id="ref", key=KeyIr("id"), loader_spec=LoaderIr(callable=load_guardrails_demo_ref_table))
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.main_loader"))
+    ref_source = SourceIr(
+        source_id="ref",
+        key=KeyIr("id"),
+        loader_spec=LoaderIr(
+            callable_ref=RuntimeHandleIdIr(handle_id="ref.loader"),
+            bindings={
+                "id": BindingIr(
+                    key_field="id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="ref.params_builder.id"),
+                )
+            },
+        ),
+    )
     rel_to_ref = main_source["ref_id"].join(ref_source["id"])
 
     fields: Sequence[Any] = [
         FieldIr(field_id="ref_id", name="ref_id", source=main_source),
-        FieldIr(field_id="a", name="a", source=main_source, transform=_to_int),
+        FieldIr(
+            field_id="a",
+            name="a",
+            source=main_source,
+            value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="field.a.transform")),),
+        ),
         FieldIr(field_id="b", name="b", source=main_source),
-        DerivedFieldIr(field_id="ratio", name="ratio", dependencies=("a", "b"), calculator=lambda a, b: a / b),
+        DerivedFieldIr(
+            field_id="ratio",
+            name="ratio",
+            dependencies=("a", "b"),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.ratio"),
+                args=(
+                    CallByValueIr(kind="field", value="a"),
+                    CallByValueIr(kind="field", value="b"),
+                ),
+                field_names=("a", "b"),
+            ),
+        ),
         FieldIr(field_id="ref_value", name="ref_value", source=ref_source, data_key="value", relation=rel_to_ref),
     ]
 
@@ -54,8 +97,25 @@ def _build_demand() -> DemandIr:
     )
 
 
+def _build_runtime_bindings() -> RuntimeBindings:
+    bindings = RuntimeBindings()
+    bindings.main_source_loaders["main"] = load_guardrails_demo_main_rows
+    bindings.source_loaders["ref"] = load_guardrails_demo_ref_table
+
+    def _params(ctx) -> Any:
+        ids = ctx.lookup_keys_list or []
+        return (), {"ids": ids}
+
+    bindings.params_builders[("ref", "id")] = _params
+
+    bindings.value_transforms["a"] = _to_int
+    bindings.derived_calculators["ratio"] = lambda a, b: a / b
+    return bindings
+
+
 def run_guardrails() -> ExampleResult:
     demand = _build_demand()
+    runtime_bindings = _build_runtime_bindings()
     targets = ["ref_id", "a", "b", "ratio", "ref_value"]
     plan = PlanBuilder(demand).build(targets=targets)
 
@@ -64,7 +124,14 @@ def run_guardrails() -> ExampleResult:
     error_collector = _ErrorCollector()
     observer_manager = ObserverManager(observers=[error_collector])
 
-    engine = ScalimEngine(demand=demand, plan=plan, observer_manager=observer_manager, batch_size=50, guardrails=guardrails_quiet)
+    engine = ScalimEngine(
+        demand=demand,
+        plan=plan,
+        runtime_bindings=runtime_bindings,
+        observer_manager=observer_manager,
+        batch_size=50,
+        guardrails=guardrails_quiet,
+    )
     rows = list(engine.run())
 
     expected_rows = [
@@ -85,7 +152,7 @@ def run_guardrails() -> ExampleResult:
 
     # `fast_fail`: 首次违规即抛异常
     guardrails_fast_fail = GuardrailsPolicy(enabled=True, mode="fast_fail", loader=GuardrailsLoaderPolicy(required_fields=("b",)))
-    engine_fast = ScalimEngine(demand=demand, plan=plan, batch_size=50, guardrails=guardrails_fast_fail)
+    engine_fast = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=50, guardrails=guardrails_fast_fail)
     fast_fail_ok = False
     try:
         _ = engine_fast.run()

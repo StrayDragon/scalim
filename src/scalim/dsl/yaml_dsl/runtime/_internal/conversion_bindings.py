@@ -1,27 +1,27 @@
-from typing import Callable, Optional
-
-from .....spec.ir.aliases import LookupKeyCast
-from .....typedefs import FieldValue
+from .....spec.ir._fields import ValueOpIr
+from .....spec.ir.lookup_casts import LookupCastSpecIr
+from ...schema_dsl.constants import LOOKUP_CAST_NAME_ENUM
 from ...schema_dsl.models import LookupCastConfig
 from ..errors import ScalimConversionError
-from .conversion_lookup import VALUE_CASTS, LookupCastRegistry
+from .conversion_lookup import VALUE_CASTS
 
 
 class ConfigToIRConversionBindingMixin:
-    _lookup_casts: Optional[LookupCastRegistry] = None
-
-    def _get_value_cast_fn(self, value_cast: str) -> Callable[[FieldValue], FieldValue]:
-        fn = VALUE_CASTS.get(value_cast)
-        if fn is None:
+    def _get_value_cast_op(self, value_cast: str) -> ValueOpIr:
+        if str(value_cast or "").strip() not in VALUE_CASTS:
             msg = "Unknown value_cast: '{}'".format(value_cast)
             raise ScalimConversionError(msg)
-        return fn
+        return ValueOpIr(kind="cast", to=str(value_cast))
 
-    def _get_lookup_cast_fn(self, lookup_cast: LookupCastConfig, *, is_multi: bool) -> LookupKeyCast:
-        if self._lookup_casts is None:
-            msg = "Lookup cast registry is not initialized"
+    def _get_lookup_cast_spec(self, lookup_cast: LookupCastConfig) -> LookupCastSpecIr:
+        name = str(lookup_cast.name or "").strip()
+        if not name:
+            msg = "lookup_cast.name is required"
             raise ScalimConversionError(msg)
-        return self._lookup_casts.build(lookup_cast, is_multi=is_multi)
+        if name not in LOOKUP_CAST_NAME_ENUM:
+            msg = "Unknown lookup_cast: '{}'".format(name)
+            raise ScalimConversionError(msg)
+        return LookupCastSpecIr(name=name, sep=lookup_cast.sep)
 
 
 __all__ = ()

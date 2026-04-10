@@ -11,7 +11,7 @@ from ....vendor.compact.typing_extensionsx import override
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX, ParsedReference, ScalimReferenceSyntaxError, parse_python_reference
 from .allowlist_policy import ResolverTrustedMode
 from .builtin_callables import resolve_builtin_callable_reference
-from .errors import ScalimResolverError
+from .errors import ScalimAllowlistViolationError, ScalimResolverError
 
 resolver_logger = logging.getLogger("scalim.dsl.yaml_dsl.resolver")
 
@@ -93,7 +93,7 @@ class ResolverPolicy:
             msg = "函数 '{}' 不在 `allowed_functions` 允许列表中".format(full_path)
             if "." in func_name:
                 msg += " (类式引用的允许列表必须写完整属性链,例如 `pkg.mod:Obj.safe` 或 `pkg.mod.Obj.safe`)"
-            raise ScalimResolverError(msg)
+            raise ScalimAllowlistViolationError(msg)
         self._check_allowed_module(module_path)
 
     def _check_allowed_module(self, module_path: str) -> None:
@@ -110,7 +110,7 @@ class ResolverPolicy:
 
         if not allowed:
             msg = "模块 '{}' 不在 `allowed_modules` 允许列表中".format(module_path)
-            raise ScalimResolverError(msg)
+            raise ScalimAllowlistViolationError(msg)
 
     def _is_allowed_function(self, module_path: str, func_name: str) -> bool:
         if self._allowed_functions is None:

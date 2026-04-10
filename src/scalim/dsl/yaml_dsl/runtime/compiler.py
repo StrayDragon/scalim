@@ -74,9 +74,11 @@ from .effective_outputs import outputs_require_unique_effective_field_display_na
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimResolverError
 from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
+from .runtime_linking import resolve_runtime_bindings
 
 if TYPE_CHECKING:
     from ....execution.output_composition import OutputCompositionSpec
+    from ....execution.runtime_bindings import RuntimeBindings
 
 
 def _ensure_allowlist(
@@ -637,10 +639,9 @@ def create_reference_resolver(
 def compile_ir(
     config: DemandConfig,
     *,
-    resolver: SecurePythonReferenceResolver,
     init_vars: Optional[Dict[str, object]] = None,
 ) -> DemandIr:
-    converter = ConfigToIRConverter(resolver=resolver, init_vars=init_vars)
+    converter = ConfigToIRConverter(init_vars=init_vars)
     return converter.convert(config)
 
 
@@ -1052,6 +1053,7 @@ def build_request(
     yaml_base_dir: str,
     options: RunOptions,
     resolver: SecurePythonReferenceResolver,
+    runtime_bindings: "RuntimeBindings",
 ) -> ExecutionRequest:
     effective_config = _apply_io_overrides(config, options=options)
     effective_config = _apply_demand_runtime_policy_overrides(effective_config, options=options)
@@ -1105,6 +1107,7 @@ def build_request(
         parallel_mode=options.parallel_mode,
         max_workers=options.max_workers,
         key_normalization=options.key_normalization,
+        runtime_bindings=runtime_bindings,
     )
 
 
@@ -1133,9 +1136,20 @@ def compile(  # noqa: A001
         builtin_callables=options.builtin_callables,
         public_builtin_callable_ids=options.public_builtin_callable_ids,
     )
-    demand_ir = compile_ir(config, resolver=resolver, init_vars=options.init_vars)
+    demand_ir = compile_ir(config, init_vars=options.init_vars)
+    runtime_bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=resolver,
+    )
     yaml_base_dir = str(Path(str(yaml_path)).expanduser().resolve(strict=False).parent)
-    request = build_request(config, demand_ir, yaml_base_dir=yaml_base_dir, options=options, resolver=resolver)
+    request = build_request(
+        config,
+        demand_ir,
+        yaml_base_dir=yaml_base_dir,
+        options=options,
+        resolver=resolver,
+        runtime_bindings=runtime_bindings,
+    )
     return Compilation(
         config=config,
         demand_ir=demand_ir,

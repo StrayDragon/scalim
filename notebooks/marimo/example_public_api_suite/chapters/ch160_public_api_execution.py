@@ -6,7 +6,7 @@ from scalim import execution as api
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
-from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
+from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir, build_minimal_public_api_runtime_bindings
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
@@ -16,8 +16,9 @@ _EXAMPLE_ID = "example_public_api_suite/ch160_public_api_execution"
 def run_public_api_execution() -> ExampleResult:
     symbols = {name: getattr(api, name) for name in api.__all__}
     demand_ir = build_minimal_public_api_ir()
+    runtime_bindings = build_minimal_public_api_runtime_bindings()
     plan = PlanBuilder(demand_ir).build()
-    engine = api.ScalimEngine(demand=demand_ir, plan=plan, batch_size=10, parallel_mode="seq")
+    engine = api.ScalimEngine(demand=demand_ir, plan=plan, runtime_bindings=runtime_bindings, batch_size=10, parallel_mode="seq")
 
     sink = InMemoryRowSink()
     _ = engine.run(sink=sink)

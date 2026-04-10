@@ -13,6 +13,7 @@ from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.adaptive.tuning import AdaptiveTuning
 from scalim.execution.context import BatchContext
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.pipeline.base._adaptive_pool import maybe_create_adaptive_pool
@@ -24,11 +25,7 @@ from scalim.planning import PlanBuilder
 from scalim.planning.plan import ExecutionPlan
 from scalim.sinks import ISink
 from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
-from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import FieldIr
-from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import BindingIr, DemandIr, FieldIr, KeyIr, LoaderIr, LookupStepIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 
 
 def _picklable_test_main_loader() -> List[Dict[str, Any]]:
@@ -77,7 +74,7 @@ def test_pipeline_loads_main_rows_when_missing(
     assert engine._pipeline.runtime.preloaded_cache
 
 
-def test_pipeline_runs_gc_when_interval_hits(plan_builder) -> None:
+def test_pipeline_runs_gc_when_interval_hits(plan_builder, engine_factory) -> None:
     plan = plan_builder.build(targets=["order_id"])
 
     calls = []
@@ -87,13 +84,7 @@ def test_pipeline_runs_gc_when_interval_hits(plan_builder) -> None:
         return 0
 
     overrides = PipelineOverrides(gc_collect_fn=_fake_collect)
-    engine = ScalimEngine(
-        demand=plan_builder.demand,
-        plan=plan,
-        batch_size=2,
-        gc_interval=1,
-        pipeline_overrides=overrides,
-    )
+    engine = engine_factory(plan, batch_size=2, gc_interval=1, pipeline_overrides=overrides)
 
     engine.run(main_rows=[{"order_id": 0}, {"order_id": 1}, {"order_id": 2}])
 
@@ -124,33 +115,39 @@ def test_parallel_mode_process_removed(plan_builder, engine_factory) -> None:
 
 
 def test_scalim_engine_rejects_invalid_batch_size() -> None:
-    demand = DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=_picklable_test_main_loader))
+    demand = DemandIr(
+        sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
+    )
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": _picklable_test_main_loader})
     plan = ExecutionPlan(target_fields=[])
 
     with pytest.raises(ValueError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size=0)
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=0)
 
     with pytest.raises(ValueError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size=-1)
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=-1)
 
     with pytest.raises(TypeError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size=True)  # type: ignore[arg-type]
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=True)  # type: ignore[arg-type]
 
     with pytest.raises(TypeError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size=1.5)  # type: ignore[arg-type]
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1.5)  # type: ignore[arg-type]
 
     with pytest.raises(TypeError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size="oops")  # type: ignore[arg-type]
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size="oops")  # type: ignore[arg-type]
 
     with pytest.raises(TypeError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size=Decimal("2"))  # type: ignore[arg-type]
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=Decimal("2"))  # type: ignore[arg-type]
 
     with pytest.raises(TypeError, match="batch_size"):
-        _ = ScalimEngine(demand=demand, plan=plan, batch_size=Fraction(4, 2))  # type: ignore[arg-type]
+        _ = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=Fraction(4, 2))  # type: ignore[arg-type]
 
 
 def test_scalim_engine_accepts_none_batch_size_and_runs_single_batch() -> None:
-    demand = DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=_picklable_test_main_loader))
+    demand = DemandIr(
+        sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
+    )
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": _picklable_test_main_loader})
     plan = ExecutionPlan(target_fields=[])
 
     class _BatchCounterHook(BaseHook):
@@ -169,7 +166,7 @@ def test_scalim_engine_accepts_none_batch_size_and_runs_single_batch() -> None:
     manager = HookManager()
     manager.register(hook)
 
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=None, hook_manager=manager)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=None, hook_manager=manager)
     _ = engine.run(main_rows=[{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}, {"id": 5}])
 
     assert hook.pipeline_batch_size is None
@@ -194,18 +191,9 @@ def test_adaptive_pipeline_writes_to_batch_sink(plan_builder, engine_factory) ->
 
 
 def _make_pipeline(*, overrides: PipelineOverrides) -> SeqPipeline:
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": lambda: []})
     demand = DemandIr(sources={}, fields={}, main_source=main_source)
-    plan = ExecutionPlan(target_fields=[])
-    hook_manager = HookManager()
-    observer_manager = ObserverManager()
-    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, main_source=main_source, parallel_mode="adaptive", max_workers=2)
-    executor = BatchExecutor(plan, runtime, overrides=overrides)
-    return SeqPipeline(plan, executor, runtime, hook_manager, observer_manager, demand, batch_size=10, overrides=overrides)
-
-
-def test_maybe_create_adaptive_pool_returns_none_when_workers_le_1() -> None:
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
     plan = ExecutionPlan(target_fields=[])
     hook_manager = HookManager()
     observer_manager = ObserverManager()
@@ -214,6 +202,28 @@ def test_maybe_create_adaptive_pool_returns_none_when_workers_le_1() -> None:
         hook_manager,
         observer_manager,
         main_source=main_source,
+        sources=demand.sources,
+        runtime_bindings=runtime_bindings,
+        parallel_mode="adaptive",
+        max_workers=2,
+    )
+    executor = BatchExecutor(plan, runtime, overrides=overrides)
+    return SeqPipeline(plan, executor, runtime, hook_manager, observer_manager, demand, batch_size=10, overrides=overrides)
+
+
+def test_maybe_create_adaptive_pool_returns_none_when_workers_le_1() -> None:
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
+    plan = ExecutionPlan(target_fields=[])
+    hook_manager = HookManager()
+    observer_manager = ObserverManager()
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": lambda: []})
+    runtime = ExecutionRuntime(
+        plan,
+        hook_manager,
+        observer_manager,
+        main_source=main_source,
+        sources={},
+        runtime_bindings=runtime_bindings,
         parallel_mode="adaptive",
         max_workers=1,
     )
@@ -241,13 +251,16 @@ def test_maybe_create_adaptive_pool_rejects_pruned_backend(backend: str) -> None
             _ = tuning
             return backend
 
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     plan = ExecutionPlan(target_fields=[])
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": lambda: []})
     runtime = ExecutionRuntime(
         plan,
         HookManager(),
         ObserverManager(),
         main_source=main_source,
+        sources={},
+        runtime_bindings=runtime_bindings,
         parallel_mode="adaptive",
         max_workers=2,
     )
@@ -271,24 +284,29 @@ def test_maybe_create_adaptive_pool_rejects_pruned_backend(backend: str) -> None
 
 
 def test_adaptive_scheduler_rejects_invalid_backend() -> None:
-    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s1))
+    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")))
 
     from scalim.planning.operators import LoadRefOperatorIr, OperatorType  # noqa: PLC0415
 
     op_a = LoadRefOperatorIr(
         operator_id="load_ref_a",
         operator_type=OperatorType.LOAD_REF.value,
-        source=s1,
+        source_id=s1.source_id,
         field_key="a",
-        field_spec=FieldIr(field_id="a", name="a", source=s1),
         lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
     )
-    plan = ExecutionPlan(operators=(op_a,), field_specs={"a": op_a.field_spec})
+    field_spec = FieldIr(field_id="a", name="a", source=s1)
+    plan = ExecutionPlan(operators=(op_a,), field_specs={"a": field_spec}, ref_loader_sequence=[(s1, [("a", ())])])
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": _picklable_test_main_loader}, source_loaders={"s1": _picklable_test_load_s1}
+    )
     runtime = ExecutionRuntime(
         plan,
         HookManager(),
         ObserverManager(),
-        main_source=MainSourceIr(source_id="main", loader=_picklable_test_main_loader),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        sources={"s1": s1},
+        runtime_bindings=runtime_bindings,
         parallel_mode="adaptive",
         max_workers=2,
     )
@@ -315,24 +333,29 @@ def test_adaptive_scheduler_rejects_invalid_backend() -> None:
 
 @pytest.mark.parametrize("backend", [ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC])
 def test_adaptive_scheduler_rejects_pruned_backend_selected_in_runtime(backend: str) -> None:
-    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s1))
+    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")))
 
     from scalim.planning.operators import LoadRefOperatorIr, OperatorType  # noqa: PLC0415
 
     op_a = LoadRefOperatorIr(
         operator_id="load_ref_a",
         operator_type=OperatorType.LOAD_REF.value,
-        source=s1,
+        source_id=s1.source_id,
         field_key="a",
-        field_spec=FieldIr(field_id="a", name="a", source=s1),
         lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
     )
-    plan = ExecutionPlan(operators=(op_a,), field_specs={"a": op_a.field_spec})
+    field_spec = FieldIr(field_id="a", name="a", source=s1)
+    plan = ExecutionPlan(operators=(op_a,), field_specs={"a": field_spec}, ref_loader_sequence=[(s1, [("a", ())])])
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": _picklable_test_main_loader}, source_loaders={"s1": _picklable_test_load_s1}
+    )
     runtime = ExecutionRuntime(
         plan,
         HookManager(),
         ObserverManager(),
-        main_source=MainSourceIr(source_id="main", loader=_picklable_test_main_loader),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        sources={"s1": s1},
+        runtime_bindings=runtime_bindings,
         parallel_mode="adaptive",
         max_workers=2,
     )
@@ -374,34 +397,44 @@ def test_adaptive_scheduler_uses_runtime_backend_selected_by_pool() -> None:
             self.calls += 1
             return ADAPTIVE_BACKEND_THREAD if self.calls == 1 else ADAPTIVE_BACKEND_PROCESS
 
-    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s1))
-    s2 = SourceIr(source_id="s2", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=_picklable_test_load_s2))
+    s1 = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")))
+    s2 = SourceIr(source_id="s2", key=KeyIr(key="id"), loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s2.loader")))
 
     from scalim.planning.operators import LoadRefOperatorIr, OperatorType  # noqa: PLC0415
 
     op_a = LoadRefOperatorIr(
         operator_id="load_ref_a",
         operator_type=OperatorType.LOAD_REF.value,
-        source=s1,
+        source_id=s1.source_id,
         field_key="a",
-        field_spec=FieldIr(field_id="a", name="a", source=s1),
         lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
     )
     op_b = LoadRefOperatorIr(
         operator_id="load_ref_b",
         operator_type=OperatorType.LOAD_REF.value,
-        source=s2,
+        source_id=s2.source_id,
         field_key="b",
-        field_spec=FieldIr(field_id="b", name="b", source=s2),
         lookup_steps=(LookupStepIr(from_field="fk2", to_source=s2),),
     )
 
-    plan = ExecutionPlan(operators=(op_a, op_b), field_specs={"a": op_a.field_spec, "b": op_b.field_spec})
+    field_a = FieldIr(field_id="a", name="a", source=s1)
+    field_b = FieldIr(field_id="b", name="b", source=s2)
+    plan = ExecutionPlan(
+        operators=(op_a, op_b),
+        field_specs={"a": field_a, "b": field_b},
+        ref_loader_sequence=[(s1, [("a", ())]), (s2, [("b", ())])],
+    )
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": _picklable_test_main_loader},
+        source_loaders={"s1": _picklable_test_load_s1, "s2": _picklable_test_load_s2},
+    )
     runtime = ExecutionRuntime(
         plan,
         HookManager(),
         ObserverManager(),
-        main_source=MainSourceIr(source_id="main", loader=_picklable_test_main_loader),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        sources={"s1": s1, "s2": s2},
+        runtime_bindings=runtime_bindings,
         parallel_mode="adaptive",
         max_workers=2,
     )
@@ -489,18 +522,20 @@ def _make_simple_demand_and_plan():
             101: {"customer_id": 101, "customer_name": "Bob"},
         }
 
-    def _build_keys_params(field_name: str, param_name: str):  # type: ignore[no-untyped-def]
-        def _builder(ctx):  # type: ignore[no-untyped-def]
-            return (), {param_name: set(ctx.lookup_keys or set())}
+    def _build_keys_params(field_name: str, param_name: str) -> BindingIr:
+        return BindingIr(
+            key_field=field_name,
+            params_builder_ref=RuntimeHandleIdIr(handle_id="customers.params_builder.{}".format(field_name)),
+            param_name=param_name,
+            mode="keys",
+        )
 
-        return BindingIr(key_field=field_name, params_builder=_builder, mode="keys")
-
-    orders = MainSourceIr(source_id="orders", loader=_load_orders)
+    orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=LoaderIr(
-            callable=_load_customers,
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
             bindings={"customer_id": _build_keys_params("customer_id", "customer_id_set")},
         ),
     )
@@ -517,17 +552,26 @@ def _make_simple_demand_and_plan():
     ]
     demand = DemandIr.from_irs(sources=[customers], fields=fields, main_source=orders)
     plan = PlanBuilder(demand).build(targets=["order_id", "customer_name"])
-    return demand, plan, _load_orders
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"orders": _load_orders},
+        source_loaders={"customers": _load_customers},
+        params_builders={
+            ("customers", "customer_id"): (lambda ctx: ((), {"customer_id_set": set(ctx.lookup_keys or set())})),
+        },
+    )
+    return demand, plan, runtime_bindings, _load_orders
 
 
 @pytest.mark.parametrize("sink_mode", ["memory", "column"], ids=["memory", "column"])
 def test_stage_spans_emitted(sink_mode: str) -> None:
-    demand, plan, load_orders = _make_simple_demand_and_plan()
+    demand, plan, runtime_bindings, load_orders = _make_simple_demand_and_plan()
     hook = _StageSpanHook()
     hooks = HookManager()
     hooks.register(hook)
 
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=10, parallel_mode="seq", hook_manager=hooks)
+    engine = ScalimEngine(
+        demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=10, parallel_mode="seq", hook_manager=hooks
+    )
     if sink_mode == "column":
         with InMemoryColumnSink(field_names=plan.target_fields) as sink:
             _ = engine.run(main_rows=list(load_orders()), sink=sink)

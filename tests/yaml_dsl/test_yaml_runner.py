@@ -25,6 +25,7 @@ from scalim.ob.observer import Observer
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
 from scalim.sinks import InMemoryRowSink
 from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from tests.support.pathing import fixtures_dir
 from tests.support.testing_utils import missing_optional_dependency
 
@@ -445,7 +446,7 @@ def test_pretty_logging_observer_formats_cache_status() -> None:
 
 
 def test_yaml_run_result_to_dataframe_requires_pandas(monkeypatch) -> None:
-    main_source = MainSourceIr(source_id="demo", loader=lambda: [])
+    main_source = MainSourceIr(source_id="demo", loader_ref=RuntimeHandleIdIr(handle_id="demo.loader"))
     demand_ir = DemandIr.from_irs([], [], main_source)
     plan = PlanBuilder(demand_ir).build(targets=[])
     sink = InMemoryRowSink()
@@ -468,7 +469,7 @@ def test_yaml_run_result_to_dataframe_requires_pandas(monkeypatch) -> None:
 
 
 def test_yaml_run_result_to_dataframe_requires_in_memory_sink() -> None:
-    main_source = MainSourceIr(source_id="demo", loader=lambda: [])
+    main_source = MainSourceIr(source_id="demo", loader_ref=RuntimeHandleIdIr(handle_id="demo.loader"))
     demand_ir = DemandIr.from_irs([], [], main_source)
     plan = PlanBuilder(demand_ir).build(targets=[])
     core = ExecutionResult(
@@ -486,7 +487,7 @@ def test_yaml_run_result_to_dataframe_requires_in_memory_sink() -> None:
 
 
 def test_yaml_run_result_to_dataframe_ok() -> None:
-    main_source = MainSourceIr(source_id="demo", loader=lambda: [])
+    main_source = MainSourceIr(source_id="demo", loader_ref=RuntimeHandleIdIr(handle_id="demo.loader"))
     demand_ir = DemandIr.from_irs([], [], main_source)
     plan = PlanBuilder(demand_ir).build(targets=[])
     sink = InMemoryRowSink()
@@ -509,7 +510,7 @@ def test_yaml_run_result_to_dataframe_ok() -> None:
 
 
 def test_export_layout_uses_field_ids_when_header_by_field_id() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[
@@ -524,7 +525,7 @@ def test_export_layout_uses_field_ids_when_header_by_field_id() -> None:
 
 
 def test_export_layout_uses_field_names_when_header_by_name() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[
@@ -538,7 +539,7 @@ def test_export_layout_uses_field_names_when_header_by_name() -> None:
 
 
 def test_export_layout_header_names_none_when_no_mapping() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[

@@ -62,7 +62,7 @@ def test_ref_loader_sequence_cross_source_dependency_ordering() -> None:
     assert [src.source_id for src, _ in plan.ref_loader_sequence] == ["zz_customers", "mm_regions", "aa_countries"]
 
     load_ref_ops = [op for op in plan.operators if isinstance(op, LoadRefOperatorIr)]
-    assert [(op.source.source_id, op.field_key) for op in load_ref_ops] == [
+    assert [(op.source_id, op.field_key) for op in load_ref_ops] == [
         ("zz_customers", "region_id"),
         ("mm_regions", "country_id"),
         ("aa_countries", "country_name"),

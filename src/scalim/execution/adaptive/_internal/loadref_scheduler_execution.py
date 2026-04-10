@@ -54,6 +54,8 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
             hook_manager=hook_manager,
             observer_manager=observer_manager,
             main_source=runtime.main_source,
+            sources=runtime.sources,
+            runtime_bindings=runtime.runtime_bindings,
             guardrails=runtime.guardrails,
             loader_retry=runtime.loader_retry,
             parallel_mode="seq",

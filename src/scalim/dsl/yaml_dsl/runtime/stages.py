@@ -1,10 +1,11 @@
-"""显式划分 `YAML` 运行时编译的阶段边界.
+"""显式划分 YAML DSL 运行时编译的阶段边界.
 
 阶段:
-1)`allowlist` 校验
-2)`YAML` 解析
-3)配置 -> `IR` 转换
-4)执行请求映射
+1)白名单(`allowlist`)校验
+2)YAML 解析
+3)配置 -> IR 转换
+4)运行时链接(生成 `RuntimeBindings`)
+5)执行请求映射
 """
 
 from typing import FrozenSet, Mapping, Optional
@@ -23,6 +24,7 @@ from .compiler import (
 )
 from .contracts import RunOptions
 from .references import SecurePythonReferenceResolver
+from .runtime_linking import resolve_runtime_bindings
 
 
 def stage_validate_allowlist(*, allowed_modules: FrozenSet[str], allowed_functions: Optional[FrozenSet[str]]) -> None:
@@ -61,7 +63,8 @@ def stage_load_yaml_config(yaml_path: str, *, template_vars: Optional[Mapping[st
 
 
 def stage_compile_demand_ir(config: DemandConfig, *, context: YamlDslStageContext) -> DemandIr:
-    return compile_ir(config, resolver=context.resolver)
+    _ = context
+    return compile_ir(config)
 
 
 def stage_build_execution_request(
@@ -74,7 +77,15 @@ def stage_build_execution_request(
 ) -> ExecutionRequest:
     if options.allowed_modules != context.allowed_modules or options.allowed_functions != context.allowed_functions:
         raise ScalimStageAllowlistMismatchError
-    return build_request(config, demand_ir, yaml_base_dir=str(yaml_base_dir), options=options, resolver=context.resolver)
+    runtime_bindings = resolve_runtime_bindings(demand_ir, resolver=context.resolver)
+    return build_request(
+        config,
+        demand_ir,
+        yaml_base_dir=str(yaml_base_dir),
+        options=options,
+        resolver=context.resolver,
+        runtime_bindings=runtime_bindings,
+    )
 
 
 __all__ = (

@@ -10,14 +10,15 @@ from ....ob.manager import ObserverManager
 from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks import ISink
-from ....spec.ir import LookupStepIr, MainSourceIr, SupportedFieldIr
-from ....spec.ir.aliases import LookupKeyCast
+from ....spec.ir import LookupStepIr, MainSourceIr, SourceIr, SupportedFieldIr
+from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LookupKey, ParallelMode, RowData
 from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ....vendor.dataclassesx import dataclass
 from ...guardrails import GuardrailsPolicy
 from ...key_normalization import normalize_key_normalization, should_apply_str_key_normalization
 from ...loader_retry import LoaderRetryPolicies
+from ...runtime_bindings import RuntimeBindings
 from ...workflow_cache_pool import WorkflowCachePool
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
@@ -55,6 +56,7 @@ class ExecutionRuntime:
     guardrails: GuardrailsPolicy
     loader_retry: LoaderRetryPolicies
     field_specs: Dict[str, SupportedFieldIr]
+    sources: Dict[str, SourceIr]
     key_fields: FrozenSet[str]
     reverse_deps: Dict[str, Set[str]]
     field_consumers: Dict[str, int]
@@ -68,6 +70,7 @@ class ExecutionRuntime:
     key_normalization: KeyNormalizationMode
     adaptive_backend: Optional[str]
     adaptive_process_failure_mode: Optional[str]
+    runtime_bindings: RuntimeBindings
 
     def __init__(
         self,
@@ -75,6 +78,8 @@ class ExecutionRuntime:
         hook_manager: HookManager,
         observer_manager: ObserverManager,
         main_source: Optional[MainSourceIr],
+        sources: Dict[str, SourceIr],
+        runtime_bindings: RuntimeBindings,
         guardrails: Optional[GuardrailsPolicy] = None,
         loader_retry: Optional[LoaderRetryPolicies] = None,
         *,
@@ -96,7 +101,9 @@ class ExecutionRuntime:
         self.instrumentation = InstrumentationHub(hook_manager=self.hook_manager, observer_manager=self.observer_manager)
         self.guardrails = guardrails or GuardrailsPolicy.disabled()
         self.loader_retry = loader_retry or LoaderRetryPolicies.disabled()
+        self.runtime_bindings = runtime_bindings
         self.field_specs = plan.field_specs
+        self.sources = dict(sources)
         self.key_fields = plan.key_fields
         self.target_fields = plan.target_fields
         self.primary_field = plan.primary_field
@@ -254,10 +261,18 @@ class ExecutionRuntime:
         has_explicit_cast = step.lookup_cast is not None or step.to_source.key.cast is not None
 
         if step.lookup_cast is not None:
-            candidate, status, error_message = self._apply_lookup_cast(step.lookup_cast, raw_key, none_message="lookup_cast returned None")
+            candidate, status, error_message = self._apply_lookup_cast(
+                step.lookup_cast,
+                raw_key,
+                is_multi=step.is_multi_field(),
+                none_message="lookup_cast returned None",
+            )
         elif step.to_source.key.cast is not None:
             candidate, status, error_message = self._apply_lookup_cast(
-                step.to_source.key.cast, raw_key, none_message="key.cast returned None"
+                step.to_source.key.cast,
+                raw_key,
+                is_multi=step.is_multi_field(),
+                none_message="key.cast returned None",
             )
         else:
             candidate, status, error_message = raw_key, "ok", None
@@ -275,13 +290,18 @@ class ExecutionRuntime:
 
     def _apply_lookup_cast(
         self,
-        lookup_cast: LookupKeyCast,
+        lookup_cast: LookupCastSpecIr,
         raw_key: object,
         *,
+        is_multi: bool,
         none_message: str,
     ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+        cast_fn = self.runtime_bindings.get_lookup_key_cast(lookup_cast_id(lookup_cast, is_multi=is_multi))
+        if cast_fn is None:
+            msg = "Missing runtime lookup_cast callable for {}".format(lookup_cast_id(lookup_cast, is_multi=is_multi))
+            raise KeyError(msg)
         try:
-            normalized = lookup_cast(raw_key)
+            normalized = cast_fn(raw_key)
         except (ValueError, TypeError) as exc:
             return None, "type_error", str(exc)
 

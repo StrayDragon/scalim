@@ -1,12 +1,79 @@
 from types import MappingProxyType
-from typing import Callable, Hashable, Mapping, Optional, Set, Tuple, Union
+from typing import Hashable, Mapping, Optional, Set, Tuple, Union
 
 from ...typedefs import FieldValue
 from ...vendor.dataclassesx import dataclass
 from ._helpers import extract_from_fields
 from ._relations import JoinConditionIr, LookupStepIr, RelationIr
 from ._sources import SourceRefIr
+from .callable_refs import CallableRefIr
 from .presentation import FieldPresentationIr
+
+
+@dataclass(frozen=True)
+class CallByValueIr:
+    """`call_by` 参数值规范(纯数据).
+
+    `kind` 取值:
+    - `literal`: `value` 为 `Python` 字面量(`int`/`float`/`str`/`bool`/`None` 等)
+    - `field`: `value` 为依赖字段的 `field_id`
+    - `ctx`: 忽略 `value`,使用上下文对象
+    - `ctx_attr`: `value` 为上下文对象的属性名
+    """
+
+    kind: str
+    value: object
+
+
+@dataclass(frozen=True)
+class CallBySpecIr:
+    """派生字段的 `call_by` 规范(纯数据,不执行 `import`/解析)."""
+
+    reference: CallableRefIr
+    args: Tuple[CallByValueIr, ...] = ()
+    kwargs: Tuple[Tuple[str, CallByValueIr], ...] = ()
+    field_names: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ValueOpIr:
+    """值处理操作规范(纯数据,不包含可调用对象).
+
+    `kind` 取值:
+    - `cast`: 内置类型转换(例如 `to='decimal'`)
+    - `transform`: 运行时解析 `callable_ref` 并执行转换
+    - `format`: 运行时解析 `callable_ref` 并执行格式化
+    """
+
+    kind: str
+    to: str = ""
+    callable_ref: Optional[CallableRefIr] = None
+
+    def __post_init__(self) -> None:
+        kind = str(self.kind or "").strip()
+        object.__setattr__(self, "kind", kind)
+        if kind == "cast":
+            to = str(self.to or "").strip()
+            if not to:
+                msg = "ValueOpIr(kind='cast') requires non-empty to"
+                raise ValueError(msg)
+            if self.callable_ref is not None:
+                msg = "ValueOpIr(kind='cast') must not set callable_ref"
+                raise ValueError(msg)
+            object.__setattr__(self, "to", to)
+            return
+
+        if kind in ("transform", "format"):
+            if self.to:
+                msg = "ValueOpIr(kind={!r}) must not set to".format(kind)
+                raise ValueError(msg)
+            if self.callable_ref is None:
+                msg = "ValueOpIr(kind={!r}) requires callable_ref".format(kind)
+                raise ValueError(msg)
+            return
+
+        msg = "Unknown ValueOpIr.kind={!r}".format(kind)
+        raise ValueError(msg)
 
 
 @dataclass(frozen=True)
@@ -78,15 +145,8 @@ class FieldIr:
     导出/展示元信息
     """
 
-    value_formatter: Optional[Callable[[FieldValue], FieldValue]] = None
-    """
-    输出格式化函数
-    """
-
-    transform: Optional[Callable[[FieldValue], FieldValue]] = None
-    """
-    值转换函数 (可选)
-    """
+    value_ops: Tuple[ValueOpIr, ...] = ()
+    """值处理操作序列(纯描述,不包含可调用对象)."""
 
     relation: "Optional[Union[JoinConditionIr, RelationIr]]" = None
     """
@@ -137,22 +197,6 @@ class FieldIr:
             return tuple(deps)
         return ()
 
-    def apply_transform(self, value: FieldValue) -> FieldValue:
-        """应用转换函数(结果侧)
-
-        参数:
-            `value`: 原始值
-
-        注意: 类型安全说明:
-        - 如果有 `transform` 函数,返回类型由 `transform` 决定
-        - 如果没有 `transform`,返回原始值 (类型保持为 `FieldValue`)
-        """
-        if self.transform is not None:
-            value = self.transform(value)
-        if self.value_formatter is not None:
-            return self.value_formatter(value)
-        return value
-
 
 @dataclass(frozen=True)
 class DerivedFieldIr:
@@ -184,20 +228,19 @@ class DerivedFieldIr:
     依赖字段的 `field_key` 元组.
     """
 
-    calculator: Callable[..., FieldValue]
-    """
-    计算函数
-    """
+    compute_expr: str = ""
+    """可选: `compute` 表达式(纯文本,运行时再编译)."""
+
+    call_by: Optional[CallBySpecIr] = None
+    """可选: `call_by` 规范(纯数据,运行时再解析/绑定)."""
 
     presentation: Optional[FieldPresentationIr] = None
     """
     导出/展示元信息
     """
 
-    value_formatter: Optional[Callable[[FieldValue], FieldValue]] = None
-    """
-    输出格式化函数
-    """
+    value_ops: Tuple[ValueOpIr, ...] = ()
+    """值处理操作序列(例如格式化;纯描述,不包含可调用对象)."""
 
     call_ctx_key: Optional[str] = None
     """
@@ -213,6 +256,16 @@ class DerivedFieldIr:
     """
 
     def __post_init__(self) -> None:
+        compute_expr = str(self.compute_expr or "").strip()
+        object.__setattr__(self, "compute_expr", compute_expr)
+
+        if compute_expr and self.call_by is not None:
+            msg = "派生字段 {!r} 必须二选一: compute_expr 或 call_by".format(self.field_id)
+            raise ValueError(msg)
+        if not compute_expr and self.call_by is None:
+            msg = "派生字段 {!r} 必须声明 compute_expr 或 call_by".format(self.field_id)
+            raise ValueError(msg)
+
         if self.is_constant_compute:
             if self.dependencies:
                 msg = "常量 compute 字段 {!r} 必须不声明 dependencies".format(self.field_id)
@@ -228,18 +281,6 @@ class DerivedFieldIr:
 
     def get_dependencies(self) -> Tuple[str, ...]:
         return self.dependencies
-
-    def compute(self, **field_values: FieldValue) -> FieldValue:
-        """
-        执行计算: 通过依赖字段的值计算得出新的值
-
-        参数:
-            `**field_values`: 依赖字段的值
-        """
-        result = self.calculator(**field_values)
-        if self.value_formatter is not None:
-            return self.value_formatter(result)
-        return result
 
 
 SupportedFieldIr = Union[FieldIr, DerivedFieldIr]

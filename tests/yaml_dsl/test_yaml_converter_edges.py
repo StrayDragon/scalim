@@ -4,21 +4,23 @@ import pytest
 
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
-from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
-from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_int
-from scalim.dsl.yaml_dsl.runtime._internal.conversion_sources import _ensure_field_value, _resolve_call_by_ctx_attr
+from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime.runtime_linking import _eval_call_by_value, resolve_runtime_bindings
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import LookupCastRegistry, VALUE_CASTS, cast_int
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_sources import _ensure_field_value
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DemandConfig,
     DerivedFieldConfig,
-    LookupCastConfig,
     MainSourceConfig,
     RelationConfig,
     RelationStepConfig,
     SourceConfig,
     SourceFieldConfig,
 )
+from scalim.spec.ir import CallByValueIr, ComputeCallContextIr, LookupStepIr
 from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir import LookupStepIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
+from scalim.spec.ir.lookup_casts import LookupCastSpecIr
 from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 
 
@@ -64,7 +66,7 @@ def _make_config(
 
 
 def _dummy_source_ir(source_id):
-    loader_spec = LoaderIr(callable=lambda **_kwargs: {})
+    loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("dummy_loader:{}".format(source_id)))
     return SourceIr(source_id=source_id, key=KeyIr(key="id", cast=None), loader_spec=loader_spec)
 
 
@@ -78,7 +80,7 @@ def test_converter_does_not_filter_fields() -> None:
         "unused": DerivedFieldConfig(field_id="unused", name="unused", compute="order_id", depends_on=("order_id",)),
     }
     config = _make_config(source_fields=source_fields, derived_fields=derived_fields)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     demand_ir = converter.convert(config)
 
@@ -94,7 +96,7 @@ def test_converter_collects_nested_derived_dependencies() -> None:
         "total": DerivedFieldConfig(field_id="total", name="total", compute="net", depends_on=("net",)),
     }
     config = _make_config(source_fields=source_fields, derived_fields=derived_fields)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     demand_ir = converter.convert(config)
 
@@ -112,12 +114,16 @@ def test_converter_compute_accepts_decimal_result_from_dec_helper() -> None:
         "total": DerivedFieldConfig(field_id="total", name="total", compute="dec(amount) + dec(tax)", depends_on=("amount", "tax")),
     }
     config = _make_config(source_fields=source_fields, derived_fields=derived_fields)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     demand_ir = converter.convert(config)
 
-    total = demand_ir.fields["total"]
-    assert total.compute(amount=0.1, tax="0.2") == Decimal("0.3")
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])),
+    )
+    total_calc = bindings.derived_calculators["total"]
+    assert total_calc(0.1, "0.2") == Decimal("0.3")
 
 
 def test_converter_step_to_field_tuple() -> None:
@@ -140,7 +146,7 @@ def test_converter_step_to_field_tuple() -> None:
         )
     }
     config = _make_config(sources=sources, relations=relations)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     converter.convert(config)
 
@@ -150,8 +156,8 @@ def test_converter_step_to_field_tuple() -> None:
 
 
 def test_converter_source_field_missing_source_or_extract() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
-    converter._main_source_ir = MainSourceIr(source_id="orders", loader=lambda: [])
+    converter = ConfigToIRConverter()
+    converter._main_source_ir = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr("main_source:orders"))
 
     cases = [
         (_make_source_field("bad", source="", extract="id"), "missing source"),
@@ -166,14 +172,14 @@ def test_converter_rejects_invalid_source_field_extract_expression() -> None:
     config = _make_config(
         source_fields={"bad": _make_source_field("bad", extract="a..b")},
     )
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     with pytest.raises(ScalimConversionError, match="invalid extract"):
         converter.convert(config)
 
 
 def test_converter_lookup_steps_return_none_when_no_main_source() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     target_source = _dummy_source_ir("customers")
 
     result = converter._resolve_lookup_steps(_make_source_field("name", source="customers", extract="name"), _make_config(), target_source)
@@ -182,8 +188,8 @@ def test_converter_lookup_steps_return_none_when_no_main_source() -> None:
 
 
 def test_converter_lookup_steps_return_none_for_main_source_target() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
-    converter._main_source_ir = MainSourceIr(source_id="orders", loader=lambda: [])
+    converter = ConfigToIRConverter()
+    converter._main_source_ir = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr("main_source:orders"))
     target_source = _dummy_source_ir("orders")
 
     result = converter._resolve_lookup_steps(
@@ -194,7 +200,7 @@ def test_converter_lookup_steps_return_none_for_main_source_target() -> None:
 
 
 def test_converter_infer_unique_path_edges() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
     dummy_step = LookupStepIr(from_field="id", to_source=_dummy_source_ir("orders"))
     converter._relation_steps = {
         "loop": [("orders", "orders", dummy_step)],
@@ -207,7 +213,7 @@ def test_converter_infer_unique_path_edges() -> None:
 
 
 def test_converter_parse_source_field_expr_errors() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     for expr in ("invalid", "source."):
         with pytest.raises(ScalimConversionError, match="Invalid field reference"):
@@ -238,7 +244,7 @@ def test_converter_resolves_relation_field_id_to_data_key() -> None:
         "products": {"product_category_id": "category_id"},
     }
     config = _make_config(sources=sources, relations=relations, source_field_id_map=source_field_id_map)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     converter.convert(config)
 
@@ -270,7 +276,7 @@ def test_converter_relation_field_falls_back_to_data_key_when_field_id_missing()
         "products": {"product_category_id": "category_id"},
     }
     config = _make_config(sources=sources, relations=relations, source_field_id_map=source_field_id_map)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     converter.convert(config)
 
@@ -302,14 +308,14 @@ def test_converter_rejects_ambiguous_relation_field_id() -> None:
         "products": {"category_id": "category_id_v2", "product_category_id": "category_id"},
     }
     config = _make_config(sources=sources, relations=relations, source_field_id_map=source_field_id_map)
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     with pytest.raises(ScalimConversionError, match="ambiguous"):
         converter.convert(config)
 
 
 def test_converter_parse_step_field_tuple_errors() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     cases = [
         (("a.id", "b.id"), "Step fields must reference the same source"),
@@ -321,35 +327,37 @@ def test_converter_parse_step_field_tuple_errors() -> None:
 
 
 def test_converter_value_and_lookup_cast_edges() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
-
-    value_cast = converter._get_value_cast_fn("int")
+    value_cast = VALUE_CASTS["int"]
     assert value_cast("1") == 1
 
-    lookup_cast = converter._get_lookup_cast_fn(LookupCastConfig(name="sep_first", sep=","), is_multi=False)
+    registry = LookupCastRegistry()
+    lookup_cast = registry.build(LookupCastSpecIr(name="sep_first", sep=","), is_multi=False)
     assert lookup_cast(None) is None
     assert lookup_cast(" , ") is None
     assert lookup_cast("1,2") == "1"
 
-    multi_cast = converter._get_lookup_cast_fn(LookupCastConfig(name="sep_first", sep=","), is_multi=True)
+    multi_cast = registry.build(LookupCastSpecIr(name="sep_first", sep=","), is_multi=True)
     assert multi_cast("bad") is None
     assert multi_cast(["", "1"]) is None
 
 
-def test_converter_lookup_cast_registry_uninitialized_and_cast_int_type_error() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
-    converter._lookup_casts = None
-
-    with pytest.raises(ScalimConversionError, match="Lookup cast registry is not initialized"):
-        converter._get_lookup_cast_fn(LookupCastConfig(name="auto", sep=None), is_multi=False)
+def test_converter_lookup_cast_registry_and_cast_int_type_error() -> None:
+    registry = LookupCastRegistry()
+    with pytest.raises(ScalimConversionError, match="Unknown lookup_cast"):
+        _ = registry.build(LookupCastSpecIr(name="unknown"), is_multi=False)
 
     with pytest.raises(TypeError, match="Unsupported int cast value type"):
         cast_int(object())
 
 
 def test_conversion_source_helpers_raise_on_invalid_runtime_values() -> None:
-    with pytest.raises(TypeError, match="returned unsupported type"):
+    with pytest.raises(TypeError, match="unsupported value type"):
         _ensure_field_value(object(), field_id="status_name", producer="call_by")
 
-    with pytest.raises(AttributeError, match="call_by context missing attribute"):
-        _resolve_call_by_ctx_attr(object(), "row_id")
+    with pytest.raises(AttributeError, match="has no attribute 'missing'"):
+        _eval_call_by_value(
+            CallByValueIr(kind="ctx_attr", value="missing"),
+            field_id="status_name",
+            dep_values={},
+            ctx=ComputeCallContextIr(row_id="row", batch_num=1, field_id="status_name", deps=(), values={}),
+        )

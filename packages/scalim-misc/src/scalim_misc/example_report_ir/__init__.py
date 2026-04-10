@@ -18,7 +18,7 @@
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 
 try:
     import pandas as pd
@@ -27,9 +27,24 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 from scalim._internal.utils.converters import must_get_seps_values_first_int
-from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, KeyIr, LookupStepIr, MainSourceIr, SourceIr
-from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.typedefs import SourceSpecIrCacheMode
+from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.spec.ir import (
+    CallBySpecIr,
+    CallByValueIr,
+    DemandIr,
+    DerivedFieldIr,
+    FieldIr,
+    KeyIr,
+    LookupCastSpecIr,
+    LookupStepIr,
+    MainSourceIr,
+    RuntimeHandleIdIr,
+    SourceIr,
+    ValueOpIr,
+)
+from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
+from scalim.spec.ir.lookup_casts import lookup_cast_id
+from scalim.typedefs import LoaderCallParams, SourceSpecIrCacheMode
 
 # 配置日志记录器
 FORMAT = "%(asctime)s | %(message)s"
@@ -379,6 +394,7 @@ __all__ = [
     "Dal",
     "PandasDataLoader",
     "build_order_report_model",
+    "build_order_report_runtime_bindings",
     "data_loader",
 ]
 
@@ -398,7 +414,7 @@ def build_order_report_model() -> DemandIr:
     # 订单数据源 (主数据源, 行流加载)
     orders_source = MainSourceIr(
         source_id="orders",
-        loader=DAL.paged_get_order_list,
+        loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"),
         params={
             "begin_time": "2024-01-01",
             "end_time": "2024-01-07",
@@ -409,11 +425,12 @@ def build_order_report_model() -> DemandIr:
 
     # 支付数据源
     pays_loader = LoaderIr(
-        callable=BLL.get_pay_info_from_api_of_concrete_params,
+        callable_ref=RuntimeHandleIdIr(handle_id="pays.loader"),
         bindings={
             "pay_id": BindingIr(
                 key_field="pay_id",
-                params_builder=lambda ctx: ((), {"pay_ids_set": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="pays.params_builder.pay_id"),
+                param_name="pay_ids_set",
             ),
         },
     )
@@ -427,11 +444,12 @@ def build_order_report_model() -> DemandIr:
 
     # 客户数据源
     customers_loader = LoaderIr(
-        callable=BLL.get_customer_info_from_api_of_kw_params,
+        callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
         bindings={
             "customer_id": BindingIr(
                 key_field="customer_id",
-                params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="customers.params_builder.customer_id"),
+                param_name="customer_ids_set",
             ),
         },
     )
@@ -444,11 +462,12 @@ def build_order_report_model() -> DemandIr:
 
     # 国家数据源
     countries_loader = LoaderIr(
-        callable=DAL.get_country_info_of_concrete_params,
+        callable_ref=RuntimeHandleIdIr(handle_id="countries.loader"),
         bindings={
             "country_id": BindingIr(
                 key_field="country_id",
-                params_builder=lambda ctx: ((), {"country_ids_set": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="countries.params_builder.country_id"),
+                param_name="country_ids_set",
             ),
         },
     )
@@ -466,12 +485,13 @@ def build_order_report_model() -> DemandIr:
     # - 缓存数据在整个管线生命周期内有效
     # - 不参与内存优化剪枝
     order_types_loader = LoaderIr(
-        callable=data_loader.get_order_types,
+        callable_ref=RuntimeHandleIdIr(handle_id="order_types.loader"),
         bindings={
             # 注意: 预加载模式下此绑定不会被使用,但保留以支持回退到普通模式
             "type_id": BindingIr(
                 key_field="type_id",
-                params_builder=lambda ctx: ((), {"type_ids_set": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="order_types.params_builder.type_id"),
+                param_name="type_ids_set",
             ),
         },
     )
@@ -485,12 +505,13 @@ def build_order_report_model() -> DemandIr:
 
     # 区域机构映射数据源 - 展示复合键与多字段连接
     region_institution_mapping_loader = LoaderIr(
-        callable=data_loader.get_region_institution_mapping,
+        callable_ref=RuntimeHandleIdIr(handle_id="region_institution_mapping.loader"),
         bindings={
             # 使用元组作为键,匹配复合主键
             ("region_id", "institution_id"): BindingIr(
                 key_field=("region_id", "institution_id"),
-                params_builder=lambda ctx: ((), {"composite_keys": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="region_institution_mapping.params_builder.composite"),
+                param_name="composite_keys",
             ),
         },
     )
@@ -504,11 +525,12 @@ def build_order_report_model() -> DemandIr:
     # FR013: 小组数据源 - 多级关联中间表
     # 用于演示: `orders` → `small_groups` → `big_groups`
     small_groups_loader = LoaderIr(
-        callable=data_loader.get_small_groups,
+        callable_ref=RuntimeHandleIdIr(handle_id="small_groups.loader"),
         bindings={
             "small_group_id": BindingIr(
                 key_field="small_group_id",
-                params_builder=lambda ctx: ((), {"group_ids_set": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="small_groups.params_builder.small_group_id"),
+                param_name="group_ids_set",
             ),
         },
     )
@@ -523,11 +545,12 @@ def build_order_report_model() -> DemandIr:
 
     # FR013: 大组数据源 - 多级关联目标表
     big_groups_loader = LoaderIr(
-        callable=data_loader.get_big_groups,
+        callable_ref=RuntimeHandleIdIr(handle_id="big_groups.loader"),
         bindings={
             "big_group_id": BindingIr(
                 key_field="big_group_id",
-                params_builder=lambda ctx: ((), {"group_ids_set": ctx.lookup_keys or set()}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="big_groups.params_builder.big_group_id"),
+                param_name="group_ids_set",
             ),
         },
     )
@@ -622,15 +645,19 @@ def build_order_report_model() -> DemandIr:
         data_key="pay_id",
     )
 
-    def profit_field_calculator_fn(amount: float, cost: float) -> str:
-        return "{0:.2f}".format((amount or 0) - (cost or 0))
-
     # FR002: 派生字段 - 利润计算 (多字段派生)
     profit_field = DerivedFieldIr(
         field_id="profit",
         name="利润",
         dependencies=("amount", "cost"),
-        calculator=profit_field_calculator_fn,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.profit"),
+            args=(
+                CallByValueIr(kind="field", value="amount"),
+                CallByValueIr(kind="field", value="cost"),
+            ),
+            field_names=("amount", "cost"),
+        ),
     )
 
     # 关联字段 - 客户名称 (使用新API - 预定义关联)
@@ -651,18 +678,12 @@ def build_order_report_model() -> DemandIr:
         relation=orders_to_pays,
     )
 
-    # FR002: 值转换字段 - 订单来源 (枚举映射)
-    def order_source_transform(value: Any) -> str:
-        """订单来源枚举转换"""
-        mapping = {1: "小程序", 2: "线下"}
-        return mapping.get(value, "其他")
-
     order_source_field = FieldIr(
         field_id="order_source",
         name="订单来源",
         source=orders_source,
         data_key="order_source",
-        transform=order_source_transform,
+        value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="transform.order_source")),),
     )
 
     # 多级关联字段 - 国家名称 (使用新API - 预定义关联)
@@ -708,6 +729,8 @@ def build_order_report_model() -> DemandIr:
         data_key="small_group_ids",
     )
 
+    csv_first_int_cast = LookupCastSpecIr(name="sep_first_int", sep=",")
+
     # FR013: 小组名称 - 单级关联 + CSV 多值字段
     # `lookup_cast` 从 "10,20" 提取第一个值 10
     small_group_name_field = FieldIr(
@@ -719,7 +742,7 @@ def build_order_report_model() -> DemandIr:
             LookupStepIr(
                 from_field="small_group_ids",
                 to_source=small_groups_source,
-                lookup_cast=must_get_seps_values_first_int,
+                lookup_cast=csv_first_int_cast,
             ),
         ),
     )
@@ -736,7 +759,7 @@ def build_order_report_model() -> DemandIr:
             LookupStepIr(
                 from_field="small_group_ids",
                 to_source=small_groups_source,
-                lookup_cast=must_get_seps_values_first_int,
+                lookup_cast=csv_first_int_cast,
             ),
             LookupStepIr(
                 from_field="big_group_id",
@@ -781,6 +804,56 @@ def build_order_report_model() -> DemandIr:
     )
 
     # endregion
+
+
+def build_order_report_runtime_bindings() -> RuntimeBindings:
+    """Build runtime bindings for `build_order_report_model()` (Python DSL / programmatic IR path)."""
+
+    bindings = RuntimeBindings()
+
+    bindings.main_source_loaders["orders"] = DAL.paged_get_order_list
+
+    bindings.source_loaders["pays"] = BLL.get_pay_info_from_api_of_concrete_params
+    bindings.source_loaders["customers"] = BLL.get_customer_info_from_api_of_kw_params
+    bindings.source_loaders["countries"] = DAL.get_country_info_of_concrete_params
+    bindings.source_loaders["order_types"] = data_loader.get_order_types
+    bindings.source_loaders["region_institution_mapping"] = data_loader.get_region_institution_mapping
+    bindings.source_loaders["small_groups"] = data_loader.get_small_groups
+    bindings.source_loaders["big_groups"] = data_loader.get_big_groups
+
+    def _build_set_param(param_name: str) -> Callable[[LoaderCallContextIr], LoaderCallParams]:
+        def _builder(ctx: LoaderCallContextIr) -> LoaderCallParams:
+            return (), {param_name: ctx.lookup_keys or set()}
+
+        return _builder
+
+    bindings.params_builders[("pays", "pay_id")] = _build_set_param("pay_ids_set")
+    bindings.params_builders[("customers", "customer_id")] = _build_set_param("customer_ids_set")
+    bindings.params_builders[("countries", "country_id")] = _build_set_param("country_ids_set")
+    bindings.params_builders[("order_types", "type_id")] = _build_set_param("type_ids_set")
+    bindings.params_builders[("small_groups", "small_group_id")] = _build_set_param("group_ids_set")
+    bindings.params_builders[("big_groups", "big_group_id")] = _build_set_param("group_ids_set")
+
+    def _build_composite_keys(ctx: LoaderCallContextIr) -> LoaderCallParams:
+        return (), {"composite_keys": ctx.lookup_keys or set()}
+
+    bindings.params_builders[("region_institution_mapping", ("region_id", "institution_id"))] = _build_composite_keys
+
+    def _profit_field_calculator(amount: float, cost: float) -> str:
+        return "{0:.2f}".format((amount or 0) - (cost or 0))
+
+    bindings.derived_calculators["profit"] = _profit_field_calculator
+
+    def _order_source_transform(value: Any) -> str:
+        mapping = {1: "小程序", 2: "线下"}
+        return mapping.get(value, "其他")
+
+    bindings.value_transforms["order_source"] = _order_source_transform
+
+    csv_first_int_cast = LookupCastSpecIr(name="sep_first_int", sep=",")
+    bindings.lookup_key_casts[lookup_cast_id(csv_first_int_cast, is_multi=False)] = must_get_seps_values_first_int
+
+    return bindings
 
 
 # endregion

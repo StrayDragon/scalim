@@ -3,12 +3,12 @@
 from scalim.execution.context import BatchContext
 from scalim.events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM, Event
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
+from scalim.spec.ir import FieldIr, KeyIr, LookupCastSpecIr, LookupStepIr, RuntimeHandleIdIr, SourceIr, SourceNormalizeIr, ValueOpIr
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir import FieldIr
-from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, SourceIr, SourceNormalizeIr
+from scalim.spec.ir.lookup_casts import lookup_cast_id
 from scalim.hooks import BaseHook
 
 from tests.fixtures.executor_operator_fixtures import (
@@ -24,9 +24,15 @@ from tests.fixtures.executor_operator_fixtures import (
 
 
 def test_load_operator_build_loader_call_kwargs_is_wants_gated() -> None:
-    binding = BindingIr(key_field="k", params_builder=lambda ctx: ((), {"src": ctx.source_id}))
+    runtime_bindings = RuntimeBindings()
+
+    def _params_builder(ctx: LoaderCallContextIr):  # type: ignore[no-untyped-def]
+        return (), {"src": ctx.source_id}
+
+    runtime_bindings.params_builders[("main", "k")] = _params_builder
+    binding = BindingIr(key_field="k", params_builder_ref=RuntimeHandleIdIr(handle_id="params_builder:main:k"))
     loader_context = LoaderCallContextIr(source_id="main")
-    runtime = _Runtime(_WantsInstrumentation(EVENT_LOADER_CALL))
+    runtime = _Runtime(_WantsInstrumentation(EVENT_LOADER_CALL), runtime_bindings=runtime_bindings)
 
     executor = LoadOperatorExecutor()
     assert executor._build_loader_call_kwargs(runtime, binding, loader_context) == {"src": "main"}  # noqa: SLF001
@@ -52,32 +58,51 @@ def test_load_operator_maybe_emit_loader_slim_extracts_key_count() -> None:
 
 def test_load_operator_uses_extractor_and_missing_field_spec() -> None:
     loader = _SampleLoader()
+    runtime_bindings = RuntimeBindings()
 
     def _extract(pk, result):  # type: ignore[no-untyped-def]
         row = result[pk]
         return {"amount": row["amount"], "extra": row["extra"]}
 
+    def _params_builder(ctx: LoaderCallContextIr):  # type: ignore[no-untyped-def]
+        return (), {"order_ids": list(ctx.batch_row_nth)}
+
+    runtime_bindings.source_loaders["orders"] = loader.get_orders
+    runtime_bindings.params_builders[("orders", "order_id")] = _params_builder
+    runtime_bindings.loader_extractors["orders"] = _extract
+    runtime_bindings.value_transforms["amount"] = lambda value: value * 2  # type: ignore[no-any-return]
+
     loader_spec = LoaderIr(
-        callable=loader.get_orders,
-        extractor=_extract,
+        callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders"),
+        extractor_ref=RuntimeHandleIdIr(handle_id="loader_extractor:orders"),
         bindings={
             "order_id": BindingIr(
                 key_field="order_id",
-                params_builder=lambda ctx: ((), {"order_ids": list(ctx.batch_row_nth)}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="params_builder:orders:order_id"),
             )
         },
     )
     source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=loader_spec)
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source, transform=lambda value: value * 2)
+    field_spec = FieldIr(
+        field_id="amount",
+        name="Amount",
+        source=source,
+        value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="value_transform:amount")),),
+    )
 
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount", "extra"])
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(
+        plan,
+        _make_main_source(),
+        sources={str(source.source_id): source},
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
 
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("amount", "extra"),
         is_primary=True,
     )
@@ -90,19 +115,30 @@ def test_load_operator_uses_extractor_and_missing_field_spec() -> None:
 
 
 def test_execution_runtime_helpers_cover_cache_and_transforms() -> None:
+    runtime_bindings = RuntimeBindings()
+    key_cast_error = LookupCastSpecIr(name="raise_value_error")
+    lookup_cast_error = LookupCastSpecIr(name="raise_type_error")
+    key_cast_none = LookupCastSpecIr(name="return_none_key")
+    lookup_cast_none = LookupCastSpecIr(name="return_none_lookup")
+
+    runtime_bindings.lookup_key_casts[lookup_cast_id(key_cast_error, is_multi=False)] = _raise_value_error
+    runtime_bindings.lookup_key_casts[lookup_cast_id(lookup_cast_error, is_multi=False)] = _raise_type_error
+    runtime_bindings.lookup_key_casts[lookup_cast_id(key_cast_none, is_multi=False)] = lambda _value: None  # type: ignore[no-any-return]
+    runtime_bindings.lookup_key_casts[lookup_cast_id(lookup_cast_none, is_multi=False)] = lambda _value: None  # type: ignore[no-any-return]
+
     source = SourceIr(
         source_id="src",
-        key=KeyIr(key="id", cast=_raise_value_error),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        key=KeyIr(key="id", cast=key_cast_error),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:src")),
     )
     plan = ExecutionPlan(field_specs={})
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(plan, _make_main_source(), runtime_bindings=runtime_bindings)
 
     assert runtime.get_from_cache("missing", "1") is None
     runtime.preloaded_cache["src"] = {"key": "value"}
     assert runtime.get_from_cache("src", "key") == "value"
 
-    step_with_lookup_error = LookupStepIr(from_field="fk_id", to_source=source, lookup_cast=_raise_type_error)
+    step_with_lookup_error = LookupStepIr(from_field="fk_id", to_source=source, lookup_cast=lookup_cast_error)
     normalized, status, message = runtime.normalize_lookup_key_with_status("1", step_with_lookup_error)
     assert normalized is None
     assert status == "type_error"
@@ -114,8 +150,8 @@ def test_execution_runtime_helpers_cover_cache_and_transforms() -> None:
 
     none_transform_source = SourceIr(
         source_id="none",
-        key=KeyIr(key="id", cast=lambda _value: None),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        key=KeyIr(key="id", cast=key_cast_none),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:none")),
     )
     step_with_none_cast = LookupStepIr(from_field="fk_id", to_source=none_transform_source)
     normalized, status, message = runtime.normalize_lookup_key_with_status("1", step_with_none_cast)
@@ -123,14 +159,18 @@ def test_execution_runtime_helpers_cover_cache_and_transforms() -> None:
     assert status == "type_error"
     assert message == "key.cast returned None"
 
-    step_returns_none = LookupStepIr(from_field="fk_id", to_source=source, lookup_cast=lambda _value: None)
+    step_returns_none = LookupStepIr(from_field="fk_id", to_source=source, lookup_cast=lookup_cast_none)
     normalized, status, message = runtime.normalize_lookup_key_with_status("1", step_returns_none)
     assert normalized is None
     assert status == "type_error"
     assert message == "lookup_cast returned None"
     assert runtime.normalize_lookup_key("1", step_returns_none) is None
 
-    plain_source = SourceIr(source_id="plain", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    plain_source = SourceIr(
+        source_id="plain",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:plain")),
+    )
     plain_step = LookupStepIr(from_field="fk_id", to_source=plain_source)
     normalized, status, _ = runtime.normalize_lookup_key_with_status("ok", plain_step)
     assert normalized == "ok"
@@ -142,15 +182,26 @@ def test_load_operator_handles_object_data_and_missing_pk() -> None:
     def _loader():  # type: ignore[no-untyped-def]
         return {1: _Order(amount=7)}
 
-    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=_loader))
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.source_loaders["orders"] = _loader
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
+    )
     plan = ExecutionPlan(field_specs={}, target_fields=["amount"])
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(
+        plan,
+        _make_main_source(),
+        sources={str(source.source_id): source},
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
 
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("amount",),
     )
 
@@ -164,21 +215,28 @@ def test_load_operator_applies_source_normalize_index_by_key() -> None:
     def _loader():  # type: ignore[no-untyped-def]
         return [{"order_id": 1, "amount": 7}, {"order_id": 2, "amount": 9}]
 
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.source_loaders["orders"] = _loader
     source = SourceIr(
         source_id="orders",
         key=KeyIr(key="order_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="order_id"),
     )
     field_spec = FieldIr(field_id="amount", name="Amount", source=source)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(
+        plan,
+        _make_main_source(),
+        sources={str(source.source_id): source},
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
 
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("amount",),
         is_primary=True,
     )
@@ -207,22 +265,29 @@ def test_load_operator_emits_loader_call_skipped_none_rows_for_index_by_key_on_n
         ]
 
     hook = _CaptureLoaderCallHook()
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.source_loaders["orders"] = _loader
     source = SourceIr(
         source_id="orders",
         key=KeyIr(key="order_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="order_id", on_none="skip"),
     )
     field_spec = FieldIr(field_id="amount", name="Amount", source=source)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(
+        plan,
+        _make_main_source(),
+        sources={str(source.source_id): source},
+        runtime_bindings=runtime_bindings,
+    )
     runtime.instrumentation.register(hook)
     context = BatchContext()
 
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("amount",),
         is_primary=True,
     )
@@ -243,16 +308,27 @@ def test_load_operator_object_missing_attribute_returns_none() -> None:
     def _loader():  # type: ignore[no-untyped-def]
         return {1: _OrderMissing(amount=7)}
 
-    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=_loader))
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.source_loaders["orders"] = _loader
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
+    )
     field_spec = FieldIr(field_id="missing", name="Missing", source=source)
     plan = ExecutionPlan(field_specs={"missing": field_spec}, target_fields=["missing"])
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(
+        plan,
+        _make_main_source(),
+        sources={str(source.source_id): source},
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
 
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("missing",),
         is_primary=True,
     )
@@ -263,15 +339,18 @@ def test_load_operator_object_missing_attribute_returns_none() -> None:
 
 
 def test_load_operator_execute_returns_early_for_non_load_operator() -> None:
-    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
+    )
     field_spec = FieldIr(field_id="amount", name="Amount", source=source)
     runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
     operator = LoadRefOperatorIr(
         operator_id="load_ref_amount",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="amount",
-        field_spec=field_spec,
         lookup_steps=(),
     )
 
@@ -279,7 +358,11 @@ def test_load_operator_execute_returns_early_for_non_load_operator() -> None:
 
 
 def test_load_operator_executor_ignores_non_load_operator() -> None:
-    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
+    )
     field_spec = FieldIr(field_id="amount", name="Amount", source=source)
     runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
     context = BatchContext()
@@ -287,9 +370,8 @@ def test_load_operator_executor_ignores_non_load_operator() -> None:
     wrong_operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="amount",
-        field_spec=field_spec,
         lookup_steps=(),
     )
 

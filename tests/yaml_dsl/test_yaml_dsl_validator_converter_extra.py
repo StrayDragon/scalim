@@ -164,9 +164,7 @@ def test_secure_resolver_rejects_dangerous_module_parts() -> None:
 
 
 def _assert_conversion_error(config: DemandConfig, match: str) -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["scalim_misc"])),
-    )
+    converter = ConfigToIRConverter()
     with pytest.raises(ScalimConversionError, match=match):
         converter.convert(config)
 
@@ -255,9 +253,7 @@ def test_converter_validation_errors(config_factory, match: str) -> None:
 
 
 def test_converter_infers_unique_path() -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["scalim_misc"])),
-    )
+    converter = ConfigToIRConverter()
     config = copy.deepcopy(_base_converter_config())
     config.source_fields["customer_name"] = SourceFieldConfig(
         field_id="customer_name",
@@ -273,9 +269,7 @@ def test_converter_infers_unique_path() -> None:
 
 
 def test_converter_resolves_relation_reference() -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["scalim_misc"])),
-    )
+    converter = ConfigToIRConverter()
     config = copy.deepcopy(_base_converter_config())
     config.source_fields["customer_name"] = SourceFieldConfig(
         field_id="customer_name",

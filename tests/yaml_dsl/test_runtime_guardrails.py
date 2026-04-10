@@ -13,11 +13,13 @@ from scalim.execution.guardrails import (
     GuardrailsRelationsPolicy,
 )
 from scalim.execution.executor.helpers.field_access import extract_field
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import KeyIr, LookupCastSpecIr, MainSourceIr, RuntimeHandleIdIr, SourceIr, ValueOpIr
+from scalim.spec.ir.lookup_casts import lookup_cast_id
 
 
 def test_extract_field_rowlike_precedence() -> None:
@@ -62,26 +64,43 @@ def _build_relation_demand(
     *,
     main_rows: List[Dict[str, Any]],
     customer_loader_result: Any,
-    customer_key_cast: Optional[Any] = None,
+    customer_key_cast: Optional[LookupCastSpecIr] = None,
     customer_transform: Optional[Any] = None,
-) -> DemandIr:
+) -> Any:
     def _main_loader() -> List[Dict[str, Any]]:
         return list(main_rows)
 
     def _customer_loader(customer_ids_set: Optional[Set[Hashable]] = None) -> Any:  # noqa: ARG001
         return customer_loader_result
 
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"orders": _main_loader},
+        source_loaders={"customers": _customer_loader},
+        params_builders={
+            ("customers", "customer_id"): lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys}),
+        },
+    )
+    if customer_transform is not None:
+        runtime_bindings.value_transforms["customer_name"] = customer_transform
+
+    if customer_key_cast is not None:
+        from scalim.dsl.yaml_dsl.runtime.conversion import LookupCastRegistry
+
+        registry = LookupCastRegistry()
+        cast_key = lookup_cast_id(customer_key_cast, is_multi=False)
+        runtime_bindings.lookup_key_casts[cast_key] = registry.build(customer_key_cast, is_multi=False)
+
     customers_loader = LoaderIr(
-        callable=_customer_loader,
+        callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
         bindings={
             "customer_id": BindingIr(
                 key_field="customer_id",
-                params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="customers.customer_id.params_builder"),
             ),
         },
     )
 
-    orders_source = MainSourceIr(source_id="orders", loader=_main_loader)
+    orders_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     customers_source = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id", cast=customer_key_cast),
@@ -96,10 +115,14 @@ def _build_relation_demand(
         source=customers_source,
         data_key="customer_name",
         relation=orders_to_customers,
-        transform=customer_transform,
+        value_ops=(
+            (ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="customer_name.transform")),)
+            if customer_transform is not None
+            else ()
+        ),
     )
 
-    return DemandIr.from_irs(
+    demand = DemandIr.from_irs(
         sources=[customers_source],
         fields=[
             FieldIr(field_id="order_id", name="Order ID", source=orders_source, is_primary=True),
@@ -107,10 +130,11 @@ def _build_relation_demand(
         ],
         main_source=orders_source,
     )
+    return demand, runtime_bindings
 
 
 def test_guardrails_validate_result_contract_always_fast_fail_even_in_quiet_mode() -> None:
-    demand = _build_relation_demand(
+    demand, runtime_bindings = _build_relation_demand(
         main_rows=[{"order_id": 1, "customer_id": 100}],
         customer_loader_result=[{"customer_id": 100, "customer_name": "Alice"}],
     )
@@ -121,7 +145,7 @@ def test_guardrails_validate_result_contract_always_fast_fail_even_in_quiet_mode
         mode="quiet",
         loader=GuardrailsLoaderPolicy(validate_result=True),
     )
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1, guardrails=guardrails)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1, guardrails=guardrails)
 
     with pytest.raises(GuardrailViolation) as exc_info:
         _ = engine.run()
@@ -133,7 +157,7 @@ def test_guardrails_loader_transform_error_quiet_writes_none_and_continues() -> 
     def _boom(_value: Any) -> Any:
         raise ValueError("boom")
 
-    demand = _build_relation_demand(
+    demand, runtime_bindings = _build_relation_demand(
         main_rows=[{"order_id": 1, "customer_id": 100}],
         customer_loader_result={100: {"customer_id": 100, "customer_name": "Alice"}},
         customer_transform=_boom,
@@ -145,7 +169,7 @@ def test_guardrails_loader_transform_error_quiet_writes_none_and_continues() -> 
         mode="quiet",
         loader=GuardrailsLoaderPolicy(on_transform_error="quiet"),
     )
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1, guardrails=guardrails)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1, guardrails=guardrails)
 
     results = engine.run()
     assert results and results[0]["customer_name"] is None
@@ -155,7 +179,7 @@ def test_guardrails_loader_transform_error_fast_fail_aborts() -> None:
     def _boom(_value: Any) -> Any:
         raise ValueError("boom")
 
-    demand = _build_relation_demand(
+    demand, runtime_bindings = _build_relation_demand(
         main_rows=[{"order_id": 1, "customer_id": 100}],
         customer_loader_result={100: {"customer_id": 100, "customer_name": "Alice"}},
         customer_transform=_boom,
@@ -167,7 +191,7 @@ def test_guardrails_loader_transform_error_fast_fail_aborts() -> None:
         mode="fast_fail",
         loader=GuardrailsLoaderPolicy(on_transform_error="fast_fail"),
     )
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1, guardrails=guardrails)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1, guardrails=guardrails)
 
     with pytest.raises(GuardrailViolation) as exc_info:
         _ = engine.run()
@@ -176,7 +200,7 @@ def test_guardrails_loader_transform_error_fast_fail_aborts() -> None:
 
 
 def test_guardrails_relations_null_key_max_rate_fast_fail() -> None:
-    demand = _build_relation_demand(
+    demand, runtime_bindings = _build_relation_demand(
         main_rows=[
             {"order_id": 1, "customer_id": None},
         ],
@@ -189,7 +213,7 @@ def test_guardrails_relations_null_key_max_rate_fast_fail() -> None:
         mode="fast_fail",
         relations=GuardrailsRelationsPolicy(null_key_max_rate=0.0),
     )
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1, guardrails=guardrails)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1, guardrails=guardrails)
 
     with pytest.raises(GuardrailViolation) as exc_info:
         _ = engine.run()
@@ -198,12 +222,12 @@ def test_guardrails_relations_null_key_max_rate_fast_fail() -> None:
 
 
 def test_guardrails_relations_type_error_max_rate_fast_fail() -> None:
-    demand = _build_relation_demand(
+    demand, runtime_bindings = _build_relation_demand(
         main_rows=[
             {"order_id": 1, "customer_id": "not-an-int"},
         ],
         customer_loader_result={},
-        customer_key_cast=int,
+        customer_key_cast=LookupCastSpecIr(name="int"),
     )
     plan = PlanBuilder(demand).build(targets=["customer_name"])
 
@@ -212,7 +236,7 @@ def test_guardrails_relations_type_error_max_rate_fast_fail() -> None:
         mode="fast_fail",
         relations=GuardrailsRelationsPolicy(type_error_max_rate=0.0),
     )
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1, guardrails=guardrails)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1, guardrails=guardrails)
 
     with pytest.raises(GuardrailViolation) as exc_info:
         _ = engine.run()
@@ -224,12 +248,16 @@ def test_guardrails_compute_fast_fail_aborts() -> None:
     def _main_loader() -> List[Dict[str, Any]]:
         return [{"x": 1}]
 
-    main_source = MainSourceIr(source_id="orders", loader=_main_loader)
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"orders": _main_loader},
+        derived_calculators={"boom": lambda x: 1 / 0},
+    )
     demand = DemandIr.from_irs(
         sources=[],
         fields=[
             FieldIr(field_id="x", name="x", source=main_source, is_primary=True),
-            DerivedFieldIr(field_id="boom", name="boom", dependencies=("x",), calculator=lambda x: 1 / 0),
+            DerivedFieldIr(field_id="boom", name="boom", dependencies=("x",), compute_expr="x / 0"),
         ],
         main_source=main_source,
     )
@@ -240,7 +268,7 @@ def test_guardrails_compute_fast_fail_aborts() -> None:
         mode="fast_fail",
         compute=GuardrailsComputePolicy(on_error="fast_fail"),
     )
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1, guardrails=guardrails)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1, guardrails=guardrails)
 
     with pytest.raises(GuardrailViolation) as exc_info:
         _ = engine.run()

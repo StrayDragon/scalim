@@ -5,7 +5,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
 
-from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import load_yaml_mapping_text
+from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import load_yaml_mapping_text
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")

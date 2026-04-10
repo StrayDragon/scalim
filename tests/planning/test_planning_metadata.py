@@ -1,6 +1,5 @@
 from scalim.planning import PlanBuilder
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, RuntimeHandleIdIr
 
 from tests.fixtures.planning_fixtures import build_derived_model, build_multi_level_model, build_relation_model, make_main_source
 
@@ -40,8 +39,26 @@ def test_metadata_max_depth_multi_layer_derived_dependencies() -> None:
     fields = [
         FieldIr(field_id="order_id", name="订单ID", source=source, is_primary=True),
         FieldIr(field_id="amount", name="金额", source=source),
-        DerivedFieldIr(field_id="inc", name="Inc", dependencies=("amount",), calculator=lambda amount: (amount or 0) + 1),
-        DerivedFieldIr(field_id="double_inc", name="DoubleInc", dependencies=("inc",), calculator=lambda inc: (inc or 0) * 2),
+        DerivedFieldIr(
+            field_id="inc",
+            name="Inc",
+            dependencies=("amount",),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.inc"),
+                args=(CallByValueIr(kind="field", value="amount"),),
+                field_names=("amount",),
+            ),
+        ),
+        DerivedFieldIr(
+            field_id="double_inc",
+            name="DoubleInc",
+            dependencies=("inc",),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.double_inc"),
+                args=(CallByValueIr(kind="field", value="inc"),),
+                field_names=("inc",),
+            ),
+        ),
     ]
 
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=source)

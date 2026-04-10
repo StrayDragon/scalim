@@ -1,10 +1,11 @@
 from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple, cast
 
-from ....typedefs import LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
+from ....typedefs import LoaderCallKwargs, LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
 from ....vendor.compact.typing_extensionsx import TypeGuard
 from ....vendor.dataclassesx import dataclass, field
-from ..aliases import LoaderExtractor, LoaderParamsBuilder, LoaderResultMapCallable, NormalizedLookupKeySpec
+from ..aliases import NormalizedLookupKeySpec
+from ..callable_refs import CallableRefIr
 
 
 def _is_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
@@ -110,10 +111,16 @@ class BindingIr:
     绑定的键字段名 (主键或外键)
     """
 
-    params_builder: LoaderParamsBuilder
+    params_template: Optional[object] = None
+    """可选:编译后的参数模板对象(纯数据,不包含可调用对象).
+
+    说明:
+    - 对 YAML DSL: 来自 `scalim.dsl.yaml_dsl.params_template.compile_params_template`.
+    - 该对象预期提供 `render_kwargs(ctx, path=...)` 方法.
     """
-    参数构建器类型:`(context) -> (args, kwargs)`
-    """
+
+    params_builder_ref: Optional[CallableRefIr] = None
+    """可选:运行时绑定的参数构造器引用(用于 `Python` DSL)."""
 
     mode: str = "keys"
     """
@@ -135,9 +142,37 @@ class BindingIr:
     `params_builder` 绑定的参数名(可选,用于诊断与签名稳定性)
     """
 
+    template_path: str = ""
+    """可选:模板路径标签(用于错误信息稳定)."""
+
+    def __post_init__(self) -> None:
+        if self.params_template is not None and self.params_builder_ref is not None:
+            msg = "BindingIr must not set both params_template and params_builder_ref"
+            raise ValueError(msg)
+
     def build_params(self, context: "LoaderCallContextIr") -> LoaderCallParams:
-        """构建调用参数"""
-        return self.params_builder(context)
+        """构建调用参数.
+
+        注意:
+        - 当使用 `params_builder_ref` 时,该方法无法直接构建参数(需要在“运行时链接”阶段解析为函数后,
+          由执行阶段从 `RuntimeBindings` 获取并调用).
+        """
+
+        if self.params_builder_ref is not None:
+            msg = "BindingIr(params_builder_ref=...) requires runtime linking; build_params is not available"
+            raise TypeError(msg)
+        template = self.params_template
+        if template is None:
+            return (), {}
+        render = getattr(template, "render_kwargs", None)  # pragma: allow-dynattr optional-interface: params_template render contract
+        if not callable(render):
+            msg = "BindingIr.params_template must provide render_kwargs(ctx, path=...)"
+            raise TypeError(msg)
+        kwargs = cast(  # pragma: allow-cast params_template render kwargs contract boundary
+            "LoaderCallKwargs",
+            render(context, path=self.template_path or "(binding)"),  # type: ignore[misc]  # pragma: allow-any template typing boundary
+        )
+        return (), kwargs
 
 
 def _empty_bindings() -> "Mapping[NormalizedLookupKeySpec, BindingIr]":
@@ -179,15 +214,11 @@ class LoaderIr:
     [数据源]加载器(IR): 定义如何调用数据加载函数以及如何提取返回的数据
     """
 
-    callable: LoaderResultMapCallable
-    """
-    实际的用户注册的加载函数
-    """
+    callable_ref: CallableRefIr
+    """加载器可调用引用描述(纯数据,不包含可调用对象)."""
 
-    extractor: Optional[LoaderExtractor] = None
-    """
-    数据提取器类型:`(key, loader_result) -> extracted_data`
-    """
+    extractor_ref: Optional[CallableRefIr] = None
+    """可选:数据提取器可调用引用描述(纯数据,不包含可调用对象)."""
 
     bindings: Mapping[NormalizedLookupKeySpec, BindingIr] = field(default_factory=_empty_bindings)
     """

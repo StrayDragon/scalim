@@ -18,7 +18,8 @@ except ImportError:  # pragma: no cover
 from lsprotocol import types
 from pygls.lsp.server import LanguageServer
 
-from scalim.dsl.yaml_dsl._internal.config_parsing.presets import load_scalim_preset_yaml_text
+from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend
+from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import load_scalim_preset_yaml_text
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 from .core import (
@@ -87,6 +88,7 @@ __all__ = ()
 _LOG = logging.getLogger(__name__)
 
 _COMMAND_DUMP_DISCOVERY = "scalim.dumpDiscovery"
+_COMMAND_DUMP_PLAN_DEPS = "scalim.dumpPlanDeps"
 _COMMAND_CREATE_MINIMAL_SCALIM_YAML = "scalim.yaml.createMinimal"
 _COMMAND_ADD_IMPORT_ROOTS = "scalim.yaml.addImportRoots"
 _COMMAND_ADD_IMPORT_ROOT_ALIAS = "scalim.yaml.addImportRootAlias"
@@ -116,6 +118,8 @@ def _read_did_change_debounce_secs() -> float:
 
 _DID_CHANGE_DEBOUNCE_SECS = _read_did_change_debounce_secs()
 
+_PLAN_DEPS_IDLE_BACKFILL_SECS = 1.0
+
 _IMPORT_ESCAPES_ALLOWED_ROOTS_MARKER = "YAML path escapes allowed roots:"
 _RESOLVED_PATH_RE = re.compile(r"resolved_path='([^']+)'")
 _IMPORT_RAW_PATH_RE = re.compile(r"raw='([^']+)'")
@@ -134,6 +138,8 @@ class _DocumentState:
     entity_index: Optional[YamlDslEntityIndex] = None
     effective_view: Optional[YamlDslEditorEffectiveView] = None
     expression_scope_index: Optional[YamlDslExpressionScopeIndex] = None
+    plan_snapshot: Optional[Dict[str, Any]] = None
+    deps_snapshot: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -175,8 +181,9 @@ def create_server() -> LanguageServer:
     return server
 
 
-def _register_text_document_sync(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:  # noqa: C901
+def _register_text_document_sync(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:  # noqa: C901, PLR0915
     pending_updates: Dict[str, asyncio.Task[None]] = {}
+    pending_plan_backfills: Dict[str, asyncio.Task[None]] = {}
 
     def _cancel_pending(uri: str) -> None:
         task = pending_updates.pop(str(uri), None)
@@ -185,6 +192,39 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
         if task.done():
             return
         task.cancel()
+
+    def _cancel_pending_plan_backfill(uri: str) -> None:
+        task = pending_plan_backfills.pop(str(uri), None)
+        if task is None:
+            return
+        if task.done():
+            return
+        task.cancel()
+
+    async def _schedule_plan_backfill(
+        ls: LanguageServer,
+        uri: str,
+        *,
+        yaml_text: Optional[str],
+        version: int,
+        delay_secs: float,
+    ) -> None:
+        _cancel_pending_plan_backfill(uri)
+
+        async def _run() -> None:
+            try:
+                await asyncio.sleep(float(delay_secs))
+                await _backfill_state_plan_deps_snapshots(
+                    ls,
+                    uri,
+                    state,
+                    yaml_text=yaml_text,
+                    version=int(version),
+                )
+            except asyncio.CancelledError:
+                return
+
+        pending_plan_backfills[str(uri)] = asyncio.create_task(_run())
 
     async def _schedule_update(
         ls: LanguageServer,
@@ -195,6 +235,7 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
         delay_secs: float,
     ) -> None:
         _cancel_pending(uri)
+        _cancel_pending_plan_backfill(uri)
 
         async def _run() -> None:
             try:
@@ -206,6 +247,13 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
                     yaml_text=yaml_text,
                     version=int(version),
                 )
+                await _schedule_plan_backfill(
+                    ls,
+                    uri,
+                    yaml_text=yaml_text,
+                    version=int(version),
+                    delay_secs=_PLAN_DEPS_IDLE_BACKFILL_SECS,
+                )
             except asyncio.CancelledError:
                 return
 
@@ -215,12 +263,20 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
     async def did_open(ls: LanguageServer, params: types.DidOpenTextDocumentParams) -> None:
         uri = str(params.text_document.uri)
         _cancel_pending(uri)
+        _cancel_pending_plan_backfill(uri)
         await _update_state_and_publish_diagnostics(
             ls,
             uri,
             state,
             yaml_text=str(params.text_document.text or ""),
             version=int(params.text_document.version or 0),
+        )
+        await _schedule_plan_backfill(
+            ls,
+            uri,
+            yaml_text=str(params.text_document.text or ""),
+            version=int(params.text_document.version or 0),
+            delay_secs=_PLAN_DEPS_IDLE_BACKFILL_SECS,
         )
 
     @server.feature(types.TEXT_DOCUMENT_DID_CHANGE)
@@ -244,9 +300,17 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
                 entity_index=None,
                 effective_view=None,
                 expression_scope_index=None,
+                plan_snapshot=None,
+                deps_snapshot=None,
             )
         else:
-            state[uri] = replace(prev, text=str(next_text), version=int(next_version))
+            state[uri] = replace(
+                prev,
+                text=str(next_text),
+                version=int(next_version),
+                plan_snapshot=None,
+                deps_snapshot=None,
+            )
 
         await _schedule_update(
             ls,
@@ -260,6 +324,7 @@ def _register_text_document_sync(server: LanguageServer, state: Dict[str, _Docum
     async def did_close(_ls: LanguageServer, params: types.DidCloseTextDocumentParams) -> None:
         uri = str(params.text_document.uri)
         _cancel_pending(uri)
+        _cancel_pending_plan_backfill(uri)
         state.pop(uri, None)
 
 
@@ -2644,6 +2709,11 @@ def _register_code_actions(server: LanguageServer, state: Dict[str, _DocumentSta
         document_uri = str(args[0]) if args else ""
         return _dump_discovery_payload(ls, document_uri)
 
+    @server.command(_COMMAND_DUMP_PLAN_DEPS)
+    async def dump_plan_deps(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
+        document_uri = str(args[0]) if args else ""
+        return await _cmd_dump_plan_deps(ls, document_uri, state=state)
+
     @server.command(_COMMAND_CREATE_MINIMAL_SCALIM_YAML)
     async def create_minimal_scalim_yaml(ls: LanguageServer, *args: Any) -> Dict[str, Any]:
         document_uri = str(args[0]) if args else ""
@@ -2869,6 +2939,99 @@ def _dump_discovery_payload(ls: LanguageServer, document_uri: str) -> Dict[str, 
     if "scalim_yaml_path" not in payload:
         payload["scalim_yaml_path"] = None
     return payload
+
+
+async def _cmd_dump_plan_deps(  # noqa: C901, PLR0911
+    ls: LanguageServer,
+    document_uri: str,
+    *,
+    state: Dict[str, _DocumentState],
+) -> Dict[str, Any]:
+    uri = str(document_uri or "")
+    path = _uri_to_path(uri)
+    if path is None:
+        return {"ok": False, "kind": "error", "message": "仅支持 file:// URI", "hints": [uri]}
+
+    workspace_root = _workspace_root_path(ls)
+
+    doc_state = state.get(uri)
+    yaml_text = str(doc_state.text) if doc_state is not None else ""
+    report = doc_state.report if doc_state is not None else None
+
+    if not yaml_text:
+        try:
+            yaml_text = path.read_text(encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "kind": "error",
+                "message": "读取 YAML 失败: {}: {}".format(type(exc).__name__, exc),
+                "hints": [str(path)],
+            }
+
+    if report is None:
+        try:
+            report = collect_yaml_dsl_editor_diagnostics(path, yaml_text=yaml_text, workspace_root_override=workspace_root)
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "kind": "error",
+                "message": "诊断计算失败: {}: {}".format(type(exc).__name__, exc),
+                "hints": [str(path)],
+            }
+
+    if str(report.yaml_kind or "") != "demand":
+        return {
+            "ok": False,
+            "kind": "explain_only",
+            "message": "仅支持 demand YAML 的 plan/deps 导出",
+            "hints": [str(report.yaml_kind or "")],
+        }
+
+    if report.errors:
+        return {
+            "ok": False,
+            "kind": "diagnostics_failed",
+            "message": "diagnostics 未通过,已跳过 plan/deps 编译",
+            "errors": [d.as_dict() for d in report.errors],
+            "warnings": [d.as_dict() for d in report.warnings],
+        }
+
+    try:
+        plan_snapshot, deps_snapshot = await asyncio.to_thread(
+            _compute_plan_deps_snapshots,
+            yaml_path=path,
+            yaml_text=yaml_text,
+            report=report,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "kind": "error",
+            "message": "plan/deps 编译失败: {}: {}".format(type(exc).__name__, exc),
+            "hints": [str(path)],
+        }
+
+    if plan_snapshot is None or deps_snapshot is None:
+        return {
+            "ok": False,
+            "kind": "compile_failed",
+            "message": "plan/deps 编译未产出结果(请检查 diagnostics)",
+            "hints": [str(path)],
+        }
+
+    if doc_state is not None:
+        current = state.get(uri)
+        if current is not None and int(current.version) == int(doc_state.version):
+            state[uri] = replace(current, plan_snapshot=plan_snapshot, deps_snapshot=deps_snapshot)
+
+    return {
+        "ok": True,
+        "kind": "plan_deps",
+        "uri": uri,
+        "plan_snapshot": plan_snapshot,
+        "deps_snapshot": deps_snapshot,
+    }
 
 
 def _cmd_preset_get_text(preset_id: str) -> Dict[str, Any]:
@@ -3496,6 +3659,85 @@ async def _update_state_and_publish_diagnostics(
         expression_scope_index=expression_scope_index,
     )
     ls.text_document_publish_diagnostics(types.PublishDiagnosticsParams(uri=uri, diagnostics=list(base_diagnostics)))
+
+
+async def _backfill_state_plan_deps_snapshots(  # noqa: C901, PLR0911
+    ls: LanguageServer,
+    uri: str,
+    state: Dict[str, _DocumentState],
+    *,
+    yaml_text: Optional[str],
+    version: int,
+) -> None:
+    current = state.get(uri)
+    if current is None or int(current.version) != int(version):
+        return
+    if current.report is None:
+        return
+    report = current.report
+    if str(report.yaml_kind or "") != "demand":
+        return
+    if report.errors:
+        # diagnostics-first: 仅在基础诊断通过后才尝试编译 plan/deps
+        return
+    if current.plan_snapshot is not None and current.deps_snapshot is not None:
+        return
+
+    if yaml_text is None:
+        try:
+            text_doc = ls.workspace.get_text_document(uri)
+            yaml_text = str(text_doc.source)
+        except Exception as exc:  # noqa: BLE001
+            _LOG.exception("工作区获取文档失败(计划回填) `uri`=%s: %s: %s", uri, type(exc).__name__, exc)
+            return
+
+    yaml_path = _uri_to_path(uri)
+    if yaml_path is None:
+        return
+
+    try:
+        plan_snapshot, deps_snapshot = await asyncio.to_thread(
+            _compute_plan_deps_snapshots,
+            yaml_path=yaml_path,
+            yaml_text=str(yaml_text or ""),
+            report=report,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("计划/依赖回填失败 `path`=%s: %s: %s", yaml_path, type(exc).__name__, exc)
+        return
+
+    current2 = state.get(uri)
+    if current2 is None or int(current2.version) != int(version):
+        return
+    state[uri] = replace(
+        current2,
+        plan_snapshot=plan_snapshot,
+        deps_snapshot=deps_snapshot,
+    )
+
+
+def _compute_plan_deps_snapshots(
+    *,
+    yaml_path: Path,
+    yaml_text: str,
+    report: YamlDslEditorDiagnosticsResult,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    discovery = report.discovery
+    scalim_yaml_override = discovery.scalim_yaml_path
+    project_root_override: Optional[Path] = None
+    if scalim_yaml_override is not None:
+        project_root_override = discovery.project_root
+
+    compilation = compile_demand_frontend(
+        yaml_path,
+        yaml_text=str(yaml_text or ""),
+        allowed_yaml_roots=discovery.allowed_yaml_roots,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
+    if not compilation.diagnostics.ok():
+        return None, None
+    return compilation.plan_snapshot, compilation.deps_snapshot
 
 
 def _compute_diagnostics_report_and_entity_index(

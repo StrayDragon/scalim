@@ -30,6 +30,7 @@ from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext, create_batch_context_for_rows
 from ...executor.batch.executor import BatchExecutor
 from ...executor.runtime.runtime import ExecutionRuntime
+from ...loader_call_params import build_loader_call_params
 from ...loader_retry import CALLSITE_MAIN_SOURCE, CALLSITE_PRELOAD_FOREVER, call_with_loader_retry
 from ...workflow_cache_pool import build_preload_forever_signature
 from ..overrides import PipelineOverrides, chunk_iterable
@@ -203,19 +204,25 @@ class Pipeline(ABC):
 
                 binding = source.bind
                 call_kwargs: LoaderCallKwargs = {}
-                callable_ref = source.loader_spec.callable
+                loader_fn = self.runtime.runtime_bindings.require_source_loader(source.source_id)
                 if binding is not None:
                     preload_ctx = LoaderCallContextIr(source_id=source.source_id, is_ref_loader=False)
-                    _args, call_kwargs = binding.build_params(preload_ctx)
-                call = _make_noarg_loader_call(callable_ref, call_kwargs)
+                    _args, call_kwargs = build_loader_call_params(
+                        binding=binding,
+                        context=preload_ctx,
+                        runtime_bindings=self.runtime.runtime_bindings,
+                    )
+                call = _make_noarg_loader_call(loader_fn, call_kwargs)
 
                 source_id = source.source_id
                 normalize = source.normalize
+                normalize_call_by = self.runtime.runtime_bindings.get_source_normalize_call_by(source_id)
 
                 def _load_preload_forever_source(
                     *,
                     source_id: str = source_id,
                     normalize: object = normalize,
+                    normalize_call_by: object = normalize_call_by,
                     call: Callable[[], object] = call,
                     call_kwargs: LoaderCallKwargs = call_kwargs,
                 ) -> LoaderResultMapping:
@@ -236,6 +243,7 @@ class Pipeline(ABC):
                         result_obj = cast("Any", normalize).apply(  # pragma: allow-cast normalize apply typed narrowing
                             result,
                             source_id=source_id,
+                            call_by=normalize_call_by,
                         )
                     is_mapping = isinstance(result_obj, Mapping)
                     if not is_mapping:
@@ -284,7 +292,7 @@ class Pipeline(ABC):
     def _load_main_rows(self) -> Iterable[RowData]:
         """加载主数据源行(按行流)."""
         main_source = self.demand.main_source
-        loader_fn = main_source.loader
+        loader_fn = self.runtime.runtime_bindings.require_main_source_loader(main_source.source_id)
         params = dict(main_source.params or {})
 
         loader_start = time.perf_counter()
@@ -501,10 +509,8 @@ class SeqPipeline(Pipeline):
             if isinstance(operator, LoadOperatorIr):
                 for fk in operator.field_keys:
                     self._write_column_if_target(fk, write_row_ids, context, column_sink, batch_num)
-            elif isinstance(operator, LoadRefOperatorIr):
+            elif isinstance(operator, (LoadRefOperatorIr, ComputeOperatorIr)):
                 self._write_column_if_target(operator.field_key, write_row_ids, context, column_sink, batch_num)
-            elif isinstance(operator, ComputeOperatorIr):
-                self._write_column_if_target(operator.field_spec.field_id, write_row_ids, context, column_sink, batch_num)
 
         stage_durations = self.executor.execute_operators(
             context,

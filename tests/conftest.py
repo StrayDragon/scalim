@@ -18,6 +18,11 @@ def example_model(example_report_ir_module):
     return example_report_ir_module.build_order_report_model()
 
 
+@pytest.fixture(scope="module")
+def example_runtime_bindings(example_report_ir_module):
+    return example_report_ir_module.build_order_report_runtime_bindings()
+
+
 @pytest.fixture
 def plan_builder(example_model):
     from scalim.planning import PlanBuilder
@@ -26,11 +31,11 @@ def plan_builder(example_model):
 
 
 @pytest.fixture
-def engine_factory(example_model):
+def engine_factory(example_model, example_runtime_bindings):
     from scalim.execution import ScalimEngine
 
     def _factory(plan, **kwargs):
-        return ScalimEngine(demand=example_model, plan=plan, **kwargs)
+        return ScalimEngine(demand=example_model, plan=plan, runtime_bindings=example_runtime_bindings, **kwargs)
 
     return _factory
 

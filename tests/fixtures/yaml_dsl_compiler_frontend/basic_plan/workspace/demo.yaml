@@ -1,0 +1,13 @@
+imports:
+  frags: frag.yaml
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    a: {}
+sources: {}
+fields:
+  $import: frags.fields
+outputs: []
+

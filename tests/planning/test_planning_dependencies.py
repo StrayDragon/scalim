@@ -2,8 +2,7 @@ import pytest
 
 from scalim.planning import PlanBuilder
 from scalim._internal.utils.graph import ScalimCyclicDependencyError
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, RuntimeHandleIdIr
 
 from tests.fixtures.planning_fixtures import (
     build_derived_model,
@@ -56,8 +55,26 @@ def test_cyclic_dependency_raises() -> None:
 
     fields = [
         FieldIr(field_id="id", name="ID", source=source, is_primary=True),
-        DerivedFieldIr(field_id="a", name="A", dependencies=("b",), calculator=lambda b: b),
-        DerivedFieldIr(field_id="b", name="B", dependencies=("a",), calculator=lambda a: a),
+        DerivedFieldIr(
+            field_id="a",
+            name="A",
+            dependencies=("b",),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.a"),
+                args=(CallByValueIr(kind="field", value="b"),),
+                field_names=("b",),
+            ),
+        ),
+        DerivedFieldIr(
+            field_id="b",
+            name="B",
+            dependencies=("a",),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.b"),
+                args=(CallByValueIr(kind="field", value="a"),),
+                field_names=("a",),
+            ),
+        ),
     ]
 
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=source)

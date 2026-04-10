@@ -1,8 +1,9 @@
-import contextlib
 from collections.abc import Mapping as MappingABC
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
+from ..dsl.yaml_dsl.runtime._internal.conversion_lookup import LookupCastRegistry
 from ..spec.ir import FieldRefIr, JoinConditionIr, RelationIr, SourceIr
+from ..spec.ir.lookup_casts import LookupCastSpecIr
 from ..vendor.compact.typing_extensionsx import TypeGuard, override
 
 
@@ -77,10 +78,19 @@ class RelationDiagnostics:
                 key_info = " [LOOKUP_KEY]"
 
             if source.key.cast:
-                cast_name = "custom"
-                with contextlib.suppress(AttributeError):
-                    cast_name = source.key.cast.__name__  # type: ignore[attr-defined]
-                transform_info = " (cast: {})".format(cast_name)
+                cast_spec = source.key.cast
+                cast_name = str(getattr(cast_spec, "name", "") or "").strip()  # pragma: allow-dynattr introspection: key.cast spec contract
+                sep = getattr(cast_spec, "sep", None)  # pragma: allow-dynattr introspection: key.cast spec contract
+                if not cast_name:
+                    if isinstance(cast_spec, type):
+                        cast_name = cast_spec.__name__
+                    else:
+                        cast_name = type(cast_spec).__name__
+                cast_name = str(cast_name or "").strip().lower() or "auto"
+                if cast_name == "sep_first":
+                    transform_info = " (cast: {} sep={!r})".format(cast_name, sep or ",")
+                else:
+                    transform_info = " (cast: {})".format(cast_name)
 
         return key_info, transform_info
 
@@ -249,20 +259,28 @@ class RelationDiagnostics:
             normalized_fk: Optional[Any] = None
             if not missing:
                 normalized_fk = fk_raw
-                if isinstance(right_source, SourceIr) and right_source.key.cast:
+                if isinstance(right_source, SourceIr) and right_source.key.cast is not None:
                     try:
-                        if _is_tuple(fk_raw):
-                            casted: List[Any] = []
-                            for item in fk_raw:
-                                converted = right_source.key.cast(item)
-                                if converted is None:
-                                    casted = []
-                                    break
-                                casted.append(converted)
-                            normalized_fk = tuple(casted) if casted else None
+                        cast_spec = cast("Any", right_source.key.cast)  # pragma: allow-cast relation diagnostics runtime cast boundary
+                        if isinstance(cast_spec, LookupCastSpecIr):
+                            cast_fn = LookupCastRegistry().build(cast_spec, is_multi=_is_tuple(fk_raw_obj))
+                            normalized_fk = cast_fn(fk_raw_obj)
+                        elif callable(cast_spec):
+                            if _is_tuple(fk_raw_obj):
+                                parts: List[Any] = []
+                                for item in fk_raw_obj:
+                                    casted = cast_spec(item)
+                                    if casted is None:
+                                        normalized_fk = None
+                                        break
+                                    parts.append(casted)
+                                else:
+                                    normalized_fk = tuple(parts)
+                            else:
+                                normalized_fk = cast_spec(fk_raw_obj)
                         else:
-                            normalized_fk = right_source.key.cast(fk_raw_obj)
-                    except (ValueError, TypeError):
+                            normalized_fk = fk_raw_obj
+                    except (ValueError, TypeError, AttributeError):
                         normalized_fk = None
 
             matched = normalized_fk in data_b if normalized_fk is not None else False

@@ -2,13 +2,14 @@ import pytest
 
 from scalim.dsl.yaml_dsl.runtime._internal.conversion_relations import ConfigToIRConversionRelationMixin
 from scalim.dsl.yaml_dsl.runtime._internal.conversion_sources import ConfigToIRConversionSourceMixin
+from scalim.dsl.yaml_dsl.schema_dsl.models import LookupCastConfig
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
 
 
 @pytest.mark.parametrize(
     ("method_name", "kwargs"),
     [
-        ("_get_lookup_cast_fn", {"lookup_cast": None, "is_multi": False}),
+        ("_get_lookup_cast_spec", {"lookup_cast": LookupCastConfig(name="auto", sep=None)}),
         ("_create_binding", {"bind_config": None, "static_params": None, "key_field": "id"}),
     ],
 )
@@ -41,7 +42,6 @@ def test_relation_mixin_require_helpers_raise_clear_errors(method_name: str, mat
 @pytest.mark.parametrize(
     ("method_name", "match"),
     [
-        ("_require_resolver", "Reference resolver is not initialized"),
         ("_require_compute_engine", "Compute engine is not initialized"),
     ],
 )

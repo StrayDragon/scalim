@@ -57,6 +57,7 @@ def test_stage_parse_convert_and_map_request(tmp_path: Path) -> None:
     assert config.name == "stages"
     assert demand_ir.main_source.source_id == "orders"
     assert tuple(request.export_layout.field_ids) == ("order_id",)
+    assert request.runtime_bindings is not None
 
 
 def test_stage_map_request_rejects_allowlist_mismatch(tmp_path: Path) -> None:

@@ -1,9 +1,9 @@
 from collections import deque
-from typing import Deque, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Deque, Dict, List, Optional, Set, Tuple, Union
 
 from .....spec.ir import LookupStepIr, MainSourceIr, SourceIr
-from .....spec.ir.aliases import LookupKeyCast, NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr
+from .....spec.ir.lookup_casts import LookupCastSpecIr
 from ...schema_dsl.models import (
     DemandConfig,
     LookupCastConfig,
@@ -11,6 +11,9 @@ from ...schema_dsl.models import (
     SourceFieldConfig,
 )
 from ..errors import ScalimConversionError
+
+if TYPE_CHECKING:
+    from .....spec.ir.aliases import NormalizedLookupKeySpec
 
 StepInfo = Tuple[str, str, LookupStepIr]
 
@@ -23,8 +26,8 @@ class ConfigToIRConversionRelationMixin:
     _source_field_id_map: Optional[Dict[str, Dict[str, str]]] = None
     _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]] = None
 
-    def _get_lookup_cast_fn(self, lookup_cast: LookupCastConfig, *, is_multi: bool) -> LookupKeyCast:
-        _ = (lookup_cast, is_multi)
+    def _get_lookup_cast_spec(self, lookup_cast: LookupCastConfig) -> LookupCastSpecIr:
+        _ = lookup_cast
         raise NotImplementedError
 
     def _create_binding(
@@ -97,14 +100,14 @@ class ConfigToIRConversionRelationMixin:
 
         to_source = self._require_source_ir(to_source_id)
         to_field = self._resolve_to_field(to_fields, to_source)
-        lookup_cast_fn = self._resolve_step_lookup_cast(step, from_fields)
+        lookup_cast_spec = self._resolve_step_lookup_cast(step)
         bind_ir = self._resolve_step_binding(step, config, to_source_id, to_source.key.key)
 
         step_ir = LookupStepIr(
             from_field=tuple(from_fields) if len(from_fields) > 1 else from_fields[0],
             to_source=to_source,
             to_field=to_field,
-            lookup_cast=lookup_cast_fn,
+            lookup_cast=lookup_cast_spec,
             bind=bind_ir,
         )
 
@@ -127,11 +130,10 @@ class ConfigToIRConversionRelationMixin:
             return None
         return to_field
 
-    def _resolve_step_lookup_cast(self, step: RelationStepConfig, from_fields: List[str]) -> Optional["LookupKeyCast"]:
+    def _resolve_step_lookup_cast(self, step: RelationStepConfig) -> Optional[LookupCastSpecIr]:
         if step.lookup_cast is None:
             return None
-        is_multi = len(from_fields) > 1
-        return self._get_lookup_cast_fn(step.lookup_cast, is_multi=is_multi)
+        return self._get_lookup_cast_spec(step.lookup_cast)
 
     def _resolve_step_binding(
         self,

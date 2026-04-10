@@ -1,0 +1,4 @@
+fields:
+  b:
+    compute: "a"
+

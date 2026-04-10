@@ -14,14 +14,15 @@ import pytest
 
 from scalim.hooks import BaseHook, HookManager
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import KeyIr, LookupCastSpecIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
+from scalim.spec.ir.lookup_casts import lookup_cast_id
 from scalim._internal.utils.converters import (
-    NamedLookupCast,
     auto_normalize_key,
     must_get_seps_values_first_int,
     must_to_int,
@@ -181,9 +182,51 @@ def mock_float_key_loader() -> MockFloatKeyLoader:
     return MockFloatKeyLoader()
 
 
-def _run_engine(demand: DemandIr, targets: List[str]) -> List[Dict[str, Any]]:
+def _bind_main_source(runtime_bindings: RuntimeBindings, source_id: str, loader_fn) -> MainSourceIr:  # type: ignore[no-untyped-def]
+    runtime_bindings.main_source_loaders[str(source_id)] = loader_fn
+    return MainSourceIr(
+        source_id=str(source_id),
+        loader_ref=RuntimeHandleIdIr("main_source:{}".format(source_id)),
+    )
+
+
+def _bind_params_builder(  # type: ignore[no-untyped-def]
+    runtime_bindings: RuntimeBindings,
+    source_id: str,
+    key_field,
+    params_builder_fn,
+) -> BindingIr:
+    runtime_bindings.params_builders[(str(source_id), key_field)] = params_builder_fn
+    return BindingIr(
+        key_field=key_field,
+        params_builder_ref=RuntimeHandleIdIr("params_builder:{}:{}".format(source_id, key_field)),
+    )
+
+
+def _bind_source_loader(runtime_bindings: RuntimeBindings, source_id: str, loader_fn, *, bindings=None) -> LoaderIr:  # type: ignore[no-untyped-def]
+    runtime_bindings.source_loaders[str(source_id)] = loader_fn
+    return LoaderIr(
+        callable_ref=RuntimeHandleIdIr("source_loader:{}".format(source_id)),
+        bindings=bindings or {},
+    )
+
+
+def _bind_lookup_cast(runtime_bindings: RuntimeBindings, spec: LookupCastSpecIr, *, is_multi: bool, fn) -> None:  # type: ignore[no-untyped-def]
+    runtime_bindings.lookup_key_casts[lookup_cast_id(spec, is_multi=is_multi)] = fn
+
+
+def _run_engine(
+    demand: DemandIr,
+    targets: List[str],
+    runtime_bindings: RuntimeBindings,
+    *,
+    hook_manager: Optional[HookManager] = None,
+    main_rows: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
     plan = PlanBuilder(demand).build(targets=targets)
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=2)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, hook_manager=hook_manager, batch_size=2)
+    if main_rows is not None:
+        return engine.run(main_rows=main_rows)  # type: ignore[arg-type]
     return engine.run()
 
 
@@ -196,19 +239,25 @@ class _DiagnosticCaptureHook(BaseHook):
 
 
 def test_key_cast_single_field_str_to_int(mock_loader_with_types: MockDataLoaderWithTypes) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_loader_with_types.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_loader_with_types.get_orders)
 
+    customer_id_cast = LookupCastSpecIr(name="must_to_int")
+    _bind_lookup_cast(runtime_bindings, customer_id_cast, is_multi=False, fn=must_to_int)
+    customer_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "customers",
+        "customer_id",
+        lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+    )
     customers_source = SourceIr(
         source_id="customers",
-        key=KeyIr(key="customer_id", cast=must_to_int),
-        loader_spec=LoaderIr(
-            callable=mock_loader_with_types.get_customers,
-            bindings={
-                "customer_id": BindingIr(
-                    key_field="customer_id",
-                    params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        key=KeyIr(key="customer_id", cast=customer_id_cast),
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "customers",
+            mock_loader_with_types.get_customers,
+            bindings={"customer_id": customer_id_binding},
         ),
     )
 
@@ -228,7 +277,7 @@ def test_key_cast_single_field_str_to_int(mock_loader_with_types: MockDataLoader
 
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=orders_source)
 
-    results = _run_engine(demand, targets=["order_id", "customer_name"])
+    results = _run_engine(demand, targets=["order_id", "customer_name"], runtime_bindings=runtime_bindings)
     result_map = {row["order_id"]: row for row in results}
 
     assert result_map[0]["customer_name"] == "Alice"
@@ -237,19 +286,23 @@ def test_key_cast_single_field_str_to_int(mock_loader_with_types: MockDataLoader
 
 
 def test_key_cast_missing_causes_lookup_miss(mock_loader_with_types: MockDataLoaderWithTypes) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_loader_with_types.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_loader_with_types.get_orders)
 
+    customer_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "customers",
+        "customer_id",
+        lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+    )
     customers_source = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(
-            callable=mock_loader_with_types.get_customers,
-            bindings={
-                "customer_id": BindingIr(
-                    key_field="customer_id",
-                    params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "customers",
+            mock_loader_with_types.get_customers,
+            bindings={"customer_id": customer_id_binding},
         ),
     )
 
@@ -263,28 +316,34 @@ def test_key_cast_missing_causes_lookup_miss(mock_loader_with_types: MockDataLoa
 
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=orders_source)
 
-    results = _run_engine(demand, targets=["order_id", "customer_name"])
+    results = _run_engine(demand, targets=["order_id", "customer_name"], runtime_bindings=runtime_bindings)
     assert all(row["customer_name"] is None for row in results)
 
 
 def test_lookup_cast_auto_float_emits_diagnostic_warning(mock_float_key_loader: MockFloatKeyLoader) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_float_key_loader.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_float_key_loader.get_orders)
 
+    customer_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "customers",
+        "customer_id",
+        lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+    )
     customers_source = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(
-            callable=mock_float_key_loader.get_customers,
-            bindings={
-                "customer_id": BindingIr(
-                    key_field="customer_id",
-                    params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "customers",
+            mock_float_key_loader.get_customers,
+            bindings={"customer_id": customer_id_binding},
         ),
     )
 
-    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=auto_normalize_key),)
+    auto_cast = LookupCastSpecIr(name="auto")
+    _bind_lookup_cast(runtime_bindings, auto_cast, is_multi=False, fn=auto_normalize_key)
+    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=auto_cast),)
 
     fields = [
         FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
@@ -299,36 +358,45 @@ def test_lookup_cast_auto_float_emits_diagnostic_warning(mock_float_key_loader: 
     ]
 
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=orders_source)
-    plan = PlanBuilder(demand).build(targets=["order_id", "customer_name"])
     hook = _DiagnosticCaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    engine = ScalimEngine(demand=demand, plan=plan, hook_manager=hook_manager, batch_size=2)
 
-    results = engine.run()
+    results = _run_engine(
+        demand,
+        targets=["order_id", "customer_name"],
+        runtime_bindings=runtime_bindings,
+        hook_manager=hook_manager,
+    )
     assert all(row["customer_name"] is None for row in results)
     assert len(hook.events) == 1
     assert isinstance(hook.events[0].lookup_key, float)
 
 
 def test_lookup_cast_auto_non_float_has_no_warning(mock_loader_with_types: MockDataLoaderWithTypes) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_loader_with_types.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_loader_with_types.get_orders)
 
+    customer_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "customers",
+        "customer_id",
+        lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+    )
     customers_source = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(
-            callable=mock_loader_with_types.get_customers,
-            bindings={
-                "customer_id": BindingIr(
-                    key_field="customer_id",
-                    params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "customers",
+            mock_loader_with_types.get_customers,
+            bindings={"customer_id": customer_id_binding},
         ),
     )
 
-    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=auto_normalize_key),)
+    auto_cast = LookupCastSpecIr(name="auto")
+    _bind_lookup_cast(runtime_bindings, auto_cast, is_multi=False, fn=auto_normalize_key)
+    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=auto_cast),)
 
     fields = [
         FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
@@ -343,18 +411,23 @@ def test_lookup_cast_auto_non_float_has_no_warning(mock_loader_with_types: MockD
     ]
 
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=orders_source)
-    plan = PlanBuilder(demand).build(targets=["order_id", "customer_name"])
     hook = _DiagnosticCaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    engine = ScalimEngine(demand=demand, plan=plan, hook_manager=hook_manager, batch_size=2)
 
-    results = engine.run()
+    results = _run_engine(
+        demand,
+        targets=["order_id", "customer_name"],
+        runtime_bindings=runtime_bindings,
+        hook_manager=hook_manager,
+    )
     assert all(row["customer_name"] is None for row in results)
     assert hook.events == []
 
 
 def test_lookup_cast_auto_multi_field_float_warns(mock_loader_with_types: MockDataLoaderWithTypes) -> None:
+    runtime_bindings = RuntimeBindings()
+
     def _auto_multi_cast(value: object) -> Optional[Tuple[object, ...]]:
         if not isinstance(value, (list, tuple)):
             return None
@@ -366,20 +439,21 @@ def test_lookup_cast_auto_multi_field_float_warns(mock_loader_with_types: MockDa
             converted.append(normalized)
         return tuple(converted)
 
-    lookup_cast = NamedLookupCast("auto", _auto_multi_cast)
+    auto_cast = LookupCastSpecIr(name="auto")
+    _bind_lookup_cast(runtime_bindings, auto_cast, is_multi=True, fn=_auto_multi_cast)
 
-    orders_source = MainSourceIr(source_id="orders", loader=mock_loader_with_types.get_orders)
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_loader_with_types.get_orders)
     mapping_source = SourceIr(
         source_id="mapping",
         key=KeyIr(key=("region_id", "institution_id")),
-        loader_spec=LoaderIr(callable=lambda _keys_set=None: {}),  # type: ignore[call-arg]
+        loader_spec=_bind_source_loader(runtime_bindings, "mapping", (lambda _keys_set=None: {})),  # type: ignore[no-any-return]
     )
 
     lookup_steps = (
         LookupStepIr(
             from_field=("region_id", "institution_id"),
             to_source=mapping_source,
-            lookup_cast=lookup_cast,
+            lookup_cast=auto_cast,
         ),
     )
 
@@ -397,37 +471,45 @@ def test_lookup_cast_auto_multi_field_float_warns(mock_loader_with_types: MockDa
     ]
 
     demand = DemandIr.from_irs(sources=[mapping_source], fields=fields, main_source=orders_source)
-    plan = PlanBuilder(demand).build(targets=["order_id", "mapping_name"])
     hook = _DiagnosticCaptureHook()
     hook_manager = HookManager()
     hook_manager.register(hook)
-    engine = ScalimEngine(demand=demand, plan=plan, hook_manager=hook_manager, batch_size=2)
 
     # 注入 `float` 复合键,确保触发 `tuple` 分支
-    results = engine.run(
+    results = _run_engine(
+        demand,
+        targets=["order_id", "mapping_name"],
+        runtime_bindings=runtime_bindings,
+        hook_manager=hook_manager,
         main_rows=[
             {"order_id": 0, "region_id": 1.0, "institution_id": 10},
             {"order_id": 1, "region_id": 2.0, "institution_id": 20},
-        ]
+        ],
     )
     assert all(row["mapping_name"] is None for row in results)
     assert len(hook.events) == 1
 
 
 def test_multi_field_key_cast(mock_loader_with_types: MockDataLoaderWithTypes) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_loader_with_types.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_loader_with_types.get_orders)
 
+    mapping_key_cast = LookupCastSpecIr(name="must_to_int_tuple")
+    _bind_lookup_cast(runtime_bindings, mapping_key_cast, is_multi=True, fn=must_to_int_tuple)
+    mapping_binding = _bind_params_builder(
+        runtime_bindings,
+        "mapping",
+        ("region_id", "institution_id"),
+        lambda ctx: ((), {"composite_keys": ctx.lookup_keys or set()}),
+    )
     mapping_source = SourceIr(
         source_id="mapping",
-        key=KeyIr(key=("region_id", "institution_id"), cast=must_to_int_tuple),
-        loader_spec=LoaderIr(
-            callable=mock_loader_with_types.get_mappings,
-            bindings={
-                ("region_id", "institution_id"): BindingIr(
-                    key_field=("region_id", "institution_id"),
-                    params_builder=lambda ctx: ((), {"composite_keys": ctx.lookup_keys or set()}),
-                ),
-            },
+        key=KeyIr(key=("region_id", "institution_id"), cast=mapping_key_cast),
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "mapping",
+            mock_loader_with_types.get_mappings,
+            bindings={("region_id", "institution_id"): mapping_binding},
         ),
     )
 
@@ -448,7 +530,7 @@ def test_multi_field_key_cast(mock_loader_with_types: MockDataLoaderWithTypes) -
 
     demand = DemandIr.from_irs(sources=[mapping_source], fields=fields, main_source=orders_source)
 
-    results = _run_engine(demand, targets=["order_id", "mapping_name"])
+    results = _run_engine(demand, targets=["order_id", "mapping_name"], runtime_bindings=runtime_bindings)
     result_map = {row["order_id"]: row for row in results}
 
     assert result_map[0]["mapping_name"] == "mapping_1_10"
@@ -457,33 +539,42 @@ def test_multi_field_key_cast(mock_loader_with_types: MockDataLoaderWithTypes) -
 
 
 def test_multi_level_key_cast(mock_multi_level_loader: MockMultiLevelLoader) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_multi_level_loader.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_multi_level_loader.get_orders)
 
+    to_int_cast = LookupCastSpecIr(name="must_to_int")
+    _bind_lookup_cast(runtime_bindings, to_int_cast, is_multi=False, fn=must_to_int)
+    pay_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "pays",
+        "pay_id",
+        lambda ctx: ((), {"pay_ids_set": ctx.lookup_keys or set()}),
+    )
     pays_source = SourceIr(
         source_id="pays",
-        key=KeyIr(key="pay_id", cast=must_to_int),
-        loader_spec=LoaderIr(
-            callable=mock_multi_level_loader.get_pays,
-            bindings={
-                "pay_id": BindingIr(
-                    key_field="pay_id",
-                    params_builder=lambda ctx: ((), {"pay_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        key=KeyIr(key="pay_id", cast=to_int_cast),
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "pays",
+            mock_multi_level_loader.get_pays,
+            bindings={"pay_id": pay_id_binding},
         ),
     )
 
+    country_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "countries",
+        "country_id",
+        lambda ctx: ((), {"country_ids_set": ctx.lookup_keys or set()}),
+    )
     countries_source = SourceIr(
         source_id="countries",
-        key=KeyIr(key="country_id", cast=must_to_int),
-        loader_spec=LoaderIr(
-            callable=mock_multi_level_loader.get_countries,
-            bindings={
-                "country_id": BindingIr(
-                    key_field="country_id",
-                    params_builder=lambda ctx: ((), {"country_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        key=KeyIr(key="country_id", cast=to_int_cast),
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "countries",
+            mock_multi_level_loader.get_countries,
+            bindings={"country_id": country_id_binding},
         ),
     )
 
@@ -506,7 +597,7 @@ def test_multi_level_key_cast(mock_multi_level_loader: MockMultiLevelLoader) -> 
 
     demand = DemandIr.from_irs(sources=[pays_source, countries_source], fields=fields, main_source=orders_source)
 
-    results = _run_engine(demand, targets=["order_id", "country_name"])
+    results = _run_engine(demand, targets=["order_id", "country_name"], runtime_bindings=runtime_bindings)
     result_map = {row["order_id"]: row for row in results}
 
     assert result_map[0]["country_name"] == "China"
@@ -518,23 +609,31 @@ def test_lookup_cast_overrides_key_cast(mock_loader_with_types: MockDataLoaderWi
     def bad_cast(_value: Any) -> Optional[int]:
         raise RuntimeError("key.cast should not be called")
 
-    orders_source = MainSourceIr(source_id="orders", loader=mock_loader_with_types.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_loader_with_types.get_orders)
 
+    bad_cast_spec = LookupCastSpecIr(name="bad_cast")
+    _bind_lookup_cast(runtime_bindings, bad_cast_spec, is_multi=False, fn=bad_cast)
+    customer_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "customers",
+        "customer_id",
+        lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+    )
     customers_source = SourceIr(
         source_id="customers",
-        key=KeyIr(key="customer_id", cast=bad_cast),
-        loader_spec=LoaderIr(
-            callable=mock_loader_with_types.get_customers,
-            bindings={
-                "customer_id": BindingIr(
-                    key_field="customer_id",
-                    params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        key=KeyIr(key="customer_id", cast=bad_cast_spec),
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "customers",
+            mock_loader_with_types.get_customers,
+            bindings={"customer_id": customer_id_binding},
         ),
     )
 
-    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=must_to_int),)
+    to_int_cast = LookupCastSpecIr(name="must_to_int")
+    _bind_lookup_cast(runtime_bindings, to_int_cast, is_multi=False, fn=must_to_int)
+    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=to_int_cast),)
 
     fields = [
         FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
@@ -550,7 +649,7 @@ def test_lookup_cast_overrides_key_cast(mock_loader_with_types: MockDataLoaderWi
 
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=orders_source)
 
-    results = _run_engine(demand, targets=["order_id", "customer_name"])
+    results = _run_engine(demand, targets=["order_id", "customer_name"], runtime_bindings=runtime_bindings)
     result_map = {row["order_id"]: row for row in results}
 
     assert result_map[0]["customer_name"] == "Alice"
@@ -559,23 +658,31 @@ def test_lookup_cast_overrides_key_cast(mock_loader_with_types: MockDataLoaderWi
 
 
 def test_lookup_cast_csv_first(mock_csv_loader: MockCSVFieldLoader) -> None:
-    orders_source = MainSourceIr(source_id="orders", loader=mock_csv_loader.get_orders)
+    runtime_bindings = RuntimeBindings()
+    orders_source = _bind_main_source(runtime_bindings, "orders", mock_csv_loader.get_orders)
 
+    to_int_cast = LookupCastSpecIr(name="must_to_int")
+    _bind_lookup_cast(runtime_bindings, to_int_cast, is_multi=False, fn=must_to_int)
+    group_id_binding = _bind_params_builder(
+        runtime_bindings,
+        "groups",
+        "group_id",
+        lambda ctx: ((), {"group_ids_set": ctx.lookup_keys or set()}),
+    )
     groups_source = SourceIr(
         source_id="groups",
-        key=KeyIr(key="group_id", cast=must_to_int),
-        loader_spec=LoaderIr(
-            callable=mock_csv_loader.get_groups,
-            bindings={
-                "group_id": BindingIr(
-                    key_field="group_id",
-                    params_builder=lambda ctx: ((), {"group_ids_set": ctx.lookup_keys or set()}),
-                ),
-            },
+        key=KeyIr(key="group_id", cast=to_int_cast),
+        loader_spec=_bind_source_loader(
+            runtime_bindings,
+            "groups",
+            mock_csv_loader.get_groups,
+            bindings={"group_id": group_id_binding},
         ),
     )
 
-    lookup_steps = (LookupStepIr(from_field="group_ids", to_source=groups_source, lookup_cast=must_get_seps_values_first_int),)
+    csv_first = LookupCastSpecIr(name="sep_first")
+    _bind_lookup_cast(runtime_bindings, csv_first, is_multi=False, fn=must_get_seps_values_first_int)
+    lookup_steps = (LookupStepIr(from_field="group_ids", to_source=groups_source, lookup_cast=csv_first),)
 
     fields = [
         FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
@@ -591,7 +698,7 @@ def test_lookup_cast_csv_first(mock_csv_loader: MockCSVFieldLoader) -> None:
 
     demand = DemandIr.from_irs(sources=[groups_source], fields=fields, main_source=orders_source)
 
-    results = _run_engine(demand, targets=["order_id", "group_name"])
+    results = _run_engine(demand, targets=["order_id", "group_name"], runtime_bindings=runtime_bindings)
     result_map = {row["order_id"]: row for row in results}
 
     assert result_map[0]["group_name"] == "Group A"

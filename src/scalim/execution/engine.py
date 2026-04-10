@@ -15,6 +15,7 @@ from .guardrails import GuardrailsPolicy
 from .loader_retry import LoaderRetryPolicies
 from .pipeline.base.pipeline import Pipeline, SeqPipeline
 from .pipeline.overrides import PipelineOverrides
+from .runtime_bindings import RuntimeBindings
 
 # endregion
 
@@ -41,6 +42,7 @@ class ScalimEngine:
         self,
         demand: DemandIr,
         plan: ExecutionPlan,
+        runtime_bindings: RuntimeBindings,
         hook_manager: Optional[HookManager] = None,
         observer_manager: Optional[ObserverManager] = None,
         batch_size: Optional[int] = 1000,
@@ -103,6 +105,8 @@ class ScalimEngine:
             hook_manager=self.hook_manager,
             observer_manager=self.observer_manager,
             main_source=self.demand.main_source,
+            sources=self.demand.sources,
+            runtime_bindings=runtime_bindings,
             guardrails=guardrails,
             loader_retry=loader_retry,
             parallel_mode=parallel_mode,

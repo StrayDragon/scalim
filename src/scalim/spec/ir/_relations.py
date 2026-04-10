@@ -4,8 +4,9 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 from ._source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
-from .aliases import LookupKeyCast, LookupKeySpec
+from .aliases import LookupKeySpec
 from .binding import BindingIr
+from .lookup_casts import LookupCastSpecIr
 
 
 @dataclass(frozen=True)
@@ -245,7 +246,7 @@ class LookupStepIr:
     目标字段名或字段名列表(可选,默认使用 `to_source` 的键)
     """
 
-    lookup_cast: Optional[LookupKeyCast] = None
+    lookup_cast: Optional[LookupCastSpecIr] = None
     """
     关联键归一化转换(仅当前步骤)
     """

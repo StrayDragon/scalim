@@ -12,7 +12,7 @@ from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryColumnSink
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
-from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.demo_big_data_report.verification import VerificationResult, verify_scalim_output
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -32,6 +32,7 @@ def run_observability(
     set_config(cfg)
     try:
         demand = build_ecommerce_model(cfg)
+        runtime_bindings = build_ecommerce_runtime_bindings()
         targets_list = list(targets or TARGET_FIELDS_FULL[:12])
         plan = PlanBuilder(demand).build(targets=targets_list)
 
@@ -49,7 +50,13 @@ def run_observability(
         observer_manager.register(trace_observer)
         observer_manager.register(row_gap_observer)
 
-        engine = ScalimEngine(demand=demand, plan=plan, observer_manager=observer_manager, batch_size=int(batch_size))
+        engine = ScalimEngine(
+            demand=demand,
+            plan=plan,
+            runtime_bindings=runtime_bindings,
+            observer_manager=observer_manager,
+            batch_size=int(batch_size),
+        )
         with InMemoryColumnSink(field_names=targets_list) as sink:
             engine.run(main_rows=None, sink=sink)
             rows = sink.get_rows()

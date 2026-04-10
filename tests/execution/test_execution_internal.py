@@ -7,6 +7,7 @@ from scalim.execution.context import BatchContext
 from scalim.execution import ScalimEngine
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.pipeline.base._row_emission import RowEmissionCoordinator
 from scalim.execution.pipeline.base.pipeline import SeqPipeline
 from scalim.execution.pipeline.overrides import PipelineOverrides
@@ -19,21 +20,21 @@ from scalim.sinks import IColumnSink
 from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DerivedFieldIr, FieldIr, RuntimeHandleIdIr
 from scalim.spec.ir import LookupStepIr
 from scalim.spec.ir import KeyIr, MainSourceIr, OrderByKeyIr, SourceIr
 from tests.support.testing_utils import RecordingLoadRefExecutor
 
 
 def _make_main_source() -> MainSourceIr:
-    return MainSourceIr(source_id="main", loader=lambda: [])
+    return MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
 
 
 def _make_source(source_id: str = "customers") -> SourceIr:
     return SourceIr(
         source_id=source_id,
         key=KeyIr(key="id"),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="{}.loader".format(source_id))),
     )
 
 
@@ -54,10 +55,37 @@ def _make_pipeline(
     demand: DemandIr,
     runtime_main_source: Optional[MainSourceIr],
     overrides: Optional[PipelineOverrides] = None,
+    runtime_bindings: Optional[RuntimeBindings] = None,
 ) -> SeqPipeline:
     hook_manager = HookManager()
     observer_manager = ObserverManager()
-    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, runtime_main_source)
+    if runtime_bindings is None:
+
+        def _noop_source_loader(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return {}
+
+        def _noop_params_builder(_ctx):  # type: ignore[no-untyped-def]
+            return (), {}
+
+        params_builders = {}
+        for source_id, source in (demand.sources or {}).items():
+            for key_field, binding in (source.loader_spec.bindings or {}).items():
+                if binding.params_builder_ref is not None:
+                    params_builders[(source_id, key_field)] = _noop_params_builder
+
+        runtime_bindings = RuntimeBindings(
+            main_source_loaders={runtime_main_source.source_id: (lambda: [])} if runtime_main_source else {},
+            source_loaders={source_id: _noop_source_loader for source_id in (demand.sources or {})},
+            params_builders=params_builders,
+        )
+    runtime = ExecutionRuntime(
+        plan,
+        hook_manager,
+        observer_manager,
+        runtime_main_source,
+        sources=demand.sources,
+        runtime_bindings=runtime_bindings,
+    )
     executor = BatchExecutor(plan, runtime)
     return SeqPipeline(plan, executor, runtime, hook_manager, observer_manager, demand, batch_size=2, overrides=overrides)
 
@@ -101,7 +129,14 @@ def test_batch_executor_prefill_noop(has_other_field: bool, main_rows, required_
         target_fields = ["other"]
 
     plan = _make_plan(field_specs, target_fields)
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source)
+    runtime = ExecutionRuntime(
+        plan,
+        HookManager(),
+        ObserverManager(),
+        main_source,
+        sources={},
+        runtime_bindings=RuntimeBindings(main_source_loaders={"main": lambda: []}),
+    )
     executor = BatchExecutor(plan, runtime)
     context = BatchContext()
 
@@ -111,24 +146,37 @@ def test_batch_executor_prefill_noop(has_other_field: bool, main_rows, required_
 
 
 def _make_loadref_op(*, field_key: str, source: SourceIr, step: LookupStepIr) -> LoadRefOperatorIr:
-    field_spec = FieldIr(field_id=field_key, name=field_key, source=source)
     return LoadRefOperatorIr(
         operator_id="load_ref_{}".format(field_key),
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=source.source_id,
         field_key=field_key,
-        field_spec=field_spec,
         lookup_steps=(step,),
     )
 
 
 def test_batch_executor_seq_loadref_segment_returns_when_executor_missing() -> None:
-    binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="keys")
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    binding = BindingIr(
+        key_field="id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="s1.id.params_builder"),
+        mode="keys",
+    )
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
     op = _make_loadref_op(field_key="x", source=source, step=LookupStepIr(from_field="id", to_source=source, bind=binding))
 
     plan = ExecutionPlan(operators=(op,))
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime = ExecutionRuntime(
+        plan,
+        HookManager(),
+        ObserverManager(),
+        _make_main_source(),
+        sources={"s1": source},
+        runtime_bindings=RuntimeBindings(),
+    )
     executor = BatchExecutor(plan, runtime)
     executor._executors.pop(OperatorType.LOAD_REF.value, None)
 
@@ -145,8 +193,16 @@ def test_batch_executor_seq_loadref_segment_returns_when_executor_missing() -> N
 
 
 def test_batch_executor_adaptive_loadref_segment_falls_back_to_serial_when_no_pool() -> None:
-    binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="keys")
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    binding = BindingIr(
+        key_field="id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="s1.id.params_builder"),
+        mode="keys",
+    )
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
     step = LookupStepIr(from_field="id", to_source=source, bind=binding)
     op1 = _make_loadref_op(field_key="a", source=source, step=step)
     op2 = _make_loadref_op(field_key="b", source=source, step=step)
@@ -156,7 +212,9 @@ def test_batch_executor_adaptive_loadref_segment_falls_back_to_serial_when_no_po
         plan,
         HookManager(),
         ObserverManager(),
-        main_source=MainSourceIr(source_id="main", loader=lambda: []),
+        _make_main_source(),
+        sources={"s1": source},
+        runtime_bindings=RuntimeBindings(),
         parallel_mode="adaptive",
         max_workers=1,
     )
@@ -186,8 +244,16 @@ def test_batch_executor_adaptive_loadref_segment_falls_back_to_serial_when_no_po
 
 
 def test_batch_executor_adaptive_loadref_segment_returns_when_executor_missing() -> None:
-    binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}), mode="keys")
-    source = SourceIr(source_id="s1", key=KeyIr(key="id"), loader_spec=LoaderIr(callable=lambda: {}))
+    binding = BindingIr(
+        key_field="id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="s1.id.params_builder"),
+        mode="keys",
+    )
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
     op = _make_loadref_op(field_key="x", source=source, step=LookupStepIr(from_field="id", to_source=source, bind=binding))
 
     plan = ExecutionPlan(operators=(op,))
@@ -195,7 +261,9 @@ def test_batch_executor_adaptive_loadref_segment_returns_when_executor_missing()
         plan,
         HookManager(),
         ObserverManager(),
-        main_source=MainSourceIr(source_id="main", loader=lambda: []),
+        _make_main_source(),
+        sources={"s1": source},
+        runtime_bindings=RuntimeBindings(),
         parallel_mode="adaptive",
         max_workers=1,
     )
@@ -244,6 +312,7 @@ def test_adaptive_pipeline_uses_overridden_adaptive_executor_cls() -> None:
     engine = ScalimEngine(
         demand=demand,
         plan=plan,
+        runtime_bindings=RuntimeBindings(),
         parallel_mode="adaptive",
         batch_size=1,
         max_workers=2,
@@ -307,7 +376,7 @@ def test_pipeline_execute_batch_column_mode_handles_load_operator() -> None:
     load_op = LoadOperatorIr(
         operator_id="load_0",
         operator_type=OperatorType.LOAD.value,
-        source=customers_source,
+        source_id=customers_source.source_id,
         field_keys=("customer_name",),
         is_primary=False,
     )
@@ -332,7 +401,7 @@ def test_pipeline_execute_batch_streaming_mode_writes_load_operator_fields() -> 
     load_op = LoadOperatorIr(
         operator_id="load_0",
         operator_type=OperatorType.LOAD.value,
-        source=customers_source,
+        source_id=customers_source.source_id,
         field_keys=("customer_name",),
         is_primary=False,
     )
@@ -355,7 +424,12 @@ def test_pipeline_true_row_streaming_writes_null_fk_row_before_ref_loader_call()
         def _builder(ctx):  # type: ignore[no-untyped-def]
             return (), {param_name: set(ctx.lookup_keys or set())}
 
-        return BindingIr(key_field=field_name, params_builder=_builder, mode="keys")
+        binding = BindingIr(
+            key_field=field_name,
+            params_builder_ref=RuntimeHandleIdIr(handle_id="{}.{}.params_builder".format(field_name, param_name)),
+            mode="keys",
+        )
+        return binding, _builder
 
     def _load_customers(customer_id_set=None):  # type: ignore[no-untyped-def]
         written = sink.get_data()
@@ -364,11 +438,16 @@ def test_pipeline_true_row_streaming_writes_null_fk_row_before_ref_loader_call()
         _ = customer_id_set
         return {100: {"customer_id": 100, "customer_name": "Alice"}}
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    customer_binding, customer_params_builder = _build_keys_params("customer_id", "customer_id_set")
+
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(callable=_load_customers, bindings={"customer_id": _build_keys_params("customer_id", "customer_id_set")}),
+        loader_spec=LoaderIr(
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={"customer_id": customer_binding},
+        ),
     )
 
     fields = [
@@ -384,7 +463,13 @@ def test_pipeline_true_row_streaming_writes_null_fk_row_before_ref_loader_call()
 
     demand = DemandIr.from_irs(sources=[customers], fields=fields, main_source=main_source)
     plan = PlanBuilder(demand).build(targets=["order_id", "customer_name"])
-    pipeline = _make_pipeline(plan, demand, main_source)
+    runtime_bindings = RuntimeBindings(
+        source_loaders={"customers": _load_customers},
+        params_builders={
+            ("customers", "customer_id"): customer_params_builder,
+        },
+    )
+    pipeline = _make_pipeline(plan, demand, main_source, runtime_bindings=runtime_bindings)
 
     row_ids = [0, 1]
     batch_rows = {0: {"order_id": 0, "customer_id": None}, 1: {"order_id": 1, "customer_id": 100}}
@@ -407,14 +492,36 @@ def test_pipeline_true_row_streaming_releases_written_rows_before_next_compute_r
             assert len(capture.row_releases) == 1
         return a * 10
 
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     id_field = FieldIr(field_id="id", name="ID", source=main_source, is_primary=True)
-    a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), calculator=lambda id: id)
-    b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("a",), calculator=_compute_b)
+    a_field = DerivedFieldIr(
+        field_id="a",
+        name="A",
+        dependencies=("id",),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="a.calculator"),
+            args=(CallByValueIr(kind="field", value="id"),),
+        ),
+    )
+    b_field = DerivedFieldIr(
+        field_id="b",
+        name="B",
+        dependencies=("a",),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="b.calculator"),
+            args=(CallByValueIr(kind="field", value="a"),),
+        ),
+    )
 
     demand = DemandIr.from_irs(sources=[], fields=[id_field, a_field, b_field], main_source=main_source)
     plan = PlanBuilder(demand).build(targets=["a", "b"])
-    pipeline = _make_pipeline(plan, demand, main_source)
+    runtime_bindings = RuntimeBindings(
+        derived_calculators={
+            "a": lambda id: id,
+            "b": _compute_b,
+        }
+    )
+    pipeline = _make_pipeline(plan, demand, main_source, runtime_bindings=runtime_bindings)
     pipeline.hook_manager.register(capture)
 
     row_ids = [0, 1]
@@ -446,11 +553,11 @@ def test_pipeline_resolve_streaming_global_ready_target_fields_includes_passthro
 
 
 def test_pipeline_collect_streaming_rows_binding_barriers_skips_steps_without_binding() -> None:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader")),
     )
 
     fields = [
@@ -495,7 +602,13 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
         def _builder(ctx):  # type: ignore[no-untyped-def]
             return (), {param_name: list(ctx.batch_rows or [])}
 
-        return BindingIr(key_field=field_name, params_builder=_builder, mode="rows", cache_mode=cache_mode)
+        binding = BindingIr(
+            key_field=field_name,
+            params_builder_ref=RuntimeHandleIdIr(handle_id="{}.{}.rows_params_builder".format(field_name, param_name)),
+            mode="rows",
+            cache_mode=cache_mode,
+        )
+        return binding, _builder
 
     def _load_customers(rows=None):  # type: ignore[no-untyped-def]
         _ = rows
@@ -503,11 +616,16 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
             100: {"customer_id": 100, "customer_name": "Alice", "level": "VIP"},
         }
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    customer_binding, customer_params_builder = _build_rows_params("customer_id", "rows")
+
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(callable=_load_customers, bindings={"customer_id": _build_rows_params("customer_id", "rows")}),
+        loader_spec=LoaderIr(
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={"customer_id": customer_binding},
+        ),
     )
 
     fields = [
@@ -530,7 +648,13 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
 
     demand = DemandIr.from_irs(sources=[customers], fields=fields, main_source=main_source)
     plan = PlanBuilder(demand).build(targets=["order_id", "customer_name", "customer_level"])
-    pipeline = _make_pipeline(plan, demand, main_source)
+    runtime_bindings = RuntimeBindings(
+        source_loaders={"customers": _load_customers},
+        params_builders={
+            ("customers", "customer_id"): customer_params_builder,
+        },
+    )
+    pipeline = _make_pipeline(plan, demand, main_source, runtime_bindings=runtime_bindings)
     pipeline.hook_manager.register(hook)
 
     rows_binding_relations, rows_binding_ops = pipeline._collect_streaming_rows_binding_barriers()
@@ -583,7 +707,7 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
 
 def test_row_emission_coordinator_flush_noops_when_write_order_missing() -> None:
     plan = _make_plan({}, ["a"])
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
     sink = InMemoryRowSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
@@ -602,7 +726,7 @@ def test_row_emission_coordinator_flush_noops_when_write_order_missing() -> None
 
 def test_row_emission_coordinator_defers_release_when_disabled() -> None:
     plan = _make_plan({}, ["a"])
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
     sink = InMemoryRowSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
@@ -625,7 +749,7 @@ def test_row_emission_coordinator_defers_release_when_disabled() -> None:
 
 def test_row_emission_coordinator_finalize_writes_rows_even_when_not_ready() -> None:
     plan = _make_plan({}, ["a"])
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
     sink = InMemoryRowSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
@@ -657,7 +781,7 @@ def test_row_emission_coordinator_falls_back_when_write_row_aligned_missing() ->
             return
 
     plan = _make_plan({}, ["a"])
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
     sink = _NoAlignedRowSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
@@ -692,7 +816,7 @@ def test_row_emission_coordinator_prefers_write_row_aligned_when_supported() -> 
             return
 
     plan = _make_plan({}, ["a"])
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source())
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
     sink = _AlignedOnlyRowSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
@@ -715,7 +839,7 @@ def test_row_emission_coordinator_prefers_write_row_aligned_when_supported() -> 
 def test_pipeline_streaming_order_by_sorts_rows_and_stable() -> None:
     main_source = MainSourceIr(
         source_id="main",
-        loader=lambda: [],
+        loader_ref=RuntimeHandleIdIr(handle_id="main.loader"),
         order_by=(OrderByKeyIr(field_key="order_id", direction="asc"),),
     )
     field_spec = FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True)
@@ -739,7 +863,7 @@ def test_pipeline_streaming_order_by_sorts_rows_and_stable() -> None:
 def test_pipeline_streaming_order_by_desc_nulls_last() -> None:
     main_source = MainSourceIr(
         source_id="main",
-        loader=lambda: [],
+        loader_ref=RuntimeHandleIdIr(handle_id="main.loader"),
         order_by=(OrderByKeyIr(field_key="score", direction="desc"),),
     )
     field_spec = FieldIr(field_id="score", name="Score", source=main_source, is_primary=True)
@@ -759,7 +883,7 @@ def test_pipeline_streaming_order_by_desc_nulls_last() -> None:
 def test_pipeline_column_order_by_sets_row_ids() -> None:
     main_source = MainSourceIr(
         source_id="main",
-        loader=lambda: [],
+        loader_ref=RuntimeHandleIdIr(handle_id="main.loader"),
         order_by=(OrderByKeyIr(field_key="order_id", direction="asc"),),
     )
     field_spec = FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True)
@@ -786,7 +910,7 @@ def test_pipeline_streaming_mode_emits_row_events() -> None:
     hook_manager = HookManager()
     hook_manager.register(hook)
     observer_manager = ObserverManager()
-    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, main_source)
+    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, main_source, sources={}, runtime_bindings=RuntimeBindings())
     executor = BatchExecutor(plan, runtime)
     pipeline = SeqPipeline(plan, executor, runtime, hook_manager, observer_manager, demand, batch_size=2)
 
@@ -809,7 +933,7 @@ def test_pipeline_column_mode_emits_column_events() -> None:
     hook_manager = HookManager()
     hook_manager.register(hook)
     observer_manager = ObserverManager()
-    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, main_source)
+    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, main_source, sources={}, runtime_bindings=RuntimeBindings())
     executor = BatchExecutor(plan, runtime)
     pipeline = SeqPipeline(plan, executor, runtime, hook_manager, observer_manager, demand, batch_size=2)
 

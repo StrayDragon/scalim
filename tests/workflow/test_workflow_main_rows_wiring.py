@@ -7,6 +7,7 @@ from scalim.execution.run_ir import ExecutionRequest, ExecutionResult
 from scalim.planning.plan import ExecutionPlan
 from scalim.sinks.rows import InMemoryRows
 from scalim.spec.ir import DemandIr, MainSourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
 from scalim.workflow.errors import ScalimWorkflowConfigError
 from scalim.workflow.execute import run_workflow_ir
@@ -50,7 +51,11 @@ def test_workflow_main_rows_capture_and_release_are_scoped_and_deterministic(mon
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
 
-    demand_ir = DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="orders", loader=lambda: []))
+    demand_ir = DemandIr(
+        sources={},
+        fields={},
+        main_source=MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader")),
+    )
 
     def _compile_demand_fn(_path: str, **_kwargs: Any) -> _Compilation:
         return _Compilation(demand_ir=demand_ir, request=_make_base_request())
@@ -155,7 +160,11 @@ def test_workflow_main_rows_visibility_error_has_diagnostic_path() -> None:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
 
-    demand_ir = DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="orders", loader=lambda: []))
+    demand_ir = DemandIr(
+        sources={},
+        fields={},
+        main_source=MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader")),
+    )
 
     def _compile_demand_fn(_path: str, **_kwargs: Any) -> _Compilation:
         return _Compilation(demand_ir=demand_ir, request=_make_base_request())

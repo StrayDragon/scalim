@@ -431,6 +431,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-validation/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
 
+### `yaml-dsl-compiler-frontend`
+- Title: yaml-dsl-compiler-frontend Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-compiler-frontend/spec.md)
+- Summary: TBD - created by archiving change c30-yaml-dsl-compiler-frontend. Update Purpose after archive.
+
 ### `yaml-dsl-demand-imports-scope`
 - Title: yaml-dsl-demand-imports-scope Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-demand-imports-scope/spec.md)

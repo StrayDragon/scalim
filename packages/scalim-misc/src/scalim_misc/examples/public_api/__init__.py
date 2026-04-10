@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ._fixtures import (
     build_minimal_public_api_ir,
+    build_minimal_public_api_runtime_bindings,
     get_preload_counter_calls,
     load_dims,
     load_items,
@@ -16,6 +17,7 @@ from ._fixtures import (
 
 __all__ = [
     "build_minimal_public_api_ir",
+    "build_minimal_public_api_runtime_bindings",
     "get_preload_counter_calls",
     "load_dims",
     "load_items",

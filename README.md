@@ -17,16 +17,21 @@
 
 ```python
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink
-from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 
 
 def load_orders(**_kwargs):
     raise NotImplementedError
 
 
-orders = MainSourceIr(source_id="orders", loader=load_orders)
+def calc_amount_x2(amount):
+    return amount * 2
+
+
+orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
 
 demand = DemandIr.from_irs(
     sources=[],
@@ -38,14 +43,22 @@ demand = DemandIr.from_irs(
             field_id="amount_x2",
             name="金额*2",
             dependencies=("amount",),
-            calculator=lambda amount: amount * 2,
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="amount_x2.calculator"),
+                kwargs=(("amount", CallByValueIr(kind="field", value="amount")),),
+                field_names=("amount",),
+            ),
         ),
     ),
     name="orders_report",
 )
 
 plan = PlanBuilder(demand).build()
-engine = ScalimEngine(demand=demand, plan=plan, batch_size=1000, parallel_mode="seq")
+runtime_bindings = RuntimeBindings(
+    main_source_loaders={"orders": load_orders},
+    derived_calculators={"amount_x2": calc_amount_x2},
+)
+engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1000, parallel_mode="seq")
 
 sink = InMemoryRowSink()
 engine.run(sink=sink)

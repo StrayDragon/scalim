@@ -6,7 +6,6 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
-from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, MainSourceConfig, SourceConfig
 from scalim.spec.ir.binding import LoaderCallContextIr
 
@@ -277,8 +276,6 @@ def test_params_template_render_kwargs_rejects_non_string_keys() -> None:
 
 
 def test_converter_rejects_disallowed_directives_and_reports_template_errors() -> None:
-    resolver = PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
-
     config = DemandConfig(
         name="demo",
         main_source=MainSourceConfig(
@@ -295,7 +292,7 @@ def test_converter_rejects_disallowed_directives_and_reports_template_errors() -
         },
     )
     with pytest.raises(ScalimConversionError, match="`\\$keys` is not allowed"):
-        ConfigToIRConverter(resolver=resolver).convert(config)
+        ConfigToIRConverter().convert(config)
 
     config3 = DemandConfig(
         name="demo",
@@ -310,7 +307,7 @@ def test_converter_rejects_disallowed_directives_and_reports_template_errors() -
         },
     )
     with pytest.raises(ScalimConversionError, match="Missing init var"):
-        ConfigToIRConverter(resolver=resolver).convert(config3)
+        ConfigToIRConverter().convert(config3)
 
 
 def test_params_template_legacy_runtime_directive_is_rejected_with_migration_hint_and_path() -> None:

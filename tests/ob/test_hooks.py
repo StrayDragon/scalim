@@ -30,21 +30,22 @@ from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from scalim.typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY
+from scalim.execution.runtime_bindings import RuntimeBindings
 
 
-def _get_main_rows(demand, limit: int = 3):
+def _get_main_rows(demand, runtime_bindings: RuntimeBindings, limit: int = 3):
     main_source = demand.main_source
     if main_source is None:
         return []
     params = dict(main_source.params or {})
     if params:
-        rows = list(main_source.loader(**params))
+        rows = list(runtime_bindings.require_main_source_loader(main_source.source_id)(**params))
     else:
-        rows = list(main_source.loader())
+        rows = list(runtime_bindings.require_main_source_loader(main_source.source_id)())
     return rows[:limit]
 
 
-def test_streaming_hooks_capture_events(plan_builder, engine_factory, caplog) -> None:
+def test_streaming_hooks_capture_events(plan_builder, engine_factory, example_runtime_bindings, caplog) -> None:
     targets = ["order_id", "amount", "cost", "profit"]
     plan = plan_builder.build(targets=targets)
 
@@ -60,7 +61,7 @@ def test_streaming_hooks_capture_events(plan_builder, engine_factory, caplog) ->
 
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
 
     with caplog.at_level(logging.INFO, logger=logger.name):
         engine.run(main_rows=main_rows, sink=InMemoryRowSink())
@@ -83,7 +84,7 @@ def test_streaming_hooks_capture_events(plan_builder, engine_factory, caplog) ->
     trace_observer.print_summary()
 
 
-def test_memory_hook_column_events(plan_builder, engine_factory) -> None:
+def test_memory_hook_column_events(plan_builder, engine_factory, example_runtime_bindings) -> None:
     targets = ["order_id", "order_source"]
     plan = plan_builder.build(targets=targets)
 
@@ -92,7 +93,7 @@ def test_memory_hook_column_events(plan_builder, engine_factory) -> None:
 
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows, sink=InMemoryColumnSink(field_names=targets))
 
     assert memory_observer.column_write_events
@@ -105,7 +106,7 @@ def test_memory_hook_column_events(plan_builder, engine_factory) -> None:
     assert memory_observer.field_slim_events == []
 
 
-def test_column_trace_and_logging_hooks_capture_field_slim(plan_builder, engine_factory) -> None:
+def test_column_trace_and_logging_hooks_capture_field_slim(plan_builder, engine_factory, example_runtime_bindings) -> None:
     targets = ["order_id", "order_source"]
     plan = plan_builder.build(targets=targets)
 
@@ -116,7 +117,7 @@ def test_column_trace_and_logging_hooks_capture_field_slim(plan_builder, engine_
     observer_manager.register(trace_observer)
 
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows, sink=InMemoryColumnSink(field_names=targets))
 
     assert trace_observer.total_field_slims > 0
@@ -424,7 +425,7 @@ def test_hook_manager_diagnostic_warning_fallback_logger(caplog) -> None:
     assert not caplog.records
 
 
-def test_seq_pipeline_emits_pipeline_and_batch_events(plan_builder, engine_factory) -> None:
+def test_seq_pipeline_emits_pipeline_and_batch_events(plan_builder, engine_factory, example_runtime_bindings) -> None:
     targets = ["order_id", "amount"]
     plan = plan_builder.build(targets=targets)
 
@@ -433,7 +434,7 @@ def test_seq_pipeline_emits_pipeline_and_batch_events(plan_builder, engine_facto
 
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
 
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows, sink=InMemoryRowSink())
 
     assert observer.pipeline_start_events
@@ -446,7 +447,7 @@ def test_seq_pipeline_emits_pipeline_and_batch_events(plan_builder, engine_facto
     assert len(observer.batch_start_events) == len(observer.batch_end_events) == 2
 
 
-def test_seq_pipeline_emits_event_order(plan_builder, engine_factory) -> None:
+def test_seq_pipeline_emits_event_order(plan_builder, engine_factory, example_runtime_bindings) -> None:
     targets = ["order_id", "amount"]
     plan = plan_builder.build(targets=targets)
 
@@ -454,7 +455,7 @@ def test_seq_pipeline_emits_event_order(plan_builder, engine_factory) -> None:
     observer_manager = ObserverManager(observers=[observer])
 
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
-    main_rows = _get_main_rows(plan_builder.demand, limit=3)
+    main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
     engine.run(main_rows=main_rows, sink=InMemoryRowSink())
 
     events = observer.events

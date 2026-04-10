@@ -141,7 +141,7 @@ def _append_load_operators(
             LoadOperatorIr(
                 operator_id="load_{}".format(op_id),
                 operator_type=OperatorType.LOAD.value,
-                source=source,
+                source_id=str(source.source_id),
                 field_keys=tuple(field_keys),
                 is_primary=is_primary,
             )
@@ -179,9 +179,8 @@ def _append_ref_load_operators(
                 LoadRefOperatorIr(
                     operator_id="load_ref_{}".format(op_id),
                     operator_type=OperatorType.LOAD_REF.value,
-                    source=source,
+                    source_id=str(source.source_id),
                     field_key=field_key,
-                    field_spec=field_spec,
                     lookup_steps=steps,
                     use_cache=source.is_preload_forever(),
                 )
@@ -213,7 +212,7 @@ def _append_compute_operators(
                 ComputeOperatorIr(
                     operator_id="compute_{}".format(op_id),
                     operator_type=OperatorType.COMPUTE.value,
-                    field_spec=field_spec,
+                    field_key=str(field_key),
                     input_fields=field_spec.dependencies,
                 )
             )

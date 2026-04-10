@@ -6,12 +6,13 @@
 """
 
 from .loaders import ECommerceConfig, get_config, set_config
-from .shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from .shared import TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings
 
 __all__ = [
     "TARGET_FIELDS_FULL",
     "ECommerceConfig",
     "build_ecommerce_model",
+    "build_ecommerce_runtime_bindings",
     "get_config",
     "set_config",
 ]

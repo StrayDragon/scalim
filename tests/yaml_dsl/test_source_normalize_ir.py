@@ -1,6 +1,7 @@
 import pytest
 
 from scalim.spec.ir import SourceNormalizeIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 
 
 def test_source_normalize_index_by_key_success() -> None:
@@ -189,9 +190,9 @@ def test_source_normalize_call_by_requires_mapping_return() -> None:
     def bad_return(result: object) -> object:
         return []
 
-    normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", call_by=bad_return)
+    normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", call_by_ref=RuntimeHandleIdIr(handle_id="normalize.call_by"))
     with pytest.raises(TypeError, match="must return Mapping.*sources\\.s1\\.normalize\\.call_by"):
-        _ = normalize.apply([{"id": 1}], source_id="s1")
+        _ = normalize.apply([{"id": 1}], source_id="s1", call_by=bad_return)
 
 
 def test_source_normalize_call_by_accepts_ctx_keyword() -> None:
@@ -199,8 +200,8 @@ def test_source_normalize_call_by_accepts_ctx_keyword() -> None:
         _ = ctx
         return result
 
-    normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", call_by=identity)
-    result = normalize.apply([{"id": 1, "v": "x"}], source_id="s1")
+    normalize = SourceNormalizeIr(kind="index_by_key", key_field="id", call_by_ref=RuntimeHandleIdIr(handle_id="normalize.call_by"))
+    result = normalize.apply([{"id": 1, "v": "x"}], source_id="s1", call_by=identity)
     assert result[1]["v"] == "x"
 
 

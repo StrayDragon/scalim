@@ -23,7 +23,7 @@ from scalim_misc.demo_big_data_report.derived_outputs_demo import (
     verify_derived_outputs_workbook,
 )
 from scalim_misc.demo_big_data_report.loaders import get_config, set_config
-from scalim_misc.demo_big_data_report.shared import build_ecommerce_model
+from scalim_misc.demo_big_data_report.shared import build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -97,6 +97,7 @@ def run_output_composition(*, tmp_path: Optional[Path] = None) -> ExampleResult:
     set_config(build_test_config_small())
     try:
         demand_ir = build_ecommerce_model()
+        runtime_bindings = build_ecommerce_runtime_bindings()
         detail_layout = export_layout_from_demand_ir(demand_ir, DETAIL_FIELDS)
         summary_layout = ExportLayout(field_ids=SUMMARY_FIELDS, header_names=None)
         composition = _build_composition(workbook_path=str(workbook_path), detail_layout=detail_layout, summary_layout=summary_layout)
@@ -110,6 +111,7 @@ def run_output_composition(*, tmp_path: Optional[Path] = None) -> ExampleResult:
                 output_composition=composition,
                 parallel_mode="seq",
                 batch_size=10,
+                runtime_bindings=runtime_bindings,
             ),
         )
 

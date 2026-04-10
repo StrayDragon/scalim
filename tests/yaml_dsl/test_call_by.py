@@ -7,19 +7,21 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidat
 from decimal import Decimal
 
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
+from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError, ScalimResolverError
 from scalim.dsl.yaml_dsl.runtime._internal.callable_preflight import ScalimCallablePreflightError
 from scalim.dsl.yaml_dsl.runtime._internal.call_by_signature import validate_call_by_signature
 from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
+from scalim.dsl.yaml_dsl.runtime.runtime_linking import resolve_runtime_bindings
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, DerivedFieldConfig, MainSourceConfig, SourceFieldConfig
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir import DerivedFieldIr
+from scalim.spec.ir import ComputeCallContextIr, DerivedFieldIr
 
 
 def test_parse_call_by_extracts_reference_and_dependencies() -> None:
@@ -374,47 +376,67 @@ def _make_call_by_config(call_by: str, *, depends_on: tuple) -> DemandConfig:
 
 def test_converter_requires_allowlist_for_call_by() -> None:
     config = _make_call_by_config("tests.fixtures.call_by_fns:echo(status)", depends_on=("status",))
-    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.call_by_fns"]))
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
-
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
-    assert derived.compute(status="x", **{"$ctx": object()}) == "x"
+    assert derived.call_by is not None
+    assert derived.call_ctx_key == "$ctx"
+
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    ctx = ComputeCallContextIr(
+        row_id=1,
+        batch_num=2,
+        field_id="text",
+        deps=("status",),
+        values={"status": "x"},
+    )
+    assert calculator("x", ctx=ctx) == "x"
 
 
 def test_converter_rejects_unknown_call_by_reference() -> None:
     config = _make_call_by_config("tests.fixtures.call_by_fns:missing(status)", depends_on=("status",))
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    converter = ConfigToIRConverter()
+    demand_ir = converter.convert(config)
 
-    with pytest.raises(ScalimConversionError, match="failed to resolve call_by reference"):
-        converter.convert(config)
+    with pytest.raises(ScalimResolverError, match="不存在属性"):
+        _ = resolve_runtime_bindings(
+            demand_ir,
+            resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+        )
 
 
 def test_converter_compiles_call_by_and_ctx() -> None:
     config = _make_call_by_config("tests.fixtures.call_by_fns:status_text(status=status, ctx=$ctx)", depends_on=("status",))
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
-
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
     assert derived.call_ctx_key == "$ctx"
 
-    ctx = {"row_id": 1, "batch_num": 2, "field_id": "text", "deps": ("status",), "values": {"status": True}}
-    # Use a minimal duck-typed ctx in this unit test.
-    result = derived.compute(status=True, **{"$ctx": type("Ctx", (), ctx)()})
-    assert result == "ok:1:2"
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    ctx = ComputeCallContextIr(
+        row_id=1,
+        batch_num=2,
+        field_id="text",
+        deps=("status",),
+        values={"status": True},
+    )
+    assert calculator(True, ctx=ctx) == "ok:1:2"
 
 
 def test_converter_rejects_call_by_positional_arg_for_keyword_only_param() -> None:
     # `is_valid_group(*, group_name, **kw)` requires keyword-only `group_name`.
-    # Positional call_by args should fast-fail at compile-time (conversion), instead of being swallowed as a compute TypeError.
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    # Positional call_by args should fast-fail at runtime linking (signature preflight), instead of being swallowed as a compute TypeError.
+    converter = ConfigToIRConverter()
     config = DemandConfig(
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.fixtures.call_by_fns:dummy_main_loader"),
@@ -430,14 +452,16 @@ def test_converter_rejects_call_by_positional_arg_for_keyword_only_param() -> No
         },
     )
 
-    with pytest.raises(ScalimConversionError, match="函数签名不匹配"):
-        converter.convert(config)
+    demand_ir = converter.convert(config)
+    with pytest.raises(ScalimResolverError, match="函数签名不匹配"):
+        _ = resolve_runtime_bindings(
+            demand_ir,
+            resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+        )
 
 
 def test_converter_accepts_call_by_keyword_arg_for_keyword_only_param() -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    converter = ConfigToIRConverter()
     config = DemandConfig(
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.fixtures.call_by_fns:dummy_main_loader"),
@@ -456,19 +480,40 @@ def test_converter_accepts_call_by_keyword_arg_for_keyword_only_param() -> None:
     demand_ir = converter.convert(config)
     derived = demand_ir.fields["ok"]
     assert isinstance(derived, DerivedFieldIr)
-    assert derived.compute(group_name="vip", **{"$ctx": object()}) is True
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("ok")
+    ctx = ComputeCallContextIr(
+        row_id=1,
+        batch_num=0,
+        field_id="ok",
+        deps=("group_name",),
+        values={"group_name": "vip"},
+    )
+    assert calculator("vip", ctx=ctx) is True
 
 
 def test_converter_call_by_accepts_decimal_result() -> None:
     config = _make_call_by_config("tests.fixtures.call_by_fns:decimal_from_value(status)", depends_on=("status",))
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
-
+    converter = ConfigToIRConverter()
     demand_ir = converter.convert(config)
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
-    assert derived.compute(status="0.3", **{"$ctx": object()}) == Decimal("0.3")
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    ctx = ComputeCallContextIr(
+        row_id=1,
+        batch_num=0,
+        field_id="text",
+        deps=("status",),
+        values={"status": "0.3"},
+    )
+    assert calculator("0.3", ctx=ctx) == Decimal("0.3")
 
 
 def test_converter_rejects_missing_compute_and_call_by() -> None:
@@ -485,18 +530,14 @@ def test_converter_rejects_missing_compute_and_call_by() -> None:
             )
         },
     )
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    converter = ConfigToIRConverter()
 
     with pytest.raises(ScalimConversionError, match="must declare"):
         converter.convert(config)
 
 
 def test_converter_call_by_parse_error_and_literal_and_ctx_attr_and_missing_ctx() -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    converter = ConfigToIRConverter()
     base = DemandConfig(
         name="demo",
         main_source=MainSourceConfig(source_id="orders", loader="tests.fixtures.call_by_fns:dummy_main_loader"),
@@ -528,7 +569,19 @@ def test_converter_call_by_parse_error_and_literal_and_ctx_attr_and_missing_ctx(
     demand_ir = converter.convert(literal_cfg)
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
-    assert derived.compute(status=True, **{"$ctx": object()}) == 1
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    ctx = ComputeCallContextIr(
+        row_id=1,
+        batch_num=0,
+        field_id="text",
+        deps=("status",),
+        values={"status": True},
+    )
+    assert calculator(True, ctx=ctx) == 1
 
     ctx_attr_cfg = DemandConfig(
         name=base.name,
@@ -547,33 +600,52 @@ def test_converter_call_by_parse_error_and_literal_and_ctx_attr_and_missing_ctx(
     demand_ir = converter.convert(ctx_attr_cfg)
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
-    ctx = type("Ctx", (), {"row_id": 9, "batch_num": 0})()
-    assert derived.compute(status=True, **{"$ctx": ctx}) == 9
-    with pytest.raises(ValueError, match="requires context"):
-        derived.compute(status=True)
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    ctx = ComputeCallContextIr(
+        row_id=9,
+        batch_num=0,
+        field_id="text",
+        deps=("status",),
+        values={"status": True},
+    )
+    assert calculator(True, ctx=ctx) == 9
+    with pytest.raises(TypeError, match="requires ctx=ComputeCallContextIr"):
+        calculator(True)
 
 
 def test_compute_operator_injects_ctx_when_configured() -> None:
-    def _calc(amount, **kwargs):  # type: ignore[no-untyped-def]
-        ctx = kwargs["$ctx"]
-        return "{}:{}".format(ctx.row_id, ctx.batch_num)
-
     field_spec = DerivedFieldIr(
         field_id="score",
         name="Score",
         dependencies=("amount",),
-        calculator=_calc,
+        compute_expr="amount",
         call_ctx_key="$ctx",
     )
     operator = ComputeOperatorIr(
         operator_id="compute_score",
         operator_type=OperatorType.COMPUTE.value,
-        field_spec=field_spec,
+        field_key="score",
         input_fields=("amount",),
     )
 
-    plan = ExecutionPlan(field_specs={"score": field_spec}, target_fields=["score"])
-    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), None)
+    plan = ExecutionPlan(operators=(operator,), field_specs={"score": field_spec}, target_fields=["score"])
+    runtime_bindings = RuntimeBindings(
+        derived_calculators={
+            "score": lambda amount, ctx: "{}:{}".format(ctx.row_id, ctx.batch_num),
+        }
+    )
+    runtime = ExecutionRuntime(
+        plan=plan,
+        hook_manager=HookManager(),
+        observer_manager=ObserverManager(),
+        main_source=None,
+        sources={},
+        runtime_bindings=runtime_bindings,
+    )
     runtime.batch_num = 7
 
     context = BatchContext()
@@ -587,27 +659,39 @@ def test_compute_operator_injects_ctx_when_configured() -> None:
 
 
 def test_converter_call_by_ctx_attr_missing_attribute_raises() -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    converter = ConfigToIRConverter()
     config = _make_call_by_config("tests.fixtures.call_by_fns:needs_ctx_attr($ctx.row_id)", depends_on=("status",))
     demand_ir = converter.convert(config)
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
 
-    with pytest.raises(AttributeError, match="call_by context missing attribute 'row_id'"):
-        derived.compute(status=True, **{"$ctx": type("Ctx", (), {"batch_num": 1})()})
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    with pytest.raises(TypeError, match="requires ctx=ComputeCallContextIr"):
+        calculator(True, ctx=object())  # type: ignore[arg-type]
 
 
 def test_converter_call_by_rejects_non_field_value_result() -> None:
-    converter = ConfigToIRConverter(
-        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
-    )
+    converter = ConfigToIRConverter()
     config = _make_call_by_config("tests.fixtures.call_by_fns:echo($ctx.values)", depends_on=("status",))
     demand_ir = converter.convert(config)
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
 
-    ctx = type("Ctx", (), {"values": {"status": True}})()
-    with pytest.raises(TypeError, match="returned unsupported type 'dict'"):
-        derived.compute(status=True, **{"$ctx": ctx})
+    bindings = resolve_runtime_bindings(
+        demand_ir,
+        resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
+    )
+    calculator = bindings.require_derived_calculator("text")
+    ctx = ComputeCallContextIr(
+        row_id=1,
+        batch_num=0,
+        field_id="text",
+        deps=("status",),
+        values={"status": True},
+    )
+    with pytest.raises(TypeError, match="unsupported value type"):
+        calculator(True, ctx=ctx)

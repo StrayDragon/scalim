@@ -10,8 +10,11 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir import (
     BindingIr,
+    CallBySpecIr,
+    CallByValueIr,
     DemandIr,
     DerivedFieldIr,
     FieldIr,
@@ -20,6 +23,7 @@ from scalim.spec.ir import (
     LoaderIr,
     MainSourceIr,
     OrderByKeyIr,
+    RuntimeHandleIdIr,
     SourceIr,
     SourceNormalizeIr,
 )
@@ -53,6 +57,7 @@ __all__ = [
     "TARGET_FIELDS_RELATIONS",
     "ECommerceConfig",
     "build_ecommerce_model",
+    "build_ecommerce_runtime_bindings",
     "build_target_sets",
     "get_config",
     "set_config",
@@ -145,7 +150,7 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
 
     main_source = MainSourceIr(
         source_id="orders",
-        loader=load_orders,
+        loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"),
         order_by=(OrderByKeyIr(field_key="order_id", direction="asc"),),
     )
 
@@ -153,8 +158,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=LoaderIr(
-            callable=load_customers,
-            bindings={"customer_id": BindingIr(key_field="customer_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={
+                "customer_id": BindingIr(
+                    key_field="customer_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="customers.params_builder.customer_id"),
+                )
+            },
         ),
     )
 
@@ -162,8 +172,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="products",
         key=KeyIr(key="product_id"),
         loader_spec=LoaderIr(
-            callable=load_products,
-            bindings={"product_id": BindingIr(key_field="product_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="products.loader"),
+            bindings={
+                "product_id": BindingIr(
+                    key_field="product_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="products.params_builder.product_id"),
+                )
+            },
         ),
         fk_fields=frozenset({"category_id"}),
     )
@@ -172,8 +187,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="categories",
         key=KeyIr(key="category_id"),
         loader_spec=LoaderIr(
-            callable=load_categories,
-            bindings={"category_id": BindingIr(key_field="category_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="categories.loader"),
+            bindings={
+                "category_id": BindingIr(
+                    key_field="category_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="categories.params_builder.category_id"),
+                )
+            },
         ),
     )
 
@@ -181,8 +201,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="warehouses",
         key=KeyIr(key="warehouse_id"),
         loader_spec=LoaderIr(
-            callable=load_warehouses,
-            bindings={"warehouse_id": BindingIr(key_field="warehouse_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="warehouses.loader"),
+            bindings={
+                "warehouse_id": BindingIr(
+                    key_field="warehouse_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="warehouses.params_builder.warehouse_id"),
+                )
+            },
         ),
         fk_fields=frozenset({"region_id"}),
     )
@@ -191,8 +216,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="regions",
         key=KeyIr(key="region_id"),
         loader_spec=LoaderIr(
-            callable=load_regions,
-            bindings={"region_id": BindingIr(key_field="region_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="regions.loader"),
+            bindings={
+                "region_id": BindingIr(
+                    key_field="region_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="regions.params_builder.region_id"),
+                )
+            },
         ),
     )
 
@@ -200,11 +230,11 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="region_pricing",
         key=KeyIr(key=("region_id", "product_category_id")),
         loader_spec=LoaderIr(
-            callable=load_region_pricing,
+            callable_ref=RuntimeHandleIdIr(handle_id="region_pricing.loader"),
             bindings={
                 ("region_id", "product_category_id"): BindingIr(
                     key_field=("region_id", "product_category_id"),
-                    params_builder=_composite_binding_params,
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="region_pricing.params_builder.region_id__product_category_id"),
                 )
             },
         ),
@@ -215,8 +245,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="promotions",
         key=KeyIr(key="promotion_id"),
         loader_spec=LoaderIr(
-            callable=load_promotions,
-            bindings={"promotion_id": BindingIr(key_field="promotion_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="promotions.loader"),
+            bindings={
+                "promotion_id": BindingIr(
+                    key_field="promotion_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="promotions.params_builder.promotion_id"),
+                )
+            },
         ),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
     )
@@ -225,8 +260,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="payment_methods",
         key=KeyIr(key="payment_method_id"),
         loader_spec=LoaderIr(
-            callable=load_payment_methods,
-            bindings={"payment_method_id": BindingIr(key_field="payment_method_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="payment_methods.loader"),
+            bindings={
+                "payment_method_id": BindingIr(
+                    key_field="payment_method_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="payment_methods.params_builder.payment_method_id"),
+                )
+            },
         ),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="payment_method_id", on_conflict="error"),
@@ -236,8 +276,13 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         source_id="logistics",
         key=KeyIr(key="logistics_id"),
         loader_spec=LoaderIr(
-            callable=load_logistics,
-            bindings={"logistics_id": BindingIr(key_field="logistics_id", params_builder=_default_binding_params)},
+            callable_ref=RuntimeHandleIdIr(handle_id="logistics.loader"),
+            bindings={
+                "logistics_id": BindingIr(
+                    key_field="logistics_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="logistics.params_builder.logistics_id"),
+                )
+            },
         ),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
     )
@@ -326,15 +371,59 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         FieldIr(field_id="tax_rate", name="税率", source=region_pricing_source, relation=rel_to_region_pricing),
         # 派生字段
         DerivedFieldIr(
-            field_id="order_amount", name="订单金额", dependencies=("quantity", "unit_price", "discount_rate"), calculator=calc_order_amount
+            field_id="order_amount",
+            name="订单金额",
+            dependencies=("quantity", "unit_price", "discount_rate"),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.order_amount"),
+                kwargs=(
+                    ("quantity", CallByValueIr(kind="field", value="quantity")),
+                    ("unit_price", CallByValueIr(kind="field", value="unit_price")),
+                    ("discount_rate", CallByValueIr(kind="field", value="discount_rate")),
+                ),
+                field_names=("quantity", "unit_price", "discount_rate"),
+            ),
         ),
-        DerivedFieldIr(field_id="profit", name="利润", dependencies=("order_amount", "product_cost", "quantity"), calculator=calc_profit),
-        DerivedFieldIr(field_id="tax_amount", name="税费", dependencies=("order_amount", "tax_rate"), calculator=calc_tax_amount),
+        DerivedFieldIr(
+            field_id="profit",
+            name="利润",
+            dependencies=("order_amount", "product_cost", "quantity"),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.profit"),
+                kwargs=(
+                    ("order_amount", CallByValueIr(kind="field", value="order_amount")),
+                    ("product_cost", CallByValueIr(kind="field", value="product_cost")),
+                    ("quantity", CallByValueIr(kind="field", value="quantity")),
+                ),
+                field_names=("order_amount", "product_cost", "quantity"),
+            ),
+        ),
+        DerivedFieldIr(
+            field_id="tax_amount",
+            name="税费",
+            dependencies=("order_amount", "tax_rate"),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.tax_amount"),
+                kwargs=(
+                    ("order_amount", CallByValueIr(kind="field", value="order_amount")),
+                    ("tax_rate", CallByValueIr(kind="field", value="tax_rate")),
+                ),
+                field_names=("order_amount", "tax_rate"),
+            ),
+        ),
         DerivedFieldIr(
             field_id="final_price",
             name="最终价格",
             dependencies=("order_amount", "price_adjustment", "shipping_fee"),
-            calculator=calc_final_price,
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.final_price"),
+                kwargs=(
+                    ("order_amount", CallByValueIr(kind="field", value="order_amount")),
+                    ("price_adjustment", CallByValueIr(kind="field", value="price_adjustment")),
+                    ("shipping_fee", CallByValueIr(kind="field", value="shipping_fee")),
+                ),
+                field_names=("order_amount", "price_adjustment", "shipping_fee"),
+            ),
         ),
     ]
 
@@ -359,6 +448,53 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
         name="ecommerce_order_report",
         batch_size_hint=100,
     )
+
+
+def build_ecommerce_runtime_bindings() -> RuntimeBindings:
+    """Build runtime bindings for `build_ecommerce_model()` (Python DSL / programmatic IR path)."""
+
+    bindings = RuntimeBindings()
+
+    bindings.main_source_loaders["orders"] = load_orders
+
+    bindings.source_loaders["customers"] = load_customers
+    bindings.source_loaders["products"] = load_products
+    bindings.source_loaders["categories"] = load_categories
+    bindings.source_loaders["warehouses"] = load_warehouses
+    bindings.source_loaders["regions"] = load_regions
+    bindings.source_loaders["region_pricing"] = load_region_pricing
+    bindings.source_loaders["promotions"] = load_promotions
+    bindings.source_loaders["payment_methods"] = load_payment_methods
+    bindings.source_loaders["logistics"] = load_logistics
+
+    bindings.params_builders[("customers", "customer_id")] = _default_binding_params
+    bindings.params_builders[("products", "product_id")] = _default_binding_params
+    bindings.params_builders[("categories", "category_id")] = _default_binding_params
+    bindings.params_builders[("warehouses", "warehouse_id")] = _default_binding_params
+    bindings.params_builders[("regions", "region_id")] = _default_binding_params
+    bindings.params_builders[("region_pricing", ("region_id", "product_category_id"))] = _composite_binding_params
+    bindings.params_builders[("promotions", "promotion_id")] = _default_binding_params
+    bindings.params_builders[("payment_methods", "payment_method_id")] = _default_binding_params
+    bindings.params_builders[("logistics", "logistics_id")] = _default_binding_params
+
+    def _calc_order_amount(quantity: Any, unit_price: Any, discount_rate: Any) -> Any:
+        return calc_order_amount(quantity=quantity, unit_price=unit_price, discount_rate=discount_rate)
+
+    def _calc_profit(order_amount: Any, product_cost: Any, quantity: Any) -> Any:
+        return calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)
+
+    def _calc_tax_amount(order_amount: Any, tax_rate: Any) -> Any:
+        return calc_tax_amount(order_amount=order_amount, tax_rate=tax_rate)
+
+    def _calc_final_price(order_amount: Any, price_adjustment: Any, shipping_fee: Any) -> Any:
+        return calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)
+
+    bindings.derived_calculators["order_amount"] = _calc_order_amount
+    bindings.derived_calculators["profit"] = _calc_profit
+    bindings.derived_calculators["tax_amount"] = _calc_tax_amount
+    bindings.derived_calculators["final_price"] = _calc_final_price
+
+    return bindings
 
 
 def build_target_sets() -> Dict[str, List[str]]:

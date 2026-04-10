@@ -1,5 +1,5 @@
 import os
-from typing import Callable, Dict, List, Sequence
+from typing import Dict, List, Sequence
 
 import pytest
 
@@ -8,6 +8,7 @@ from scalim.events import EVENT_RELATION_LOOKUP
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver
@@ -16,7 +17,7 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import LookupStepIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 from scalim_benchlib import BenchmarkRunner
 
 
@@ -53,32 +54,21 @@ class _NoopRelationLookupObserver(EventDispatchObserver):
         return
 
 
-def _make_operator(*, loader_fn: Callable[[Sequence[int]], Dict[int, Dict[str, object]]]) -> LoadRefOperatorIr:
+def _make_operator() -> LoadRefOperatorIr:
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=loader_fn),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=lambda ctx: ((), {"target_ids": list(ctx.lookup_keys or [])}))
+    binding = BindingIr(key_field="target_id", params_builder_ref=RuntimeHandleIdIr(handle_id="targets.target_id.params_builder"))
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     return LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=target_source.source_id,
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-
-
-def _make_runtime(*, plan: ExecutionPlan, wanted: bool) -> ExecutionRuntime:
-    hook_manager = HookManager(fallback_logger_enabled=False)
-    observer_manager = ObserverManager(fallback_logger_enabled=False)
-    runtime = ExecutionRuntime(plan, hook_manager, observer_manager, MainSourceIr(source_id="main", loader=lambda: []))
-    if wanted:
-        runtime.observer_manager.register(_NoopRelationLookupObserver())
-    return runtime
 
 
 @pytest.mark.bench
@@ -95,9 +85,30 @@ def test_bench_loadref_relation_lookup_wants_gated(benchmark, wanted: bool) -> N
     def _loader(target_ids: Sequence[int]) -> Dict[int, Dict[str, object]]:
         return {key: {"name": "Name{}".format(key)} for key in target_ids}
 
-    operator = _make_operator(loader_fn=_loader)
-    plan = ExecutionPlan(field_specs={"target_name": operator.field_spec})
-    runtime = _make_runtime(plan=plan, wanted=wanted)
+    operator = _make_operator()
+    target_source = operator.lookup_steps[0].to_source
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": lambda: []},
+        source_loaders={"targets": _loader},
+        params_builders={
+            ("targets", "target_id"): lambda ctx: ((), {"target_ids": list(ctx.lookup_keys or [])}),
+        },
+    )
+    plan = ExecutionPlan(
+        operators=(operator,),
+        field_specs={"target_name": FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")},
+        target_fields=["target_name"],
+    )
+    runtime = ExecutionRuntime(
+        plan=plan,
+        hook_manager=HookManager(fallback_logger_enabled=False),
+        observer_manager=ObserverManager(fallback_logger_enabled=False),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        sources={"targets": target_source},
+        runtime_bindings=runtime_bindings,
+    )
+    if wanted:
+        runtime.observer_manager.register(_NoopRelationLookupObserver())
     executor = LoadRefOperatorExecutor()
 
     def _run() -> int:

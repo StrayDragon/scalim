@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Mapping
 
-from scalim.spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr
+from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 
 _PRELOAD_COUNTER = {"calls": 0}
 
@@ -56,7 +57,7 @@ def load_dims_key_normalization_demo_int_keys() -> Mapping[int, Dict[str, object
 
 
 def build_minimal_public_api_ir() -> DemandIr:
-    main = MainSourceIr(source_id="items", loader=load_items)
+    main = MainSourceIr(source_id="items", loader_ref=RuntimeHandleIdIr(handle_id="items.main_loader"))
     fields = [
         FieldIr(field_id="item_id", name="item_id", source=main, extract_expr="item_id"),
         FieldIr(field_id="dim_id", name="dim_id", source=main, extract_expr="dim_id"),
@@ -64,7 +65,11 @@ def build_minimal_public_api_ir() -> DemandIr:
             field_id="value_plus_one",
             name="value_plus_one",
             dependencies=("item_id",),
-            calculator=lambda item_id: int(item_id or 0) + 1,
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.value_plus_one"),
+                args=(CallByValueIr(kind="field", value="item_id"),),
+                field_names=("item_id",),
+            ),
         ),
     ]
     return DemandIr.from_irs(
@@ -74,3 +79,16 @@ def build_minimal_public_api_ir() -> DemandIr:
         batch_size_hint=10,
         name="public_api_minimal",
     )
+
+
+def build_minimal_public_api_runtime_bindings() -> RuntimeBindings:
+    """Build runtime bindings for `build_minimal_public_api_ir()` (Python DSL / programmatic IR path)."""
+
+    bindings = RuntimeBindings()
+    bindings.main_source_loaders["items"] = load_items
+
+    def _value_plus_one(item_id: object) -> int:
+        return int(item_id or 0) + 1
+
+    bindings.derived_calculators["value_plus_one"] = _value_plus_one
+    return bindings

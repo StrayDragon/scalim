@@ -12,7 +12,7 @@ from scalim.sinks import BlockColumnCSVSink, ColumnCSVSink
 from scalim.sinks import InMemoryColumnSink
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
-from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.demo_big_data_report.verification import VerificationResult, verify_scalim_output
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -32,6 +32,7 @@ def run_memory_optimization(
     set_config(cfg)
     try:
         demand = build_ecommerce_model(cfg)
+        runtime_bindings = build_ecommerce_runtime_bindings()
         targets: List[str] = list(TARGET_FIELDS_FULL)
         plan = PlanBuilder(demand).build(targets=targets)
 
@@ -39,7 +40,13 @@ def run_memory_optimization(
         memory_observer = MemoryOptimizationObserver()
         observer_manager.register(memory_observer)
 
-        engine = ScalimEngine(demand=demand, plan=plan, observer_manager=observer_manager, batch_size=int(batch_size))
+        engine = ScalimEngine(
+            demand=demand,
+            plan=plan,
+            runtime_bindings=runtime_bindings,
+            observer_manager=observer_manager,
+            batch_size=int(batch_size),
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -49,7 +56,7 @@ def run_memory_optimization(
                 engine.run(main_rows=None, sink=sink)
 
             # 用内存 `sink` 再跑一遍做对拍(避免解析 `CSV` 的类型损失)
-            engine2 = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+            engine2 = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
             with InMemoryColumnSink(field_names=targets) as mem_sink:
                 engine2.run(main_rows=None, sink=mem_sink)
                 results = mem_sink.get_rows()
@@ -58,7 +65,7 @@ def run_memory_optimization(
 
             # `BlockColumnCSVSink`: 仅用于演示,这里强制 `write_delay=0`,避免集成对拍变慢
             block_csv = tmpdir_path / "block.csv"
-            engine3 = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+            engine3 = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
             with BlockColumnCSVSink(str(block_csv), field_names=targets[:10], write_delay=float(write_delay)) as block_sink:
                 engine3.run(main_rows=None, sink=block_sink)
 

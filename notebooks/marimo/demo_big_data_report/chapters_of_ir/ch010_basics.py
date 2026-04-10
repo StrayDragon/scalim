@@ -8,7 +8,7 @@ from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryColumnSink
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, load_orders, set_config
-from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.demo_big_data_report.verification import (
     OrderByVerificationResult,
     VerificationResult,
@@ -34,6 +34,7 @@ def run_basics(
     set_config(cfg)
     try:
         demand = build_ecommerce_model(cfg)
+        runtime_bindings = build_ecommerce_runtime_bindings()
         targets_list = list(targets or TARGET_FIELDS_FULL)
         plan = PlanBuilder(demand).build(targets=targets_list)
 
@@ -41,7 +42,7 @@ def run_basics(
         if row_limit is not None:
             main_rows = main_rows[: int(row_limit)]
 
-        engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+        engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
         start = time.time()
         with InMemoryColumnSink(field_names=targets_list) as sink:
             _ = engine.run(main_rows=main_rows, sink=sink)

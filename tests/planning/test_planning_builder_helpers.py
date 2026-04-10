@@ -6,8 +6,7 @@ from scalim.planning.builder_helpers.dep_graph import build_dependency_graph
 from scalim.planning.builder_helpers.key_fields import compute_key_fields
 from scalim.planning.builder_helpers.operators import build_plan_operators
 from scalim.planning.builder_helpers.resolver import LookupStepsResolver, extract_relation_dependency_keys
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, RuntimeHandleIdIr
 
 from tests.fixtures.planning_fixtures import make_main_source, make_source
 
@@ -107,7 +106,16 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
         main_source=main_source,
     )
 
-    derived = DerivedFieldIr(field_id="derived", name="Derived", dependencies=("order_id",), calculator=lambda v: v)
+    derived = DerivedFieldIr(
+        field_id="derived",
+        name="Derived",
+        dependencies=("order_id",),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.derived"),
+            args=(CallByValueIr(kind="field", value="order_id"),),
+            field_names=("order_id",),
+        ),
+    )
     demand.fields["derived"] = derived
 
     # 1) not FieldIr -> skipped
@@ -195,7 +203,11 @@ def test_build_plan_operators_skips_compute_when_field_not_required() -> None:
         field_id="derived",
         name="Derived",
         dependencies=("order_id",),
-        calculator=lambda v: v,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.derived"),
+            args=(CallByValueIr(kind="field", value="order_id"),),
+            field_names=("order_id",),
+        ),
     )
 
     demand = DemandIr.from_irs(sources=[], fields=[order_id, derived], main_source=main_source)

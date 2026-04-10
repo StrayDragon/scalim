@@ -14,32 +14,29 @@ except ImportError:  # pragma: no cover  # pragma: allow-no-cover optional depen
     _jsonschema = None  # type: ignore[assignment]
 
 from scalim.dsl import yaml_dsl
-from scalim.dsl.yaml_dsl._internal.config_parsing.allowed_paths import (
+from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend, compile_demand_frontend_diagnostics
+from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import (
+    VALIDATION_SEVERITY_ERROR,
+    ErrorEnvelope,
+    ErrorLoc,
+    FieldDef,
+    FieldDefIndex,
+    ParserOutputsMixin,
+    RawDemand,
+    ScalimJsonSchemaCollectorError,
+    ScalimYamlValidationError,
+    SecureComputeEngine,
+    ValidationIssue,
+    YamlDslProjectConfig,
+    collect_field_defs,
+    collect_jsonschema_validation_issues,
+    envelope_from_validation_issue,
+    find_unknown_fields,
+    load_scalim_preset_yaml_text,
+    load_yaml_dsl_project_config,
+    load_yaml_mapping_text,
     normalize_allowed_yaml_roots,
     validate_resolved_yaml_path_within_roots,
-)
-from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
-from scalim.dsl.yaml_dsl._internal.config_parsing.imports import (
-    ScalimYamlImportExpansionError,
-    contains_import_syntax,
-    expand_imports_inplace,
-)
-from scalim.dsl.yaml_dsl._internal.config_parsing.jsonschema_issues import (
-    ScalimJsonSchemaCollectorError,
-    collect_jsonschema_validation_issues,
-)
-from scalim.dsl.yaml_dsl._internal.config_parsing.models import FieldDef, FieldDefIndex, RawDemand, collect_field_defs
-from scalim.dsl.yaml_dsl._internal.config_parsing.parsers.outputs import ParserOutputsMixin
-from scalim.dsl.yaml_dsl._internal.config_parsing.presets import load_scalim_preset_yaml_text
-from scalim.dsl.yaml_dsl._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
-from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
-from scalim.dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
-from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
-from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import (
-    envelope_from_validation_issue,
-    error_loc_for_yaml_path,
-    load_yaml_mapping_text,
 )
 from scalim.dsl.yaml_dsl.reference_syntax import (
     ParsedReference,
@@ -155,6 +152,34 @@ class YamlDslEditorDiagnosticsResult:
             "warnings": [d.as_dict() for d in self.warnings],
             "ok": not self.errors,
         }
+
+
+@dataclass(frozen=True)
+class YamlDslEditorPlanDepsResult:
+    """静态编译产物的最小快照(面向 `LSP`/编辑器消费)."""
+
+    yaml_kind: str
+    discovery: YamlDslEditorProjectDiscovery
+    errors: Tuple[EditorDiagnostic, ...] = ()
+    warnings: Tuple[EditorDiagnostic, ...] = ()
+    import_fragment_files: Tuple[str, ...] = ()
+    plan_snapshot: Optional[Dict[str, Any]] = None
+    deps_snapshot: Optional[Dict[str, Any]] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "yaml_kind": str(self.yaml_kind),
+            "discovery": self.discovery.as_dict(),
+            "errors": [d.as_dict() for d in self.errors],
+            "warnings": [d.as_dict() for d in self.warnings],
+            "import_fragment_files": list(self.import_fragment_files),
+        }
+        if self.plan_snapshot is not None:
+            payload["plan_snapshot"] = self.plan_snapshot
+        if self.deps_snapshot is not None:
+            payload["deps_snapshot"] = self.deps_snapshot
+        payload["ok"] = not self.errors and self.plan_snapshot is not None and self.deps_snapshot is not None
+        return payload
 
 
 @dataclass(frozen=True)
@@ -790,12 +815,104 @@ def collect_yaml_dsl_editor_diagnostics(
         yaml_text,
         yaml_path=path,
         allowed_yaml_roots=discovery.allowed_yaml_roots,
+        scalim_yaml_override=discovery.scalim_yaml_path,
+        project_root_override=discovery.project_root,
     )
     return YamlDslEditorDiagnosticsResult(
         yaml_kind=YAML_DSL_KIND_DEMAND,
         discovery=discovery,
         errors=errors,
         warnings=warnings,
+    )
+
+
+def compile_yaml_dsl_editor_plan_deps(
+    yaml_path: Union[str, Path],
+    *,
+    yaml_text: Optional[str] = None,
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
+    workspace_root_override: Optional[Union[str, Path]] = None,
+) -> YamlDslEditorPlanDepsResult:
+    """静态编译单个 YAML 文档到 plan/deps 快照(不导入/不执行用户模块).
+
+    说明:
+        - 该入口不要求 allowlist.
+        - 失败时降级为 diagnostics(不 crash).
+    """
+
+    path = Path(str(yaml_path)).expanduser().resolve(strict=False)
+    if yaml_text is None:
+        yaml_text = path.read_text(encoding="utf-8")
+
+    workspace_root = _resolve_workspace_root_override(workspace_root_override)
+    cfg = _load_yaml_dsl_project_config_for_editor(
+        path,
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+        workspace_root=workspace_root,
+    )
+    discovery = _discover_yaml_dsl_editor_project_from_project_config(path, cfg, workspace_root=workspace_root)
+
+    yaml_kind = (
+        _classify_yaml_kind_from_overrides(path, cfg)
+        or _classify_yaml_kind_by_required_keys(yaml_text)
+        or _classify_yaml_kind_by_heuristic(yaml_text)
+    )
+
+    if yaml_kind != YAML_DSL_KIND_DEMAND:
+        return YamlDslEditorPlanDepsResult(
+            yaml_kind=str(yaml_kind or ""),
+            discovery=discovery,
+            errors=(),
+            warnings=(),
+            import_fragment_files=(),
+            plan_snapshot=None,
+            deps_snapshot=None,
+        )
+
+    effective_project_root_override = _effective_project_root_override_for_imports(
+        scalim_yaml_override=discovery.scalim_yaml_path,
+        project_root_override=discovery.project_root,
+    )
+
+    try:
+        compilation = compile_demand_frontend(
+            path,
+            yaml_text=str(yaml_text or ""),
+            allowed_yaml_roots=discovery.allowed_yaml_roots,
+            scalim_yaml_override=discovery.scalim_yaml_path,
+            project_root_override=effective_project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
+        env = ErrorEnvelope(
+            code="yaml_frontend_plan_error",
+            message="Failed to compile plan/deps: {}: {}".format(type(exc).__name__, exc),
+            source_path=str(path),
+            path="(plan)",
+            loc=ErrorLoc(1, 1),
+        )
+        return YamlDslEditorPlanDepsResult(
+            yaml_kind=YAML_DSL_KIND_DEMAND,
+            discovery=discovery,
+            errors=tuple(_envelopes_to_diagnostics((env,), severity=_SEVERITY_ERROR)),
+            warnings=(),
+            import_fragment_files=(),
+            plan_snapshot=None,
+            deps_snapshot=None,
+        )
+
+    errors = tuple(_envelopes_to_diagnostics(compilation.diagnostics.errors, severity=_SEVERITY_ERROR))
+    warnings = tuple(_envelopes_to_diagnostics(compilation.diagnostics.warnings, severity=_SEVERITY_WARNING))
+
+    return YamlDslEditorPlanDepsResult(
+        yaml_kind=YAML_DSL_KIND_DEMAND,
+        discovery=discovery,
+        errors=errors,
+        warnings=warnings,
+        import_fragment_files=tuple(compilation.import_fragment_files or ()),
+        plan_snapshot=compilation.plan_snapshot,
+        deps_snapshot=compilation.deps_snapshot,
     )
 
 
@@ -3904,57 +4021,36 @@ def _collect_demand_diagnostics(
     *,
     yaml_path: Path,
     allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Union[str, Path]] = None,
+    project_root_override: Optional[Union[str, Path]] = None,
 ) -> Tuple[Tuple[EditorDiagnostic, ...], Tuple[EditorDiagnostic, ...]]:
-    try:
-        yaml_data, locations, _lines = load_yaml_mapping_text(yaml_text, source_path=str(yaml_path), detect_duplicate_keys=True)
-    except ScalimYamlValidationError as exc:
-        return (
-            tuple(_envelopes_to_diagnostics(exc.errors, severity=_SEVERITY_ERROR)),
-            tuple(_envelopes_to_diagnostics(exc.warnings, severity=_SEVERITY_WARNING)),
-        )
+    effective_project_root_override = _effective_project_root_override_for_imports(
+        scalim_yaml_override=scalim_yaml_override,
+        project_root_override=project_root_override,
+    )
 
     try:
-        if contains_import_syntax(yaml_data):
-            _ = expand_imports_inplace(yaml_data, yaml_path=yaml_path, allowed_yaml_roots=allowed_yaml_roots)
-    except ScalimYamlImportExpansionError as exc:
-        logical_path = str(exc.logical_path or "(root)")
+        compilation = compile_demand_frontend_diagnostics(
+            yaml_path,
+            yaml_text=str(yaml_text or ""),
+            allowed_yaml_roots=allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=effective_project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
-            code="yaml_import_expansion_error",
-            message=str(exc),
+            code="yaml_frontend_diagnostics_error",
+            message="Failed to compile demand diagnostics: {}: {}".format(type(exc).__name__, exc),
             source_path=str(yaml_path),
-            path=logical_path,
-            loc=error_loc_for_yaml_path(logical_path, locations),
+            path="(diagnostics)",
+            loc=ErrorLoc(1, 1),
         )
         return (tuple(_envelopes_to_diagnostics((env,), severity=_SEVERITY_ERROR)), ())
 
-    report = ConfigValidator(schema_path=str(_schema_dir() / "demand.gen.json")).validate_report(
-        yaml_data,
-        strict_unknown_fields=True,
-        enable_jsonschema_validation=True,
+    return (
+        tuple(_envelopes_to_diagnostics(compilation.diagnostics.errors, severity=_SEVERITY_ERROR)),
+        tuple(_envelopes_to_diagnostics(compilation.diagnostics.warnings, severity=_SEVERITY_WARNING)),
     )
-
-    errors: List[EditorDiagnostic] = []
-    warnings: List[EditorDiagnostic] = []
-
-    for issue in report.errors():
-        env = envelope_from_validation_issue(
-            issue,
-            source_path=str(yaml_path),
-            locations=locations,
-            default_code="yaml_validate_error",
-        )
-        errors.append(_envelope_to_diagnostic(env, severity=_SEVERITY_ERROR))
-
-    for issue in report.warnings():
-        env = envelope_from_validation_issue(
-            issue,
-            source_path=str(yaml_path),
-            locations=locations,
-            default_code="yaml_validate_warning",
-        )
-        warnings.append(_envelope_to_diagnostic(env, severity=_SEVERITY_WARNING))
-
-    return tuple(errors), tuple(warnings)
 
 
 def _collect_workflow_diagnostics(
@@ -4479,38 +4575,6 @@ def _effective_project_root_override_for_imports(
     return project_root_override
 
 
-def _maybe_expand_imports_inplace_for_effective_view(
-    raw: Dict[str, Any],
-    *,
-    yaml_path: Path,
-    allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]],
-    project_root_override: Optional[Union[str, Path]],
-    import_cache: Dict[str, Dict[str, Any]],
-    warnings: List[str],
-) -> bool:
-    if not contains_import_syntax(raw):
-        return True
-
-    try:
-        _ = expand_imports_inplace(
-            raw,
-            yaml_path=yaml_path,
-            cache=import_cache,
-            allowed_yaml_roots=list(allowed_yaml_roots),
-            scalim_yaml_override=scalim_yaml_override,
-            project_root_override=project_root_override,
-        )
-    except ScalimYamlImportExpansionError as exc:
-        warnings.append("imports expansion failed: {}".format(str(exc)))
-        return False
-    except Exception as exc:  # noqa: BLE001
-        warnings.append("imports expansion failed unexpectedly: {}: {}".format(type(exc).__name__, exc))
-        return False
-
-    return True
-
-
 def _collect_field_defs_for_effective_view(
     raw: Dict[str, Any],
     *,
@@ -4564,28 +4628,33 @@ def build_yaml_dsl_editor_effective_view(
             warnings=tuple(warnings),
         )
 
-    import_cache: Dict[str, Dict[str, Any]] = {}
     effective_project_root_override = _effective_project_root_override_for_imports(
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
     )
-    imports_expanded = _maybe_expand_imports_inplace_for_effective_view(
-        raw,
-        yaml_path=yaml_path_resolved,
-        allowed_yaml_roots=allowed_yaml_roots,
-        scalim_yaml_override=scalim_yaml_override,
-        project_root_override=effective_project_root_override,
-        import_cache=import_cache,
-        warnings=warnings,
-    )
-    if not imports_expanded:
-        # Editor semantics should still be useful while the user is typing or when
-        # imports expansion fails (e.g. allowed-roots guardrail). Degrade gracefully:
-        # - continue collecting in-file field defs for completion/navigation
-        # - keep warnings, and keep `import_fragment_files` empty
-        pass
+    effective_raw: Dict[str, Any] = raw
+    import_fragment_files: Tuple[str, ...] = ()
+    try:
+        compilation = compile_demand_frontend_diagnostics(
+            yaml_path_resolved,
+            yaml_text=str(yaml_text or ""),
+            allowed_yaml_roots=allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=effective_project_root_override,
+        )
+        if compilation.effective_yaml is not None:
+            effective_raw = compilation.effective_yaml
+        import_fragment_files = tuple(compilation.import_fragment_files or ())
 
-    field_def_index, main_source_id = _collect_field_defs_for_effective_view(raw, warnings=warnings)
+        import_expansion_errors = [
+            e for e in compilation.diagnostics.errors if str(getattr(e, "code", "") or "") == "yaml_import_expansion_error"
+        ]
+        if import_expansion_errors:
+            warnings.append("imports expansion failed: {}".format(str(import_expansion_errors[0].message)))
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("front-end compilation failed: {}: {}".format(type(exc).__name__, exc))
+
+    field_def_index, main_source_id = _collect_field_defs_for_effective_view(effective_raw, warnings=warnings)
     if field_def_index is None:
         return YamlDslEditorEffectiveView(
             yaml_kind=YAML_DSL_KIND_DEMAND,
@@ -4597,7 +4666,7 @@ def build_yaml_dsl_editor_effective_view(
     field_infos_by_id = _build_field_infos_by_id(field_def_index)
 
     resolver = _EditorOutputsFieldResolver()
-    outputs_effective = resolver.resolve_outputs_effective_fields(raw, field_def_index=field_def_index, warnings=warnings)
+    outputs_effective = resolver.resolve_outputs_effective_fields(effective_raw, field_def_index=field_def_index, warnings=warnings)
 
     anchor_expansions = _build_yaml_anchor_expansions(
         yaml_anchor_values,
@@ -4615,15 +4684,12 @@ def build_yaml_dsl_editor_effective_view(
         main_source_id=main_source_id,
     )
 
-    import_fragment_files: Sequence[str] = ()
-    if imports_expanded:
-        import_fragment_files = _iter_file_import_cache_paths(import_cache)
-        for fragment_file in import_fragment_files:
-            fragment_path = Path(fragment_file)
-            _append_field_definitions_from_yaml_file(
-                definitions_by_id,
-                fragment_path,
-            )
+    for fragment_file in import_fragment_files:
+        fragment_path = Path(fragment_file)
+        _append_field_definitions_from_yaml_file(
+            definitions_by_id,
+            fragment_path,
+        )
 
     definitions_final: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
 

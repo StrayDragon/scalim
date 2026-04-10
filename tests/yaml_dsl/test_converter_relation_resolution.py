@@ -1,5 +1,4 @@
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
-from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     DemandConfig,
     MainSourceConfig,
@@ -49,7 +48,7 @@ def _make_config() -> DemandConfig:
 
 
 def test_converter_relation_adjacency_built_and_reused() -> None:
-    converter = ConfigToIRConverter(resolver=PythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures"])))
+    converter = ConfigToIRConverter()
 
     converter.convert(_make_config())
 

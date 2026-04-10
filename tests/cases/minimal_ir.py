@@ -1,10 +1,20 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Sequence, Tuple
 
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import (
+    CallBySpecIr,
+    CallByValueIr,
+    DemandIr,
+    DerivedFieldIr,
+    FieldIr,
+    KeyIr,
+    MainSourceIr,
+    RuntimeHandleIdIr,
+    SourceIr,
+    ValueOpIr,
+)
 from scalim.typedefs import RowData, SourceSpecIrCacheMode
 
 
@@ -153,6 +163,7 @@ def _map_order_source(code: Any) -> Optional[str]:
 @dataclass(frozen=True)
 class MinimalIrCase:
     demand: DemandIr
+    runtime_bindings: RuntimeBindings
 
     def main_rows(self, limit: Optional[int] = None) -> List[RowData]:
         rows = list(load_orders())
@@ -162,22 +173,54 @@ class MinimalIrCase:
 
 
 def build_minimal_ir_case() -> MinimalIrCase:
-    main_source = MainSourceIr(source_id="orders", loader=load_orders)
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"orders": load_orders},
+        source_loaders={
+            "customers": load_customers,
+            "pays": load_pays,
+            "countries": load_countries,
+            "mapping": load_mapping,
+            "order_types": load_order_types,
+        },
+        params_builders={
+            ("customers", "customer_id"): _default_binding_params,
+            ("pays", "pay_id"): _default_binding_params,
+            ("countries", "country_id"): _default_binding_params,
+            ("mapping", ("region_id", "institution_id")): _default_binding_params,
+            ("order_types", "type_id"): _default_binding_params,
+        },
+        derived_calculators={"profit": _calc_profit},
+        value_transforms={"order_source": _map_order_source},
+    )
+
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
 
     customers = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=LoaderIr(
-            callable=load_customers,
-            bindings={"customer_id": BindingIr(key_field="customer_id", params_builder=_default_binding_params, as_="list")},
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
+            bindings={
+                "customer_id": BindingIr(
+                    key_field="customer_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="customers.params_builder"),
+                    as_="list",
+                )
+            },
         ),
     )
     pays = SourceIr(
         source_id="pays",
         key=KeyIr(key="pay_id"),
         loader_spec=LoaderIr(
-            callable=load_pays,
-            bindings={"pay_id": BindingIr(key_field="pay_id", params_builder=_default_binding_params, as_="list")},
+            callable_ref=RuntimeHandleIdIr(handle_id="pays.loader"),
+            bindings={
+                "pay_id": BindingIr(
+                    key_field="pay_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="pays.params_builder"),
+                    as_="list",
+                )
+            },
         ),
         fk_fields=frozenset({"country_id"}),
     )
@@ -185,21 +228,27 @@ def build_minimal_ir_case() -> MinimalIrCase:
         source_id="countries",
         key=KeyIr(key="country_id"),
         loader_spec=LoaderIr(
-            callable=load_countries,
-            bindings={"country_id": BindingIr(key_field="country_id", params_builder=_default_binding_params, as_="list")},
+            callable_ref=RuntimeHandleIdIr(handle_id="countries.loader"),
+            bindings={
+                "country_id": BindingIr(
+                    key_field="country_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="countries.params_builder"),
+                    as_="list",
+                )
+            },
         ),
     )
     mapping = SourceIr(
         source_id="mapping",
         key=KeyIr(key=("region_id", "institution_id")),
         loader_spec=LoaderIr(
-            callable=load_mapping,
+            callable_ref=RuntimeHandleIdIr(handle_id="mapping.loader"),
             bindings={
                 ("region_id", "institution_id"): BindingIr(
                     key_field=("region_id", "institution_id"),
-                    params_builder=_default_binding_params,
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="mapping.params_builder"),
                     as_="list",
-                )
+                ),
             },
         ),
     )
@@ -207,8 +256,14 @@ def build_minimal_ir_case() -> MinimalIrCase:
         source_id="order_types",
         key=KeyIr(key="type_id"),
         loader_spec=LoaderIr(
-            callable=load_order_types,
-            bindings={"type_id": BindingIr(key_field="type_id", params_builder=_default_binding_params, as_="list")},
+            callable_ref=RuntimeHandleIdIr(handle_id="order_types.loader"),
+            bindings={
+                "type_id": BindingIr(
+                    key_field="type_id",
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="order_types.params_builder"),
+                    as_="list",
+                )
+            },
         ),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
     )
@@ -228,7 +283,7 @@ def build_minimal_ir_case() -> MinimalIrCase:
             name="Order Source",
             source=main_source,
             data_key="source_code",
-            transform=_map_order_source,
+            value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="orders.order_source.transform")),),
         ),
         FieldIr(
             field_id="customer_name",
@@ -261,7 +316,13 @@ def build_minimal_ir_case() -> MinimalIrCase:
             field_id="profit",
             name="Profit",
             dependencies=("amount", "cost"),
-            calculator=lambda amount, cost: _calc_profit(amount=amount, cost=cost),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="profit.calculator"),
+                args=(
+                    CallByValueIr(kind="field", value="amount"),
+                    CallByValueIr(kind="field", value="cost"),
+                ),
+            ),
         ),
     ]
 
@@ -271,7 +332,7 @@ def build_minimal_ir_case() -> MinimalIrCase:
         main_source=main_source,
         name="minimal_ir",
     )
-    return MinimalIrCase(demand=demand)
+    return MinimalIrCase(demand=demand, runtime_bindings=runtime_bindings)
 
 
 __all__ = [

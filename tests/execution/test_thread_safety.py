@@ -3,11 +3,12 @@ from typing import List
 
 from scalim.events import EVENT_PIPELINE_START
 from scalim.execution import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir import DemandIr
-from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir import MainSourceIr, RuntimeHandleIdIr
 
 from tests.support.testing_utils import CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S
 
@@ -15,9 +16,14 @@ _TIMEOUT_S = CI_TIMEOUT_S
 
 
 def test_scalim_engine_run_is_serialized_per_instance() -> None:
-    demand = DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=lambda: []))
+    runtime_bindings = RuntimeBindings()
+    demand = DemandIr(
+        sources={},
+        fields={},
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr("main_source:main")),
+    )
     plan = ExecutionPlan(target_fields=["x"])
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=1)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1)
 
     run1_started = threading.Event()
     run1_can_continue = threading.Event()

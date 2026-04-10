@@ -1,11 +1,12 @@
 """Executor operator tests: load_ref."""
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import pytest
 
 from scalim.events import EVENT_LOADER_CALL, EVENT_RELATION_LOOKUP
 from scalim.execution.context import BatchContext
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.executor.operators.load_ref.context import LoadRefExecutionContext
 from scalim.execution.executor.operators.load_ref import loader as load_ref_loader
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
@@ -16,9 +17,11 @@ from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir import FieldIr
+from scalim.spec.ir import FieldIr, ValueOpIr
 from scalim.spec.ir import LookupStepIr
 from scalim.spec.ir import KeyIr, SourceIr
+from scalim.spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 
 from tests.fixtures.executor_operator_fixtures import (
     _FailLoader,
@@ -31,6 +34,30 @@ from tests.fixtures.executor_operator_fixtures import (
 )
 
 
+def _bind_source_loader(runtime_bindings: RuntimeBindings, source_id: str, loader_fn) -> LoaderIr:  # type: ignore[no-untyped-def]
+    runtime_bindings.source_loaders[str(source_id)] = loader_fn
+    return LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:{}".format(source_id)))
+
+
+def _bind_params_builder(
+    runtime_bindings: RuntimeBindings,
+    source_id: str,
+    key_field: str,
+    params_builder_fn,  # type: ignore[no-untyped-def]
+    **kwargs,
+) -> BindingIr:
+    runtime_bindings.params_builders[(str(source_id), str(key_field))] = params_builder_fn
+    return BindingIr(
+        key_field=str(key_field),
+        params_builder_ref=RuntimeHandleIdIr("params_builder:{}:{}".format(source_id, key_field)),
+        **kwargs,
+    )
+
+
+def _bind_lookup_cast(runtime_bindings: RuntimeBindings, spec: LookupCastSpecIr, *, is_multi: bool, fn) -> None:  # type: ignore[no-untyped-def]
+    runtime_bindings.lookup_key_casts[lookup_cast_id(spec, is_multi=is_multi)] = fn
+
+
 @pytest.mark.parametrize(
     ("main_source", "lookup_steps"),
     [
@@ -40,7 +67,11 @@ from tests.fixtures.executor_operator_fixtures import (
             (
                 LookupStepIr(
                     from_field="fk_id",
-                    to_source=SourceIr(source_id="customers", key=KeyIr(key="customer_id"), loader_spec=LoaderIr(callable=lambda: {})),
+                    to_source=SourceIr(
+                        source_id="customers",
+                        key=KeyIr(key="customer_id"),
+                        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:customers")),
+                    ),
                 ),
             ),
         ),
@@ -51,17 +82,26 @@ from tests.fixtures.executor_operator_fixtures import (
     ],
 )
 def test_load_ref_returns_early_variants(main_source, lookup_steps) -> None:  # type: ignore[no-untyped-def]
-    source = SourceIr(source_id="customers", key=KeyIr(key="customer_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    runtime_bindings = RuntimeBindings()
+    source = SourceIr(
+        source_id="customers",
+        key=KeyIr(key="customer_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "customers", lambda: {}),
+    )
     field_spec = FieldIr(field_id="customer_name", name="Name", source=source)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="customer_name",
-        field_spec=field_spec,
         lookup_steps=lookup_steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"customer_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"customer_name": field_spec}),
+        main_source,
+        sources={str(source.source_id): source},
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     context.set_field_value("fk_id", 1, 10)
 
@@ -71,6 +111,8 @@ def test_load_ref_returns_early_variants(main_source, lookup_steps) -> None:  # 
 
 
 def test_load_ref_relation_lookup_diagnostics_are_wants_gated(monkeypatch: pytest.MonkeyPatch) -> None:
+    runtime_bindings = RuntimeBindings()
+
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"target_ids": list(ctx.lookup_keys or [])}
 
@@ -81,21 +123,24 @@ def test_load_ref_relation_lookup_diagnostics_are_wants_gated(monkeypatch: pytes
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     batch_row_nth = list(range(10))
     for row_id in batch_row_nth:
@@ -112,6 +157,8 @@ def test_load_ref_relation_lookup_diagnostics_are_wants_gated(monkeypatch: pytes
 
 
 def test_load_ref_relation_lookup_diagnostics_still_work_when_wanted(monkeypatch: pytest.MonkeyPatch) -> None:
+    runtime_bindings = RuntimeBindings()
+
     class _RelationLookupObserver(EventDispatchObserver):
         event_types = {EVENT_RELATION_LOOKUP}
 
@@ -131,21 +178,24 @@ def test_load_ref_relation_lookup_diagnostics_still_work_when_wanted(monkeypatch
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     observer = _RelationLookupObserver()
     runtime.observer_manager.register(observer)
 
@@ -172,6 +222,7 @@ def test_load_ref_relation_lookup_diagnostics_still_work_when_wanted(monkeypatch
 
 def test_load_ref_builds_batch_rows_with_row_binding() -> None:
     captured: Dict[str, object] = {}
+    runtime_bindings = RuntimeBindings()
 
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         captured["batch_rows"] = ctx.batch_rows
@@ -185,20 +236,23 @@ def test_load_ref_builds_batch_rows_with_row_binding() -> None:
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows")
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows")
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     context.set_field_value("fk_id", 1, 1)
     context.set_field_value("note", 1, "n1")
@@ -211,6 +265,8 @@ def test_load_ref_builds_batch_rows_with_row_binding() -> None:
 
 
 def test_load_ref_rows_cache_does_not_retain_batch_rows_in_cache() -> None:
+    runtime_bindings = RuntimeBindings()
+
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"rows": ctx.batch_rows}
 
@@ -222,20 +278,23 @@ def test_load_ref_rows_cache_does_not_retain_batch_rows_in_cache() -> None:
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows", cache_mode="batch")
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows", cache_mode="batch")
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     context.set_field_value("fk_id", 1, 1)
     context.set_field_value("note", 1, "n1")
@@ -256,7 +315,8 @@ def test_load_ref_cache_hit_uses_cached_batch_rows_in_context() -> None:
         def on_event(self, event) -> None:  # type: ignore[override]
             self.events.append(event)
 
-    runtime = _make_runtime(ExecutionPlan(), _make_main_source())
+    runtime_bindings = RuntimeBindings()
+    runtime = _make_runtime(ExecutionPlan(), _make_main_source(), runtime_bindings=runtime_bindings)
     observer = _CaptureLoaderCallObserver()
     runtime.observer_manager.register(observer)
 
@@ -264,7 +324,13 @@ def test_load_ref_cache_hit_uses_cached_batch_rows_in_context() -> None:
     cached_batch_rows = [{"fk_id": 1, "note": "n1"}]
     cached_result = {1: {"name": "Alpha"}}
     runtime.load_ref_cache[cache_key] = LoadRefCacheEntry(result=cached_result, batch_rows=cached_batch_rows)
-    binding = BindingIr(key_field="target_id", params_builder=lambda ctx: ((), {"rows": ctx.batch_rows}), mode="rows")
+    binding = _bind_params_builder(
+        runtime_bindings,
+        "targets",
+        "target_id",
+        lambda ctx: ((), {"rows": ctx.batch_rows}),
+        mode="rows",
+    )
 
     loader_context = LoaderCallContextIr(
         batch_row_nth=[0],
@@ -294,6 +360,7 @@ def test_load_ref_cache_hit_uses_cached_batch_rows_in_context() -> None:
 
 def test_load_ref_lookup_chunking_splits_calls() -> None:
     calls: List[List[int]] = []
+    runtime_bindings = RuntimeBindings()
 
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"order_ids": list(ctx.lookup_keys or [])}
@@ -306,21 +373,24 @@ def test_load_ref_lookup_chunking_splits_calls() -> None:
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
         lookup_chunk_size=2,
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
 
     for row_id in [1, 2, 3, 4, 5]:
@@ -339,6 +409,7 @@ def test_load_ref_lookup_chunking_splits_calls() -> None:
 
 def test_load_ref_lookup_chunking_disabled_by_default() -> None:
     calls: List[List[int]] = []
+    runtime_bindings = RuntimeBindings()
 
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"order_ids": list(ctx.lookup_keys or [])}
@@ -351,20 +422,23 @@ def test_load_ref_lookup_chunking_disabled_by_default() -> None:
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
 
     for row_id in [1, 2, 3]:
@@ -376,19 +450,28 @@ def test_load_ref_lookup_chunking_disabled_by_default() -> None:
 
 
 def test_load_ref_skips_missing_multi_field_fk() -> None:
+    runtime_bindings = RuntimeBindings()
+
     main_source = _make_main_source()
-    target_source = SourceIr(source_id="targets", key=KeyIr(key="target_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
+    )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
     steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     context.set_field_value("region_id", 1, "r1")
     context.set_field_value("store_id", 1, None)
@@ -399,19 +482,26 @@ def test_load_ref_skips_missing_multi_field_fk() -> None:
 
 
 def test_load_ref_multi_field_next_step_and_object_result() -> None:
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.value_transforms["target_name"] = lambda value: value.upper() if value else value  # type: ignore[no-any-return]
+
     main_source = _make_main_source()
-    mapping_source = SourceIr(source_id="mapping", key=KeyIr(key="fk_id"), loader_spec=LoaderIr(callable=_FailLoader()))
+    mapping_source = SourceIr(
+        source_id="mapping",
+        key=KeyIr(key="fk_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
+    )
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id")),
-        loader_spec=LoaderIr(callable=_FailLoader()),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
     field_spec = FieldIr(
         field_id="target_name",
         name="Target",
         source=target_source,
         data_key="name",
-        transform=lambda value: value.upper() if value else value,
+        value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr("value_transform:target_name")),),
     )
     steps = (
         LookupStepIr(from_field="fk_id", to_source=mapping_source),
@@ -420,12 +510,15 @@ def test_load_ref_multi_field_next_step_and_object_result() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache = {
         "mapping": {
             10: {"region_id": "r1", "store_id": "s1"},
@@ -449,11 +542,12 @@ def test_load_ref_multi_field_next_step_and_object_result() -> None:
 
 
 def test_load_ref_handles_list_to_field_binding_key() -> None:
+    runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id")),
-        loader_spec=LoaderIr(callable=_FailLoader()),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
     steps = (
@@ -466,12 +560,15 @@ def test_load_ref_handles_list_to_field_binding_key() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache = {"targets": {("r1", "s1"): {"target_name": "alpha"}}}
 
     context = BatchContext()
@@ -484,9 +581,18 @@ def test_load_ref_handles_list_to_field_binding_key() -> None:
 
 
 def test_load_ref_breaks_when_lookup_keys_empty() -> None:
+    runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
-    mapping_source = SourceIr(source_id="mapping", key=KeyIr(key="fk_id"), loader_spec=LoaderIr(callable=_FailLoader()))
-    target_source = SourceIr(source_id="targets", key=KeyIr(key="target_id"), loader_spec=LoaderIr(callable=_FailLoader()))
+    mapping_source = SourceIr(
+        source_id="mapping",
+        key=KeyIr(key="fk_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
+    )
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
+    )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
     steps = (
         LookupStepIr(from_field="fk_id", to_source=mapping_source),
@@ -495,12 +601,15 @@ def test_load_ref_breaks_when_lookup_keys_empty() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache = {
         "mapping": {
             10: {"region_id": "r1"},
@@ -518,6 +627,8 @@ def test_load_ref_breaks_when_lookup_keys_empty() -> None:
 
 
 def test_load_ref_write_final_step_missing_field_spec() -> None:
+    runtime_bindings = RuntimeBindings()
+
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"value_ids": list(ctx.lookup_keys or [])}
 
@@ -525,8 +636,9 @@ def test_load_ref_write_final_step_missing_field_spec() -> None:
         return {value_id: {"value": "v{}".format(value_id)} for value_id in value_ids}
 
     main_source = _make_main_source()
-    binding = BindingIr(key_field="value_id", params_builder=_params_builder)
-    loader_spec = LoaderIr(callable=_loader, bindings={"value_id": binding})
+    runtime_bindings.source_loaders["values"] = _loader
+    binding = _bind_params_builder(runtime_bindings, "values", "value_id", _params_builder)
+    loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:values"), bindings={"value_id": binding})
     target_source = SourceIr(source_id="values", key=KeyIr(key="value_id"), loader_spec=loader_spec)
     field_spec = FieldIr(field_id="value", name="Value", source=target_source)
 
@@ -534,13 +646,16 @@ def test_load_ref_write_final_step_missing_field_spec() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="value",
-        field_spec=field_spec,
         lookup_steps=(step,),
     )
 
-    runtime = _make_runtime(ExecutionPlan(operators=(operator,), field_specs={}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(operators=(operator,), field_specs={}),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     context.set_field_value("value_id", 1, 1)
 
@@ -550,6 +665,8 @@ def test_load_ref_write_final_step_missing_field_spec() -> None:
 
 
 def test_load_ref_normalize_cache_reuses_lookup_cast_per_relation() -> None:
+    runtime_bindings = RuntimeBindings()
+
     loader = _SampleLoader()
     cast_calls: List[Any] = []
 
@@ -557,36 +674,38 @@ def test_load_ref_normalize_cache_reuses_lookup_cast_per_relation() -> None:
         cast_calls.append(value)
         return value
 
-    binding = BindingIr(
-        key_field="order_id",
-        params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys or [])}),
-    )
-    loader_spec = LoaderIr(callable=loader.get_orders, bindings={"order_id": binding})
+    cast_spec = LookupCastSpecIr(name="counting_cast")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_counting_cast)
+
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"order_ids": list(ctx.lookup_keys_list or [])}
+
+    runtime_bindings.source_loaders["payments"] = loader.get_orders
+    binding = _bind_params_builder(runtime_bindings, "payments", "order_id", _params_builder)
+    loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:payments"), bindings={"order_id": binding})
     source = SourceIr(source_id="payments", key=KeyIr(key="order_id"), loader_spec=loader_spec)
 
-    step = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=_counting_cast)
+    step = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_spec)
     field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step,))
     field_extra = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step,))
 
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_0",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="amount",
-        field_spec=field_amount,
         lookup_steps=(step,),
     )
     op_extra = LoadRefOperatorIr(
         operator_id="load_ref_1",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="extra",
-        field_spec=field_extra,
         lookup_steps=(step,),
     )
 
     plan = ExecutionPlan(operators=(op_amount, op_extra), field_specs={"amount": field_amount, "extra": field_extra})
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(plan, _make_main_source(), runtime_bindings=runtime_bindings)
     context = BatchContext()
     context.set_field_value("order_id", 1, 1)
     context.set_field_value("order_id", 2, 2)
@@ -601,6 +720,8 @@ def test_load_ref_normalize_cache_reuses_lookup_cast_per_relation() -> None:
 
 
 def test_load_ref_normalize_cache_skips_different_relation() -> None:
+    runtime_bindings = RuntimeBindings()
+
     loader = _SampleLoader()
     cast_a_calls: List[Any] = []
     cast_b_calls: List[Any] = []
@@ -613,37 +734,41 @@ def test_load_ref_normalize_cache_skips_different_relation() -> None:
         cast_b_calls.append(value)
         return value
 
-    binding = BindingIr(
-        key_field="order_id",
-        params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys or [])}),
-    )
-    loader_spec = LoaderIr(callable=loader.get_orders, bindings={"order_id": binding})
+    cast_spec_a = LookupCastSpecIr(name="cast_a")
+    cast_spec_b = LookupCastSpecIr(name="cast_b")
+    _bind_lookup_cast(runtime_bindings, cast_spec_a, is_multi=False, fn=_cast_a)
+    _bind_lookup_cast(runtime_bindings, cast_spec_b, is_multi=False, fn=_cast_b)
+
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"order_ids": list(ctx.lookup_keys_list or [])}
+
+    runtime_bindings.source_loaders["payments"] = loader.get_orders
+    binding = _bind_params_builder(runtime_bindings, "payments", "order_id", _params_builder)
+    loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:payments"), bindings={"order_id": binding})
     source = SourceIr(source_id="payments", key=KeyIr(key="order_id"), loader_spec=loader_spec)
 
-    step_a = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=_cast_a)
-    step_b = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=_cast_b)
+    step_a = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_spec_a)
+    step_b = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_spec_b)
     field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step_a,))
     field_extra = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step_b,))
 
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_a",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="amount",
-        field_spec=field_amount,
         lookup_steps=(step_a,),
     )
     op_extra = LoadRefOperatorIr(
         operator_id="load_ref_b",
         operator_type=OperatorType.LOAD_REF.value,
-        source=source,
+        source_id=str(source.source_id),
         field_key="extra",
-        field_spec=field_extra,
         lookup_steps=(step_b,),
     )
 
     plan = ExecutionPlan(operators=(op_amount, op_extra), field_specs={"amount": field_amount, "extra": field_extra})
-    runtime = _make_runtime(plan, _make_main_source())
+    runtime = _make_runtime(plan, _make_main_source(), runtime_bindings=runtime_bindings)
     context = BatchContext()
     context.set_field_value("order_id", 1, 1)
     context.set_field_value("order_id", 2, 2)
@@ -657,30 +782,32 @@ def test_load_ref_normalize_cache_skips_different_relation() -> None:
 
 
 def test_load_ref_normalize_cache_dedupes_diagnostics() -> None:
+    runtime_bindings = RuntimeBindings()
+
     main_source = _make_main_source()
+    cast_spec = LookupCastSpecIr(name="raise_value_error")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_raise_value_error)
     target_source = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(callable=_FailLoader()),
+        loader_spec=_bind_source_loader(runtime_bindings, "customers", _FailLoader()),
     )
-    step = LookupStepIr(from_field="customer_id", to_source=target_source, lookup_cast=_raise_value_error)
+    step = LookupStepIr(from_field="customer_id", to_source=target_source, lookup_cast=cast_spec)
     field_a = FieldIr(field_id="name_a", name="NameA", source=target_source, lookup_steps=(step,))
     field_b = FieldIr(field_id="name_b", name="NameB", source=target_source, lookup_steps=(step,))
 
     op_a = LoadRefOperatorIr(
         operator_id="load_ref_a",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="name_a",
-        field_spec=field_a,
         lookup_steps=(step,),
     )
     op_b = LoadRefOperatorIr(
         operator_id="load_ref_b",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="name_b",
-        field_spec=field_b,
         lookup_steps=(step,),
     )
 
@@ -690,6 +817,7 @@ def test_load_ref_normalize_cache_dedupes_diagnostics() -> None:
         ExecutionPlan(operators=(op_a, op_b), field_specs={"name_a": field_a, "name_b": field_b}),
         main_source,
         observer_manager=observer_manager,
+        runtime_bindings=runtime_bindings,
     )
     context = BatchContext()
     context.set_field_value("customer_id", 1, "bad")
@@ -704,6 +832,8 @@ def test_load_ref_normalize_cache_dedupes_diagnostics() -> None:
 
 
 def test_load_ref_records_relation_observability() -> None:
+    runtime_bindings = RuntimeBindings()
+
     def _load_customers():  # type: ignore[no-untyped-def]
         return {100: {"name": "Alice"}}
 
@@ -711,25 +841,25 @@ def test_load_ref_records_relation_observability() -> None:
     target_source = SourceIr(
         source_id="customers",
         key=KeyIr(key="customer_id"),
-        loader_spec=LoaderIr(callable=_load_customers),
+        loader_spec=_bind_source_loader(runtime_bindings, "customers", _load_customers),
     )
     field_spec = FieldIr(field_id="customer_name", name="Name", source=target_source, data_key="name")
     steps = (LookupStepIr(from_field="customer_id", to_source=target_source),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="customer_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
     relation_observer = RelationObserver(config=RelationConfig(sampling_rate=1.0, report_format="none"))
     observer_manager = ObserverManager(observers=[relation_observer])
     runtime = _make_runtime(
-        ExecutionPlan(field_specs={"customer_name": field_spec}),
+        ExecutionPlan(field_specs={"customer_name": field_spec}, operators=(operator,)),
         main_source,
         observer_manager=observer_manager,
+        runtime_bindings=runtime_bindings,
     )
     context = BatchContext()
     context.set_field_value("customer_id", 1, 100)
@@ -749,25 +879,33 @@ def test_load_ref_records_relation_observability() -> None:
 
 
 def test_load_ref_records_relation_type_error() -> None:
+    runtime_bindings = RuntimeBindings()
+
     main_source = _make_main_source()
-    target_source = SourceIr(source_id="customers", key=KeyIr(key="customer_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    cast_spec = LookupCastSpecIr(name="raise_value_error")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_raise_value_error)
+    target_source = SourceIr(
+        source_id="customers",
+        key=KeyIr(key="customer_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "customers", _FailLoader()),
+    )
     field_spec = FieldIr(field_id="customer_name", name="Name", source=target_source)
-    steps = (LookupStepIr(from_field="customer_id", to_source=target_source, lookup_cast=_raise_value_error),)
+    steps = (LookupStepIr(from_field="customer_id", to_source=target_source, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="customer_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
     relation_observer = RelationObserver(config=RelationConfig(sampling_rate=1.0, report_format="none"))
     observer_manager = ObserverManager(observers=[relation_observer])
     runtime = _make_runtime(
-        ExecutionPlan(field_specs={"customer_name": field_spec}),
+        ExecutionPlan(field_specs={"customer_name": field_spec}, operators=(operator,)),
         main_source,
         observer_manager=observer_manager,
+        runtime_bindings=runtime_bindings,
     )
     context = BatchContext()
     context.set_field_value("customer_id", 1, "bad")
@@ -780,23 +918,30 @@ def test_load_ref_records_relation_type_error() -> None:
 
 
 def test_load_ref_multi_field_first_step_type_error() -> None:
+    runtime_bindings = RuntimeBindings()
+
     main_source = _make_main_source()
+    cast_spec = LookupCastSpecIr(name="raise_value_error")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=True, fn=_raise_value_error)
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id")),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
-    steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source, lookup_cast=_raise_value_error),)
+    steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     context = BatchContext()
     context.set_field_value("region_id", 1, "r1")
     context.set_field_value("store_id", 1, "s1")
@@ -807,12 +952,20 @@ def test_load_ref_multi_field_first_step_type_error() -> None:
 
 
 def test_load_ref_next_step_single_field_errors() -> None:
+    runtime_bindings = RuntimeBindings()
+
     main_source = _make_main_source()
-    mapping_source = SourceIr(source_id="mapping", key=KeyIr(key="map_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    mapping_source = SourceIr(
+        source_id="mapping",
+        key=KeyIr(key="map_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
+    )
+    cast_spec = LookupCastSpecIr(name="raise_value_error")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_raise_value_error)
     target_source = SourceIr(
         source_id="targets",
-        key=KeyIr(key="target_id", cast=_raise_value_error),
-        loader_spec=LoaderIr(callable=_FailLoader()),
+        key=KeyIr(key="target_id", cast=cast_spec),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
     steps = (
@@ -822,12 +975,15 @@ def test_load_ref_next_step_single_field_errors() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache = {
         "mapping": {
             10: {"target_id": "bad"},
@@ -845,12 +1001,20 @@ def test_load_ref_next_step_single_field_errors() -> None:
 
 
 def test_load_ref_next_step_multi_field_type_error() -> None:
+    runtime_bindings = RuntimeBindings()
+
     main_source = _make_main_source()
-    mapping_source = SourceIr(source_id="mapping", key=KeyIr(key="map_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    mapping_source = SourceIr(
+        source_id="mapping",
+        key=KeyIr(key="map_id"),
+        loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
+    )
+    cast_spec = LookupCastSpecIr(name="raise_value_error")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=True, fn=_raise_value_error)
     target_source = SourceIr(
         source_id="targets",
-        key=KeyIr(key=("region_id", "store_id"), cast=_raise_value_error),
-        loader_spec=LoaderIr(callable=_FailLoader()),
+        key=KeyIr(key=("region_id", "store_id"), cast=cast_spec),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
     steps = (
@@ -860,12 +1024,15 @@ def test_load_ref_next_step_multi_field_type_error() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source)
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache = {
         "mapping": {
             10: {"region_id": "r1", "store_id": "s1"},
@@ -880,13 +1047,16 @@ def test_load_ref_next_step_multi_field_type_error() -> None:
 
 
 def test_load_ref_uses_cached_sources_and_multi_field() -> None:
+    runtime_bindings = RuntimeBindings()
+    runtime_bindings.value_transforms["country_name"] = lambda value: value.upper() if value else value  # type: ignore[no-any-return]
+
     main_source = _make_main_source()
 
     mapping_loader = _FailLoader()
     mapping_source = SourceIr(
         source_id="mapping",
         key=KeyIr(key=("region_id", "store_id")),
-        loader_spec=LoaderIr(callable=mapping_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "mapping", mapping_loader),
     )
 
     country_loader = _FailLoader()
@@ -897,14 +1067,15 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
     countries_source = SourceIr(
         source_id="countries",
         key=KeyIr(key="country_id"),
-        loader_spec=LoaderIr(callable=country_loader, extractor=_country_extract),
+        loader_spec=_bind_source_loader(runtime_bindings, "countries", country_loader),
     )
+    runtime_bindings.loader_extractors[str(countries_source.source_id)] = _country_extract
 
     field_spec = FieldIr(
         field_id="country_name",
         name="Country",
         source=countries_source,
-        transform=lambda value: value.upper() if value else value,
+        value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr("value_transform:country_name")),),
     )
 
     steps = (
@@ -915,14 +1086,13 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
     operator = LoadRefOperatorIr(
         operator_id="load_ref_country",
         operator_type=OperatorType.LOAD_REF.value,
-        source=countries_source,
+        source_id=str(countries_source.source_id),
         field_key="country_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
-    plan = ExecutionPlan(field_specs={"country_name": field_spec}, target_fields=["country_name"])
-    runtime = _make_runtime(plan, main_source)
+    plan = ExecutionPlan(field_specs={"country_name": field_spec}, target_fields=["country_name"], operators=(operator,))
+    runtime = _make_runtime(plan, main_source, runtime_bindings=runtime_bindings)
     runtime.preloaded_cache = {
         "mapping": {
             ("r1", "s1"): {"country_id": "C1"},
@@ -949,11 +1119,15 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
 
 
 def test_load_ref_execute_returns_early_for_non_load_ref_operator() -> None:
-    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:orders")),
+    )
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("amount",),
         is_primary=True,
     )
@@ -963,7 +1137,11 @@ def test_load_ref_execute_returns_early_for_non_load_ref_operator() -> None:
 
 
 def test_load_ref_executor_ignores_non_load_ref_operator() -> None:
-    source = SourceIr(source_id="orders", key=KeyIr(key="order_id"), loader_spec=LoaderIr(callable=lambda: {}))
+    source = SourceIr(
+        source_id="orders",
+        key=KeyIr(key="order_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:orders")),
+    )
     field_spec = FieldIr(field_id="amount", name="Amount", source=source)
     runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
     context = BatchContext()
@@ -971,7 +1149,7 @@ def test_load_ref_executor_ignores_non_load_ref_operator() -> None:
     wrong_operator = LoadOperatorIr(
         operator_id="load",
         operator_type=OperatorType.LOAD.value,
-        source=source,
+        source_id=str(source.source_id),
         field_keys=("amount",),
         is_primary=False,
     )
@@ -981,6 +1159,8 @@ def test_load_ref_executor_ignores_non_load_ref_operator() -> None:
 
 
 def test_load_ref_key_normalization_auto_str_unifies_key_types_for_matching() -> None:
+    runtime_bindings = RuntimeBindings()
+
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"target_ids": list(ctx.lookup_keys or [])}
 
@@ -992,30 +1172,29 @@ def test_load_ref_key_normalization_auto_str_unifies_key_types_for_matching() ->
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    plan = ExecutionPlan(field_specs={"target_name": field_spec})
+    plan = ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,))
 
     # raw: fk=1 -> lookup key is int(1), but mapping is str-keyed -> miss
-    runtime_raw = _make_runtime(plan, main_source, key_normalization="raw")
+    runtime_raw = _make_runtime(plan, main_source, key_normalization="raw", runtime_bindings=runtime_bindings)
     ctx_raw = BatchContext()
     ctx_raw.set_field_value("fk_id", 1, 1)
     LoadRefOperatorExecutor().execute(operator, ctx_raw, [1], runtime_raw)
     assert ctx_raw.get_field_value("target_name", 1) is None
 
     # auto_str: fk=1 -> lookup key is "1", mapping is str-keyed -> hit
-    runtime_norm = _make_runtime(plan, main_source, key_normalization="auto_str")
+    runtime_norm = _make_runtime(plan, main_source, key_normalization="auto_str", runtime_bindings=runtime_bindings)
     ctx_norm = BatchContext()
     ctx_norm.set_field_value("fk_id", 1, 1)
     LoadRefOperatorExecutor().execute(operator, ctx_norm, [1], runtime_norm)
@@ -1023,6 +1202,10 @@ def test_load_ref_key_normalization_auto_str_unifies_key_types_for_matching() ->
 
 
 def test_load_ref_key_normalization_force_str_normalizes_even_when_lookup_cast_is_set() -> None:
+    runtime_bindings = RuntimeBindings()
+    cast_spec = LookupCastSpecIr(name="int")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=int)
+
     def _params_builder(ctx):  # type: ignore[no-untyped-def]
         return (), {"target_ids": list(ctx.lookup_keys_list or [])}
 
@@ -1034,30 +1217,29 @@ def test_load_ref_key_normalization_force_str_normalizes_even_when_lookup_cast_i
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=int),)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    plan = ExecutionPlan(field_specs={"target_name": field_spec})
+    plan = ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,))
 
     # auto_str: explicit lookup_cast takes precedence -> loader sees int keys
-    runtime_auto = _make_runtime(plan, main_source, key_normalization="auto_str")
+    runtime_auto = _make_runtime(plan, main_source, key_normalization="auto_str", runtime_bindings=runtime_bindings)
     ctx_auto = BatchContext()
     ctx_auto.set_field_value("fk_id", 1, "1")
     LoadRefOperatorExecutor().execute(operator, ctx_auto, [1], runtime_auto)
     assert ctx_auto.get_field_value("target_name", 1) == "Name1"
 
     # force_str: normalize at the final match boundary -> loader sees str keys
-    runtime_force = _make_runtime(plan, main_source, key_normalization="force_str")
+    runtime_force = _make_runtime(plan, main_source, key_normalization="force_str", runtime_bindings=runtime_bindings)
     ctx_force = BatchContext()
     ctx_force.set_field_value("fk_id", 1, "1")
     LoadRefOperatorExecutor().execute(operator, ctx_force, [1], runtime_force)
@@ -1069,24 +1251,29 @@ def test_load_ref_key_normalization_force_str_normalizes_even_when_lookup_cast_i
 
 
 def test_load_ref_cached_mapping_key_normalization_hits_preloaded_int_key() -> None:
+    runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     fail_loader = _FailLoader()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=fail_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        key_normalization="auto_str",
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache["targets"] = {1: {"name": "Alpha"}}
     ctx = BatchContext()
     ctx.set_field_value("fk_id", 1, "1")
@@ -1098,24 +1285,29 @@ def test_load_ref_cached_mapping_key_normalization_hits_preloaded_int_key() -> N
 
 
 def test_load_ref_cached_mapping_key_normalization_hits_preloaded_multi_field_key() -> None:
+    runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     fail_loader = _FailLoader()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key=("a", "b")),
-        loader_spec=LoaderIr(callable=fail_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
     steps = (LookupStepIr(from_field=["a", "b"], to_source=target_source),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        key_normalization="auto_str",
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache["targets"] = {(1, 2): {"name": "Alpha"}}
     ctx = BatchContext()
     ctx.set_field_value("a", 1, "1")
@@ -1128,24 +1320,29 @@ def test_load_ref_cached_mapping_key_normalization_hits_preloaded_multi_field_ke
 
 
 def test_load_ref_cached_mapping_key_normalization_collision_fail_fast() -> None:
+    runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     fail_loader = _FailLoader()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=fail_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
-    runtime = _make_runtime(ExecutionPlan(field_specs={"target_name": field_spec}), main_source, key_normalization="auto_str")
+    runtime = _make_runtime(
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
+        main_source,
+        key_normalization="auto_str",
+        runtime_bindings=runtime_bindings,
+    )
     runtime.preloaded_cache["targets"] = {123: {"name": "A"}, "123": {"name": "B"}}
     ctx = BatchContext()
     ctx.set_field_value("fk_id", 1, 123)
@@ -1171,29 +1368,30 @@ def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_
             self.events.append(event)
 
     main_source = _make_main_source()
+    runtime_bindings = RuntimeBindings()
     fail_loader = _FailLoader()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=fail_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
     steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
     observer = _CaptureWarningObserver()
     runtime = _make_runtime(
-        ExecutionPlan(field_specs={"target_name": field_spec}),
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
         main_source,
         observer_manager=ObserverManager([observer]),
         key_normalization="auto_str",
+        runtime_bindings=runtime_bindings,
     )
     runtime.preloaded_cache["targets"] = {123: {"name": "A"}, "123": {"name": "A"}}
     ctx = BatchContext()
@@ -1233,30 +1431,34 @@ def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_r
         # Always return string-keyed mapping (regardless of input type).
         return {str(key): {"name": "Name{}".format(key)} for key in target_ids}
 
+    runtime_bindings = RuntimeBindings()
+    cast_spec = LookupCastSpecIr(name="int")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=int)
+
     main_source = _make_main_source()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows", cache_mode="none")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=int),)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows", cache_mode="none")
+    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
     observer = _CaptureWarningObserver()
     runtime = _make_runtime(
-        ExecutionPlan(field_specs={"target_name": field_spec}),
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
         main_source,
         observer_manager=ObserverManager([observer]),
         key_normalization="auto_str",
+        runtime_bindings=runtime_bindings,
     )
     ctx = BatchContext()
     ctx.set_field_value("fk_id", 1, "123")
@@ -1297,37 +1499,41 @@ def test_load_ref_key_normalization_auto_str_with_explicit_cast_unnormalizable_k
         _ = target_ids
         return {}
 
+    runtime_bindings = RuntimeBindings()
+    cast_spec = LookupCastSpecIr(name="weird_key")
+    _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=(lambda _value: _WeirdKey()))
+
     main_source = _make_main_source()
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
-        loader_spec=LoaderIr(callable=_loader),
+        loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    binding = BindingIr(key_field="target_id", params_builder=_params_builder, mode="rows", cache_mode="none")
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows", cache_mode="none")
     steps = (
         LookupStepIr(
             from_field="fk_id",
             to_source=target_source,
             bind=binding,
-            lookup_cast=lambda _value: _WeirdKey(),  # type: ignore[arg-type]
+            lookup_cast=cast_spec,
         ),
     )
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
-        source=target_source,
+        source_id=str(target_source.source_id),
         field_key="target_name",
-        field_spec=field_spec,
         lookup_steps=steps,
     )
 
     observer = _CaptureWarningObserver()
     runtime = _make_runtime(
-        ExecutionPlan(field_specs={"target_name": field_spec}),
+        ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,)),
         main_source,
         observer_manager=ObserverManager([observer]),
         key_normalization="auto_str",
+        runtime_bindings=runtime_bindings,
     )
     ctx = BatchContext()
     ctx.set_field_value("fk_id", 1, "any")

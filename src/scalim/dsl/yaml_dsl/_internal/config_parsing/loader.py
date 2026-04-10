@@ -276,6 +276,16 @@ class YamlDemandLoader(
         if self._validator is None:
             self._validator = _create_validator()
 
+    def parse_raw_demand(self, raw: RawDemand) -> DemandConfig:
+        """从已加载/已展开 `imports` 的 `RawDemand` 解析 `DemandConfig`.
+
+        说明:
+        - 该入口不会做 YAML 解析与 `imports` 展开;调用方需保证 `raw.data` 已满足相应约束.
+        - 这是 `compiler_frontend` 等静态编译入口复用 `parser` 的公共入口,避免依赖私有 `_parse_config`.
+        """
+
+        return self._parse_config(raw)
+
     def _parse_config(self, raw: RawDemand) -> DemandConfig:
         name = str(raw.data.get(DEMAND_KEYS["name"], ""))
         description = str(raw.data.get(DEMAND_KEYS["description"], ""))

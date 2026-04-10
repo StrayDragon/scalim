@@ -5,9 +5,9 @@ from typing import Callable, ClassVar, Dict, List, Optional, Sequence
 
 from ....._internal.utils.converters import NamedLookupCast, auto_normalize_key, auto_str_normalize, must_to_int, must_to_str
 from .....spec.ir.aliases import LookupKeyCast
+from .....spec.ir.lookup_casts import LookupCastSpecIr
 from .....typedefs import FieldValue, LookupKey
 from .....vendor.compact.typing_extensionsx import TypeGuard
-from ...schema_dsl.models import LookupCastConfig
 from ..errors import ScalimConversionError
 
 _SOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -91,7 +91,7 @@ class LookupCastRegistry:
         "str": must_to_str,
     }
 
-    def build(self, lookup_cast: LookupCastConfig, *, is_multi: bool) -> LookupKeyCast:
+    def build(self, lookup_cast: LookupCastSpecIr, *, is_multi: bool) -> LookupKeyCast:
         base = self._get_base_cast(lookup_cast)
         meta: Dict[str, object] = {}
         if lookup_cast.name == "sep_first":
@@ -100,7 +100,7 @@ class LookupCastRegistry:
             return NamedLookupCast(lookup_cast.name, base, meta=meta)
         return NamedLookupCast(lookup_cast.name, self._wrap_multi(base), meta=meta)
 
-    def _get_base_cast(self, lookup_cast: LookupCastConfig) -> LookupKeyCast:
+    def _get_base_cast(self, lookup_cast: LookupCastSpecIr) -> LookupKeyCast:
         if lookup_cast.name == "sep_first":
             return self._build_sep_first(lookup_cast.sep)
         base = self._BASE_CASTS.get(lookup_cast.name)

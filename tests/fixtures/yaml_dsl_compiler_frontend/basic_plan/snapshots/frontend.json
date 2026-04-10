@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "diagnostics": {
+      "errors": [],
+      "warnings": []
+    },
+    "effective_yaml": {
+      "fields": {
+        "b": {
+          "compute": "a"
+        }
+      },
+      "main_source": {
+        "fields": {
+          "a": {}
+        },
+        "loader": "tests.fixtures.mock_loaders.mock_loader",
+        "source_id": "orders"
+      },
+      "name": "demo",
+      "outputs": [],
+      "sources": {}
+    },
+    "import_fragment_files": [
+      "<WORKSPACE>/frag.yaml"
+    ],
+    "schema_version": "yaml_dsl_frontend/v1"
+  }
+}

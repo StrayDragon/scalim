@@ -1,19 +1,28 @@
 from typing import List, Optional
 
-from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import (
+    BindingIr,
+    CallBySpecIr,
+    CallByValueIr,
+    DemandIr,
+    DerivedFieldIr,
+    FieldIr,
+    KeyIr,
+    LoaderIr,
+    MainSourceIr,
+    RuntimeHandleIdIr,
+    SourceIr,
+)
 
 
-def make_loader(name: str = "test") -> LoaderIr:
+def make_loader(*, source_id: str, key_field: str) -> LoaderIr:
     """Create a minimal LoaderIr for tests."""
     return LoaderIr(
-        callable=lambda: {},
+        callable_ref=RuntimeHandleIdIr(handle_id="{}.loader".format(source_id)),
         bindings={
-            name: BindingIr(
-                key_field=name,
-                params_builder=lambda ctx: ((), {}),
+            key_field: BindingIr(
+                key_field=key_field,
+                params_builder_ref=RuntimeHandleIdIr(handle_id="{}.params_builder.{}".format(source_id, key_field)),
             ),
         },
     )
@@ -28,7 +37,7 @@ def make_source(
     return SourceIr(
         source_id=source_id,
         key=KeyIr(key=key_field),
-        loader_spec=make_loader(source_id),
+        loader_spec=make_loader(source_id=source_id, key_field=key_field),
         fk_fields=frozenset(fk_fields or []),
     )
 
@@ -36,7 +45,7 @@ def make_source(
 def make_main_source(source_id: str) -> MainSourceIr:
     return MainSourceIr(
         source_id=source_id,
-        loader=lambda: [],
+        loader_ref=RuntimeHandleIdIr(handle_id="{}.main_loader".format(source_id)),
     )
 
 
@@ -69,7 +78,14 @@ def build_derived_model() -> DemandIr:
             field_id="profit",
             name="利润",
             dependencies=("amount", "cost"),
-            calculator=lambda amount, cost: (amount or 0) - (cost or 0),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.profit"),
+                args=(
+                    CallByValueIr(kind="field", value="amount"),
+                    CallByValueIr(kind="field", value="cost"),
+                ),
+                field_names=("amount", "cost"),
+            ),
         ),
     ]
 
@@ -141,11 +157,11 @@ def build_multi_field_model() -> DemandIr:
         source_id="mapping",
         key=KeyIr(key=("region_id", "institution_id")),
         loader_spec=LoaderIr(
-            callable=lambda: {},
+            callable_ref=RuntimeHandleIdIr(handle_id="mapping.loader"),
             bindings={
                 ("region_id", "institution_id"): BindingIr(
                     key_field=("region_id", "institution_id"),
-                    params_builder=lambda ctx: ((), {}),
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="mapping.params_builder.composite"),
                 ),
             },
         ),

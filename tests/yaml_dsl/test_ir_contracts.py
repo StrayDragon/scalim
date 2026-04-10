@@ -1,25 +1,25 @@
 import pytest
 
 from scalim.spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir._helpers import extract_from_fields, infer_lookup_steps
+from scalim.spec.ir import BuiltinCallableIdIr, CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, SourceNormalizeIr, ValueOpIr
+from scalim.spec.ir.callable_refs import describe_callable_ref
+from scalim.spec.ir._helpers import call_loader_with_binding, extract_from_fields, infer_lookup_steps
 from scalim.spec.ir import JoinConditionIr, LookupStepIr, RelationIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 
 
 def _make_source(source_id: str, pk_key: object = "id") -> SourceIr:
     return SourceIr(
         source_id=source_id,
         key=KeyIr(key=pk_key),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="{}.loader".format(source_id))),
     )
 
 
 def _make_main_source(source_id: str) -> MainSourceIr:
     return MainSourceIr(
         source_id=source_id,
-        loader=lambda: [],
+        loader_ref=RuntimeHandleIdIr(handle_id="{}.loader".format(source_id)),
     )
 
 
@@ -181,30 +181,33 @@ def test_lookup_step_to_field_and_pk_single() -> None:
     assert step_pk.get_to_fields_or_source_key() == ("order_id",)
 
 
-def test_field_and_derived_field_transforms() -> None:
+def test_field_and_derived_field_value_ops_and_call_by_contracts() -> None:
     source = _make_source("orders", pk_key="order_id")
 
-    field = FieldIr(
-        field_id="amount",
-        name="Amount",
-        source=source,
-        transform=lambda v: v * 2,
-        value_formatter=lambda v: "{:d}".format(v),
-    )
-    assert field.apply_transform(5) == "10"
+    field = FieldIr(field_id="amount", name="Amount", source=source, value_ops=(ValueOpIr(kind="cast", to="decimal"),))
+    assert field.value_ops[0].kind == "cast"
 
-    with pytest.raises(ValueError, match="必须至少有一个依赖"):
-        DerivedFieldIr(field_id="bad", name="Bad", dependencies=(), calculator=lambda: 0)
+    with pytest.raises(ValueError, match="requires non-empty to"):
+        ValueOpIr(kind="cast")  # pyright: ignore[reportUnusedCallResult]
+
+    with pytest.raises(ValueError, match="requires callable_ref"):
+        ValueOpIr(kind="transform")  # pyright: ignore[reportUnusedCallResult]
+
+    with pytest.raises(ValueError, match="必须声明 compute_expr 或 call_by"):
+        DerivedFieldIr(field_id="bad", name="Bad", dependencies=("amount",))
 
     derived = DerivedFieldIr(
         field_id="profit",
         name="Profit",
         dependencies=("amount",),
-        calculator=lambda amount: amount + 1,
-        value_formatter=lambda v: "{}".format(v),
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="profit.calculator"),
+            kwargs=(("amount", CallByValueIr(kind="field", value="amount")),),
+            field_names=("amount",),
+        ),
+        value_ops=(ValueOpIr(kind="cast", to="int"),),
     )
     assert derived.get_dependencies() == ("amount",)
-    assert derived.compute(amount=1) == "2"
 
 
 def test_derived_field_constant_compute_rejects_dependencies() -> None:
@@ -213,7 +216,7 @@ def test_derived_field_constant_compute_rejects_dependencies() -> None:
             field_id="bad",
             name="Bad",
             dependencies=("amount",),
-            calculator=lambda amount: amount,  # type: ignore[no-untyped-def]
+            compute_expr="1",
             is_constant_compute=True,
         )
 
@@ -224,7 +227,7 @@ def test_derived_field_constant_compute_rejects_call_ctx_key() -> None:
             field_id="bad",
             name="Bad",
             dependencies=(),
-            calculator=lambda: 0,  # type: ignore[no-untyped-def]
+            compute_expr="1",
             call_ctx_key="$ctx",
             is_constant_compute=True,
         )
@@ -318,10 +321,10 @@ def test_infer_lookup_steps_and_extract_fields() -> None:
 def test_loader_ir_bindings_immutable() -> None:
     binding = BindingIr(
         key_field="order_id",
-        params_builder=lambda ctx: ((), {"ids": list(ctx.lookup_keys or [])}),
+        params_builder_ref=RuntimeHandleIdIr(handle_id="order_id.params_builder"),
     )
     loader_ir = LoaderIr(
-        callable=lambda: {},
+        callable_ref=RuntimeHandleIdIr(handle_id="orders.loader"),
         bindings={"order_id": binding},
     )
 
@@ -330,3 +333,87 @@ def test_loader_ir_bindings_immutable() -> None:
 
     with pytest.raises(TypeError):
         loader_ir.bindings["new_key"] = binding  # type: ignore[index]
+
+
+class _Template:
+    def render_kwargs(self, _ctx: object, *, path: str):  # type: ignore[no-untyped-def]
+        return {"path": path}
+
+
+def test_binding_ir_build_params_enforces_runtime_linking_boundary() -> None:
+    ctx = LoaderCallContextIr()
+
+    with pytest.raises(ValueError, match="must not set both"):
+        _ = BindingIr(
+            key_field="id",
+            params_template=_Template(),
+            params_builder_ref=BuiltinCallableIdIr(callable_id="demo.builder"),
+        )
+
+    binding_ref = BindingIr(key_field="id", params_builder_ref=BuiltinCallableIdIr(callable_id="demo.builder"))
+    with pytest.raises(TypeError, match="requires runtime linking"):
+        binding_ref.build_params(ctx)
+
+    binding_empty = BindingIr(key_field="id")
+    assert binding_empty.build_params(ctx) == ((), {})
+
+    binding_bad_template = BindingIr(key_field="id", params_template=object())
+    with pytest.raises(TypeError, match="render_kwargs"):
+        binding_bad_template.build_params(ctx)
+
+    binding_template = BindingIr(key_field="id", params_template=_Template(), template_path="sources.demo.bind")
+    args, kwargs = binding_template.build_params(ctx)
+    assert args == ()
+    assert kwargs["path"] == "sources.demo.bind"
+
+
+def test_call_loader_with_binding_supports_template_and_none() -> None:
+    ctx = LoaderCallContextIr()
+
+    def _loader_fn(*args, **kwargs):  # type: ignore[no-untyped-def]
+        return {"args": args, "kwargs": kwargs}
+
+    assert call_loader_with_binding(None, ctx, _loader_fn) == {"args": (), "kwargs": {}}
+
+    binding = BindingIr(key_field="id", params_template=_Template(), template_path="demo")
+    assert call_loader_with_binding(binding, ctx, _loader_fn) == {"args": (), "kwargs": {"path": "demo"}}
+
+
+def test_value_op_ir_validates_configs() -> None:
+    with pytest.raises(ValueError, match="must not set callable_ref"):
+        _ = ValueOpIr(kind="cast", to="int", callable_ref=BuiltinCallableIdIr(callable_id="demo.cast"))
+
+    with pytest.raises(ValueError, match="must not set to"):
+        _ = ValueOpIr(kind="transform", to="int", callable_ref=BuiltinCallableIdIr(callable_id="demo.transform"))
+
+    with pytest.raises(ValueError, match="Unknown ValueOpIr.kind"):
+        _ = ValueOpIr(kind="weird")
+
+
+def test_derived_field_ir_rejects_ambiguous_call_by_and_compute_expr() -> None:
+    with pytest.raises(ValueError, match="compute_expr 或 call_by"):
+        _ = DerivedFieldIr(
+            field_id="x",
+            name="X",
+            dependencies=("a",),
+            compute_expr="1",
+            call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="demo.fn")),
+        )
+
+    with pytest.raises(ValueError, match="至少有一个依赖"):
+        _ = DerivedFieldIr(field_id="x", name="X", dependencies=(), compute_expr="1")
+
+
+def test_describe_callable_ref_formats_builtin_ids() -> None:
+    assert describe_callable_ref(BuiltinCallableIdIr(callable_id="demo")) == "^demo"
+
+
+def test_source_normalize_ir_requires_runtime_resolved_callable_when_call_by_ref_set() -> None:
+    normalize = SourceNormalizeIr(kind="take_first", call_by_ref=BuiltinCallableIdIr(callable_id="demo.normalize"))
+    result = {"k": [{"x": 1}]}
+
+    with pytest.raises(ValueError, match="requires runtime resolution"):
+        normalize.apply(result, source_id="demo")
+
+    with pytest.raises(TypeError, match="expects callable runtime binding"):
+        normalize.apply(result, source_id="demo", call_by=object())

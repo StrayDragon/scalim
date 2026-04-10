@@ -7,8 +7,10 @@ from ...typedefs import LoaderResultMap, LoaderResultMapping, SourceSpecIrCacheM
 from ...vendor.compact.typing_extensionsx import TypeGuard, override
 from ...vendor.dataclassesx import dataclass, field
 from ._relations import FieldRefIr
-from .aliases import LookupKeyCast, MainSourceRowIterableCallable, NormalizedLookupKeySpec
+from .aliases import NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
+from .callable_refs import CallableRefIr
+from .lookup_casts import LookupCastSpecIr
 
 
 @dataclass(frozen=True)
@@ -22,7 +24,7 @@ class KeyIr:
     键定义.
     """
 
-    cast: Optional[LookupKeyCast] = None
+    cast: Optional[LookupCastSpecIr] = None
     """
     键归一化转换:用于对齐关联键类型.
 
@@ -141,10 +143,16 @@ class SourceNormalizeIr:
     steps: Tuple[SourceNormalizeStepIr, ...] = ()
     """用于 `normalize.kind: map_values` 的归一化步骤(按顺序)."""
 
-    call_by: Optional[NormalizeCallByFn] = field(default=None, compare=False)
-    """可选: `normalize` 受控扩展点(面向 `whole-result` 的 `Mapping -> Mapping`)."""
+    call_by_ref: Optional[CallableRefIr] = None
+    """可选: `normalize.call_by` 可调用引用描述(纯数据,不包含可调用对象)."""
 
-    def apply(self, result: object, *, source_id: str) -> LoaderResultMapping:
+    def apply(
+        self,
+        result: object,
+        *,
+        source_id: str,
+        call_by: Optional[object] = None,
+    ) -> LoaderResultMapping:
         normalized: LoaderResultMapping
         if self.kind == "index_by_key":
             normalized = _normalize_index_by_key(
@@ -177,13 +185,19 @@ class SourceNormalizeIr:
             msg = "Unknown normalize.kind '{}' for source '{}'".format(self.kind, source_id)
             raise ValueError(msg)
 
-        if self.call_by is None:
+        if self.call_by_ref is None:
             return normalized
+        if call_by is None:
+            msg = "Source '{}' normalize.call_by_ref requires runtime resolution before apply()".format(source_id)
+            raise ValueError(msg)
+        if not callable(call_by):
+            msg = "Source '{}' normalize.call_by_ref expects callable runtime binding, got '{}'".format(source_id, type(call_by).__name__)
+            raise TypeError(msg)
         return _normalize_call_by(
             normalized,
             source_id=source_id,
             kind=self.kind,
-            call_by=self.call_by,
+            call_by=call_by,
         )
 
 
@@ -715,10 +729,8 @@ class MainSourceIr:
     数据源唯一标识
     """
 
-    loader: MainSourceRowIterableCallable
-    """
-    主数据源加载器(返回 `Iterable[RowData]`).
-    """
+    loader_ref: CallableRefIr
+    """主数据源加载器引用描述(纯数据,不包含可调用对象)."""
 
     params: StaticParams = field(default_factory=dict)
     """

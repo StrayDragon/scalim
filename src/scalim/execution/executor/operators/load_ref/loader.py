@@ -6,12 +6,13 @@ from typing import List, Optional, Tuple, cast
 
 from .....events import EVENT_LOADER_CALL
 from .....spec.ir import LookupStepIr
-from .....spec.ir._helpers import call_loader_with_binding, coerce_loader_result_mapping
+from .....spec.ir._helpers import coerce_loader_result_mapping
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
 from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData
 from .....utils.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
 from .....vendor.compact.typing_extensionsx import Protocol
+from ....loader_call_params import build_loader_call_params
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
@@ -61,7 +62,11 @@ def _trigger_ref_loader_call(
         return
     call_kwargs: LoaderCallKwargs = {}
     if binding:
-        _, call_kwargs = binding.build_params(loader_context)
+        _, call_kwargs = build_loader_call_params(
+            binding=binding,
+            context=loader_context,
+            runtime_bindings=runtime.runtime_bindings,
+        )
     result_obj: object = result
     skipped_none_rows: Optional[int] = None
     with contextlib.suppress(AttributeError):
@@ -93,10 +98,20 @@ def _call_ref_loader(
     event_field_keys: Tuple[str, ...],
     cache_status: str,
 ) -> LoaderResultMapping:
+    loader_fn = runtime.runtime_bindings.require_source_loader(source.source_id)
+
+    def _call_loader() -> object:
+        args, kwargs = build_loader_call_params(
+            binding=binding,
+            context=loader_context,
+            runtime_bindings=runtime.runtime_bindings,
+        )
+        return loader_fn(*args, **kwargs)
+
     loader_start = time.perf_counter()
     policy = runtime.loader_retry.resolve(source.source_id)
     result_raw: object = call_with_loader_retry(
-        call=lambda: call_loader_with_binding(binding, loader_context, source.loader_spec.callable),
+        call=_call_loader,
         instrumentation=runtime.instrumentation,
         policy=policy,
         loader_name=source.source_id,
@@ -108,7 +123,8 @@ def _call_ref_loader(
     result_obj: object = result_raw
     normalize_spec = source.normalize
     if normalize_spec is not None:
-        result_obj = normalize_spec.apply(result_raw, source_id=source.source_id)
+        normalize_call_by = runtime.runtime_bindings.get_source_normalize_call_by(source.source_id)
+        result_obj = normalize_spec.apply(result_raw, source_id=source.source_id, call_by=normalize_call_by)
 
     result_mapping = coerce_loader_result_mapping(result_obj)
     _trigger_ref_loader_call(

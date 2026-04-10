@@ -3,7 +3,6 @@ from typing import Any, Dict, Hashable, List, Tuple, cast
 
 from .....events import EVENT_FIELD_COMPUTE
 from .....planning.operators import ComputeOperatorIr, SupportedOperatorIr
-from .....secure_compute_contracts import is_secure_compute_calculator
 from .....spec.ir import ComputeCallContextIr, DerivedFieldIr
 from .....vendor.compact.typing_extensionsx import override
 from ....context import BatchContext
@@ -21,17 +20,23 @@ _EXPECTED_COMPUTE_ERRORS = (
 
 
 def _execute_constant_compute(
-    field_spec: "DerivedFieldIr",
+    *,
+    field_spec: DerivedFieldIr,
     context: BatchContext,
     batch_row_nth: List[Hashable],
     runtime: ExecutionRuntime,
-    *,
     compute_mode: str,
     wants_field_compute: bool,
 ) -> None:
-    constant_dep_values: Dict[str, Any] = {}
+    deps: Tuple[str, ...] = tuple(field_spec.dependencies or ())
+    dep_payload: Dict[str, Any] = {}
+    calculator = runtime.runtime_bindings.require_derived_calculator(field_spec.field_id)
+    value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
+
     try:
-        result = field_spec.compute(**constant_dep_values)
+        result = calculator()
+        if value_transform is not None:
+            result = value_transform(result)
     except _EXPECTED_COMPUTE_ERRORS as exc:  # type: ignore[misc]
         for row_id in batch_row_nth:
             handle_compute_error(
@@ -39,8 +44,8 @@ def _execute_constant_compute(
                 context,
                 field_key=field_spec.field_id,
                 row_id=row_id,
-                dependencies=constant_dep_values,
-                dependency_names=field_spec.dependencies,
+                dependencies=dep_payload,
+                dependency_names=deps,
                 exc=exc,
                 compute_mode=compute_mode,
                 unexpected=False,
@@ -59,8 +64,8 @@ def _execute_constant_compute(
                 context,
                 field_key=field_spec.field_id,
                 row_id=row_id,
-                dependencies=constant_dep_values,
-                dependency_names=field_spec.dependencies,
+                dependencies=dep_payload,
+                dependency_names=deps,
                 exc=exc,
                 compute_mode=compute_mode,
                 unexpected=True,
@@ -70,30 +75,41 @@ def _execute_constant_compute(
     for row_id in batch_row_nth:
         context.set_field_value(field_spec.field_id, row_id, result)
         if wants_field_compute:
-            runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, constant_dep_values, result)
+            runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_payload, result)
 
 
-def _execute_secure_compute(
-    field_spec: "DerivedFieldIr",
+def _execute_row_compute(
+    *,
+    field_spec: DerivedFieldIr,
     context: BatchContext,
     batch_row_nth: List[Hashable],
     runtime: ExecutionRuntime,
-    *,
     compute_mode: str,
     wants_field_compute: bool,
 ) -> None:
-    deps = field_spec.dependencies
-    calculator = field_spec.calculator
-    value_formatter = field_spec.value_formatter
+    deps: Tuple[str, ...] = tuple(field_spec.dependencies or ())
+    calculator = runtime.runtime_bindings.require_derived_calculator(field_spec.field_id)
+    value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
     guardrails_enabled = runtime.guardrails.enabled
+    use_ctx = field_spec.call_ctx_key is not None
 
     for row_id in batch_row_nth:
         dep_args: Tuple[Any, ...] = tuple(context.get_field_value(dep_key, row_id) for dep_key in deps)
-
         try:
-            result = calculator(*dep_args)
-            if value_formatter is not None:
-                result = value_formatter(result)
+            if use_ctx:
+                dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
+                ctx = ComputeCallContextIr(
+                    row_id=row_id,
+                    batch_num=runtime.batch_num,
+                    field_id=field_spec.field_id,
+                    deps=deps,
+                    values=dep_values_payload,
+                )
+                result = calculator(*dep_args, ctx=ctx)
+            else:
+                result = calculator(*dep_args)
+            if value_transform is not None:
+                result = value_transform(result)
             context.set_field_value(field_spec.field_id, row_id, result)
 
             if wants_field_compute:
@@ -136,77 +152,6 @@ def _execute_secure_compute(
             )
 
 
-def _execute_general_compute(
-    field_spec: Any,
-    context: BatchContext,
-    batch_row_nth: List[Hashable],
-    runtime: ExecutionRuntime,
-    *,
-    compute_mode: str,
-    wants_field_compute: bool,
-) -> None:
-    for row_id in batch_row_nth:
-        dep_values: Dict[str, Any] = {}
-        for dep_key in field_spec.dependencies:
-            dep_values[dep_key] = context.get_field_value(dep_key, row_id)
-
-        try:
-            ctx_key = field_spec.call_ctx_key if isinstance(field_spec, DerivedFieldIr) else None
-            if ctx_key:
-                ctx_value = ComputeCallContextIr(
-                    row_id=row_id,
-                    batch_num=runtime.batch_num,
-                    field_id=field_spec.field_id,
-                    deps=field_spec.dependencies,
-                    values=dep_values,
-                )
-                if wants_field_compute:
-                    compute_kwargs = dict(dep_values)
-                    compute_kwargs[ctx_key] = ctx_value
-                    result = field_spec.compute(**compute_kwargs)
-                else:
-                    dep_values[ctx_key] = ctx_value
-                    try:
-                        result = field_spec.compute(**dep_values)
-                    finally:
-                        del dep_values[ctx_key]
-            else:
-                result = field_spec.compute(**dep_values)
-
-            context.set_field_value(field_spec.field_id, row_id, result)
-            if wants_field_compute:
-                runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_values, result)
-        except _EXPECTED_COMPUTE_ERRORS as exc:  # type: ignore[misc]
-            handle_compute_error(
-                runtime,
-                context,
-                field_key=field_spec.field_id,
-                row_id=row_id,
-                dependencies=dep_values,
-                dependency_names=field_spec.dependencies,
-                exc=exc,
-                compute_mode=compute_mode,
-                unexpected=False,
-            )
-        except Exception as exc:
-            logging.exception(  # noqa: LOG015
-                "字段计算发生未预期的异常: 字段=%s, 行标识=%s",
-                field_spec.field_id,
-                row_id,
-            )
-            handle_compute_error(
-                runtime,
-                context,
-                field_key=field_spec.field_id,
-                row_id=row_id,
-                dependencies=dep_values,
-                dependency_names=field_spec.dependencies,
-                exc=exc,
-                compute_mode=compute_mode,
-                unexpected=True,
-            )
-
-
 class ComputeOperatorExecutor(OperatorExecutor):
     """计算算子执行器."""
 
@@ -219,38 +164,29 @@ class ComputeOperatorExecutor(OperatorExecutor):
         runtime: ExecutionRuntime,
     ) -> None:
         op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
-        field_spec = op.field_spec
+        field_spec = runtime.field_specs.get(op.field_key)
+        if not isinstance(field_spec, DerivedFieldIr):
+            return
         guardrails = runtime.guardrails
         compute_mode = guardrails.effective_compute_mode()
         wants_field_compute = runtime.instrumentation.wants(EVENT_FIELD_COMPUTE)
 
-        if isinstance(field_spec, DerivedFieldIr) and field_spec.is_constant_compute:
+        if field_spec.is_constant_compute:
             _execute_constant_compute(
-                field_spec,
-                context,
-                batch_row_nth,
-                runtime,
+                field_spec=field_spec,
+                context=context,
+                batch_row_nth=batch_row_nth,
+                runtime=runtime,
                 compute_mode=compute_mode,
                 wants_field_compute=wants_field_compute,
             )
             return
 
-        if isinstance(field_spec, DerivedFieldIr) and not field_spec.call_ctx_key and is_secure_compute_calculator(field_spec.calculator):
-            _execute_secure_compute(
-                field_spec,
-                context,
-                batch_row_nth,
-                runtime,
-                compute_mode=compute_mode,
-                wants_field_compute=wants_field_compute,
-            )
-            return
-
-        _execute_general_compute(
-            field_spec,
-            context,
-            batch_row_nth,
-            runtime,
+        _execute_row_compute(
+            field_spec=field_spec,
+            context=context,
+            batch_row_nth=batch_row_nth,
+            runtime=runtime,
             compute_mode=compute_mode,
             wants_field_compute=wants_field_compute,
         )

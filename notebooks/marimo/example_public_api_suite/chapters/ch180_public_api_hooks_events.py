@@ -9,7 +9,7 @@ from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
-from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
+from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir, build_minimal_public_api_runtime_bindings
 
 __generated_with = "0.20.2"
 app = marimo.App(width="full")
@@ -53,6 +53,7 @@ class _TraceObserver(Observer):
 
 def run_public_api_hooks_events() -> ExampleResult:
     demand_ir = build_minimal_public_api_ir()
+    runtime_bindings = build_minimal_public_api_runtime_bindings()
     export_layout = export_layout_from_demand_ir(
         demand_ir,
         ("item_id", "dim_id", "value_plus_one"),
@@ -70,6 +71,7 @@ def run_public_api_hooks_events() -> ExampleResult:
         observability=None,
         guardrails=None,
         loader_retry=None,
+        runtime_bindings=runtime_bindings,
         components=[observer, hook],
         batch_size=10,
         parallel_mode="seq",

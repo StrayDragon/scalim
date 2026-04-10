@@ -6,10 +6,9 @@
 import pytest
 from typing import Any, Dict, List, Optional, Set
 
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.spec.ir import DemandIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 from scalim.execution import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.execution.context import BatchContext
@@ -67,11 +66,41 @@ def mock_loader() -> MockDataLoader:
 
 
 @pytest.fixture
+def runtime_bindings(mock_loader: MockDataLoader) -> RuntimeBindings:
+    """RuntimeBindings for IR tests (no callables in static IR)."""
+
+    def _build_customer_params(ctx):  # type: ignore[no-untyped-def]
+        return (), {"customer_ids_set": set(ctx.lookup_keys or set())}
+
+    def _profit(amount, cost):  # type: ignore[no-untyped-def]
+        return (amount or 0) - (cost or 0)
+
+    def _b_double_amount(amount):  # type: ignore[no-untyped-def]
+        return (amount or 0) * 2
+
+    def _c_triple_b(b_double_amount):  # type: ignore[no-untyped-def]
+        return (b_double_amount or 0) * 3
+
+    return RuntimeBindings(
+        main_source_loaders={"orders": mock_loader.get_orders},
+        source_loaders={"customers": mock_loader.get_customers},
+        params_builders={
+            ("customers", "customer_id"): _build_customer_params,
+        },
+        derived_calculators={
+            "profit": _profit,
+            "b_double_amount": _b_double_amount,
+            "c_triple_b": _c_triple_b,
+        },
+    )
+
+
+@pytest.fixture
 def simple_model(mock_loader: MockDataLoader) -> DemandIr:
     """简单模型: 单数据源,无关联"""
     orders_source = MainSourceIr(
         source_id="orders",
-        loader=mock_loader.get_orders,
+        loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"),
     )
 
     fields = [
@@ -100,7 +129,7 @@ def derived_model(mock_loader: MockDataLoader) -> DemandIr:
     """派生字段模型"""
     orders_source = MainSourceIr(
         source_id="orders",
-        loader=mock_loader.get_orders,
+        loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"),
     )
 
     fields = [
@@ -124,7 +153,13 @@ def derived_model(mock_loader: MockDataLoader) -> DemandIr:
             field_id="profit",
             name="利润",
             dependencies=("amount", "cost"),
-            calculator=lambda amount, cost: (amount or 0) - (cost or 0),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="profit.calculator"),
+                args=(
+                    CallByValueIr(kind="field", value="amount"),
+                    CallByValueIr(kind="field", value="cost"),
+                ),
+            ),
         ),
     ]
 
@@ -139,18 +174,18 @@ def derived_model(mock_loader: MockDataLoader) -> DemandIr:
 def relation_model(mock_loader: MockDataLoader) -> DemandIr:
     """关联字段模型"""
     customers_loader = LoaderIr(
-        callable=mock_loader.get_customers,
+        callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
         bindings={
             "customer_id": BindingIr(
                 key_field="customer_id",
-                params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys}),
+                params_builder_ref=RuntimeHandleIdIr(handle_id="customers.customer_id.params_builder"),
             ),
         },
     )
 
     orders_source = MainSourceIr(
         source_id="orders",
-        loader=mock_loader.get_orders,
+        loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"),
     )
 
     customers_source = SourceIr(
@@ -204,7 +239,7 @@ def chained_derived_model(mock_loader: MockDataLoader) -> DemandIr:
     """
     orders_source = MainSourceIr(
         source_id="orders",
-        loader=mock_loader.get_orders,
+        loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"),
     )
 
     fields = [
@@ -223,13 +258,19 @@ def chained_derived_model(mock_loader: MockDataLoader) -> DemandIr:
             field_id="b_double_amount",
             name="双倍金额",
             dependencies=("amount",),
-            calculator=lambda amount: (amount or 0) * 2,
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="b_double_amount.calculator"),
+                args=(CallByValueIr(kind="field", value="amount"),),
+            ),
         ),
         DerivedFieldIr(
             field_id="c_triple_b",
             name="三倍B",
             dependencies=("b_double_amount",),
-            calculator=lambda b_double_amount: (b_double_amount or 0) * 3,
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="c_triple_b.calculator"),
+                args=(CallByValueIr(kind="field", value="b_double_amount"),),
+            ),
         ),
     ]
 
@@ -388,6 +429,7 @@ class TestIREngineBatching:
         self,
         simple_model: DemandIr,
         mock_loader: MockDataLoader,
+        runtime_bindings: RuntimeBindings,
     ) -> None:
         """测试批次处理"""
         builder = PlanBuilder(simple_model)
@@ -396,6 +438,7 @@ class TestIREngineBatching:
         engine = ScalimEngine(
             demand=simple_model,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             batch_size=1,  # 每批只处理1条
         )
 
@@ -411,6 +454,7 @@ class TestIREngineBatching:
         self,
         simple_model: DemandIr,
         mock_loader: MockDataLoader,
+        runtime_bindings: RuntimeBindings,
     ) -> None:
         """测试空主键列表"""
         builder = PlanBuilder(simple_model)
@@ -419,6 +463,7 @@ class TestIREngineBatching:
         engine = ScalimEngine(
             demand=simple_model,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             batch_size=10,
         )
 
@@ -433,20 +478,21 @@ class TestRelationDependencyDirection:
     def test_relation_reversed_condition_still_resolves(
         self,
         mock_loader: MockDataLoader,
+        runtime_bindings: RuntimeBindings,
     ) -> None:
         customers_loader = LoaderIr(
-            callable=mock_loader.get_customers,
+            callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"),
             bindings={
                 "customer_id": BindingIr(
                     key_field="customer_id",
-                    params_builder=lambda ctx: ((), {"customer_ids_set": ctx.lookup_keys or set()}),
+                    params_builder_ref=RuntimeHandleIdIr(handle_id="customers.customer_id.params_builder"),
                 ),
             },
         )
 
         orders_source = MainSourceIr(
             source_id="orders",
-            loader=mock_loader.get_orders,
+            loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"),
         )
 
         customers_source = SourceIr(
@@ -492,6 +538,7 @@ class TestRelationDependencyDirection:
         engine = ScalimEngine(
             demand=demand,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             batch_size=2,
         )
 
@@ -527,6 +574,7 @@ class TestAdaptiveExecution:
         targets: List[str],
         expected_field: str,
         expected_values: List[object],
+        runtime_bindings: RuntimeBindings,
     ) -> None:
         model = request.getfixturevalue(model_fixture)
         plan = PlanBuilder(model).build(targets=targets)
@@ -534,6 +582,7 @@ class TestAdaptiveExecution:
         engine = ScalimEngine(
             demand=model,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             batch_size=1,
             parallel_mode="adaptive",
             max_workers=2,
@@ -549,13 +598,21 @@ class TestAdaptiveExecution:
     def test_adaptive_vs_sequential_consistency(
         self,
         derived_model: DemandIr,
+        runtime_bindings: RuntimeBindings,
     ) -> None:
         plan = PlanBuilder(derived_model).build(targets=["order_id", "profit"])
 
-        engine_seq = ScalimEngine(demand=derived_model, plan=plan, batch_size=2, parallel_mode="seq")
+        engine_seq = ScalimEngine(demand=derived_model, plan=plan, runtime_bindings=runtime_bindings, batch_size=2, parallel_mode="seq")
         results_seq = engine_seq.run()
 
-        engine_adaptive = ScalimEngine(demand=derived_model, plan=plan, batch_size=2, parallel_mode="adaptive", max_workers=2)
+        engine_adaptive = ScalimEngine(
+            demand=derived_model,
+            plan=plan,
+            runtime_bindings=runtime_bindings,
+            batch_size=2,
+            parallel_mode="adaptive",
+            max_workers=2,
+        )
         results_adaptive = engine_adaptive.run()
 
         assert len(results_seq) == len(results_adaptive) == 3
@@ -565,9 +622,16 @@ class TestAdaptiveExecution:
         for pk in [0, 1, 2]:
             assert seq_dict[pk]["profit"] == adaptive_dict[pk]["profit"]
 
-    def test_adaptive_allows_streaming_sink(self, simple_model: DemandIr) -> None:
+    def test_adaptive_allows_streaming_sink(self, simple_model: DemandIr, runtime_bindings: RuntimeBindings) -> None:
         plan = PlanBuilder(simple_model).build(targets=["order_id", "amount"])
-        engine = ScalimEngine(demand=simple_model, plan=plan, batch_size=2, parallel_mode="adaptive", max_workers=2)
+        engine = ScalimEngine(
+            demand=simple_model,
+            plan=plan,
+            runtime_bindings=runtime_bindings,
+            batch_size=2,
+            parallel_mode="adaptive",
+            max_workers=2,
+        )
 
         sink = InMemoryRowSink()
         result = engine.run(sink=sink)
@@ -575,20 +639,20 @@ class TestAdaptiveExecution:
         assert result == []
         assert sink.get_data()
 
-    def test_parallel_mode_thread_process_hard_removed(self, simple_model: DemandIr) -> None:
+    def test_parallel_mode_thread_process_hard_removed(self, simple_model: DemandIr, runtime_bindings: RuntimeBindings) -> None:
         plan = PlanBuilder(simple_model).build(targets=["order_id", "amount"])
 
         with pytest.raises(ValueError, match="parallel_mode='thread' was removed"):
-            _ = ScalimEngine(demand=simple_model, plan=plan, parallel_mode="thread")
+            _ = ScalimEngine(demand=simple_model, plan=plan, runtime_bindings=runtime_bindings, parallel_mode="thread")
 
         with pytest.raises(ValueError, match="parallel_mode='process' was removed"):
-            _ = ScalimEngine(demand=simple_model, plan=plan, parallel_mode="process")
+            _ = ScalimEngine(demand=simple_model, plan=plan, runtime_bindings=runtime_bindings, parallel_mode="process")
 
-    def test_parallel_mode_invalid_value_rejected(self, simple_model: DemandIr) -> None:
+    def test_parallel_mode_invalid_value_rejected(self, simple_model: DemandIr, runtime_bindings: RuntimeBindings) -> None:
         plan = PlanBuilder(simple_model).build(targets=["order_id", "amount"])
 
         with pytest.raises(ValueError, match="Invalid parallel_mode='nope'"):
-            _ = ScalimEngine(demand=simple_model, plan=plan, parallel_mode="nope")
+            _ = ScalimEngine(demand=simple_model, plan=plan, runtime_bindings=runtime_bindings, parallel_mode="nope")
 
 
 # endregion
@@ -615,6 +679,7 @@ class TestChainedDerivedFields:
         chained_derived_model: DemandIr,
         mock_loader: MockDataLoader,
         batch_size: int,
+        runtime_bindings: RuntimeBindings,
     ) -> None:
         """测试只请求链末端字段 C 时的计算正确性(覆盖不同 batch_size)"""
         builder = PlanBuilder(chained_derived_model)
@@ -624,6 +689,7 @@ class TestChainedDerivedFields:
         engine = ScalimEngine(
             demand=chained_derived_model,
             plan=plan,
+            runtime_bindings=runtime_bindings,
             batch_size=batch_size,
         )
 

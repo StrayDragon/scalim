@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "field_order": [
+      "a",
+      "b"
+    ],
+    "key_fields": [],
+    "operators": [
+      {
+        "depends_on": [],
+        "field_key": "b",
+        "input_fields": [
+          "a"
+        ],
+        "operator_id": "compute_0",
+        "operator_type": "compute"
+      }
+    ],
+    "primary_field": null,
+    "schema_version": "execution_plan/v1",
+    "target_fields": [
+      "a",
+      "b"
+    ]
+  }
+}

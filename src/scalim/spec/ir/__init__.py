@@ -4,7 +4,15 @@
 """
 
 from ._demand import DemandIr
-from ._fields import ComputeCallContextIr, DerivedFieldIr, FieldIr, SupportedFieldIr
+from ._fields import (
+    CallBySpecIr,
+    CallByValueIr,
+    ComputeCallContextIr,
+    DerivedFieldIr,
+    FieldIr,
+    SupportedFieldIr,
+    ValueOpIr,
+)
 from ._relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr
 from ._sources import (
     KeyIr,
@@ -26,6 +34,8 @@ from .aliases import (
     NormalizedLookupKeySpec,
 )
 from .binding import BindingIr, LoaderCallContextIr, LoaderIr, build_stable_lookup_key_list
+from .callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr, RuntimeHandleIdIr, describe_callable_ref
+from .lookup_casts import LookupCastSpecIr
 from .presentation import (
     CsvFieldPresentationIr,
     ExportProfileIr,
@@ -40,6 +50,10 @@ del _non_public_exports
 
 __all__ = (
     "BindingIr",
+    "BuiltinCallableIdIr",
+    "CallBySpecIr",
+    "CallByValueIr",
+    "CallableRefIr",
     "ComputeCallContextIr",
     "CsvFieldPresentationIr",
     "DemandIr",
@@ -55,6 +69,7 @@ __all__ = (
     "LoaderIr",
     "LoaderParamsBuilder",
     "LoaderResultMapCallable",
+    "LookupCastSpecIr",
     "LookupKeyCast",
     "LookupKeySpec",
     "LookupStepIr",
@@ -63,11 +78,15 @@ __all__ = (
     "NormalizedLookupKeySpec",
     "OrderByKeyIr",
     "PandasFieldPresentationIr",
+    "PythonReferenceIr",
     "RelationIr",
+    "RuntimeHandleIdIr",
     "SourceIr",
     "SourceNormalizeIr",
     "SourceRefIr",
     "SpreadsheetFieldPresentationIr",
     "SupportedFieldIr",
+    "ValueOpIr",
     "build_stable_lookup_key_list",
+    "describe_callable_ref",
 )

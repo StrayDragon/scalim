@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "dependencies_by_field": {
+      "a": [],
+      "b": [
+        "a"
+      ]
+    },
+    "edges": [
+      {
+        "from": "a",
+        "to": "b"
+      }
+    ],
+    "schema_version": "execution_deps/v1"
+  }
+}

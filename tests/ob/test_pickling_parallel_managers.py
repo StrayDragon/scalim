@@ -4,16 +4,8 @@ from types import MappingProxyType
 
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
+from scalim.spec.ir import RuntimeHandleIdIr
 from scalim.spec.ir.binding import BindingIr, LoaderIr, _restore_bindings
-
-
-def _noop_loader():  # type: ignore[no-untyped-def]
-    return {}
-
-
-def _noop_params(ctx):  # type: ignore[no-untyped-def]
-    _ = ctx
-    return (), {}
 
 
 def test_hook_manager_pickle_roundtrip_recreates_lock() -> None:
@@ -33,11 +25,11 @@ def test_observer_manager_pickle_roundtrip_recreates_lock() -> None:
 
 def test_loader_ir_pickle_roundtrip_restores_mappingproxy_bindings() -> None:
     loader = LoaderIr(
-        callable=_noop_loader,
+        callable_ref=RuntimeHandleIdIr(handle_id="noop.loader"),
         bindings={
             "id": BindingIr(
                 key_field="id",
-                params_builder=_noop_params,
+                params_builder_ref=RuntimeHandleIdIr(handle_id="noop.params_builder.id"),
             )
         },
     )
@@ -53,7 +45,7 @@ def test_restore_bindings_returns_none_for_non_dict() -> None:
 
 
 def test_restore_bindings_rejects_non_string_tuple_key_items() -> None:
-    binding = BindingIr(key_field="id", params_builder=_noop_params)
+    binding = BindingIr(key_field="id", params_builder_ref=RuntimeHandleIdIr(handle_id="noop.params_builder.id"))
     with pytest.raises(TypeError, match="Invalid binding key"):
         _restore_bindings({("id", 1): binding})
 

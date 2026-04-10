@@ -1,10 +1,10 @@
 import math
 import threading
-from types import SimpleNamespace
 
 import pytest
 
 from scalim.execution.pipeline.base.pipeline import Pipeline
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.workflow_cache_pool import WorkflowCacheEntrySignature, WorkflowCachePool, ScalimWorkflowCachePoolError
 from scalim.hooks import HookManager
 from scalim.ob.manager import ObserverManager
@@ -12,6 +12,7 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from scalim.spec.ir._workflow import WorkflowCachePoolBudgetIr, WorkflowCachePoolIr, WorkflowCachePoolPinIr
 from scalim.typedefs import SourceSpecIrCacheMode
 
@@ -58,41 +59,25 @@ def test_build_preload_forever_signature_normalizes_normalize_payload() -> None:
     source = SourceIr(
         source_id="s1",
         key=KeyIr(key="id"),
-        loader_spec=LoaderIr(callable=lambda: {}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="id"),
     )
 
     signature = mod.build_preload_forever_signature(source, rendered_params={})  # type: ignore[arg-type]
+    assert signature.loader_ref == "runtime:s1.loader"
     assert signature.normalize is not None
     assert signature.normalize.get("kind") == "index_by_key"
     assert signature.normalize.get("key_field") == "id"
 
 
-def test_format_callable_reference_and_lookup_cast_signature_variants() -> None:
+def test_lookup_cast_signature_variants() -> None:
     from scalim.execution import workflow_cache_pool as mod
+    from scalim.spec.ir.lookup_casts import LookupCastSpecIr
 
-    assert mod._format_callable_reference(len) == "len"  # type: ignore[attr-defined]
-    expected = "{}:{}".format(_TopLevelCallable.method.__module__, _TopLevelCallable.method.__qualname__)
-    assert mod._format_callable_reference(_TopLevelCallable.method) == expected  # type: ignore[attr-defined]
-    assert mod._format_callable_reference(SimpleNamespace(__module__="m", __qualname__="", __name__="")) == "m"  # type: ignore[attr-defined]
-
-    cast_fn = SimpleNamespace(
-        scalim_lookup_cast_name="id_cast",
-        scalim_lookup_cast_meta={
-            "name": "ignored",
-            "answer": 42,
-        },
-    )
-    assert mod._lookup_cast_signature(cast_fn) == {"name": "id_cast", "answer": 42}  # type: ignore[attr-defined]
-
-    fallback = mod._lookup_cast_signature(lambda x: x)  # type: ignore[attr-defined]
-    assert fallback is not None
-    assert "callable" in fallback
-
-
-class _TopLevelCallable(object):
-    def method(self) -> None:
-        return None
+    assert mod._lookup_cast_signature(None) is None  # type: ignore[arg-type]
+    assert mod._lookup_cast_signature(LookupCastSpecIr(name="id_cast")) == {"name": "id_cast"}  # type: ignore[attr-defined]
+    assert mod._lookup_cast_signature(LookupCastSpecIr(name="sep_first")) == {"name": "sep_first", "sep": ","}  # type: ignore[attr-defined]
+    assert mod._lookup_cast_signature(LookupCastSpecIr(name="sep_first", sep="|")) == {"name": "sep_first", "sep": "|"}  # type: ignore[attr-defined]
 
 
 def test_workflow_cache_pool_release_and_refcount_edge_cases() -> None:
@@ -196,13 +181,24 @@ def test_pipeline_preload_uses_preloaded_cache_get_or_load() -> None:
     source = SourceIr(
         source_id="preload",
         key=KeyIr(key="id"),
-        loader_spec=LoaderIr(callable=lambda: {1: {"id": 1, "value": "ok"}}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="preload.loader")),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
     )
     plan = ExecutionPlan(preload_sources=(source,))
     hook_manager = HookManager()
     observer_manager = ObserverManager()
-    runtime = _make_runtime(plan, hook_manager=hook_manager, observer_manager=observer_manager, cache=cache)
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": lambda: []},
+        source_loaders={"preload": lambda: {1: {"id": 1, "value": "ok"}}},
+    )
+    runtime = _make_runtime(
+        plan,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        cache=cache,
+        sources={"preload": source},
+        runtime_bindings=runtime_bindings,
+    )
     executor = _make_executor(plan, runtime)
     pipeline = _TestPipeline(
         plan,
@@ -210,7 +206,7 @@ def test_pipeline_preload_uses_preloaded_cache_get_or_load() -> None:
         runtime,
         hook_manager,
         observer_manager,
-        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=lambda: [])),
+        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))),
     )
 
     pipeline._preload_cached_sources()  # type: ignore[attr-defined]
@@ -235,13 +231,24 @@ def test_pipeline_preload_passes_signature_digest_when_guardrail_enabled() -> No
     source = SourceIr(
         source_id="preload",
         key=KeyIr(key="id"),
-        loader_spec=LoaderIr(callable=lambda: {1: {"id": 1, "value": "ok"}}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="preload.loader")),
         cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
     )
     plan = ExecutionPlan(preload_sources=(source,))
     hook_manager = HookManager()
     observer_manager = ObserverManager()
-    runtime = _make_runtime(plan, hook_manager=hook_manager, observer_manager=observer_manager, cache=cache)
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": lambda: []},
+        source_loaders={"preload": lambda: {1: {"id": 1, "value": "ok"}}},
+    )
+    runtime = _make_runtime(
+        plan,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        cache=cache,
+        sources={"preload": source},
+        runtime_bindings=runtime_bindings,
+    )
     executor = _make_executor(plan, runtime)
     pipeline = _TestPipeline(
         plan,
@@ -249,7 +256,7 @@ def test_pipeline_preload_passes_signature_digest_when_guardrail_enabled() -> No
         runtime,
         hook_manager,
         observer_manager,
-        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader=lambda: [])),
+        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))),
     )
 
     pipeline._preload_cached_sources()  # type: ignore[attr-defined]
@@ -270,6 +277,8 @@ def _make_runtime(  # type: ignore[no-untyped-def]
     hook_manager,
     observer_manager,
     cache,
+    sources,
+    runtime_bindings,
 ):
     from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 
@@ -277,7 +286,9 @@ def _make_runtime(  # type: ignore[no-untyped-def]
         plan,
         hook_manager,
         observer_manager,
-        MainSourceIr(source_id="main", loader=lambda: []),
+        MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+        sources,
+        runtime_bindings,
         preloaded_cache=cache,
         workflow_cache_pool=None,
         workflow_node_id=None,

@@ -23,7 +23,7 @@ from scalim_misc.demo_big_data_report.derived_set_aggregations_demo import (
     verify_derived_set_aggregations_workbook,
 )
 from scalim_misc.demo_big_data_report.loaders import get_config, set_config
-from scalim_misc.demo_big_data_report.shared import build_ecommerce_model
+from scalim_misc.demo_big_data_report.shared import build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -46,6 +46,7 @@ def run_derived_set_aggregations(*, tmp_path: Optional[Path] = None) -> ExampleR
     set_config(build_test_config_small())
     try:
         demand_ir = build_ecommerce_model()
+        runtime_bindings = build_ecommerce_runtime_bindings()
 
         detail_fields = (
             "order_id",
@@ -163,6 +164,7 @@ def run_derived_set_aggregations(*, tmp_path: Optional[Path] = None) -> ExampleR
                 output_composition=composition,
                 parallel_mode="seq",
                 batch_size=10,
+                runtime_bindings=runtime_bindings,
             ),
         )
 

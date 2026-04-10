@@ -12,7 +12,7 @@ from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
-from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model
+from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.demo_big_data_report.verification import (
     VerificationResult,
     compare_csv_files,
@@ -29,8 +29,9 @@ app = marimo.App(width="full")
 def _run_engine_to_rows(cfg: ECommerceConfig, targets: Sequence[str], *, batch_size: int) -> List[RowData]:
     set_config(cfg)
     demand = build_ecommerce_model(cfg)
+    runtime_bindings = build_ecommerce_runtime_bindings()
     plan = PlanBuilder(demand).build(targets=list(targets))
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
     with InMemoryRowSink() as sink:
         _ = engine.run(main_rows=None, sink=sink)
         rows: List[RowData] = sink.get_data()
@@ -40,8 +41,9 @@ def _run_engine_to_rows(cfg: ECommerceConfig, targets: Sequence[str], *, batch_s
 def _run_engine_to_columns(cfg: ECommerceConfig, targets: Sequence[str], *, batch_size: int) -> List[RowData]:
     set_config(cfg)
     demand = build_ecommerce_model(cfg)
+    runtime_bindings = build_ecommerce_runtime_bindings()
     plan = PlanBuilder(demand).build(targets=list(targets))
-    engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
     with InMemoryColumnSink(field_names=list(targets)) as sink:
         _ = engine.run(main_rows=None, sink=sink)
         rows: List[RowData] = sink.get_rows()
@@ -100,12 +102,13 @@ def run_sinks(
 
             set_config(cfg)
             demand = build_ecommerce_model(cfg)
+            runtime_bindings = build_ecommerce_runtime_bindings()
             plan = PlanBuilder(demand).build(targets=targets_list)
-            engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+            engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
             with CSVSink(str(csv_row_path), field_names=targets_list) as sink_row:
                 engine.run(main_rows=None, sink=sink_row)
 
-            engine2 = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+            engine2 = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
             with ColumnCSVSink(str(csv_col_path), field_names=targets_list) as sink_col:
                 engine2.run(main_rows=None, sink=sink_col)
 

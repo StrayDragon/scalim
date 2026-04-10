@@ -18,7 +18,7 @@ from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, 
 
 from .cases import build_test_config_small
 from .loaders import get_config, set_config
-from .shared import build_ecommerce_model
+from .shared import build_ecommerce_model, build_ecommerce_runtime_bindings
 from .verification import VerificationResult, verify_scalim_output
 
 DETAIL_FIELDS: Tuple[str, ...] = (
@@ -109,6 +109,7 @@ def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
     set_config(build_test_config_small())
     try:
         demand_ir = build_ecommerce_model()
+        runtime_bindings = build_ecommerce_runtime_bindings()
 
         detail_layout = export_layout_from_demand_ir(demand_ir, DETAIL_FIELDS)
         summary_layout = ExportLayout(field_ids=SUMMARY_FIELDS, header_names=None)
@@ -173,6 +174,7 @@ def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
                 output_composition=composition,
                 parallel_mode="seq",
                 batch_size=10,
+                runtime_bindings=runtime_bindings,
             ),
         )
 

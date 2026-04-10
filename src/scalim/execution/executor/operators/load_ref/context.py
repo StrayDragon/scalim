@@ -56,7 +56,8 @@ class LoadRefExecutionContext:
         )
 
     def maybe_warn_float_lookup_key(self, row_id: Hashable, raw_key: object, step: LookupStepIr) -> None:
-        if not is_auto_lookup_cast(step.lookup_cast):
+        effective_cast = step.lookup_cast if step.lookup_cast is not None else step.to_source.key.cast
+        if not is_auto_lookup_cast(effective_cast):
             return
         if not contains_float(raw_key):
             return

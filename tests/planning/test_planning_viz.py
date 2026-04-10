@@ -12,8 +12,7 @@ from scalim.ob.observability import Observability
 from scalim.ob.presets.viz import VizObserver, VizObserverConfig
 from scalim.planning.plan import ExecutionPlan, PlanMetadata, Stage
 from scalim.planning.viz import _viz_add_node, _viz_add_source_edges, _viz_collect_fields
-from scalim.spec.ir.binding import LoaderIr
-from scalim.spec.ir import DerivedFieldIr, FieldIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, DerivedFieldIr, FieldIr, LoaderIr, RuntimeHandleIdIr
 from scalim.spec.ir import LookupStepIr
 from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 from tests.support.pathing import fixtures_dir
@@ -22,11 +21,11 @@ from tests.support.pathing import fixtures_dir
 
 
 def _build_plan_with_stages() -> ExecutionPlan:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
     _ = SourceIr(
         source_id="customers",
         key=KeyIr("customer_id"),
-        loader_spec=LoaderIr(callable=lambda **kwargs: {}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader")),
     )
 
     field_order_id = FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True)
@@ -35,7 +34,14 @@ def _build_plan_with_stages() -> ExecutionPlan:
         field_id="profit",
         name="利润",
         dependencies=("order_id", "customer_id"),
-        calculator=lambda **kwargs: 0,
+        call_by=CallBySpecIr(
+            reference=RuntimeHandleIdIr(handle_id="derived.profit"),
+            args=(
+                CallByValueIr(kind="field", value="order_id"),
+                CallByValueIr(kind="field", value="customer_id"),
+            ),
+            field_names=("order_id", "customer_id"),
+        ),
     )
 
     metadata = PlanMetadata(total_fields=3, total_sources=2, total_loaders=2)
@@ -65,7 +71,7 @@ def _build_plan_with_stages() -> ExecutionPlan:
 
 
 def _build_simple_plan() -> ExecutionPlan:
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
     field_order_id = FieldIr(field_id="order_id", name="Order ID", source=main_source, is_primary=True)
     metadata = PlanMetadata(total_fields=1, total_sources=1, total_loaders=1)
     stages = [Stage(stage_id="stage0", field_keys=["order_id"], level=0)]
@@ -286,11 +292,11 @@ def test_viz_plan_helpers_cover_branches() -> None:
     _viz_collect_fields({"unknown": DummyField()}, add_node)
     assert any(node["id"] == "field:unknown" for node in nodes)
 
-    main_source = MainSourceIr(source_id="orders", loader=lambda: [])
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
     ref_source = SourceIr(
         source_id="customers",
         key=KeyIr("customer_id"),
-        loader_spec=LoaderIr(callable=lambda **_kwargs: {}),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader")),
     )
     lookup_step = LookupStepIr(from_field="customer_id", to_source=ref_source)
     ref_field = FieldIr(

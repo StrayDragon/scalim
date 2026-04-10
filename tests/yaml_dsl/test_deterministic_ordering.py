@@ -9,14 +9,12 @@ from typing import Any
 import pytest
 
 from scalim.dsl.yaml_dsl.params_template import ScalimParamsTemplateRenderError, compile_params_template
-from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError
-from scalim.dsl.yaml_dsl.schema_dsl.models import LookupCastConfig
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import LoaderCallContextIr, BindingIr, _is_valid_binding_key, _restore_bindings, build_stable_lookup_key_list
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import DerivedFieldIr, FieldIr
-from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir import MainSourceIr, RuntimeHandleIdIr
 from scalim._internal.utils.graph import topological_sort
 from tests.support.pathing import repo_root as _repo_root
 
@@ -71,10 +69,10 @@ def test_yaml_params_builder_use_keys_as_list_uses_batch_row_nth_for_non_ref_loa
 
 
 def test_plan_builder_field_specs_and_dependencies_follow_field_order() -> None:
-    main_source = MainSourceIr(source_id="main", loader=lambda: [])
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     id_field = FieldIr(field_id="id", name="ID", source=main_source, is_primary=True)
-    a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), calculator=lambda id: id)
-    b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("id",), calculator=lambda id: id)
+    a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), compute_expr="id")
+    b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("id",), compute_expr="id")
 
     demand = DemandIr.from_irs(sources=[], fields=[id_field, a_field, b_field], main_source=main_source)
     plan = PlanBuilder(demand).build(targets=["a", "b"])
@@ -106,11 +104,12 @@ from scalim.planning import PlanBuilder
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import DerivedFieldIr, FieldIr
 from scalim.spec.ir import MainSourceIr
+from scalim.spec.ir import RuntimeHandleIdIr
 
-main = MainSourceIr(source_id="main", loader=lambda: [])
+main = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
 id_field = FieldIr(field_id="id", name="ID", source=main, is_primary=True)
-a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), calculator=lambda id: id)
-b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("id",), calculator=lambda id: id)
+a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), compute_expr="id")
+b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("id",), compute_expr="id")
 
 demand = DemandIr.from_irs(sources=[], fields=[id_field, a_field, b_field], main_source=main)
 plan = PlanBuilder(demand).build(targets=["a", "b"])
@@ -118,7 +117,7 @@ plan = PlanBuilder(demand).build(targets=["a", "b"])
 compute_fields = []
 for op in plan.operators:
     if getattr(op, "operator_type", None) == "compute":
-        compute_fields.append(op.field_spec.field_id)
+        compute_fields.append(op.field_key)
 
 print(json.dumps({"field_order": plan.field_order, "compute_fields": compute_fields}))
 """
@@ -154,7 +153,7 @@ def test_binding_key_validation_and_restore_guards() -> None:
 
 
 def test_restore_bindings_rejects_invalid_state_entries() -> None:
-    valid_binding = BindingIr(key_field="id", params_builder=lambda _ctx: ((), {}))
+    valid_binding = BindingIr(key_field="id", params_builder_ref=RuntimeHandleIdIr(handle_id="id.params_builder"))
 
     with pytest.raises(TypeError) as excinfo:
         _restore_bindings({1: valid_binding})
@@ -165,10 +164,10 @@ def test_restore_bindings_rejects_invalid_state_entries() -> None:
     assert "Invalid binding value" in str(excinfo.value)
 
 
-def test_lookup_cast_requires_initialized_registry() -> None:
-    converter = ConfigToIRConverter.from_allowlist(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
-    converter._lookup_casts = None
+def test_lookup_cast_registry_rejects_unknown_cast_name() -> None:
+    from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import LookupCastRegistry
+    from scalim.spec.ir.lookup_casts import LookupCastSpecIr
 
-    with pytest.raises(ScalimConversionError) as excinfo:
-        converter._get_lookup_cast_fn(LookupCastConfig(name="auto", sep=None), is_multi=False)
-    assert "Lookup cast registry is not initialized" in str(excinfo.value)
+    registry = LookupCastRegistry()
+    with pytest.raises(ScalimConversionError, match="Unknown lookup_cast"):
+        registry.build(LookupCastSpecIr(name="nope"), is_multi=False)

@@ -62,8 +62,10 @@ def prefill_main_source_fields(
         for field_key, field_spec in main_field_specs:
             data_key = field_spec.extract_expr or field_spec.data_key or field_key
             field_value: FieldValue = extract_field_segments(row_data, field_spec.extract_segments)
+            value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
             try:
-                field_value = field_spec.apply_transform(field_value)
+                if value_transform is not None:
+                    field_value = value_transform(field_value)
             except Exception as exc:
                 if not guardrails.enabled:
                     raise

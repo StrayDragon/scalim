@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from scalim.typedefs import RowData
 
 from .loaders import ECommerceConfig, get_config, load_orders, set_config
-from .shared import build_ecommerce_model
+from .shared import build_ecommerce_model, build_ecommerce_runtime_bindings
 from .verification import VerificationResult, verify_scalim_output
 
 
@@ -78,11 +78,12 @@ def run_case(
     set_config(case.config)
     try:
         demand = build_ecommerce_model()
+        runtime_bindings = build_ecommerce_runtime_bindings()
         from scalim.execution import ScalimEngine  # noqa: PLC0415
         from scalim.planning import PlanBuilder  # noqa: PLC0415
 
         plan = PlanBuilder(demand).build(targets=list(case.targets))
-        engine = ScalimEngine(demand=demand, plan=plan, batch_size=int(batch_size))
+        engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
 
         row_limit = int(row_limit_override) if row_limit_override is not None else int(case.row_limit)
         main_rows = list(load_orders())[:row_limit]

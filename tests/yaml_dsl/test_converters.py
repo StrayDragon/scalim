@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_int
+from scalim.dsl.yaml_dsl.runtime._internal.conversion_lookup import cast_int, cast_str
 from scalim.typedefs import SourceSpecIrCacheMode
 from scalim._internal.utils.converters import (
     get_seps_values_first_int,
@@ -64,7 +64,9 @@ def test_converter_edge_cases() -> None:
 
 
 def test_cast_int_rejects_unsupported_object_type() -> None:
+    assert cast_int(None) is None
     assert cast_int(Decimal("12")) == 12
+    assert cast_str(123) == "123"
 
     with pytest.raises(ValueError):
         _ = cast_int("x")
