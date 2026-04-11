@@ -33,6 +33,21 @@ from ...spec.ir._workflow import (
 from ...vendor.dataclassesx import dataclass, replace
 from ._internal.config_parsing.loader import YamlDemandLoader
 from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ._internal.patch_apply import (
+    as_bool as _patch_as_bool,
+)
+from ._internal.patch_apply import (
+    as_opt_mapping as _patch_as_opt_mapping,
+)
+from ._internal.patch_apply import (
+    as_opt_str as _patch_as_opt_str,
+)
+from ._internal.patch_apply import (
+    as_required_non_empty_str as _patch_as_required_non_empty_str,
+)
+from ._internal.patch_apply import (
+    assert_no_unknown_keys as _patch_assert_no_unknown_keys,
+)
 from ._internal.validation_contracts import validate_excel_sheet_name as _validate_excel_sheet_name_ssot
 from .runtime.contracts import (
     BookResourceOverride,
@@ -187,29 +202,21 @@ def _effective_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
     )
 
 
-def _overlay_book_write_defaults_patch(  # noqa: C901
+def _validate_book_write_defaults_enum(value: str, *, key: str, allowed: Sequence[str], path: str) -> None:
+    if value in allowed:
+        return
+    msg = "Invalid write_defaults.{}={!r}; expected one of: {}".format(str(key), value, ", ".join(allowed))
+    raise ScalimWorkflowConfigError(msg, path=path)
+
+
+def _overlay_book_write_defaults_patch(
     base: BookWriteDefaultsConfig,
     patch: Dict[str, Any],
     *,
     path: str,
 ) -> BookWriteDefaultsConfig:
     allowed_keys = {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"}
-    unknown = sorted({str(k) for k in patch} - allowed_keys)
-    if unknown:
-        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    def _as_opt_str(key: str) -> Optional[str]:
-        if key not in patch:
-            return None
-        raw = patch.get(key)
-        if raw is None:
-            return None
-        if not isinstance(raw, str):
-            msg = "{}.{} must be a string".format(path, key)
-            raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, key))
-        v = str(raw).strip()
-        return v or None
+    _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=path)
 
     mode = str(base.mode or DEFAULT_BOOK_WRITE_MODE)
     align_by = str(base.align_by or DEFAULT_BOOK_WRITE_ALIGN_BY)
@@ -217,11 +224,11 @@ def _overlay_book_write_defaults_patch(  # noqa: C901
     on_mismatch = str(base.on_mismatch or DEFAULT_BOOK_WRITE_ON_MISMATCH)
     on_conflict = str(base.on_conflict or DEFAULT_BOOK_WRITE_ON_CONFLICT)
 
-    raw_mode = _as_opt_str("mode")
-    raw_align_by = _as_opt_str("align_by")
-    raw_header_policy = _as_opt_str("header_policy")
-    raw_on_mismatch = _as_opt_str("on_mismatch")
-    raw_on_conflict = _as_opt_str("on_conflict")
+    raw_mode = _patch_as_opt_str(patch.get("mode"), path="{}.mode".format(path))
+    raw_align_by = _patch_as_opt_str(patch.get("align_by"), path="{}.align_by".format(path))
+    raw_header_policy = _patch_as_opt_str(patch.get("header_policy"), path="{}.header_policy".format(path))
+    raw_on_mismatch = _patch_as_opt_str(patch.get("on_mismatch"), path="{}.on_mismatch".format(path))
+    raw_on_conflict = _patch_as_opt_str(patch.get("on_conflict"), path="{}.on_conflict".format(path))
 
     if raw_mode is not None:
         mode = raw_mode
@@ -234,23 +241,36 @@ def _overlay_book_write_defaults_patch(  # noqa: C901
     if raw_on_conflict is not None:
         on_conflict = raw_on_conflict
 
-    if mode not in BOOK_WRITE_MODE_ENUM:
-        msg = "Invalid write_defaults.mode={!r}; expected one of: {}".format(mode, ", ".join(BOOK_WRITE_MODE_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.mode".format(path))
-    if align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
-        msg = "Invalid write_defaults.align_by={!r}; expected one of: {}".format(align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.align_by".format(path))
-    if header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
-        msg = "Invalid write_defaults.header_policy={!r}; expected one of: {}".format(
-            header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM)
-        )
-        raise ScalimWorkflowConfigError(msg, path="{}.header_policy".format(path))
-    if on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
-        msg = "Invalid write_defaults.on_mismatch={!r}; expected one of: {}".format(on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.on_mismatch".format(path))
-    if on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
-        msg = "Invalid write_defaults.on_conflict={!r}; expected one of: {}".format(on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.on_conflict".format(path))
+    _validate_book_write_defaults_enum(
+        str(mode),
+        key="mode",
+        allowed=BOOK_WRITE_MODE_ENUM,
+        path="{}.mode".format(path),
+    )
+    _validate_book_write_defaults_enum(
+        str(align_by),
+        key="align_by",
+        allowed=BOOK_WRITE_ALIGN_BY_ENUM,
+        path="{}.align_by".format(path),
+    )
+    _validate_book_write_defaults_enum(
+        str(header_policy),
+        key="header_policy",
+        allowed=BOOK_WRITE_HEADER_POLICY_ENUM,
+        path="{}.header_policy".format(path),
+    )
+    _validate_book_write_defaults_enum(
+        str(on_mismatch),
+        key="on_mismatch",
+        allowed=BOOK_WRITE_ON_MISMATCH_ENUM,
+        path="{}.on_mismatch".format(path),
+    )
+    _validate_book_write_defaults_enum(
+        str(on_conflict),
+        key="on_conflict",
+        allowed=BOOK_WRITE_ON_CONFLICT_ENUM,
+        path="{}.on_conflict".format(path),
+    )
 
     return BookWriteDefaultsConfig(
         mode=str(mode),
@@ -284,129 +304,139 @@ def _validate_xlsx_memory_align_by(
     raise ScalimWorkflowConfigError(msg, path=str(align_by_path))
 
 
-def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
-    base: Optional[BookConfig],
-    patch: Mapping[str, object],
+def _apply_book_budget_patch(budget: Optional[BookBudgetConfig], raw: Dict[str, Any], *, path: str) -> BookBudgetConfig:
+    max_sheets_raw = raw.get("max_sheets")
+    max_total_cells_raw = raw.get("max_total_cells")
+
+    if budget is None:
+        if max_sheets_raw is None or max_total_cells_raw is None:
+            msg = "{}.budget requires max_sheets and max_total_cells when creating a new xlsx_memory book".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+        return BookBudgetConfig(max_sheets=int(max_sheets_raw), max_total_cells=int(max_total_cells_raw))
+
+    max_sheets = int(budget.max_sheets)
+    max_total_cells = int(budget.max_total_cells)
+    if max_sheets_raw is not None:
+        max_sheets = int(max_sheets_raw)
+    if max_total_cells_raw is not None:
+        max_total_cells = int(max_total_cells_raw)
+    return BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
+
+
+def _apply_book_export_xlsx_patch(
+    export_xlsx: Optional[BookExportXlsxConfig],
+    raw: Dict[str, Any],
     *,
     path: str,
-) -> BookConfig:
+) -> BookExportXlsxConfig:
+    path_raw = raw.get("path")
+    write_lock_raw = raw.get("write_lock")
+    allow_formulas_raw = raw.get("allow_formulas")
+
+    if export_xlsx is None:
+        if path_raw is None:
+            msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(path))
+        return BookExportXlsxConfig(
+            path=path_raw,
+            write_lock=bool(write_lock_raw) if isinstance(write_lock_raw, bool) else False,
+            allow_formulas=bool(allow_formulas_raw) if isinstance(allow_formulas_raw, bool) else False,
+        )
+
+    next_path = export_xlsx.path if path_raw is None else path_raw
+    next_write_lock = export_xlsx.write_lock if write_lock_raw is None else bool(write_lock_raw)
+    next_allow_formulas = export_xlsx.allow_formulas if allow_formulas_raw is None else bool(allow_formulas_raw)
+    return BookExportXlsxConfig(
+        path=next_path,
+        write_lock=bool(next_write_lock),
+        allow_formulas=bool(next_allow_formulas),
+    )
+
+
+def _apply_optional_book_budget_patch(budget: Optional[BookBudgetConfig], value: object, *, path: str) -> Optional[BookBudgetConfig]:
+    raw = _patch_as_opt_mapping(value, path="{}.budget".format(path))
+    if raw is None:
+        return None
+    return _apply_book_budget_patch(budget, raw, path=path)
+
+
+def _apply_optional_book_export_xlsx_patch(
+    export_xlsx: Optional[BookExportXlsxConfig],
+    value: object,
+    *,
+    path: str,
+) -> Optional[BookExportXlsxConfig]:
+    raw = _patch_as_opt_mapping(value, path="{}.export_xlsx".format(path))
+    if raw is None:
+        return None
+    return _apply_book_export_xlsx_patch(export_xlsx, raw, path=path)
+
+
+def _apply_optional_book_write_defaults_patch(
+    *,
+    kind: str,
+    book_path: Any,
+    budget: Optional[BookBudgetConfig],
+    export_xlsx: Optional[BookExportXlsxConfig],
+    allow_formulas: bool,
+    write_lock: bool,
+    write_defaults: Optional[BookWriteDefaultsConfig],
+    value: object,
+    path: str,
+) -> Optional[BookWriteDefaultsConfig]:
+    raw = _patch_as_opt_mapping(value, path="{}.write_defaults".format(path))
+    if raw is None:
+        return None
+    return _apply_book_write_defaults_patch(
+        kind=str(kind),
+        book_path=book_path,
+        budget=budget,
+        export_xlsx=export_xlsx,
+        allow_formulas=bool(allow_formulas),
+        write_lock=bool(write_lock),
+        write_defaults=write_defaults,
+        raw=raw,
+        path=path,
+    )
+
+
+def _apply_book_write_defaults_patch(
+    *,
+    kind: str,
+    book_path: Any,
+    budget: Optional[BookBudgetConfig],
+    export_xlsx: Optional[BookExportXlsxConfig],
+    allow_formulas: bool,
+    write_lock: bool,
+    write_defaults: Optional[BookWriteDefaultsConfig],
+    raw: Dict[str, Any],
+    path: str,
+) -> BookWriteDefaultsConfig:
+    base_defaults = _effective_write_defaults(
+        BookConfig(
+            kind=str(kind),
+            path=book_path,
+            budget=budget,
+            export_xlsx=export_xlsx,
+            allow_formulas=bool(allow_formulas),
+            write_lock=bool(write_lock),
+            write_defaults=write_defaults,
+        )
+    )
+    return _overlay_book_write_defaults_patch(base_defaults, raw, path="{}.write_defaults".format(path))
+
+
+def _validate_book_kind_semantic_contracts(
+    *,
+    kind: str,
+    book_path: Any,
+    budget: Optional[BookBudgetConfig],
+    export_xlsx: Optional[BookExportXlsxConfig],
+    allow_formulas: bool,
+    write_lock: bool,
+    path: str,
+) -> None:
     msg: str
-
-    kind = str(base.kind or "").strip() if base is not None else ""
-    book_path: Any = base.path if base is not None else None
-    budget = base.budget if base is not None else None
-    export_xlsx = base.export_xlsx if base is not None else None
-    allow_formulas = bool(base.allow_formulas) if base is not None else False
-    write_lock = bool(base.write_lock) if base is not None else False
-    write_defaults = base.write_defaults if base is not None else None
-
-    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
-    unknown = sorted({str(k) for k in patch} - allowed_keys)
-    if unknown:
-        msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    if "kind" in patch:
-        raw = patch.get("kind")
-        kind = str(raw or "").strip() if isinstance(raw, str) else ""
-        if not kind:
-            msg = "{}.kind must be a non-empty string".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
-
-    if "path" in patch:
-        book_path = patch.get("path")
-
-    if "allow_formulas" in patch:
-        raw = patch.get("allow_formulas")
-        if not isinstance(raw, bool):
-            msg = "{}.allow_formulas must be a bool".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
-        allow_formulas = bool(raw)
-
-    if "write_lock" in patch:
-        raw = patch.get("write_lock")
-        if not isinstance(raw, bool):
-            msg = "{}.write_lock must be a bool".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
-        write_lock = bool(raw)
-
-    if "budget" in patch:
-        raw = patch.get("budget")
-        if raw is None:
-            budget = None
-        elif not isinstance(raw, dict):
-            msg = "{}.budget must be a mapping".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
-        else:
-            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime overrides dict narrowing
-            max_sheets_raw = raw_dict.get("max_sheets")
-            max_total_cells_raw = raw_dict.get("max_total_cells")
-            if budget is None:
-                if max_sheets_raw is None or max_total_cells_raw is None:
-                    msg = "{}.budget requires max_sheets and max_total_cells when creating a new xlsx_memory book".format(path)
-                    raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
-                budget = BookBudgetConfig(max_sheets=int(max_sheets_raw), max_total_cells=int(max_total_cells_raw))
-            else:
-                max_sheets = int(budget.max_sheets)
-                max_total_cells = int(budget.max_total_cells)
-                if max_sheets_raw is not None:
-                    max_sheets = int(max_sheets_raw)
-                if max_total_cells_raw is not None:
-                    max_total_cells = int(max_total_cells_raw)
-                budget = BookBudgetConfig(max_sheets=int(max_sheets), max_total_cells=int(max_total_cells))
-
-    if "export_xlsx" in patch:
-        raw = patch.get("export_xlsx")
-        if raw is None:
-            export_xlsx = None
-        elif not isinstance(raw, dict):
-            msg = "{}.export_xlsx must be a mapping".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
-        else:
-            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime overrides dict narrowing
-            path_raw = raw_dict.get("path")
-            write_lock_raw = raw_dict.get("write_lock")
-            allow_formulas_raw = raw_dict.get("allow_formulas")
-            if export_xlsx is None:
-                if path_raw is None:
-                    msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
-                    raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(path))
-                export_xlsx = BookExportXlsxConfig(
-                    path=path_raw,
-                    write_lock=bool(write_lock_raw) if isinstance(write_lock_raw, bool) else False,
-                    allow_formulas=bool(allow_formulas_raw) if isinstance(allow_formulas_raw, bool) else False,
-                )
-            else:
-                next_path = export_xlsx.path if path_raw is None else path_raw
-                next_write_lock = export_xlsx.write_lock if write_lock_raw is None else bool(write_lock_raw)
-                next_allow_formulas = export_xlsx.allow_formulas if allow_formulas_raw is None else bool(allow_formulas_raw)
-                export_xlsx = BookExportXlsxConfig(
-                    path=next_path,
-                    write_lock=bool(next_write_lock),
-                    allow_formulas=bool(next_allow_formulas),
-                )
-
-    if "write_defaults" in patch:
-        raw = patch.get("write_defaults")
-        if raw is None:
-            write_defaults = None
-        elif not isinstance(raw, dict):
-            msg = "{}.write_defaults must be a mapping".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.write_defaults".format(path))
-        else:
-            raw_dict = cast("Dict[str, Any]", raw)  # pragma: allow-cast runtime overrides dict narrowing
-            base_defaults = _effective_write_defaults(
-                BookConfig(
-                    kind=str(kind),
-                    path=book_path,
-                    budget=budget,
-                    export_xlsx=export_xlsx,
-                    allow_formulas=bool(allow_formulas),
-                    write_lock=bool(write_lock),
-                    write_defaults=write_defaults,
-                )
-            )
-            write_defaults = _overlay_book_write_defaults_patch(base_defaults, raw_dict, path="{}.write_defaults".format(path))
 
     # 校验 `kind` 分支约束(与 `YAML` 解析器语义保持一致).
     if kind == "xlsx_file":
@@ -419,7 +449,9 @@ def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
         if export_xlsx is not None:
             msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
-    elif kind == "xlsx_memory":
+        return
+
+    if kind == "xlsx_memory":
         if budget is None:
             msg = "{}.budget is required for kind=xlsx_memory".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
@@ -432,9 +464,69 @@ def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
         if write_lock:
             msg = "{}.write_lock is not allowed for kind=xlsx_memory".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
-    else:
-        msg = "{}.kind={!r} is invalid; expected one of: xlsx_file, xlsx_memory".format(path, kind)
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+        return
+
+    msg = "{}.kind={!r} is invalid; expected one of: xlsx_file, xlsx_memory".format(path, kind)
+    raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+
+def _apply_book_patch(
+    base: Optional[BookConfig],
+    patch: Mapping[str, object],
+    *,
+    path: str,
+) -> BookConfig:
+    kind = str(base.kind or "").strip() if base is not None else ""
+    book_path: Any = base.path if base is not None else None
+    budget = base.budget if base is not None else None
+    export_xlsx = base.export_xlsx if base is not None else None
+    allow_formulas = bool(base.allow_formulas) if base is not None else False
+    write_lock = bool(base.write_lock) if base is not None else False
+    write_defaults = base.write_defaults if base is not None else None
+
+    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
+    _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=path)
+
+    if "kind" in patch:
+        kind = _patch_as_required_non_empty_str(patch.get("kind"), path="{}.kind".format(path))
+
+    if "path" in patch:
+        book_path = patch.get("path")
+
+    if "allow_formulas" in patch:
+        allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path="{}.allow_formulas".format(path))
+
+    if "write_lock" in patch:
+        write_lock = _patch_as_bool(patch.get("write_lock"), path="{}.write_lock".format(path))
+
+    if "budget" in patch:
+        budget = _apply_optional_book_budget_patch(budget, patch.get("budget"), path=path)
+
+    if "export_xlsx" in patch:
+        export_xlsx = _apply_optional_book_export_xlsx_patch(export_xlsx, patch.get("export_xlsx"), path=path)
+
+    if "write_defaults" in patch:
+        write_defaults = _apply_optional_book_write_defaults_patch(
+            kind=str(kind),
+            book_path=book_path,
+            budget=budget,
+            export_xlsx=export_xlsx,
+            allow_formulas=bool(allow_formulas),
+            write_lock=bool(write_lock),
+            write_defaults=write_defaults,
+            value=patch.get("write_defaults"),
+            path=path,
+        )
+
+    _validate_book_kind_semantic_contracts(
+        kind=str(kind),
+        book_path=book_path,
+        budget=budget,
+        export_xlsx=export_xlsx,
+        allow_formulas=bool(allow_formulas),
+        write_lock=bool(write_lock),
+        path=path,
+    )
 
     return BookConfig(
         kind=str(kind),

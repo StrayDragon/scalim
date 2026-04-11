@@ -141,21 +141,22 @@ def test_workflow_compile_parse_output_extra_sheet_override_branches_cover_error
 
 
 @pytest.mark.parametrize(
-    ("patch", "match"),
+    ("patch", "match", "expected_path"),
     [
-        ({"nope": "x"}, r"contains unknown keys"),
-        ({"mode": 1}, r"p\.mode must be a string"),
-        ({"mode": "nope"}, r"Invalid write_defaults\.mode"),
-        ({"align_by": "nope"}, r"Invalid write_defaults\.align_by"),
-        ({"header_policy": "nope"}, r"Invalid write_defaults\.header_policy"),
-        ({"on_mismatch": "nope"}, r"Invalid write_defaults\.on_mismatch"),
-        ({"on_conflict": "nope"}, r"Invalid write_defaults\.on_conflict"),
+        ({"nope": "x"}, r"contains unknown keys", "p"),
+        ({"mode": 1}, r"p\.mode must be a string", "p.mode"),
+        ({"mode": "nope"}, r"Invalid write_defaults\.mode", "p.mode"),
+        ({"align_by": "nope"}, r"Invalid write_defaults\.align_by", "p.align_by"),
+        ({"header_policy": "nope"}, r"Invalid write_defaults\.header_policy", "p.header_policy"),
+        ({"on_mismatch": "nope"}, r"Invalid write_defaults\.on_mismatch", "p.on_mismatch"),
+        ({"on_conflict": "nope"}, r"Invalid write_defaults\.on_conflict", "p.on_conflict"),
     ],
 )
-def test_workflow_compile_overlay_book_write_defaults_patch_error_branches_cover_paths(patch: dict, match: str) -> None:
+def test_workflow_compile_overlay_book_write_defaults_patch_error_branches_cover_paths(patch: dict, match: str, expected_path: str) -> None:
     base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a.xlsx"))  # noqa: SLF001
-    with pytest.raises(ScalimWorkflowConfigError, match=match):
+    with pytest.raises(ScalimWorkflowConfigError, match=match) as exc_info:
         _ = workflow_compile_mod._overlay_book_write_defaults_patch(base, patch, path="p")  # noqa: SLF001
+    assert exc_info.value.path == expected_path
 
 
 def test_workflow_compile_overlay_book_write_defaults_patch_allows_none_values_as_noop() -> None:
@@ -215,32 +216,45 @@ def test_workflow_compile_extra_sheets_unsupported_mode_branch_is_defensive_and_
 def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
     base = BookConfig(kind="xlsx_file", path="a.xlsx")
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"nope": 1}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.kind must be a non-empty string"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.kind must be a non-empty string") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"kind": ""}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.kind"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas must be a bool"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.kind must be a non-empty string") as exc_info:
+        _ = workflow_compile_mod._apply_book_patch(base, {"kind": None}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.kind"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas must be a bool") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"allow_formulas": "nope"}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.allow_formulas"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"write_lock must be a bool"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"write_lock must be a bool") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"write_lock": "nope"}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.write_lock"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget must be a mapping") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"budget": "nope"}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"requires max_sheets and max_total_cells"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"requires max_sheets and max_total_cells") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(BookConfig(kind="xlsx_memory"), {"budget": {}}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx must be a mapping") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(BookConfig(kind="xlsx_memory"), {"export_xlsx": "nope"}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx\.path is required"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx\.path is required") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(BookConfig(kind="xlsx_memory"), {"export_xlsx": {}}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx.path"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"write_defaults must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"write_defaults must be a mapping") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"write_defaults": "nope"}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.write_defaults"
 
     # semantic: xlsx_file requires path
     with pytest.raises(ScalimWorkflowConfigError, match=r"path is required for kind=xlsx_file"):
