@@ -12,6 +12,7 @@ from scalim_misc.demo_big_data_report.shared import (
     TARGET_FIELDS_FULL,
     TARGET_FIELDS_RELATIONS,
     build_ecommerce_model,
+    build_ecommerce_runtime_bindings,
 )
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
@@ -59,10 +60,17 @@ def _make_pipeline_runner(
 ) -> Callable[[], int]:
     model = build_ecommerce_model(cfg)
     plan = PlanBuilder(model).build(targets=targets)
+    runtime_bindings = build_ecommerce_runtime_bindings()
 
     def _run() -> int:
         observer_manager = observer_factory() if observer_factory else None
-        engine = ScalimEngine(demand=model, plan=plan, observer_manager=observer_manager, batch_size=batch_size)
+        engine = ScalimEngine(
+            demand=model,
+            plan=plan,
+            runtime_bindings=runtime_bindings,
+            observer_manager=observer_manager,
+            batch_size=batch_size,
+        )
         with sink_factory() as sink:
             engine.run(main_rows=load_orders(), sink=sink)
         return cfg.order_count
