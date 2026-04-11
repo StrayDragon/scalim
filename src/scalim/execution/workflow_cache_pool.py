@@ -306,6 +306,10 @@ class WorkflowCachePool:
                 entry = _CacheEntry(signature=signature, loading=True)
                 self._entries[signature_key] = entry
                 self._signature_keys_by_logical_key.setdefault(logical_key, set()).add(signature_key)
+            elif entry.value is None:
+                # 淘汰护栏: 对于缓存未命中且即将进入加载流程的调用,在释放全局锁前建立“加载中”意图标记.
+                # 注意: 事件发射必须在锁外执行,这里不做任何外部回调.
+                entry.loading = True
 
             self._acquired_by_node_id.setdefault(node_id, set()).add(signature_key)
             self._entries.move_to_end(signature_key)
@@ -338,6 +342,8 @@ class WorkflowCachePool:
         # 加载过程由每条目锁(`per-entry lock`)保护.
         with entry.lock:
             if entry.value is not None:
+                # 修复: 若之前在锁外已标记为“加载中”,在命中快路径返回前必须清理,避免条目永久处于“加载中”而无法淘汰.
+                entry.loading = False
                 return entry.value
             entry.loading = True
             try:

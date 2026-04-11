@@ -410,6 +410,76 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
     assert results[1] == {1: {"id": 1}}
 
 
+def test_workflow_cache_pool_retry_miss_sets_loading_intent_before_eviction_window() -> None:
+    class _BlockingInstrumentation:
+        def __init__(self) -> None:
+            self.block_node_id = "n_retry"
+            self.entered = threading.Event()
+            self.allow_continue = threading.Event()
+
+        def emit(self, event_type: str, payload, meta=None):  # type: ignore[no-untyped-def]
+            _ = event_type, payload
+            if not isinstance(meta, dict):
+                return None
+            if str(meta.get("workflow_node_id")) != self.block_node_id:
+                return None
+            self.entered.set()
+            if not self.allow_continue.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("test timeout waiting to continue emit")
+            return None
+
+    instrumentation = _BlockingInstrumentation()
+    pool = WorkflowCachePool(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,  # type: ignore[arg-type]
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=1, over_budget_policy="evict_lru"),
+        ),
+        logical_keys_by_node_id={},
+        consumers_by_logical_key={},
+    )
+    signature = _sig("s1")
+
+    def _failing_load() -> object:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        _ = pool.get_or_load(signature, workflow_node_id="n1", load_fn=_failing_load)  # type: ignore[arg-type]
+
+    retry_results = []
+    retry_errors = []
+
+    def _retry() -> None:
+        try:
+            retry_results.append(pool.get_or_load(signature, workflow_node_id="n_retry", load_fn=lambda: {1: {"id": 1}}))
+        except Exception as exc:  # noqa: BLE001
+            retry_errors.append(exc)
+
+    t = threading.Thread(target=_retry, daemon=True)
+    t.start()
+    assert instrumentation.entered.wait(timeout=_TIMEOUT_S)
+
+    with pytest.raises(ScalimWorkflowCachePoolError, match="no evictable"):
+        _ = pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {2: {"id": 2}})
+
+    instrumentation.allow_continue.set()
+    t.join(timeout=_TIMEOUT_S)
+    assert not t.is_alive()
+    assert not retry_errors
+    assert retry_results == [{1: {"id": 1}}]
+
+    hit_calls = []
+
+    def _should_not_load() -> object:
+        hit_calls.append("load")
+        return {1: {"id": 999}}
+
+    assert pool.get_or_load(signature, workflow_node_id="n3", load_fn=_should_not_load) == {1: {"id": 1}}
+    assert hit_calls == []
+
+
 def test_workflow_cache_pool_emit_does_not_deadlock_on_reentry() -> None:
     class _ReentrantInstrumentation:
         def __init__(self) -> None:
