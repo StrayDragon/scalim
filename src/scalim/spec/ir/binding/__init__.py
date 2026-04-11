@@ -85,8 +85,8 @@ class BindingIr:
 
     说明:
     - `BindingIr` 只保存纯数据,不保存任何 `Python` 可调用对象.
-    - 对 YAML DSL: 使用 `params_template`(由 params template 编译得到),执行期渲染为 `kwargs`.
-    - 对 Python DSL: 使用 `params_builder_ref`(`CallableRefIr`),在“运行时链接”阶段解析为函数并注入 `RuntimeBindings.params_builders`.
+    - 对 `YAML DSL`: 使用 `params_template`(由 `params template` 编译得到),执行期渲染为 `kwargs`.
+    - 对 `Python DSL`: 使用 `params_builder_ref`(`CallableRefIr`),在“运行时链接”阶段解析为函数并注入 `RuntimeBindings.params_builders`.
 
     运行时 `params_builder` 的签名约定:
     - `(ctx: LoaderCallContextIr) -> (args, kwargs)`
