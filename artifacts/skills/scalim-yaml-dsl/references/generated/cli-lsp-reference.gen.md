@@ -58,6 +58,7 @@
 - Purpose: 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
 - Requirements:
   - CLI validation MUST reuse the unified YAML load facade
+  - YAML validation contracts MUST be centralized as SSOT across entrypoints
   - CLI validate 与 schema validate 职责边界(避免重复诊断)
   - validate and schema validate MUST catch known fail-late cases consistently
   - CLI Schema-Only Validation

@@ -71,13 +71,13 @@ def test_workflow_compile_try_resolve_book_export_abs_path_cover_branches(tmp_pa
 
 
 def test_workflow_compile_validate_excel_sheet_name_errors_cover_branches() -> None:
-    with pytest.raises(ValueError, match=r"p is required"):
+    with pytest.raises(ValueError, match=r"p: Excel sheet name must be non-empty.*Hint:"):
         workflow_compile_mod._validate_excel_sheet_name("", path="p")  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"too long"):
         workflow_compile_mod._validate_excel_sheet_name("x" * 32, path="p")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"invalid character"):
+    with pytest.raises(ValueError, match=r"invalid characters"):
         workflow_compile_mod._validate_excel_sheet_name("A/B", path="p")  # noqa: SLF001
 
 

@@ -8,7 +8,6 @@
 """
 
 import os
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
@@ -19,6 +18,7 @@ from ....spec.ir import DemandIr
 from ....vendor.dataclassesx import replace
 from .._internal.config_parsing.loader import YamlDemandLoader
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from .._internal.validation_contracts import validate_output_name as _validate_output_name_ssot
 from ..diagnostics import format_duplicate_effective_field_display_names_message
 from ..init_var_nodes import parse_init_var_mapping_node
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
@@ -99,7 +99,6 @@ def validate_allowlist(
     _ensure_allowlist(allowed_modules, allowed_functions)
 
 
-_OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
 _DEMAND_FAILURE_POLICIES: Tuple[str, ...] = ("all_fail", "primary_only")
@@ -296,12 +295,7 @@ def _parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915
             raise TypeError(msg)
 
         name = str(item.name or "").strip()
-        if not name:
-            msg = "{}.{}.name is required".format(path, idx)
-            raise ValueError(msg)
-        if not _OUTPUT_NAME_PATTERN.match(name):
-            msg = "{}.{}.name={!r} is invalid; expected identifier like [a-zA-Z_][a-zA-Z0-9_]*".format(path, idx, name)
-            raise ValueError(msg)
+        _validate_output_name_ssot(name, path="{}.{}.name".format(path, idx))
         if name in seen_names:
             msg = "{} has duplicate output name: {}".format(path, name)
             raise ValueError(msg)

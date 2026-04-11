@@ -20,9 +20,9 @@ def _dummy_field_index() -> FieldDefIndex:
 def test_validate_output_name_requires_value_and_pattern() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"outputs\.\*\.name is required"):
+    with pytest.raises(ValueError, match=r"outputs\.\*\.name: .*Hint:"):
         loader._validate_output_name("", path="outputs.*.name")
-    with pytest.raises(ValueError, match="is invalid; expected identifier"):
+    with pytest.raises(ValueError, match=r"Invalid identifier.*Hint:"):
         loader._validate_output_name("1bad", path="outputs.*.name")
 
 

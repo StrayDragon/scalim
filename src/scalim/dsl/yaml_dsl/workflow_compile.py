@@ -33,6 +33,7 @@ from ...spec.ir._workflow import (
 from ...vendor.dataclassesx import dataclass, replace
 from ._internal.config_parsing.loader import YamlDemandLoader
 from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ._internal.validation_contracts import validate_excel_sheet_name as _validate_excel_sheet_name_ssot
 from .runtime.contracts import (
     BookResourceOverride,
     FileResourceOverride,
@@ -90,9 +91,6 @@ class WorkflowCompileResult:
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
 
-_INVALID_EXCEL_SHEET_CHARS: FrozenSet[str] = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
-_EXCEL_SHEET_NAME_MAX_LEN = 31
-
 
 def _as_abs_path(raw_path: str) -> str:
     return str(Path(str(raw_path)).expanduser().resolve(strict=False))
@@ -122,19 +120,7 @@ def _try_resolve_book_export_abs_path(
 
 
 def _validate_excel_sheet_name(sheet: str, *, path: str) -> None:
-    name = str(sheet or "").strip()
-    if not name:
-        msg = "{} is required".format(path)
-        raise ValueError(msg)
-    if len(name) > _EXCEL_SHEET_NAME_MAX_LEN:
-        msg = "Excel sheet name is too long: len={} > {}".format(len(name), _EXCEL_SHEET_NAME_MAX_LEN)
-        err = "{} (path={})".format(msg, path)
-        raise ValueError(err)
-    for ch in _INVALID_EXCEL_SHEET_CHARS:
-        if ch in name:
-            msg = "Excel sheet name contains invalid character {!r}".format(ch)
-            err = "{} (path={})".format(msg, path)
-            raise ValueError(err)
+    _validate_excel_sheet_name_ssot(str(sheet), path=str(path))
 
 
 def _workflow_base_dir(workflow_yaml_path: str) -> Path:

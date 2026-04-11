@@ -102,12 +102,12 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="", fields=("order_id",), to=OutputToOverride(file="detail_csv")),)),
             ValueError,
-            r"overrides\.outputs\.0\.name is required",
+            r"overrides\.outputs\.0\.name: .*Hint:",
         ),
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="bad-name", fields=("order_id",), to=OutputToOverride(file="detail_csv")),)),
             ValueError,
-            r"overrides\.outputs\.0\.name='bad-name' is invalid",
+            r"overrides\.outputs\.0\.name: Invalid identifier.*Hint:",
         ),
         (
             lambda: RunOverrides(

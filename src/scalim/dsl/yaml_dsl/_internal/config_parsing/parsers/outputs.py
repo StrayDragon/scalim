@@ -1,6 +1,4 @@
 # pragma: allow-c901-file plan: c60
-
-import re
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
 
 from ......_internal.utils import graph as graph_utils
@@ -36,6 +34,7 @@ from ....schema_dsl.output_enums import (
 from ....schema_dsl.output_enums import (
     AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
 )
+from ...validation_contracts import validate_output_name as validate_output_name_ssot
 from ..call_by import ScalimCallByParseError, extract_call_by_dependencies, parse_call_by
 from ..models import FieldDefIndex, RawDemand
 from ..security import (
@@ -46,8 +45,6 @@ from ..security import (
     extract_compute_dependencies,
 )
 from .utils import list_or_none, mapping_or_none, str_or_none
-
-_OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def _non_empty_str(raw: object) -> str:
@@ -208,12 +205,7 @@ class ParserOutputsMixin:
         return unique[0]
 
     def _validate_output_name(self, value: str, *, path: str) -> None:
-        if not value:
-            msg = "{} is required".format(path)
-            raise ValueError(msg)
-        if not _OUTPUT_NAME_PATTERN.match(value):
-            msg = "{}={!r} is invalid; expected identifier like [a-zA-Z_][a-zA-Z0-9_]*".format(path, value)
-            raise ValueError(msg)
+        validate_output_name_ssot(value, path=str(path))
 
     def _resolve_output_field_ref(
         self,

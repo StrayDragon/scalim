@@ -28,6 +28,7 @@ from .._internal.config_parsing.security import (
     SecureComputeEngine,
     build_compute_engine,
 )
+from .._internal.validation_contracts import validate_excel_sheet_name as _validate_excel_sheet_name_ssot
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import (
     BookConfig,
@@ -47,25 +48,9 @@ from ._internal.callable_preflight import ScalimCallablePreflightError
 from .output_path_resolve import resolve_yaml_relative_output_path
 from .references import SecurePythonReferenceResolver
 
-_EXCEL_SHEET_NAME_MAX_LEN = 31
-_EXCEL_SHEET_NAME_INVALID_CHARS = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
-
 
 def _validate_excel_sheet_name(sheet: str, *, path: str) -> None:
-    name = str(sheet or "").strip()
-    if not name:
-        msg = "Excel sheet name must be non-empty"
-        err = "{} (path={})".format(msg, path)
-        raise ValueError(err)
-    if len(name) > _EXCEL_SHEET_NAME_MAX_LEN:
-        msg = "Excel sheet name is too long (max_len={})".format(_EXCEL_SHEET_NAME_MAX_LEN)
-        err = "{} (path={})".format(msg, path)
-        raise ValueError(err)
-    invalid = sorted(set(name).intersection(_EXCEL_SHEET_NAME_INVALID_CHARS))
-    if invalid:
-        msg = "Excel sheet name contains invalid characters: {}".format("".join(invalid))
-        err = "{} (path={})".format(msg, path)
-        raise ValueError(err)
+    _validate_excel_sheet_name_ssot(str(sheet), path=str(path))
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
