@@ -36,7 +36,13 @@ from ....schema_dsl.output_enums import (
 )
 from ..call_by import ScalimCallByParseError, extract_call_by_dependencies, parse_call_by
 from ..models import FieldDefIndex, RawDemand
-from ..security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine, extract_compute_dependencies
+from ..security import (
+    ScalimComputeExpressionError,
+    ScalimSecurityError,
+    SecureComputeEngine,
+    build_compute_engine,
+    extract_compute_dependencies,
+)
 from .utils import list_or_none, mapping_or_none, str_or_none
 
 _OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -246,7 +252,7 @@ class ParserOutputsMixin:
             return (), None
 
         known_field_ids = set(field_def_index.defs_by_id.keys())
-        engine = SecureComputeEngine()
+        engine = build_compute_engine()
 
         base_outputs: List[OutputTargetConfig] = []
         for idx, item in enumerate(outputs_list):

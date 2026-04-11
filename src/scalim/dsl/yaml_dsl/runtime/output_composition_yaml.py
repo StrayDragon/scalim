@@ -21,7 +21,12 @@ from ....spec.ir import DemandIr
 from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
 from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
-from .._internal.config_parsing.security import ScalimComputeExpressionError, ScalimSecurityError, SecureComputeEngine
+from .._internal.config_parsing.security import (
+    ScalimComputeExpressionError,
+    ScalimSecurityError,
+    SecureComputeEngine,
+    build_compute_engine,
+)
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import (
     BookConfig,
@@ -716,7 +721,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
     _validate_extra_sheet_target_names(config, outputs_path=outputs_path)
 
-    engine = SecureComputeEngine()
+    engine = build_compute_engine()
 
     direct_targets: List[OutputTargetSpec] = []
     derived_targets: List[DerivedOutputTargetSpec] = []

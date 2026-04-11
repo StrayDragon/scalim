@@ -3,6 +3,7 @@ import hashlib
 import inspect
 import logging
 import operator
+import os
 import sys
 import threading
 from collections import OrderedDict
@@ -27,6 +28,10 @@ security_logger = logging.getLogger("scalim.dsl.yaml_dsl.security")
 
 EVAL_AUDIT_LOG_PREFIX = "求值审计"
 EVAL_AUDIT_LOG = EVAL_AUDIT_LOG_PREFIX + ": 表达式=%r, 字段=%r, 结果=%r"
+
+EVAL_AUDIT_FULL_UNLOCK_ENV = "SCALIM_ALLOW_UNSAFE_COMPUTE_AUDIT"
+_full_audit_warning_emitted = threading.Event()
+_full_audit_warning_lock = threading.Lock()
 
 SECURITY_AUDIT_RESOLVED_REFERENCE_PREFIX = "已解析引用"
 SECURITY_AUDIT_RESOLVED_REFERENCE_LOG = SECURITY_AUDIT_RESOLVED_REFERENCE_PREFIX + ": %s"
@@ -140,10 +145,19 @@ def is_secure_compute_calculator(value: object) -> bool:
     return _is_secure_compute_calculator(value)
 
 
-def default_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
-    # 注意: 这里会记录原始字段值与计算结果;根据输入数据集不同,可能包含 `PII` 或其他敏感信息.
-    # 在生产环境中,除非你完全信任数据,否则建议使用脱敏回调(或直接禁用审计日志).
+def unsafe_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
+    """不安全的 `raw` 审计回调: 记录字段值与结果原文(可能包含敏感信息).
+
+    注意:
+    - 该回调可能泄露 `PII` 或其他敏感数据;请勿在生产环境启用.
+    - 推荐使用 `redacted_audit_callback` 或默认禁用审计.
+    """
     security_logger.debug(EVAL_AUDIT_LOG, expression, field_values, result)
+
+
+def default_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
+    """安全默认审计回调: 等价于 `redacted_audit_callback`."""
+    redacted_audit_callback(expression, field_values, result)
 
 
 def redacted_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
@@ -157,6 +171,23 @@ def redacted_audit_callback(expression: str, field_values: Dict[str, Any], resul
         field_names,
         type(result).__name__,
     )
+
+
+def _is_full_audit_unlocked() -> bool:
+    return str(os.environ.get(EVAL_AUDIT_FULL_UNLOCK_ENV, "")).strip() == "1"
+
+
+def _warn_full_audit_enabled_once() -> None:
+    if _full_audit_warning_emitted.is_set():
+        return
+    with _full_audit_warning_lock:
+        if _full_audit_warning_emitted.is_set():
+            return
+        security_logger.warning(
+            "求值审计: 已启用 `full/raw` 模式,可能包含敏感信息;生产环境请勿启用(解锁条件: 环境变量 %s=1)",
+            EVAL_AUDIT_FULL_UNLOCK_ENV,
+        )
+        _full_audit_warning_emitted.set()
 
 
 def _safe_decimal_helper(value: Any) -> Optional[Decimal]:
@@ -449,7 +480,7 @@ class SecureComputeEngine:
         self,
         allowed_functions: Optional[FrozenSet[str]] = None,
         allowed_function_map: Optional[Dict[str, Callable[..., Any]]] = None,
-        audit_callback: Optional["AuditCallback"] = None,
+        audit_mode: str = "none",
         limits: Optional[ComputeLimits] = None,
         max_compiled_cache_size: int = DEFAULT_COMPILED_CACHE_MAX_SIZE,
     ) -> None:
@@ -467,6 +498,22 @@ class SecureComputeEngine:
         self._compiled_cache_max_size = max_compiled_cache_size
         self._compiled_cache = OrderedDict()
         self._compiled_cache_lock = threading.Lock()
+
+        normalized_audit_mode = str(audit_mode or "none").strip().lower()
+        if normalized_audit_mode not in ("none", "redacted", "full"):
+            msg = "audit_mode must be one of: none/redacted/full"
+            raise ValueError(msg)
+
+        audit_callback = None
+        if normalized_audit_mode == "redacted":
+            audit_callback = redacted_audit_callback
+        elif normalized_audit_mode == "full":
+            if not _is_full_audit_unlocked():
+                msg = "compute full/raw 审计模式需要显式解锁: 请设置环境变量 {}=1".format(EVAL_AUDIT_FULL_UNLOCK_ENV)
+                raise ScalimSecurityError(msg)
+            _warn_full_audit_enabled_once()
+            audit_callback = unsafe_audit_callback
+
         self._audit_callback = audit_callback
 
     def _validate_limits(self) -> None:
@@ -782,8 +829,8 @@ class SecurityAuditLogger:
             self._logger.warning(SECURITY_AUDIT_INVALID_EXPRESSION_LOG, expression, error)
 
 
-def build_compute_engine() -> "SecureComputeEngine":
-    return SecureComputeEngine()
+def build_compute_engine(*, audit_mode: str = "none") -> "SecureComputeEngine":
+    return SecureComputeEngine(audit_mode=audit_mode)
 
 
 def extract_compute_dependencies(compute_expr: str) -> List[str]:

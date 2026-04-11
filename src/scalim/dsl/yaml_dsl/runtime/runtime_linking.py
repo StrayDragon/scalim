@@ -13,7 +13,7 @@ from ....spec.ir import (
 from ....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr, RuntimeHandleIdIr, describe_callable_ref
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import FieldValue, LoaderResultMapping, LookupKey
-from .._internal.config_parsing.security import SecureComputeEngine
+from .._internal.config_parsing.security import SecureComputeEngine, build_compute_engine
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ._internal.callable_preflight import (
     ScalimCallablePreflightError,
@@ -423,7 +423,7 @@ def resolve_runtime_bindings(
     - 执行阶段只消费返回的 `RuntimeBindings`,不再做任何导入/解析.
     """
 
-    engine = compute_engine or SecureComputeEngine()
+    engine = compute_engine or build_compute_engine()
     bindings = RuntimeBindings()
 
     _bind_main_source_runtime_bindings(demand_ir, bindings=bindings, resolver=resolver)

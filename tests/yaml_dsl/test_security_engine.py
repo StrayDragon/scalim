@@ -14,7 +14,6 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.security import (
     SecurityAuditLogger,
     ScalimSecurityError,
     default_audit_callback,
-    redacted_audit_callback,
     extract_dependencies_from_compute,
 )
 
@@ -295,20 +294,66 @@ def test_security_audit_logger_emits_messages(caplog) -> None:
     assert any(security.SECURITY_AUDIT_SECURITY_VIOLATION_PREFIX in message for message in messages)
 
 
-def test_audit_callback_called_on_eval() -> None:
-    calls: List[Tuple[str, Dict[str, Any], object]] = []
+def test_audit_mode_none_does_not_emit_audit_log(caplog) -> None:
+    engine = SecureComputeEngine(audit_mode="none")
+    calc = engine.compile("a + 1", ("a",))
 
-    def my_audit(expression: str, field_values: Dict[str, Any], result: object) -> None:
-        calls.append((expression, field_values.copy(), result))
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
+        _ = calc(a=5)
 
-    engine = SecureComputeEngine(audit_callback=my_audit)
-    calc = engine.compile("a + b", ("a", "b"))
-    assert calc(a=1, b=2) == 3
-    assert calc(1, 2) == 3
+    messages = [record.getMessage() for record in caplog.records if record.name == "scalim.dsl.yaml_dsl.security"]
+    assert not any(security.EVAL_AUDIT_LOG_PREFIX in message for message in messages)
 
-    assert len(calls) == 2
-    assert calls[0] == ("a + b", {"a": 1, "b": 2}, 3)
-    assert calls[1] == ("a + b", {"a": 1, "b": 2}, 3)
+
+def test_audit_mode_redacted_logs_only_hash_and_field_names(caplog) -> None:
+    secret = "13812345678"
+    engine = SecureComputeEngine(audit_mode="redacted")
+    calc = engine.compile("a", ("a",))
+
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
+        _ = calc(a=secret)
+
+    messages = [record.getMessage() for record in caplog.records if record.name == "scalim.dsl.yaml_dsl.security"]
+    assert any("`expr_hash`=" in message for message in messages)
+    assert secret not in "\n".join(messages)
+
+
+def test_audit_mode_redacted_positional_logs_only_hash_and_field_names(caplog) -> None:
+    secret = "13812345678"
+    engine = SecureComputeEngine(audit_mode="redacted")
+    calc = engine.compile("a", ("a",))
+
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
+        _ = calc(secret)
+
+    messages = [record.getMessage() for record in caplog.records if record.name == "scalim.dsl.yaml_dsl.security"]
+    assert any("`expr_hash`=" in message for message in messages)
+    assert secret not in "\n".join(messages)
+
+
+def test_audit_mode_invalid_value_rejected() -> None:
+    with pytest.raises(ValueError, match="audit_mode"):
+        _ = SecureComputeEngine(audit_mode="nope")
+
+
+def test_audit_mode_full_requires_explicit_unlock() -> None:
+    with pytest.raises(ScalimSecurityError, match=security.EVAL_AUDIT_FULL_UNLOCK_ENV):
+        _ = SecureComputeEngine(audit_mode="full")
+
+
+def test_audit_mode_full_logs_raw_values_when_unlocked(caplog, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(security.EVAL_AUDIT_FULL_UNLOCK_ENV, "1")
+    secret = "13812345678"
+    engine = SecureComputeEngine(audit_mode="full")
+    calc = engine.compile("a", ("a",))
+
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
+        _ = calc(a=secret)
+
+    messages = [record.getMessage() for record in caplog.records if record.name == "scalim.dsl.yaml_dsl.security"]
+    assert any(secret in message for message in messages)
+
+    _ = SecureComputeEngine(audit_mode="full")
 
 
 def test_positional_eval_error_is_wrapped_as_compute_expression_error() -> None:
@@ -318,33 +363,15 @@ def test_positional_eval_error_is_wrapped_as_compute_expression_error() -> None:
         _ = calc(1, 0)
 
 
-def test_audit_callback_not_called_when_none() -> None:
-    engine = SecureComputeEngine(audit_callback=None)
-    calc = engine.compile("a + 1", ("a",))
-    result = calc(a=5)
-    assert result == 6
-
-
-def test_default_audit_callback_logs(caplog) -> None:
-    engine = SecureComputeEngine(audit_callback=default_audit_callback)
-    calc = engine.compile("a * 2", ("a",))
-
+def test_default_audit_callback_is_redacted(caplog) -> None:
+    secret = "13812345678"
     with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
-        calc(a=10)
-
-    assert any(security.EVAL_AUDIT_LOG_PREFIX in record.getMessage() for record in caplog.records)
-
-
-def test_redacted_audit_callback_logs_only_hash_and_field_names(caplog) -> None:
-    engine = SecureComputeEngine(audit_callback=redacted_audit_callback)
-    calc = engine.compile("a * 2", ("a",))
-
-    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
-        calc(a=10)
+        default_audit_callback("a", {"a": secret}, secret)
 
     messages = [record.getMessage() for record in caplog.records]
     assert any("`expr_hash`=" in message for message in messages)
     assert any("`fields`=" in message for message in messages)
+    assert secret not in "\n".join(messages)
 
 
 def test_compute_limits_rejects_negative_values() -> None:
@@ -398,6 +425,12 @@ def test_compute_limits_rejects_static_range_len() -> None:
     engine = SecureComputeEngine(limits=security.ComputeLimits(max_range_len=3))
     with pytest.raises(ScalimComputeExpressionError, match="max_range_len"):
         engine.compile("sum(range(4))", ())
+
+
+def test_compute_limits_static_range_within_limit_passes() -> None:
+    engine = SecureComputeEngine(limits=security.ComputeLimits(max_range_len=3))
+    calc = engine.compile("sum(range(3))", ())
+    assert calc() == 3
 
 
 def test_compute_limits_enforces_runtime_range_len() -> None:
