@@ -1354,6 +1354,10 @@ cfg = load_output_config("path/to/config.yaml")
 base_module_path = derive_base_module_path("path/to/config.yaml")
 ```
 
+运行时/服务端集成的故障处理(包括上述 `base_module_path` 推导报错)见:
+
+- [`artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
+
 ---
 
 ## 5. 完整示例 (Complete Examples)

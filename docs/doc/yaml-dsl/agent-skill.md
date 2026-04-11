@@ -20,6 +20,7 @@
   - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-authoring.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-authoring.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md)
+  - [`artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md)

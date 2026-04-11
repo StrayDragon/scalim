@@ -11,6 +11,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 新写或改写 workflow YAML(编排多 demand / `workflow.resources.books` / outputs→book 绑定): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
+- 运行时故障处理(服务端/工作目录/PYTHONPATH 导致的相对引用问题): 读 [references/task-runtime-troubleshooting.md](references/task-runtime-troubleshooting.md)
 - 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
