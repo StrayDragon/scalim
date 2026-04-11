@@ -34,6 +34,7 @@ from scalim.execution.output_contracts import ExportLayout, OutputSpec
 from scalim.ob.presets._internal import viz_config as viz_config_module
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfig
+from tests.support.testing_utils import CI_TIMEOUT_S
 
 # endregion
 
@@ -176,6 +177,63 @@ def test_viz_event_emitter_concurrent_emission_keeps_jsonl_valid(tmp_path: Path)
     assert len(lines) == 400
     for line in lines:
         _ = json.loads(line)
+
+
+def test_viz_snapshot_concurrent_writers_keep_json_parseable(tmp_path: Path) -> None:
+    import threading
+    import time
+
+    snapshot_path = tmp_path / "viz_snapshot.json"
+    errors = []
+    stop = threading.Event()
+    started = threading.Barrier(parties=5)
+
+    def _writer(tid: int) -> None:
+        started.wait(timeout=CI_TIMEOUT_S)
+        for idx in range(10):
+            observer = VizObserver(
+                config=VizObserverConfig(snapshot_path=str(snapshot_path)),
+                snapshot={
+                    "meta": {"t": int(tid), "i": int(idx)},
+                    "nodes": [
+                        {"id": f"n:{j}", "type": "node", "data": {"label": "x" * 200}, "position": {"x": j, "y": j}} for j in range(25)
+                    ],
+                    "edges": [],
+                },
+            )
+            observer._write_snapshot_if_needed()
+
+    def _reader() -> None:
+        started.wait(timeout=CI_TIMEOUT_S)
+        while not stop.is_set():
+            if not snapshot_path.exists():
+                time.sleep(0.001)
+                continue
+            try:
+                _ = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+                return
+            time.sleep(0.001)
+
+    reader = threading.Thread(target=_reader)
+    writers = [threading.Thread(target=_writer, args=(tid,)) for tid in range(4)]
+
+    reader.start()
+    for t in writers:
+        t.start()
+
+    for t in writers:
+        t.join(timeout=CI_TIMEOUT_S)
+        assert not t.is_alive()
+
+    stop.set()
+    reader.join(timeout=CI_TIMEOUT_S)
+    assert not reader.is_alive()
+
+    if errors:
+        raise AssertionError(errors)
+    _ = json.loads(snapshot_path.read_text(encoding="utf-8"))
 
 
 def test_viz_event_emitter_handles_serialization_error_and_disabled_output() -> None:
