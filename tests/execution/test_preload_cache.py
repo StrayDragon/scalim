@@ -753,38 +753,23 @@ def test_preload_cache_inflight_wait_raises_clear_internal_error_if_done_without
         raise AssertionError("expected RuntimeError for inflight done but missing value/error")
 
 
-def test_preload_cache_clone_exception_for_reraise_exercises_fallbacks() -> None:
+def test_preload_cache_waiter_error_is_cloned_for_reraise() -> None:
     from scalim.execution import preload_cache as preload_cache_module
 
-    # copy.copy path
-    e1 = ValueError("x")
-    c1 = preload_cache_module._clone_exception_for_reraise(e1)  # type: ignore[attr-defined]
-    assert isinstance(c1, BaseException)
-    assert type(c1) is ValueError
-    assert c1 is not e1
+    cache = PreloadCache()
+    inflight = preload_cache_module._InFlight(owner_ident=123)  # type: ignore[attr-defined]
+    err = ValueError("x")
+    inflight.error = err
+    inflight.done.set()
+    cache._inflight["src"] = inflight  # type: ignore[attr-defined]
 
-    # ctor fallback path (copy fails)
-    class _UncopyableError(Exception):
-        def __reduce__(self):  # type: ignore[no-untyped-def]
-            raise RuntimeError("nope")
+    def _load():  # type: ignore[no-untyped-def]
+        raise AssertionError("load_fn should not be called")
 
-    e2 = _UncopyableError("y")
-    c2 = preload_cache_module._clone_exception_for_reraise(e2)  # type: ignore[attr-defined]
-    assert isinstance(c2, BaseException)
-    assert type(c2) is _UncopyableError
-    assert c2 is not e2
-
-    # final fallback path (copy fails + ctor fails)
-    class _BadCtorError(Exception):
-        def __reduce__(self):  # type: ignore[no-untyped-def]
-            raise RuntimeError("nope")
-
-        def __init__(self):  # type: ignore[no-untyped-def]
-            super(_BadCtorError, self).__init__("bad")
-
-    e3 = _BadCtorError()
-    c3 = preload_cache_module._clone_exception_for_reraise(e3)  # type: ignore[attr-defined]
-    assert c3 is e3
+    with pytest.raises(ValueError) as excinfo:
+        cache.get_or_load("src", _load)
+    assert excinfo.value is not err
+    assert excinfo.value.args == err.args
 
 
 def test_preload_cache_owner_error_path_tolerates_unexpected_with_traceback_failure() -> None:

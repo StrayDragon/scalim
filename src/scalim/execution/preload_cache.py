@@ -1,5 +1,3 @@
-import contextlib
-import copy
 import math
 import threading
 import time
@@ -8,6 +6,7 @@ from collections.abc import MutableMapping as MutableMappingABC
 from typing import TYPE_CHECKING, Callable, Dict, Iterator, Optional
 
 from .._internal import loggingx
+from .._internal.utils.exceptions import clone_exception_for_reraise
 from ..typedefs import LoaderResultMapping
 from ..vendor.compact.typing_extensionsx import override
 
@@ -91,21 +90,6 @@ class PreloadCacheSignatureGuardrail(object):
     @classmethod
     def disabled(cls) -> "PreloadCacheSignatureGuardrail":
         return cls(enabled=False)
-
-
-def _clone_exception_for_reraise(exc: BaseException) -> BaseException:
-    try:
-        cloned = copy.copy(exc)
-    except Exception:  # noqa: BLE001
-        cloned = None
-    if isinstance(cloned, BaseException):
-        return cloned
-
-    try:
-        args = exc.args
-        return exc.__class__(*args)
-    except Exception:  # noqa: BLE001
-        return exc
 
 
 class PreloadCache(_PreloadCacheBase):
@@ -198,9 +182,7 @@ class PreloadCache(_PreloadCacheBase):
         try:
             value = load_fn()
         except BaseException as exc:
-            stored_error = _clone_exception_for_reraise(exc)
-            with contextlib.suppress(Exception):
-                stored_error = stored_error.with_traceback(None)
+            stored_error = clone_exception_for_reraise(exc)
             with lock:
                 inflight.error = stored_error
                 inflight.value = None
@@ -249,7 +231,7 @@ class PreloadCache(_PreloadCacheBase):
             if source_id in self._data:
                 return self._data[source_id]
         if inflight.error is not None:
-            raise _clone_exception_for_reraise(inflight.error)
+            raise clone_exception_for_reraise(inflight.error)
         if inflight.value is not None:
             return inflight.value
         msg = "PreloadCache internal error: inflight done but missing value/error for source_id: {!r}".format(source_id)

@@ -102,10 +102,20 @@ def test_release_write_lock_is_best_effort(tmp_path: Path) -> None:
 
 
 def test_clone_exception_for_reraise_handles_fallbacks() -> None:
-    clone = resources_base_mod._clone_exception_for_reraise
+    from scalim._internal.utils.exceptions import clone_exception_for_reraise
+
+    clone = clone_exception_for_reraise
 
     first = clone(resources_mod.ScalimWorkflowWriteError("boom"))
     assert isinstance(first, BaseException)
+
+    try:
+        raise ValueError("with traceback")
+    except ValueError as exc:
+        with_tb = exc
+
+    cloned_with_tb = clone(with_tb)
+    assert cloned_with_tb.__traceback__ is None
 
     class _CopyFails(Exception):
         def __reduce_ex__(self, _protocol: int) -> object:

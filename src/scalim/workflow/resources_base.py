@@ -6,7 +6,6 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-import copy
 import math
 import os
 import socket
@@ -20,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, cast
 
 from .._internal import loggingx
+from .._internal.utils.exceptions import clone_exception_for_reraise
 from ..events import (
     EVENT_DIAGNOSTIC_WARNING,
     EVENT_WORKFLOW_RESOURCE_COMMIT,
@@ -82,20 +82,6 @@ class ScalimWorkflowWriteError(ScalimWorkflowError):
     def __init__(self, message: str, *, diff: Optional[List[str]] = None) -> None:
         super(ScalimWorkflowWriteError, self).__init__(message)
         self.diff = list(diff) if diff is not None else None
-
-
-def _clone_exception_for_reraise(exc: BaseException) -> BaseException:
-    try:
-        cloned = copy.copy(exc)
-    except Exception:  # noqa: BLE001
-        cloned = None
-    if isinstance(cloned, BaseException):
-        return cloned
-
-    try:
-        return exc.__class__(*exc.args)
-    except Exception:  # noqa: BLE001
-        return exc
 
 
 class _InFlightCreate:
@@ -639,9 +625,7 @@ class _WorkflowResourceManagerBase(ABC):
         inflight_state: _InFlightCreate,
         exc: BaseException,
     ) -> None:
-        stored_error = _clone_exception_for_reraise(exc)
-        with suppress(Exception):
-            stored_error = stored_error.with_traceback(None)
+        stored_error = clone_exception_for_reraise(exc)
         with self._lock:
             inflight_state.error = stored_error
             if inflight.get(key) is inflight_state:
@@ -668,7 +652,7 @@ class _WorkflowResourceManagerBase(ABC):
         if existing is not None:
             return existing
         if error is not None:
-            raise _clone_exception_for_reraise(error)
+            raise clone_exception_for_reraise(error)
         msg = (  # pragma: no cover  # pragma: allow-no-cover unreachable: inflight always stores plan or error
             "WorkflowResourceManager internal error: inflight done but missing plan/error for resource_id: {!r}".format(key)
         )
