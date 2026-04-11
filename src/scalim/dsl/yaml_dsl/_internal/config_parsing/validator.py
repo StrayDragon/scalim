@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from ....._internal.loggingx import format_kv, get_logger, prefix
+from ....._internal.type_narrowing import as_list, as_mapping
 from .....vendor.compact.importlibx import import_module
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import asdict, dataclass
@@ -160,19 +161,18 @@ class ConfigValidator(ValidatorFieldsMixin):
         config: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:
-        outputs_raw = config.get("outputs")
-        outputs = cast("Optional[List[object]]", outputs_raw if isinstance(outputs_raw, list) else None)
+        outputs = as_list(config.get("outputs"), path="outputs")
         if not outputs:
             return config
 
         next_config: Optional[Dict[str, Any]] = None
         for idx, out_raw in enumerate(outputs):
-            out = cast("Optional[Dict[str, Any]]", out_raw if isinstance(out_raw, dict) else None)
+            out = as_mapping(out_raw, path="outputs.{}".format(int(idx)))
             if out is None:
                 continue
 
             write_raw = out.get("write")
-            write_cfg = cast("Optional[Dict[str, Any]]", write_raw if isinstance(write_raw, dict) else None)
+            write_cfg = as_mapping(write_raw, path="outputs.{}.write".format(int(idx)))
             if write_cfg is None:
                 continue
 
@@ -206,7 +206,8 @@ class ConfigValidator(ValidatorFieldsMixin):
             if next_config is None:
                 next_config = dict(config)
 
-            next_outputs = list(cast("List[object]", next_config.get("outputs") or []))
+            existing_outputs = as_list(next_config.get("outputs"), path="outputs") or []
+            next_outputs = list(existing_outputs)
             next_out = dict(out)
             if next_write:
                 next_out["write"] = next_write
@@ -308,8 +309,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         cleaned: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:
-        main_source_raw = cleaned.get("main_source")
-        main_source = cast("Optional[Dict[str, Any]]", main_source_raw if isinstance(main_source_raw, dict) else None)
+        main_source = as_mapping(cleaned.get("main_source"), path="main_source")
         if main_source is None or "retry" not in main_source:
             return cleaned
 
@@ -332,14 +332,13 @@ class ConfigValidator(ValidatorFieldsMixin):
         cleaned: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:
-        sources_raw = cleaned.get("sources")
-        sources = cast("Optional[Dict[str, Any]]", sources_raw if isinstance(sources_raw, dict) else None)
+        sources = as_mapping(cleaned.get("sources"), path="sources")
         if sources is None:
             return cleaned
 
         next_sources: Optional[Dict[str, Any]] = None
         for source_id, source_cfg_raw in sources.items():
-            source_cfg = cast("Optional[Dict[str, Any]]", source_cfg_raw if isinstance(source_cfg_raw, dict) else None)
+            source_cfg = as_mapping(source_cfg_raw, path="sources.{}".format(str(source_id)))
             if source_cfg is None or "retry" not in source_cfg:
                 continue
 

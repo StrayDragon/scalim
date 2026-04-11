@@ -205,6 +205,63 @@ def test_source_normalize_call_by_accepts_ctx_keyword() -> None:
     assert result[1]["v"] == "x"
 
 
+@pytest.mark.parametrize("force_fallback", [False, True])
+@pytest.mark.parametrize(
+    ("factory", "expects_ctx"),
+    [
+        (
+            lambda seen: lambda result, ctx: seen.__setitem__("ctx", ctx) or result,
+            True,
+        ),
+        (
+            lambda seen: lambda result, *, ctx: seen.__setitem__("ctx", ctx) or result,
+            True,
+        ),
+        (
+            lambda seen: lambda result, **kwargs: seen.__setitem__("ctx", kwargs.get("ctx")) or result,
+            True,
+        ),
+        (
+            lambda seen: lambda result: result,
+            False,
+        ),
+    ],
+    ids=[
+        "positional_ctx",
+        "kwonly_ctx",
+        "kwargs_ctx",
+        "result_only",
+    ],
+)
+def test_normalize_call_by_signature_matrix(
+    monkeypatch: pytest.MonkeyPatch,
+    force_fallback: bool,
+    factory: object,
+    expects_ctx: bool,
+) -> None:
+    import scalim.spec.ir._sources as sources_module
+
+    if force_fallback:
+
+        def _raise_value_error(_: object) -> object:
+            raise ValueError("no signature")
+
+        monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+
+    seen: dict = {}
+    fn = factory(seen)
+
+    ctx = sources_module.NormalizeCallByContext(source_id="s1", kind="index_by_key", config_path="sources.s1.normalize.call_by")
+    result: object = {}
+    returned = sources_module._call_normalize_call_by(fn, result, ctx)
+
+    assert returned is result
+    if expects_ctx:
+        assert seen.get("ctx") is ctx
+    else:
+        assert "ctx" not in seen
+
+
 def test_source_normalize_step_apply_value_rejects_unknown_kind() -> None:
     from scalim.spec.ir import SourceNormalizeStepIr
 

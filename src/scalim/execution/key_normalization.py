@@ -8,7 +8,7 @@ def normalize_key_normalization(value: object) -> KeyNormalizationMode:
         return "raw"
     raw = str(value).strip()
     if raw in ("raw", "auto_str", "force_str"):
-        return raw  # type: ignore[return-value]
+        return raw
     msg = "Invalid key_normalization={!r}. Expected 'raw', 'auto_str', or 'force_str'.".format(value)
     raise ValueError(msg)
 

@@ -1,4 +1,6 @@
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional
+
+from ......_internal.type_narrowing import as_list, as_mapping
 
 
 def str_or_none(v: Any) -> Optional[str]:
@@ -6,15 +8,11 @@ def str_or_none(v: Any) -> Optional[str]:
 
 
 def mapping_or_none(value: object) -> Optional[Dict[str, Any]]:
-    if not isinstance(value, dict):
-        return None
-    return cast("Dict[str, Any]", value)  # pragma: allow-cast yaml mapping typed narrowing
+    return as_mapping(value, path="yaml.mapping")
 
 
 def list_or_none(value: object) -> Optional[List[Any]]:
-    if not isinstance(value, list):
-        return None
-    return cast("List[Any]", value)  # pragma: allow-cast yaml list typed narrowing
+    return as_list(value, path="yaml.list")
 
 
 __all__ = ()

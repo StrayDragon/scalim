@@ -154,9 +154,9 @@ class ParserOutputsMixin:
             out_field_id = str(out_field_id_raw or "").strip()
             if not out_field_id:
                 continue
-            if not isinstance(field_raw, dict):
+            field_dict = mapping_or_none(field_raw)
+            if field_dict is None:
                 continue
-            field_dict = cast("Dict[str, Any]", field_raw)  # pragma: allow-cast yaml output aggregate field typed narrowing
             field_defs.append(_AggregateFieldDef(out_field_id=out_field_id, data=field_dict))
             alias_index.add(field_dict, out_field_id)
         return _AggregateFieldIndex(field_defs=field_defs, alias_index=alias_index)
