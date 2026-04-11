@@ -2288,6 +2288,147 @@ def test_resource_manager_commit_csv_commit_failure_raises(tmp_path: Path) -> No
     assert not Path(str(output_dir) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
 
+def test_resource_manager_csv_publish_concurrent_write_lock_fails_fast(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    output_path = tmp_path / "merged.csv"
+    manager1 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf1",
+        instrumentation=_Instrumentation(),
+        workbook_defs={},
+        csv_defs={"merged": str(output_path)},
+        csv_write_lock={"merged": True},
+        sheetbook_defs={},
+    )
+    manager2 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf2",
+        instrumentation=_Instrumentation(),
+        workbook_defs={},
+        csv_defs={"merged": str(output_path)},
+        csv_write_lock={"merged": True},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id"], ["a1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id"], ["b1"]])
+    manager1.apply_csv_append(
+        workflow_node_id="n1",
+        decl_order=0,
+        csv_id="merged",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        header_policy="once",
+        on_mismatch="error",
+    )
+    manager2.apply_csv_append(
+        workflow_node_id="n2",
+        decl_order=0,
+        csv_id="merged",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(second),
+        header_policy="once",
+        on_mismatch="error",
+    )
+
+    blocked_in_replace = threading.Event()
+    continue_replace = threading.Event()
+    original_replace = Path.replace
+
+    def _replace(self: Path, target: object) -> Path:  # noqa: ANN001
+        if str(target) == str(output_path) and not blocked_in_replace.is_set():
+            blocked_in_replace.set()
+            if not continue_replace.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("test timeout waiting to continue replace")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", _replace)
+
+    barrier = threading.Barrier(2)
+    errors: List[BaseException] = []
+
+    def _run(manager: resources_mod.WorkflowResourceManager) -> None:
+        try:
+            _ = barrier.wait(timeout=_TIMEOUT_S)
+            manager.commit_all()
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _run(manager1), daemon=True)
+    t2 = threading.Thread(target=lambda: _run(manager2), daemon=True)
+    t1.start()
+    t2.start()
+
+    assert blocked_in_replace.wait(timeout=_TIMEOUT_S)
+    deadline = time.time() + _TIMEOUT_S
+    while time.time() < deadline and errors == []:
+        time.sleep(0.01)
+    continue_replace.set()
+
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+
+    assert len(errors) == 1
+    assert isinstance(errors[0], resources_mod.ScalimWorkflowWriteError)
+    assert errors[0].diff is not None
+    assert any(str(line).startswith("lock_path=") for line in errors[0].diff or [])
+    assert any(str(line).startswith("lock_owner.workflow_exec_id=") for line in errors[0].diff or [])
+    assert not Path(str(output_path) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
+
+
+def test_resource_manager_csv_publish_without_write_lock_allows_overwrite(tmp_path: Path) -> None:
+    output_path = tmp_path / "merged.csv"
+    manager1 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf1",
+        instrumentation=_Instrumentation(),
+        workbook_defs={},
+        csv_defs={"merged": str(output_path)},
+        csv_write_lock={"merged": False},
+        sheetbook_defs={},
+    )
+    manager2 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf2",
+        instrumentation=_Instrumentation(),
+        workbook_defs={},
+        csv_defs={"merged": str(output_path)},
+        csv_write_lock={"merged": False},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id"], ["a1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id"], ["b1"]])
+    manager1.apply_csv_append(
+        workflow_node_id="n1",
+        decl_order=0,
+        csv_id="merged",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        header_policy="once",
+        on_mismatch="error",
+    )
+    manager1.commit_all()
+
+    manager2.apply_csv_append(
+        workflow_node_id="n2",
+        decl_order=0,
+        csv_id="merged",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(second),
+        header_policy="once",
+        on_mismatch="error",
+    )
+    manager2.commit_all()
+
+    lines = output_path.read_text(encoding="utf-8").strip().splitlines()
+    assert lines == [
+        "id",
+        "b1",
+    ]
+
+
 def test_resource_manager_workbook_publish_concurrent_write_lock_fails_fast(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip("openpyxl")
 

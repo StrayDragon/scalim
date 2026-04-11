@@ -67,6 +67,7 @@ Sources:
 - `encoding`: type=string; default=utf-8; csv_file: 文件编码(默认 `utf-8`).
 - `kind`: type=string; enum=csv_file; file kind.
 - `path`: csv_file: 输出路径(字符串或 {$init_var: <name>})
+- `write_lock`: type=boolean; default=false; csv_file: 写锁(默认 false).
 
 ### `guardrails`
 - `$import`: $import 引用.
@@ -217,6 +218,7 @@ Sources:
 - `encoding`: type=string; default=utf-8; csv_file: 文件编码(默认 `utf-8`).
 - `kind` (required): type=string; enum=csv_file; file kind.
 - `path` (required): csv_file: 输出路径(字符串或 {$init_var: <name>})
+- `write_lock`: type=boolean; default=false; csv_file: 写锁(默认 false).
 
 #### `resources`
 - `books`: type=object; books 资源映射(Excel book; key 为 `book_id`).

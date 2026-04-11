@@ -42,6 +42,18 @@ def test_loader_parse_file_config_semantic_errors_cover_branches() -> None:
     with pytest.raises(ValueError, match=r"path is required for kind=csv_file"):
         _ = loader._parse_file_config({FILE_KEYS["kind"]: "csv_file"}, base_path="resources.files.detail_csv")  # noqa: SLF001
 
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv has unknown keys"):
+        _ = loader._parse_file_config(
+            {FILE_KEYS["kind"]: "csv_file", FILE_KEYS["path"]: "a.csv", "unknown": 1},
+            base_path="resources.files.detail_csv",
+        )  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"resources\.files\.detail_csv\.write_lock must be a boolean"):
+        _ = loader._parse_file_config(
+            {FILE_KEYS["kind"]: "csv_file", FILE_KEYS["path"]: "a.csv", FILE_KEYS["write_lock"]: "yes"},
+            base_path="resources.files.detail_csv",
+        )  # noqa: SLF001
+
 
 def test_outputs_parser_write_include_header_type_error_cover_branches() -> None:
     loader = YamlDemandLoader()

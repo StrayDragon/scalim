@@ -288,6 +288,7 @@ class FileResourceOverride:
     kind: Optional[str] = None
     path: Optional[Union[str, "os.PathLike[str]"]] = None
     encoding: Optional[str] = None
+    write_lock: Optional[bool] = None
 
 
 @dataclass(frozen=True)

@@ -261,6 +261,7 @@ class _WorkflowResourceManagerBase(ABC):
     _workbook_allow_formulas: Dict[str, bool]
     _workbook_write_lock: Dict[str, bool]
     _csv_defs: Dict[str, str]
+    _csv_write_lock: Dict[str, bool]
     _sheetbook_defs: Dict[str, object]
     _workbooks: Dict[str, object]
     _csvs: Dict[str, object]
@@ -284,6 +285,7 @@ class _WorkflowResourceManagerBase(ABC):
         workbook_allow_formulas: Optional[Mapping[str, bool]] = None,
         workbook_write_lock: Optional[Mapping[str, bool]] = None,
         csv_defs: Mapping[str, str],
+        csv_write_lock: Optional[Mapping[str, bool]] = None,
         sheetbook_defs: Mapping[str, object],
         wait_diagnostics: Optional[WorkflowResourceWaitDiagnostics] = None,
         max_wait_s: Optional[float] = None,
@@ -299,6 +301,7 @@ class _WorkflowResourceManagerBase(ABC):
         # 历史 `workbook` 资源的默认值由执行层设置(通常为 `True`); `books.kind=xlsx_file` 默认 `False` 且可由 `YAML` 显式配置.
         self._workbook_write_lock = dict(workbook_write_lock or {})
         self._csv_defs = dict(csv_defs)
+        self._csv_write_lock = dict(csv_write_lock or {})
         self._sheetbook_defs = dict(sheetbook_defs)
         self._workbooks = {}
         self._csvs = {}
@@ -397,6 +400,8 @@ class _WorkflowResourceManagerBase(ABC):
         def _resolve_write_lock(item: _StagedOutput) -> bool:
             if str(item.resource_type) == "workbook":
                 return bool(self._workbook_write_lock.get(str(item.resource_id), False))
+            if str(item.resource_type) == "csv":
+                return bool(self._csv_write_lock.get(str(item.resource_id), False))
             if str(item.resource_type) == "sheetbook":
                 raw_def = self._sheetbook_defs.get(str(item.resource_id))
                 try:

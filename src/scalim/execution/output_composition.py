@@ -438,6 +438,7 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
         header_names=header_names,
         include_header=bool(output.include_header),
         flush_policy="every_n_rows",
+        write_lock=bool(output.write_lock),
     )
 
 

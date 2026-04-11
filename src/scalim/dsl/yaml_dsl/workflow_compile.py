@@ -460,8 +460,30 @@ def _apply_book_patch(  # noqa: C901, PLR0912, PLR0915
     )
 
 
+def _apply_file_patch_encoding(encoding: str, patch: Mapping[str, object], *, path: str) -> str:
+    if "encoding" not in patch:
+        return str(encoding or DEFAULT_OUTPUT_ENCODING)
+    raw_encoding = patch.get("encoding")
+    if raw_encoding is None:
+        return DEFAULT_OUTPUT_ENCODING
+    if not isinstance(raw_encoding, str):
+        msg = "{}.encoding must be a string".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.encoding".format(path))
+    return str(raw_encoding).strip() or DEFAULT_OUTPUT_ENCODING
+
+
+def _apply_file_patch_write_lock(patch: Mapping[str, object], *, path: str, write_lock: bool) -> bool:
+    if "write_lock" not in patch:
+        return bool(write_lock)
+    raw_write_lock = patch.get("write_lock")
+    if not isinstance(raw_write_lock, bool):
+        msg = "{}.write_lock must be a boolean".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+    return bool(raw_write_lock)
+
+
 def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *, path: str) -> FileConfig:
-    allowed_keys = {"kind", "path", "encoding"}
+    allowed_keys = {"kind", "path", "encoding", "write_lock"}
     unknown = sorted({str(k) for k in patch} - allowed_keys)
     if unknown:
         msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
@@ -470,34 +492,26 @@ def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *
     kind = str(base.kind or "").strip() if base is not None else ""
     file_path: Any = base.path if base is not None else None
     encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
+    write_lock = bool(base.write_lock) if base is not None else False
 
-    if "kind" in patch:
-        raw_kind = patch.get("kind")
-        kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
-        if not kind:
-            msg = "{}.kind must be a non-empty string".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+    raw_kind = patch.get("kind", kind)
+    kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
+    if not kind:
+        msg = "{}.kind must be a non-empty string".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
     if kind not in FILE_KINDS:
         msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
         raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
 
-    if "path" in patch:
-        file_path = patch.get("path")
+    file_path = patch.get("path", file_path)
     if file_path is None:
         msg = "{}.path is required for kind=csv_file".format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
 
-    if "encoding" in patch:
-        raw_encoding = patch.get("encoding")
-        if raw_encoding is None:
-            encoding = DEFAULT_OUTPUT_ENCODING
-        elif not isinstance(raw_encoding, str):
-            msg = "{}.encoding must be a string".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.encoding".format(path))
-        else:
-            encoding = str(raw_encoding).strip() or DEFAULT_OUTPUT_ENCODING
+    encoding = _apply_file_patch_encoding(str(encoding), patch, path=path)
+    write_lock = _apply_file_patch_write_lock(patch, path=path, write_lock=bool(write_lock))
 
-    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
+    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding), write_lock=bool(write_lock))
 
 
 def _book_export_path_and_options(
@@ -581,7 +595,11 @@ def _file_export_path_and_options(
         init_vars=init_vars,
         path="{}.path".format(path_prefix),
     )
-    return export_path, {"kind": "csv_file", "encoding": str(file_cfg.encoding or DEFAULT_OUTPUT_ENCODING)}
+    return export_path, {
+        "kind": "csv_file",
+        "encoding": str(file_cfg.encoding or DEFAULT_OUTPUT_ENCODING),
+        "write_lock": bool(file_cfg.write_lock),
+    }
 
 
 def _book_override_to_patch(override: BookResourceOverride) -> Dict[str, object]:  # noqa: C901, PLR0912
@@ -634,6 +652,8 @@ def _file_override_to_patch(override: FileResourceOverride) -> Dict[str, object]
         patch["path"] = override.path
     if override.encoding is not None:
         patch["encoding"] = override.encoding
+    if override.write_lock is not None:
+        patch["write_lock"] = override.write_lock
     return patch
 
 

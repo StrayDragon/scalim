@@ -483,7 +483,7 @@ def _parse_file_config(raw: object, *, path: str) -> FileConfig:
         raise ScalimWorkflowConfigError(msg, path=path)
     typed = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
     _raise_if_import_present(typed, path=path)
-    allowed_keys = {"kind", "path", "encoding"}
+    allowed_keys = {"kind", "path", "encoding", "write_lock"}
     unknown = sorted({str(k) for k in typed} - allowed_keys)
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
@@ -506,7 +506,14 @@ def _parse_file_config(raw: object, *, path: str) -> FileConfig:
     encoding_raw = typed.get("encoding")
     encoding = str(encoding_raw or "").strip() if isinstance(encoding_raw, str) else ""
     encoding = encoding or DEFAULT_OUTPUT_ENCODING
-    return FileConfig(kind=kind, path=file_path, encoding=encoding)
+
+    write_lock_raw = typed.get("write_lock", False)
+    if not isinstance(write_lock_raw, bool):
+        msg = "{}.write_lock must be a boolean".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+    write_lock = bool(write_lock_raw)
+
+    return FileConfig(kind=kind, path=file_path, encoding=encoding, write_lock=write_lock)
 
 
 def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:

@@ -291,6 +291,16 @@ class FileConfig:
         ),
     )
 
+    write_lock: bool = dataclass_field(
+        default=False,
+        metadata=schema_meta(
+            desc="csv_file: 写锁(默认 false)",
+            md="csv_file: 写锁(默认 false).",
+            default=False,
+            examples=[False],
+        ),
+    )
+
 
 @dataclass(frozen=True)
 class ResourcesConfig:

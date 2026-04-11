@@ -716,13 +716,20 @@ def _maybe_build_workflow_cache_pool(
     )
 
 
+def _options_bool(opts: object, key: str, *, default: bool = False) -> bool:
+    if not _is_dict_str_any(opts):
+        return bool(default)
+    return bool(opts.get(str(key), default))
+
+
 def _build_workflow_resource_defs(  # noqa: PLR0915
     workflow_ir: WorkflowIr,
-) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, bool], Dict[str, str], Dict[str, SheetBookDef]]:
+) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, bool], Dict[str, str], Dict[str, bool], Dict[str, SheetBookDef]]:
     workbook_defs: Dict[str, str] = {}
     workbook_allow_formulas_by_id: Dict[str, bool] = {}
     workbook_write_lock_by_id: Dict[str, bool] = {}
     csv_defs: Dict[str, str] = {}
+    csv_write_lock_by_id: Dict[str, bool] = {}
     sheetbook_defs: Dict[str, SheetBookDef] = {}
 
     for res in workflow_ir.resources:
@@ -765,15 +772,14 @@ def _build_workflow_resource_defs(  # noqa: PLR0915
         if res_type == "workbook":
             workbook_defs[str(res.resource_id)] = str(res.path)
             opts = res.options or {}
-            allow_formulas = False
-            if isinstance(opts, dict):
-                allow_formulas = bool(opts.get("allow_formulas", False))
-            workbook_allow_formulas_by_id[str(res.resource_id)] = bool(allow_formulas)
+            workbook_allow_formulas_by_id[str(res.resource_id)] = _options_bool(opts, "allow_formulas", default=False)
             workbook_write_lock_by_id[str(res.resource_id)] = True
             continue
 
         if res_type == "csv":
             csv_defs[str(res.resource_id)] = str(res.path)
+            opts = res.options or {}
+            csv_write_lock_by_id[str(res.resource_id)] = _options_bool(opts, "write_lock", default=False)
             continue
 
         if res_type == "sheetbook":
@@ -798,7 +804,7 @@ def _build_workflow_resource_defs(  # noqa: PLR0915
             )
             continue
 
-    return workbook_defs, workbook_allow_formulas_by_id, workbook_write_lock_by_id, csv_defs, sheetbook_defs
+    return workbook_defs, workbook_allow_formulas_by_id, workbook_write_lock_by_id, csv_defs, csv_write_lock_by_id, sheetbook_defs
 
 
 def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, FrozenSet[str]]:
@@ -893,6 +899,7 @@ def _prepare_workflow_run_ir(
             workbook_allow_formulas_by_id,
             workbook_write_lock_by_id,
             csv_defs,
+            csv_write_lock_by_id,
             sheetbook_defs,
         ) = _build_workflow_resource_defs(workflow_ir)
         diagnostics_ir = workflow_ir.options.resources_wait.diagnostics
@@ -909,6 +916,7 @@ def _prepare_workflow_run_ir(
             workbook_allow_formulas=workbook_allow_formulas_by_id,
             workbook_write_lock=workbook_write_lock_by_id,
             csv_defs=csv_defs,
+            csv_write_lock=csv_write_lock_by_id,
             sheetbook_defs=sheetbook_defs,
             wait_diagnostics=wait_diagnostics,
             max_wait_s=float(workflow_ir.options.resources_wait.max_wait_s),

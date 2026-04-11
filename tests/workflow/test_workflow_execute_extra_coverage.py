@@ -427,6 +427,7 @@ def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors(
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
         resources=(
             WorkflowResourceIr(resource_id="report", resource_type="workbook", path="./r.xlsx", options={"allow_formulas": True}),
+            WorkflowResourceIr(resource_id="out", resource_type="csv", path="./out.csv", options={"write_lock": True}),
             WorkflowResourceIr(
                 resource_id="sb",
                 resource_type="sheetbook",
@@ -437,12 +438,14 @@ def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors(
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
 
-    workbook_defs, workbook_allow_formulas, workbook_write_lock, _csv_defs, sheetbook_defs = (
+    workbook_defs, workbook_allow_formulas, workbook_write_lock, csv_defs, csv_write_lock, sheetbook_defs = (
         workflow_execute_mod._build_workflow_resource_defs(workflow_ir)
     )
     assert workbook_defs["report"].endswith("r.xlsx")
     assert workbook_allow_formulas["report"] is True
     assert workbook_write_lock["report"] is True
+    assert csv_defs["out"].endswith("out.csv")
+    assert csv_write_lock["out"] is True
     assert "sb" in sheetbook_defs
 
     bad_ir = WorkflowIr(

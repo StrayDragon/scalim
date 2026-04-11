@@ -940,6 +940,7 @@ def _apply_file_override(base: Optional[FileConfig], override: FileResourceOverr
     kind = str(base.kind or "").strip() if base is not None else ""
     file_path: Any = base.path if base is not None else None
     encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
+    write_lock = bool(base.write_lock) if base is not None else False
 
     if override.kind is not None:
         kind = str(override.kind or "").strip()
@@ -962,7 +963,13 @@ def _apply_file_override(base: Optional[FileConfig], override: FileResourceOverr
             raise TypeError(msg)
         encoding = str(override.encoding).strip() or DEFAULT_OUTPUT_ENCODING
 
-    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
+    if override.write_lock is not None:
+        if not isinstance(override.write_lock, bool):
+            msg = "{}.write_lock must be a boolean".format(path)
+            raise TypeError(msg)
+        write_lock = bool(override.write_lock)
+
+    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding), write_lock=bool(write_lock))
 
 
 def _apply_resources_override(config: DemandConfig, override: ResourcesOverride) -> DemandConfig:

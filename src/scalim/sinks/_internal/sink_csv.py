@@ -3,7 +3,10 @@
 import csv
 import io
 import logging
+import os
+import socket
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
@@ -42,6 +45,63 @@ CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = CSV_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
 COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ColumnCSVSink 删除临时文件失败"
 COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
+
+_WRITE_LOCK_SUFFIX = ".scalim.lock"
+
+
+def _read_lock_owner_info(lock_path: Path) -> Dict[str, str]:
+    info: Dict[str, str] = {}
+    try:
+        raw = lock_path.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        return info
+    for raw_line in raw.splitlines():
+        line = str(raw_line or "").strip()
+        if not line or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k = str(k or "").strip()
+        v = str(v or "").strip()
+        if not k:
+            continue
+        info[str(k)] = str(v)
+    return info
+
+
+def _acquire_write_lock(output_path: str) -> Path:
+    lock_path = Path(str(output_path) + _WRITE_LOCK_SUFFIX)
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        lock_info = _read_lock_owner_info(lock_path)
+        if not lock_info:
+            for _ in range(5):
+                time.sleep(0.01)
+                lock_info = _read_lock_owner_info(lock_path)
+                if lock_info:
+                    break
+        diff = [
+            "lock_path={!r}".format(str(lock_path)),
+        ]
+        for k in sorted(lock_info.keys()):
+            diff.append("lock_owner.{}={!r}".format(str(k), str(lock_info.get(k) or "")))
+        msg = "Output path is locked (possible concurrent writers): output_path={!r}, {}".format(str(output_path), ", ".join(diff))
+        raise RuntimeError(msg) from None
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        _ = f.write("pid={}\n".format(os.getpid()))
+        _ = f.write("created_at_unix_s={}\n".format(int(time.time())))
+        with suppress(Exception):
+            _ = f.write("hostname={}\n".format(socket.gethostname()))
+    return lock_path
+
+
+def _release_write_lock(lock_path: Path) -> None:
+    try:
+        lock_path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        _LOGGER.warning("%s删除输出锁文件失败: %s", _SINKS_PREFIX, lock_path, exc_info=True)
 
 
 def _normalize_csv_value(value: Any) -> str:
@@ -161,6 +221,7 @@ class CSVSink(BaseRowSink):
     _open_fn: Callable[..., io.TextIOWrapper]
     _aligned_cache_field_keys: Optional[Tuple[str, ...]]
     _aligned_cache_indexes: Optional[List[Optional[int]]]
+    _write_lock: bool
 
     def __init__(
         self,
@@ -174,6 +235,7 @@ class CSVSink(BaseRowSink):
         flush_every_rows: int = 1000,
         open_fn: Optional[Callable[..., io.TextIOWrapper]] = None,
         allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        write_lock: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.delimiter = delimiter
@@ -183,6 +245,7 @@ class CSVSink(BaseRowSink):
         self.flush_every_rows = flush_every_rows
         self._open_fn = open_fn or io.open
         self.allow_formulas = bool(allow_formulas)
+        self._write_lock = bool(write_lock)
         self._rows_since_flush = 0
         self._closed = False
 
@@ -270,18 +333,32 @@ class CSVSink(BaseRowSink):
 
         self._file.close()
         temp_path_obj = Path(self._temp_path)
+
+        lock_path: Optional[Path] = None
         try:
-            # 原子重命名临时文件到目标路径
-            _ = temp_path_obj.replace(self.output_path)
-        except OSError as exc:
-            _LOGGER.exception(CSV_SINK_ATOMIC_REPLACE_FAILED_LOG, self.output_path)
+            if self._write_lock:
+                lock_path = _acquire_write_lock(self.output_path)
+
+            try:
+                # 原子重命名临时文件到目标路径
+                _ = temp_path_obj.replace(self.output_path)
+            except OSError as exc:
+                _LOGGER.exception(CSV_SINK_ATOMIC_REPLACE_FAILED_LOG, self.output_path)
+                if temp_path_obj.exists():
+                    try:
+                        temp_path_obj.unlink()
+                    except OSError:
+                        _LOGGER.warning(CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                msg = "CSVSink close failed: failed to replace temp file {} -> {}".format(temp_path_obj, self.output_path)
+                raise OSError(msg) from exc
+        except RuntimeError:
             if temp_path_obj.exists():
-                try:
+                with suppress(Exception):
                     temp_path_obj.unlink()
-                except OSError:
-                    _LOGGER.warning(CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
-            msg = "CSVSink close failed: failed to replace temp file {} -> {}".format(temp_path_obj, self.output_path)
-            raise OSError(msg) from exc
+            raise
+        finally:
+            if lock_path is not None:
+                _release_write_lock(lock_path)
 
         self._closed = True
 
@@ -330,6 +407,7 @@ class ColumnCSVSink(IColumnSink):
     _row_ids: List[Any]
     _columns: ColumnData
     _closed: bool
+    _write_lock: bool
 
     def __init__(
         self,
@@ -340,6 +418,7 @@ class ColumnCSVSink(IColumnSink):
         encoding: str = "utf-8",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        write_lock: bool = False,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names
@@ -348,6 +427,7 @@ class ColumnCSVSink(IColumnSink):
         self.encoding = encoding
         self.include_header = include_header
         self.allow_formulas = bool(allow_formulas)
+        self._write_lock = bool(write_lock)
         self._row_ids = []
         self._columns = {}
         self._closed = False
@@ -405,9 +485,16 @@ class ColumnCSVSink(IColumnSink):
                         [_normalize_csv_value_for_spreadsheet(value, allow_formulas=self.allow_formulas) for value in row_values]
                     )
 
-            # 原子重命名临时文件到目标路径
-            _ = temp_path_obj.replace(self.output_path)
-        except (OSError, csv.Error):
+            lock_path: Optional[Path] = None
+            try:
+                if self._write_lock:
+                    lock_path = _acquire_write_lock(self.output_path)
+                # 原子重命名临时文件到目标路径
+                _ = temp_path_obj.replace(self.output_path)
+            finally:
+                if lock_path is not None:
+                    _release_write_lock(lock_path)
+        except (OSError, csv.Error, RuntimeError):
             # 清理临时文件
             if temp_path_obj.exists():
                 try:

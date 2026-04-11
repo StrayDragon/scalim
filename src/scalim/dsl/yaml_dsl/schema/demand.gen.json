@@ -2126,6 +2126,15 @@
             "utf-8"
           ]
         },
+        "write_lock": {
+          "type": "boolean",
+          "description": "csv_file: 写锁(默认 false).",
+          "markdownDescription": "#### resources.files.*.write_lock\n\ncsv_file: 写锁(默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
         "$import": {
           "oneOf": [
             {

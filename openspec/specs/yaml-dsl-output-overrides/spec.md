@@ -110,7 +110,7 @@
 语义:
 
 - `RunOverrides.resources` 与 `RunOverrides.outputs_defaults` MUST 以 patch/overlay 方式应用到 YAML(不做整体 replace)
-- overlay MUST 仅允许覆盖 IO 层字段(例如 `books.*.path/budget/export_xlsx/write_defaults/allow_formulas/write_lock` 或 `files.*.path/encoding`)
+- overlay MUST 仅允许覆盖 IO 层字段(例如 `books.*.path/budget/export_xlsx/write_defaults/allow_formulas/write_lock` 或 `files.*.path/encoding/write_lock`)
 - overlay MUST NOT 允许覆盖输出定义层字段(例如 `outputs[*].where/from/aggregate`)
 
 #### Scenario: overriding book path does not require editing YAML
@@ -119,3 +119,8 @@
 - **WHEN** 调用方提供 `RunOverrides.resources.books["report"].path=./out/report_dev.xlsx`
 - **THEN** effective 运行 MUST 将输出写入 `./out/report_dev.xlsx`
 
+#### Scenario: overriding file write_lock does not require editing YAML
+
+- **GIVEN** demand/workflow YAML 声明 `resources.files.detail.kind=csv_file` 且 `path=./out/detail.csv`
+- **WHEN** 调用方提供 `RunOverrides.resources.files["detail"].write_lock=true`
+- **THEN** effective file resource config MUST 使 `resources.files.detail.write_lock` 等价为 `true`

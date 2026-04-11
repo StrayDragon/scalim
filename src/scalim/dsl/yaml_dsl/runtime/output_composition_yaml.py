@@ -311,6 +311,7 @@ def _output_spec_for_file_resource(file_cfg: FileConfig, *, path: Optional[str],
         streaming=True,
         include_header=bool(include_header),
         sheet_name=None,
+        write_lock=bool(file_cfg.write_lock),
     )
 
 

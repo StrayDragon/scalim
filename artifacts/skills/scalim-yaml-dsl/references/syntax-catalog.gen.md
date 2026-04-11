@@ -75,7 +75,7 @@ entries[35	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	
   33	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
   34	workflow	workflow.options	properties.workflow.properties.options	false	null	object	#### workflow.options workflow.options	null	null	null	null	additionalProperties=false
   35	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"#### workflow.resources workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
-properties[119	]{entry_id	name	required	summary}:
+properties[120	]{entry_id	name	required	summary}:
   6	$import	false	string | array, oneOf(2)
   7	$import	false	string | array, oneOf(2)
   8	$import	false	string | array, oneOf(2)
@@ -112,6 +112,7 @@ properties[119	]{entry_id	name	required	summary}:
   16	encoding	false	string
   16	kind	false	string, enum csv_file
   16	path	false	string | object, oneOf(2)
+  16	write_lock	false	boolean
   17	relations	false	ref #/definitions/guardrails_relations
   17	$import	false	string | array, oneOf(2)
   17	compute	false	ref #/definitions/guardrails_compute

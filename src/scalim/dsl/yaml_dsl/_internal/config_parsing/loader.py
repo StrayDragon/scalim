@@ -464,6 +464,12 @@ class YamlDemandLoader(
         )
 
     def _parse_file_config(self, raw: Dict[str, Any], *, base_path: str) -> FileConfig:
+        allowed_keys = {FILE_KEYS["kind"], FILE_KEYS["path"], FILE_KEYS["encoding"], FILE_KEYS["write_lock"]}
+        unknown = sorted({str(k) for k in raw} - allowed_keys)
+        if unknown:
+            msg = "{} has unknown keys: {}".format(base_path, ", ".join(unknown))
+            raise ValueError(msg)
+
         kind = str(raw.get(FILE_KEYS["kind"]) or "").strip()
         if not kind:
             msg = "{}.kind is required".format(base_path)
@@ -478,7 +484,12 @@ class YamlDemandLoader(
             raise ValueError(msg)
 
         encoding = str(raw.get(FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
-        return FileConfig(kind=kind, path=path, encoding=encoding)
+        write_lock_raw = raw.get(FILE_KEYS["write_lock"], False)
+        if not isinstance(write_lock_raw, bool):
+            msg = "{}.write_lock must be a boolean".format(base_path)
+            raise TypeError(msg)
+        write_lock = bool(write_lock_raw)
+        return FileConfig(kind=kind, path=path, encoding=encoding, write_lock=write_lock)
 
     def _parse_path_or_init_var(self, raw: object, *, path: str) -> Any:
         if isinstance(raw, dict):
