@@ -19,6 +19,8 @@ from .base import (
     ColumnData,
     ColumnValues,
     IColumnSink,
+    atomic_replace_temp_path,
+    best_effort_cleanup_temp_path_dir,
     create_temp_path,
     iter_row_values,
     store_rows_as_columns,
@@ -250,7 +252,7 @@ class ExcelSink(BaseRowSink):
                 try:
                     self._workbook.save(temp_path_obj)
                     # 原子重命名临时文件到目标路径
-                    _ = temp_path_obj.replace(self.output_path)
+                    atomic_replace_temp_path(temp_path, self.output_path)
                 except _excel_atomic_save_errors():
                     _LOGGER.exception(EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
                     # 清理临时文件
@@ -260,6 +262,7 @@ class ExcelSink(BaseRowSink):
                         pass
                     except OSError:
                         _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                    best_effort_cleanup_temp_path_dir(temp_path)
                     raise
             except _excel_sink_outer_close_errors():
                 # 尽力清理: 在写锁冲突/保存失败等异常路径,避免出现只写生成器告警.
@@ -412,7 +415,7 @@ class ExcelWorkbookSink:
 
                 try:
                     self._workbook.save(temp_path_obj)
-                    _ = temp_path_obj.replace(self.output_path)
+                    atomic_replace_temp_path(temp_path, self.output_path)
                 except _excel_atomic_save_errors():
                     _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
                     try:
@@ -421,6 +424,7 @@ class ExcelWorkbookSink:
                         pass
                     except OSError:
                         _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                    best_effort_cleanup_temp_path_dir(temp_path)
                     raise
             except _excel_sink_outer_close_errors():
                 # 尽力清理: 在写锁冲突/保存失败等异常路径,避免出现只写生成器告警.
@@ -560,7 +564,7 @@ class ColumnExcelSink(IColumnSink):
 
                 wb.save(temp_path_obj)
                 # 原子重命名临时文件到目标路径
-                _ = temp_path_obj.replace(self.output_path)
+                atomic_replace_temp_path(temp_path, self.output_path)
             except _excel_atomic_save_errors():
                 _LOGGER.exception(COLUMN_EXCEL_SINK_SAVE_FAILED_LOG, self.output_path)
                 # 清理临时文件
@@ -570,6 +574,7 @@ class ColumnExcelSink(IColumnSink):
                     pass
                 except OSError:
                     _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                best_effort_cleanup_temp_path_dir(temp_path)
                 raise
             finally:
                 if wb is not None:

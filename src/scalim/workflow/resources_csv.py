@@ -8,14 +8,13 @@
 import csv
 import io
 from abc import ABC
-from contextlib import suppress
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Union, cast
 
 from ..events import EVENT_DIAGNOSTIC_WARNING
 from ..events._events import DiagnosticWarningEvent
 from ..sinks import InMemoryCsv
-from ..sinks._internal.base import create_temp_path
+from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
@@ -253,10 +252,9 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                             out_row.append(row[idx] if idx >= 0 and idx < len(row) else "")
                         writer.writerow(out_row)
 
-            _ = temp_obj.replace(staging_path)
+            atomic_replace_temp_path(temp_path, staging_path)
         except Exception as exc:
-            with suppress(Exception):
-                temp_obj.unlink()
+            best_effort_remove_temp_path(temp_path)
             msg = "CSV commit failed: {}: {}".format(type(exc).__name__, exc)
             raise ScalimWorkflowWriteError(msg) from exc
 

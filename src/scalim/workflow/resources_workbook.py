@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
 from .._internal.utils.excel import escape_excel_formula
 from ..events import EVENT_DIAGNOSTIC_WARNING
 from ..events._events import DiagnosticWarningEvent
-from ..sinks._internal.base import create_temp_path
+from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
@@ -333,10 +333,9 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             temp_obj = Path(temp_path)
             try:
                 wb.save(temp_obj)
-                _ = temp_obj.replace(staging_path)
+                atomic_replace_temp_path(temp_path, staging_path)
             except Exception as exc:
-                with suppress(Exception):
-                    temp_obj.unlink()
+                best_effort_remove_temp_path(temp_path)
                 msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
                 raise ScalimWorkflowWriteError(msg) from exc
         except Exception:

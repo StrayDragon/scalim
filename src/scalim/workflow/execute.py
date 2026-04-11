@@ -45,7 +45,7 @@ from ..ob.presets.viz import (
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
-from ..sinks._internal.base import create_temp_path
+from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..sinks.rows import InMemoryRows, iter_in_memory_rows_as_main_rows
 from ..spec.ir import DemandIr
 from ..spec.ir._workflow import (
@@ -1625,10 +1625,9 @@ def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
             with temp_file.open("w", encoding="utf-8") as handle:
                 json.dump(workflow_snapshot, handle, ensure_ascii=False, indent=2, default=str)
                 handle.flush()
-            _ = temp_file.replace(snapshot_path)
+            atomic_replace_temp_path(temp_path, str(snapshot_path))
         finally:
-            with contextlib.suppress(OSError):
-                temp_file.unlink()
+            best_effort_remove_temp_path(temp_path)
 
 
 def _build_demand_replay_instrumentation(  # noqa: C901

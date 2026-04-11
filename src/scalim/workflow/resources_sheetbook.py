@@ -13,7 +13,7 @@ from typing import Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 from .._internal.utils.excel import escape_excel_formula
 from ..events import EVENT_DIAGNOSTIC_WARNING
 from ..events._events import DiagnosticWarningEvent
-from ..sinks._internal.base import create_temp_path
+from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..typedefs import FieldValue
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
@@ -60,10 +60,9 @@ def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> Non
     temp_obj = Path(temp_path)
     try:
         wb.save(temp_obj)
-        _ = temp_obj.replace(output_path)
+        atomic_replace_temp_path(temp_path, output_path)
     except Exception as exc:
-        with suppress(Exception):
-            temp_obj.unlink()
+        best_effort_remove_temp_path(temp_path)
         msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
         raise ScalimWorkflowWriteError(msg) from exc
 

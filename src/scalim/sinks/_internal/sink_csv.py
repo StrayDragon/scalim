@@ -21,6 +21,9 @@ from .base import (
     ColumnData,
     ColumnValues,
     IColumnSink,
+    atomic_replace_temp_path,
+    best_effort_cleanup_temp_path_dir,
+    best_effort_remove_temp_path,
     create_temp_path,
     iter_row_values,
     store_rows_as_columns,
@@ -341,7 +344,7 @@ class CSVSink(BaseRowSink):
 
             try:
                 # 原子重命名临时文件到目标路径
-                _ = temp_path_obj.replace(self.output_path)
+                atomic_replace_temp_path(self._temp_path, self.output_path)
             except OSError as exc:
                 _LOGGER.exception(CSV_SINK_ATOMIC_REPLACE_FAILED_LOG, self.output_path)
                 if temp_path_obj.exists():
@@ -349,12 +352,11 @@ class CSVSink(BaseRowSink):
                         temp_path_obj.unlink()
                     except OSError:
                         _LOGGER.warning(CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+                best_effort_cleanup_temp_path_dir(self._temp_path)
                 msg = "CSVSink close failed: failed to replace temp file {} -> {}".format(temp_path_obj, self.output_path)
                 raise OSError(msg) from exc
         except RuntimeError:
-            if temp_path_obj.exists():
-                with suppress(Exception):
-                    temp_path_obj.unlink()
+            best_effort_remove_temp_path(self._temp_path)
             raise
         finally:
             if lock_path is not None:
@@ -470,7 +472,6 @@ class ColumnCSVSink(IColumnSink):
 
         # 使用临时文件,确保在同一目录以支持原子重命名
         temp_path = create_temp_path(self.output_path, ".csv.tmp")
-        temp_path_obj = Path(temp_path)
 
         try:
             with io.open(temp_path, "w", encoding=self.encoding, newline="") as f:
@@ -490,17 +491,19 @@ class ColumnCSVSink(IColumnSink):
                 if self._write_lock:
                     lock_path = _acquire_write_lock(self.output_path)
                 # 原子重命名临时文件到目标路径
-                _ = temp_path_obj.replace(self.output_path)
+                atomic_replace_temp_path(temp_path, self.output_path)
             finally:
                 if lock_path is not None:
                     _release_write_lock(lock_path)
         except (OSError, csv.Error, RuntimeError):
             # 清理临时文件
+            temp_path_obj = Path(temp_path)
             if temp_path_obj.exists():
                 try:
                     temp_path_obj.unlink()
                 except OSError:
                     _LOGGER.warning(COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+            best_effort_cleanup_temp_path_dir(temp_path)
             raise
 
         self._closed = True

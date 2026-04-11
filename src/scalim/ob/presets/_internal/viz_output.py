@@ -1,4 +1,3 @@
-import contextlib
 import json
 import logging
 import threading
@@ -9,7 +8,7 @@ from typing import IO, Any, Dict, Optional, cast
 
 from ...._internal.loggingx import get_logger, prefix
 from ....events import generate_run_id
-from ....sinks._internal.base import create_temp_path
+from ....sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from .viz_config import VizObserverConfig
 from .viz_config import default_viz_dir as _default_viz_dir
 from .viz_config import normalize_output_dir as _normalize_output_dir
@@ -153,7 +152,7 @@ class VizObserverOutputMixin(ABC):
         snapshot = self.snapshot
         if not snapshot_path or not snapshot:
             return
-        temp_file = None
+        temp_path = None
         try:
             path = Path(snapshot_path)
             temp_path = create_temp_path(str(path), ".json.tmp")
@@ -161,14 +160,13 @@ class VizObserverOutputMixin(ABC):
             with temp_file.open("w", encoding="utf-8") as handle:
                 json.dump(snapshot, handle, ensure_ascii=False, indent=2, default=str)
                 handle.flush()
-            _ = temp_file.replace(path)
+            atomic_replace_temp_path(temp_path, str(path))
             self._snapshot_written = True
         except OSError as exc:
             self.config.logger.warning("%s写入快照失败: %s", prefix("viz"), exc)
         finally:
-            if not self._snapshot_written and temp_file is not None:
-                with contextlib.suppress(OSError):
-                    temp_file.unlink()
+            if temp_path is not None:
+                best_effort_remove_temp_path(temp_path)
 
     def _select_payload(self, summary: Dict[str, Any], sample: Dict[str, Any], full: Dict[str, Any]) -> Dict[str, Any]:
         policy = (self.config.payload_policy or "summary").lower()
