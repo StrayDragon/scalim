@@ -331,8 +331,6 @@ class PreloadCache(_PreloadCacheBase):
         signature_digest: Optional[str] = None,
     ) -> LoaderResultMapping:
         digest = self._guardrail_digest_or_none(signature_digest, source_id=source_id)
-        if digest is None and source_id in self._data:
-            return self._data[source_id]
 
         lock = self._lock_for(source_id)
         current_ident = threading.get_ident()

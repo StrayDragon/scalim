@@ -5,8 +5,9 @@ import threading
 import pytest
 
 from scalim.execution.preload_cache import PreloadCache, PreloadCacheSignatureGuardrail, PreloadCacheWaitDiagnostics
+from tests.support.testing_utils import CI_TIMEOUT_S
 
-_TIMEOUT_S = 5.0
+_TIMEOUT_S = CI_TIMEOUT_S
 
 
 def test_preload_cache_supports_basic_mapping_protocol_and_pickle_roundtrip() -> None:
@@ -70,6 +71,64 @@ def test_preload_cache_get_or_load_returns_cached_value_inside_lock() -> None:
 
     assert results == [{1: {"value": "z"}}, {1: {"value": "z"}}]
     assert len(calls) == 1
+
+
+def test_preload_cache_get_or_load_cache_hit_does_not_raise_key_error_under_concurrent_delete() -> None:
+    cache = PreloadCache(signature_guardrail=PreloadCacheSignatureGuardrail.disabled())
+    source_id = "src"
+    cached_value = {1: {"value": "x"}}
+    cache[source_id] = cached_value
+
+    delete_trigger = threading.Event()
+    delete_done = threading.Event()
+    writer_state = {"acquired": False}
+    errors = []
+
+    class _CoordinatedDict(dict):
+        def __contains__(self, key):  # type: ignore[no-untyped-def]
+            exists = dict.__contains__(self, key)
+            if key == source_id and exists:
+                delete_trigger.set()
+                if not delete_done.wait(timeout=_TIMEOUT_S):
+                    raise RuntimeError("timeout waiting for delete_done")
+            return exists
+
+    cache._data = _CoordinatedDict(cache._data)  # type: ignore[attr-defined]
+
+    def _writer() -> None:
+        try:
+            if not delete_trigger.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("timeout waiting for delete_trigger")
+
+            lock = cache._lock_for(source_id)  # type: ignore[attr-defined]
+            acquired = lock.acquire(False)
+            writer_state["acquired"] = acquired
+            try:
+                if acquired:
+                    _ = cache._data.pop(source_id, None)  # type: ignore[attr-defined]
+            finally:
+                if acquired:
+                    lock.release()
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            delete_done.set()
+
+    t = threading.Thread(target=_writer)
+    t.start()
+
+    def _load_should_not_run():  # type: ignore[no-untyped-def]
+        raise AssertionError("load_fn should not be called")
+
+    assert cache.get_or_load(source_id, _load_should_not_run) == cached_value
+
+    t.join(timeout=_TIMEOUT_S)
+    assert not t.is_alive()
+    if errors:
+        raise AssertionError(errors)
+
+    assert writer_state["acquired"] is False
+    assert cache[source_id] == cached_value
 
 
 def test_preload_cache_wait_diagnostics_default_disabled_emits_no_warning(caplog) -> None:
