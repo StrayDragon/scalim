@@ -10,9 +10,29 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import unquote, urlparse
 
 
-DEFAULT_TIMEOUT_S = float(os.environ.get("SCALIM_YAML_DSL_LSP_TIMEOUT_S", "10.0"))
-TRACE_KEEP_N = int(os.environ.get("SCALIM_YAML_DSL_LSP_TRACE_KEEP_N", "80"))
-DIAGNOSTICS_SETTLE_S = float(os.environ.get("SCALIM_YAML_DSL_LSP_DIAGNOSTICS_SETTLE_S", "0.2"))
+def _read_float_env(name: str, default: float) -> float:
+    raw = str(os.environ.get(name, "")).strip()
+    if not raw:
+        return float(default)
+    try:
+        return float(raw)
+    except Exception:  # noqa: BLE001
+        return float(default)
+
+
+def _read_int_env(name: str, default: int) -> int:
+    raw = str(os.environ.get(name, "")).strip()
+    if not raw:
+        return int(default)
+    try:
+        return int(raw)
+    except Exception:  # noqa: BLE001
+        return int(default)
+
+
+DEFAULT_TIMEOUT_S = _read_float_env("SCALIM_YAML_DSL_LSP_TIMEOUT_S", 10.0)
+TRACE_KEEP_N = _read_int_env("SCALIM_YAML_DSL_LSP_TRACE_KEEP_N", 80)
+DIAGNOSTICS_SETTLE_S = _read_float_env("SCALIM_YAML_DSL_LSP_DIAGNOSTICS_SETTLE_S", 0.2)
 
 
 def start_yaml_dsl_lsp_server(workspace: Path) -> subprocess.Popen[bytes]:

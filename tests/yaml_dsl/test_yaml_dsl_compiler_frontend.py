@@ -95,6 +95,15 @@ def test_frontend_diagnostics_reads_yaml_file_when_text_is_missing(tmp_path: Pat
     assert compilation.effective_yaml is not None
 
 
+def test_frontend_diagnostics_degrades_when_yaml_file_is_missing(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "missing.yaml"
+    compilation = compile_demand_frontend_diagnostics(yaml_path)
+
+    assert not compilation.diagnostics.ok()
+    assert compilation.diagnostics.errors
+    assert compilation.diagnostics.errors[0].code == "yaml_read_failed"
+
+
 def test_frontend_diagnostics_degrades_on_unexpected_yaml_parse_error(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     def _boom(*_args, **_kwargs):
         raise RuntimeError("boom")

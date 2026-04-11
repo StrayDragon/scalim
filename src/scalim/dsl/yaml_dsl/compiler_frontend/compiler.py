@@ -108,7 +108,17 @@ def compile_demand_frontend_diagnostics(
 
     yaml_path_resolved = Path(str(yaml_path)).expanduser().resolve(strict=False)
     if yaml_text is None:
-        yaml_text = yaml_path_resolved.read_text(encoding="utf-8")
+        try:
+            yaml_text = yaml_path_resolved.read_text(encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            env = ErrorEnvelope(
+                code="yaml_read_failed",
+                message="Failed to read YAML file: {}: {}".format(type(exc).__name__, exc),
+                source_path=str(yaml_path_resolved),
+                path="(file)",
+                loc=ErrorLoc(1, 1),
+            )
+            return StaticCompilation(diagnostics=FrontendDiagnostics(errors=(env,), warnings=()))
 
     yaml_data, locations, parse_diags = _load_yaml_mapping_with_locations(yaml_text, yaml_path=yaml_path_resolved)
     if yaml_data is None:
