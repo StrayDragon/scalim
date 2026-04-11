@@ -5262,7 +5262,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     assert _read_xlsx_rows(workbook_skip, "S")[-1] == ["a2", "A2"]
 
 
-def test_workflow_shared_output_lock_file_does_not_block_workbook_write(tmp_path: Path) -> None:
+def test_workflow_shared_output_lock_file_blocks_workbook_write_when_write_lock_enabled(tmp_path: Path) -> None:
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
@@ -5294,11 +5294,13 @@ def test_workflow_shared_output_lock_file_does_not_block_workbook_write(tmp_path
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), options=_run_options())
-    assert not result.errors()
-    assert workbook_path.exists()
+    with pytest.raises(WorkflowRuntimeConfigError, match="Output path is locked") as excinfo:
+        _ = run_workflow(str(wf), options=_run_options())
+    assert not workbook_path.exists()
     assert lock_path.exists()
-    assert _read_xlsx_rows(workbook_path, "S")[-1] == ["a2", "A2"]
+    assert excinfo.value.__cause__ is not None
+    assert getattr(excinfo.value.__cause__, "diff", None) is not None
+    assert any(str(line).startswith("lock_path=") for line in (getattr(excinfo.value.__cause__, "diff", None) or []))
 
 
 def test_workflow_pathless_csv_output_without_writes_fails_fast(tmp_path: Path) -> None:

@@ -17,7 +17,7 @@ import traceback
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, cast
 
 from .._internal import loggingx
 from ..events import (
@@ -176,7 +176,7 @@ def _read_lock_owner_info(lock_path: Path) -> Tuple[Dict[str, str], Optional[flo
     return info, mtime_s
 
 
-def _acquire_write_lock(  # noqa: C901
+def _acquire_write_lock(  # noqa: C901, PLR0912
     output_path: str,
     *,
     owner: Optional[Mapping[str, object]] = None,
@@ -197,6 +197,14 @@ def _acquire_write_lock(  # noqa: C901
             fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             lock_info, lock_mtime_s = _read_lock_owner_info(lock_path)
+            # 另一个写入方可能已创建锁文件, 但还未完成写入持有者 `owner` 元信息(极小窗口, 线程/进程调度可触发).
+            # 这里短暂重试读取, 仅用于改善诊断信息,仍保持 `fail-fast`(不等待锁释放).
+            if not lock_info:
+                for _ in range(5):
+                    time.sleep(0.01)
+                    lock_info, lock_mtime_s = _read_lock_owner_info(lock_path)
+                    if lock_info:
+                        break
             lock_age_s = None
             if lock_mtime_s is not None:
                 lock_age_s = max(0.0, float(time.time()) - float(lock_mtime_s))
@@ -287,6 +295,8 @@ class _WorkflowResourceManagerBase(ABC):
         self._instrumentation = instrumentation
         self._workbook_defs = dict(workbook_defs)
         self._workbook_allow_formulas = dict(workbook_allow_formulas or {})
+        # 注意: `workbook_write_lock` 由上游编译/执行层传入; 默认空映射表示不启用 `write_lock`。
+        # 历史 `workbook` 资源的默认值由执行层设置(通常为 `True`); `books.kind=xlsx_file` 默认 `False` 且可由 `YAML` 显式配置.
         self._workbook_write_lock = dict(workbook_write_lock or {})
         self._csv_defs = dict(csv_defs)
         self._sheetbook_defs = dict(sheetbook_defs)
@@ -380,9 +390,20 @@ class _WorkflowResourceManagerBase(ABC):
                 temp_obj.unlink()
             raise
 
-    def _publish_staged_outputs(self) -> None:
+    def _publish_staged_outputs(self) -> None:  # noqa: C901
         if not self._staged_outputs:
             return
+
+        def _resolve_write_lock(item: _StagedOutput) -> bool:
+            if str(item.resource_type) == "workbook":
+                return bool(self._workbook_write_lock.get(str(item.resource_id), False))
+            if str(item.resource_type) == "sheetbook":
+                raw_def = self._sheetbook_defs.get(str(item.resource_id))
+                try:
+                    return bool(cast("Any", raw_def).export_write_lock)  # pragma: allow-cast sheetbook def boundary
+                except AttributeError:
+                    return False
+            return False
 
         def _sort_key(item: _StagedOutput) -> Tuple[str, str, str]:
             return (str(item.resource_type), str(item.resource_id), str(item.final_path))
@@ -402,6 +423,34 @@ class _WorkflowResourceManagerBase(ABC):
                 raise ScalimWorkflowWriteError(msg)
 
             Path(final_path).parent.mkdir(parents=True, exist_ok=True)
+
+            write_lock = _resolve_write_lock(item)
+            lock_path = None
+            if write_lock:
+                owner = {
+                    "workflow_exec_id": self._workflow_exec_id,
+                    "resource_type": str(item.resource_type),
+                    "resource_id": str(item.resource_id),
+                    "workflow_node_id": str(node_id),
+                    "staged_path": str(staged_path),
+                }
+                try:
+                    lock_path = _acquire_write_lock(final_path, owner=owner)
+                except ScalimWorkflowWriteError as exc:
+                    diff = list(exc.diff or [])
+                    diff.extend(
+                        [
+                            "resource_type={!r}".format(str(item.resource_type)),
+                            "resource_id={!r}".format(str(item.resource_id)),
+                            "workflow_node_id={!r}".format(str(node_id)),
+                            "staged_path={!r}".format(str(staged_path)),
+                            "final_path={!r}".format(str(final_path)),
+                            "keep_on_success={!r}".format(bool(self._output_staging_keep_on_success)),
+                            "write_lock={!r}".format(bool(write_lock)),
+                        ]
+                    )
+                    raise ScalimWorkflowWriteError(str(exc), diff=diff) from exc
+
             try:
                 if self._output_staging_keep_on_success:
                     self._copy_file_atomic(staged_path, final_path=final_path)
@@ -414,12 +463,18 @@ class _WorkflowResourceManagerBase(ABC):
                     diff=[
                         "resource_type={!r}".format(str(item.resource_type)),
                         "resource_id={!r}".format(str(item.resource_id)),
+                        "workflow_node_id={!r}".format(str(node_id)),
                         "staged_path={!r}".format(str(staged_path)),
                         "final_path={!r}".format(str(final_path)),
                         "keep_on_success={!r}".format(bool(self._output_staging_keep_on_success)),
+                        "write_lock={!r}".format(bool(write_lock)),
+                        "lock_path={!r}".format(str(lock_path)) if lock_path is not None else "lock_path=<none>",
                         "hint=check_permissions_and_disk_space_or_set_workflow.options.output_staging.keep_on_success=true",
                     ],
                 ) from exc
+            finally:
+                if lock_path is not None:
+                    _release_write_lock(lock_path)
 
             self._emit_resource_commit(
                 workflow_node_id=str(node_id),

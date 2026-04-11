@@ -2288,6 +2288,262 @@ def test_resource_manager_commit_csv_commit_failure_raises(tmp_path: Path) -> No
     assert not Path(str(output_dir) + resources_base_mod._WRITE_LOCK_SUFFIX).exists()
 
 
+def test_resource_manager_workbook_publish_concurrent_write_lock_fails_fast(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("openpyxl")
+
+    output_path = tmp_path / "report.xlsx"
+    manager1 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf1",
+        instrumentation=_Instrumentation(),
+        workbook_defs={"report": str(output_path)},
+        workbook_write_lock={"report": True},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+    manager2 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf2",
+        instrumentation=_Instrumentation(),
+        workbook_defs={"report": str(output_path)},
+        workbook_write_lock={"report": True},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id"], ["a1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id"], ["b1"]])
+    manager1.apply_workbook_sheet(
+        workflow_node_id="n1",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        on_conflict="error",
+    )
+    manager2.apply_workbook_sheet(
+        workflow_node_id="n2",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(second),
+        on_conflict="error",
+    )
+
+    blocked_in_replace = threading.Event()
+    continue_replace = threading.Event()
+    original_replace = Path.replace
+
+    def _replace(self: Path, target: object) -> Path:  # noqa: ANN001
+        if str(target) == str(output_path) and not blocked_in_replace.is_set():
+            blocked_in_replace.set()
+            if not continue_replace.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("test timeout waiting to continue replace")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", _replace)
+
+    barrier = threading.Barrier(2)
+    errors: List[BaseException] = []
+
+    def _run(manager: resources_mod.WorkflowResourceManager) -> None:
+        try:
+            _ = barrier.wait(timeout=_TIMEOUT_S)
+            manager.commit_all()
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _run(manager1), daemon=True)
+    t2 = threading.Thread(target=lambda: _run(manager2), daemon=True)
+    t1.start()
+    t2.start()
+
+    assert blocked_in_replace.wait(timeout=_TIMEOUT_S)
+    deadline = time.time() + _TIMEOUT_S
+    while time.time() < deadline and errors == []:
+        time.sleep(0.01)
+    continue_replace.set()
+
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+
+    assert len(errors) == 1
+    assert isinstance(errors[0], resources_mod.ScalimWorkflowWriteError)
+    assert errors[0].diff is not None
+    assert any(str(line).startswith("lock_path=") for line in errors[0].diff or [])
+    assert any(str(line).startswith("lock_owner.workflow_exec_id=") for line in errors[0].diff or [])
+
+
+def test_resource_manager_sheetbook_publish_concurrent_export_write_lock_fails_fast(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("openpyxl")
+
+    output_path = tmp_path / "report.sheetbook.xlsx"
+    manager1 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf1",
+        instrumentation=_Instrumentation(),
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=str(output_path),
+                export_write_lock=True,
+            )
+        },
+    )
+    manager2 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf2",
+        instrumentation=_Instrumentation(),
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=str(output_path),
+                export_write_lock=True,
+            )
+        },
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id", "value"], ["b1", "B1"]])
+    manager1.apply_sheetbook_append(
+        workflow_node_id="n1",
+        decl_order=0,
+        sheetbook_id="sb",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+    )
+    manager2.apply_sheetbook_append(
+        workflow_node_id="n2",
+        decl_order=0,
+        sheetbook_id="sb",
+        sheet="S",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(second),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+    )
+
+    blocked_in_replace = threading.Event()
+    continue_replace = threading.Event()
+    original_replace = Path.replace
+
+    def _replace(self: Path, target: object) -> Path:  # noqa: ANN001
+        if str(target) == str(output_path) and not blocked_in_replace.is_set():
+            blocked_in_replace.set()
+            if not continue_replace.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("test timeout waiting to continue replace")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", _replace)
+
+    barrier = threading.Barrier(2)
+    errors: List[BaseException] = []
+
+    def _run(manager: resources_mod.WorkflowResourceManager) -> None:
+        try:
+            _ = barrier.wait(timeout=_TIMEOUT_S)
+            manager.commit_all()
+        except BaseException as exc:
+            errors.append(exc)
+
+    t1 = threading.Thread(target=lambda: _run(manager1), daemon=True)
+    t2 = threading.Thread(target=lambda: _run(manager2), daemon=True)
+    t1.start()
+    t2.start()
+
+    assert blocked_in_replace.wait(timeout=_TIMEOUT_S)
+    deadline = time.time() + _TIMEOUT_S
+    while time.time() < deadline and errors == []:
+        time.sleep(0.01)
+    continue_replace.set()
+
+    t1.join(timeout=_TIMEOUT_S)
+    t2.join(timeout=_TIMEOUT_S)
+    assert not t1.is_alive()
+    assert not t2.is_alive()
+
+    assert len(errors) == 1
+    assert isinstance(errors[0], resources_mod.ScalimWorkflowWriteError)
+    assert errors[0].diff is not None
+    assert any(str(line).startswith("lock_path=") for line in errors[0].diff or [])
+    assert any(str(line).startswith("lock_owner.workflow_exec_id=") for line in errors[0].diff or [])
+
+
+def test_resource_manager_workbook_publish_without_write_lock_allows_overwrite(tmp_path: Path) -> None:
+    openpyxl = pytest.importorskip("openpyxl")
+
+    output_path = tmp_path / "report.xlsx"
+    manager1 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf1",
+        instrumentation=_Instrumentation(),
+        workbook_defs={"report": str(output_path)},
+        workbook_write_lock={"report": False},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+    manager2 = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf2",
+        instrumentation=_Instrumentation(),
+        workbook_defs={"report": str(output_path)},
+        workbook_write_lock={"report": False},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id"], ["a1"]])
+    second = _write_csv(tmp_path / "b.csv", [["id"], ["b1"]])
+    manager1.apply_workbook_sheet(
+        workflow_node_id="n1",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        on_conflict="error",
+    )
+    manager1.commit_all()
+
+    manager2.apply_workbook_sheet(
+        workflow_node_id="n2",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(second),
+        on_conflict="error",
+    )
+    manager2.commit_all()
+
+    wb = openpyxl.load_workbook(str(output_path), read_only=True, data_only=True)
+    try:
+        rows = list(wb["S"].iter_rows(values_only=True))
+        assert rows == [("id",), ("b1",)]
+    finally:
+        with suppress(Exception):
+            wb.close()
+
+
 def test_resource_manager_commit_workbook_missing_openpyxl_does_not_write_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     instrumentation = _Instrumentation()
     workbook_path = tmp_path / "report.xlsx"
