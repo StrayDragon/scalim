@@ -10,7 +10,7 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import MainSourceIr, RuntimeHandleIdIr
 
-from tests.support.testing_utils import CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S
+from tests.support.testing_utils import CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S, barrier_wait, event_wait, join_or_fail
 
 _TIMEOUT_S = CI_TIMEOUT_S
 
@@ -32,8 +32,7 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
 
     def _rows1():  # type: ignore[no-untyped-def]
         run1_started.set()
-        if not run1_can_continue.wait(timeout=_TIMEOUT_S):
-            raise RuntimeError("timeout waiting for run1_can_continue")
+        event_wait(run1_can_continue, timeout_s=_TIMEOUT_S, label="run1_can_continue")
         yield {"x": 1}
 
     def _rows2():  # type: ignore[no-untyped-def]
@@ -50,7 +49,7 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
 
     t1 = threading.Thread(target=lambda: _run_rows(_rows1()), daemon=True)
     t1.start()
-    assert run1_started.wait(timeout=_TIMEOUT_S)
+    event_wait(run1_started, timeout_s=_TIMEOUT_S, label="run1_started")
 
     def _run_rows2() -> None:
         run2_thread_started.set()
@@ -59,14 +58,12 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
     t2 = threading.Thread(target=_run_rows2, daemon=True)
     t2.start()
 
-    assert run2_thread_started.wait(timeout=_TIMEOUT_S)
+    event_wait(run2_thread_started, timeout_s=_TIMEOUT_S, label="run2_thread_started")
     assert run2_started.wait(timeout=NEGATIVE_TIMEOUT_S) is False
 
     run1_can_continue.set()
-    t1.join(timeout=_TIMEOUT_S)
-    t2.join(timeout=_TIMEOUT_S)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
+    join_or_fail(t1, timeout_s=_TIMEOUT_S, label="engine.run.t1")
+    join_or_fail(t2, timeout_s=_TIMEOUT_S, label="engine.run.t2")
     assert not errors
     assert run2_started.is_set() is True
 
@@ -80,7 +77,7 @@ def test_observer_manager_capture_drain_and_emit_are_thread_safe() -> None:
 
     def _emit():  # type: ignore[no-untyped-def]
         try:
-            start.wait(timeout=1.0)
+            barrier_wait(start, label="observer_manager._emit.start")
             for i in range(2000):
                 manager.emit_event("x", payload=i)
         except BaseException as exc:  # noqa: BLE001
@@ -90,7 +87,7 @@ def test_observer_manager_capture_drain_and_emit_are_thread_safe() -> None:
 
     def _drain():  # type: ignore[no-untyped-def]
         try:
-            start.wait(timeout=1.0)
+            barrier_wait(start, label="observer_manager._drain.start")
             while not done.is_set():
                 _ = manager.drain_events()
             _ = manager.drain_events()
@@ -101,10 +98,8 @@ def test_observer_manager_capture_drain_and_emit_are_thread_safe() -> None:
     t2 = threading.Thread(target=_drain, daemon=True)
     t1.start()
     t2.start()
-    t1.join(timeout=CI_TIMEOUT_S)
-    t2.join(timeout=CI_TIMEOUT_S)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
+    join_or_fail(t1, timeout_s=CI_TIMEOUT_S, label="observer_manager._emit")
+    join_or_fail(t2, timeout_s=CI_TIMEOUT_S, label="observer_manager._drain")
     assert not errors
 
 
@@ -127,7 +122,7 @@ def test_hook_manager_register_unreg_while_emitting_is_thread_safe() -> None:
 
     def _emit():  # type: ignore[no-untyped-def]
         try:
-            start.wait(timeout=1.0)
+            barrier_wait(start, label="hook_manager._emit.start")
             for _i in range(2000):
                 manager.emit_typed(EVENT_PIPELINE_START, payload=None)
         except BaseException as exc:  # noqa: BLE001
@@ -137,7 +132,7 @@ def test_hook_manager_register_unreg_while_emitting_is_thread_safe() -> None:
 
     def _mutate():  # type: ignore[no-untyped-def]
         try:
-            start.wait(timeout=1.0)
+            barrier_wait(start, label="hook_manager._mutate.start")
             while not done.is_set():
                 manager.register(hook)
                 _ = manager.unregister(hook)
@@ -148,8 +143,6 @@ def test_hook_manager_register_unreg_while_emitting_is_thread_safe() -> None:
     t2 = threading.Thread(target=_mutate, daemon=True)
     t1.start()
     t2.start()
-    t1.join(timeout=CI_TIMEOUT_S)
-    t2.join(timeout=CI_TIMEOUT_S)
-    assert not t1.is_alive()
-    assert not t2.is_alive()
+    join_or_fail(t1, timeout_s=CI_TIMEOUT_S, label="hook_manager._emit")
+    join_or_fail(t2, timeout_s=CI_TIMEOUT_S, label="hook_manager._mutate")
     assert not errors

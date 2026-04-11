@@ -25,7 +25,14 @@ from scalim.execution.adaptive.policy import (
     AdaptivePolicy,
 )
 from scalim.execution.adaptive.tuning import AdaptiveTuning
-from tests.support.testing_utils import InlineExecutor, NoOpLoadRefExecutor, RecordingLoadRefExecutor
+from tests.support.testing_utils import (
+    CI_TIMEOUT_S,
+    InlineExecutor,
+    NoOpLoadRefExecutor,
+    RecordingLoadRefExecutor,
+    event_wait,
+    join_or_fail,
+)
 
 
 def _noop_loader(*_args: Any, **_kwargs: Any) -> dict:
@@ -247,8 +254,7 @@ def test_adaptive_scheduler_enforces_pool_limits() -> None:
                 self._current["n"] += 1
                 self._current["max"] = max(self._current["max"], self._current["n"])
             self._started[op.field_key].set()
-            if not self._finish[op.field_key].wait(timeout=1.0):
-                raise RuntimeError("timeout waiting for finish")
+            event_wait(self._finish[op.field_key], label="finish[{}]".format(str(op.field_key)))
             with self._lock:
                 self._current["n"] -= 1
             _ = context
@@ -280,17 +286,16 @@ def test_adaptive_scheduler_enforces_pool_limits() -> None:
         )
         t.start()
 
-        assert started["a"].wait(timeout=1.0)
-        assert started["b"].wait(timeout=1.0)
+        event_wait(started["a"], label="started[a]")
+        event_wait(started["b"], label="started[b]")
         assert started["c"].wait(timeout=0.3) is False
 
         finish["a"].set()
-        assert started["c"].wait(timeout=1.0)
+        event_wait(started["c"], label="started[c] after finish[a]")
 
         finish["b"].set()
         finish["c"].set()
-        t.join(timeout=5.0)
-        assert not t.is_alive()
+        join_or_fail(t, timeout_s=CI_TIMEOUT_S, label="adaptive_scheduler.execute_segment")
 
     assert current["max"] == 2
 
@@ -544,8 +549,7 @@ def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -
         def execute(self, operator, context, batch_row_nth, runtime) -> None:  # type: ignore[no-untyped-def]
             op = cast("LoadRefOperatorIr", operator)  # pragma: allow-cast test executor typed narrowing
             self._started[op.field_key].set()
-            if not self._finish.wait(timeout=1.0):
-                raise RuntimeError("timeout waiting for finish")
+            event_wait(self._finish, label="finish")
             _ = context
             _ = batch_row_nth
             _ = runtime
@@ -580,13 +584,12 @@ def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -
             daemon=True,
         )
         t.start()
-        assert started["a"].wait(timeout=1.0)
-        assert started["b"].wait(timeout=1.0)
-        assert pool_blocked.wait(timeout=1.0)
+        event_wait(started["a"], label="started[a]")
+        event_wait(started["b"], label="started[b]")
+        event_wait(pool_blocked, label="pool_blocked")
         assert started["c"].is_set() is False
         finish.set()
-        t.join(timeout=1.0)
-        assert not t.is_alive()
+        join_or_fail(t, timeout_s=CI_TIMEOUT_S, label="adaptive_scheduler.emit_pool_limit_diagnostics")
 
     scheduler_metrics = perf.metrics.adaptive_scheduler
     assert scheduler_metrics is not None

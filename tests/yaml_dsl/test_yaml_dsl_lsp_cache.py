@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scalim_yaml_dsl_lsp import cache as lsp_cache
+from tests.support.testing_utils import CI_TIMEOUT_S, event_wait, future_result
 
 
 def _bump_mtime_ns(path: Path) -> None:
@@ -86,18 +87,18 @@ def test_inflight_dedup_prevents_duplicate_reads(monkeypatch: pytest.MonkeyPatch
         if self == path:
             calls["count"] += 1
             started.set()
-            proceed.wait(timeout=2)
+            event_wait(proceed, timeout_s=CI_TIMEOUT_S, label="proceed")
         return orig_read_text(self, *args, **kwargs)
 
     monkeypatch.setattr(Path, "read_text", _slow_read_text)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         fut1 = executor.submit(lsp_cache.read_text_cached, path)
-        assert started.wait(timeout=2)
+        event_wait(started, timeout_s=CI_TIMEOUT_S, label="started")
         fut2 = executor.submit(lsp_cache.read_text_cached, path)
         proceed.set()
 
-        assert fut1.result(timeout=2) == "hello"
-        assert fut2.result(timeout=2) == "hello"
+        assert future_result(fut1, timeout_s=CI_TIMEOUT_S, label="fut1") == "hello"
+        assert future_result(fut2, timeout_s=CI_TIMEOUT_S, label="fut2") == "hello"
 
     assert calls["count"] == 1
