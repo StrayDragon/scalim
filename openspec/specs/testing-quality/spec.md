@@ -15,17 +15,24 @@
 - `tests/bench/` (bench-only suite; marker `bench`)
 
 ## Implementation Notes (Current Behavior)
-- 默认 pytest 配置由 `pyproject.toml` 的 `addopts` 提供(含 `--cov-fail-under=100` 与 `-p no:benchmark`),因此直接运行 `pytest`/`just test` 会默认执行非 bench 测试并进行覆盖率门禁.
+- 默认 pytest 配置由 `pyproject.toml` 的 `addopts` 提供(默认排除 bench + 禁用 benchmark 插件),因此直接运行 `pytest`/`just test` 会执行所有非 bench 测试,但不隐式强制启用 xdist + coverage 门禁(优先本地快速反馈).
+- 质量门禁入口(`just qa`/CI)通过 `just test-gate` 显式启用 xdist 并行 + coverage 统计 + coverage gate,以保证 CI 结果稳定可复现.
 - bench 入口通过 `-o addopts=""` + `--no-cov` 显式关闭默认 addopts(避免覆盖率/xdist 干扰),并启用 pytest-benchmark 的 `--benchmark-only` 工作流.
 ## Requirements
 ### Requirement: 测试分类与默认执行
 - 测试套件 MUST 使用 `bench` marker 标识基准用例.
-- 默认测试入口 MUST 运行所有非 bench 测试.
-- 非 bench 测试 MUST 参与覆盖率统计.
+- 默认（本地/轻量）测试入口 MUST 运行所有非 bench 测试,并以快速反馈为优先(不得隐式强制开启 xdist + coverage 门禁).
+- 质量门禁（CI/qa）入口 MUST 显式启用重型参数(例如 xdist 并行 + coverage 统计 + coverage gate),并运行所有非 bench 测试.
+- 非 bench 测试 MUST 在质量门禁入口中参与覆盖率统计与覆盖率阈值校验.
 
 #### Scenario: 默认执行非 bench 测试
-- **WHEN** 使用默认测试命令执行 pytest
+- **WHEN** 使用默认（本地/轻量）测试命令执行 pytest
 - **THEN** 运行所有非 bench 测试且不包含 bench
+
+#### Scenario: qa/ci gate runs coverage explicitly
+- **WHEN** 使用质量门禁入口(CI/qa)执行测试
+- **THEN** 测试 MUST 显式启用 coverage 统计与覆盖率阈值门禁
+- **AND** 运行范围 MUST 覆盖所有非 bench 测试
 
 ### Requirement: 覆盖率保持 100%
 - 使用覆盖率统计时,核心模块的覆盖率 MUST 保持 100%.
@@ -513,4 +520,3 @@ contract tests MUST：
 - **GIVEN** contract tests 在随机 `tmp_path` 下创建 workspace
 - **WHEN** 生成/对拍 snapshots
 - **THEN** snapshots MUST NOT 包含 `tmp_path` 的绝对路径字符串
-

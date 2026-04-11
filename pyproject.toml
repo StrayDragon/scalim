@@ -217,7 +217,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.pytest]
 [tool.pytest.ini_options]
-addopts = "-rs -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-fail-under=99 -p no:benchmark -m \"not bench\""
+addopts = "-rs -p no:benchmark -m \"not bench\""
 # asyncio_mode = "auto"
 # asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]

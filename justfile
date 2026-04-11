@@ -339,7 +339,11 @@ py-output-language-check:
 # 检查: 运行单元测试
 test:
     # Fast/local functional checks (bench excluded). Use for daily dev loops.
-    uv {{ UV_OPTIONS }} run pytest tests/ -q -m "not bench"
+    uv {{ UV_OPTIONS }} run pytest tests/ -q
+
+# 检查: 运行单元测试 (gate: xdist + coverage)
+test-gate:
+    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-fail-under=99
 
 # 压力测试: 运行
 bench *ARGS:
@@ -697,7 +701,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test
+quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test-gate
 
 alias quick-qa-only-py := quick-check-only-py
 
