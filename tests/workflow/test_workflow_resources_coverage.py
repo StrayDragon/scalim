@@ -25,9 +25,12 @@ _TIMEOUT_S = 5.0
 class _Instrumentation:
     def __init__(self) -> None:
         self.events: List[Dict[str, Any]] = []
+        self.warning_event = threading.Event()
 
     def emit(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> None:
         self.events.append({"event_type": str(event_type), "payload": payload, "meta": dict(meta or {})})
+        if str(event_type) == EVENT_DIAGNOSTIC_WARNING:
+            self.warning_event.set()
 
 
 class _RaiseOnDiagnosticWarningInstrumentation(_Instrumentation):
@@ -1085,17 +1088,31 @@ def test_wait_for_inflight_done_does_not_emit_warning_before_warn_after() -> Non
     instrumentation = _Instrumentation()
     diagnostics = resources_base_mod.WorkflowResourceWaitDiagnostics(
         enabled=True,
-        warn_after_s=0.3,
-        repeat_every_s=0.01,
+        warn_after_s=_TIMEOUT_S,
+        repeat_every_s=None,
         capture_owner_callsite=False,
     )
     manager = _JoinableTestManager(instrumentation=instrumentation, wait_diagnostics=diagnostics)
 
     inflight_state = resources_base_mod._InFlightCreate(owner_thread_ident=123, owner_callsite=None)  # noqa: SLF001
 
+    wait_called = threading.Event()
+    errors: List[BaseException] = []
+    original_wait = inflight_state.done.wait
+
+    def _wait(timeout: Optional[float] = None) -> bool:
+        wait_called.set()
+        return bool(original_wait(timeout=timeout))
+
+    inflight_state.done.wait = _wait  # type: ignore[assignment]
+
     def _set_done() -> None:
-        time.sleep(0.05)
-        inflight_state.done.set()
+        try:
+            if not wait_called.wait(timeout=_TIMEOUT_S):
+                raise RuntimeError("test timeout waiting for inflight_state.done.wait call")
+            inflight_state.done.set()
+        except BaseException as exc:
+            errors.append(exc)
 
     t1 = threading.Thread(target=_set_done, daemon=True)
     t1.start()
@@ -1107,6 +1124,7 @@ def test_wait_for_inflight_done_does_not_emit_warning_before_warn_after() -> Non
     )
     t1.join(timeout=_TIMEOUT_S)
     assert not t1.is_alive()
+    assert not errors
     assert not [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
 
 
@@ -1165,13 +1183,9 @@ def test_joinable_wait_diagnostics_emits_warning_and_includes_required_fields() 
     t2 = threading.Thread(target=_waiter)
     t2.start()
 
-    deadline = time.monotonic() + _TIMEOUT_S
-    warnings: List[Dict[str, Any]] = []
-    while time.monotonic() < deadline:
-        warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
-        if warnings:
-            break
-        time.sleep(0.01)
+    if not instrumentation.warning_event.wait(timeout=_TIMEOUT_S):
+        pytest.fail("test timeout waiting for EVENT_DIAGNOSTIC_WARNING (events={})".format(len(instrumentation.events)))
+    warnings = [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
     assert warnings
 
     continue_create.set()
