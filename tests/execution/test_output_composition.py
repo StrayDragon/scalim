@@ -139,7 +139,7 @@ def test_run_ir_output_composition_workbook_detail_and_summary(tmp_path: Path) -
     meta_kv = {r[0]: r[1] for r in meta_rows[1:]}
     fp = meta_kv.get("derived.summary_by_source.fingerprint")
     assert isinstance(fp, str)
-    assert len(fp) == 40
+    assert len(fp) == 64
 
 
 def test_run_ir_output_composition_can_tee_to_row_sink(tmp_path: Path) -> None:
@@ -466,7 +466,7 @@ def test_audit_includes_derived_truncate_events_and_fingerprint(tmp_path: Path) 
     meta_kv = {r[0]: r[1] for r in meta_rows[1:]}
     fp = meta_kv.get("derived.summary.fingerprint")
     assert isinstance(fp, str)
-    assert len(fp) == 40
+    assert len(fp) == 64
 
     audit_rows = _read_sheet_rows(out, "Audit")
     header = audit_rows[0]
@@ -480,6 +480,28 @@ def test_audit_includes_derived_truncate_events_and_fingerprint(tmp_path: Path) 
     assert row[idx_fp] == fp
     assert "sha256=" in str(row[idx_msg])
     assert len(str(row[idx_hash])) == 64
+
+
+def test_fingerprint_for_derived_target_is_stable_and_sensitive() -> None:
+    derived = DerivedGroupBySpec(
+        group_by=("g",),
+        metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
+    )
+
+    fp1 = output_comp_mod._fingerprint_for_derived_target(target_id="t1", derived=derived)  # noqa: SLF001
+    fp2 = output_comp_mod._fingerprint_for_derived_target(target_id="t1", derived=derived)  # noqa: SLF001
+    assert fp1 == fp2
+    assert len(fp1) == 64
+
+    fp_other_target = output_comp_mod._fingerprint_for_derived_target(target_id="t2", derived=derived)  # noqa: SLF001
+    assert fp_other_target != fp1
+
+    derived_changed = DerivedGroupBySpec(
+        group_by=("g2",),
+        metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
+    )
+    fp_other_parts = output_comp_mod._fingerprint_for_derived_target(target_id="t1", derived=derived_changed)  # noqa: SLF001
+    assert fp_other_parts != fp1
 
 
 def test_dedup_by_first_fail_fast_under_adaptive(tmp_path: Path) -> None:

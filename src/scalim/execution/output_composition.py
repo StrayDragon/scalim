@@ -395,7 +395,9 @@ def _sha256_text(value: str) -> str:
 
 
 def _fingerprint_for_derived_target(*, target_id: str, derived: IDerivedAggregationSpec) -> str:
-    h = hashlib.sha1()  # noqa: S324
+    # 指纹仅用于稳定标识符/对拍与归因,不用于签名/认证/加密等安全用途.
+    # 注意: 指纹会进入 `meta/audit`,属于“对外可见的稳定输出”;本次切换到 `sha256` 属于显式破坏性变更(值变化,长度 40->64).
+    h = hashlib.sha256()
     payload = "\n".join(["target_id=" + str(target_id), *derived.fingerprint_parts()]).encode("utf-8", errors="replace")
     h.update(payload)
     return h.hexdigest()
