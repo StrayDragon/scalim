@@ -12,7 +12,10 @@ LoaderResultMapCallable = Callable[..., object]
 
 LoaderParamsBuilder = Callable[..., LoaderCallParams]
 """
-`Binding.params_builder` 函数类型: `(context) -> (args, kwargs)`
+`params_builder` 运行时函数类型: `(context) -> (args, kwargs)`
+
+说明:
+- 静态 `IR` 用 `BindingIr.params_builder_ref` 描述引用;实际函数对象由“运行时链接”阶段解析后注入 `RuntimeBindings.params_builders`.
 """
 
 

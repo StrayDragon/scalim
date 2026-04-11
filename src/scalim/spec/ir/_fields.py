@@ -202,13 +202,35 @@ class FieldIr:
 class DerivedFieldIr:
     """派生字段(IR): 通过其他依赖字段计算(转换)得出的字段
 
-    示例:
+    说明:
+    - `DerivedFieldIr` 只保存纯数据(`compute_expr`/`call_by` 规范),不保存任何 `Python` 可调用对象.
+    - 运行时会在“运行时链接”阶段把 `compute_expr` 编译为安全函数/把 `call_by.reference` 解析为可调用对象,
+      并注入到 `RuntimeBindings.derived_calculators[field_id]`.
+
+    示例(安全表达式 compute):
       ```python
       DerivedFieldIr(
           field_id="profit",
           name="利润",
           dependencies=("amount", "cost"),
-          calculator=lambda amount, cost: amount - cost,
+          compute_expr="amount - cost",
+      )
+      ```
+
+    示例(call_by 引用):
+      ```python
+      DerivedFieldIr(
+          field_id="profit",
+          name="利润",
+          dependencies=("amount", "cost"),
+          call_by=CallBySpecIr(
+              reference=PythonReferenceIr(
+                  reference="myapp.calculators:profit",
+                  module_path="myapp.calculators",
+                  attr_path=("profit",),
+                  style="dotted",
+              ),
+          ),
       )
       ```
     """

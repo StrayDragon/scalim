@@ -83,25 +83,25 @@ class LoaderCallContextIr:
 class BindingIr:
     """参数绑定(`IR`):定义如何根据运行时上下文构建 `loader` 调用参数.
 
-    `params_builder` 用于构建调用参数,返回 `(args, kwargs)` 元组,例如:
-    ```python
-    lambda ctx: ((), {"order_ids": ctx.lookup_keys})
-    ```
+    说明:
+    - `BindingIr` 只保存纯数据,不保存任何 `Python` 可调用对象.
+    - 对 YAML DSL: 使用 `params_template`(由 params template 编译得到),执行期渲染为 `kwargs`.
+    - 对 Python DSL: 使用 `params_builder_ref`(`CallableRefIr`),在“运行时链接”阶段解析为函数并注入 `RuntimeBindings.params_builders`.
 
-    示例:
-    ```python
-    Binding(
-        key_field="order_id",
-        params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys)}),
-    )
-    ```
+    运行时 `params_builder` 的签名约定:
+    - `(ctx: LoaderCallContextIr) -> (args, kwargs)`
 
-    示例(带元信息):
+    示例(运行时绑定引用):
     ```python
-    Binding(
+    BindingIr(
         key_field="order_id",
-        params_builder=lambda ctx: ((), {"order_ids": list(ctx.lookup_keys)}),
-        meta=BindingFieldMeta(field_name="order_id", field_type=int),
+        params_builder_ref=PythonReferenceIr(
+            reference="myapp.bindings:build_order_params",
+            module_path="myapp.bindings",
+            attr_path=("build_order_params",),
+            style="dotted",
+        ),
+        param_name="order_ids",
     )
     ```
     """

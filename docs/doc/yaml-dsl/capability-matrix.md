@@ -7,9 +7,12 @@
 ??? note "维护提示"
     - 本页是“能力边界/映射表”,当新增 YAML key、调整编译链路或扩展 IR/执行请求时,应同步更新
     - 代码入口:
+      - 静态前端(不 import/不解析引用): `src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py` (`compile_demand_frontend*`)
+      - 编译编排(run/compile): `src/scalim/dsl/yaml_dsl/runtime/compiler.py` (`compile`/`compile_ir`/`build_request`)
+      - 运行时链接(RuntimeBindings): `src/scalim/dsl/yaml_dsl/runtime/runtime_linking.py` (`resolve_runtime_bindings`)
       - 编译产物: `src/scalim/dsl/yaml_dsl/runtime/contracts.py` (`Compilation`)
-      - 编译器: `src/scalim/dsl/yaml_dsl/runtime/compiler.py` (`compile_ir`/`build_request`)
       - IR: `src/scalim/spec/ir/` (例如 `src/scalim/spec/ir/demand.py`, `src/scalim/spec/ir/fields.py`, `src/scalim/spec/ir/sources.py`)
+      - 运行时绑定契约: `src/scalim/execution/runtime_bindings.py` (`RuntimeBindings`)
 
 本仓库的 YAML DSL 编译后会同时产出三层对象:
 
@@ -18,6 +21,9 @@
 3) `ExecutionRequest` (输出、可观测性、并行模式等运行时请求)
 
 因此下表的“编译到”列可能指向 IR,也可能指向 `ExecutionRequest`(这类能力不属于 IR 本体,但属于可执行请求的一部分)。
+
+补充: `DemandIr`/`ExecutionPlan` 只保存纯数据(例如 `CallableRefIr`/表达式文本),不保存任何 `Python` 可调用对象.
+执行阶段需要的函数对象由“运行时链接”阶段解析/编译后注入到 `ExecutionRequest.runtime_bindings`(`RuntimeBindings`)。
 
 ## 1) Demand YAML:顶层/导入/模板
 
@@ -35,12 +41,12 @@
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
 | `main_source.source_id` | `DemandIr.main_source.source_id` | 必填;不可与 `sources` key 冲突 | - |
-| `main_source.loader` | `DemandIr.main_source.loader` | 必须通过 allowlist 解析(安全边界) | 用 `allowed_modules/allowed_functions` 放行 |
+| `main_source.loader` | `DemandIr.main_source.loader_ref` / `RuntimeBindings.main_source_loaders[source_id]` | 静态前端不 import;在“运行时链接”阶段做 allowlist 校验并解析引用(安全边界) | 用 `allowed_modules/allowed_functions` 放行 |
 | `main_source.params` | `DemandIr.main_source.params` | 仅允许静态值 + `{$init_var: <name>}`;禁止 `$keys/$rows` | 把动态输入放 `init_vars` 里,并在调用 `run/compile` 时传入 |
 | `main_source.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(loader_retry=...))` 配置 |
 | `main_source.order_by` | `MainSourceIr.order_by` | 仅批次内写入顺序;每项支持 `-field` 表示 desc | 若需要更复杂排序,在 loader 内排序 |
 | `main_source.fields.*` | `FieldIr` (source=main) | 仅源字段;禁止 `compute/call_by` | 复杂派生逻辑放 `fields.*`(derived) |
-| `sources.*.loader` | `SourceIr.loader_spec` | 必须通过 allowlist 解析(安全边界) | - |
+| `sources.*.loader` | `SourceIr.loader_spec.callable_ref` / `RuntimeBindings.source_loaders[source_id]` | 静态前端不 import;在“运行时链接”阶段做 allowlist 校验并解析引用(安全边界) | - |
 | `sources.*.key` | `SourceIr.key` (`KeyIr.key`) | 支持单键或复合键(tuple/list) | - |
 | `sources.*.lookup_cast` | `SourceIr.key.cast` | 仅提供预置 cast(见 schema choices) | 更复杂归一化用 `normalize.call_by` 或 loader 内处理 |
 | `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | 仅 keys 模式有效;`0/None` 表示不分片 | - |
@@ -55,8 +61,8 @@
 | YAML key | 编译到(主要影响) | 限制/边界 | 替代方案 |
 |---|---|---|---|
 | `fields.*` | `DerivedFieldIr` | 必须 `compute` 或 `call_by`;依赖自动提取 | 复杂逻辑用 `call_by` |
-| `fields.*.compute` | `DerivedFieldIr.calculator`(安全表达式) | 禁止 import/任意执行;表达式能力受限 | 用 `call_by` 引用 Python 函数 |
-| `fields.*.call_by` | `DerivedFieldIr.calculator`(Python callable) | 受 allowlist 限制;签名/依赖由解析器约束 | 将函数放到受控模块并加入 allowlist |
+| `fields.*.compute` | `DerivedFieldIr.compute_expr` / `RuntimeBindings.derived_calculators[field_id]` | 禁止 import/任意执行;表达式能力受限(运行时链接阶段编译为安全函数) | 用 `call_by` 引用 Python 函数 |
+| `fields.*.call_by` | `DerivedFieldIr.call_by` / `RuntimeBindings.derived_calculators[field_id]` | 受 allowlist 限制;签名/依赖由解析器约束(运行时链接阶段解析引用) | 将函数放到受控模块并加入 allowlist |
 | `*.fields.*.extract` | `FieldIr.extract_expr/extract_segments` | 表达式是“路径提取”;不支持 list index 语义 | 需要复杂提取时在 loader 中生成扁平字段 |
 | `*.fields.*.value_cast` | `FieldIr.transform` | 仅预置 cast | 复杂转换用 derived field |
 | `*.fields.*.relation` | `FieldIr.lookup_steps`(解析结果) | 只支持等值关联链(steps);路径必须从 main_source 可达 | 在 `relations` 中沉淀命名链路并用 string ref 复用 |

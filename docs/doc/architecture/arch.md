@@ -27,6 +27,7 @@ Scalim 的核心是“分层 + 批次流水线”:
 
 - 入口可以是 YAML DSL 或 Python DSL
 - 中间统一为不可变 IR(`DemandIr`)
+- 执行期所需 `Python` 可调用对象集中在 `RuntimeBindings`(通过 `ExecutionRequest.runtime_bindings` 注入)
 - 规划层产出执行计划(`ExecutionPlan`)
 - 执行层按批次执行 plan,写入 sink,并发边界被严格控制
 
@@ -39,7 +40,8 @@ flowchart TD
 
   subgraph DSL[DSL 转换层]
     YAML_LOADER[加载+校验<br/>DemandConfig]
-    CONVERTER[Config → IR<br/>安全解析/编译]
+    FRONTEND[静态编译<br/>Config → IR]
+    LINK[运行时链接<br/>CallableRef → RuntimeBindings]
   end
 
   subgraph SPEC[规范层 spec/]
@@ -52,6 +54,7 @@ flowchart TD
   end
 
   subgraph EXEC[执行层 execution/]
+    RB[RuntimeBindings<br/>可调用对象注册表]
     PIPE[SeqPipeline<br/>批次编排]
     BE[BatchExecutor<br/>算子执行]
     RT[ExecutionRuntime<br/>缓存/依赖/观测枢纽]
@@ -68,9 +71,11 @@ flowchart TD
   end
 
   USER_CODE --> IR
-  YAML_DSL --> YAML_LOADER --> CONVERTER --> IR
+  YAML_DSL --> YAML_LOADER --> FRONTEND --> IR
+  IR --> LINK --> RB
   IR --> PB --> EP
   EP --> PIPE --> BE
+  RB --> BE
   BE --> SINK
 
   PIPE -.-> HOOKS
@@ -100,6 +105,7 @@ YAML DSL 的语法与约束来自两部分:
 - `compute` 表达式使用 AST 白名单校验,**不允许属性访问/下标/任意调用**等高风险语法
 - `call_by` 是另一套解析器: 仅允许 `$ctx` 或 `$ctx.<attr>`,且 `attr` 受白名单限制
 - YAML 运行时需要 allowlist(运行时参数),不是 YAML 字段
+- 静态编译阶段不 `import`/不解析引用;仅“运行时链接”阶段会在 allowlist 约束下解析引用并构建 `RuntimeBindings`
 
 ```mermaid
 flowchart TD
@@ -120,6 +126,14 @@ flowchart TD
   end
 ```
 
+这条“静态编译 / 运行时链接”的边界主要是为了可维护性与安全性:
+
+- `IR/plan` 变为纯数据,更易快照/缓存/对拍/做 LSP 分析(不依赖运行环境 `import` 状态)
+- allowlist/import 只发生在“运行时链接”阶段,安全边界更清晰
+
+性能上,解析引用/编译表达式的成本只是从 conversion 阶段集中到 runtime_linking(一次性启动成本);
+执行期只是从 `RuntimeBindings` 取函数并调用,通常相对 I/O/数据处理开销可忽略.
+
 ### 2.3 Workflow YAML 的边界与分层
 
 除单次 demand YAML 的运行入口外,Scalim 还支持 workflow YAML 用于编排多个 demand run 与 workflow shared resources 写出.
@@ -138,7 +152,7 @@ flowchart TD
 
   WF_RUN -->|compile_demand_fn| D_YAML[demand.yaml]
   D_YAML --> D_ADAPTER[scalim.dsl.yaml_dsl.compile]
-  D_ADAPTER --> D_IR[DemandIr + ExecutionRequest]
+  D_ADAPTER --> D_IR[DemandIr + ExecutionRequest<br/>(+ RuntimeBindings)]
   D_IR --> RUN_IR[scalim.execution.run_ir]
   RUN_IR --> RESULT[ExecutionResult]
 ```
