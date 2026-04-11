@@ -9,7 +9,7 @@ from ....vendor.dataclassesx import fields as dataclass_fields
 from . import constants as schema_constants
 from . import models as schema_models
 from .constants import SCHEMA_META_KEY
-from .doc_standardizer import standardize_schema_docs
+from .doc_standardizer import maybe_standardize_schema_docs
 
 _IMPORT_KEY = "$import"
 _IMPORTS_KEY = "imports"
@@ -159,7 +159,7 @@ class SchemaBuilder:
         )  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
             schema["additionalProperties"] = bool(additional_props)
-        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        return maybe_standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def build_workflow_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -412,7 +412,7 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
         self._assert_schema_does_not_expose_import_key(schema, path="$")
-        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        return maybe_standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def build_scalim_yaml_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -454,7 +454,7 @@ class SchemaBuilder:
         }
         if "markdownDescription" in types_mod.SCALIM_YAML_SCHEMA_META:
             schema["markdownDescription"] = types_mod.SCALIM_YAML_SCHEMA_META["markdownDescription"]
-        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        return maybe_standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def _import_ref_schema(self) -> Dict[str, Any]:
         return {

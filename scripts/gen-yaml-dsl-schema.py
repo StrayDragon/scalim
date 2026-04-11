@@ -1,10 +1,13 @@
 import argparse
 import difflib
+import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
 from scalim.dsl.yaml_dsl.schema_dsl.builder import write_demand_schema, write_scalim_yaml_schema, write_workflow_schema
+from scalim.dsl.yaml_dsl.schema_dsl.doc_standardizer import load_schema_doc_standardizer_impl
 
 
 def _read_text(path: Path) -> str:
@@ -32,10 +35,35 @@ def _check_exact(path: Path, expected: str) -> Tuple[bool, str]:
     return False, _diff(got, expected, str(path), str(path) + " (expected)")
 
 
+def _is_ci_env() -> bool:
+    value = str(os.environ.get("CI") or "").strip().lower()
+    return value not in ("", "0", "false", "no")
+
+
+def _ensure_schema_doc_standardizer_available() -> bool:
+    impl = load_schema_doc_standardizer_impl()
+    if impl is not None:
+        return True
+
+    msg = (
+        "[提示] 缺少可选开发插件 `scalim-misc`: `schema` 文档标准化将降级. "
+        "修复建议: 安装开发依赖,或确保工作区包含 `scalim-misc`(例如 `uv sync --group dev`)."
+    )
+    if _is_ci_env():
+        print(msg, file=sys.stderr)
+        print("[错误] `CI` 环境必须启用 `schema` 文档标准化; 当前检测到 `scalim-misc` 不可用.", file=sys.stderr)
+        return False
+    print(msg, file=sys.stderr)
+    return True
+
+
 def main(argv: Optional[Iterable[str]] = None) -> int:
     p = argparse.ArgumentParser(description="生成 YAML DSL schema (`*.gen.json`) 并提供漂移检查.")
     p.add_argument("--check", action="store_true", help="仅检查漂移,不写入文件.")
     args = p.parse_args(list(argv) if argv is not None else None)
+
+    if not _ensure_schema_doc_standardizer_available():
+        return 1
 
     repo_root = Path(__file__).resolve().parents[1]
     schema_dir = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema"

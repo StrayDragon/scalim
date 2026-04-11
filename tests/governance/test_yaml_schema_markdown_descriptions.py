@@ -172,7 +172,7 @@ def test_fixture_snippet_extractor_supports_nesting_and_is_yaml_parseable() -> N
     )
     scalim_yaml = repo_root / "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/scalim.yaml"
 
-    from scalim.dsl.yaml_dsl.schema_dsl.doc_standardizer import _extract_snippets_from_fixture
+    from scalim_misc.yaml_schema_doc_standardizer import _extract_snippets_from_fixture
 
     all_snippets: Dict[str, str] = {}
     for fixture in (ecommerce, workflow, scalim_yaml):
