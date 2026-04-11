@@ -1,3 +1,5 @@
+# pragma: allow-c901-file plan: c60
+
 from pathlib import Path
 from typing import IO, Any, Dict, Mapping, Optional, Sequence, Union, cast
 

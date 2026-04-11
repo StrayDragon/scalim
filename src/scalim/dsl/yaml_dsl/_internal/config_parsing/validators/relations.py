@@ -1,3 +1,5 @@
+# pragma: allow-c901-file plan: c60
+
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ..parsers.utils import list_or_none, mapping_or_none

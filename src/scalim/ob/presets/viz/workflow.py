@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 import time
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, cast
 

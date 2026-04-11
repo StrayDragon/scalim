@@ -1,3 +1,5 @@
+# pragma: allow-c901-file plan: c60
+
 import ast
 import sys
 from typing import Any, FrozenSet, List, Optional, Set, Tuple

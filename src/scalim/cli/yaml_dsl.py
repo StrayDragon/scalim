@@ -906,7 +906,7 @@ def _validate_demand_yaml_path(
     )
 
 
-def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
+def _run_validate(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c80
     yaml_path = args.yaml_file.resolve()
     schema_path = _resolve_schema_path(args.schema)
     args_dict = vars(args)

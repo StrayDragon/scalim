@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 from concurrent.futures import Executor, Future
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 

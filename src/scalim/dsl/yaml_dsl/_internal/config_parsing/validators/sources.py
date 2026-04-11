@@ -1,3 +1,5 @@
+# pragma: allow-c901-file plan: c60
+
 import re
 from typing import Any, Dict, List, Optional, Set
 

@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c70
 """`YAML DSL` 运行时编译器.
 
 本模块将 `YAML DSL` 文件转换为:

@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 """`LoadRef` 算子执行器实现(内部模块).
 
 请从 `scalim.execution.executor.operators.load_ref.executor` 导入 `LoadRefOperatorExecutor`.

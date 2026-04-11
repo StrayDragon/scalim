@@ -8,7 +8,7 @@
 from abc import ABC
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Type, cast
 
 from .._internal.utils.excel import escape_excel_formula
 from ..events import EVENT_DIAGNOSTIC_WARNING
@@ -54,6 +54,50 @@ def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
             continue
         with suppress(Exception):
             ws.close()
+
+
+def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool) -> Iterator[List[object]]:
+    """将 `sheet_plan` 的 `segments` 物化为一组待写入的行数据(不依赖 `openpyxl`)."""
+
+    header_written = False
+    segments = sorted(sheet_plan.segments, key=lambda seg: int(seg.decl_order))
+    for seg in segments:
+        if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
+            header = [escape_excel_formula(x, allow_formulas=bool(allow_formulas)) for x in list(sheet_plan.baseline_header)]
+            yield header
+            header_written = True
+        # `never`: 不输出 `header`
+
+        for row in _iter_csv_rows(seg.input_csv):
+            out_row: List[object] = []
+            for idx in seg.mapping:
+                value = row[idx] if idx >= 0 and idx < len(row) else ""
+                out_row.append(escape_excel_formula(value, allow_formulas=bool(allow_formulas)))
+            yield out_row
+
+
+def _write_workbook_plan_to_openpyxl_workbook(workbook: object, plan: "_WorkbookPlan") -> None:
+    wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
+    for sheet_name in plan.sheet_order:
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:
+            continue  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
+        ws = wb.create_sheet(str(sheet_name))
+        for row in _iter_workbook_sheet_rows(sheet_plan, allow_formulas=bool(plan.allow_formulas)):
+            _ = ws.append(row)
+
+
+def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
+    wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
+    temp_path = create_temp_path(output_path, ".xlsx.tmp")
+    temp_obj = Path(temp_path)
+    try:
+        wb.save(temp_obj)
+        atomic_replace_temp_path(temp_path, output_path)
+    except Exception as exc:
+        best_effort_remove_temp_path(temp_path)
+        msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
+        raise ScalimWorkflowWriteError(msg) from exc
 
 
 @dataclass
@@ -293,7 +337,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
     @override
-    def _commit_workbook(self, plan: object) -> None:  # noqa: C901
+    def _commit_workbook(self, plan: object) -> None:
         p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
         if not p.sheets:
             return
@@ -308,36 +352,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         wb = workbook_cls(write_only=True)
         try:
-            for sheet_name in p.sheet_order:
-                sheet_plan = p.sheets.get(sheet_name)
-                if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
-                    continue  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
-                ws = wb.create_sheet(str(sheet_name))
-                header_written = False
-                segments = sorted(sheet_plan.segments, key=lambda seg: int(seg.decl_order))
-                for seg in segments:
-                    if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
-                        header = [escape_excel_formula(x, allow_formulas=bool(p.allow_formulas)) for x in list(sheet_plan.baseline_header)]
-                        _ = ws.append(header)
-                        header_written = True
-                    # `never`: 不输出 `header`
-
-                    for row in _iter_csv_rows(seg.input_csv):
-                        out_row: List[object] = []
-                        for idx in seg.mapping:
-                            value = row[idx] if idx >= 0 and idx < len(row) else ""
-                            out_row.append(escape_excel_formula(value, allow_formulas=bool(p.allow_formulas)))
-                        _ = ws.append(out_row)
-
-            temp_path = create_temp_path(staging_path, ".xlsx.tmp")
-            temp_obj = Path(temp_path)
-            try:
-                wb.save(temp_obj)
-                atomic_replace_temp_path(temp_path, staging_path)
-            except Exception as exc:
-                best_effort_remove_temp_path(temp_path)
-                msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
-                raise ScalimWorkflowWriteError(msg) from exc
+            _write_workbook_plan_to_openpyxl_workbook(wb, p)
+            _save_openpyxl_workbook_atomic(wb, output_path=staging_path)
         except Exception:
             _best_effort_close_write_only_workbook_worksheets(wb)
             raise

@@ -664,6 +664,14 @@ report-print-usage:
 check-no-print:
     uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check
 
+# 报告: noqa C901 使用基线
+report-noqa-c901:
+    uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py
+
+# 检查: `# noqa: C901` 必须显式 allow 且携带 plan
+check-noqa-c901:
+    uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py --check
+
 # 检查: public API surface governance (`__all__` 约束 + 内部模块封堵)
 check-api-surface-governance:
     uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
@@ -701,7 +709,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test-gate
+quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-noqa-c901 check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test-gate
 
 alias quick-qa-only-py := quick-check-only-py
 

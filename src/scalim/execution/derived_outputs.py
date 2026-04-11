@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 from __future__ import absolute_import
 
 import hashlib

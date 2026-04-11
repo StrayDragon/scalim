@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c90
 """`workflow` 共享输出资源: 基础设施(内部模块).
 
 说明:

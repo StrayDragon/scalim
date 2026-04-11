@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 from collections.abc import Mapping as MappingABC
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 

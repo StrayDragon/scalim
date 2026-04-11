@@ -1,4 +1,5 @@
 # pragma: allow-cast-file gen-only schema doc standardizer; casts for Any-narrowing (not runtime hot path)
+# pragma: allow-c901-file plan: c85
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast

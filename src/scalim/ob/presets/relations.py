@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 # region imports
 
 import json

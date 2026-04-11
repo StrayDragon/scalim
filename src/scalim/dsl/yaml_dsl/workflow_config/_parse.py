@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c75
 import json
 import os
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast

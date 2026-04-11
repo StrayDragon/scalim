@@ -1,3 +1,5 @@
+# pragma: allow-c901-file plan: c60
+
 import re
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
 

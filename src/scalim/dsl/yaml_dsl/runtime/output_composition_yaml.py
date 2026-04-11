@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c70
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 

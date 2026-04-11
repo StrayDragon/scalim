@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 import heapq
 import logging
 from typing import Dict, List, Set, Tuple, Union

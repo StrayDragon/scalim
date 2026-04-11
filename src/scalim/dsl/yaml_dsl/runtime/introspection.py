@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c70
 from typing import Any, Dict, FrozenSet, List, Optional, Set
 
 from ....ob.presets.viz import VizObserver, VizObserverConfig

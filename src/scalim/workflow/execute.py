@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c90
 import concurrent.futures
 import contextlib
 import json
@@ -13,7 +14,6 @@ from ..events import (
     EVENT_WORKFLOW_NODE_CANCELLED,
     EVENT_WORKFLOW_NODE_END,
     EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
     WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED,
     WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
     WORKFLOW_NODE_END_STATUS_ERROR,
@@ -59,6 +59,9 @@ from ..spec.ir._workflow import (
 )
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
+from ._internal.replay_event_classification import (
+    classify_workflow_events_for_replay as _classify_workflow_events_for_replay,
+)
 from ._internal.request_overrides import WorkflowNodeRequestOverrides, merge_workflow_node_request
 from .artifacts import WorkflowArtifactsDirectory
 from .errors import ScalimWorkflowConfigError
@@ -89,6 +92,21 @@ def _workflow_error_diff(exc: BaseException) -> Optional[List[str]]:
     if isinstance(exc, ScalimWorkflowWriteError):
         return exc.diff
     return None
+
+
+def _build_workflow_run_error(exc: BaseException, *, run_id: str, demand_path: str) -> WorkflowRunError:
+    return WorkflowRunError(
+        run_id=str(run_id),
+        demand_path=str(demand_path),
+        exc_type=safe_error_type(exc),
+        message=str(safe_error_message(exc) or ""),
+        diff=_workflow_error_diff(exc),
+    )
+
+
+def _build_workflow_error_outcome(exc: BaseException, *, run_id: str, demand_path: str) -> WorkflowRunOutcome:
+    err = _build_workflow_run_error(exc, run_id=str(run_id), demand_path=str(demand_path))
+    return WorkflowRunOutcome(run_id=str(run_id), demand_path=str(demand_path), result=None, error=err)
 
 
 def ensure_json_like(value: object, *, path: str) -> object:
@@ -1077,14 +1095,7 @@ def _workflow_try_submit_ready(  # noqa: PLR0913
             except ScalimWorkflowConfigError:
                 raise
             except Exception as exc:  # noqa: BLE001
-                err = WorkflowRunError(
-                    run_id=str(node_id),
-                    demand_path=demand_path,
-                    exc_type=safe_error_type(exc),
-                    message=str(safe_error_message(exc) or ""),
-                    diff=_workflow_error_diff(exc),
-                )
-                outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=demand_path, result=None, error=err)
+                outcome = _build_workflow_error_outcome(exc, run_id=str(node_id), demand_path=str(demand_path))
                 outcomes[index_by_node_id[str(node_id)]] = outcome
                 node_state[str(node_id)] = "failed"
                 emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
@@ -1195,14 +1206,7 @@ def _workflow_process_completed_future(  # noqa: C901, PLR0912, PLR0913, PLR0915
     except Exception as exc:
         if isinstance(exc, ScalimWorkflowCachePoolError):
             raise ScalimWorkflowConfigError(str(exc), path=exc.path) from exc
-        err = WorkflowRunError(
-            run_id=str(node_id),
-            demand_path=str(demand_path or ""),
-            exc_type=safe_error_type(exc),
-            message=str(safe_error_message(exc) or ""),
-            diff=_workflow_error_diff(exc),
-        )
-        outcome = WorkflowRunOutcome(run_id=str(node_id), demand_path=str(demand_path or ""), result=None, error=err)
+        outcome = _build_workflow_error_outcome(exc, run_id=str(node_id), demand_path=str(demand_path or ""))
         outcomes[idx] = outcome
         node_state[str(node_id)] = "failed"
         emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
@@ -1690,52 +1694,7 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
         workflow_events = cast("Any", capture.observer_manager).drain_events()  # pragma: allow-cast capture observer manager drain
 
     known_node_ids: Set[str] = {node.node_id for node in prepared.workflow_ir.nodes}
-    started_events: List[Event] = []
-    finished_events: List[Event] = []
-    other_global_events: List[Event] = []
-    unknown_node_events: List[Event] = []
-
-    node_start_events_by_node_id: Dict[str, List[Event]] = {}
-    node_end_events_by_node_id: Dict[str, List[Event]] = {}
-    node_cancelled_events_by_node_id: Dict[str, List[Event]] = {}
-    node_other_events_by_node_id: Dict[str, List[Event]] = {}
-    resource_commit_events: List[Event] = []
-
-    for event in workflow_events:
-        if str(event.event_type) == "workflow_started":
-            started_events.append(event)
-            continue
-        if str(event.event_type) == "workflow_finished":
-            finished_events.append(event)
-            continue
-        if str(event.event_type) == EVENT_WORKFLOW_RESOURCE_COMMIT:
-            resource_commit_events.append(event)
-            continue
-
-        node_id = ""
-        meta = event.meta
-        if meta and isinstance(meta, dict):
-            raw_node_id = meta.get("workflow_node_id")
-            if raw_node_id is not None:
-                node_id = str(raw_node_id)
-        node_id = str(node_id or "").strip()
-        if not node_id:
-            other_global_events.append(event)
-            continue
-        if node_id not in known_node_ids:
-            unknown_node_events.append(event)
-            continue
-
-        if str(event.event_type) == EVENT_WORKFLOW_NODE_START:
-            node_start_events_by_node_id.setdefault(node_id, []).append(event)
-            continue
-        if str(event.event_type) == EVENT_WORKFLOW_NODE_END:
-            node_end_events_by_node_id.setdefault(node_id, []).append(event)
-            continue
-        if str(event.event_type) == EVENT_WORKFLOW_NODE_CANCELLED:
-            node_cancelled_events_by_node_id.setdefault(node_id, []).append(event)
-            continue
-        node_other_events_by_node_id.setdefault(node_id, []).append(event)
+    buckets = _classify_workflow_events_for_replay(workflow_events, known_node_ids=known_node_ids)
 
     workflow_seq = 0
 
@@ -1779,21 +1738,21 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
             with contextlib.suppress(Exception):
                 node_replay.observer_manager.close()
 
-    for event in started_events:
+    for event in buckets.started_events:
         _emit_workflow_event(event)
 
     nodes_in_order = sorted(prepared.workflow_ir.nodes, key=lambda n: int(n.decl_order))
     for node in nodes_in_order:
         node_id = str(node.node_id)
-        for event in node_start_events_by_node_id.get(node_id, []):
+        for event in buckets.node_start_events_by_node_id.get(node_id, []):
             _emit_workflow_event(event)
         if isinstance(node, WorkflowNodeIr) and node_id in prepared.captured_demand_events_by_node_id:
             _replay_demand_node(node_id)
-        for event in node_other_events_by_node_id.get(node_id, []):
+        for event in buckets.node_other_events_by_node_id.get(node_id, []):
             _emit_workflow_event(event)
-        for event in node_cancelled_events_by_node_id.get(node_id, []):
+        for event in buckets.node_cancelled_events_by_node_id.get(node_id, []):
             _emit_workflow_event(event)
-        for event in node_end_events_by_node_id.get(node_id, []):
+        for event in buckets.node_end_events_by_node_id.get(node_id, []):
             _emit_workflow_event(event)
 
     def _resource_commit_sort_key(event: Event) -> Tuple[str, str, str]:
@@ -1804,13 +1763,13 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
             str(payload.path),
         )
 
-    for event in sorted(resource_commit_events, key=_resource_commit_sort_key):
+    for event in sorted(buckets.resource_commit_events, key=_resource_commit_sort_key):
         _emit_workflow_event(event)
-    for event in unknown_node_events:
+    for event in buckets.unknown_node_events:
         _emit_workflow_event(event)
-    for event in other_global_events:
+    for event in buckets.other_global_events:
         _emit_workflow_event(event)
-    for event in finished_events:
+    for event in buckets.finished_events:
         _emit_workflow_event(event)
 
 

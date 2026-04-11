@@ -1,3 +1,4 @@
+# pragma: allow-c901-file plan: c60
 import threading
 import time
 from concurrent.futures import Future, as_completed

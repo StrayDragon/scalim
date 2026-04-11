@@ -1,4 +1,5 @@
 # pragma: allow-cast-file yaml validation boundary typed narrowing
+# pragma: allow-c901-file plan: c60
 import json
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
