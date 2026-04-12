@@ -29,12 +29,12 @@ def test_workflow_compile_apply_file_patch_cover_branches() -> None:
         _ = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file"}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p\.encoding must be a string"):
-        _ = workflow_compile_mod._apply_file_patch(FileConfig(kind="csv_file", path="a.csv"), {"encoding": 1}, path="p")  # noqa: SLF001
+        _ = workflow_compile_mod._apply_file_patch(FileConfig(kind="csv_file", path="a"), {"encoding": 1}, path="p")  # noqa: SLF001
 
-    patched = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a.csv", "encoding": None}, path="p")  # noqa: SLF001
+    patched = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a", "encoding": None}, path="p")  # noqa: SLF001
     assert patched.encoding
 
-    patched2 = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a.csv", "encoding": " latin1 "}, path="p")  # noqa: SLF001
+    patched2 = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a", "encoding": " latin1 "}, path="p")  # noqa: SLF001
     assert patched2.encoding == "latin1"
 
 
@@ -42,10 +42,10 @@ def test_workflow_compile_resources_files_kind_mismatch_between_workflow_and_dem
     wf = WorkflowConfig(
         runs=(WorkflowRun(id="a", demand="a.yaml"),),
         options=WorkflowOptions(),
-        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./out.csv")}),
+        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./out")}),
     )
     demand_cfg_by_run_id = {
-        "a": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="json_file", path="./out.csv")})),
+        "a": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="json_file", path="./out")})),
     }
     with pytest.raises(ScalimWorkflowConfigError, match=r"File kind mismatch between workflow and demand"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -64,8 +64,8 @@ def test_workflow_compile_resources_files_conflicting_demand_definitions() -> No
         options=WorkflowOptions(),
     )
     demand_cfg_by_run_id = {
-        "a": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./a.csv")})),
-        "b": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./b.csv")})),
+        "a": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./a")})),
+        "b": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./b")})),
     }
     with pytest.raises(ScalimWorkflowConfigError, match=r"Conflicting demand file definitions for file_id='detail_csv'"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -86,21 +86,21 @@ def test_workflow_compile_resources_files_override_can_create_new_file_resource(
         demand_cfg_by_run_id={},
         demand_yaml_paths_by_run_id={},
         init_vars=None,
-        overrides_resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
+        overrides_resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out")}),
     )
     assert files["detail_csv"].kind == "csv_file"
     assert resources
-    assert any(str(r.path).endswith("out.csv") for r in resources)
+    assert any(str(r.path).endswith("out") for r in resources)
 
 
 def test_workflow_compile_resources_files_same_kind_between_workflow_and_demand_continues(tmp_path: Path) -> None:
     wf = WorkflowConfig(
         runs=(WorkflowRun(id="a", demand="a.yaml"),),
         options=WorkflowOptions(),
-        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./out.csv")}),
+        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./out")}),
     )
     demand_cfg_by_run_id = {
-        "a": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./out.csv")})),
+        "a": DemandConfig(resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="./out")})),
     }
     resources, _books, files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf,
@@ -131,7 +131,7 @@ def test_workflow_compile_resources_files_invalid_kind_is_wrapped(tmp_path: Path
     wf = WorkflowConfig(
         runs=(),
         options=WorkflowOptions(),
-        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="json_file", path="./out.csv")}),
+        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="json_file", path="./out")}),
     )
     with pytest.raises(ScalimWorkflowConfigError, match=r"Unknown file kind 'json_file'"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001

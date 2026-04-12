@@ -3,9 +3,9 @@
 **状态: ✅ 已实现**
 ## Purpose
 定义 demand/workflow 统一的 `resources.files` 文件输出资源入口,并约束 CSV 输出通过 `outputs[*].to.file` + `outputs[*].write` 绑定,取代 legacy `outputs[*].container`.
-
 ## Requirements
 ### Requirement: demand and workflow YAML MUST support `resources.files` as the unified file-output resource surface
+
 系统 MUST 提供 `resources.files` 作为非 book 文件输出的统一资源入口,并在 demand/workflow 两类 YAML 中保持一致:
 
 - demand: `resources.files.<file_id>`
@@ -17,37 +17,21 @@
 - `resources.files.<file_id>` MUST 为 mapping
 - v1 仅允许 `kind=csv_file`
 - `path` MUST 为非空字符串或 `{$init_var: <name>}`
-- `encoding` MAY 存在,默认 `utf-8`
-- `write_lock` MUST 为 bool(默认 `false`)
+- `path` 语义 MUST 为 **输出 root 目录**（版本化输出 D-2），而不是最终文件路径
 - 相对路径 MUST 以声明该资源的 YAML 文件所在目录为基准解析
+- 系统 MUST 基于 `file_id` 与 `version_id` 推导最终输出路径：
+  - final path MUST 等价于 `<root>/versions/<version_id>/files/<file_id>.csv`
+- legacy `write_lock` 配置面 MUST 被移除；若用户仍提供该字段，系统 MUST fail-fast 并给出迁移提示
+
+其中 `version_id` 取值约束：
+
+- standalone demand: `version_id` MUST 等于该 demand 的 `run_id`
+- workflow: `version_id` MUST 等于该 workflow 的 `workflow_exec_id`
 
 #### Scenario: file resource passes schema validation
 - **WHEN** demand YAML 声明 `resources.files.detail.kind=csv_file`
-- **AND** `resources.files.detail.path=./out/detail.csv`
-- **AND** `resources.files.detail.write_lock=true`
+- **AND** `resources.files.detail.path=./out`
 - **THEN** schema-only 校验 MUST 通过
-
-### Requirement: csv_file write_lock MUST prevent concurrent writers to the same output path
-
-当 `resources.files.<id>.write_lock=true` 时,系统 MUST 在最终文件写入边界对目标输出路径执行跨进程互斥:
-
-- 锁文件路径 MUST 为 `<final_path>.scalim.lock`
-- 当检测到并发 writer 时,系统 MUST fail-fast 并抛出可诊断的写入异常
-- 异常信息 MUST 包含 `lock_path` 以及可用的 lock owner 信息(例如 `workflow_exec_id`)
-
-#### Scenario: concurrent workflow publish with write_lock fails fast
-- **GIVEN** 两个独立 workflow 进程将 CSV 输出发布到同一 `final_path`
-- **AND** 该 CSV file resource 启用了 `write_lock=true`
-- **WHEN** 两个 workflow 在 publish(staged → final) 阶段并发尝试写入该 `final_path`
-- **THEN** 系统 MUST 允许其中一个 workflow 完成 publish
-- **AND** 系统 MUST 使另一个 workflow fail-fast 并抛出写入异常
-
-#### Scenario: concurrent standalone writes with write_lock fails fast
-- **GIVEN** 两个独立运行(standalone demand)将 CSV 输出写入到同一 `final_path`
-- **AND** 该 CSV file resource 启用了 `write_lock=true`
-- **WHEN** 两个运行在 sink close 的原子 replace 边界并发尝试写入该 `final_path`
-- **THEN** 系统 MUST 允许其中一个运行完成写入
-- **AND** 系统 MUST 使另一个运行 fail-fast 并抛出写入异常
 
 ### Requirement: temp-path creation for atomic file writes MUST mitigate TOCTOU in untrusted output directories
 
@@ -109,3 +93,4 @@
 - **AND** workflow 声明 `workflow.resources.files.detail.path=./out/b.csv`
 - **WHEN** workflow 运行该 demand
 - **THEN** effective file path MUST 等于 workflow 声明值
+

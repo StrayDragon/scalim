@@ -26,4 +26,3 @@ main_source_params:
 report_book:
   kind: xlsx_file
   allow_formulas: true
-  write_lock: true

@@ -5,8 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, compile as compile_yaml
-from scalim.execution.run_ir import run_ir
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run as run_yaml
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.logs import LoggingObserver
 from scalim.ob.presets.memory import MemoryOptimizationObserver
@@ -61,10 +60,10 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
 
     with tempfile.TemporaryDirectory(prefix="scalim-ob-full-") as tmpdir:
         tmp = Path(tmpdir)
-        out_detail = tmp / "detail.csv"
+        out_root_detail = tmp / "out_detail"
         viz_base_dir = tmp / "viz_out"
 
-        init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
         overrides = RunOverrides(
             viz_config=VizObserverConfig(
                 output_dir=str(viz_base_dir),
@@ -83,7 +82,7 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
         ]
 
         try:
-            compilation = compile_yaml(
+            result = run_yaml(
                 str(yaml_path),
                 options=RunOptions(
                     allowed_modules=_ALLOWED_MODULES,
@@ -93,10 +92,10 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
                     overrides=overrides,
                 ),
             )
-            trace_observer = _find_first_instance(compilation.request.components, ExecutionTraceObserver)
-            memory_opt_observer = _find_first_instance(compilation.request.components, MemoryOptimizationObserver)
-            logging_observer = _find_first_instance(compilation.request.components, LoggingObserver)
-            core = run_ir(compilation.demand_ir, compilation.request)
+            trace_observer = _find_first_instance(components, ExecutionTraceObserver)
+            memory_opt_observer = _find_first_instance(components, MemoryOptimizationObserver)
+            logging_observer = _find_first_instance(components, LoggingObserver)
+            core = result.core
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -106,7 +105,8 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
-        rows = _read_csv_rows(out_detail) if out_detail.exists() else []
+        detail_csv_path = Path(str((core.outputs or {}).get("detail") or ""))
+        rows = _read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
         trace = trace_observer if isinstance(trace_observer, ExecutionTraceObserver) else None
         mem = memory_opt_observer if isinstance(memory_opt_observer, MemoryOptimizationObserver) else None
         log = logging_observer if isinstance(logging_observer, LoggingObserver) else None
@@ -128,7 +128,8 @@ def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> Exam
 
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
-            "detail_csv": str(out_detail),
+            "out_root_detail": str(out_root_detail),
+            "detail_csv": str(detail_csv_path),
             "rows": len(rows),
             "core_total_rows": int(core.total_rows),
             "observers_present": {

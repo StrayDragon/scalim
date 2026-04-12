@@ -330,27 +330,26 @@ def _apply_book_export_xlsx_patch(
     path: str,
 ) -> BookExportXlsxConfig:
     path_raw = raw.get("path")
-    write_lock_raw = raw.get("write_lock")
     allow_formulas_raw = raw.get("allow_formulas")
+    if "write_lock" in raw:
+        msg = (
+            "{}.export_xlsx.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(
+                path
+            )
+        )
+        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.write_lock".format(path))
 
     if export_xlsx is None:
         if path_raw is None:
             msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(path))
         return BookExportXlsxConfig(
-            path=path_raw,
-            write_lock=bool(write_lock_raw) if isinstance(write_lock_raw, bool) else False,
-            allow_formulas=bool(allow_formulas_raw) if isinstance(allow_formulas_raw, bool) else False,
+            path=path_raw, allow_formulas=bool(allow_formulas_raw) if isinstance(allow_formulas_raw, bool) else False
         )
 
     next_path = export_xlsx.path if path_raw is None else path_raw
-    next_write_lock = export_xlsx.write_lock if write_lock_raw is None else bool(write_lock_raw)
     next_allow_formulas = export_xlsx.allow_formulas if allow_formulas_raw is None else bool(allow_formulas_raw)
-    return BookExportXlsxConfig(
-        path=next_path,
-        write_lock=bool(next_write_lock),
-        allow_formulas=bool(next_allow_formulas),
-    )
+    return BookExportXlsxConfig(path=next_path, allow_formulas=bool(next_allow_formulas))
 
 
 def _apply_optional_book_budget_patch(budget: Optional[BookBudgetConfig], value: object, *, path: str) -> Optional[BookBudgetConfig]:
@@ -379,7 +378,6 @@ def _apply_optional_book_write_defaults_patch(
     budget: Optional[BookBudgetConfig],
     export_xlsx: Optional[BookExportXlsxConfig],
     allow_formulas: bool,
-    write_lock: bool,
     write_defaults: Optional[BookWriteDefaultsConfig],
     value: object,
     path: str,
@@ -393,7 +391,6 @@ def _apply_optional_book_write_defaults_patch(
         budget=budget,
         export_xlsx=export_xlsx,
         allow_formulas=bool(allow_formulas),
-        write_lock=bool(write_lock),
         write_defaults=write_defaults,
         raw=raw,
         path=path,
@@ -407,7 +404,6 @@ def _apply_book_write_defaults_patch(
     budget: Optional[BookBudgetConfig],
     export_xlsx: Optional[BookExportXlsxConfig],
     allow_formulas: bool,
-    write_lock: bool,
     write_defaults: Optional[BookWriteDefaultsConfig],
     raw: Dict[str, Any],
     path: str,
@@ -419,7 +415,6 @@ def _apply_book_write_defaults_patch(
             budget=budget,
             export_xlsx=export_xlsx,
             allow_formulas=bool(allow_formulas),
-            write_lock=bool(write_lock),
             write_defaults=write_defaults,
         )
     )
@@ -433,7 +428,6 @@ def _validate_book_kind_semantic_contracts(
     budget: Optional[BookBudgetConfig],
     export_xlsx: Optional[BookExportXlsxConfig],
     allow_formulas: bool,
-    write_lock: bool,
     path: str,
 ) -> None:
     msg: str
@@ -461,9 +455,6 @@ def _validate_book_kind_semantic_contracts(
         if allow_formulas:
             msg = "{}.allow_formulas is not allowed for kind=xlsx_memory".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
-        if write_lock:
-            msg = "{}.write_lock is not allowed for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
         return
 
     msg = "{}.kind={!r} is invalid; expected one of: xlsx_file, xlsx_memory".format(path, kind)
@@ -481,10 +472,9 @@ def _apply_book_patch(
     budget = base.budget if base is not None else None
     export_xlsx = base.export_xlsx if base is not None else None
     allow_formulas = bool(base.allow_formulas) if base is not None else False
-    write_lock = bool(base.write_lock) if base is not None else False
     write_defaults = base.write_defaults if base is not None else None
 
-    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_lock", "write_defaults"}
+    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_defaults"}
     _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=path)
 
     if "kind" in patch:
@@ -495,9 +485,6 @@ def _apply_book_patch(
 
     if "allow_formulas" in patch:
         allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path="{}.allow_formulas".format(path))
-
-    if "write_lock" in patch:
-        write_lock = _patch_as_bool(patch.get("write_lock"), path="{}.write_lock".format(path))
 
     if "budget" in patch:
         budget = _apply_optional_book_budget_patch(budget, patch.get("budget"), path=path)
@@ -512,7 +499,6 @@ def _apply_book_patch(
             budget=budget,
             export_xlsx=export_xlsx,
             allow_formulas=bool(allow_formulas),
-            write_lock=bool(write_lock),
             write_defaults=write_defaults,
             value=patch.get("write_defaults"),
             path=path,
@@ -524,7 +510,6 @@ def _apply_book_patch(
         budget=budget,
         export_xlsx=export_xlsx,
         allow_formulas=bool(allow_formulas),
-        write_lock=bool(write_lock),
         path=path,
     )
 
@@ -534,7 +519,6 @@ def _apply_book_patch(
         budget=budget,
         export_xlsx=export_xlsx,
         allow_formulas=bool(allow_formulas),
-        write_lock=bool(write_lock),
         write_defaults=write_defaults,
     )
 
@@ -551,18 +535,8 @@ def _apply_file_patch_encoding(encoding: str, patch: Mapping[str, object], *, pa
     return str(raw_encoding).strip() or DEFAULT_OUTPUT_ENCODING
 
 
-def _apply_file_patch_write_lock(patch: Mapping[str, object], *, path: str, write_lock: bool) -> bool:
-    if "write_lock" not in patch:
-        return bool(write_lock)
-    raw_write_lock = patch.get("write_lock")
-    if not isinstance(raw_write_lock, bool):
-        msg = "{}.write_lock must be a boolean".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
-    return bool(raw_write_lock)
-
-
 def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *, path: str) -> FileConfig:
-    allowed_keys = {"kind", "path", "encoding", "write_lock"}
+    allowed_keys = {"kind", "path", "encoding"}
     unknown = sorted({str(k) for k in patch} - allowed_keys)
     if unknown:
         msg = "{} contains unknown keys: {}".format(path, ", ".join(unknown))
@@ -571,7 +545,6 @@ def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *
     kind = str(base.kind or "").strip() if base is not None else ""
     file_path: Any = base.path if base is not None else None
     encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
-    write_lock = bool(base.write_lock) if base is not None else False
 
     raw_kind = patch.get("kind", kind)
     kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
@@ -588,9 +561,7 @@ def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *
         raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
 
     encoding = _apply_file_patch_encoding(str(encoding), patch, path=path)
-    write_lock = _apply_file_patch_write_lock(patch, path=path, write_lock=bool(write_lock))
-
-    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding), write_lock=bool(write_lock))
+    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
 
 
 def _book_export_path_and_options(
@@ -603,18 +574,23 @@ def _book_export_path_and_options(
 ) -> Tuple[str, Dict[str, object]]:
     kind = str(book.kind or "").strip()
     if kind == "xlsx_file":
-        export_path = resolve_yaml_relative_output_path(
+        output_root = resolve_yaml_relative_output_path(
             book.path,
             base_dir=str(base_dir),
             init_vars=init_vars,
             path="{}.path".format(path_prefix),
         )
+        if Path(str(output_root)).suffix.lower() == ".xlsx":
+            msg = (
+                "{}.path now expects an output root directory, not a file path. "
+                "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+            ).format(path_prefix)
+            raise ValueError(msg)
         options: Dict[str, object] = {
             "kind": "xlsx_file",
             "allow_formulas": bool(book.allow_formulas),
-            "write_lock": bool(book.write_lock),
         }
-        return export_path, options
+        return str(output_root), options
 
     if kind == "xlsx_memory":
         budget = book.budget
@@ -625,17 +601,22 @@ def _book_export_path_and_options(
             raise ValueError(err)
 
         export_cfg = book.export_xlsx
-        export_path = ""
+        output_root = ""
         export_options = None
         if export_cfg is not None:
-            export_path = resolve_yaml_relative_output_path(
+            output_root = resolve_yaml_relative_output_path(
                 export_cfg.path,
                 base_dir=str(base_dir),
                 init_vars=init_vars,
                 path="{}.export_xlsx.path".format(path_prefix),
             )
+            if Path(str(output_root)).suffix.lower() == ".xlsx":
+                msg = (
+                    "{}.export_xlsx.path now expects an output root directory, not a file path. "
+                    "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+                ).format(path_prefix)
+                raise ValueError(msg)
             export_options = {
-                "write_lock": bool(export_cfg.write_lock),
                 "allow_formulas": bool(export_cfg.allow_formulas),
             }
 
@@ -645,7 +626,7 @@ def _book_export_path_and_options(
         }
         if export_options is not None:
             options["export_xlsx"] = export_options
-        return export_path, options
+        return str(output_root), options
 
     msg = "Unknown book kind {!r} for book_id={!r}".format(kind, str(book_id))
     path_ref = "{}.kind".format(path_prefix)
@@ -668,16 +649,21 @@ def _file_export_path_and_options(
         err = "{} (path={})".format(msg, path_ref)
         raise ValueError(err)
 
-    export_path = resolve_yaml_relative_output_path(
+    output_root = resolve_yaml_relative_output_path(
         file_cfg.path,
         base_dir=str(base_dir),
         init_vars=init_vars,
         path="{}.path".format(path_prefix),
     )
-    return export_path, {
+    if Path(str(output_root)).suffix.lower() == ".csv":
+        msg = (
+            "{}.path now expects an output root directory, not a file path. "
+            "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+        ).format(path_prefix)
+        raise ValueError(msg)
+    return str(output_root), {
         "kind": "csv_file",
         "encoding": str(file_cfg.encoding or DEFAULT_OUTPUT_ENCODING),
-        "write_lock": bool(file_cfg.write_lock),
     }
 
 
@@ -689,8 +675,6 @@ def _book_override_to_patch(override: BookResourceOverride) -> Dict[str, object]
         patch["path"] = override.path
     if override.allow_formulas is not None:
         patch["allow_formulas"] = override.allow_formulas
-    if override.write_lock is not None:
-        patch["write_lock"] = override.write_lock
     if override.budget is not None:
         budget_patch: Dict[str, object] = {}
         if override.budget.max_sheets is not None:
@@ -702,8 +686,6 @@ def _book_override_to_patch(override: BookResourceOverride) -> Dict[str, object]
         export_patch: Dict[str, object] = {}
         if override.export_xlsx.path is not None:
             export_patch["path"] = override.export_xlsx.path
-        if override.export_xlsx.write_lock is not None:
-            export_patch["write_lock"] = override.export_xlsx.write_lock
         if override.export_xlsx.allow_formulas is not None:
             export_patch["allow_formulas"] = override.export_xlsx.allow_formulas
         patch["export_xlsx"] = export_patch
@@ -731,8 +713,6 @@ def _file_override_to_patch(override: FileResourceOverride) -> Dict[str, object]
         patch["path"] = override.path
     if override.encoding is not None:
         patch["encoding"] = override.encoding
-    if override.write_lock is not None:
-        patch["write_lock"] = override.write_lock
     return patch
 
 
@@ -990,20 +970,6 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             )
         )
 
-    # 预检 `xlsx` 导出路径冲突(跨 `books`,且顺序确定).
-    by_abs_path: Dict[str, List[str]] = {}
-    for res in resources:
-        p = str(res.path or "").strip()
-        if not p:
-            continue
-        abs_path = _as_abs_path(p)
-        by_abs_path.setdefault(abs_path, []).append(str(res.resource_id))
-    collisions = sorted((path, sorted(ids)) for path, ids in by_abs_path.items() if len(ids) > 1)
-    if collisions:
-        path, ids = collisions[0]
-        msg = "Excel output path collision across books: path={!r}, book_ids={}".format(str(path), ",".join(ids))
-        raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
-
     return resources, effective_books, effective_files
 
 
@@ -1130,16 +1096,10 @@ def _parse_output_extra_sheet_override(
         msg = "{}.allow_formulas must be a bool".format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
 
-    write_lock = raw.write_lock
-    if write_lock is not None and not isinstance(write_lock, bool):
-        msg = "{}.write_lock must be a bool".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
-
     return OutputExtraSheetConfig(
         path=resolved_path,
         sheet=sheet,
         allow_formulas=allow_formulas,
-        write_lock=write_lock,
     )
 
 
@@ -1334,6 +1294,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     default_book_id: Optional[str],
 ) -> Dict[str, List[str]]:
     last_write_node_id_by_book_id: Dict[str, str] = {}
+    last_write_node_id_by_file_id: Dict[str, str] = {}
     xlsx_memory_write_node_ids_by_run_id: Dict[str, List[str]] = {}
 
     for run in wf_obj.runs:
@@ -1362,6 +1323,33 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                         "or provide overrides.resources.files.{} in Python."
                     ).format(str(file_id), str(file_ref_path), str(file_id), str(file_id), str(file_id))
                     raise ScalimWorkflowConfigError(msg, path=str(file_ref_path))
+                node_id = "{}write.{}.{}".format(_INTERNAL_NODE_ID_PREFIX, str(run.id), int(next_write_idx))
+                next_write_idx += 1
+                decl_order = len(nodes)
+                write_deps = [str(run.id)]
+                prev_write_id = last_write_node_id_by_file_id.get(str(file_id))
+                if prev_write_id is not None:
+                    write_deps.append(str(prev_write_id))
+                last_write_node_id_by_file_id[str(file_id)] = str(node_id)
+
+                nodes.append(
+                    AppendSheetNodeIr(
+                        node_id=str(node_id),
+                        node_type=WorkflowNodeType.APPEND_SHEET,
+                        decl_order=int(decl_order),
+                        deps=tuple(write_deps),
+                        resource_type="csv",
+                        resource_id=str(file_id),
+                        sheet=None,
+                        input_node_id=str(run.id),
+                        input_output_id=str(out_cfg.name),
+                        align_by="header",
+                        header_policy="once",
+                        on_mismatch="error",
+                    )
+                )
+                for dep_id in write_deps:
+                    edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
                 continue
 
             book_id, book_ref_path = _effective_book_binding_for_output(

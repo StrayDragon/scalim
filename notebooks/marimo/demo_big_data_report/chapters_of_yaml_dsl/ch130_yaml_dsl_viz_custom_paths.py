@@ -6,8 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, compile as compile_yaml
-from scalim.execution.run_ir import run_ir
+from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run as run_yaml
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -36,12 +35,12 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
 
     with tempfile.TemporaryDirectory(prefix="scalim-viz-custom-") as tmpdir:
         tmp = Path(tmpdir)
-        out_detail = tmp / "detail.csv"
+        out_root_detail = tmp / "out_detail"
         viz_events = tmp / "viz_events.jsonl"
         viz_snapshot = tmp / "viz_snapshot.json"
         viz_trace = tmp / "viz_trace.jsonl"
 
-        init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
         overrides = RunOverrides(
             viz_config=VizObserverConfig(
                 output_path=str(viz_events),
@@ -56,7 +55,7 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
         )
 
         try:
-            compilation = compile_yaml(
+            result = run_yaml(
                 str(yaml_path),
                 options=RunOptions(
                     allowed_modules=_ALLOWED_MODULES,
@@ -65,7 +64,7 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
                     overrides=overrides,
                 ),
             )
-            core = run_ir(compilation.demand_ir, compilation.request)
+            core = result.core
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -75,7 +74,8 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
-        rows = _read_csv_rows(out_detail) if out_detail.exists() else []
+        detail_csv_path = Path(str((core.outputs or {}).get("detail") or ""))
+        rows = _read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
         events_ok = viz_events.exists() and viz_events.stat().st_size > 0
         snapshot_ok = viz_snapshot.exists() and viz_snapshot.stat().st_size > 0
         trace_ok = viz_trace.exists() and viz_trace.stat().st_size > 0
@@ -100,7 +100,8 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
 
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
-            "detail_csv": str(out_detail),
+            "out_root_detail": str(out_root_detail),
+            "detail_csv": str(detail_csv_path),
             "rows": len(rows),
             "viz_paths": {
                 "events": str(viz_events),

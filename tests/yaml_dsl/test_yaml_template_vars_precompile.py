@@ -36,10 +36,10 @@ outputs:
         str(yaml_path),
         options=RunOptions(
             allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"output_path": "./output/report.xlsx"},
+            template_vars={"output_path": "./output"},
         ),
     )
-    assert compilation.config.resources.files["detail_csv"].path == "./output/report.xlsx"
+    assert compilation.config.resources.files["detail_csv"].path == "./output"
 
 
 def test_template_vars_opt_in_does_not_render_when_not_provided(tmp_path) -> None:
@@ -193,7 +193,7 @@ sources:
 
 
 def test_template_vars_precompile_applies_to_workflow_yaml_max_concurrency(tmp_path) -> None:
-    out_path = tmp_path / "out.csv"
+    out_root = tmp_path / "out"
     demand = tmp_path / "demand.yaml"
     demand_text = (
         """
@@ -218,7 +218,7 @@ outputs:
 """
     ).lstrip()
     demand.write_text(
-        demand_text.replace("__OUT_PATH__", str(out_path)),
+        demand_text.replace("__OUT_PATH__", str(out_root)),
         encoding="utf-8",
     )
 
@@ -400,7 +400,7 @@ outputs:
             str(yaml_path),
             options=RunOptions(
                 allowed_modules=frozenset(["tests.fixtures"]),
-                template_vars={"output_path": "  ./out.csv  "},
+                template_vars={"output_path": "  ./out  "},
                 template_sandbox="legacy",
             ),
         )
@@ -442,10 +442,10 @@ outputs:
     compilation = unsafe_compile(
         str(yaml_path),
         allowed_modules=frozenset(["tests.fixtures"]),
-        template_vars={"output_path": "  ./out.csv  "},
+        template_vars={"output_path": "  ./out  "},
         template_sandbox="legacy",
     )
-    assert compilation.config.resources.files["detail_csv"].path == "./out.csv"
+    assert compilation.config.resources.files["detail_csv"].path == "./out"
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 
@@ -481,7 +481,7 @@ def test_template_sandbox_legacy_is_available_via_unsafe_run_entrypoint(tmp_path
 
     caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
     yaml_path = tmp_path / "demand.yaml"
-    out = tmp_path / "out.csv"
+    out_root = tmp_path / "out"
     yaml_path.write_text(
         """
 name: demo
@@ -509,11 +509,14 @@ outputs:
     result = unsafe_run(
         str(yaml_path),
         allowed_modules=frozenset(["tests.fixtures"]),
-        template_vars={"output_path": "  {}  ".format(str(out))},
+        template_vars={"output_path": "  {}  ".format(str(out_root))},
         template_sandbox="legacy",
     )
     assert result is not None
-    assert out.exists()
+    assert result.output_path is not None
+    from pathlib import Path
+
+    assert Path(str(result.output_path)).exists()
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 

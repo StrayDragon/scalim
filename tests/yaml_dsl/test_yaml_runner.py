@@ -114,7 +114,7 @@ def test_run_outputs_and_returns_data(
     check_header: bool,
 ) -> None:
     yaml_path = yaml_builder(tmp_path)
-    output_path = tmp_path / "nested" / output_name
+    output_root = tmp_path / "nested"
 
     sink = sink_factory() if sink_factory is not None else None
     result = run(
@@ -123,26 +123,27 @@ def test_run_outputs_and_returns_data(
             allowed_modules=_ALLOWED_MODULES,
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
             sink=sink,
         ),
     )
 
     assert result.total_rows > 0
-    assert output_path.exists()
-    assert result.output_path == str(output_path)
+    assert result.output_path is not None
+    out_path = Path(str(result.output_path))
+    assert out_path.exists()
     if sink is not None:
         assert sink.get_data()
 
     if check_header:
-        header = output_path.read_text(encoding="utf-8").splitlines()[0]
+        header = out_path.read_text(encoding="utf-8").splitlines()[0]
         assert "订单ID" in header
 
 
 def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_path: Path) -> None:
-    output_path = tmp_path / "order_report_named.csv"
-    yaml_path = _write_yaml_with_named_headers(tmp_path, _demo_yaml_path(), output_path)
+    output_root = tmp_path / "out_named"
+    yaml_path = _write_yaml_with_named_headers(tmp_path, _demo_yaml_path(), output_root)
 
     fields = ["order_id"]
     result = run(
@@ -158,10 +159,13 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
                         write=OutputWriteOverride(header_fields_output_by="name"),
                     ),
                 ),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
         ),
     )
+
+    assert result.output_path is not None
+    output_path = Path(str(result.output_path))
 
     with output_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
@@ -189,9 +193,9 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
     expected_header,
 ) -> None:
     openpyxl = pytest.importorskip("openpyxl")
-    output_path = tmp_path / "order_report_books.xlsx"
+    output_root = tmp_path / "out_books"
 
-    _ = run(
+    result = run(
         str(_demo_yaml_path()),
         options=RunOptions(
             allowed_modules=_ALLOWED_MODULES,
@@ -204,11 +208,13 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
                         write=write_override,
                     ),
                 ),
-                resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_path))}),
+                resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_root))}),
             ),
         ),
     )
 
+    assert result.output_path is not None
+    output_path = Path(str(result.output_path))
     wb = openpyxl.load_workbook(str(output_path))
     ws = wb["明细"]
     header = [cell for cell in next(ws.iter_rows(min_row=1, max_row=1, values_only=True))]
@@ -234,7 +240,7 @@ def test_run_in_memory_sink_without_output_path_returns_data(example_model, tmp_
 
 def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None:
     yaml_path = _write_yaml_with_column_output(tmp_path, _demo_yaml_path())
-    output_path = tmp_path / "order_report_column.csv"
+    output_root = tmp_path / "out_column"
     hook = _CaptureHook()
 
     result = run(
@@ -243,20 +249,21 @@ def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None
             allowed_modules=_ALLOWED_MODULES,
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
             components=[hook],
         ),
     )
 
     assert hook.pipeline_started is True
-    assert result.output_path == str(output_path)
+    assert result.output_path is not None
+    output_path = Path(str(result.output_path))
     assert output_path.exists()
 
 
 def test_run_registers_observer_components(example_model, tmp_path: Path) -> None:
     yaml_path = _demo_yaml_path()
-    output_path = tmp_path / "order_report_component_observer.csv"
+    output_root = tmp_path / "out_component_observer"
 
     class _CaptureObserver(Observer):
         event_types = {EVENT_PIPELINE_START}
@@ -275,7 +282,7 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
             components=[observer],
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
         ),
     )
@@ -297,14 +304,15 @@ def test_run_raises_typeerror_on_invalid_component(example_model, tmp_path: Path
 
 
 def test_run_uses_config_output_path(example_model, tmp_path: Path) -> None:
-    yaml_path = _write_yaml_with_output_path(tmp_path, _demo_yaml_path(), tmp_path / "order_report_custom.csv")
+    output_root = tmp_path / "out_custom"
+    yaml_path = _write_yaml_with_output_path(tmp_path, _demo_yaml_path(), output_root)
 
     result = run(
         str(yaml_path),
         options=RunOptions(allowed_modules=_ALLOWED_MODULES),
     )
 
-    assert result.output_path == str(tmp_path / "order_report_custom.csv")
+    assert result.output_path is not None
     assert Path(result.output_path).exists()
 
 

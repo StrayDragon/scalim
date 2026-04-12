@@ -177,19 +177,20 @@ output:
 ```yaml
 resources:
   files:
-    detail_csv:
+    report:
       kind: csv_file
-      path: ./output/report.csv
+      path: ./output
 
 outputs:
   - name: detail
-    to: {file: detail_csv}
+    to: {file: report}
     fields: [order_id, customer_name]
 ```
 
 说明:
 
 - `output:` 顶层字段已移除(不再支持兼容层);必须升级为 `outputs:`(有序列表)
+- `resources.*.path` 语义为输出 root 目录(版本化输出 D-2);产物通过 `<root>/manifest/latest.json` 或指定版本目录定位
 - `outputs.*.fields` 推荐优先用 `field_id` 字符串列表;允许的结构以当前 schema 为准(需要时查 `docs/doc/yaml-dsl/schema-reference.gen.md` 与 `references/syntax-catalog.gen.md`)
 
 ### 6. relation 引用

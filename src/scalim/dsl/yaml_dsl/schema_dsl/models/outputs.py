@@ -942,7 +942,7 @@ class OutputTargetConfig:
                 "  files:\n"
                 "    detail_csv:\n"
                 "      kind: csv_file\n"
-                "      path: ./out.csv\n"
+                "      path: ./out\n"
                 "```\n\n"
                 "注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n"
                 "可通过 `from` 继承."
@@ -1029,16 +1029,6 @@ class OutputExtraSheetConfig:
         ),
     )
     """可选:允许 `Excel` 公式."""
-
-    write_lock: Optional[bool] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            desc="可选:写锁(缺省使用 primary workbook 的容器配置)",
-            md="可选:写锁(缺省使用 primary workbook 的容器配置).",
-            examples=[True],
-        ),
-    )
-    """可选:写锁."""
 
 
 def _validate_output_aggregate_producer_keys_schema() -> None:

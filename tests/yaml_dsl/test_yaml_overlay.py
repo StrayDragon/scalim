@@ -51,9 +51,9 @@ sources: {}
     """,
     )
 
-    out_path = tmp_path / "out.xlsx"
+    out_root = tmp_path / "out"
     overrides = RunOverrides.xlsx_file_single_sheet(
-        output_path=out_path,
+        output_root=out_root,
         fields=("amount", "order_id"),
         sheet="Detail",
         output_name="detail",
@@ -74,7 +74,13 @@ sources: {}
 
     target = request.output_composition.targets[0]
     assert target.output.format == "excel"
-    assert target.output.path == str(out_path)
+    assert target.output.path is not None
+    from scalim.execution.versioned_outputs import parse_versioned_output_path  # noqa: PLC0415
+
+    parsed = parse_versioned_output_path(Path(str(target.output.path)))
+    assert parsed.root == out_root.resolve(strict=False)
+    assert parsed.kind == "books"
+    assert parsed.artifact_id == "report"
     assert target.output.sheet_name == "Detail"
     assert target.output.include_header is True
     assert target.layout.field_ids == ("amount", "order_id")
@@ -176,7 +182,7 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                     books={
                         "report": BookResourceOverride(
                             kind="xlsx_file",
-                            path="./out.xlsx",
+                            path="./out",
                             write_defaults=BookWriteDefaultsOverride(mode="append"),
                         )
                     }
@@ -240,12 +246,12 @@ sources: {}
 """,
     )
 
-    output_path = str(tmp_path / "out.csv")
+    output_root = str(tmp_path / "out")
     compilation = compile(
         str(yaml_path),
         options=RunOptions(
             allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            init_vars={"out_path": output_path},
+            init_vars={"out_path": output_root},
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
                 resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path={"$init_var": "out_path"})}),
@@ -254,7 +260,13 @@ sources: {}
     )
 
     assert compilation.request.output_composition is not None
-    assert compilation.request.output_composition.targets[0].output.path == output_path
+    out_path = Path(str(compilation.request.output_composition.targets[0].output.path))
+    from scalim.execution.versioned_outputs import parse_versioned_output_path  # noqa: PLC0415
+
+    parsed = parse_versioned_output_path(out_path)
+    assert parsed.root == Path(str(output_root)).resolve(strict=False)
+    assert parsed.kind == "files"
+    assert parsed.artifact_id == "detail_csv"
 
 
 def test_compile_overrides_outputs_supports_pathlike_path(tmp_path: Path) -> None:
@@ -271,20 +283,26 @@ sources: {}
 """,
     )
 
-    output_path = tmp_path / "out.csv"
+    output_root = tmp_path / "out"
     compilation = compile(
         str(yaml_path),
         options=RunOptions(
             allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_path)}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_root)}),
             ),
         ),
     )
 
     assert compilation.request.output_composition is not None
-    assert compilation.request.output_composition.targets[0].output.path == str(output_path)
+    out_path = Path(str(compilation.request.output_composition.targets[0].output.path))
+    from scalim.execution.versioned_outputs import parse_versioned_output_path  # noqa: PLC0415
+
+    parsed = parse_versioned_output_path(out_path)
+    assert parsed.root == output_root.resolve(strict=False)
+    assert parsed.kind == "files"
+    assert parsed.artifact_id == "detail_csv"
 
 
 def test_compile_overrides_outputs_disables_implicit_meta_without_workbook(tmp_path: Path) -> None:
@@ -308,7 +326,7 @@ sources: {}
             overrides=RunOverrides(
                 output_extras=OutputExtrasOverride(meta=True),
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out")}),
             ),
         ),
     )
@@ -346,7 +364,7 @@ sources: {}
                             write=OutputWriteOverride(header_fields_output_by="name"),
                         ),
                     ),
-                    resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv")}),
+                    resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out")}),
                 ),
             ),
         )
@@ -369,7 +387,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 """
     )
 
@@ -414,7 +432,7 @@ main_source:
 sources: {}
 resources:
   books:
-    report: {kind: xlsx_file, path: ./out.xlsx}
+    report: {kind: xlsx_file, path: ./out}
 """
     )
 
@@ -454,7 +472,7 @@ outputs:
     fields: [order_id, amount]
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 """,
     )
 
@@ -486,7 +504,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./out.xlsx
+      path: ./out
 outputs:
   - name: detail
     to: {book: report, sheet: 明细}
@@ -524,7 +542,7 @@ outputs:
     fields: [order_id, amount]
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 """,
     )
 

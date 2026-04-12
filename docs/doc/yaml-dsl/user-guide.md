@@ -62,8 +62,9 @@ result = run(
     options=RunOptions(
         allowed_modules=frozenset(["myapp.loaders"]),
         overrides=RunOverrides.csv_file(
-            output_path="./output/minimal_order_report.csv",
+            output_root="./output",
             fields=["order_id"],
+            file_id="minimal_order_report",
         ),
     ),
 )
@@ -74,14 +75,13 @@ result = run(
 ```yaml
 resources:
   books:
-    report:
+    minimal_order_report:
       kind: xlsx_file
-      path: ./output/minimal_order_report.xlsx
-      write_lock: true
+      path: ./output
 
 outputs:
   - name: detail
-    to: {book: report, sheet: 明细}
+    to: {book: minimal_order_report, sheet: 明细}
     fields: [order_id]
 ```
 
@@ -126,15 +126,15 @@ fields:
 
 outputs:
   - name: detail
-    to: {file: detail_csv}
+    to: {file: order_report}
     write: {header_fields_output_by: name}
     fields: [order_id, customer_name, amount, total_amount]
 
 resources:
   files:
-    detail_csv:
+    order_report:
       kind: csv_file
-      path: ./output/order_report.csv
+      path: ./output
 ```
 
 ### 1.3 运行配置的方法
@@ -183,8 +183,9 @@ result = run(
     options=RunOptions(
         allowed_modules=frozenset(["myapp.loaders"]),
         overrides=RunOverrides.csv_file(
-            output_path="./output/order_report.csv",
+            output_root="./output",
             fields=["order_id"],
+            file_id="order_report",
         ),
     ),
 )
@@ -205,7 +206,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: {$init_var: output_path}
+      path: {$init_var: out_root}
 
 outputs:
   - name: detail
@@ -220,7 +221,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: {$init_var: output_path}
+      path: {$init_var: out_root}
 ```
 
 ```python
@@ -233,7 +234,7 @@ result = run(
         allowed_modules=frozenset(["myapp.loaders"]),
         init_vars={
             "end_dt": datetime(2024, 1, 31),
-            "output_path": "./output/report.csv",
+            "out_root": "./output",
         },
     ),
 )
@@ -246,6 +247,7 @@ result = run(
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
 | `resources.files.<id>.path` | ✅ | ❌ | ❌ |
+| `resources.books.<id>.path` / `resources.books.<id>.export_xlsx.path` | ✅ | ❌ | ❌ |
 
 ---
 
@@ -327,8 +329,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./output/report.xlsx
-      write_lock: true
+      path: ./output
 
 _templates:
   report_to: &report_to {book: report}
@@ -920,7 +921,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./output/order_report.csv
+      path: ./output
 ```
 
 ### 3.7 可观测性(Observability)（runtime entrypoints）
@@ -1278,8 +1279,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./output/report.xlsx
-      write_lock: true
+      path: ./output
 
 _templates:
   report_to: &report_to {book: report}
@@ -1322,11 +1322,10 @@ result = run(
     options=RunOptions(
         allowed_modules=frozenset(["myapp.loaders"]),
         overrides=RunOverrides.xlsx_file_single_sheet(
-            output_path="./output/report.xlsx",
+            output_root="./output",
             fields=["order_id", "amount", "profit"],
             sheet="明细",
             book_id="report",
-            write_lock=True,
         ),
     ),
 )
@@ -1444,7 +1443,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./.tmp/output/order_report.csv
+      path: ./.tmp/output
 ```
 
 运行提示:
@@ -1611,7 +1610,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./.tmp/output/ecommerce_report.csv
+      path: ./.tmp/output
 ```
 
 可观测性(可选)请通过 runtime entrypoints 装配(示例):
@@ -1741,7 +1740,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./output/report.csv
+      path: ./output
 
 outputs:
   - name: detail
@@ -2020,7 +2019,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./output/report.csv
+      path: ./output
 
 outputs:
   - name: detail
@@ -2104,8 +2103,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./output/report.xlsx
-      write_lock: true
+      path: ./output
 
 outputs:
   - name: detail
@@ -2159,7 +2157,7 @@ result = run(
     "path/to/config.yaml",
     options=RunOptions(
         allowed_modules=frozenset(["myapp.loaders"]),
-        template_vars={"output_path": "./out/report.csv"},
+        template_vars={"out_root": "./out"},
         rendered_yaml_max_len=2_000_000,  # (可选)按需调大
     ),
 )

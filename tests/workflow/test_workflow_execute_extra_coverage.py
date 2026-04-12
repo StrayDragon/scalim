@@ -61,7 +61,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -417,36 +417,39 @@ def test_run_workflow_write_and_append_nodes_workbook_and_sheetbook_branches() -
     assert kinds == ["workbook_sheet", "sheetbook_sheet", "workbook_append", "sheetbook_append"]
 
 
-def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors() -> None:
+def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
     from scalim.workflow import execute as workflow_execute_mod
+
+    monkeypatch.chdir(tmp_path)
 
     workflow_ir = WorkflowIr(
         nodes=(),
         edges=(),
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
         resources=(
-            WorkflowResourceIr(resource_id="report", resource_type="workbook", path="./r.xlsx", options={"allow_formulas": True}),
-            WorkflowResourceIr(resource_id="out", resource_type="csv", path="./out.csv", options={"write_lock": True}),
+            WorkflowResourceIr(resource_id="report", resource_type="workbook", path="./out", options={"allow_formulas": True}),
+            WorkflowResourceIr(resource_id="out", resource_type="csv", path="./out", options={}),
             WorkflowResourceIr(
                 resource_id="sb",
                 resource_type="sheetbook",
-                path="./sb.xlsx",
-                options={"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"write_lock": False, "allow_formulas": False}},
+                path="./out",
+                options={"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"allow_formulas": False}},
             ),
         ),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
 
-    workbook_defs, workbook_allow_formulas, workbook_write_lock, csv_defs, csv_write_lock, sheetbook_defs = (
-        workflow_execute_mod._build_workflow_resource_defs(workflow_ir)
+    workflow_exec_id = "wf_test"
+    workbook_defs, workbook_allow_formulas, csv_defs, sheetbook_defs = workflow_execute_mod._build_workflow_resource_defs(
+        workflow_ir, workflow_exec_id=workflow_exec_id
     )
-    assert workbook_defs["report"].endswith("r.xlsx")
+    assert workbook_defs["report"].endswith("/versions/{}/books/report.xlsx".format(workflow_exec_id))
     assert workbook_allow_formulas["report"] is True
-    assert workbook_write_lock["report"] is True
-    assert csv_defs["out"].endswith("out.csv")
-    assert csv_write_lock["out"] is True
+    assert csv_defs["out"].endswith("/versions/{}/files/out.csv".format(workflow_exec_id))
     assert "sb" in sheetbook_defs
+    assert sheetbook_defs["sb"].export_path is not None
+    assert str(sheetbook_defs["sb"].export_path).endswith("/versions/{}/books/sb.xlsx".format(workflow_exec_id))
 
     bad_ir = WorkflowIr(
         nodes=(),
@@ -456,7 +459,7 @@ def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors(
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
     with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="Invalid workflow resource options for book"):
-        _ = workflow_execute_mod._build_workflow_resource_defs(bad_ir)
+        _ = workflow_execute_mod._build_workflow_resource_defs(bad_ir, workflow_exec_id=workflow_exec_id)
 
     bad_kind_ir = WorkflowIr(
         nodes=(),
@@ -466,7 +469,80 @@ def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors(
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
     with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="Unknown book kind"):
-        _ = workflow_execute_mod._build_workflow_resource_defs(bad_kind_ir)
+        _ = workflow_execute_mod._build_workflow_resource_defs(bad_kind_ir, workflow_exec_id=workflow_exec_id)
+
+
+def test_workflow_options_bool_returns_default_when_opts_is_not_mapping() -> None:
+    from scalim.workflow import execute as workflow_execute_mod
+
+    assert workflow_execute_mod._options_bool(None, "x", default=True) is True  # noqa: SLF001
+    assert workflow_execute_mod._options_bool("nope", "x", default=False) is False  # noqa: SLF001
+
+
+def test_build_workflow_resource_defs_rejects_empty_output_root_for_xlsx_file_book() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    workflow_exec_id = "wf_test"
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(WorkflowResourceIr(resource_id="report", resource_type="book", path="", options={"kind": "xlsx_file"}),),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match=r"Output root must be a non-empty string") as excinfo:
+        _ = workflow_execute_mod._build_workflow_resource_defs(workflow_ir, workflow_exec_id=workflow_exec_id)
+    assert excinfo.value.path == "workflow.resources.books.report.path"
+
+
+def test_build_workflow_resource_defs_rejects_existing_version_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    monkeypatch.chdir(tmp_path)
+    workflow_exec_id = "wf_test"
+    (tmp_path / "out" / "versions" / workflow_exec_id).mkdir(parents=True)
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(WorkflowResourceIr(resource_id="report", resource_type="workbook", path="./out", options={}),),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match=r"Version directory already exists") as excinfo:
+        _ = workflow_execute_mod._build_workflow_resource_defs(workflow_ir, workflow_exec_id=workflow_exec_id)
+    assert excinfo.value.path == "workflow.resources.workbooks.report.path"
+
+
+def test_build_workflow_resource_defs_sheetbook_can_omit_export_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    monkeypatch.chdir(tmp_path)
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(
+            WorkflowResourceIr(
+                resource_id="sb",
+                resource_type="sheetbook",
+                path="",
+                options={
+                    "budget": {"max_sheets": 1, "max_total_cells": 1},
+                    "export_xlsx": {"allow_formulas": False},
+                },
+            ),
+        ),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+
+    _workbook_defs, _workbook_allow_formulas, _csv_defs, sheetbook_defs = workflow_execute_mod._build_workflow_resource_defs(
+        workflow_ir, workflow_exec_id="wf_test"
+    )
+    assert sheetbook_defs["sb"].export_path is None
 
 
 def test_workflow_try_submit_ready_reraises_config_error() -> None:
@@ -588,9 +664,9 @@ outputs:
 resources:
   files:
     detail_csv: {{kind: csv_file, path: "{detail_path}"}}
-"""
+    """
         )
-        .format(detail_path=str(tmp_path / "detail.csv"))
+        .format(detail_path=str(tmp_path / "out"))
         .lstrip(),
         encoding="utf-8",
     )
@@ -615,7 +691,7 @@ resources:
         ),
         edges=(),
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
-        resources=(WorkflowResourceIr(resource_id="merged", resource_type="csv", path=str(tmp_path / "merged.csv"), options=None),),
+        resources=(WorkflowResourceIr(resource_id="merged", resource_type="csv", path=str(tmp_path / "out"), options=None),),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "w": ()}),
     )
 
@@ -656,6 +732,59 @@ resources:
         workflow_execute_mod._cleanup_workflow_finally(prepared, resources_finalized=resources_finalized)
 
 
+def test_commit_workflow_resources_discards_on_commit_failure() -> None:
+    from scalim.workflow import execute as workflow_execute_mod
+    from scalim.workflow.report import WorkflowRunOutcome
+
+    class _FailingResourceManager:
+        def __init__(self) -> None:
+            self.discards = []
+
+        def discard_all(self, *, workflow_node_id: str, reason: str) -> None:
+            self.discards.append((str(workflow_node_id), str(reason)))
+
+        def commit_all(self) -> None:
+            raise workflow_execute_mod.ScalimWorkflowWriteError("boom")  # noqa: SLF001
+
+    mgr = _FailingResourceManager()
+
+    outcomes = [WorkflowRunOutcome(run_id="a", demand_path="demand.yaml", result=None, error=None)]
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match=r"boom"):
+        workflow_execute_mod._commit_workflow_resources(  # noqa: SLF001
+            resource_manager=mgr, outcomes=outcomes, failed=None
+        )
+
+    assert mgr.discards == [("__wf__discard", "resource_commit_failed")]
+
+
+def test_run_workflow_ir_reraises_config_error_from_commit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    def _boom_commit_all(self: object) -> None:
+        _ = self
+        raise workflow_execute_mod.ScalimWorkflowWriteError("boom")
+
+    monkeypatch.setattr(workflow_execute_mod.WorkflowResourceManager, "commit_all", _boom_commit_all)
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match=r"boom") as excinfo:
+        _ = workflow_execute_mod.run_workflow_ir(
+            str(tmp_path / "workflow.yaml"),
+            workflow_ir,
+            compile_demand_fn=lambda *_args, **_kwargs: object(),
+        )
+
+    assert excinfo.value.path == "workflow.resources"
+
+
 def test_workflow_negative_write_consumer_count_is_reported(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
@@ -691,7 +820,7 @@ resources:
     detail_csv: {{kind: csv_file, path: "{detail_path}"}}
 """
         )
-        .format(detail_path=str(tmp_path / "detail.csv"))
+        .format(detail_path=str(tmp_path / "out"))
         .lstrip(),
         encoding="utf-8",
     )
@@ -716,7 +845,7 @@ resources:
         ),
         edges=(),
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
-        resources=(WorkflowResourceIr(resource_id="merged", resource_type="csv", path=str(tmp_path / "merged.csv"), options=None),),
+        resources=(WorkflowResourceIr(resource_id="merged", resource_type="csv", path=str(tmp_path / "out"), options=None),),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "w": ()}),
     )
 
@@ -794,7 +923,7 @@ resources:
     detail_csv: {{kind: csv_file, path: "{detail_path}"}}
 """
         )
-        .format(detail_path=str(tmp_path / "detail.csv"))
+        .format(detail_path=str(tmp_path / "out"))
         .lstrip(),
         encoding="utf-8",
     )
@@ -834,8 +963,8 @@ resources:
         edges=(),
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
         resources=(
-            WorkflowResourceIr(resource_id="merged0", resource_type="csv", path=str(tmp_path / "merged0.csv"), options=None),
-            WorkflowResourceIr(resource_id="merged1", resource_type="csv", path=str(tmp_path / "merged1.csv"), options=None),
+            WorkflowResourceIr(resource_id="merged0", resource_type="csv", path=str(tmp_path / "out"), options=None),
+            WorkflowResourceIr(resource_id="merged1", resource_type="csv", path=str(tmp_path / "out"), options=None),
         ),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "w0": (), "w1": ()}),
     )

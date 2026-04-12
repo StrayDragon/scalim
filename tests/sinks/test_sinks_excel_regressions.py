@@ -283,78 +283,6 @@ def test_excel_formula_injection_escape_and_allow(tmp_path: Path, sink_cls) -> N
     assert allowed_value == "=1+1"
 
 
-def test_excel_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
-    output_path = tmp_path / "locked.xlsx"
-    lock_path = Path(str(output_path) + ".scalim.lock")
-
-    sink = excel_mod.ExcelSink(str(output_path), ["id"], write_lock=True)
-    sink.write_row({"id": 1})
-    sink.close()
-
-    assert output_path.exists()
-    assert lock_path.exists() is False
-
-
-def test_excel_sink_write_lock_conflict_fails_fast(tmp_path: Path) -> None:
-    output_path = tmp_path / "locked_conflict.xlsx"
-    lock_path = Path(str(output_path) + ".scalim.lock")
-    lock_path.write_text("held", encoding="utf-8")
-
-    sink = excel_mod.ExcelSink(str(output_path), ["id"], write_lock=True)
-    sink.write_row({"id": 1})
-    with pytest.raises(RuntimeError, match="Output path is locked"):
-        sink.close()
-    # close 失败后也要尽力关闭 `write_only worksheet`,避免 openpyxl 生成器在 GC 时抛出 unraisable warning.
-    assert getattr(sink._worksheet, "closed", False) is True
-    # 再次 close: 仍然会因锁冲突失败,但应为幂等清理(避免二次 close 触发 `write_only worksheet` 的异常分支).
-    with pytest.raises(RuntimeError, match="Output path is locked"):
-        sink.close()
-
-    assert output_path.exists() is False
-    assert lock_path.exists() is True
-
-
-def test_excel_workbook_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
-    output_path = tmp_path / "wb_lock.xlsx"
-    lock_path = Path(str(output_path) + ".scalim.lock")
-
-    wb = excel_mod.ExcelWorkbookSink(str(output_path), write_lock=True)
-    sheet = wb.create_sheet_row_sink("Sheet1", field_names=["id"], include_header=True)
-    sheet.write_row({"id": 1})
-    wb.close()
-
-    assert output_path.exists()
-    assert lock_path.exists() is False
-
-
-def test_excel_workbook_sink_write_lock_conflict_closes_write_only_sheets(tmp_path: Path) -> None:
-    output_path = tmp_path / "wb_locked_conflict.xlsx"
-    lock_path = Path(str(output_path) + ".scalim.lock")
-    lock_path.write_text("held", encoding="utf-8")
-
-    wb = excel_mod.ExcelWorkbookSink(str(output_path), write_lock=True)
-    sheet = wb.create_sheet_row_sink("Sheet1", field_names=["id"], include_header=True)
-    sheet.write_row({"id": 1})
-    with pytest.raises(RuntimeError, match="Output path is locked"):
-        wb.close()
-
-    # close 失败后也要尽力关闭 `write_only worksheet`,避免 openpyxl 生成器在 GC 时抛出 unraisable warning.
-    assert all(getattr(ws, "closed", False) is True for ws in getattr(wb._workbook, "worksheets", []))
-
-
-def test_column_excel_sink_write_lock_removes_lock_file(tmp_path: Path) -> None:
-    output_path = tmp_path / "col_lock.xlsx"
-    lock_path = Path(str(output_path) + ".scalim.lock")
-
-    sink = excel_mod.ColumnExcelSink(str(output_path), ["id"], write_lock=True)
-    sink.set_row_ids([1])
-    sink.write_column("id", {1: 1})
-    sink.close()
-
-    assert output_path.exists()
-    assert lock_path.exists() is False
-
-
 def test_excel_workbook_sink_close_exception_logs_unlink_failure(tmp_path: Path, monkeypatch, caplog) -> None:
     caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
     monkeypatch.setattr(excel_mod, "Workbook", _FailingSaveWorkbook)
@@ -423,30 +351,6 @@ def test_excel_sink_close_exception_logs_unlink_failure(
         os.unlink(temp_file)
 
 
-def test_excel_write_lock_release_ignores_missing_lock_file(tmp_path: Path) -> None:
-    lock_path = tmp_path / "missing.scalim.lock"
-    excel_mod._release_write_lock(lock_path)
-
-
-def test_excel_write_lock_release_logs_warning_on_oserror(tmp_path: Path, monkeypatch, caplog) -> None:
-    lock_path = tmp_path / "held.scalim.lock"
-    lock_path.write_text("held", encoding="utf-8")
-
-    caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
-
-    original_unlink = excel_mod.Path.unlink
-
-    def _failing_unlink(path, *args, **kwargs):  # type: ignore[no-untyped-def]
-        if str(path) == str(lock_path):
-            raise OSError("simulated unlink failure")
-        return original_unlink(path, *args, **kwargs)
-
-    monkeypatch.setattr(excel_mod.Path, "unlink", _failing_unlink)
-
-    excel_mod._release_write_lock(lock_path)
-    assert any("删除输出锁文件失败" in record.getMessage() for record in caplog.records)
-
-
 def test_excel_formula_escape_skips_already_escaped_value() -> None:
     assert excel_mod.escape_excel_formula("'=1+1", allow_formulas=False) == "'=1+1"
 
@@ -454,3 +358,20 @@ def test_excel_formula_escape_skips_already_escaped_value() -> None:
 def test_excel_best_effort_close_write_only_workbook_worksheets_ignores_typeerror() -> None:
     workbook = type("_Workbook", (), {"worksheets": 1})()
     excel_mod._best_effort_close_write_only_workbook_worksheets(workbook)
+
+
+def test_excel_best_effort_close_write_only_worksheet_returns_when_already_closed() -> None:
+    class _ClosedWorksheet:
+        closed = True
+
+        def close(self) -> None:
+            raise AssertionError("should not be called")
+
+    excel_mod._best_effort_close_write_only_worksheet(_ClosedWorksheet())
+
+
+def test_excel_best_effort_close_write_only_workbook_worksheets_closes_each_worksheet() -> None:
+    ws = _CloseableWorksheet()
+    workbook = type("_Workbook", (), {"worksheets": [ws]})()
+    excel_mod._best_effort_close_write_only_workbook_worksheets(workbook)
+    assert ws.closed_called is True

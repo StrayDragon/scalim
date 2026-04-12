@@ -298,28 +298,24 @@ def test_runtime_compiler_overlay_book_export_xlsx_override_cover_branches() -> 
     with pytest.raises(ValueError, match=r"p\.path is required when creating export_xlsx"):
         _ = compiler_mod._overlay_book_export_xlsx_override(None, BookExportXlsxOverride(path=None), path="p")  # noqa: SLF001
 
-    base = BookExportXlsxConfig(path="a.xlsx", write_lock=False, allow_formulas=False)
+    base = BookExportXlsxConfig(path="a", allow_formulas=False)
     updated = compiler_mod._overlay_book_export_xlsx_override(  # noqa: SLF001
         base,
-        BookExportXlsxOverride(path="b.xlsx", write_lock=True, allow_formulas=True),
+        BookExportXlsxOverride(path="b", allow_formulas=True),
         path="p",
     )
-    assert updated.path == "b.xlsx"
-    assert updated.write_lock is True
+    assert updated.path == "b"
     assert updated.allow_formulas is True
 
 
 def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_branches() -> None:
-    base_file = BookConfig(kind="xlsx_file", path="a.xlsx")
+    base_file = BookConfig(kind="xlsx_file", path="a")
     with pytest.raises(TypeError, match=r"p\.allow_formulas must be a bool"):
         _ = compiler_mod._apply_book_override(base_file, BookResourceOverride(allow_formulas="yes"), path="p")  # type: ignore[arg-type]  # noqa: SLF001
 
-    with pytest.raises(TypeError, match=r"p\.write_lock must be a bool"):
-        _ = compiler_mod._apply_book_override(base_file, BookResourceOverride(write_lock="yes"), path="p")  # type: ignore[arg-type]  # noqa: SLF001
-
     with pytest.raises(ValueError, match=r"p\.budget is not allowed for kind=xlsx_file"):
         _ = compiler_mod._apply_book_override(  # noqa: SLF001
-            BookConfig(kind="xlsx_file", path="a.xlsx", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
+            BookConfig(kind="xlsx_file", path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
             BookResourceOverride(),
             path="p",
         )
@@ -328,8 +324,8 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
         _ = compiler_mod._apply_book_override(  # noqa: SLF001
             BookConfig(
                 kind="xlsx_file",
-                path="a.xlsx",
-                export_xlsx=BookExportXlsxConfig(path="x.xlsx", write_lock=False, allow_formulas=False),
+                path="a",
+                export_xlsx=BookExportXlsxConfig(path="x", allow_formulas=False),
             ),
             BookResourceOverride(),
             path="p",
@@ -337,7 +333,7 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
 
     with pytest.raises(ValueError, match=r"p\.path is not allowed for kind=xlsx_memory"):
         _ = compiler_mod._apply_book_override(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory", path="a.xlsx", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
+            BookConfig(kind="xlsx_memory", path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
             BookResourceOverride(),
             path="p",
         )
@@ -353,22 +349,11 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
             path="p",
         )
 
-    with pytest.raises(ValueError, match=r"p\.write_lock is not allowed for kind=xlsx_memory"):
-        _ = compiler_mod._apply_book_override(  # noqa: SLF001
-            BookConfig(
-                kind="xlsx_memory",
-                budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
-                write_lock=True,
-            ),
-            BookResourceOverride(),
-            path="p",
-        )
-
 
 def test_runtime_compiler_apply_file_override_non_empty_kind_validation_cover_branches() -> None:
     with pytest.raises(ValueError, match=r"p\.kind must be a non-empty string"):
         _ = compiler_mod._apply_file_override(  # noqa: SLF001
-            FileConfig(kind="csv_file", path="a.csv"),
+            FileConfig(kind="csv_file", path="a"),
             FileResourceOverride(kind="  "),
             path="p",
         )
@@ -405,7 +390,7 @@ def test_runtime_compiler_parse_non_empty_and_optional_path_or_init_var_cover_br
     with pytest.raises(ValueError, match=r"p is required"):
         _ = compiler_mod._parse_non_empty_path_or_init_var(None, path="p")  # noqa: SLF001
 
-    assert compiler_mod._parse_non_empty_path_or_init_var(_BlankPathLike(" x.xlsx "), path="p") == "x.xlsx"  # noqa: SLF001
+    assert compiler_mod._parse_non_empty_path_or_init_var(_BlankPathLike(" x "), path="p") == "x"  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"p is required"):
         _ = compiler_mod._parse_non_empty_path_or_init_var(_BlankPathLike("   "), path="p")  # noqa: SLF001
@@ -418,7 +403,7 @@ def test_runtime_compiler_parse_non_empty_and_optional_path_or_init_var_cover_br
 
     assert compiler_mod._parse_optional_path_or_init_var(None, path="p") is None  # noqa: SLF001
     assert compiler_mod._parse_optional_path_or_init_var({"$init_var": "p"}, path="p") == {"$init_var": "p"}  # noqa: SLF001
-    assert compiler_mod._parse_optional_path_or_init_var(_BlankPathLike(" x.xlsx "), path="p") == "x.xlsx"  # noqa: SLF001
+    assert compiler_mod._parse_optional_path_or_init_var(_BlankPathLike(" x "), path="p") == "x"  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"p must not be empty"):
         _ = compiler_mod._parse_optional_path_or_init_var(_BlankPathLike("   "), path="p")  # noqa: SLF001
@@ -477,21 +462,21 @@ def test_runtime_compiler_apply_file_override_cover_branches() -> None:
 
     with pytest.raises(TypeError, match=r"p\.encoding must be a string"):
         _ = compiler_mod._apply_file_override(  # noqa: SLF001
-            FileConfig(kind="csv_file", path="a.csv"),
+            FileConfig(kind="csv_file", path="a"),
             FileResourceOverride(encoding=1),  # type: ignore[arg-type]
             path="p",
         )
 
     patched = compiler_mod._apply_file_override(  # noqa: SLF001
-        FileConfig(kind="csv_file", path="a.csv"),
+        FileConfig(kind="csv_file", path="a"),
         FileResourceOverride(encoding=" latin1 "),
         path="p",
     )
     assert patched.encoding == "latin1"
 
-    created = compiler_mod._apply_file_override(None, FileResourceOverride(kind="csv_file", path="a.csv"), path="p")  # noqa: SLF001
+    created = compiler_mod._apply_file_override(None, FileResourceOverride(kind="csv_file", path="a"), path="p")  # noqa: SLF001
     assert created.kind == "csv_file"
-    assert created.path == "a.csv"
+    assert created.path == "a"
 
 
 def test_runtime_compiler_apply_book_override_cover_branches() -> None:
@@ -509,7 +494,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
             None,
             BookResourceOverride(
                 kind="xlsx_file",
-                path="a.xlsx",
+                path="a",
                 budget=BookBudgetOverride(max_sheets=1, max_total_cells=2),
             ),
             path="p",
@@ -518,12 +503,12 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
     with pytest.raises(ValueError, match=r"p\.budget is required for kind=xlsx_memory"):
         _ = compiler_mod._apply_book_override(None, BookResourceOverride(kind="xlsx_memory"), path="p")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"p\.path/allow_formulas/write_lock are not allowed for kind=xlsx_memory"):
+    with pytest.raises(ValueError, match=r"p\.path/allow_formulas are not allowed for kind=xlsx_memory"):
         _ = compiler_mod._apply_book_override(  # noqa: SLF001
             None,
             BookResourceOverride(
                 kind="xlsx_memory",
-                path="x.xlsx",
+                path="x",
                 budget=BookBudgetOverride(max_sheets=1, max_total_cells=2),
             ),
             path="p",
@@ -538,20 +523,19 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
     assert created.budget is not None
 
     updated = compiler_mod._apply_book_override(  # noqa: SLF001
-        BookConfig(kind="xlsx_file", path="a.xlsx"),
-        BookResourceOverride(path="b.xlsx", allow_formulas=True, write_lock=True),
+        BookConfig(kind="xlsx_file", path="a"),
+        BookResourceOverride(path="b", allow_formulas=True),
         path="p",
     )
-    assert updated.path == "b.xlsx"
+    assert updated.path == "b"
     assert updated.allow_formulas is True
-    assert updated.write_lock is True
 
 
 def test_runtime_compiler_apply_resources_override_and_io_overrides_cover_branches() -> None:
     base = DemandConfig(
         resources=ResourcesConfig(
-            books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
-            files={"detail": FileConfig(kind="csv_file", path="a.csv")},
+            books={"report": BookConfig(kind="xlsx_file", path="a")},
+            files={"detail": FileConfig(kind="csv_file", path="a")},
         )
     )
 
@@ -560,32 +544,32 @@ def test_runtime_compiler_apply_resources_override_and_io_overrides_cover_branch
     merged = compiler_mod._apply_resources_override(  # noqa: SLF001
         base,
         ResourcesOverride(
-            books={"report": BookResourceOverride(path="b.xlsx")},
-            files={"detail": FileResourceOverride(path="b.csv")},
+            books={"report": BookResourceOverride(path="b")},
+            files={"detail": FileResourceOverride(path="b")},
         ),
     )
     assert merged.resources is not None
-    assert merged.resources.books["report"].path == "b.xlsx"
-    assert merged.resources.files["detail"].path == "b.csv"
+    assert merged.resources.books["report"].path == "b"
+    assert merged.resources.files["detail"].path == "b"
 
     with pytest.raises(ValueError, match=r"overrides\.resources\.books keys must be non-empty strings"):
         _ = compiler_mod._apply_resources_override(  # noqa: SLF001
             DemandConfig(),
-            ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="x.xlsx")}),  # type: ignore[dict-item]
+            ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="x")}),  # type: ignore[dict-item]
         )
 
     options = RunOptions(
         allowed_modules=frozenset(["tests.fixtures"]),
-        overrides=RunOverrides(resources=ResourcesOverride(files={"detail": FileResourceOverride(path="c.csv")})),
+        overrides=RunOverrides(resources=ResourcesOverride(files={"detail": FileResourceOverride(path="c")})),
     )
     out = compiler_mod._apply_io_overrides(base, options=options)  # noqa: SLF001
     assert out.resources is not None
-    assert out.resources.files["detail"].path == "c.csv"
+    assert out.resources.files["detail"].path == "c"
 
 
 def test_run_overrides_resources_legacy_dict_fail_fast() -> None:
     with pytest.raises(TypeError, match=r"Legacy YAML-shaped overrides are no longer supported: RunOverrides\.resources=dict"):
-        _ = RunOverrides(resources={"files": {"detail": {"path": "x.csv"}}})  # type: ignore[arg-type]
+        _ = RunOverrides(resources={"files": {"detail": {"path": "x"}}})  # type: ignore[arg-type]
 
 
 def test_run_overrides_outputs_defaults_legacy_dict_fail_fast() -> None:

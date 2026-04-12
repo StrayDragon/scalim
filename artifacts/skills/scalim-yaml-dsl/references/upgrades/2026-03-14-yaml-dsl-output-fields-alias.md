@@ -43,7 +43,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./out.csv
+      path: ./out
 ```
 
 其中 `*quantity` 展开后为 dict,解析器会基于 alias identity 优先匹配,并推导得到 `field_id="quantity"`.
@@ -69,10 +69,10 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./out.csv
+      path: ./out
     detail_plus_csv:
       kind: csv_file
-      path: ./out_plus.csv
+      path: ./out_plus
 ```
 
 ## 注意事项

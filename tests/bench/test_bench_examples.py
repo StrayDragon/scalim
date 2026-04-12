@@ -271,7 +271,7 @@ def test_bench_pipeline_trace(benchmark) -> None:
 def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
     cfg = _build_model()
     yaml_path = demo_big_data_report_yaml_path(__file__)
-    output_path = tmp_path / "ecommerce_report.csv"
+    output_root = tmp_path / "out"
     allowed_modules = frozenset(["scalim_misc.demo_big_data_report.loaders"])
 
     def _run_yaml() -> None:
@@ -279,7 +279,7 @@ def test_bench_yaml_dsl(benchmark, tmp_path: Path) -> None:
             str(yaml_path),
             options=RunOptions(
                 allowed_modules=allowed_modules,
-                overrides=RunOverrides.csv_file(output_path=output_path, fields=TARGET_FIELDS_BASIC, output_name="detail"),
+                overrides=RunOverrides.csv_file(output_root=output_root, fields=TARGET_FIELDS_BASIC, output_name="detail"),
                 init_vars={"order_ids": []},
             ),
         )

@@ -65,7 +65,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: {$init_var: output_path}
+      path: {$init_var: out_root}
 ```
 
 运行期策略提示:
@@ -96,7 +96,7 @@ resources:
 
 输出路径注入提示:
 
-- `resources.files.*.path: {$init_var: ...}` / `resources.books.*.(path|export_xlsx.path)` 会将“输出路径决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
+- `resources.files.*.path: {$init_var: ...}` / `resources.books.*.(path|export_xlsx.path)` 会将“输出 root 决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
 
 ## YAML 模板预编译(可选): `template_vars`
 
@@ -116,7 +116,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: {{ output_path | default("./output/report.csv") }}
+      path: {{ out_root | default("./output") }}
 
 outputs:
   - name: detail
@@ -133,7 +133,7 @@ run(
     "report.yaml",
     options=RunOptions(
         allowed_modules=frozenset(["myapp"]),
-        template_vars={"output_path": "./out/report.csv"},
+        template_vars={"out_root": "./out"},
     ),
 )
 ```
@@ -175,8 +175,8 @@ compile(
 
 ## 设计偏好
 
-- CSV 输出路径在 `resources.files.*.path` 显式声明; Excel 输出路径在 `resources.books.*.path` / `resources.books.*.export_xlsx.path` 声明
-- 多 outputs 共享同一 book 输出时,建议显式开启 `write_lock: true`(避免并发/多进程写入导致冲突)
+- CSV/Excel 输出 root 在 `resources.files.*.path` / `resources.books.*.(path|export_xlsx.path)` 显式声明(版本化输出 D-2)
+- 多 outputs 共享同一 book 输出时,用 `to.book/to.sheet` 明确绑定;并发写同一 root 依赖“版本目录隔离”(读取 `<root>/manifest/latest.json` 或指定版本目录定位产物)
 - 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
 - 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar
 - 只有在 DSL 无法表达时才退回 Python

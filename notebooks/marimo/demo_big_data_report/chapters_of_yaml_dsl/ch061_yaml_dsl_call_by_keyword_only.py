@@ -39,9 +39,9 @@ def run_yaml_dsl_call_by_keyword_only() -> ExampleResult:
         tmp = Path(tmpdir)
         bad_yaml = tmp / "bad_call_by.yaml"
         good_yaml = tmp / "good_call_by.yaml"
-        out_detail = tmp / "detail.csv"
+        out_root = tmp / "out"
 
-        init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        init_vars: Dict[str, object] = {"out_root": str(out_root)}
 
         bad_yaml.write_text(
             """\
@@ -64,7 +64,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: {$init_var: out_path_detail}
+      path: {$init_var: out_root}
       encoding: utf-8
 
 outputs:
@@ -114,7 +114,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: {$init_var: out_path_detail}
+      path: {$init_var: out_root}
       encoding: utf-8
 
 outputs:
@@ -143,7 +143,9 @@ outputs:
             )
             core = run_ir(compilation.demand_ir, compilation.request)
             good_outputs = sorted(core.outputs.keys()) if core.outputs else []
-            good_rows = _read_csv_rows(out_detail) if out_detail.exists() else []
+            detail_path = None if core.outputs is None else core.outputs.get("detail")
+            out_detail = Path(str(detail_path)) if detail_path else None
+            good_rows = _read_csv_rows(out_detail) if out_detail is not None and out_detail.exists() else []
             good_ok = bool(len(good_rows) == 5 and good_outputs)
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(
@@ -160,7 +162,8 @@ outputs:
             "bad_yaml_path": str(bad_yaml),
             "bad_exc_message": bad_exc_msg,
             "good_yaml_path": str(good_yaml),
-            "detail_csv": str(out_detail),
+            "out_root": str(out_root),
+            "detail_csv": str(out_detail) if out_detail is not None else None,
             "good_rows": len(good_rows),
         }
         return ExampleResult(

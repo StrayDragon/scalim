@@ -60,14 +60,14 @@ def test_workflow_compile_try_resolve_book_export_abs_path_cover_branches(tmp_pa
 
     # success -> abs path
     out = workflow_compile_mod._try_resolve_book_export_abs_path(  # noqa: SLF001
-        BookConfig(kind="xlsx_file", path="./a.xlsx"),
+        BookConfig(kind="xlsx_file", path="./a"),
         book_id="b",
         base_dir=str(tmp_path),
         init_vars=None,
         path_prefix="resources.books.b",
     )
     assert out is not None
-    assert str(out).endswith("a.xlsx")
+    assert str(out) == str((tmp_path / "a").resolve(strict=False))
 
 
 def test_workflow_compile_validate_excel_sheet_name_errors_cover_branches() -> None:
@@ -123,21 +123,14 @@ def test_workflow_compile_parse_output_extra_sheet_override_branches_cover_error
             path="p",
         )  # noqa: SLF001
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"p\.write_lock must be a bool"):
-        _ = workflow_compile_mod._parse_output_extra_sheet_override(
-            OutputExtraSheetOverride(write_lock="nope"),
-            path="p",
-        )  # noqa: SLF001
-
     cfg = workflow_compile_mod._parse_output_extra_sheet_override(
-        OutputExtraSheetOverride(path="./a.xlsx", sheet=" S ", allow_formulas=True, write_lock=True),
+        OutputExtraSheetOverride(path="./a.xlsx", sheet=" S ", allow_formulas=True),
         path="p",
     )  # noqa: SLF001
     assert cfg is not None
     assert cfg.path == "./a.xlsx"
     assert cfg.sheet == "S"
     assert cfg.allow_formulas is True
-    assert cfg.write_lock is True
 
 
 @pytest.mark.parametrize(
@@ -153,14 +146,14 @@ def test_workflow_compile_parse_output_extra_sheet_override_branches_cover_error
     ],
 )
 def test_workflow_compile_overlay_book_write_defaults_patch_error_branches_cover_paths(patch: dict, match: str, expected_path: str) -> None:
-    base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a.xlsx"))  # noqa: SLF001
+    base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a"))  # noqa: SLF001
     with pytest.raises(ScalimWorkflowConfigError, match=match) as exc_info:
         _ = workflow_compile_mod._overlay_book_write_defaults_patch(base, patch, path="p")  # noqa: SLF001
     assert exc_info.value.path == expected_path
 
 
 def test_workflow_compile_overlay_book_write_defaults_patch_allows_none_values_as_noop() -> None:
-    base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a.xlsx"))  # noqa: SLF001
+    base = workflow_compile_mod._effective_write_defaults(BookConfig(kind="xlsx_file", path="a"))  # noqa: SLF001
     out = workflow_compile_mod._overlay_book_write_defaults_patch(base, {"mode": None}, path="p")  # noqa: SLF001
     assert out == base
 
@@ -202,8 +195,8 @@ def test_workflow_compile_extra_sheets_unsupported_mode_branch_is_defensive_and_
             edges=edges,
             effective_books=_FlakyBooks(
                 [
-                    BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="append")),
-                    BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="nope")),
+                    BookConfig(kind="xlsx_file", path="a", write_defaults=BookWriteDefaultsConfig(mode="append")),
+                    BookConfig(kind="xlsx_file", path="a", write_defaults=BookWriteDefaultsConfig(mode="nope")),
                 ]
             ),
             effective_files={},
@@ -214,7 +207,7 @@ def test_workflow_compile_extra_sheets_unsupported_mode_branch_is_defensive_and_
 
 
 def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
-    base = BookConfig(kind="xlsx_file", path="a.xlsx")
+    base = BookConfig(kind="xlsx_file", path="a")
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"nope": 1}, path="p")  # noqa: SLF001
@@ -232,9 +225,9 @@ def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
         _ = workflow_compile_mod._apply_book_patch(base, {"allow_formulas": "nope"}, path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.allow_formulas"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"write_lock must be a bool") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys: write_lock") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"write_lock": "nope"}, path="p")  # noqa: SLF001
-    assert exc_info.value.path == "p.write_lock"
+    assert exc_info.value.path == "p"
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget must be a mapping") as exc_info:
         _ = workflow_compile_mod._apply_book_patch(base, {"budget": "nope"}, path="p")  # noqa: SLF001
@@ -270,16 +263,15 @@ def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
 
 
 def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_more_branches() -> None:
-    base = BookConfig(kind="xlsx_file", path="a.xlsx")
+    base = BookConfig(kind="xlsx_file", path="a")
 
     patched = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
         base,
-        {"path": "b.xlsx", "allow_formulas": True, "write_lock": True, "budget": None},
+        {"path": "b", "allow_formulas": True, "budget": None},
         path="p",
     )
-    assert patched.path == "b.xlsx"
+    assert patched.path == "b"
     assert patched.allow_formulas is True
-    assert patched.write_lock is True
     assert patched.budget is None
 
     assert workflow_compile_mod._apply_book_patch(base, {"write_defaults": None}, path="p").write_defaults is None  # noqa: SLF001
@@ -291,21 +283,20 @@ def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_mor
     base_mem = BookConfig(kind="xlsx_memory")
     created = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
         base_mem,
-        {"budget": {"max_sheets": 1, "max_total_cells": 2}, "export_xlsx": {"path": "x.xlsx"}},
+        {"budget": {"max_sheets": 1, "max_total_cells": 2}, "export_xlsx": {"path": "x"}},
         path="p",
     )
     assert created.budget is not None
     assert created.export_xlsx is not None
 
-    updated = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
-        created,
-        {"budget": {"max_sheets": 3}, "export_xlsx": {"write_lock": True}},
-        path="p",
-    )
+    updated = workflow_compile_mod._apply_book_patch(created, {"budget": {"max_sheets": 3}}, path="p")  # noqa: SLF001
     assert updated.budget is not None
     assert updated.budget.max_sheets == 3
     assert updated.export_xlsx is not None
-    assert updated.export_xlsx.write_lock is True
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx\.write_lock was removed") as exc_info:
+        _ = workflow_compile_mod._apply_book_patch(updated, {"export_xlsx": {"write_lock": True}}, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx.write_lock"
 
     updated2 = workflow_compile_mod._apply_book_patch(updated, {"budget": {"max_total_cells": 5}}, path="p")  # noqa: SLF001
     assert updated2.budget is not None
@@ -316,26 +307,26 @@ def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_mor
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget is not allowed for kind=xlsx_file"):
         _ = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_file", path="a.xlsx"),
+            BookConfig(kind="xlsx_file", path="a"),
             {"budget": {"max_sheets": 1, "max_total_cells": 1}},
             path="p",
         )
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx is not allowed for kind=xlsx_file"):
         _ = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_file", path="a.xlsx"),
-            {"export_xlsx": {"path": "x.xlsx"}},
+            BookConfig(kind="xlsx_file", path="a"),
+            {"export_xlsx": {"path": "x"}},
             path="p",
         )
 
     base_mem = BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1))
     with pytest.raises(ScalimWorkflowConfigError, match=r"path is not allowed for kind=xlsx_memory"):
-        _ = workflow_compile_mod._apply_book_patch(base_mem, {"path": "a.xlsx"}, path="p")  # noqa: SLF001
+        _ = workflow_compile_mod._apply_book_patch(base_mem, {"path": "a"}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas is not allowed for kind=xlsx_memory"):
         _ = workflow_compile_mod._apply_book_patch(base_mem, {"allow_formulas": True}, path="p")  # noqa: SLF001
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"write_lock is not allowed for kind=xlsx_memory"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys: write_lock"):
         _ = workflow_compile_mod._apply_book_patch(base_mem, {"write_lock": True}, path="p")  # noqa: SLF001
 
 
@@ -380,7 +371,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     wf_obj = WorkflowConfig(
         runs=(run_a,),
         options=WorkflowOptions(),
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(1, 1))}))
     with pytest.raises(ScalimWorkflowConfigError, match=r"Book kind mismatch"):
@@ -397,9 +388,9 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     wf_obj = WorkflowConfig(
         runs=(run_a,),
         options=WorkflowOptions(),
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="wf.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="wf_out")}),
     )
-    demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="d.xlsx")}))
+    demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="d_out")}))
     _resources, effective_books, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
         workflow_base_dir=workflow_base_dir,
@@ -408,12 +399,12 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         init_vars=None,
         overrides_resources=None,
     )
-    assert effective_books["report"].path == "wf.xlsx"
+    assert effective_books["report"].path == "wf_out"
 
     # conflicting demand book definitions for same book_id
     wf_obj = WorkflowConfig(runs=(run_a, run_b), options=WorkflowOptions(), resources=ResourcesConfig())
-    demand_cfg_a = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")}))
-    demand_cfg_b = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="b.xlsx")}))
+    demand_cfg_a = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a_out")}))
+    demand_cfg_b = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="b_out")}))
     with pytest.raises(ScalimWorkflowConfigError, match=r"Conflicting demand book definitions"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
             wf_obj,
@@ -425,8 +416,8 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         )
 
     # same config, but base_dir mismatch leads to conflicting resolved abs paths
-    demand_cfg_a = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}))
-    demand_cfg_b = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}))
+    demand_cfg_a = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}))
+    demand_cfg_b = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}))
     with pytest.raises(ScalimWorkflowConfigError, match=r"Conflicting demand book paths"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
             wf_obj,
@@ -439,7 +430,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
     # demand-only book is accepted and uses demand YAML base_dir semantics
     wf_obj = WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig())
-    demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}))
+    demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}))
     resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
         workflow_base_dir=workflow_base_dir,
@@ -450,7 +441,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     )
     assert "report" in effective_books
     assert effective_files == {}
-    assert [res.path for res in resources if res.resource_id == "report"] == [str((tmp_path / "d" / "out.xlsx").resolve())]
+    assert [res.path for res in resources if res.resource_id == "report"] == [str((tmp_path / "d" / "out").resolve())]
 
     # overrides.resources.books keys mismatch (non-str) triggers "continue" branch for unresolved book_id
     resources, effective_books, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -459,7 +450,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         demand_cfg_by_run_id={"a": DemandConfig()},
         demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
         init_vars=None,
-        overrides_resources=ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="a.xlsx")}),  # type: ignore[dict-item]
+        overrides_resources=ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="a")}),  # type: ignore[dict-item]
     )
     assert resources == []
     assert effective_books == {}
@@ -481,11 +472,11 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         demand_cfg_by_run_id={"a": DemandConfig()},
         demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
         init_vars=None,
-        overrides_resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path="a.xlsx")}),
+        overrides_resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path="a")}),
     )
     assert effective_books["report"].kind == "xlsx_file"
     assert effective_files == {}
-    assert [res.path for res in resources if res.resource_id == "report"] == [str((workflow_base_dir / "a.xlsx").resolve())]
+    assert [res.path for res in resources if res.resource_id == "report"] == [str((workflow_base_dir / "a").resolve())]
 
     # exception wrap branch when export options invalid (xlsx_memory missing budget)
     wf_obj = WorkflowConfig(
@@ -501,18 +492,17 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
             overrides_resources=None,
         )
 
-    # collision branch (two books same path)
+    # legacy file-path semantics are rejected (xlsx_file.path expects output root dir, not *.xlsx)
     wf_obj = WorkflowConfig(
         runs=(),
         options=WorkflowOptions(),
         resources=ResourcesConfig(
             books={
                 "a": BookConfig(kind="xlsx_file", path=str(tmp_path / "same.xlsx")),
-                "b": BookConfig(kind="xlsx_file", path=str(tmp_path / "same.xlsx")),
             }
         ),
     )
-    with pytest.raises(ScalimWorkflowConfigError, match=r"path collision"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"expects an output root directory") as exc_info:
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
             wf_obj,
             workflow_base_dir=workflow_base_dir,
@@ -521,6 +511,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
             init_vars=None,
             overrides_resources=None,
         )
+    assert exc_info.value.path == "workflow.resources.books.a"
 
 
 def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields(tmp_path: Path) -> None:
@@ -529,9 +520,8 @@ def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields
         books={
             "report": BookResourceOverride(
                 kind="xlsx_file",
-                path="./report.xlsx",
+                path="./report_root",
                 allow_formulas=True,
-                write_lock=True,
                 write_defaults=BookWriteDefaultsOverride(
                     mode="append",
                     align_by="header",
@@ -543,12 +533,12 @@ def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields
             "mem": BookResourceOverride(
                 kind="xlsx_memory",
                 budget=BookBudgetOverride(max_sheets=1, max_total_cells=2),
-                export_xlsx=BookExportXlsxOverride(path="./mem.xlsx", write_lock=True, allow_formulas=True),
+                export_xlsx=BookExportXlsxOverride(path="./mem_root", allow_formulas=True),
                 write_defaults=BookWriteDefaultsOverride(mode="append"),
             ),
         },
         files={
-            "detail_csv": FileResourceOverride(kind="csv_file", path="./out.csv", encoding="latin1"),
+            "detail_csv": FileResourceOverride(kind="csv_file", path="./out_root", encoding="latin1"),
         },
     )
 
@@ -562,7 +552,6 @@ def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields
     )
     assert resources
     assert books["report"].allow_formulas is True
-    assert books["report"].write_lock is True
     assert books["report"].write_defaults is not None
     assert books["mem"].budget is not None
     assert books["mem"].export_xlsx is not None
@@ -714,7 +703,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
+            effective_books={"report": BookConfig(kind="xlsx_file", path="a")},
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,
@@ -723,7 +712,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
     # unsupported mode error path
     cfg = DemandConfig(
         resources=ResourcesConfig(
-            books={"report": BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="nope"))}
+            books={"report": BookConfig(kind="xlsx_file", path="a", write_defaults=BookWriteDefaultsConfig(mode="nope"))}
         ),
         outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(book="report", sheet="S"), fields=("a",)),),
     )
@@ -797,7 +786,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
 
     # missing default binding error
     cfg = DemandConfig(
-        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="out.csv")}),
+        resources=ResourcesConfig(files={"detail_csv": FileConfig(kind="csv_file", path="out")}),
         outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(file="detail_csv"), fields=("a",)),),
         meta=OutputExtraSheetConfig(sheet="__meta__"),
     )
@@ -808,7 +797,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             nodes=[],
             edges=[],
             effective_books={},
-            effective_files={"detail_csv": FileConfig(kind="csv_file", path="out.csv")},
+            effective_files={"detail_csv": FileConfig(kind="csv_file", path="out")},
             overrides_outputs=None,
             default_book_id=None,
         )
@@ -841,7 +830,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx")},
+            effective_books={"report": BookConfig(kind="xlsx_file", path="a")},
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,
@@ -864,7 +853,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={"report": BookConfig(kind="xlsx_file", path="a.xlsx", write_defaults=BookWriteDefaultsConfig(mode="nope"))},
+            effective_books={"report": BookConfig(kind="xlsx_file", path="a", write_defaults=BookWriteDefaultsConfig(mode="nope"))},
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,

@@ -145,11 +145,10 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 path=str(p.path),
             )
 
-        plan = self._get_or_create_joinable_plan(
+        plan = self._get_or_create_plan(
             resource_type="workbook",
             resource_id=key,
             plans=self._workbooks,
-            inflight=self._inflight_workbooks,
             create_fn=_create,
             on_create=_on_create,
         )
@@ -173,53 +172,46 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         input_header = _read_csv_header(input_csv)
 
-        pending_skip = False
-        with self._lock:
-            existing = plan.sheets.get(sheet_name)
-            if existing is not None:
-                if on_conflict == "skip":
-                    action = "skip"
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-                if on_conflict == "error":
-                    msg = "Sheet conflict (workbook_sheet): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
-                    raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
-                if on_conflict == "overwrite":
-                    action = "overwrite"
-
-            if not pending_skip:
-                existing_decl_order = plan.sheet_decl_order.get(sheet_name)
-                resolved_decl_order = int(decl_order)
-                if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
-                    plan.sheet_decl_order[sheet_name] = resolved_decl_order
-                plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
-
-                mapping = _build_alignment_mapping(input_header, input_header)
-                segment = _AppendSegment(
-                    decl_order=int(decl_order),
-                    input_csv=input_csv,
-                    header_policy="once",
-                    mapping=mapping,
-                    on_mismatch="error",
-                    align_by="header",
-                    input_header=input_header,
-                )
-                plan.sheets[sheet_name] = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[segment])
+        existing = plan.sheets.get(sheet_name)
+        if existing is not None:
+            if on_conflict == "skip":
                 plan.last_workflow_node_id = str(workflow_node_id)
+                self._emit_resource_write(
+                    workflow_node_id=str(workflow_node_id),
+                    resource_type="workbook",
+                    resource_id=str(workbook_id),
+                    path=str(plan.path),
+                    write_kind="workbook_sheet",
+                    action="skip",
+                    input_node_id=str(input_node_id),
+                    input_output_id=str(input_output_id),
+                    sheet=sheet_name,
+                )
+                return
+            if on_conflict == "error":
+                msg = "Sheet conflict (workbook_sheet): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
+                raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
+            if on_conflict == "overwrite":
+                action = "overwrite"
 
-        if pending_skip:
-            self._emit_resource_write(
-                workflow_node_id=str(workflow_node_id),
-                resource_type="workbook",
-                resource_id=str(workbook_id),
-                path=str(plan.path),
-                write_kind="workbook_sheet",
-                action=action,
-                input_node_id=str(input_node_id),
-                input_output_id=str(input_output_id),
-                sheet=sheet_name,
-            )
-            return
+        existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+        resolved_decl_order = int(decl_order)
+        if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+            plan.sheet_decl_order[sheet_name] = resolved_decl_order
+        plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
+
+        mapping = _build_alignment_mapping(input_header, input_header)
+        segment = _AppendSegment(
+            decl_order=int(decl_order),
+            input_csv=input_csv,
+            header_policy="once",
+            mapping=mapping,
+            on_mismatch="error",
+            align_by="header",
+            input_header=input_header,
+        )
+        plan.sheets[sheet_name] = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[segment])
+        plan.last_workflow_node_id = str(workflow_node_id)
 
         self._emit_resource_write(
             workflow_node_id=str(workflow_node_id),
@@ -255,57 +247,56 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         pending_warning_meta: Optional[Dict[str, object]] = None
         pending_skip = False
 
-        with self._lock:
-            sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:
-                plan.sheet_decl_order[sheet_name] = int(decl_order)
-                plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
-                sheet_plan = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[])
-                plan.sheets[sheet_name] = sheet_plan
-            else:
-                existing_decl_order = plan.sheet_decl_order.get(sheet_name)
-                resolved_decl_order = int(decl_order)
-                if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
-                    plan.sheet_decl_order[sheet_name] = resolved_decl_order
-                    plan.sheet_order = sorted(
-                        plan.sheet_decl_order.keys(),
-                        key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
-                    )
-
-            expected = list(sheet_plan.baseline_header)
-            mapping = _build_alignment_mapping(expected, input_header)
-
-            if list(input_header) != expected:
-                diff = _describe_header_diff(expected, input_header)
-                if on_mismatch == "error":
-                    msg = "Field alignment mismatch (workbook_append): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
-                    raise ScalimWorkflowWriteError(msg, diff=diff)
-                if on_mismatch == "warn":
-                    pending_warning = DiagnosticWarningEvent(
-                        message="Field alignment mismatch (warn): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name),
-                        source_id=None,
-                        field_id=None,
-                        lookup_key={"expected": expected, "actual": list(input_header)},
-                        row_id=None,
-                    )
-                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
-                if on_mismatch == "skip":
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-
-            if not pending_skip:
-                sheet_plan.segments.append(
-                    _AppendSegment(
-                        decl_order=int(decl_order),
-                        input_csv=input_csv,
-                        header_policy=str(header_policy),
-                        mapping=mapping,
-                        on_mismatch=str(on_mismatch),
-                        align_by=str(align_by),
-                        input_header=list(input_header),
-                    )
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:
+            plan.sheet_decl_order[sheet_name] = int(decl_order)
+            plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
+            sheet_plan = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[])
+            plan.sheets[sheet_name] = sheet_plan
+        else:
+            existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+            resolved_decl_order = int(decl_order)
+            if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+                plan.sheet_decl_order[sheet_name] = resolved_decl_order
+                plan.sheet_order = sorted(
+                    plan.sheet_decl_order.keys(),
+                    key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
                 )
+
+        expected = list(sheet_plan.baseline_header)
+        mapping = _build_alignment_mapping(expected, input_header)
+
+        if list(input_header) != expected:
+            diff = _describe_header_diff(expected, input_header)
+            if on_mismatch == "error":
+                msg = "Field alignment mismatch (workbook_append): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
+                raise ScalimWorkflowWriteError(msg, diff=diff)
+            if on_mismatch == "warn":
+                pending_warning = DiagnosticWarningEvent(
+                    message="Field alignment mismatch (warn): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name),
+                    source_id=None,
+                    field_id=None,
+                    lookup_key={"expected": expected, "actual": list(input_header)},
+                    row_id=None,
+                )
+                pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
+            if on_mismatch == "skip":
                 plan.last_workflow_node_id = str(workflow_node_id)
+                pending_skip = True
+
+        if not pending_skip:
+            sheet_plan.segments.append(
+                _AppendSegment(
+                    decl_order=int(decl_order),
+                    input_csv=input_csv,
+                    header_policy=str(header_policy),
+                    mapping=mapping,
+                    on_mismatch=str(on_mismatch),
+                    align_by=str(align_by),
+                    input_header=list(input_header),
+                )
+            )
+            plan.last_workflow_node_id = str(workflow_node_id)
 
         if pending_warning is not None:
             _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)

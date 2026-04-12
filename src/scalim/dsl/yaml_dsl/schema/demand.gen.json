@@ -1703,7 +1703,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -1722,23 +1722,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "导出 xlsx 的输出路径(字符串或 {$init_var: <name>})",
+          "description": "导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
-            "./output/report.xlsx",
+            "./output",
             {
-              "$init_var": "output_path"
+              "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "写锁(导出时;默认 false).",
-          "markdownDescription": "#### resources.books.*.export_xlsx.write_lock\n\n写锁(导出时;默认 false).",
-          "default": false,
-          "examples": [
-            false
-          ]
+          "markdownDescription": "#### resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
@@ -1904,7 +1895,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -1923,14 +1914,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "xlsx_file: 输出路径(字符串或 {$init_var: <name>})",
+          "description": "xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
-            "./output/report.xlsx",
+            "./output",
             {
-              "$init_var": "output_path"
+              "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.books.*.path\n\nxlsx_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
+          "markdownDescription": "#### resources.books.*.path\n\nxlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "budget": {
           "description": "xlsx_memory: 预算配置(必填)",
@@ -1954,15 +1945,6 @@
           "type": "boolean",
           "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "markdownDescription": "#### resources.books.*.allow_formulas\n\nxlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "default": false,
-          "examples": [
-            false
-          ]
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "xlsx_file: 写锁(默认 false).",
-          "markdownDescription": "#### resources.books.*.write_lock\n\nxlsx_file: 写锁(默认 false).",
           "default": false,
           "examples": [
             false
@@ -2061,9 +2043,6 @@
               },
               "allow_formulas": {
                 "not": {}
-              },
-              "write_lock": {
-                "not": {}
               }
             }
           }
@@ -2089,7 +2068,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -2108,14 +2087,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "csv_file: 输出路径(字符串或 {$init_var: <name>})",
+          "description": "csv_file: 输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
-            "./output/report.xlsx",
+            "./output",
             {
-              "$init_var": "output_path"
+              "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.files.*.path\n\ncsv_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
+          "markdownDescription": "#### resources.files.*.path\n\ncsv_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "encoding": {
           "type": "string",
@@ -2124,15 +2103,6 @@
           "default": "utf-8",
           "examples": [
             "utf-8"
-          ]
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "csv_file: 写锁(默认 false).",
-          "markdownDescription": "#### resources.files.*.write_lock\n\ncsv_file: 写锁(默认 false).",
-          "default": false,
-          "examples": [
-            false
           ]
         },
         "$import": {
@@ -3617,7 +3587,7 @@
           },
           "minItems": 1,
           "description": "输出字段顺序(`field_id/out_field_id` 列表).",
-          "markdownDescription": "#### outputs[*].fields\n\n输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      kind: csv_file\n      path: ./out.csv\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.\n\n##### 字段约束\n- 必填: 否\n- 类型: array\n- minItems: `1`\n\n##### 例子\n```yaml\n- order_id\n- user_id\n```",
+          "markdownDescription": "#### outputs[*].fields\n\n输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      kind: csv_file\n      path: ./out\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.\n\n##### 字段约束\n- 必填: 否\n- 类型: array\n- minItems: `1`\n\n##### 例子\n```yaml\n- order_id\n- user_id\n```",
           "examples": [
             [
               "order_id",
@@ -3699,14 +3669,6 @@
           "markdownDescription": "#### output_extra_sheet.allow_formulas\n\n可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置).",
           "examples": [
             false
-          ]
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "可选:写锁(缺省使用 primary workbook 的容器配置).",
-          "markdownDescription": "#### output_extra_sheet.write_lock\n\n可选:写锁(缺省使用 primary workbook 的容器配置).",
-          "examples": [
-            true
           ]
         }
       },

@@ -6,8 +6,10 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy, RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy, RunOptions, compile as compile_yaml
 from scalim.execution.output_composition import OutputTargetStats
+from scalim.execution.run_ir import run_ir
+from scalim.execution import versioned_outputs
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -66,6 +68,14 @@ def _summarize_stats(stats: Optional[Sequence[OutputTargetStats]]) -> List[Dict[
     return rows
 
 
+def _inject_output_dir_conflict_for_target(*, output_path: str) -> Path:
+    """在“应为文件”的路径上预先创建同名目录,用于构造确定性的写入失败."""
+    p = Path(str(output_path))
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.mkdir(parents=False, exist_ok=True)
+    return p
+
+
 def run_yaml_dsl_output_failure_policy(
     *,
     yaml_redacted_path: Optional[Path] = None,
@@ -85,8 +95,7 @@ def run_yaml_dsl_output_failure_policy(
 
     with tempfile.TemporaryDirectory(prefix="scalim-output-failure-") as tmpdir:
         tmp = Path(tmpdir)
-        bad_workbook_path = tmp / "secondary_workbook_dir"
-        bad_workbook_path.mkdir(parents=True, exist_ok=True)
+        out_root_secondary = tmp / "out_secondary_workbook"
 
         # 本章故意构造次输出写失败.为了让 `just examples` 输出更干净,临时把 `excel` 输出端的 `ERROR` 堆栈日志静音.
         sink_logger = logging.getLogger("scalim.sinks.sink_excel")
@@ -96,14 +105,14 @@ def run_yaml_dsl_output_failure_policy(
             # -----------------------------------------------------------------
             # `primary_only` + 脱敏错误信息
             # -----------------------------------------------------------------
-            out_detail_redacted = tmp / "detail_redacted.csv"
+            out_root_detail_redacted = tmp / "out_detail_redacted"
             init_vars_redacted: Dict[str, object] = {
-                "out_path_detail": str(out_detail_redacted),
-                "out_path_secondary_workbook": str(bad_workbook_path),
+                "out_path_detail": str(out_root_detail_redacted),
+                "out_path_secondary_workbook": str(out_root_secondary),
             }
 
             try:
-                redacted_result = run_yaml(
+                redacted_compilation = compile_yaml(
                     str(yaml_redacted_path),
                     options=RunOptions(
                         allowed_modules=_ALLOWED_MODULES,
@@ -113,6 +122,16 @@ def run_yaml_dsl_output_failure_policy(
                         allowed_yaml_roots=allowed_yaml_roots,
                     ),
                 )
+                redacted_spec = redacted_compilation.request.output_composition
+                secondary_output_path = None
+                for t in redacted_spec.targets if redacted_spec is not None else ():
+                    if str(t.target_id) == "secondary_debug_workbook":
+                        secondary_output_path = str(t.output.path)
+                        break
+                if not secondary_output_path:
+                    raise ValueError("output_composition 中缺少输出 target_id=`secondary_debug_workbook`")
+                _ = _inject_output_dir_conflict_for_target(output_path=str(secondary_output_path))
+                redacted_core = run_ir(redacted_compilation.demand_ir, redacted_compilation.request)
             except Exception as exc:  # noqa: BLE001
                 return ExampleResult(
                     example_id=_EXAMPLE_ID,
@@ -122,16 +141,25 @@ def run_yaml_dsl_output_failure_policy(
                     details={"exc_type": type(exc).__name__, "message": str(exc)},
                 )
 
-            redacted_rows = _read_csv_rows(out_detail_redacted) if out_detail_redacted.exists() else []
-            redacted_stats = _stats_by_id(redacted_result.core.output_target_stats)
+            redacted_output_path = Path(str((redacted_core.outputs or {}).get("detail") or redacted_core.output_path or ""))
+            redacted_rows = _read_csv_rows(redacted_output_path) if redacted_output_path.exists() else []
+            redacted_stats = _stats_by_id(redacted_core.output_target_stats)
 
             redacted_ok = True
             if len(redacted_rows) != 5:
                 redacted_ok = False
-            if redacted_result.output_path is None:
+            if not redacted_output_path.exists():
                 redacted_ok = False
-            elif Path(str(redacted_result.output_path)).resolve() != out_detail_redacted.resolve():
-                redacted_ok = False
+            else:
+                try:
+                    parsed = versioned_outputs.parse_versioned_output_path(redacted_output_path)
+                except Exception:  # noqa: BLE001
+                    redacted_ok = False
+                else:
+                    if parsed.root.resolve() != out_root_detail_redacted.resolve():
+                        redacted_ok = False
+                    if parsed.kind != "files" or parsed.artifact_id != "detail_csv":
+                        redacted_ok = False
 
             primary = redacted_stats.get("detail")
             secondary = redacted_stats.get("secondary_debug_workbook")
@@ -150,14 +178,14 @@ def run_yaml_dsl_output_failure_policy(
             # -----------------------------------------------------------------
             # `primary_only` + 完整错误信息
             # -----------------------------------------------------------------
-            out_detail_full = tmp / "detail_full.csv"
+            out_root_detail_full = tmp / "out_detail_full"
             init_vars_full: Dict[str, object] = {
-                "out_path_detail": str(out_detail_full),
-                "out_path_secondary_workbook": str(bad_workbook_path),
+                "out_path_detail": str(out_root_detail_full),
+                "out_path_secondary_workbook": str(out_root_secondary),
             }
 
             try:
-                full_result = run_yaml(
+                full_compilation = compile_yaml(
                     str(yaml_full_path),
                     options=RunOptions(
                         allowed_modules=_ALLOWED_MODULES,
@@ -168,6 +196,16 @@ def run_yaml_dsl_output_failure_policy(
                         allowed_yaml_roots=allowed_yaml_roots,
                     ),
                 )
+                full_spec = full_compilation.request.output_composition
+                secondary_output_path = None
+                for t in full_spec.targets if full_spec is not None else ():
+                    if str(t.target_id) == "secondary_debug_workbook":
+                        secondary_output_path = str(t.output.path)
+                        break
+                if not secondary_output_path:
+                    raise ValueError("output_composition 中缺少输出 target_id=`secondary_debug_workbook`")
+                _ = _inject_output_dir_conflict_for_target(output_path=str(secondary_output_path))
+                full_core = run_ir(full_compilation.demand_ir, full_compilation.request)
             except Exception as exc:  # noqa: BLE001
                 return ExampleResult(
                     example_id=_EXAMPLE_ID,
@@ -177,16 +215,25 @@ def run_yaml_dsl_output_failure_policy(
                     details={"exc_type": type(exc).__name__, "message": str(exc)},
                 )
 
-            full_rows = _read_csv_rows(out_detail_full) if out_detail_full.exists() else []
-            full_stats = _stats_by_id(full_result.core.output_target_stats)
+            full_output_path = Path(str((full_core.outputs or {}).get("detail") or full_core.output_path or ""))
+            full_rows = _read_csv_rows(full_output_path) if full_output_path.exists() else []
+            full_stats = _stats_by_id(full_core.output_target_stats)
 
             full_ok = True
             if len(full_rows) != 5:
                 full_ok = False
-            if full_result.output_path is None:
+            if not full_output_path.exists():
                 full_ok = False
-            elif Path(str(full_result.output_path)).resolve() != out_detail_full.resolve():
-                full_ok = False
+            else:
+                try:
+                    parsed = versioned_outputs.parse_versioned_output_path(full_output_path)
+                except Exception:  # noqa: BLE001
+                    full_ok = False
+                else:
+                    if parsed.root.resolve() != out_root_detail_full.resolve():
+                        full_ok = False
+                    if parsed.kind != "files" or parsed.artifact_id != "detail_csv":
+                        full_ok = False
 
             full_secondary = full_stats.get("secondary_debug_workbook")
             if full_secondary is None:
@@ -201,16 +248,16 @@ def run_yaml_dsl_output_failure_policy(
             # -----------------------------------------------------------------
             # `all_fail` 预期抛错
             # -----------------------------------------------------------------
-            out_detail_all_fail = tmp / "detail_all_fail.csv"
+            out_root_detail_all_fail = tmp / "out_detail_all_fail"
             init_vars_all_fail: Dict[str, object] = {
-                "out_path_detail": str(out_detail_all_fail),
-                "out_path_secondary_workbook": str(bad_workbook_path),
+                "out_path_detail": str(out_root_detail_all_fail),
+                "out_path_secondary_workbook": str(out_root_secondary),
             }
 
             all_fail_ok = False
             all_fail_summary = ""
             try:
-                _ = run_yaml(
+                all_fail_compilation = compile_yaml(
                     str(yaml_all_fail_path),
                     options=RunOptions(
                         allowed_modules=_ALLOWED_MODULES,
@@ -220,6 +267,16 @@ def run_yaml_dsl_output_failure_policy(
                         allowed_yaml_roots=allowed_yaml_roots,
                     ),
                 )
+                all_fail_spec = all_fail_compilation.request.output_composition
+                secondary_output_path = None
+                for t in all_fail_spec.targets if all_fail_spec is not None else ():
+                    if str(t.target_id) == "secondary_debug_workbook":
+                        secondary_output_path = str(t.output.path)
+                        break
+                if not secondary_output_path:
+                    raise ValueError("output_composition 中缺少输出 target_id=`secondary_debug_workbook`")
+                _ = _inject_output_dir_conflict_for_target(output_path=str(secondary_output_path))
+                _ = run_ir(all_fail_compilation.demand_ir, all_fail_compilation.request)
                 all_fail_summary = "unexpected: all_fail run succeeded"
             except Exception as exc:  # noqa: BLE001
                 msg = str(exc)
@@ -242,8 +299,8 @@ def run_yaml_dsl_output_failure_policy(
                 "yaml_all_fail": str(yaml_all_fail_path),
                 "detail_rows_redacted": len(redacted_rows),
                 "detail_rows_full": len(full_rows),
-                "redacted_output_target_stats": _summarize_stats(redacted_result.core.output_target_stats),
-                "full_output_target_stats": _summarize_stats(full_result.core.output_target_stats),
+                "redacted_output_target_stats": _summarize_stats(redacted_core.output_target_stats),
+                "full_output_target_stats": _summarize_stats(full_core.output_target_stats),
                 "all_fail_summary": all_fail_summary,
             }
             return ExampleResult(

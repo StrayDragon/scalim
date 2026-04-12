@@ -89,14 +89,15 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         ({"books": {"report": {"kind": "nope"}}}, r"workflow.resources.books.report.kind=.*expected one of"),
         ({"books": {"report": {"kind": "xlsx_file"}}}, "path is required for kind=xlsx_file"),
         ({"books": {"report": {"kind": "xlsx_file", "path": 1}}}, "must be a non-empty string"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "nope": 1}}}, "has unknown keys"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "nope": 1}}}, "has unknown keys"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx"}}}, "output root directory"),
         (
-            {"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "budget": {"max_sheets": 1, "max_total_cells": 1}}}},
+            {"books": {"report": {"kind": "xlsx_file", "path": "out", "budget": {"max_sheets": 1, "max_total_cells": 1}}}},
             "budget is not allowed",
         ),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "export_xlsx": {"path": "b.xlsx"}}}}, "export_xlsx is not allowed"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx", "write_lock": "nope"}}}, "write_lock must be a bool"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "export_xlsx": {"path": "out2"}}}}, "export_xlsx is not allowed"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
+        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "write_lock": "nope"}}}, "write_lock was removed"),
         ({"books": {"mem": {"kind": "xlsx_memory"}}}, "budget is required for kind=xlsx_memory"),
         ({"books": {"mem": {"kind": "xlsx_memory", "budget": "nope"}}}, "budget must be a mapping"),
         (
@@ -125,7 +126,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         ),
         (
             {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_lock": False}}},
-            "write_lock is not allowed",
+            "write_lock was removed",
         ),
         (
             {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}},
@@ -157,7 +158,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
                     }
                 }
             },
-            "write_lock must be a bool",
+            "write_lock was removed",
         ),
         (
             {
@@ -165,7 +166,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
                     "mem": {
                         "kind": "xlsx_memory",
                         "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "export_xlsx": {"path": "x.xlsx", "allow_formulas": "nope"},
+                        "export_xlsx": {"path": "out", "allow_formulas": "nope"},
                     }
                 }
             },
@@ -254,9 +255,9 @@ def test_load_workflow_config_from_mapping_resources_errors(resources_raw: Any, 
 
 def test_load_workflow_config_from_mapping_books_path_accepts_pathlike(tmp_path: Path) -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"books": {"report": {"kind": "xlsx_file", "path": tmp_path / "a.xlsx"}}}
+    root["workflow"]["resources"] = {"books": {"report": {"kind": "xlsx_file", "path": tmp_path / "out"}}}
     cfg = load_workflow_config_from_mapping(root)
-    assert cfg.resources.books["report"].path.endswith("a.xlsx")
+    assert cfg.resources.books["report"].path.endswith("out")
 
 
 def test_load_workflow_config_from_mapping_allows_null_resource_groups() -> None:

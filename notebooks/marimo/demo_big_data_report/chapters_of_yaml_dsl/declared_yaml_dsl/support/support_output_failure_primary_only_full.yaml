@@ -28,7 +28,7 @@ outputs:
     fields: [ticket_id, priority, resolve_minutes]
 
   # 故意作为“非主输出”来演示 `failure_policy` + `demand_diagnostics.include_full_error_message`.
-  # 运行时,我们会把 `out_path_secondary_workbook` 传成一个 *目录* 来触发可预期失败.
+  # NOTE: 本章的 marimo notebook 会通过“在输出文件路径上预先创建同名目录”的方式,构造一个确定性的 workbook 写失败.
   - name: secondary_debug_workbook
     to:
       book: secondary_debug

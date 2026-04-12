@@ -17,8 +17,7 @@ def _read_csv_header(path: Path) -> "list[str]":
 
 
 def test_yaml_outputs_aggregate_fields_rank_post_fields_and_where_e2e(tmp_path: Path) -> None:
-    detail_path = tmp_path / "detail_direct.csv"
-    summary_path = tmp_path / "summary_direct.csv"
+    out_root = tmp_path / "out"
 
     yaml_path = tmp_path / "demo.demand.yaml"
     yaml_path.write_text(
@@ -54,11 +53,14 @@ outputs:
         score: {score_by_rank: {rank_field: rank, base: 100, step: 10}}
         score2: {call_by: "tests.fixtures.yaml_outputs_e2e:score_from_rank(rank=rank, base=100, step=10)"}
 """
-        % (str(detail_path), str(summary_path)),
+        % (str(out_root), str(out_root)),
         encoding="utf-8",
     )
 
-    _ = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    assert result.core.outputs is not None
+    detail_path = Path(str(result.core.outputs["detail_direct"]))
+    summary_path = Path(str(result.core.outputs["summary_direct"]))
 
     assert detail_path.exists()
     assert summary_path.exists()
@@ -78,7 +80,7 @@ outputs:
 
 
 def test_yaml_outputs_aggregate_allows_output_fields_order_and_aggregate_names_e2e(tmp_path: Path) -> None:
-    summary_path = tmp_path / "summary_direct.csv"
+    out_root = tmp_path / "out"
 
     yaml_path = tmp_path / "demo.demand.yaml"
     yaml_path.write_text(
@@ -108,11 +110,13 @@ outputs:
         rank: {name: 排名, dense_rank: {by: sum_amount, order: desc}}
     fields: [rank, customer_id, order_cnt, sum_amount]
 """
-        % str(summary_path),
+        % str(out_root),
         encoding="utf-8",
     )
 
-    _ = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    assert result.core.outputs is not None
+    summary_path = Path(str(result.core.outputs["summary_direct"]))
 
     assert summary_path.exists()
     assert _read_csv_header(summary_path) == ["排名", "客户", "订单量", "GMV"]

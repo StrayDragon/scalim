@@ -305,7 +305,7 @@ workflow:
           max_sheets: 16
           max_total_cells: 2000000
         export_xlsx:
-          path: ./out/report.xlsx
+          path: ./out
 
   runs:
     - id: main

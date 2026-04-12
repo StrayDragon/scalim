@@ -347,16 +347,49 @@ class WorkflowRunController:
             self.submit_ready_nodes()
 
     def submit_ready_nodes(self) -> None:
-        while self._can_submit_next_ready():
-            node_id = self._state.ready_queue.pop(0)
+        while True:
+            if not self._state.ready_queue:
+                return
+            if self._state.failure_policy == "all_fail" and self._state.failed_outcome is not None:
+                return
+
+            # 单写者模型: `write node` 在 `controller` 线程同步执行,
+            # 且不会与 `in-flight` 的 `demand future` 重叠; 共享状态更新被约束在 `controller` 内,
+            # 从而不再依赖 `artifacts/ctx/resources` 的线程锁。
+            if self._state.submitted:
+                if len(self._state.submitted) >= int(self._state.max_concurrency):
+                    return
+                node_id = self._pop_next_ready_demand_node_id()
+                if node_id is None:
+                    return
+                self._submit_one_ready_node(str(node_id))
+                continue
+
+            write_node_id = self._pop_next_ready_write_node_id()
+            if write_node_id is not None:
+                self._submit_one_ready_node(str(write_node_id))
+                continue
+
+            if len(self._state.submitted) >= int(self._state.max_concurrency):
+                return
+            node_id = self._pop_next_ready_demand_node_id()
+            if node_id is None:
+                return
             self._submit_one_ready_node(str(node_id))
 
-    def _can_submit_next_ready(self) -> bool:
-        if not self._state.ready_queue:
-            return False
-        if len(self._state.submitted) >= int(self._state.max_concurrency):
-            return False
-        return not (self._state.failure_policy == "all_fail" and self._state.failed_outcome is not None)
+    def _pop_next_ready_demand_node_id(self) -> Optional[str]:
+        for idx, node_id in enumerate(list(self._state.ready_queue)):
+            node = self._node_by_id.get(str(node_id))
+            if isinstance(node, WorkflowNodeIr):
+                return str(self._state.ready_queue.pop(int(idx)))
+        return None
+
+    def _pop_next_ready_write_node_id(self) -> Optional[str]:
+        for idx, node_id in enumerate(list(self._state.ready_queue)):
+            node = self._node_by_id.get(str(node_id))
+            if node is not None and not isinstance(node, WorkflowNodeIr):
+                return str(self._state.ready_queue.pop(int(idx)))
+        return None
 
     def _submit_one_ready_node(self, node_id: str) -> None:
         node = self._node_by_id[str(node_id)]
@@ -367,13 +400,23 @@ class WorkflowRunController:
             self._submit_demand_node(str(node_id), node)
             return
 
-        fut = self._executor.submit(
-            self._run_workflow_write_node,
-            node,
-            artifacts_dir=self._artifacts_dir,
-            resource_manager=self._resource_manager,
-        )
-        self._state.submitted[fut] = (str(node_id), node, None, None, None)
+        idx = int(self._index_by_node_id.get(str(node_id), 0))
+        try:
+            self._run_workflow_write_node(
+                node,
+                artifacts_dir=self._artifacts_dir,
+                resource_manager=self._resource_manager,
+            )
+            self._maybe_release_workflow_managed_in_memory_output(node)
+            self._state.outcomes[idx] = WorkflowRunOutcome(run_id=str(node_id), demand_path="", result=None, error=None)
+            self._maybe_release_workflow_main_rows_artifact(node)
+            self._state.node_state[str(node_id)] = "done"
+            self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
+            if self._workflow_cache_pool is not None:
+                self._workflow_cache_pool.on_workflow_node_done(str(node_id))
+            self._on_terminal(str(node_id), ok=True)
+        except Exception as exc:  # noqa: BLE001
+            self._mark_node_failed(node_id=str(node_id), node=node, demand_path="", exc=exc, idx=idx)
 
     def _submit_demand_node(self, node_id: str, node: WorkflowNodeIr) -> None:
         demand_path = str(node.demand_path or "")
@@ -401,7 +444,8 @@ class WorkflowRunController:
 
         comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
         demand_ir = cast("DemandIr", comp.demand_ir)  # pragma: allow-cast compilation.demand_ir narrow
-        fut = self._executor.submit(self._run_one, demand_ir, request_for_run, str(node_id))
+        visible = self._ctx_store.visible_producer_node_ids(str(node_id))
+        fut = self._executor.submit(self._run_one, demand_ir, request_for_run, str(node_id), visible)
         self._state.submitted[fut] = (str(node_id), node, str(demand_path), compilation, request_for_run)
 
     def process_completed_future(self, fut: "concurrent.futures.Future[Any]") -> None:
@@ -629,7 +673,13 @@ class WorkflowRunController:
         for event in buckets.finished_events:
             _emit_workflow_event(event)
 
-    def _run_one(self, demand_ir: DemandIr, request: ExecutionRequest, workflow_node_id: str) -> object:
+    def _run_one(
+        self,
+        demand_ir: DemandIr,
+        request: ExecutionRequest,
+        workflow_node_id: str,
+        visible_producer_node_ids: FrozenSet[str],
+    ) -> object:
         def _engine_factory(**kwargs: object) -> ScalimEngine:
             engine_kwargs = cast("Any", kwargs)  # pragma: allow-cast engine kwargs typed narrowing
             return ScalimEngine(
@@ -638,7 +688,7 @@ class WorkflowRunController:
                 workflow_node_id=str(workflow_node_id),
             )
 
-        visible = self._ctx_store.visible_producer_node_ids(str(workflow_node_id))
+        visible = frozenset(str(x) for x in visible_producer_node_ids)
         decl_order = int(self._index_by_node_id.get(str(workflow_node_id), 0))
         event_meta_defaults = {
             "workflow_exec_id": self._workflow_exec_id,

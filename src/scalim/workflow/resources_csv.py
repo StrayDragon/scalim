@@ -128,11 +128,10 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                 path=str(p.path),
             )
 
-        plan = self._get_or_create_joinable_plan(
+        plan = self._get_or_create_plan(
             resource_type="csv",
             resource_id=key,
             plans=self._csvs,
-            inflight=self._inflight_csvs,
             create_fn=_create,
             on_create=_on_create,
         )
@@ -157,45 +156,44 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         pending_warning_meta: Optional[Dict[str, object]] = None
         pending_skip = False
 
-        with self._lock:
-            if plan.baseline_header is None:
-                plan.baseline_header = list(input_header)
-                plan.segments = []
+        if plan.baseline_header is None:
+            plan.baseline_header = list(input_header)
+            plan.segments = []
 
-            expected = list(plan.baseline_header or [])
-            mapping = _build_alignment_mapping(expected, input_header)
+        expected = list(plan.baseline_header or [])
+        mapping = _build_alignment_mapping(expected, input_header)
 
-            if list(input_header) != expected:
-                diff = _describe_header_diff(expected, input_header)
-                if on_mismatch == "error":
-                    msg = "Field alignment mismatch (csv_append): csv={!r}".format(str(csv_id))
-                    raise ScalimWorkflowWriteError(msg, diff=diff)
-                if on_mismatch == "warn":
-                    pending_warning = DiagnosticWarningEvent(
-                        message="Field alignment mismatch (warn): csv={!r}".format(str(csv_id)),
-                        source_id=None,
-                        field_id=None,
-                        lookup_key={"expected": expected, "actual": list(input_header)},
-                        row_id=None,
-                    )
-                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
-                if on_mismatch == "skip":
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-
-            if not pending_skip:
-                cast("List[_AppendSegment]", plan.segments).append(  # pragma: allow-cast csv segments typed narrowing
-                    _AppendSegment(
-                        decl_order=int(decl_order),
-                        input_csv=input_csv,
-                        header_policy=str(header_policy),
-                        mapping=mapping,
-                        on_mismatch=str(on_mismatch),
-                        align_by="header",
-                        input_header=list(input_header),
-                    )
+        if list(input_header) != expected:
+            diff = _describe_header_diff(expected, input_header)
+            if on_mismatch == "error":
+                msg = "Field alignment mismatch (csv_append): csv={!r}".format(str(csv_id))
+                raise ScalimWorkflowWriteError(msg, diff=diff)
+            if on_mismatch == "warn":
+                pending_warning = DiagnosticWarningEvent(
+                    message="Field alignment mismatch (warn): csv={!r}".format(str(csv_id)),
+                    source_id=None,
+                    field_id=None,
+                    lookup_key={"expected": expected, "actual": list(input_header)},
+                    row_id=None,
                 )
+                pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
+            if on_mismatch == "skip":
                 plan.last_workflow_node_id = str(workflow_node_id)
+                pending_skip = True
+
+        if not pending_skip:
+            cast("List[_AppendSegment]", plan.segments).append(  # pragma: allow-cast csv segments typed narrowing
+                _AppendSegment(
+                    decl_order=int(decl_order),
+                    input_csv=input_csv,
+                    header_policy=str(header_policy),
+                    mapping=mapping,
+                    on_mismatch=str(on_mismatch),
+                    align_by="header",
+                    input_header=list(input_header),
+                )
+            )
+            plan.last_workflow_node_id = str(workflow_node_id)
 
         if pending_warning is not None:
             _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)

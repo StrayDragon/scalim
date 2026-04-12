@@ -6,6 +6,8 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
+# pragma: allow-c901-file plan: c10
+
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
 from ...execution.run_ir import ExecutionResult
@@ -67,7 +69,6 @@ def _merge_book_export_xlsx_overrides(
         return right
     return BookExportXlsxOverride(
         path=left.path if right.path is None else right.path,
-        write_lock=left.write_lock if right.write_lock is None else right.write_lock,
         allow_formulas=left.allow_formulas if right.allow_formulas is None else right.allow_formulas,
     )
 
@@ -98,7 +99,6 @@ def _merge_book_resource_overrides(left: Optional[BookResourceOverride], right: 
         budget=_merge_book_budget_overrides(left.budget, right.budget),
         export_xlsx=_merge_book_export_xlsx_overrides(left.export_xlsx, right.export_xlsx),
         allow_formulas=left.allow_formulas if right.allow_formulas is None else right.allow_formulas,
-        write_lock=left.write_lock if right.write_lock is None else right.write_lock,
         write_defaults=_merge_book_write_defaults_overrides(left.write_defaults, right.write_defaults),
     )
 
@@ -147,7 +147,6 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
     if book.export_xlsx is not None:
         export_override = BookExportXlsxOverride(
             path=book.export_xlsx.path,
-            write_lock=True if bool(book.export_xlsx.write_lock) else None,
             allow_formulas=True if bool(book.export_xlsx.allow_formulas) else None,
         )
 
@@ -162,7 +161,6 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
         )
 
     allow_formulas = True if bool(book.allow_formulas) else None
-    write_lock = True if bool(book.write_lock) else None
 
     return BookResourceOverride(
         kind=kind,
@@ -170,7 +168,6 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
         budget=budget_override,
         export_xlsx=export_override,
         allow_formulas=allow_formulas,
-        write_lock=write_lock,
         write_defaults=write_defaults_override,
     )
 
@@ -431,7 +428,7 @@ def _normalize_and_validate_workflow_base_options(options: RunOptions) -> RunOpt
     return base_options
 
 
-def run_workflow_lifecycle_until_preflight(
+def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
     workflow_yaml_path: str,
     *,
     base_options: RunOptions,
@@ -450,6 +447,33 @@ def run_workflow_lifecycle_until_preflight(
     )
     parse = WorkflowLifecycleParseResult(workflow_yaml_path=str(workflow_path), workflow_config=wf)
 
+    run_ids = frozenset(run.id for run in wf.runs)
+    typed_run_options_patches_by_run_id = _validate_run_options_patches_by_run_id(run_options_patches_by_run_id, known_run_ids=run_ids)
+
+    # `workflow IR` 的资源编译需要看到每个 `run` 的 `patch` 中对 `resources` 的覆盖,否则会导致:
+    # - `demand` 编译期按 `patch` 解析输出路径
+    # - 资源管理器按 `base`/`workflow` 资源写入,最终产物路径不一致
+    compile_overrides = base_options.overrides
+    compile_resources = None if compile_overrides is None else compile_overrides.resources
+    if typed_run_options_patches_by_run_id is not None:
+        for run in wf.runs:
+            patch = typed_run_options_patches_by_run_id.get(str(run.id))
+            if patch is None:
+                continue
+            patch_overrides = patch.overrides
+            if isinstance(patch_overrides, UnsetType) or patch_overrides is None:
+                continue
+            patch_resources = patch_overrides.resources
+            if patch_resources is not None:
+                compile_resources = _merge_resources_overrides(compile_resources, patch_resources)
+
+    base_resources = None if compile_overrides is None else compile_overrides.resources
+    if compile_resources != base_resources:
+        if compile_overrides is None:
+            compile_overrides = RunOverrides(resources=compile_resources)
+        else:
+            compile_overrides = replace(compile_overrides, resources=compile_resources)
+
     # 阶段: 结构预加载(`preload`/`compile`; `parser-only`)
     compilation = compile_workflow_ir(
         wf,
@@ -460,7 +484,7 @@ def run_workflow_lifecycle_until_preflight(
         rendered_yaml_max_len=base_options.rendered_yaml_max_len,
         allowed_yaml_roots=base_options.allowed_yaml_roots,
         init_vars=base_options.init_vars,
-        overrides=base_options.overrides,
+        overrides=compile_overrides,
         workflow_resources_wait=workflow_resources_wait,
         workflow_output_staging=workflow_output_staging,
     )
@@ -486,8 +510,6 @@ def run_workflow_lifecycle_until_preflight(
 
     # 阶段: 合并 `per-run` `effective options`(`policy-aware` 边界从这里开始)
     workflow_resources_override = _workflow_resources_override(wf)
-    run_ids = frozenset(run.id for run in wf.runs)
-    typed_run_options_patches_by_run_id = _validate_run_options_patches_by_run_id(run_options_patches_by_run_id, known_run_ids=run_ids)
 
     bundle_viz_base_config = _extract_bundle_viz_base_config(base_options.overrides)
 
@@ -604,7 +626,7 @@ def run_workflow(
         managed_output_ids: Optional[FrozenSet[str]],
         viz_config: Optional["VizObserverConfig"],
     ) -> _CompilationLike:
-        _ = workflow_exec_id, workflow_node_decl_order
+        _ = workflow_node_decl_order
 
         run_id = str(workflow_node_id)
         base_node_options = effective_options_by_run_id.get(run_id)
@@ -622,6 +644,7 @@ def run_workflow(
             merged.update(node_init_vars)
             init_vars = merged
         node_options = replace(node_options, init_vars=init_vars)
+        node_options = replace(node_options, output_version_id=str(workflow_exec_id))
 
         # `bundle viz` 注入必须保留 `legacy` 语义: 当 `run options patch` 覆盖 `overrides` 时,
         # 允许通过整体替换 `overrides` 对象来丢弃 `viz_config`.

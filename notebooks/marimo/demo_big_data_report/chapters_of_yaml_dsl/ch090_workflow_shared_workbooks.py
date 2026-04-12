@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -35,6 +36,23 @@ def _count_sheet_rows_and_header(workbook: Any, sheet_name: str) -> Tuple[Option
     header = ["" if v is None else str(v) for v in first]
     rest_count = sum(1 for _ in it)
     return header, 1 + int(rest_count)
+
+
+def _resolve_latest_book_artifact(out_root: Path, *, book_id: str) -> Tuple[Optional[Path], Dict[str, Any]]:
+    """通过 `manifest/latest.json` 定位 `<out_root>/versions/<version_id>/books/<book_id>.xlsx`."""
+    try:
+        latest = versioned_outputs.read_latest(out_root)
+        version_id = str(latest.get("version_id") or "")
+        if not version_id:
+            return None, {"latest": latest}
+        manifest = versioned_outputs.read_version_manifest(out_root, version_id=version_id)
+        books = manifest.get("books") if isinstance(manifest, dict) else None
+        rel = books.get(book_id) if isinstance(books, dict) else None
+        if not rel:
+            rel = versioned_outputs.book_output_relpath(book_id=str(book_id))
+        return out_root / "versions" / version_id / str(rel), {"latest": latest, "manifest": manifest}
+    except Exception as exc:  # noqa: BLE001
+        return None, {"exc_type": type(exc).__name__, "message": str(exc)}
 
 
 def run_workflow_shared_workbooks(
@@ -86,13 +104,30 @@ def run_workflow_shared_workbooks(
                 )
 
             errors = wf_result.errors()
-            shared_report_sheet_xlsx = out_dir / "shared_report_sheet.xlsx"
-            shared_report_append_xlsx = out_dir / "shared_report_append.xlsx"
-            sheetbook_report_sheet_xlsx = out_dir / "sheetbook_report_sheet.xlsx"
-            sheetbook_report_append_xlsx = out_dir / "sheetbook_report_append.xlsx"
+            shared_report_sheet_root = out_dir / "out" / "shared_report_sheet"
+            shared_report_append_root = out_dir / "out" / "shared_report_append"
+            sheetbook_report_sheet_root = out_dir / "out" / "sheetbook_report_sheet"
+            sheetbook_report_append_root = out_dir / "out" / "sheetbook_report_append"
+
+            shared_report_sheet_xlsx, shared_sheet_meta = _resolve_latest_book_artifact(
+                shared_report_sheet_root, book_id="shared_report_sheet"
+            )
+            shared_report_append_xlsx, shared_append_meta = _resolve_latest_book_artifact(
+                shared_report_append_root, book_id="shared_report_append"
+            )
+            sheetbook_report_sheet_xlsx, sheetbook_sheet_meta = _resolve_latest_book_artifact(
+                sheetbook_report_sheet_root, book_id="sheetbook_report_sheet"
+            )
+            sheetbook_report_append_xlsx, sheetbook_append_meta = _resolve_latest_book_artifact(
+                sheetbook_report_append_root, book_id="sheetbook_report_append"
+            )
 
             artifacts_ok = bool(
-                shared_report_sheet_xlsx.exists()
+                shared_report_sheet_xlsx
+                and shared_report_append_xlsx
+                and sheetbook_report_sheet_xlsx
+                and sheetbook_report_append_xlsx
+                and shared_report_sheet_xlsx.exists()
                 and shared_report_append_xlsx.exists()
                 and sheetbook_report_sheet_xlsx.exists()
                 and sheetbook_report_append_xlsx.exists()
@@ -106,13 +141,13 @@ def run_workflow_shared_workbooks(
             if artifacts_ok:
                 from openpyxl import load_workbook
 
-                wb_sheet = load_workbook(shared_report_sheet_xlsx, read_only=True, data_only=True)
+                wb_sheet = load_workbook(shared_report_sheet_xlsx, read_only=True, data_only=True)  # type: ignore[arg-type]
                 try:
                     wb_detail_header, wb_detail_rows = _count_sheet_rows_and_header(wb_sheet, "Detail")
                 finally:
                     wb_sheet.close()
 
-                wb_append = load_workbook(shared_report_append_xlsx, read_only=True, data_only=True)
+                wb_append = load_workbook(shared_report_append_xlsx, read_only=True, data_only=True)  # type: ignore[arg-type]
                 try:
                     wb_append_header, wb_append_rows = _count_sheet_rows_and_header(wb_append, "DetailAppend")
                 finally:
@@ -134,13 +169,13 @@ def run_workflow_shared_workbooks(
                     "detail_append": {"rows_total": wb_append_rows, "expected": expected_append_rows},
                 }
 
-                sb_sheet = load_workbook(sheetbook_report_sheet_xlsx, read_only=True, data_only=True)
+                sb_sheet = load_workbook(sheetbook_report_sheet_xlsx, read_only=True, data_only=True)  # type: ignore[arg-type]
                 try:
                     sb_detail_header, sb_detail_rows = _count_sheet_rows_and_header(sb_sheet, "Detail")
                 finally:
                     sb_sheet.close()
 
-                sb_append = load_workbook(sheetbook_report_append_xlsx, read_only=True, data_only=True)
+                sb_append = load_workbook(sheetbook_report_append_xlsx, read_only=True, data_only=True)  # type: ignore[arg-type]
                 try:
                     sb_append_header, sb_append_rows = _count_sheet_rows_and_header(sb_append, "DetailAppend")
                 finally:
@@ -172,10 +207,24 @@ def run_workflow_shared_workbooks(
             details: Dict[str, Any] = {
                 "output_dir": str(out_dir),
                 "workflow_yaml_path": str(workflow_yaml_path),
-                "shared_report_sheet_xlsx": str(shared_report_sheet_xlsx),
-                "shared_report_append_xlsx": str(shared_report_append_xlsx),
-                "sheetbook_report_sheet_xlsx": str(sheetbook_report_sheet_xlsx),
-                "sheetbook_report_append_xlsx": str(sheetbook_report_append_xlsx),
+                "output_roots": {
+                    "shared_report_sheet": str(shared_report_sheet_root),
+                    "shared_report_append": str(shared_report_append_root),
+                    "sheetbook_report_sheet": str(sheetbook_report_sheet_root),
+                    "sheetbook_report_append": str(sheetbook_report_append_root),
+                },
+                "artifacts": {
+                    "shared_report_sheet_xlsx": str(shared_report_sheet_xlsx) if shared_report_sheet_xlsx else None,
+                    "shared_report_append_xlsx": str(shared_report_append_xlsx) if shared_report_append_xlsx else None,
+                    "sheetbook_report_sheet_xlsx": str(sheetbook_report_sheet_xlsx) if sheetbook_report_sheet_xlsx else None,
+                    "sheetbook_report_append_xlsx": str(sheetbook_report_append_xlsx) if sheetbook_report_append_xlsx else None,
+                },
+                "versioned_resolve": {
+                    "shared_report_sheet": shared_sheet_meta,
+                    "shared_report_append": shared_append_meta,
+                    "sheetbook_report_sheet": sheetbook_sheet_meta,
+                    "sheetbook_report_append": sheetbook_append_meta,
+                },
                 "workbook": wb_checks,
                 "sheetbook": sb_checks,
                 "errors": errors,

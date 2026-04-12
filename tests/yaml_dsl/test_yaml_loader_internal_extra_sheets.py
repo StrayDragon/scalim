@@ -41,7 +41,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./out.xlsx
+      path: ./out
       write_defaults: {mode: sheet}
 
 outputs:
@@ -82,7 +82,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./out.xlsx
+      path: ./out
       write_defaults: {mode: sheet}
 
 outputs:
@@ -109,7 +109,9 @@ outputs:
     assert compilation.request.output_composition is not None
     assert compilation.request.output_composition.meta_sheet is not None
     assert compilation.request.output_composition.audit_sheet is not None
-    assert compilation.request.output_composition.meta_sheet.output.path == str(tmp_path / "out.xlsx")
+    assert compilation.request.output_composition.targets
+    detail = next(t for t in compilation.request.output_composition.targets if t.target_id == "detail")
+    assert compilation.request.output_composition.meta_sheet.output.path == detail.output.path
     assert compilation.request.output_composition.audit_sheet.sheet_name == "__audit__"
 
 
@@ -140,12 +142,6 @@ def test_runtime_compiler_parse_output_extra_sheet_override_error_branches() -> 
     with pytest.raises(TypeError, match=r"p\.allow_formulas must be a bool"):
         _ = compiler_mod._parse_output_extra_sheet_override(
             OutputExtraSheetOverride(allow_formulas="nope"),
-            path="p",
-        )  # noqa: SLF001
-
-    with pytest.raises(TypeError, match=r"p\.write_lock must be a bool"):
-        _ = compiler_mod._parse_output_extra_sheet_override(
-            OutputExtraSheetOverride(write_lock="nope"),
             path="p",
         )  # noqa: SLF001
 

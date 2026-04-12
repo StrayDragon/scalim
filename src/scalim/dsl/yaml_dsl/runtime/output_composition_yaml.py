@@ -1,5 +1,6 @@
 # pragma: allow-c901-file plan: c70
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
 from ....execution.output_composition import (
@@ -18,6 +19,7 @@ from ....execution.output_composition import (
 )
 from ....execution.output_contracts import ExportLayout, OutputSpec
 from ....execution.run_ir import export_layout_from_demand_ir
+from ....execution.versioned_outputs import book_output_relpath, file_output_relpath, validate_version_id
 from ....spec.ir import DemandIr
 from ....typedefs import FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
@@ -302,7 +304,6 @@ def _output_spec_for_file_resource(file_cfg: FileConfig, *, path: Optional[str],
         streaming=True,
         include_header=bool(include_header),
         sheet_name=None,
-        write_lock=bool(file_cfg.write_lock),
     )
 
 
@@ -425,7 +426,6 @@ def _compile_extra_sheet(
     default_sheet: str,
     default_workbook_path: Optional[str],
     default_allow_formulas: bool,
-    default_write_lock: bool,
     as_in_memory_csv: bool,
 ) -> Tuple[OutputSpec, str]:
     sheet = str(cfg.sheet) if cfg.sheet else str(default_sheet)
@@ -441,13 +441,11 @@ def _compile_extra_sheet(
         msg = "{} requires a workbook path (set {}.path or provide at least one workbook output)".format(target_id, target_id)
         raise ValueError(msg)
     allow_formulas = default_allow_formulas if cfg.allow_formulas is None else bool(cfg.allow_formulas)
-    write_lock = default_write_lock if cfg.write_lock is None else bool(cfg.write_lock)
     return (
         OutputSpec(
             format="excel",
             path=path,
             excel_allow_formulas=allow_formulas,
-            write_lock=write_lock,
         ),
         sheet,
     )
@@ -460,7 +458,6 @@ def _maybe_compile_extra_sheet(
     default_sheet: str,
     default_workbook_path: Optional[str],
     default_allow_formulas: bool,
-    default_write_lock: bool,
     skip_without_workbook: bool,
     as_in_memory_csv: bool,
 ) -> Optional[Tuple[OutputSpec, str]]:
@@ -473,7 +470,6 @@ def _maybe_compile_extra_sheet(
         default_sheet=default_sheet,
         default_workbook_path=default_workbook_path,
         default_allow_formulas=default_allow_formulas,
-        default_write_lock=default_write_lock,
         as_in_memory_csv=as_in_memory_csv,
     )
     return out, sheet_name
@@ -559,6 +555,33 @@ def _require_book_resource(config: DemandConfig, *, book_id: str, book_ref_path:
     return book
 
 
+_VERSIONED_OUTPUT_MIGRATION_HINT = (
+    "Migration: set path to an output root directory (e.g. './out'), and locate outputs via <root>/manifest/latest.json."
+)
+
+
+def _validate_output_root_path(root: str, *, path: str) -> None:
+    # `path` 语义升级为 `output root` (目录); 旧语义常见为 `./out/report.xlsx` / `./out/detail.csv`。
+    suffix = Path(str(root)).suffix.lower()
+    if suffix in (".xlsx", ".csv"):
+        msg = "{} now expects an output root directory, not a file path: {!r}. {}".format(
+            str(path), str(root), _VERSIONED_OUTPUT_MIGRATION_HINT
+        )
+        raise ValueError(msg)
+
+
+def _versioned_file_output_path(*, output_root: str, version_id: str, file_id: str) -> str:
+    vid = validate_version_id(str(version_id))
+    rel = file_output_relpath(file_id=str(file_id))
+    return str(Path(str(output_root)) / "versions" / str(vid) / Path(str(rel)))
+
+
+def _versioned_book_output_path(*, output_root: str, version_id: str, book_id: str) -> str:
+    vid = validate_version_id(str(version_id))
+    rel = book_output_relpath(book_id=str(book_id))
+    return str(Path(str(output_root)) / "versions" / str(vid) / Path(str(rel)))
+
+
 def _resolve_file_export_path(
     config: DemandConfig,
     *,
@@ -566,14 +589,17 @@ def _resolve_file_export_path(
     file_ref_path: str,
     yaml_base_dir: str,
     init_vars: Optional[Dict[str, object]],
+    version_id: str,
 ) -> Tuple[str, FileConfig]:
     file_cfg = _require_file_resource(config, file_id=str(file_id), file_ref_path=str(file_ref_path))
-    export_path = resolve_yaml_relative_output_path(
+    output_root = resolve_yaml_relative_output_path(
         file_cfg.path,
         base_dir=str(yaml_base_dir),
         init_vars=init_vars,
         path="resources.files.{}.path".format(str(file_id)),
     )
+    _validate_output_root_path(str(output_root), path="resources.files.{}.path".format(str(file_id)))
+    export_path = _versioned_file_output_path(output_root=str(output_root), version_id=str(version_id), file_id=str(file_id))
     return export_path, file_cfg
 
 
@@ -584,18 +610,21 @@ def _resolve_book_export_path(
     book_ref_path: str,
     yaml_base_dir: str,
     init_vars: Optional[Dict[str, object]],
-) -> Tuple[str, bool, bool]:
+    version_id: str,
+) -> Tuple[str, bool]:
     book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
 
     kind = str(book.kind or "").strip()
     if kind == "xlsx_file":
-        export_path = resolve_yaml_relative_output_path(
+        output_root = resolve_yaml_relative_output_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
             path="resources.books.{}.path".format(str(book_id)),
         )
-        return export_path, bool(book.allow_formulas), bool(book.write_lock)
+        _validate_output_root_path(str(output_root), path="resources.books.{}.path".format(str(book_id)))
+        export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
+        return export_path, bool(book.allow_formulas)
 
     if kind == "xlsx_memory":
         export = book.export_xlsx
@@ -607,18 +636,60 @@ def _resolve_book_export_path(
             path_ref = "resources.books.{}.export_xlsx".format(str(book_id))
             err = "{} (path={})".format(msg, path_ref)
             raise ValueError(err)
-        export_path = resolve_yaml_relative_output_path(
+        output_root = resolve_yaml_relative_output_path(
             export.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
             path="resources.books.{}.export_xlsx.path".format(str(book_id)),
         )
-        return export_path, bool(export.allow_formulas), bool(export.write_lock)
+        _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+        export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
+        return export_path, bool(export.allow_formulas)
 
     msg = "Unknown book kind: {!r}".format(kind)
     path_ref = "resources.books.{}.kind".format(str(book_id))
     err = "{} (path={})".format(msg, path_ref)
     raise ValueError(err)
+
+
+def _try_resolve_workflow_managed_book_export_path(
+    book: BookConfig,
+    *,
+    book_id: str,
+    yaml_base_dir: str,
+    init_vars: Optional[Dict[str, object]],
+    version_id: str,
+) -> Optional[str]:
+    """为 `workflow-managed` 的 `book` 输出解析“可能存在”的最终导出路径.
+
+    - `xlsx_file`: 始终可导出,返回版本化 `.xlsx` 文件路径
+    - `xlsx_memory`: 仅当声明 `export_xlsx` 时返回导出路径;否则返回 `None`(仅内存态)
+    """
+    kind = str(book.kind or "").strip()
+    if kind == "xlsx_file":
+        output_root = resolve_yaml_relative_output_path(
+            book.path,
+            base_dir=str(yaml_base_dir),
+            init_vars=init_vars,
+            path="resources.books.{}.path".format(str(book_id)),
+        )
+        _validate_output_root_path(str(output_root), path="resources.books.{}.path".format(str(book_id)))
+        return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
+
+    if kind == "xlsx_memory":
+        export = book.export_xlsx
+        if export is None:
+            return None
+        output_root = resolve_yaml_relative_output_path(
+            export.path,
+            base_dir=str(yaml_base_dir),
+            init_vars=init_vars,
+            path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+        )
+        _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+        return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
+
+    return None
 
 
 def _effective_book_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
@@ -691,6 +762,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
+    version_id: str,
     resolver: SecurePythonReferenceResolver,
     init_vars: Optional[Dict[str, object]] = None,
     yaml_base_dir: Optional[str] = None,
@@ -712,7 +784,9 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     direct_targets: List[OutputTargetSpec] = []
     derived_targets: List[DerivedOutputTargetSpec] = []
     workbook_default_path: Optional[str] = None
-    workbook_default_allow_formulas = workbook_default_write_lock = False
+    workbook_default_allow_formulas = False
+
+    version_id = validate_version_id(str(version_id))
 
     for idx, out_cfg in enumerate(outputs):
         is_primary = idx == 0
@@ -739,6 +813,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 file_ref_path=str(file_ref_path),
                 yaml_base_dir=str(yaml_base_dir),
                 init_vars=init_vars,
+                version_id=str(version_id),
             )
             include_header = _effective_output_include_header(
                 out_cfg=out_cfg,
@@ -746,7 +821,12 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 header_policy=None,
                 include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
             )
-            output_spec = _output_spec_for_file_resource(file_cfg, path=export_path, include_header=include_header)
+            if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
+                in_memory = True
+                managed_artifact_kind = MANAGED_ARTIFACT_KIND_CSV
+                output_spec = OutputSpec(format="csv", path=str(export_path), streaming=True, include_header=bool(include_header))
+            else:
+                output_spec = _output_spec_for_file_resource(file_cfg, path=export_path, include_header=include_header)
             header_by = _effective_output_header_fields_output_by(out_cfg=out_cfg)
         else:
             book_id, book_ref_path = _effective_book_id_for_output(out_cfg, idx=int(idx), outputs_path=str(outputs_path))
@@ -779,6 +859,15 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
             if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
                 in_memory = True
+                export_path = None
+                if yaml_base_dir is not None:
+                    export_path = _try_resolve_workflow_managed_book_export_path(
+                        book,
+                        book_id=str(book_id),
+                        yaml_base_dir=str(yaml_base_dir),
+                        init_vars=init_vars,
+                        version_id=str(version_id),
+                    )
                 effective_defaults = _effective_book_write_defaults(book)
                 include_header = _effective_output_include_header(
                     out_cfg=out_cfg,
@@ -789,10 +878,18 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 )
                 if str(book.kind or "").strip() == "xlsx_memory":
                     managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
-                    output_spec = OutputSpec(format="excel", path=None, streaming=True, include_header=bool(include_header))
+                    output_spec = OutputSpec(
+                        format="excel",
+                        path=str(export_path) if export_path else None,
+                        streaming=True,
+                        include_header=bool(include_header),
+                        sheet_name=str(sheet_name),
+                    )
                 else:
                     managed_artifact_kind = MANAGED_ARTIFACT_KIND_CSV
-                    output_spec = OutputSpec(format="csv", path=None, streaming=True, include_header=bool(include_header))
+                    output_spec = OutputSpec(
+                        format="csv", path=str(export_path) if export_path else None, streaming=True, include_header=bool(include_header)
+                    )
             else:
                 if yaml_base_dir is None:
                     msg = "yaml_base_dir is required to resolve resources.books output paths"
@@ -805,12 +902,13 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
                     header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
                 )
-                export_path, allow_formulas, write_lock = _resolve_book_export_path(
+                export_path, allow_formulas = _resolve_book_export_path(
                     config,
                     book_id=str(book_id),
                     book_ref_path=str(book_ref_path),
                     yaml_base_dir=str(yaml_base_dir),
                     init_vars=init_vars,
+                    version_id=str(version_id),
                 )
                 output_spec = OutputSpec(
                     format="excel",
@@ -819,12 +917,10 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     include_header=bool(include_header),
                     sheet_name=str(sheet_name),
                     excel_allow_formulas=bool(allow_formulas),
-                    write_lock=bool(write_lock),
                 )
                 if workbook_default_path is None:
                     workbook_default_path = str(export_path)
                     workbook_default_allow_formulas = bool(allow_formulas)
-                    workbook_default_write_lock = bool(write_lock)
             header_by = _effective_output_header_fields_output_by(out_cfg=out_cfg)
 
         predicate = None
@@ -903,7 +999,6 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         default_sheet="__meta__",
         default_workbook_path=workbook_default_path,
         default_allow_formulas=workbook_default_allow_formulas,
-        default_write_lock=workbook_default_write_lock,
         skip_without_workbook=skip_extra_sheets_without_workbook,
         as_in_memory_csv=workflow_managed_output_ids is not None,
     )
@@ -923,7 +1018,6 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         default_sheet="__audit__",
         default_workbook_path=workbook_default_path,
         default_allow_formulas=workbook_default_allow_formulas,
-        default_write_lock=workbook_default_write_lock,
         skip_without_workbook=skip_extra_sheets_without_workbook,
         as_in_memory_csv=workflow_managed_output_ids is not None,
     )

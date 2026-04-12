@@ -386,6 +386,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 workflow YAML 的共享 `.xlsx` book 资源(以 `workflow.resources.books` 表达)的迁移约束与运行期契约: 预算护栏、确定性写入、冲突安全、可观测且可原子导出为最终 xlsx,并提供可稳定引用的内置 loader 供下游节点读取 sheet rows.
 
+### `workflow-versioned-outputs`
+- Title: workflow-versioned-outputs Specification
+- Source: [spec.md](#code=openspec/specs/workflow-versioned-outputs/spec.md)
+- Summary: **状态: ✅ 已实现** 定义版本化输出协议（D-2）：将 `path` 解释为输出 root 目录,并在 root 下以 `versions/<version_id>/...` 写入产物,同时通过 `manifest/latest.json` 提供稳定入口与并发下的原子更新语义（last-writer-wins,但不丢历史版本）。
+
 ### `yaml-backend-migration`
 - Title: yaml-backend-migration Specification
 - Source: [spec.md](#code=openspec/specs/yaml-backend-migration/spec.md)

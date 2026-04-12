@@ -1,13 +1,13 @@
 import marimo
 
 import csv
+import json
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailsRelationsPolicy
-from scalim.execution.run_ir import run_ir
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import (
     GuardrailCaptureObserver,
@@ -33,13 +33,6 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
                 continue
             rows.append({str(k): str(v) if v is not None else "" for k, v in row.items()})
     return rows
-
-
-def _find_row_gap(components: Optional[Sequence[object]]) -> Optional[RowGapObserver]:
-    for c in components or ():
-        if isinstance(c, RowGapObserver):
-            return c
-    return None
 
 
 def run_yaml_dsl_support(
@@ -70,19 +63,17 @@ def run_yaml_dsl_support(
 
     with tempfile.TemporaryDirectory(prefix="scalim-support-") as tmpdir:
         tmp = Path(tmpdir)
-        out_detail = tmp / "detail.csv"
-        out_metrics = tmp / "metrics_by_team.csv"
+        out_root = tmp / "out"
 
         init_vars = dict(init_vars or {})
         init_vars.update(
             {
-                "out_path_detail": str(out_detail),
-                "out_path_metrics": str(out_metrics),
+                "out_root": str(out_root),
             }
         )
 
         try:
-            compilation = compile_yaml(
+            run_result = run_yaml(
                 str(yaml_path),
                 options=RunOptions(
                     allowed_modules=_ALLOWED_MODULES,
@@ -92,7 +83,7 @@ def run_yaml_dsl_support(
                     batch_size=None,
                 ),
             )
-            core = run_ir(compilation.demand_ir, compilation.request)
+            core = run_result.core
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -102,6 +93,12 @@ def run_yaml_dsl_support(
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
+        latest = json.loads((out_root / "manifest" / "latest.json").read_text("utf-8"))
+        version_id = str(latest["version_id"])
+        vdir = out_root / "versions" / version_id
+        out_detail = vdir / "files" / "detail_csv.csv"
+        out_metrics = vdir / "files" / "metrics_csv.csv"
+
         detail_rows = _read_csv_rows(out_detail) if out_detail.exists() else []
         metrics_rows = _read_csv_rows(out_metrics) if out_metrics.exists() else []
 
@@ -110,14 +107,13 @@ def run_yaml_dsl_support(
             actual_metrics_by_team=metrics_rows,
         )
 
-        row_gap = _find_row_gap(compilation.request.components)
         row_gap_totals = {
-            "total_expected": int(row_gap.total_expected) if row_gap else None,
-            "total_actual": int(row_gap.total_actual) if row_gap else None,
-            "total_missing": int(row_gap.total_missing) if row_gap else None,
+            "total_expected": int(row_gap_observer.total_expected),
+            "total_actual": int(row_gap_observer.total_actual),
+            "total_missing": int(row_gap_observer.total_missing),
         }
         expected_totals = expected_support_row_gap_totals()
-        ok_row_gap = bool(row_gap and row_gap_totals == expected_totals)
+        ok_row_gap = bool(row_gap_totals == expected_totals)
 
         expected_codes = set(expected_support_guardrail_codes())
         got_codes = {s.code for s in guardrail_capture.signals if s.code}
@@ -135,6 +131,8 @@ def run_yaml_dsl_support(
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
             "outputs": core.outputs,
+            "out_root": str(out_root),
+            "version_id": version_id,
             "detail_csv": str(out_detail),
             "metrics_csv": str(out_metrics),
             "oracle": oracle_details,

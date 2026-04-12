@@ -93,18 +93,6 @@
 - **WHEN** CSV sink 写出该值
 - **THEN** 输出的 CSV 字段值 MUST 保持为 `=1+1`
 
-### Requirement: file sinks 支持可选的并发写出保护(避免静默覆盖)
-当多个进程/实例可能同时写入同一输出路径时,系统 MUST 允许用户启用低成本的并发写出保护,以避免“最后写入者覆盖”静默发生.
-
-启用保护时:
-- 系统 MUST fail-fast 并给出清晰错误信息(包含目标路径与恢复建议:改用唯一路径/外部加锁/清理锁)
-- 系统 MUST best-effort 清理其并发保护资源(例如 lock 文件)
-
-#### Scenario: 并发保护启用且锁已存在时 fail-fast
-- **GIVEN** 并发保护启用且目标路径的锁已存在
-- **WHEN** sink 尝试 close 并写出
-- **THEN** close MUST 失败并提示冲突与恢复建议
-
 ### Requirement: Sinks MAY implement aligned-write fastpath without breaking existing contracts
 系统 MUST 在保持现有 `ISink`/`IRowSink`/`IColumnSink` 契约可用的前提下，允许 sinks 通过“可选方法”提供 aligned-write fastpath（见 `sink-fastpath` capability）。
 
@@ -115,3 +103,18 @@
 #### Scenario: built-in sinks produce identical output via fastpath
 - **WHEN** 内建 sink 同时支持现有接口与 aligned-write fastpath
 - **THEN** 在相同输入下两条路径写出的结果 MUST 一致
+
+### Requirement: built-in file sinks MUST NOT create adjacent `.scalim.lock` files
+
+系统内建 file sinks（例如 CSV/Excel）在写出边界 MUST NOT 通过在目标输出路径旁创建 `<output_path>.scalim.lock` 的方式实现并发保护。
+
+说明：
+
+- 并发隔离应优先通过“版本化输出（D-2）+ 唯一路径”在更高层解决。
+- 若调用方仍需要对固定路径做互斥，系统 SHALL 建议调用方在框架外部进行协调（例如业务层唯一输出路径、外部锁或排队）。
+
+#### Scenario: sink close does not leave a lock file next to output
+- **GIVEN** 某次 CSV/Excel sink 写出目标路径为 `./out/report.csv` 或 `./out/report.xlsx`
+- **WHEN** sink 成功 close 并发布最终文件
+- **THEN** `./out/report.csv.scalim.lock` 与 `./out/report.xlsx.scalim.lock` MUST NOT 存在
+

@@ -19,6 +19,7 @@ from scalim.dsl.yaml_dsl.runtime import compiler as by_yaml_compiler_mod
 from scalim.dsl.yaml_dsl.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunOptionsPatch
 from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.exceptions import ScalimInternalError
+from scalim.execution import versioned_outputs
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.workflow import loaders as workflow_loaders_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
@@ -177,7 +178,7 @@ def _write_table_demand_yaml_with_csv_output(
     name: str,
     loader_ref: str,
     output_name: str,
-    output_path: Path,
+    output_root: Path,
     field_ids: List[str],
 ) -> Path:
     file_id = "{}_{}_csv".format(str(name), str(output_name))
@@ -201,7 +202,7 @@ resources:
   files:
     {file_id}:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: {output_name}
@@ -216,7 +217,7 @@ outputs:
             fields="\n".join(field_lines),
             file_id=file_id,
             output_name=str(output_name),
-            output_path=str(output_path),
+            output_root=str(output_root),
             fields_list=json.dumps([str(x) for x in field_ids]),
         )
         .lstrip(),
@@ -230,10 +231,10 @@ def _write_table_demand_yaml_with_two_csv_outputs(
     name: str,
     loader_ref: str,
     output1_name: str,
-    output1_path: Path,
+    output1_root: Path,
     output1_field_ids: List[str],
     output2_name: str,
-    output2_path: Path,
+    output2_root: Path,
     output2_field_ids: List[str],
     main_field_ids: List[str],
 ) -> Path:
@@ -259,10 +260,10 @@ resources:
   files:
     {output1_file_id}:
       kind: csv_file
-      path: "{output1_path}"
+      path: "{output1_root}"
     {output2_file_id}:
       kind: csv_file
-      path: "{output2_path}"
+      path: "{output2_root}"
 
 outputs:
   - name: {output1_name}
@@ -281,11 +282,11 @@ outputs:
             fields="\n".join(field_lines),
             output1_name=str(output1_name),
             output1_file_id=output1_file_id,
-            output1_path=str(output1_path),
+            output1_root=str(output1_root),
             output1_fields_list=json.dumps([str(x) for x in output1_field_ids]),
             output2_name=str(output2_name),
             output2_file_id=output2_file_id,
-            output2_path=str(output2_path),
+            output2_root=str(output2_root),
             output2_fields_list=json.dumps([str(x) for x in output2_field_ids]),
         )
         .lstrip(),
@@ -401,7 +402,7 @@ def _write_table_demand_yaml_from_sheetbook_loader(
     name: str,
     init_var_name: str,
     output_name: str,
-    output_path: Path,
+    output_root: Path,
     field_ids: List[str],
 ) -> Path:
     file_id = "{}_{}_csv".format(str(name), str(output_name))
@@ -428,7 +429,7 @@ resources:
   files:
     {file_id}:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: {output_name}
@@ -443,14 +444,14 @@ outputs:
             fields="\n".join(field_lines),
             file_id=file_id,
             output_name=str(output_name),
-            output_path=str(output_path),
+            output_root=str(output_root),
             fields_list=json.dumps([str(x) for x in field_ids]),
         )
         .lstrip(),
     )
 
 
-def _write_duplicate_header_demand_yaml(tmp_path: Path, *, file_name: str, output_path: Path) -> Path:
+def _write_duplicate_header_demand_yaml(tmp_path: Path, *, file_name: str, output_root: Path) -> Path:
     return _write_text(
         tmp_path / file_name,
         (
@@ -474,7 +475,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: detail
@@ -483,7 +484,7 @@ outputs:
     fields: [id, value]
 """
         )
-        .format(output_path=str(output_path))
+        .format(output_root=str(output_root))
         .lstrip(),
     )
 
@@ -1187,14 +1188,14 @@ outputs:
         ).lstrip(),
     )
 
-    wf_detail_a_path = tmp_path / "wf_detail_a.csv"
-    wf_detail_b_path = tmp_path / "wf_detail_b.csv"
+    wf_detail_a_root = tmp_path / "wf_detail_a"
+    wf_detail_b_root = tmp_path / "wf_detail_b"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
             "files": {
-                "detail_a": {"kind": "csv_file", "path": str(wf_detail_a_path)},
-                "detail_b": {"kind": "csv_file", "path": str(wf_detail_b_path)},
+                "detail_a": {"kind": "csv_file", "path": str(wf_detail_a_root)},
+                "detail_b": {"kind": "csv_file", "path": str(wf_detail_b_root)},
             }
         },
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
@@ -1202,24 +1203,24 @@ outputs:
         failure_policy="primary_only",
     )
 
-    global_detail_a_path = tmp_path / "global_detail_a.csv"
-    global_detail_b_path = tmp_path / "global_detail_b.csv"
+    global_detail_a_root = tmp_path / "global_detail_a"
+    global_detail_b_root = tmp_path / "global_detail_b"
     overrides = RunOverrides(
         resources=ResourcesOverride(
             files={
-                "detail_a": FileResourceOverride(path=str(global_detail_a_path)),
-                "detail_b": FileResourceOverride(path=str(global_detail_b_path)),
+                "detail_a": FileResourceOverride(path=str(global_detail_a_root)),
+                "detail_b": FileResourceOverride(path=str(global_detail_b_root)),
             }
         )
     )
 
-    patch_detail_a_path = tmp_path / "patch_detail_a.csv"
+    patch_detail_a_root = tmp_path / "patch_detail_a"
     run_options_patches_by_run_id = {
         "a": WorkflowRunOptionsPatch(
             overrides=RunOverrides(
                 resources=ResourcesOverride(
                     files={
-                        "detail_a": FileResourceOverride(path=str(patch_detail_a_path)),
+                        "detail_a": FileResourceOverride(path=str(patch_detail_a_root)),
                     }
                 )
             )
@@ -1233,11 +1234,34 @@ outputs:
     )
     assert not result.errors()
 
-    assert patch_detail_a_path.exists()
-    assert global_detail_b_path.exists()
-    assert not global_detail_a_path.exists()
-    assert not wf_detail_a_path.exists()
-    assert not wf_detail_b_path.exists()
+    from scalim.execution.versioned_outputs import parse_versioned_output_path  # noqa: PLC0415
+
+    outcomes = {str(o.run_id): o for o in result.outcomes}
+    out_a = outcomes["a"]
+    out_b = outcomes["b"]
+    assert isinstance(out_a.result, RunResult)
+    assert isinstance(out_b.result, RunResult)
+
+    assert out_a.result.core.outputs is not None
+    assert out_b.result.core.outputs is not None
+    out_a_path = Path(str(out_a.result.core.outputs["detail"]))
+    out_b_path = Path(str(out_b.result.core.outputs["detail"]))
+    assert out_a_path.exists()
+    assert out_b_path.exists()
+
+    parsed_a = parse_versioned_output_path(out_a_path)
+    parsed_b = parse_versioned_output_path(out_b_path)
+    assert parsed_a.root == wf_detail_a_root.resolve(strict=False) or parsed_a.root == patch_detail_a_root.resolve(strict=False)
+    assert parsed_a.kind == "files"
+    assert parsed_a.artifact_id == "detail_a"
+    assert parsed_a.root == patch_detail_a_root.resolve(strict=False)
+
+    assert parsed_b.kind == "files"
+    assert parsed_b.artifact_id == "detail_b"
+    assert parsed_b.root == global_detail_b_root.resolve(strict=False)
+
+    assert parsed_a.root != global_detail_a_root.resolve(strict=False)
+    assert parsed_b.root != wf_detail_b_root.resolve(strict=False)
 
 
 def test_run_workflow_all_fail_raises(tmp_path: Path) -> None:
@@ -2847,12 +2871,12 @@ def test_load_workflow_config_from_mapping_accepts_resources_mapping() -> None:
             "workflow": {
                 "runs": [{"id": "a", "demand": "a.yaml"}],
                 "resources": {
-                    "books": {"report": {"kind": "xlsx_file", "path": "./out/report.xlsx"}},
+                    "books": {"report": {"kind": "xlsx_file", "path": "./out"}},
                 },
             }
         }
     )
-    assert cfg.resources.books["report"].path == "./out/report.xlsx"
+    assert cfg.resources.books["report"].path == "./out"
 
 
 def test_load_workflow_config_from_mapping_rejects_resources_not_mapping() -> None:
@@ -3221,6 +3245,18 @@ def _read_csv_rows(path: Path) -> List[List[str]]:
         return [list(r) for r in csv.reader(handle)]
 
 
+def _latest_version_id(out_root: Path) -> str:
+    latest = versioned_outputs.read_latest(out_root)
+    version_id = latest.get("version_id")
+    assert isinstance(version_id, str)
+    return str(version_id)
+
+
+def _latest_book_path(out_root: Path, *, book_id: str) -> Path:
+    version_id = _latest_version_id(out_root)
+    return out_root / "versions" / version_id / "books" / "{}.xlsx".format(str(book_id))
+
+
 def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: Path) -> None:
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
@@ -3243,10 +3279,10 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
         field_ids=["id", "value"],
     )
 
-    workbook_path = tmp_path / "report.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root)}}},
         runs=[
             {"id": "a", "demand": "a.yaml"},
             {"id": "b", "demand": "b.yaml"},
@@ -3258,8 +3294,9 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
     recorder = _WorkflowEventRecorder()
     result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
+    workbook_path = _latest_book_path(out_root, book_id="report")
     assert workbook_path.exists()
-    assert not Path(str(workbook_path) + ".scalim.lock").exists()
+    assert list(out_root.rglob("*.scalim.lock")) == []
 
     assert _read_xlsx_sheetnames(workbook_path) == ["A", "B"]
     assert _read_xlsx_rows(workbook_path, "A") == [
@@ -3306,7 +3343,7 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
         field_ids=["id", "value"],
     )
 
-    export_path = tmp_path / "report.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
@@ -3314,7 +3351,7 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root)},
                 }
             }
         },
@@ -3329,8 +3366,9 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
     recorder = _WorkflowEventRecorder()
     result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
+    export_path = _latest_book_path(out_root, book_id="report")
     assert export_path.exists()
-    assert not Path(str(export_path) + ".scalim.lock").exists()
+    assert list(out_root.rglob("*.scalim.lock")) == []
 
     assert _read_xlsx_sheetnames(export_path) == ["A", "B"]
     assert _read_xlsx_rows(export_path, "A") == [
@@ -3381,7 +3419,7 @@ outputs:
         ).lstrip(),
     )
 
-    export_path = tmp_path / "multi.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
@@ -3389,7 +3427,7 @@ outputs:
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root)},
                     "write_defaults": {"mode": "sheet"},
                 }
             }
@@ -3404,6 +3442,7 @@ outputs:
     recorder = _WorkflowEventRecorder()
     result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
+    export_path = _latest_book_path(out_root, book_id="report")
     assert export_path.exists()
     assert _read_xlsx_sheetnames(export_path) == ["Metrics", "Detail"]
     assert _read_xlsx_rows(export_path, "Metrics") == [
@@ -3437,14 +3476,14 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
         field_ids=["id", "value"],
     )
 
-    consume_out = tmp_path / "consume.csv"
+    consume_root = tmp_path / "consume_out"
     _ = _write_table_demand_yaml_from_sheetbook_loader(
         tmp_path,
         file_name="consume.yaml",
         name="consume",
         init_var_name="orders_sheet_ref",
         output_name="detail",
-        output_path=consume_out,
+        output_root=consume_root,
         field_ids=["id", "value"],
     )
 
@@ -3469,7 +3508,13 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
 
     result = run_workflow(str(wf), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
     assert not result.errors()
-    assert _read_csv_rows(consume_out) == [
+    outcomes = {str(o.run_id): o for o in result.outcomes}
+    consume_outcome = outcomes["consume"]
+    assert isinstance(consume_outcome.result, RunResult)
+    assert consume_outcome.result.core.outputs is not None
+    consume_out_path = Path(str(consume_outcome.result.core.outputs["detail"]))
+    assert consume_out_path.exists()
+    assert _read_csv_rows(consume_out_path) == [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
@@ -3529,18 +3574,18 @@ outputs:
         ).lstrip(),
     )
 
-    consume_out = tmp_path / "consume.csv"
+    consume_root = tmp_path / "consume_out"
     _ = _write_table_demand_yaml_from_sheetbook_loader(
         tmp_path,
         file_name="consume_named.yaml",
         name="consume_named",
         init_var_name="orders_sheet_ref",
         output_name="detail",
-        output_path=consume_out,
+        output_root=consume_root,
         field_ids=["id", "value"],
     )
 
-    export_path = tmp_path / "report.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
@@ -3548,7 +3593,7 @@ outputs:
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root)},
                 }
             }
         },
@@ -3567,11 +3612,18 @@ outputs:
 
     result = run_workflow(str(wf), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
     assert not result.errors()
-    assert _read_csv_rows(consume_out) == [
+    outcomes = {str(o.run_id): o for o in result.outcomes}
+    consume_outcome = outcomes["consume_named"]
+    assert isinstance(consume_outcome.result, RunResult)
+    assert consume_outcome.result.core.outputs is not None
+    consume_path = Path(str(consume_outcome.result.core.outputs["detail"]))
+    assert consume_path.exists()
+    assert _read_csv_rows(consume_path) == [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
     ]
+    export_path = _latest_book_path(out_root, book_id="report")
     assert _read_xlsx_rows(export_path, "Orders") == [
         ["Order ID", "Display Value"],
         ["a1", "A1"],
@@ -3606,7 +3658,7 @@ outputs:
         ).lstrip(),
     )
 
-    consume_out = tmp_path / "typed_consume.csv"
+    consume_root = tmp_path / "typed_consume_out"
     _ = _write_text(
         tmp_path / "consume_typed.yaml",
         (
@@ -3647,11 +3699,11 @@ outputs:
     fields: ["order_count_type", "amount_type", "paid_type", "code", "raw_text"]
 """
         )
-        .replace("__OUT__", str(consume_out))
+        .replace("__OUT__", str(consume_root))
         .lstrip(),
     )
 
-    export_path = tmp_path / "typed_report.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
@@ -3659,7 +3711,7 @@ outputs:
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root)},
                 }
             }
         },
@@ -3679,11 +3731,18 @@ outputs:
     allowed_modules = frozenset(["tests.fixtures.workflow_loaders", "tests.fixtures.call_by_fns", "scalim.workflow.loaders"])
     result = run_workflow(str(wf), options=_run_options(allowed_modules=allowed_modules))
     assert not result.errors()
-    assert _read_csv_rows(consume_out) == [
+    outcomes = {str(o.run_id): o for o in result.outcomes}
+    consume_outcome = outcomes["consume_typed"]
+    assert isinstance(consume_outcome.result, RunResult)
+    assert consume_outcome.result.core.outputs is not None
+    consume_out_path = Path(str(consume_outcome.result.core.outputs["detail"]))
+    assert consume_out_path.exists()
+    assert _read_csv_rows(consume_out_path) == [
         ["order_count_type", "amount_type", "paid_type", "code", "raw_text"],
         ["int", "Decimal", "bool", "007", ""],
     ]
 
+    export_path = _latest_book_path(out_root, book_id="report")
     exported = _read_xlsx_rows(export_path, "Orders")
     assert exported[0] == ["order_count", "amount", "paid", "code", "raw_text"]
     assert exported[1][0] == 5
@@ -3715,7 +3774,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         field_ids=["id", "value"],
     )
 
-    export_path = tmp_path / "budget.xlsx"
+    out_root = tmp_path / "out"
     wf_max_sheets = _write_workflow_yaml(
         tmp_path,
         resources={
@@ -3723,7 +3782,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 1, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root)},
                 }
             }
         },
@@ -3736,10 +3795,11 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
     )
     result_sheets = run_workflow(str(wf_max_sheets), options=_run_options())
     assert result_sheets.errors()
-    assert not export_path.exists()
-    assert not Path(str(export_path) + ".scalim.lock").exists()
+    assert not (out_root / "manifest" / "latest.json").exists()
+    assert list(out_root.rglob("*.xlsx")) == []
+    assert list(out_root.rglob("*.scalim.lock")) == []
 
-    export_path2 = tmp_path / "budget_cells.xlsx"
+    out_root2 = tmp_path / "out2"
     wf_max_cells = _write_workflow_yaml(
         tmp_path,
         resources={
@@ -3747,7 +3807,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 3},
-                    "export_xlsx": {"path": str(export_path2), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root2)},
                 }
             }
         },
@@ -3757,10 +3817,11 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
     )
     result_cells = run_workflow(str(wf_max_cells), options=_run_options())
     assert result_cells.errors()
-    assert not export_path2.exists()
-    assert not Path(str(export_path2) + ".scalim.lock").exists()
+    assert not (out_root2 / "manifest" / "latest.json").exists()
+    assert list(out_root2.rglob("*.xlsx")) == []
+    assert list(out_root2.rglob("*.scalim.lock")) == []
 
-    export_path3 = tmp_path / "failed.xlsx"
+    out_root3 = tmp_path / "out3"
     _ = _write_demand_yaml(
         tmp_path,
         file_name="bad.yaml",
@@ -3775,7 +3836,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
                 "report": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(export_path3), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root3)},
                 }
             }
         },
@@ -3788,12 +3849,13 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
     )
     result_failed = run_workflow(str(wf_failed), options=_run_options())
     assert result_failed.errors()
-    assert not export_path3.exists()
-    assert not Path(str(export_path3) + ".scalim.lock").exists()
+    assert not (out_root3 / "manifest" / "latest.json").exists()
+    assert list(out_root3.rglob("*.xlsx")) == []
+    assert list(out_root3.rglob("*.scalim.lock")) == []
 
 
 def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: Path) -> None:
-    out_path = tmp_path / "dup.xlsx"
+    out_root = tmp_path / "out"
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
@@ -3819,18 +3881,37 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         tmp_path,
         resources={
             "books": {
-                "a_book": {"kind": "xlsx_file", "path": str(out_path)},
-                "b_book": {"kind": "xlsx_file", "path": str(out_path)},
+                "a_book": {"kind": "xlsx_file", "path": str(out_root)},
+                "b_book": {"kind": "xlsx_file", "path": str(out_root)},
             }
         },
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match="Excel output path collision"):
-        _ = run_workflow(str(wf_collision), options=_run_options())
+    ok = run_workflow(str(wf_collision), options=_run_options())
+    assert not ok.errors()
 
-    reserved_export = tmp_path / "reserved.xlsx"
+    a_book_path = _latest_book_path(out_root, book_id="a_book")
+    b_book_path = _latest_book_path(out_root, book_id="b_book")
+    assert a_book_path.exists()
+    assert b_book_path.exists()
+    assert list(out_root.rglob("*.scalim.lock")) == []
+
+    assert _read_xlsx_sheetnames(a_book_path) == ["A"]
+    assert _read_xlsx_rows(a_book_path, "A") == [
+        ["id", "value"],
+        ["a1", "A1"],
+        ["a2", "A2"],
+    ]
+    assert _read_xlsx_sheetnames(b_book_path) == ["B"]
+    assert _read_xlsx_rows(b_book_path, "B") == [
+        ["id", "value"],
+        ["b1", "B1"],
+        ["b2", "B2"],
+    ]
+
+    out_root2 = tmp_path / "out2"
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="file.yaml",
@@ -3855,11 +3936,11 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         tmp_path,
         resources={
             "books": {
-                "file_book": {"kind": "xlsx_file", "path": str(reserved_export)},
+                "file_book": {"kind": "xlsx_file", "path": str(out_root2)},
                 "mem_book": {
                     "kind": "xlsx_memory",
                     "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(reserved_export), "write_lock": True},
+                    "export_xlsx": {"path": str(out_root2)},
                 },
             }
         },
@@ -3867,13 +3948,15 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match="Excel output path collision"):
-        _ = run_workflow(str(wf_reserved), options=_run_options())
+    ok2 = run_workflow(str(wf_reserved), options=_run_options())
+    assert not ok2.errors()
+    assert _latest_book_path(out_root2, book_id="file_book").exists()
+    assert _latest_book_path(out_root2, book_id="mem_book").exists()
 
 
 def test_workflow_excel_output_collision_precheck_allows_dynamic_init_var_paths(tmp_path: Path) -> None:
-    a_path = tmp_path / "a.xlsx"
-    b_path = tmp_path / "b.xlsx"
+    a_root = tmp_path / "a_out"
+    b_root = tmp_path / "b_out"
 
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
@@ -3911,14 +3994,14 @@ def test_workflow_excel_output_collision_precheck_allows_dynamic_init_var_paths(
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), options=_run_options(init_vars={"a_path": str(a_path), "b_path": str(b_path)}))
+    result = run_workflow(str(wf), options=_run_options(init_vars={"a_path": str(a_root), "b_path": str(b_root)}))
     assert not result.errors()
-    assert a_path.exists()
-    assert b_path.exists()
+    assert _latest_book_path(a_root, book_id="a_book").exists()
+    assert _latest_book_path(b_root, book_id="b_book").exists()
 
 
-def test_workflow_excel_output_collision_precheck_rejects_dynamic_init_var_collisions(tmp_path: Path) -> None:
-    out_path = tmp_path / "dup.xlsx"
+def test_workflow_excel_output_allows_dynamic_init_var_shared_output_root(tmp_path: Path) -> None:
+    out_root = tmp_path / "out"
 
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
@@ -3956,16 +4039,13 @@ def test_workflow_excel_output_collision_precheck_rejects_dynamic_init_var_colli
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), options=_run_options(init_vars={"a_path": str(out_path), "b_path": str(out_path)}))
-    msg = str(excinfo.value)
-    assert "Excel output path collision" in msg
-    assert str(out_path.expanduser().resolve(strict=False)) in msg
-    assert "a_book" in msg
-    assert "b_book" in msg
+    result = run_workflow(str(wf), options=_run_options(init_vars={"a_path": str(out_root), "b_path": str(out_root)}))
+    assert not result.errors()
+    assert _latest_book_path(out_root, book_id="a_book").exists()
+    assert _latest_book_path(out_root, book_id="b_book").exists()
 
 
-def test_workflow_excel_output_reserved_paths_check_uses_resolved_dynamic_init_var_path(tmp_path: Path) -> None:
+def test_workflow_resources_rejects_export_xlsx_write_lock(tmp_path: Path) -> None:
     reserved_export = tmp_path / "reserved.xlsx"
 
     _ = _write_table_demand_yaml_with_book_output(
@@ -4005,17 +4085,13 @@ def test_workflow_excel_output_reserved_paths_check_uses_resolved_dynamic_init_v
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="write_lock was removed") as excinfo:
         _ = run_workflow(str(wf), options=_run_options(init_vars={"reserved_path": str(reserved_export)}))
-    msg = str(excinfo.value)
-    assert "Excel output path collision" in msg
-    assert str(reserved_export.expanduser().resolve(strict=False)) in msg
-    assert "file_book" in msg
-    assert "mem_book" in msg
+    assert excinfo.value.path == "workflow.resources.books.mem_book.export_xlsx.write_lock"
 
 
 def test_workflow_excel_output_runtime_precheck_includes_meta_and_audit_paths(tmp_path: Path) -> None:
-    workbook_path = tmp_path / "out.xlsx"
+    out_root = tmp_path / "out"
 
     _ = _write_text(
         tmp_path / "demand.yaml",
@@ -4040,7 +4116,7 @@ outputs:
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path), "write_defaults": {"mode": "sheet"}}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root), "write_defaults": {"mode": "sheet"}}}},
         runs=[{"id": "a", "demand": "demand.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -4050,6 +4126,7 @@ outputs:
         options=_run_options(overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True))),
     )
     assert not result.errors()
+    workbook_path = _latest_book_path(out_root, book_id="report")
     assert workbook_path.exists()
     assert _read_xlsx_sheetnames(workbook_path) == ["S", "__meta__", "__audit__"]
 
@@ -4118,7 +4195,7 @@ def test_workflow_structural_preload_does_not_import_runtime_compiler() -> None:
 
 
 def test_compile_workflow_ir_skips_runtime_duplicate_name_validation(tmp_path: Path) -> None:
-    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=tmp_path / "detail.csv")
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_root=tmp_path / "out")
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "dup", "demand": "dup.yaml"}],
@@ -4134,7 +4211,7 @@ def test_compile_workflow_ir_skips_runtime_duplicate_name_validation(tmp_path: P
 
 
 def test_derive_cache_pool_consumers_skips_runtime_duplicate_name_validation(tmp_path: Path) -> None:
-    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=tmp_path / "dup.csv")
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_root=tmp_path / "out")
     _ = _write_demand_yaml(
         tmp_path,
         file_name="ok.yaml",
@@ -4164,8 +4241,8 @@ def test_derive_cache_pool_consumers_skips_runtime_duplicate_name_validation(tmp
 
 
 def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(tmp_path: Path) -> None:
-    output_path = tmp_path / "detail.csv"
-    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    out_root = tmp_path / "out"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_root=out_root)
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "dup", "demand": "dup.yaml"}],
@@ -4179,13 +4256,17 @@ def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(t
     )
 
     assert not result.errors()
-    assert output_path.exists()
+    outcome = next(o for o in result.outcomes if o.run_id == "dup")
+    assert isinstance(outcome.result, RunResult)
+    assert outcome.result.core.outputs is not None
+    out_path = Path(str(outcome.result.core.outputs["detail"]))
+    assert out_path.exists()
 
 
 def test_run_workflow_run_patch_demand_diagnostics_isolated_per_run_in_multi_demand_workflow(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    for run_id, out_path in [("a", a_out), ("b", b_out)]:
+    a_out = tmp_path / "a_out"
+    b_out = tmp_path / "b_out"
+    for run_id, out_root in [("a", a_out), ("b", b_out)]:
         file_id = "{}_detail_csv".format(run_id)
         _ = _write_text(
             tmp_path / "{}.yaml".format(run_id),
@@ -4210,7 +4291,7 @@ resources:
   files:
     {file_id}:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: detail
@@ -4222,7 +4303,7 @@ outputs:
             .format(
                 run_id=str(run_id),
                 file_id=str(file_id),
-                output_path=str(out_path),
+                output_root=str(out_root),
             )
             .lstrip(),
         )
@@ -4247,9 +4328,9 @@ outputs:
 
 
 def test_run_workflow_global_demand_diagnostics_applies_to_all_runs_in_multi_demand_workflow(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    for run_id, out_path in [("a", a_out), ("b", b_out)]:
+    a_out = tmp_path / "a_out"
+    b_out = tmp_path / "b_out"
+    for run_id, out_root in [("a", a_out), ("b", b_out)]:
         file_id = "{}_detail_csv".format(run_id)
         _ = _write_text(
             tmp_path / "{}.yaml".format(run_id),
@@ -4274,7 +4355,7 @@ resources:
   files:
     {file_id}:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: detail
@@ -4286,7 +4367,7 @@ outputs:
             .format(
                 run_id=str(run_id),
                 file_id=str(file_id),
-                output_path=str(out_path),
+                output_root=str(out_root),
             )
             .lstrip(),
         )
@@ -4318,14 +4399,16 @@ outputs:
     assert isinstance(b_result, RunResult)
     assert a_result.config.validate_unique_field_names is False
     assert b_result.config.validate_unique_field_names is False
-    assert a_out.exists()
-    assert b_out.exists()
+    assert a_result.core.outputs is not None
+    assert b_result.core.outputs is not None
+    assert Path(str(a_result.core.outputs["detail"])).exists()
+    assert Path(str(b_result.core.outputs["detail"])).exists()
 
 
 def test_run_workflow_run_patch_demand_diagnostics_none_disables_global_policy_for_one_run(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    for run_id, out_path in [("a", a_out), ("b", b_out)]:
+    a_out = tmp_path / "a_out"
+    b_out = tmp_path / "b_out"
+    for run_id, out_root in [("a", a_out), ("b", b_out)]:
         file_id = "{}_detail_csv".format(run_id)
         _ = _write_text(
             tmp_path / "{}.yaml".format(run_id),
@@ -4350,7 +4433,7 @@ resources:
   files:
     {file_id}:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: detail
@@ -4362,7 +4445,7 @@ outputs:
             .format(
                 run_id=str(run_id),
                 file_id=str(file_id),
-                output_path=str(out_path),
+                output_root=str(out_root),
             )
             .lstrip(),
         )
@@ -4385,8 +4468,8 @@ outputs:
 
 
 def test_run_workflow_preflight_duplicate_names_fail_before_engine(tmp_path: Path) -> None:
-    output_path = tmp_path / "detail.csv"
-    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    out_root = tmp_path / "out"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_root=out_root)
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "dup", "demand": "dup.yaml"}],
@@ -4405,19 +4488,19 @@ def test_run_workflow_preflight_duplicate_names_fail_before_engine(tmp_path: Pat
             run_ir_fn=_run_ir_fn,
         )
 
-    assert not output_path.exists()
+    assert not out_root.exists()
 
 
 def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_and_returns_effective_options(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
+    a_root = tmp_path / "a_out"
+    b_root = tmp_path / "b_out"
     _ = _write_table_demand_yaml_with_csv_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        output_root=a_root,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -4426,7 +4509,7 @@ def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_an
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=b_out,
+        output_root=b_root,
         field_ids=["id", "value"],
     )
     wf = _write_workflow_yaml(
@@ -4452,8 +4535,8 @@ def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_an
     assert lifecycle.effective.options_by_run_id["a"].batch_size == 1000
     assert lifecycle.effective.options_by_run_id["b"].batch_size == 123
 
-    assert not a_out.exists()
-    assert not b_out.exists()
+    assert not a_root.exists()
+    assert not b_root.exists()
 
 
 def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4463,7 +4546,7 @@ def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=tmp_path / "a_detail.csv",
+        output_root=tmp_path / "a_out",
         field_ids=["id", "value"],
     )
     wf = _write_workflow_yaml(
@@ -4502,7 +4585,7 @@ def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, mon
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=tmp_path / "a_detail.csv",
+        output_root=tmp_path / "a_out",
         field_ids=["id", "value"],
     )
     wf = _write_workflow_yaml(
@@ -4555,7 +4638,7 @@ def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path:
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=tmp_path / "a_detail.csv",
+        output_root=tmp_path / "a_out",
         field_ids=["id", "value"],
     )
     wf = _write_workflow_yaml(
@@ -4599,8 +4682,8 @@ def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path:
 
 
 def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(tmp_path: Path) -> None:
-    output_path = tmp_path / "detail.csv"
-    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    out_root = tmp_path / "out"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_root=out_root)
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "dup", "demand": "dup.yaml"}],
@@ -4626,11 +4709,15 @@ def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(t
         options=_run_options(overrides=overrides),
     )
     assert not result.errors()
-    assert output_path.exists()
+    outcome = next(o for o in result.outcomes if o.run_id == "dup")
+    assert isinstance(outcome.result, RunResult)
+    assert outcome.result.core.outputs is not None
+    out_path = Path(str(outcome.result.core.outputs["detail"]))
+    assert out_path.exists()
 
 
 def test_run_workflow_preflight_outputs_override_can_enable_duplicate_name_trigger(tmp_path: Path) -> None:
-    output_path = tmp_path / "detail.csv"
+    out_root = tmp_path / "out"
     _ = _write_text(
         tmp_path / "dup.yaml",
         (
@@ -4654,7 +4741,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: "{output_path}"
+      path: "{output_root}"
 
 outputs:
   - name: detail
@@ -4665,7 +4752,7 @@ outputs:
       header_fields_output_by: field_id
 """
         )
-        .format(output_path=str(output_path))
+        .format(output_root=str(out_root))
         .lstrip(),
     )
     wf = _write_workflow_yaml(
@@ -4692,19 +4779,19 @@ outputs:
             options=_run_options(overrides=overrides),
         )
 
-    assert not output_path.exists()
+    assert not out_root.exists()
 
 
 def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_error_message(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
+    a_out = tmp_path / "a_out"
+    b_out = tmp_path / "b_out"
     _ = _write_table_demand_yaml_with_csv_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        output_root=a_out,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -4713,7 +4800,7 @@ def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_err
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=b_out,
+        output_root=b_out,
         field_ids=["id", "value"],
     )
     wf = _write_workflow_yaml(
@@ -4747,8 +4834,8 @@ def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_err
 
 
 def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: Path) -> None:
-    output_path = tmp_path / "detail.csv"
-    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_path=output_path)
+    out_root = tmp_path / "out"
+    _ = _write_duplicate_header_demand_yaml(tmp_path, file_name="dup.yaml", output_root=out_root)
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "dup", "demand": "dup.yaml"}],
@@ -4765,7 +4852,11 @@ def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: 
     )
 
     assert not result.errors()
-    assert output_path.exists()
+    outcome = next(o for o in result.outcomes if o.run_id == "dup")
+    assert isinstance(outcome.result, RunResult)
+    assert outcome.result.core.outputs is not None
+    out_path = Path(str(outcome.result.core.outputs["detail"]))
+    assert out_path.exists()
 
 
 def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) -> None:
@@ -4798,7 +4889,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
         ["b2", "B2"],
     ]
     for idx in range(3):
-        export_path = tmp_path / "append_{}.xlsx".format(int(idx))
+        out_root = tmp_path / "out_{}".format(int(idx))
         wf = _write_workflow_yaml(
             tmp_path,
             resources={
@@ -4806,7 +4897,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
                     "report": {
                         "kind": "xlsx_memory",
                         "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                        "export_xlsx": {"path": str(export_path), "write_lock": True},
+                        "export_xlsx": {"path": str(out_root)},
                     }
                 }
             },
@@ -4820,6 +4911,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
 
         result = run_workflow(str(wf), options=_run_options())
         assert not result.errors()
+        export_path = _latest_book_path(out_root, book_id="report")
         assert export_path.exists()
         assert _read_xlsx_sheetnames(export_path) == ["S"]
         assert _read_xlsx_rows(export_path, "S") == expected_rows
@@ -4900,10 +4992,10 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
     ]
     expected_order_signature: Optional[List[Any]] = None
     for idx in range(3):
-        workbook_path = tmp_path / "append_{}.xlsx".format(int(idx))
+        out_root = tmp_path / "out_{}".format(int(idx))
         wf = _write_workflow_yaml(
             tmp_path,
-            resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
+            resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root)}}},
             runs=[
                 {"id": "slow", "demand": "slow.yaml"},
                 {"id": "fast", "demand": "fast.yaml"},
@@ -4915,6 +5007,7 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         recorder = _WorkflowEventRecorder()
         result = run_workflow(str(wf), options=_run_options(components=[recorder]))
         assert not result.errors()
+        workbook_path = _latest_book_path(out_root, book_id="report")
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
 
@@ -5004,14 +5097,14 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
     }
 
     for header_policy, expected_rows in cases.items():
-        workbook_path = tmp_path / "policies_{}.xlsx".format(str(header_policy))
+        out_root = tmp_path / "out_{}".format(str(header_policy))
         wf = _write_workflow_yaml(
             tmp_path,
             resources={
                 "books": {
                     "report": {
                         "kind": "xlsx_file",
-                        "path": str(workbook_path),
+                        "path": str(out_root),
                         "write_defaults": {"mode": "append", "header_policy": str(header_policy)},
                     }
                 }
@@ -5027,6 +5120,7 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
 
         result = run_workflow(str(wf), options=_run_options())
         assert not result.errors()
+        workbook_path = _latest_book_path(out_root, book_id="report")
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
 
@@ -5090,14 +5184,14 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
     )
 
     for on_mismatch, expected_rows, expect_skips in cases:
-        workbook_path = tmp_path / "merged_{}.xlsx".format(str(on_mismatch))
+        out_root = tmp_path / "out_{}".format(str(on_mismatch))
         wf = _write_workflow_yaml(
             tmp_path,
             resources={
                 "books": {
                     "report": {
                         "kind": "xlsx_file",
-                        "path": str(workbook_path),
+                        "path": str(out_root),
                         "write_defaults": {"mode": "append", "header_policy": "once", "on_mismatch": str(on_mismatch)},
                     }
                 }
@@ -5114,6 +5208,7 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
         recorder = _WorkflowEventRecorder()
         result = run_workflow(str(wf), options=_run_options(components=[recorder]))
         assert not result.errors()
+        workbook_path = _latest_book_path(out_root, book_id="report")
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
 
@@ -5138,14 +5233,14 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
         name="bad",
         loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
         output_name="detail",
-        output_path=tmp_path / "bad_detail.csv",
+        output_root=tmp_path / "bad_out",
         field_ids=["id", "value"],
     )
 
-    workbook_path = tmp_path / "discard.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path)}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root)}}},
         runs=[
             {"id": "ok", "demand": "ok.yaml"},
             {"id": "bad", "demand": "bad.yaml"},
@@ -5157,8 +5252,9 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
     recorder = _WorkflowEventRecorder()
     result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert result.errors()
-    assert not workbook_path.exists()
-    assert not Path(str(workbook_path) + ".scalim.lock").exists()
+    assert not (out_root / "manifest" / "latest.json").exists()
+    assert list(out_root.rglob("*.xlsx")) == []
+    assert list(out_root.rglob("*.scalim.lock")) == []
 
     discards = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_DISCARD and e.payload.resource_id == "report"]
     assert discards
@@ -5188,14 +5284,14 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     )
 
     # on_conflict=error
-    workbook_err = tmp_path / "conflict_err.xlsx"
+    out_root_err = tmp_path / "out_err"
     wf_err = _write_workflow_yaml(
         tmp_path,
         resources={
             "books": {
                 "report": {
                     "kind": "xlsx_file",
-                    "path": str(workbook_err),
+                    "path": str(out_root_err),
                     "write_defaults": {"mode": "sheet", "on_conflict": "error"},
                 }
             }
@@ -5209,17 +5305,18 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     )
     result_err = run_workflow(str(wf_err), options=_run_options())
     assert result_err.errors()
-    assert not workbook_err.exists()
+    assert not (out_root_err / "manifest" / "latest.json").exists()
+    assert list(out_root_err.rglob("*.xlsx")) == []
 
     # on_conflict=overwrite
-    workbook_over = tmp_path / "conflict_over.xlsx"
+    out_root_over = tmp_path / "out_over"
     wf_over = _write_workflow_yaml(
         tmp_path,
         resources={
             "books": {
                 "report": {
                     "kind": "xlsx_file",
-                    "path": str(workbook_over),
+                    "path": str(out_root_over),
                     "write_defaults": {"mode": "sheet", "on_conflict": "overwrite"},
                 }
             }
@@ -5233,18 +5330,19 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     )
     result_over = run_workflow(str(wf_over), options=_run_options())
     assert not result_over.errors()
+    workbook_over = _latest_book_path(out_root_over, book_id="report")
     assert workbook_over.exists()
     assert _read_xlsx_rows(workbook_over, "S")[-1] == ["b2", "B2"]
 
     # on_conflict=skip
-    workbook_skip = tmp_path / "conflict_skip.xlsx"
+    out_root_skip = tmp_path / "out_skip"
     wf_skip = _write_workflow_yaml(
         tmp_path,
         resources={
             "books": {
                 "report": {
                     "kind": "xlsx_file",
-                    "path": str(workbook_skip),
+                    "path": str(out_root_skip),
                     "write_defaults": {"mode": "sheet", "on_conflict": "skip"},
                 }
             }
@@ -5258,11 +5356,12 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
     )
     result_skip = run_workflow(str(wf_skip), options=_run_options())
     assert not result_skip.errors()
+    workbook_skip = _latest_book_path(out_root_skip, book_id="report")
     assert workbook_skip.exists()
     assert _read_xlsx_rows(workbook_skip, "S")[-1] == ["a2", "A2"]
 
 
-def test_workflow_shared_output_lock_file_blocks_workbook_write_when_write_lock_enabled(tmp_path: Path) -> None:
+def test_workflow_resources_rejects_write_lock_for_xlsx_file(tmp_path: Path) -> None:
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
@@ -5274,17 +5373,14 @@ def test_workflow_shared_output_lock_file_blocks_workbook_write_when_write_lock_
         field_ids=["id", "value"],
     )
 
-    workbook_path = tmp_path / "locked.xlsx"
-    lock_path = Path(str(workbook_path) + ".scalim.lock")
-    lock_path.write_text("locked", encoding="utf-8")
-
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
         resources={
             "books": {
                 "report": {
                     "kind": "xlsx_file",
-                    "path": str(workbook_path),
+                    "path": str(out_root),
                     "write_lock": True,
                     "write_defaults": {"mode": "sheet"},
                 }
@@ -5294,13 +5390,9 @@ def test_workflow_shared_output_lock_file_blocks_workbook_write_when_write_lock_
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(WorkflowRuntimeConfigError, match="Output path is locked") as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="write_lock was removed") as excinfo:
         _ = run_workflow(str(wf), options=_run_options())
-    assert not workbook_path.exists()
-    assert lock_path.exists()
-    assert excinfo.value.__cause__ is not None
-    assert getattr(excinfo.value.__cause__, "diff", None) is not None
-    assert any(str(line).startswith("lock_path=") for line in (getattr(excinfo.value.__cause__, "diff", None) or []))
+    assert excinfo.value.path == "workflow.resources.books.report.write_lock"
 
 
 def test_workflow_pathless_csv_output_without_writes_fails_fast(tmp_path: Path) -> None:
@@ -5351,10 +5443,10 @@ def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_a
         field_ids=["id", "value"],
     )
 
-    workbook_path = tmp_path / "managed.xlsx"
+    out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(workbook_path), "write_defaults": {"mode": "sheet"}}}},
+        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root), "write_defaults": {"mode": "sheet"}}}},
         runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -5362,21 +5454,22 @@ def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_a
 
     result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
+    workbook_path = _latest_book_path(out_root, book_id="report")
     assert workbook_path.exists()
     assert _read_xlsx_rows(workbook_path, "S")[-1] == ["a2", "A2"]
     assert not (tmp_path / ".scalim").exists()
 
 
 def test_workflow_main_rows_from_wires_upstream_typed_rows_into_downstream_main_rows(tmp_path: Path) -> None:
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
+    a_root = tmp_path / "a_out"
+    b_root = tmp_path / "b_out"
     _ = _write_table_demand_yaml_with_csv_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        output_root=a_root,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -5385,7 +5478,7 @@ def test_workflow_main_rows_from_wires_upstream_typed_rows_into_downstream_main_
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
         output_name="detail",
-        output_path=b_out,
+        output_root=b_root,
         field_ids=["id", "value"],
     )
 
@@ -5401,7 +5494,12 @@ def test_workflow_main_rows_from_wires_upstream_typed_rows_into_downstream_main_
 
     result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
-    assert _read_csv_rows(b_out) == [
+
+    b_outcome = next(o for o in result.outcomes if o.run_id == "b")
+    assert isinstance(b_outcome.result, RunResult)
+    assert b_outcome.result.core.outputs is not None
+    b_out_path = Path(str(b_outcome.result.core.outputs["detail"]))
+    assert _read_csv_rows(b_out_path) == [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
@@ -5423,17 +5521,17 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
 
     monkeypatch.setattr(workflow_execute_mod, "WorkflowArtifactsDirectory", _RecordingArtifactsDirectory)
 
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
-    c_out = tmp_path / "c_detail.csv"
-    d_out = tmp_path / "d_detail.csv"
+    a_root = tmp_path / "a_out"
+    b_root = tmp_path / "b_out"
+    c_root = tmp_path / "c_out"
+    d_root = tmp_path / "d_out"
     _ = _write_table_demand_yaml_with_csv_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        output_root=a_root,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -5442,7 +5540,7 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
         output_name="detail",
-        output_path=b_out,
+        output_root=b_root,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -5451,7 +5549,7 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
         name="c",
         loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
         output_name="detail",
-        output_path=c_out,
+        output_root=c_root,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -5460,7 +5558,7 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
         name="d",
         loader_ref="tests.fixtures.workflow_loaders:load_table_b_fast",
         output_name="detail",
-        output_path=d_out,
+        output_root=d_root,
         field_ids=["id", "value"],
     )
 
@@ -5478,12 +5576,21 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
 
     result = run_workflow(str(wf), options=_run_options())
     assert not result.errors()
-    assert _read_csv_rows(b_out) == [
+    outcomes = {str(o.run_id): o for o in result.outcomes}
+    b_outcome = outcomes["b"]
+    c_outcome = outcomes["c"]
+    assert isinstance(b_outcome.result, RunResult)
+    assert isinstance(c_outcome.result, RunResult)
+    assert b_outcome.result.core.outputs is not None
+    assert c_outcome.result.core.outputs is not None
+    b_out_path = Path(str(b_outcome.result.core.outputs["detail"]))
+    c_out_path = Path(str(c_outcome.result.core.outputs["detail"]))
+    assert _read_csv_rows(b_out_path) == [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
     ]
-    assert _read_csv_rows(c_out) == [
+    assert _read_csv_rows(c_out_path) == [
         ["id", "value"],
         ["a1", "A1"],
         ["a2", "A2"],
@@ -5524,15 +5631,15 @@ def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: P
 
     monkeypatch.setattr(workflow_execute_mod, "WorkflowArtifactsDirectory", _CorruptArtifactsDirectory)
 
-    a_out = tmp_path / "a_detail.csv"
-    b_out = tmp_path / "b_detail.csv"
+    a_root = tmp_path / "a_out"
+    b_root = tmp_path / "b_out"
     _ = _write_table_demand_yaml_with_csv_output(
         tmp_path,
         file_name="a.yaml",
         name="a",
         loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
         output_name="detail",
-        output_path=a_out,
+        output_root=a_root,
         field_ids=["id", "value"],
     )
     _ = _write_table_demand_yaml_with_csv_output(
@@ -5541,7 +5648,7 @@ def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: P
         name="b",
         loader_ref="tests.fixtures.workflow_loaders:load_table_raises",
         output_name="detail",
-        output_path=b_out,
+        output_root=b_root,
         field_ids=["id", "value"],
     )
 

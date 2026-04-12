@@ -29,9 +29,8 @@ Sources:
 - `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
 - `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
 - `kind`: type=string; enum=xlsx_file|xlsx_memory; book kind.
-- `path`: xlsx_file: 输出路径(字符串或 {$init_var: <name>})
+- `path`: xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})
 - `write_defaults`: ref=book_write_defaults; 可选:默认写入语义与冲突策略
-- `write_lock`: type=boolean; default=false; xlsx_file: 写锁(默认 false).
 
 ### `book_budget`
 - `$import`: $import 引用.
@@ -41,8 +40,7 @@ Sources:
 ### `book_export_xlsx`
 - `$import`: $import 引用.
 - `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(可信输入显式 opt-out;默认 false).
-- `path`: 导出 xlsx 的输出路径(字符串或 {$init_var: <name>})
-- `write_lock`: type=boolean; default=false; 写锁(导出时;默认 false).
+- `path`: 导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})
 
 ### `book_write_defaults`
 - `$import`: $import 引用.
@@ -66,8 +64,7 @@ Sources:
 - `$import`: $import 引用.
 - `encoding`: type=string; default=utf-8; csv_file: 文件编码(默认 `utf-8`).
 - `kind`: type=string; enum=csv_file; file kind.
-- `path`: csv_file: 输出路径(字符串或 {$init_var: <name>})
-- `write_lock`: type=boolean; default=false; csv_file: 写锁(默认 false).
+- `path`: csv_file: 输出 root 目录(字符串或 {$init_var: <name>})
 
 ### `guardrails`
 - `$import`: $import 引用.
@@ -124,7 +121,6 @@ Sources:
 - `allow_formulas`: type=boolean; 可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置).
 - `path`: type=string; 可选:工作簿路径(缺省使用 primary workbook).
 - `sheet`: type=string; sheet 名称.
-- `write_lock`: type=boolean; 可选:写锁(缺省使用 primary workbook 的容器配置).
 
 ### `output_target`
 
@@ -188,9 +184,8 @@ Sources:
 - `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
 - `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
 - `kind` (required): type=string; enum=xlsx_file|xlsx_memory; book kind.
-- `path`: xlsx_file: 输出路径(字符串或 {$init_var: <name>})
+- `path`: xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})
 - `write_defaults`: ref=book_write_defaults; 可选:默认写入语义与冲突策略
-- `write_lock`: type=boolean; default=false; xlsx_file: 写锁(默认 false).
 
 #### `book_budget`
 
@@ -202,8 +197,7 @@ Sources:
 
 - Required: `path`
 - `allow_formulas`: type=boolean; default=false; 允许 Excel 公式(可信输入显式 opt-out;默认 false).
-- `path` (required): 导出 xlsx 的输出路径(字符串或 {$init_var: <name>})
-- `write_lock`: type=boolean; default=false; 写锁(导出时;默认 false).
+- `path` (required): 导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})
 
 #### `book_write_defaults`
 - `align_by`: type=string; default=field_id; enum=field_id|header; 字段对齐策略(仅 `mode=append` 生效).
@@ -217,8 +211,7 @@ Sources:
 - Required: `kind`, `path`
 - `encoding`: type=string; default=utf-8; csv_file: 文件编码(默认 `utf-8`).
 - `kind` (required): type=string; enum=csv_file; file kind.
-- `path` (required): csv_file: 输出路径(字符串或 {$init_var: <name>})
-- `write_lock`: type=boolean; default=false; csv_file: 写锁(默认 false).
+- `path` (required): csv_file: 输出 root 目录(字符串或 {$init_var: <name>})
 
 #### `resources`
 - `books`: type=object; books 资源映射(Excel book; key 为 `book_id`).

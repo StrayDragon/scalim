@@ -36,6 +36,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 - `resources.books` / `resources.files`:
   - `resources.books.<book_id>` → Excel 工作簿资源(配合 `outputs.*.to.book/to.sheet`)
   - `resources.files.<file_id>` → CSV 文件资源(配合 `outputs.*.to.file`)
+- `resources.*.path` 语义为输出 root 目录(版本化输出 D-2);产物通过 `<root>/manifest/latest.json` 或指定版本目录定位
 - 明细输出:
   - 使用 `fields: [field_id, ...]` 指定列顺序
 - 派生汇总输出:
@@ -65,13 +66,13 @@ output:
 ```yaml
 resources:
   files:
-    detail_csv:
+    report:
       kind: csv_file
-      path: ./output/report.csv
+      path: ./output
 
 outputs:
   - name: detail
-    to: {file: detail_csv}
+    to: {file: report}
     fields: [order_id, customer_name]
 ```
 
@@ -84,6 +85,6 @@ outputs:
 5) 多 sheet 分发:
    - 增加多个 outputs
    - 用 `where` 表达式区分
-   - 共享 workbook 时为每个 output 显式设置 `to.book/to.sheet` 并建议开启 `write_lock: true`
+   - 共享 workbook 时为每个 output 显式设置 `to.book/to.sheet`;并发写同一 root 依赖“版本目录隔离”(读取 `<root>/manifest/latest.json` 或指定版本目录定位产物)
 6) 需要汇总 sheet 时,新增一个带 `aggregate` 的 output
 7) (可选) 启用 `meta: true` / `audit: true` 以输出对拍信息

@@ -28,7 +28,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./out.xlsx
+      path: ./out
       write_defaults:
         mode: sheet
 """,
@@ -51,7 +51,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./out.xlsx
+      path: ./out
       write_defaults:
         mode: sheet
 """,
@@ -141,3 +141,74 @@ def test_output_target_requires_unique_effective_display_names_rejects_missing_d
         )
         is False
     )
+
+
+def test_validator_error_and_strip_removed_resources_write_lock_fields_reports_and_strips() -> None:
+    v = ConfigValidator()
+    issues = []
+
+    next_config = v._error_and_strip_removed_resources_write_lock_fields(  # noqa: SLF001
+        {
+            "resources": {
+                "files": {
+                    "": {},  # continue branch (empty id)
+                    "bad": None,  # continue branch (non-dict)
+                    "detail_csv": {
+                        "path": {"$init_var": "out_root"},
+                        "write_lock": True,
+                    },
+                },
+                "books": {
+                    "": {},  # continue branch (empty id)
+                    "bad": None,  # continue branch (non-dict)
+                    "report": {
+                        "kind": "xlsx_file",
+                        "path": {"$init_var": "out_root"},
+                        "write_lock": True,
+                        "export_xlsx": {
+                            "path": {"$init_var": "out_root"},
+                            "write_lock": True,
+                        },
+                    },
+                    "report2": {
+                        "kind": "xlsx_memory",
+                        "export_xlsx": {"path": {"$init_var": "out_root"}},  # continue branch (no write_lock)
+                    },
+                },
+            }
+        },
+        issues,
+    )
+
+    assert any(i.path == "resources.files.detail_csv.write_lock" for i in issues)
+    assert any(i.path == "resources.books.report.write_lock" for i in issues)
+    assert any(i.path == "resources.books.report.export_xlsx.write_lock" for i in issues)
+
+    assert "write_lock" not in next_config["resources"]["files"]["detail_csv"]
+    assert "write_lock" not in next_config["resources"]["books"]["report"]
+    assert "write_lock" not in next_config["resources"]["books"]["report"]["export_xlsx"]
+
+
+def test_validator_validate_resource_output_paths_reports_migration_for_xlsx_paths() -> None:
+    v = ConfigValidator()
+    errors = []
+    v._validate_resource_output_paths(  # noqa: SLF001
+        {
+            "resources": {
+                "books": {
+                    "report": {
+                        "kind": "xlsx_file",
+                        "path": "report.xlsx",
+                    },
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "export_xlsx": {"path": "mem.xlsx"},
+                    },
+                }
+            }
+        },
+        errors,
+    )
+    assert errors
+    assert any(i.path == "resources.books.report.path" for i in errors)
+    assert any(i.path == "resources.books.mem.export_xlsx.path" for i in errors)

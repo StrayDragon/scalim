@@ -76,11 +76,6 @@ def resolve_workflow_input_csv(
         input_output_id=str(input_output_id),
         error_prefix=str(error_prefix),
     )
-    if output_path:
-        if not str(output_path).lower().endswith(".csv"):
-            msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
-            raise ScalimWorkflowWriteError(msg)
-        return output_path
 
     mem_map_obj = _get_optional_workflow_artifact(
         artifacts_dir=artifacts_dir,
@@ -93,6 +88,12 @@ def resolve_workflow_input_csv(
     csv_artifact = mem_map.get(output_id) if mem_map is not None else None
     if csv_artifact is not None:
         return csv_artifact
+
+    if output_path:
+        if not str(output_path).lower().endswith(".csv"):
+            msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
+            raise ScalimWorkflowWriteError(msg)
+        return output_path
     if output_in_mapping:
         msg = "Missing workflow-managed in-memory CSV artifact: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
         raise ScalimWorkflowWriteError(msg)
@@ -117,11 +118,6 @@ def resolve_workflow_input_tabular(
         input_output_id=str(input_output_id),
         error_prefix=str(error_prefix),
     )
-    if output_path:
-        if not str(output_path).lower().endswith(".csv"):
-            msg = "workflow writes currently only supports CSV outputs: output_path={!r}".format(str(output_path))
-            raise ScalimWorkflowWriteError(msg)
-        return output_path
 
     rows_map_obj = _get_optional_workflow_artifact(
         artifacts_dir=artifacts_dir,
@@ -145,7 +141,7 @@ def resolve_workflow_input_tabular(
             error_prefix=str(error_prefix),
         )
     except ScalimWorkflowWriteError:
-        if output_in_mapping:
+        if output_in_mapping and not output_path:
             msg = "Missing workflow-managed tabular artifact: input_node_id={!r}, output_id={!r}".format(str(input_node_id), output_id)
             raise ScalimWorkflowWriteError(msg) from None
         raise

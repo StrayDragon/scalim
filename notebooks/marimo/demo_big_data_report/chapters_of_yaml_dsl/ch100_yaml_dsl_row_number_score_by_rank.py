@@ -5,8 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
-from scalim.execution.run_ir import run_ir
+from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
+from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle import verify_ecommerce_rank_score_csv_rows
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
@@ -46,12 +46,12 @@ def run_yaml_dsl_row_number_score_by_rank(
     try:
         with tempfile.TemporaryDirectory(prefix="scalim-rank-score-") as tmpdir:
             tmp = Path(tmpdir)
-            out_rank = tmp / "top2_by_region_category.csv"
+            out_root = tmp / "out"
 
-            init_vars: Dict[str, object] = {"out_path_rank": str(out_rank)}
+            init_vars: Dict[str, object] = {"out_root_rank": str(out_root)}
 
             try:
-                compilation = compile_yaml(
+                result = run_yaml(
                     str(yaml_path),
                     options=RunOptions(
                         allowed_modules=_ALLOWED_MODULES,
@@ -59,7 +59,7 @@ def run_yaml_dsl_row_number_score_by_rank(
                         init_vars=init_vars,
                     ),
                 )
-                core = run_ir(compilation.demand_ir, compilation.request)
+                core = result.core
             except Exception as exc:  # noqa: BLE001
                 return ExampleResult(
                     example_id=_EXAMPLE_ID,
@@ -69,6 +69,9 @@ def run_yaml_dsl_row_number_score_by_rank(
                     details={"exc_type": type(exc).__name__, "message": str(exc)},
                 )
 
+            latest = versioned_outputs.read_latest(out_root)
+            version_id = str(latest.get("version_id") or "")
+            out_rank = out_root / "versions" / version_id / versioned_outputs.file_output_relpath(file_id="rank_csv")
             rows = _read_csv_rows(out_rank) if out_rank.exists() else []
             ok_oracle, oracle_summary, oracle_details = verify_ecommerce_rank_score_csv_rows(actual_rows=rows, cfg=cfg)
 

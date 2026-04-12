@@ -134,7 +134,6 @@ class SheetBookDef:
     budget_max_sheets: int
     budget_max_total_cells: int
     export_path: Optional[str]
-    export_write_lock: bool
     export_allow_formulas: bool = False
 
 
@@ -161,7 +160,6 @@ class _SheetBookPlan:
     budget_max_sheets: int
     budget_max_total_cells: int
     export_path: Optional[str]
-    export_write_lock: bool
     export_allow_formulas: bool
     sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
@@ -226,26 +224,25 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     ) -> Tuple[str, bool]:
         action = "write"
         pending_skip = False
-        with self._lock:
-            existing = plan.sheets.get(sheet_name)
-            if existing is not None:
-                if on_conflict == "skip":
-                    action = "skip"
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-                if on_conflict == "error":
-                    msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                    raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
-                if on_conflict == "overwrite":
-                    action = "overwrite"
-            elif len(plan.sheets) >= int(plan.budget_max_sheets):
-                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                diff = [
-                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                    "current_sheets={}".format(len(plan.sheets)),
-                    "new_sheet={!r}".format(sheet_name),
-                ]
-                raise ScalimWorkflowWriteError(msg, diff=diff)
+        existing = plan.sheets.get(sheet_name)
+        if existing is not None:
+            if on_conflict == "skip":
+                action = "skip"
+                plan.last_workflow_node_id = str(workflow_node_id)
+                pending_skip = True
+            if on_conflict == "error":
+                msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
+            if on_conflict == "overwrite":
+                action = "overwrite"
+        elif len(plan.sheets) >= int(plan.budget_max_sheets):
+            msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
+            diff = [
+                "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
+                "current_sheets={}".format(len(plan.sheets)),
+                "new_sheet={!r}".format(sheet_name),
+            ]
+            raise ScalimWorkflowWriteError(msg, diff=diff)
         return action, pending_skip
 
     def _sheetbook_sheet_store(
@@ -261,44 +258,43 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         rows: List[List[FieldValue]],
         new_sheet_cells: int,
     ) -> None:
-        with self._lock:
-            existing = plan.sheets.get(sheet_name)
-            old_cells = 0
-            if existing is not None:
-                old_cells = int(existing.cell_count)
+        existing = plan.sheets.get(sheet_name)
+        old_cells = 0
+        if existing is not None:
+            old_cells = int(existing.cell_count)
 
-            new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
-            self._check_sheetbook_budget(plan, new_total_cells=new_total)
+        new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
+        self._check_sheetbook_budget(plan, new_total_cells=new_total)
 
-            existing_decl_order = plan.sheet_decl_order.get(sheet_name)
-            resolved_decl_order = int(decl_order)
-            if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
-                plan.sheet_decl_order[sheet_name] = resolved_decl_order
-            plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
+        existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+        resolved_decl_order = int(decl_order)
+        if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+            plan.sheet_decl_order[sheet_name] = resolved_decl_order
+        plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
 
-            sheet_plan = _SheetBookSheetPlan(
-                sheet=sheet_name,
-                baseline_header=list(expected),
-                export_header=self._resolve_sheetbook_export_header(
-                    list(expected),
-                    export_header=export_header,
-                    sheetbook_id=plan.resource_id,
-                    sheet_name=sheet_name,
-                ),
-                segments=[],
-                cell_count=int(new_sheet_cells),
+        sheet_plan = _SheetBookSheetPlan(
+            sheet=sheet_name,
+            baseline_header=list(expected),
+            export_header=self._resolve_sheetbook_export_header(
+                list(expected),
+                export_header=export_header,
+                sheetbook_id=plan.resource_id,
+                sheet_name=sheet_name,
+            ),
+            segments=[],
+            cell_count=int(new_sheet_cells),
+        )
+        sheet_plan.segments.append(
+            _SheetBookSegment(
+                producer_node_id=str(input_node_id),
+                decl_order=int(decl_order),
+                rows=rows,
+                header_policy="once",
             )
-            sheet_plan.segments.append(
-                _SheetBookSegment(
-                    producer_node_id=str(input_node_id),
-                    decl_order=int(decl_order),
-                    rows=rows,
-                    header_policy="once",
-                )
-            )
-            plan.sheets[sheet_name] = sheet_plan
-            plan.total_cells = int(new_total)
-            plan.last_workflow_node_id = str(workflow_node_id)
+        )
+        plan.sheets[sheet_name] = sheet_plan
+        plan.total_cells = int(new_total)
+        plan.last_workflow_node_id = str(workflow_node_id)
 
     def _sheetbook_append_prepare(
         self,
@@ -319,79 +315,78 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         pending_warning_meta: Optional[Dict[str, object]] = None
         pending_skip = False
 
-        with self._lock:
-            sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:
-                if len(plan.sheets) >= int(plan.budget_max_sheets):
-                    msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                    diff = [
-                        "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                        "current_sheets={}".format(len(plan.sheets)),
-                        "new_sheet={!r}".format(sheet_name),
-                    ]
-                    raise ScalimWorkflowWriteError(msg, diff=diff)
-                plan.sheet_decl_order[sheet_name] = int(decl_order)
-                plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
-                sheet_plan = _SheetBookSheetPlan(
-                    sheet=sheet_name,
-                    baseline_header=list(input_header),
-                    export_header=self._resolve_sheetbook_export_header(
-                        list(input_header),
-                        export_header=export_header,
-                        sheetbook_id=plan.resource_id,
-                        sheet_name=sheet_name,
-                    ),
-                    segments=[],
-                    cell_count=0,
-                )
-                plan.sheets[sheet_name] = sheet_plan
-            else:
-                existing_decl_order = plan.sheet_decl_order.get(sheet_name)
-                resolved_decl_order = int(decl_order)
-                if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
-                    plan.sheet_decl_order[sheet_name] = resolved_decl_order
-                    plan.sheet_order = sorted(
-                        plan.sheet_decl_order.keys(),
-                        key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
-                    )
-                _ = self._resolve_sheetbook_export_header(
-                    list(sheet_plan.baseline_header),
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:
+            if len(plan.sheets) >= int(plan.budget_max_sheets):
+                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
+                diff = [
+                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
+                    "current_sheets={}".format(len(plan.sheets)),
+                    "new_sheet={!r}".format(sheet_name),
+                ]
+                raise ScalimWorkflowWriteError(msg, diff=diff)
+            plan.sheet_decl_order[sheet_name] = int(decl_order)
+            plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
+            sheet_plan = _SheetBookSheetPlan(
+                sheet=sheet_name,
+                baseline_header=list(input_header),
+                export_header=self._resolve_sheetbook_export_header(
+                    list(input_header),
                     export_header=export_header,
-                    existing_export_header=sheet_plan.export_header,
                     sheetbook_id=plan.resource_id,
                     sheet_name=sheet_name,
+                ),
+                segments=[],
+                cell_count=0,
+            )
+            plan.sheets[sheet_name] = sheet_plan
+        else:
+            existing_decl_order = plan.sheet_decl_order.get(sheet_name)
+            resolved_decl_order = int(decl_order)
+            if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
+                plan.sheet_decl_order[sheet_name] = resolved_decl_order
+                plan.sheet_order = sorted(
+                    plan.sheet_decl_order.keys(),
+                    key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)),
                 )
+            _ = self._resolve_sheetbook_export_header(
+                list(sheet_plan.baseline_header),
+                export_header=export_header,
+                existing_export_header=sheet_plan.export_header,
+                sheetbook_id=plan.resource_id,
+                sheet_name=sheet_name,
+            )
 
-            expected = list(sheet_plan.baseline_header)
-            mapping = _build_alignment_mapping(expected, input_header)
+        expected = list(sheet_plan.baseline_header)
+        mapping = _build_alignment_mapping(expected, input_header)
 
-            action = _sheetbook_decide_alignment_action(expected, input_header, align_by=str(align_by), on_mismatch=str(on_mismatch))
-            if action != "ok":
-                diff = _describe_header_diff(expected, input_header)
-                if action == "error":
-                    msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                    raise ScalimWorkflowWriteError(msg, diff=diff)
-                if action == "warn":
-                    pending_warning = DiagnosticWarningEvent(
-                        message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
-                        source_id=None,
-                        field_id=None,
-                        lookup_key={"expected": expected, "actual": list(input_header)},
-                        row_id=None,
-                    )
-                    pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
-                if action == "skip":
-                    plan.last_workflow_node_id = str(workflow_node_id)
-                    pending_skip = True
-
-            # 重复写入检测: 同一生产者不应写入同一工作表多次.
-            if not pending_skip and _sheetbook_has_duplicate_producer_write(sheet_plan.segments, producer_node_id=str(input_node_id)):
-                msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
-                    str(sheetbook_id),
-                    sheet_name,
-                    str(input_node_id),
+        action = _sheetbook_decide_alignment_action(expected, input_header, align_by=str(align_by), on_mismatch=str(on_mismatch))
+        if action != "ok":
+            diff = _describe_header_diff(expected, input_header)
+            if action == "error":
+                msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                raise ScalimWorkflowWriteError(msg, diff=diff)
+            if action == "warn":
+                pending_warning = DiagnosticWarningEvent(
+                    message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
+                    source_id=None,
+                    field_id=None,
+                    lookup_key={"expected": expected, "actual": list(input_header)},
+                    row_id=None,
                 )
-                raise ScalimWorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
+                pending_warning_meta = {"workflow_exec_id": self._workflow_exec_id, "workflow_node_id": str(workflow_node_id)}
+            if action == "skip":
+                plan.last_workflow_node_id = str(workflow_node_id)
+                pending_skip = True
+
+        # 重复写入检测: 同一生产者不应写入同一工作表多次.
+        if not pending_skip and _sheetbook_has_duplicate_producer_write(sheet_plan.segments, producer_node_id=str(input_node_id)):
+            msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
+                str(sheetbook_id),
+                sheet_name,
+                str(input_node_id),
+            )
+            raise ScalimWorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
         return expected, mapping, pending_warning, pending_warning_meta, pending_skip
 
     def _sheetbook_append_apply(
@@ -407,51 +402,48 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         rows: List[List[FieldValue]],
         header_policy: str,
     ) -> None:
-        with self._lock:
-            sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
-                msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
-                raise ScalimWorkflowWriteError(msg)
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
+            msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+            raise ScalimWorkflowWriteError(msg)
 
-            new_total = int(plan.total_cells) + int(append_cells)
-            self._check_sheetbook_budget(plan, new_total_cells=new_total)
-            sheet_plan.segments.append(
-                _SheetBookSegment(
-                    producer_node_id=str(input_node_id),
-                    decl_order=int(decl_order),
-                    rows=rows,
-                    header_policy=str(header_policy),
-                )
+        new_total = int(plan.total_cells) + int(append_cells)
+        self._check_sheetbook_budget(plan, new_total_cells=new_total)
+        sheet_plan.segments.append(
+            _SheetBookSegment(
+                producer_node_id=str(input_node_id),
+                decl_order=int(decl_order),
+                rows=rows,
+                header_policy=str(header_policy),
             )
-            sheet_plan.cell_count = int(sheet_plan.cell_count) + int(append_cells)
-            plan.total_cells = int(new_total)
-            plan.last_workflow_node_id = str(workflow_node_id)
+        )
+        sheet_plan.cell_count = int(sheet_plan.cell_count) + int(append_cells)
+        plan.total_cells = int(new_total)
+        plan.last_workflow_node_id = str(workflow_node_id)
 
     def _get_or_create_sheetbook(self, sheetbook_id: str, *, workflow_node_id: str) -> _SheetBookPlan:
         key = str(sheetbook_id)
-        with self._lock:
-            existing = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(key))  # pragma: allow-cast sheetbook plan typed narrowing
-            if existing is not None:
-                return existing
+        existing = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(key))  # pragma: allow-cast sheetbook plan typed narrowing
+        if existing is not None:
+            return existing
 
-            raw_def = self._sheetbook_defs.get(key)
-            if raw_def is None:
-                msg = "Unknown sheetbook resource id: {!r}".format(key)
-                raise ScalimWorkflowWriteError(msg)
+        raw_def = self._sheetbook_defs.get(key)
+        if raw_def is None:
+            msg = "Unknown sheetbook resource id: {!r}".format(key)
+            raise ScalimWorkflowWriteError(msg)
 
-            raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
-            plan = SheetBookPlan(
-                resource_id=str(raw_def.resource_id),
-                budget_max_sheets=int(raw_def.budget_max_sheets),
-                budget_max_total_cells=int(raw_def.budget_max_total_cells),
-                export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
-                export_write_lock=bool(raw_def.export_write_lock),
-                export_allow_formulas=bool(raw_def.export_allow_formulas),
-                sheet_decl_order={},
-                sheet_order=[],
-                sheets={},
-            )
-            self._sheetbooks[key] = plan
+        raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
+        plan = SheetBookPlan(
+            resource_id=str(raw_def.resource_id),
+            budget_max_sheets=int(raw_def.budget_max_sheets),
+            budget_max_total_cells=int(raw_def.budget_max_total_cells),
+            export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
+            export_allow_formulas=bool(raw_def.export_allow_formulas),
+            sheet_decl_order={},
+            sheet_order=[],
+            sheets={},
+        )
+        self._sheetbooks[key] = plan
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._emit_resource_create(
@@ -658,29 +650,28 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet_name = str(sheet)
         visible = frozenset(str(x) for x in visible_producer_node_ids)
 
-        with self._lock:
-            plan = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(sb_id))  # pragma: allow-cast sheetbook plan typed narrowing
-            if plan is None:
-                msg = "Unknown sheetbook resource id: {!r}".format(sb_id)
-                raise ValueError(msg)
-            sheet_plan = plan.sheets.get(sheet_name)
-            if sheet_plan is None:
-                msg = "Unknown sheetbook sheet: sheetbook={!r}, sheet={!r}".format(sb_id, sheet_name)
-                raise ValueError(msg)
+        plan = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(sb_id))  # pragma: allow-cast sheetbook plan typed narrowing
+        if plan is None:
+            msg = "Unknown sheetbook resource id: {!r}".format(sb_id)
+            raise ValueError(msg)
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:
+            msg = "Unknown sheetbook sheet: sheetbook={!r}, sheet={!r}".format(sb_id, sheet_name)
+            raise ValueError(msg)
 
-            ordered_segments = _sorted_sheetbook_segments(list(sheet_plan.segments))
-            cutoff_idx = _sheetbook_find_cutoff_index(ordered_segments, producer_node_id=producer)
-            if cutoff_idx is None:
-                msg = "Unknown sheetbook ref node for sheet: node={!r}, sheetbook={!r}, sheet={!r}".format(producer, sb_id, sheet_name)
-                raise ValueError(msg)
+        ordered_segments = _sorted_sheetbook_segments(list(sheet_plan.segments))
+        cutoff_idx = _sheetbook_find_cutoff_index(ordered_segments, producer_node_id=producer)
+        if cutoff_idx is None:
+            msg = "Unknown sheetbook ref node for sheet: node={!r}, sheetbook={!r}, sheet={!r}".format(producer, sb_id, sheet_name)
+            raise ValueError(msg)
 
-            baseline_header = list(sheet_plan.baseline_header)
-            segments = _sheetbook_collect_visible_segments(
-                ordered_segments,
-                cutoff_idx=int(cutoff_idx),
-                producer_node_id=producer,
-                visible_producer_node_ids=visible,
-            )
+        baseline_header = list(sheet_plan.baseline_header)
+        segments = _sheetbook_collect_visible_segments(
+            ordered_segments,
+            cutoff_idx=int(cutoff_idx),
+            producer_node_id=producer,
+            visible_producer_node_ids=visible,
+        )
 
         return _iter_sheetbook_row_dicts(baseline_header, segments)
 

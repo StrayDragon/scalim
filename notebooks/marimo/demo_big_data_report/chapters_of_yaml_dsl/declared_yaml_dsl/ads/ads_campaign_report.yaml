@@ -18,7 +18,7 @@ description: |
 _templates:
   detail_all_csv_file: &detail_all_csv_file
     kind: csv_file
-    path: {$init_var: out_path_detail_all}
+    path: {$init_var: out_root}
     encoding: utf-8
   csv_write_field_id: &csv_write_field_id
     header_fields_output_by: field_id
@@ -150,10 +150,10 @@ resources:
     detail_all_csv: *detail_all_csv_file
     detail_clicks_csv:
       <<: *detail_all_csv_file
-      path: {$init_var: out_path_detail_clicks}
+      path: {$init_var: out_root}
     metrics_by_campaign_csv:
       kind: csv_file
-      path: {$init_var: out_path_metrics_by_campaign}
+      path: {$init_var: out_root}
       encoding: utf-8
 
 outputs:

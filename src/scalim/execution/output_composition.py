@@ -440,7 +440,6 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
         header_names=header_names,
         include_header=bool(output.include_header),
         flush_policy="every_n_rows",
-        write_lock=bool(output.write_lock),
     )
 
 
@@ -455,7 +454,6 @@ def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink
         sheet_name=sheet_name,
         include_header=bool(output.include_header),
         allow_formulas=bool(output.excel_allow_formulas),
-        write_lock=bool(output.write_lock),
     )
 
 
@@ -946,10 +944,8 @@ def _get_or_create_excel_workbook_sink(
     path = str(output.path)
     wb = workbook_by_path.get(path)
     if wb is None:
-        wb = ExcelWorkbookSink(path, write_lock=bool(output.write_lock))
+        wb = ExcelWorkbookSink(path)
         workbook_by_path[path] = wb
-    else:
-        wb.write_lock = bool(wb.write_lock or output.write_lock)
     return wb
 
 
@@ -1186,7 +1182,6 @@ def _maybe_create_meta_target(
         include_header=True,
         sheet_name=str(meta_sheet.sheet_name),
         excel_allow_formulas=bool(meta_sheet.output.excel_allow_formulas),
-        write_lock=bool(meta_sheet.output.write_lock),
     )
     sink, counter, managed_plan = _create_row_sink_for_composed_output(
         target_id=str(meta_sheet.target_id),
@@ -1248,7 +1243,6 @@ def _maybe_create_audit_target(
         include_header=True,
         sheet_name=str(audit_sheet.sheet_name),
         excel_allow_formulas=bool(audit_sheet.output.excel_allow_formulas),
-        write_lock=bool(audit_sheet.output.write_lock),
     )
     sink, counter, managed_plan = _create_row_sink_for_composed_output(
         target_id=str(audit_sheet.target_id),

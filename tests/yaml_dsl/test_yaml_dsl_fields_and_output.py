@@ -31,7 +31,7 @@ fields:
     compute: "quantity * unit_price"
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -89,7 +89,7 @@ fields:
     compute: "quantity * unit_price"
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -121,7 +121,7 @@ main_source:
 sources: {}
 resources:
   files:
-    summary_csv: {kind: csv_file, path: ./out.csv}
+    summary_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: summary
     to: {file: summary_csv}
@@ -159,7 +159,7 @@ main_source:
 sources: {}
 resources:
   files:
-    summary_csv: {kind: csv_file, path: ./out.csv}
+    summary_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: summary
     to: {file: summary_csv}
@@ -194,7 +194,7 @@ main_source:
 sources: {}
 resources:
   files:
-    summary_csv: {kind: csv_file, path: ./out.csv}
+    summary_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: summary
     to: {file: summary_csv}
@@ -225,7 +225,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -253,7 +253,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -281,7 +281,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -308,7 +308,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}

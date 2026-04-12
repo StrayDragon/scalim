@@ -7,7 +7,7 @@ from scalim.dsl.yaml_dsl import run_workflow as run_workflow_public
 from scalim.dsl.yaml_dsl.workflow_entrypoints import run_workflow as run_workflow_stable
 
 
-def _write_demand_yaml(tmp_path: Path, *, file_name: str, name: str, output_path: Path) -> Path:
+def _write_demand_yaml(tmp_path: Path, *, file_name: str, name: str, output_root: Path) -> Path:
     yaml_content = """
 name: {name}
 main_source:
@@ -19,14 +19,14 @@ main_source:
 sources: {{}}
 resources:
   files:
-    detail_csv: {{kind: csv_file, path: {output_path}}}
+    detail_csv: {{kind: csv_file, path: {output_root}}}
 outputs:
   - name: detail
     to: {{file: detail_csv}}
     fields: [order_id]
 """.format(
         name=str(name),
-        output_path=json.dumps(str(output_path)),
+        output_root=json.dumps(str(output_root)),
     )
 
     p = tmp_path / str(file_name)
@@ -60,7 +60,7 @@ def test_stable_workflow_entrypoints_are_importable_and_runnable(tmp_path: Path)
         wf1_dir,
         file_name="a.yaml",
         name="a",
-        output_path=wf1_dir / "a.csv",
+        output_root=wf1_dir / "out",
     )
     wf1 = _write_workflow_yaml(wf1_dir, file_name="wf.yaml", run_id="a", demand_file="a.yaml")
     result1 = run_workflow_public(str(wf1), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
@@ -72,7 +72,7 @@ def test_stable_workflow_entrypoints_are_importable_and_runnable(tmp_path: Path)
         wf2_dir,
         file_name="b.yaml",
         name="b",
-        output_path=wf2_dir / "b.csv",
+        output_root=wf2_dir / "out",
     )
     wf2 = _write_workflow_yaml(wf2_dir, file_name="wf.yaml", run_id="b", demand_file="b.yaml")
     result2 = run_workflow_stable(str(wf2), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
@@ -91,7 +91,7 @@ def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurre
         wf1_dir,
         file_name="a.yaml",
         name="a",
-        output_path=wf1_dir / "a.csv",
+        output_root=wf1_dir / "out",
     )
     wf1 = _write_workflow_yaml(wf1_dir, file_name="wf.yaml", run_id="a", demand_file="a.yaml")
 
@@ -101,7 +101,7 @@ def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurre
         wf2_dir,
         file_name="b.yaml",
         name="b",
-        output_path=wf2_dir / "b.csv",
+        output_root=wf2_dir / "out",
     )
     wf2 = _write_workflow_yaml(wf2_dir, file_name="wf.yaml", run_id="b", demand_file="b.yaml")
 

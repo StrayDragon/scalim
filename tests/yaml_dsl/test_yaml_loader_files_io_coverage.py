@@ -48,9 +48,9 @@ def test_loader_parse_file_config_semantic_errors_cover_branches() -> None:
             base_path="resources.files.detail_csv",
         )  # noqa: SLF001
 
-    with pytest.raises(TypeError, match=r"resources\.files\.detail_csv\.write_lock must be a boolean"):
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.write_lock was removed"):
         _ = loader._parse_file_config(
-            {FILE_KEYS["kind"]: "csv_file", FILE_KEYS["path"]: "a.csv", FILE_KEYS["write_lock"]: "yes"},
+            {FILE_KEYS["kind"]: "csv_file", FILE_KEYS["path"]: "a.csv", "write_lock": "yes"},
             base_path="resources.files.detail_csv",
         )  # noqa: SLF001
 

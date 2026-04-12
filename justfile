@@ -443,6 +443,10 @@ examples:
                 continue
             name = str(path.name)
             if name.startswith("demo_") or name.startswith("example_"):
+                # 防御: 避免本地残留空目录/中间产物(无任何 `.py` 源码)被误识别为 suite,导致 gate 失败。
+                # 真实 suite 至少应包含 1 个可 import 的 Python 模块(例如 `demo_main.py` 或 `chapters*/registry.py`)。
+                if not any(path.rglob("*.py")):
+                    continue
                 suites.append(name)
         return sorted(suites)
 

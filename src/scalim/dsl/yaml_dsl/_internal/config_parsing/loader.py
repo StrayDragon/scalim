@@ -429,7 +429,6 @@ class YamlDemandLoader(
             export_cfg = self._parse_book_export_xlsx(export_raw, base_path="{}.export_xlsx".format(base_path))
 
         allow_formulas = bool(raw.get(BOOK_KEYS["allow_formulas"], False))
-        write_lock = bool(raw.get(BOOK_KEYS["write_lock"], False))
 
         write_defaults_cfg = None
         write_defaults_raw = mapping_or_none(raw.get(BOOK_KEYS["write_defaults"]))
@@ -461,12 +460,18 @@ class YamlDemandLoader(
             budget=budget_cfg,
             export_xlsx=export_cfg,
             allow_formulas=allow_formulas,
-            write_lock=write_lock,
             write_defaults=write_defaults_cfg,
         )
 
     def _parse_file_config(self, raw: Dict[str, Any], *, base_path: str) -> FileConfig:
-        allowed_keys = {FILE_KEYS["kind"], FILE_KEYS["path"], FILE_KEYS["encoding"], FILE_KEYS["write_lock"]}
+        if "write_lock" in raw:
+            msg = (
+                "{}.write_lock was removed. "
+                "Migration: set path to an output root directory (e.g. './out'), and locate outputs via <root>/manifest/latest.json."
+            ).format(base_path)
+            raise ValueError(msg)
+
+        allowed_keys = {FILE_KEYS["kind"], FILE_KEYS["path"], FILE_KEYS["encoding"]}
         unknown = sorted({str(k) for k in raw} - allowed_keys)
         if unknown:
             msg = "{} has unknown keys: {}".format(base_path, ", ".join(unknown))
@@ -486,12 +491,7 @@ class YamlDemandLoader(
             raise ValueError(msg)
 
         encoding = str(raw.get(FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
-        write_lock_raw = raw.get(FILE_KEYS["write_lock"], False)
-        if not isinstance(write_lock_raw, bool):
-            msg = "{}.write_lock must be a boolean".format(base_path)
-            raise TypeError(msg)
-        write_lock = bool(write_lock_raw)
-        return FileConfig(kind=kind, path=path, encoding=encoding, write_lock=write_lock)
+        return FileConfig(kind=kind, path=path, encoding=encoding)
 
     def _parse_path_or_init_var(self, raw: object, *, path: str) -> Any:
         if isinstance(raw, dict):
@@ -540,9 +540,8 @@ class YamlDemandLoader(
         if not export_path or (isinstance(export_path, str) and not export_path.strip()):
             msg = "{}.path is required".format(base_path)
             raise ValueError(msg)
-        write_lock = bool(raw.get(BOOK_EXPORT_XLSX_KEYS["write_lock"], False))
         allow_formulas = bool(raw.get(BOOK_EXPORT_XLSX_KEYS["allow_formulas"], False))
-        return BookExportXlsxConfig(path=export_path, write_lock=write_lock, allow_formulas=allow_formulas)
+        return BookExportXlsxConfig(path=export_path, allow_formulas=allow_formulas)
 
     def _parse_book_write_defaults(self, raw: Dict[str, Any], *, base_path: str) -> BookWriteDefaultsConfig:
         mode = str(raw.get(BOOK_WRITE_DEFAULTS_KEYS["mode"]) or DEFAULT_BOOK_WRITE_MODE).strip() or DEFAULT_BOOK_WRITE_MODE

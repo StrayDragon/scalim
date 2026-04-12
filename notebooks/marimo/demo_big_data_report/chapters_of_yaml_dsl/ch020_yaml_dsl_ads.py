@@ -1,6 +1,7 @@
 import marimo
 
 import csv
+import json
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -45,16 +46,12 @@ def run_yaml_dsl_ads(
     reset_ads_creatives_retry_counter_calls()
     with tempfile.TemporaryDirectory(prefix="scalim-ads-") as tmpdir:
         tmp = Path(tmpdir)
-        out_detail_all = tmp / "detail_all.csv"
-        out_detail_clicks = tmp / "detail_clicks.csv"
-        out_metrics = tmp / "metrics_by_campaign.csv"
+        out_root = tmp / "out"
 
         init_vars = dict(init_vars or {})
         init_vars.update(
             {
-                "out_path_detail_all": str(out_detail_all),
-                "out_path_detail_clicks": str(out_detail_clicks),
-                "out_path_metrics_by_campaign": str(out_metrics),
+                "out_root": str(out_root),
             }
         )
 
@@ -88,6 +85,13 @@ def run_yaml_dsl_ads(
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
+        latest = json.loads((out_root / "manifest" / "latest.json").read_text("utf-8"))
+        version_id = str(latest["version_id"])
+        vdir = out_root / "versions" / version_id
+        out_detail_all = vdir / "files" / "detail_all_csv.csv"
+        out_detail_clicks = vdir / "files" / "detail_clicks_csv.csv"
+        out_metrics = vdir / "files" / "metrics_by_campaign_csv.csv"
+
         detail_all_rows = _read_csv_rows(out_detail_all) if out_detail_all.exists() else []
         detail_clicks_rows = _read_csv_rows(out_detail_clicks) if out_detail_clicks.exists() else []
         metrics_rows = _read_csv_rows(out_metrics) if out_metrics.exists() else []
@@ -110,6 +114,8 @@ def run_yaml_dsl_ads(
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
             "outputs": run_result.core.outputs,
+            "out_root": str(out_root),
+            "version_id": version_id,
             "detail_all_csv": str(out_detail_all),
             "detail_clicks_csv": str(out_detail_clicks),
             "metrics_by_campaign_csv": str(out_metrics),

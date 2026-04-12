@@ -22,4 +22,3 @@ base_resources:
         kind: xlsx_file
         path: {$init_var: out_path_secondary_workbook}
         allow_formulas: false
-        write_lock: false

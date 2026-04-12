@@ -140,7 +140,6 @@ def test_compile_extra_sheet_requires_workbook_path() -> None:
             default_sheet="__meta__",
             default_workbook_path=None,
             default_allow_formulas=False,
-            default_write_lock=False,
             as_in_memory_csv=False,
         )
 
@@ -149,11 +148,11 @@ def test_compile_output_composition_meta_audit_requires_outputs() -> None:
     config = DemandConfig(meta=OutputExtraSheetConfig())
 
     with pytest.raises(ValueError, match=r"meta/audit requires outputs"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
 
 def test_compile_output_composition_returns_none_when_no_outputs() -> None:
-    assert oc_yaml.compile_output_composition_from_yaml(DemandConfig(), _make_demand_ir(), resolver=_resolver()) is None
+    assert oc_yaml.compile_output_composition_from_yaml(DemandConfig(), _make_demand_ir(), version_id="run_0", resolver=_resolver()) is None
 
 
 def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical() -> None:
@@ -163,7 +162,7 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
                 "mem": BookConfig(
                     kind="xlsx_memory",
                     budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
-                    export_xlsx=BookExportXlsxConfig(path="./report.xlsx"),
+                    export_xlsx=BookExportXlsxConfig(path="./out"),
                 )
             }
         ),
@@ -180,6 +179,7 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(field_name_by_id={"order_id": "Order ID", "amount": "Amount"}),
+        version_id="run_0",
         resolver=_resolver(),
         workflow_managed_output_ids=frozenset(["detail"]),
     )
@@ -193,12 +193,13 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
 
 
 def test_compile_output_composition_can_skip_extra_sheet_without_workbook() -> None:
-    config = _csv_config("./out.csv")
+    config = _csv_config("./out")
     config = DemandConfig(resources=config.resources, outputs=config.outputs, meta=OutputExtraSheetConfig())
 
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(),
+        version_id="run_0",
         resolver=_resolver(),
         yaml_base_dir=".",
         skip_extra_sheets_without_workbook=True,
@@ -208,12 +209,13 @@ def test_compile_output_composition_can_skip_extra_sheet_without_workbook() -> N
 
 
 def test_compile_output_composition_skip_flag_keeps_explicit_extra_sheet_path() -> None:
-    config = _csv_config("./out.csv")
+    config = _csv_config("./out")
     config = DemandConfig(resources=config.resources, outputs=config.outputs, meta=OutputExtraSheetConfig(path="./meta.xlsx"))
 
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(),
+        version_id="run_0",
         resolver=_resolver(),
         yaml_base_dir=".",
         skip_extra_sheets_without_workbook=True,
@@ -229,26 +231,29 @@ def test_compile_output_composition_resolves_file_resource_path_init_var() -> No
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(),
+        version_id="run_0",
         resolver=_resolver(),
-        init_vars={"output_path": "./out.csv"},
+        init_vars={"output_path": "./out"},
         yaml_base_dir=".",
     )
     assert spec is not None
-    assert str(spec.targets[0].output.path).endswith("out.csv")
+    assert spec.targets[0].output.path == str((Path(".") / "out" / "versions" / "run_0" / "files" / "detail_csv.csv").resolve(strict=False))
 
 
 def test_compile_output_composition_requires_file_resource_path_init_var_value() -> None:
     config = _csv_config({"$init_var": "output_path"})
 
     with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.path"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
 
 def test_compile_output_composition_rejects_file_resource_path_init_var_shape_errors() -> None:
     config = _csv_config({"$init_var": "out_path", "other": 1})
     with pytest.raises(ScalimInitVarNodeValueError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.csv"}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
     assert excinfo.value.path == "resources.files.detail_csv.path"
     assert excinfo.value.reason == "only supports {$init_var: <name>}; unexpected keys: other"
@@ -256,7 +261,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
     config = _csv_config({})
     with pytest.raises(ScalimInitVarNodeValueError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.csv"}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
     assert excinfo.value.path == "resources.files.detail_csv.path"
     assert excinfo.value.reason == "only supports {$init_var: <name>}; missing '$init_var'"
@@ -264,7 +269,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
     config = _csv_config({"$init_var": None})
     with pytest.raises(ScalimInitVarNodeTypeError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.csv"}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
     assert excinfo.value.path == "resources.files.detail_csv.path.$init_var"
     assert excinfo.value.reason == "must be a non-empty string"
@@ -272,7 +277,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
     config = _csv_config({"$init_var": " "})
     with pytest.raises(ScalimInitVarNodeTypeError) as excinfo:
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "./out.csv"}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
     assert excinfo.value.path == "resources.files.detail_csv.path.$init_var"
     assert excinfo.value.reason == "must be a non-empty string"
@@ -284,43 +289,47 @@ def test_compile_output_composition_validates_init_var_value_types_and_normalize
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(),
+        version_id="run_0",
         resolver=_resolver(),
-        init_vars={"out_path": " ./out.csv "},
+        init_vars={"out_path": " ./out "},
         yaml_base_dir=".",
     )
     assert spec is not None
-    assert spec.targets[0].output.path == str((Path(".") / "out.csv").resolve(strict=False))
+    assert spec.targets[0].output.path == str((Path(".") / "out" / "versions" / "run_0" / "files" / "detail_csv.csv").resolve(strict=False))
 
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(),
+        version_id="run_0",
         resolver=_resolver(),
-        init_vars={"out_path": Path("output/out.csv")},
+        init_vars={"out_path": Path("output")},
         yaml_base_dir=".",
     )
     assert spec is not None
-    assert spec.targets[0].output.path == str((Path(".") / "output" / "out.csv").resolve(strict=False))
+    assert spec.targets[0].output.path == str(
+        (Path(".") / "output" / "versions" / "run_0" / "files" / "detail_csv.csv").resolve(strict=False)
+    )
 
     with pytest.raises(ValueError, match=r"resolved to None"):
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": None}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": None}, yaml_base_dir="."
         )
 
     with pytest.raises(TypeError, match=r"must be str or os\.PathLike"):
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": 1}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": 1}, yaml_base_dir="."
         )
 
     with pytest.raises(ValueError, match=r"resolved to an empty string"):
         _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), resolver=_resolver(), init_vars={"out_path": "   "}, yaml_base_dir="."
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "   "}, yaml_base_dir="."
         )
 
 
 def test_compile_output_composition_requires_yaml_base_dir_for_file_outputs() -> None:
-    config = _csv_config("./out.csv")
+    config = _csv_config("./out")
     with pytest.raises(ValueError, match=r"yaml_base_dir is required to resolve resources\.files output paths"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
 
 def test_compile_output_composition_missing_file_resource_raises_helpful_error() -> None:
@@ -329,12 +338,14 @@ def test_compile_output_composition_missing_file_resource_raises_helpful_error()
         outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(file="missing_csv"), fields=("a",)),),
     )
     with pytest.raises(ValueError, match=r"Missing file resource id 'missing_csv'"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
 
 def test_compile_output_composition_append_mode_rejects_include_header() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -345,21 +356,27 @@ def test_compile_output_composition_append_mode_rejects_include_header() -> None
         ),
     )
     with pytest.raises(ValueError, match=r"outputs\.0\.write\.include_header is not allowed for append-mode book outputs"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
 
 def test_compile_output_composition_rejects_empty_or_missing_file_resource_path_values() -> None:
     config = _csv_config(None)
     with pytest.raises(ValueError, match=r"is required"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
     config = _csv_config("   ")
     with pytest.raises(ValueError, match=r"is required"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
 
 def test_compile_output_composition_meta_output_name_is_reserved() -> None:
-    base = _csv_config("./out.csv")
+    base = _csv_config("./out")
     config = DemandConfig(
         resources=base.resources,
         outputs=(OutputTargetConfig(name="meta", to=OutputToConfig(file="detail_csv"), fields=("a",)),),
@@ -367,11 +384,11 @@ def test_compile_output_composition_meta_output_name_is_reserved() -> None:
     )
 
     with pytest.raises(ValueError, match=r"cannot be 'meta'"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
 
 def test_compile_output_composition_audit_output_name_is_reserved() -> None:
-    base = _csv_config("./out.csv")
+    base = _csv_config("./out")
     config = DemandConfig(
         resources=base.resources,
         outputs=(OutputTargetConfig(name="audit", to=OutputToConfig(file="detail_csv"), fields=("a",)),),
@@ -379,14 +396,14 @@ def test_compile_output_composition_audit_output_name_is_reserved() -> None:
     )
 
     with pytest.raises(ValueError, match=r"cannot be 'audit'"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
 
 def test_compile_output_composition_requires_output_destination_binding() -> None:
     config = DemandConfig(outputs=(OutputTargetConfig(name="detail", fields=("a",)),))
 
     with pytest.raises(ValueError, match=r"Missing output destination"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
 
 def test_validate_excel_sheet_name_errors_cover_empty_too_long_and_invalid_chars() -> None:
@@ -408,7 +425,6 @@ def test_compile_extra_sheet_workflow_managed_mode_rejects_path() -> None:
             default_sheet="__meta__",
             default_workbook_path=None,
             default_allow_formulas=False,
-            default_write_lock=False,
             as_in_memory_csv=True,
         )
 
@@ -427,6 +443,7 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
             book_ref_path="outputs.0.to.book",
             yaml_base_dir=".",
             init_vars=None,
+            version_id="run_0",
         )
 
     config = DemandConfig(
@@ -435,21 +452,21 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
                 "mem": BookConfig(
                     kind="xlsx_memory",
                     budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
-                    export_xlsx=BookExportXlsxConfig(path="./export.xlsx", write_lock=True, allow_formulas=True),
+                    export_xlsx=BookExportXlsxConfig(path="./out", allow_formulas=True),
                 )
             }
         )
     )
-    export_path, allow_formulas, write_lock = oc_yaml._resolve_book_export_path(  # noqa: SLF001
+    export_path, allow_formulas = oc_yaml._resolve_book_export_path(  # noqa: SLF001
         config,
         book_id="mem",
         book_ref_path="outputs.0.to.book",
         yaml_base_dir=".",
         init_vars=None,
+        version_id="run_0",
     )
-    assert export_path.endswith("export.xlsx")
+    assert export_path.endswith(str(Path("books") / "mem.xlsx"))
     assert allow_formulas is True
-    assert write_lock is True
 
     config = DemandConfig(resources=ResourcesConfig(books={"bad": BookConfig(kind="nope")}))
     with pytest.raises(ValueError, match=r"Unknown book kind"):
@@ -459,12 +476,13 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
             book_ref_path="outputs.0.to.book",
             yaml_base_dir=".",
             init_vars=None,
+            version_id="run_0",
         )
 
 
 def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_dir_required() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="Bad/Name",
@@ -474,10 +492,12 @@ def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_
         ),
     )
     with pytest.raises(ValueError, match=r"Invalid default Excel sheet name"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -487,10 +507,10 @@ def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_
         ),
     )
     with pytest.raises(ValueError, match=r"yaml_base_dir is required"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver())
+        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -500,12 +520,14 @@ def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_
         ),
     )
     with pytest.raises(ValueError, match=r"outputs\.0\.to\.sheet"):
-        _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), resolver=_resolver(), yaml_base_dir=".")
+        _ = oc_yaml.compile_output_composition_from_yaml(
+            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+        )
 
 
 def test_compile_output_composition_books_default_header_uses_field_name() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out.xlsx")}),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -518,6 +540,7 @@ def test_compile_output_composition_books_default_header_uses_field_name() -> No
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(field_name_by_id={"order_id": "订单ID", "user_name": "用户姓名"}),
+        version_id="run_0",
         resolver=_resolver(),
         yaml_base_dir=".",
     )
@@ -531,7 +554,7 @@ def test_compile_output_composition_books_write_override_changes_header_source()
             books={
                 "report": BookConfig(
                     kind="xlsx_file",
-                    path="./out.xlsx",
+                    path="./out",
                 )
             }
         ),
@@ -548,6 +571,7 @@ def test_compile_output_composition_books_write_override_changes_header_source()
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
         _make_demand_ir(field_name_by_id={"order_id": "订单ID", "user_name": "用户姓名"}),
+        version_id="run_0",
         resolver=_resolver(),
         yaml_base_dir=".",
     )
@@ -669,3 +693,25 @@ def test_compile_compute_post_field_executes_expression_and_validates_result_typ
             cfg={"expression": "   ", "dependencies": ()},
             engine=engine,
         )
+
+
+def test_validate_output_root_path_rejects_file_path_suffixes() -> None:
+    with pytest.raises(ValueError, match=r"expects an output root directory"):
+        oc_yaml._validate_output_root_path("out.xlsx", path="resources.books.report.path")  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"expects an output root directory"):
+        oc_yaml._validate_output_root_path("out.csv", path="resources.files.detail_csv.path")  # noqa: SLF001
+
+
+def test_try_resolve_workflow_managed_book_export_path_returns_none_for_unknown_kind() -> None:
+    book = BookConfig(kind="unknown")
+    assert (
+        oc_yaml._try_resolve_workflow_managed_book_export_path(  # noqa: SLF001
+            book,
+            book_id="book",
+            yaml_base_dir=".",
+            init_vars={},
+            version_id="run_0",
+        )
+        is None
+    )

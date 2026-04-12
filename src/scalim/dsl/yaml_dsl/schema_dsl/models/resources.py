@@ -23,7 +23,7 @@ _PATH_OR_INIT_VAR_SCHEMA = {
         {
             "type": "string",
             "minLength": 1,
-            "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)",
+            "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)",
         },
         {
             "type": "object",
@@ -39,10 +39,10 @@ _PATH_OR_INIT_VAR_SCHEMA = {
             "description": "运行时动态路径: {$init_var: <name>}",
         },
     ],
-    "description": "输出文件路径(支持静态字符串 或 {$init_var: <name>} 动态注入)",
+    "description": "输出 root 目录(支持静态字符串 或 {$init_var: <name>} 动态注入)",
     "examples": [
-        "./output/report.xlsx",
-        {"$init_var": "output_path"},
+        "./output",
+        {"$init_var": "output_root"},
     ],
 }
 
@@ -84,17 +84,7 @@ class BookExportXlsxConfig:
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
-            desc="导出 xlsx 的输出路径(字符串或 {$init_var: <name>})",
-        ),
-    )
-
-    write_lock: bool = dataclass_field(
-        default=False,
-        metadata=schema_meta(
-            desc="写锁(导出时;默认 false)",
-            md="写锁(导出时;默认 false).",
-            default=False,
-            examples=[False],
+            desc="导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})",
         ),
     )
 
@@ -197,7 +187,6 @@ class BookConfig:
                 "properties": {
                     "path": {"not": {}},
                     "allow_formulas": {"not": {}},
-                    "write_lock": {"not": {}},
                 },
             },
         },
@@ -217,7 +206,7 @@ class BookConfig:
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
-            desc="xlsx_file: 输出路径(字符串或 {$init_var: <name>})",
+            desc="xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})",
         ),
     )
 
@@ -236,16 +225,6 @@ class BookConfig:
         metadata=schema_meta(
             desc="xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)",
             md="xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-            default=False,
-            examples=[False],
-        ),
-    )
-
-    write_lock: bool = dataclass_field(
-        default=False,
-        metadata=schema_meta(
-            desc="xlsx_file: 写锁(默认 false)",
-            md="xlsx_file: 写锁(默认 false).",
             default=False,
             examples=[False],
         ),
@@ -277,7 +256,7 @@ class FileConfig:
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
-            desc="csv_file: 输出路径(字符串或 {$init_var: <name>})",
+            desc="csv_file: 输出 root 目录(字符串或 {$init_var: <name>})",
         ),
     )
 
@@ -288,16 +267,6 @@ class FileConfig:
             md="csv_file: 文件编码(默认 `utf-8`).",
             default=DEFAULT_OUTPUT_ENCODING,
             examples=[DEFAULT_OUTPUT_ENCODING],
-        ),
-    )
-
-    write_lock: bool = dataclass_field(
-        default=False,
-        metadata=schema_meta(
-            desc="csv_file: 写锁(默认 false)",
-            md="csv_file: 写锁(默认 false).",
-            default=False,
-            examples=[False],
         ),
     )
 

@@ -63,7 +63,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -143,7 +143,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out.csv}
+    detail_csv: {kind: csv_file, path: ./out}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -171,7 +171,7 @@ def test_resolve_required_field_ids_requires_allowlist() -> None:
 @pytest.mark.slow
 def test_run_writes_output(tmp_path: Path) -> None:
     yaml_path = _demo_yaml_path()
-    output_path = tmp_path / "export.csv"
+    output_root = tmp_path / "out"
     sink = InMemoryRowSink()
 
     result = run(
@@ -187,12 +187,13 @@ def test_run_writes_output(tmp_path: Path) -> None:
                         to=OutputToOverride(file="detail_csv"),
                     ),
                 ),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
         ),
     )
 
-    assert output_path.exists()
+    assert result.core.outputs is not None
+    assert Path(result.core.outputs["detail"]).exists()
     assert result.total_rows > 0
     assert sink.get_data()
 
@@ -209,7 +210,7 @@ def test_resolve_required_field_ids_defaults_to_all_fields(tmp_path: Path) -> No
 @pytest.mark.slow
 def test_run_with_performance_observability(tmp_path: Path) -> None:
     yaml_path = _demo_yaml_path()
-    output_path = tmp_path / "perf.csv"
+    output_root = tmp_path / "out_perf"
     perf_observer = PerformanceObserver(config=PerformanceConfig(report_format="none"))
 
     result = run(
@@ -225,11 +226,12 @@ def test_run_with_performance_observability(tmp_path: Path) -> None:
                         to=OutputToOverride(file="detail_csv"),
                     ),
                 ),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_path))}),
+                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
         ),
     )
 
-    assert output_path.exists()
+    assert result.core.outputs is not None
+    assert Path(result.core.outputs["detail"]).exists()
     assert result.total_rows > 0
     assert perf_observer.metrics.total_rows > 0

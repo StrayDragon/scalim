@@ -22,6 +22,7 @@
   - [`artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md)
+  - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md)
   - [`artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md)
 - 受控生成 references:

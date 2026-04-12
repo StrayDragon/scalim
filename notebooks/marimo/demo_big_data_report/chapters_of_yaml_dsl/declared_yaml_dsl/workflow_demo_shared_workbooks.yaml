@@ -5,8 +5,7 @@ workflow:
     books:
       shared_report_sheet:
         kind: xlsx_file
-        path: ./shared_report_sheet.xlsx
-        write_lock: true
+        path: ./out/shared_report_sheet
         allow_formulas: false
         write_defaults:
           mode: sheet
@@ -14,8 +13,7 @@ workflow:
 
       shared_report_append:
         kind: xlsx_file
-        path: ./shared_report_append.xlsx
-        write_lock: true
+        path: ./out/shared_report_append
         allow_formulas: false
         write_defaults:
           mode: append
@@ -29,8 +27,7 @@ workflow:
           max_sheets: 6
           max_total_cells: 200000
         export_xlsx:
-          path: ./sheetbook_report_sheet.xlsx
-          write_lock: true
+          path: ./out/sheetbook_report_sheet
           allow_formulas: false
         write_defaults:
           mode: sheet
@@ -42,8 +39,7 @@ workflow:
           max_sheets: 6
           max_total_cells: 200000
         export_xlsx:
-          path: ./sheetbook_report_append.xlsx
-          write_lock: true
+          path: ./out/sheetbook_report_append
           allow_formulas: false
         write_defaults:
           mode: append

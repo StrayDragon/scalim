@@ -41,7 +41,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
    - 用 `runs[*].writes` 声明写入 intents(每个 run 可声明 0..N 条；每条 intent 恰好一个 intent key)
 5) 若使用 sheetbook:
    - 必须声明 `sheetbooks.<id>.budget.max_sheets/max_total_cells`
-   - 需要导出为最终 xlsx 时,声明 `export_xlsx.path`(可选 `write_lock`)
+   - 需要导出为最终 xlsx 时,声明 `export_xlsx.path`(输出 root 目录)
 6) 校验与编辑器配置:
    - workflow YAML full validate(静态/编译期;递归校验引用的 demands;不执行 workflow):
      - `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`

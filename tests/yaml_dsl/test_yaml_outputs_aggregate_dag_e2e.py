@@ -17,7 +17,7 @@ def test_yaml_outputs_aggregate_derived_fields_dag_gap01_to_03_e2e(tmp_path: Pat
     # - rank.by can reference compute derived field (rank-by-compute)
     # - post field can depend on post field (post-depends-on-post)
     # - rank can reference post derived field (rank-after-post)
-    out_path = tmp_path / "summary.csv"
+    out_root = tmp_path / "out"
 
     yaml_content = make_yaml_config(
         name="demo",
@@ -38,7 +38,7 @@ resources:
   files:
     summary_csv:
       kind: csv_file
-      path: "{out_path}"
+      path: "{out_root}"
 outputs:
   - name: summary
     to: {{file: summary_csv}}
@@ -80,9 +80,18 @@ outputs:
     yaml_path = tmp_path / "demo.demand.yaml"
     yaml_path.write_text(yaml_content, encoding="utf-8")
 
-    _ = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
+    assert result.output_path is not None
+    out_path = Path(str(result.output_path))
     assert out_path.exists()
+
+    from scalim.execution.versioned_outputs import parse_versioned_output_path  # noqa: PLC0415
+
+    parsed = parse_versioned_output_path(out_path)
+    assert parsed.root == out_root.resolve(strict=False)
+    assert parsed.kind == "files"
+    assert parsed.artifact_id == "summary_csv"
 
     rows = _read_csv_rows(out_path)
     # top_k_mode=rank expands ties: keep both c2/c3 and drop c1.

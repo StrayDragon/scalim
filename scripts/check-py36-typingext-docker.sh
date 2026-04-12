@@ -129,6 +129,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.loaders import load_orders
 
 repo_root = Path(".").resolve()
@@ -142,16 +143,20 @@ yaml_path = (
     / "ecommerce_rank_score_report.yaml"
 )
 tmp_root = Path(str(os.environ["SCALIM_PY36_TMP_ROOT"]))
-out_path = tmp_root / "ecommerce_rank_score_report.output.csv"
+out_root = tmp_root / "ecommerce_rank_score_report.out"
 
 _ = run(
     str(yaml_path),
     options=RunOptions(
         allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
         batch_size=10,
-        init_vars={"out_path_rank": str(out_path)},
+        init_vars={"out_root_rank": str(out_root)},
     ),
 )
+
+latest = versioned_outputs.read_latest(out_root)
+version_id = str(latest.get("version_id") or "")
+out_path = out_root / "versions" / version_id / versioned_outputs.file_output_relpath(file_id="rank_csv")
 
 with out_path.open("r", encoding="utf-8", newline="") as handle:
     reader = csv.DictReader(handle)

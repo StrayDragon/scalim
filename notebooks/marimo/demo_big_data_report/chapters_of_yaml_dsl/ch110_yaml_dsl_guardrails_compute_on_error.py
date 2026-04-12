@@ -5,8 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
-from scalim.execution.run_ir import run_ir
+from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import GuardrailCaptureObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -44,9 +43,9 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
     guardrail_capture = GuardrailCaptureObserver()
     with tempfile.TemporaryDirectory(prefix="scalim-guardrails-compute-") as tmpdir:
         tmp = Path(tmpdir)
-        out_detail = tmp / "detail.csv"
+        out_root_detail = tmp / "out_detail"
 
-        init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
         from scalim.execution.guardrails import GuardrailsComputePolicy, GuardrailsPolicy
 
         guardrails = GuardrailsPolicy(
@@ -55,7 +54,7 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
             compute=GuardrailsComputePolicy(on_error="quiet"),
         )
         try:
-            compilation = compile_yaml(
+            result = run_yaml(
                 str(yaml_path),
                 options=RunOptions(
                     allowed_modules=_ALLOWED_MODULES,
@@ -65,7 +64,7 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
                     init_vars=init_vars,
                 ),
             )
-            core = run_ir(compilation.demand_ir, compilation.request)
+            core = result.core
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -75,8 +74,9 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
-        rows = _read_csv_rows(out_detail) if out_detail.exists() else []
-        codes = _guardrail_codes(compilation.request.components)
+        detail_csv_path = Path(str((core.outputs or {}).get("detail") or ""))
+        rows = _read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
+        codes = _guardrail_codes([guardrail_capture])
         has_compute_error = "compute_error" in set(codes)
 
         # 对拍: ticket_id=1001 必然触发除零 -> risky_score 为空;其余至少一个非空.
@@ -96,7 +96,8 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
 
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
-            "detail_csv": str(out_detail),
+            "out_root_detail": str(out_root_detail),
+            "detail_csv": str(detail_csv_path),
             "rows": len(rows),
             "guardrail_codes": codes,
             "row_1001": r_1001,

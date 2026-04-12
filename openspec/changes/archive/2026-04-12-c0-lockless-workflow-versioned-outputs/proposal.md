@@ -20,6 +20,7 @@
 - `workflow-shared-output-containers`: shared resources 的 commit/publish 语义扩展为“版本化输出”，并明确不在用户目录生成锁文件的约束。
 - `yaml-dsl-books-resources`: `books.*.path`/`export_xlsx.path` 的 authoring surface 支持“目录 root”语义，并定义导出文件在版本目录中的命名规则。
 - `yaml-dsl-file-resources`: `files.*.path` 的 authoring surface 支持“目录 root”语义，并定义导出文件在版本目录中的命名规则。
+- `yaml-dsl-output-overrides`: `RunOverrides` 与 IO-only overlay 的 authoring surface 与 D-2 版本化输出对齐（移除 `write_lock`，`path` 语义为输出 root）。
 - `sinks-contracts`: sink 的并发写入安全从“路径锁文件”迁移到“版本化输出协议 + 原子 replace”，并明确框架产生的元数据/指示文件位置约束。
 
 ## Impact

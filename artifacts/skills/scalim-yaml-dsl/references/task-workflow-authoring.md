@@ -27,7 +27,7 @@ workflow:
       report:
         kind: xlsx_memory
         budget: {max_sheets: 16, max_total_cells: 2000000}
-        export_xlsx: {path: ./out/report.xlsx, write_lock: true}
+        export_xlsx: {path: ./out}
 
   runs:
     - id: extract

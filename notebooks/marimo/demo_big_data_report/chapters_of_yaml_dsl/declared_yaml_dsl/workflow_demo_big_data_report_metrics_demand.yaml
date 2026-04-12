@@ -31,7 +31,7 @@ resources:
   files:
     metrics_csv:
       kind: csv_file
-      path: ./metrics.csv
+      path: ./out
 
 outputs:
   - name: metrics

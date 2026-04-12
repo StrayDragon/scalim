@@ -9,8 +9,7 @@ workflow:
           max_sheets: 8
           max_total_cells: 200000
         export_xlsx:
-          path: ./report.xlsx
-          write_lock: true
+          path: ./out
         write_defaults:
           mode: sheet
           on_conflict: overwrite

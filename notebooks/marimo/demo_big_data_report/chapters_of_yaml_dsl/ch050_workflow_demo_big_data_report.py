@@ -1,7 +1,9 @@
 import marimo
 
 import csv
+import json
 import os
+import shutil
 import tempfile
 from decimal import Decimal
 from pathlib import Path
@@ -82,8 +84,10 @@ def run_workflow_demo_big_data_report(
         reset_workflow_preload_counter_calls()
 
         def _run_in_dir(out_dir: Path) -> ExampleResult:
+            out_root = out_dir / "out"
             if clean_output_dir:
-                for filename in ("detail.csv", "metrics.csv", "report.xlsx", "workflow.yaml"):
+                shutil.rmtree(str(out_root), ignore_errors=True)
+                for filename in ("workflow.yaml",):
                     try:
                         (out_dir / filename).unlink()
                     except FileNotFoundError:
@@ -130,9 +134,20 @@ def run_workflow_demo_big_data_report(
             errors = result.errors()
             preload_calls = get_workflow_preload_counter_calls()
 
-            detail_csv = out_dir / "detail.csv"
-            metrics_csv = out_dir / "metrics.csv"
-            report_xlsx = out_dir / "report.xlsx"
+            version_id: Optional[str] = None
+            version_dir: Optional[Path] = None
+            try:
+                latest = json.loads((out_root / "manifest" / "latest.json").read_text("utf-8"))
+                version_id = str(latest["version_id"])
+                version_dir = out_root / "versions" / version_id
+            except Exception:  # noqa: BLE001
+                version_id = None
+                version_dir = None
+
+            missing = out_root / "__missing__"
+            detail_csv = (version_dir / "files" / "detail_csv.csv") if version_dir else missing
+            metrics_csv = (version_dir / "files" / "metrics_csv.csv") if version_dir else missing
+            report_xlsx = (version_dir / "books" / "report.xlsx") if version_dir else missing
 
             verification: VerificationResult
             if detail_csv.exists():
@@ -143,7 +158,7 @@ def run_workflow_demo_big_data_report(
                     total_rows=0,
                     checked_rows=0,
                     mismatches=[],
-                    summary="Missing detail.csv",
+                    summary="Missing detail_csv.csv",
                 )
 
             metrics_ok = False
@@ -176,6 +191,9 @@ def run_workflow_demo_big_data_report(
 
             details: Dict[str, Any] = {
                 "output_dir": str(out_dir),
+                "out_root": str(out_root),
+                "version_id": version_id,
+                "version_dir": str(version_dir) if version_dir is not None else None,
                 "detail_csv": str(detail_csv),
                 "metrics_csv": str(metrics_csv),
                 "report_xlsx": str(report_xlsx),

@@ -79,11 +79,11 @@ def test_resources_wait_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> N
         cache_pool_consumers_by_logical_key=None,
     )
     try:
-        assert prepared.resource_manager._max_wait_s == 12.5  # noqa: SLF001
-        assert prepared.resource_manager._wait_diagnostics.enabled is True  # noqa: SLF001
-        assert prepared.resource_manager._wait_diagnostics.warn_after_s == 0.1  # noqa: SLF001
-        assert prepared.resource_manager._wait_diagnostics.repeat_every_s == 0.2  # noqa: SLF001
-        assert prepared.resource_manager._wait_diagnostics.capture_owner_callsite is True  # noqa: SLF001
+        assert prepared.workflow_ir.options.resources_wait.max_wait_s == 12.5
+        assert prepared.workflow_ir.options.resources_wait.diagnostics.enabled is True
+        assert prepared.workflow_ir.options.resources_wait.diagnostics.warn_after_s == 0.1
+        assert prepared.workflow_ir.options.resources_wait.diagnostics.repeat_every_s == 0.2
+        assert prepared.workflow_ir.options.resources_wait.diagnostics.capture_owner_callsite is True
     finally:
         workflow_execute_mod._cleanup_workflow_finally(prepared, resources_finalized=True)  # noqa: SLF001
 
@@ -108,8 +108,8 @@ def test_resources_wait_default_timeout_is_enabled_in_runtime(tmp_path: Path) ->
         cache_pool_consumers_by_logical_key=None,
     )
     try:
-        assert prepared.resource_manager._max_wait_s == 600.0  # noqa: SLF001
-        assert prepared.resource_manager._wait_diagnostics.enabled is False  # noqa: SLF001
+        assert prepared.workflow_ir.options.resources_wait.max_wait_s == 600.0
+        assert prepared.workflow_ir.options.resources_wait.diagnostics.enabled is False
     finally:
         workflow_execute_mod._cleanup_workflow_finally(prepared, resources_finalized=True)  # noqa: SLF001
 

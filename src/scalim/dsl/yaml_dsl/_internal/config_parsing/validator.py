@@ -219,6 +219,102 @@ class ConfigValidator(ValidatorFieldsMixin):
 
         return config if next_config is None else next_config
 
+    def _error_and_strip_removed_resources_write_lock_fields(  # noqa: C901, PLR0915
+        self,
+        config: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        resources_raw: object = config.get(DEMAND_KEYS["resources"])
+        if not _is_dict(resources_raw):
+            return config
+
+        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        next_config: Optional[Dict[str, Any]] = None
+
+        def _ensure_next_config() -> Dict[str, Any]:
+            nonlocal next_config
+            if next_config is None:
+                next_config = dict(config)
+            return next_config
+
+        def _ensure_next_resources() -> Dict[str, Any]:
+            c = _ensure_next_config()
+            existing_resources = cast("Dict[str, Any]", c.get(DEMAND_KEYS["resources"]) or {})
+            next_resources = dict(existing_resources)
+            c[DEMAND_KEYS["resources"]] = next_resources
+            return next_resources
+
+        write_lock_hint = (
+            "write_lock was removed (lockless versioned outputs). "
+            "Migration: set resources.*.path to an output root directory and locate outputs via <root>/manifest/latest.json."
+        )
+
+        files_raw: object = resources.get(RESOURCES_KEYS["files"])
+        if _is_dict(files_raw):
+            files = cast("Dict[str, Any]", files_raw)  # pragma: allow-cast yaml mapping typed narrowing
+            for raw_file_id, raw_file_cfg in files.items():
+                file_id = str(raw_file_id or "").strip()
+                if not file_id or not _is_dict(raw_file_cfg):
+                    continue
+                file_cfg = cast("Dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+                if "write_lock" not in file_cfg:
+                    continue
+                self._add_error(
+                    issues,
+                    "resources.files.{}.write_lock was removed; {}".format(file_id, write_lock_hint),
+                    path="resources.files.{}.write_lock".format(file_id),
+                )
+                next_resources = _ensure_next_resources()
+                next_files = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["files"]) or files))
+                next_file_cfg = dict(file_cfg)
+                next_file_cfg.pop("write_lock", None)
+                next_files[str(raw_file_id)] = next_file_cfg
+                next_resources[RESOURCES_KEYS["files"]] = next_files
+
+        books_raw: object = resources.get(RESOURCES_KEYS["books"])
+        if _is_dict(books_raw):
+            books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
+            for raw_book_id, raw_book_cfg in books.items():
+                book_id = str(raw_book_id or "").strip()
+                if not book_id or not _is_dict(raw_book_cfg):
+                    continue
+                book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+
+                if "write_lock" in book_cfg:
+                    self._add_error(
+                        issues,
+                        "resources.books.{}.write_lock was removed; {}".format(book_id, write_lock_hint),
+                        path="resources.books.{}.write_lock".format(book_id),
+                    )
+                    next_resources = _ensure_next_resources()
+                    next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
+                    next_book_cfg = dict(book_cfg)
+                    next_book_cfg.pop("write_lock", None)
+                    next_books[str(raw_book_id)] = next_book_cfg
+                    next_resources[RESOURCES_KEYS["books"]] = next_books
+
+                export_raw = book_cfg.get(BOOK_KEYS["export_xlsx"])
+                if not _is_dict(export_raw):
+                    continue
+                export_cfg = cast("Dict[str, Any]", export_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                if "write_lock" not in export_cfg:
+                    continue
+                self._add_error(
+                    issues,
+                    "resources.books.{}.export_xlsx.write_lock was removed; {}".format(book_id, write_lock_hint),
+                    path="resources.books.{}.export_xlsx.write_lock".format(book_id),
+                )
+                next_resources = _ensure_next_resources()
+                next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
+                next_book_cfg = dict(cast("Dict[str, Any]", next_books.get(str(raw_book_id)) or book_cfg))
+                next_export_cfg = dict(export_cfg)
+                next_export_cfg.pop("write_lock", None)
+                next_book_cfg[BOOK_KEYS["export_xlsx"]] = next_export_cfg
+                next_books[str(raw_book_id)] = next_book_cfg
+                next_resources[RESOURCES_KEYS["books"]] = next_books
+
+        return config if next_config is None else next_config
+
     @staticmethod
     def _strip_removed_demand_runtime_policy_top_level(
         cleaned: Dict[str, Any],
@@ -393,6 +489,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         config = self._error_and_strip_removed_demand_runtime_policy_fields(config, errors)
         config = self._error_and_strip_removed_output_extras_fields(config, errors)
         config = self._error_and_strip_removed_output_write_workbook_fields(config, errors)
+        config = self._error_and_strip_removed_resources_write_lock_fields(config, errors)
         raw = RawDemand.from_raw(config)
 
         self._validate_required_fields(raw.data, errors)
@@ -678,6 +775,14 @@ class ConfigValidator(ValidatorFieldsMixin):
                 file_id = str(raw_file_id or "").strip()
                 if not file_id or not isinstance(raw_file_cfg, dict):
                     continue
+                # 语义升级: `path` 应为 `output root` 目录 (旧语义常见为 `./out/detail.csv`)
+                path_value = cast("Any", raw_file_cfg).get("path")
+                if isinstance(path_value, str) and Path(path_value).suffix.lower() == ".csv":
+                    msg = (
+                        "resources.files.{}.path now expects an output root directory, not a file path. "
+                        "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+                    ).format(file_id)
+                    self._add_error(errors, msg, path="resources.files.{}.path".format(file_id))
                 path_raw = cast("Any", raw_file_cfg).get("path")
                 if not isinstance(path_raw, dict):
                     continue
@@ -697,8 +802,16 @@ class ConfigValidator(ValidatorFieldsMixin):
             if not book_id or not isinstance(raw_book_cfg, dict):
                 continue
             book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+            kind_raw = book_cfg.get(BOOK_KEYS["kind"])
+            kind = str(kind_raw or "").strip()
             for suffix in ("path",):
                 path_raw = book_cfg.get(suffix)
+                if kind == "xlsx_file" and isinstance(path_raw, str) and Path(path_raw).suffix.lower() == ".xlsx":
+                    msg = (
+                        "resources.books.{}.path now expects an output root directory, not a file path. "
+                        "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+                    ).format(book_id)
+                    self._add_error(errors, msg, path="resources.books.{}.path".format(book_id))
                 if not isinstance(path_raw, dict):
                     continue
                 try:
@@ -712,6 +825,12 @@ class ConfigValidator(ValidatorFieldsMixin):
             if not isinstance(export_raw, dict):
                 continue
             export_path_raw = cast("Dict[str, Any]", export_raw).get("path")
+            if kind == "xlsx_memory" and isinstance(export_path_raw, str) and Path(export_path_raw).suffix.lower() == ".xlsx":
+                msg = (
+                    "resources.books.{}.export_xlsx.path now expects an output root directory, not a file path. "
+                    "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+                ).format(book_id)
+                self._add_error(errors, msg, path="resources.books.{}.export_xlsx.path".format(book_id))
             if not isinstance(export_path_raw, dict):
                 continue
             try:

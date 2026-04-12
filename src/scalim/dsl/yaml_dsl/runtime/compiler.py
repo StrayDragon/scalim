@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
+from ....events import generate_run_id
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
@@ -243,16 +244,10 @@ def _parse_output_extra_sheet_override(
         msg = "{}.allow_formulas must be a bool".format(path)
         raise TypeError(msg)
 
-    write_lock = raw.write_lock
-    if write_lock is not None and not isinstance(write_lock, bool):
-        msg = "{}.write_lock must be a bool".format(path)
-        raise TypeError(msg)
-
     return OutputExtraSheetConfig(
         path=resolved_path,
         sheet=sheet,
         allow_formulas=allow_formulas,
-        write_lock=write_lock,
     )
 
 
@@ -826,22 +821,15 @@ def _overlay_book_export_xlsx_override(
             raise ValueError(msg)
         export_path = _parse_non_empty_path_or_init_var(override.path, path="{}.path".format(path))
         return BookExportXlsxConfig(
-            path=export_path,
-            write_lock=bool(override.write_lock) if override.write_lock is not None else False,
-            allow_formulas=bool(override.allow_formulas) if override.allow_formulas is not None else False,
+            path=export_path, allow_formulas=bool(override.allow_formulas) if override.allow_formulas is not None else False
         )
 
     export_path_any: Any = base.path
     if override.path is not None:
         export_path_any = _parse_non_empty_path_or_init_var(override.path, path="{}.path".format(path))
 
-    write_lock = base.write_lock if override.write_lock is None else bool(override.write_lock)
     allow_formulas = base.allow_formulas if override.allow_formulas is None else bool(override.allow_formulas)
-    return BookExportXlsxConfig(
-        path=export_path_any,
-        write_lock=bool(write_lock),
-        allow_formulas=bool(allow_formulas),
-    )
+    return BookExportXlsxConfig(path=export_path_any, allow_formulas=bool(allow_formulas))
 
 
 def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
@@ -855,7 +843,6 @@ def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
     budget = base.budget if base is not None else None
     export_xlsx = base.export_xlsx if base is not None else None
     allow_formulas = bool(base.allow_formulas) if base is not None else False
-    write_lock = bool(base.write_lock) if base is not None else False
     write_defaults = base.write_defaults if base is not None else None
 
     if override.kind is not None:
@@ -874,11 +861,6 @@ def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
             msg = "{}.allow_formulas must be a bool".format(path)
             raise TypeError(msg)
         allow_formulas = bool(override.allow_formulas)
-    if override.write_lock is not None:
-        if not isinstance(override.write_lock, bool):
-            msg = "{}.write_lock must be a bool".format(path)
-            raise TypeError(msg)
-        write_lock = bool(override.write_lock)
 
     if override.budget is not None:
         budget = _overlay_book_budget_override(budget, override.budget, path="{}.budget".format(path))
@@ -904,8 +886,8 @@ def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
             raise ValueError(msg)
 
     if kind == "xlsx_memory":
-        if override.path is not None or override.allow_formulas is not None or override.write_lock is not None:
-            msg = "{}.path/allow_formulas/write_lock are not allowed for kind=xlsx_memory (use export_xlsx.*)".format(path)
+        if override.path is not None or override.allow_formulas is not None:
+            msg = "{}.path/allow_formulas are not allowed for kind=xlsx_memory (use export_xlsx.*)".format(path)
             raise ValueError(msg)
         if budget is None:
             msg = "{}.budget is required for kind=xlsx_memory".format(path)
@@ -916,9 +898,6 @@ def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
         if allow_formulas:
             msg = "{}.allow_formulas is not allowed for kind=xlsx_memory".format(path)
             raise ValueError(msg)
-        if write_lock:
-            msg = "{}.write_lock is not allowed for kind=xlsx_memory".format(path)
-            raise ValueError(msg)
 
     return BookConfig(
         kind=str(kind),
@@ -926,7 +905,6 @@ def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
         budget=budget,
         export_xlsx=export_xlsx,
         allow_formulas=bool(allow_formulas),
-        write_lock=bool(write_lock),
         write_defaults=write_defaults,
     )
 
@@ -935,7 +913,6 @@ def _apply_file_override(base: Optional[FileConfig], override: FileResourceOverr
     kind = str(base.kind or "").strip() if base is not None else ""
     file_path: Any = base.path if base is not None else None
     encoding = str(base.encoding or DEFAULT_OUTPUT_ENCODING) if base is not None else DEFAULT_OUTPUT_ENCODING
-    write_lock = bool(base.write_lock) if base is not None else False
 
     if override.kind is not None:
         kind = str(override.kind or "").strip()
@@ -957,14 +934,7 @@ def _apply_file_override(base: Optional[FileConfig], override: FileResourceOverr
             msg = "{}.encoding must be a string".format(path)
             raise TypeError(msg)
         encoding = str(override.encoding).strip() or DEFAULT_OUTPUT_ENCODING
-
-    if override.write_lock is not None:
-        if not isinstance(override.write_lock, bool):
-            msg = "{}.write_lock must be a boolean".format(path)
-            raise TypeError(msg)
-        write_lock = bool(override.write_lock)
-
-    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding), write_lock=bool(write_lock))
+    return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
 
 
 def _apply_resources_override(config: DemandConfig, override: ResourcesOverride) -> DemandConfig:
@@ -1025,6 +995,7 @@ def _compile_output_composition_for_outputs(
     yaml_base_dir: str,
     options: RunOptions,
     resolver: SecurePythonReferenceResolver,
+    version_id: str,
 ) -> Optional["OutputCompositionSpec"]:
     if not effective_outputs:
         return None
@@ -1038,6 +1009,7 @@ def _compile_output_composition_for_outputs(
         compile_output_composition_from_yaml(
             config_for_outputs,
             demand_ir,
+            version_id=str(version_id),
             resolver=resolver,
             init_vars=options.init_vars,
             yaml_base_dir=str(yaml_base_dir),
@@ -1061,6 +1033,7 @@ def build_request(
     effective_config = _apply_demand_runtime_policy_overrides(effective_config, options=options)
     effective_config = _apply_output_extras_overrides(effective_config, options=options)
     effective_outputs, outputs_path = _resolve_effective_outputs_and_path(effective_config, demand_ir, options=options)
+    version_id = str(options.output_version_id) if options.output_version_id is not None else generate_run_id()
     output_composition = _compile_output_composition_for_outputs(
         effective_config,
         demand_ir,
@@ -1069,6 +1042,7 @@ def build_request(
         yaml_base_dir=str(yaml_base_dir),
         options=options,
         resolver=resolver,
+        version_id=str(version_id),
     )
 
     # 无 `outputs` 时走默认策略: 不写文件,但 `sink` 仍可捕获数据.

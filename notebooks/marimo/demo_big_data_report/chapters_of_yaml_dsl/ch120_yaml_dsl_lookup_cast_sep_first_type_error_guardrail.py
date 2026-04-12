@@ -5,8 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
-from scalim.execution.run_ir import run_ir
+from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import GuardrailCaptureObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -38,9 +37,9 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
     guardrail_capture = GuardrailCaptureObserver()
     with tempfile.TemporaryDirectory(prefix="scalim-lookup-cast-") as tmpdir:
         tmp = Path(tmpdir)
-        out_detail = tmp / "detail.csv"
+        out_root_detail = tmp / "out_detail"
 
-        init_vars: Dict[str, object] = {"out_path_detail": str(out_detail)}
+        init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
         from scalim.execution.guardrails import GuardrailsPolicy, GuardrailsRelationsPolicy
 
         guardrails = GuardrailsPolicy(
@@ -49,7 +48,7 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
             relations=GuardrailsRelationsPolicy(type_error_max_rate=0),
         )
         try:
-            compilation = compile_yaml(
+            result = run_yaml(
                 str(yaml_path),
                 options=RunOptions(
                     allowed_modules=_ALLOWED_MODULES,
@@ -59,7 +58,7 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
                     init_vars=init_vars,
                 ),
             )
-            core = run_ir(compilation.demand_ir, compilation.request)
+            core = result.core
         except Exception as exc:  # noqa: BLE001
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -69,7 +68,8 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
-        rows = _read_csv_rows(out_detail) if out_detail.exists() else []
+        detail_csv_path = Path(str((core.outputs or {}).get("detail") or ""))
+        rows = _read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
         got_codes = {s.code for s in guardrail_capture.signals if s.code}
         has_type_error_guardrail = "relation_type_error_rate_exceeded" in got_codes
 
@@ -87,7 +87,8 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
         )
         details: Dict[str, Any] = {
             "yaml_path": str(yaml_path),
-            "detail_csv": str(out_detail),
+            "out_root_detail": str(out_root_detail),
+            "detail_csv": str(detail_csv_path),
             "rows": len(rows),
             "guardrail_codes": sorted(got_codes),
             "row_2001": by_ticket.get("2001"),

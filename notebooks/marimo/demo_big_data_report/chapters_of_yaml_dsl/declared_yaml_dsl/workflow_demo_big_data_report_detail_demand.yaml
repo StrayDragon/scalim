@@ -209,7 +209,7 @@ resources:
   files:
     detail_csv:
       kind: csv_file
-      path: ./detail.csv
+      path: ./out
 
 outputs:
   - name: detail

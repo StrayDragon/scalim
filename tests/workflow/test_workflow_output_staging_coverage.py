@@ -152,10 +152,13 @@ def test_output_staging_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> N
 
 
 def test_output_staging_publish_cleans_exec_dir_by_default(tmp_path: Path) -> None:
+    from scalim.execution import versioned_outputs
     from scalim.sinks import InMemoryCsv
     from scalim.workflow.resources import WorkflowResourceManager
 
-    final_path = tmp_path / "out.csv"
+    out_root = tmp_path / "out"
+    layout = versioned_outputs.ensure_output_root_layout(out_root)
+    final_path = versioned_outputs.file_output_path(layout, version_id="wf", file_id="merged")
     manager = WorkflowResourceManager(
         workflow_exec_id="wf",
         instrumentation=_Instrumentation(),
@@ -180,15 +183,18 @@ def test_output_staging_publish_cleans_exec_dir_by_default(tmp_path: Path) -> No
     assert final_path.exists()
     assert _read_csv(final_path) == [["id"], ["1"], ["2"]]
 
-    staging_exec_dir = tmp_path / ".scalim-staging" / "wf"
+    staging_exec_dir = final_path.parent / ".scalim-staging" / "wf"
     assert not staging_exec_dir.exists()
 
 
 def test_output_staging_keep_on_success_preserves_staged_file(tmp_path: Path) -> None:
+    from scalim.execution import versioned_outputs
     from scalim.sinks import InMemoryCsv
     from scalim.workflow.resources import WorkflowResourceManager
 
-    final_path = tmp_path / "out.csv"
+    out_root = tmp_path / "out"
+    layout = versioned_outputs.ensure_output_root_layout(out_root)
+    final_path = versioned_outputs.file_output_path(layout, version_id="wf", file_id="merged")
     manager = WorkflowResourceManager(
         workflow_exec_id="wf",
         instrumentation=_Instrumentation(),
@@ -211,7 +217,7 @@ def test_output_staging_keep_on_success_preserves_staged_file(tmp_path: Path) ->
     manager.commit_all()
 
     assert final_path.exists()
-    staging_path = tmp_path / ".scalim-staging" / "wf" / "out.csv"
+    staging_path = final_path.parent / ".scalim-staging" / "wf" / final_path.name
     assert staging_path.exists()
 
 

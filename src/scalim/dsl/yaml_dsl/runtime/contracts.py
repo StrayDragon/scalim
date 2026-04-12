@@ -112,7 +112,7 @@ class RunOverrides:
     def csv_file(
         cls,
         *,
-        output_path: Union[str, "os.PathLike[str]"],
+        output_root: Union[str, "os.PathLike[str]"],
         fields: Sequence[str],
         output_name: str = "detail",
         file_id: str = "detail_csv",
@@ -120,7 +120,7 @@ class RunOverrides:
         include_header: bool = True,
         header_fields_output_by: str = "field_id",
     ) -> "RunOverrides":
-        resources = ResourcesOverride(files={str(file_id): FileResourceOverride(kind="csv_file", path=output_path, encoding=str(encoding))})
+        resources = ResourcesOverride(files={str(file_id): FileResourceOverride(kind="csv_file", path=output_root, encoding=str(encoding))})
         output = OutputOverride(
             name=str(output_name),
             fields=tuple(str(x) for x in fields),
@@ -133,13 +133,12 @@ class RunOverrides:
     def xlsx_file_single_sheet(
         cls,
         *,
-        output_path: Union[str, "os.PathLike[str]"],
+        output_root: Union[str, "os.PathLike[str]"],
         fields: Sequence[str],
         sheet: str,
         output_name: str = "detail",
         book_id: str = "report",
         allow_formulas: bool = False,
-        write_lock: bool = False,
         include_header: bool = True,
         header_fields_output_by: str = "field_id",
     ) -> "RunOverrides":
@@ -148,9 +147,8 @@ class RunOverrides:
             books={
                 str(book_id): BookResourceOverride(
                     kind="xlsx_file",
-                    path=output_path,
+                    path=output_root,
                     allow_formulas=bool(allow_formulas),
-                    write_lock=bool(write_lock),
                     write_defaults=BookWriteDefaultsOverride(mode="sheet"),
                 )
             }
@@ -197,7 +195,6 @@ class OutputExtraSheetOverride:
     path: Optional[Union[str, "os.PathLike[str]"]] = None
     sheet: Optional[str] = None
     allow_formulas: Optional[bool] = None
-    write_lock: Optional[bool] = None
 
     def __post_init__(self) -> None:
         sheet = str(self.sheet).strip() if self.sheet is not None else None
@@ -269,7 +266,6 @@ class BookBudgetOverride:
 @dataclass(frozen=True)
 class BookExportXlsxOverride:
     path: Optional[Union[str, "os.PathLike[str]"]] = None
-    write_lock: Optional[bool] = None
     allow_formulas: Optional[bool] = None
 
 
@@ -280,7 +276,6 @@ class BookResourceOverride:
     budget: Optional[BookBudgetOverride] = None
     export_xlsx: Optional[BookExportXlsxOverride] = None
     allow_formulas: Optional[bool] = None
-    write_lock: Optional[bool] = None
     write_defaults: Optional[BookWriteDefaultsOverride] = None
 
 
@@ -289,7 +284,6 @@ class FileResourceOverride:
     kind: Optional[str] = None
     path: Optional[Union[str, "os.PathLike[str]"]] = None
     encoding: Optional[str] = None
-    write_lock: Optional[bool] = None
 
 
 @dataclass(frozen=True)
@@ -423,6 +417,14 @@ class RunOptions:
 
     init_vars: Optional[Dict[str, object]] = None
     """可选:初始化变量注入(编译期使用,用于解析 `params` 中的 `{$init_var: <name>}` 指令节点)."""
+
+    output_version_id: Optional[str] = None
+    """可选:覆盖版本化输出(`D-2`)的 `version_id`.
+
+    约定:
+    - 独立 `demand`: 默认由框架生成随机 `run_id` 并作为 `version_id`
+    - `workflow`: 由 `run_workflow` 注入 `workflow_exec_id` 作为 `version_id`
+    """
 
     template_vars: Optional[Mapping[str, object]] = None
     """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""

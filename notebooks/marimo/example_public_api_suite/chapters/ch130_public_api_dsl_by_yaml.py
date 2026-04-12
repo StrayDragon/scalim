@@ -24,7 +24,7 @@ def _write_text(path: Path, text: str) -> None:
 def _write_duplicate_headers_workflow_fixture(tmp: Path) -> Path:
     demand_path = tmp / "duplicate_headers.demand.yaml"
     workflow_path = tmp / "duplicate_headers.workflow.yaml"
-    output_path = tmp / "duplicate_headers.csv"
+    output_root = tmp / "duplicate_headers_out"
 
     _write_text(
         demand_path,
@@ -51,7 +51,7 @@ outputs:
     to: {file: detail_csv}
     fields: [item_id, dim_id]
 """
-        % str(output_path),
+        % str(output_root),
     )
     _write_text(
         workflow_path,
@@ -187,7 +187,7 @@ workflow:
 
         sink = InMemoryRowSink()
         overrides = api.RunOverrides.csv_file(
-            output_path=str(tmp / "out.csv"),
+            output_root=str(tmp / "out"),
             fields=["item_id", "dim_id"],
             header_fields_output_by="name",
         )
@@ -247,7 +247,17 @@ workflow:
         )
         duplicate_global_errors = duplicate_global.errors()
         duplicate_patch_errors = duplicate_patch.errors()
-        duplicate_output_exists = (tmp / "duplicate_headers.csv").exists()
+        try:
+            from scalim.execution import versioned_outputs
+
+            dup_root = tmp / "duplicate_headers_out"
+            latest = versioned_outputs.read_latest(dup_root)
+            version_id = str(latest.get("version_id", "") or "")
+            manifest = versioned_outputs.read_version_manifest(dup_root, version_id=version_id)
+            file_relpath = str((manifest.get("files", {}) or {}).get("detail_csv", "") or "")
+            duplicate_output_exists = bool(file_relpath and (dup_root / "versions" / version_id / file_relpath).exists())
+        except Exception:
+            duplicate_output_exists = False
         passed = bool(
             not errors
             and not duplicate_global_errors

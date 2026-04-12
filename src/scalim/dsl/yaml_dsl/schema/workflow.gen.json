@@ -301,7 +301,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -320,23 +320,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "导出 xlsx 的输出路径(字符串或 {$init_var: <name>})",
+          "description": "导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
-            "./output/report.xlsx",
+            "./output",
             {
-              "$init_var": "output_path"
+              "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "写锁(导出时;默认 false).",
-          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.write_lock\n\n写锁(导出时;默认 false).",
-          "default": false,
-          "examples": [
-            false
-          ]
+          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
@@ -447,7 +438,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -466,14 +457,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "xlsx_file: 输出路径(字符串或 {$init_var: <name>})",
+          "description": "xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
-            "./output/report.xlsx",
+            "./output",
             {
-              "$init_var": "output_path"
+              "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.path\n\nxlsx_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
+          "markdownDescription": "#### workflow.resources.books.*.path\n\nxlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "budget": {
           "description": "xlsx_memory: 预算配置(必填)",
@@ -497,15 +488,6 @@
           "type": "boolean",
           "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "markdownDescription": "#### workflow.resources.books.*.allow_formulas\n\nxlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "default": false,
-          "examples": [
-            false
-          ]
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "xlsx_file: 写锁(默认 false).",
-          "markdownDescription": "#### workflow.resources.books.*.write_lock\n\nxlsx_file: 写锁(默认 false).",
           "default": false,
           "examples": [
             false
@@ -572,9 +554,6 @@
               },
               "allow_formulas": {
                 "not": {}
-              },
-              "write_lock": {
-                "not": {}
               }
             }
           }
@@ -600,7 +579,7 @@
             {
               "type": "string",
               "minLength": 1,
-              "description": "输出文件路径(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
             },
             {
               "type": "object",
@@ -619,14 +598,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "csv_file: 输出路径(字符串或 {$init_var: <name>})",
+          "description": "csv_file: 输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
-            "./output/report.xlsx",
+            "./output",
             {
-              "$init_var": "output_path"
+              "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.files.*.path\n\ncsv_file: 输出路径(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output/report.xlsx\n```\n```yaml\n$init_var: output_path\n```"
+          "markdownDescription": "#### workflow.resources.files.*.path\n\ncsv_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "encoding": {
           "type": "string",
@@ -635,15 +614,6 @@
           "default": "utf-8",
           "examples": [
             "utf-8"
-          ]
-        },
-        "write_lock": {
-          "type": "boolean",
-          "description": "csv_file: 写锁(默认 false).",
-          "markdownDescription": "#### workflow.resources.files.*.write_lock\n\ncsv_file: 写锁(默认 false).",
-          "default": false,
-          "examples": [
-            false
           ]
         }
       },

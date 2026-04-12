@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
     get_config,
@@ -51,9 +52,14 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: p
         assert not result.errors()
         assert get_workflow_preload_counter_calls() == 1
 
-        detail_csv = tmp_path / "detail.csv"
-        metrics_csv = tmp_path / "metrics.csv"
-        report_xlsx = tmp_path / "report.xlsx"
+        out_root = tmp_path / "out"
+        latest = versioned_outputs.read_latest(out_root)
+        version_id = str(latest["version_id"])
+        version_dir = out_root / "versions" / version_id
+
+        detail_csv = version_dir / "files" / "detail_csv.csv"
+        metrics_csv = version_dir / "files" / "metrics_csv.csv"
+        report_xlsx = version_dir / "books" / "report.xlsx"
         assert detail_csv.exists()
         assert metrics_csv.exists()
         assert report_xlsx.exists()

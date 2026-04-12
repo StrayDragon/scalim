@@ -3,7 +3,6 @@ import concurrent.futures
 import contextlib
 import json
 import sys
-import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -15,6 +14,7 @@ from ..events import (
     generate_run_id,
 )
 from ..exceptions import ScalimWorkflowError
+from ..execution import versioned_outputs
 from ..execution.adaptive.capture import HookCaptureManager, HookRecordedEvent
 from ..execution.run_ir import ExecutionRequest, ExecutionResult, run_ir
 from ..execution.workflow_cache_pool import WorkflowCachePool
@@ -60,7 +60,6 @@ from .input_artifacts import (
 )
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
 from .resources import ScalimWorkflowWriteError, SheetBookDef, WorkflowResourceManager
-from .resources_base import WorkflowResourceWaitDiagnostics
 from .visibility_index import WorkflowVisibilityIndex
 
 
@@ -99,7 +98,6 @@ class WorkflowCtxStore:
     _values_by_producer_node_id: Dict[str, Dict[str, object]]
     _value_bytes_by_producer_node_id: Dict[str, Dict[str, int]]
     _total_bytes: int
-    _lock: threading.Lock
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
         self._guardrails = workflow_ir.options.ctx
@@ -108,7 +106,6 @@ class WorkflowCtxStore:
         self._values_by_producer_node_id = {}
         self._value_bytes_by_producer_node_id = {}
         self._total_bytes = 0
-        self._lock = threading.Lock()
 
     def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
         return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
@@ -132,25 +129,24 @@ class WorkflowCtxStore:
             )
             raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
 
-        with self._lock:
-            by_key = self._values_by_producer_node_id.setdefault(node_id, {})
-            by_key_bytes = self._value_bytes_by_producer_node_id.setdefault(node_id, {})
-            prev_bytes = int(by_key_bytes.get(ctx_key, 0))
+        by_key = self._values_by_producer_node_id.setdefault(node_id, {})
+        by_key_bytes = self._value_bytes_by_producer_node_id.setdefault(node_id, {})
+        prev_bytes = int(by_key_bytes.get(ctx_key, 0))
 
-            next_total = int(self._total_bytes) - prev_bytes + int(value_bytes)
-            max_bytes = int(self._guardrails.max_bytes)
-            if next_total > max_bytes:
-                msg = "ctx total bytes exceeded: adding node={}, key={} would make total_bytes={} > max_bytes={}".format(
-                    node_id,
-                    ctx_key,
-                    next_total,
-                    max_bytes,
-                )
-                raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
+        next_total = int(self._total_bytes) - prev_bytes + int(value_bytes)
+        max_bytes = int(self._guardrails.max_bytes)
+        if next_total > max_bytes:
+            msg = "ctx total bytes exceeded: adding node={}, key={} would make total_bytes={} > max_bytes={}".format(
+                node_id,
+                ctx_key,
+                next_total,
+                max_bytes,
+            )
+            raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
 
-            by_key[ctx_key] = ctx_value
-            by_key_bytes[ctx_key] = int(value_bytes)
-            self._total_bytes = int(next_total)
+        by_key[ctx_key] = ctx_value
+        by_key_bytes[ctx_key] = int(value_bytes)
+        self._total_bytes = int(next_total)
 
     def resolve(self, consumer_node_id: str, *, node: str, key: str, path: str) -> object:
         consumer = str(consumer_node_id)
@@ -166,12 +162,11 @@ class WorkflowCtxStore:
             msg = "ctx key '{}' from node '{}' is not visible to node '{}' (declare depends_on)".format(ctx_key, producer, consumer)
             raise ScalimWorkflowConfigError(msg, path=path)
 
-        with self._lock:
-            by_key = self._values_by_producer_node_id.get(producer) or {}
-            if ctx_key not in by_key:
-                msg = "Unknown ctx key '{}' for node '{}'".format(ctx_key, producer)
-                raise ScalimWorkflowConfigError(msg, path=path)
-            return by_key[ctx_key]
+        by_key = self._values_by_producer_node_id.get(producer) or {}
+        if ctx_key not in by_key:
+            msg = "Unknown ctx key '{}' for node '{}'".format(ctx_key, producer)
+            raise ScalimWorkflowConfigError(msg, path=path)
+        return by_key[ctx_key]
 
 
 def _is_list(value: object) -> TypeGuard[List[object]]:
@@ -692,15 +687,44 @@ def _options_bool(opts: object, key: str, *, default: bool = False) -> bool:
     return bool(opts.get(str(key), default))
 
 
-def _build_workflow_resource_defs(  # noqa: PLR0915
+def _build_workflow_resource_defs(  # noqa: C901, PLR0915
     workflow_ir: WorkflowIr,
-) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, bool], Dict[str, str], Dict[str, bool], Dict[str, SheetBookDef]]:
+    *,
+    workflow_exec_id: str,
+) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, str], Dict[str, SheetBookDef]]:
     workbook_defs: Dict[str, str] = {}
     workbook_allow_formulas_by_id: Dict[str, bool] = {}
-    workbook_write_lock_by_id: Dict[str, bool] = {}
     csv_defs: Dict[str, str] = {}
-    csv_write_lock_by_id: Dict[str, bool] = {}
     sheetbook_defs: Dict[str, SheetBookDef] = {}
+
+    layouts_by_root: Dict[str, versioned_outputs.OutputRootLayout] = {}
+
+    def _layout_for_root(output_root: str, *, path: str) -> versioned_outputs.OutputRootLayout:
+        root_str = str(output_root or "").strip()
+        if not root_str:
+            msg = "Output root must be a non-empty string"
+            raise ScalimWorkflowConfigError(msg, path=str(path))
+
+        root_norm = str(Path(root_str).expanduser())
+        layout = layouts_by_root.get(root_norm)
+        if layout is not None:
+            return layout
+
+        try:
+            layout = versioned_outputs.ensure_output_root_layout(Path(root_norm))
+            _ = versioned_outputs.ensure_version_dir(layout, version_id=str(workflow_exec_id))
+        except FileExistsError as exc:
+            msg = (
+                "Version directory already exists (possible concurrent writers or reused workflow_exec_id): "
+                "root={!r}, workflow_exec_id={!r}"
+            ).format(root_norm, str(workflow_exec_id))
+            raise ScalimWorkflowConfigError(msg, path=str(path)) from exc
+        except OSError as exc:
+            msg = "Failed to prepare output root for workflow run: {}: {}".format(type(exc).__name__, exc)
+            raise ScalimWorkflowConfigError(msg, path=str(path)) from exc
+
+        layouts_by_root[root_norm] = layout
+        return layout
 
     for res in workflow_ir.resources:
         res_type = str(res.resource_type)
@@ -711,9 +735,11 @@ def _build_workflow_resource_defs(  # noqa: PLR0915
                 raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
             kind = str(opts.get("kind") or "").strip()
             if kind == "xlsx_file":
-                workbook_defs[str(res.resource_id)] = str(res.path)
+                output_root = str(res.path or "")
+                layout = _layout_for_root(output_root, path="workflow.resources.books.{}.path".format(str(res.resource_id)))
+                final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
+                workbook_defs[str(res.resource_id)] = str(final_path)
                 workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", False))
-                workbook_write_lock_by_id[str(res.resource_id)] = bool(opts.get("write_lock", False))
                 continue
             if kind == "xlsx_memory":
                 budget_obj = opts.get("budget")
@@ -723,15 +749,17 @@ def _build_workflow_resource_defs(  # noqa: PLR0915
 
                 export_cfg_obj = opts.get("export_xlsx")
                 export_cfg_dict: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-                export_write_lock = bool(export_cfg_dict.get("write_lock", False))
                 export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", False))
                 export_path = str(res.path or "").strip() or None
+                if export_path is not None:
+                    layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
+                    final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
+                    export_path = str(final_path)
                 sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                     resource_id=str(res.resource_id),
                     budget_max_sheets=int(max_sheets),
                     budget_max_total_cells=int(max_total_cells),
                     export_path=str(export_path) if export_path is not None else None,
-                    export_write_lock=bool(export_write_lock),
                     export_allow_formulas=bool(export_allow_formulas),
                 )
                 continue
@@ -740,16 +768,19 @@ def _build_workflow_resource_defs(  # noqa: PLR0915
             raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
 
         if res_type == "workbook":
-            workbook_defs[str(res.resource_id)] = str(res.path)
+            output_root = str(res.path or "")
+            layout = _layout_for_root(output_root, path="workflow.resources.workbooks.{}.path".format(str(res.resource_id)))
+            final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
+            workbook_defs[str(res.resource_id)] = str(final_path)
             opts = res.options or {}
             workbook_allow_formulas_by_id[str(res.resource_id)] = _options_bool(opts, "allow_formulas", default=False)
-            workbook_write_lock_by_id[str(res.resource_id)] = True
             continue
 
         if res_type == "csv":
-            csv_defs[str(res.resource_id)] = str(res.path)
-            opts = res.options or {}
-            csv_write_lock_by_id[str(res.resource_id)] = _options_bool(opts, "write_lock", default=False)
+            output_root = str(res.path or "")
+            layout = _layout_for_root(output_root, path="workflow.resources.files.{}.path".format(str(res.resource_id)))
+            final_path = versioned_outputs.file_output_path(layout, version_id=str(workflow_exec_id), file_id=str(res.resource_id))
+            csv_defs[str(res.resource_id)] = str(final_path)
             continue
 
         if res_type == "sheetbook":
@@ -761,20 +792,22 @@ def _build_workflow_resource_defs(  # noqa: PLR0915
 
             export_cfg_obj = opts.get("export_xlsx")
             sheetbook_export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-            export_write_lock = bool(sheetbook_export_cfg.get("write_lock", False))
             export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", False))
             export_path = str(res.path or "").strip() or None
+            if export_path is not None:
+                layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
+                final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
+                export_path = str(final_path)
             sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                 resource_id=str(res.resource_id),
                 budget_max_sheets=int(max_sheets),
                 budget_max_total_cells=int(max_total_cells),
                 export_path=str(export_path) if export_path is not None else None,
-                export_write_lock=bool(export_write_lock),
                 export_allow_formulas=bool(export_allow_formulas),
             )
             continue
 
-    return workbook_defs, workbook_allow_formulas_by_id, workbook_write_lock_by_id, csv_defs, csv_write_lock_by_id, sheetbook_defs
+    return workbook_defs, workbook_allow_formulas_by_id, csv_defs, sheetbook_defs
 
 
 def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, FrozenSet[str]]:
@@ -867,29 +900,16 @@ def _prepare_workflow_run_ir(
         (
             workbook_defs,
             workbook_allow_formulas_by_id,
-            workbook_write_lock_by_id,
             csv_defs,
-            csv_write_lock_by_id,
             sheetbook_defs,
-        ) = _build_workflow_resource_defs(workflow_ir)
-        diagnostics_ir = workflow_ir.options.resources_wait.diagnostics
-        wait_diagnostics = WorkflowResourceWaitDiagnostics(
-            enabled=bool(diagnostics_ir.enabled),
-            warn_after_s=float(diagnostics_ir.warn_after_s),
-            repeat_every_s=float(diagnostics_ir.repeat_every_s) if diagnostics_ir.repeat_every_s is not None else None,
-            capture_owner_callsite=bool(diagnostics_ir.capture_owner_callsite),
-        )
+        ) = _build_workflow_resource_defs(workflow_ir, workflow_exec_id=str(workflow_exec_id))
         resource_manager = WorkflowResourceManager(
             workflow_exec_id=workflow_exec_id,
             instrumentation=workflow_instrumentation,
             workbook_defs=workbook_defs,
             workbook_allow_formulas=workbook_allow_formulas_by_id,
-            workbook_write_lock=workbook_write_lock_by_id,
             csv_defs=csv_defs,
-            csv_write_lock=csv_write_lock_by_id,
             sheetbook_defs=sheetbook_defs,
-            wait_diagnostics=wait_diagnostics,
-            max_wait_s=float(workflow_ir.options.resources_wait.max_wait_s),
             output_staging_dir_name=str(workflow_ir.options.output_staging.dir_name),
             output_staging_keep_on_success=bool(workflow_ir.options.output_staging.keep_on_success),
             output_staging_keep_on_failure=bool(workflow_ir.options.output_staging.keep_on_failure),

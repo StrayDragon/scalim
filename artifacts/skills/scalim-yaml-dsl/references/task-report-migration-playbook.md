@@ -115,7 +115,7 @@ main_source:
 
 - 先用 YAML 描述整张宽表(字段/关联/派生字段)
 - 用多个 `outputs` + `where` 分发到不同 sheet
-- 多目标共享同一 workbook 时,为每个 output 显式设置 `to.book/to.sheet` 并建议开启 `write_lock: true`
+- 多目标共享同一 workbook 时,为每个 output 显式设置 `to.book/to.sheet`;并发写同一 output root 依赖“版本目录隔离”(读取 `<root>/manifest/latest.json` 或指定版本目录定位产物)
 - 只有在需要复杂格式/样式/跨 sheet 自定义公式等能力时,才保留薄 Python 组装层
 
 ## 方案阶段输出要求

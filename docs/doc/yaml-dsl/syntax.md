@@ -146,7 +146,7 @@ resources:
   books:
     report:
       $import: io.report_book
-      path: ./output/report.xlsx
+      path: ./output
 ```
 
 一个带 `scalim.yaml` 目录别名的示例:
@@ -297,8 +297,7 @@ resources:
   books:
     report:
       kind: xlsx_file
-      path: ./out.xlsx
-      write_lock: true
+      path: ./out
 
 _templates:
   report_to: &report_to {book: report}
