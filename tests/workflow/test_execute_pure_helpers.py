@@ -5,18 +5,19 @@ from scalim.events import (
     Event,
 )
 from scalim.events._events import WorkflowResourceCommitEvent
-from scalim.workflow import execute as execute_mod
+from scalim.workflow import execute_controller as controller_mod
+from scalim.workflow._internal.replay_event_classification import classify_workflow_events_for_replay
 from scalim.workflow.resources_base import ScalimWorkflowWriteError
 
 
 def test_build_workflow_run_error_and_outcome_preserves_diff_for_write_error() -> None:
     exc = ScalimWorkflowWriteError("boom", diff=["a", "b"])
-    err = execute_mod._build_workflow_run_error(exc, run_id="r1", demand_path="d1")
+    err = controller_mod._build_workflow_run_error(exc, run_id="r1", demand_path="d1")
     assert err.run_id == "r1"
     assert err.demand_path == "d1"
     assert err.diff == ["a", "b"]
 
-    outcome = execute_mod._build_workflow_error_outcome(exc, run_id="r1", demand_path="d1")
+    outcome = controller_mod._build_workflow_error_outcome(exc, run_id="r1", demand_path="d1")
     assert outcome.run_id == "r1"
     assert outcome.demand_path == "d1"
     assert outcome.result is None
@@ -77,7 +78,7 @@ def test_classify_workflow_events_for_replay_buckets() -> None:
         Event(event_type="workflow_finished", timestamp=0.0, run_id="wf", payload=None, meta={}, seq=8),
     ]
 
-    buckets = execute_mod._classify_workflow_events_for_replay(events, known_node_ids={"n1"})
+    buckets = classify_workflow_events_for_replay(events, known_node_ids={"n1"})
     assert buckets.started_events == [events[0]]
     assert buckets.finished_events == [events[-1]]
     assert buckets.resource_commit_events == [events[6]]

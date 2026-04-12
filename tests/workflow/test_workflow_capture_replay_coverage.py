@@ -21,6 +21,7 @@ from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
 from scalim.ob.presets._internal.viz_config import VizObserverConfig
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+from scalim.workflow import execute_controller as controller_mod
 from scalim.workflow import execute as execute_mod
 
 
@@ -75,7 +76,7 @@ def _make_workflow_ir_single_node(node_id: str) -> WorkflowIr:
 
 
 def test_build_demand_replay_instrumentation_returns_none_without_request_and_viz() -> None:
-    hub = execute_mod._build_demand_replay_instrumentation(None, None, workflow_components=())
+    hub = controller_mod._build_demand_replay_instrumentation(None, None, workflow_components=())
     assert hub is None
 
 

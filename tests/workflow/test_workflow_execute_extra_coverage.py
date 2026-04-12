@@ -473,14 +473,17 @@ def test_workflow_try_submit_ready_reraises_config_error() -> None:
     import concurrent.futures
 
     from scalim.spec.ir._workflow import (
-        WorkflowAnyNodeIr,
         WorkflowArtifactsIr,
         WorkflowIr,
         WorkflowNodeIr,
         WorkflowNodeType,
         WorkflowOptionsIr,
     )
+    from scalim.hooks import HookManager
+    from scalim.ob.hub import InstrumentationHub
+    from scalim.ob.manager import ObserverManager
     from scalim.workflow import execute as workflow_execute_mod
+    from scalim.workflow.execute_controller import WorkflowRunController
 
     node = WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="demand.yaml")
     workflow_ir = WorkflowIr(
@@ -495,51 +498,42 @@ def test_workflow_try_submit_ready_reraises_config_error() -> None:
     def _compile_demand(*_args: object, **_kwargs: object) -> object:
         raise workflow_execute_mod.ScalimWorkflowConfigError("boom", path="workflow.runs")
 
-    ready_queue = ["a"]
-    submitted: dict = {}
-    node_by_id = {"a": node}  # type: ignore[var-annotated]
-    node_state: dict = {}
-    index_by_node_id = {"a": 0}
-    outcomes = [None]
-    failed_outcome_holder = [None]
-    failed_exc_holder = [None]
-
-    def _emit_start(_node: WorkflowAnyNodeIr) -> None:
-        return
-
-    def _emit_end(*_args: object, **_kwargs: object) -> None:
-        return
+    workflow_instrumentation = InstrumentationHub(
+        hook_manager=HookManager(),
+        observer_manager=ObserverManager(run_id="wf_test"),
+    )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="boom"):
-            workflow_execute_mod._workflow_try_submit_ready(
-                executor,
-                ready_queue=ready_queue,
-                submitted=submitted,
+            controller = WorkflowRunController.build_for_prepared_run(
+                executor=executor,
+                workflow_exec_id="wf_test",
+                workflow_ir=workflow_ir,
+                artifacts_dir=artifacts_dir,
+                ctx_store=object(),  # 该用例不触发 ctx 渲染
                 max_concurrency=1,
                 failure_policy="all_fail",
-                failed_outcome_holder=failed_outcome_holder,
-                failed_exc_holder=failed_exc_holder,
-                node_by_id=node_by_id,
-                node_state=node_state,
-                index_by_node_id=index_by_node_id,
-                outcomes=outcomes,
-                workflow_exec_id="wf",
-                workflow_cache_pool=None,
-                compile_demand_fn=_compile_demand,
-                artifacts_dir=artifacts_dir,
-                ctx_store=object(),
                 bundle_viz_base_config=None,
+                workflow_instrumentation=workflow_instrumentation,
+                workflow_cache_pool=None,
+                resource_manager=object(),  # 不会触发资源写入
                 write_output_ids_by_run_id={},
+                write_consumers_remaining_by_output_key={},
                 main_rows_consumers_remaining_by_run_id={},
-                resource_manager=object(),
-                run_one=lambda _request, _node_id: object(),
-                emit_workflow_node_start=_emit_start,
-                emit_workflow_node_end=_emit_end,
-                maybe_release_workflow_main_rows_artifact=lambda _node: None,
-                on_terminal=lambda *_args, **_kwargs: None,
-                cancel_all_not_started_due_to_all_fail=lambda: None,
+                captured_demand_events_by_node_id={},
+                captured_demand_hook_events_by_node_id={},
+                captured_demand_viz_observer_by_node_id={},
+                captured_demand_request_by_node_id={},
+                compile_demand_node_fn=workflow_execute_mod._compile_demand_node,
+                compile_demand_fn=_compile_demand,
+                build_demand_run_result_fn=None,
+                run_ir_fn=workflow_execute_mod.run_ir,
+                run_workflow_write_node_fn=workflow_execute_mod._run_workflow_write_node,
+                capture_observability=False,
+                workflow_replay_instrumentation=None,
+                workflow_components=(),
             )
+            controller.submit_ready_nodes()
 
 
 def test_workflow_artifacts_directory_get_optional_variants() -> None:
