@@ -5,6 +5,7 @@ import pytest
 
 from scalim.execution.adaptive import loadref_scheduler
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
+from scalim.execution.adaptive.strategy_unit import collect_layer_executable_ops
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.runtime_bindings import RuntimeBindings
@@ -16,7 +17,7 @@ from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import LookupStepIr
 from scalim.spec.ir import KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
-from scalim.utils.relation_signature import has_rows_binding
+from scalim.utils.relation_signature import build_relation_signature, has_rows_binding
 from tests.support.testing_utils import InlineExecutor, NoOpLoadRefExecutor, RecordingLoadRefExecutor
 
 
@@ -93,6 +94,28 @@ def test_has_rows_binding_handles_missing_and_rows() -> None:
     )
 
     assert has_rows_binding(op.lookup_steps) is True
+
+
+def test_collect_layer_executable_ops_skips_executed_group_and_calls_after_operator() -> None:
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
+    op = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source),))
+    plan = ExecutionPlan()
+    runtime = _make_runtime(plan, main_source=None)
+    runtime.load_ref_group_executed.add(build_relation_signature(op.lookup_steps))
+
+    after_calls: List[str] = []
+
+    def _after(operator: LoadRefOperatorIr) -> None:
+        after_calls.append(operator.field_key)
+
+    skipped_field_keys, executable_ops = collect_layer_executable_ops((op,), runtime=runtime, after_operator=_after)
+    assert skipped_field_keys == {"a"}
+    assert executable_ops == []
+    assert after_calls == ["a"]
 
 
 def test_adaptive_scheduler_repr_and_empty_ops_returns() -> None:
