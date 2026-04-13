@@ -178,6 +178,30 @@ def test_adaptive_policy_decisions_and_pool_selection() -> None:
 
     tuning = AdaptiveTuning(min_parallel_tasks_per_layer=2)
     decision = policy.decide_layer_parallelism(
+        [op, op],
+        tuning=tuning,
+        runtime=runtime,
+        pool_is_available=True,
+        resolved_max_workers=4,
+        layer_lookup_keys={"a": 3, "b": 3},
+    )
+    assert decision.should_parallelize is True
+    assert decision.reason is None
+
+    tuning = AdaptiveTuning(min_lookup_keys_per_task=3, min_parallel_tasks_per_layer=2)
+    decision = policy.decide_layer_parallelism(
+        [op, op],
+        tuning=tuning,
+        runtime=runtime,
+        pool_is_available=True,
+        resolved_max_workers=4,
+        layer_lookup_keys={"a": 3, "b": 3},
+    )
+    assert decision.should_parallelize is True
+    assert decision.reason is None
+
+    tuning = AdaptiveTuning(min_parallel_tasks_per_layer=2)
+    decision = policy.decide_layer_parallelism(
         [op, op], tuning=tuning, runtime=runtime, pool_is_available=True, resolved_max_workers=4, layer_lookup_keys=None
     )
     assert decision.should_parallelize is True
