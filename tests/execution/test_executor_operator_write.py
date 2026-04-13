@@ -55,6 +55,31 @@ def test_write_column_operator_writes_column_and_emits_hooks() -> None:
     assert len(hook.field_slims) == 1
 
 
+def test_write_column_operator_does_not_release_field_when_release_disabled() -> None:
+    runtime = _make_runtime(ExecutionPlan(), None)
+    runtime.batch_num = 4
+    runtime.sink = InMemoryColumnSink()
+
+    context = BatchContext()
+    context.set_field_value("amount", 1, 100)
+    context.set_field_value("amount", 2, 200)
+
+    WriteColumnOperatorExecutor().execute(
+        WriteColumnOperatorIr(
+            operator_id="write_amount",
+            operator_type=OperatorType.WRITE_COLUMN.value,
+            field_key="amount",
+            can_release_after=False,
+        ),
+        context,
+        [1, 2],
+        runtime,
+    )
+
+    assert context.has_field("amount") is True
+    assert runtime.sink.get_column("amount")[2] == 200
+
+
 def test_write_row_operator_writes_rows() -> None:
     hook = _CaptureHook()
     hook_manager = HookManager()
