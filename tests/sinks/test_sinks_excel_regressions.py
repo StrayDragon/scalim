@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import scalim.sinks._internal.excel as excel_mod
+from scalim.sinks import ColumnExcelSink
 
 
 def _read_excel_rows(path: Path):
@@ -80,6 +81,21 @@ class _FakeWorkbook:
 
     def close(self) -> None:
         return None
+
+
+def test_column_excel_sink_close_workbook_factory_error_skips_finally_close(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    output_path = tmp_path / "workbook_factory_error.xlsx"
+    sink = ColumnExcelSink(str(output_path), field_names=["id"])
+    sink.set_row_ids([1])
+    sink.write_column("id", {1: 1})
+
+    def _failing_workbook_factory(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("simulated workbook failure")
+
+    monkeypatch.setattr(excel_mod, "Workbook", _failing_workbook_factory)
+
+    with pytest.raises(OSError, match="simulated workbook failure"):
+        sink.close()
 
 
 def test_excel_sink_close_twice(tmp_path: Path) -> None:

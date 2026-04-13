@@ -522,7 +522,7 @@ class ColumnExcelSink(IColumnSink):
             best_effort_cleanup_temp_path_dir(temp_path)
             raise
         finally:
-            if wb is not None:
+            if wb is not None:  # pragma: no branch  # pragma: allow-no-branch best-effort cleanup under multiple error paths
                 with suppress(Exception):
                     wb.close()
 
