@@ -18,7 +18,16 @@ from scalim.dsl.yaml_dsl import (
 )
 from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
 from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
-from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig, OutputWriteConfig
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
+    BookConfig,
+    BookWriteDefaultsConfig,
+    DemandConfig,
+    OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
+    ResourcesConfig,
+)
+from scalim.dsl.yaml_dsl.schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
 from scalim.dsl.yaml_dsl import workflow_preflight as preflight_mod
 
 
@@ -152,6 +161,27 @@ resources:
     assert effective_outputs_mod.effective_book_header_policy(config, resources_override=None, book_id="report") == "never"
 
 
+def test_workflow_preflight_effective_book_defaults_blank_values_fall_back_to_defaults() -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode=None, header_policy=None),
+                ),
+            }
+        )
+    )
+
+    assert effective_outputs_mod.effective_book_write_mode(config, resources_override=None, book_id="report") == str(
+        DEFAULT_BOOK_WRITE_MODE
+    )
+    assert effective_outputs_mod.effective_book_header_policy(config, resources_override=None, book_id="report") == str(
+        DEFAULT_BOOK_WRITE_HEADER_POLICY
+    )
+
+
 def test_workflow_preflight_effective_book_write_defaults_can_be_overridden() -> None:
     loader = YamlDemandLoader()
     config = loader.load_string(
@@ -181,6 +211,38 @@ resources:
     )
 
     assert effective_outputs_mod.effective_book_write_mode(config, resources_override=resources_override, book_id="report") == "append"
+    assert effective_outputs_mod.effective_book_header_policy(config, resources_override=resources_override, book_id="report") == "never"
+
+
+def test_workflow_preflight_effective_book_write_defaults_blank_override_does_not_override_config() -> None:
+    loader = YamlDemandLoader()
+    config = loader.load_string(
+        """
+name: preflight_book_defaults_blank_override
+main_source:
+  source_id: main
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    id: {extract: id}
+sources: {}
+resources:
+  books:
+    report:
+      kind: xlsx_file
+      path: ./out
+      write_defaults:
+        mode: sheet
+        header_policy: never
+"""
+    )
+
+    resources_override = ResourcesOverride(
+        books={
+            "report": BookResourceOverride(write_defaults=BookWriteDefaultsOverride(mode=" ", header_policy=" ")),
+        }
+    )
+
+    assert effective_outputs_mod.effective_book_write_mode(config, resources_override=resources_override, book_id="report") == "sheet"
     assert effective_outputs_mod.effective_book_header_policy(config, resources_override=resources_override, book_id="report") == "never"
 
 
@@ -364,6 +426,21 @@ resources:
             resources_override=None,
         )
         is False
+    )
+
+    assert (
+        effective_outputs_mod.output_override_requires_unique_effective_field_display_names(
+            config,
+            OutputOverride(
+                name="detail",
+                fields=("id",),
+                to=OutputToOverride(book="report", sheet="S"),
+                write=OutputWriteOverride(header_fields_output_by="name"),
+            ),
+            default_book_id=None,
+            resources_override=None,
+        )
+        is True
     )
 
 
