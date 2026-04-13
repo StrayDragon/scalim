@@ -87,9 +87,13 @@ def _read_file_at_tag(tag: str, relpath: str, *, root: Path) -> Optional[str]:
 def _extract_section_lines(text: str, heading: str) -> List[str]:
     lines = text.splitlines()
     start = None
-    needle = "## {}".format(heading)
+    # 兼容标题带后缀的写法，例如：
+    # - `## What Changes（推荐方案）`
+    # - `## What Changes: ...`
+    # - `## Capabilities（v2）`
+    pattern = re.compile(r"^##\s+{}\s*(?:$|[（(：:])".format(re.escape(heading)))
     for i, line in enumerate(lines):
-        if line.strip() == needle:
+        if pattern.match(line.strip()):
             start = i + 1
             break
     if start is None:
@@ -175,6 +179,9 @@ def _score_highlight(text: str) -> int:
     # 破坏性细节留给 `Breaking / Upgrade` 段。
     if s.strip().startswith(("移除", "删除", "弃用", "废弃")):
         score -= 4
+    # `Highlights` 避免挑到 Non-goals/约束口径（例如“不会改变/保持不变”），它们通常不是版本主线变化。
+    if s.strip().startswith(("不改变", "不变", "保持不变")):
+        score -= 6
     if "支持" in s:
         score += 1
     # `Highlights` 优先保留用户会“立刻感知”的破坏性变更；否则容易被“同步文档/示例”等条目抢走。
@@ -195,6 +202,9 @@ def _score_highlight(text: str) -> int:
         score += 2
     if "工作流" in s or "workflow" in lower or "质量" in s or "qa" in lower:
         score += 2
+    # `版本化输出/manifest/latest.json` 通常是用户立刻能感知的主线变化，优先上榜。
+    if "版本化" in s or "manifest" in lower or "latest.json" in lower:
+        score += 5
     if "保持" in s or "不变" in s or "non-breaking" in lower:
         score -= 1
     if "schema" in lower or "hover" in lower or "description" in lower or "markdowndescription" in lower or "编辑器" in s:
@@ -206,6 +216,36 @@ def _score_highlight(text: str) -> int:
     if "文档" in s or "docs" in lower:
         score += 1
     return score
+
+
+def _extract_meta_topic(proposal_text: str) -> Optional[str]:
+    for line in _extract_section_lines(proposal_text, "Meta"):
+        match = re.search(r"-\s*Topic[:：]\s*(.+)$", line.strip())
+        if match:
+            topic = match.group(1).strip()
+            if topic:
+                return _clean_inline_markers(topic)
+    return None
+
+
+def _choose_highlight_from_proposal(proposal_text: str, change_id: str) -> str:
+    what_changes_lines = _extract_section_lines(proposal_text, "What Changes")
+    if what_changes_lines:
+        return _choose_highlight(what_changes_lines)
+
+    topic = _extract_meta_topic(proposal_text)
+    if topic:
+        return topic
+
+    # 最后兜底：取正文中第一句非标题内容，避免输出“（无）”。
+    for raw in proposal_text.splitlines():
+        stripped = raw.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            continue
+        return _clean_inline_markers(stripped)
+    return change_id
 
 
 def _choose_highlight(what_changes_lines: List[str]) -> str:
@@ -263,6 +303,8 @@ def _extract_keyword(proposal_text: str, *, fallback_change_id: str) -> str:
 
 def _example_priority(change_id: str, proposal_text: str) -> int:
     cid = change_id.lower()
+    if "versioned-outputs" in cid or "versioned_outputs" in cid:
+        return 0
     if "normalize" in cid:
         return 1
     # `resources.books` / `workflow IO` 收敛：属于 `outputs/IO` 编写面的核心变化。
@@ -295,9 +337,9 @@ def _example_priority(change_id: str, proposal_text: str) -> int:
     # 回退：当 `change_id` 不带明确 `token` 时，用提案正文推断作者写法主题；避免错过 “YAML DSL 写法变化”
     # 但 ID 命名偏实现细节的变更（例如 `...-callable-precheck-fast-fail` / `...-lsp-sugar-support`）。
     lower = proposal_text.lower()
-    if "normalize.call_by" in lower or "normalize" in lower:
+    if "normalize.call_by" in lower or re.search(r"\bnormalize\b", lower):
         return 1
-    if "extract" in lower or "value_cast" in lower or "value-cast" in lower:
+    if re.search(r"(?<![a-z0-9_])extract(?![a-z0-9_])", lower) or "value_cast" in lower or "value-cast" in lower:
         return 2
     if (
         "$init_var" in proposal_text
@@ -383,6 +425,19 @@ def _render_example_snippet_for_change(change: _Change) -> Optional[List[str]]:
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
     cid = change_id.lower()
+    if "versioned-outputs" in cid or "versioned_outputs" in cid:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "workflow:",
+            "  resources:",
+            "    files:",
+            "      detail:",
+            "        kind: csv_file",
+            "        path: ./out/report   # 现在是输出 root 目录（不是最终文件路径）",
+            "        # write_lock: true   # 旧字段已移除（请删除）",
+            "# 产物位置：<root>/versions/<run_id>/files/detail.csv",
+            "# 稳定入口：<root>/manifest/latest.json",
+        ]
     if "import_roots" in cid or "import-roots" in cid:
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
@@ -591,9 +646,15 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         # 兼容把 YAML 对写进反引号的写法：`call_by: "fn(x)"` / `fields.*.source: xxx`。
         # 只取 `key` 部分做“编写面 `token`”判定，避免因为包含 `value` 导致漏判。
         key_match = re.match(r"^([a-zA-Z0-9_.$\-\[\]*]+)\s*:", t)
-        if key_match:
+        from_key_match = key_match is not None
+        if from_key_match:
             t = key_match.group(1).strip()
             lower = t.lower()
+        # 明确过滤掉“代码符号/签名”，避免把 refactor 里的内部函数名当成 YAML 编写面。
+        if t.startswith("_"):
+            return False
+        if "->" in t or "(" in t or ")" in t:
+            return False
         # `scalim.yaml` 的项目配置键路径（`yaml_dsl.*`）也是作者可感知的编写面。
         if "yaml_dsl." in lower:
             return True
@@ -613,7 +674,11 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if "[*]" in t or "$" in t:
             return True
         # 常见的 `YAML` 键（`snake_case`）也属于编写面 `token`。
-        if "_" in t and re.fullmatch(r"[a-z_][a-z0-9_]*", t):
+        # - 仅在明确出现 `key:` 的反引号片段里才放行通用 `snake_case`（避免把 Python API 参数/变量名误判为 YAML）。
+        # - 少量高频 `YAML` 键允许以“裸 token”出现（例如提案里写成 `write_lock`）。
+        if t == "write_lock":
+            return True
+        if from_key_match and "_" in t and re.fullmatch(r"[a-z_][a-z0-9_]*", t):
             return True
         if any(
             k in lower
@@ -627,6 +692,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
                 "$runtime",
                 "outputs",
                 "fields",
+                "resources",
                 "aggregate",
                 "group_by",
                 "dedup_by",
@@ -642,7 +708,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             )
         ):
             return True
-        if "." in t and any(k in lower for k in ("workflow", "demand", "outputs", "fields")):
+        if "." in t and any(k in lower for k in ("workflow", "demand", "outputs", "fields", "resources")):
             return True
         return False
 
@@ -652,8 +718,11 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return False
         lower = text.lower()
         tokens = re.findall(r"`([^`]+)`", text)
-        has_surface_token = (
-            any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "workflow " in lower or "yaml-dsl" in lower
+        workflow_authoring_hint = "workflow yaml" in lower or "workflow yml" in lower or "workflow 配置" in text
+        demand_authoring_hint = "demand yaml" in lower or "demand yml" in lower
+        has_surface_token = any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "yaml-dsl" in lower or workflow_authoring_hint or demand_authoring_hint
+        has_user_facing_hint = ("用户" in text and ("需要" in text or "应" in text or "改为" in text or "改成" in text or "迁移" in text)) or (
+            "旧写法" in text or "旧语法" in text or "旧字段" in text or "不再支持" in text or "不兼容" in text
         )
 
         # 明确不是 `breaking` 的常见表述：避免“为了避免 `breaking`”之类的句子误入。
@@ -661,8 +730,8 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             if "不再支持" not in text and "移除" not in text and "删除" not in text:
                 return False
 
-        # 没有任何 `authoring surface token` 的句子，通常不是“你要改 `YAML`”的点。
-        if not has_surface_token:
+        # 没有任何“用户可感知线索”的句子，通常不是“你要改什么”的 upgrade 点（避免 refactor 内部迁移误入）。
+        if not (has_surface_token or has_user_facing_hint):
             return False
 
         # “输出约束：移除 ...” 这类描述是输出格式约束，不是 `upgrade` 点。
@@ -677,7 +746,8 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if "删除旧写法" in text:
             return True
         if ("移除" in text or "移出" in text or "迁出" in text or "删除" in text or "废弃" in text or "弃用" in text) and (
-            "旧写法" in text
+            has_surface_token
+            or "旧写法" in text
             or "旧语法" in text
             or "旧字段" in text
             or "不再支持" in text
@@ -725,6 +795,19 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     instructions: List[str] = []
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
+
+        # 版本化输出：最常见的升级点是“产物读取入口与路径语义变化”，这里直接抽成一条可执行指令。
+        if "最终产物路径" in cleaned and ("迁移" in cleaned or "改为" in cleaned or "改成" in cleaned) and (
+            "latest" in cleaned.lower() or "manifest" in cleaned.lower() or "latest 指示" in cleaned
+        ):
+            instructions.append("把产物读取入口改为 `manifest/latest.json`（或指定版本目录）；不要再依赖固定最终文件路径。")
+            continue
+
+        if ("输出 root" in cleaned or "root 目录" in cleaned) and ("path" in cleaned.lower() or "`path`" in cleaned):
+            if ("books.*.path" in proposal_text or "resources.books" in proposal_text) and (
+                "files.*.path" in proposal_text or "resources.files" in proposal_text
+            ):
+                instructions.append("把 `books.*.path` / `files.*.path`（以及 workflow 对应字段）改为输出 root 目录（不是最终文件路径）。")
 
         # `scalim.yaml` `imports` 单入口：优先输出一条“旧字段 -> 新字段”的升级指令，避免 `Breaking` 段刷屏。
         if (
@@ -931,8 +1014,11 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
 def _score_change(change: _Change) -> int:
     score = 0
     cid = change.change_id.lower()
-    if change.is_yaml:
-        score += 100
+    # `Highlights` 只把“写法/语义”相关的 YAML 变更顶上来；纯 refactor/docs 不用靠 `is_yaml` 抢版面。
+    if change.is_yaml and change.example_priority < 99:
+        score += 120
+    elif change.is_yaml:
+        score += 20
     if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
         score += 60
     if "template-vars" in cid or "template_vars" in cid:
@@ -959,8 +1045,6 @@ def _score_change(change: _Change) -> int:
     # `Highlights` 里优先把破坏性升级点顶上来，否则容易被“编辑器/文档/卫生”类变更挤掉。
     if change.has_breaking:
         score += 250
-    elif "breaking" in change.proposal_text.lower():
-        score += 120
     if "skill" in cid:
         score -= 30
     if "preproposal" in cid:
@@ -970,6 +1054,11 @@ def _score_change(change: _Change) -> int:
     # 文档漂移/卫生在多数发布中不应盖过“写法/行为”变更：仅在缺少其它变化时才上榜。
     if "docs-consistency" in cid or "docs" in cid:
         score -= 80
+    # schema docs standardizer / dev-only 插件通常不是“发布主线变化”，避免压过 workflow/核心重构。
+    if "doc-standardizer" in cid or "doc_standardizer" in cid:
+        score -= 250
+    if change.keyword == "dev-optional-plugins":
+        score -= 150
     if "marimo" in cid:
         score += 10
     if "demo" in cid or "example" in cid:
@@ -996,7 +1085,7 @@ def _build_change(tag: str, change_id: str, *, root: Path) -> Optional[_Change]:
         if match:
             cap_names.append(match.group(1).strip())
     is_yaml = "yaml" in change_id.lower() or "yaml" in keyword.lower() or any("yaml" in name.lower() for name in cap_names)
-    highlight = _choose_highlight(_extract_section_lines(proposal_text, "What Changes"))
+    highlight = _choose_highlight_from_proposal(proposal_text, change_id)
     breaking = _extract_breaking_instructions(proposal_text, change_id)
     has_breaking = len(breaking) > 0 and any("按提案升级：" not in b for b in breaking)
     prio = _example_priority(change_id, proposal_text) if is_yaml else 99
@@ -1037,8 +1126,9 @@ def _render_notes(
         # 优先挑更关键的变更；若本版本有 YAML 变更，`Highlights` 至少保留 1 条 YAML。
         sorted_changes = sorted(new_changes, key=_score_change, reverse=True)
         chosen = sorted_changes[:highlight_max]
-        if any(c.is_yaml for c in new_changes) and not any(c.is_yaml for c in chosen):
-            yaml_first = next((c for c in sorted_changes if c.is_yaml), None)
+        yaml_authoring = [c for c in new_changes if c.is_yaml and c.example_priority < 99]
+        if yaml_authoring and not any(c.is_yaml and c.example_priority < 99 for c in chosen):
+            yaml_first = next((c for c in sorted_changes if c.is_yaml and c.example_priority < 99), None)
             if yaml_first is not None and chosen:
                 chosen[-1] = yaml_first
             elif yaml_first is not None:
@@ -1051,9 +1141,8 @@ def _render_notes(
     lines.append("## Breaking / Upgrade")
     breaking_items: List[str] = []
     for ch in new_changes:
-        # 按你的约束：只放“需要改 `YAML`/旧写法跑不起来”的点；因此仅从 `YAML` 相关 `archived changes` 抽取。
-        if ch.is_yaml:
-            breaking_items.extend(list(ch.breaking_instructions))
+        # 按你的约束：只放“旧写法跑不起来 / 需要改 YAML/配置”的点；完全基于提案文本抽取（不做代码推断）。
+        breaking_items.extend(list(ch.breaking_instructions))
     # 丢弃“按提案升级：...”这类低信息量兜底项（不满足“你要改什么”的要求）。
     breaking_items = [b for b in breaking_items if not b.startswith("按提案升级：")]
 
@@ -1104,9 +1193,11 @@ def _render_notes(
                 score += 80
             if s.startswith("不要再用 "):
                 score += 60
+            if "`just " in s or s.startswith("不要再用 `just "):
+                score -= 30
             if "fail-fast" in s.lower() or "直接失败" in s:
                 score += 20
-            if any(k in s for k in ("outputs", "workflow", "resources", "yaml")):
+            if any(k in s for k in ("outputs", "workflow", "resources", "yaml", "write_lock", "latest.json", "manifest/latest.json")):
                 score += 10
             scored.append((score, -idx, item))
         breaking_uniq = [it for _score, _neg_idx, it in sorted(scored, reverse=True)]
@@ -1116,7 +1207,7 @@ def _render_notes(
         lines.append("- {}".format(normalized + "。"))
 
     if include_example:
-        yaml_candidates = [c for c in new_changes if c.is_yaml]
+        yaml_candidates = [c for c in new_changes if c.is_yaml and c.example_priority < 99]
         # 同一优先级下优先选择带破坏性迁移点的变更，避免示例落到纯“编辑器能力”导致不贴题。
         yaml_candidates.sort(key=lambda c: (c.example_priority, not c.has_breaking, c.change_id))
         for chosen in yaml_candidates:
@@ -1134,8 +1225,10 @@ def _render_notes(
     if len(commit_lines) <= max_commit_lines:
         shown = commit_lines
     else:
-        # 把 “...略” 也算进 8 行预算里：7 条 `commit` + 1 行省略。
-        shown = commit_lines[: max_commit_lines - 1] + ["...略"]
+        # 仍保持 8 行：第 8 条 commit 行尾追加 “…略”。
+        shown = commit_lines[:max_commit_lines]
+        if shown:
+            shown[-1] = shown[-1] + " …略"
     for ln in shown:
         lines.append("- {}".format(ln))
 
@@ -1248,8 +1341,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 continue
             changes.append(ch)
 
-        has_yaml = any(c.is_yaml for c in changes)
-        include_example = has_yaml
+        has_yaml_authoring = any(c.is_yaml and c.example_priority < 99 for c in changes)
+        include_example = has_yaml_authoring
         highlight_max = 3
         breaking_max = 3
 
