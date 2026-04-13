@@ -705,6 +705,44 @@ def test_output_composition_warns_on_dedup_without_max_distinct_and_spec_methods
     assert any("dedup_by.max_distinct=0" in record.getMessage() for record in caplog.records)
 
 
+def test_output_composition_does_not_warn_on_dedup_when_max_distinct_is_nonzero(tmp_path: Path, caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.execution.output_composition")
+    out = tmp_path / "report.xlsx"
+
+    derived_spec = output_comp_mod.DerivedDedupByGroupBySpec(
+        dedup_by=output_comp_mod.DedupBySpec(
+            key_fields=("k",),
+            on_conflict="first",
+            max_distinct=1,
+            on_overflow="error",
+        ),
+        group_by=DerivedGroupBySpec(
+            group_by=("g",),
+            metrics=(AggMetricSpec(out_field_id="cnt", op="count"),),
+            max_groups=1,
+        ),
+    )
+    derived = DerivedOutputTargetSpec(
+        target_id="summary",
+        derived=derived_spec,
+        output_layout=ExportLayout(field_ids=("g", "cnt"), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
+        is_primary=True,
+    )
+    spec = OutputCompositionSpec(derived_targets=(derived,))
+    plan = build_output_composition(
+        spec=spec,
+        demand_name="d",
+        demand_main_source_id="s",
+        demand_target_fields=["g"],
+        demand_field_fingerprints=[],
+        run_parallel_mode="seq",
+    )
+    plan.sink.close()
+
+    assert not any("dedup_by.max_distinct=0" in record.getMessage() for record in caplog.records)
+
+
 def test_two_stage_group_by_spec_methods_and_build(tmp_path: Path) -> None:
     stage1 = DerivedGroupBySpec(
         group_by=("g", "u"),

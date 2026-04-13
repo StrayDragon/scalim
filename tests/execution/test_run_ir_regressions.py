@@ -1,5 +1,6 @@
 from dataclasses import replace
 
+from scalim.execution.managed_artifacts import ManagedArtifactPlan
 from scalim.execution import run_ir as run_ir_mod
 from scalim.execution.output_composition import (
     AggMetricSpec,
@@ -58,3 +59,42 @@ def test_select_primary_output_path_prefers_derived_primary_then_falls_back() ->
     outputs2 = {"a": "path_a", "b": "path_b"}
     assert run_ir_mod._select_primary_output_path(outputs2, no_primary) == "path_a"  # noqa: SLF001
     assert run_ir_mod._select_primary_output_path({}, no_primary) is None  # noqa: SLF001
+
+
+def test_select_primary_output_path_handles_non_primary_derived_and_missing_output_key() -> None:
+    spec = OutputCompositionSpec(
+        derived_targets=(
+            DerivedOutputTargetSpec(
+                target_id="d_nonprimary",
+                derived=DerivedGroupBySpec(
+                    group_by=("g",),
+                    metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id=None),),
+                ),
+                output_layout=ExportLayout(field_ids=("g", "cnt"), header_names=None),
+                output=OutputSpec(format="csv", path="out.csv"),
+                is_primary=False,
+            ),
+            DerivedOutputTargetSpec(
+                target_id="d_primary",
+                derived=DerivedGroupBySpec(
+                    group_by=("g",),
+                    metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id=None),),
+                ),
+                output_layout=ExportLayout(field_ids=("g", "cnt"), header_names=None),
+                output=OutputSpec(format="csv", path="out.csv"),
+                is_primary=True,
+            ),
+        ),
+    )
+
+    # The primary output id is found, but is missing from the outputs mapping.
+    assert run_ir_mod._select_primary_output_path({"x": "path_x"}, spec) == "path_x"  # noqa: SLF001
+
+
+def test_collect_managed_artifact_outputs_skips_none_csv_artifacts() -> None:
+    plan = ManagedArtifactPlan(kind="csv")
+
+    in_memory_rows, in_memory_csv = run_ir_mod._collect_managed_artifact_outputs({"t": plan})  # noqa: SLF001
+
+    assert in_memory_rows is None
+    assert in_memory_csv is None

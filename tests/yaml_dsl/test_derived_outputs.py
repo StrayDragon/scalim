@@ -402,6 +402,43 @@ def test_group_by_diagnostics_skips_unexpected_distinct_metric_state() -> None:
     assert diag.meta["metric.u.distinct_keys_total"] == 0
 
 
+def test_group_by_diagnostics_count_distinct_not_truncated_has_no_audit_event() -> None:
+    agg = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
+        max_distinct=0,
+        distinct_on_overflow="truncate",
+    )
+    agg.accumulate({"g": "x", "user_id": "u1"})
+    agg.accumulate({"g": "x", "user_id": "u2"})
+
+    diag = agg.diagnostics()
+
+    assert diag.meta["metric.u.distinct_truncated_groups"] == 0
+    assert not any(e.get("event_type") == "distinct_truncated" for e in diag.audit_events)
+
+
+def test_dedup_by_diagnostics_not_truncated_has_no_dedup_truncated_event() -> None:
+    downstream = mod.GroupByAggregator(
+        group_by=("g",),
+        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
+    )
+    dedup = mod.DedupByThenAggregator(
+        key_fields=("k",),
+        on_conflict="first",
+        max_distinct=1,
+        on_overflow="truncate",
+        downstream=downstream,
+    )
+    dedup.accumulate({"k": "a", "g": "x"})
+    dedup.accumulate({"k": "a", "g": "x"})
+
+    diag = dedup.diagnostics()
+
+    assert diag.meta["dedup.truncated"] is False
+    assert not any(e.get("event_type") == "dedup_truncated" for e in diag.audit_events)
+
+
 def test_dedup_by_validation_required_fields_and_truncate_drops_new_key() -> None:
     downstream = mod.GroupByAggregator(
         group_by=("g",),

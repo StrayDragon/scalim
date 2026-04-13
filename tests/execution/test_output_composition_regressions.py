@@ -266,6 +266,28 @@ def test_router_row_sink_raises_output_target_write_error_on_write_exception() -
         router.write_row({"a": 1})
 
 
+def test_router_row_sink_records_first_error_only_once_on_repeated_write_errors() -> None:
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="t_fail",
+        sink=_FailingWriteRowSink(),
+        predicate=None,
+        is_primary=True,
+        output_path=None,
+        sheet_name=None,
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    router = mod.RouterRowSink(routes=(route,), failure_policy="all_fail", workbook_resources=())
+
+    with pytest.raises(mod.ScalimOutputTargetWriteError, match="t_fail"):
+        router.write_row({"a": 1})
+    first = route.first_error
+    assert first is not None
+
+    with pytest.raises(mod.ScalimOutputTargetWriteError, match="t_fail"):
+        router.write_row({"a": 2})
+    assert route.first_error is first
+
+
 def test_router_row_sink_write_row_after_close_raises() -> None:
     route = mod._RouteState(  # noqa: SLF001
         target_id="t",
@@ -295,6 +317,25 @@ def test_router_row_sink_close_handles_close_errors_primary_only_non_primary_dis
     router = mod.RouterRowSink(routes=(route,), failure_policy="primary_only", workbook_resources=())
     router.close()
     assert route.disabled is True
+
+
+def test_router_row_sink_close_does_not_override_first_error_on_close_exception() -> None:
+    prev = ValueError("prev")
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="t",
+        sink=_FailingCloseSink(),
+        predicate=None,
+        is_primary=False,
+        output_path=None,
+        sheet_name=None,
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    route.first_error = prev
+    router = mod.RouterRowSink(routes=(route,), failure_policy="primary_only", workbook_resources=())
+    router.close()
+
+    assert route.disabled is True
+    assert route.first_error is prev
 
 
 def test_router_row_sink_close_raises_on_close_error_all_fail() -> None:
@@ -333,6 +374,32 @@ def test_router_row_sink_close_swallows_workbook_close_error_for_primary_only_no
     router.close()
     assert route.disabled is True
     assert route.error_count >= 1
+
+
+def test_router_row_sink_close_does_not_override_first_error_when_workbook_close_fails() -> None:
+    class _FailingWorkbook:
+        def __init__(self, output_path: str) -> None:
+            self.output_path = str(output_path)
+
+        def close(self) -> None:
+            raise ValueError("boom-wb")
+
+    prev = ValueError("prev")
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="secondary",
+        sink=_CollectingRowSink(),
+        predicate=None,
+        is_primary=False,
+        output_path="bad.xlsx",
+        sheet_name="S",
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    route.first_error = prev
+    router = mod.RouterRowSink(routes=(route,), failure_policy="primary_only", workbook_resources=(_FailingWorkbook("bad.xlsx"),))
+    router.close()
+
+    assert route.disabled is True
+    assert route.first_error is prev
 
 
 def test_router_row_sink_close_raises_workbook_close_error_for_primary_route() -> None:
@@ -400,3 +467,43 @@ def test_router_row_sink_close_reraises_workbook_close_error_when_unattributable
 def test_output_target_write_error_str_includes_target_id() -> None:
     err = mod.ScalimOutputTargetWriteError("t", Exception("x"))
     assert "t" in str(err)
+
+
+def test_router_row_sink_build_meta_rows_skips_empty_run_failure_policy_and_optional_stats_fields() -> None:
+    route = mod._RouteState(  # noqa: SLF001
+        target_id="t",
+        sink=_CollectingRowSink(),
+        predicate=None,
+        is_primary=True,
+        output_path=None,
+        sheet_name=None,
+        output_counter=mod._RowCounter(),  # noqa: SLF001
+    )
+    router = mod.RouterRowSink(
+        routes=(route,),
+        failure_policy="all_fail",
+        workbook_resources=(),
+        run_failure_policy="",
+    )
+    router._final_stats.append(  # noqa: SLF001
+        mod.OutputTargetStats(
+            target_id="t_err",
+            input_row_count=0,
+            row_count=0,
+            error_count=1,
+            duration_seconds=0.0,
+            disabled=False,
+            output_path=None,
+            sheet_name=None,
+            error_type="ValueError",
+            error_message="boom",
+            error_message_hash=None,
+        )
+    )
+
+    rows = router._build_meta_rows()  # noqa: SLF001
+    keys = [r["key"] for r in rows]
+
+    assert "run.failure_policy" not in keys
+    assert "output.t.output_path" not in keys
+    assert "output.t_err.error_message_hash" not in keys

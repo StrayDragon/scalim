@@ -145,3 +145,36 @@ def test_batch_context_on_field_set_callback_is_called() -> None:
     ctx.set_field_value("a", 1, 123)
 
     assert calls == [("a", 1)]
+
+
+def test_batch_context_delete_row_from_field_noops_when_row_missing() -> None:
+    ctx = BatchContext()
+    ctx.set_field_value("a", 0, 1)
+
+    ctx.delete_row_from_field("a", 1)
+
+    assert ctx.get_field_value("a", 0) == 1
+    assert ctx.get_all_rows_for_field("a") == {0}
+
+
+def test_batch_context_delete_row_from_all_fields_skips_missing_row_in_field() -> None:
+    ctx = BatchContext()
+    ctx.set_field_value("a", 0, 1)
+    ctx.set_field_value("b", 1, 2)
+
+    released = ctx.delete_row_from_all_fields(0)
+
+    assert released == ["a"]
+    assert ctx.get_field_value("a", 0) is None
+    assert ctx.get_field_value("b", 1) == 2
+
+
+def test_dense_batch_context_set_field_value_twice_hits_already_present_branch() -> None:
+    ctx = DenseBatchContext(base_row_id=0, row_count=1)
+    ctx.set_field_value("a", 0, 1)
+    ctx.set_field_value("a", 0, 2)
+
+    ctx.delete_field("missing")
+
+    assert ctx.get_field_value("a", 0) == 2
+    assert ctx.get_all_rows_for_field("a") == {0}

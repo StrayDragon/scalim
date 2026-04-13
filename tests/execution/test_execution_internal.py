@@ -295,6 +295,16 @@ def test_pipeline_iter_row_batches_empty() -> None:
     assert list(pipeline._iter_row_batches([{"id": 1}])) == []
 
 
+def test_pipeline_iter_row_batches_batch_size_none_empty_rows_yields_nothing() -> None:
+    main_source = _make_main_source()
+    demand = DemandIr.from_irs(sources=[], fields=[], main_source=main_source)
+    plan = _make_plan({}, [])
+    pipeline = _make_pipeline(plan, demand, main_source)
+    pipeline.batch_size = None
+
+    assert list(pipeline._iter_row_batches([])) == []
+
+
 def test_adaptive_pipeline_uses_overridden_adaptive_executor_cls() -> None:
     class _TrackingThreadPoolExecutor(concurrent_futures.ThreadPoolExecutor):
         created: int = 0
@@ -390,6 +400,28 @@ def test_pipeline_execute_batch_column_mode_handles_load_operator() -> None:
     pipeline._execute_batch_column_mode(row_ids, batch_rows, sink, batch_num=1)
 
     assert "customer_name" in sink.get_columns()
+
+
+def test_pipeline_execute_batch_column_mode_after_operator_ignores_unknown_operator_types(monkeypatch) -> None:
+    main_source = _make_main_source()
+    demand = DemandIr.from_irs(sources=[], fields=[], main_source=main_source)
+    plan = _make_plan({}, [])
+    pipeline = _make_pipeline(plan, demand, main_source)
+
+    def _fake_execute_operators(*_args, **kwargs):  # type: ignore[no-untyped-def]
+        after_operator = kwargs.get("after_operator")
+        if after_operator is not None:
+            after_operator(object())
+        return None
+
+    monkeypatch.setattr(pipeline.executor, "execute_operators", _fake_execute_operators)
+
+    row_ids = [0]
+    batch_rows = {0: {"id": 1}}
+    sink = InMemoryColumnSink()
+    pipeline._execute_batch_column_mode(row_ids, batch_rows, sink, batch_num=1)
+
+    assert sink.get_columns() == {}
 
 
 def test_pipeline_execute_batch_streaming_mode_writes_load_operator_fields() -> None:

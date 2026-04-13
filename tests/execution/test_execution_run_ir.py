@@ -254,6 +254,34 @@ def test_prepare_engine_sink_closes_sink_and_observer_manager_on_capture_error()
     assert observer_manager.closed is True
 
 
+def test_prepare_engine_sink_handles_observer_manager_close_not_callable() -> None:
+    class _ObserverManager:
+        close = 1
+
+    class _ClosingColumnSink(InMemoryColumnSink):
+        def __init__(self) -> None:
+            super(_ClosingColumnSink, self).__init__(["order_id"])
+            self.closed = False
+
+        @override
+        def close(self) -> None:
+            self.closed = True
+            super(_ClosingColumnSink, self).close()
+
+    sink = _ClosingColumnSink()
+    observer_manager = _ObserverManager()
+
+    with pytest.raises(TypeError, match=r"IColumnSink"):
+        _ = run_ir_mod._prepare_engine_sink(  # noqa: SLF001
+            sink=sink,
+            field_ids=["order_id"],
+            capture_in_memory_rows=True,
+            observer_manager=observer_manager,
+        )
+
+    assert sink.closed is True
+
+
 def test_run_ir_rejects_unknown_key_normalization() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
