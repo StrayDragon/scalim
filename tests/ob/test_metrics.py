@@ -20,6 +20,13 @@ def test_loader_metrics_stats() -> None:
     assert metrics.max_duration == 1.5
 
 
+def test_metrics_collector_get_loader_metrics_returns_existing_instance() -> None:
+    collector = MetricsCollector()
+    m1 = collector.get_loader_metrics("orders")
+    m2 = collector.get_loader_metrics("orders")
+    assert m1 is m2
+
+
 def test_metrics_collector_summary(caplog) -> None:
     collector = MetricsCollector()
     loader = collector.get_loader_metrics("orders")
