@@ -788,3 +788,48 @@ def test_preload_cache_owner_error_path_tolerates_unexpected_with_traceback_fail
         pass
     else:
         raise AssertionError("expected _BadWithTracebackError")
+
+
+def test_preload_cache_decref_inflight_skips_cleanup_when_mapping_replaced() -> None:
+    from scalim.execution import preload_cache as preload_cache_module
+
+    cache = PreloadCache()
+    lock = cache._lock_for("src")  # type: ignore[attr-defined]
+    inflight = preload_cache_module._InFlight(owner_ident=123)  # type: ignore[attr-defined]
+    inflight.ref_count = 1
+
+    replacement = preload_cache_module._InFlight(owner_ident=456)  # type: ignore[attr-defined]
+    cache._inflight["src"] = replacement  # type: ignore[attr-defined]
+
+    cache._decref_inflight_and_maybe_cleanup(source_id="src", inflight=inflight, lock=lock)  # type: ignore[attr-defined]
+
+    assert cache._inflight["src"] is replacement  # type: ignore[attr-defined]
+
+
+def test_preload_cache_signature_guardrail_cached_digest_match_is_noop() -> None:
+    cache = PreloadCache(signature_guardrail=PreloadCacheSignatureGuardrail(enabled=True, policy="error"))
+
+    def _load():  # type: ignore[no-untyped-def]
+        return {1: {"value": "ok"}}
+
+    assert cache.get_or_load("src", _load, signature_digest="d1") == {1: {"value": "ok"}}
+
+    def _should_not_load():  # type: ignore[no-untyped-def]
+        raise AssertionError("load_fn should not be called when cached digest matches")
+
+    assert cache.get_or_load("src", _should_not_load, signature_digest="d1") == {1: {"value": "ok"}}
+
+
+def test_preload_cache_signature_guardrail_inflight_digest_match_is_noop() -> None:
+    from scalim.execution import preload_cache as preload_cache_module
+
+    cache = PreloadCache(signature_guardrail=PreloadCacheSignatureGuardrail(enabled=True, policy="error"))
+    inflight = preload_cache_module._InFlight(owner_ident=123, signature_digest="d1")  # type: ignore[attr-defined]
+    inflight.value = {1: {"value": "x"}}
+    inflight.done.set()
+    cache._inflight["src"] = inflight  # type: ignore[attr-defined]
+
+    def _load():  # type: ignore[no-untyped-def]
+        raise AssertionError("load_fn should not be called")
+
+    assert cache.get_or_load("src", _load, signature_digest="d1") == {1: {"value": "x"}}

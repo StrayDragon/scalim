@@ -535,3 +535,106 @@ def test_workflow_cache_pool_emit_does_not_deadlock_on_reentry() -> None:
     runner.start()
     if not runner_done.wait(timeout=CI_TIMEOUT_S):
         pytest.fail("WorkflowCachePool.emit appears to be called under internal locks (reentry deadlock)")
+
+
+def test_workflow_cache_pool_signature_conflict_with_missing_first_entry_still_loads() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+    stale = _sig("s1")
+    logical_key = stale.logical_key()
+    pool._signature_keys_by_logical_key[logical_key] = set([stale.canonical_key()])  # type: ignore[attr-defined]
+
+    signature = WorkflowCacheEntrySignature(
+        kind="preload_forever",
+        source_id="s1",
+        loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
+        rendered_params={"k": "s1"},
+        normalize=None,
+        key=None,
+        lookup_cast=None,
+    )
+
+    assert pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}}) == {1: {"id": 1}}
+
+
+def test_workflow_cache_pool_on_node_done_skips_missing_eviction_pending() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="dag_refcount",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+        logical_keys_by_node_id={"n1": frozenset([("preload_forever", "s1")])},
+        consumers_by_logical_key={("preload_forever", "s1"): set(["n1"])},
+    )
+
+    signature = _sig("s1")
+    pool._signature_keys_by_logical_key[signature.logical_key()] = set([signature.canonical_key()])  # type: ignore[attr-defined]
+
+    pool.on_workflow_node_done("n1")
+
+
+def test_workflow_cache_pool_close_skips_none_pending_from_evict_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+    signature = _sig("s1")
+    assert pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}}) == {1: {"id": 1}}
+
+    original_evict = pool._evict_entry  # type: ignore[attr-defined]
+
+    def _evict_and_drop_event(signature_key: str, *, workflow_node_id: str, reason: str):  # type: ignore[no-untyped-def]
+        _ = original_evict(signature_key, workflow_node_id=workflow_node_id, reason=reason)
+        return None
+
+    monkeypatch.setattr(pool, "_evict_entry", _evict_and_drop_event)  # type: ignore[arg-type]
+    pool.close()
+
+
+def test_workflow_cache_pool_budget_evict_lru_skips_none_pending(monkeypatch: pytest.MonkeyPatch) -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=1, over_budget_policy="evict_lru"),
+        ),
+    )
+    assert pool.get_or_load(_sig("s1"), workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}}) == {1: {"id": 1}}
+
+    original_evict = pool._evict_entry  # type: ignore[attr-defined]
+
+    def _evict_and_drop_event(signature_key: str, *, workflow_node_id: str, reason: str):  # type: ignore[no-untyped-def]
+        _ = original_evict(signature_key, workflow_node_id=workflow_node_id, reason=reason)
+        return None
+
+    monkeypatch.setattr(pool, "_evict_entry", _evict_and_drop_event)  # type: ignore[arg-type]
+
+    assert pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {2: {"id": 2}}) == {2: {"id": 2}}
+
+
+def test_workflow_cache_pool_evict_entry_skips_cleanup_when_signature_key_map_missing() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+    signature = _sig("s1")
+    assert pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}}) == {1: {"id": 1}}
+
+    logical_key = signature.logical_key()
+    signature_key = signature.canonical_key()
+    _ = pool._signature_keys_by_logical_key.pop(logical_key, None)  # type: ignore[attr-defined]
+
+    pending = pool._evict_entry(signature_key, workflow_node_id="n1", reason="test")  # type: ignore[attr-defined]
+    assert pending is not None
