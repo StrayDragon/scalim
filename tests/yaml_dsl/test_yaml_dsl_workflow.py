@@ -1089,6 +1089,13 @@ def test_components_replace_normalizes_iterable_items_to_tuple() -> None:
     assert patch.items == (r,)
 
 
+def test_components_extend_accepts_tuple_items_without_normalization() -> None:
+    r = _WorkflowEventRecorder()
+    patch = ComponentsExtend((r,))
+    assert isinstance(patch.items, tuple)
+    assert patch.items == (r,)
+
+
 def test_validate_run_options_patches_by_run_id_rejects_non_str_key() -> None:
     from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
@@ -2431,6 +2438,18 @@ def test_resolve_workflow_demand_path_rejects_unknown_alias(tmp_path: Path) -> N
     assert "run_id=r1" in str(excinfo.value)
 
 
+def test_resolve_workflow_demand_path_unknown_alias_error_omits_run_id_when_missing(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "DATA:/b.yaml",
+            workflow_yaml_path=str(wf),
+            path_aliases={},
+        )
+    assert "Unknown path alias" in str(excinfo.value)
+    assert "run_id=" not in str(excinfo.value)
+
+
 def test_resolve_workflow_demand_path_rejects_empty_at_alias_path(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
@@ -2442,6 +2461,18 @@ def test_resolve_workflow_demand_path_rejects_empty_at_alias_path(tmp_path: Path
         )
     assert "Invalid demand alias path" in str(excinfo.value)
     assert "run_id=r1" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_empty_alias_error_omits_run_id_when_missing(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "@/",
+            workflow_yaml_path=str(wf),
+            path_aliases={"@": str(tmp_path)},
+        )
+    assert "Invalid demand alias path" in str(excinfo.value)
+    assert "run_id=" not in str(excinfo.value)
 
 
 def test_resolve_workflow_demand_path_supports_absolute_paths(tmp_path: Path) -> None:
@@ -2493,6 +2524,19 @@ def test_resolve_workflow_demand_path_rejects_alias_escape_by_default(tmp_path: 
     assert "alias=DATA" in str(excinfo.value)
 
 
+def test_resolve_workflow_demand_path_alias_escape_error_omits_run_id_when_missing(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "DATA:/escape.yaml",
+            workflow_yaml_path=str(wf),
+            path_aliases={"DATA": str(tmp_path.parent)},
+        )
+    assert "YAML path escapes allowed roots" in str(excinfo.value)
+    assert "alias=DATA" in str(excinfo.value)
+    assert "run_id=" not in str(excinfo.value)
+
+
 def test_resolve_workflow_demand_path_allows_escape_with_explicit_allowed_roots(tmp_path: Path) -> None:
     wf = tmp_path / "workflow.yaml"
     allowed_yaml_roots = [tmp_path.parent]
@@ -2533,6 +2577,19 @@ def test_resolve_workflow_demand_path_invalid_allowed_yaml_roots_is_wrapped(tmp_
         )
     assert "Invalid allowed_yaml_roots" in str(excinfo.value)
     assert "run_id=r1" in str(excinfo.value)
+
+
+def test_resolve_workflow_demand_path_invalid_allowed_yaml_roots_wrap_omits_run_id_when_missing(tmp_path: Path) -> None:
+    wf = tmp_path / "workflow.yaml"
+    missing_root = tmp_path / "missing_root"
+    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
+        _ = resolve_workflow_demand_path(
+            "rel.yaml",
+            workflow_yaml_path=str(wf),
+            allowed_yaml_roots=[missing_root],
+        )
+    assert "Invalid allowed_yaml_roots" in str(excinfo.value)
+    assert "run_id=" not in str(excinfo.value)
 
 
 def test_validate_workflow_yaml_text_json_variants() -> None:

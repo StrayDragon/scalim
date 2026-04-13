@@ -874,8 +874,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             patch = _book_override_to_patch(book_override)
             if book is None:
                 book = BookConfig(kind="")
-                if base_dir is None:
-                    base_dir = str(workflow_base_dir)
+                base_dir = str(workflow_base_dir)
             book = _apply_book_patch(book, patch, path="overrides.resources.books.{}".format(bid))
             path_prefix = "overrides.resources.books.{}".format(bid)
 
@@ -908,8 +907,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
             patch = _file_override_to_patch(file_override)
             if file_cfg is None:
                 file_cfg = FileConfig(kind="")
-                if base_dir is None:
-                    base_dir = str(workflow_base_dir)
+                base_dir = str(workflow_base_dir)
             file_cfg = _apply_file_patch(file_cfg, patch, path="overrides.resources.files.{}".format(fid))
             path_prefix = "overrides.resources.files.{}".format(fid)
 
@@ -1440,7 +1438,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                     idx=int(scan_idx),
                     outputs_path=outputs_path,
                 )
-                if candidate:
+                if candidate:  # pragma: no branch  # pragma: allow-no-branch unreachable: non-file outputs already validated to have a non-empty book binding
                     default_book_id, default_book_ref = candidate, cand_ref
                     break
 
@@ -1485,7 +1483,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 decl_order = len(nodes)
                 write_deps = [str(run.id)]
                 prev_write_id = last_write_node_id_by_book_id.get(str(default_book_id))
-                if prev_write_id is not None:
+                if prev_write_id is not None:  # pragma: no branch  # pragma: allow-no-branch unreachable: default book already has at least one write node before extras
                     write_deps.append(str(prev_write_id))
                 last_write_node_id_by_book_id[str(default_book_id)] = str(node_id)
 

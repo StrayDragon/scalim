@@ -1,6 +1,6 @@
 import logging
 
-from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEvent
+from scalim.events._events import BatchEndEvent, BatchStartEvent, FieldSlimEvent, LoaderCallEvent, RowWriteEvent
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver, FieldSlimStep, LoaderCallStep, RowWriteStep
 
 
@@ -16,6 +16,21 @@ def test_tracer_steps_to_dict() -> None:
     row_step = RowWriteStep(row_id=1, batch_num=2)
     row_dict = row_step.to_dict()
     assert row_dict["row_id"] == "1"
+
+    row_step_none = RowWriteStep(row_id=None, batch_num=2)
+    row_dict_none = row_step_none.to_dict()
+    assert row_dict_none["row_id"] is None
+
+
+def test_tracer_handlers_noop_when_batch_is_missing() -> None:
+    observer = ExecutionTraceObserver()
+    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.2))
+    observer.on_field_slim(FieldSlimEvent(field_key="f", reason="test", batch_num=None, remaining_fields=0))
+    observer.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=None, row_index=0))
+
+    assert observer.batches == []
+    assert observer.total_field_slims == 0
+    assert observer.total_row_writes == 0
 
 
 def test_tracer_serialize_params_handles_collections() -> None:

@@ -449,6 +449,46 @@ outputs:
     assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
 
 
+def test_template_sandbox_safe_does_not_warn_legacy_deprecation_in_unsafe_entrypoints(tmp_path) -> None:
+    import warnings
+
+    from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_compile
+
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+resources:
+  files:
+    detail_csv:
+      kind: csv_file
+      path: ./out
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    fields:
+      - order_id
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        _ = unsafe_compile(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_sandbox="safe",
+        )
+    assert not any("template_sandbox='legacy'" in str(w.message) for w in recorded)
+
+
 def test_template_sandbox_invalid_value_is_rejected_by_unsafe_entrypoints(tmp_path) -> None:
     from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_compile
 

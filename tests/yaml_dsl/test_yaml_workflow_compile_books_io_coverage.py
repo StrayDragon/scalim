@@ -30,7 +30,7 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     OutputToConfig,
     ResourcesConfig,
 )
-from scalim.spec.ir._workflow import AppendSheetNodeIr, WorkflowAnyNodeIr, WorkflowEdgeIr, WorkflowNodeType, WriteSheetNodeIr
+from scalim.spec.ir._workflow import AppendSheetNodeIr, WorkflowAnyNodeIr, WorkflowEdgeIr, WorkflowNodeIr, WorkflowNodeType, WriteSheetNodeIr
 
 
 def test_workflow_compile_try_resolve_book_export_abs_path_cover_branches(tmp_path: Path) -> None:
@@ -91,6 +91,14 @@ def test_workflow_compile_effective_book_binding_and_sheet_name_cover_branches()
     assert book == "report"
     assert ref == "outputs.0.to.book"
 
+    blank_book, blank_ref = workflow_compile_mod._effective_book_binding_for_output(  # noqa: SLF001
+        OutputTargetConfig(name="detail", to=OutputToConfig(book="  "), fields=("a",)),
+        idx=2,
+        outputs_path="outputs",
+    )
+    assert blank_book is None
+    assert blank_ref == "outputs.2.to.book"
+
     missing_book, missing_ref = workflow_compile_mod._effective_book_binding_for_output(  # noqa: SLF001
         OutputTargetConfig(name="detail", fields=("a",)),
         idx=1,
@@ -102,6 +110,33 @@ def test_workflow_compile_effective_book_binding_and_sheet_name_cover_branches()
     sheet, ref = workflow_compile_mod._effective_sheet_name_for_output(out_cfg, idx=0, outputs_path="outputs")  # noqa: SLF001
     assert sheet == "detail"
     assert ref == "outputs.0.name"
+
+
+def test_workflow_compile_effective_file_binding_for_output_handles_empty_strings() -> None:
+    out_cfg = OutputTargetConfig(name="detail", to=OutputToConfig(file="detail_csv"), fields=("a",))
+    file_id, ref = workflow_compile_mod._effective_file_binding_for_output(  # noqa: SLF001
+        out_cfg,
+        idx=0,
+        outputs_path="outputs",
+    )
+    assert file_id == "detail_csv"
+    assert ref == "outputs.0.to.file"
+
+    blank_file_id, blank_ref = workflow_compile_mod._effective_file_binding_for_output(  # noqa: SLF001
+        OutputTargetConfig(name="detail", to=OutputToConfig(file="  "), fields=("a",)),
+        idx=1,
+        outputs_path="outputs",
+    )
+    assert blank_file_id is None
+    assert blank_ref == "outputs.1.to.file"
+
+    missing_file_id, missing_ref = workflow_compile_mod._effective_file_binding_for_output(  # noqa: SLF001
+        OutputTargetConfig(name="detail", fields=("a",)),
+        idx=2,
+        outputs_path="outputs",
+    )
+    assert missing_file_id is None
+    assert missing_ref == "outputs.2.to.file"
 
 
 def test_workflow_compile_parse_output_extra_sheet_override_branches_cover_errors_and_success() -> None:
@@ -428,6 +463,36 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
             overrides_resources=None,
         )
 
+    # same config, same base_dir: duplicate ids are accepted, and loops continue when later items exist
+    demand_cfg_a = DemandConfig(
+        resources=ResourcesConfig(
+            books={"report": BookConfig(kind="xlsx_file", path="./out")},
+            files={"detail_csv": FileConfig(kind="csv_file", path="./out", encoding="utf-8")},
+        )
+    )
+    demand_cfg_b = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(kind="xlsx_file", path="./out"),
+                "extra": BookConfig(kind="xlsx_file", path="./extra"),
+            },
+            files={
+                "detail_csv": FileConfig(kind="csv_file", path="./out", encoding="utf-8"),
+                "extra_csv": FileConfig(kind="csv_file", path="./extra", encoding="utf-8"),
+            },
+        )
+    )
+    _resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+        wf_obj,
+        workflow_base_dir=workflow_base_dir,
+        demand_cfg_by_run_id={"a": demand_cfg_a, "b": demand_cfg_b},
+        demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml"), "b": str(tmp_path / "d" / "b.yaml")},
+        init_vars=None,
+        overrides_resources=None,
+    )
+    assert "report" in effective_books and "extra" in effective_books
+    assert "detail_csv" in effective_files and "extra_csv" in effective_files
+
     # demand-only book is accepted and uses demand YAML base_dir semantics
     wf_obj = WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig())
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}))
@@ -558,6 +623,73 @@ def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields
     assert files["detail_csv"].encoding == "latin1"
 
 
+def test_workflow_compile_resources_override_to_patch_supports_partial_overrides_and_ignores_none_fields() -> None:
+    patch = workflow_compile_mod._book_override_to_patch(BookResourceOverride(path="./out"))  # noqa: SLF001
+    assert patch == {"path": "./out"}
+
+    patch2 = workflow_compile_mod._book_override_to_patch(  # noqa: SLF001
+        BookResourceOverride(
+            kind="xlsx_memory",
+            budget=BookBudgetOverride(max_sheets=None, max_total_cells=2),
+        )
+    )
+    assert patch2["kind"] == "xlsx_memory"
+    assert patch2["budget"] == {"max_total_cells": 2}
+
+    patch3 = workflow_compile_mod._book_override_to_patch(  # noqa: SLF001
+        BookResourceOverride(
+            kind="xlsx_memory",
+            budget=BookBudgetOverride(max_sheets=1, max_total_cells=None),
+        )
+    )
+    assert patch3["budget"] == {"max_sheets": 1}
+
+    patch4 = workflow_compile_mod._book_override_to_patch(  # noqa: SLF001
+        BookResourceOverride(
+            kind="xlsx_memory",
+            export_xlsx=BookExportXlsxOverride(path=None, allow_formulas=True),
+        )
+    )
+    assert patch4["export_xlsx"] == {"allow_formulas": True}
+
+    patch5 = workflow_compile_mod._book_override_to_patch(  # noqa: SLF001
+        BookResourceOverride(
+            kind="xlsx_memory",
+            export_xlsx=BookExportXlsxOverride(path="./x", allow_formulas=None),
+        )
+    )
+    assert patch5["export_xlsx"] == {"path": "./x"}
+
+    patch6 = workflow_compile_mod._book_override_to_patch(  # noqa: SLF001
+        BookResourceOverride(
+            kind="xlsx_file",
+            write_defaults=BookWriteDefaultsOverride(mode=None, align_by="header"),
+        )
+    )
+    assert patch6["write_defaults"] == {"align_by": "header"}
+
+    file_patch = workflow_compile_mod._file_override_to_patch(FileResourceOverride(path=None, encoding="latin1"))  # noqa: SLF001
+    assert file_patch == {"encoding": "latin1"}
+
+
+def test_workflow_compile_resources_override_updates_existing_workflow_book(tmp_path: Path) -> None:
+    wf_obj = WorkflowConfig(
+        runs=(),
+        options=WorkflowOptions(),
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./wf")}),
+    )
+    resources, books, _files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+        wf_obj,
+        workflow_base_dir=tmp_path,
+        demand_cfg_by_run_id={},
+        demand_yaml_paths_by_run_id={},
+        init_vars=None,
+        overrides_resources=ResourcesOverride(books={"report": BookResourceOverride(path="./override")}),
+    )
+    assert resources
+    assert books["report"].path == "./override"
+
+
 def test_workflow_compile_outputs_defaults_book_id_and_default_binding_cover_branches() -> None:
     assert workflow_compile_mod._parse_overrides_outputs_defaults_book_id(None) is None  # noqa: SLF001
 
@@ -661,6 +793,19 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
         default_book_id=None,
     )
     assert outs[0].name == "detail"
+
+    outs2 = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
+        cfg,
+        overrides_outputs=[
+            OutputOverride(
+                name="detail2",
+                fields=("a",),
+                to=OutputToOverride(book="report", sheet="S"),
+            )
+        ],
+        default_book_id=None,
+    )
+    assert outs2[0].write is None
 
     # build nodes: cfg missing in mapping -> continue branch
     wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
@@ -870,6 +1015,26 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
         nodes,  # type: ignore[arg-type]
         edges=[],
     )
+
+    # inject deps: already present -> noop branches
+    nodes2 = [
+        WorkflowNodeIr(
+            node_id="consumer",
+            node_type=WorkflowNodeType.DEMAND,
+            decl_order=0,
+            deps=("w",),
+        )
+    ]
+    edges2: list[WorkflowEdgeIr] = []
+    workflow_compile_mod._inject_xlsx_memory_write_dependencies(  # noqa: SLF001
+        {"a": ["w"]},
+        {"a": ["consumer"]},
+        {"consumer": 0},
+        nodes2,  # type: ignore[arg-type]
+        edges=edges2,
+    )
+    assert nodes2[0].deps == ("w",)
+    assert edges2 == []
 
 
 def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_branches(tmp_path: Path) -> None:

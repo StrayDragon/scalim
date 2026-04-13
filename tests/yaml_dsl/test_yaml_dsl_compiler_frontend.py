@@ -3,6 +3,7 @@ from pathlib import Path
 
 import scalim.dsl.yaml_dsl.compiler_frontend.compiler as frontend_compiler
 from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend, compile_demand_frontend_diagnostics
+from scalim.dsl.yaml_dsl.compiler_frontend.contracts import StaticCompilation
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
 
 from tests.support.pathing import fixtures_dir
@@ -78,6 +79,16 @@ def test_iter_file_import_cache_paths_filters_keys(tmp_path: Path) -> None:
     paths = frontend_compiler._iter_file_import_cache_paths(cache)  # type: ignore[attr-defined]
 
     assert paths == [str(existing.resolve(strict=False))]
+
+
+def test_static_compilation_as_frontend_snapshot_omits_effective_yaml_when_missing() -> None:
+    snapshot = StaticCompilation(effective_yaml=None).as_frontend_snapshot()
+    assert "effective_yaml" not in snapshot
+
+
+def test_error_envelope_as_dict_omits_loc_when_missing() -> None:
+    envelope = ErrorEnvelope(code="c", message="m", source_path="p", path="x", loc=None)
+    assert envelope.as_dict() == {"code": "c", "message": "m", "source_path": "p", "path": "x"}
 
 
 def test_frontend_diagnostics_reads_yaml_file_when_text_is_missing(tmp_path: Path) -> None:
