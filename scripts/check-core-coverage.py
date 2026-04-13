@@ -121,11 +121,11 @@ def _reason_after_marker(text: str, marker: str) -> str:
 
 
 def _parse_non_core_reason(source: str) -> str:
-    """读取文件级 allow-non-core 标记.
+    """读取文件级 `allow-non-core` 标记.
 
     规则:
-    - 只在文件 header 注释区生效(模块 docstring 之后/第一段代码之前).
-    - 必须带 reason,否则视为未声明.
+    - 只在文件 `header` 注释区生效(模块 `docstring` 之后/第一段代码之前).
+    - 必须带 `reason`,否则视为未声明.
     """
     in_header = True
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
@@ -157,7 +157,7 @@ def _classify_files(*, repo_root: Path, rel_root: Path) -> tuple[list[str], dict
             non_core[rel] = _NonCoreFile(reason=reason)
             continue
         if _ALLOW_NON_CORE_FILE_MARK in source:
-            # 出现了 marker 但没给 reason: 属于治理错误(避免无理由绕过 gate).
+            # 出现了 `marker` 但没给 `reason`: 属于治理错误(避免无理由绕过 `gate`).
             invalid_non_core.append(rel)
             continue
         core.append(rel)
@@ -168,7 +168,7 @@ def _classify_files(*, repo_root: Path, rel_root: Path) -> tuple[list[str], dict
 def _load_coverage_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("Invalid coverage JSON: expected object at top-level")
+        raise ValueError("无效的覆盖率 JSON：顶层必须是对象")
     return payload
 
 
@@ -378,7 +378,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     coverage_json_abs = (coverage_json_path if coverage_json_path.is_absolute() else repo_root / coverage_json_path).resolve()
 
     if not coverage_json_abs.exists():
-        raise SystemExit("[error] coverage json not found: {}".format(coverage_json_abs.as_posix()))
+        raise SystemExit("[错误] 未找到覆盖率 JSON: {}".format(coverage_json_abs.as_posix()))
 
     core_files, non_core_files, invalid_non_core = _classify_files(repo_root=repo_root, rel_root=rel_root)
 
@@ -387,7 +387,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     branch_coverage_enabled = bool(meta.get("branch_coverage"))
     coverage_files = payload.get("files") or {}
     if not isinstance(coverage_files, dict):
-        raise ValueError("Invalid coverage JSON: files must be a dict")
+        raise ValueError("无效的覆盖率 JSON：`files` 必须是对象")
 
     failures, missing_in_report = _compute_failures(
         core_files=core_files,

@@ -179,7 +179,7 @@ def _score_highlight(text: str) -> int:
     # 破坏性细节留给 `Breaking / Upgrade` 段。
     if s.strip().startswith(("移除", "删除", "弃用", "废弃")):
         score -= 4
-    # `Highlights` 避免挑到 Non-goals/约束口径（例如“不会改变/保持不变”），它们通常不是版本主线变化。
+    # `Highlights` 避免挑到 `Non-goals`/约束口径（例如“不会改变/保持不变”），它们通常不是版本主线变化。
     if s.strip().startswith(("不改变", "不变", "保持不变")):
         score -= 6
     if "支持" in s:
@@ -650,7 +650,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if from_key_match:
             t = key_match.group(1).strip()
             lower = t.lower()
-        # 明确过滤掉“代码符号/签名”，避免把 refactor 里的内部函数名当成 YAML 编写面。
+        # 明确过滤掉“代码符号/签名”，避免把 `refactor` 里的内部函数名当成 YAML 编写面。
         if t.startswith("_"):
             return False
         if "->" in t or "(" in t or ")" in t:
@@ -675,7 +675,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             return True
         # 常见的 `YAML` 键（`snake_case`）也属于编写面 `token`。
         # - 仅在明确出现 `key:` 的反引号片段里才放行通用 `snake_case`（避免把 Python API 参数/变量名误判为 YAML）。
-        # - 少量高频 `YAML` 键允许以“裸 token”出现（例如提案里写成 `write_lock`）。
+        # - 少量高频 `YAML` 键允许以“裸 `token`”出现（例如提案里写成 `write_lock`）。
         if t == "write_lock":
             return True
         if from_key_match and "_" in t and re.fullmatch(r"[a-z_][a-z0-9_]*", t):
@@ -720,17 +720,23 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         tokens = re.findall(r"`([^`]+)`", text)
         workflow_authoring_hint = "workflow yaml" in lower or "workflow yml" in lower or "workflow 配置" in text
         demand_authoring_hint = "demand yaml" in lower or "demand yml" in lower
-        has_surface_token = any(_tok_is_surface(tok) for tok in tokens) or "workflow." in text or "yaml-dsl" in lower or workflow_authoring_hint or demand_authoring_hint
-        has_user_facing_hint = ("用户" in text and ("需要" in text or "应" in text or "改为" in text or "改成" in text or "迁移" in text)) or (
-            "旧写法" in text or "旧语法" in text or "旧字段" in text or "不再支持" in text or "不兼容" in text
+        has_surface_token = (
+            any(_tok_is_surface(tok) for tok in tokens)
+            or "workflow." in text
+            or "yaml-dsl" in lower
+            or workflow_authoring_hint
+            or demand_authoring_hint
         )
+        has_user_facing_hint = (
+            "用户" in text and ("需要" in text or "应" in text or "改为" in text or "改成" in text or "迁移" in text)
+        ) or ("旧写法" in text or "旧语法" in text or "旧字段" in text or "不再支持" in text or "不兼容" in text)
 
         # 明确不是 `breaking` 的常见表述：避免“为了避免 `breaking`”之类的句子误入。
         if ("避免" in text or "保持" in text) and ("breaking" in lower or "不兼容" in text):
             if "不再支持" not in text and "移除" not in text and "删除" not in text:
                 return False
 
-        # 没有任何“用户可感知线索”的句子，通常不是“你要改什么”的 upgrade 点（避免 refactor 内部迁移误入）。
+        # 没有任何“用户可感知线索”的句子，通常不是“你要改什么”的 `upgrade` 点（避免 `refactor` 内部迁移误入）。
         if not (has_surface_token or has_user_facing_hint):
             return False
 
@@ -797,8 +803,10 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         cleaned = _clean_inline_markers(cand)
 
         # 版本化输出：最常见的升级点是“产物读取入口与路径语义变化”，这里直接抽成一条可执行指令。
-        if "最终产物路径" in cleaned and ("迁移" in cleaned or "改为" in cleaned or "改成" in cleaned) and (
-            "latest" in cleaned.lower() or "manifest" in cleaned.lower() or "latest 指示" in cleaned
+        if (
+            "最终产物路径" in cleaned
+            and ("迁移" in cleaned or "改为" in cleaned or "改成" in cleaned)
+            and ("latest" in cleaned.lower() or "manifest" in cleaned.lower() or "latest 指示" in cleaned)
         ):
             instructions.append("把产物读取入口改为 `manifest/latest.json`（或指定版本目录）；不要再依赖固定最终文件路径。")
             continue
@@ -1014,7 +1022,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
 def _score_change(change: _Change) -> int:
     score = 0
     cid = change.change_id.lower()
-    # `Highlights` 只把“写法/语义”相关的 YAML 变更顶上来；纯 refactor/docs 不用靠 `is_yaml` 抢版面。
+    # `Highlights` 只把“写法/语义”相关的 YAML 变更顶上来；纯 `refactor/docs` 不用靠 `is_yaml` 抢版面。
     if change.is_yaml and change.example_priority < 99:
         score += 120
     elif change.is_yaml:
@@ -1054,7 +1062,7 @@ def _score_change(change: _Change) -> int:
     # 文档漂移/卫生在多数发布中不应盖过“写法/行为”变更：仅在缺少其它变化时才上榜。
     if "docs-consistency" in cid or "docs" in cid:
         score -= 80
-    # schema docs standardizer / dev-only 插件通常不是“发布主线变化”，避免压过 workflow/核心重构。
+    # `schema docs standardizer` / `dev-only` 插件通常不是“发布主线变化”，避免压过 `workflow`/核心重构。
     if "doc-standardizer" in cid or "doc_standardizer" in cid:
         score -= 250
     if change.keyword == "dev-optional-plugins":
@@ -1225,7 +1233,7 @@ def _render_notes(
     if len(commit_lines) <= max_commit_lines:
         shown = commit_lines
     else:
-        # 仍保持 8 行：第 8 条 commit 行尾追加 “…略”。
+        # 仍保持 8 行：第 8 条 `commit` 行尾追加 “…略”。
         shown = commit_lines[:max_commit_lines]
         if shown:
             shown[-1] = shown[-1] + " …略"
