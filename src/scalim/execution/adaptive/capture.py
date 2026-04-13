@@ -70,13 +70,12 @@ class HookCaptureManager(HookManager):
             return
 
         payload = result
-        if self.loader_result_policy != "full":
-            if self.loader_result_policy == "none":
-                payload = None
-            elif self.loader_result_policy == "summary":
-                payload = self._summarize_result(result)
-            elif self.loader_result_policy == "sample":
-                payload = self._sample_result(result)
+        if self.loader_result_policy == "none":
+            payload = None
+        elif self.loader_result_policy == "summary":
+            payload = self._summarize_result(result)
+        elif self.loader_result_policy == "sample":
+            payload = self._sample_result(result)
 
         event = LoaderCallEvent(
             loader_name=loader_name,
