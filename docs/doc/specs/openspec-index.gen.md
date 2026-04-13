@@ -76,6 +76,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/error-taxonomy/spec.md)
 - Summary: **状态: ✅ 已实现** 为 `scalim` 建立统一的异常体系规范:以 `ScalimError(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
 
+### `exception-chain-convention`
+- Title: exception-chain-convention Specification
+- Source: [spec.md](#code=openspec/specs/exception-chain-convention/spec.md)
+- Summary: TBD - created by archiving change c10-fix-exception-chain-consistency. Update Purpose after archive.
+
 ### `execution-structure`
 - Title: execution-structure Specification
 - Source: [spec.md](#code=openspec/specs/execution-structure/spec.md)
@@ -251,6 +256,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/preload-cache-signature-guardrail/spec.md)
 - Summary: TBD - created by archiving change c700-preload-cache-signature-guardrail. Update Purpose after archive.
 
+### `preload-cache-thread-safety`
+- Title: preload-cache-thread-safety Specification
+- Source: [spec.md](#code=openspec/specs/preload-cache-thread-safety/spec.md)
+- Summary: TBD - created by archiving change c35-harden-preload-cache-thread-safety. Update Purpose after archive.
+
 ### `prompt-eval-fixture-cli`
 - Title: prompt-eval-fixture-cli Specification
 - Source: [spec.md](#code=openspec/specs/prompt-eval-fixture-cli/spec.md)
@@ -280,6 +290,11 @@ Sources:
 - Title: runtime-pruning Specification
 - Source: [spec.md](#code=openspec/specs/runtime-pruning/spec.md)
 - Summary: **状态: ✅ 已实现** PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
+
+### `single-writer-model-safety`
+- Title: single-writer-model-safety Specification
+- Source: [spec.md](#code=openspec/specs/single-writer-model-safety/spec.md)
+- Summary: TBD - created by archiving change c40-harden-single-writer-model-futureproof. Update Purpose after archive.
 
 ### `sink-fastpath`
 - Title: sink-fastpath Specification
@@ -330,6 +345,16 @@ Sources:
 - Title: workflow-cache-pool Specification
 - Source: [spec.md](#code=openspec/specs/workflow-cache-pool/spec.md)
 - Summary: **状态: ✅ 已实现** 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
+
+### `workflow-cache-pool-safety`
+- Title: workflow-cache-pool-safety Specification
+- Source: [spec.md](#code=openspec/specs/workflow-cache-pool-safety/spec.md)
+- Summary: TBD - created by archiving change c30-harden-cache-pool-eviction-safety. Update Purpose after archive.
+
+### `workflow-execute-organization`
+- Title: workflow-execute-organization Specification
+- Source: [spec.md](#code=openspec/specs/workflow-execute-organization/spec.md)
+- Summary: TBD - created by archiving change c45-refactor-execute-controller-phase1. Update Purpose after archive.
 
 ### `workflow-intermediate-store`
 - Title: workflow-intermediate-store Specification
