@@ -106,3 +106,18 @@ def test_csv_sink_flush_policy_every_n_rows_requires_positive(tmp_path) -> None:
             flush_policy="every_n_rows",
             flush_every_rows=0,
         )
+
+
+def test_csv_sink_flush_policy_mutated_unknown_value_is_ignored(tmp_path) -> None:
+    output_path = tmp_path / "mutated.csv"
+    sink = CSVSink(
+        str(output_path),
+        field_names=["id"],
+        flush_policy="every_n_rows",
+        flush_every_rows=2,
+    )
+    sink.flush_policy = "unknown"
+    sink.write_row({"id": 1})
+    sink.close()
+
+    assert output_path.exists()

@@ -37,6 +37,67 @@ from tests.fixtures.executor_operator_fixtures import (
 )
 
 
+def test_load_ref_trigger_loader_call_handles_missing_binding() -> None:
+    class _InstrumentationStub:
+        def __init__(self) -> None:
+            self.calls: List[Dict[str, Any]] = []
+
+        def wants(self, event_type: str) -> bool:
+            return event_type == EVENT_LOADER_CALL
+
+        def emit_loader_call(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
+            self.calls.append(kwargs)
+
+    class _RuntimeStub:
+        def __init__(self) -> None:
+            self.instrumentation = _InstrumentationStub()
+            self.batch_num = 3
+            self.runtime_bindings = RuntimeBindings()
+
+    runtime = _RuntimeStub()
+
+    load_ref_loader._trigger_ref_loader_call(  # noqa: SLF001
+        runtime=runtime,  # type: ignore[arg-type]
+        source_id="src",
+        binding=None,
+        loader_context=LoaderCallContextIr(source_id="src"),
+        result={"x": 1},
+        duration=0.25,
+        cache_enabled=False,
+        lookup_key_count=0,
+        event_field_keys=("k",),
+        cache_status=None,
+    )
+
+    assert runtime.instrumentation.calls
+    assert runtime.instrumentation.calls[0]["params"] == {}
+
+
+def test_load_ref_loader_chunked_skips_duplicate_keys_without_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(load_ref_loader, "build_ref_loader_context", lambda *args, **kwargs: object())
+    monkeypatch.setattr(load_ref_loader, "_call_ref_loader", lambda **kwargs: {"dup": 1})
+
+    class _SourceStub:
+        source_id = "src"
+
+    class _RuntimeStub:
+        load_ref_cache: Dict[object, object] = {}
+
+    merged = load_ref_loader._load_ref_chunked(  # noqa: SLF001
+        exec_ctx=object(),  # type: ignore[arg-type]
+        source=_SourceStub(),  # type: ignore[arg-type]
+        binding=None,
+        runtime=_RuntimeStub(),  # type: ignore[arg-type]
+        event_field_keys=("k",),
+        lookup_keys_list=["a", "b"],
+        batch_rows=None,
+        chunk_size=1,
+        cache_key=None,
+    )
+
+    assert merged == {"dup": 1}
+
+
 def test_load_ref_key_normalization_space_mismatch_warning_continues_loop() -> None:
     class _NoEmitInstrumentation:
         def emit_diagnostic_warning(self, **_kwargs) -> None:  # type: ignore[no-untyped-def]
