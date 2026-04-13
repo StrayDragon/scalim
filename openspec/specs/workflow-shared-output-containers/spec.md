@@ -271,6 +271,28 @@ staging 路径布局约束:
 - **THEN** 系统 MUST 仅在 controller 上下文中发布 artifacts/ctx/resource 写入
 - **AND** 任一 worker 线程调用上述 publish/commit 接口 MUST 被视为实现错误并导致 fail-fast
 
+### Requirement: WorkflowArtifactsDirectory MUST fail-fast on any non-controller thread write path
+
+`WorkflowArtifactsDirectory` 是 workflow-managed 的共享可变状态. 所有会写内部状态的 API MUST 被视为 controller-only writer,包括:
+
+- `publish` / `discard`
+- in-memory artifact cleanup helpers(例如 `discard_in_memory_*`、`discard_all_in_memory_*`、`discard_all_in_memory_rows`)
+
+任一非 controller 线程(worker)调用上述 writer API MUST 被视为实现错误,并 MUST fail-fast(例如抛出 `RuntimeError`),而不是静默写入共享状态.
+
+#### Scenario: worker misuse of in-memory discard helpers fails fast
+- **GIVEN** workflow 启用并发执行（`max_concurrency > 1`）
+- **WHEN** worker 线程调用 `WorkflowArtifactsDirectory` 的 in-memory discard/cleanup helper
+- **THEN** 调用 MUST fail-fast(例如抛出 `RuntimeError`),而不是静默写入共享状态
+
+### Requirement: The single-writer contract MUST be consistently enforced across all artifacts cleanup paths
+
+单写者契约 MUST NOT 仅在“主入口 API”上部分生效,而留下 helper 方法的未加固写路径. 任何会写内部 dict 的 artifacts helper MUST 具备与 `publish/discard` 等价的 owner-thread enforcement.
+
+#### Scenario: refactor does not introduce unguarded helper writes
+- **WHEN** 新增 artifacts helper API 或重构既有 helper
+- **THEN** 任一会写 workflow-managed artifacts 的 helper MUST 包含相同的 owner-thread enforcement
+
 ### Requirement: workflow shared resources MUST publish into versioned output roots and update manifest/latest
 
 当 workflow 最终 commit 共享输出资源（books/files）时，系统 MUST 按版本化输出（D-2）协议发布：
@@ -286,4 +308,3 @@ staging 路径布局约束:
 - **THEN** `./out/versions/<wf_exec_id_1>/` 与 `./out/versions/<wf_exec_id_2>/` MUST 同时存在
 - **AND** `./out/manifest/latest.json` MUST 始终为可解析 JSON
 - **AND** `./out/**/*.scalim.lock` MUST 不存在
-

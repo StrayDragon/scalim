@@ -76,6 +76,7 @@ class WorkflowArtifactsDirectory:
             _ = self._values_by_producer_node_id.pop(producer, None)
 
     def discard_in_memory_csv_output(self, producer_node_id: str, output_id: str) -> None:
+        self._assert_owner_thread()
         producer = str(producer_node_id)
         out_id = str(output_id)
         by_artifact = self._values_by_producer_node_id.get(producer)
@@ -98,6 +99,7 @@ class WorkflowArtifactsDirectory:
             _ = self._values_by_producer_node_id.pop(producer, None)
 
     def discard_all_in_memory_csv_outputs(self) -> None:
+        self._assert_owner_thread()
         for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
             _ = by_artifact.pop("in_memory_csv_outputs", None)
             _ = by_artifact.pop("in_memory_csv_export_headers", None)
@@ -105,12 +107,14 @@ class WorkflowArtifactsDirectory:
                 _ = self._values_by_producer_node_id.pop(producer_node_id, None)
 
     def discard_all_in_memory_rows(self) -> None:
+        self._assert_owner_thread()
         for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
             _ = by_artifact.pop("in_memory_rows", None)
             if not by_artifact:
                 _ = self._values_by_producer_node_id.pop(producer_node_id, None)
 
     def discard_in_memory_rows_output(self, producer_node_id: str, output_id: str) -> None:
+        self._assert_owner_thread()
         producer = str(producer_node_id)
         out_id = str(output_id)
         by_artifact = self._values_by_producer_node_id.get(producer)
@@ -127,6 +131,7 @@ class WorkflowArtifactsDirectory:
             _ = self._values_by_producer_node_id.pop(producer, None)
 
     def discard_all_in_memory_rows_outputs(self) -> None:
+        self._assert_owner_thread()
         for producer_node_id, by_artifact in list(self._values_by_producer_node_id.items()):
             _ = by_artifact.pop("in_memory_rows_outputs", None)
             if not by_artifact:
