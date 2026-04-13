@@ -1065,20 +1065,19 @@ class ParserOutputsMixin:
                     raise ValueError(msg)
                 continue
 
-            if cfg.producer_key == "compute":
-                compute_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
-                compute_deps = cast(
-                    "Tuple[str, ...]", compute_cfg.get("dependencies") or ()
-                )  # pragma: allow-cast output aggregate config typed narrowing
-                missing = [d for d in compute_deps if d not in allowed]
-                if missing:
-                    msg = "outputs.{}.aggregate.fields.{}.compute reference unknown fields: {}".format(
-                        name,
-                        fid,
-                        ", ".join(sorted(set(missing))),
-                    )
-                    raise ValueError(msg)
-                continue
+            # `post_field_ids` 已按 `_POST_FUNC_KEYS` 过滤; 走到这里时 `producer_key` 只能是 `compute`.
+            compute_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
+            compute_deps = cast(
+                "Tuple[str, ...]", compute_cfg.get("dependencies") or ()
+            )  # pragma: allow-cast output aggregate config typed narrowing
+            missing = [d for d in compute_deps if d not in allowed]
+            if missing:
+                msg = "outputs.{}.aggregate.fields.{}.compute reference unknown fields: {}".format(
+                    name,
+                    fid,
+                    ", ".join(sorted(set(missing))),
+                )
+                raise ValueError(msg)
 
     def _derived_deps_for_aggregate_derived_field(self, cfg: OutputAggregateFieldConfig) -> Tuple[str, ...]:
         producer_key = str(cfg.producer_key)
@@ -1086,11 +1085,7 @@ class ParserOutputsMixin:
             rank_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
             by = str(rank_cfg.get("by") or "").strip()
             order_by = cast("Tuple[str, ...]", rank_cfg.get("order_by") or ())  # pragma: allow-cast output aggregate config typed narrowing
-            deps_list: List[str] = []
-            if by:
-                deps_list.append(by)
-            if order_by:
-                deps_list.extend([str(x) for x in order_by])
+            deps_list = [by] + [str(x) for x in order_by]
             # `order_by` 缺省时,语义等价于 `[by]`.
             return ordered_unique_str([x for x in deps_list if x])
 
@@ -1184,8 +1179,7 @@ class ParserOutputsMixin:
         required: List[str] = []
         for t in outputs:
             if t.aggregate is None:
-                if t.fields:
-                    required.extend([str(x) for x in t.fields])
+                required.extend([str(x) for x in (t.fields or ())])
             else:
                 agg = t.aggregate
                 required.extend([str(x) for x in agg.group_by])

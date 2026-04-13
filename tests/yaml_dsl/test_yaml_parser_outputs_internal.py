@@ -65,6 +65,16 @@ def test_resolve_output_targets_from_inheritance_rejects_inherit_fields_when_bas
         _ = _resolve_output_targets_from_inheritance(base_outputs, validate_output_name=lambda _x: None)  # noqa: SLF001
 
 
+def test_resolve_output_targets_from_inheritance_keeps_child_fields_when_declared() -> None:
+    base_outputs = [
+        OutputTargetConfig(name="base", fields=("a",)),
+        OutputTargetConfig(name="child", from_="base", fields=("b",)),
+    ]
+
+    merged = _resolve_output_targets_from_inheritance(base_outputs, validate_output_name=lambda _x: None)  # noqa: SLF001
+    assert [x.fields for x in merged] == [("a",), ("b",)]
+
+
 def test_parse_output_target_rejects_fields_non_list() -> None:
     loader = YamlDemandLoader()
     engine = SecureComputeEngine()
@@ -85,6 +95,38 @@ def test_parse_output_target_rejects_fields_non_list() -> None:
             known_field_ids={"order_id"},
             engine=engine,
         )
+
+
+def test_parse_output_target_rejects_aggregate_when_missing_fields_key() -> None:
+    loader = YamlDemandLoader()
+    engine = SecureComputeEngine()
+    field_index = _dummy_field_index()
+
+    with pytest.raises(TypeError, match=r"outputs\.0\.aggregate\.fields must be an object"):
+        loader._parse_output_target(
+            {"name": "agg", "to": {"file": "detail_csv"}, "aggregate": {"group_by": ["order_id"]}},
+            idx=0,
+            outputs_key="outputs",
+            field_def_index=field_index,
+            known_field_ids={"order_id"},
+            engine=engine,
+        )
+
+
+def test_parse_output_target_fields_allows_blank_items_and_skips_them() -> None:
+    loader = YamlDemandLoader()
+    engine = SecureComputeEngine()
+    field_index = _dummy_field_index()
+
+    parsed = loader._parse_output_target(
+        {"name": "detail", "to": {"file": "detail_csv"}, "fields": [" ", "order_id"]},
+        idx=0,
+        outputs_key="outputs",
+        field_def_index=field_index,
+        known_field_ids={"order_id"},
+        engine=engine,
+    )
+    assert parsed.fields == ("order_id",)
 
 
 def test_resolve_output_field_ref_rejects_non_str_and_non_mapping() -> None:
@@ -176,6 +218,32 @@ def test_parse_output_aggregate_field_agg_allows_null_field_value() -> None:
         field_def_index=field_index,
     )
     assert cfg == {"field": None}
+
+
+def test_parse_output_aggregate_field_agg_count_distinct_allows_fields_null_when_field_is_set() -> None:
+    loader = YamlDemandLoader()
+    field_index = _dummy_field_index()
+
+    cfg = loader._parse_output_aggregate_field_agg(  # type: ignore[attr-defined]
+        "count_distinct",
+        {"field": "a", "fields": None},
+        base_path="aggregate.fields.distinct",
+        field_def_index=field_index,
+    )
+    assert cfg == {"field": "a"}
+
+
+def test_parse_output_aggregate_field_agg_count_distinct_skips_blank_fields_items() -> None:
+    loader = YamlDemandLoader()
+    field_index = _dummy_field_index()
+
+    cfg = loader._parse_output_aggregate_field_agg(  # type: ignore[attr-defined]
+        "count_distinct",
+        {"fields": [" ", "a"]},
+        base_path="aggregate.fields.distinct",
+        field_def_index=field_index,
+    )
+    assert cfg == {"fields": ("a",)}
 
 
 def test_parse_output_aggregate_field_rank_rejects_blank_by_after_strip() -> None:
@@ -297,6 +365,20 @@ def test_parse_output_aggregate_defensive_checks() -> None:
     assert parsed.fields
     assert "cnt" in parsed.fields
     assert "" not in parsed.fields
+
+
+def test_parse_output_aggregate_skips_blank_group_by_items() -> None:
+    loader = YamlDemandLoader()
+    field_index = _dummy_field_index()
+    engine = SecureComputeEngine()
+
+    parsed = loader._parse_output_aggregate(
+        {"group_by": [" ", "order_id"], "fields": {"cnt": {"count": {}}}},
+        base_path="aggregate",
+        field_def_index=field_index,
+        engine=engine,
+    )
+    assert parsed.group_by == ("order_id",)
 
 
 def test_parse_output_aggregate_field_defensive_checks() -> None:
@@ -592,6 +674,34 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
     assert parsed.producer_key == "rank"
     assert parsed.config["partition_by"] == ("g",)
     assert parsed.config["order_by"] == ("cnt", "g")
+
+
+def test_parse_output_aggregate_field_score_by_rank_allows_missing_rank_field_key() -> None:
+    loader = YamlDemandLoader()
+    field_index = _dummy_field_index()
+    agg_field_index = loader._build_aggregate_field_index({})
+
+    cfg = loader._parse_output_aggregate_field_score_by_rank(  # type: ignore[attr-defined]
+        {},
+        base_path="agg.fields.score",
+        field_def_index=field_index,
+        agg_field_index=agg_field_index,
+    )
+    assert cfg == {"rank_field": None, "base": None, "step": None}
+
+
+def test_parse_output_aggregate_field_score_by_rank_allows_null_rank_field_value() -> None:
+    loader = YamlDemandLoader()
+    field_index = _dummy_field_index()
+    agg_field_index = loader._build_aggregate_field_index({})
+
+    cfg = loader._parse_output_aggregate_field_score_by_rank(  # type: ignore[attr-defined]
+        {"rank_field": None},
+        base_path="agg.fields.score",
+        field_def_index=field_index,
+        agg_field_index=agg_field_index,
+    )
+    assert cfg == {"rank_field": None, "base": None, "step": None}
 
 
 def test_parse_output_aggregate_supports_object_alias_field_refs_and_agg_field_refs() -> None:
