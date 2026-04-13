@@ -1,7 +1,6 @@
 import marimo
 
 import csv
-import json
 import os
 import shutil
 import tempfile
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
     ECommerceConfig,
@@ -137,17 +137,24 @@ def run_workflow_demo_big_data_report(
             version_id: Optional[str] = None
             version_dir: Optional[Path] = None
             try:
-                latest = json.loads((out_root / "manifest" / "latest.json").read_text("utf-8"))
-                version_id = str(latest["version_id"])
-                version_dir = out_root / "versions" / version_id
+                latest = outputs_api.load_latest_outputs(out_root)
+                version_id = str(latest.run_id)
+                any_artifact = None
+                if latest.files:
+                    any_artifact = next(iter(latest.files.values()))
+                elif latest.books:
+                    any_artifact = next(iter(latest.books.values()))
+                version_dir = any_artifact.parent.parent if any_artifact is not None else None
             except Exception:  # noqa: BLE001
-                version_id = None
-                version_dir = None
+                latest = None  # type: ignore[assignment]
 
             missing = out_root / "__missing__"
-            detail_csv = (version_dir / "files" / "detail_csv.csv") if version_dir else missing
-            metrics_csv = (version_dir / "files" / "metrics_csv.csv") if version_dir else missing
-            report_xlsx = (version_dir / "books" / "report.xlsx") if version_dir else missing
+            detail_csv = latest.files.get("detail_csv") if latest is not None else None  # type: ignore[union-attr]
+            metrics_csv = latest.files.get("metrics_csv") if latest is not None else None  # type: ignore[union-attr]
+            report_xlsx = latest.books.get("report") if latest is not None else None  # type: ignore[union-attr]
+            detail_csv = detail_csv or missing
+            metrics_csv = metrics_csv or missing
+            report_xlsx = report_xlsx or missing
 
             verification: VerificationResult
             if detail_csv.exists():

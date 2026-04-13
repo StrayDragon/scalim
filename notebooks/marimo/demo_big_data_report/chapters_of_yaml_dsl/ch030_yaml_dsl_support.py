@@ -1,7 +1,6 @@
 import marimo
 
 import csv
-import json
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -9,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailsRelationsPolicy
 from scalim.ob.presets.row_gap import RowGapObserver
+from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import (
     GuardrailCaptureObserver,
     expected_support_guardrail_codes,
@@ -93,11 +93,9 @@ def run_yaml_dsl_support(
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
-        latest = json.loads((out_root / "manifest" / "latest.json").read_text("utf-8"))
-        version_id = str(latest["version_id"])
-        vdir = out_root / "versions" / version_id
-        out_detail = vdir / "files" / "detail_csv.csv"
-        out_metrics = vdir / "files" / "metrics_csv.csv"
+        latest = outputs_api.load_latest_outputs(out_root)
+        out_detail = outputs_api.latest_file_path(out_root, file_id="detail_csv")
+        out_metrics = outputs_api.latest_file_path(out_root, file_id="metrics_csv")
 
         detail_rows = _read_csv_rows(out_detail) if out_detail.exists() else []
         metrics_rows = _read_csv_rows(out_metrics) if out_metrics.exists() else []
@@ -132,7 +130,7 @@ def run_yaml_dsl_support(
             "yaml_path": str(yaml_path),
             "outputs": core.outputs,
             "out_root": str(out_root),
-            "version_id": version_id,
+            "run_id": latest.run_id,
             "detail_csv": str(out_detail),
             "metrics_csv": str(out_metrics),
             "oracle": oracle_details,

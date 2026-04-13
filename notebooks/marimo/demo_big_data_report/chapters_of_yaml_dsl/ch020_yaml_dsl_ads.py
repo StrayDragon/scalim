@@ -1,13 +1,13 @@
 import marimo
 
 import csv
-import json
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
+from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario import (
     get_ads_creatives_retry_counter_calls,
     reset_ads_creatives_retry_counter_calls,
@@ -85,12 +85,10 @@ def run_yaml_dsl_ads(
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
 
-        latest = json.loads((out_root / "manifest" / "latest.json").read_text("utf-8"))
-        version_id = str(latest["version_id"])
-        vdir = out_root / "versions" / version_id
-        out_detail_all = vdir / "files" / "detail_all_csv.csv"
-        out_detail_clicks = vdir / "files" / "detail_clicks_csv.csv"
-        out_metrics = vdir / "files" / "metrics_by_campaign_csv.csv"
+        latest = outputs_api.load_latest_outputs(out_root)
+        out_detail_all = outputs_api.latest_file_path(out_root, file_id="detail_all_csv")
+        out_detail_clicks = outputs_api.latest_file_path(out_root, file_id="detail_clicks_csv")
+        out_metrics = outputs_api.latest_file_path(out_root, file_id="metrics_by_campaign_csv")
 
         detail_all_rows = _read_csv_rows(out_detail_all) if out_detail_all.exists() else []
         detail_clicks_rows = _read_csv_rows(out_detail_clicks) if out_detail_clicks.exists() else []
@@ -115,7 +113,7 @@ def run_yaml_dsl_ads(
             "yaml_path": str(yaml_path),
             "outputs": run_result.core.outputs,
             "out_root": str(out_root),
-            "version_id": version_id,
+            "run_id": latest.run_id,
             "detail_all_csv": str(out_detail_all),
             "detail_clicks_csv": str(out_detail_clicks),
             "metrics_by_campaign_csv": str(out_metrics),

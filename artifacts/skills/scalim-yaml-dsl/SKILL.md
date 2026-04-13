@@ -13,7 +13,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
 - 运行时故障处理(服务端/工作目录/PYTHONPATH 导致的相对引用问题): 读 [references/task-runtime-troubleshooting.md](references/task-runtime-troubleshooting.md)
 - 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
-- 服务端并发输出/版本化输出(D-2)/`manifest/latest.json` 测试写法: 读 [references/task-workflow-versioned-outputs.md](references/task-workflow-versioned-outputs.md)
+- 服务端并发输出/版本化输出(D-2)/outputs facade 定位写法: 读 [references/task-workflow-versioned-outputs.md](references/task-workflow-versioned-outputs.md)
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)

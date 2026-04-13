@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
-from scalim.execution import versioned_outputs
+from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle import verify_ecommerce_rank_score_csv_rows
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
@@ -69,9 +69,7 @@ def run_yaml_dsl_row_number_score_by_rank(
                     details={"exc_type": type(exc).__name__, "message": str(exc)},
                 )
 
-            latest = versioned_outputs.read_latest(out_root)
-            version_id = str(latest.get("version_id") or "")
-            out_rank = out_root / "versions" / version_id / versioned_outputs.file_output_relpath(file_id="rank_csv")
+            out_rank = outputs_api.latest_file_path(out_root, file_id="rank_csv")
             rows = _read_csv_rows(out_rank) if out_rank.exists() else []
             ok_oracle, oracle_summary, oracle_details = verify_ecommerce_rank_score_csv_rows(actual_rows=rows, cfg=cfg)
 

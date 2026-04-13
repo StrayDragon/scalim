@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-from scalim.execution import versioned_outputs
+from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -39,18 +39,11 @@ def _count_sheet_rows_and_header(workbook: Any, sheet_name: str) -> Tuple[Option
 
 
 def _resolve_latest_book_artifact(out_root: Path, *, book_id: str) -> Tuple[Optional[Path], Dict[str, Any]]:
-    """通过 `manifest/latest.json` 定位 `<out_root>/versions/<version_id>/books/<book_id>.xlsx`."""
     try:
-        latest = versioned_outputs.read_latest(out_root)
-        version_id = str(latest.get("version_id") or "")
-        if not version_id:
-            return None, {"latest": latest}
-        manifest = versioned_outputs.read_version_manifest(out_root, version_id=version_id)
-        books = manifest.get("books") if isinstance(manifest, dict) else None
-        rel = books.get(book_id) if isinstance(books, dict) else None
-        if not rel:
-            rel = versioned_outputs.book_output_relpath(book_id=str(book_id))
-        return out_root / "versions" / version_id / str(rel), {"latest": latest, "manifest": manifest}
+        latest = outputs_api.load_latest_outputs(out_root)
+        path = latest.books.get(str(book_id))
+        meta = {"run_id": latest.run_id, "books": sorted(latest.books.keys())}
+        return path, meta
     except Exception as exc:  # noqa: BLE001
         return None, {"exc_type": type(exc).__name__, "message": str(exc)}
 

@@ -248,14 +248,12 @@ workflow:
         duplicate_global_errors = duplicate_global.errors()
         duplicate_patch_errors = duplicate_patch.errors()
         try:
-            from scalim.execution import versioned_outputs
+            from scalim.shortcuts.resources import outputs
 
             dup_root = tmp / "duplicate_headers_out"
-            latest = versioned_outputs.read_latest(dup_root)
-            version_id = str(latest.get("version_id", "") or "")
-            manifest = versioned_outputs.read_version_manifest(dup_root, version_id=version_id)
-            file_relpath = str((manifest.get("files", {}) or {}).get("detail_csv", "") or "")
-            duplicate_output_exists = bool(file_relpath and (dup_root / "versions" / version_id / file_relpath).exists())
+            latest = outputs.load_latest_outputs(dup_root)
+            detail_csv = latest.files.get("detail_csv")
+            duplicate_output_exists = bool(detail_csv and detail_csv.exists())
         except Exception:
             duplicate_output_exists = False
         passed = bool(

@@ -281,6 +281,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/public-api-surface-governance/spec.md)
 - Summary: **状态: ✅ 已实现** 定义稳定公开入口的编目规则与回归门禁,避免内部实现路径在文档/skills/examples/tests 中被误固化为事实公共 API.
 
+### `resources-discovery`
+- Title: resources-discovery Specification
+- Source: [spec.md](#code=openspec/specs/resources-discovery/spec.md)
+- Summary: **状态: ✅ 已实现** 定义面向用户的稳定公开入口,用于从 output root 定位“最新一次成功发布”的产物集合(books/files),并隐藏底层 D-2 版本化输出协议的内部落盘细节.
+
 ### `runtime-guardrails`
 - Title: runtime-guardrails Specification
 - Source: [spec.md](#code=openspec/specs/runtime-guardrails/spec.md)

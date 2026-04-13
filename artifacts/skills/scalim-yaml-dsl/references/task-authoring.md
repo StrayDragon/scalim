@@ -176,7 +176,7 @@ compile(
 ## 设计偏好
 
 - CSV/Excel 输出 root 在 `resources.files.*.path` / `resources.books.*.(path|export_xlsx.path)` 显式声明(版本化输出 D-2)
-- 多 outputs 共享同一 book 输出时,用 `to.book/to.sheet` 明确绑定;并发写同一 root 依赖“版本目录隔离”(读取 `<root>/manifest/latest.json` 或指定版本目录定位产物)
+- 多 outputs 共享同一 book 输出时,用 `to.book/to.sheet` 明确绑定;并发写同一 root 依赖“版本目录隔离”(通过 `scalim.shortcuts.resources.outputs` 定位最新产物,或显式指定版本目录)
 - 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
 - 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar
 - 只有在 DSL 无法表达时才退回 Python

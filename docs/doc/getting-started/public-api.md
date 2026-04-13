@@ -30,6 +30,8 @@
 | `scalim.events` | 事件 envelope + 事件类型常量 + 事件目录查询入口 | 写 Observer/Hook；按 `event_type` 订阅/过滤 |
 | `scalim.sinks` | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 | `scalim.sinks.rows` | workflow typed rows artifact 稳定入口 | `InMemoryRows` 中间态 / 转换与适配 |
+| `scalim.shortcuts.resources` | 资源类 shortcut 稳定入口 | 从 output root 定位产物/资源 |
+| `scalim.shortcuts.resources.outputs` | outputs discovery facade | 定位最新一次发布的 workbook/books 与 files |
 
 最常见的“只关心导入”的用法:
 

@@ -36,6 +36,8 @@ TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update
 - `scalim.dsl.yaml_dsl` 的 facade imports
 - workflow 辅助公开模块（`workflow` / `workflow_types` / `workflow_paths`）
 - `scalim.spec.ir`
+- `scalim.shortcuts.resources`（资源类 shortcut 稳定入口 package）
+- `scalim.shortcuts.resources.outputs`（输出发现/最新产物定位 facade）
 
 #### Scenario: public API suite exercises curated public imports
 - **WHEN** 开发者运行 public API suite

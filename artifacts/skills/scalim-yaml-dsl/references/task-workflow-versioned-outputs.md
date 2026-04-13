@@ -46,7 +46,7 @@
 ### 推荐：每请求一个 output root（最省心）
 
 - 每个请求创建自己的 `out_root`（临时目录或按 request_id 组织的目录）
-- 运行结束后读取 `<root>/manifest/latest.json`，它在该 root 下不会被其他请求覆盖
+- 运行结束后通过稳定 facade 定位最新产物（例如 `scalim.shortcuts.resources.outputs.load_latest_outputs(out_root)`）
 - 读取产物 bytes 并清理 root（或按业务需要保留）
 
 ### 不推荐：多个请求共享同一个 root
@@ -62,18 +62,12 @@
 下面示例以“中间过程可以落盘,最终返回内存 bytes”为目标。关键点是 **per-request root + finally 清理**：
 
 ```python
-import json
 import shutil
 import tempfile
 from pathlib import Path
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-
-
-def _read_latest_version_id(root: Path) -> str:
-    latest_path = root / "manifest" / "latest.json"
-    latest = json.loads(latest_path.read_text("utf-8"))
-    return str(latest["version_id"])
+from scalim.shortcuts.resources import outputs
 
 
 def run_report_and_return_xlsx_bytes(
@@ -91,29 +85,23 @@ def run_report_and_return_xlsx_bytes(
             ),
         )
 
-        version_id = _read_latest_version_id(out_root)
-        xlsx_path = out_root / "versions" / version_id / "books" / (str(book_id) + ".xlsx")
+        xlsx_path = outputs.latest_book_path(out_root, book_id=str(book_id))
         return xlsx_path.read_bytes()
     finally:
         shutil.rmtree(out_root, ignore_errors=True)
 ```
 
-## pytest 测试写法（推荐断言 `latest.json`）
+## pytest 测试写法（推荐断言 facade 行为）
 
 原则：测试中把 `path` 配成临时目录 root（例如 `tmp_path/"out"`），不要再断言固定的“最终文件路径”。
 
 示例（workflow 运行后检查 workbook 产物）：
 
 ```python
-import json
 from pathlib import Path
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-
-
-def _version_dir(root: Path) -> Path:
-    latest = json.loads((root / "manifest" / "latest.json").read_text("utf-8"))
-    return root / "versions" / str(latest["version_id"])
+from scalim.shortcuts.resources import outputs
 
 
 def test_workflow_outputs_are_versioned(tmp_path: Path) -> None:
@@ -127,9 +115,9 @@ def test_workflow_outputs_are_versioned(tmp_path: Path) -> None:
         ),
     )
 
-    vdir = _version_dir(out_root)
-    assert (vdir / "manifest.json").exists()
-    assert (vdir / "books" / "report.xlsx").exists()
+    report_xlsx = outputs.latest_book_path(out_root, book_id="report")
+    assert report_xlsx.exists()
+    assert (report_xlsx.parent.parent / "manifest.json").exists()
 
     # 版本化输出后,不应在最终文件旁生成 `.scalim.lock`
     assert not any(out_root.rglob("*.scalim.lock"))
@@ -160,4 +148,3 @@ resources:
 - `<out_root>/versions/<version_id>/books/report.xlsx`
 
 如果你需要产物文件名更贴近业务命名,让 `book_id/file_id` 本身表达这个名字即可（v1 不提供单独的 `filename` 字段）。
-
