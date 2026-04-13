@@ -128,3 +128,111 @@ def test_validator_strips_removed_output_write_workbook_fields_keeps_remaining_k
     cleaned = validator._error_and_strip_removed_output_write_workbook_fields(config, issues)  # noqa: SLF001
     assert cleaned["outputs"][0]["write"] == {OUTPUT_WRITE_KEYS["include_header"]: True}  # type: ignore[index]
     assert issues
+
+
+def test_validator_relations_accepts_none_and_source_field_group_empty_list() -> None:
+    validator = _validator()
+    errors = []
+
+    out = validator._validate_relations(  # noqa: SLF001
+        {"relations": None},
+        errors,
+        sources_info={},
+        main_source_id="orders",
+    )
+    assert out == {}
+    assert errors == []
+
+    assert validator._parse_source_field_group([]) is None  # noqa: SLF001
+
+
+def test_validator_field_relation_returns_when_steps_are_invalid() -> None:
+    validator = _validator()
+    errors = []
+    validator._validate_field_relation(  # noqa: SLF001
+        field_id="f",
+        relation_val={"steps": None},
+        source_id="s1",
+        main_source_id="main",
+        sources_set=set(["s1", "main"]),
+        sources_info={},
+        relation_paths={},
+        errors=errors,
+        field_path="sources.s1.fields.f",
+    )
+    assert errors
+
+
+def test_validator_sources_normalize_options_cover_valid_branches() -> None:
+    validator = _validator()
+    errors = []
+    validator._validate_normalize_take_first(  # noqa: SLF001
+        {"on_empty": "miss"},
+        errors,
+        norm_path="sources.s1.normalize",
+        source_id="s1",
+    )
+    assert errors == []
+
+    errors = []
+    validator._validate_normalize_project_fields(  # noqa: SLF001
+        {"fields": {"v": {"extract": "a"}}},
+        errors,
+        norm_path="sources.s1.normalize",
+        source_id="s1",
+    )
+    assert errors == []
+
+    errors = []
+    validator._validate_normalize_project_fields(  # noqa: SLF001
+        {"on_missing": "null", "fields": {"v": {"extract": "a"}}},
+        errors,
+        norm_path="sources.s1.normalize",
+        source_id="s1",
+    )
+    assert errors == []
+
+    errors = []
+    validator._validate_normalize_step_project_fields(  # noqa: SLF001
+        {"fields": {"v": {"extract": "a"}}},
+        errors,
+        step_path="sources.s1.normalize.steps[0]",
+    )
+    assert errors == []
+
+
+def test_validator_strips_removed_output_write_workbook_fields_multiple_outputs_reuses_next_config() -> None:
+    validator = _validator()
+    issues = []
+    config = {
+        "outputs": [
+            {
+                OUTPUT_TARGET_KEYS["to"]: {OUTPUT_TO_KEYS["book"]: "report"},
+                "write": {
+                    "mode": "append",
+                    OUTPUT_WRITE_KEYS["include_header"]: True,
+                },
+            },
+            {
+                OUTPUT_TARGET_KEYS["to"]: {OUTPUT_TO_KEYS["book"]: "report"},
+                "write": {
+                    "mode": "append",
+                    OUTPUT_WRITE_KEYS["include_header"]: True,
+                },
+            },
+        ]
+    }
+    cleaned = validator._error_and_strip_removed_output_write_workbook_fields(config, issues)  # noqa: SLF001
+    assert cleaned["outputs"][0]["write"] == {OUTPUT_WRITE_KEYS["include_header"]: True}  # type: ignore[index]
+    assert cleaned["outputs"][1]["write"] == {OUTPUT_WRITE_KEYS["include_header"]: True}  # type: ignore[index]
+    assert len(issues) >= 2
+
+
+def test_validator_strips_removed_sources_retry_multiple_sources_reuses_next_sources() -> None:
+    issues = []
+    cleaned = {"sources": {"s1": {"retry": {"should_retry": "x"}}, "s2": {"retry": {"should_retry": "y"}}}}
+    out = ConfigValidator._strip_removed_demand_runtime_policy_sources_retry(cleaned, issues)  # noqa: SLF001
+
+    assert "retry" not in out["sources"]["s1"]  # type: ignore[index]
+    assert "retry" not in out["sources"]["s2"]  # type: ignore[index]
+    assert len(issues) == 2

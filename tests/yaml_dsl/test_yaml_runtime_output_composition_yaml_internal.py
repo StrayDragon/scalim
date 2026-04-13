@@ -603,6 +603,7 @@ def test_to_decimal_handles_common_types_and_error_branches() -> None:
     assert oc_yaml._to_decimal(" ") is None  # noqa: SLF001
     assert oc_yaml._to_decimal("oops") is None  # noqa: SLF001
     assert oc_yaml._to_decimal("NaN") is None  # noqa: SLF001
+    assert oc_yaml._to_decimal([]) is None  # noqa: SLF001
 
 
 def test_compile_call_by_post_field_covers_ctx_kinds_and_ensure_field_value_branches() -> None:
@@ -630,6 +631,43 @@ def test_eval_call_by_value_rejects_unknown_kind() -> None:
             row={},
             ctx=oc_yaml._AggregateCallByContext(row_id=None, batch_num=0, field_id="v", deps=(), values={}),  # noqa: SLF001
         )
+
+
+def test_get_derived_field_name_falls_back_when_agg_name_is_blank() -> None:
+    demand_ir = _make_demand_ir()
+    agg = OutputAggregateConfig(
+        group_by=(),
+        fields={
+            "m": OutputAggregateFieldConfig(
+                producer_key="count",
+                config={},
+                name=" ",
+            )
+        },
+    )
+
+    assert oc_yaml._get_derived_field_name("m", demand_ir, agg) == "m"  # noqa: SLF001
+    assert oc_yaml._get_derived_field_name("missing", demand_ir, agg) == "missing"  # noqa: SLF001
+
+
+def test_effective_file_and_book_ids_return_none_for_blank_refs() -> None:
+    out_cfg = OutputTargetConfig(
+        name="detail",
+        to=OutputToConfig(file=" "),
+        fields=("a",),
+    )
+    file_id, file_path = oc_yaml._effective_file_id_for_output(out_cfg, idx=0, outputs_path="outputs")  # noqa: SLF001
+    assert file_id is None
+    assert file_path == "outputs.0.to.file"
+
+    out_cfg = OutputTargetConfig(
+        name="detail",
+        to=OutputToConfig(book=" "),
+        fields=("a",),
+    )
+    book_id, book_path = oc_yaml._effective_book_id_for_output(out_cfg, idx=1, outputs_path="outputs")  # noqa: SLF001
+    assert book_id is None
+    assert book_path == "outputs.1.to.book"
 
 
 def test_compile_call_by_post_field_rejects_parse_and_resolve_errors() -> None:

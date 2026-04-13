@@ -14,8 +14,7 @@ from ...execution.run_ir import ExecutionResult
 from ...spec.ir._workflow import WorkflowIr, WorkflowNodeIr
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import dataclass, replace
-from ...workflow.execute import ScalimWorkflowRunFailedError
-from ...workflow.execute import run_workflow_ir as _run_workflow_ir
+from ...workflow.execute import ScalimWorkflowRunFailedError, run_workflow_ir
 from ...workflow.report import WorkflowResult
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import (
@@ -686,7 +685,7 @@ def run_workflow(
         )
 
     # 5) 执行 `workflow` `IR`(框架层)
-    return _run_workflow_ir(
+    return run_workflow_ir(
         workflow_path,
         workflow_ir,
         compile_demand_fn=_compile_demand_node,

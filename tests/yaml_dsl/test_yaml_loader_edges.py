@@ -1,9 +1,11 @@
 import io
+from pathlib import Path
 
 import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
+from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import ValidationReport
 
 
 def _assert_load_string_errors(yaml_content: str, *expected_messages: str) -> None:
@@ -161,3 +163,66 @@ relations:
         to: customers.customer_id
 """
     _assert_load_string_errors(yaml_content, "Relation 'bad' must be a dictionary")
+
+
+def test_loader_skips_validation_when_validator_disabled(tmp_path: Path) -> None:
+    loader = YamlDemandLoader()
+    loader._validator = 0  # type: ignore[assignment]
+
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources: {}
+""",
+        encoding="utf-8",
+    )
+
+    config = loader.load(yaml_path)
+    assert config.name == "demo"
+
+
+def test_loader_warning_logs_skip_root_path_suffix_for_load_and_load_string(caplog: object, tmp_path: Path) -> None:
+    import logging
+
+    class _WarnValidator:
+        def validate_report(  # type: ignore[no-untyped-def]
+            self,
+            _data,
+            *,
+            strict_unknown_fields: bool,
+            enable_jsonschema_validation: bool,
+        ) -> ValidationReport:
+            _ = (strict_unknown_fields, enable_jsonschema_validation)
+            report = ValidationReport()
+            report.add_warning("warn", path="")
+            return report
+
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources: {}
+"""
+
+    caplog.set_level(logging.WARNING)
+
+    loader = YamlDemandLoader()
+    loader._validator = _WarnValidator()  # type: ignore[assignment]
+
+    yaml_path = tmp_path / "warn.yaml"
+    yaml_path.write_text(yaml_content, encoding="utf-8")
+
+    cfg_from_file = loader.load(yaml_path)
+    assert cfg_from_file.name == "demo"
+
+    cfg_from_inline = loader.load_string(yaml_content)
+    assert cfg_from_inline.name == "demo"
+
+    messages = [str(r.message) for r in caplog.records if "warn" in str(r.message)]
+    assert messages
+    assert all("(path=" not in msg for msg in messages)

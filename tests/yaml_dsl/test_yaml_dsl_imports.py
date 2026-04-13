@@ -25,6 +25,32 @@ def _args(path: Path, *, json_output: bool) -> argparse.Namespace:
     )
 
 
+def test_import_expansion_error_format_handles_empty_trace() -> None:
+    err = ScalimYamlImportExpansionError("boom", trace=[], logical_path="root")
+    msg = str(err)
+    assert "boom" in msg
+    assert "import trace:" not in msg
+    assert "logical path: root" in msg
+
+
+def test_load_and_expand_imports_accepts_cache_mapping(tmp_path: Path) -> None:
+    demand = tmp_path / "demand.yaml"
+    demand.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources: {}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    cache = {}
+    expanded = load_and_expand_imports(demand, cache=cache)
+    assert expanded["name"] == "demo"
+
+
 def test_imports_expand_and_merge_sources_mapping(tmp_path) -> None:
     common = tmp_path / "common.yaml"
     common.write_text(

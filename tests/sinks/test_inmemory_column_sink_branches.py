@@ -12,4 +12,3 @@ def test_inmemory_column_sink_get_rows_skips_missing_cells_and_2d_list_has_no_he
     grid = sink.get_2d_list()
     assert grid[0] == [1, None]
     assert grid[1] == [2, "B"]
-

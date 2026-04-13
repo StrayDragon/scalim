@@ -34,6 +34,14 @@ def test_parse_call_by_extracts_reference_and_dependencies() -> None:
     assert dotted.reference == "tests.fixtures.call_by_fns.echo"
 
 
+def test_parse_call_by_supports_nested_parentheses_and_does_not_rewrite_ctx_prefixes() -> None:
+    parsed = parse_call_by("tests.fixtures.call_by_fns:echo((a))")
+    assert parsed.field_names == ("a",)
+
+    with pytest.raises(ScalimCallByParseError, match="arguments syntax"):
+        parse_call_by("tests.fixtures.call_by_fns:echo($ctxX)")
+
+
 def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
     # NOTE: This is a pure helper unit test. We pass local callables to
     # cover the signature-binding branches deterministically.

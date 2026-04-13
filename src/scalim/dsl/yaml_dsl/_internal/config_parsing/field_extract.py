@@ -39,7 +39,7 @@ def compile_field_extract(expr: str) -> Tuple[ExtractSegment, ...]:
         segments.append(segment)
 
         if i >= n:
-            break
+            continue
         if expr[i] == ".":
             i += 1
             if i >= n:

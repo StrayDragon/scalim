@@ -11,4 +11,3 @@ def test_observer_manager_state_sample_result_falls_back_to_summary_for_object()
 
     result = manager.sample_result(object())
     assert result == {"type": "object"}
-

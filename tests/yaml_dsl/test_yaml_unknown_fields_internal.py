@@ -11,7 +11,13 @@ def test_unknown_fields_private_helpers_cover_edge_branches() -> None:
     assert uf._value_schema_types(object()) == frozenset()  # noqa: SLF001
 
     assert uf._schema_type_set({"type": ["string", "number"]}) == frozenset({"string", "number"})  # noqa: SLF001
+    assert uf._schema_type_set({"type": ["", 1, None]}) is None  # noqa: SLF001
     assert uf._schema_accepts_value({"type": "string"}, object()) is True  # noqa: SLF001
+
+    # allOf 中的非 dict 条目会被忽略
+    schema = {"allOf": ["bad", {"type": "object"}]}
+    effective = uf._iter_effective_schemas(schema, schema, seen=set())  # noqa: SLF001
+    assert any(item.get("type") == "object" for item in effective)
 
     # oneOf/anyOf 没有 dict 分支: 直接返回空列表
     assert uf._maybe_select_variant_branches({"oneOf": [1, 2]}, {}, {}) == []  # noqa: SLF001
@@ -64,3 +70,9 @@ def test_unknown_fields_internal_dedup_and_schema_union_helpers() -> None:
 
     selected = uf._resolve_array_item_schema(array_1, array_1, 0, [{}])  # noqa: SLF001
     assert selected == item_a
+
+    # 覆盖 `_resolve_array_item_schema` 的 additionalItems 非 dict 时的 skip 分支
+    array_bad = {"type": "array", "items": [item_a], "additionalItems": False}
+    root2 = {"allOf": [array_bad, array_2]}
+    selected_from_bad = uf._resolve_array_item_schema(root2, root2, 1, [{}, {}])  # noqa: SLF001
+    assert selected_from_bad == item_b

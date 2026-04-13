@@ -142,3 +142,21 @@ def test_construct_ruamel_mapping_rejects_non_mapping_node() -> None:
             source_path="demo.yaml",
         )
     assert "expected a mapping node" in str(excinfo.value)
+
+
+def test_raise_yaml_duplicate_key_without_int_mark_keeps_loc_none() -> None:
+    import scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load as yaml_load_mod
+
+    class _DummyMark:
+        line = "bad"
+        column = None
+
+    class _DummyNode:
+        start_mark = _DummyMark()
+
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        yaml_load_mod._raise_yaml_duplicate_key("a", key_node=_DummyNode(), source_path="demo.yaml")  # noqa: SLF001
+
+    env = excinfo.value.errors[0]
+    assert env.code == "yaml_duplicate_key"
+    assert env.loc is None

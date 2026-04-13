@@ -75,13 +75,49 @@ def test_load_ref_trigger_loader_call_handles_missing_binding() -> None:
 
 def test_load_ref_loader_chunked_skips_duplicate_keys_without_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(load_ref_loader, "build_ref_loader_context", lambda *args, **kwargs: object())
-    monkeypatch.setattr(load_ref_loader, "_call_ref_loader", lambda **kwargs: {"dup": 1})
+
+    monkeypatch.setattr(
+        load_ref_loader,
+        "call_with_loader_retry",
+        lambda *, call, **_kwargs: call(),  # type: ignore[no-untyped-def]
+    )
+
+    calls = {"n": 0}
+
+    def _loader() -> object:
+        calls["n"] += 1
+        return {"dup": calls["n"]}
 
     class _SourceStub:
         source_id = "src"
+        normalize = None
 
     class _RuntimeStub:
-        load_ref_cache: Dict[object, object] = {}
+        def __init__(self) -> None:
+            class _LoaderRetryStub:
+                def resolve(self, _name: str) -> object:
+                    return object()
+
+            class _InstrumentationStub:
+                def wants(self, _event_type: str) -> bool:
+                    return False
+
+            class _GuardrailsLoaderStub:
+                validate_result = False
+
+            class _GuardrailsStub:
+                enabled = False
+                loader = _GuardrailsLoaderStub()
+
+            runtime_bindings = RuntimeBindings()
+            runtime_bindings.source_loaders["src"] = _loader
+
+            self.load_ref_cache: Dict[object, object] = {}
+            self.runtime_bindings = runtime_bindings
+            self.loader_retry = _LoaderRetryStub()
+            self.instrumentation = _InstrumentationStub()
+            self.batch_num = 0
+            self.guardrails = _GuardrailsStub()
 
     merged = load_ref_loader._load_ref_chunked(  # noqa: SLF001
         exec_ctx=object(),  # type: ignore[arg-type]
@@ -96,6 +132,7 @@ def test_load_ref_loader_chunked_skips_duplicate_keys_without_cache(monkeypatch:
     )
 
     assert merged == {"dup": 1}
+    assert calls["n"] == 2
 
 
 def test_load_ref_key_normalization_space_mismatch_warning_continues_loop() -> None:

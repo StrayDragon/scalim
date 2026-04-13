@@ -321,13 +321,14 @@ def _make_executor(plan, runtime):  # type: ignore[no-untyped-def]
 def _make_pool(  # type: ignore[no-untyped-def]
     *,
     config,
+    pool_cls=WorkflowCachePool,
     logical_keys_by_node_id=None,
     consumers_by_logical_key=None,
 ):
     from scalim.ob.hub import InstrumentationHub
 
     instrumentation = InstrumentationHub(hook_manager=HookManager(), observer_manager=ObserverManager())
-    return WorkflowCachePool(
+    return pool_cls(
         workflow_exec_id="wf",
         instrumentation=instrumentation,
         config=config,
@@ -346,6 +347,12 @@ def _sig(source_id: str) -> WorkflowCacheEntrySignature:
         key=None,
         lookup_cast=None,
     )
+
+
+class _DropPendingEvictPool(WorkflowCachePool):
+    def _evict_entry(self, signature_key: str, *, workflow_node_id: str, reason: str):  # type: ignore[no-untyped-def]
+        _ = super()._evict_entry(signature_key, workflow_node_id=workflow_node_id, reason=reason)  # noqa: SLF001
+        return None
 
 
 def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature() -> None:
@@ -579,44 +586,30 @@ def test_workflow_cache_pool_on_node_done_skips_missing_eviction_pending() -> No
     pool.on_workflow_node_done("n1")
 
 
-def test_workflow_cache_pool_close_skips_none_pending_from_evict_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_workflow_cache_pool_close_skips_none_pending_from_evict_entry() -> None:
     pool = _make_pool(
         config=WorkflowCachePoolIr(
             conflict_policy="warn",
             release_policy="workflow_end",
             budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
         ),
+        pool_cls=_DropPendingEvictPool,
     )
     signature = _sig("s1")
     assert pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}}) == {1: {"id": 1}}
-
-    original_evict = pool._evict_entry  # type: ignore[attr-defined]
-
-    def _evict_and_drop_event(signature_key: str, *, workflow_node_id: str, reason: str):  # type: ignore[no-untyped-def]
-        _ = original_evict(signature_key, workflow_node_id=workflow_node_id, reason=reason)
-        return None
-
-    monkeypatch.setattr(pool, "_evict_entry", _evict_and_drop_event)  # type: ignore[arg-type]
     pool.close()
 
 
-def test_workflow_cache_pool_budget_evict_lru_skips_none_pending(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_workflow_cache_pool_budget_evict_lru_skips_none_pending() -> None:
     pool = _make_pool(
         config=WorkflowCachePoolIr(
             conflict_policy="warn",
             release_policy="workflow_end",
             budget=WorkflowCachePoolBudgetIr(max_entries=1, over_budget_policy="evict_lru"),
         ),
+        pool_cls=_DropPendingEvictPool,
     )
     assert pool.get_or_load(_sig("s1"), workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}}) == {1: {"id": 1}}
-
-    original_evict = pool._evict_entry  # type: ignore[attr-defined]
-
-    def _evict_and_drop_event(signature_key: str, *, workflow_node_id: str, reason: str):  # type: ignore[no-untyped-def]
-        _ = original_evict(signature_key, workflow_node_id=workflow_node_id, reason=reason)
-        return None
-
-    monkeypatch.setattr(pool, "_evict_entry", _evict_and_drop_event)  # type: ignore[arg-type]
 
     assert pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {2: {"id": 2}}) == {2: {"id": 2}}
 

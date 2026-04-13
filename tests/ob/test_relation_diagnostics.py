@@ -2,7 +2,8 @@ from typing import Optional
 
 import pytest
 
-from scalim.spec.ir import KeyIr, LookupCastSpecIr, SourceIr
+from scalim.spec.ir import KeyIr, LookupCastSpecIr, MainSourceIr, SourceIr
+from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from scalim.utils.relation_diagnostics import RelationDiagnostics, TypeMismatchWarning
 
 
@@ -189,6 +190,16 @@ class TestRelationDiagnosticsVisualizePath:
         assert "[LOOKUP_KEY]" in output
         assert "cast" in output
 
+    def test_visualize_with_main_source_ir_has_no_key_or_cast_marks(self) -> None:
+        source_a = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+        source_b = MainSourceIr(source_id="customers", loader_ref=RuntimeHandleIdIr(handle_id="customers.loader"))
+
+        relation = source_a["customer_id"].join(source_b["customer_id"])
+        output = RelationDiagnostics.visualize_path(relation)
+        assert "Relation Path" in output
+        assert "[KEY]" not in output
+        assert "[LOOKUP_KEY]" not in output
+
 
 class TestRelationDiagnosticsSampleComparison:
     def test_sample_comparison_basic(self) -> None:
@@ -232,6 +243,24 @@ class TestRelationDiagnosticsSampleComparison:
 
         join_cond = source_a["customer_id"].join(source_b["customer_id"])
         relation = RelationIr(conditions=(join_cond,))
+
+        data_a = {1: {"order_id": 1, "customer_id": 100}}
+        data_b = {100: {"customer_id": 100}}
+
+        results = RelationDiagnostics.sample_comparison(relation, data_a, data_b)
+        assert len(results) == 1
+        assert results[0]["matched"] is True
+
+    def test_sample_comparison_ignores_unrelated_conditions(self) -> None:
+        from scalim.spec.ir import RelationIr
+
+        source_a = _make_source("orders", "order_id")
+        source_b = _make_source("customers", "customer_id")
+        source_c = _make_source("countries", "country_id")
+
+        join_cond = source_a["customer_id"].join(source_b["customer_id"])
+        unrelated = source_a["ignored"].join(source_c["ignored"])
+        relation = RelationIr(conditions=(join_cond, unrelated))
 
         data_a = {1: {"order_id": 1, "customer_id": 100}}
         data_b = {100: {"customer_id": 100}}

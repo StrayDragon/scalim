@@ -307,6 +307,14 @@ def test_runtime_compiler_overlay_book_export_xlsx_override_cover_branches() -> 
     assert updated.path == "b"
     assert updated.allow_formulas is True
 
+    updated2 = compiler_mod._overlay_book_export_xlsx_override(  # noqa: SLF001
+        base,
+        BookExportXlsxOverride(path=None, allow_formulas=None),
+        path="p",
+    )
+    assert updated2.path == "a"
+    assert updated2.allow_formulas is False
+
 
 def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_branches() -> None:
     base_file = BookConfig(kind="xlsx_file", path="a")

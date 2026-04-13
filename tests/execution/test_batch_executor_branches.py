@@ -33,4 +33,3 @@ def test_batch_executor_still_calls_after_operator_when_executor_is_missing() ->
     )
 
     assert seen == [operator]
-

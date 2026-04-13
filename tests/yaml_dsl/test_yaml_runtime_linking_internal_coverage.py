@@ -14,7 +14,7 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.security import build_compute_
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir import BuiltinCallableIdIr, CallByValueIr, ComputeCallContextIr, PythonReferenceIr, RuntimeHandleIdIr
 from scalim.spec.ir import DemandIr, DerivedFieldIr, KeyIr, MainSourceIr, SourceIr
-from scalim.spec.ir.binding import LoaderIr
+from scalim.spec.ir.binding import BindingIr, LoaderIr
 
 
 class _DummyResolver:
@@ -144,6 +144,34 @@ def test_bind_source_runtime_bindings_builds_extractor_wrapper() -> None:
     wrapped = bindings.loader_extractors["s1"]
     assert wrapped("lk", {"lk": 1}) == {"k": "lk", "r": {"lk": 1}}
     assert "extract" in calls
+
+
+def test_bind_source_runtime_bindings_skips_preflight_when_params_template_missing() -> None:
+    def _loader(**_kwargs):  # noqa: ANN001
+        return {}
+
+    class _Resolver:
+        def resolve(self, reference: str):  # noqa: ANN001
+            assert reference == "tests:loader"
+            return _loader
+
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(
+            callable_ref=PythonReferenceIr(reference="tests:loader", module_path="tests", attr_path=("loader",), style="class"),
+        ),
+        bind=BindingIr(key_field="id"),
+    )
+    demand_ir = DemandIr.from_irs(
+        sources=[source],
+        fields=(),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+    )
+
+    bindings = RuntimeBindings()
+    _bind_source_runtime_bindings(demand_ir, bindings=bindings, resolver=_Resolver())
+    assert "s1" in bindings.source_loaders
 
 
 def test_bind_field_runtime_bindings_rejects_invalid_derived_field_state() -> None:

@@ -30,6 +30,28 @@ def test_params_template_node_base_render_raises_not_implemented() -> None:
         params_tmpl._NodeBase().render(LoaderCallContextIr(), path="p")  # type: ignore[attr-defined]
 
 
+def test_compiled_params_template_top_level_keys_skip_non_strings_and_seen_state_allows_duplicates() -> None:
+    template = params_tmpl.CompiledParamsTemplate(
+        root=params_tmpl.MappingNode(
+            items=(
+                (1, params_tmpl.LiteralNode(value=1)),
+                ("a", params_tmpl.LiteralNode(value=2)),
+            )
+        )
+    )
+    assert template.top_level_mapping_string_keys() == ("a",)
+
+    state_keys = params_tmpl._CompileState()
+    state_keys.seen_keys("set", path="p")
+    state_keys.seen_keys("set", path="p2")
+    assert state_keys.directive_mode == "keys"
+
+    state_rows = params_tmpl._CompileState()
+    state_rows.seen_rows("batch", path="p")
+    state_rows.seen_rows("batch", path="p2")
+    assert state_rows.directive_mode == "rows"
+
+
 def test_params_template_runtime_deepcopy_is_alias_safe_and_path_can_be_empty() -> None:
     payload = {"a": [1], "b": ({"c": {1}},)}
     template = params_tmpl.compile_params_template(

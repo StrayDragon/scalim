@@ -79,4 +79,3 @@ def test_block_column_csv_sink_write_batch_before_init_skips_file_writes_and_flu
     sink.close()
 
     assert not output_path.exists()
-

@@ -136,4 +136,3 @@ def test_instrumentation_hub_emit_loader_call_unknown_policy_keeps_payload() -> 
 
     assert observer_manager.payloads
     assert observer_manager.payloads[0].result is result  # type: ignore[attr-defined]
-

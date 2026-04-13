@@ -1,3 +1,8 @@
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
 from scalim.dsl.yaml_dsl import (
     BookBudgetOverride,
     BookExportXlsxOverride,
@@ -5,6 +10,7 @@ from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     FileResourceOverride,
     ResourcesOverride,
+    RunOptions,
     RunOverrides,
 )
 from scalim.dsl.yaml_dsl import workflow_entrypoints as entrypoints_mod
@@ -17,6 +23,7 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     ResourcesConfig,
 )
 from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, WorkflowOptions
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowRun, WorkflowRunOptionsPatch
 
 
 def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> None:
@@ -131,3 +138,108 @@ def test_workflow_entrypoints_merge_node_overrides_deep_merges_resources() -> No
 
     same = entrypoints_mod._merge_node_overrides(base, workflow_resources_override=None)  # noqa: SLF001
     assert same is base
+
+
+def test_workflow_entrypoints_lifecycle_skips_merge_when_patch_resources_is_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    wf = WorkflowConfig(
+        runs=(
+            WorkflowRun(id="r1", demand="d1.yaml"),
+            WorkflowRun(id="r2", demand="d2.yaml"),
+        ),
+        options=WorkflowOptions(),
+        resources=ResourcesConfig(),
+    )
+
+    def _fake_load_workflow_config_from_path(  # type: ignore[no-untyped-def]
+        workflow_yaml_path: str,
+        *,
+        template_vars,
+        template_sandbox,
+        rendered_yaml_max_len,
+    ):
+        _ = (template_vars, template_sandbox, rendered_yaml_max_len)
+        return Path(workflow_yaml_path), wf
+
+    class _Stop(Exception):
+        pass
+
+    def _stop_compile(*_args: object, **_kwargs: object) -> object:
+        raise _Stop()
+
+    monkeypatch.setattr(entrypoints_mod, "load_workflow_config_from_path", _fake_load_workflow_config_from_path)
+    monkeypatch.setattr(entrypoints_mod, "compile_workflow_ir", _stop_compile)
+
+    base_options = RunOptions(allowed_modules=frozenset(["tests"]))
+    patches = {"r1": WorkflowRunOptionsPatch(overrides=RunOverrides())}
+
+    with pytest.raises(_Stop):
+        entrypoints_mod.run_workflow_lifecycle_until_preflight(
+            "wf.yaml",
+            base_options=base_options,
+            path_aliases=None,
+            run_options_patches_by_run_id=patches,
+            workflow_resources_wait=None,
+            workflow_output_staging=None,
+        )
+
+
+def test_workflow_entrypoints_run_workflow_skips_bundle_viz_injection_when_patch_overrides_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_options = RunOptions(allowed_modules=frozenset(["tests"]))
+
+    lifecycle = SimpleNamespace(
+        parse=SimpleNamespace(workflow_yaml_path="wf.yaml"),
+        preload=SimpleNamespace(
+            workflow_ir=object(),
+            cache_pool_logical_keys_by_node_id={},
+            cache_pool_consumers_by_logical_key={},
+        ),
+        effective=SimpleNamespace(
+            bundle_viz_base_config=None,
+            options_by_run_id={"r1": base_options},
+            run_options_patches_by_run_id={"r1": WorkflowRunOptionsPatch(overrides=None)},
+        ),
+    )
+    monkeypatch.setattr(entrypoints_mod, "run_workflow_lifecycle_until_preflight", lambda *_a, **_k: lifecycle)
+
+    class _Stop(Exception):
+        pass
+
+    captured: dict = {}
+
+    def _fake_compile_demand_yaml(path: str, *, options: RunOptions):  # type: ignore[no-untyped-def]
+        captured["path"] = path
+        captured["options"] = options
+        return object()
+
+    def _fake_run_workflow_ir(  # type: ignore[no-untyped-def]
+        workflow_path: str,
+        workflow_ir: object,
+        *,
+        compile_demand_fn,
+        **_kwargs,
+    ) -> object:
+        _ = (workflow_path, workflow_ir)
+        _ = compile_demand_fn(
+            "demand.yaml",
+            workflow_exec_id="exec_0",
+            workflow_node_id="r1",
+            workflow_node_decl_order=0,
+            node_init_vars={},
+            managed_output_ids=None,
+            viz_config=object(),
+        )
+        raise _Stop()
+
+    monkeypatch.setattr(entrypoints_mod, "run_workflow_ir", _fake_run_workflow_ir)
+
+    with pytest.raises(_Stop):
+        entrypoints_mod.run_workflow(
+            "wf.yaml",
+            options=base_options,
+            run_options_patches_by_run_id={"r1": WorkflowRunOptionsPatch(overrides=None)},
+            compile_demand_yaml_fn=_fake_compile_demand_yaml,
+        )
+
+    assert captured["options"].overrides is None

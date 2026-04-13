@@ -78,6 +78,41 @@ outputs:
     assert result["output_fields"] == ["order_id", "amount"]
 
 
+def test_load_output_config_skips_fields_without_name_in_field_name_mapping(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "export_missing_names.yaml"
+    yaml_path.write_text(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+      name: Order ID
+    amount:
+      extract: amount
+      name: ""
+fields:
+  profit:
+    compute: "1"
+    name: ""
+sources: {}
+resources:
+  files:
+    detail_csv: {kind: csv_file, path: ./out}
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    fields: [order_id, amount, profit]
+""",
+        encoding="utf-8",
+    )
+
+    result = load_output_config(str(yaml_path))
+    assert result["field_name_mapping"] == {"order_id": "Order ID"}
+
+
 def test_load_output_config_skips_invalid_field_entry(tmp_path: Path) -> None:
     yaml_path = tmp_path / "export_invalid.yaml"
     yaml_path.write_text(

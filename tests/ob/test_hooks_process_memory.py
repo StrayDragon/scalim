@@ -91,13 +91,18 @@ def test_performance_observer_threshold_and_sampling_helpers_cover_missing_branc
     )
     config.thresholds.batch_duration_warn = 1.0
     config.thresholds.memory_increase_warn = 1.0
-    observer = PerformanceObserver(config=config)
+
+    class _NoResourceObserver(PerformanceObserver):
+        def _get_memory_mb(self):  # type: ignore[no-untyped-def]
+            return None
+
+        def _get_cpu_percent(self):  # type: ignore[no-untyped-def]
+            return None
+
+    observer = _NoResourceObserver(config=config)
 
     observer.metrics.memory_samples = []
     observer.metrics.cpu_samples = []
-
-    monkeypatch.setattr(observer, "_get_memory_mb", lambda: None)  # type: ignore[no-untyped-def]
-    monkeypatch.setattr(observer, "_get_cpu_percent", lambda: None)  # type: ignore[no-untyped-def]
 
     observer._sample_memory("x")  # noqa: SLF001
     observer._sample_cpu("x")  # noqa: SLF001
