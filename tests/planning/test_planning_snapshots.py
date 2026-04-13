@@ -17,6 +17,10 @@ class _Template:
         return ("alpha", "beta")
 
 
+class _TemplateWithNonCallableKeys:
+    top_level_mapping_string_keys = "not-callable"
+
+
 def test_operator_snapshot_for_all_core_operator_types() -> None:
     load = LoadOperatorIr(
         operator_id="load.orders",
@@ -38,7 +42,9 @@ def test_operator_snapshot_for_all_core_operator_types() -> None:
     assert operator_snapshot(compute)["operator_type"] == str(OperatorType.COMPUTE)
 
     lookup_cast = LookupCastSpecIr(name="sep_first", sep="|")
+    lookup_cast_without_sep = LookupCastSpecIr(name="sep_first", sep=None)
     binding_template = BindingIr(key_field="order_id", params_template=_Template())
+    binding_template_without_callable_keys = BindingIr(key_field="order_id", params_template=_TemplateWithNonCallableKeys())
     binding_builder = BindingIr(key_field="order_id", params_builder_ref=BuiltinCallableIdIr(callable_id="demo.builder"))
 
     customer_source = _DummySource(source_id="customers")
@@ -49,7 +55,9 @@ def test_operator_snapshot_for_all_core_operator_types() -> None:
             to_field=("customer_id", "tenant_id"),
             lookup_cast=lookup_cast,
         ),
+        LookupStepIr(from_field="customer_id", to_source=customer_source, to_field="customer_id", lookup_cast=lookup_cast_without_sep),
         LookupStepIr(from_field="customer_id", to_source=customer_source, lookup_cast=lookup_cast, bind=binding_template),
+        LookupStepIr(from_field="customer_id", to_source=customer_source, bind=binding_template_without_callable_keys),
         LookupStepIr(from_field="customer_id", to_source=customer_source, bind=binding_builder),
         LookupStepIr(from_field="customer_id", to_source=customer_source),
     )
@@ -67,8 +75,12 @@ def test_operator_snapshot_for_all_core_operator_types() -> None:
     assert payload["use_cache"] is True
     assert payload["lookup_steps"][0]["from_field"] == ["customer_id", "tenant_id"]
     assert payload["lookup_steps"][0]["to_field"] == ["customer_id", "tenant_id"]
-    assert payload["lookup_steps"][1]["lookup_cast"]["sep"] == "|"
-    assert payload["lookup_steps"][2]["bind"]["params_builder_ref"]
+    assert payload["lookup_steps"][1]["to_field"] == "customer_id"
+    assert payload["lookup_steps"][1]["lookup_cast"]["name"] == "sep_first"
+    assert "sep" not in payload["lookup_steps"][1]["lookup_cast"]
+    assert payload["lookup_steps"][2]["lookup_cast"]["sep"] == "|"
+    assert "template_top_level_keys" not in payload["lookup_steps"][3]["bind"]
+    assert payload["lookup_steps"][4]["bind"]["params_builder_ref"]
 
 
 def test_operator_snapshot_rejects_unknown_operator_type() -> None:

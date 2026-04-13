@@ -97,10 +97,17 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
         deps=(),
         demand_path="dup.yaml",
     )
+    condition = WorkflowNodeIr(
+        node_id="cond",
+        node_type=WorkflowNodeType.CONDITION,
+        decl_order=5,
+        deps=(),
+        demand_path=None,
+    )
     write = WriteSheetNodeIr(
         node_id="w",
         node_type=WorkflowNodeType.WRITE_SHEET,
-        decl_order=5,
+        decl_order=6,
         deps=("a",),
         resource_type="excel",
         resource_id="res_ok",
@@ -109,10 +116,22 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
         input_output_id="out",
         on_conflict="error",
     )
+    write_missing_res = WriteSheetNodeIr(
+        node_id="w_missing",
+        node_type=WorkflowNodeType.WRITE_SHEET,
+        decl_order=7,
+        deps=(),
+        resource_type="",
+        resource_id="",
+        sheet="Sheet1",
+        input_node_id="a",
+        input_output_id="out",
+        on_conflict="error",
+    )
     append = AppendSheetNodeIr(
         node_id="p",
         node_type=WorkflowNodeType.APPEND_SHEET,
-        decl_order=6,
+        decl_order=8,
         deps=("w", "missing_node"),  # include unknown dep to hit edge early-return
         resource_type="excel",
         resource_id="res_missing",  # not present in resources -> writes_to edge skipped
@@ -128,7 +147,7 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
     res_bad = WorkflowResourceIr(resource_id="", resource_type="excel", path="/tmp/ignored.xlsx")
 
     workflow_ir = WorkflowIr(
-        nodes=(node_missing, node_b, node_a, dup_1, dup_2, write, append),
+        nodes=(node_missing, node_b, node_a, dup_1, dup_2, condition, write, write_missing_res, append),
         edges=(),
         options=WorkflowOptionsIr(),
         resources=(res_ok, res_bad),
@@ -146,11 +165,14 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
     assert "workflow_node:a" in nodes
     assert "workflow_node:b" in nodes
     assert "workflow_node:w" in nodes
+    assert "workflow_node:w_missing" in nodes
     assert "workflow_node:p" in nodes
+    assert "workflow_node:cond" in nodes
     assert "workflow_resource:excel:res_ok" in nodes
 
     assert nodes["workflow_node:a"]["data"]["kind"] == "workflow_demand"
     assert nodes["workflow_node:a"]["data"]["demand_run_id"] == "a"
+    assert nodes["workflow_node:cond"]["data"]["kind"] == "workflow_node"
     assert nodes["workflow_node:w"]["data"]["kind"] == "workflow_write"
     assert nodes["workflow_node:p"]["data"]["kind"] == "workflow_write"
 
@@ -162,14 +184,59 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
     assert ("workflow_node:p", "workflow_resource:excel:res_missing", "writes_to") not in edge_types
 
 
+def test_build_workflow_viz_graph_snapshot_handles_missing_stage_id_for_flaky_node_id() -> None:
+    class _FlakyNodeId:
+        def __init__(self) -> None:
+            self._calls = 0
+
+        def __str__(self) -> str:
+            self._calls += 1
+            if self._calls <= 2:
+                return "flaky"
+            return "flaky_stage_mismatch"
+
+    node = WorkflowNodeIr(  # type: ignore[arg-type]
+        node_id=_FlakyNodeId(),
+        node_type=WorkflowNodeType.DEMAND,
+        decl_order=0,
+        deps=(),
+        demand_path="x.yaml",
+    )
+    workflow_ir = WorkflowIr(
+        nodes=(node,),
+        edges=(),
+        options=WorkflowOptionsIr(),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+
+    snapshot = build_workflow_viz_graph_snapshot(workflow_ir)
+    nodes = {item.get("id"): item for item in snapshot.get("nodes") or []}
+    assert "workflow_node:flaky_stage_mismatch" in nodes
+    assert "stage_id" not in (nodes["workflow_node:flaky_stage_mismatch"].get("data") or {})
+
+
 def test_workflow_viz_observer_disabled_branches(tmp_path: Path) -> None:
     # Disabled config: event emission is skipped, but payload parsing branches still run.
     obs = WorkflowVizObserver()
     obs._ensure_started()
     assert obs._entry_workflow_node_ref_id() == "workflow_node:__workflow__"
+    obs.snapshot = {"nodes": [{"id": "field:x"}], "meta": {}}
+    assert obs._entry_workflow_node_ref_id() == "workflow_node:__workflow__"
 
     obs.on_workflow_started("not a dict")
     obs.on_workflow_finished("not a dict")
+    obs.on_workflow_node_end(
+        WorkflowNodeEndEvent(
+            workflow_exec_id="wf_exec",
+            workflow_node_id="not_started",
+            node_type="demand",
+            status="ok",
+            demand_path="x.yaml",
+            error_type=None,
+            error_message=None,
+        )
+    )
 
     # Enabled config: cover the full emission path for all supported workflow-scope events.
     out_path = tmp_path / "viz_events.jsonl"

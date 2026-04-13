@@ -220,3 +220,29 @@ def test_build_plan_operators_skips_compute_when_field_not_required() -> None:
         ref_loader_sequence=[],
     )
     assert ops == ()
+
+
+def test_build_plan_operators_load_operator_primary_detection_covers_branches() -> None:
+    main_source = make_main_source("orders")
+    loader_source = make_source("orders_loader")
+    order_id = FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True)
+    amount = FieldIr(field_id="amount", name="金额", source=main_source)
+
+    demand = DemandIr.from_irs(sources=[loader_source], fields=[order_id, amount], main_source=main_source)
+    ops = build_plan_operators(
+        demand=demand,
+        resolver=LookupStepsResolver(),
+        required_fields=set(),
+        field_order=(),
+        loader_sequence=[
+            (loader_source, ["amount", "order_id"]),
+            (loader_source, []),
+        ],
+        ref_loader_sequence=[],
+    )
+
+    assert len(ops) == 2
+    assert ops[0].operator_type == "load"
+    assert ops[0].is_primary is True
+    assert ops[1].operator_type == "load"
+    assert ops[1].is_primary is False

@@ -132,3 +132,33 @@ def test_performance_presentation_render_summary_skips_zero_duration_stage() -> 
     assert "stage=loader" in rendered
     assert "stage=write" in rendered
     assert "stage=compute" not in rendered
+
+
+def test_performance_presentation_output_report_supports_csv(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    layer = PerformancePresentationLayer()
+    metrics = PerformanceMetrics(
+        total_duration=0.1,
+        batch_count=1,
+        total_rows=10,
+        batch_durations=[0.1],
+    )
+    output_path = tmp_path / "perf.csv"
+    logger = logging.getLogger("scalim.performance.presentation")
+
+    layer.output_report(
+        metrics=metrics,
+        report_format="csv",
+        output_path=str(output_path),
+        include_details=False,
+        logger=logger,
+    )
+
+    assert output_path.exists()
+
+    layer.output_report(
+        metrics=metrics,
+        report_format="unknown",
+        output_path=str(output_path),
+        include_details=False,
+        logger=logger,
+    )

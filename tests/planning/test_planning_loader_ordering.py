@@ -60,6 +60,28 @@ def test_sort_ref_loaders_warns_and_falls_back_stably(caplog) -> None:
     assert ", ..." in warnings[0].message
 
 
+def test_sort_ref_loaders_skips_same_loader_deps_and_covers_degree_branches(caplog) -> None:
+    source_a = make_source("a")
+    source_b = make_source("b")
+    source_c = make_source("c")
+
+    # `field_a2` 属于同一个 loader,依赖它不应产生 loader 依赖边.
+    # 同时给 `c` 增加两个依赖,覆盖 in_degree 从 2 递减到 1 的分支.
+    ref_loaders = [
+        (source_a, [("field_a", "field_a2"), ("field_a2", "")]),
+        (source_b, [("field_b", "")]),
+        (source_c, [("field_c", ("field_a", "field_b", "missing_once"))]),
+    ]
+
+    with caplog.at_level(logging.WARNING):
+        sorted_loaders = sort_ref_loaders(ref_loaders)
+
+    assert [src.source_id for src, _ in sorted_loaders] == ["a", "b", "c"]
+    warnings = [rec for rec in caplog.records if REF_LOADER_ORDERING_DEGRADED_PREFIX in rec.getMessage()]
+    assert len(warnings) == 1
+    assert ", ..." not in warnings[0].message
+
+
 def test_build_ref_field_ordering_deps_handles_edge_cases() -> None:
     class _FakeSource:
         def __init__(self, source_id: str) -> None:

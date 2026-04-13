@@ -9,7 +9,10 @@ from scalim.execution.context import BatchContext
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.executor.operators.load_ref.context import LoadRefExecutionContext
 from scalim.execution.executor.operators.load_ref import loader as load_ref_loader
-from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
+from scalim.execution.executor.operators.load_ref.executor import (
+    LoadRefOperatorExecutor,
+    _maybe_emit_key_normalization_key_space_mismatch_warning,
+)
 from scalim.execution.executor.runtime.runtime import LoadRefCacheEntry
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver, Observer
@@ -32,6 +35,37 @@ from tests.fixtures.executor_operator_fixtures import (
     _raise_type_error,
     _raise_value_error,
 )
+
+
+def test_load_ref_key_normalization_space_mismatch_warning_continues_loop() -> None:
+    class _NoEmitInstrumentation:
+        def emit_diagnostic_warning(self, **_kwargs) -> None:  # type: ignore[no-untyped-def]
+            raise AssertionError("should not emit warning")
+
+    class _RuntimeStub:
+        def __init__(self) -> None:
+            self.key_normalization = "auto_str"
+            self.key_space_mismatch_logged = set()
+            self.instrumentation = _NoEmitInstrumentation()
+
+    runtime = _RuntimeStub()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:targets")),
+    )
+    step = LookupStepIr(from_field="fk_id", to_source=target_source, lookup_cast=LookupCastSpecIr(name="sep_first"))
+
+    _maybe_emit_key_normalization_key_space_mismatch_warning(
+        runtime=runtime,  # type: ignore[arg-type]
+        relation_signature=(),
+        step=step,
+        field_id="field",
+        lookup_keys={"a", "b"},
+        intermediate_result={},
+    )
+
+    assert runtime.key_space_mismatch_logged == set()
 
 
 def _bind_source_loader(runtime_bindings: RuntimeBindings, source_id: str, loader_fn) -> LoaderIr:  # type: ignore[no-untyped-def]

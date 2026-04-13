@@ -118,6 +118,25 @@ def test_viz_graph_snapshot_includes_nodes_and_stages() -> None:
         assert edge["id"].startswith("e{}:".format(idx))
 
 
+def test_viz_graph_snapshot_skips_optional_node_groups() -> None:
+    plan = _build_simple_plan()
+    snapshot = plan.to_viz_graph_snapshot(
+        include_stage_nodes=False,
+        include_loader_nodes=False,
+        include_source_nodes=False,
+    )
+
+    node_ids = {node["id"] for node in snapshot["nodes"]}
+    assert "field:order_id" in node_ids
+    assert not any(node_id.startswith("stage:") for node_id in node_ids)
+    assert not any(node_id.startswith("loader:") for node_id in node_ids)
+    assert not any(node_id.startswith("source:") for node_id in node_ids)
+
+    edge_types = {edge["type"] for edge in snapshot["edges"]}
+    assert "in_stage" not in edge_types
+    assert "loads_from" not in edge_types
+
+
 def test_viz_observer_outputs_jsonl_sample(tmp_path: Path) -> None:
     output_path = tmp_path / "viz.jsonl"
     config = VizObserverConfig(

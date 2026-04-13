@@ -58,6 +58,18 @@ def test_load_operator_maybe_emit_loader_slim_extracts_key_count() -> None:
     ]
 
 
+def test_load_operator_maybe_emit_loader_slim_handles_empty_and_non_mapping_values() -> None:
+    instrumentation = _WantsInstrumentation(EVENT_LOADER_SLIM)
+    runtime = _Runtime(instrumentation, batch_num=1)
+    executor = LoadOperatorExecutor()
+
+    executor._maybe_emit_loader_slim(runtime, loader_name="demo", result={}, field_keys=["a"])  # noqa: SLF001
+    executor._maybe_emit_loader_slim(runtime, loader_name="demo", result={"row1": 1}, field_keys=["a"])  # noqa: SLF001
+    executor._maybe_emit_loader_slim(runtime, loader_name="demo", result={"row1": {"a": 1}}, field_keys=["a"])  # noqa: SLF001
+
+    assert instrumentation.loader_slim_calls == []
+
+
 def test_load_operator_uses_extractor_and_missing_field_spec() -> None:
     loader = _SampleLoader()
     runtime_bindings = RuntimeBindings()

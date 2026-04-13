@@ -227,6 +227,37 @@ class TestRelationObserver:
         assert observer.metrics.total_lookups == 1
         assert observer.metrics.type_mismatch_count == 1
 
+    def test_on_relation_lookup_accepts_unknown_result_for_branch_coverage(self) -> None:
+        from scalim.events._events import RelationLookupEvent
+
+        observer = RelationObserver(config=RelationConfig(sampling_rate=1.0))
+        observer.on_relation_lookup(  # type: ignore[arg-type]
+            RelationLookupEvent(
+                field_key="",
+                row_id=1,
+                fk_raw="1",
+                fk_normalized="1",
+                target_source="customers",
+                result="unknown",
+            )
+        )
+        assert observer.metrics.total_lookups == 1
+
+    def test_type_error_samples_skip_logging_and_respect_max_samples(self) -> None:
+        observer = RelationObserver(config=RelationConfig(sampling_rate=1.0, log_type_mismatch=False, max_samples=0))
+        observer.record_lookup(
+            row_id=1,
+            fk_raw="abc",
+            fk_normalized="abc",
+            target_source="customers",
+            result="type_error",
+            fk_type="str",
+            expected_type="int",
+            error_message="type mismatch",
+        )
+        assert observer.metrics.type_mismatch_count == 1
+        assert observer.metrics.type_mismatch_samples == []
+
     def test_record_lookup_disabled_noop(self) -> None:
         config = RelationConfig(enabled=False, sampling_rate=1.0)
         observer = RelationObserver(config=config)
@@ -315,6 +346,10 @@ class TestRelationObserver:
 
         observer.print_summary()
 
+    def test_print_summary_skips_per_source_stats_section_when_empty(self) -> None:
+        observer = RelationObserver(config=RelationConfig(sampling_rate=1.0))
+        observer.print_summary()
+
     def test_print_summary_with_type_mismatch_samples(self) -> None:
         config = RelationConfig(sampling_rate=1.0)
         observer = RelationObserver(config=config)
@@ -382,3 +417,7 @@ class TestRelationObserver:
         observer = RelationObserver(config=config)
         observer.record_lookup(1, 10, 10, "customers", "hit")
         observer.close()
+
+    def test_output_report_ignores_unknown_report_format(self) -> None:
+        observer = RelationObserver(config=RelationConfig(report_format="unknown"))  # type: ignore[arg-type]
+        observer._output_report()  # noqa: SLF001

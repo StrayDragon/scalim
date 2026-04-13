@@ -332,6 +332,17 @@ def test_pretty_logging_observer_renders_stats(capsys) -> None:
     assert "loader=demo_loader" in output
 
 
+def test_pretty_logging_observer_pipeline_end_skips_empty_loader_stats(capsys) -> None:
+    observer = PrettyLoggingObserver()
+
+    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
+    observer.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+
+    output = capsys.readouterr().out
+    assert "pipeline_end" in output
+    assert "loader=" not in output
+
+
 def test_pretty_logging_observer_renders_batch_duration_from_event(capsys) -> None:
     observer = PrettyLoggingObserver()
 

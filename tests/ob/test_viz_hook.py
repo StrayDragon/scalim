@@ -914,3 +914,63 @@ def test_viz_observer_additional_coverage(tmp_path: Path) -> None:
     )
     assert observer_active._normalize_node_ref_id("loader:orders [preload_forever]") == "loader:orders"
     observer_active.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+
+
+def test_viz_pipeline_end_closes_trace_emitter_when_events_emitter_is_missing(tmp_path: Path) -> None:
+    snapshot_path = tmp_path / "trace_only_snapshot.json"
+    config = VizObserverConfig(snapshot_path=str(snapshot_path), trace_enabled=True)
+    observer = VizObserver(config=config, snapshot={"meta": {}})
+    observer.run_id = "run_trace_only"
+
+    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    assert observer._events_emitter is None
+    assert observer._trace_emitter is not None
+
+    observer.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+    assert observer._events_emitter is None
+    assert observer._trace_emitter is None
+
+
+def test_viz_handlers_cover_optional_field_skip_branches(tmp_path: Path) -> None:
+    events_path = tmp_path / "viz_optional.jsonl"
+    snapshot_path = tmp_path / "viz_optional_snapshot.json"
+    config = VizObserverConfig(
+        output_path=str(events_path),
+        snapshot_path=str(snapshot_path),
+        trace_enabled=True,
+        payload_policy="summary",
+    )
+    observer = VizObserver(config=config, snapshot={"meta": {}})
+    observer.run_id = "run_optional"
+
+    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    assert observer._events_emitter is not None
+    assert observer._trace_emitter is not None
+
+    observer.on_relation_lookup(
+        RelationLookupEvent(
+            field_key="profit",
+            row_id=1,
+            fk_raw="1",
+            fk_normalized=1,
+            target_source="orders",
+            result="hit",
+        )
+    )
+    observer.on_adaptive_scheduler_decision(
+        AdaptiveSchedulerDecisionEvent(batch_num=1, layer_index=0, decision="process", backend="multiprocessing")
+    )
+    observer.on_output_target_end(
+        OutputTargetEndEvent(
+            target_id="summary",
+            output_path="/tmp/demo.xlsx",
+            sheet_name=None,
+            row_count=10,
+            error_count=0,
+            duration=0.0,
+            disabled=False,
+            error_type=None,
+            error_message=None,
+        )
+    )
+    observer.close()

@@ -27,4 +27,3 @@ def test_workflow_loader_context_restores_previous_context() -> None:
         assert loaders_mod._TLS.ctx is outer_ctx  # noqa: SLF001
 
     assert not hasattr(loaders_mod._TLS, "ctx")  # noqa: SLF001
-

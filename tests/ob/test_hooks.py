@@ -312,6 +312,17 @@ def test_logging_hook_error_context(caplog) -> None:
     assert len(caplog.records) >= 2
 
 
+def test_logging_hook_error_skips_context_loop_when_empty(caplog) -> None:
+    logger = logging.getLogger("scalim.tests.logging_error.empty_ctx")
+    hook = LoggingObserver(logger=logger)
+
+    event = ErrorEvent(RuntimeError("boom"), {})
+    with caplog.at_level(logging.ERROR, logger=logger.name):
+        hook.on_error(event)
+
+    assert len(caplog.records) == 1
+
+
 def test_logging_hook_default_logger() -> None:
     hook = LoggingObserver()
     assert hook.logger is not None
@@ -329,6 +340,19 @@ def test_logging_hook_loader_call_len_error(caplog) -> None:
         hook.on_loader_call(event)
 
     assert any("result_count=0" in record.getMessage() for record in caplog.records)
+
+
+def test_logging_hook_loader_call_cache_status_without_field_keys(caplog) -> None:
+    logger = logging.getLogger("scalim.tests.logging_cache")
+    hook = LoggingObserver(logger=logger)
+    event = LoaderCallEvent(loader_name="loader", params={}, result={}, duration=0.1, cache_status="hit", field_keys=None)
+
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        hook.on_loader_call(event)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("cache_status=hit" in message for message in messages)
+    assert not any("cache_fields=" in message for message in messages)
 
 
 def test_logging_hook_diagnostic_warning(caplog) -> None:

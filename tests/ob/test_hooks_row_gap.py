@@ -41,6 +41,24 @@ def test_row_gap_data_loader_tracks_missing_and_summary(caplog) -> None:
     assert any((ROW_GAP_LOG_SUMMARY % (3, 1, 2, None)) == record.getMessage() for record in caplog.records)
 
 
+def test_row_gap_data_loader_handles_missing_expected_keys_and_skips_summary(caplog) -> None:
+    hook = RowGapObserver(primary_loader_name="primary", data_loader_names={"data"}, sample_limit=1)
+
+    data_event = LoaderCallEvent(
+        loader_name="data",
+        params={},
+        result={1: {"id": 1}},
+        duration=0.0,
+    )
+
+    with caplog.at_level(logging.INFO, logger=hook.logger.name):
+        hook.on_loader_call(data_event)
+        hook.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+
+    assert hook.total_expected == 0
+    assert not any(ROW_GAP_LOG_SUMMARY in record.getMessage() for record in caplog.records)
+
+
 def test_row_gap_extract_expected_keys_and_result_size() -> None:
     assert RowGapObserver._extract_expected_keys({"batch_row_nth": [1, 2]}) == [1, 2]
     assert RowGapObserver._extract_expected_keys({"batch_keys": [1, 2]}) == [1, 2]

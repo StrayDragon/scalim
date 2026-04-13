@@ -351,6 +351,24 @@ def test_excel_sink_close_exception_logs_unlink_failure(
         os.unlink(temp_file)
 
 
+def test_column_excel_sink_close_skips_workbook_close_when_factory_fails(tmp_path: Path, monkeypatch, caplog) -> None:
+    def _raise_workbook(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise TypeError("simulated workbook create failure")
+
+    caplog.set_level(logging.ERROR, logger="scalim.sinks.sink_excel")
+    monkeypatch.setattr(excel_mod, "Workbook", _raise_workbook)
+
+    output_path = tmp_path / "exc_cols_factory.xlsx"
+    sink = excel_mod.ColumnExcelSink(str(output_path), ["id"])
+    sink.set_row_ids([1])
+    sink.write_column("id", {1: 1})
+
+    with pytest.raises(TypeError, match="simulated workbook create failure"):
+        sink.close()
+
+    assert any(excel_mod.COLUMN_EXCEL_SINK_SAVE_FAILED in record.getMessage() for record in caplog.records)
+
+
 def test_excel_formula_escape_skips_already_escaped_value() -> None:
     assert excel_mod.escape_excel_formula("'=1+1", allow_formulas=False) == "'=1+1"
 
