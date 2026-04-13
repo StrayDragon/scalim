@@ -120,6 +120,11 @@ class TestTopologicalSort:
         with pytest.raises(ScalimCyclicDependencyError):
             topological_sort(["a", "b"], lambda x: deps.get(x, []))
 
+    def test_unknown_deps_are_ignored(self) -> None:
+        """测试拓扑排序忽略不在 nodes 内的依赖(仅影响 branch coverage)."""
+        deps = {"a": ["missing1", "missing2"]}
+        assert topological_sort(["a"], lambda x: deps.get(x, [])) == ["a"]
+
 
 # endregion
 

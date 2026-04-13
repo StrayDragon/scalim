@@ -224,6 +224,15 @@ def test_adaptive_scheduler_metrics_record_and_to_dict() -> None:
     metrics.record_decision(
         AdaptiveSchedulerDecisionEvent(
             batch_num=1,
+            layer_index=0,
+            decision="parallel",
+            backend="thread",
+            pool_limits={"db": 3, "cache": 1},
+        )
+    )
+    metrics.record_decision(
+        AdaptiveSchedulerDecisionEvent(
+            batch_num=1,
             layer_index=1,
             decision="serial",
             backend="thread",
@@ -241,9 +250,10 @@ def test_adaptive_scheduler_metrics_record_and_to_dict() -> None:
     )
 
     d = metrics.to_dict()
-    assert d["parallel_layers"] == 1
+    assert d["parallel_layers"] == 2
     assert d["serial_layers"] == 2
     assert d["serial_reasons"]["below_min_parallel_tasks"] == 1
-    assert d["backends"]["thread"] == 2
+    assert d["backends"]["thread"] == 3
     assert d["pools"]["limits"]["db"] == 2
+    assert d["pools"]["limits"]["cache"] == 1
     assert d["pools"]["wait_count"]["db"] == 1

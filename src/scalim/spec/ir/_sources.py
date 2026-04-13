@@ -256,8 +256,7 @@ def _call_normalize_call_by(fn: NormalizeCallByFn, result: object, ctx: Normaliz
             return fn(result, ctx=ctx)  # type: ignore[call-arg]
         if accepts_varargs:
             return fn(result, ctx)
-        if len(positional) == 1:
-            return fn(result)
+        return fn(result)
 
     msg = "normalize.call_by must accept at least 1 positional argument: (result) or (result, ctx)"
     raise TypeError(msg)

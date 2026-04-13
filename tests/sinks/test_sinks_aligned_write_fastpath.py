@@ -183,3 +183,24 @@ def test_excel_sinks_aligned_write_and_mismatch(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="write_column_aligned"):
         col_sink.write_column_aligned("id", [0, 1], [10])
+
+
+def test_column_excel_sink_close_skips_workbook_close_when_creation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    import scalim.sinks._internal.excel as excel_mod
+
+    output_path = tmp_path / "column.xlsx"
+    sink = ColumnExcelSink(str(output_path), ["id"], include_header=False)
+
+    sink.set_row_ids([0, 2])
+    sink.write_batch([{"id": 1}])
+
+    def _boom(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise TypeError("boom")
+
+    monkeypatch.setattr(excel_mod, "Workbook", _boom)
+
+    with pytest.raises(TypeError, match="boom"):
+        sink.close()

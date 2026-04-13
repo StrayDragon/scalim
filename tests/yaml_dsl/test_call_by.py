@@ -5,6 +5,7 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.call_by import ScalimCallByPar
 from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from decimal import Decimal
+from types import MappingProxyType
 
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError, ScalimResolverError
@@ -119,6 +120,12 @@ def test_validate_call_by_signature_covers_binding_error_shapes() -> None:
             parsed=parse_call_by("tests.fixtures.call_by_fns:echo(a)"),
             fn=_fn_kwonly,
         )
+
+
+def test_compute_call_ctx_keeps_mappingproxy_values() -> None:
+    values = MappingProxyType({"a": 1})
+    ctx = ComputeCallContextIr(row_id="r1", batch_num=1, field_id="f", deps=(), values=values)
+    assert ctx.values is values
 
 
 def test_signature_accepts_positional_handles_py36_without_positional_only(monkeypatch: pytest.MonkeyPatch) -> None:

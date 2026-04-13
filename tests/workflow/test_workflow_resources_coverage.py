@@ -1000,6 +1000,46 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
     assert instrumentation._reentered is True
 
 
+def test_resource_manager_workbook_sheet_conflict_unknown_on_conflict_is_treated_as_write(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    output_root = tmp_path / "out"
+    workbook_path = output_root / "versions" / "wf" / "books" / "report.xlsx"
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(workbook_path)},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+
+    manager.apply_workbook_sheet(
+        workflow_node_id="n1",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="n1",
+        input_output_id="detail",
+        input_csv=str(first),
+        on_conflict="error",
+    )
+    manager.apply_workbook_sheet(
+        workflow_node_id="n2",
+        decl_order=1,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="n2",
+        input_output_id="detail",
+        input_csv=str(first),
+        on_conflict="unknown",
+    )
+
+    write_events = [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE]
+    assert isinstance(write_events[-1]["payload"], WorkflowResourceWriteEvent)
+    assert write_events[-1]["payload"].action == "write"
+
+
 def test_resource_manager_commit_workbook_publishes_versioned_output_and_manifest(tmp_path: Path) -> None:
     from openpyxl import load_workbook
 

@@ -86,9 +86,7 @@ def build_viz_schedule_plan(
     for layer_index, layer_field_keys in enumerate(layers):
         layer_ops: List[LoadRefOperatorIr] = []
         for key in layer_field_keys:
-            op = op_by_field_key.get(key)
-            if op is not None:
-                layer_ops.append(op)
+            layer_ops.append(op_by_field_key[key])
 
         rows_barrier = any(has_rows_binding(op.lookup_steps) for op in layer_ops)
 

@@ -84,7 +84,7 @@ def _update_versioned_output_manifests(result: "RunResult") -> None:
             raise ValueError(msg)
         if parsed.kind == "books":
             books_by_root.setdefault(root_str, {})[str(parsed.artifact_id)] = str(parsed.artifact_relpath)
-        elif parsed.kind == "files":
+        else:
             files_by_root.setdefault(root_str, {})[str(parsed.artifact_id)] = str(parsed.artifact_relpath)
 
     for root_str, version_id in version_id_by_root.items():

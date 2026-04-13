@@ -181,12 +181,11 @@ class RelationIr:
                 return self._build_lookup_steps(path)
 
             # 探索邻居
-            if current_source.source_id in adjacency:
-                for from_field, next_source, to_field in adjacency[current_source.source_id]:
-                    if next_source.source_id not in visited:
-                        visited.add(next_source.source_id)
-                        new_path = [*path, (from_field, next_source, to_field)]
-                        queue.append((next_source, new_path))
+            for from_field, next_source, to_field in adjacency.get(current_source.source_id, []):
+                if next_source.source_id not in visited:
+                    visited.add(next_source.source_id)
+                    new_path = [*path, (from_field, next_source, to_field)]
+                    queue.append((next_source, new_path))
 
         msg = f"无法从 {from_source.source_id!r} 到达 {to_source.source_id!r}"
         raise ValueError(msg)

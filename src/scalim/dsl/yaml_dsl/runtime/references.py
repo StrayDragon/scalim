@@ -357,12 +357,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
             msg = RELATIVE_REFERENCE_BASE_REQUIRED.format(reference)
             raise ScalimResolverError(msg)
 
-        dot_count = 0
-        for ch in module_path:
-            if ch != ".":
-                break
-            dot_count += 1
-
+        dot_count = len(module_path) - len(module_path.lstrip("."))
         rest = module_path[dot_count:]
         base_parts = [p for p in str(base).split(".") if p] if base else []
         up_levels = dot_count - 1

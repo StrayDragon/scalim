@@ -90,9 +90,7 @@ def _parse_dotted_style(reference: str) -> ParsedReference:
 
     module_path, func_name = parts
     if not module_path:
-        msg = "点号形式引用 '{}' 非法;期望格式: `module.path.function`".format(reference)
-        if reference.startswith("."):
-            msg = "相对点号引用 '{}' 非法;期望格式: `.module.path.function`".format(reference)
+        msg = "相对点号引用 '{}' 非法;期望格式: `.module.path.function`".format(reference)
         raise ScalimReferenceSyntaxError(msg)
 
     if _MODULE_PATH_RE.fullmatch(module_path) is None:

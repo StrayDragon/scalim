@@ -120,6 +120,8 @@ def test_internal_observer_manager_lazy_branches_and_viz_node_cache() -> None:
             seq=1,
         )
     )
+    emit_only.loader_result_policy = "unknown"
+    emit_only.emit_loader_call(loader_name="x", params={}, result={"a": 1}, duration=0.0)  # noqa: SLF001
 
     manager = ObserverManager(mode="capture")
     manager._recorded_events = None  # noqa: SLF001

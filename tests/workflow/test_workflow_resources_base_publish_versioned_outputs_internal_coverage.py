@@ -92,3 +92,56 @@ def test_publish_staged_outputs_rejects_version_id_mismatch(tmp_path: Path) -> N
 
     with pytest.raises(ScalimWorkflowWriteError, match=r"version_id mismatch"):
         mgr._publish_staged_outputs()  # noqa: SLF001
+
+
+def test_publish_staged_outputs_ignores_unknown_versioned_output_kinds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    mgr = _make_manager("exec_1")
+
+    root = tmp_path / "out"
+    final_unknown = root / "versions" / "exec_1" / "files" / "unknown.csv"
+    final_known = root / "versions" / "exec_1" / "files" / "known.csv"
+
+    staged_unknown = tmp_path / "staged_unknown.csv"
+    staged_unknown.write_text("id,name\n1,a\n", encoding="utf-8")
+    staged_known = tmp_path / "staged_known.csv"
+    staged_known.write_text("id,name\n2,b\n", encoding="utf-8")
+
+    mgr._staged_outputs = [  # noqa: SLF001
+        resources_base_mod._StagedOutput(
+            resource_type="csv",
+            resource_id="unknown",
+            workflow_node_id="node_1",
+            staged_path=str(staged_unknown),
+            final_path=str(final_unknown),
+        ),
+        resources_base_mod._StagedOutput(
+            resource_type="csv",
+            resource_id="known",
+            workflow_node_id="node_1",
+            staged_path=str(staged_known),
+            final_path=str(final_known),
+        ),
+    ]
+
+    original = resources_base_mod.versioned_outputs.parse_versioned_output_path
+
+    def _fake_parse(path: Path):  # type: ignore[no-untyped-def]
+        parsed = original(path)
+        if path.name == "unknown.csv":
+            return resources_base_mod.versioned_outputs.ParsedVersionedOutputPath(
+                root=parsed.root,
+                version_id=parsed.version_id,
+                kind="unknown",
+                artifact_id=parsed.artifact_id,
+                artifact_relpath=parsed.artifact_relpath,
+            )
+        return parsed
+
+    monkeypatch.setattr(resources_base_mod.versioned_outputs, "parse_versioned_output_path", _fake_parse)
+
+    mgr._publish_staged_outputs()  # noqa: SLF001
+
+    manifest_path = root / "versions" / "exec_1" / "manifest.json"
+    manifest_payload = json.loads(manifest_path.read_text("utf-8"))
+    assert "known" in manifest_payload["files"]
+    assert "unknown" not in manifest_payload["files"]
