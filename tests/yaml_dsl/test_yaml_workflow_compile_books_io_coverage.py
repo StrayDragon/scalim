@@ -30,7 +30,14 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     OutputToConfig,
     ResourcesConfig,
 )
-from scalim.spec.ir._workflow import AppendSheetNodeIr, WorkflowAnyNodeIr, WorkflowEdgeIr, WorkflowNodeIr, WorkflowNodeType, WriteSheetNodeIr
+from scalim.spec.ir._workflow import (
+    AppendSheetNodeIr,
+    WorkflowAnyNodeIr,
+    WorkflowEdgeIr,
+    WorkflowNodeIr,
+    WorkflowNodeType,
+    WriteSheetNodeIr,
+)
 
 
 def test_workflow_compile_try_resolve_book_export_abs_path_cover_branches(tmp_path: Path) -> None:

@@ -387,9 +387,9 @@ class WorkflowRunController:
             return
 
         if self._state.submitted:
-            raise RuntimeError(  # pragma: no cover  # pragma: allow-no-cover invariant: submit_ready_nodes never schedules write nodes when futures in-flight
-                "write node must not be scheduled while demand futures are in-flight"
-            )
+            msg = "write node must not be scheduled while demand futures are in-flight"
+            # pragma: allow-no-cover invariant: write nodes scheduled only after demand futures complete
+            raise RuntimeError(msg)  # pragma: no cover
         idx = int(self._index_by_node_id.get(str(node_id), 0))
         try:
             self._run_workflow_write_node(

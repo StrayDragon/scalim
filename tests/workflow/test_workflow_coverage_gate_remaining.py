@@ -519,6 +519,7 @@ def test_workflow_controller_submit_ready_nodes_returns_when_ready_queue_contain
         assert controller.state.ready_queue == ["missing"]
         assert controller.state.submitted == {}
 
+
 def test_workflow_controller_process_completed_future_for_write_node_sets_outcome() -> None:
     from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
