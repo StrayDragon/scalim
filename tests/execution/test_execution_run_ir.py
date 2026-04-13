@@ -128,6 +128,24 @@ def test_run_ir_total_rows_counts_even_without_output_or_sink() -> None:
     assert result.output_path is None
 
 
+def test_run_ir_rejects_missing_runtime_bindings() -> None:
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    demand_ir = DemandIr.from_irs(
+        sources=[],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        main_source=main_source,
+    )
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=InMemoryListSink(),
+        runtime_bindings=None,
+    )
+
+    with pytest.raises(ValueError, match=r"runtime_bindings is required"):
+        _ = run_ir(demand_ir, request)
+
+
 def test_run_ir_passes_main_rows_to_engine_and_bypasses_loader() -> None:
     def _load_main_should_not_be_called():  # type: ignore[no-untyped-def]
         raise RuntimeError("loader should not be called")

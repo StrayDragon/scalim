@@ -76,7 +76,7 @@ def _parse_callable_ref(reference: object, *, context_label: str) -> CallableRef
     try:
         parsed = parse_python_reference(raw)
     except ScalimReferenceSyntaxError as exc:
-        raise ScalimConversionError(str(exc)) from None
+        raise ScalimConversionError(str(exc)) from exc
 
     return PythonReferenceIr(
         reference=str(parsed.reference),

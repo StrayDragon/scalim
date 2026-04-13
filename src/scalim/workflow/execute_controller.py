@@ -19,7 +19,6 @@ from ..events._events import (
     WorkflowNodeStartEvent,
     WorkflowResourceCommitEvent,
 )
-from ..exceptions import safe_error_message, safe_error_type
 from ..execution.adaptive.capture import HookRecordedEvent
 from ..execution.engine import ScalimEngine
 from ..execution.run_ir import ExecutionRequest, ExecutionResult, run_ir, run_ir_capture_events
@@ -46,8 +45,11 @@ from ._internal.replay_event_classification import (
 from .artifacts import WorkflowArtifactsDirectory
 from .errors import ScalimWorkflowConfigError
 from .loaders import workflow_loader_context
+from .outcome_builder import build_outcome_from_exception, build_outcome_from_result, safe_error_message, safe_error_type
 from .report import WorkflowRunError, WorkflowRunOutcome
-from .resources import ScalimWorkflowWriteError, WorkflowResourceManager
+from .resource_lifecycle import WorkflowResourceLifecycle
+from .resources import WorkflowResourceManager
+from .scheduler_rules import can_schedule_more, should_cancel_on_failure
 
 
 class _WorkflowCtxStoreLike(Protocol):
@@ -95,27 +97,6 @@ class WorkflowRunState:
     captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]] = field(default_factory=dict)
     captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]] = field(default_factory=dict)
     captured_demand_request_by_node_id: Dict[str, object] = field(default_factory=dict)
-
-
-def _workflow_error_diff(exc: BaseException) -> Optional[List[str]]:
-    if isinstance(exc, ScalimWorkflowWriteError):
-        return exc.diff
-    return None
-
-
-def _build_workflow_run_error(exc: BaseException, *, run_id: str, demand_path: str) -> WorkflowRunError:
-    return WorkflowRunError(
-        run_id=str(run_id),
-        demand_path=str(demand_path),
-        exc_type=safe_error_type(exc),
-        message=str(safe_error_message(exc) or ""),
-        diff=_workflow_error_diff(exc),
-    )
-
-
-def _build_workflow_error_outcome(exc: BaseException, *, run_id: str, demand_path: str) -> WorkflowRunOutcome:
-    err = _build_workflow_run_error(exc, run_id=str(run_id), demand_path=str(demand_path))
-    return WorkflowRunOutcome(run_id=str(run_id), demand_path=str(demand_path), result=None, error=err)
 
 
 def _build_demand_replay_instrumentation(  # noqa: C901
@@ -179,6 +160,7 @@ class WorkflowRunController:
     _workflow_instrumentation: InstrumentationHub
     _workflow_cache_pool: Optional[WorkflowCachePool]
     _resource_manager: WorkflowResourceManager
+    _resource_lifecycle: WorkflowResourceLifecycle
     _write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
 
     _compile_demand_node: Callable[..., Tuple[object, ExecutionRequest]]
@@ -208,6 +190,7 @@ class WorkflowRunController:
         workflow_instrumentation: InstrumentationHub,
         workflow_cache_pool: Optional[WorkflowCachePool],
         resource_manager: WorkflowResourceManager,
+        resource_lifecycle: WorkflowResourceLifecycle,
         write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
         compile_demand_node_fn: Callable[..., Tuple[object, ExecutionRequest]],
         compile_demand_fn: Callable[..., object],
@@ -230,6 +213,7 @@ class WorkflowRunController:
         self._workflow_instrumentation = workflow_instrumentation
         self._workflow_cache_pool = workflow_cache_pool
         self._resource_manager = resource_manager
+        self._resource_lifecycle = resource_lifecycle
         self._write_output_ids_by_run_id = write_output_ids_by_run_id
 
         self._compile_demand_node = compile_demand_node_fn
@@ -266,6 +250,7 @@ class WorkflowRunController:
         workflow_instrumentation: InstrumentationHub,
         workflow_cache_pool: Optional[WorkflowCachePool],
         resource_manager: WorkflowResourceManager,
+        resource_lifecycle: WorkflowResourceLifecycle,
         write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
         write_consumers_remaining_by_output_key: Dict[Tuple[str, str], int],
         main_rows_consumers_remaining_by_run_id: Dict[str, int],
@@ -323,6 +308,7 @@ class WorkflowRunController:
             workflow_instrumentation=workflow_instrumentation,
             workflow_cache_pool=workflow_cache_pool,
             resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id=write_output_ids_by_run_id,
             compile_demand_node_fn=compile_demand_node_fn,
             compile_demand_fn=compile_demand_fn,
@@ -350,14 +336,14 @@ class WorkflowRunController:
         while True:
             if not self._state.ready_queue:
                 return
-            if self._state.failure_policy == "all_fail" and self._state.failed_outcome is not None:
+            if should_cancel_on_failure(self._state.failure_policy, self._state.failed_outcome):
                 return
 
             # 单写者模型: `write node` 在 `controller` 线程同步执行,
             # 且不会与 `in-flight` 的 `demand future` 重叠; 共享状态更新被约束在 `controller` 内,
             # 从而不再依赖 `artifacts/ctx/resources` 的线程锁。
             if self._state.submitted:
-                if len(self._state.submitted) >= int(self._state.max_concurrency):
+                if not can_schedule_more(len(self._state.submitted), self._state.max_concurrency):
                     return
                 node_id = self._pop_next_ready_demand_node_id()
                 if node_id is None:
@@ -370,7 +356,7 @@ class WorkflowRunController:
                 self._submit_one_ready_node(str(write_node_id))
                 continue
 
-            if len(self._state.submitted) >= int(self._state.max_concurrency):
+            if not can_schedule_more(len(self._state.submitted), self._state.max_concurrency):
                 return
             node_id = self._pop_next_ready_demand_node_id()
             if node_id is None:
@@ -400,6 +386,9 @@ class WorkflowRunController:
             self._submit_demand_node(str(node_id), node)
             return
 
+        if self._state.submitted:
+            msg = "write node must not be scheduled while demand futures are in-flight"
+            raise RuntimeError(msg)
         idx = int(self._index_by_node_id.get(str(node_id), 0))
         try:
             self._run_workflow_write_node(
@@ -412,8 +401,7 @@ class WorkflowRunController:
             self._maybe_release_workflow_main_rows_artifact(node)
             self._state.node_state[str(node_id)] = "done"
             self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
-            if self._workflow_cache_pool is not None:
-                self._workflow_cache_pool.on_workflow_node_done(str(node_id))
+            self._resource_lifecycle.on_node_terminal(str(node_id), ok=True)
             self._on_terminal(str(node_id), ok=True)
         except Exception as exc:  # noqa: BLE001
             self._mark_node_failed(node_id=str(node_id), node=node, demand_path="", exc=exc, idx=idx)
@@ -492,22 +480,19 @@ class WorkflowRunController:
                         workflow_exec_id=str(self._workflow_exec_id),
                         workflow_node_id=str(node_id),
                     )
-                outcome = WorkflowRunOutcome(
+                self._state.outcomes[idx] = build_outcome_from_result(
+                    node_result,
                     run_id=str(node_id),
                     demand_path=demand_yaml_path,
-                    result=node_result,
-                    error=None,
                 )
-                self._state.outcomes[idx] = outcome
             else:
                 self._maybe_release_workflow_managed_in_memory_output(node)
-                self._state.outcomes[idx] = WorkflowRunOutcome(run_id=str(node_id), demand_path="", result=None, error=None)
+                self._state.outcomes[idx] = build_outcome_from_result(None, run_id=str(node_id), demand_path="")
 
             self._maybe_release_workflow_main_rows_artifact(node)
             self._state.node_state[str(node_id)] = "done"
             self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
-            if self._workflow_cache_pool is not None:
-                self._workflow_cache_pool.on_workflow_node_done(str(node_id))
+            self._resource_lifecycle.on_node_terminal(str(node_id), ok=True)
             self._on_terminal(str(node_id), ok=True)
         except Exception as exc:
             if isinstance(exc, ScalimWorkflowCachePoolError):
@@ -530,13 +515,12 @@ class WorkflowRunController:
         idx: Optional[int] = None,
     ) -> None:
         idx = int(idx if idx is not None else self._index_by_node_id.get(str(node_id), 0))
-        outcome = _build_workflow_error_outcome(exc, run_id=str(node_id), demand_path=str(demand_path))
+        outcome = build_outcome_from_exception(exc, run_id=str(node_id), demand_path=str(demand_path))
         self._state.outcomes[idx] = outcome
         self._state.node_state[str(node_id)] = "failed"
         self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
         self._maybe_release_workflow_main_rows_artifact(node)
-        if self._workflow_cache_pool is not None:
-            self._workflow_cache_pool.on_workflow_node_done(str(node_id))
+        self._resource_lifecycle.on_node_terminal(str(node_id), ok=False)
         self._on_terminal(str(node_id), ok=False)
 
         if self._state.failure_policy == "all_fail" and self._state.failed_outcome is None:
@@ -809,8 +793,7 @@ class WorkflowRunController:
         self._state.node_state[str(node_id)] = "cancelled"
         self._emit_workflow_node_cancelled(node, reason=reason, message=message)
         self._maybe_release_workflow_main_rows_artifact(node)
-        if self._workflow_cache_pool is not None:
-            self._workflow_cache_pool.on_workflow_node_done(str(node_id))
+        self._resource_lifecycle.on_node_terminal(str(node_id), ok=False)
 
     def _on_terminal(self, node_id: str, *, ok: bool) -> None:
         for child_id in self._dependents_by_node_id.get(str(node_id), []):

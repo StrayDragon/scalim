@@ -16,7 +16,7 @@ from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from scalim.spec.ir._workflow import WorkflowCachePoolBudgetIr, WorkflowCachePoolIr, WorkflowCachePoolPinIr
 from scalim.typedefs import SourceSpecIrCacheMode
 
-_TIMEOUT_S = 5.0
+from tests.support.testing_utils import CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S, event_wait, join_or_fail
 
 
 def test_json_like_helpers_reject_invalid_values() -> None:
@@ -165,6 +165,23 @@ def test_workflow_cache_pool_collect_refcount_evictions_skips_loading_entries() 
     assert pool._collect_refcount_evictions(node_id="n1") == {}  # type: ignore[attr-defined]
 
     pool._evict_entry("missing", workflow_node_id="n3", reason="x")  # type: ignore[attr-defined]
+
+
+def test_workflow_cache_pool_close_waits_for_loading_entry_lock() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+    signature = _sig("s1")
+    _ = pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
+
+    entry = pool._entries[signature.canonical_key()]  # type: ignore[attr-defined]
+    entry.loading = True
+
+    pool.close()
 
 
 def test_pipeline_preload_uses_preloaded_cache_get_or_load() -> None:
@@ -355,7 +372,7 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
     def load_fn():  # type: ignore[no-untyped-def]
         calls.append("load")
         load_started.set()
-        if not allow_finish.wait(timeout=_TIMEOUT_S):
+        if not allow_finish.wait(timeout=CI_TIMEOUT_S):
             pytest.fail("test fixture deadlock: allow_finish not set")
         return {1: {"id": 1}}
 
@@ -378,7 +395,7 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
 
     t1 = threading.Thread(target=_worker1, daemon=True)
     t1.start()
-    if not load_started.wait(timeout=_TIMEOUT_S):
+    if not load_started.wait(timeout=CI_TIMEOUT_S):
         pytest.fail("load_fn did not start")
 
     t2 = threading.Thread(
@@ -386,22 +403,18 @@ def test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature(
         daemon=True,
     )
     t2.start()
-    if not thread2_started.wait(timeout=_TIMEOUT_S):
+    if not thread2_started.wait(timeout=CI_TIMEOUT_S):
         pytest.fail("thread2 did not start")
-    if thread2_done.wait(timeout=0.1):
+    if thread2_done.wait(timeout=NEGATIVE_TIMEOUT_S):
         pytest.fail("thread2 finished before load finished; expected in-flight wait")
 
     allow_finish.set()
 
-    if not thread1_done.wait(timeout=_TIMEOUT_S):
-        pytest.fail("thread1 did not finish")
-    if not thread2_done.wait(timeout=_TIMEOUT_S):
-        pytest.fail("thread2 did not finish")
+    event_wait(thread1_done, label="thread1_done")
+    event_wait(thread2_done, label="thread2_done")
 
-    t1.join(timeout=_TIMEOUT_S)
-    t2.join(timeout=_TIMEOUT_S)
-    if t1.is_alive() or t2.is_alive():
-        pytest.fail("threads did not finish")
+    join_or_fail(t1, label="cache_pool_inflight_t1")
+    join_or_fail(t2, label="cache_pool_inflight_t2")
 
     assert not errors
     assert len(calls) == 1
@@ -424,7 +437,7 @@ def test_workflow_cache_pool_retry_miss_sets_loading_intent_before_eviction_wind
             if str(meta.get("workflow_node_id")) != self.block_node_id:
                 return None
             self.entered.set()
-            if not self.allow_continue.wait(timeout=_TIMEOUT_S):
+            if not self.allow_continue.wait(timeout=CI_TIMEOUT_S):
                 raise RuntimeError("test timeout waiting to continue emit")
             return None
 
@@ -459,14 +472,13 @@ def test_workflow_cache_pool_retry_miss_sets_loading_intent_before_eviction_wind
 
     t = threading.Thread(target=_retry, daemon=True)
     t.start()
-    assert instrumentation.entered.wait(timeout=_TIMEOUT_S)
+    assert instrumentation.entered.wait(timeout=CI_TIMEOUT_S)
 
     with pytest.raises(ScalimWorkflowCachePoolError, match="no evictable"):
         _ = pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {2: {"id": 2}})
 
     instrumentation.allow_continue.set()
-    t.join(timeout=_TIMEOUT_S)
-    assert not t.is_alive()
+    join_or_fail(t, label="cache_pool_eviction_blocked_t")
     assert not retry_errors
     assert retry_results == [{1: {"id": 1}}]
 
@@ -521,5 +533,5 @@ def test_workflow_cache_pool_emit_does_not_deadlock_on_reentry() -> None:
         daemon=True,
     )
     runner.start()
-    if not runner_done.wait(timeout=_TIMEOUT_S):
+    if not runner_done.wait(timeout=CI_TIMEOUT_S):
         pytest.fail("WorkflowCachePool.emit appears to be called under internal locks (reentry deadlock)")

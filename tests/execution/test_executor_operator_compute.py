@@ -476,6 +476,46 @@ def test_compute_operator_constant_compute_caches_result_and_emits_per_row() -> 
     assert len(hook.field_computed) == 3
 
 
+def test_compute_operator_constant_compute_applies_value_transform() -> None:
+    def _compute(**_kwargs):  # type: ignore[no-untyped-def]
+        return 3
+
+    field_spec = DerivedFieldIr(
+        field_id="const",
+        name="Const",
+        dependencies=(),
+        call_by=CallBySpecIr(reference=RuntimeHandleIdIr(handle_id="derived.const")),
+        is_constant_compute=True,
+    )
+    operator = ComputeOperatorIr(
+        operator_id="compute_const",
+        operator_type=OperatorType.COMPUTE.value,
+        field_key="const",
+        input_fields=(),
+    )
+
+    runtime_bindings = RuntimeBindings(
+        derived_calculators={"const": _compute},
+        value_transforms={"const": (lambda v: v + 1)},  # type: ignore[no-any-return]
+    )
+    runtime, _hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"const": field_spec}), runtime_bindings=runtime_bindings)
+
+    context = BatchContext()
+    ComputeOperatorExecutor().execute(operator, context, [1, 2, 3], runtime)
+    assert context.get_field_value("const", 1) == 4
+
+
+def test_compute_operator_returns_early_when_field_is_not_derived() -> None:
+    operator = ComputeOperatorIr(
+        operator_id="compute_missing",
+        operator_type=OperatorType.COMPUTE.value,
+        field_key="missing",
+        input_fields=(),
+    )
+    runtime, _hook = _make_runtime_with_hook(ExecutionPlan(field_specs={}), runtime_bindings=RuntimeBindings())
+    ComputeOperatorExecutor().execute(operator, BatchContext(), [1], runtime)
+
+
 @pytest.mark.parametrize(
     ("kind", "unexpected"),
     [

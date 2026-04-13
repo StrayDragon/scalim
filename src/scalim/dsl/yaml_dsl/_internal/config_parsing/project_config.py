@@ -66,7 +66,7 @@ def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
         msg = "scalim.yaml parse error: path='{}'".format(str(path))
         if exc.errors:
             msg = "{}: {}".format(msg, exc.errors[0].message)
-        raise TypeError(msg) from None
+        raise TypeError(msg) from exc
 
     if not isinstance(loaded, dict):
         msg = "scalim.yaml must be a mapping: path='{}'".format(str(path))
@@ -82,14 +82,14 @@ def _resolve_dir(value: object, *, base_dir: Path, context_label: str) -> Path:
     resolved = (base_dir / raw).expanduser().resolve(strict=False)
     try:
         _ = resolved.relative_to(base_dir)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:
         msg = "{} must stay within project_root: raw='{}' | project_root='{}' | resolved='{}'".format(
             str(context_label or "path"),
             raw,
             str(base_dir),
             str(resolved),
         )
-        raise ValueError(msg) from None
+        raise ValueError(msg) from exc
     if not resolved.exists() or not resolved.is_dir():
         msg = "{} must be an existing directory: raw='{}' | resolved='{}' | exists={} | is_dir={}".format(
             str(context_label or "path"),

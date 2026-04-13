@@ -17,3 +17,19 @@ def test_schema_builder_schema_generation_does_not_require_scalim_misc(monkeypat
     schema = schema_builder.SchemaBuilder().build_demand_schema()
     assert isinstance(schema, dict)
     assert schema.get("type") == "object"
+
+
+def test_load_schema_doc_standardizer_impl_returns_none_on_import_error(monkeypatch) -> None:
+    def _raise_import_error(_name: str):  # type: ignore[no-untyped-def]
+        raise ImportError("boom")
+
+    monkeypatch.setattr(hook.importlib, "import_module", _raise_import_error)
+    assert hook.load_schema_doc_standardizer_impl() is None
+
+
+def test_load_schema_doc_standardizer_impl_returns_none_when_attr_missing_or_not_callable(monkeypatch) -> None:
+    class _Mod:
+        standardize_schema_docs = None
+
+    monkeypatch.setattr(hook.importlib, "import_module", lambda _name: _Mod())
+    assert hook.load_schema_doc_standardizer_impl() is None

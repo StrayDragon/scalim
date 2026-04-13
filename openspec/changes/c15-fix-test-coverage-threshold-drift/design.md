@@ -1,6 +1,8 @@
 ## Context
 
-`openspec/specs/testing-quality/spec.md` 要求 `--cov-fail-under=100`，`justfile:test-gate` 使用 `--cov-fail-under=99`。两者必须对齐。
+覆盖率门禁阈值由 `openspec/specs/testing-quality/spec.md` 与 `justfile:test-gate` 共同声明并必须保持一致(SSOT)。
+
+本次变更将覆盖率阈值提升为 `--cov-fail-under=100` 并确保该门禁可以稳定通过。
 
 约束：
 - 覆盖率门禁是 CI/QA 的硬性质量关卡
@@ -9,19 +11,17 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- 对齐 spec 和 justfile 中的覆盖率阈值为同一个值
+- 对齐 spec 和 justfile 中的覆盖率阈值为同一个值(100)
 - 建立 SSOT 机制防止再次漂移
 
 **Non-Goals:**
-- 不讨论应该是 99 还是 100（留给实施时根据实际覆盖率决定）
+- 不改变核心模块定义/覆盖率统计范围
 
 ## Decisions
 
-### 1) 将 spec 调整为 99 并记录原因
+### 1) 统一阈值为 100，并在 gate 中强制执行
 
-**理由：** `--cov-fail-under=100` 在实践中过于严格——vendor 兼容层、平台特定分支、defensive `except` 等可能导致个别行无法覆盖。99% 是更务实的门禁，同时仍保持极高的覆盖率标准。
-
-若当前实际覆盖率 > 99.5%，可考虑提升到 100 并配合 `# pragma: no cover` 对合理的不可覆盖行做标注。
+**理由：** 把“未覆盖路径”视为质量债务并强制清零；对于确实不可达/不可覆盖的防御性分支，使用显式 `# pragma: no cover` + `# pragma: allow-no-cover <reason>` 进行治理。
 
 ### 2) 漂移检测
 
@@ -33,9 +33,9 @@
 
 ## Migration Plan
 
-- 更新 `openspec/specs/testing-quality/spec.md`
-- 添加治理测试
-- 验证：`just qa`
+- 更新 `openspec/specs/testing-quality/spec.md` 与 `justfile:test-gate`
+- 回填缺失覆盖率(测试补齐/必要时 no-cover 治理)
+- 验证：`just test-gate`、`just qa`
 
 ## Open Questions
 

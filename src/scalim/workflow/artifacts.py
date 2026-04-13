@@ -1,5 +1,6 @@
 """`workflow` `artifacts` 模块(稳定导入路径)."""
 
+import threading
 from typing import TYPE_CHECKING, Dict, FrozenSet, Optional, Tuple, cast
 
 from ..spec.ir._workflow import WorkflowIr
@@ -13,16 +14,24 @@ if TYPE_CHECKING:
 class WorkflowArtifactsDirectory:
     _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
     _values_by_producer_node_id: Dict[str, Dict[str, object]]
+    _owner_thread_id: Optional[int]
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
         visibility = WorkflowVisibilityIndex.from_workflow_ir(workflow_ir)
         self._visible_by_consumer_node_id = visibility.visible_by_consumer_node_id
         self._values_by_producer_node_id = {}
+        self._owner_thread_id = threading.current_thread().ident
+
+    def _assert_owner_thread(self) -> None:
+        if threading.current_thread().ident != self._owner_thread_id:
+            msg = "WorkflowArtifactsDirectory write must be called from controller thread"
+            raise RuntimeError(msg)
 
     def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
         return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
     def publish(self, producer_node_id: str, artifact_id: str, value: object) -> None:
+        self._assert_owner_thread()
         by_artifact = self._values_by_producer_node_id.setdefault(str(producer_node_id), {})
         by_artifact[str(artifact_id)] = value
 
@@ -56,6 +65,7 @@ class WorkflowArtifactsDirectory:
         return by_artifact[artifact_key]
 
     def discard(self, producer_node_id: str, artifact_id: str) -> None:
+        self._assert_owner_thread()
         producer = str(producer_node_id)
         artifact_key = str(artifact_id)
         by_artifact = self._values_by_producer_node_id.get(producer)

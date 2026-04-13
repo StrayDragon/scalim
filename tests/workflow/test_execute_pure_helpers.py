@@ -5,24 +5,22 @@ from scalim.events import (
     Event,
 )
 from scalim.events._events import WorkflowResourceCommitEvent
-from scalim.workflow import execute_controller as controller_mod
 from scalim.workflow._internal.replay_event_classification import classify_workflow_events_for_replay
+from scalim.workflow.outcome_builder import build_outcome_from_exception
 from scalim.workflow.resources_base import ScalimWorkflowWriteError
 
 
 def test_build_workflow_run_error_and_outcome_preserves_diff_for_write_error() -> None:
     exc = ScalimWorkflowWriteError("boom", diff=["a", "b"])
-    err = controller_mod._build_workflow_run_error(exc, run_id="r1", demand_path="d1")
-    assert err.run_id == "r1"
-    assert err.demand_path == "d1"
-    assert err.diff == ["a", "b"]
-
-    outcome = controller_mod._build_workflow_error_outcome(exc, run_id="r1", demand_path="d1")
+    outcome = build_outcome_from_exception(exc, run_id="r1", demand_path="d1")
     assert outcome.run_id == "r1"
     assert outcome.demand_path == "d1"
     assert outcome.result is None
-    assert outcome.error is not None
-    assert outcome.error.diff == ["a", "b"]
+    err = outcome.error
+    assert err is not None
+    assert err.run_id == "r1"
+    assert err.demand_path == "d1"
+    assert err.diff == ["a", "b"]
 
 
 def test_classify_workflow_events_for_replay_buckets() -> None:

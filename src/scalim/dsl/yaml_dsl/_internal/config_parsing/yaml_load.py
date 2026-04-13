@@ -329,7 +329,7 @@ def load_yaml_mapping_text(
                     loc=loc,
                 )
             ],
-        ) from None
+        ) from None  # 抑制异常链:YAML 解析边界,隐藏 `ruamel` 内部实现细节
 
     if loaded is None:
         error_message = "YAML document is empty"
@@ -389,7 +389,7 @@ def load_yaml_mapping_file(
                     loc=None,
                 )
             ],
-        ) from None
+        ) from None  # 抑制异常链:文件读边界,隐藏 `OS`/编码等内部细节
 
     return load_yaml_mapping_text(
         yaml_text,

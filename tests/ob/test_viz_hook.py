@@ -169,7 +169,7 @@ def test_viz_event_emitter_concurrent_emission_keeps_jsonl_valid(tmp_path: Path)
     for t in threads:
         t.start()
     for t in threads:
-        t.join(timeout=5.0)
+        t.join(timeout=CI_TIMEOUT_S)
         assert not t.is_alive()
     emitter.close()
 
@@ -181,7 +181,6 @@ def test_viz_event_emitter_concurrent_emission_keeps_jsonl_valid(tmp_path: Path)
 
 def test_viz_snapshot_concurrent_writers_keep_json_parseable(tmp_path: Path) -> None:
     import threading
-    import time
 
     snapshot_path = tmp_path / "viz_snapshot.json"
     errors = []
@@ -207,14 +206,14 @@ def test_viz_snapshot_concurrent_writers_keep_json_parseable(tmp_path: Path) -> 
         started.wait(timeout=CI_TIMEOUT_S)
         while not stop.is_set():
             if not snapshot_path.exists():
-                time.sleep(0.001)
+                stop.wait(timeout=0.001)
                 continue
             try:
                 _ = json.loads(snapshot_path.read_text(encoding="utf-8"))
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
                 return
-            time.sleep(0.001)
+            stop.wait(timeout=0.001)
 
     reader = threading.Thread(target=_reader)
     writers = [threading.Thread(target=_writer, args=(tid,)) for tid in range(4)]

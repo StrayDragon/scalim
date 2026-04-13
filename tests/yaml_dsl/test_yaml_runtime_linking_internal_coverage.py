@@ -2,13 +2,19 @@ import pytest
 
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
 from scalim.dsl.yaml_dsl.runtime.runtime_linking import (
+    _bind_field_runtime_bindings,
+    _bind_source_runtime_bindings,
     _compose_value_ops,
     _eval_call_by_value,
     _preflight_loader_params_signature,
     _resolve_callable_ref,
     _resolve_value_op_callable,
 )
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import build_compute_engine
+from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir import BuiltinCallableIdIr, CallByValueIr, ComputeCallContextIr, PythonReferenceIr, RuntimeHandleIdIr
+from scalim.spec.ir import DemandIr, DerivedFieldIr, KeyIr, MainSourceIr, SourceIr
+from scalim.spec.ir.binding import LoaderIr
 
 
 class _DummyResolver:
@@ -96,3 +102,74 @@ def test_value_ops_internal_coverage_edges() -> None:
 
     with pytest.raises(ValueError, match=r"Unknown ValueOpIr.kind"):
         _ = _compose_value_ops(field_id="f", ops=(_OpUnknown(),), resolver=resolver)
+
+
+def test_bind_source_runtime_bindings_builds_extractor_wrapper() -> None:
+    calls = []
+
+    def _loader():  # type: ignore[no-untyped-def]
+        calls.append("loader")
+        return {}
+
+    def _extract(lookup_key, result):  # type: ignore[no-untyped-def]
+        calls.append("extract")
+        return {"k": lookup_key, "r": result}
+
+    class _Resolver:
+        def resolve(self, reference: str):  # noqa: ANN001
+            if reference == "tests:loader":
+                return _loader
+            if reference == "tests:extract":
+                return _extract
+            raise AssertionError("unexpected reference: {}".format(reference))
+
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(
+            callable_ref=PythonReferenceIr(reference="tests:loader", module_path="tests", attr_path=("loader",), style="class"),
+            extractor_ref=PythonReferenceIr(reference="tests:extract", module_path="tests", attr_path=("extract",), style="class"),
+        ),
+    )
+    demand_ir = DemandIr.from_irs(
+        sources=[source],
+        fields=(),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+    )
+
+    bindings = RuntimeBindings()
+    _bind_source_runtime_bindings(demand_ir, bindings=bindings, resolver=_Resolver())
+
+    assert "s1" in bindings.loader_extractors
+    wrapped = bindings.loader_extractors["s1"]
+    assert wrapped("lk", {"lk": 1}) == {"k": "lk", "r": {"lk": 1}}
+    assert "extract" in calls
+
+
+def test_bind_field_runtime_bindings_rejects_invalid_derived_field_state() -> None:
+    # DerivedFieldIr enforces invariants in __post_init__, but we still keep a runtime guard for
+    # corrupted/untrusted instances (e.g., pickled state). Build an invalid instance without running __post_init__.
+    bad = object.__new__(DerivedFieldIr)
+    object.__setattr__(bad, "field_id", "bad")
+    object.__setattr__(bad, "name", "Bad")
+    object.__setattr__(bad, "dependencies", ("x",))
+    object.__setattr__(bad, "compute_expr", "")
+    object.__setattr__(bad, "call_by", None)
+    object.__setattr__(bad, "presentation", None)
+    object.__setattr__(bad, "value_ops", ())
+    object.__setattr__(bad, "call_ctx_key", None)
+    object.__setattr__(bad, "is_constant_compute", False)
+
+    demand_ir = DemandIr.from_irs(
+        sources=[],
+        fields=(bad,),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
+    )
+
+    with pytest.raises(ValueError, match=r"missing compute_expr/call_by"):
+        _bind_field_runtime_bindings(
+            demand_ir,
+            bindings=RuntimeBindings(),
+            resolver=_DummyResolver(),  # type: ignore[arg-type] internal tests: duck-typed resolver
+            compute_engine=build_compute_engine(),
+        )

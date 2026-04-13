@@ -47,6 +47,12 @@ def test_resolver_allows_explicit_function_over_module_allowlist() -> None:
     assert resolved is math.sqrt
 
 
+def test_resolver_has_allowlist_reflects_constructor_args() -> None:
+    assert PythonReferenceResolver().has_allowlist() is False
+    assert PythonReferenceResolver(allowed_modules=frozenset(["math"])).has_allowlist() is True
+    assert PythonReferenceResolver(allowed_functions=frozenset(["math:sqrt"])).has_allowlist() is True
+
+
 def test_resolver_rejects_wildcard_modules_by_default() -> None:
     with pytest.raises(ValueError, match=r"resolver_trusted_mode=.*strict_allowlist.*trusted_allow_all_modules"):
         _ = PythonReferenceResolver(allowed_modules=frozenset(["*"]))

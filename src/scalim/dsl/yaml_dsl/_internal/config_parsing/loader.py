@@ -136,7 +136,7 @@ class YamlDemandLoader(
                                 loc=error_loc_for_yaml_path(logical_path, locations),
                             )
                         ],
-                    ) from None
+                    ) from exc
             else:
                 msg = "imports/$import is only supported for file path entrypoints; use YamlDemandLoader.load(<yaml_path>)"
                 error_message = "YAML imports expansion is not supported for inline YAML"
@@ -519,14 +519,14 @@ class YamlDemandLoader(
             raise TypeError(msg)
         try:
             max_sheets = int(max_sheets_raw)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
             msg = "{}.max_sheets must be an integer".format(base_path)
-            raise TypeError(msg) from None
+            raise TypeError(msg) from exc
         try:
             max_total_cells = int(max_total_cells_raw)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
             msg = "{}.max_total_cells must be an integer".format(base_path)
-            raise TypeError(msg) from None
+            raise TypeError(msg) from exc
         if max_sheets < 1:
             msg = "{}.max_sheets must be >= 1".format(base_path)
             raise ValueError(msg)

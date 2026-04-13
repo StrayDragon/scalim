@@ -48,7 +48,7 @@ def load_workflow_config(
     except ScalimYamlValidationError as exc:
         first = exc.errors[0] if exc.errors else None
         msg = first.message if first is not None else str(exc)
-        raise ScalimWorkflowConfigError(msg, path=str(first.path if first is not None else "(root)")) from None
+        raise ScalimWorkflowConfigError(msg, path=str(first.path if first is not None else "(root)")) from exc
 
     return load_workflow_config_from_mapping(loaded)
 

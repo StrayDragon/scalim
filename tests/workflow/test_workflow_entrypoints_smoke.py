@@ -6,6 +6,8 @@ from scalim.dsl.yaml_dsl import RunOptions
 from scalim.dsl.yaml_dsl import run_workflow as run_workflow_public
 from scalim.dsl.yaml_dsl.workflow_entrypoints import run_workflow as run_workflow_stable
 
+from tests.support.testing_utils import CI_TIMEOUT_S
+
 
 def _write_demand_yaml(tmp_path: Path, *, file_name: str, name: str, output_root: Path) -> Path:
     yaml_content = """
@@ -113,7 +115,7 @@ def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurre
         def _fake(demand_ir, request, engine_factory=None, event_meta_defaults=None):  # type: ignore[no-untyped-def]
             with lock:
                 calls.append(tag)
-            barrier.wait(timeout=10.0)
+            barrier.wait(timeout=CI_TIMEOUT_S)
             return real_run_ir(
                 demand_ir,
                 request,
@@ -140,8 +142,8 @@ def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurre
     t2 = threading.Thread(target=_run, args=("b", wf2, _make_fake("b")))
     t1.start()
     t2.start()
-    t1.join(timeout=30.0)
-    t2.join(timeout=30.0)
+    t1.join(timeout=CI_TIMEOUT_S * 3)  # long-flow smoke test: multiplied for workflow execution
+    t2.join(timeout=CI_TIMEOUT_S * 3)
 
     assert not t1.is_alive()
     assert not t2.is_alive()

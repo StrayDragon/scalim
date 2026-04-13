@@ -854,7 +854,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     msg = ("Invalid default Excel sheet name for output {!r}; set {}.{}.to.sheet explicitly. {}").format(
                         str(out_cfg.name), str(outputs_path), int(idx), exc
                     )
-                    raise ValueError(msg) from None
+                    raise ValueError(msg) from exc
                 raise
 
             if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:

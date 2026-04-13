@@ -98,6 +98,12 @@ class PreloadCache(_PreloadCacheBase):
     设计目标:
     - 支持跨多个 `runs` 共享 `preload_forever` 结果(`Workflow` 场景)
     - 并发下对单个 `source_id` 加锁,保证最多一次真实 `loader` 调用
+
+    线程安全契约:
+    - `_global_lock`: 保护 `_locks` 字典查找、`__iter__`/`__len__`/`__contains__` 快照操作.
+    - 按 `source` 互斥锁(`_lock_for`): 保护 `_data`/`_inflight` 在同一 `source_id` 下的读写.
+    - `waiter` 路径在 `inflight.done.wait()` 返回后,在同一 `source_id` 的互斥锁内读取 `inflight.error`/`inflight.value`.
+    - `__iter__` 返回 `keys` 快照(非实时视图),这是 `MutableMapping` 在并发下的合理语义.
     """
 
     def __init__(
@@ -157,11 +163,18 @@ class PreloadCache(_PreloadCacheBase):
 
     @override
     def __iter__(self) -> Iterator[str]:
-        return iter(self._data)
+        with self._global_lock:
+            return iter(list(self._data.keys()))
 
     @override
     def __len__(self) -> int:
-        return len(self._data)
+        with self._global_lock:
+            return len(self._data)
+
+    @override
+    def __contains__(self, key: object) -> bool:
+        with self._global_lock:
+            return key in self._data
 
     def _decref_inflight_and_maybe_cleanup(self, *, source_id: str, inflight: _InFlight, lock: threading.Lock) -> None:
         with lock:
@@ -230,10 +243,12 @@ class PreloadCache(_PreloadCacheBase):
         with lock:
             if source_id in self._data:
                 return self._data[source_id]
-        if inflight.error is not None:
-            raise clone_exception_for_reraise(inflight.error)
-        if inflight.value is not None:
-            return inflight.value
+            error = inflight.error
+            value = inflight.value
+        if error is not None:
+            raise clone_exception_for_reraise(error)
+        if value is not None:
+            return value
         msg = "PreloadCache internal error: inflight done but missing value/error for source_id: {!r}".format(source_id)
         raise RuntimeError(msg)
 

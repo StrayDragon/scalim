@@ -234,14 +234,14 @@ def _parse_book_budget(raw: object, *, path: str) -> BookBudgetConfig:
         raise ScalimWorkflowConfigError(msg, path="{}.max_total_cells".format(path))
     try:
         max_sheets = int(max_sheets_raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as exc:
         msg = "{}.max_sheets must be an integer >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_sheets".format(path)) from None
+        raise ScalimWorkflowConfigError(msg, path="{}.max_sheets".format(path)) from exc
     try:
         max_total_cells = int(max_total_cells_raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as exc:
         msg = "{}.max_total_cells must be an integer >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_total_cells".format(path)) from None
+        raise ScalimWorkflowConfigError(msg, path="{}.max_total_cells".format(path)) from exc
     if max_sheets < 1:
         msg = "{}.max_sheets must be >= 1".format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.max_sheets".format(path))

@@ -1,6 +1,5 @@
 import csv
 import threading
-import time
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -18,7 +17,7 @@ from scalim.events import (
 )
 from scalim.events._events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
 
-_TIMEOUT_S = 5.0
+from tests.support.testing_utils import CI_TIMEOUT_S
 
 
 class _Instrumentation:
@@ -994,9 +993,9 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
 
     runner = threading.Thread(target=_run, daemon=True)
     runner.start()
-    if not runner_done.wait(timeout=_TIMEOUT_S):
+    if not runner_done.wait(timeout=CI_TIMEOUT_S):
         pytest.fail("WorkflowResourceManager.emit appears to be called under internal locks (reentry deadlock)")
-    runner.join(timeout=_TIMEOUT_S)
+    runner.join(timeout=CI_TIMEOUT_S)
     assert not runner_errors
     assert instrumentation._reentered is True
 
@@ -1745,7 +1744,7 @@ def test_resource_manager_concurrent_workflows_publish_versions_and_latest_json_
             try:
                 latest = versioned_outputs.read_latest(output_root)
             except FileNotFoundError:
-                time.sleep(0.001)
+                stop_reader.wait(timeout=0.001)
                 continue
             try:
                 assert str(latest.get("version_id") or "") in {"wf1", "wf2"}
@@ -1761,7 +1760,7 @@ def test_resource_manager_concurrent_workflows_publish_versions_and_latest_json_
 
     def _run(manager: resources_mod.WorkflowResourceManager) -> None:
         try:
-            _ = barrier.wait(timeout=_TIMEOUT_S)
+            _ = barrier.wait(timeout=CI_TIMEOUT_S)
             manager.commit_all()
         except BaseException as exc:
             errors.append(exc)
@@ -1770,13 +1769,13 @@ def test_resource_manager_concurrent_workflows_publish_versions_and_latest_json_
     t2 = threading.Thread(target=lambda: _run(manager2), daemon=True)
     t1.start()
     t2.start()
-    t1.join(timeout=_TIMEOUT_S)
-    t2.join(timeout=_TIMEOUT_S)
+    t1.join(timeout=CI_TIMEOUT_S)
+    t2.join(timeout=CI_TIMEOUT_S)
     assert not t1.is_alive()
     assert not t2.is_alive()
 
     stop_reader.set()
-    reader.join(timeout=_TIMEOUT_S)
+    reader.join(timeout=CI_TIMEOUT_S)
     assert not reader.is_alive()
 
     assert errors == []

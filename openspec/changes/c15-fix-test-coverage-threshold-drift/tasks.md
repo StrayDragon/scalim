@@ -1,17 +1,17 @@
 ## 1. Align SSOT
 
-- [ ] 1.1 决定统一阈值（将 `justfile:test-gate` 提升至与规范一致，或将 `openspec/specs/testing-quality/spec.md` 调整为与当前门禁一致），并同时更新两处
-- [ ] 1.2 若阈值低于 100%，在 `testing-quality` 主规范中补充简短 rationale
+- [x] 1.1 将 `justfile:test-gate` 的 `--cov-fail-under` 提升到 100（并保持与 spec 一致）
+- [x] 1.2 将 `openspec/specs/testing-quality/spec.md` 的覆盖率门槛提升到 100，并更新 rationale
 
 ## 2. Optional drift guard
 
-- [ ] 2.1 在 `tests/governance/` 中添加测试：读取 `justfile` 中 `test-gate` 的 `--cov-fail-under` 并与规范声明比对（按 design 可选）
+- [x] 2.1 在 `tests/governance/test_cov_fail_under_drift.py` 中添加漂移检测测试（保持）
 
-## 3. Coverage backfill (if threshold raised)
+## 3. Coverage backfill (threshold=100)
 
-- [ ] 3.1 若将门禁提高到 100%，补充缺失覆盖或对合理不可覆盖行使用受控 `pragma: no cover` 并满足现有 no-cover 治理
+- [x] 3.1 回填缺失覆盖率：补齐未覆盖路径或为不可达分支添加显式 `no cover` 治理，确保 `--cov-fail-under=100` 可通过
 
 ## 4. Verification
 
-- [ ] 4.1 Run `just qa` / `just test-gate` to verify
-- [ ] 4.2 Run `just openspec-check` to validate artifacts
+- [x] 4.1 Run `just test-gate` / `just qa` to verify
+- [x] 4.2 Run `just openspec-check` to validate artifacts

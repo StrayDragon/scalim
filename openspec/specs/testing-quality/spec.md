@@ -38,6 +38,8 @@
 - 使用覆盖率统计时,核心模块的覆盖率 MUST 保持 100%.
 - 核心模块定义为 `src/IMPL_ROOT/` 排除 `src/IMPL_ROOT/cli/**` 与 `packages/scalim-misc/**`.
 - 覆盖率低于 100% 时 MUST 视为失败(例如通过 `--cov-fail-under=100` 强制).
+- Rationale: 将“未覆盖的执行路径”视为质量债务并强制清零；若确有不可覆盖/不可达分支,必须使用 `# pragma: no cover` 并附带 `# pragma: allow-no-cover <reason>` 进行显式治理。
+- 该阈值 MUST 与 `justfile:test-gate` 中的 `--cov-fail-under` 参数保持一致(SSOT 对齐)。
 
 #### Scenario: 覆盖率低于 100% 时失败
 - **WHEN** 执行带覆盖率统计的非 bench 测试套件

@@ -2,7 +2,7 @@ from typing import Optional
 
 import pytest
 
-from scalim.spec.ir import KeyIr, SourceIr
+from scalim.spec.ir import KeyIr, LookupCastSpecIr, SourceIr
 from scalim.utils.relation_diagnostics import RelationDiagnostics, TypeMismatchWarning
 
 
@@ -283,6 +283,33 @@ class TestRelationDiagnosticsSampleComparison:
         assert results[0]["lookup_key_normalized"] == "100"
         assert results[0]["matched"] is True
 
+    def test_sample_comparison_with_lookup_cast_spec_registry(self) -> None:
+        source_a = _make_source("orders", "order_id")
+        source_b = _make_source("customers", "customer_id", key_cast=LookupCastSpecIr(name="int"))
+
+        relation = source_a["customer_id"].join(source_b["customer_id"])
+
+        data_a = {1: {"order_id": 1, "customer_id": "100"}}
+        data_b = {100: {"customer_id": 100}}
+
+        results = RelationDiagnostics.sample_comparison(relation, data_a, data_b)
+        assert len(results) == 1
+        assert results[0]["lookup_key_normalized"] == 100
+        assert results[0]["matched"] is True
+
+    def test_sample_comparison_tolerates_unknown_key_cast_object(self) -> None:
+        source_a = _make_source("orders", "order_id")
+        source_b = _make_source("customers", "customer_id", key_cast="nope")
+
+        relation = source_a["customer_id"].join(source_b["customer_id"])
+
+        data_a = {1: {"order_id": 1, "customer_id": 100}}
+        data_b = {100: {"customer_id": 100}}
+
+        results = RelationDiagnostics.sample_comparison(relation, data_a, data_b)
+        assert len(results) == 1
+        assert results[0]["lookup_key_normalized"] == 100
+
     def test_sample_comparison_with_transform_error(self) -> None:
         def bad_transform(v: object) -> int:
             raise ValueError("bad")
@@ -405,3 +432,9 @@ class TestRelationDiagnosticsHelpers:
     def test_as_tuple(self) -> None:
         assert RelationDiagnostics._as_tuple(1) == (1,)
         assert RelationDiagnostics._as_tuple((1, 2)) == (1, 2)
+
+    def test_format_field_ref_includes_sep_first_cast_details(self) -> None:
+        source = _make_source("mapping", "id", key_cast=LookupCastSpecIr(name="sep_first", sep="|"))
+        _key_info, transform_info = RelationDiagnostics._format_field_ref(source["id"])  # type: ignore[arg-type]
+        assert "sep_first" in transform_info
+        assert "sep='|'" in transform_info

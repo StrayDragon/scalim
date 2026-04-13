@@ -66,6 +66,13 @@ def test_execution_runtime_normalize_lookup_key_status_explicit_cast_precedence_
     assert (key2, status2) == ("1", "ok")
 
 
+def test_execution_runtime_lookup_cast_missing_callable_raises() -> None:
+    runtime = _make_runtime(key_normalization="auto_str")
+    step = _make_step(lookup_cast=LookupCastSpecIr(name="missing"))
+    with pytest.raises(KeyError, match=r"Missing runtime lookup_cast callable"):
+        _ = runtime.normalize_lookup_key_with_status("1", step)
+
+
 def test_execution_runtime_get_cached_source_mapping_branches() -> None:
     raw_mapping = {1: {"name": "Alpha"}}
     step = _make_step()

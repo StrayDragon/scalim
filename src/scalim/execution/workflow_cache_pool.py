@@ -424,6 +424,13 @@ class WorkflowCachePool:
         return evict_reasons
 
     def close(self) -> None:
+        with self._lock:
+            loading_entries = [e for e in self._entries.values() if e.loading]
+
+        for entry in loading_entries:
+            with entry.lock:
+                pass
+
         pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
         with self._lock:
             for signature_key in list(self._entries.keys()):

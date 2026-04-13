@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from scalim.workflow.resource_lifecycle import WorkflowResourceLifecycle
+
 
 def test_build_workflow_resource_defs_wraps_oserror_as_config_error(monkeypatch: pytest.MonkeyPatch) -> None:
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
@@ -11,7 +13,9 @@ def test_build_workflow_resource_defs_wraps_oserror_as_config_error(monkeypatch:
     def _boom(_path: object) -> object:
         raise PermissionError("nope")
 
-    monkeypatch.setattr(workflow_execute_mod.versioned_outputs, "ensure_output_root_layout", _boom)
+    from scalim.workflow import resource_defs as resource_defs_mod
+
+    monkeypatch.setattr(resource_defs_mod.versioned_outputs, "ensure_output_root_layout", _boom)
 
     workflow_ir = WorkflowIr(
         nodes=(),
@@ -63,7 +67,9 @@ def test_prepare_workflow_run_ir_closes_resources_on_exception(monkeypatch: pyte
     def _boom(_path: object) -> object:
         raise PermissionError("nope")
 
-    monkeypatch.setattr(workflow_execute_mod.versioned_outputs, "ensure_output_root_layout", _boom)
+    from scalim.workflow import resource_defs as resource_defs_mod
+
+    monkeypatch.setattr(resource_defs_mod.versioned_outputs, "ensure_output_root_layout", _boom)
 
     workflow_ir = WorkflowIr(
         nodes=(),
@@ -234,6 +240,8 @@ def test_workflow_controller_state_property_exposes_internal_state() -> None:
             _ = producer_node_id
             _ = result
 
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,
@@ -246,7 +254,8 @@ def test_workflow_controller_state_property_exposes_internal_state() -> None:
             bundle_viz_base_config=None,
             workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
             workflow_cache_pool=None,
-            resource_manager=object(),
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id={},
             write_consumers_remaining_by_output_key={},
             main_rows_consumers_remaining_by_run_id={},
@@ -265,6 +274,42 @@ def test_workflow_controller_state_property_exposes_internal_state() -> None:
         )
 
     assert controller.state is controller._state
+
+
+def test_workflow_artifacts_directory_rejects_write_when_owner_thread_mismatch() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow.artifacts import WorkflowArtifactsDirectory
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
+    artifacts_dir._owner_thread_id = -1
+
+    with pytest.raises(RuntimeError, match="controller thread"):
+        artifacts_dir.publish("a", "k", 1)
+
+
+def test_workflow_ctx_store_rejects_write_when_owner_thread_mismatch() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow.execute import WorkflowCtxStore
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    ctx_store = WorkflowCtxStore(workflow_ir)
+    ctx_store._owner_thread_id = -1
+
+    with pytest.raises(RuntimeError, match="controller thread"):
+        ctx_store.publish("a", "k", 1, path="workflow.options.ctx")
 
 
 def test_workflow_controller_submit_ready_nodes_returns_when_all_fail_already_failed() -> None:
@@ -296,6 +341,8 @@ def test_workflow_controller_submit_ready_nodes_returns_when_all_fail_already_fa
             _ = producer_node_id
             _ = result
 
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,
@@ -308,7 +355,8 @@ def test_workflow_controller_submit_ready_nodes_returns_when_all_fail_already_fa
             bundle_viz_base_config=None,
             workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
             workflow_cache_pool=None,
-            resource_manager=object(),
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id={},
             write_consumers_remaining_by_output_key={},
             main_rows_consumers_remaining_by_run_id={},
@@ -365,6 +413,8 @@ def test_workflow_controller_submit_ready_nodes_returns_when_max_concurrency_zer
             _ = producer_node_id
             _ = result
 
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,
@@ -377,7 +427,8 @@ def test_workflow_controller_submit_ready_nodes_returns_when_max_concurrency_zer
             bundle_viz_base_config=None,
             workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
             workflow_cache_pool=None,
-            resource_manager=object(),
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id={},
             write_consumers_remaining_by_output_key={},
             main_rows_consumers_remaining_by_run_id={},
@@ -429,6 +480,8 @@ def test_workflow_controller_submit_ready_nodes_returns_when_ready_queue_contain
             _ = producer_node_id
             _ = result
 
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,
@@ -441,7 +494,8 @@ def test_workflow_controller_submit_ready_nodes_returns_when_ready_queue_contain
             bundle_viz_base_config=None,
             workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
             workflow_cache_pool=None,
-            resource_manager=object(),
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id={},
             write_consumers_remaining_by_output_key={},
             main_rows_consumers_remaining_by_run_id={},
@@ -464,6 +518,86 @@ def test_workflow_controller_submit_ready_nodes_returns_when_ready_queue_contain
 
         assert controller.state.ready_queue == ["missing"]
         assert controller.state.submitted == {}
+
+
+def test_workflow_controller_rejects_scheduling_write_node_when_demand_futures_in_flight() -> None:
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+        WriteSheetNodeIr,
+    )
+    from scalim.workflow.artifacts import WorkflowArtifactsDirectory
+    from scalim.workflow.execute_controller import WorkflowRunController
+
+    write_node = WriteSheetNodeIr(
+        node_id="w1",
+        node_type=WorkflowNodeType.WRITE_SHEET,
+        decl_order=0,
+        deps=(),
+        resource_type="book",
+        resource_id="b",
+        sheet="s",
+        input_node_id="a",
+        input_output_id="detail",
+        on_conflict="error",
+    )
+    workflow_ir = WorkflowIr(
+        nodes=(write_node,),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={"w1": ()}),
+    )
+    artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
+
+    class _Ctx:
+        def visible_producer_node_ids(self, consumer_node_id: str) -> object:
+            return frozenset([str(consumer_node_id)])
+
+        def publish_default_summary(self, producer_node_id: str, result: object) -> None:
+            _ = producer_node_id
+            _ = result
+
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        controller = WorkflowRunController.build_for_prepared_run(
+            executor=executor,
+            workflow_exec_id="wf_test",
+            workflow_ir=workflow_ir,
+            artifacts_dir=artifacts_dir,
+            ctx_store=_Ctx(),
+            max_concurrency=1,
+            failure_policy="all_fail",
+            bundle_viz_base_config=None,
+            workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
+            workflow_cache_pool=None,
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
+            write_output_ids_by_run_id={},
+            write_consumers_remaining_by_output_key={},
+            main_rows_consumers_remaining_by_run_id={},
+            captured_demand_events_by_node_id={},
+            captured_demand_hook_events_by_node_id={},
+            captured_demand_viz_observer_by_node_id={},
+            captured_demand_request_by_node_id={},
+            compile_demand_node_fn=lambda *_a, **_k: (object(), object()),
+            compile_demand_fn=lambda *_a, **_k: object(),
+            build_demand_run_result_fn=None,
+            run_ir_fn=lambda *_a, **_k: object(),
+            run_workflow_write_node_fn=lambda *_a, **_k: None,
+            capture_observability=False,
+            workflow_replay_instrumentation=None,
+            workflow_components=(),
+        )
+
+        fut = concurrent.futures.Future()
+        controller._state.submitted[fut] = ("a", write_node, None, None, None)
+
+        with pytest.raises(RuntimeError, match="write node must not be scheduled"):
+            controller._submit_one_ready_node("w1")
 
 
 def test_workflow_controller_process_completed_future_for_write_node_sets_outcome() -> None:
@@ -506,6 +640,8 @@ def test_workflow_controller_process_completed_future_for_write_node_sets_outcom
             _ = producer_node_id
             _ = result
 
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,
@@ -518,7 +654,8 @@ def test_workflow_controller_process_completed_future_for_write_node_sets_outcom
             bundle_viz_base_config=None,
             workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
             workflow_cache_pool=None,
-            resource_manager=object(),
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id={},
             write_consumers_remaining_by_output_key={},
             main_rows_consumers_remaining_by_run_id={},
@@ -603,6 +740,8 @@ def test_workflow_controller_process_completed_future_capture_skips_request_when
         viz_observer=None,
     )
 
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,
@@ -615,7 +754,8 @@ def test_workflow_controller_process_completed_future_capture_skips_request_when
             bundle_viz_base_config=None,
             workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
             workflow_cache_pool=None,
-            resource_manager=object(),
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id={},
             write_consumers_remaining_by_output_key={},
             main_rows_consumers_remaining_by_run_id={},

@@ -3,6 +3,7 @@ import concurrent.futures
 import contextlib
 import json
 import sys
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -14,7 +15,6 @@ from ..events import (
     generate_run_id,
 )
 from ..exceptions import ScalimWorkflowError
-from ..execution import versioned_outputs
 from ..execution.adaptive.capture import HookCaptureManager, HookRecordedEvent
 from ..execution.run_ir import ExecutionRequest, ExecutionResult, run_ir
 from ..execution.workflow_cache_pool import WorkflowCachePool
@@ -24,18 +24,14 @@ from ..ob.hub import InstrumentationHub
 from ..ob.manager import ObserverManager
 from ..ob.observability import Observability
 from ..ob.observer import Observer
-from ..ob.presets._internal import viz_config as viz_config_module
-from ..ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
 from ..ob.presets.viz import (
     VizObserverConfig,
     WorkflowVizObserver,
     build_workflow_viz_graph_snapshot,
 )
-from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..sinks.rows import InMemoryRows, iter_in_memory_rows_as_main_rows
 from ..spec.ir._workflow import (
     AppendSheetNodeIr,
-    WorkflowAnyNodeIr,
     WorkflowCtxOptionsIr,
     WorkflowIr,
     WorkflowNodeIr,
@@ -43,24 +39,31 @@ from ..spec.ir._workflow import (
 )
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
+from . import input_artifacts as _input_artifacts_module
+from . import resource_defs as _resource_defs_module
+from . import resource_lifecycle as _resource_lifecycle_module
+from . import write_nodes as _write_nodes_module
 from ._internal.request_overrides import WorkflowNodeRequestOverrides, merge_workflow_node_request
 from .artifacts import WorkflowArtifactsDirectory
 from .errors import ScalimWorkflowConfigError
 from .execute_controller import (
     WorkflowRunController,
 )
-from .input_artifacts import (
-    resolve_workflow_input_csv as _resolve_workflow_input_csv,
-)
-from .input_artifacts import (
-    resolve_workflow_input_tabular as _resolve_workflow_input_tabular,
-)
-from .input_artifacts import (
-    resolve_workflow_output_export_header as _resolve_workflow_output_export_header,
-)
 from .report import WorkflowResult, WorkflowRunError, WorkflowRunOutcome
-from .resources import ScalimWorkflowWriteError, SheetBookDef, WorkflowResourceManager
+from .resource_lifecycle import WorkflowResourceLifecycle
+from .resources import ScalimWorkflowWriteError, WorkflowResourceManager
 from .visibility_index import WorkflowVisibilityIndex
+from .viz_reporter import WorkflowVizReporter
+
+_build_workflow_resource_defs = _resource_defs_module.build_workflow_resource_defs
+_options_bool = _resource_defs_module.options_bool
+_run_workflow_write_sheet_node = _write_nodes_module.run_workflow_write_sheet_node
+_run_workflow_append_sheet_node = _write_nodes_module.run_workflow_append_sheet_node
+_run_workflow_write_node = _write_nodes_module.run_workflow_write_node
+_resolve_workflow_input_csv = _input_artifacts_module.resolve_workflow_input_csv
+_resolve_workflow_input_tabular = _input_artifacts_module.resolve_workflow_input_tabular
+_resolve_workflow_output_export_header = _input_artifacts_module.resolve_workflow_output_export_header
+_commit_workflow_resources = _resource_lifecycle_module.commit_workflow_resources
 
 
 class _CompilationLike(ABC):
@@ -98,6 +101,7 @@ class WorkflowCtxStore:
     _values_by_producer_node_id: Dict[str, Dict[str, object]]
     _value_bytes_by_producer_node_id: Dict[str, Dict[str, int]]
     _total_bytes: int
+    _owner_thread_id: Optional[int]
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
         self._guardrails = workflow_ir.options.ctx
@@ -106,17 +110,25 @@ class WorkflowCtxStore:
         self._values_by_producer_node_id = {}
         self._value_bytes_by_producer_node_id = {}
         self._total_bytes = 0
+        self._owner_thread_id = threading.current_thread().ident
+
+    def _assert_owner_thread(self) -> None:
+        if threading.current_thread().ident != self._owner_thread_id:
+            msg = "WorkflowCtxStore write must be called from controller thread"
+            raise RuntimeError(msg)
 
     def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
         return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
     def publish_default_summary(self, producer_node_id: str, result: ExecutionResult) -> None:
+        self._assert_owner_thread()
         node_id = str(producer_node_id)
         self.publish(node_id, "output_path", result.output_path, path="workflow.options.ctx")
         self.publish(node_id, "total_rows", int(result.total_rows), path="workflow.options.ctx")
         self.publish(node_id, "duration_secs", float(result.duration), path="workflow.options.ctx")
 
     def publish(self, producer_node_id: str, key: str, value: object, *, path: str) -> None:
+        self._assert_owner_thread()
         node_id = str(producer_node_id)
         ctx_key = str(key)
         ctx_value = ensure_json_like(value, path=path)
@@ -174,10 +186,6 @@ def _is_list(value: object) -> TypeGuard[List[object]]:
 
 
 def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
-    return isinstance(value, dict)
-
-
-def _is_dict_str_any(value: object) -> TypeGuard[Dict[str, Any]]:
     return isinstance(value, dict)
 
 
@@ -302,291 +310,6 @@ class ScalimWorkflowRunFailedError(ScalimWorkflowError):
         self.demand_path = str(demand_path)
 
 
-def _run_workflow_write_sheet_node(
-    node: WriteSheetNodeIr,
-    *,
-    artifacts_dir: WorkflowArtifactsDirectory,
-    resource_manager: WorkflowResourceManager,
-) -> None:
-    if str(node.resource_type) == "book":
-        book_kind = resource_manager.get_book_kind(str(node.resource_id))
-        if book_kind == "xlsx_memory":
-            input_csv = _resolve_workflow_input_tabular(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-                error_prefix="write node",
-            )
-        else:
-            input_csv = _resolve_workflow_input_csv(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-                error_prefix="write node",
-            )
-        resource_manager.apply_book_sheet(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            book_id=str(node.resource_id),
-            sheet=str(node.sheet),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
-            export_header=_resolve_workflow_output_export_header(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-            ),
-            on_conflict=str(node.on_conflict or "error"),
-        )
-        return
-
-    if str(node.resource_type) == "workbook":
-        input_csv = _resolve_workflow_input_csv(
-            artifacts_dir=artifacts_dir,
-            consumer_node_id=str(node.node_id),
-            consumer_decl_order=int(node.decl_order),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            error_prefix="write node",
-        )
-        resource_manager.apply_workbook_sheet(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            workbook_id=str(node.resource_id),
-            sheet=str(node.sheet),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
-            on_conflict=str(node.on_conflict or "error"),
-        )
-        return
-
-    if str(node.resource_type) == "sheetbook":
-        input_tabular = _resolve_workflow_input_tabular(
-            artifacts_dir=artifacts_dir,
-            consumer_node_id=str(node.node_id),
-            consumer_decl_order=int(node.decl_order),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            error_prefix="write node",
-        )
-        resource_manager.apply_sheetbook_sheet(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            sheetbook_id=str(node.resource_id),
-            sheet=str(node.sheet),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_tabular,
-            export_header=_resolve_workflow_output_export_header(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-            ),
-            on_conflict=str(node.on_conflict or "error"),
-        )
-        return
-
-    msg = "Unsupported write_sheet resource_type: {!r}".format(
-        str(node.resource_type)
-    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-    raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-
-
-def _run_workflow_append_sheet_node(
-    node: AppendSheetNodeIr,
-    *,
-    artifacts_dir: WorkflowArtifactsDirectory,
-    resource_manager: WorkflowResourceManager,
-) -> None:
-    if str(node.resource_type) == "book":
-        book_kind = resource_manager.get_book_kind(str(node.resource_id))
-        if book_kind == "xlsx_memory":
-            input_csv = _resolve_workflow_input_tabular(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-                error_prefix="append node",
-            )
-        else:
-            input_csv = _resolve_workflow_input_csv(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-                error_prefix="append node",
-            )
-        if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            msg = "append_sheet requires sheet for book resource (resource_id={!r})".format(
-                str(node.resource_id)
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-        resource_manager.apply_book_append(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            book_id=str(node.resource_id),
-            sheet=str(node.sheet),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
-            export_header=_resolve_workflow_output_export_header(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-            ),
-            align_by=str(node.align_by or "field_id"),
-            header_policy=str(node.header_policy or "once"),
-            on_mismatch=str(node.on_mismatch or "error"),
-        )
-        return
-
-    if str(node.resource_type) == "workbook":
-        input_csv = _resolve_workflow_input_csv(
-            artifacts_dir=artifacts_dir,
-            consumer_node_id=str(node.node_id),
-            consumer_decl_order=int(node.decl_order),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            error_prefix="append node",
-        )
-        if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(
-                str(node.resource_id)
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-        resource_manager.apply_workbook_append(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            workbook_id=str(node.resource_id),
-            sheet=str(node.sheet),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
-            align_by=str(node.align_by or "field_id"),
-            header_policy=str(node.header_policy or "once"),
-            on_mismatch=str(node.on_mismatch or "error"),
-        )
-        return
-
-    if str(node.resource_type) == "csv":
-        input_csv = _resolve_workflow_input_csv(
-            artifacts_dir=artifacts_dir,
-            consumer_node_id=str(node.node_id),
-            consumer_decl_order=int(node.decl_order),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            error_prefix="append node",
-        )
-        resource_manager.apply_csv_append(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            csv_id=str(node.resource_id),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_csv,
-            header_policy=str(node.header_policy or "once"),
-            on_mismatch=str(node.on_mismatch or "error"),
-        )
-        return
-
-    if str(node.resource_type) == "sheetbook":
-        input_tabular = _resolve_workflow_input_tabular(
-            artifacts_dir=artifacts_dir,
-            consumer_node_id=str(node.node_id),
-            consumer_decl_order=int(node.decl_order),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            error_prefix="append node",
-        )
-        if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            msg = "append_sheet requires sheet for sheetbook resource (resource_id={!r})".format(
-                str(node.resource_id)
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-        resource_manager.apply_sheetbook_append(
-            workflow_node_id=str(node.node_id),
-            decl_order=int(node.decl_order),
-            sheetbook_id=str(node.resource_id),
-            sheet=str(node.sheet),
-            input_node_id=str(node.input_node_id),
-            input_output_id=str(node.input_output_id),
-            input_csv=input_tabular,
-            export_header=_resolve_workflow_output_export_header(
-                artifacts_dir=artifacts_dir,
-                consumer_node_id=str(node.node_id),
-                consumer_decl_order=int(node.decl_order),
-                input_node_id=str(node.input_node_id),
-                input_output_id=str(node.input_output_id),
-            ),
-            align_by=str(node.align_by or "field_id"),
-            header_policy=str(node.header_policy or "once"),
-            on_mismatch=str(node.on_mismatch or "error"),
-        )
-        return
-
-    msg = "Unsupported append_sheet resource_type: {!r}".format(
-        str(node.resource_type)
-    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-    raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-
-
-def _run_workflow_write_node(
-    node: WorkflowAnyNodeIr,
-    *,
-    artifacts_dir: WorkflowArtifactsDirectory,
-    resource_manager: WorkflowResourceManager,
-) -> None:
-    if isinstance(node, WriteSheetNodeIr):
-        _run_workflow_write_sheet_node(
-            node,
-            artifacts_dir=artifacts_dir,
-            resource_manager=resource_manager,
-        )
-        return
-
-    if isinstance(node, AppendSheetNodeIr):
-        _run_workflow_append_sheet_node(
-            node,
-            artifacts_dir=artifacts_dir,
-            resource_manager=resource_manager,
-        )
-        return
-
-    msg = "Unsupported workflow node type: {}".format(
-        type(node).__name__
-    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-    raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
-
-
-def _bundle_run_dir(config: VizObserverConfig, run_id: str) -> Path:
-    base_dir = config.output_dir
-    if base_dir is None:
-        base_dir = viz_config_module.default_viz_dir()
-    output_dir = _normalize_viz_output_dir(str(base_dir))
-    return Path(output_dir) / str(run_id)
-
-
-def _bundle_has_child_replay(config: VizObserverConfig, run_id: str) -> bool:
-    run_dir = _bundle_run_dir(config, run_id)
-    snapshot_path = run_dir / str(config.snapshot_filename)
-    events_path = run_dir / str(config.events_filename)
-    return snapshot_path.exists() and events_path.exists()
-
-
 @dataclass
 class _PreparedWorkflowRun:
     workflow_path: str
@@ -604,6 +327,7 @@ class _PreparedWorkflowRun:
     workflow_instrumentation: InstrumentationHub
     workflow_cache_pool: Optional[WorkflowCachePool]
     resource_manager: WorkflowResourceManager
+    resource_lifecycle: WorkflowResourceLifecycle
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
     write_consumers_remaining_by_output_key: Dict[Tuple[str, str], int]
     main_rows_consumers_remaining_by_run_id: Dict[str, int]
@@ -679,135 +403,6 @@ def _maybe_build_workflow_cache_pool(
         logical_keys_by_node_id=logical_keys_by_node_id,
         consumers_by_logical_key=consumers_by_logical_key,
     )
-
-
-def _options_bool(opts: object, key: str, *, default: bool = False) -> bool:
-    if not _is_dict_str_any(opts):
-        return bool(default)
-    return bool(opts.get(str(key), default))
-
-
-def _build_workflow_resource_defs(  # noqa: C901, PLR0915
-    workflow_ir: WorkflowIr,
-    *,
-    workflow_exec_id: str,
-) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, str], Dict[str, SheetBookDef]]:
-    workbook_defs: Dict[str, str] = {}
-    workbook_allow_formulas_by_id: Dict[str, bool] = {}
-    csv_defs: Dict[str, str] = {}
-    sheetbook_defs: Dict[str, SheetBookDef] = {}
-
-    layouts_by_root: Dict[str, versioned_outputs.OutputRootLayout] = {}
-
-    def _layout_for_root(output_root: str, *, path: str) -> versioned_outputs.OutputRootLayout:
-        root_str = str(output_root or "").strip()
-        if not root_str:
-            msg = "Output root must be a non-empty string"
-            raise ScalimWorkflowConfigError(msg, path=str(path))
-
-        root_norm = str(Path(root_str).expanduser())
-        layout = layouts_by_root.get(root_norm)
-        if layout is not None:
-            return layout
-
-        try:
-            layout = versioned_outputs.ensure_output_root_layout(Path(root_norm))
-            _ = versioned_outputs.ensure_version_dir(layout, version_id=str(workflow_exec_id))
-        except FileExistsError as exc:
-            msg = (
-                "Version directory already exists (possible concurrent writers or reused workflow_exec_id): "
-                "root={!r}, workflow_exec_id={!r}"
-            ).format(root_norm, str(workflow_exec_id))
-            raise ScalimWorkflowConfigError(msg, path=str(path)) from exc
-        except OSError as exc:
-            msg = "Failed to prepare output root for workflow run: {}: {}".format(type(exc).__name__, exc)
-            raise ScalimWorkflowConfigError(msg, path=str(path)) from exc
-
-        layouts_by_root[root_norm] = layout
-        return layout
-
-    for res in workflow_ir.resources:
-        res_type = str(res.resource_type)
-        if res_type == "book":
-            opts = res.options or {}
-            if not _is_dict_str_any(opts):
-                msg = "Invalid workflow resource options for book: resource_id={!r}".format(str(res.resource_id))
-                raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
-            kind = str(opts.get("kind") or "").strip()
-            if kind == "xlsx_file":
-                output_root = str(res.path or "")
-                layout = _layout_for_root(output_root, path="workflow.resources.books.{}.path".format(str(res.resource_id)))
-                final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
-                workbook_defs[str(res.resource_id)] = str(final_path)
-                workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", False))
-                continue
-            if kind == "xlsx_memory":
-                budget_obj = opts.get("budget")
-                budget_dict: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
-                max_sheets = int(budget_dict.get("max_sheets") or 0)
-                max_total_cells = int(budget_dict.get("max_total_cells") or 0)
-
-                export_cfg_obj = opts.get("export_xlsx")
-                export_cfg_dict: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-                export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", False))
-                export_path = str(res.path or "").strip() or None
-                if export_path is not None:
-                    layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
-                    final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
-                    export_path = str(final_path)
-                sheetbook_defs[str(res.resource_id)] = SheetBookDef(
-                    resource_id=str(res.resource_id),
-                    budget_max_sheets=int(max_sheets),
-                    budget_max_total_cells=int(max_total_cells),
-                    export_path=str(export_path) if export_path is not None else None,
-                    export_allow_formulas=bool(export_allow_formulas),
-                )
-                continue
-
-            msg = "Unknown book kind: {!r} (book_id={!r})".format(kind, str(res.resource_id))
-            raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
-
-        if res_type == "workbook":
-            output_root = str(res.path or "")
-            layout = _layout_for_root(output_root, path="workflow.resources.workbooks.{}.path".format(str(res.resource_id)))
-            final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
-            workbook_defs[str(res.resource_id)] = str(final_path)
-            opts = res.options or {}
-            workbook_allow_formulas_by_id[str(res.resource_id)] = _options_bool(opts, "allow_formulas", default=False)
-            continue
-
-        if res_type == "csv":
-            output_root = str(res.path or "")
-            layout = _layout_for_root(output_root, path="workflow.resources.files.{}.path".format(str(res.resource_id)))
-            final_path = versioned_outputs.file_output_path(layout, version_id=str(workflow_exec_id), file_id=str(res.resource_id))
-            csv_defs[str(res.resource_id)] = str(final_path)
-            continue
-
-        if res_type == "sheetbook":
-            opts = res.options or {}
-            budget_obj = opts.get("budget")
-            sheetbook_budget: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
-            max_sheets = int(sheetbook_budget.get("max_sheets") or 0)
-            max_total_cells = int(sheetbook_budget.get("max_total_cells") or 0)
-
-            export_cfg_obj = opts.get("export_xlsx")
-            sheetbook_export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-            export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", False))
-            export_path = str(res.path or "").strip() or None
-            if export_path is not None:
-                layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
-                final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
-                export_path = str(final_path)
-            sheetbook_defs[str(res.resource_id)] = SheetBookDef(
-                resource_id=str(res.resource_id),
-                budget_max_sheets=int(max_sheets),
-                budget_max_total_cells=int(max_total_cells),
-                export_path=str(export_path) if export_path is not None else None,
-                export_allow_formulas=bool(export_allow_formulas),
-            )
-            continue
-
-    return workbook_defs, workbook_allow_formulas_by_id, csv_defs, sheetbook_defs
 
 
 def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, FrozenSet[str]]:
@@ -914,6 +509,11 @@ def _prepare_workflow_run_ir(
             output_staging_keep_on_success=bool(workflow_ir.options.output_staging.keep_on_success),
             output_staging_keep_on_failure=bool(workflow_ir.options.output_staging.keep_on_failure),
         )
+        resource_lifecycle = WorkflowResourceLifecycle(
+            resource_manager=resource_manager,
+            artifacts_dir=artifacts_dir,
+            cache_pool=workflow_cache_pool,
+        )
         write_output_ids_by_run_id = _build_write_output_ids_by_run_id(workflow_ir)
         write_consumers_remaining_by_output_key = _build_write_consumers_remaining_by_output_key(workflow_ir)
         main_rows_consumers_remaining_by_run_id = _build_main_rows_consumers_remaining_by_run_id(workflow_ir)
@@ -934,6 +534,7 @@ def _prepare_workflow_run_ir(
             workflow_instrumentation=workflow_instrumentation,
             workflow_cache_pool=workflow_cache_pool,
             resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
             write_output_ids_by_run_id=write_output_ids_by_run_id,
             write_consumers_remaining_by_output_key=write_consumers_remaining_by_output_key,
             main_rows_consumers_remaining_by_run_id=main_rows_consumers_remaining_by_run_id,
@@ -1034,6 +635,7 @@ def _execute_workflow_run(
             workflow_instrumentation=prepared.workflow_instrumentation,
             workflow_cache_pool=prepared.workflow_cache_pool,
             resource_manager=prepared.resource_manager,
+            resource_lifecycle=prepared.resource_lifecycle,
             write_output_ids_by_run_id=prepared.write_output_ids_by_run_id,
             write_consumers_remaining_by_output_key=prepared.write_consumers_remaining_by_output_key,
             main_rows_consumers_remaining_by_run_id=prepared.main_rows_consumers_remaining_by_run_id,
@@ -1052,25 +654,6 @@ def _execute_workflow_run(
         )
         controller.run()
         return controller.finalize()
-
-
-def _commit_workflow_resources(
-    *,
-    resource_manager: WorkflowResourceManager,
-    outcomes: List[WorkflowRunOutcome],
-    failed: Optional[WorkflowRunOutcome],
-) -> None:
-    try:
-        has_errors = any(o.error is not None for o in outcomes)
-        if has_errors:
-            discard_node_id = failed.run_id if failed is not None else "__wf__discard"
-            resource_manager.discard_all(workflow_node_id=str(discard_node_id), reason="workflow_failed")
-        else:
-            resource_manager.commit_all()
-    except ScalimWorkflowWriteError as exc:
-        with contextlib.suppress(Exception):
-            resource_manager.discard_all(workflow_node_id="__wf__discard", reason="resource_commit_failed")
-        raise ScalimWorkflowConfigError(str(exc), path="workflow.resources") from exc
 
 
 def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
@@ -1092,33 +675,20 @@ def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
 
     # 子运行完成后重写工作流快照,避免生成指向缺失子运行的下钻链接.
     with contextlib.suppress(Exception):
-        demand_run_id_by_workflow_node_id: Dict[str, str] = {}
+        reporter = WorkflowVizReporter(
+            prepared.workflow_ir,
+            workflow_yaml_path=prepared.workflow_path,
+            base_config=prepared.bundle_viz_base_config,
+        )
+        replays: List[str] = []
         for node in prepared.workflow_ir.nodes:
             if not isinstance(node, WorkflowNodeIr):
                 continue
             node_id = str(node.node_id or "").strip()
             if not node_id:
                 continue  # pragma: no cover  # pragma: allow-no-cover unreachable: node_id required by IR
-            if _bundle_has_child_replay(prepared.bundle_viz_base_config, node_id):
-                demand_run_id_by_workflow_node_id[node_id] = node_id
-
-        workflow_run_dir = _bundle_run_dir(prepared.bundle_viz_base_config, "workflow")
-        workflow_run_dir.mkdir(parents=True, exist_ok=True)
-        workflow_snapshot = build_workflow_viz_graph_snapshot(
-            prepared.workflow_ir,
-            demand_run_id_by_workflow_node_id=demand_run_id_by_workflow_node_id,
-            workflow_yaml_path=prepared.workflow_path,
-        )
-        snapshot_path = workflow_run_dir / str(prepared.bundle_viz_base_config.snapshot_filename)
-        temp_path = create_temp_path(str(snapshot_path), ".json.tmp")
-        temp_file = Path(temp_path)
-        try:
-            with temp_file.open("w", encoding="utf-8") as handle:
-                json.dump(workflow_snapshot, handle, ensure_ascii=False, indent=2, default=str)
-                handle.flush()
-            atomic_replace_temp_path(temp_path, str(snapshot_path))
-        finally:
-            best_effort_remove_temp_path(temp_path)
+            replays.append(node_id)
+        reporter.fix_child_replay_links(replays, parent_run_id="workflow")
 
 
 def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> None:
@@ -1137,18 +707,7 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
 
 
 def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_finalized: bool) -> None:
-    if not resources_finalized:
-        with contextlib.suppress(Exception):
-            prepared.resource_manager.discard_all(workflow_node_id="__wf__discard", reason="workflow_finally")
-    with contextlib.suppress(Exception):
-        prepared.artifacts_dir.discard_all_in_memory_csv_outputs()
-    with contextlib.suppress(Exception):
-        prepared.artifacts_dir.discard_all_in_memory_rows_outputs()
-    with contextlib.suppress(Exception):
-        prepared.artifacts_dir.discard_all_in_memory_rows()
-    if prepared.workflow_cache_pool is not None:
-        with contextlib.suppress(Exception):
-            prepared.workflow_cache_pool.close()
+    prepared.resource_lifecycle.cleanup_finally(resources_finalized=bool(resources_finalized))
     with contextlib.suppress(Exception):
         cast("Any", prepared.workflow_observer_manager).close()  # pragma: allow-cast observer manager close boundary
 
@@ -1183,10 +742,11 @@ def run_workflow_ir(
             run_ir_fn=run_ir_fn or run_ir,
         )
         try:
-            _commit_workflow_resources(
-                resource_manager=prepared.resource_manager,
-                outcomes=final_outcomes,
-                failed=failed,
+            has_errors = any(o.error is not None for o in final_outcomes)
+            discard_node_id = failed.run_id if failed is not None else "__wf__discard"
+            prepared.resource_lifecycle.commit_or_discard(
+                success=not has_errors,
+                discard_node_id=str(discard_node_id),
             )
             resources_finalized = True
         except ScalimWorkflowConfigError:

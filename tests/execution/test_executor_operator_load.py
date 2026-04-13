@@ -1,5 +1,7 @@
 """Executor operator tests: load."""
 
+import pytest
+
 from scalim.execution.context import BatchContext
 from scalim.events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM, Event
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
@@ -209,6 +211,22 @@ def test_load_operator_handles_object_data_and_missing_pk() -> None:
 
     assert context.get_field_value("amount", 1) == 7
     assert context.get_field_value("amount", 2) is None
+
+
+def test_load_operator_rejects_unknown_source_id() -> None:
+    plan = ExecutionPlan(field_specs={}, target_fields=())
+    runtime = _make_runtime(plan, _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
+    context = BatchContext()
+
+    operator = LoadOperatorIr(
+        operator_id="load_missing",
+        operator_type=OperatorType.LOAD.value,
+        source_id="missing",
+        field_keys=("amount",),
+    )
+
+    with pytest.raises(KeyError, match=r"Unknown source_id"):
+        LoadOperatorExecutor().execute(operator, context, [1], runtime)
 
 
 def test_load_operator_applies_source_normalize_index_by_key() -> None:

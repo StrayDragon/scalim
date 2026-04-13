@@ -934,7 +934,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
                 path_prefix=prefix,
             )
         except (TypeError, ValueError) as exc:
-            raise ScalimWorkflowConfigError(str(exc), path=prefix) from None
+            raise ScalimWorkflowConfigError(str(exc), path=prefix) from exc
 
         resources.append(
             WorkflowResourceIr(
@@ -959,7 +959,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
                 path_prefix=prefix,
             )
         except (TypeError, ValueError) as exc:
-            raise ScalimWorkflowConfigError(str(exc), path=prefix) from None
+            raise ScalimWorkflowConfigError(str(exc), path=prefix) from exc
 
         resources.append(
             WorkflowResourceIr(
@@ -1381,7 +1381,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             try:
                 _validate_excel_sheet_name(sheet_name, path=str(sheet_ref_path))
             except ValueError as exc:
-                raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from None
+                raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from exc
 
             base_defaults = _effective_write_defaults(book)
             effective_defaults = base_defaults
@@ -1478,7 +1478,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 try:
                     _validate_excel_sheet_name(sheet_name, path=str(sheet_ref_path))
                 except ValueError as exc:
-                    raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from None
+                    raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from exc
 
                 node_id = "{}write.{}.{}".format(_INTERNAL_NODE_ID_PREFIX, str(run.id), int(next_write_idx))
                 next_write_idx += 1

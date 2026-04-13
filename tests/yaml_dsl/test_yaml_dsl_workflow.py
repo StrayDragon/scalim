@@ -4539,6 +4539,59 @@ def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_an
     assert not b_root.exists()
 
 
+def test_workflow_lifecycle_pipeline_harness_merges_resources_overrides_into_compile_overrides_when_base_has_none(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    out_root = tmp_path / "out"
+    _ = _write_table_demand_yaml_with_csv_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        output_root=out_root,
+        field_ids=["id", "value"],
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
+
+    seen = {"overrides": None}
+    original_compile = workflow_entrypoints_mod.compile_workflow_ir
+
+    def _compile_capture(*args: Any, **kwargs: Any) -> workflow_compile_mod.WorkflowCompileResult:  # noqa: ANN401
+        seen["overrides"] = kwargs.get("overrides")
+        return original_compile(*args, **kwargs)
+
+    monkeypatch.setattr(workflow_entrypoints_mod, "compile_workflow_ir", _compile_capture)
+
+    file_id = "a_detail_csv"
+    patch_out_root = tmp_path / "patch_out"
+    run_options_patches_by_run_id = {
+        "a": WorkflowRunOptionsPatch(
+            overrides=RunOverrides(resources=ResourcesOverride(files={file_id: FileResourceOverride(path=str(patch_out_root))}))
+        )
+    }
+
+    base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
+    _ = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
+        str(wf),
+        base_options=base_options,
+        path_aliases=None,
+        run_options_patches_by_run_id=run_options_patches_by_run_id,
+        workflow_resources_wait=None,
+        workflow_output_staging=None,
+    )
+
+    assert seen["overrides"] is not None
+
+
 def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _ = _write_table_demand_yaml_with_csv_output(
         tmp_path,

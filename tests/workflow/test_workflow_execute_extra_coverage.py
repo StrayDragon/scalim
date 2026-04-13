@@ -570,6 +570,7 @@ def test_workflow_try_submit_ready_reraises_config_error() -> None:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": ()}),
     )
     artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+    from scalim.workflow.resource_lifecycle import WorkflowResourceLifecycle
 
     def _compile_demand(*_args: object, **_kwargs: object) -> object:
         raise workflow_execute_mod.ScalimWorkflowConfigError("boom", path="workflow.runs")
@@ -581,6 +582,7 @@ def test_workflow_try_submit_ready_reraises_config_error() -> None:
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="boom"):
+            resource_manager = object()
             controller = WorkflowRunController.build_for_prepared_run(
                 executor=executor,
                 workflow_exec_id="wf_test",
@@ -592,7 +594,10 @@ def test_workflow_try_submit_ready_reraises_config_error() -> None:
                 bundle_viz_base_config=None,
                 workflow_instrumentation=workflow_instrumentation,
                 workflow_cache_pool=None,
-                resource_manager=object(),  # 不会触发资源写入
+                resource_manager=resource_manager,  # 不会触发资源写入
+                resource_lifecycle=WorkflowResourceLifecycle(
+                    resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None
+                ),
                 write_output_ids_by_run_id={},
                 write_consumers_remaining_by_output_key={},
                 main_rows_consumers_remaining_by_run_id={},

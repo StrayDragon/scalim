@@ -1249,7 +1249,7 @@ def fingerprint_for_meta(
     该指纹刻意不包含可调用对象(`callable`),以保持跨进程/跨环境稳定.
     """
 
-    h = hashlib.sha1()  # noqa: S324
+    h = hashlib.sha256()
     payload = "\n".join(
         [
             "demand_name=" + str(demand_name),

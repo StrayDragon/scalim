@@ -343,7 +343,7 @@ test:
 
 # 检查: 运行单元测试 (gate: xdist + coverage)
 test-gate:
-    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-fail-under=99
+    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100
 
 # 压力测试: 运行
 bench *ARGS:
@@ -668,6 +668,10 @@ report-print-usage:
 check-no-print:
     uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check
 
+# 检查: tests/ 禁止 time.sleep 轮询 (allowlist 除外)
+check-no-test-sleep:
+    uv {{ UV_OPTIONS }} run python scripts/check-no-test-sleep.py --check
+
 # 报告: noqa C901 使用基线
 report-noqa-c901:
     uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py
@@ -713,7 +717,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-noqa-c901 check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test-gate
+quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test-gate
 
 alias quick-qa-only-py := quick-check-only-py
 
