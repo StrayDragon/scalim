@@ -51,6 +51,8 @@ from .resource_lifecycle import WorkflowResourceLifecycle
 from .resources import WorkflowResourceManager
 from .scheduler_rules import can_schedule_more, should_cancel_on_failure
 
+_ERR_WRITE_NODE_SCHEDULED_WHILE_FUTURES_IN_FLIGHT = "write node must not be scheduled while demand futures are in-flight"
+
 
 class _WorkflowCtxStoreLike(Protocol):
     def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]: ...
@@ -387,9 +389,8 @@ class WorkflowRunController:
             return
 
         if self._state.submitted:
-            msg = "write node must not be scheduled while demand futures are in-flight"
             # pragma: allow-no-cover invariant: write nodes scheduled only after demand futures complete
-            raise RuntimeError(msg)  # pragma: no cover
+            raise RuntimeError(_ERR_WRITE_NODE_SCHEDULED_WHILE_FUTURES_IN_FLIGHT)  # pragma: no cover
         idx = int(self._index_by_node_id.get(str(node_id), 0))
         try:
             self._run_workflow_write_node(
