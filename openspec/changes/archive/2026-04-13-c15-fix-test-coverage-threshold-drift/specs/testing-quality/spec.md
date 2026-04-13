@@ -1,6 +1,6 @@
 # testing-quality (delta) Specification
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: 覆盖率保持与 `--cov-fail-under` SSOT
 

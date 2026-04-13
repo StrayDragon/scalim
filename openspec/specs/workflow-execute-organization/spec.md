@@ -1,7 +1,8 @@
-# workflow-execute-organization (delta) Specification
+# workflow-execute-organization Specification
 
-## MODIFIED Requirements
-
+## Purpose
+TBD - created by archiving change c45-refactor-execute-controller-phase1. Update Purpose after archive.
+## Requirements
 ### Requirement: Workflow execution observable behavior MUST remain unchanged after Phase 1 refactor
 
 Phase 1 MUST reorganize `execute.py` / `execute_controller.py` implementation into focused modules (`outcome_builder`, `scheduler_rules`, `WorkflowResourceLifecycle`, `WorkflowVizReporter`) without changing external semantics: outcomes, scheduling decisions, resource commit/discard, viz snapshots, and replay link behavior MUST remain byte-for-byte or logically equivalent to pre-change behavior for the same inputs and options.
@@ -29,3 +30,4 @@ New modules under `src/scalim/workflow/` MUST use the same Python 3.6 compatibil
 #### Scenario: Organization improves testability
 - **WHEN** reviewers add or extend unit tests for `outcome_builder` and `scheduler_rules`
 - **THEN** pure functions MUST be callable without constructing a full workflow runtime except where integration tests require it
+

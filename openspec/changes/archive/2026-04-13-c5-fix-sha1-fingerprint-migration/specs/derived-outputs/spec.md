@@ -1,6 +1,6 @@
 # derived-outputs (delta) Specification
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: 派生输出 meta 元信息指纹算法（SHA-256）
 

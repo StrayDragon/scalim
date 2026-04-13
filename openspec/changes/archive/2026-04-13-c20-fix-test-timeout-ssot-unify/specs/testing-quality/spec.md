@@ -1,6 +1,6 @@
 # testing-quality (delta) Specification
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Test timeouts MUST use SSOT constants and helpers
 

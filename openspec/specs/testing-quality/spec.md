@@ -545,3 +545,77 @@ contract tests MUST：
 - **GIVEN** contract tests 在随机 `tmp_path` 下创建 workspace
 - **WHEN** 生成/对拍 snapshots
 - **THEN** snapshots MUST NOT 包含 `tmp_path` 的绝对路径字符串
+
+### Requirement: 覆盖率保持与 `--cov-fail-under` SSOT
+
+核心模块在启用覆盖率统计的质量门禁中 MUST 达到 `openspec/specs/testing-quality/spec.md` 与 `justfile` 中 `test-gate` **共同声明的同一** `--cov-fail-under` 阈值；两处声明的整数值 MUST 完全一致，不得出现规范与实现漂移（例如规范写 100 而门禁为 99，或相反）。
+
+若维护者调整该阈值，MUST 同时更新主规范文档与 `justfile:test-gate`，并在规范中简要记录 rationale（例如 vendor 兼容层、平台分支、合理不可覆盖行与 `pragma: no cover` 策略）。
+
+可选：仓库 MAY 提供治理测试，从 `justfile` 解析 `test-gate` 的 `--cov-fail-under` 并与规范中的声明比对，漂移时 MUST 失败。
+
+#### Scenario: 规范与 `test-gate` 数值一致
+
+- **WHEN** 审阅者比对 `testing-quality` 规范中的覆盖率失败阈值与 `just test-gate` 的 pytest 参数
+- **THEN** `--cov-fail-under` 的整数值 MUST 相同
+
+#### Scenario: 低于阈值时门禁失败
+
+- **WHEN** 通过质量门禁入口运行带覆盖率统计的非 bench 测试
+- **THEN** 若核心模块覆盖率低于上述共同声明阈值，执行 MUST 失败
+
+#### Scenario: 漂移治理测试（若存在）
+
+- **WHEN** 运行覆盖率阈值 SSOT 漂移治理测试
+- **THEN** 若规范与 `justfile` 声明不一致，测试 MUST 失败
+
+### Requirement: Test timeouts MUST use SSOT constants and helpers
+
+`tests/` 下的测试 MUST 使用 `tests/support/testing_utils.py` 中定义的超时 SSOT（例如 `CI_TIMEOUT_S`、`NEGATIVE_TIMEOUT_S`、`POLL_DEADLINE_S`）及配套 helper（例如 `event_wait`、`barrier_wait`、`join_or_fail`、`future_result`），而不得依赖与 SSOT 不一致的硬编码超时字面量。
+
+- 对 `wait(timeout=...)` 等模式，测试 SHOULD 统一为 `event_wait(...)` / `future_result(...)` 等 helper，除非有明确理由保持原 API。
+- 若某场景确需长于默认 SSOT 的等待时间，测试 MUST 使用 `CI_TIMEOUT_S` 的整数倍（例如 `CI_TIMEOUT_S * 3`）并附注释说明原因，而不得使用与 CI 不可调协的裸数字。
+- 系统 MAY 提供可选的治理扫描，用于发现 `tests/` 中未使用 SSOT 的 `timeout=` 字面量并 fail-fast。
+
+#### Scenario: workflow cache pool tests use SSOT timeouts
+
+- **WHEN** 维护者审阅 `tests/workflow/test_workflow_cache_pool.py` 等需等待并发/IO 的用例
+- **THEN** 超时与等待 MUST 基于 `CI_TIMEOUT_S` 与 `event_wait`（或等价 helper），而不得使用模块级私有超时常量或与 SSOT 不一致的 `wait(timeout=...)` 字面量
+
+#### Scenario: long-running smoke tests scale with CI timeout
+
+- **WHEN** 某 smoke 用例需要长于默认 `CI_TIMEOUT_S` 的端到端等待
+- **THEN** 等待时长 MUST 表达为 `CI_TIMEOUT_S` 的倍数（或等价 SSOT 组合）并具备可审阅的注释
+- **AND** CI 通过环境变量调整 SSOT 时，该用例的等待 MUST 随之缩放
+
+#### Scenario: optional timeout literal gate catches drift
+
+- **GIVEN** 仓库启用了针对 `tests/` 的 `timeout=` 字面量治理扫描
+- **WHEN** 新测试引入未豁免的硬编码 `timeout=` 等待
+- **THEN** 治理扫描 MUST 失败并指出位置
+
+### Requirement: `time.sleep` in tests MUST be governed with an explicit allowlist
+
+`tests/**/*.py` 中 MUST NOT 使用 `time.sleep` 作为轮询或“等待条件成立”的手段；此类同步 MUST 改用 `threading.Event`（或等价）配合 `event_wait` 等 SSOT helper。
+
+以下用途 MAY 保留 `time.sleep`，但 MUST 被列入治理脚本的显式允许列表并具备可审阅理由（例如模拟慢加载的 fixture）：
+
+- `tests/fixtures/workflow_loaders.py` 等用于**模拟慢 I/O/慢加载器**的 fixture 中的 `time.sleep`，MUST 通过允许列表排除。
+
+系统 MUST 提供可独立运行的扫描入口（例如 `scripts/check-no-test-sleep.py`），在 `--check` 模式下对未允许的 `time.sleep` 返回非零退出码；该检查 MUST 接入 `just qa`（例如 `quick-check-only-py` 链），以防止回归。
+
+#### Scenario: polling loop uses event coordination
+
+- **WHEN** 测试需要等待另一线程写入文件或更新共享状态
+- **THEN** 测试 MUST 使用写入方 `Event.set()` 与读取方 `event_wait(...)`（或等价），而不得使用 `while` + `time.sleep` 轮询
+
+#### Scenario: unauthorized sleep fails the gate
+
+- **WHEN** 维护者在未列入允许列表的 `tests/` 模块中新增 `time.sleep` 调用
+- **THEN** `just qa` 中的 sleep 治理检查 MUST 失败并报告文件与位置
+
+#### Scenario: documented fixture sleep remains allowed
+
+- **WHEN** `tests/fixtures/workflow_loaders.py`（或允许列表中明确列出的路径）使用 `time.sleep` 模拟慢加载
+- **THEN** 治理扫描 MUST 将该命中视为允许且不阻断 `just qa`
+

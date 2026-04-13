@@ -1,6 +1,6 @@
 # testing-quality (delta) Specification
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: `time.sleep` in tests MUST be governed with an explicit allowlist
 
