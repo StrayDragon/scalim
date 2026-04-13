@@ -46,3 +46,18 @@ def test_validate_output_aggregate_producer_keys_schema_raises_on_mismatch(monke
 
     with pytest.raises(ValueError, match="schema 覆盖不一致"):
         schema_outputs._validate_output_aggregate_producer_keys_schema()  # noqa: SLF001
+
+
+def test_validate_output_aggregate_producer_keys_schema_ignores_non_str_required_items(monkeypatch: pytest.MonkeyPatch) -> None:
+    expected = tuple(AGG_METRIC_PRODUCER_KEYS + AGG_RANK_PRODUCER_KEYS + AGG_POST_PRODUCER_KEYS)
+    fake_one_of = [{"required": [1]}] + [{"required": [k]} for k in expected]
+    fake_schema = {"additionalProperties": {"oneOf": fake_one_of}}
+
+    fake_output_aggregate_config = SimpleNamespace(
+        __dataclass_fields__={
+            "fields": SimpleNamespace(metadata={"schema": {"schema": fake_schema}}),
+        }
+    )
+    monkeypatch.setattr(schema_outputs, "OutputAggregateConfig", fake_output_aggregate_config, raising=True)
+
+    schema_outputs._validate_output_aggregate_producer_keys_schema()  # noqa: SLF001
