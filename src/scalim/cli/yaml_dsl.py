@@ -1,3 +1,4 @@
+# pragma: allow-non-core-file boundary: cli surface may migrate out; not part of core coverage gate
 import argparse
 import json
 import re

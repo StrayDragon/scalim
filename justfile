@@ -345,6 +345,23 @@ test:
 test-gate:
     uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100
 
+# 检查: 生成 branch coverage 报告(不做阈值门禁;用于定位 missing branches)
+test-gate-branch-report:
+    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-report=json:.tmp/coverage.json
+
+# 检查: core 覆盖率 gate (statements + branches; core 由 allow-non-core-file 治理标记决定)
+core-coverage-report:
+    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100
+
+core-coverage-check:
+    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check
+
+test-gate-core-coverage:
+    # 先执行 statements/line coverage gate(SSOT: --cov-fail-under=100),再执行 core branch gate.
+    just test-gate
+    just test-gate-branch-report
+    just core-coverage-check
+
 # 压力测试: 运行
 bench *ARGS:
     # Performance baseline run only. Typical workflows:
@@ -636,6 +653,10 @@ report-no-cover:
 check-no-cover:
     uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check
 
+# 检查: `# pragma: no branch` 使用必须显式 allow
+check-no-branch:
+    uv {{ UV_OPTIONS }} run python scripts/check-no-branch.py --check
+
 # 报告: dynattr 使用基线
 report-dynattr:
     uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py
@@ -716,8 +737,11 @@ report-object-type:
 check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
+# QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
+quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check
+
 # QA: 仅py轻量的检查
-quick-check-only-py: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check test-gate
+quick-check-only-py: quick-check-only-py-no-test-gate test-gate
 
 alias quick-qa-only-py := quick-check-only-py
 
@@ -726,11 +750,11 @@ quick-check: quick-check-only-py
 
 alias quick-qa := quick-check
 
-# QA: 仅py完整的检查
-check-only-py: quick-check-only-py py36-compat-check py36-typingext-check examples bench bench-memray
+# QA: 仅py完整的检查(不包含 frontend; 作为 qa 的可组合基础)
+check-only-py: quick-check-only-py-no-test-gate test-gate-core-coverage py36-compat-check py36-typingext-check
 
-# QA: 所有完整的检查
-check: quick-check-only-py py36-compat-check py36-typingext-check frontend-check examples
+# QA: 所有完整的检查(最全面入口; MUST 覆盖全部质量门禁)
+check: check-only-py frontend-check examples
 
 alias qa := check
 

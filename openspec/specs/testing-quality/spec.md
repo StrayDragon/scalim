@@ -8,6 +8,8 @@
 - `justfile` (`test`/`bench`/`schema-drift-check`/`lintfix`/`check-*` quality gates)
 - `scripts/check-cast-usage.py` (`cast` 使用扫描器)
 - `scripts/check-no-cover.py` (`# pragma: no cover` 使用扫描器)
+- `scripts/check-no-branch.py` (`# pragma: no branch` 使用扫描器)
+- `scripts/check-core-coverage.py` (core 子集 coverage gate 脚本: statements + branches)
 - `scripts/check-dynattr.py` (`getattr`/`setattr`/`hasattr` 使用扫描器)
 - `tests/test_yaml_schema_generation.py` (YAML schema generation drift guard)
 - `tests/test_et_yaml_parse_regression.py` (INTEGRATION_APP YAML parse regression; parser-only, no business loaders)
@@ -18,6 +20,8 @@
 - 默认 pytest 配置由 `pyproject.toml` 的 `addopts` 提供(默认排除 bench + 禁用 benchmark 插件),因此直接运行 `pytest`/`just test` 会执行所有非 bench 测试,但不隐式强制启用 xdist + coverage 门禁(优先本地快速反馈).
 - 质量门禁入口(`just qa`/CI)通过 `just test-gate` 显式启用 xdist 并行 + coverage 统计 + coverage gate,以保证 CI 结果稳定可复现.
 - bench 入口通过 `-o addopts=""` + `--no-cov` 显式关闭默认 addopts(避免覆盖率/xdist 干扰),并启用 pytest-benchmark 的 `--benchmark-only` 工作流.
+- 当前 `just test-gate` 仅强制 statements/line coverage 100%(不强制 branch coverage). 如需定位 missing branches,可运行 `just test-gate-branch-report` 生成 `.tmp/coverage.json`.
+- 若希望对“core 子集”强制 statements + branch 100%(允许 `no cover`/`no branch` 治理例外),可使用 `scripts/check-core-coverage.py` 读取 `.tmp/coverage.json` 并按 `# pragma: allow-non-core-file <reason>` 显式跳过非 core 文件.
 ## Requirements
 ### Requirement: 测试分类与默认执行
 - 测试套件 MUST 使用 `bench` marker 标识基准用例.
