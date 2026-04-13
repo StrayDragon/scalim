@@ -52,6 +52,18 @@
 - **THEN** 系统 MUST fail-fast
 - **AND** 系统 MUST NOT 静默采用后写入的 header baseline
 
+### Requirement: xlsx_memory export_xlsx errors MUST point to the authoring surface config path
+
+当准备 `xlsx_memory` 的最终导出（`export_xlsx`）及其相关版本化输出 root 时，若 runtime 错误可归因到 `export_xlsx.path`，系统 MUST 提供可操作的配置定位路径：
+
+- `ScalimWorkflowConfigError.path` MUST 指向 `workflow.resources.books.<book_id>.export_xlsx.path`
+- message MAY 包含内部资源提示（例如 `resource_type=sheetbook`），但 MUST NOT 替换上述 user-facing path
+
+#### Scenario: output root preparation error reports export_xlsx.path
+- **GIVEN** a workflow uses `books.<book_id>.kind=xlsx_memory` with `export_xlsx.path`
+- **WHEN** preparing the versioned output root fails (e.g. due to permission error or invalid path)
+- **THEN** the raised `ScalimWorkflowConfigError` MUST include `path=workflow.resources.books.<book_id>.export_xlsx.path`
+
 ### Requirement: xlsx_memory append alignment MUST reject header-based semantics
 系统 MUST 禁止 `xlsx_memory` 在 append 语义中使用 header-based 对齐:
 
