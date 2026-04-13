@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 import pytest
 
 from scalim.sinks import BlockColumnCSVSink, CSVSink, ColumnCSVSink
@@ -97,6 +99,33 @@ def test_pandas_sinks_aligned_write_and_mismatch() -> None:
 
     with pytest.raises(ValueError, match="write_column_aligned"):
         col_sink.write_column_aligned("id", [0, 1], [10])
+
+
+def test_pandas_sinks_cover_internal_branch_arcs() -> None:
+    class _DuplicateKeyRow(Mapping):
+        def __init__(self) -> None:
+            self._data = {"id": 1}
+
+        def __getitem__(self, key):  # type: ignore[no-untyped-def]
+            return self._data[key]
+
+        def __iter__(self):  # type: ignore[no-untyped-def]
+            return iter(["id", "id"])
+
+        def __len__(self) -> int:
+            return len(self._data)
+
+    row_sink = PandasRowSink()
+    row_sink.write_row(_DuplicateKeyRow())
+    assert row_sink.field_names == ["id"]
+
+    col_sink = PandasColumnSink()
+    col_sink.write_column("id", {0: 10})
+    col_sink.write_column("id", {1: 20})
+    col_sink.write_column_aligned("id", [0, 1], [10, 20])
+
+    col_sink.set_row_ids([0])
+    col_sink.write_batch([{"id": 1}])
 
 
 def test_block_column_csv_sink_write_column_aligned_unknown_field_and_sleep(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

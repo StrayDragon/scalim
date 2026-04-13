@@ -13,6 +13,7 @@ from scalim.ob._internal.manager_emit import ObserverManagerEmitMixin
 from scalim.events import EVENT_PIPELINE_START
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets._internal import viz_config as viz_config_module
+from scalim.ob.presets._internal import viz_output as viz_output_module
 from scalim.ob.observer import EventDispatchObserver, Observer
 from scalim.ob.presets.viz import VizObserver
 
@@ -157,3 +158,80 @@ def test_internal_observer_manager_lazy_branches_and_viz_node_cache() -> None:
     viz_observer = VizObserver()
     viz_observer._node_id_cache = None  # noqa: SLF001
     assert viz_observer._normalize_node_ref_id("field:test") == "field:test"  # noqa: SLF001
+
+
+def test_internal_viz_nodes_cover_remaining_branch_arcs() -> None:
+    observer = VizObserver(
+        snapshot={
+            "meta": {},
+            "nodes": [
+                {"type": "loader", "data": {}},
+                {"id": "loader:orders", "type": "loader", "data": {}},
+            ],
+        }
+    )
+    assert observer._get_known_node_ids() == {"loader:orders"}  # noqa: SLF001
+    assert observer._normalize_node_ref_id("loader:unknown extra") == "loader:unknown extra"  # noqa: SLF001
+
+    observer_no_candidates = VizObserver(
+        snapshot={
+            "meta": {},
+            "nodes": [{"id": "loader:orders", "type": "loader", "data": {}}],
+        }
+    )
+    assert observer_no_candidates._normalize_node_ref_id("field:test") == "field:test"  # noqa: SLF001
+
+    observer_candidates_no_value = VizObserver(
+        snapshot={
+            "meta": {},
+            "nodes": [{"id": "field:test_a", "type": "field", "data": {}}],
+        }
+    )
+    assert observer_candidates_no_value._normalize_node_ref_id("field:test") == "field:test_a"  # noqa: SLF001
+
+
+def test_internal_viz_config_fill_paths_skip_branches(tmp_path) -> None:
+    config = viz_config_module.VizObserverConfig(
+        output_dir=str(tmp_path / "viz"),
+        output_path=str(tmp_path / "events.jsonl"),
+        snapshot_path=str(tmp_path / "snapshot.json"),
+        trace_path=str(tmp_path / "trace.jsonl"),
+    )
+    events_path, snapshot_path, trace_path = config._fill_paths_from_output_dir(  # noqa: SLF001
+        str(tmp_path / "base"),
+        config.output_path,
+        config.snapshot_path,
+        config.trace_path,
+    )
+    assert events_path == config.output_path
+    assert snapshot_path == config.snapshot_path
+    assert trace_path == config.trace_path
+
+
+def test_internal_viz_output_emitters_cover_events_path_absent_branch(tmp_path) -> None:
+    config = viz_config_module.VizObserverConfig(
+        trace_path=str(tmp_path / "trace.jsonl"),
+        trace_enabled=True,
+    )
+    observer = VizObserver(config=config)
+    observer.run_id = "run"
+    observer._ensure_emitters()  # noqa: SLF001
+    assert observer._events_emitter is None  # noqa: SLF001
+    assert observer._trace_emitter is not None  # noqa: SLF001
+    observer.close()
+
+
+def test_internal_viz_output_snapshot_cleanup_skips_when_temp_path_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    def _raise_oserror(_output_path: str, _suffix: str) -> str:
+        raise OSError("boom")
+
+    monkeypatch.setattr(viz_output_module, "create_temp_path", _raise_oserror)
+
+    config = viz_config_module.VizObserverConfig(
+        snapshot_path=str(tmp_path / "snapshot.json"),
+    )
+    observer = VizObserver(config=config, snapshot={"meta": {}, "nodes": []})
+    observer._write_snapshot_if_needed()  # noqa: SLF001
