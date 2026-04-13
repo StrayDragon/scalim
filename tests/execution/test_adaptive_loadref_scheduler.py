@@ -117,6 +117,10 @@ def test_collect_layer_executable_ops_skips_executed_group_and_calls_after_opera
     assert executable_ops == []
     assert after_calls == ["a"]
 
+    skipped_field_keys, executable_ops = collect_layer_executable_ops((op,), runtime=runtime, after_operator=None)
+    assert skipped_field_keys == {"a"}
+    assert executable_ops == []
+
 
 def test_adaptive_scheduler_repr_and_empty_ops_returns() -> None:
     plan = ExecutionPlan()
