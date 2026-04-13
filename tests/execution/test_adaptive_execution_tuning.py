@@ -724,6 +724,46 @@ def test_commit_layer_results_skips_field_keys_in_commit_loop() -> None:
     assert after_calls == ["exec"]
 
 
+def test_commit_layer_results_dedupes_task_keys_and_still_calls_after_operator() -> None:
+    from scalim.execution.adaptive.loadref_scheduler import _AdaptiveTaskResult  # noqa: SLF001
+
+    source_a = _make_source("s1")
+    source_b = _make_source("s2")
+    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
+    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    plan = ExecutionPlan(operators=(op_a, op_b))
+    scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
+    runtime = _make_runtime(plan, main_source=None)
+
+    ctx = BatchContext()
+    results_by_key = {
+        ("task", 1): _AdaptiveTaskResult(
+            overlay={"a": {0: 100}, "b": {0: 200}},
+            hook_events=[],
+            observer_events=[],
+            relation_key=(),
+            group_enabled=False,
+        )
+    }
+    op_task_key = {"a": ("task", 1), "b": ("task", 1)}
+    after_calls: List[str] = []
+
+    scheduler._commit_layer_results(  # noqa: SLF001
+        [op_a, op_b],
+        skipped_field_keys=set(),
+        op_task_key=op_task_key,
+        results_by_key=results_by_key,
+        context=ctx,
+        runtime=runtime,
+        committed_relation_keys=set(),
+        after_operator=lambda op: after_calls.append(op.field_key),
+    )
+
+    assert ctx.get_field_value("a", 0) == 100
+    assert ctx.get_field_value("b", 0) == 200
+    assert after_calls == ["a", "b"]
+
+
 def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
     from scalim.spec.ir.binding import BindingIr
     from scalim.spec.ir import MainSourceIr
