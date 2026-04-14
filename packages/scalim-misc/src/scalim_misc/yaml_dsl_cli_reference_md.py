@@ -3,12 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from scalim_cli import yaml_dsl as yaml_dsl_cli
+
 from scalim import _project_constants
-from scalim.cli import yaml_dsl as yaml_dsl_cli
 
 DEMAND_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
 WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
-CLI_SOURCE_REL = Path("src") / "scalim" / "cli" / "yaml_dsl.py"
+CLI_SOURCE_REL = Path("packages") / "scalim-cli" / "src" / "scalim_cli" / "yaml_dsl.py"
+CLI_DIST_NAME = "{}-cli".format(_project_constants.DIST_NAME)
 
 DOCS_CLI_MIN_COMMANDS_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-cli-min-commands -->"
 DOCS_CLI_MIN_COMMANDS_END = "<!-- END AUTOGEN:yaml-dsl-cli-min-commands -->"
@@ -113,32 +115,32 @@ def render_yaml_dsl_cli_reference_markdown(
             ),
             "",
             "### External",
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate <file.yaml>`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl validate <file.yaml>`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl validate --type workflow <workflow.yaml>`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl validate --type workflow <workflow.yaml>`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema validate <file.yaml>`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl schema validate <file.yaml>`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema show`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl schema show`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl schema path`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
-            '- `uvx --from "{dist}[cli]" {cli} yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- `uvx --from "{dist}" {cli} yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
             "",
@@ -163,8 +165,8 @@ def render_yaml_dsl_cli_reference_markdown(
                 cli=_project_constants.CLI_NAME
             ),
             "- Repo query: `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
-            '- External query: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
-                dist=_project_constants.DIST_NAME,
+            '- External query: `uvx --from "{dist}" {cli} yaml-dsl schema path`'.format(
+                dist=CLI_DIST_NAME,
                 cli=_project_constants.CLI_NAME,
             ),
             (
@@ -252,19 +254,19 @@ def render_yaml_dsl_cli_min_commands_markdown(*, placeholder_prefix: str = "path
             "- workflow YAML schema-only(需显式 workflow schema): "
             "`uv run {cli} yaml-dsl schema validate --schema {workflow_schema} {p}/workflow.yaml`"
         ).format(cli=_project_constants.CLI_NAME, workflow_schema=workflow_schema_path, p=placeholder_prefix),
-        '- 仓库外语义校验: `uvx --from "{dist}[cli]" {cli} yaml-dsl validate {p}/config.yaml`'.format(
-            dist=_project_constants.DIST_NAME,
+        '- 仓库外语义校验: `uvx --from "{dist}" {cli} yaml-dsl validate {p}/config.yaml`'.format(
+            dist=CLI_DIST_NAME,
             cli=_project_constants.CLI_NAME,
             p=placeholder_prefix,
         ),
-        '- 仓库外 schema-only: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema validate {p}/config.yaml`'.format(
-            dist=_project_constants.DIST_NAME,
+        '- 仓库外 schema-only: `uvx --from "{dist}" {cli} yaml-dsl schema validate {p}/config.yaml`'.format(
+            dist=CLI_DIST_NAME,
             cli=_project_constants.CLI_NAME,
             p=placeholder_prefix,
         ),
         "- 查询 schema 路径(仓库内): `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
-        '- 查询 schema 路径(仓库外): `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
-            dist=_project_constants.DIST_NAME,
+        '- 查询 schema 路径(仓库外): `uvx --from "{dist}" {cli} yaml-dsl schema path`'.format(
+            dist=CLI_DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
         "",
@@ -311,17 +313,17 @@ def render_yaml_dsl_skill_cli_min_commands_markdown() -> str:
             "- workflow YAML 仓库内 schema 校验(结构/unknown-fields; 必须显式 schema 路径): "
             "`uv run {cli} yaml-dsl schema validate --schema {schema} <workflow.yaml>`"
         ).format(cli=_project_constants.CLI_NAME, schema=workflow_schema_path),
-        '- 仓库外完整校验: `uvx --from "{dist}[cli]" {cli} yaml-dsl validate <file.yaml>`'.format(
-            dist=_project_constants.DIST_NAME,
+        '- 仓库外完整校验: `uvx --from "{dist}" {cli} yaml-dsl validate <file.yaml>`'.format(
+            dist=CLI_DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
-        '- 仓库外 schema 校验: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema validate <file.yaml>`'.format(
-            dist=_project_constants.DIST_NAME,
+        '- 仓库外 schema 校验: `uvx --from "{dist}" {cli} yaml-dsl schema validate <file.yaml>`'.format(
+            dist=CLI_DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
         "- 仓库内查询 schema 绝对路径: `uv run {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
-        '- 仓库外查询 schema 绝对路径: `uvx --from "{dist}[cli]" {cli} yaml-dsl schema path`'.format(
-            dist=_project_constants.DIST_NAME,
+        '- 仓库外查询 schema 绝对路径: `uvx --from "{dist}" {cli} yaml-dsl schema path`'.format(
+            dist=CLI_DIST_NAME,
             cli=_project_constants.CLI_NAME,
         ),
         "",

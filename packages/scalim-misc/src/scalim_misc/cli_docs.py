@@ -4,8 +4,9 @@ import argparse
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
+from scalim_cli import yaml_dsl as yaml_dsl_cli
+
 from scalim import _project_constants
-from scalim.cli import yaml_dsl as yaml_dsl_cli
 
 
 class CliDocsError(RuntimeError):

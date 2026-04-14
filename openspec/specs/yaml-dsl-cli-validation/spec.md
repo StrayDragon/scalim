@@ -5,13 +5,13 @@
 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
 
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/cli/yaml_dsl.py` (cli validate/schema validate/show/path + linter-style output + location indexing)
-- `src/IMPL_ROOT/cli/yaml_dsl_lsp.py` (upsert-lsp-comment)
+- `packages/scalim-cli/src/scalim_cli/yaml_dsl.py` (cli validate/schema validate/show/path + linter-style output + location indexing)
+- `packages/scalim-cli/src/scalim_cli/yaml_dsl_lsp.py` (upsert-lsp-comment)
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (`ConfigValidator` + strict unknown fields + `ConfigValidationError`)
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/unknown_fields.py` (unknown field detection + suggestions)
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validators/issues.py` (`ValidationIssue` + `MAX_VALIDATION_ERROR_LINES`)
-- `tests/test_yaml_dsl_cli_output.py` (CLI output regression tests)
-- `tests/test_yaml_dsl_lsp_comment.py` (upsert-lsp-comment regression tests)
+- `tests/yaml_dsl/test_yaml_dsl_cli_output.py` (CLI output regression tests)
+- `tests/yaml_dsl/test_yaml_dsl_lsp_comment.py` (upsert-lsp-comment regression tests)
 - `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` (schema input for schema-only validation and unknown-field checks)
 
 ## Implementation Notes (Current Behavior)
@@ -19,6 +19,19 @@
 - `PROJECT_CLI_NAME yaml-dsl schema validate` 走 JSON Schema(依赖 `jsonschema`)并补充 unknown fields/legacy fields 的诊断.
 - CLI 的 `--json` 输出提供结构化 payload(含 `ok`/`errors`/`warnings`/`yaml_path`/`schema_path`)供脚本化消费.
 ## Requirements
+### Requirement: CLI implementation MAY live outside runtime core but MUST preserve validation contracts
+
+系统 MUST 允许将 `PROJECT_CLI_NAME yaml-dsl ...` 的 CLI 实现迁移到独立发行物（例如 `scalim-cli`）以降低 runtime core 的维护负担，但该迁移 MUST 满足：
+
+- CLI 的对外行为契约（退出码、`--json` payload 结构、linter-style 输出格式、workflow validate 合并结构等）MUST 保持与现有规范一致；
+- CLI 的校验语义 MUST 委托 `scalim` 内的可复用 service 层（例如 `dsl/yaml_dsl/validation_service.py`），不得在 CLI 包中复制一份语义真相；
+- runtime core（`src/IMPL_ROOT/`）MUST 仍可在不安装 CLI 发行物的环境中被 import 并用于 compile/validate/run/workflow。
+
+#### Scenario: runtime imports succeed without CLI distribution
+- **GIVEN** 环境未安装 CLI 发行物（例如 `scalim-cli`）
+- **WHEN** 调用方导入并使用 runtime 入口（例如 `scalim.dsl.yaml_dsl.run`）
+- **THEN** 导入与运行 MUST 成功
+
 ### Requirement: CLI validation MUST reuse the unified YAML load facade
 
 系统 MUST 要求 `PROJECT_CLI_NAME yaml-dsl validate`（或等价 CLI 校验入口）复用统一的 YAML load facade,以保证与 runtime/compile/workflow validate 的一致性.

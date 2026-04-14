@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 
-import scalim.cli.yaml_dsl as yaml_dsl
+import scalim_cli.yaml_dsl as yaml_dsl
 import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_mod
 
 

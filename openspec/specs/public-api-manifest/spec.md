@@ -41,7 +41,7 @@
 
 该 catalog MUST 满足:
 - 扫描范围默认为 `src/scalim/**`
-- MUST 排除 `src/scalim/cli/**` 与 `src/scalim/vendor/**`（以及其它显式排除项）
+- MUST 排除 `src/scalim/vendor/**`（以及其它显式排除项; CLI 已迁出 `src/scalim/`）
 - 对于 internal 模块（例如 `_internal/` 或 `_*.py`）,其 `__all__` 按治理规则应为空,因此不会扩大 catalog
 - 输出 MUST 为确定性产物,并具备可用于 drift-check 的稳定格式
 
@@ -61,4 +61,3 @@
 #### Scenario: generated public API docs are drift-gated
 - **WHEN** 维护者修改 `src/scalim/**` 中的 `__all__` 导出面但未刷新生成文档
 - **THEN** drift-check MUST 失败并提示运行生成入口
-

@@ -1,4 +1,3 @@
-# pragma: allow-non-core-file boundary: cli surface may migrate out; not part of core coverage gate
 import argparse
 import json
 import re
@@ -6,16 +5,23 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from ..dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
-from ..dsl.yaml_dsl._internal.config_parsing.imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
-from ..dsl.yaml_dsl._internal.config_parsing.jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
-from ..dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
-from ..dsl.yaml_dsl._internal.config_parsing.yaml_load import (
+from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
+from scalim.dsl.yaml_dsl._internal.config_parsing.imports import (
+    ScalimYamlImportExpansionError,
+    contains_import_syntax,
+    expand_imports_inplace,
+)
+from scalim.dsl.yaml_dsl._internal.config_parsing.jsonschema_issues import (
+    ScalimJsonSchemaCollectorError,
+    collect_jsonschema_validation_issues,
+)
+from scalim.dsl.yaml_dsl._internal.config_parsing.unknown_fields import find_unknown_fields
+from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import (
     YamlLocationIndex,
     error_loc_for_yaml_path,
     load_yaml_mapping_text,
 )
-from ..dsl.yaml_dsl.validation_service import (
+from scalim.dsl.yaml_dsl.validation_service import (
     DemandValidationResult,
     ValidationPayload,
     WorkflowValidationResult,
@@ -28,7 +34,8 @@ from ..dsl.yaml_dsl.validation_service import (
     validate_demand_text,
     validate_workflow_text,
 )
-from ..vendor.compact.importlibx import import_module
+from scalim.vendor.compact.importlibx import import_module
+
 from . import yaml_dsl_lsp
 
 try:
@@ -163,7 +170,7 @@ def _add_upsert_lsp_comment_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _default_schema_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
+    return yaml_dsl_lsp.schema_dir() / "demand.gen.json"
 
 
 def _resolve_schema_path(arg: Optional[Path]) -> Path:
@@ -178,7 +185,7 @@ def _schema_path_for_schema_type(schema_type: str) -> Path:
     if not _SCHEMA_TYPE_PATTERN.match(schema_type):
         msg = "Invalid schema type: {}".format(schema_type)
         raise ValueError(msg)
-    return Path(__file__).resolve().parents[1] / "dsl" / "yaml_dsl" / "schema" / "{}.gen.json".format(schema_type)
+    return yaml_dsl_lsp.schema_dir() / "{}.gen.json".format(schema_type)
 
 
 def _load_json_schema(schema_path: Path) -> Dict[str, Any]:
@@ -615,7 +622,7 @@ def _get_jsonschema_module(
     if _HAS_JSONSCHEMA and jsonschema is not None:
         return jsonschema
     _emit_error(
-        "缺少 jsonschema 依赖,请安装 scalim[cli]",
+        "缺少 jsonschema 依赖,请安装 scalim-cli",
         json_output=args.json,
         yaml_path=yaml_path,
         schema_path=schema_path,

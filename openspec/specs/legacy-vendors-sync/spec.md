@@ -52,7 +52,7 @@
 #### Scenario: downstream vendors runtime imports YAML DSL successfully
 - **GIVEN** 下游工程仅 vendors 化同步了 `src/scalim/` 源码,且运行环境为 Python 3.6
 - **AND** 下游环境未安装任何名为 `yaml`/`ruamel.yaml` 的第三方包
-- **WHEN** 下游导入并执行 YAML DSL 的解析入口(例如 `scalim.cli.yaml_dsl` 或 `scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load`)
+- **WHEN** 下游导入并执行 YAML DSL 的解析入口(例如 `scalim.dsl.yaml_dsl.validation_service` 或 `scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load`)
 - **THEN** 导入与 YAML 解析 MUST 成功
 
 #### Scenario: scalim YAML parsing uses vendored `ruamel.yaml` without external installs

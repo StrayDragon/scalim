@@ -6,7 +6,7 @@ from typing import Iterable, Set
 import jsonschema
 import pytest
 
-import scalim.cli.yaml_dsl as yaml_dsl_cli
+import scalim_cli.yaml_dsl as yaml_dsl_cli
 
 
 def _args(path: Path) -> argparse.Namespace:

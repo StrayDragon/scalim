@@ -47,7 +47,7 @@
 - schema: `src/scalim/dsl/yaml_dsl/schema_dsl/**` → 生成物 `src/scalim/dsl/yaml_dsl/schema/*.gen.json`(仅通过 `just gen-yaml-dsl-schema` 刷新)
 - parser/validator: `src/scalim/dsl/yaml_dsl/_internal/config_parsing/**`
 - runtime conversion/compile: `src/scalim/dsl/yaml_dsl/runtime/**`
-- CLI 辅助与一致性: `src/scalim/cli/yaml_dsl.py`
+- CLI 辅助与一致性: `packages/scalim-cli/src/scalim_cli/yaml_dsl.py`
 - docs: `docs/doc/yaml-dsl/**`(如涉及 `.gen.*` 或注入区块,只通过 `just gen-docs` 刷新)
 - skills: `artifacts/skills/scalim-yaml-dsl/**`(如变更影响 authoring/校验入口)
 

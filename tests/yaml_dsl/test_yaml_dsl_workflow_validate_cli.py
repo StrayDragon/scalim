@@ -2,7 +2,7 @@ import argparse
 import json
 from pathlib import Path
 
-import scalim.cli.yaml_dsl as yaml_dsl_cli
+import scalim_cli.yaml_dsl as yaml_dsl_cli
 
 
 def _workflow_args(path: Path, *, json_output: bool) -> argparse.Namespace:

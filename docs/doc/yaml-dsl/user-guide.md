@@ -142,7 +142,7 @@ resources:
 **安装 CLI 工具**:
 
 ```bash
-uv tool install --editable <PATH_TO_SCALIM>/scalim[cli]
+uv tool install scalim-cli
 ```
 
 **运行配置**:

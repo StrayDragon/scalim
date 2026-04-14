@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import scalim.cli.yaml_dsl as yaml_dsl_cli
+import scalim_cli.yaml_dsl as yaml_dsl_cli
 from scalim.dsl.yaml_dsl._internal.config_parsing import imports as imports_mod
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.imports import ScalimYamlImportExpansionError, load_and_expand_imports

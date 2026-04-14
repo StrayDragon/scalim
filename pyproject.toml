@@ -30,15 +30,12 @@ members = ["packages/*"]
 
 [tool.uv.sources]
 scalim-benchlib = { workspace = true }
+scalim-cli = { workspace = true }
 scalim-misc = { workspace = true }
 scalim-yaml-dsl-lsp = { workspace = true }
 scalim = { workspace = true }
 
 [project.optional-dependencies]
-cli = [
-    "jsonschema>=3.2,<4;python_version<'3.7'",
-    "jsonschema>=4.0.0;python_version>='3.7'",
-]
 pandas = [
     # numpy: 1.19.5 是最后支持 3.6 的版本, 1.20.0+ 需要 >=3.7
     "numpy>=1.19.0,<1.20;python_version<'3.7'",
@@ -55,9 +52,6 @@ excel = [
 yaml-dsl-lsp = [
     "scalim-yaml-dsl-lsp[server]",
 ]
-
-[project.scripts]
-scalim-cli = "scalim.cli.main:main"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.10" }
@@ -84,6 +78,7 @@ dev = [
     "matplotlib>=3.10.8",
     "psutil>=5.9.0",
     "scalim-benchlib",
+    "scalim-cli",
     "scalim-misc",
     "scalim-yaml-dsl-lsp[server]",
     "pandas>=2.0.3",
@@ -353,31 +348,6 @@ reportUndefinedVariable = false            # 不报告未定义的变量
 reportPossiblyUnboundVariable = false      # 不报告可能未绑定的变量
 reportMissingSuperCall = false             # 不报告缺少父类方法调用
 reportInvalidTypeForm = false              # 不报告无效的类型格式
-
-# `src/scalim/cli` 属于 `tooling-boundary`: 命令装配/参数分派保持受控放宽.
-[[tool.basedpyright.executionEnvironments]]
-root = "src/scalim/cli"
-reportArgumentType = false               # 不报告参数类型错误
-reportPrivateUsage = false               # 不报告私有成员使用
-reportCallIssue = false                  # 不报告函数调用问题
-reportGeneralTypeIssues = false          # 不报告泛型相关错误
-reportImplicitAbstractClass = false      # 不报告抽象类问题
-reportImplicitOverride = false           # 不报告隐式方法重写问题
-reportIndexIssue = false                 # 不报告索引访问问题
-reportUnknownLambdaType = false          # 不报告 Lambda 表达式类型错误
-reportUnknownMemberType = false          # 不报告属性/方法访问的类型错误
-reportMissingParameterType = false       # 不报告函数参数类型错误
-reportUnknownParameterType = false       # 不报告未知参数类型
-reportOptionalMemberAccess = false       # 不报告对可选成员的安全访问警告
-reportAttributeAccessIssue = "none"      # 不报告属性访问相关错误
-reportOperatorIssue = false              # 不报告操作符使用问题
-reportReturnType = false                 # 不报告返回值类型错误
-reportMissingTypeArgument = false        # 不报告泛型类型参数缺失
-reportMissingImports = false             # 不报告模块导入缺失
-reportTypedDictNotRequiredAccess = false # 不报告 TypedDict 访问要求
-reportUnknownArgumentType = false        # 不报告函数调用参数类型错误
-reportUnknownVariableType = false        # 不报告变量类型推断失败
-reportUnusedCallResult = false           # 允许忽略函数返回值
 
 [tool.vulture]
 exclude = []

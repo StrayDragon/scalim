@@ -15,6 +15,7 @@ resolution-markers = [
 members = [
     "scalim",
     "scalim-benchlib",
+    "scalim-cli",
     "scalim-misc",
     "scalim-yaml-dsl-lsp",
 ]
@@ -3178,9 +3179,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-cli = [
-    { name = "jsonschema" },
-]
 excel = [
     { name = "openpyxl" },
 ]
@@ -3219,6 +3217,7 @@ dev = [
     { name = "pyzmq" },
     { name = "rich" },
     { name = "scalim-benchlib" },
+    { name = "scalim-cli" },
     { name = "scalim-misc" },
     { name = "scalim-yaml-dsl-lsp", extra = ["server"] },
     { name = "sqlalchemy" },
@@ -3229,8 +3228,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", marker = "python_full_version >= '3.7' and extra == 'cli'", specifier = ">=4.0.0" },
-    { name = "jsonschema", marker = "python_full_version < '3.7' and extra == 'cli'", specifier = ">=3.2,<4" },
     { name = "numpy", marker = "python_full_version >= '3.7' and extra == 'pandas'", specifier = ">=1.24.4" },
     { name = "numpy", marker = "python_full_version < '3.7' and extra == 'pandas'", specifier = ">=1.19.0,<1.20" },
     { name = "openpyxl", marker = "python_full_version >= '3.8' and extra == 'excel'", specifier = ">=3.1.5" },
@@ -3241,7 +3238,7 @@ requires-dist = [
     { name = "typing-extensions", marker = "python_full_version < '3.7'", specifier = ">=4.1.1,<4.2" },
     { name = "typing-extensions", marker = "python_full_version >= '3.7'", specifier = ">=4.1.1" },
 ]
-provides-extras = ["cli", "pandas", "excel", "yaml-dsl-lsp"]
+provides-extras = ["pandas", "excel", "yaml-dsl-lsp"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3266,6 +3263,7 @@ dev = [
     { name = "pyzmq", marker = "python_full_version >= '3.10'", specifier = ">=27.1.0" },
     { name = "rich", marker = "python_full_version >= '3.10'" },
     { name = "scalim-benchlib", marker = "python_full_version >= '3.10'", editable = "packages/scalim-benchlib" },
+    { name = "scalim-cli", marker = "python_full_version >= '3.10'", editable = "packages/scalim-cli" },
     { name = "scalim-misc", marker = "python_full_version >= '3.10'", editable = "packages/scalim-misc" },
     { name = "scalim-yaml-dsl-lsp", extras = ["server"], marker = "python_full_version >= '3.10'", editable = "packages/scalim-yaml-dsl-lsp" },
     { name = "sqlalchemy", marker = "python_full_version >= '3.10'" },
@@ -3280,6 +3278,21 @@ version = "0.8.1"
 source = { editable = "packages/scalim-benchlib" }
 
 [[package]]
+name = "scalim-cli"
+version = "0.8.1"
+source = { editable = "packages/scalim-cli" }
+dependencies = [
+    { name = "jsonschema" },
+    { name = "scalim" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "jsonschema", specifier = ">=4.0.0" },
+    { name = "scalim", editable = "." },
+]
+
+[[package]]
 name = "scalim-misc"
 version = "0.8.1"
 source = { editable = "packages/scalim-misc" }
@@ -3287,6 +3300,7 @@ dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "scalim" },
+    { name = "scalim-cli" },
 ]
 
 [package.metadata]
@@ -3294,6 +3308,7 @@ requires-dist = [
     { name = "pandas", marker = "python_full_version < '3.7'", specifier = ">=1.0.0,<1.2" },
     { name = "pandas", marker = "python_full_version >= '3.7'", specifier = ">=2.0.3" },
     { name = "scalim", editable = "." },
+    { name = "scalim-cli", editable = "packages/scalim-cli" },
 ]
 
 [[package]]

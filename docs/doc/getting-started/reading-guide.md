@@ -50,7 +50,7 @@
 
 1. **读取与校验**
    - schema/语义校验: [`src/scalim/dsl/yaml_dsl/_internal/config_parsing/`](#code=src/scalim/dsl/yaml_dsl/_internal/config_parsing/)
-   - CLI 入口: [`src/scalim/cli/yaml_dsl.py`](#code=src/scalim/cli/yaml_dsl.py)
+   - CLI 入口: [`packages/scalim-cli/src/scalim_cli/yaml_dsl.py`](#code=packages/scalim-cli/src/scalim_cli/yaml_dsl.py)
 2. **配置 → IR**
    - 编译编排(run/compile): [`src/scalim/dsl/yaml_dsl/runtime/compiler.py`](#code=src/scalim/dsl/yaml_dsl/runtime/compiler.py)
    - 静态前端(不 import/适合 LSP): [`src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py`](#code=src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py)

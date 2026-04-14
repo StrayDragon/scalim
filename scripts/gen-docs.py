@@ -451,7 +451,7 @@ def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, 
     command_docs = build_yaml_dsl_command_docs()
     cli_reference_content = _autogen_md_header(
         sources=[
-            "`src/scalim/cli/yaml_dsl.py`",
+            "`packages/scalim-cli/src/scalim_cli/yaml_dsl.py`",
             "`packages/scalim-misc/src/scalim_misc/cli_docs.py`",
             "`packages/scalim-misc/src/scalim_misc/yaml_dsl_cli_reference_md.py`",
         ]

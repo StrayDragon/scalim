@@ -30,7 +30,7 @@ def test_workflow_config_error_message_is_consistent_across_entrypoints() -> Non
 def test_workflow_config_error_message_is_consistent_in_cli_validate(tmp_path, capsys) -> None:
     from argparse import Namespace
 
-    from scalim.cli import yaml_dsl as cli_mod
+    from scalim_cli import yaml_dsl as cli_mod
     from scalim.dsl.yaml_dsl.workflow_config import load_workflow_config_from_mapping
     from scalim.workflow.errors import ScalimWorkflowConfigError
 

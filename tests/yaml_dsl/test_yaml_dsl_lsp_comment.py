@@ -2,8 +2,8 @@ import argparse
 from pathlib import Path
 from typing import Optional
 
-import scalim.cli.yaml_dsl as yaml_dsl
-from scalim.cli import yaml_dsl_lsp
+import scalim_cli.yaml_dsl as yaml_dsl
+from scalim_cli import yaml_dsl_lsp
 
 
 def _upsert_args(

@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-import scalim.cli.yaml_dsl as yaml_dsl_cli
+import scalim_cli.yaml_dsl as yaml_dsl_cli
 from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 

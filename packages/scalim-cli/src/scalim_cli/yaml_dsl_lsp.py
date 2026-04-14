@@ -1,11 +1,11 @@
-# pragma: allow-non-core-file boundary: cli surface may migrate out; not part of core coverage gate
 import re
+from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from ..vendor.dataclassesx import dataclass
-from ..vendor.yamlx.ruamel.yaml import YAML
+import scalim
+from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 DEFAULT_SCHEMA_TYPE = "demand"
 DEFAULT_MAX_SCAN_LINES = 10
@@ -28,7 +28,7 @@ DEFAULT_COMMENT_STYLE = COMMENT_STYLE_ALL
 
 
 def schema_dir() -> Path:
-    return Path(__file__).resolve().parents[1] / "dsl" / "yaml_dsl" / "schema"
+    return Path(scalim.__file__).resolve().parent / "dsl" / "yaml_dsl" / "schema"
 
 
 DEFAULT_SCHEMA_PATH = str(schema_dir())

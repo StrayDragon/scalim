@@ -1,4 +1,3 @@
-# pragma: allow-non-core-file boundary: cli surface may migrate out; not part of core coverage gate
 import argparse
 from typing import List, Optional
 
