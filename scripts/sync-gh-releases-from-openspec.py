@@ -171,7 +171,11 @@ def _score_highlight(text: str) -> int:
     score = 0
     if "non-goals" in lower or "non goals" in lower or "non-goal" in lower or "非目标" in s or "不做" in s or "明确不做" in s:
         score -= 50
-    if "新增" in s or "引入" in s or "扩展" in s or "增加" in s or "new" in lower:
+    # `Highlights` 避免把 “不做的事/非目标” 当成主线变化（例如“**不引入**抽象层”）。
+    if s.strip().startswith(("不引入", "不增加", "不在")):
+        score -= 12
+
+    if "新增" in s or ("引入" in s and "不引入" not in s) or "扩展" in s or ("增加" in s and "不增加" not in s) or "new" in lower:
         score += 3
     if "统一" in s or "收敛" in s or "单一" in s or "单入口" in s:
         score += 2
@@ -180,7 +184,7 @@ def _score_highlight(text: str) -> int:
     if s.strip().startswith(("移除", "删除", "弃用", "废弃")):
         score -= 4
     # `Highlights` 避免挑到 `Non-goals`/约束口径（例如“不会改变/保持不变”），它们通常不是版本主线变化。
-    if s.strip().startswith(("不改变", "不变", "保持不变")):
+    if s.strip().startswith(("不改变", "不变", "保持不变", "不引入", "不增加", "不在")):
         score -= 6
     if "支持" in s:
         score += 1
@@ -717,6 +721,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if not text:
             return False
         lower = text.lower()
+        has_non_breaking_marker = re.search(r"\bnon[- ]breaking\b", lower) is not None
         tokens = re.findall(r"`([^`]+)`", text)
         workflow_authoring_hint = "workflow yaml" in lower or "workflow yml" in lower or "workflow 配置" in text
         demand_authoring_hint = "demand yaml" in lower or "demand yml" in lower
@@ -736,16 +741,22 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             if "不再支持" not in text and "移除" not in text and "删除" not in text:
                 return False
 
-        # 没有任何“用户可感知线索”的句子，通常不是“你要改什么”的 `upgrade` 点（避免 `refactor` 内部迁移误入）。
-        if not (has_surface_token or has_user_facing_hint):
-            return False
+        # 明确 `BREAKING`：即便不包含 YAML authoring surface token，也应该进入升级提示（例如输出格式/指纹变化）。
+        if (not has_non_breaking_marker) and re.search(r"\bbreaking\b", lower):
+            return True
+        if "破坏性" in text or "不兼容" in text or "不再支持" in text:
+            return True
 
         # “输出约束：移除 ...” 这类描述是输出格式约束，不是 `upgrade` 点。
         if "输出约束" in text and ("移除" in text or "删除" in text):
             return False
 
+        # 没有任何“用户可感知线索”的句子，通常不是“你要改什么”的 `upgrade` 点（避免 `refactor` 内部迁移误入）。
+        if not (has_surface_token or has_user_facing_hint):
+            return False
+
         # 触发词（严格依赖提案文本，不做代码推断）。
-        if re.search(r"\bbreaking\b", lower):
+        if (not has_non_breaking_marker) and re.search(r"\bbreaking\b", lower):
             return True
         if "破坏性" in text or "不兼容" in text or "不再支持" in text:
             return True
@@ -801,6 +812,21 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
     instructions: List[str] = []
     for cand in candidates:
         cleaned = _clean_inline_markers(cand)
+
+        # `derived outputs meta fingerprint` 迁移：明确告诉用户“要改什么/要更新什么基线”，避免落到低信息量兜底项。
+        fingerprint_hint = ("指纹" in cleaned) or ("fingerprint" in cleaned.lower())
+        if fingerprint_hint and (("40" in cleaned and "64" in cleaned) or ("sha1" in proposal_text.lower() and "sha256" in proposal_text.lower())):
+            if "sha1" in proposal_text.lower() and "sha256" in proposal_text.lower():
+                instructions.append("更新依赖 meta 指纹的审计/对拍基线：算法已从 SHA-1 改为 SHA-256，指纹长度 40→64。")
+            else:
+                instructions.append("更新依赖 meta 指纹格式的审计/对拍基线（长度已变化）。")
+            continue
+        if fingerprint_hint and ("基线" in cleaned or "对拍" in cleaned or "snapshot" in cleaned.lower()):
+            if "sha1" in proposal_text.lower() and "sha256" in proposal_text.lower():
+                instructions.append("更新依赖 meta 指纹的审计/对拍基线：算法已从 SHA-1 改为 SHA-256，指纹长度 40→64。")
+            else:
+                instructions.append("更新依赖 meta 指纹格式的审计/对拍基线（长度已变化）。")
+            continue
 
         # 版本化输出：最常见的升级点是“产物读取入口与路径语义变化”，这里直接抽成一条可执行指令。
         if (
@@ -1042,6 +1068,9 @@ def _score_change(change: _Change) -> int:
     # `output`/`outputs`/`aggregate` 都算“输出编写面”一类。
     if "outputs" in cid or "output" in cid or "aggregate" in cid or "derived-outputs" in cid:
         score += 30
+    # 稳定 public facade/shortcut（面向用户的 API 入口）通常比内部拆分细节更值得进 Highlights。
+    if change.keyword in ("resources-discovery", "public-api-surface-governance") or "output-discovery" in cid:
+        score += 120
     if "workflow" in cid:
         score += 80
     if "qa" in cid or "hardening" in cid:
@@ -1187,7 +1216,7 @@ def _render_notes(
         ]
 
     if not breaking_uniq:
-        breaking_uniq = ["无（没有需要改 YAML 的点）。"]
+        breaking_uniq = ["无（提案未提及不兼容/迁移点）。"]
 
     # 优先展示“你要改成什么”的迁移指令，其次再是“不要再用”的移除提示。
     if len(breaking_uniq) > 1:
