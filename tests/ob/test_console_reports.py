@@ -79,7 +79,12 @@ def test_relations_console_report_is_line_oriented(caplog) -> None:
 def test_performance_console_report_contains_summary_and_breakdown(caplog) -> None:
     logger = logging.getLogger("scalim.performance")
     observer = PerformanceObserver(
-        config=PerformanceConfig(metrics={"duration"}, report_format="console", include_details=True, logger=logger)
+        config=PerformanceConfig(
+            metrics={"duration"},
+            report_format="console",
+            include_loader_top_n=5,
+            logger=logger,
+        )
     )
 
     observer.on_pipeline_start(PipelineStartEvent(targets=["x"], batch_size=3))
@@ -125,7 +130,13 @@ def test_performance_presentation_render_summary_skips_zero_duration_stage() -> 
         stage_metrics=StageMetrics(loader_duration=1.0, compute_duration=0.0, write_duration=0.5),
     )
 
-    rendered = layer.render_summary(metrics, include_details=False)
+    rendered = layer.render_summary(
+        metrics,
+        include_loader_stats=False,
+        include_loader_top_n=0,
+        include_field_compute_top_n=0,
+        include_advisor_hints=False,
+    )
 
     assert "[scalim] performance:" in rendered
     assert "summary" in rendered
@@ -149,7 +160,10 @@ def test_performance_presentation_output_report_supports_csv(tmp_path) -> None: 
         metrics=metrics,
         report_format="csv",
         output_path=str(output_path),
-        include_details=False,
+        include_loader_stats=False,
+        include_loader_top_n=0,
+        include_field_compute_top_n=0,
+        include_advisor_hints=False,
         logger=logger,
     )
 
@@ -159,6 +173,9 @@ def test_performance_presentation_output_report_supports_csv(tmp_path) -> None: 
         metrics=metrics,
         report_format="unknown",
         output_path=str(output_path),
-        include_details=False,
+        include_loader_stats=False,
+        include_loader_top_n=0,
+        include_field_compute_top_n=0,
+        include_advisor_hints=False,
         logger=logger,
     )

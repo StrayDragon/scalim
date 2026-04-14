@@ -335,6 +335,28 @@ class StageSpanEvent:
 
 
 @dataclass(frozen=True)
+class OperatorSpanEvent:
+    """算子级别耗时事件(用于 `profiling`; 按需启用).
+
+    说明:
+    - 与 `StageSpanEvent` 不同,它用于更细粒度的 `operator-level profiling`.
+    - 运行时必须 `wants-gated`,默认关闭,避免在未启用时引入与算子数量成正比的开销.
+    """
+
+    operator_type: str
+    """算子类型(例如 `compute`)."""
+
+    field_key: Optional[str]
+    """字段键(仅对部分算子有意义;例如 `compute`)."""
+
+    batch_num: int
+    """批次编号."""
+
+    duration: float
+    """耗时(秒)."""
+
+
+@dataclass(frozen=True)
 class OutputTargetEndEvent:
     """输出目标结束统计事件.
 

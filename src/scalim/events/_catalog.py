@@ -15,6 +15,7 @@ from ._events import (
     LoaderCallEvent,
     LoaderRetryEvent,
     LoaderSlimEvent,
+    OperatorSpanEvent,
     OutputTargetEndEvent,
     PipelineEndEvent,
     PipelineStartEvent,
@@ -52,6 +53,7 @@ EVENT_LOADER_SLIM = "loader_slim"
 EVENT_COLUMN_WRITE = "column_write"
 EVENT_RELATION_LOOKUP = "relation_lookup"
 EVENT_STAGE_SPAN = "stage_span"
+EVENT_OPERATOR_SPAN = "operator_span"
 EVENT_ADAPTIVE_SCHEDULER_DECISION = "adaptive_scheduler_decision"
 EVENT_OUTPUT_TARGET_END = "output_target_end"
 
@@ -234,6 +236,14 @@ _EVENT_CATALOG: List[EventDescriptor] = [
         volume="lite",
         payload_policy="full",
         payload_type=StageSpanEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_OPERATOR_SPAN,
+        summary="operator 耗时",
+        key_fields=("operator_type", "field_key", "batch_num", "duration"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=OperatorSpanEvent.__name__,
     ),
     EventDescriptor(
         name=EVENT_ADAPTIVE_SCHEDULER_DECISION,

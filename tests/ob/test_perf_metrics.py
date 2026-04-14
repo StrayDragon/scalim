@@ -3,6 +3,7 @@ import json
 from scalim.ob.perf_metrics import (
     AdaptiveSchedulerMetrics,
     CpuSample,
+    FieldComputeStats,
     LoaderStats,
     MemorySample,
     PerformanceMetrics,
@@ -66,9 +67,32 @@ def test_loader_stats_to_dict() -> None:
     assert d["total_records"] == 10
 
 
+def test_loader_stats_to_dict_when_empty_has_no_percentiles() -> None:
+    stats = LoaderStats(name="empty")
+    d = stats.to_dict()
+    assert d["name"] == "empty"
+    assert "p50_s" not in d
+
+
+def test_loader_stats_to_dict_includes_stddev_for_multiple_calls() -> None:
+    stats = LoaderStats(name="loader2")
+    stats.record_call(0.1, 1, cache_status=None)
+    stats.record_call(0.3, 1, cache_status=None)
+    d = stats.to_dict()
+    assert "stddev_s" in d
+
+
+def test_field_compute_stats_to_dict_zero_calls() -> None:
+    stats = FieldComputeStats(field_key="field_x")
+    d = stats.to_dict()
+    assert d["total_duration"] == 0.0
+    assert d["avg_duration"] == 0.0
+
+
 def test_stage_metrics_to_dict() -> None:
     stages = StageMetrics(loader_duration=1.5, compute_duration=0.5, write_duration=0.3)
     d = stages.to_dict()
+    assert d["stream"] == 0.0
     assert d["loader"] == 1.5
     assert d["compute"] == 0.5
     assert d["write"] == 0.3
@@ -107,6 +131,13 @@ def test_performance_metrics_get_loader_stats() -> None:
 
     stats1.record_call(0.1, 10, cache_status=None)
     assert metrics.loader_stats["loader1"].call_count == 1
+
+
+def test_performance_metrics_get_field_compute_stats_is_idempotent() -> None:
+    metrics = PerformanceMetrics()
+    s1 = metrics.get_field_compute_stats("a")
+    s2 = metrics.get_field_compute_stats("a")
+    assert s1 is s2
 
 
 def test_loader_stats_cache_hit_rate_zero_denominator() -> None:
@@ -164,6 +195,13 @@ def test_performance_metrics_to_dict_with_adaptive_scheduler() -> None:
 
     d = metrics.to_dict()
     assert "adaptive_scheduler" in d
+
+
+def test_performance_metrics_to_dict_includes_field_compute_stats() -> None:
+    metrics = PerformanceMetrics()
+    metrics.field_compute_stats["a"] = FieldComputeStats(field_key="a")
+    d = metrics.to_dict()
+    assert "field_compute" in d
 
 
 def test_performance_metrics_to_json() -> None:

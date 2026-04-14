@@ -9,8 +9,9 @@ import time
 from concurrent.futures import Executor
 from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
 
+from ....events import EVENT_OPERATOR_SPAN
+from ....planning.operators import ComputeOperatorIr, OperatorType, SupportedOperatorIr
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
-from ....planning.operators import OperatorType, SupportedOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks import ISink
 from ....typedefs import FieldValue, RowData
@@ -121,6 +122,7 @@ class BatchExecutor:
         after_operator: Optional[Callable[[object], None]],
     ) -> Optional[Dict[str, float]]:
         wants_stage_spans, stage_durations, stage_map = init_stage_span_tracking(runtime)
+        wants_operator_spans = runtime.instrumentation.wants(EVENT_OPERATOR_SPAN)
 
         resolved_workers = 1
         if runtime.parallel_mode == "adaptive":
@@ -164,11 +166,22 @@ class BatchExecutor:
 
             if executor:
                 stage = stage_map.get(operator.operator_type)
-                if wants_stage_spans and stage:
+                wants_compute_span = wants_operator_spans and operator.operator_type == OperatorType.COMPUTE.value
+                if (wants_stage_spans and stage) or wants_compute_span:
                     perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
                     start = perf_counter()
                     executor.execute(operator, context, batch_row_nth, runtime)
-                    stage_durations[stage] += max(0.0, perf_counter() - start)
+                    duration = max(0.0, perf_counter() - start)
+                    if wants_stage_spans and stage:
+                        stage_durations[stage] += duration
+                    if wants_compute_span:
+                        compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
+                        runtime.instrumentation.emit_operator_span(
+                            operator_type=OperatorType.COMPUTE.value,
+                            field_key=str(compute_op.field_key),
+                            batch_num=int(runtime.batch_num),
+                            duration=float(duration),
+                        )
                 else:
                     executor.execute(operator, context, batch_row_nth, runtime)
 

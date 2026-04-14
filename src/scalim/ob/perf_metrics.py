@@ -1,6 +1,7 @@
 # region imports
 
 import json
+import statistics
 from typing import Any, Dict, List, Optional
 
 from ..events._events import AdaptiveSchedulerDecisionEvent
@@ -102,6 +103,15 @@ class LoaderStats:
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = asdict(self)
         result.pop("durations", None)
+        if self.durations:
+            sorted_durations = sorted(float(x) for x in self.durations)
+            n = len(sorted_durations)
+            p50_idx = round(0.5 * (n - 1))
+            p90_idx = round(0.9 * (n - 1))
+            result["p50_s"] = round(float(sorted_durations[max(0, min(n - 1, p50_idx))]), 4)
+            result["p90_s"] = round(float(sorted_durations[max(0, min(n - 1, p90_idx))]), 4)
+            if n > 1:
+                result["stddev_s"] = round(float(statistics.pstdev(sorted_durations)), 4)
         result["cache_hit_rate"] = round(self.cache_hit_rate, 4)
         result["total_duration"] = round(self.total_duration, 4)
         result["avg_duration"] = round(self.avg_duration, 4)
@@ -111,8 +121,37 @@ class LoaderStats:
 
 
 @dataclass
+class FieldComputeStats:
+    field_key: str
+    call_count: int = 0
+    total_duration: float = 0.0
+    durations: List[float] = field(default_factory=list)
+
+    def record_call(self, duration: float) -> None:
+        self.call_count += 1
+        self.total_duration += float(duration)
+        self.durations.append(float(duration))
+
+    @property
+    def avg_duration(self) -> float:
+        if self.call_count == 0:
+            return 0.0
+        return self.total_duration / self.call_count
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = asdict(self)
+        result.pop("durations", None)
+        result["total_duration"] = round(self.total_duration, 4)
+        result["avg_duration"] = round(self.avg_duration, 4)
+        return result
+
+
+@dataclass
 class StageMetrics:
     """跨批次汇总的各阶段实际耗时."""
+
+    stream_duration: float = 0.0
+    """主表 `streaming` 阶段累计耗时(秒)."""
 
     loader_duration: float = 0.0
     compute_duration: float = 0.0
@@ -121,6 +160,7 @@ class StageMetrics:
     def to_dict(self) -> Dict[str, float]:
         result = asdict(self)
         return {
+            "stream": round(result["stream_duration"], 4),
             "loader": round(result["loader_duration"], 4),
             "compute": round(result["compute_duration"], 4),
             "write": round(result["write_duration"], 4),
@@ -236,6 +276,9 @@ class PerformanceMetrics:
     loader_stats: Dict[str, LoaderStats] = field(default_factory=dict)
     """按加载器汇总的统计信息(`loader_name` -> `LoaderStats`)."""
 
+    field_compute_stats: Dict[str, FieldComputeStats] = field(default_factory=dict)
+    """可选:按字段汇总的 `compute` 耗时 `profiling`(`field_key` -> `FieldComputeStats`)."""
+
     memory_samples: Optional[List[MemorySample]] = None
     """可选:内存采样列表."""
 
@@ -289,6 +332,11 @@ class PerformanceMetrics:
             self.loader_stats[loader_name] = LoaderStats(name=loader_name)
         return self.loader_stats[loader_name]
 
+    def get_field_compute_stats(self, field_key: str) -> FieldComputeStats:
+        if field_key not in self.field_compute_stats:
+            self.field_compute_stats[field_key] = FieldComputeStats(field_key=field_key)
+        return self.field_compute_stats[field_key]
+
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {
             "summary": {
@@ -307,6 +355,9 @@ class PerformanceMetrics:
             "stages": self.stage_metrics.to_dict(),
             "loaders": {name: stats.to_dict() for name, stats in self.loader_stats.items()},
         }
+
+        if self.field_compute_stats:
+            result["field_compute"] = {k: v.to_dict() for k, v in self.field_compute_stats.items()}
 
         if self.memory_samples is not None:
             result["memory"] = {
@@ -348,6 +399,7 @@ class PerformanceMetrics:
 __all__ = (
     "AdaptiveSchedulerMetrics",
     "CpuSample",
+    "FieldComputeStats",
     "LoaderStats",
     "MemorySample",
     "PerformanceMetrics",

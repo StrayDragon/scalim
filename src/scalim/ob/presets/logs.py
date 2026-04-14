@@ -22,6 +22,7 @@ from ...events._events import (
 )
 from .._internal.console_report import build_line, format_seconds
 from ..observer import EventDispatchObserver
+from ..structured_logging import emit_structured, is_jsonl_logging_installed
 
 # endregion
 
@@ -56,19 +57,67 @@ class LoggingObserver(EventDispatchObserver):
         self.logger = logger
 
     def on_pipeline_start(self, event: PipelineStartEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.INFO,
+                kind="pipeline.start",
+                message="pipeline_start",
+                fields={
+                    "target_fields": len(event.targets),
+                    "batch_size": event.batch_size,
+                },
+            )
+            return
         batch_size_text = "all" if event.batch_size is None else str(event.batch_size)
         kv = format_kv(target_fields=len(event.targets), batch_size=batch_size_text)
         self.logger.info("%s管道启动 %s", prefix("pipeline"), kv)
 
     def on_pipeline_end(self, event: PipelineEndEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.INFO,
+                kind="pipeline.end",
+                message="pipeline_end",
+                fields={
+                    "batches": int(event.total_batches),
+                    "total_duration_s": float(event.total_duration),
+                },
+            )
+            return
         kv = format_kv(batches=event.total_batches, total_duration_s="{:.2f}".format(float(event.total_duration)))
         self.logger.info("%s管道完成 %s", prefix("pipeline"), kv)
 
     def on_batch_start(self, event: BatchStartEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.INFO,
+                kind="pipeline.batch_start",
+                message="batch_start",
+                fields={
+                    "batch_num": int(event.batch_num),
+                    "row_count": len(event.row_ids),
+                },
+            )
+            return
         kv = format_kv(batch_num=event.batch_num, row_count=len(event.row_ids))
         self.logger.info("%s批次开始 %s", prefix("pipeline"), kv)
 
     def on_batch_end(self, event: BatchEndEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.INFO,
+                kind="pipeline.batch_end",
+                message="batch_end",
+                fields={
+                    "batch_num": int(event.batch_num),
+                    "duration_s": float(event.duration),
+                },
+            )
+            return
         kv = format_kv(batch_num=event.batch_num, duration_s="{:.2f}".format(float(event.duration)))
         self.logger.info("%s批次完成 %s", prefix("pipeline"), kv)
 
@@ -84,6 +133,21 @@ class LoggingObserver(EventDispatchObserver):
             if event.field_keys:
                 cache_fields = ",".join(event.field_keys)
             cache_status = str(event.cache_status)
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.INFO,
+                kind="pipeline.loader_call",
+                message="loader_call",
+                fields={
+                    "loader_name": str(event.loader_name),
+                    "result_count": int(result_size),
+                    "duration_s": float(event.duration),
+                    "cache_status": cache_status,
+                    "cache_fields": cache_fields,
+                },
+            )
+            return
         kv = format_kv(
             loader_name=event.loader_name,
             result_count=int(result_size),
@@ -94,16 +158,56 @@ class LoggingObserver(EventDispatchObserver):
         self.logger.info("%s加载 %s", prefix("pipeline"), kv)
 
     def on_field_compute(self, event: FieldComputeEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.DEBUG,
+                kind="pipeline.field_compute",
+                message="field_compute",
+                fields={
+                    "field_key": str(event.field_key),
+                    "row_id": event.row_id,
+                    "result": event.result,
+                },
+            )
+            return
         kv = format_kv(field_key=event.field_key, row_id=event.row_id, result=event.result)
         self.logger.debug("%s计算 %s", prefix("pipeline"), kv)
 
     def on_error(self, event: ErrorEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.ERROR,
+                kind="pipeline.error",
+                message="error",
+                fields={
+                    "error_type": str(event.error_type),
+                    "error_message": str(event.error_message),
+                },
+            )
+            return
         self.logger.error("%s错误[%s]: %s", prefix("pipeline"), str(event.error_type), str(event.error_message))
         if event.context:
             for key, ctx_value in event.context.items():
                 self.logger.error("%s  %s: %s", prefix("pipeline"), key, ctx_value)
 
     def on_diagnostic_warning(self, event: DiagnosticWarningEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.WARNING,
+                kind="pipeline.diagnostic_warning",
+                message="diagnostic_warning",
+                fields={
+                    "warning_message": str(event.message),
+                    "source_id": str(event.source_id),
+                    "field_id": str(event.field_id),
+                    "row_id": event.row_id,
+                    "lookup_key": event.lookup_key,
+                },
+            )
+            return
         kv = format_kv(
             message=event.message,
             source_id=event.source_id,
@@ -114,14 +218,51 @@ class LoggingObserver(EventDispatchObserver):
         self.logger.warning("%s诊断警告 %s", prefix("pipeline"), kv)
 
     def on_field_slim(self, event: FieldSlimEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.DEBUG,
+                kind="pipeline.field_slim",
+                message="field_slim",
+                fields={
+                    "field_key": str(event.field_key),
+                    "reason": str(event.reason),
+                },
+            )
+            return
         kv = format_kv(field_key=event.field_key, reason=event.reason)
         self.logger.debug("%s字段瘦身 %s", prefix("pipeline"), kv)
 
     def on_row_write(self, event: RowWriteEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.DEBUG,
+                kind="pipeline.row_write",
+                message="row_write",
+                fields={
+                    "row_id": event.row_id,
+                    "field_count": int(event.field_count),
+                },
+            )
+            return
         kv = format_kv(row_id=event.row_id, field_count=event.field_count)
         self.logger.debug("%s写入行 %s", prefix("pipeline"), kv)
 
     def on_row_release(self, event: RowReleaseEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.DEBUG,
+                kind="pipeline.row_release",
+                message="row_release",
+                fields={
+                    "row_id": event.row_id,
+                    "released_count": len(event.released_fields),
+                    "retained_count": len(event.retained_fields),
+                },
+            )
+            return
         kv = format_kv(
             row_id=event.row_id,
             released_count=len(event.released_fields),
@@ -130,10 +271,35 @@ class LoggingObserver(EventDispatchObserver):
         self.logger.debug("%s释放行 %s", prefix("pipeline"), kv)
 
     def on_loader_slim(self, event: LoaderSlimEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.DEBUG,
+                kind="pipeline.loader_slim",
+                message="loader_slim",
+                fields={
+                    "loader_name": str(event.loader_name),
+                    "original_keys": int(event.original_keys),
+                    "extracted_fields": list(event.extracted_fields) if event.extracted_fields else None,
+                },
+            )
+            return
         kv = format_kv(loader_name=event.loader_name, original_keys=event.original_keys)
         self.logger.debug("%s加载器瘦身 %s", prefix("pipeline"), kv)
 
     def on_column_write(self, event: ColumnWriteEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                self.logger,
+                level=logging.DEBUG,
+                kind="pipeline.column_write",
+                message="column_write",
+                fields={
+                    "field_key": str(event.field_key),
+                    "row_count": int(event.row_count),
+                },
+            )
+            return
         kv = format_kv(field_key=event.field_key, row_count=event.row_count)
         self.logger.debug("%s写入列 %s", prefix("pipeline"), kv)
 
@@ -156,6 +322,16 @@ class PrettyLoggingObserver(EventDispatchObserver):
           会导致输出无法被当前用例捕获.
         - 若用户已自行向 `scalim.pretty` 绑定同名 `handler`,则优先复用该 `handler`,避免覆盖/重复输出.
         """
+
+        if is_jsonl_logging_installed():
+            owned_handler = _pretty_stdout_handler_slot.handler if _pretty_stdout_handler_slot.owned else None
+            if owned_handler is not None and owned_handler in _PRETTY_LOGGER.handlers:
+                _PRETTY_LOGGER.removeHandler(owned_handler)
+            _pretty_stdout_handler_slot.handler = None
+            _pretty_stdout_handler_slot.owned = False
+            _PRETTY_LOGGER.setLevel(logging.INFO)
+            _PRETTY_LOGGER.propagate = True
+            return
 
         fmt = logging.Formatter("%(message)s")
 
@@ -192,6 +368,18 @@ class PrettyLoggingObserver(EventDispatchObserver):
         batch_size_text = "all" if event.batch_size is None else str(event.batch_size)
         self._loader_stats = {}
         self._total_rows = 0
+        if is_jsonl_logging_installed():
+            emit_structured(
+                _PRETTY_LOGGER,
+                level=logging.INFO,
+                kind="pretty.pipeline_start",
+                message="pipeline_start",
+                fields={
+                    "target_fields": len(event.targets),
+                    "batch_size": event.batch_size,
+                },
+            )
+            return
         _PRETTY_LOGGER.info(
             "%s",
             build_line("pretty", "pipeline_start", target_fields=len(event.targets), batch_size=str(batch_size_text)),
@@ -199,16 +387,29 @@ class PrettyLoggingObserver(EventDispatchObserver):
 
     def on_pipeline_end(self, event: PipelineEndEvent) -> None:
         _ = event
-        _PRETTY_LOGGER.info(
-            "%s",
-            build_line(
-                "pretty",
-                "pipeline_end",
-                batches=int(event.total_batches),
-                total_duration_s=format_seconds(float(event.total_duration), digits=2),
-                total_rows=int(self._total_rows),
-            ),
-        )
+        if is_jsonl_logging_installed():
+            emit_structured(
+                _PRETTY_LOGGER,
+                level=logging.INFO,
+                kind="pretty.pipeline_end",
+                message="pipeline_end",
+                fields={
+                    "batches": int(event.total_batches),
+                    "total_duration_s": float(event.total_duration),
+                    "total_rows": int(self._total_rows),
+                },
+            )
+        else:
+            _PRETTY_LOGGER.info(
+                "%s",
+                build_line(
+                    "pretty",
+                    "pipeline_end",
+                    batches=int(event.total_batches),
+                    total_duration_s=format_seconds(float(event.total_duration), digits=2),
+                    total_rows=int(self._total_rows),
+                ),
+            )
 
         if self._loader_stats:
             for name in sorted(self._loader_stats.keys()):
@@ -216,25 +417,54 @@ class PrettyLoggingObserver(EventDispatchObserver):
                 calls = int(stats.get("calls") or 0)
                 total_duration = float(stats.get("total_duration") or 0.0)
                 avg_time = (total_duration / calls) if calls else 0.0
-                _PRETTY_LOGGER.info(
-                    "%s",
-                    build_line(
-                        "pretty",
-                        "loader",
-                        loader=str(name),
-                        calls=int(calls),
-                        records=int(stats.get("records") or 0),
-                        total_duration_s=format_seconds(total_duration, digits=3),
-                        avg_time_s=format_seconds(avg_time, digits=4),
-                        cache_hit=int(stats.get("cache_hit") or 0) or None,
-                        cache_miss=int(stats.get("cache_miss") or 0) or None,
-                    ),
-                )
+                if is_jsonl_logging_installed():
+                    emit_structured(
+                        _PRETTY_LOGGER,
+                        level=logging.INFO,
+                        kind="pretty.loader",
+                        message="loader",
+                        fields={
+                            "loader_name": str(name),
+                            "calls": int(calls),
+                            "records": int(stats.get("records") or 0),
+                            "total_duration_s": float(total_duration),
+                            "avg_duration_s": float(avg_time),
+                            "cache_hit": int(stats.get("cache_hit") or 0) or None,
+                            "cache_miss": int(stats.get("cache_miss") or 0) or None,
+                        },
+                    )
+                else:
+                    _PRETTY_LOGGER.info(
+                        "%s",
+                        build_line(
+                            "pretty",
+                            "loader",
+                            loader=str(name),
+                            calls=int(calls),
+                            records=int(stats.get("records") or 0),
+                            total_duration_s=format_seconds(total_duration, digits=3),
+                            avg_time_s=format_seconds(avg_time, digits=4),
+                            cache_hit=int(stats.get("cache_hit") or 0) or None,
+                            cache_miss=int(stats.get("cache_miss") or 0) or None,
+                        ),
+                    )
 
     def on_batch_start(self, event: BatchStartEvent) -> None:
         self._total_rows += len(event.row_ids)
 
     def on_batch_end(self, event: BatchEndEvent) -> None:
+        if is_jsonl_logging_installed():
+            emit_structured(
+                _PRETTY_LOGGER,
+                level=logging.INFO,
+                kind="pretty.batch_end",
+                message="batch_end",
+                fields={
+                    "batch_num": int(event.batch_num),
+                    "duration_s": float(event.duration),
+                },
+            )
+            return
         _PRETTY_LOGGER.info(
             "%s",
             build_line(

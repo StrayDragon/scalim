@@ -305,6 +305,70 @@ def test_pipeline_iter_row_batches_batch_size_none_empty_rows_yields_nothing() -
     assert list(pipeline._iter_row_batches([])) == []
 
 
+def test_pipeline_iter_row_batches_emits_stream_duration_only_when_stage_spans_wanted() -> None:
+    from scalim.events import EVENT_STAGE_SPAN
+    from scalim.ob.observer import Observer
+
+    class _Clock:
+        def __init__(self) -> None:
+            self.t = 0.0
+
+        def now(self) -> float:
+            return float(self.t)
+
+        def advance(self, dt: float) -> None:
+            self.t += float(dt)
+
+    clock = _Clock()
+
+    def _chunk_with_cost(iterable, chunk_size):  # type: ignore[no-untyped-def]
+        it = iter(iterable)
+
+        class _Iter:
+            def __iter__(self):  # type: ignore[no-untyped-def]
+                return self
+
+            def __next__(self):  # type: ignore[no-untyped-def]
+                batch = []
+                for _ in range(int(chunk_size)):
+                    try:
+                        batch.append(next(it))
+                    except StopIteration:
+                        break
+                if not batch:
+                    raise StopIteration
+                # simulate "streaming wall time per batch" without sleeping
+                clock.advance(0.5)
+                return batch
+
+        return _Iter()
+
+    overrides = PipelineOverrides(chunk_iterable=_chunk_with_cost, stage_perf_counter_fn=clock.now)
+    main_source = _make_main_source()
+    demand = DemandIr.from_irs(sources=[], fields=[], main_source=main_source)
+    plan = _make_plan({}, [])
+    pipeline = _make_pipeline(plan, demand, main_source, overrides=overrides)
+
+    # not wanted -> no timing
+    items = list(pipeline._iter_row_batches([{"id": 1}, {"id": 2}, {"id": 3}]))
+    assert len(items) == 2
+    assert items[0][2] is None
+    assert items[1][2] is None
+
+    class _WantsStageSpans(Observer):
+        event_types = {EVENT_STAGE_SPAN}
+
+        def on_event(self, event):  # type: ignore[override,no-untyped-def]
+            _ = event
+
+    pipeline.observer_manager.register(_WantsStageSpans())
+
+    items2 = list(pipeline._iter_row_batches([{"id": 1}, {"id": 2}, {"id": 3}]))
+    assert len(items2) == 2
+    assert items2[0][2] == pytest.approx(0.5)
+    assert items2[1][2] == pytest.approx(0.5)
+
+
 def test_adaptive_pipeline_uses_overridden_adaptive_executor_cls() -> None:
     class _TrackingThreadPoolExecutor(concurrent_futures.ThreadPoolExecutor):
         created: int = 0

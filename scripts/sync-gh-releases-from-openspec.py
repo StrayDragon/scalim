@@ -741,7 +741,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             if "不再支持" not in text and "移除" not in text and "删除" not in text:
                 return False
 
-        # 明确 `BREAKING`：即便不包含 YAML authoring surface token，也应该进入升级提示（例如输出格式/指纹变化）。
+        # 明确 `BREAKING`：即便不包含 `YAML authoring surface token`，也应该进入升级提示（例如输出格式/指纹变化）。
         if (not has_non_breaking_marker) and re.search(r"\bbreaking\b", lower):
             return True
         if "破坏性" in text or "不兼容" in text or "不再支持" in text:
@@ -815,7 +815,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
 
         # `derived outputs meta fingerprint` 迁移：明确告诉用户“要改什么/要更新什么基线”，避免落到低信息量兜底项。
         fingerprint_hint = ("指纹" in cleaned) or ("fingerprint" in cleaned.lower())
-        if fingerprint_hint and (("40" in cleaned and "64" in cleaned) or ("sha1" in proposal_text.lower() and "sha256" in proposal_text.lower())):
+        if fingerprint_hint and (
+            ("40" in cleaned and "64" in cleaned) or ("sha1" in proposal_text.lower() and "sha256" in proposal_text.lower())
+        ):
             if "sha1" in proposal_text.lower() and "sha256" in proposal_text.lower():
                 instructions.append("更新依赖 meta 指纹的审计/对拍基线：算法已从 SHA-1 改为 SHA-256，指纹长度 40→64。")
             else:
@@ -1068,7 +1070,7 @@ def _score_change(change: _Change) -> int:
     # `output`/`outputs`/`aggregate` 都算“输出编写面”一类。
     if "outputs" in cid or "output" in cid or "aggregate" in cid or "derived-outputs" in cid:
         score += 30
-    # 稳定 public facade/shortcut（面向用户的 API 入口）通常比内部拆分细节更值得进 Highlights。
+    # 稳定 `public facade/shortcut`（面向用户的 `API` 入口）通常比内部拆分细节更值得进 `Highlights`。
     if change.keyword in ("resources-discovery", "public-api-surface-governance") or "output-discovery" in cid:
         score += 120
     if "workflow" in cid:

@@ -12,6 +12,7 @@ from scalim.events._events import (
     ColumnWriteEvent,
     FieldComputeEvent,
     LoaderCallEvent,
+    OperatorSpanEvent,
     PipelineEndEvent,
     PipelineStartEvent,
     RowWriteEvent,
@@ -25,6 +26,7 @@ from scalim.events import (
     EVENT_ERROR,
     EVENT_FIELD_SLIM,
     EVENT_LOADER_CALL,
+    EVENT_OPERATOR_SPAN,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
     EVENT_ROW_RELEASE,
@@ -182,7 +184,7 @@ def test_performance_observer_console_output(plan_builder, engine_factory, examp
         plan_builder,
         engine_factory,
         report_format="console",
-        include_details=True,
+        include_loader_top_n=5,
         logger=logger,
     )
 
@@ -199,7 +201,7 @@ def test_performance_observer_print_summary_details(caplog) -> None:
     config = PerformanceConfig(
         metrics={"duration"},
         report_format="console",
-        include_details=True,
+        include_loader_stats=True,
         logger=logger,
     )
     observer = PerformanceObserver(config=config)
@@ -322,12 +324,47 @@ def test_performance_config_full() -> None:
     assert "duration" in config.metrics
     assert "memory" in config.metrics
     assert "cpu" in config.metrics
-    assert config.include_details is True
+    assert config.include_batch_lines is True
+    assert config.include_loader_stats is True
 
 
 def test_performance_observer_default_config() -> None:
     observer = PerformanceObserver()
     assert "duration" in observer.config.metrics
+
+
+def test_performance_observer_event_types_include_operator_span_when_enabled() -> None:
+    logger = logging.getLogger("scalim.tests.operator_span")
+    disabled = PerformanceObserver(
+        config=PerformanceConfig(metrics={"duration"}, report_format="none", include_field_compute_top_n=0, logger=logger)
+    )
+    assert EVENT_OPERATOR_SPAN not in (disabled.event_types or set())
+
+    enabled = PerformanceObserver(
+        config=PerformanceConfig(metrics={"duration"}, report_format="none", include_field_compute_top_n=3, logger=logger)
+    )
+    assert EVENT_OPERATOR_SPAN in (enabled.event_types or set())
+
+
+def test_performance_observer_field_compute_profiling_reports_top(caplog) -> None:
+    logger = logging.getLogger("scalim.tests.field_top")
+    observer = PerformanceObserver(
+        config=PerformanceConfig(
+            metrics={"duration"},
+            report_format="console",
+            include_field_compute_top_n=2,
+            logger=logger,
+        )
+    )
+
+    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=2))
+    observer.on_operator_span(OperatorSpanEvent(operator_type="compute", field_key="a", batch_num=1, duration=0.2))
+    observer.on_operator_span(OperatorSpanEvent(operator_type="compute", field_key="b", batch_num=1, duration=0.1))
+
+    with caplog.at_level(logging.INFO, logger=logger.name):
+        observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.5))
+
+    assert any("field_top" in record.getMessage() for record in caplog.records)
 
 
 def test_performance_observer_warns_when_psutil_missing(monkeypatch) -> None:
@@ -399,7 +436,7 @@ def test_performance_observer_memory_threshold_warning(caplog) -> None:
 
 def test_performance_observer_details_and_events(caplog) -> None:
     logger = logging.getLogger("scalim.tests.details")
-    config = PerformanceConfig(metrics={"duration"}, report_format="console", include_details=True, logger=logger)
+    config = PerformanceConfig(metrics={"duration"}, report_format="console", include_batch_lines=True, logger=logger)
     observer = PerformanceObserver(config=config)
     observer.config.metrics = {"duration", "memory", "cpu"}
     observer._has_psutil = True

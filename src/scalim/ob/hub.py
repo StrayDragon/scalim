@@ -14,6 +14,7 @@ from ..events import (
     EVENT_LOADER_CALL,
     EVENT_LOADER_RETRY,
     EVENT_LOADER_SLIM,
+    EVENT_OPERATOR_SPAN,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
     EVENT_RELATION_LOOKUP,
@@ -33,6 +34,7 @@ from ..events._events import (
     LoaderCallEvent,
     LoaderRetryEvent,
     LoaderSlimEvent,
+    OperatorSpanEvent,
     PipelineEndEvent,
     PipelineStartEvent,
     RelationLookupEvent,
@@ -433,6 +435,25 @@ class InstrumentationHub:
         if not self.wants(EVENT_STAGE_SPAN):
             return
         _ = self._emit_assume_wanted(EVENT_STAGE_SPAN, StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration), meta=meta)
+
+    def emit_operator_span(
+        self,
+        operator_type: str,
+        *,
+        field_key: Optional[str],
+        batch_num: int,
+        duration: float,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if not self.wants(EVENT_OPERATOR_SPAN):
+            return
+        payload = OperatorSpanEvent(
+            operator_type=str(operator_type),
+            field_key=str(field_key) if field_key is not None else None,
+            batch_num=int(batch_num),
+            duration=float(duration),
+        )
+        _ = self._emit_assume_wanted(EVENT_OPERATOR_SPAN, payload, meta=meta)
 
 
 __all__ = ("InstrumentationHub",)

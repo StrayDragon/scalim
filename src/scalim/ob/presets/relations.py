@@ -15,6 +15,7 @@ from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import asdict, dataclass, field
 from .._internal.console_report import emit_info, emit_warning, format_percent
 from ..observer import EventDispatchObserver
+from ..structured_logging import emit_structured, is_jsonl_logging_installed
 
 # endregion
 
@@ -115,6 +116,7 @@ class RelationConfig:
 class RelationObserver(EventDispatchObserver):
     config: RelationConfig
     metrics: RelationMetrics
+    _reported: bool
 
     def __init__(
         self,
@@ -124,6 +126,7 @@ class RelationObserver(EventDispatchObserver):
             config = RelationConfig.default()
         self.config = config
         self.metrics = RelationMetrics()
+        self._reported = False
 
     def on_relation_lookup(self, event: RelationLookupEvent) -> None:  # noqa: C901
         if not self.config.enabled:
@@ -163,15 +166,29 @@ class RelationObserver(EventDispatchObserver):
 
         if event.result == "type_error":
             if self.config.log_type_mismatch:
-                emit_warning(
-                    self.config.logger,
-                    "relations",
-                    "type_error",
-                    row_id=event.row_id,
-                    fk_raw=event.fk_raw,
-                    target_source=event.target_source,
-                    error=event.error_message,
-                )
+                if is_jsonl_logging_installed():
+                    emit_structured(
+                        self.config.logger,
+                        level=logging.WARNING,
+                        kind="relations.type_error",
+                        message="relations.type_error",
+                        fields={
+                            "row_id": event.row_id,
+                            "fk_raw": event.fk_raw,
+                            "target_source": str(event.target_source),
+                            "error_message": str(event.error_message) if event.error_message is not None else None,
+                        },
+                    )
+                else:
+                    emit_warning(
+                        self.config.logger,
+                        "relations",
+                        "type_error",
+                        row_id=event.row_id,
+                        fk_raw=event.fk_raw,
+                        target_source=event.target_source,
+                        error=event.error_message,
+                    )
             if len(m.type_mismatch_samples) < self.config.max_samples:
                 m.type_mismatch_samples.append(sample)
         elif len(m.samples) < self.config.max_samples:
@@ -211,54 +228,116 @@ class RelationObserver(EventDispatchObserver):
     def on_pipeline_end(self, event: Any) -> None:
         _ = event
         self._output_report()
+        self._reported = True
 
     def print_summary(self) -> None:
         m = self.metrics
         logger = self.config.logger
 
-        emit_info(
-            logger,
-            "relations",
-            "summary",
-            total_lookups=int(m.total_lookups),
-            hits=int(m.hit_count),
-            misses=int(m.miss_count),
-            null_keys=int(m.null_key_count),
-            type_errors=int(m.type_mismatch_count),
-            hit_rate=format_percent(m.hit_rate, digits=2),
-        )
+        if is_jsonl_logging_installed():
+            emit_structured(
+                logger,
+                level=logging.INFO,
+                kind="relations.summary",
+                message="relations.summary",
+                fields={
+                    "total_lookups": int(m.total_lookups),
+                    "hit_count": int(m.hit_count),
+                    "miss_count": int(m.miss_count),
+                    "null_key_count": int(m.null_key_count),
+                    "type_mismatch_count": int(m.type_mismatch_count),
+                    "hit_rate": float(m.hit_rate),
+                },
+            )
+        else:
+            emit_info(
+                logger,
+                "relations",
+                "summary",
+                total_lookups=int(m.total_lookups),
+                hits=int(m.hit_count),
+                misses=int(m.miss_count),
+                null_keys=int(m.null_key_count),
+                type_errors=int(m.type_mismatch_count),
+                hit_rate=format_percent(m.hit_rate, digits=2),
+            )
 
         if m.per_source_stats:
             for source_id in sorted(m.per_source_stats.keys()):
                 stats = m.per_source_stats[source_id]
-                emit_info(
-                    logger,
-                    "relations",
-                    "per_source",
-                    source=str(source_id),
-                    total=int(stats.total_lookups),
-                    hits=int(stats.hit_count),
-                    misses=int(stats.miss_count),
-                    null_keys=int(stats.null_key_count),
-                    type_errors=int(stats.type_mismatch_count),
-                    hit_rate=format_percent(stats.hit_rate, digits=2),
-                )
+                if is_jsonl_logging_installed():
+                    emit_structured(
+                        logger,
+                        level=logging.INFO,
+                        kind="relations.per_source",
+                        message="relations.per_source",
+                        fields={
+                            "target_source": str(source_id),
+                            "total_lookups": int(stats.total_lookups),
+                            "hit_count": int(stats.hit_count),
+                            "miss_count": int(stats.miss_count),
+                            "null_key_count": int(stats.null_key_count),
+                            "type_mismatch_count": int(stats.type_mismatch_count),
+                            "hit_rate": float(stats.hit_rate),
+                        },
+                    )
+                else:
+                    emit_info(
+                        logger,
+                        "relations",
+                        "per_source",
+                        source=str(source_id),
+                        total=int(stats.total_lookups),
+                        hits=int(stats.hit_count),
+                        misses=int(stats.miss_count),
+                        null_keys=int(stats.null_key_count),
+                        type_errors=int(stats.type_mismatch_count),
+                        hit_rate=format_percent(stats.hit_rate, digits=2),
+                    )
 
         if m.type_mismatch_samples:
             showing = min(5, len(m.type_mismatch_samples))
-            emit_info(logger, "relations", "type_mismatch_samples", total=len(m.type_mismatch_samples), showing=int(showing))
-            for sample in m.type_mismatch_samples[:showing]:
-                emit_info(
+            if is_jsonl_logging_installed():
+                emit_structured(
                     logger,
-                    "relations",
-                    "type_mismatch_sample",
-                    row_id=sample.row_id,
-                    fk_raw=sample.fk_raw,
-                    fk_type=sample.fk_type,
-                    expected_type=sample.expected_type,
-                    target_source=sample.target_source,
-                    error=sample.error_message,
+                    level=logging.INFO,
+                    kind="relations.type_mismatch_samples",
+                    message="relations.type_mismatch_samples",
+                    fields={
+                        "type_mismatch_count": len(m.type_mismatch_samples),
+                        "showing": int(showing),
+                    },
                 )
+            else:
+                emit_info(logger, "relations", "type_mismatch_samples", total=len(m.type_mismatch_samples), showing=int(showing))
+            for sample in m.type_mismatch_samples[:showing]:
+                if is_jsonl_logging_installed():
+                    emit_structured(
+                        logger,
+                        level=logging.INFO,
+                        kind="relations.type_mismatch_sample",
+                        message="relations.type_mismatch_sample",
+                        fields={
+                            "row_id": sample.row_id,
+                            "fk_raw": sample.fk_raw,
+                            "fk_type": sample.fk_type,
+                            "expected_type": sample.expected_type,
+                            "target_source": sample.target_source,
+                            "error_message": sample.error_message,
+                        },
+                    )
+                else:
+                    emit_info(
+                        logger,
+                        "relations",
+                        "type_mismatch_sample",
+                        row_id=sample.row_id,
+                        fk_raw=sample.fk_raw,
+                        fk_type=sample.fk_type,
+                        expected_type=sample.expected_type,
+                        target_source=sample.target_source,
+                        error=sample.error_message,
+                    )
 
     def _write_json_report(self) -> None:
         output_path = self.config.output_path
@@ -289,10 +368,14 @@ class RelationObserver(EventDispatchObserver):
 
     @override
     def close(self) -> None:
+        if self._reported:
+            return
         self._output_report()
+        self._reported = True
 
     def reset(self) -> None:
         self.metrics = RelationMetrics()
+        self._reported = False
 
 
 __all__ = (

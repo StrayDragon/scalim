@@ -1,6 +1,7 @@
 import argparse
 from typing import List, Optional
 
+from . import log as log_cmd
 from . import yaml_dsl
 
 
@@ -14,6 +15,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.set_defaults(func=_show_help)
     subparsers = parser.add_subparsers(dest="command")
     yaml_dsl.register(subparsers)
+    log_cmd.register(subparsers)
     return parser
 
 

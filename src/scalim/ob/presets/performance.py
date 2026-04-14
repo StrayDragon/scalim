@@ -12,6 +12,7 @@ from ...events import (
     EVENT_BATCH_END,
     EVENT_BATCH_START,
     EVENT_LOADER_CALL,
+    EVENT_OPERATOR_SPAN,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
     EVENT_STAGE_SPAN,
@@ -23,6 +24,7 @@ from ...events._events import (
     ColumnWriteEvent,
     FieldComputeEvent,
     LoaderCallEvent,
+    OperatorSpanEvent,
     PipelineEndEvent,
     PipelineStartEvent,
     RowWriteEvent,
@@ -33,6 +35,7 @@ from ...vendor.compact.importlibx import import_module
 from ...vendor.dataclassesx import dataclass, field
 from ..observer import EventDispatchObserver
 from ..perf_metrics import AdaptiveSchedulerMetrics, CpuSample, MemorySample, PerformanceMetrics
+from ..structured_logging import emit_structured, is_jsonl_logging_installed
 from .performance_presentation import PerformancePresentationLayer
 
 # endregion
@@ -63,8 +66,20 @@ class PerformanceConfig:
     output_path: Optional[str] = None
     """可选:报告输出路径(部分格式必需)."""
 
-    include_details: bool = False
-    """是否在报告中包含明细数据."""
+    include_batch_lines: bool = False
+    """是否输出 `per-batch` 明细行(高噪声,默认关闭)."""
+
+    include_loader_stats: bool = False
+    """是否输出 `per-loader` 全量统计(可能较多,默认关闭)."""
+
+    include_loader_top_n: int = 0
+    """可选:输出耗时 `top-N` `loader` 统计(0 表示关闭)."""
+
+    include_field_compute_top_n: int = 0
+    """可选:输出 `compute` 字段耗时 `top-N` `profiling`(0 表示关闭;需要 `operator-level span`)."""
+
+    include_advisor_hints: bool = False
+    """可选:输出基于运行期统计的 `advisor hints`(默认关闭)."""
 
     include_scheduler_decisions: bool = False
     """是否包含自适应调度器决策统计(需要订阅相应事件)."""
@@ -84,7 +99,12 @@ class PerformanceConfig:
 
     @classmethod
     def full(cls) -> "PerformanceConfig":
-        return cls(metrics={"duration", "memory", "cpu"}, include_details=True, include_scheduler_decisions=True)
+        return cls(
+            metrics={"duration", "memory", "cpu"},
+            include_batch_lines=True,
+            include_loader_stats=True,
+            include_scheduler_decisions=True,
+        )
 
 
 class PerformanceObserver(EventDispatchObserver):
@@ -116,6 +136,8 @@ class PerformanceObserver(EventDispatchObserver):
         }
         if config.include_scheduler_decisions:
             self.event_types.add(EVENT_ADAPTIVE_SCHEDULER_DECISION)
+        if int(config.include_field_compute_top_n) > 0:
+            self.event_types.add(EVENT_OPERATOR_SPAN)
         self.metrics = PerformanceMetrics()
         self._on_threshold_exceeded = on_threshold_exceeded
         self._presentation = config.presentation or PerformancePresentationLayer()
@@ -232,7 +254,7 @@ class PerformanceObserver(EventDispatchObserver):
     def _get_batch_stage_entry(self, batch_num: int) -> Dict[str, float]:
         entry = self._batch_stage_durations.get(batch_num)
         if entry is None:
-            entry = {"loader": 0.0, "compute": 0.0, "write": 0.0}
+            entry = {"stream": 0.0, "loader": 0.0, "compute": 0.0, "write": 0.0}
             self._batch_stage_durations[batch_num] = entry
         return entry
 
@@ -277,7 +299,11 @@ class PerformanceObserver(EventDispatchObserver):
     def on_batch_end(self, event: BatchEndEvent) -> None:
         self.metrics.batch_durations.append(event.duration)
 
-        stage_entry = self._batch_stage_durations.pop(event.batch_num, {"loader": 0.0, "compute": 0.0, "write": 0.0})
+        stage_entry = self._batch_stage_durations.pop(
+            event.batch_num,
+            {"stream": 0.0, "loader": 0.0, "compute": 0.0, "write": 0.0},
+        )
+        self.metrics.stage_metrics.stream_duration += stage_entry.get("stream", 0.0)
         self.metrics.stage_metrics.loader_duration += stage_entry["loader"]
         self.metrics.stage_metrics.compute_duration += stage_entry["compute"]
         self.metrics.stage_metrics.write_duration += stage_entry["write"]
@@ -290,10 +316,30 @@ class PerformanceObserver(EventDispatchObserver):
 
         self._check_thresholds("batch_duration", event.duration)
 
-        if self.config.include_details and self.config.report_format != "none":
+        if self.config.include_batch_lines and self.config.report_format != "none":
             mem_mb = self._get_memory_mb()
             cpu_pct = self._get_cpu_percent()
+            if is_jsonl_logging_installed():
+                emit_structured(
+                    self.config.logger,
+                    level=logging.INFO,
+                    kind="performance.batch",
+                    message="performance.batch",
+                    fields={
+                        "batch_num": int(event.batch_num),
+                        "duration_s": float(event.duration),
+                        "stream_s": float(stage_entry.get("stream", 0.0)),
+                        "source_lookup_s": float(stage_entry.get("loader", 0.0)),
+                        "compute_s": float(stage_entry.get("compute", 0.0)),
+                        "write_s": float(stage_entry.get("write", 0.0)),
+                        "memory_mb": float(mem_mb) if mem_mb is not None else None,
+                        "cpu_percent": float(cpu_pct) if cpu_pct is not None else None,
+                    },
+                )
+                return
+
             parts = ["duration={:.2f}s".format(event.duration)]
+            parts.append("stream={:.2f}s".format(stage_entry.get("stream", 0.0)))
             parts.append("loader={:.2f}s".format(stage_entry["loader"]))
             parts.append("compute={:.2f}s".format(stage_entry["compute"]))
             parts.append("write={:.2f}s".format(stage_entry["write"]))
@@ -327,6 +373,14 @@ class PerformanceObserver(EventDispatchObserver):
         if event.stage in entry:
             entry[event.stage] += max(0.0, event.duration)
 
+    def on_operator_span(self, event: OperatorSpanEvent) -> None:
+        if event.operator_type != "compute":
+            return
+        if not event.field_key:
+            return
+        stats = self.metrics.get_field_compute_stats(str(event.field_key))
+        stats.record_call(float(event.duration))
+
     def on_adaptive_scheduler_decision(self, event: AdaptiveSchedulerDecisionEvent) -> None:
         metrics = self.metrics.adaptive_scheduler
         if metrics is None:
@@ -339,7 +393,10 @@ class PerformanceObserver(EventDispatchObserver):
             metrics=self.metrics,
             report_format=self.config.report_format,
             output_path=self.config.output_path,
-            include_details=self.config.include_details,
+            include_loader_stats=self.config.include_loader_stats,
+            include_loader_top_n=int(self.config.include_loader_top_n),
+            include_field_compute_top_n=int(self.config.include_field_compute_top_n),
+            include_advisor_hints=bool(self.config.include_advisor_hints),
             logger=self.config.logger,
         )
 
@@ -358,7 +415,13 @@ class PerformanceObserver(EventDispatchObserver):
         )
 
     def print_summary(self) -> None:
-        for line in self._presentation.iter_console_lines(self.metrics, include_details=self.config.include_details):
+        for line in self._presentation.iter_console_lines(
+            self.metrics,
+            include_loader_stats=self.config.include_loader_stats,
+            include_loader_top_n=int(self.config.include_loader_top_n),
+            include_field_compute_top_n=int(self.config.include_field_compute_top_n),
+            include_advisor_hints=bool(self.config.include_advisor_hints),
+        ):
             self.config.logger.info("%s", line)
 
     def get_metrics(self) -> PerformanceMetrics:

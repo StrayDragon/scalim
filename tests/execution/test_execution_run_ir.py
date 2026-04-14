@@ -128,6 +128,51 @@ def test_run_ir_total_rows_counts_even_without_output_or_sink() -> None:
     assert result.output_path is None
 
 
+def test_run_ir_includes_partial_event_meta_defaults_in_log_context(tmp_path: Path) -> None:
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    sink = InMemoryListSink()
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=str(tmp_path / "out.csv")),
+        sink=sink,
+        runtime_bindings=runtime_bindings,
+    )
+    result = run_ir(demand_ir, request, event_meta_defaults={"workflow_node_id": "node_1"})
+    assert result.total_rows == 1
+
+
+def test_run_ir_capture_events_covers_optional_meta_defaults() -> None:
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+    sink = InMemoryListSink()
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(path=None),
+        sink=sink,
+        runtime_bindings=runtime_bindings,
+    )
+
+    result, hook_events, events, viz_observer = run_ir_mod.run_ir_capture_events(demand_ir, request)
+    assert result.total_rows == 1
+    assert viz_observer is None
+    assert isinstance(hook_events, list)
+    assert isinstance(events, list)
+
+    result, _hook_events, _events, _viz_observer = run_ir_mod.run_ir_capture_events(
+        demand_ir,
+        request,
+        event_meta_defaults={"workflow_exec_id": "wf_1"},
+    )
+    assert result.total_rows == 1
+
+
 def test_run_ir_rejects_missing_runtime_bindings() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(

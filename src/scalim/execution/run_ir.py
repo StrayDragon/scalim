@@ -5,12 +5,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .._internal.warningsx import ScalimExperimentalWarning
-from ..events import EVENT_DIAGNOSTIC_WARNING, Event
+from ..events import EVENT_DIAGNOSTIC_WARNING, Event, generate_run_id
 from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.observability import Observability
 from ..ob.presets.viz import VizObserver, VizObserverConfig
+from ..ob.structured_logging import log_context, maybe_install_jsonl_logging_from_env
 from ..planning.builder import PlanBuilder
 from ..planning.plan import ExecutionPlan
 from ..sinks import (
@@ -441,6 +442,7 @@ def _build_observer_and_hook_managers(
     *,
     plan: ExecutionPlan,
     request: ExecutionRequest,
+    run_id: str,
     event_meta_defaults: Optional[Dict[str, Any]] = None,
 ) -> Tuple["ObserverManager", HookManager, Optional[VizObserver]]:
     fallback_logger_enabled = False
@@ -449,7 +451,10 @@ def _build_observer_and_hook_managers(
         fallback_logger_enabled = request.observability.fallback_logger_enabled
         viz_config = request.observability.viz_config
 
-    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager(event_meta_defaults=event_meta_defaults)
+    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager(
+        run_id=str(run_id),
+        event_meta_defaults=event_meta_defaults,
+    )
 
     component_observers, component_hooks = split_components(request.components)
     for observer in component_observers:
@@ -788,35 +793,48 @@ def run_ir_capture_events(
 
     主要用于工作流并发执行时实现 `capture+replay`.
     """
+    maybe_install_jsonl_logging_from_env()
+    run_id = generate_run_id(prefix="run")
+
+    ctx: Dict[str, Any] = {"run_id": str(run_id)}
+    if demand_ir.name:
+        ctx["demand"] = str(demand_ir.name)
+    if event_meta_defaults:
+        for key in ("workflow_exec_id", "workflow_node_id", "workflow_node_decl_order", "demand_path"):
+            if key in event_meta_defaults:
+                ctx[key] = event_meta_defaults[key]
+
     start_time = time.perf_counter()
     wall_start_time = time.time()
 
     request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
 
     plan = _build_execution_plan(demand_ir, request)
-    replay_observer_manager, replay_hook_manager, viz_observer = _build_observer_and_hook_managers(
-        plan=plan,
-        request=request,
-        event_meta_defaults=event_meta_defaults,
-    )
+    with log_context(**ctx):
+        replay_observer_manager, replay_hook_manager, viz_observer = _build_observer_and_hook_managers(
+            plan=plan,
+            request=request,
+            run_id=str(run_id),
+            event_meta_defaults=event_meta_defaults,
+        )
 
-    hook_manager = HookCaptureManager(replay_hook_manager)
-    observer_manager = replay_observer_manager.create_capture_manager()
-    observer_manager.max_recorded_events = None
+        hook_manager = HookCaptureManager(replay_hook_manager)
+        observer_manager = replay_observer_manager.create_capture_manager()
+        observer_manager.max_recorded_events = None
 
-    result = _run_ir_with_plan_and_managers(
-        demand_ir,
-        plan,
-        request,
-        hook_manager=hook_manager,
-        observer_manager=observer_manager,
-        wall_start_time=wall_start_time,
-        start_time=start_time,
-        engine_factory=engine_factory,
-    )
-    hook_events = hook_manager.drain_events()
-    events = observer_manager.drain_events()
-    return result, hook_events, events, viz_observer
+        result = _run_ir_with_plan_and_managers(
+            demand_ir,
+            plan,
+            request,
+            hook_manager=hook_manager,
+            observer_manager=observer_manager,
+            wall_start_time=wall_start_time,
+            start_time=start_time,
+            engine_factory=engine_factory,
+        )
+        hook_events = hook_manager.drain_events()
+        events = observer_manager.drain_events()
+        return result, hook_events, events, viz_observer
 
 
 def run_ir(
@@ -825,27 +843,40 @@ def run_ir(
     engine_factory: Optional[Callable[..., ScalimEngine]] = None,
     event_meta_defaults: Optional[Dict[str, Any]] = None,
 ) -> ExecutionResult:
+    maybe_install_jsonl_logging_from_env()
+    run_id = generate_run_id(prefix="run")
+
+    ctx: Dict[str, Any] = {"run_id": str(run_id)}
+    if demand_ir.name:
+        ctx["demand"] = str(demand_ir.name)
+    if event_meta_defaults:
+        for key in ("workflow_exec_id", "workflow_node_id", "workflow_node_decl_order", "demand_path"):
+            if key in event_meta_defaults:
+                ctx[key] = event_meta_defaults[key]
+
     start_time = time.perf_counter()
     wall_start_time = time.time()
 
     request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
 
     plan = _build_execution_plan(demand_ir, request)
-    observer_manager, hook_manager, _viz_observer = _build_observer_and_hook_managers(
-        plan=plan,
-        request=request,
-        event_meta_defaults=event_meta_defaults,
-    )
-    return _run_ir_with_plan_and_managers(
-        demand_ir,
-        plan,
-        request,
-        hook_manager=hook_manager,
-        observer_manager=observer_manager,
-        wall_start_time=wall_start_time,
-        start_time=start_time,
-        engine_factory=engine_factory,
-    )
+    with log_context(**ctx):
+        observer_manager, hook_manager, _viz_observer = _build_observer_and_hook_managers(
+            plan=plan,
+            request=request,
+            run_id=str(run_id),
+            event_meta_defaults=event_meta_defaults,
+        )
+        return _run_ir_with_plan_and_managers(
+            demand_ir,
+            plan,
+            request,
+            hook_manager=hook_manager,
+            observer_manager=observer_manager,
+            wall_start_time=wall_start_time,
+            start_time=start_time,
+            engine_factory=engine_factory,
+        )
 
 
 __all__ = (

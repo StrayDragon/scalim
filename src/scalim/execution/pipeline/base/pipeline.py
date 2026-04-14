@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from concurrent.futures import Executor
 from typing import Any, Callable, Dict, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
 
+from ....events import EVENT_STAGE_SPAN
 from ....hooks import HookManager
 from ....ob.manager import ObserverManager
 from ....planning.operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
@@ -319,10 +320,12 @@ class Pipeline(ABC):
     def _iter_row_batches(
         self,
         main_rows: Iterable[RowData],
-    ) -> Iterator[Tuple[List[Hashable], Dict[Hashable, RowData]]]:
-        """按行顺序产出批次(`row_ids`, `row_map`)."""
+    ) -> Iterator[Tuple[List[Hashable], Dict[Hashable, RowData], Optional[float]]]:
+        """按行顺序产出批次(`row_ids`, `row_map`, `stream_duration_s`)."""
         row_iter = iter(main_rows)
         next_row_id = 0
+        wants_stage_spans = self.runtime.instrumentation.wants(EVENT_STAGE_SPAN)
+        perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
 
         def _make_row_ids(start: int, count: int) -> List[Hashable]:
             ids: List[Hashable] = []
@@ -330,21 +333,42 @@ class Pipeline(ABC):
             return ids
 
         if self.batch_size is None:
-            batch_rows = list(row_iter)
+            stream_duration_s: Optional[float] = None
+            if wants_stage_spans:
+                start = perf_counter()
+                batch_rows = list(row_iter)
+                stream_duration_s = max(0.0, perf_counter() - start)
+            else:
+                batch_rows = list(row_iter)
             if batch_rows:
                 row_ids = _make_row_ids(next_row_id, len(batch_rows))
                 single_batch_map: Dict[Hashable, RowData] = dict(zip(row_ids, batch_rows))
-                yield row_ids, single_batch_map
+                yield row_ids, single_batch_map, stream_duration_s
             return
 
         chunk_size = self.batch_size
-        for batch_rows in self._overrides.chunk_iterable(row_iter, chunk_size):
+        chunk_iter = self._overrides.chunk_iterable(row_iter, chunk_size)
+        while True:
+            stream_duration_s = None
+            if wants_stage_spans:
+                start = perf_counter()
+                try:
+                    batch_rows = next(chunk_iter)
+                except StopIteration:
+                    break
+                stream_duration_s = max(0.0, perf_counter() - start)
+            else:
+                try:
+                    batch_rows = next(chunk_iter)
+                except StopIteration:
+                    break
+
             if not batch_rows:
                 break
             row_ids = _make_row_ids(next_row_id, len(batch_rows))
             next_row_id += len(batch_rows)
             batch_map: Dict[Hashable, RowData] = dict(zip(row_ids, batch_rows))
-            yield row_ids, batch_map
+            yield row_ids, batch_map, stream_duration_s
 
 
 class SeqPipeline(Pipeline):
@@ -381,8 +405,10 @@ class SeqPipeline(Pipeline):
                     warnings_module=self._overrides.warnings_module or warnings,
                 )
 
-                for row_ids, batch_rows in self._iter_row_batches(main_rows):
+                for row_ids, batch_rows, stream_duration_s in self._iter_row_batches(main_rows):
                     batch_count += 1
+                    if stream_duration_s is not None and stream_duration_s > 0:
+                        self.runtime.instrumentation.emit_stage_span("stream", batch_count, float(stream_duration_s))
                     batch_start_time = time.perf_counter()
                     self.runtime.instrumentation.emit_batch_start(batch_count, list(row_ids))
 

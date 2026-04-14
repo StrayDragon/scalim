@@ -435,7 +435,7 @@ class WorkflowRunController:
         comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
         demand_ir = cast("DemandIr", comp.demand_ir)  # pragma: allow-cast compilation.demand_ir narrow
         visible = self._ctx_store.visible_producer_node_ids(str(node_id))
-        fut = self._executor.submit(self._run_one, demand_ir, request_for_run, str(node_id), visible)
+        fut = self._executor.submit(self._run_one, demand_ir, request_for_run, str(node_id), visible, str(demand_path))
         self._state.submitted[fut] = (str(node_id), node, str(demand_path), compilation, request_for_run)
 
     def process_completed_future(self, fut: "concurrent.futures.Future[Any]") -> None:
@@ -665,6 +665,7 @@ class WorkflowRunController:
         request: ExecutionRequest,
         workflow_node_id: str,
         visible_producer_node_ids: FrozenSet[str],
+        demand_path: str,
     ) -> object:
         def _engine_factory(**kwargs: object) -> ScalimEngine:
             engine_kwargs = cast("Any", kwargs)  # pragma: allow-cast engine kwargs typed narrowing
@@ -676,10 +677,16 @@ class WorkflowRunController:
 
         visible = frozenset(str(x) for x in visible_producer_node_ids)
         decl_order = int(self._index_by_node_id.get(str(workflow_node_id), 0))
+        try:
+            demand_name = str(demand_ir.name or "")
+        except AttributeError:
+            demand_name = ""
         event_meta_defaults = {
             "workflow_exec_id": self._workflow_exec_id,
             "workflow_node_id": str(workflow_node_id),
             "workflow_node_decl_order": int(decl_order),
+            "demand": demand_name,
+            "demand_path": str(demand_path or "") or None,
         }
         with workflow_loader_context(
             workflow_exec_id=self._workflow_exec_id,
