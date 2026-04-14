@@ -1,0 +1,4 @@
+workflow:
+  runs:
+    - id: d10_paid_orders
+      demand: ./demands/d10_paid_orders.demand.yaml

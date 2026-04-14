@@ -190,6 +190,38 @@ def test_lsp_contract_imports_dollar_import_definition_hover(tmp_path) -> None:
         session.shutdown()
 
 
+def test_lsp_contract_workflow_run_demand_definition(tmp_path) -> None:
+    scenario = "workflow_run_demand_definition"
+    workspace = tmp_path / "workspace"
+    _copy_workspace_fixture(scenario, workspace)
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+
+    proc = start_yaml_dsl_lsp_server(workspace)
+    session = LspSession(proc, workspace=workspace)
+    try:
+        session.initialize()
+        session.did_open(uri=yaml_path.as_uri(), text=yaml_text)
+        diag = session.wait_for_diagnostics(uri=yaml_path.as_uri())
+        diag_params = diag.get("params") or {}
+        diag_snapshot = {
+            "uri": diag_params.get("uri"),
+            "diagnostics": normalize_diagnostics(diag_params.get("diagnostics") or []),
+        }
+        diag_snapshot = normalize_json(diag_snapshot, workspace=workspace)
+        assert_no_path_leaks(diag_snapshot, workspace=workspace)
+        assert_json_snapshot(_snapshot_path(scenario, "diagnostics.json"), diag_snapshot)
+
+        line, char = _pos_of(yaml_text, "d10_paid_orders.demand.yaml", offset=2)
+        locations = session.definition(uri=yaml_path.as_uri(), line=line, character=char) or []
+        definition_snapshot = normalize_json(normalize_locations(locations), workspace=workspace)
+        assert_no_path_leaks(definition_snapshot, workspace=workspace)
+        assert_json_snapshot(_snapshot_path(scenario, "definition.json"), definition_snapshot)
+    finally:
+        session.shutdown()
+
+
 def test_lsp_contract_builtin_callable_definition_hover_completion(tmp_path) -> None:
     scenario = "builtin_callable_definition_hover_completion"
     workspace = tmp_path / "workspace"

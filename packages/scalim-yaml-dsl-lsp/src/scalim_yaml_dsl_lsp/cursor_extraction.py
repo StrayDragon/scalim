@@ -32,10 +32,12 @@ _OUTPUTS_AGGREGATE_CALL_BY_PATH_MIN_LEN = 6
 _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_WHERE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_AGGREGATE_COMPUTE_PATH_MIN_LEN = 6
+_WORKFLOW_RUN_DEMAND_PATH_MIN_LEN = 4
 _EXPR_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _SIMPLE_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _IMPORTS_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
 _DOLLAR_IMPORT_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)\$import\s*:\s*(.*)$")
+_WORKFLOW_DEMAND_KEY_VALUE_LINE_RE = re.compile(r"^(\s*)demand\s*:\s*(.*)$")
 _AGGREGATE_RANK_KINDS = ("row_number", "rank", "dense_rank")
 
 
@@ -195,6 +197,86 @@ def extract_yaml_dsl_import_path_reference_by_cursor(
     )
 
 
+def extract_yaml_dsl_workflow_demand_path_reference_by_cursor(
+    yaml_text: str,
+    position: EditorPosition,
+) -> YamlCursorExtractionResult:
+    """基于 `yaml_text + position` 抽取 workflow YAML 的 `workflow.runs[*].demand` path 值.
+
+    约束:
+    - 仅做静态解析,无副作用
+    - 失败时降级为“空结果 + warnings”,不得 crash
+    - v1 仅覆盖单行 scalar string (`workflow.runs[*].demand: <path>`)
+    """
+
+    base = _extract_yaml_dsl_reference_by_cursor(yaml_text, position, allowed_kinds=("workflow_demand_path",))
+    if base.range is None:
+        fallback = _fallback_extract_workflow_demand_path_value_by_cursor(yaml_text, position)
+        if fallback is not None:
+            return fallback
+        return base
+    return YamlCursorExtractionResult(
+        yaml_path=base.yaml_path,
+        kind="workflow_demand_path",
+        reference=base.reference,
+        range=base.range,
+        value=str(base.reference or ""),
+        value_range=base.range,
+        warnings=base.warnings,
+    )
+
+
+def _fallback_extract_workflow_demand_path_value_by_cursor(  # noqa: PLR0911
+    yaml_text: str,
+    position: EditorPosition,
+) -> Optional[YamlCursorExtractionResult]:
+    """Fallback for `workflow.runs[*].demand: <empty>` where YAML parser may shift null nodes.
+
+    We do a conservative, line-based detection to keep editor behavior stable in partially-valid YAML.
+    """
+
+    lines = str(yaml_text or "").splitlines()
+    line_idx0 = int(position.line) - 1
+    if not (0 <= line_idx0 < len(lines)):
+        return None
+    line_text = str(lines[line_idx0])
+    if not line_text.strip() or line_text.lstrip().startswith("#"):
+        return None
+
+    m = _WORKFLOW_DEMAND_KEY_VALUE_LINE_RE.match(line_text)
+    if not m:
+        return None
+
+    indent = len(str(m.group(1) or ""))
+    if not _is_under_workflow_runs_block(lines, line_idx0, indent):
+        return None
+
+    cursor_col0 = int(position.column) - 1
+    colon_idx0 = line_text.find(":", int(m.end(1)) + len("demand"))
+    if colon_idx0 == -1:
+        return None
+    after_colon0 = int(colon_idx0) + 1
+    if cursor_col0 < after_colon0:
+        return None
+
+    value_start0 = int(m.start(2))
+    comment_idx0 = line_text.find("#", int(colon_idx0) + 1)
+    end0 = int(comment_idx0) if comment_idx0 != -1 else len(line_text)
+    raw_value = line_text[int(value_start0) : int(end0)]
+
+    trimmed, start_offset, end_offset = _trim_value(raw_value)
+    rng = _range_for_offsets(int(position.line), int(value_start0), int(start_offset), int(end_offset))
+
+    return YamlCursorExtractionResult(
+        yaml_path="workflow.runs[*].demand",
+        kind="workflow_demand_path",
+        reference=str(trimmed),
+        range=rng,
+        value=str(trimmed),
+        value_range=rng,
+    )
+
+
 def _fallback_extract_imports_path_value_by_cursor(  # noqa: PLR0911
     yaml_text: str,
     position: EditorPosition,
@@ -273,6 +355,29 @@ def _is_under_imports_block(lines: List[str], line_idx0: int, indent: int) -> bo
             idx -= 1
             continue
         return bool(stripped.startswith("imports:"))
+    return False
+
+
+def _is_under_workflow_runs_block(lines: List[str], line_idx0: int, indent: int) -> bool:
+    """Best-effort check whether a key line is nested under `workflow: ... runs:`."""
+
+    found_runs = False
+    current_indent = int(indent)
+    for i in range(int(line_idx0) - 1, -1, -1):
+        raw = str(lines[i])
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        leading = len(raw) - len(raw.lstrip(" "))
+        if int(leading) >= int(current_indent):
+            continue
+        if not found_runs and stripped.startswith("runs:"):
+            found_runs = True
+            current_indent = int(leading)
+            continue
+        if found_runs and stripped.startswith("workflow:"):
+            return True
+        current_indent = int(leading)
     return False
 
 
@@ -1532,6 +1637,8 @@ def _reference_kind(path: List[str]) -> str:
     kind = ""
     if len(path) >= _IMPORTS_PATH_MIN_LEN and str(path[0]) == "imports":
         kind = "imports_path"
+    elif _is_workflow_run_demand_path(path):
+        kind = "workflow_demand_path"
     else:
         leaf = str(path[-1])
         if (
@@ -1621,6 +1728,16 @@ def _is_output_aggregate_score_by_rank_ref_path(path: List[str]) -> bool:
         and str(path[-1]) == "rank_field"
         and str(path[-2]) == "score_by_rank"
     )
+
+
+def _is_workflow_run_demand_path(path: List[str]) -> bool:
+    if len(path) != _WORKFLOW_RUN_DEMAND_PATH_MIN_LEN:
+        return False
+    if str(path[0]) != "workflow" or str(path[1]) != "runs":
+        return False
+    if not _is_int_str(str(path[2])):
+        return False
+    return str(path[3]) == "demand"
 
 
 def _is_supported_reference_path(path: List[str], *, allowed_kinds: Tuple[str, ...]) -> bool:

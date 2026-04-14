@@ -19,7 +19,8 @@ from lsprotocol import types
 from pygls.lsp.server import LanguageServer
 
 from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend
-from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import load_scalim_preset_yaml_text
+from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import load_scalim_preset_yaml_text, load_yaml_dsl_project_config
+from scalim.dsl.yaml_dsl.workflow_config import resolve_workflow_demand_path
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 from .core import (
@@ -80,7 +81,11 @@ from .core import (
     resolve_yaml_dsl_yaml_alias_definition,
     resolve_yaml_import_definition,
 )
-from .cursor_extraction import YamlCursorExtractionResult, extract_yaml_dsl_import_path_reference_by_cursor
+from .cursor_extraction import (
+    YamlCursorExtractionResult,
+    extract_yaml_dsl_import_path_reference_by_cursor,
+    extract_yaml_dsl_workflow_demand_path_reference_by_cursor,
+)
 from .editor_types import EditorPosition, EditorRange
 
 __all__ = ()
@@ -358,12 +363,19 @@ async def _handle_definition(  # noqa: C901
     if anchor_path is None:
         return None
 
-    locations = await _handle_yaml_import_path_definition(
+    locations = await _handle_yaml_workflow_demand_path_definition(
         doc_state,
         position=params.position,
         anchor_path=anchor_path,
         uri=uri,
     )
+    if locations is None:
+        locations = await _handle_yaml_import_path_definition(
+            doc_state,
+            position=params.position,
+            anchor_path=anchor_path,
+            uri=uri,
+        )
     if locations is None:
         locations = await _handle_yaml_import_definition(
             doc_state,
@@ -540,6 +552,64 @@ async def _handle_yaml_import_path_definition(
         )
 
     return locations or None
+
+
+async def _handle_yaml_workflow_demand_path_definition(
+    doc_state: _DocumentState,
+    *,
+    position: types.Position,
+    anchor_path: Path,
+    uri: str,
+) -> Optional[List[types.Location]]:
+    if doc_state.report is None:
+        return None
+    if str(doc_state.report.yaml_kind or "") != "workflow":
+        return None
+
+    extraction = _safe_extract_workflow_demand_path_reference_for_lsp(doc_state.text, position, uri=uri, op="definition")
+    if not extraction.reference:
+        return None
+
+    discovery = doc_state.report.discovery
+    scalim_yaml_override = discovery.scalim_yaml_path
+    project_root_override: Optional[Path] = None
+    if scalim_yaml_override is not None:
+        project_root_override = discovery.project_root
+
+    resolved_path: Optional[Path] = None
+    warnings: Tuple[str, ...] = ()
+    try:
+        resolved_path, warnings = await asyncio.to_thread(
+            _resolve_workflow_demand_path_definition,
+            extraction.reference,
+            workflow_yaml_path=anchor_path,
+            allowed_yaml_roots=discovery.allowed_yaml_roots,
+            scalim_yaml_override=scalim_yaml_override,
+            project_root_override=project_root_override,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception(
+            "定义跳转(`workflow.runs[*].demand`) 解析失败 `uri`=%s `yaml_path`=%s: %s: %s",
+            uri,
+            extraction.yaml_path,
+            type(exc).__name__,
+            exc,
+        )
+        return None
+
+    if warnings:
+        _LOG.info(
+            "定义跳转(`workflow.runs[*].demand`) 警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            uri,
+            extraction.yaml_path,
+            list(warnings),
+        )
+
+    if resolved_path is None:
+        return None
+
+    location = _location_from_definition_location(str(resolved_path), None)
+    return [location] if location is not None else None
 
 
 async def _handle_yaml_dsl_yaml_alias_definition(
@@ -930,6 +1000,29 @@ def _safe_extract_import_path_reference_for_lsp(
     return extraction
 
 
+def _safe_extract_workflow_demand_path_reference_for_lsp(
+    yaml_text: str,
+    position: types.Position,
+    *,
+    uri: str,
+    op: str,
+) -> YamlCursorExtractionResult:
+    try:
+        extraction = _extract_workflow_demand_path_reference_for_lsp(yaml_text, position)
+    except Exception as exc:  # noqa: BLE001
+        _LOG.exception("%s(`workflow.runs[*].demand`) 光标抽取失败 `uri`=%s: %s: %s", op, uri, type(exc).__name__, exc)
+        return YamlCursorExtractionResult(warnings=("{}(`workflow.runs[*].demand`) 光标抽取失败".format(op),))
+    if extraction.warnings:
+        _LOG.debug(
+            "%s(`workflow.runs[*].demand`) 光标抽取警告 `uri`=%s `yaml_path`=%s `warnings`=%s",
+            op,
+            uri,
+            extraction.yaml_path,
+            list(extraction.warnings),
+        )
+    return extraction
+
+
 def _safe_extract_output_field_reference_for_lsp(
     yaml_text: str,
     position: types.Position,
@@ -1188,6 +1281,44 @@ async def _safe_resolve_yaml_import_path_definition(
         )
         return None
     return result
+
+
+def _resolve_workflow_demand_path_definition(
+    raw_demand_path: str,
+    *,
+    workflow_yaml_path: Path,
+    allowed_yaml_roots: Sequence[Path],
+    scalim_yaml_override: Optional[Path],
+    project_root_override: Optional[Path],
+) -> Tuple[Optional[Path], Tuple[str, ...]]:
+    warnings: List[str] = []
+
+    path_aliases: Optional[Dict[str, str]] = None
+    if scalim_yaml_override is not None or project_root_override is not None:
+        try:
+            cfg = load_yaml_dsl_project_config(
+                workflow_yaml_path,
+                scalim_yaml_override=scalim_yaml_override,
+                project_root_override=project_root_override,
+            )
+        except Exception as exc:  # noqa: BLE001
+            warnings.append("加载 scalim.yaml 失败: {}: {}".format(type(exc).__name__, exc))
+            cfg = None
+        if cfg is not None and cfg.import_aliases:
+            path_aliases = {str(k): str(v) for k, v in dict(cfg.import_aliases).items()}
+
+    try:
+        resolved = resolve_workflow_demand_path(
+            str(raw_demand_path or "").strip(),
+            workflow_yaml_path=str(workflow_yaml_path),
+            path_aliases=path_aliases,
+            allowed_yaml_roots=allowed_yaml_roots,
+        )
+    except Exception as exc:  # noqa: BLE001
+        warnings.append("resolve demand path failed: {}: {}".format(type(exc).__name__, exc))
+        return None, tuple(warnings)
+
+    return resolved, tuple(warnings)
 
 
 def _register_hover_feature(server: LanguageServer, state: Dict[str, _DocumentState]) -> None:
@@ -3827,6 +3958,11 @@ def _extract_import_reference_for_lsp(yaml_text: str, position: types.Position) 
 def _extract_import_path_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
     editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
     return extract_yaml_dsl_import_path_reference_by_cursor(yaml_text, editor_pos)
+
+
+def _extract_workflow_demand_path_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
+    editor_pos = EditorPosition(line=int(position.line) + 1, column=int(position.character) + 1)
+    return extract_yaml_dsl_workflow_demand_path_reference_by_cursor(yaml_text, editor_pos)
 
 
 def _extract_entity_reference_for_lsp(yaml_text: str, position: types.Position) -> YamlCursorExtractionResult:
