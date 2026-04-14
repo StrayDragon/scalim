@@ -1,6 +1,6 @@
 [project]
 name = "scalim-yaml-dsl-lsp"
-version = "0.8.1"
+version = "0.8.2"
 description = "YAML DSL editor semantics core for scalim"
 readme = "README.md"
 requires-python = ">=3.10"
