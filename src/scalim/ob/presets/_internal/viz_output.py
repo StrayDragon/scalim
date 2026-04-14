@@ -1,10 +1,11 @@
 import json
 import logging
+import queue
 import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import IO, Any, Dict, Optional, cast
+from typing import IO, Any, Dict, Optional, Tuple, cast
 
 from ...._internal.loggingx import get_logger, prefix
 from ....events import generate_run_id
@@ -15,15 +16,22 @@ from .viz_config import normalize_output_dir as _normalize_output_dir
 
 _LOGGER = get_logger("viz")
 
+_VIZ_JSONL_QUEUE_MAXSIZE = 4096
+_VizQueueItem = Tuple[str, threading.Event]
+
 
 class VizEventEmitter:
-    _output_handle: Optional[IO[str]]
+    _output_handle: Optional[IO[bytes]]
     _logger: logging.Logger
-    _lock: "threading.Lock"
+    _queue: Optional["queue.Queue[_VizQueueItem]"]
+    _writer_thread: Optional["threading.Thread"]
+    _closing: "threading.Event"
 
     def __init__(self, path: Optional[str], *, logger: Optional[logging.Logger] = None, append: bool = True) -> None:
         self._logger = logger or _LOGGER
-        self._lock = threading.Lock()
+        self._closing = threading.Event()
+        self._queue = None
+        self._writer_thread = None
         self._output_handle = None
         if not path:
             return
@@ -31,11 +39,21 @@ class VizEventEmitter:
             resolved = Path(path)
             if resolved.parent and not resolved.parent.exists():
                 resolved.parent.mkdir(parents=True, exist_ok=True)
-            mode = "a" if append else "w"
-            self._output_handle = resolved.open(mode, encoding="utf-8")
+            mode = "ab" if append else "wb"
+            self._output_handle = resolved.open(mode, buffering=0)
         except OSError as exc:
             self._logger.warning("%s打开输出路径失败: %s", prefix("viz"), exc)
             self._output_handle = None
+            return
+
+        queue_obj: "queue.Queue[_VizQueueItem]" = queue.Queue(maxsize=_VIZ_JSONL_QUEUE_MAXSIZE)
+        self._queue = queue_obj
+        self._writer_thread = threading.Thread(
+            target=self._writer_main,
+            name="scalim-viz-writer",
+            daemon=True,
+        )
+        self._writer_thread.start()
 
     def emit(self, event: Dict[str, Any]) -> None:
         try:
@@ -44,22 +62,74 @@ class VizEventEmitter:
             self._logger.warning("%s序列化事件失败: %s", prefix("viz"), exc)
             return
 
-        try:
-            with self._lock:
+        if self._closing.is_set():
+            return
+        queue_obj = self._queue
+        if queue_obj is None:
+            return
+        done = threading.Event()
+        item: _VizQueueItem = (line, done)
+        while True:
+            if self._closing.is_set():
+                return
+            try:
+                queue_obj.put(item, timeout=0.05)
+            except queue.Full:
+                continue
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning("%s写入事件失败: %s: %s", prefix("viz"), type(exc).__name__, exc)
+                return
+            else:
+                break
+
+        _ = done.wait()
+
+    def _writer_main(self) -> None:
+        queue_obj = self._queue
+        if queue_obj is None:
+            return
+
+        while True:
+            try:
+                line, done = queue_obj.get(timeout=0.05)
+            except queue.Empty:
+                if self._closing.is_set():
+                    return
+                continue
+
+            try:
                 output_handle = self._output_handle
                 if output_handle is None:
-                    return
-                _ = output_handle.write(line + "\n")
-                output_handle.flush()
-        except OSError as exc:
-            self._logger.warning("%s写入事件失败: %s", prefix("viz"), exc)
+                    continue
+                _ = output_handle.write((line + "\n").encode("utf-8"))
+            except Exception as exc:  # noqa: BLE001
+                self._logger.warning("%s写入事件失败: %s: %s", prefix("viz"), type(exc).__name__, exc)
+            finally:
+                done.set()
+                queue_obj.task_done()
 
     def close(self, timeout: float = 2.0) -> None:
-        _ = timeout
-        with self._lock:
-            if self._output_handle:
-                self._output_handle.close()
-                self._output_handle = None
+        self._closing.set()
+
+        writer = self._writer_thread
+        if writer is not None:
+            deadline = time.time() + max(float(timeout), 0.0)
+            while writer.is_alive() and time.time() < deadline:
+                writer.join(0.05)
+
+        if writer is not None and writer.is_alive():
+            self._logger.warning("%s关闭事件写线程超时: 超时=%s", prefix("viz"), timeout)
+
+        output_handle = self._output_handle
+        self._output_handle = None
+        self._queue = None
+        self._writer_thread = None
+        if output_handle is None:
+            return
+        try:
+            output_handle.close()
+        except OSError as exc:
+            self._logger.warning("%s关闭事件输出失败: %s", prefix("viz"), exc)
 
 
 class VizObserverOutputMixin(ABC):

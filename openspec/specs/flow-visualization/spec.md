@@ -301,13 +301,15 @@ workflow bundle 支持 MUST 为增量扩展，不得破坏现有单 run replay �
 
 ### Requirement: Viz JSONL output MUST remain valid under concurrency
 
-当并发执行产生 VizEventStream 且事件发射可能来自多个线程时,系统 MUST 保证输出的 JSONL 文件在并发下仍然可解析:
-- 每一行 MUST 为完整 JSON 对象
-- 行与行之间 MUST 不交错、不出现半行
+当系统输出 `viz_events.jsonl`/`viz_trace.jsonl` 时,系统 MUST 保证在进程内并发/重入场景下文件内容始终可逐行解析:
+- 每一行 MUST 为完整的 JSON 对象(以 `\n` 分隔)
+- 系统 MUST 避免并发写入导致的“半行”或“交错拼接”JSON(即使发生并发 emit)
+- 系统 MUST 通过 single writer 或等价的写出串行化边界保证上述完整性
 
-#### Scenario: concurrent emission does not corrupt JSONL
-- **WHEN** workflow 并发执行并触发多条 viz 事件
-- **THEN** 输出的 `viz_events.jsonl` MUST 可被逐行 JSON 解析
+#### Scenario: concurrent emit does not corrupt JSONL lines
+- **GIVEN** workflow 并发执行且多个线程并发调用同一个 emitter 的 `emit()`
+- **WHEN** 事件写入完成并读取输出的 `viz_events.jsonl`/`viz_trace.jsonl` 逐行解析
+- **THEN** 每一行 MUST 为可解析的 JSON
 
 ### Requirement: run_id MUST be collision-resistant
 

@@ -59,6 +59,14 @@ class BrokenHandle:
     def flush(self) -> None:
         raise OSError("flush failed")
 
+    def close(self) -> None:
+        return None
+
+
+class BrokenCloseHandle:
+    def close(self) -> None:
+        raise OSError("close failed")
+
 
 def test_viz_helpers_and_config_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(viz_config_module.platform, "system", lambda: "Windows")
@@ -137,11 +145,13 @@ def test_viz_event_emitter_success_and_error(monkeypatch: pytest.MonkeyPatch, tm
     assert emitter._output_handle is None
 
     emitter = VizEventEmitter(config.output_path, logger=config.logger)
+    original_handle = emitter._output_handle
     emitter._output_handle = BrokenHandle()
     emitter.emit({"ok": True})
+    emitter.close(timeout=CI_TIMEOUT_S)
+    if original_handle is not None:
+        original_handle.close()
     assert logger.messages
-    emitter._output_handle = None
-    emitter.close()
 
     def boom(*_args: Any, **_kwargs: Any) -> Any:
         raise OSError("fail open")
@@ -151,18 +161,101 @@ def test_viz_event_emitter_success_and_error(monkeypatch: pytest.MonkeyPatch, tm
     assert emitter._output_handle is None
 
 
+def test_viz_event_emitter_additional_branches(tmp_path: Path) -> None:
+    import queue
+    import threading
+
+    logger = DummyLogger()
+
+    # Cover: close(timeout=0) warning branch.
+    timeout_path = tmp_path / "timeout.jsonl"
+    emitter = VizEventEmitter(str(timeout_path), logger=logger)
+    writer = emitter._writer_thread
+    emitter.close(timeout=0.0)
+    if writer is not None:
+        writer.join(timeout=CI_TIMEOUT_S)
+        assert not writer.is_alive()
+    assert any("关闭事件写线程超时" in msg for msg in logger.messages)
+
+    # Cover: close() when output_handle.close raises OSError.
+    close_path = tmp_path / "broken_close.jsonl"
+    emitter = VizEventEmitter(str(close_path), logger=logger)
+    original_handle = emitter._output_handle
+    emitter._output_handle = BrokenCloseHandle()
+    emitter.close()
+    if original_handle is not None:
+        original_handle.close()
+    assert any("关闭事件输出失败" in msg for msg in logger.messages)
+
+    # Cover: _writer_main early return when queue is missing.
+    disabled = VizEventEmitter(None, logger=logger)
+    disabled._writer_main()
+    disabled.close()
+
+    # Cover: emit() returns early when closing is set.
+    closing_path = tmp_path / "closing.jsonl"
+    emitter = VizEventEmitter(str(closing_path), logger=logger)
+    emitter._closing.set()
+    emitter.emit({"ok": True})
+    emitter.close()
+
+    # Cover: writer handles missing output handle gracefully.
+    missing_handle_path = tmp_path / "missing_handle.jsonl"
+    emitter = VizEventEmitter(str(missing_handle_path), logger=logger)
+    original_handle = emitter._output_handle
+    emitter._output_handle = None
+    emitter.emit({"ok": True})
+    emitter.close()
+    if original_handle is not None:
+        original_handle.close()
+
+    # Cover: emit() handles unexpected put errors.
+    class BrokenQueue:
+        def put(self, *_args: Any, **_kwargs: Any) -> None:
+            raise ValueError("boom")
+
+    emitter = VizEventEmitter(None, logger=logger)
+    emitter._queue = BrokenQueue()  # type: ignore[assignment]
+    emitter.emit({"ok": True})
+    emitter.close()
+    assert any("写入事件失败" in msg for msg in logger.messages)
+
+    # Cover: queue.Full + closing short-circuit in emit loop.
+    class AlwaysFullQueue:
+        def __init__(self) -> None:
+            self.put_called = threading.Event()
+
+        def put(self, *_args: Any, **_kwargs: Any) -> None:
+            self.put_called.set()
+            raise queue.Full()
+
+    emitter = VizEventEmitter(None, logger=logger)
+    full_queue = AlwaysFullQueue()
+    emitter._queue = full_queue  # type: ignore[assignment]
+
+    emit_thread = threading.Thread(target=emitter.emit, args=({"ok": True},))
+    emit_thread.start()
+    assert full_queue.put_called.wait(timeout=CI_TIMEOUT_S)
+    emitter.close()
+    emit_thread.join(timeout=CI_TIMEOUT_S)
+    assert not emit_thread.is_alive()
+
+
 def test_viz_event_emitter_concurrent_emission_keeps_jsonl_valid(tmp_path: Path) -> None:
     import threading
 
-    out_path = tmp_path / "viz_events.jsonl"
-    emitter = VizEventEmitter(str(out_path))
+    events_path = tmp_path / "viz_events.jsonl"
+    trace_path = tmp_path / "viz_trace.jsonl"
+    events_emitter = VizEventEmitter(str(events_path))
+    trace_emitter = VizEventEmitter(str(trace_path))
     threads = []
     started = threading.Barrier(parties=8)
 
     def _worker(tid: int) -> None:
         started.wait()
         for idx in range(50):
-            emitter.emit({"t": int(tid), "i": int(idx)})
+            events_emitter.emit({"t": int(tid), "i": int(idx)})
+            trace_emitter.emit({"t": int(tid), "i": int(idx)})
 
     for tid in range(8):
         threads.append(threading.Thread(target=_worker, args=(tid,)))
@@ -171,11 +264,16 @@ def test_viz_event_emitter_concurrent_emission_keeps_jsonl_valid(tmp_path: Path)
     for t in threads:
         t.join(timeout=CI_TIMEOUT_S)
         assert not t.is_alive()
-    emitter.close()
+    events_emitter.close(timeout=CI_TIMEOUT_S)
+    trace_emitter.close(timeout=CI_TIMEOUT_S)
 
-    lines = out_path.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 400
-    for line in lines:
+    events_lines = events_path.read_text(encoding="utf-8").splitlines()
+    trace_lines = trace_path.read_text(encoding="utf-8").splitlines()
+    assert len(events_lines) == 400
+    assert len(trace_lines) == 400
+    for line in events_lines:
+        _ = json.loads(line)
+    for line in trace_lines:
         _ = json.loads(line)
 
 
@@ -749,6 +847,7 @@ def test_viz_payload_policy_none_and_full(tmp_path: Path) -> None:
     observer = VizObserver(config=config, snapshot={"meta": {}})
     observer.run_id = "run_payload_none"
     observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.close()
     events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert events
     assert events[0]["payload"] == {}
@@ -758,6 +857,7 @@ def test_viz_payload_policy_none_and_full(tmp_path: Path) -> None:
     observer_full = VizObserver(config=config_full, snapshot={"meta": {}})
     observer_full.run_id = "run_payload_full"
     observer_full.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer_full.close()
     events = [json.loads(line) for line in events_path_full.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert events
     assert "data" in events[0]["payload"]
