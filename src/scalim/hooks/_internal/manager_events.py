@@ -93,6 +93,29 @@ class HookManagerEventMixin(HookManagerBase, ABC):
     def emit_typed(self, event_type: str, payload: Any) -> None:
         self._dispatch(self._get_typed_handler_pairs(event_type), payload)
 
+    def emit_typed_policy(self, event_type: str, payload: Any) -> None:
+        """发射类型化的策略决策 `signal`(默认 `fail-fast` 且保持确定性顺序).
+
+        与纯观测事件不同,策略 `signal` 会影响运行时行为;默认必须 `fail-fast`(异常直接向外抛出).
+        """
+        handler_pairs = self._get_typed_handler_pairs(event_type)
+        if not handler_pairs:
+            return
+
+        enter_hook = getattr(payload, "_enter_hook", None)  # pragma: allow-dynattr optional-interface: policy decision payload
+        exit_hook = getattr(payload, "_exit_hook", None)  # pragma: allow-dynattr optional-interface: policy decision payload
+        can_enter = callable(enter_hook)
+        can_exit = callable(exit_hook)
+
+        for hook, method in handler_pairs:
+            if can_enter:
+                _ = enter_hook(hook)
+            try:
+                method(payload)
+            finally:
+                if can_exit:
+                    _ = exit_hook()
+
     def emit_on_event(self, event: Event) -> None:
         self._dispatch(self._get_on_event_handler_pairs(event.event_type), event)
 

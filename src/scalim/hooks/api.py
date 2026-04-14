@@ -8,12 +8,15 @@
 from ._base import BaseHook, Hook, HookManager, IExecutionHook
 from ._dispatch import HookDispatchStrategy
 from ._internal.common import HOOK_RAISED_EXCEPTION_WARNING
+from .policy_signals import DecisionOverrideHistoryEntry, PreUseBatchSizeDecision
 
 __all__ = (
     "HOOK_RAISED_EXCEPTION_WARNING",
     "BaseHook",
+    "DecisionOverrideHistoryEntry",
     "Hook",
     "HookDispatchStrategy",
     "HookManager",
     "IExecutionHook",
+    "PreUseBatchSizeDecision",
 )

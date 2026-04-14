@@ -54,8 +54,8 @@ class ExecutionRequest:
     components: Optional[List[Union["Observer", "IExecutionHook"]]] = None
     """可选:要挂载的 `Observer`/`Hook` 组件列表."""
 
-    batch_size: Optional[int] = None
-    """可选:覆盖批大小(`None` 表示不覆盖)."""
+    batch_size: Optional[int] = 1000
+    """批大小(`None` 表示不分批)."""
 
     parallel_mode: ParallelMode = "seq"
     """并行模式(`seq` 或 `adaptive`)."""

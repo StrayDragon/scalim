@@ -4,13 +4,24 @@
 - `from scalim.hooks import HookManager, BaseHook`
 """
 
-from .api import HOOK_RAISED_EXCEPTION_WARNING, BaseHook, Hook, HookDispatchStrategy, HookManager, IExecutionHook
+from .api import (
+    HOOK_RAISED_EXCEPTION_WARNING,
+    BaseHook,
+    DecisionOverrideHistoryEntry,
+    Hook,
+    HookDispatchStrategy,
+    HookManager,
+    IExecutionHook,
+    PreUseBatchSizeDecision,
+)
 
 __all__ = (
     "HOOK_RAISED_EXCEPTION_WARNING",
     "BaseHook",
+    "DecisionOverrideHistoryEntry",
     "Hook",
     "HookDispatchStrategy",
     "HookManager",
     "IExecutionHook",
+    "PreUseBatchSizeDecision",
 )

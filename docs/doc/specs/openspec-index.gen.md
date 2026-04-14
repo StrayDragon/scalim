@@ -331,6 +331,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/streaming-output/spec.md)
 - Summary: **状态: ✅ 已实现** 支持 IRowSink 与 IColumnSink 的流式写入路径,定义 main source 行流、分批与 `row_id` 规则,并约束行式路径“行就绪即写出 + rows 绑定 release 屏障”语义.
 
+### `structured-logging`
+- Title: structured-logging Specification
+- Source: [spec.md](#code=openspec/specs/structured-logging/spec.md)
+- Summary: TBD - created by archiving change c1-perf-observability. Update Purpose after archive.
+
 ### `testing-behavior-contracts`
 - Title: testing-behavior-contracts Specification
 - Source: [spec.md](#code=openspec/specs/testing-behavior-contracts/spec.md)

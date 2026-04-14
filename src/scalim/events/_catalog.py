@@ -57,6 +57,11 @@ EVENT_OPERATOR_SPAN = "operator_span"
 EVENT_ADAPTIVE_SCHEDULER_DECISION = "adaptive_scheduler_decision"
 EVENT_OUTPUT_TARGET_END = "output_target_end"
 
+# 策略决策 `signal`(默认不进入公共事件目录).
+#
+# 该类 `signal` 在运行期边界(例如 `pre-run_ir`)触发,用于允许 `hook` 改写派生的运行期策略值.
+EVENT_PRE_USE_BATCH_SIZE = "pre_use_batch_size"
+
 EVENT_WORKFLOW_NODE_START = "workflow_node_start"
 EVENT_WORKFLOW_NODE_END = "workflow_node_end"
 EVENT_WORKFLOW_NODE_CANCELLED = "workflow_node_cancelled"

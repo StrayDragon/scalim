@@ -16,14 +16,18 @@ from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.run_ir import run_ir
 from ....hooks import IExecutionHook
+from ....hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch_size_signal
+from ....ob.components import split_components
 from ....ob.observer import Observer
 from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
+from ....vendor.dataclassesx import replace
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .compiler import compile as _compile
 from .contracts import UNSET, Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult, UnsetType
 
 _unsafe_logger = logging.getLogger("scalim.dsl.yaml_dsl.unsafe")
+_policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.unsafe.policy")
 
 warnings.warn(
     "`unsafe_entrypoints` 为内部/不安全 `API`;请优先使用 `scalim.dsl.yaml_dsl.run/compile`; `legacy` 沙箱已弃用,请用 `safe`.",
@@ -105,7 +109,28 @@ def unsafe_run(  # noqa: PLR0913
         allowed_yaml_roots=allowed_yaml_roots,
     )
     compilation = _compile(yaml_path, options=options)
-    core = run_ir(compilation.demand_ir, compilation.request)
+
+    request = compilation.request
+    if isinstance(options.batch_size, UnsetType):
+        _observers, hooks = split_components(request.components)
+        runtime_bindings = request.runtime_bindings
+        main_source_id = compilation.demand_ir.main_source.source_id
+        main_loader = None if runtime_bindings is None else runtime_bindings.main_source_loaders.get(str(main_source_id))
+        decision = PreUseBatchSizeDecision(
+            value=request.batch_size,
+            demand_path=str(yaml_path),
+            init_vars=options.init_vars,
+            main_loader=main_loader,
+        )
+        emit_pre_use_batch_size_signal(hooks, decision)
+        request = replace(request, batch_size=decision.value)
+
+        if decision.history:
+            _policy_logger.info("`pre_use_batch_size` 决策完成: 批大小=%s 改写轨迹=%s", decision.value, decision.history)
+        else:
+            _policy_logger.debug("`pre_use_batch_size` 决策完成: 批大小=%s 改写轨迹=%s", decision.value, decision.history)
+
+    core = run_ir(compilation.demand_ir, request)
     return RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=sink)
 
 

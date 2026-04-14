@@ -8,9 +8,13 @@
 
 # pragma: allow-c901-file plan: c10
 
+import logging
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
-from ...execution.run_ir import ExecutionResult
+from ...execution.run_ir import ExecutionRequest, ExecutionResult
+from ...hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch_size_signal
+from ...ob.components import split_components
+from ...spec.ir import DemandIr
 from ...spec.ir._workflow import WorkflowIr, WorkflowNodeIr
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import dataclass, replace
@@ -42,6 +46,8 @@ from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsRepla
 _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = (
     "workflow bundle viz requires run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))"
 )
+
+_policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.workflow.policy")
 
 
 def _merge_book_budget_overrides(
@@ -338,6 +344,12 @@ class _CompilationLike(Protocol):
     @property
     def config(self) -> DemandConfig: ...
 
+    @property
+    def demand_ir(self) -> DemandIr: ...
+
+    @property
+    def request(self) -> ExecutionRequest: ...
+
 
 def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional["VizObserverConfig"]:
     # 工作流 `bundle` 可视化: 通过 `run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))` 显式启用.
@@ -583,7 +595,7 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
     return WorkflowLifecyclePreflightResult(parse=parse, preload=preload, effective=effective)
 
 
-def run_workflow(
+def run_workflow(  # noqa: C901, PLR0915
     workflow_yaml_path: str,
     *,
     options: RunOptions,
@@ -666,7 +678,48 @@ def run_workflow(
         if managed_output_ids:
             node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
 
-        return compile_demand(str(demand_path), options=node_options)
+        compilation = compile_demand(str(demand_path), options=node_options)
+
+        if isinstance(node_options.batch_size, UnsetType):
+            try:
+                request = compilation.request
+                demand_ir = compilation.demand_ir
+            except AttributeError:
+                # 测试/注入场景可能传入不完整的 `compile_demand_yaml_fn` 返回值;此时无法发射策略 `signal`,直接跳过.
+                return compilation
+
+            _observers, hooks = split_components(request.components)
+            runtime_bindings = request.runtime_bindings
+            main_source_id = demand_ir.main_source.source_id
+            main_loader = None if runtime_bindings is None else runtime_bindings.main_source_loaders.get(str(main_source_id))
+            decision = PreUseBatchSizeDecision(
+                value=request.batch_size,
+                run_id=str(run_id),
+                demand_path=str(demand_path),
+                init_vars=node_options.init_vars,
+                main_loader=main_loader,
+            )
+            emit_pre_use_batch_size_signal(hooks, decision)
+            compilation = replace(compilation, request=replace(request, batch_size=decision.value))
+
+            if decision.history:
+                _policy_logger.info(
+                    "`pre_use_batch_size` 决策完成: `run_id`=%s `demand_path`=%s 批大小=%s 改写轨迹=%s",
+                    run_id,
+                    demand_path,
+                    decision.value,
+                    decision.history,
+                )
+            else:
+                _policy_logger.debug(
+                    "`pre_use_batch_size` 决策完成: `run_id`=%s `demand_path`=%s 批大小=%s 改写轨迹=%s",
+                    run_id,
+                    demand_path,
+                    decision.value,
+                    decision.history,
+                )
+
+        return compilation
 
     def _build_demand_run_result(
         core: ExecutionResult,

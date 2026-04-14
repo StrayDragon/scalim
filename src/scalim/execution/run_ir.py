@@ -719,7 +719,7 @@ def _run_ir_with_plan_and_managers(
     )
 
     stats = InternalStatsCollector()
-    batch_size = request.batch_size if request.batch_size is not None else demand_ir.batch_size_hint
+    batch_size = request.batch_size
 
     output_assembly = _assemble_outputs(
         demand_ir=demand_ir,

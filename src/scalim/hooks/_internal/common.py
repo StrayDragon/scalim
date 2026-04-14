@@ -18,6 +18,7 @@ from ...events import (
     EVENT_OPERATOR_SPAN,
     EVENT_PIPELINE_END,
     EVENT_PIPELINE_START,
+    EVENT_PRE_USE_BATCH_SIZE,
     EVENT_RELATION_LOOKUP,
     EVENT_ROW_RELEASE,
     EVENT_ROW_WRITE,
@@ -45,6 +46,7 @@ _HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = {
     EVENT_ROW_RELEASE: "on_row_release",
     EVENT_LOADER_SLIM: "on_loader_slim",
     EVENT_COLUMN_WRITE: "on_column_write",
+    EVENT_PRE_USE_BATCH_SIZE: "on_pre_use_batch_size",
 }
 
 HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = _HOOK_TYPED_DISPATCH_MAP

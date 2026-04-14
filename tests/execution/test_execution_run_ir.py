@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -8,6 +9,7 @@ from scalim.events import Event
 from scalim.execution.output_composition import OutputCompositionSpec, OutputTargetSpec
 from scalim.execution.run_ir import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim.sinks import BaseRowSink, BaseSink, IColumnSink, IRowSink
@@ -21,6 +23,54 @@ from scalim.vendor.compact.typing_extensionsx import override
 
 def test_run_ir_dunder_all_excludes_internal_stats_collector() -> None:
     assert "InternalStatsCollector" not in run_ir_mod.__all__
+
+
+def test_run_ir_explicit_none_batch_size_disables_chunking() -> None:
+    class _BatchCounterHook(BaseHook):
+        batch_starts: int
+
+        def __init__(self) -> None:
+            self.batch_starts = 0
+
+        def on_batch_start(self, event: Any) -> None:  # pragma: allow-dynattr typed hook event contract
+            _ = event
+            self.batch_starts += 1
+
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={
+            "orders": (lambda: [{"order_id": 1}, {"order_id": 2}, {"order_id": 3}]),
+        }
+    )
+    demand_ir = DemandIr.from_irs(
+        sources=[],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        main_source=main_source,
+    )
+
+    sink = InMemoryListSink()
+    hook = _BatchCounterHook()
+    req_no_chunking = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",)),
+        sink=sink,
+        runtime_bindings=runtime_bindings,
+        components=[hook],
+        batch_size=None,
+    )
+    _ = run_ir(demand_ir, req_no_chunking)
+    assert hook.batch_starts == 1
+
+    sink2 = InMemoryListSink()
+    hook2 = _BatchCounterHook()
+    req_chunking = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",)),
+        sink=sink2,
+        runtime_bindings=runtime_bindings,
+        components=[hook2],
+        batch_size=1,
+    )
+    _ = run_ir(demand_ir, req_chunking)
+    assert hook2.batch_starts == 3
 
 
 def test_export_layout_rejects_misaligned_header_names() -> None:

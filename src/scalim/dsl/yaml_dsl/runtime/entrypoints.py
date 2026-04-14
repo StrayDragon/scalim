@@ -1,4 +1,5 @@
 # pragma: allow-c901-file plan: c10
+import logging
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -11,9 +12,14 @@ from ....execution.versioned_outputs import (
     version_manifest_relpath,
     write_version_manifest,
 )
+from ....hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch_size_signal
+from ....ob.components import split_components
+from ....vendor.dataclassesx import replace
 from .compiler import compile as _compile
-from .contracts import Compilation, RunOptions, RunResult
+from .contracts import Compilation, RunOptions, RunResult, UnsetType
 from .normalize import normalize_public_run_options
+
+_policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.runtime.policy")
 
 
 def _ensure_versioned_output_dirs(compilation: Compilation) -> None:  # noqa: C901
@@ -125,7 +131,28 @@ def run(
     options = normalize_public_run_options(options)
     compilation = _compile(yaml_path, options=options)
     _ensure_versioned_output_dirs(compilation)
-    core = run_ir(compilation.demand_ir, compilation.request)
+
+    request = compilation.request
+    if isinstance(options.batch_size, UnsetType):
+        _observers, hooks = split_components(request.components)
+        runtime_bindings = request.runtime_bindings
+        main_source_id = compilation.demand_ir.main_source.source_id
+        main_loader = None if runtime_bindings is None else runtime_bindings.main_source_loaders.get(str(main_source_id))
+        decision = PreUseBatchSizeDecision(
+            value=request.batch_size,
+            demand_path=str(yaml_path),
+            init_vars=options.init_vars,
+            main_loader=main_loader,
+        )
+        emit_pre_use_batch_size_signal(hooks, decision)
+        request = replace(request, batch_size=decision.value)
+
+        if decision.history:
+            _policy_logger.info("`pre_use_batch_size` 决策完成: 批大小=%s 改写轨迹=%s", decision.value, decision.history)
+        else:
+            _policy_logger.debug("`pre_use_batch_size` 决策完成: 批大小=%s 改写轨迹=%s", decision.value, decision.history)
+
+    core = run_ir(compilation.demand_ir, request)
     result = RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=options.sink)
     _update_versioned_output_manifests(result)
     return result
