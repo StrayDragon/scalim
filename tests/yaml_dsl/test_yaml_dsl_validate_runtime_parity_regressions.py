@@ -7,7 +7,6 @@ import jsonschema
 import pytest
 
 import scalim.cli.yaml_dsl as yaml_dsl_cli
-from scalim.dsl.yaml_dsl.schema_dsl.builder import build_demand_schema
 
 
 def _args(path: Path) -> argparse.Namespace:
@@ -28,6 +27,12 @@ def _write_fixture(tmp_path: Path, name: str) -> Path:
     target = tmp_path / name
     target.write_text(_fixture_text(name), encoding="utf-8")
     return target
+
+
+def _load_demand_schema() -> dict:
+    repo_root = Path(__file__).resolve().parents[2]
+    schema_path = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
+    return json.loads(schema_path.read_text(encoding="utf-8"))
 
 
 def _run_validate(path: Path, capsys) -> dict:
@@ -81,7 +86,7 @@ def test_cli_validate_and_schema_validate_fail_fast_on_known_runtime_only_shapes
 
 
 def test_schema_rejects_import_only_output_target_shape() -> None:
-    schema = build_demand_schema()
+    schema = _load_demand_schema()
 
     data = {
         "name": "demo",
@@ -101,7 +106,7 @@ def test_schema_rejects_import_only_output_target_shape() -> None:
 
 
 def test_schema_validate_accepts_normalize_on_none_skip_for_index_by_key() -> None:
-    schema = build_demand_schema()
+    schema = _load_demand_schema()
     data = {
         "name": "demo",
         "main_source": {
@@ -124,7 +129,7 @@ def test_schema_validate_accepts_normalize_on_none_skip_for_index_by_key() -> No
 
 
 def test_schema_validate_rejects_normalize_on_none_for_non_index_by_key() -> None:
-    schema = build_demand_schema()
+    schema = _load_demand_schema()
     data = {
         "name": "demo",
         "main_source": {

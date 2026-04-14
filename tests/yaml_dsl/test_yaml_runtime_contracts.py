@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import List
 
@@ -7,7 +8,6 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl import RunOptions, run
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
-from scalim.dsl.yaml_dsl.schema_dsl.builder import build_demand_schema
 from scalim.sinks import CSVSink, ColumnCSVSink
 
 
@@ -27,6 +27,12 @@ sources: {{}}
         encoding="utf-8",
     )
     return yaml_path
+
+
+def _load_demand_schema() -> dict:
+    repo_root = Path(__file__).resolve().parents[2]
+    schema_path = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
+    return json.loads(schema_path.read_text(encoding="utf-8"))
 
 
 class TestLookupCastAndBindDefaults:
@@ -179,7 +185,7 @@ sources: {}
 
 class TestDslVersionRemoved:
     def test_schema_omits_dsl_version(self) -> None:
-        schema = build_demand_schema()
+        schema = _load_demand_schema()
         properties = schema.get("properties", {})
         assert "dsl_version" not in properties
 
@@ -273,7 +279,7 @@ class TestExcelIncludeHeader:
 
 class TestSchemaObservabilityRemoved:
     def test_schema_has_no_observability_definitions(self) -> None:
-        schema = build_demand_schema()
+        schema = _load_demand_schema()
         definitions = schema["definitions"]
 
         assert "observability" not in schema["properties"]

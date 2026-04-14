@@ -643,6 +643,54 @@ RELATION_STEPS_SCHEMA = {
     "markdownDescription": DESC_RELATION_STEPS_MD,
 }
 
+IMPORT_REF_SCHEMA = {
+    "oneOf": [
+        {"type": "string"},
+        {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    ],
+    "description": "$import 引用(支持 string 或 string list)",
+    "markdownDescription": (
+        "$import 引用.\n\n"
+        "- string: `<alias>(.<segment>)*`\n"
+        "- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n"
+        "- 仅支持 mapping 片段\n"
+        "- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n"
+        "- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准"
+    ),
+    "examples": ["common.sources", ["common.sources", "other.sources"]],
+}
+
+IMPORTS_SCHEMA = {
+    "type": "object",
+    "description": "片段文件导入别名映射(编译期展开)",
+    "markdownDescription": (
+        "片段文件导入别名映射.\n\n"
+        "- key: alias\n"
+        "- value: 片段文件路径(字符串)\n"
+        "- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n"
+        "  - `./x.yaml` / `x.yaml`\n"
+        "  - `x/y.yaml`(子目录)\n"
+        "  - `../x.yaml`(父目录)\n"
+        "- 支持(编辑器侧放宽,运行时校验为准):\n"
+        "  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n"
+        "  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n"
+        "- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等"
+    ),
+    "propertyNames": {"type": "string", "pattern": r"^[a-zA-Z_][a-zA-Z0-9_]*$"},
+    "additionalProperties": {
+        "type": "string",
+        # 说明: 更严格的边界与诊断以运行时实现为准(例如拒绝 `URI scheme`/绝对路径).
+        "pattern": (
+            r"^("
+            r"(\./|\.\./)*([^/\\:]+/)*[^/\\:]+\.ya?ml"
+            r"|@/([^/\\:]+/)*[^/\\:]+\.ya?ml"
+            r"|[a-zA-Z_][a-zA-Z0-9_]*:/([^/\\:]+/)*[^/\\:]+\.ya?ml"
+            r"|scalim://[^\\s\\\\]+\.ya?ml"
+            r")$"
+        ),
+    },
+}
+
 DEMAND_SCHEMA_META = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "$id": "https://scalim.invalid/schemas/demand.json",
@@ -689,6 +737,13 @@ SCALIM_YAML_SCHEMA_META = {
         "- schema 仅描述单个文件的结构,不改变 nearest-wins project discovery 语义\n"
         "- v1 聚焦 `yaml_dsl.*` 配置面(imports/lsp project discovery)"
     ),
+}
+
+WORKFLOW_SCHEMA_META = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://scalim.invalid/schemas/workflow.json",
+    "title": "Scalim Workflow 配置",
+    "description": "Scalim 框架 workflow YAML 配置定义 Schema",
 }
 
 __all__ = ()

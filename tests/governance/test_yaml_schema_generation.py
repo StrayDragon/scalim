@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from scalim.dsl.yaml_dsl.schema_dsl import constants as yaml_constants
-from scalim.dsl.yaml_dsl.schema_dsl.builder import (
+from scalim_misc.yaml_schema_generator import (
     SchemaBuilder,
     build_demand_schema,
     build_scalim_yaml_schema,
@@ -111,6 +111,7 @@ def test_build_field_definition_schema_mismatch() -> None:
         DerivedFieldConfig=_DerivedFieldConfig,
         FIELD_DERIVED_CONDITIONS=[],
         SCHEMA_OMIT_KEY=yaml_constants.SCHEMA_OMIT_KEY,
+        IMPORT_REF_SCHEMA=yaml_constants.IMPORT_REF_SCHEMA,
     )
 
     builder = SchemaBuilder(dummy_types)

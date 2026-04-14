@@ -140,6 +140,20 @@
 - **THEN** 结果 MUST 不出现 `planning -> execution` 的反向依赖
 - **AND** MUST 不出现 `hooks/ob -> dsl 专有配置` 的直接依赖
 
+### Requirement: runtime core MUST NOT import dev tooling packages
+
+系统 MUST 保持依赖方向单向且可审计：
+
+- runtime core（`src/IMPL_ROOT/**`）MUST NOT 导入 dev tooling packages（例如 `packages/scalim-misc`）
+- dev tooling packages MAY 导入 `IMPL_ROOT` 并消费其 SSOT/公共入口
+
+说明：禁止通过 optional hook / `importlib.import_module` 等动态导入方式绕开该限制。
+
+#### Scenario: importing IMPL_ROOT does not require scalim-misc
+- **GIVEN** 环境中未安装 `scalim-misc`
+- **WHEN** 用户仅导入并使用 runtime core（compile/validate/run/workflow）
+- **THEN** 导入与运行 MUST 成功
+
 ### Requirement: workflow framework MUST NOT import DSL modules
 系统 MUST 保持核心层级依赖方向可审计且单向；workflow runtime/framework 层 MUST NOT 反向依赖 DSL 层实现符号（例如 `IMPL_ROOT.dsl.yaml_dsl` 及其子模块）。
 

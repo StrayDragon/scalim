@@ -1,7 +1,14 @@
+import json
+from pathlib import Path
 from typing import Any, Dict, List
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.yaml_dsl.schema_dsl.builder import build_demand_schema
+
+
+def _load_schema() -> Dict[str, Any]:
+    repo_root = Path(__file__).resolve().parents[2]
+    path = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _load_ok(yaml_text: str) -> None:
@@ -20,7 +27,7 @@ def _enum(schema: Dict[str, Any], *path: str) -> List[str]:
 
 
 def test_schema_enums_match_runtime_validation_for_file_resources() -> None:
-    schema = build_demand_schema()
+    schema = _load_schema()
     file_kinds = _enum(schema, "definitions", "file", "properties", "kind")
     header_by_values = _enum(schema, "definitions", "output_write", "properties", "header_fields_output_by")
 
@@ -74,7 +81,7 @@ def test_schema_enums_match_runtime_validation_for_file_resources() -> None:
 
 
 def test_schema_enums_match_runtime_validation_for_books_header_fields_output_by() -> None:
-    schema = build_demand_schema()
+    schema = _load_schema()
     output_write_header_by_values = _enum(schema, "definitions", "output_write", "properties", "header_fields_output_by")
 
     for header_by in output_write_header_by_values:
@@ -103,7 +110,7 @@ def test_schema_enums_match_runtime_validation_for_books_header_fields_output_by
 
 
 def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_overflow() -> None:
-    schema = build_demand_schema()
+    schema = _load_schema()
     distinct_overflow = _enum(schema, "definitions", "output_aggregate", "properties", "distinct_on_overflow")
 
     agg_fields = schema["definitions"]["output_aggregate"]["properties"]["fields"]["additionalProperties"]["oneOf"]

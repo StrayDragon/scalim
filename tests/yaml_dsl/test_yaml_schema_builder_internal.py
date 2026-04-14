@@ -3,7 +3,7 @@ from typing import List
 
 import pytest
 
-from scalim.dsl.yaml_dsl.schema_dsl.builder import SchemaBuilder, _build_default_types_module
+from scalim_misc.yaml_schema_generator import SchemaBuilder, _build_default_types_module
 
 
 def test_schema_builder_schema_for_type_list_hits_container_branch() -> None:

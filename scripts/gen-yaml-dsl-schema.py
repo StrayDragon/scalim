@@ -6,8 +6,13 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-from scalim.dsl.yaml_dsl.schema_dsl.builder import write_demand_schema, write_scalim_yaml_schema, write_workflow_schema
-from scalim.dsl.yaml_dsl.schema_dsl.doc_standardizer import load_schema_doc_standardizer_impl
+try:
+    import scalim_misc.yaml_schema_generator as _yaml_schema_generator
+except Exception as exc:  # noqa: BLE001
+    _yaml_schema_generator = None  # type: ignore[assignment]
+    _yaml_schema_generator_import_error: Optional[Exception] = exc
+else:
+    _yaml_schema_generator_import_error = None
 
 
 def _read_text(path: Path) -> str:
@@ -40,21 +45,21 @@ def _is_ci_env() -> bool:
     return value not in ("", "0", "false", "no")
 
 
-def _ensure_schema_doc_standardizer_available() -> bool:
-    impl = load_schema_doc_standardizer_impl()
-    if impl is not None:
+def _ensure_yaml_schema_generator_available() -> bool:
+    if _yaml_schema_generator is not None:
         return True
 
     msg = (
-        "[提示] 缺少可选开发插件 `scalim-misc`: `schema` 文档标准化将降级. "
-        "修复建议: 安装开发依赖,或确保工作区包含 `scalim-misc`(例如 `uv sync --group dev`)."
+        "[提示] 缺少开发依赖 `scalim-misc`: `YAML DSL` 的 `JSON Schema` 生成器不可用. "
+        "修复建议: 安装开发依赖,或确保工作区包含 `scalim-misc`(例如 `uv sync --group dev`). "
+        "原始错误: {}".format(_yaml_schema_generator_import_error)
     )
     if _is_ci_env():
         print(msg, file=sys.stderr)
-        print("[错误] `CI` 环境必须启用 `schema` 文档标准化; 当前检测到 `scalim-misc` 不可用.", file=sys.stderr)
+        print("[错误] `CI` 环境必须启用 `YAML DSL` 的 `JSON Schema` 生成器; 当前检测到 `scalim-misc` 不可用.", file=sys.stderr)
         return False
     print(msg, file=sys.stderr)
-    return True
+    return False
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
@@ -62,7 +67,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     p.add_argument("--check", action="store_true", help="仅检查漂移,不写入文件.")
     args = p.parse_args(list(argv) if argv is not None else None)
 
-    if not _ensure_schema_doc_standardizer_available():
+    if not _ensure_yaml_schema_generator_available():
         return 1
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -73,9 +78,10 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
 
     if not args.check:
         schema_dir.mkdir(parents=True, exist_ok=True)
-        write_demand_schema(demand_path)
-        write_workflow_schema(workflow_path)
-        write_scalim_yaml_schema(scalim_yaml_path)
+        assert _yaml_schema_generator is not None
+        _yaml_schema_generator.write_demand_schema(demand_path)
+        _yaml_schema_generator.write_workflow_schema(workflow_path)
+        _yaml_schema_generator.write_scalim_yaml_schema(scalim_yaml_path)
         return 0
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -83,9 +89,10 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         tmp_demand = tmp_schema_dir / "demand.gen.json"
         tmp_workflow = tmp_schema_dir / "workflow.gen.json"
         tmp_scalim_yaml = tmp_schema_dir / "scalim_yaml.gen.json"
-        write_demand_schema(tmp_demand)
-        write_workflow_schema(tmp_workflow)
-        write_scalim_yaml_schema(tmp_scalim_yaml)
+        assert _yaml_schema_generator is not None
+        _yaml_schema_generator.write_demand_schema(tmp_demand)
+        _yaml_schema_generator.write_workflow_schema(tmp_workflow)
+        _yaml_schema_generator.write_scalim_yaml_schema(tmp_scalim_yaml)
 
         expected = [
             (demand_path, tmp_demand.read_text(encoding="utf-8")),

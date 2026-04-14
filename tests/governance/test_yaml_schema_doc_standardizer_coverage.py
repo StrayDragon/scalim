@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 import pytest
 
-from scalim.dsl.yaml_dsl.schema_dsl import builder as schema_builder
+from scalim_misc import yaml_schema_generator as schema_builder
 from scalim_misc import yaml_schema_doc_standardizer as ds
 
 

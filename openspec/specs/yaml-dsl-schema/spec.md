@@ -5,11 +5,13 @@
 通过 dataclass 元数据生成 YAML DSL JSON Schema(`demand.gen.json`),作为校验与编辑器提示的唯一来源.
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/models/__init__.py` (schema meta dataclasses)
-- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/constants.py` (enum/hover fragments)
-- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py` (schema builder + writer)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/constants.py` (enum/hover fragments + core schema meta)
+- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/workflow_ssot.py` (workflow schema SSOT fragments)
+- `packages/scalim-misc/src/scalim_misc/yaml_schema_generator.py` (schema generator: builder + writer + docs standardization)
+- `packages/scalim-misc/src/scalim_misc/yaml_schema_doc_standardizer.py` (schema docs standardizer)
 - `scripts/gen-yaml-dsl-schema.py` (single generation entrypoint)
 - `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` (generated artifact)
-- `tests/test_yaml_schema_generation.py` (drift guard)
+- `tests/governance/test_yaml_schema_generation.py` (drift guard)
 - `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (runtime strict validation)
 ## Implementation Notes (Current Behavior)
 本节描述 **实际代码链路**,用于避免“规范/实现”理解偏差.
@@ -18,16 +20,16 @@
 - **Schema 元数据来源**:
   - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/models/__init__.py` 定义 dataclass + `_schema_meta(...)` 元数据
   - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/constants.py` 提供枚举/描述/默认值/基础 schema 片段
-  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py` 默认通过轻量 adapter 统一访问 models/constants(不再保留 `schema_dsl/types.py` 聚合模块)
+  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/workflow_ssot.py` 提供 workflow schema 的 SSOT 描述片段(避免散落在生成器实现中)
 - **Schema 构建器**:
-  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py::SchemaBuilder.build_demand_schema()`
+  - `packages/scalim-misc/src/scalim_misc/yaml_schema_generator.py::SchemaBuilder.build_demand_schema()`
   - 关键实际行为:
     - 顶层 `properties` 由 `DemandConfig` + `DEMAND_SCHEMA_PROPERTIES_ORDER` 构造
     - `fields` 顶层使用自定义描述与 `FIELD_DERIVED_CONDITIONS` 约束
     - `source_field` + `derived_field` 通过 `_build_field_definition()` 合并
     - 生成 schema 包含 `$comment`,值为“自动生成, 请勿手动修改...”
 - **输出写入**:
-  - `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/builder.py::write_demand_schema()` 使用 `json.dump(..., ensure_ascii=False, indent=2, sort_keys=False)` 写出
+  - `packages/scalim-misc/src/scalim_misc/yaml_schema_generator.py::write_demand_schema()` 使用 `json.dump(..., ensure_ascii=False, indent=2, sort_keys=False)` 写出
 - **命令入口**:
   - `scripts/gen-yaml-dsl-schema.py` 是唯一生成入口
   - `just gen-yaml-dsl-schema` 调用该脚本,输出到 `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json`
@@ -38,28 +40,50 @@
 - `demand.gen.json` 用于 **编辑器提示 / schema-only 校验**(例如 `PROJECT_CLI_NAME yaml-dsl schema validate`).
 - 运行时严格校验由 `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` 执行,可能比 schema 更严格(例如 schema 对 `fields` 允许额外键,但严格校验会报告未知字段).
 ## Requirements
-### Requirement: schema docs standardization MUST be provided via an optional dev plugin without impacting runtime users
+### Requirement: YAML DSL JSON Schema generator MUST live in dev tooling and consume core SSOT
 
-YAML DSL schema 生成管线 MAY 包含“schema docs 标准化”阶段(例如生成/补全 `markdownDescription`、提取示例片段、校验枚举语义一致性),但该能力 MUST 以 dev-only 插件形式提供,避免将 gen-only 复杂度强绑定到主包运行时:
+系统 MUST 将 YAML DSL JSON Schema 的**结构/描述 SSOT** 与**生成器实现**分层：
 
-- 主包 MUST 提供一个 ImportError-safe 的标准化 hook(例如 `maybe_standardize_schema_docs(schema) -> schema`)
-- 当 dev 插件(例如 `scalim-misc`)不存在时:
-  - hook MUST no-op
-  - 主包 import 与 runtime MUST 正常工作(不得因缺少 dev 包而失败)
-- 在 dev/CI 的 schema 生成环境中,生成入口 SHOULD 确保 dev 插件可用;若不可用:
+- 结构/描述 SSOT MUST 位于 `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/**`（dataclass + metadata、枚举/默认值、字段描述文本等）。
+- JSON Schema 的生成器实现（builder/writer/docs standardization pipeline）MUST 位于 dev tooling packages（例如 `packages/scalim-misc`）。
+- 生成器 MUST 以 core SSOT 为唯一来源构建 schema，不得在 dev 包中复制字段枚举/默认值/描述文案的另一份真相。
+
+#### Scenario: changing a field description only touches core SSOT
+- **WHEN** 维护者更新某个 YAML 字段的描述性信息（例如 `markdownDescription` 文案）
+- **THEN** 变更 MUST 只发生在 `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/**`
+- **AND** 重新生成 `*.gen.json` 后生成器输出 MUST 反映该变更
+
+### Requirement: schema generation entrypoint MUST remain single and output location MUST remain stable
+
+系统 MUST 保持 schema 生成入口与生成物位置为稳定契约：
+
+- 唯一生成入口 MUST 为 `scripts/gen-yaml-dsl-schema.py`（由 `just gen-yaml-dsl-schema` 调用）
+- 生成物 MUST 写入 `src/IMPL_ROOT/dsl/yaml_dsl/schema/{demand,workflow,scalim_yaml}.gen.json`
+- 生成物为 `.gen.` 文件，MUST NOT 手工编辑（只能通过生成入口刷新）
+
+#### Scenario: drift gate points to the single generator entrypoint
+- **WHEN** `*.gen.json` 与生成器输出不一致（drift）
+- **THEN** gate MUST fail-fast
+- **AND** 输出 MUST 提示运行 `just gen-yaml-dsl-schema` 以修复
+
+### Requirement: schema docs standardization MUST live in dev tooling without impacting runtime users
+
+YAML DSL schema 生成管线 MAY 包含“schema docs 标准化”阶段(例如生成/补全 `markdownDescription`、提取示例片段、校验枚举语义一致性),但该能力 MUST 位于 dev tooling generator 内部,并保持 runtime core 不依赖 dev tooling packages:
+
+- runtime core（`src/IMPL_ROOT/**`）MUST NOT 导入 dev tooling packages（例如 `scalim-misc`），包括 optional hook / `importlib.import_module` 等动态导入方式。
+- 在 dev/CI 的 schema 生成环境中,生成入口 MUST 确保 dev tooling 可用;若不可用:
   - CI 环境 MUST fail-fast(非零退出码)
-  - 本地开发环境 SHOULD 输出明确 warning 并提示“生成结果将降级”(并给出安装插件的修复建议)
+  - 本地开发环境 SHOULD 输出明确错误并给出安装/同步依赖的修复建议
 
-#### Scenario: missing dev plugin does not break runtime imports
+#### Scenario: missing dev package does not break runtime imports
 - **GIVEN** 用户环境未安装 `scalim-misc`
 - **WHEN** 用户仅使用 runtime 能力(compile/validate/run/workflow)或 import 主包
 - **THEN** import 与运行 MUST 成功
-- **AND** schema docs 标准化 hook MUST 自动 no-op
 
-#### Scenario: schema generation uses standardizer when available
+#### Scenario: schema generation applies standardizer when available
 - **GIVEN** dev/CI 环境安装了 `scalim-misc`
 - **WHEN** 执行 `just gen-yaml-dsl-schema`(或等价生成入口)
-- **THEN** 生成器 MUST 通过可选 hook 应用 schema docs 标准化
+- **THEN** 生成器 MUST 应用 schema docs 标准化(包含 `markdownDescription` 标题、约束与示例片段)
 - **AND** 生成结果 MUST 满足 `yaml-dsl-schema` 中对 `markdownDescription`/示例的要求
 
 ### Requirement: enums and defaults MUST be sourced from schema_dsl SSOT

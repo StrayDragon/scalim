@@ -1,23 +1,39 @@
+# pragma: allow-cast-file gen-only schema generator; casts for Any-narrowing (not runtime hot path)
 import copy
 import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
-from ....vendor.dataclassesx import Field, dataclass
-from ....vendor.dataclassesx import fields as dataclass_fields
-from . import constants as schema_constants
-from . import models as schema_models
-from .constants import SCHEMA_META_KEY
-from .doc_standardizer import maybe_standardize_schema_docs
+from scalim.dsl.yaml_dsl.schema_dsl import constants as schema_constants
+from scalim.dsl.yaml_dsl.schema_dsl import models as schema_models
+from scalim.dsl.yaml_dsl.schema_dsl import workflow_ssot
+from scalim.dsl.yaml_dsl.schema_dsl.constants import SCHEMA_META_KEY
+from scalim.vendor.dataclassesx import Field, dataclass
+from scalim.vendor.dataclassesx import fields as dataclass_fields
+
+from .yaml_schema_doc_standardizer import standardize_schema_docs
 
 _IMPORT_KEY = "$import"
 _IMPORTS_KEY = "imports"
+
 _SCHEMA_DOC_FIXTURE_RELATIVE_PATHS: Tuple[str, ...] = (
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml",
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_fixture_cache_pool_pin.yaml",
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/scalim.yaml",
 )
+
+
+def _find_repo_root(start: Path) -> Optional[Path]:
+    current = start.parent if start.is_file() else start
+    for _ in range(12):
+        if (current / "src" / "scalim").exists() and (current / "packages").exists():
+            return current
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    return None
 
 
 def _resolve_schema_doc_fixture_paths() -> List[str]:
@@ -28,8 +44,9 @@ def _resolve_schema_doc_fixture_paths() -> List[str]:
     - 若在安装包环境(缺少 `notebooks/` 目录)调用生成脚本,则自动降级为不启用片段示例.
     """
 
-    # 本文件在仓库中的位置: `src/scalim/dsl/yaml_dsl/schema_dsl/builder.py`
-    repo_root = Path(__file__).resolve().parents[5]
+    repo_root = _find_repo_root(Path(__file__).resolve())
+    if repo_root is None:
+        return []
     resolved: List[str] = []
     for rel in _SCHEMA_DOC_FIXTURE_RELATIVE_PATHS:
         path = repo_root / rel
@@ -159,145 +176,10 @@ class SchemaBuilder:
         )  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
             schema["additionalProperties"] = bool(additional_props)
-        return maybe_standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def build_workflow_schema(self) -> Dict[str, Any]:
         types_mod = self._types
-        cache_pool_pin_item: Dict[str, Any] = {
-            "type": "object",
-            "required": ["kind", "source_id"],
-            "properties": {
-                "kind": {
-                    "type": "string",
-                    "enum": ["preload_forever"],
-                    "description": "pin kind(v0 仅允许 preload_forever)",
-                    "markdownDescription": "pin kind.\n\n- `preload_forever`: pin 该 `(kind, source_id)` 的缓存(避免被 refcount/LRU 逐出)",
-                },
-                "source_id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "pin 的 source_id",
-                    "markdownDescription": "pin 的 `source_id`.",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        cache_pool: Dict[str, Any] = {
-            "type": "object",
-            "required": ["conflict_policy", "release_policy", "budget"],
-            "properties": {
-                "conflict_policy": {
-                    "type": "string",
-                    "enum": ["error", "separate", "warn"],
-                    "description": "signature 冲突策略(error/separate/warn)",
-                    "markdownDescription": (
-                        "signature 冲突策略.\n\n"
-                        "- `error`: 发现同一 `(kind, source_id)` 的 signature 不一致时直接失败\n"
-                        "- `warn`: 允许冲突并继续(会发出 warning 事件,并附带 diff 摘要)\n"
-                        "- `separate`: 允许冲突并继续(作为独立 entry 共存;当前实现与 warn 等价,仍会发 warning)"
-                    ),
-                },
-                "release_policy": {
-                    "type": "string",
-                    "enum": ["dag_refcount", "workflow_end"],
-                    "description": "释放策略(dag_refcount/workflow_end)",
-                    "markdownDescription": (
-                        "释放策略.\n\n"
-                        "- `dag_refcount`: 当某 `(kind, source_id)` 的剩余 consumer=0 时释放(类似 DAG 引用计数)\n"
-                        "- `workflow_end`: 直到 workflow 结束才释放(占用更久,但可能减少重复加载)"
-                    ),
-                },
-                "budget": {
-                    "type": "object",
-                    "required": ["max_entries", "over_budget_policy"],
-                    "properties": {
-                        "max_entries": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "cache pool entry 数量预算(>=1)",
-                            "markdownDescription": "cache pool entry 数量预算(>=1).",
-                        },
-                        "over_budget_policy": {
-                            "type": "string",
-                            "enum": ["fail_fast", "evict_lru"],
-                            "description": "超限策略(fail_fast/evict_lru)",
-                            "markdownDescription": (
-                                "超限策略.\n\n"
-                                "- `fail_fast`: 超限即失败\n"
-                                "- `evict_lru`: 逐出 LRU 的 idle entry(仅逐出 refcount=0 且非 pin); 若无可逐出项则失败"
-                            ),
-                        },
-                    },
-                    "additionalProperties": False,
-                },
-                "pin": {
-                    "type": "array",
-                    "items": cache_pool_pin_item,
-                    "default": [],
-                    "description": "pin 列表(可选)",
-                    "markdownDescription": "pin 列表(可选).",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        options: Dict[str, Any] = {
-            "type": "object",
-            "properties": {
-                "max_concurrency": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "default": 1,
-                    "description": "runs 粒度并发上限(>=1)",
-                    "markdownDescription": "runs 粒度并发上限(>=1).",
-                },
-                "failure_policy": {
-                    "type": "string",
-                    "enum": ["all_fail", "primary_only"],
-                    "default": "all_fail",
-                    "description": "失败策略(all_fail/primary_only)",
-                    "markdownDescription": (
-                        "失败策略.\n\n- `all_fail`: 任一 run 失败即失败\n- `primary_only`: 失败 run 被跳过但 workflow 继续"
-                    ),
-                },
-                "cache_pool": {
-                    "oneOf": [cache_pool, {"type": "null"}],
-                    "default": None,
-                    "description": "workflow-scope cache pool 配置(可选)",
-                    "markdownDescription": "workflow-scope cache pool 配置(可选).",
-                },
-                "ctx": {
-                    "oneOf": [
-                        {
-                            "type": "object",
-                            "properties": {
-                                "max_value_bytes": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "default": 65536,
-                                    "description": "ctx 单 key 最大字节数(>=1)",
-                                    "markdownDescription": "ctx 单 key 最大字节数(>=1).",
-                                },
-                                "max_bytes": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "default": 1048576,
-                                    "description": "ctx 总量最大字节数(>=1)",
-                                    "markdownDescription": "ctx 总量最大字节数(>=1).",
-                                },
-                            },
-                            "additionalProperties": False,
-                        },
-                        {"type": "null"},
-                    ],
-                    "default": None,
-                    "description": "workflow-level ctx 护栏配置(可选)",
-                    "markdownDescription": "workflow-level ctx 护栏配置(可选).",
-                },
-            },
-            "additionalProperties": False,
-        }
 
         definitions: Dict[str, Any] = {
             "book_budget": self._build_definition(types_mod.BookBudgetConfig, allow_import=False),
@@ -308,102 +190,13 @@ class SchemaBuilder:
             "resources": self._build_definition(types_mod.ResourcesConfig, allow_import=False),
         }
 
-        run_item: Dict[str, Any] = {
-            "type": "object",
-            "required": ["id", "demand"],
-            "properties": {
-                "id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "run 标识(非空且唯一)",
-                    "markdownDescription": "run 标识(非空且唯一).",
-                },
-                "demand": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "demand YAML 路径(字符串)",
-                    "markdownDescription": (
-                        "demand YAML 路径(字符串).\n\n"
-                        "- 相对路径以 workflow 文件所在目录为基准\n"
-                        "- 可通过 Python 入口注入 path_aliases 解析 `@/...` 或 `ALIAS:/...`"
-                    ),
-                },
-                "depends_on": {
-                    "type": "array",
-                    "items": {"type": "string", "minLength": 1},
-                    "default": [],
-                    "description": "显式依赖 run.id 列表(可选)",
-                    "markdownDescription": "显式依赖 `run.id` 列表(可选).",
-                },
-                "main_rows_from": {
-                    "oneOf": [
-                        {
-                            "type": "object",
-                            "required": ["run"],
-                            "properties": {
-                                "run": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "description": "上游 run.id(作为本 run 的 main_rows 输入)",
-                                    "markdownDescription": "上游 `run.id`(producer).",
-                                }
-                            },
-                            "additionalProperties": False,
-                        },
-                        {"type": "null"},
-                    ],
-                    "default": None,
-                    "description": "可选:将上游 typed rows 作为本 run 的 main_rows 输入",
-                    "markdownDescription": (
-                        "可选:将上游 `InMemoryRows`(typed rows) 作为本 run 的 `main_rows` 输入.\n\n"
-                        "- MUST 显式声明 `depends_on` 该上游 run\n"
-                        "- producer 仅在被引用时才会启用 typed rows 捕获"
-                    ),
-                },
-                "init_vars": {
-                    "oneOf": [
-                        {
-                            "type": "object",
-                            "propertyNames": {"type": "string", "minLength": 1},
-                            "additionalProperties": True,
-                        },
-                        {"type": "null"},
-                    ],
-                    "default": None,
-                    "description": "demand compile-time init_vars(可选,支持 $ctx 指令)",
-                    "markdownDescription": "demand compile-time `init_vars`(可选,支持 `$ctx` 指令).",
-                },
-            },
-            "additionalProperties": False,
-        }
-
-        workflow: Dict[str, Any] = {
-            "type": "object",
-            "required": ["runs"],
-            "properties": {
-                "runs": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": run_item,
-                },
-                "options": options,
-                "resources": {
-                    "allOf": [{"$ref": "#/definitions/resources"}],
-                    "default": {},
-                    "description": "workflow-scope shared IO resources",
-                    "markdownDescription": (
-                        "workflow-scope shared IO resources.\n\n- stable surface: `workflow.resources.books` / `workflow.resources.files`"
-                    ),
-                },
-            },
-            "additionalProperties": False,
-        }
+        workflow = workflow_ssot.build_workflow_workflow_schema()
 
         schema: Dict[str, Any] = {
-            "$schema": types_mod.DEMAND_SCHEMA_META["$schema"],
-            "$id": "https://scalim.invalid/schemas/workflow.json",
-            "title": "Scalim Workflow 配置",
-            "description": "Scalim 框架 workflow YAML 配置定义 Schema",
+            "$schema": types_mod.WORKFLOW_SCHEMA_META["$schema"],
+            "$id": types_mod.WORKFLOW_SCHEMA_META["$id"],
+            "title": types_mod.WORKFLOW_SCHEMA_META["title"],
+            "description": types_mod.WORKFLOW_SCHEMA_META["description"],
             "$comment": self.GENERATED_SCHEMA_COMMENT,
             "type": "object",
             "required": ["workflow"],
@@ -412,7 +205,7 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
         self._assert_schema_does_not_expose_import_key(schema, path="$")
-        return maybe_standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def build_scalim_yaml_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -454,62 +247,13 @@ class SchemaBuilder:
         }
         if "markdownDescription" in types_mod.SCALIM_YAML_SCHEMA_META:
             schema["markdownDescription"] = types_mod.SCALIM_YAML_SCHEMA_META["markdownDescription"]
-        return maybe_standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
-
-    def _import_ref_schema(self) -> Dict[str, Any]:
-        return {
-            "oneOf": [
-                {"type": "string"},
-                {"type": "array", "items": {"type": "string"}, "minItems": 1},
-            ],
-            "description": "$import 引用(支持 string 或 string list)",
-            "markdownDescription": (
-                "$import 引用.\n\n"
-                "- string: `<alias>(.<segment>)*`\n"
-                "- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n"
-                "- 仅支持 mapping 片段\n"
-                "- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n"
-                "- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准"
-            ),
-            "examples": ["common.sources", ["common.sources", "other.sources"]],
-        }
-
-    def _imports_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "description": "片段文件导入别名映射(编译期展开)",
-            "markdownDescription": (
-                "片段文件导入别名映射.\n\n"
-                "- key: alias\n"
-                "- value: 片段文件路径(字符串)\n"
-                "- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n"
-                "  - `./x.yaml` / `x.yaml`\n"
-                "  - `x/y.yaml`(子目录)\n"
-                "  - `../x.yaml`(父目录)\n"
-                "- 支持(编辑器侧放宽,运行时校验为准):\n"
-                "  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n"
-                "  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n"
-                "- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等"
-            ),
-            "propertyNames": {"type": "string", "pattern": r"^[a-zA-Z_][a-zA-Z0-9_]*$"},
-            "additionalProperties": {
-                "type": "string",
-                # 说明: 更严格的边界与诊断以运行时实现为准(例如拒绝 `URI scheme`/绝对路径).
-                "pattern": (
-                    r"^("
-                    r"(\./|\.\./)*([^/\\:]+/)*[^/\\:]+\.ya?ml"
-                    r"|@/([^/\\:]+/)*[^/\\:]+\.ya?ml"
-                    r"|[a-zA-Z_][a-zA-Z0-9_]*:/([^/\\:]+/)*[^/\\:]+\.ya?ml"
-                    r"|scalim://[^\\s\\\\]+\.ya?ml"
-                    r")$"
-                ),
-            },
-        }
+        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
 
     def _build_definition(self, cls: type, *, allow_import: bool = True) -> Dict[str, Any]:
+        types_mod = self._types
         properties = self._build_class_properties(cls, allow_import=allow_import)
         if allow_import:
-            properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
+            properties.setdefault(_IMPORT_KEY, copy.deepcopy(types_mod.IMPORT_REF_SCHEMA))
         schema: Dict[str, Any] = {
             "type": "object",
             "properties": properties,
@@ -536,14 +280,14 @@ class SchemaBuilder:
     def _build_demand_properties(self) -> Dict[str, Any]:
         types_mod = self._types
         base_properties = self._build_class_properties(types_mod.DemandConfig, allow_import=True)
-        base_properties.setdefault(_IMPORTS_KEY, self._imports_schema())
+        base_properties.setdefault(_IMPORTS_KEY, copy.deepcopy(types_mod.IMPORTS_SCHEMA))
         ordered: Dict[str, Any] = {}
         for name in types_mod.DEMAND_SCHEMA_PROPERTIES_ORDER:
             if name == "_templates":
                 ordered[name] = {
                     "type": "object",
                     "description": "YAML anchor 模板集合(_templates), 供 fields/relations 复用",
-                    "markdownDescription": ("YAML anchor 模板集合.\n\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations`"),
+                    "markdownDescription": "YAML anchor 模板集合.\n\n- 仅用于 YAML 复用(anchors)\n- 常用于 `fields` / `relations`",
                     "additionalProperties": True,
                 }
                 continue
@@ -558,7 +302,7 @@ class SchemaBuilder:
                         "- 支持 YAML anchor 复用"
                     ),
                     # `c15-yaml-dsl-demand-imports-scope`: `fields` 属于稳定编写入口之一, 允许 `$import`。
-                    "properties": {_IMPORT_KEY: self._import_ref_schema()},
+                    "properties": {_IMPORT_KEY: copy.deepcopy(types_mod.IMPORT_REF_SCHEMA)},
                     "propertyNames": {"anyOf": [{"const": _IMPORT_KEY}, schema_constants.FIELD_ID_STRING_SCHEMA]},
                     "additionalProperties": {"$ref": "#/definitions/field"},
                 }
@@ -580,7 +324,7 @@ class SchemaBuilder:
                 continue
             properties[name] = schema
 
-        properties.setdefault(_IMPORT_KEY, self._import_ref_schema())
+        properties.setdefault(_IMPORT_KEY, copy.deepcopy(types_mod.IMPORT_REF_SCHEMA))
 
         return {
             "type": "object",
@@ -744,6 +488,8 @@ class SchemaBuilder:
         return {}
 
     def _container_schema(self, tp: Any, origin: Any, *, allow_import: bool) -> Dict[str, Any]:
+        types_mod = self._types
+
         if origin is list or tp is list:
             args = getattr(tp, "__args__", ())  # pragma: allow-dynattr introspection: __args__
             item_type = args[0] if args else object
@@ -751,7 +497,7 @@ class SchemaBuilder:
 
         if origin is dict or tp is dict:
             if allow_import:
-                return {"type": "object", "properties": {_IMPORT_KEY: self._import_ref_schema()}}
+                return {"type": "object", "properties": {_IMPORT_KEY: copy.deepcopy(types_mod.IMPORT_REF_SCHEMA)}}
             return {"type": "object"}
 
         if origin is tuple or tp is tuple:

@@ -1,10 +1,10 @@
 # pragma: allow-cast-file tests use casts for schema traversal helpers; not production runtime
+import json
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, cast
 
-from scalim.dsl.yaml_dsl.schema_dsl.builder import load_schema
 from scalim.vendor.yamlx import yaml as vendored_yaml
 from tests.support.pathing import repo_root as _repo_root
 
@@ -12,6 +12,11 @@ from tests.support.pathing import repo_root as _repo_root
 def _schema_path(name: str) -> Path:
     repo_root = _repo_root()
     return repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / name
+
+
+def _load_schema(path: Path) -> Dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        return cast("Dict[str, Any]", json.load(handle))
 
 
 def _is_dict(value: Any) -> bool:
@@ -94,7 +99,7 @@ def test_schema_nodes_have_structured_markdown_description() -> None:
     ]
 
     for path in schema_paths:
-        schema = load_schema(path)
+        schema = _load_schema(path)
         for node in _iter_doc_property_nodes(schema):
             md = node.get("markdownDescription")
             assert isinstance(md, str), "missing markdownDescription in {}".format(str(path))
@@ -111,7 +116,7 @@ def test_schema_nodes_have_structured_markdown_description() -> None:
 
 
 def test_schema_paths_disambiguate_common_fields() -> None:
-    schema = load_schema(_schema_path("demand.gen.json"))
+    schema = _load_schema(_schema_path("demand.gen.json"))
     main_loader = schema["definitions"]["main_source"]["properties"]["loader"]["markdownDescription"]
     source_loader = schema["definitions"]["source"]["properties"]["loader"]["markdownDescription"]
 
@@ -120,25 +125,25 @@ def test_schema_paths_disambiguate_common_fields() -> None:
 
 
 def test_import_required_workaround_is_expressed_in_brief_docs() -> None:
-    schema = load_schema(_schema_path("demand.gen.json"))
+    schema = _load_schema(_schema_path("demand.gen.json"))
     md = schema["properties"]["main_source"]["markdownDescription"]
     assert "$import" in md
 
 
 def test_workflow_paths_include_array_items() -> None:
-    schema = load_schema(_schema_path("workflow.gen.json"))
+    schema = _load_schema(_schema_path("workflow.gen.json"))
     demand_md = schema["properties"]["workflow"]["properties"]["runs"]["items"]["properties"]["demand"]["markdownDescription"]
     assert demand_md.splitlines()[0].strip() == "#### workflow.runs[*].demand"
 
 
 def test_project_config_paths_do_not_leak_definition_names() -> None:
-    schema = load_schema(_schema_path("scalim_yaml.gen.json"))
+    schema = _load_schema(_schema_path("scalim_yaml.gen.json"))
     import_roots_md = schema["definitions"]["scalim_yaml_yaml_dsl"]["properties"]["import_roots"]["markdownDescription"]
     assert import_roots_md.splitlines()[0].strip() == "#### yaml_dsl.import_roots"
 
 
 def test_enum_nodes_are_full_and_have_per_choice_semantics() -> None:
-    schema = load_schema(_schema_path("workflow.gen.json"))
+    schema = _load_schema(_schema_path("workflow.gen.json"))
     checked = 0
     for node in _iter_doc_property_nodes(schema):
         enum_vals = _schema_enum_values(node)
@@ -198,7 +203,7 @@ def test_fixture_snippet_extractor_supports_nesting_and_is_yaml_parseable() -> N
 
 
 def test_runtime_import_graph_does_not_pull_doc_standardizer() -> None:
-    """Verify schema doc standardization is gen-only (no runtime overhead/import side-effects)."""
+    """Verify core does not import dev-only `scalim-misc` (direction: scalim-misc -> scalim only)."""
 
     repo_root = _repo_root()
     script = (
@@ -207,8 +212,25 @@ def test_runtime_import_graph_does_not_pull_doc_standardizer() -> None:
         "import scalim.dsl.yaml_dsl.runtime.compiler as _c; "
         "import scalim.dsl.yaml_dsl._internal.config_parsing.loader as _l; "
         "import sys as _sys; "
-        "print('scalim.dsl.yaml_dsl.schema_dsl.doc_standardizer' in _sys.modules)"
+        "print(any(m.startswith('scalim_misc') for m in _sys.modules))"
     ).format(str(repo_root / "src"))
 
     out = subprocess.check_output([sys.executable, "-c", script], text=True).strip()
     assert out == "False"
+
+
+def test_core_sources_do_not_reference_scalim_misc_imports() -> None:
+    repo_root = _repo_root()
+    src_root = repo_root / "src" / "scalim"
+    patterns = (
+        "import scalim_misc",
+        "from scalim_misc",
+        'import_module("scalim_misc',
+        "import_module('scalim_misc",
+    )
+    offenders: List[str] = []
+    for path in src_root.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        if any(pat in text for pat in patterns):
+            offenders.append(str(path))
+    assert not offenders, "core MUST NOT reference scalim-misc imports; offenders: {}".format(offenders)

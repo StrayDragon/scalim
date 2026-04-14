@@ -2250,10 +2250,9 @@ def test_cache_pool_calls_node_done_on_runtime_error(tmp_path: Path) -> None:
 def test_workflow_schema_validation() -> None:
     jsonschema = pytest.importorskip("jsonschema")
     yaml = pytest.importorskip("yaml")
-
-    from scalim.dsl.yaml_dsl.schema_dsl.builder import build_workflow_schema
-
-    schema = build_workflow_schema()
+    repo_root = Path(__file__).resolve().parents[2]
+    schema_path = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
     ok = yaml.safe_load(
         (
             """
