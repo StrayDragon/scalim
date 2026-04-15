@@ -65,10 +65,10 @@
 指引 MUST 明确包含:
 - `uv run PROJECT_CLI_NAME yaml-dsl validate <file.yaml>`
 - `uv run PROJECT_CLI_NAME yaml-dsl schema validate <file.yaml>`
-- `uvx --from "PROJECT_DIST_NAME[cli]" PROJECT_CLI_NAME yaml-dsl validate <file.yaml>`
-- `uvx --from "PROJECT_DIST_NAME[cli]" PROJECT_CLI_NAME yaml-dsl schema validate <file.yaml>`
+- `uvx PROJECT_CLI_NAME yaml-dsl validate <file.yaml>`
+- `uvx PROJECT_CLI_NAME yaml-dsl schema validate <file.yaml>`
 - `uv run PROJECT_CLI_NAME yaml-dsl schema path`
-- `uvx --from "PROJECT_DIST_NAME[cli]" PROJECT_CLI_NAME yaml-dsl schema path`
+- `uvx PROJECT_CLI_NAME yaml-dsl schema path`
 - `# yaml-language-server: $schema=...` 的 header 参考
 
 skill MUST 明确指出 schema path 可通过 `PROJECT_CLI_NAME yaml-dsl schema path` 查询,并提供 header 模板。
@@ -80,7 +80,7 @@ skill MUST 明确指出 canonical example 不应固化本机 `.venv/...`、`site
 
 #### Scenario: 脱离仓库用户获取 CLI 指引
 - **WHEN** 用户不在仓库内但需要运行 CLI 校验
-- **THEN** skill 必须提供 `uvx --from "PROJECT_DIST_NAME[cli]" PROJECT_CLI_NAME ...` 形式的命令
+- **THEN** skill 必须提供 `uvx PROJECT_CLI_NAME ...` 形式的命令
 
 #### Scenario: 用户需要配置 YAML LSP
 - **WHEN** 用户请求编辑器补全或 schema 头部示例

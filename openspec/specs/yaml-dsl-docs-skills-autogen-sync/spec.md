@@ -36,7 +36,7 @@ TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update 
 - **THEN** 每个文件 MUST 包含对应的 `BEGIN/END AUTOGEN:*` marker
 
 #### Scenario: hand-written snippets outside markers fail fast
-- **WHEN** 维护者在 marker 外写入 `uv run PROJECT_CLI_NAME yaml-dsl ...` 或 `uvx --from "PROJECT_DIST_NAME[cli]" PROJECT_CLI_NAME yaml-dsl ...` 的命令片段
+- **WHEN** 维护者在 marker 外写入 `uv run PROJECT_CLI_NAME yaml-dsl ...` 或 `uvx PROJECT_CLI_NAME yaml-dsl ...` 的命令片段
 - **THEN** `just qa` MUST 失败
 - **AND** 错误信息 MUST 提示通过 `just gen-docs` / `just gen-agent-skill` 修复
 
