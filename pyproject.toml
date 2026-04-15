@@ -1,6 +1,6 @@
 [project]
 name = "scalim"
-version = "0.8.2"
+version = "0.8.3"
 description = "A data-orchestration framework simplifying perf opt & dev with unified way"
 readme = "README.md"
 authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
