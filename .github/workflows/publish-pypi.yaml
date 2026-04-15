@@ -5,6 +5,23 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      skip_checks:
+        description: "Skip `just check-only-py` (manual runs only)"
+        type: boolean
+        default: false
+      skip_dist_verify:
+        description: "Skip dist verification steps (`just dist-check` + build artifact checks)"
+        type: boolean
+        default: false
+      publish_main:
+        description: "Publish `scalim` (main package)"
+        type: boolean
+        default: true
+      publish_tools:
+        description: "Publish `scalim-cli` + `scalim-yaml-dsl-lsp`"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -14,6 +31,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: pypi
+    env:
+      SKIP_CHECKS: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_checks }}
+      SKIP_DIST_VERIFY: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_dist_verify }}
+      PUBLISH_MAIN: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_main }}
+      PUBLISH_TOOLS: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_tools }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -34,20 +56,70 @@ jobs:
         run: source .venv/bin/activate
 
       - name: Check
+        if: env.SKIP_CHECKS != 'true'
         run: just check-only-py
 
       - name: Build and verify distribution
+        if: env.PUBLISH_MAIN == 'true' && env.SKIP_DIST_VERIFY != 'true'
         run: just dist-check
 
+      - name: Build distribution (main)
+        if: env.SKIP_DIST_VERIFY == 'true' && env.PUBLISH_MAIN == 'true'
+        run: uv --preview-features extra-build-dependencies build --wheel --sdist --no-create-gitignore --no-sources
+
       - name: Build workspace distributions (tools)
+        if: env.PUBLISH_TOOLS == 'true'
         run: |
           uv --preview-features extra-build-dependencies build --package scalim-cli --wheel --sdist --no-create-gitignore --no-sources
           uv --preview-features extra-build-dependencies build --package scalim-yaml-dsl-lsp --wheel --sdist --no-create-gitignore --no-sources
 
       - name: Verify workspace distributions (tools)
+        if: env.PUBLISH_TOOLS == 'true' && env.SKIP_DIST_VERIFY != 'true'
         run: |
           uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_cli-*.whl --sdist dist/scalim_cli-*.tar.gz
           uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_yaml_dsl_lsp-*.whl --sdist dist/scalim_yaml_dsl_lsp-*.tar.gz
 
       - name: Publish to PyPI (Trusted Publisher)
-        run: uv publish --check-url https://pypi.org/simple
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          publish_one() {
+            local file="$1"
+            echo "==> Publishing: ${file}"
+            set +e
+            local output
+            output="$(uv publish --check-url https://pypi.org/simple "${file}" 2>&1)"
+            local status="$?"
+            set -e
+
+            printf '%s\n' "${output}"
+            if [ "${status}" -eq 0 ]; then
+              return 0
+            fi
+
+            if printf '%s\n' "${output}" | grep -q "Local file and index file do not match"; then
+              echo "::warning::Skip already-published file with mismatched hash: ${file}"
+              return 0
+            fi
+
+            return "${status}"
+          }
+
+          files=()
+          if [ "${PUBLISH_MAIN}" = "true" ]; then
+            files+=(dist/scalim-*.whl dist/scalim-*.tar.gz)
+          fi
+          if [ "${PUBLISH_TOOLS}" = "true" ]; then
+            files+=(dist/scalim_cli-*.whl dist/scalim_cli-*.tar.gz)
+            files+=(dist/scalim_yaml_dsl_lsp-*.whl dist/scalim_yaml_dsl_lsp-*.tar.gz)
+          fi
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "Nothing to publish (PUBLISH_MAIN=${PUBLISH_MAIN}, PUBLISH_TOOLS=${PUBLISH_TOOLS})."
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+            publish_one "${file}"
+          done
