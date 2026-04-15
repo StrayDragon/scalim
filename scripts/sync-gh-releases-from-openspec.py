@@ -322,8 +322,8 @@ def _example_priority(change_id: str, proposal_text: str) -> int:
     if "value-cast" in cid or "value_cast" in cid or ("decimal" in cid and "value" in cid):
         return 2
     if "extract" in cid:
-        # 避免误判类似 `extract-scalim-cli-to-package` 这种“动词 extract”（不是 YAML DSL 的 `extract:` 写法）。
-        # 只在变更 ID 或提案正文里能看到明确的 YAML authoring 线索时，才把它当成 “field-level extract” 主题。
+        # 避免误判类似 `extract-scalim-cli-to-package` 这种“动词 `extract`”（不是 `YAML DSL` 的 `extract:` 写法）。
+        # 只在变更 ID 或提案正文里能看到明确的 `YAML` 编写面线索时，才把它当成“字段级 `extract`”主题。
         lower = proposal_text.lower()
         if ("yaml" in cid or "yaml-dsl" in cid or "dsl" in cid) or ("extract:" in lower) or ("`extract`" in proposal_text):
             return 2
@@ -379,8 +379,8 @@ _CALL_BY_TOKEN_RE = re.compile(r"`call_by:\s*\"([^\"]+)\"`")
 
 
 def _render_workflow_demand_path_example(proposal_text: str) -> Optional[List[str]]:
-    # 目标：当变更涉及 workflow YAML 的 `workflow.runs[*].demand`（例如 LSP definition 支持）时，
-    # 提供一个最小的“demand 路径写法”示例，并明确这是语义示意（避免被当成可直接运行配置）。
+    # 目标：当变更涉及工作流 `YAML` 的 `workflow.runs[*].demand`（例如 `LSP` `definition` 跳转支持）时，
+    # 提供一个最小的“`demand` 路径写法”示例，并明确这是语义示意（避免被当成可直接运行配置）。
     lower = proposal_text.lower()
     if "workflow.runs[*].demand" not in lower and "workflow.runs[" not in lower:
         return None
@@ -398,9 +398,9 @@ def _render_workflow_demand_path_example(proposal_text: str) -> Optional[List[st
         "    - id: daily",
         "      demand: ./demand/daily.yaml",
         "    - id: nightly",
-        '      demand: \"@/demand/nightly.yaml\"',
+        '      demand: "@/demand/nightly.yaml"',
         "    - id: adhoc",
-        '      demand: \"app:/demand/adhoc.yaml\"',
+        '      demand: "app:/demand/adhoc.yaml"',
     ]
 
 
@@ -853,7 +853,7 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             continue
 
         # === 高价值的“非 YAML 语法”升级点（仍完全基于提案文本，不做代码推断） ===
-        # 1) `scalim-cli` 拆包：安装边界 + import 路径会导致旧用法直接跑不起来。
+        # 1) `scalim-cli` 拆包：安装边界 + 导入路径会导致旧用法直接跑不起来。
         added_special = False
         if "`scalim-cli`" in cleaned and ("不再提供" in cleaned or "不再存在" in cleaned):
             instructions.append("把 `scalim-cli` 的安装从 `scalim` 改为安装 `scalim-cli`（Python >=3.10）。")
