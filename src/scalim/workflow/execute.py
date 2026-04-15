@@ -1,7 +1,6 @@
 # pragma: allow-c901-file plan: c90
 import concurrent.futures
 import contextlib
-import json
 import sys
 import threading
 import time

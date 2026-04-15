@@ -80,6 +80,18 @@ def test_build_demand_replay_instrumentation_returns_none_without_request_and_vi
     assert hub is None
 
 
+def test_build_demand_replay_instrumentation_returns_none_when_request_has_no_components() -> None:
+    request = ExecutionRequest(export_layout=ExportLayout(field_ids=()))
+    hub = controller_mod._build_demand_replay_instrumentation(request, None, workflow_components=())
+    assert hub is None
+
+
+def test_build_demand_replay_instrumentation_supports_request_components_without_viz_observer() -> None:
+    request = ExecutionRequest(export_layout=ExportLayout(field_ids=()), components=[_RecordingObserver()])
+    hub = controller_mod._build_demand_replay_instrumentation(request, None, workflow_components=())
+    assert hub is not None
+
+
 def test_replay_captured_workflow_observability_returns_when_replay_hub_is_missing() -> None:
     prepared = SimpleNamespace(
         capture_observability=True,

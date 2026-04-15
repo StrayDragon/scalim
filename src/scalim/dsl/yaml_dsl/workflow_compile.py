@@ -17,6 +17,7 @@ from ...spec.ir._workflow import (
     WorkflowArtifactsIr,
     WorkflowCachePoolBudgetIr,
     WorkflowCachePoolIr,
+    WorkflowCachePoolPinIr,
     WorkflowEdgeIr,
     WorkflowIr,
     WorkflowNodeIr,
@@ -93,8 +94,10 @@ from .workflow_config._models import (
     WorkflowResourcesWaitOptions,
 )
 from .workflow_types import (
+    PipelineSchedulerOptions,
     WorkflowCachePoolDisabled,
     WorkflowCachePoolPreloadForeverShared,
+    WorkflowCachePoolPreset,
     WorkflowExecutionOptions,
     WorkflowRuntimeOptions,
 )
@@ -1571,8 +1574,6 @@ def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowE
 
 
 def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[WorkflowCachePoolIr]:
-    from .workflow_types import WorkflowCachePoolPreset  # 局部导入:避免循环依赖
-
     if not isinstance(raw, WorkflowCachePoolPreset):
         msg = "workflow_runtime_options.cache_pool must be a WorkflowCachePoolPreset"
         raise TypeError(msg)
@@ -1596,7 +1597,7 @@ def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[Workflow
             conflict_policy="error",
             release_policy="dag_refcount",
             budget=budget,
-            pin=(),
+            pin=tuple(WorkflowCachePoolPinIr(kind=str(p.kind), source_id=str(p.source_id)) for p in (raw.pin or ())),
         )
 
     msg = "Unsupported workflow_runtime_options.cache_pool preset: {!r}".format(type(raw).__name__)
@@ -1604,8 +1605,6 @@ def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[Workflow
 
 
 def _normalize_and_validate_workflow_runtime_options(raw: object) -> WorkflowRuntimeOptions:
-    from .workflow_types import PipelineSchedulerOptions
-
     if raw is None:
         return WorkflowRuntimeOptions.preset_default()
     if not isinstance(raw, WorkflowRuntimeOptions):

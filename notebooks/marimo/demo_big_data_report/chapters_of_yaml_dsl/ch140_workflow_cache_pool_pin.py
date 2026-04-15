@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPin, WorkflowCachePoolPreloadForeverShared, WorkflowRuntimeOptions
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
@@ -80,6 +81,16 @@ def run_workflow_cache_pool_pin(
 
             reset_workflow_preload_counter_calls()
 
+            runtime_no_pin = WorkflowRuntimeOptions(
+                cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
+            )
+            runtime_pin = WorkflowRuntimeOptions(
+                cache_pool=WorkflowCachePoolPreloadForeverShared(
+                    max_entries=16,
+                    pin=(WorkflowCachePoolPin(kind="preload_forever", source_id="preload_counter"),),
+                ),
+            )
+
             # 1) 基线: 没有 `pin` -> 引用计数归零时会触发 `refcount_zero` 淘汰
             _ = run_workflow(
                 str(workflow_yaml_no_pin),
@@ -88,6 +99,7 @@ def run_workflow_cache_pool_pin(
                     init_vars={"order_ids": []},
                     overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin))),
                 ),
+                workflow_runtime_options=runtime_no_pin,
             )
             events_no_pin = _read_jsonl(_workflow_events_path(viz_no_pin))
             reasons_no_pin, releases_no_pin = _extract_cache_signals(events_no_pin)
@@ -100,6 +112,7 @@ def run_workflow_cache_pool_pin(
                     init_vars={"order_ids": []},
                     overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin))),
                 ),
+                workflow_runtime_options=runtime_pin,
             )
             events_pin = _read_jsonl(_workflow_events_path(viz_pin))
             reasons_pin, releases_pin = _extract_cache_signals(events_pin)

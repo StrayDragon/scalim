@@ -158,7 +158,9 @@ def test_validate_workflow_resources_wait_override_rejects_invalid_diagnostics_t
     from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
     from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitOptions
 
-    with pytest.raises(TypeError, match=r"workflow_runtime_options\.resources_wait\.diagnostics must be a WorkflowResourcesWaitDiagnosticsOptions"):
+    with pytest.raises(
+        TypeError, match=r"workflow_runtime_options\.resources_wait\.diagnostics must be a WorkflowResourcesWaitDiagnosticsOptions"
+    ):
         _ = workflow_compile_mod._validate_workflow_resources_wait_override(  # noqa: SLF001
             WorkflowResourcesWaitOptions(diagnostics="x")  # type: ignore[arg-type] intentional runtime boundary test
         )

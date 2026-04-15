@@ -97,7 +97,9 @@ workflow:
 
 
 def _workflow_runtime_options(*, failure_policy: str = "all_fail", max_concurrency: int = 1) -> WorkflowRuntimeOptions:
-    return WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=int(max_concurrency), failure_policy=str(failure_policy)))
+    return WorkflowRuntimeOptions(
+        execution=WorkflowExecutionOptions(max_concurrency=int(max_concurrency), failure_policy=str(failure_policy))
+    )
 
 
 def test_workflow_viz_bundle_exports_linked_runs(tmp_path: Path) -> None:

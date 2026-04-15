@@ -96,6 +96,12 @@ class WorkflowCachePoolPreset:
 
 
 @dataclass(frozen=True)
+class WorkflowCachePoolPin:
+    kind: str
+    source_id: str
+
+
+@dataclass(frozen=True)
 class WorkflowCachePoolDisabled(WorkflowCachePoolPreset):
     """禁用工作流级 `cache pool`(默认)."""
 
@@ -105,6 +111,7 @@ class WorkflowCachePoolPreloadForeverShared(WorkflowCachePoolPreset):
     """启用跨节点共享 `preload_forever` 缓存条目(仅暴露最小必要参数)."""
 
     max_entries: int = 16
+    pin: Tuple[WorkflowCachePoolPin, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -133,17 +140,18 @@ __all__ = (
     "ComponentsInherit",
     "ComponentsPatch",
     "ComponentsReplace",
-    "ScalimWorkflowConfigError",
     "PipelineSchedulerOptions",
+    "ScalimWorkflowConfigError",
     "WorkflowCachePoolDisabled",
-    "WorkflowCachePoolPreset",
+    "WorkflowCachePoolPin",
     "WorkflowCachePoolPreloadForeverShared",
+    "WorkflowCachePoolPreset",
     "WorkflowConfig",
     "WorkflowExecutionOptions",
     "WorkflowOutputStagingOptions",
-    "WorkflowRuntimeOptions",
     "WorkflowResourcesWaitDiagnosticsOptions",
     "WorkflowResourcesWaitOptions",
     "WorkflowRun",
     "WorkflowRunOptionsPatch",
+    "WorkflowRuntimeOptions",
 )

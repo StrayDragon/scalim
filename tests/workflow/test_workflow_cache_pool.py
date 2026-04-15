@@ -146,6 +146,57 @@ def test_workflow_cache_pool_evict_lru_skips_loading_and_remaining_consumers() -
     assert pool._evict_lru_idle(workflow_node_id="n2", pending_emits=[]) is False  # type: ignore[attr-defined]
 
 
+def test_workflow_cache_pool_evict_lru_appends_pending_emits_cover_branch() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+    signature = _sig("s1")
+    _ = pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
+
+    pending_emits = []
+    assert pool._evict_lru_idle(workflow_node_id="n2", pending_emits=pending_emits) is True  # type: ignore[attr-defined]
+    assert len(pending_emits) == 1
+    assert signature.canonical_key() not in pool._entries  # type: ignore[attr-defined]
+
+
+def test_workflow_cache_pool_evict_entry_keeps_logical_key_index_when_other_entries_remain_cover_branch() -> None:
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+    )
+
+    signature1 = _sig("s1")
+    signature2 = WorkflowCacheEntrySignature(
+        kind=signature1.kind,
+        source_id=signature1.source_id,
+        loader_ref=signature1.loader_ref,
+        rendered_params={"k": "s2"},
+        normalize=None,
+        key=None,
+        lookup_cast=None,
+    )
+
+    _ = pool.get_or_load(signature1, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
+    _ = pool.get_or_load(signature2, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
+
+    logical_key = signature1.logical_key()
+    signature1_key = signature1.canonical_key()
+    signature2_key = signature2.canonical_key()
+    assert signature1_key != signature2_key
+
+    _ = pool._evict_entry(signature1_key, workflow_node_id="n2", reason="x")  # type: ignore[attr-defined]
+
+    remaining = pool._signature_keys_by_logical_key.get(logical_key)  # type: ignore[attr-defined]
+    assert remaining == set([signature2_key])
+
+
 def test_workflow_cache_pool_collect_refcount_evictions_skips_loading_entries() -> None:
     signature = _sig("s1")
     logical_key = signature.logical_key()
@@ -165,6 +216,39 @@ def test_workflow_cache_pool_collect_refcount_evictions_skips_loading_entries() 
     assert pool._collect_refcount_evictions(node_id="n1") == {}  # type: ignore[attr-defined]
 
     pool._evict_entry("missing", workflow_node_id="n3", reason="x")  # type: ignore[attr-defined]
+
+
+def test_workflow_cache_pool_collect_refcount_evictions_skips_when_release_policy_not_refcount() -> None:
+    signature = _sig("s1")
+    logical_key = signature.logical_key()
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+        ),
+        logical_keys_by_node_id={"n1": frozenset([logical_key])},
+        consumers_by_logical_key={logical_key: set(["n1"])},
+    )
+
+    assert pool._collect_refcount_evictions(node_id="n1") == {}  # type: ignore[attr-defined]
+
+
+def test_workflow_cache_pool_collect_refcount_evictions_skips_pinned_logical_key() -> None:
+    signature = _sig("s1")
+    logical_key = signature.logical_key()
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="dag_refcount",
+            budget=WorkflowCachePoolBudgetIr(max_entries=10, over_budget_policy="evict_lru"),
+            pin=(WorkflowCachePoolPinIr(kind="preload_forever", source_id="s1"),),
+        ),
+        logical_keys_by_node_id={"n1": frozenset([logical_key])},
+        consumers_by_logical_key={logical_key: set(["n1"])},
+    )
+
+    assert pool._collect_refcount_evictions(node_id="n1") == {}  # type: ignore[attr-defined]
 
 
 def test_workflow_cache_pool_close_waits_for_loading_entry_lock() -> None:
