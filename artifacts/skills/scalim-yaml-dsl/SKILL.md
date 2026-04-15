@@ -28,10 +28,10 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - demand YAML 仓库内 schema 校验: `uv run scalim-cli yaml-dsl schema validate <demand.yaml>`
 - workflow YAML 仓库内完整校验(静态/编译期;递归校验引用的 demands;不执行 workflow): `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
 - workflow YAML 仓库内 schema 校验(结构/unknown-fields; 必须显式 schema 路径): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>`
-- 仓库外完整校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
-- 仓库外 schema 校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
+- 仓库外完整校验: `uvx scalim-cli yaml-dsl validate <file.yaml>`
+- 仓库外 schema 校验: `uvx scalim-cli yaml-dsl schema validate <file.yaml>`
 - 仓库内查询 schema 绝对路径: `uv run scalim-cli yaml-dsl schema path`
-- 仓库外查询 schema 绝对路径: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
+- 仓库外查询 schema 绝对路径: `uvx scalim-cli yaml-dsl schema path`
 
 完整 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(直接批量写入头部,不依赖内置 schema server):
 

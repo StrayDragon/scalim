@@ -157,10 +157,10 @@ def test_generated_cli_reference_has_required_commands_and_paths(tmp_path: Path)
     assert "uv run scalim-cli yaml-dsl validate <file.yaml>" in cli_ref
     assert "uv run scalim-cli yaml-dsl schema validate <file.yaml>" in cli_ref
     assert "uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>" in cli_ref
-    assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>' in cli_ref
-    assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>' in cli_ref
+    assert "uvx scalim-cli yaml-dsl validate <file.yaml>" in cli_ref
+    assert "uvx scalim-cli yaml-dsl schema validate <file.yaml>" in cli_ref
     assert "uv run scalim-cli yaml-dsl schema path" in cli_ref
-    assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path' in cli_ref
+    assert "uvx scalim-cli yaml-dsl schema path" in cli_ref
     assert "uv run scalim-cli yaml-dsl upsert-lsp-comment" in cli_ref
     assert "### `yaml-dsl upsert-lsp-comment`" in cli_ref
     assert "--comment-style all" in cli_ref
@@ -236,8 +236,8 @@ def test_manual_skill_contract_matches_generated_layout() -> None:
     assert "references/generated/example-full/ecommerce_report.gen.yaml" in text
     assert "uv run scalim-cli yaml-dsl validate <demand.yaml>" in text
     assert "uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>" in text
-    assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>' in text
-    assert 'uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path' in text
+    assert "uvx scalim-cli yaml-dsl schema validate <file.yaml>" in text
+    assert "uvx scalim-cli yaml-dsl schema path" in text
     assert "完整 canonical example 故意不带头部" in text
 
     assert not (skill_dir / "references" / "dsl-reference.md").exists()

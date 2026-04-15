@@ -142,10 +142,7 @@ resources:
 **安装 CLI 工具**:
 
 ```bash
-# 兼容入口: 通过主包 extras 安装 CLI(会拉取 `scalim-cli`)
-uv tool install "scalim[cli]"
-
-# 或仅安装独立 CLI 包
+# 安装独立 CLI 包(会拉取 `scalim`)
 uv tool install scalim-cli
 ```
 
