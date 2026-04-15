@@ -68,6 +68,7 @@ def check_yaml_dsl_cli_snippet_governance(repo_root: Path) -> List[str]:
     """
     forbidden_prefixes: Tuple[str, ...] = (
         "uv run scalim-cli yaml-dsl",
+        'uvx --from "scalim[cli]" scalim-cli yaml-dsl',
         'uvx --from "scalim-cli" scalim-cli yaml-dsl',
     )
 

@@ -28,13 +28,13 @@ Sources:
 - `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ### External
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl validate <file.yaml>`
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl schema validate <file.yaml>`
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl schema show`
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl schema path`
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
-- `uvx --from "scalim-cli" scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema show`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
+- `uvx --from "scalim[cli]" scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 
 ## Validate Layering
 - `yaml-dsl validate --type demand`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.
@@ -49,7 +49,7 @@ Sources:
 - 批量写入/更新头部(默认同时写 Red Hat + JetBrains modeline; 可用 `--comment-style` 控制): `uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`
 - Workflow modeline: `uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
 - Repo query: `uv run scalim-cli yaml-dsl schema path`
-- External query: `uvx --from "scalim-cli" scalim-cli yaml-dsl schema path`
+- External query: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 - Python fallback: `python -c "import os, scalim; print(os.path.join(os.path.dirname(scalim.__file__), 'dsl/yaml_dsl/schema/demand.gen.json'))"`
 - 本地编辑时再把上面命令输出写入头部; 不要把 `.venv/...` 或其它机器相关路径提交到共享示例.
 ```yaml

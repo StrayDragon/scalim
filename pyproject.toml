@@ -36,6 +36,10 @@ scalim-yaml-dsl-lsp = { workspace = true }
 scalim = { workspace = true }
 
 [project.optional-dependencies]
+cli = [
+    # CLI 已迁移到独立包 `scalim-cli`(>=3.10). 这里用 marker 避免在 3.6~3.9 环境下安装 extras 直接失败。
+    "scalim-cli;python_version>='3.10'",
+]
 pandas = [
     # numpy: 1.19.5 是最后支持 3.6 的版本, 1.20.0+ 需要 >=3.7
     "numpy>=1.19.0,<1.20;python_version<'3.7'",
@@ -52,6 +56,11 @@ excel = [
 yaml-dsl-lsp = [
     "scalim-yaml-dsl-lsp[server]",
 ]
+
+[project.scripts]
+# NOTE: `uv tool install scalim[cli]` 默认只安装“主包”的 executables; 因此这里提供 shim 以暴露 CLI 入口。
+scalim = "scalim._cli_shim:main"
+scalim-cli = "scalim._cli_shim:main"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.10" }

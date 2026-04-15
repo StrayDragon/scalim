@@ -19,15 +19,15 @@ uv run scalim-cli yaml-dsl validate <file.yaml>
 ### 仓库外
 
 ```bash
-uvx --from "scalim-cli" scalim-cli yaml-dsl schema validate <file.yaml>
-uvx --from "scalim-cli" scalim-cli yaml-dsl validate <file.yaml>
+uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate <file.yaml>
+uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>
 ```
 
 ### 查询 schema 路径
 
 ```bash
 uv run scalim-cli yaml-dsl schema path
-uvx --from "scalim-cli" scalim-cli yaml-dsl schema path
+uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path
 ```
 
 ## `schema validate` 与 `validate` 的分工

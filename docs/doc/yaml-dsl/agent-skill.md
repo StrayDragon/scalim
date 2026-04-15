@@ -52,10 +52,10 @@
   - 若 workflow demand 路径使用 alias 语法,可用 `--path-alias <alias>=<path>` 注入解析
 - demand YAML 仓库内 schema-only(更快): `uv run scalim-cli yaml-dsl schema validate path/to/demand.yaml`
 - workflow YAML schema-only(需显式 workflow schema): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json path/to/workflow.yaml`
-- 仓库外语义校验: `uvx --from "scalim-cli" scalim-cli yaml-dsl validate path/to/config.yaml`
-- 仓库外 schema-only: `uvx --from "scalim-cli" scalim-cli yaml-dsl schema validate path/to/config.yaml`
+- 仓库外语义校验: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate path/to/config.yaml`
+- 仓库外 schema-only: `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema validate path/to/config.yaml`
 - 查询 schema 路径(仓库内): `uv run scalim-cli yaml-dsl schema path`
-- 查询 schema 路径(仓库外): `uvx --from "scalim-cli" scalim-cli yaml-dsl schema path`
+- 查询 schema 路径(仓库外): `uvx --from "scalim[cli]" scalim-cli yaml-dsl schema path`
 
 skill 中的 canonical example 故意不带头部(也就是 schema modeline)。本地编辑时,我们一般用下面这套“团队通用”的做法(直接批量写入头部,不依赖内置 schema server):
 

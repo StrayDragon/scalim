@@ -94,7 +94,7 @@ def test_yaml_dsl_cli_governance_passes_when_snippets_are_only_inside_markers(tm
             "",
             DOCS_CLI_MIN_COMMANDS_BEGIN,
             "- demand: `uv run scalim-cli yaml-dsl validate path/to/demand.yaml`",
-            '- external: `uvx --from "scalim-cli" scalim-cli yaml-dsl validate path/to/config.yaml`',
+            '- external: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate path/to/config.yaml`',
             DOCS_CLI_MIN_COMMANDS_END,
             "",
         ]
@@ -105,7 +105,7 @@ def test_yaml_dsl_cli_governance_passes_when_snippets_are_only_inside_markers(tm
             "",
             SKILL_CLI_MIN_COMMANDS_BEGIN,
             "- demand: `uv run scalim-cli yaml-dsl validate <demand.yaml>`",
-            '- external: `uvx --from "scalim-cli" scalim-cli yaml-dsl validate <file.yaml>`',
+            '- external: `uvx --from "scalim[cli]" scalim-cli yaml-dsl validate <file.yaml>`',
             SKILL_CLI_MIN_COMMANDS_END,
             "",
         ]

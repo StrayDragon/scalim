@@ -10,7 +10,9 @@ from scalim import _project_constants
 DEMAND_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "demand.gen.json"
 WORKFLOW_SCHEMA_REL = Path("src") / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
 CLI_SOURCE_REL = Path("packages") / "scalim-cli" / "src" / "scalim_cli" / "yaml_dsl.py"
-CLI_DIST_NAME = "{}-cli".format(_project_constants.DIST_NAME)
+# NOTE: `uv tool install` 默认只暴露主包的 executables; 为了兼容“只装 CLI”的用户,
+# 我们提供 `scalim[cli]` 这个 extras 入口,并在主包里提供 CLI shim 入口。
+CLI_DIST_NAME = "{}[cli]".format(_project_constants.DIST_NAME)
 
 DOCS_CLI_MIN_COMMANDS_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-cli-min-commands -->"
 DOCS_CLI_MIN_COMMANDS_END = "<!-- END AUTOGEN:yaml-dsl-cli-min-commands -->"
