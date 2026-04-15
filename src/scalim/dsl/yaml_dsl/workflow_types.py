@@ -81,6 +81,8 @@ class WorkflowRunOptionsPatch:
     loader_retry: Union[Optional["LoaderRetryPoliciesSpec"], UnsetType] = UNSET
     demand_failure_policy: Union[Optional[str], UnsetType] = UNSET
     demand_diagnostics: Union[Optional[DemandDiagnosticsOverride], UnsetType] = UNSET
+    parallel_mode: Union[str, UnsetType] = UNSET
+    max_workers: Union[int, UnsetType] = UNSET
 
 
 @dataclass(frozen=True)

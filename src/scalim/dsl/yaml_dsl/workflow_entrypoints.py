@@ -296,12 +296,44 @@ def _apply_workflow_run_options_patch_demand_diagnostics(base: RunOptions, patch
     )
 
 
+def _apply_workflow_run_options_patch_parallelism(base: RunOptions, patch: WorkflowRunOptionsPatch) -> RunOptions:
+    parallel_mode = patch.parallel_mode
+    max_workers = patch.max_workers
+    if isinstance(parallel_mode, UnsetType) and isinstance(max_workers, UnsetType):
+        return base
+
+    next_options = base
+
+    if not isinstance(parallel_mode, UnsetType):
+        if not isinstance(parallel_mode, str):
+            msg = "WorkflowRunOptionsPatch.parallel_mode must be one of: seq|adaptive (parallel_mode=seq|adaptive)"
+            raise TypeError(msg)
+        normalized_parallel_mode = str(parallel_mode).strip().lower()
+        if normalized_parallel_mode not in ("seq", "adaptive"):
+            msg = "WorkflowRunOptionsPatch.parallel_mode must be one of: seq|adaptive (parallel_mode=seq|adaptive)"
+            raise ValueError(msg)
+        next_options = replace(next_options, parallel_mode=normalized_parallel_mode)
+
+    if not isinstance(max_workers, UnsetType):
+        if not isinstance(max_workers, int) or isinstance(max_workers, bool):
+            msg = "WorkflowRunOptionsPatch.max_workers must be an int and satisfy max_workers>=0 (0=auto)"
+            raise TypeError(msg)
+        if int(max_workers) < 0:
+            msg = "WorkflowRunOptionsPatch.max_workers must satisfy max_workers>=0 (0=auto)"
+            raise ValueError(msg)
+        next_options = replace(next_options, max_workers=int(max_workers))
+
+    return next_options
+
+
 def _apply_workflow_run_options_patch(base: RunOptions, patch: WorkflowRunOptionsPatch) -> RunOptions:
     next_options = base
 
     batch_size = patch.batch_size
     if not isinstance(batch_size, UnsetType):
         next_options = replace(next_options, batch_size=batch_size)
+
+    next_options = _apply_workflow_run_options_patch_parallelism(next_options, patch)
 
     demand_failure_policy = patch.demand_failure_policy
     if not isinstance(demand_failure_policy, UnsetType):

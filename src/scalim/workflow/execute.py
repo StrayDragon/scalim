@@ -428,6 +428,8 @@ def _prepare_workflow_run_ir(
             workflow_replay_instrumentation = workflow_instrumentation
             capture_hook_manager = HookCaptureManager(workflow_instrumentation.hook_manager)
             capture_observer_manager = workflow_observer_manager.create_capture_manager()
+            capture_hook_manager.loader_result_policy = "summary"
+            capture_observer_manager.loader_result_policy = "summary"
             capture_observer_manager.max_recorded_events = None
             workflow_instrumentation = InstrumentationHub(
                 hook_manager=capture_hook_manager,

@@ -32,6 +32,7 @@ from scalim.workflow import loaders as workflow_loaders_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
 from scalim.events import (
     EVENT_DIAGNOSTIC_WARNING,
+    EVENT_LOADER_CALL,
     EVENT_PIPELINE_START,
     EVENT_WORKFLOW_CACHE_ACQUIRE,
     EVENT_WORKFLOW_CACHE_EVICT,
@@ -103,6 +104,35 @@ class _WorkflowEventRecorder(Observer):
         self.events: List[Any] = []
 
     def on_event(self, event) -> None:  # type: ignore[override]
+        with self._lock:
+            self.events.append(event)
+
+
+class _LoaderCallObserverRecorder(Observer):
+    event_types = {
+        EVENT_LOADER_CALL,
+    }
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.events: List[Any] = []
+
+    def on_event(self, event) -> None:  # type: ignore[override]
+        with self._lock:
+            self.events.append(event)
+
+
+class _LoaderCallHookRecorder(BaseHook):
+    event_types = {
+        EVENT_LOADER_CALL,
+    }
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = threading.Lock()
+        self.events: List[Any] = []
+
+    def on_loader_call(self, event) -> None:  # type: ignore[override]
         with self._lock:
             self.events.append(event)
 
@@ -926,6 +956,79 @@ def test_run_workflow_rejects_sink_in_base_options(tmp_path: Path) -> None:
         _ = run_workflow(str(wf), options=_run_options(sink=InMemoryRowSink()))
 
 
+def test_run_workflow_concurrency_capture_replay_summarizes_loader_call_payload_for_observer(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=2,
+        failure_policy="all_fail",
+    )
+
+    observer = _LoaderCallObserverRecorder()
+    result = run_workflow(
+        str(wf),
+        options=_run_options(components=[observer]),
+        workflow_runtime_options=_workflow_runtime_options(max_concurrency=2, failure_policy="all_fail"),
+    )
+    assert not result.errors()
+
+    preload_payloads: List[Any] = []
+    for event in observer.events:
+        if str(getattr(event, "event_type", "")) != EVENT_LOADER_CALL:
+            continue
+        payload = getattr(event, "payload", None)
+        if payload is None:
+            continue
+        if str(getattr(payload, "loader_name", "")) != "preload":
+            continue
+        preload_payloads.append(payload)
+
+    assert preload_payloads
+    for payload in preload_payloads:
+        assert payload.result == {"type": "dict", "size": 1}
+
+
+def test_run_workflow_concurrency_capture_replay_summarizes_loader_call_payload_for_typed_hook(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=2,
+        failure_policy="all_fail",
+    )
+
+    hook = _LoaderCallHookRecorder()
+    result = run_workflow(
+        str(wf),
+        options=_run_options(components=[hook]),
+        workflow_runtime_options=_workflow_runtime_options(max_concurrency=2, failure_policy="all_fail"),
+    )
+    assert not result.errors()
+
+    preload_events: List[Any] = []
+    for event in hook.events:
+        if str(getattr(event, "loader_name", "")) != "preload":
+            continue
+        preload_events.append(event)
+
+    assert preload_events
+    for event in preload_events:
+        assert event.result == {"type": "dict", "size": 1}
+
+
 def test_run_workflow_run_options_patches_by_run_id_batch_size_overrides_global(tmp_path: Path) -> None:
     _ = _write_demand_yaml(
         tmp_path,
@@ -963,6 +1066,128 @@ def test_run_workflow_run_options_patches_by_run_id_batch_size_overrides_global(
     assert not result.errors()
     assert seen_batch_size_by_name["a.yaml"] == 5000
     assert seen_batch_size_by_name["b.yaml"] == 2000
+
+
+def test_run_workflow_run_options_patches_by_run_id_parallel_mode_overrides_global(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    seen_parallel_mode_by_name: Dict[str, object] = {}
+
+    def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
+        seen_parallel_mode_by_name[Path(str(yaml_path)).name] = options.parallel_mode
+        return by_yaml_compiler_mod.compile(yaml_path, options=options)
+
+    result = run_workflow(
+        str(wf),
+        options=_run_options(parallel_mode="seq"),
+        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(parallel_mode="adaptive")},
+        compile_demand_yaml_fn=_compile_with_capture,
+    )
+    assert not result.errors()
+    assert seen_parallel_mode_by_name["a.yaml"] == "adaptive"
+    assert seen_parallel_mode_by_name["b.yaml"] == "seq"
+
+
+def test_run_workflow_run_options_patches_by_run_id_max_workers_overrides_global(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    seen_max_workers_by_name: Dict[str, object] = {}
+
+    def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
+        seen_max_workers_by_name[Path(str(yaml_path)).name] = options.max_workers
+        return by_yaml_compiler_mod.compile(yaml_path, options=options)
+
+    result = run_workflow(
+        str(wf),
+        options=_run_options(max_workers=0),
+        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(max_workers=4)},
+        compile_demand_yaml_fn=_compile_with_capture,
+    )
+    assert not result.errors()
+    assert seen_max_workers_by_name["a.yaml"] == 4
+    assert seen_max_workers_by_name["b.yaml"] == 0
+
+
+def test_run_workflow_run_options_patches_by_run_id_rejects_invalid_parallelism_knobs(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="ok.yaml",
+        name="ok",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+    )
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[{"id": "ok", "demand": "ok.yaml"}],
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    with pytest.raises((TypeError, ValueError), match=r"parallel_mode=seq\\|adaptive"):
+        _ = run_workflow(
+            str(wf),
+            options=_run_options(),
+            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(parallel_mode="thread")},
+        )
+
+    with pytest.raises((TypeError, ValueError), match=r"parallel_mode=seq\\|adaptive"):
+        _ = run_workflow(
+            str(wf),
+            options=_run_options(),
+            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(parallel_mode=123)},  # type: ignore[arg-type] intentional runtime boundary test
+        )
+
+    with pytest.raises((TypeError, ValueError), match=r"max_workers>=0"):
+        _ = run_workflow(
+            str(wf),
+            options=_run_options(),
+            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(max_workers=-1)},
+        )
+
+    with pytest.raises((TypeError, ValueError), match=r"max_workers>=0"):
+        _ = run_workflow(  # type: ignore[arg-type] intentional runtime boundary test
+            str(wf),
+            options=_run_options(),
+            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(max_workers="4")},
+        )
 
 
 def test_run_workflow_run_options_patches_by_run_id_rejects_unknown_id(tmp_path: Path) -> None:

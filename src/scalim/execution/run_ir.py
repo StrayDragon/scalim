@@ -819,7 +819,9 @@ def run_ir_capture_events(
         )
 
         hook_manager = HookCaptureManager(replay_hook_manager)
+        hook_manager.loader_result_policy = "summary"
         observer_manager = replay_observer_manager.create_capture_manager()
+        observer_manager.loader_result_policy = "summary"
         observer_manager.max_recorded_events = None
 
         result = _run_ir_with_plan_and_managers(
