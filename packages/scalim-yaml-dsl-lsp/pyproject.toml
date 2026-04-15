@@ -5,21 +5,23 @@ description = "YAML DSL editor semantics core for scalim"
 readme = "README.md"
 requires-python = ">=3.10"
 
-authors = [
-    { name = "scalim-dev" },
+authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
 dependencies = [
     "scalim",
+    "pygls>=2.1.1",
 ]
 
 [project.scripts]
 scalim-yaml-dsl-lsp = "scalim_yaml_dsl_lsp.cli:main"
-
-[project.optional-dependencies]
-server = [
-    "pygls>=2.1.1",
-]
 
 [build-system]
 requires = ["hatchling"]

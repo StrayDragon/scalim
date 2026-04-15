@@ -22,7 +22,7 @@
 
 系统 MUST 要求 VSCode 扩展负责启动/管理 YAML DSL LSP server，并在 `globalStorageUri` 下维护隔离的 Python venv：
 
-- 扩展 MUST 以 pinned 版本安装 LSP server 发行物（MVP 默认建议：`scalim-yaml-dsl-lsp[server]==0.7.5`；且 MUST 提供配置以覆盖 pinned 版本）
+- 扩展 MUST 以 pinned 版本安装 LSP server 发行物（MVP 默认建议：`scalim-yaml-dsl-lsp==0.7.5`；且 MUST 提供配置以覆盖 pinned 版本）
 - extension provisioning MUST 依赖 Python >=3.10；若无法找到/版本不足，extension MUST 给出可诊断提示（不得静默失败）
 - extension MUST 以 stdio 方式启动 `scalim-yaml-dsl-lsp serve`（遵循 `yaml-dsl-lsp-serve` contract）
 - server 启动失败或 provisioning 失败时，extension MUST 提供可诊断提示（不得静默失败或阻塞基础 YAML 体验）
@@ -78,4 +78,3 @@ extension 的 “Copy Diagnostic Bundle” 功能 MUST 生成可粘贴到 issue 
 - **WHEN** 用户执行 `Scalim: Copy Diagnostic Bundle`
 - **THEN** 生成的文本 MUST 不包含 YAML 正文片段
 - **AND** 仍 MUST 包含可用于排障的环境与 discovery 摘要（版本、Python 路径、scalim.yaml 路径、roots 摘要等）
-

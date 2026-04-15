@@ -20,7 +20,7 @@ import {
 } from "./internal/diagnosticBundle";
 import { mergeYamlSchemas } from "./internal/yamlSchemas";
 
-const DEFAULT_PINNED_SERVER_SPEC = "scalim-yaml-dsl-lsp[server]";
+const DEFAULT_PINNED_SERVER_SPEC = "scalim-yaml-dsl-lsp";
 const DEFAULT_ENV_MODE = "auto";
 const DEFAULT_WORKSPACE_VENV_PATH = ".venv";
 const DEFAULT_AUTO_RESTART_ON_SCALIM_YAML_CHANGE = false;

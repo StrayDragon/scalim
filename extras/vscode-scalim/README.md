@@ -46,7 +46,7 @@ Goal: run the LSP server from the repo `.venv` to validate changes quickly.
 Goal: start the server only if the user already installed it; otherwise prompt with an install command (no side effects).
 
 - Install the server with `uv tool` (recommended):
-  - `uv tool install "scalim-yaml-dsl-lsp[server]==0.7.5"`
+  - `uv tool install "scalim-yaml-dsl-lsp==0.7.5"`
 - Keep the default `scalim.yamlDsl.envMode=auto`
 - If the extension cannot find the server, it shows an error with:
   - an install command to copy

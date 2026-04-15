@@ -6,6 +6,22 @@
 
 本仓库提供可复用的 YAML DSL LSP server（命令行入口见下文）,用于补足 “YAML schema 只能做结构校验” 的语义空白。
 
+## 安装
+
+需要 `Python >= 3.10`。
+
+推荐使用 `uv` 安装（包含 server 依赖）：
+
+```bash
+uv tool install scalim-yaml-dsl-lsp
+```
+
+不安装、只跑一次：
+
+```bash
+uvx scalim-yaml-dsl-lsp serve --log-level INFO
+```
+
 ## 你会得到什么（LSP 负责）
 
 - 语义 diagnostics（对齐 `scalim` library 语义,不依赖 shell-out CLI）

@@ -9,11 +9,6 @@ from .core import discover_yaml_dsl_editor_project
 
 __all__ = ()
 
-try:
-    from .server import create_server as _create_server
-except Exception:  # noqa: BLE001
-    _create_server = None
-
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="scalim-yaml-dsl-lsp")
@@ -91,11 +86,21 @@ def _cmd_dump_discovery(yaml_path: str, *, as_json: bool) -> int:
 def _cmd_serve(*, tcp: bool, host: str, port: int, log_file: str, log_level: str) -> int:
     _configure_logging(log_file=log_file, log_level=log_level)
 
-    if _create_server is None:
-        sys.stderr.write("[错误] `LSP` 服务端依赖缺失,请安装 `scalim-yaml-dsl-lsp[server]`.\n")
+    try:
+        from .server import create_server  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        msg_lines = [
+            "[错误] `LSP` 服务端导入失败: {}: {}".format(type(exc).__name__, exc),
+            "",
+            "可能原因: 安装时使用了 `--no-deps`, 或环境损坏导致依赖缺失 (例如 `pygls`).",
+            "修复: 重新安装并确保依赖完整:",
+            "  uv tool install scalim-yaml-dsl-lsp",
+            "",
+        ]
+        sys.stderr.write("\n".join(msg_lines))
         return 2
 
-    server = _create_server()
+    server = create_server()
 
     try:
         if tcp:

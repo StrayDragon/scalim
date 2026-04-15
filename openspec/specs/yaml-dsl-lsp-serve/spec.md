@@ -27,10 +27,10 @@
 - MUST NOT 在 stdout 输出半截 JSON-RPC（不得污染 LSP client 通道）
 
 #### Scenario: missing server dependency yields clean failure
-- **GIVEN** 环境未安装 `scalim-yaml-dsl-lsp[server]`（缺少 `pygls`）
+- **GIVEN** 环境已安装 `scalim-yaml-dsl-lsp`，但运行时依赖缺失（例如安装时使用了 `--no-deps` 导致缺少 `pygls`）
 - **WHEN** 用户执行 `scalim-yaml-dsl-lsp serve`
 - **THEN** 进程 MUST 立即失败并返回非 0
-- **AND** stderr MUST 包含“需要安装 server extra”的提示
+- **AND** stderr MUST 包含可操作的安装/修复提示（例如重新安装 `scalim-yaml-dsl-lsp` 以补齐依赖）
 - **AND** stdout MUST 为空
 
 ### Requirement: CLI MUST provide a `dump-discovery` troubleshooting entrypoint

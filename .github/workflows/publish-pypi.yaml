@@ -39,5 +39,15 @@ jobs:
       - name: Build and verify distribution
         run: just dist-check
 
+      - name: Build workspace distributions (tools)
+        run: |
+          uv --preview-features extra-build-dependencies build --package scalim-cli --wheel --sdist --no-create-gitignore --no-sources
+          uv --preview-features extra-build-dependencies build --package scalim-yaml-dsl-lsp --wheel --sdist --no-create-gitignore --no-sources
+
+      - name: Verify workspace distributions (tools)
+        run: |
+          uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_cli-*.whl --sdist dist/scalim_cli-*.tar.gz
+          uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_yaml_dsl_lsp-*.whl --sdist dist/scalim_yaml_dsl_lsp-*.tar.gz
+
       - name: Publish to PyPI (Trusted Publisher)
-        run: uv publish
+        run: uv publish --check-url https://pypi.org/simple

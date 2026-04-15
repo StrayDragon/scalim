@@ -3192,7 +3192,7 @@ pandas = [
     { name = "pandas", version = "3.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 yaml-dsl-lsp = [
-    { name = "scalim-yaml-dsl-lsp", extra = ["server"] },
+    { name = "scalim-yaml-dsl-lsp" },
 ]
 
 [package.dev-dependencies]
@@ -3222,7 +3222,7 @@ dev = [
     { name = "scalim-benchlib" },
     { name = "scalim-cli" },
     { name = "scalim-misc" },
-    { name = "scalim-yaml-dsl-lsp", extra = ["server"] },
+    { name = "scalim-yaml-dsl-lsp" },
     { name = "sqlalchemy" },
     { name = "tomli" },
     { name = "types-dataclasses" },
@@ -3238,7 +3238,7 @@ requires-dist = [
     { name = "pandas", marker = "python_full_version >= '3.7' and extra == 'pandas'", specifier = ">=2.0.3" },
     { name = "pandas", marker = "python_full_version < '3.7' and extra == 'pandas'", specifier = ">=1.0.0,<1.2" },
     { name = "scalim-cli", marker = "python_full_version >= '3.10' and extra == 'cli'", editable = "packages/scalim-cli" },
-    { name = "scalim-yaml-dsl-lsp", extras = ["server"], marker = "extra == 'yaml-dsl-lsp'", editable = "packages/scalim-yaml-dsl-lsp" },
+    { name = "scalim-yaml-dsl-lsp", marker = "extra == 'yaml-dsl-lsp'", editable = "packages/scalim-yaml-dsl-lsp" },
     { name = "typing-extensions", marker = "python_full_version < '3.7'", specifier = ">=4.1.1,<4.2" },
     { name = "typing-extensions", marker = "python_full_version >= '3.7'", specifier = ">=4.1.1" },
 ]
@@ -3269,7 +3269,7 @@ dev = [
     { name = "scalim-benchlib", marker = "python_full_version >= '3.10'", editable = "packages/scalim-benchlib" },
     { name = "scalim-cli", marker = "python_full_version >= '3.10'", editable = "packages/scalim-cli" },
     { name = "scalim-misc", marker = "python_full_version >= '3.10'", editable = "packages/scalim-misc" },
-    { name = "scalim-yaml-dsl-lsp", extras = ["server"], marker = "python_full_version >= '3.10'", editable = "packages/scalim-yaml-dsl-lsp" },
+    { name = "scalim-yaml-dsl-lsp", marker = "python_full_version >= '3.10'", editable = "packages/scalim-yaml-dsl-lsp" },
     { name = "sqlalchemy", marker = "python_full_version >= '3.10'" },
     { name = "tomli", marker = "python_full_version >= '3.10'", specifier = ">=2.0.0" },
     { name = "types-dataclasses", marker = "python_full_version >= '3.10'", specifier = ">=0.6.6" },
@@ -3320,20 +3320,15 @@ name = "scalim-yaml-dsl-lsp"
 version = "0.8.3"
 source = { editable = "packages/scalim-yaml-dsl-lsp" }
 dependencies = [
-    { name = "scalim" },
-]
-
-[package.optional-dependencies]
-server = [
     { name = "pygls" },
+    { name = "scalim" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "pygls", marker = "extra == 'server'", specifier = ">=2.1.1" },
+    { name = "pygls", specifier = ">=2.1.1" },
     { name = "scalim", editable = "." },
 ]
-provides-extras = ["server"]
 
 [[package]]
 name = "six"

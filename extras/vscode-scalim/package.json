@@ -99,7 +99,7 @@
         },
         "scalim.yamlDsl.pinnedServerSpec": {
           "type": "string",
-          "default": "scalim-yaml-dsl-lsp[server]",
+          "default": "scalim-yaml-dsl-lsp",
           "description": "Pinned pip requirement used to provision the YAML DSL LSP server."
         },
         "scalim.yamlDsl.autoSchemaBinding": {

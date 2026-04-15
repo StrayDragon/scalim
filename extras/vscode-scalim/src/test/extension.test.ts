@@ -28,7 +28,7 @@ suite("yaml.schemas merge", () => {
 
 suite("diagnostic bundle", () => {
 	test("extractPinnedVersion parses == constraint", () => {
-		assert.strictEqual(extractPinnedVersion("scalim-yaml-dsl-lsp[server]==0.7.5"), "0.7.5");
+		assert.strictEqual(extractPinnedVersion("scalim-yaml-dsl-lsp==0.7.5"), "0.7.5");
 		assert.strictEqual(extractPinnedVersion("scalim-yaml-dsl-lsp==1.2.3"), "1.2.3");
 		assert.strictEqual(extractPinnedVersion("scalim-yaml-dsl-lsp>=1.0.0"), undefined);
 	});
@@ -50,8 +50,8 @@ suite("diagnostic bundle", () => {
 			lastResolutionTrace: { example: "trace" },
 			envKind: "pinnedVenv",
 			envMode: "pinnedVenv",
-			configuredPinnedServerSpec: "scalim-yaml-dsl-lsp[server]==0.7.5",
-			activeServerSpec: "scalim-yaml-dsl-lsp[server]==0.7.5",
+			configuredPinnedServerSpec: "scalim-yaml-dsl-lsp==0.7.5",
+			activeServerSpec: "scalim-yaml-dsl-lsp==0.7.5",
 			expectedServerVersion: "0.7.5",
 			serverPackageVersion: "0.7.5",
 			pythonPath: "python3",

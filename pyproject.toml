@@ -54,7 +54,7 @@ excel = [
     "openpyxl>=3.1.5;python_version>='3.8'",
 ]
 yaml-dsl-lsp = [
-    "scalim-yaml-dsl-lsp[server]",
+    "scalim-yaml-dsl-lsp",
 ]
 
 [tool.uv.dependency-groups]
@@ -84,7 +84,7 @@ dev = [
     "scalim-benchlib",
     "scalim-cli",
     "scalim-misc",
-    "scalim-yaml-dsl-lsp[server]",
+    "scalim-yaml-dsl-lsp",
     "pandas>=2.0.3",
     "openpyxl>=3.1.5",
     "pytest-memray>=1.8.0",
