@@ -18,8 +18,12 @@ on:
         description: "Publish `scalim` (main package)"
         type: boolean
         default: true
-      publish_tools:
-        description: "Publish `scalim-cli` + `scalim-yaml-dsl-lsp`"
+      publish_scalim_cli:
+        description: "Publish `scalim-cli`"
+        type: boolean
+        default: true
+      publish_scalim_yaml_dsl_lsp:
+        description: "Publish `scalim-yaml-dsl-lsp`"
         type: boolean
         default: true
 
@@ -35,7 +39,8 @@ jobs:
       SKIP_CHECKS: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_checks }}
       SKIP_DIST_VERIFY: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_dist_verify }}
       PUBLISH_MAIN: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_main }}
-      PUBLISH_TOOLS: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_tools }}
+      PUBLISH_SCALIM_CLI: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_scalim_cli }}
+      PUBLISH_SCALIM_YAML_DSL_LSP: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_scalim_yaml_dsl_lsp }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -67,17 +72,21 @@ jobs:
         if: env.SKIP_DIST_VERIFY == 'true' && env.PUBLISH_MAIN == 'true'
         run: uv --preview-features extra-build-dependencies build --wheel --sdist --no-create-gitignore --no-sources
 
-      - name: Build workspace distributions (tools)
-        if: env.PUBLISH_TOOLS == 'true'
-        run: |
-          uv --preview-features extra-build-dependencies build --package scalim-cli --wheel --sdist --no-create-gitignore --no-sources
-          uv --preview-features extra-build-dependencies build --package scalim-yaml-dsl-lsp --wheel --sdist --no-create-gitignore --no-sources
+      - name: Build distribution (scalim-cli)
+        if: env.PUBLISH_SCALIM_CLI == 'true'
+        run: uv --preview-features extra-build-dependencies build --package scalim-cli --wheel --sdist --no-create-gitignore --no-sources
 
-      - name: Verify workspace distributions (tools)
-        if: env.PUBLISH_TOOLS == 'true' && env.SKIP_DIST_VERIFY != 'true'
-        run: |
-          uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_cli-*.whl --sdist dist/scalim_cli-*.tar.gz
-          uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_yaml_dsl_lsp-*.whl --sdist dist/scalim_yaml_dsl_lsp-*.tar.gz
+      - name: Build distribution (scalim-yaml-dsl-lsp)
+        if: env.PUBLISH_SCALIM_YAML_DSL_LSP == 'true'
+        run: uv --preview-features extra-build-dependencies build --package scalim-yaml-dsl-lsp --wheel --sdist --no-create-gitignore --no-sources
+
+      - name: Verify distribution (scalim-cli)
+        if: env.PUBLISH_SCALIM_CLI == 'true' && env.SKIP_DIST_VERIFY != 'true'
+        run: uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_cli-*.whl --sdist dist/scalim_cli-*.tar.gz
+
+      - name: Verify distribution (scalim-yaml-dsl-lsp)
+        if: env.PUBLISH_SCALIM_YAML_DSL_LSP == 'true' && env.SKIP_DIST_VERIFY != 'true'
+        run: uv --preview-features extra-build-dependencies run python scripts/check-build-artifacts.py --wheel dist/scalim_yaml_dsl_lsp-*.whl --sdist dist/scalim_yaml_dsl_lsp-*.tar.gz
 
       - name: Publish to PyPI (Trusted Publisher)
         run: |
@@ -110,13 +119,15 @@ jobs:
           if [ "${PUBLISH_MAIN}" = "true" ]; then
             files+=(dist/scalim-*.whl dist/scalim-*.tar.gz)
           fi
-          if [ "${PUBLISH_TOOLS}" = "true" ]; then
+          if [ "${PUBLISH_SCALIM_CLI}" = "true" ]; then
             files+=(dist/scalim_cli-*.whl dist/scalim_cli-*.tar.gz)
+          fi
+          if [ "${PUBLISH_SCALIM_YAML_DSL_LSP}" = "true" ]; then
             files+=(dist/scalim_yaml_dsl_lsp-*.whl dist/scalim_yaml_dsl_lsp-*.tar.gz)
           fi
 
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "Nothing to publish (PUBLISH_MAIN=${PUBLISH_MAIN}, PUBLISH_TOOLS=${PUBLISH_TOOLS})."
+            echo "Nothing to publish (PUBLISH_MAIN=${PUBLISH_MAIN}, PUBLISH_SCALIM_CLI=${PUBLISH_SCALIM_CLI}, PUBLISH_SCALIM_YAML_DSL_LSP=${PUBLISH_SCALIM_YAML_DSL_LSP})."
             exit 0
           fi
 
