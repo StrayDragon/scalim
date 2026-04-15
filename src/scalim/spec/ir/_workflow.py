@@ -94,12 +94,6 @@ class WorkflowCachePoolIr:
 
 
 @dataclass(frozen=True)
-class WorkflowCtxOptionsIr:
-    max_value_bytes: int = 65536
-    max_bytes: int = 1048576
-
-
-@dataclass(frozen=True)
 class WorkflowResourcesWaitDiagnosticsIr:
     enabled: bool = False
     warn_after_s: float = 30.0
@@ -125,7 +119,6 @@ class WorkflowOptionsIr:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
     cache_pool: Optional[WorkflowCachePoolIr] = None
-    ctx: WorkflowCtxOptionsIr = field(default_factory=WorkflowCtxOptionsIr)
     resources_wait: WorkflowResourcesWaitOptionsIr = field(default_factory=WorkflowResourcesWaitOptionsIr)
     output_staging: WorkflowOutputStagingOptionsIr = field(default_factory=WorkflowOutputStagingOptionsIr)
 

@@ -26,19 +26,16 @@ def test_workflow_schema_fragments_live_in_core_and_are_descriptive() -> None:
     workflow = _as_dict(workflow_ssot.build_workflow_workflow_schema())
     props = _as_dict(workflow.get("properties"))
 
-    options = _as_dict(props.get("options"))
-    option_props = _as_dict(options.get("properties"))
-    failure_policy = _as_dict(option_props.get("failure_policy"))
-    assert isinstance(failure_policy.get("description"), str) and str(failure_policy["description"]).strip()
-    assert isinstance(failure_policy.get("markdownDescription"), str) and str(failure_policy["markdownDescription"]).strip()
+    runs = _as_dict(props.get("runs"))
+    items = _as_dict(runs.get("items"))
+    item_props = _as_dict(items.get("properties"))
+    demand = _as_dict(item_props.get("demand"))
+    assert isinstance(demand.get("description"), str) and str(demand["description"]).strip()
+    assert isinstance(demand.get("markdownDescription"), str) and str(demand["markdownDescription"]).strip()
 
-    cache_pool_union = _as_dict(option_props.get("cache_pool"))
-    one_of = cache_pool_union.get("oneOf")
-    assert isinstance(one_of, list) and one_of
-    cache_pool = _as_dict(one_of[0])
-    cache_pool_props = _as_dict(cache_pool.get("properties"))
-    conflict_policy = _as_dict(cache_pool_props.get("conflict_policy"))
-    assert isinstance(conflict_policy.get("markdownDescription"), str) and str(conflict_policy["markdownDescription"]).strip()
+    resources = _as_dict(props.get("resources"))
+    assert isinstance(resources.get("description"), str) and str(resources["description"]).strip()
+    assert isinstance(resources.get("markdownDescription"), str) and str(resources["markdownDescription"]).strip()
 
 
 def test_workflow_schema_meta_is_core_ssot() -> None:

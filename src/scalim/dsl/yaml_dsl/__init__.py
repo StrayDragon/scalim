@@ -34,9 +34,8 @@ if TYPE_CHECKING:
     from ...workflow.report import WorkflowResult
     from .runtime.entrypoints import compile as compile  # noqa: A004
     from .runtime.entrypoints import run as run
-    from .workflow_config._models import WorkflowOutputStagingOptions, WorkflowResourcesWaitOptions
     from .workflow_entrypoints import run_workflow as run_workflow
-    from .workflow_types import WorkflowRunOptionsPatch
+    from .workflow_types import WorkflowRunOptionsPatch, WorkflowRuntimeOptions
 else:
 
     def compile(yaml_path: str, *, options: RunOptions) -> Compilation:  # noqa: A001
@@ -52,8 +51,7 @@ else:
         *,
         options: RunOptions,
         run_options_patches_by_run_id: Optional[Mapping[str, "WorkflowRunOptionsPatch"]] = None,
-        workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"] = None,
-        workflow_output_staging: Optional["WorkflowOutputStagingOptions"] = None,
+        workflow_runtime_options: Optional["WorkflowRuntimeOptions"] = None,
         path_aliases: Optional[Mapping[str, str]] = None,
         run_ir_fn: Optional[Callable[..., Any]] = None,
         compile_demand_yaml_fn: Optional[Callable[..., Any]] = None,
@@ -63,8 +61,7 @@ else:
             workflow_yaml_path,
             options=options,
             run_options_patches_by_run_id=run_options_patches_by_run_id,
-            workflow_resources_wait=workflow_resources_wait,
-            workflow_output_staging=workflow_output_staging,
+            workflow_runtime_options=workflow_runtime_options,
             path_aliases=path_aliases,
             run_ir_fn=run_ir_fn,
             compile_demand_yaml_fn=compile_demand_yaml_fn,

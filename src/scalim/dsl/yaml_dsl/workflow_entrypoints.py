@@ -41,7 +41,7 @@ from .workflow import ScalimWorkflowConfigError, WorkflowConfig
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
 from .workflow_preflight import WORKFLOW_PREFLIGHT_CHECKS, WorkflowPreflightContext, WorkflowPreflightRun, run_workflow_preflight
-from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsReplace, WorkflowRunOptionsPatch
+from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsReplace, WorkflowRunOptionsPatch, WorkflowRuntimeOptions
 
 _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = (
     "workflow bundle viz requires run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))"
@@ -337,7 +337,6 @@ def _apply_workflow_run_options_patch(base: RunOptions, patch: WorkflowRunOption
 
 if TYPE_CHECKING:
     from ...ob.presets.viz import VizObserverConfig
-    from .workflow_config._models import WorkflowOutputStagingOptions, WorkflowResourcesWaitOptions
 
 
 class _CompilationLike(Protocol):
@@ -445,8 +444,7 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
     base_options: RunOptions,
     path_aliases: Optional[Mapping[str, str]],
     run_options_patches_by_run_id: Optional[Mapping[str, WorkflowRunOptionsPatch]],
-    workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"],
-    workflow_output_staging: Optional["WorkflowOutputStagingOptions"],
+    workflow_runtime_options: WorkflowRuntimeOptions,
 ) -> WorkflowLifecyclePreflightResult:
     """测试用 `harness` + `lifecycle` `pipeline` 的 `SSOT`: 执行到 `preflight` 为止(不会启动 `engine`)."""
     # 阶段: `parse`
@@ -496,8 +494,7 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
         allowed_yaml_roots=base_options.allowed_yaml_roots,
         init_vars=base_options.init_vars,
         overrides=compile_overrides,
-        workflow_resources_wait=workflow_resources_wait,
-        workflow_output_staging=workflow_output_staging,
+        workflow_runtime_options=workflow_runtime_options,
     )
     workflow_ir = compilation.workflow_ir
     demand_configs_by_run_id = compilation.demand_configs_by_run_id
@@ -600,20 +597,21 @@ def run_workflow(  # noqa: C901, PLR0915
     *,
     options: RunOptions,
     run_options_patches_by_run_id: Optional[Mapping[str, WorkflowRunOptionsPatch]] = None,
-    workflow_resources_wait: Optional["WorkflowResourcesWaitOptions"] = None,
-    workflow_output_staging: Optional["WorkflowOutputStagingOptions"] = None,
+    workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
     path_aliases: Optional[Mapping[str, str]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
     compile_demand_yaml_fn: Optional[Callable[..., _CompilationLike]] = None,
 ) -> WorkflowResult:
     base_options = _normalize_and_validate_workflow_base_options(options)
+    typed_workflow_runtime_options = (
+        WorkflowRuntimeOptions.preset_default() if workflow_runtime_options is None else workflow_runtime_options
+    )
     lifecycle = run_workflow_lifecycle_until_preflight(
         workflow_yaml_path,
         base_options=base_options,
         path_aliases=path_aliases,
         run_options_patches_by_run_id=run_options_patches_by_run_id,
-        workflow_resources_wait=workflow_resources_wait,
-        workflow_output_staging=workflow_output_staging,
+        workflow_runtime_options=typed_workflow_runtime_options,
     )
     workflow_path = lifecycle.parse.workflow_yaml_path
     workflow_ir = lifecycle.preload.workflow_ir

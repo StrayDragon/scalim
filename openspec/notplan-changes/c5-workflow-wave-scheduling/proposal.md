@@ -6,7 +6,7 @@
 
 ## What Changes
 
-- 在 workflow 的 `workflow_runtime` 中新增一个 scheduling preset（命名待定，例如 `WorkflowRuntimeOptions.scheduler`）：
+- 在 workflow 的 `workflow_runtime_options` 中新增一个 scheduling preset（命名待定，例如 `WorkflowRuntimeOptions.scheduler`）：
   - 为避免 “大平铺 + 字符串策略” 难维护，该配置建议以策略对象/内聚数据类承载（例如 `PipelineSchedulerOptions` / `WaveBarrierSchedulerOptions` 两种实现），而不是新增多个正交性不清晰的散字段。
   - preset 1：`pipeline`（默认）：保持现有 DAG pipeline（ready 就跑）语义。
   - preset 2：`wave_barrier`：严格屏障；仅当当前波次全部可运行节点终止（成功/失败/取消）后才允许下一波次节点开始。

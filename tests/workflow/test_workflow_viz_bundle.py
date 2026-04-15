@@ -5,6 +5,7 @@ import pytest
 
 from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowExecutionOptions, WorkflowRuntimeOptions
 from scalim.ob.presets.viz import VizObserverConfig
 
 
@@ -87,15 +88,16 @@ workflow:
       demand: {demand_ok}
     - id: bad
       demand: {demand_missing}
-  options:
-    max_concurrency: 1
-    failure_policy: primary_only
 """.format(
                 demand_ok=str(demand_ok),
                 demand_missing=str(demand_missing),
             )
         ).lstrip(),
     )
+
+
+def _workflow_runtime_options(*, failure_policy: str = "all_fail", max_concurrency: int = 1) -> WorkflowRuntimeOptions:
+    return WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=int(max_concurrency), failure_policy=str(failure_policy)))
 
 
 def test_workflow_viz_bundle_exports_linked_runs(tmp_path: Path) -> None:
@@ -111,6 +113,7 @@ def test_workflow_viz_bundle_exports_linked_runs(tmp_path: Path) -> None:
             allowed_modules=_ALLOWED_MODULES,
             overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(out_dir))),
         ),
+        workflow_runtime_options=_workflow_runtime_options(failure_policy="primary_only"),
     )
 
     # Workflow continues (failure_policy=primary_only), but the missing node is recorded as an error.
@@ -153,6 +156,7 @@ def test_workflow_viz_bundle_rejects_explicit_paths(tmp_path: Path) -> None:
                 allowed_modules=_ALLOWED_MODULES,
                 overrides=RunOverrides(viz_config=VizObserverConfig(output_path=str(tmp_path / "viz_events.jsonl"))),
             ),
+            workflow_runtime_options=_workflow_runtime_options(failure_policy="primary_only"),
         )
 
     assert exc_info.value.path == "run_workflow.overrides.viz_config"
@@ -169,6 +173,7 @@ def test_workflow_viz_bundle_requires_output_dir_or_default(tmp_path: Path) -> N
                 allowed_modules=_ALLOWED_MODULES,
                 overrides=RunOverrides(viz_config=VizObserverConfig()),
             ),
+            workflow_runtime_options=_workflow_runtime_options(failure_policy="primary_only"),
         )
 
     assert exc_info.value.path == "run_workflow.overrides.viz_config"
@@ -196,9 +201,6 @@ workflow:
   runs:
     - id: ok
       demand: ok.yaml
-  options:
-    max_concurrency: 1
-    failure_policy: primary_only
 """
         ).lstrip(),
     )
@@ -209,6 +211,7 @@ workflow:
             allowed_modules=_ALLOWED_MODULES,
             overrides=RunOverrides(viz_config=VizObserverConfig(use_default_output_dir=True)),
         ),
+        workflow_runtime_options=_workflow_runtime_options(failure_policy="primary_only"),
     )
     assert not result.errors()
 

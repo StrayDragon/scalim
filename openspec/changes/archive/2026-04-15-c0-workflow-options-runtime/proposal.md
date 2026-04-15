@@ -15,9 +15,9 @@
   - `workflow.options.cache_pool`（含其所有子字段）
 - 系统 MUST 在 workflow YAML parse/validate 阶段 fail-fast 拒绝上述字段，并给出迁移指导（指向 Python/CLI runtime entrypoints）。
 - `workflow.options.ctx` 将被移除，且 workflow ctx store 的“单值/总量”护栏逻辑将整体移除：框架不再对 ctx payload 做 size-limit 报错，内存与 payload 规模由调用方自行治理。
-- 系统新增/扩展 workflow runtime entrypoints 的 typed 参数 `workflow_runtime=...`，使调用方可在 Python/CLI 侧配置 workflow-level runtime policy（核心编排 knobs 为 `max_concurrency` / `failure_policy`）；未显式提供时使用稳定默认值（与历史行为等价）。
-- `workflow.options.resources_wait` / `workflow.options.output_staging` 已迁出 YAML；本变更将进一步把它们收敛到 `workflow_runtime`（不再散落为多个独立的运行入口参数），以保持外部接口受限且正交。
-- **BREAKING**：`run_workflow(...)` 将移除/替换零散的 workflow-level runtime kwargs（例如 `workflow_resources_wait` / `workflow_output_staging`），统一由 `workflow_runtime` 承载。
+- 系统新增/扩展 workflow runtime entrypoints 的 typed 参数 `workflow_runtime_options=...`，使调用方可在 Python/CLI 侧配置 workflow-level runtime policy（核心编排 knobs 为 `max_concurrency` / `failure_policy`）；未显式提供时使用稳定默认值（与历史行为等价）。
+- `workflow.options.resources_wait` / `workflow.options.output_staging` 已迁出 YAML；本变更将进一步把它们收敛到 `workflow_runtime_options`（不再散落为多个独立的运行入口参数），以保持外部接口受限且正交。
+- **BREAKING**：`run_workflow(...)` 将移除/替换零散的 workflow-level runtime kwargs（例如 `workflow_resources_wait` / `workflow_output_staging`），统一由 `workflow_runtime_options` 承载。
 - `cache_pool` 将保留为 workflow 能力，但 **配置面收口为 runtime-only preset**（避免外部接口过度开放）：
   - workflow YAML 中不再允许声明 `workflow.options.cache_pool`（fail-fast）。
   - runtime entrypoints 仅暴露极小 knobs（例如 `max_entries`：按 signature 计数的“最多缓存 entry 数量”，默认 `16`），其余策略固定为稳定默认（例如 `conflict_policy=error`、`release_policy=dag_refcount`、`over_budget_policy=fail_fast`）。
@@ -37,7 +37,7 @@
 ## Impact
 
 - **YAML 作者体验**：现有 workflow YAML 需要删除 `workflow.options`（含其子字段）；并在运行入口以 typed 参数提供等价配置。
-- **Python API**：`scalim.dsl.yaml_dsl.run_workflow(...)`（及其稳定 facade）将新增 `workflow_runtime=...` 参数用于承载 workflow-level runtime policy；并收敛/替换现有零散的 workflow-level runtime kwargs（例如 `workflow_resources_wait` / `workflow_output_staging`）。下游集成需要更新调用方式。
+- **Python API**：`scalim.dsl.yaml_dsl.run_workflow(...)`（及其稳定 facade）将新增 `workflow_runtime_options=...` 参数用于承载 workflow-level runtime policy；并收敛/替换现有零散的 workflow-level runtime kwargs（例如 `workflow_resources_wait` / `workflow_output_staging`）。下游集成需要更新调用方式。
 - **CLI（如适用）**：如仓库内存在 workflow 运行 CLI，则需要提供对应 flags / 环境选择入口以注入 runtime policy。
 - **生成物与漂移门禁**：
   - `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json` 为生成物，schema 变更必须通过 SSOT + `just gen-yaml-dsl-schema` 生成。

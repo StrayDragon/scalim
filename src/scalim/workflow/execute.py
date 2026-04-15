@@ -32,7 +32,6 @@ from ..ob.presets.viz import (
 from ..sinks.rows import InMemoryRows, iter_in_memory_rows_as_main_rows
 from ..spec.ir._workflow import (
     AppendSheetNodeIr,
-    WorkflowCtxOptionsIr,
     WorkflowIr,
     WorkflowNodeIr,
     WriteSheetNodeIr,
@@ -85,31 +84,15 @@ def ensure_json_like(value: object, *, path: str) -> object:
     )
 
 
-def _json_value_size_bytes(value: object) -> int:
-    payload = json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return len(payload)
-
-
 class WorkflowCtxStore:
-    _guardrails: WorkflowCtxOptionsIr
     _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
     _values_by_producer_node_id: Dict[str, Dict[str, object]]
-    _value_bytes_by_producer_node_id: Dict[str, Dict[str, int]]
-    _total_bytes: int
     _owner_thread_id: Optional[int]
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
-        self._guardrails = workflow_ir.options.ctx
         visibility = WorkflowVisibilityIndex.from_workflow_ir(workflow_ir)
         self._visible_by_consumer_node_id = visibility.visible_by_consumer_node_id
         self._values_by_producer_node_id = {}
-        self._value_bytes_by_producer_node_id = {}
-        self._total_bytes = 0
         self._owner_thread_id = threading.current_thread().ident
 
     def _assert_owner_thread(self) -> None:
@@ -123,9 +106,9 @@ class WorkflowCtxStore:
     def publish_default_summary(self, producer_node_id: str, result: ExecutionResult) -> None:
         self._assert_owner_thread()
         node_id = str(producer_node_id)
-        self.publish(node_id, "output_path", result.output_path, path="workflow.options.ctx")
-        self.publish(node_id, "total_rows", int(result.total_rows), path="workflow.options.ctx")
-        self.publish(node_id, "duration_secs", float(result.duration), path="workflow.options.ctx")
+        self.publish(node_id, "output_path", result.output_path, path="$ctx")
+        self.publish(node_id, "total_rows", int(result.total_rows), path="$ctx")
+        self.publish(node_id, "duration_secs", float(result.duration), path="$ctx")
 
     def publish(self, producer_node_id: str, key: str, value: object, *, path: str) -> None:
         self._assert_owner_thread()
@@ -133,32 +116,8 @@ class WorkflowCtxStore:
         ctx_key = str(key)
         ctx_value = ensure_json_like(value, path=path)
 
-        value_bytes = _json_value_size_bytes(ctx_value)
-        max_value_bytes = int(self._guardrails.max_value_bytes)
-        if value_bytes > max_value_bytes:
-            msg = "ctx value too large: node={}, key={}, bytes={} > max_value_bytes={}".format(
-                node_id, ctx_key, value_bytes, max_value_bytes
-            )
-            raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
-
         by_key = self._values_by_producer_node_id.setdefault(node_id, {})
-        by_key_bytes = self._value_bytes_by_producer_node_id.setdefault(node_id, {})
-        prev_bytes = int(by_key_bytes.get(ctx_key, 0))
-
-        next_total = int(self._total_bytes) - prev_bytes + int(value_bytes)
-        max_bytes = int(self._guardrails.max_bytes)
-        if next_total > max_bytes:
-            msg = "ctx total bytes exceeded: adding node={}, key={} would make total_bytes={} > max_bytes={}".format(
-                node_id,
-                ctx_key,
-                next_total,
-                max_bytes,
-            )
-            raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
-
         by_key[ctx_key] = ctx_value
-        by_key_bytes[ctx_key] = int(value_bytes)
-        self._total_bytes = int(next_total)
 
     def resolve(self, consumer_node_id: str, *, node: str, key: str, path: str) -> object:
         consumer = str(consumer_node_id)
@@ -395,7 +354,7 @@ def _maybe_build_workflow_cache_pool(
 
     if logical_keys_by_node_id is None or consumers_by_logical_key is None:
         msg = "workflow cache_pool requires derived consumers mapping"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool")
+        raise ScalimWorkflowConfigError(msg, path="workflow_runtime_options.cache_pool")
     return WorkflowCachePool(
         workflow_exec_id=workflow_exec_id,
         instrumentation=workflow_instrumentation,

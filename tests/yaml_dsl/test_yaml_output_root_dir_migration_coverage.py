@@ -12,7 +12,7 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     OutputTargetConfig,
     OutputToConfig,
 )
-from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, WorkflowOptions, WorkflowRun
+from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, WorkflowRun
 from scalim.dsl.yaml_dsl.workflow_config import _parse as parse_mod
 from scalim.dsl.yaml_dsl import workflow_compile as compile_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError
@@ -97,7 +97,6 @@ def test_workflow_compile_helpers_cover_output_root_dir_migration_edges(tmp_path
 def test_append_write_nodes_from_runs_serializes_multiple_writes_to_same_file_id() -> None:
     wf = WorkflowConfig(
         runs=(WorkflowRun(id="r1", demand="demand.yaml"),),
-        options=WorkflowOptions(),
     )
     outputs = (
         OutputTargetConfig(name="o1", to=OutputToConfig(file="detail_csv"), fields=("id",)),

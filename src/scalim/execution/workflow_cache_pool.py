@@ -273,7 +273,7 @@ class WorkflowCachePool:
                         logical_key[1],
                         ",".join(conflict_diff or []),
                     )
-                    raise ScalimWorkflowCachePoolError(msg, path="workflow.options.cache_pool.conflict_policy")
+                    raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
                 # `warn/separate`: 允许并行存在多个条目,但需要可诊断(含差异摘要).
                 warn_msg = "cache_pool signature conflict for kind='{}', source_id='{}' (policy={}, diff={})".format(
@@ -444,22 +444,22 @@ class WorkflowCachePool:
     def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> None:
         if self._max_entries < 1:  # pragma: no cover  # pragma: allow-no-cover invariant: budget validated by config loader
             msg = "cache_pool budget.max_entries must be >= 1"
-            raise ScalimWorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.max_entries")
+            raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool.max_entries")
         if len(self._entries) < self._max_entries:
             return
 
         if self._over_budget_policy == "fail_fast":
             msg = "cache_pool over budget: max_entries={} (over_budget_policy=fail_fast)".format(self._max_entries)
-            raise ScalimWorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+            raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
         if self._over_budget_policy != "evict_lru":
             msg = "cache_pool over_budget_policy '{}' is not supported".format(self._over_budget_policy)
-            raise ScalimWorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+            raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
         evicted = self._evict_lru_idle(workflow_node_id=workflow_node_id, pending_emits=pending_emits)
         if not evicted:
             msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(self._max_entries)
-            raise ScalimWorkflowCachePoolError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
+            raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
     def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> bool:
         for signature_key, entry in list(self._entries.items()):

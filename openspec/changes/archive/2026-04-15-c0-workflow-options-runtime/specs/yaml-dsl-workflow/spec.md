@@ -18,7 +18,7 @@ workflow MUST 包含:
 - **GIVEN** workflow YAML 声明 `workflow.options.resources_wait`
 - **WHEN** 用户执行 workflow validate 或运行入口解析
 - **THEN** 系统 MUST fail-fast
-- **AND** 错误信息 MUST 提示该字段已迁出 YAML 并指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime=...)`）
+- **AND** 错误信息 MUST 提示该字段已迁出 YAML 并指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)`）
 
 ### Requirement: workflow provides a workflow-level ctx store (namespaced by `workflow_node_id`)
 系统 MUST 在一次 workflow 执行中维护一个 workflow-level ctx store,用于在依赖边上传递小体量上下文:
@@ -37,7 +37,7 @@ workflow MUST 包含:
 系统 MUST 提供 workflow-level 的 resources wait 配置,作为 inflight join/wait 的 SSOT；该配置属于 runtime policy boundary：
 
 - workflow YAML MUST NOT 再接受 `workflow.options.resources_wait`（出现时 MUST fail-fast，并指向 runtime entrypoints）
-- runtime entrypoints MUST 允许通过 `workflow_runtime.resources_wait`（或等价 typed surface）配置以下字段：
+- runtime entrypoints MUST 允许通过 `workflow_runtime_options.resources_wait`（或等价 typed surface）配置以下字段：
   - `max_wait_s` MUST 为有限正数值(秒),缺省时 MUST 等价于 600
   - `diagnostics` MAY 缺省;若提供,MUST 为 mapping
     - `diagnostics.enabled` MUST 为 bool(缺省等价于 false)
@@ -48,13 +48,13 @@ workflow MUST 包含:
 #### Scenario: resources_wait in YAML is rejected with an actionable migration hint
 - **WHEN** workflow YAML 声明 `workflow.options.resources_wait`
 - **THEN** 系统 MUST fail-fast
-- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime=...)`）
+- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)`）
 
 ### Requirement: workflow.options.output_staging MUST configure staging directory and cleanup policy
 系统 MUST 提供 workflow-level 的 output staging 配置,作为共享输出 staging/publish 行为的 SSOT；该配置属于 runtime policy boundary：
 
 - workflow YAML MUST NOT 再接受 `workflow.options.output_staging`（出现时 MUST fail-fast，并指向 runtime entrypoints）
-- runtime entrypoints MUST 允许通过 `workflow_runtime.output_staging`（或等价 typed surface）配置以下字段：
+- runtime entrypoints MUST 允许通过 `workflow_runtime_options.output_staging`（或等价 typed surface）配置以下字段：
   - `dir_name` MUST 为非空字符串且不包含路径分隔符(`/`或`\`);缺省时 MUST 等价于 `.scalim-staging`
   - `keep_on_success` MUST 为 bool;缺省时 MUST 等价于 `false`
   - `keep_on_failure` MUST 为 bool;缺省时 MUST 等价于 `true`
@@ -62,7 +62,7 @@ workflow MUST 包含:
 #### Scenario: output_staging in YAML is rejected with an actionable migration hint
 - **WHEN** workflow YAML 声明 `workflow.options.output_staging`
 - **THEN** 系统 MUST fail-fast
-- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime=...)`）
+- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)`）
 
 ### Requirement: workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)
 系统 MUST 提供 workflow-scope cache pool 能力以支持跨 nodes 复用（例如 `preload_forever`）；但 cache pool 的配置入口 MUST 位于 runtime policy boundary 并保持对外接口受限：
@@ -74,7 +74,7 @@ workflow MUST 包含:
 #### Scenario: cache_pool in YAML is rejected with migration guidance
 - **WHEN** workflow YAML 包含 `workflow.options.cache_pool`
 - **THEN** 系统 MUST fail-fast
-- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime=...)`）
+- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)`）
 
 #### Scenario: share_preload_cache is rejected
 - **WHEN** workflow YAML 包含 `workflow.options.share_preload_cache`

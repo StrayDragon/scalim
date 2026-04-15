@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRuntimeOptions
 from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
@@ -38,6 +39,10 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: p
             )
 
         monkeypatch.chdir(tmp_path)
+        workflow_runtime_options = WorkflowRuntimeOptions(
+            execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
+            cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
+        )
         result = run_workflow(
             str(wf_copy),
             options=RunOptions(
@@ -46,6 +51,7 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: p
                 batch_size=30,
                 allowed_yaml_roots=(str(repo_root),),
             ),
+            workflow_runtime_options=workflow_runtime_options,
             path_aliases={"@": str(repo_root)},
         )
 

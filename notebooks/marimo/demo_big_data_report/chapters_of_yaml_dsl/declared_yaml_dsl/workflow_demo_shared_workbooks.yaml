@@ -54,13 +54,3 @@ workflow:
     - id: detail_b
       demand: workflow_demo_shared_workbooks_demand.yaml
       depends_on: [detail_a]
-
-  options:
-    max_concurrency: 2
-    failure_policy: all_fail
-    cache_pool:
-      conflict_policy: error
-      release_policy: dag_refcount
-      budget:
-        max_entries: 16
-        over_budget_policy: fail_fast

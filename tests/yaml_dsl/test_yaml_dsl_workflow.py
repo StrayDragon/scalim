@@ -16,7 +16,14 @@ from scalim.dsl.yaml_dsl import RunResult
 from scalim.dsl.yaml_dsl import RunOptions
 from scalim.dsl.yaml_dsl import run_workflow
 from scalim.dsl.yaml_dsl.runtime import compiler as by_yaml_compiler_mod
-from scalim.dsl.yaml_dsl.workflow_types import ComponentsExtend, ComponentsReplace, WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl.workflow_types import (
+    ComponentsExtend,
+    ComponentsReplace,
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowExecutionOptions,
+    WorkflowRuntimeOptions,
+    WorkflowRunOptionsPatch,
+)
 from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.exceptions import ScalimInternalError
 from scalim.execution import versioned_outputs
@@ -58,6 +65,21 @@ _ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", 
 
 def _run_options(*, allowed_modules=_ALLOWED_MODULES, **kwargs):  # type: ignore[no-untyped-def] test helper
     return RunOptions(allowed_modules=allowed_modules, **kwargs)
+
+
+def _workflow_runtime_options(  # type: ignore[no-untyped-def] test helper
+    *,
+    max_concurrency: int = 1,
+    failure_policy: str = "all_fail",
+    cache_pool_max_entries: Optional[int] = None,
+):
+    execution = WorkflowExecutionOptions(max_concurrency=int(max_concurrency), failure_policy=str(failure_policy))
+    if cache_pool_max_entries is None:
+        return WorkflowRuntimeOptions(execution=execution)
+    return WorkflowRuntimeOptions(
+        execution=execution,
+        cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=int(cache_pool_max_entries)),
+    )
 
 
 class _WorkflowEventRecorder(Observer):
@@ -586,44 +608,8 @@ def _write_workflow_yaml(
                     group_lines.append("        {}: {}".format(str(key), json.dumps(value)))
         resources_lines = "\n  resources:\n{}".format("\n".join(group_lines))
 
-    cache_pool_lines = ""
-    if cache_pool is not None:
-        budget = cast("Dict[str, Any]", cache_pool.get("budget") or {})  # pragma: allow-cast test yaml builder typed narrowing
-        max_entries = int(budget.get("max_entries", 1))
-        over_budget_policy = str(budget.get("over_budget_policy", "fail_fast"))
-        pins = cast("List[Dict[str, Any]]", cache_pool.get("pin") or [])  # pragma: allow-cast test yaml builder typed narrowing
-        pin_lines = ""
-        if pins:
-            pin_item_lines = []
-            for pin in pins:
-                pin_item_lines.append(
-                    "        - kind: {kind}\n          source_id: {source_id}".format(
-                        kind=str(pin.get("kind", "")),
-                        source_id=str(pin.get("source_id", "")),
-                    )
-                )
-            pin_lines = "\n      pin:\n{}".format("\n".join(pin_item_lines))
-        cache_pool_lines = (
-            "\n    cache_pool:\n"
-            "      conflict_policy: {conflict_policy}\n"
-            "      release_policy: {release_policy}\n"
-            "      budget:\n"
-            "        max_entries: {max_entries}\n"
-            "        over_budget_policy: {over_budget_policy}{pin_lines}"
-        ).format(
-            conflict_policy=str(cache_pool.get("conflict_policy", "")),
-            release_policy=str(cache_pool.get("release_policy", "")),
-            max_entries=max_entries,
-            over_budget_policy=over_budget_policy,
-            pin_lines=pin_lines,
-        )
-
-    ctx_lines = ""
-    if ctx is not None:
-        ctx_lines = ("\n    ctx:\n      max_value_bytes: {max_value_bytes}\n      max_bytes: {max_bytes}").format(
-            max_value_bytes=int(ctx.get("max_value_bytes", 65536)),
-            max_bytes=int(ctx.get("max_bytes", 1048576)),
-        )
+    # NOTE: workflow-level runtime policy was moved out of YAML into `workflow_runtime_options`.
+    _ = (max_concurrency, failure_policy, cache_pool, ctx)
     return _write_text(
         tmp_path / "workflow.yaml",
         (
@@ -632,20 +618,11 @@ workflow:
   runs:
 {runs}
 {resources_lines}
-  options:
-    max_concurrency: {max_concurrency}
-    failure_policy: {failure_policy}
-{cache_pool_lines}
-{ctx_lines}
 """
         )
         .format(
             runs="\n".join(run_lines),
             resources_lines=resources_lines.rstrip(),
-            max_concurrency=max_concurrency,
-            failure_policy=failure_policy,
-            cache_pool_lines=cache_pool_lines.rstrip(),
-            ctx_lines=ctx_lines.rstrip(),
         )
         .lstrip(),
     )
@@ -896,11 +873,10 @@ def test_run_workflow_primary_only_collects_errors(tmp_path: Path) -> None:
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "ok", "demand": "ok.yaml"}, {"id": "bad", "demand": "bad.yaml"}],
-        max_concurrency=2,
-        failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), options=_run_options())
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+    result = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert [o.run_id for o in result.outcomes] == ["ok", "bad"]
     assert result.outcomes[0].result is not None
     assert result.outcomes[0].error is None
@@ -1568,29 +1544,17 @@ def test_workflow_ctx_ref_unknown_node_fails_fast(tmp_path: Path) -> None:
         _ = run_workflow(str(wf), options=_run_options())
 
 
-def test_workflow_ctx_guardrails_fail_fast(tmp_path: Path) -> None:
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="a.yaml",
-        name="a",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
-        cache_mode="none",
-    )
+def test_workflow_ctx_guardrails_fail_fast() -> None:
+    root = {
+        "workflow": {
+            "runs": [{"id": "a", "demand": "a.yaml"}],
+            "options": {"ctx": {"max_value_bytes": 1, "max_bytes": 10}},
+        }
+    }
 
-    wf = _write_workflow_yaml(
-        tmp_path,
-        runs=[{"id": "a", "demand": "a.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-        ctx={"max_value_bytes": 1, "max_bytes": 10},
-    )
-
-    result = run_workflow(str(wf), options=_run_options())
-    assert result.errors()
-    assert result.outcomes[0].error is not None
-    assert result.outcomes[0].error.exc_type == "ScalimWorkflowConfigError"
-    assert "max_value_bytes" in result.outcomes[0].error.message
+    with pytest.raises(ScalimWorkflowConfigError, match="moved out of workflow YAML") as excinfo:
+        _ = load_workflow_config_from_mapping(root)
+    assert excinfo.value.path == "workflow.options"
 
 
 def test_workflow_primary_only_cancels_downstream_when_dep_fails(tmp_path: Path) -> None:
@@ -1622,7 +1586,8 @@ def test_workflow_primary_only_cancels_downstream_when_dep_fails(tmp_path: Path)
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
     assert [o.run_id for o in result.outcomes] == ["bad", "down"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[1].result is None
@@ -1708,8 +1673,9 @@ def test_workflow_observability_bridge_emits_cancelled_reason_for_all_fail(tmp_p
     )
 
     recorder = _WorkflowEventRecorder()
+    runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="all_fail")
     with pytest.raises(Exception):
-        _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
+        _ = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
 
     cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
@@ -1756,8 +1722,9 @@ def test_workflow_all_fail_skips_already_cancelled_nodes_on_late_terminal(tmp_pa
     )
 
     recorder = _WorkflowEventRecorder()
+    runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="all_fail")
     with pytest.raises(Exception):
-        _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
+        _ = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
 
     cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
@@ -1887,11 +1854,11 @@ def test_cache_pool_reuses_preload_forever_across_runs(tmp_path: Path) -> None:
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
+    runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -1931,53 +1898,16 @@ def test_cache_pool_conflict_policy_error_fails_fast(tmp_path: Path) -> None:
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), options=_run_options())
+        runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+        _ = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
 
     msg = str(excinfo.value)
     assert "cache_pool signature conflict" in msg and "diff=" in msg
     assert "loader_ref" in msg
     assert workflow_loaders.preload_calls() == 1
-
-
-def test_cache_pool_conflict_policy_separate_runs_and_warns(tmp_path: Path) -> None:
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="a.yaml",
-        name="a",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
-    )
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="b.yaml",
-        name="b",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
-    )
-
-    workflow_loaders.reset_counters()
-    wf = _write_workflow_yaml(
-        tmp_path,
-        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="separate", release_policy="dag_refcount", max_entries=10),
-    )
-
-    recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
-    assert not result.errors()
-    assert workflow_loaders.preload_calls() == 2
-
-    warnings = [e for e in recorder.events if e.event_type == EVENT_DIAGNOSTIC_WARNING]
-    assert warnings
-
-    acquires = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_ACQUIRE]
-    assert any(e.payload.conflict_detected is True for e in acquires)
 
 
 def test_cache_pool_signature_uses_rendered_params_for_reuse(tmp_path: Path) -> None:
@@ -2015,11 +1945,15 @@ params:
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder], init_vars={"token": 1}))
+    runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+    result = run_workflow(
+        str(wf),
+        options=_run_options(components=[recorder], init_vars={"token": 1}),
+        workflow_runtime_options=runtime,
+    )
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -2070,54 +2004,12 @@ relations:
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), options=_run_options())
+        runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+        _ = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert "lookup_cast" in str(excinfo.value)
-
-
-def test_cache_pool_budget_evict_lru_evicts_idle_entry(tmp_path: Path) -> None:
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="a.yaml",
-        name="a",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
-        preload_source_id="preload_a",
-    )
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="b.yaml",
-        name="b",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
-        preload_source_id="preload_b",
-    )
-
-    workflow_loaders.reset_counters()
-    wf = _write_workflow_yaml(
-        tmp_path,
-        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-        cache_pool=_cache_pool_config(
-            conflict_policy="error",
-            release_policy="workflow_end",
-            max_entries=1,
-            over_budget_policy="evict_lru",
-        ),
-    )
-
-    recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
-    assert not result.errors()
-    assert workflow_loaders.preload_calls() == 2
-
-    evicts = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_EVICT]
-    assert any(e.payload.reason == "budget_lru" for e in evicts)
-    assert any(e.payload.reason == "workflow_end" for e in evicts)
 
 
 def test_cache_pool_budget_fail_fast_raises(tmp_path: Path) -> None:
@@ -2125,76 +2017,32 @@ def test_cache_pool_budget_fail_fast_raises(tmp_path: Path) -> None:
         tmp_path,
         file_name="a.yaml",
         name="a",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
         preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        preload_source_id="preload_a",
     )
     _ = _write_demand_yaml(
         tmp_path,
         file_name="b.yaml",
         name="b",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_slow",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        preload_source_id="preload_b",
     )
 
     workflow_loaders.reset_counters()
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
-        max_concurrency=1,
+        max_concurrency=2,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(
-            conflict_policy="separate",
-            release_policy="workflow_end",
-            max_entries=1,
-            over_budget_policy="fail_fast",
-        ),
     )
 
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = run_workflow(str(wf), options=_run_options())
+        runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="primary_only", cache_pool_max_entries=1)
+        _ = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert "over budget" in str(excinfo.value).lower()
     assert workflow_loaders.preload_calls() == 1
-
-
-def test_cache_pool_pin_keeps_entry_until_workflow_end(tmp_path: Path) -> None:
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="a.yaml",
-        name="a",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
-    )
-    _ = _write_demand_yaml(
-        tmp_path,
-        file_name="b.yaml",
-        name="b",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
-        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
-    )
-
-    workflow_loaders.reset_counters()
-    wf = _write_workflow_yaml(
-        tmp_path,
-        runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-        cache_pool=_cache_pool_config(
-            conflict_policy="error",
-            release_policy="dag_refcount",
-            max_entries=10,
-            pin=[{"kind": "preload_forever", "source_id": "preload"}],
-        ),
-    )
-
-    recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
-    assert not result.errors()
-    assert workflow_loaders.preload_calls() == 1
-
-    evicts = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_EVICT]
-    assert evicts
-    assert any(e.payload.reason == "workflow_end" for e in evicts)
-    assert not any(e.payload.reason == "refcount_zero" for e in evicts)
 
 
 def test_cache_pool_calls_node_done_on_compile_error_and_cancelled_dependents(tmp_path: Path) -> None:
@@ -2217,9 +2065,9 @@ def test_cache_pool_calls_node_done_on_compile_error_and_cancelled_dependents(tm
         runs=[{"id": "bad", "demand": "bad.yaml"}, {"id": "ok", "demand": "ok.yaml", "depends_on": ["bad"]}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="warn", release_policy="dag_refcount", max_entries=10),
     )
-    result = run_workflow(str(wf), options=_run_options())
+    runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+    result = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert [o.run_id for o in result.outcomes] == ["bad", "ok"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[1].error is not None
@@ -2239,9 +2087,9 @@ def test_cache_pool_calls_node_done_on_runtime_error(tmp_path: Path) -> None:
         runs=[{"id": "bad", "demand": "bad.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="warn", release_policy="dag_refcount", max_entries=10),
     )
-    result = run_workflow(str(wf), options=_run_options())
+    runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+    result = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert [o.run_id for o in result.outcomes] == ["bad"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[0].error.exc_type == "ValueError"
@@ -2265,7 +2113,27 @@ workflow:
     )
     jsonschema.validate(ok, schema)
 
-    ok_cache_pool = yaml.safe_load(
+    ok_ctx_and_depends_on = yaml.safe_load(
+        (
+            """
+workflow:
+  runs:
+    - id: a
+      demand: a.yaml
+    - id: b
+      demand: b.yaml
+      depends_on: [a]
+      init_vars:
+        token:
+          $ctx:
+            node: a
+            key: total_rows
+"""
+        ).lstrip()
+    )
+    jsonschema.validate(ok_ctx_and_depends_on, schema)
+
+    bad_cache_pool = yaml.safe_load(
         (
             """
 workflow:
@@ -2284,23 +2152,16 @@ workflow:
 """
         ).lstrip()
     )
-    jsonschema.validate(ok_cache_pool, schema)
+    with pytest.raises(jsonschema.exceptions.ValidationError):
+        jsonschema.validate(bad_cache_pool, schema)
 
-    ok_ctx_and_depends_on = yaml.safe_load(
+    bad_ctx_guardrails = yaml.safe_load(
         (
             """
 workflow:
   runs:
     - id: a
       demand: a.yaml
-    - id: b
-      demand: b.yaml
-      depends_on: [a]
-      init_vars:
-        token:
-          $ctx:
-            node: a
-            key: total_rows
   options:
     ctx:
       max_value_bytes: 65536
@@ -2308,7 +2169,8 @@ workflow:
 """
         ).lstrip()
     )
-    jsonschema.validate(ok_ctx_and_depends_on, schema)
+    with pytest.raises(jsonschema.exceptions.ValidationError):
+        jsonschema.validate(bad_ctx_guardrails, schema)
 
     bad_legacy_deps = yaml.safe_load(
         (
@@ -2643,180 +2505,23 @@ def test_load_workflow_config_from_mapping_rejects_invalid_structures(bad_mappin
 
 
 @pytest.mark.parametrize(
-    ("options", "path"),
+    "options_value",
     [
-        ({"share_preload_cache": True}, "workflow.options.share_preload_cache"),
-        ({"cache_pool": []}, "workflow.options.cache_pool"),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "nope",
-                    "release_policy": "dag_refcount",
-                    "budget": {"max_entries": 1, "over_budget_policy": "fail_fast"},
-                }
-            },
-            "workflow.options.cache_pool.conflict_policy",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "nope",
-                    "budget": {"max_entries": 1, "over_budget_policy": "fail_fast"},
-                }
-            },
-            "workflow.options.cache_pool.release_policy",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": [],
-                }
-            },
-            "workflow.options.cache_pool.budget",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": True, "over_budget_policy": "fail_fast"},
-                }
-            },
-            "workflow.options.cache_pool.budget.max_entries",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": "x", "over_budget_policy": "fail_fast"},
-                }
-            },
-            "workflow.options.cache_pool.budget.max_entries",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": 0, "over_budget_policy": "fail_fast"},
-                }
-            },
-            "workflow.options.cache_pool.budget.max_entries",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": 1, "over_budget_policy": "nope"},
-                }
-            },
-            "workflow.options.cache_pool.budget.over_budget_policy",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": 1, "over_budget_policy": "fail_fast"},
-                    "pin": {},
-                }
-            },
-            "workflow.options.cache_pool.pin",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": 1, "over_budget_policy": "fail_fast"},
-                    "pin": ["x"],
-                }
-            },
-            "workflow.options.cache_pool.pin.0",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": 1, "over_budget_policy": "fail_fast"},
-                    "pin": [{"kind": "nope", "source_id": "s1"}],
-                }
-            },
-            "workflow.options.cache_pool.pin.0.kind",
-        ),
-        (
-            {
-                "cache_pool": {
-                    "conflict_policy": "warn",
-                    "release_policy": "workflow_end",
-                    "budget": {"max_entries": 1, "over_budget_policy": "fail_fast"},
-                    "pin": [{"kind": "preload_forever", "source_id": ""}],
-                }
-            },
-            "workflow.options.cache_pool.pin.0.source_id",
-        ),
+        None,
+        {},
+        {"max_concurrency": 2},
+        {"failure_policy": "all_fail"},
+        {"share_preload_cache": True},
+        {"cache_pool": {"budget": {"max_entries": 16}}},
+        {"ctx": {"max_value_bytes": 2, "max_bytes": 3}},
+        {"resources_wait": {"max_wait_s": 12.5}},
+        {"output_staging": {"dir_name": ".staging"}},
     ],
 )
-def test_load_workflow_config_from_mapping_rejects_invalid_cache_pool_options(options: Dict[str, Any], path: str) -> None:
+def test_load_workflow_config_from_mapping_rejects_workflow_options(options_value: object) -> None:
     with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": options}})
-    assert excinfo.value.path == path
-
-
-def test_load_workflow_config_from_mapping_accepts_null_options() -> None:
-    cfg = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": None}})
-    assert cfg.options.max_concurrency == 1
-
-
-def test_load_workflow_config_from_mapping_accepts_ctx_options() -> None:
-    cfg = load_workflow_config_from_mapping(
-        {
-            "workflow": {
-                "runs": [{"id": "a", "demand": "a.yaml"}],
-                "options": {
-                    "ctx": {
-                        "max_value_bytes": 2,
-                        "max_bytes": 3,
-                    }
-                },
-            }
-        }
-    )
-    assert cfg.options.ctx.max_value_bytes == 2
-    assert cfg.options.ctx.max_bytes == 3
-
-
-@pytest.mark.parametrize(
-    ("ctx", "path"),
-    [
-        ([], "workflow.options.ctx"),
-        ({"max_value_bytes": 0, "max_bytes": 1}, "workflow.options.ctx.max_value_bytes"),
-        ({"max_value_bytes": "nope", "max_bytes": 1}, "workflow.options.ctx.max_value_bytes"),
-        ({"max_value_bytes": 1, "max_bytes": 0}, "workflow.options.ctx.max_bytes"),
-        ({"max_value_bytes": 1, "max_bytes": "nope"}, "workflow.options.ctx.max_bytes"),
-        ({"max_value_bytes": True, "max_bytes": 1}, "workflow.options.ctx.max_value_bytes"),
-        ({"max_value_bytes": 1, "max_bytes": True}, "workflow.options.ctx.max_bytes"),
-    ],
-)
-def test_load_workflow_config_from_mapping_rejects_invalid_ctx_options(ctx: object, path: str) -> None:
-    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        _ = load_workflow_config_from_mapping(
-            {
-                "workflow": {
-                    "runs": [{"id": "a", "demand": "a.yaml"}],
-                    "options": {
-                        "ctx": ctx,
-                    },
-                }
-            }
-        )
-    assert excinfo.value.path == path
+        _ = load_workflow_config_from_mapping({"workflow": {"runs": [{"id": "a", "demand": "a.yaml"}], "options": options_value}})
+    assert excinfo.value.path == "workflow.options"
 
 
 def test_load_workflow_config_from_mapping_rejects_legacy_deps_field() -> None:
@@ -2988,7 +2693,8 @@ def test_run_workflow_primary_only_submits_pending_after_failure(tmp_path: Path)
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), options=_run_options())
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=1, failure_policy="primary_only"))
+    result = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert [o.run_id for o in result.outcomes] == ["bad", "ok1", "ok2"]
     assert result.outcomes[0].error is not None
     assert result.outcomes[1].result is not None
@@ -3083,10 +2789,9 @@ def test_workflow_entrypoints_ensure_json_like_variants() -> None:
         _ = workflow_execute_mod.ensure_json_like(object(), path="x")
 
 
-def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
+def test_workflow_entrypoints_ctx_store_does_not_enforce_size_guardrails() -> None:
     from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
-        WorkflowCtxOptionsIr,
         WorkflowEdgeIr,
         WorkflowIr,
         WorkflowNodeIr,
@@ -3095,17 +2800,19 @@ def test_workflow_entrypoints_ctx_store_total_bytes_guardrail() -> None:
     )
 
     ir = WorkflowIr(
-        nodes=(WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml"),),
-        edges=(),
-        options=WorkflowOptionsIr(ctx=WorkflowCtxOptionsIr(max_value_bytes=1000, max_bytes=5)),
+        nodes=(
+            WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml"),
+            WorkflowNodeIr(node_id="b", node_type=WorkflowNodeType.DEMAND, decl_order=1, deps=("a",), demand_path="b.yaml"),
+        ),
+        edges=(WorkflowEdgeIr(from_node_id="a", to_node_id="b"),),
+        options=WorkflowOptionsIr(),
         resources=(),
-        artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": ()}),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "b": ()}),
     )
     ctx_store = workflow_execute_mod.WorkflowCtxStore(ir)
-    ctx_store.publish("a", "k1", "x", path="x")
-    with pytest.raises(WorkflowRuntimeConfigError) as excinfo:
-        ctx_store.publish("a", "k2", "y", path="x")
-    assert excinfo.value.path == "workflow.options.ctx.max_bytes"
+    large_value = "x" * 10000
+    ctx_store.publish("a", "k", large_value, path="x")
+    assert ctx_store.resolve("b", node="a", key="k", path="x") == large_value
 
 
 def test_workflow_entrypoints_ctx_store_resolve_errors() -> None:
@@ -3253,11 +2960,11 @@ relations:
         runs=[{"id": "a", "demand": str(demand_path)}],
         max_concurrency=1,
         failure_policy="primary_only",
-        cache_pool=_cache_pool_config(conflict_policy="error", release_policy="dag_refcount", max_entries=10),
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
+    runtime = _workflow_runtime_options(max_concurrency=1, failure_policy="primary_only", cache_pool_max_entries=10)
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
@@ -3562,7 +3269,12 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
         failure_policy="primary_only",
     )
 
-    result = run_workflow(str(wf), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+    result = run_workflow(
+        str(wf),
+        options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK),
+        workflow_runtime_options=runtime,
+    )
     assert not result.errors()
     outcomes = {str(o.run_id): o for o in result.outcomes}
     consume_outcome = outcomes["consume"]
@@ -3594,7 +3306,11 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    bad = run_workflow(str(wf_bad), options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK))
+    bad = run_workflow(
+        str(wf_bad),
+        options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK),
+        workflow_runtime_options=runtime,
+    )
     errs = {e.run_id: e for e in bad.errors()}
     assert "c" in errs
     assert "declare depends_on" in errs["c"].message
@@ -3849,7 +3565,8 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_sheets = run_workflow(str(wf_max_sheets), options=_run_options())
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+    result_sheets = run_workflow(str(wf_max_sheets), options=_run_options(), workflow_runtime_options=runtime)
     assert result_sheets.errors()
     assert not (out_root / "manifest" / "latest.json").exists()
     assert list(out_root.rglob("*.xlsx")) == []
@@ -3871,7 +3588,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result_cells = run_workflow(str(wf_max_cells), options=_run_options())
+    result_cells = run_workflow(str(wf_max_cells), options=_run_options(), workflow_runtime_options=runtime)
     assert result_cells.errors()
     assert not (out_root2 / "manifest" / "latest.json").exists()
     assert list(out_root2.rglob("*.xlsx")) == []
@@ -3903,7 +3620,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_failed = run_workflow(str(wf_failed), options=_run_options())
+    result_failed = run_workflow(str(wf_failed), options=_run_options(), workflow_runtime_options=runtime)
     assert result_failed.errors()
     assert not (out_root3 / "manifest" / "latest.json").exists()
     assert list(out_root3.rglob("*.xlsx")) == []
@@ -4583,8 +4300,7 @@ def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_an
         base_options=base_options,
         path_aliases=None,
         run_options_patches_by_run_id={"b": WorkflowRunOptionsPatch(batch_size=123)},
-        workflow_resources_wait=None,
-        workflow_output_staging=None,
+        workflow_runtime_options=workflow_entrypoints_mod.WorkflowRuntimeOptions.preset_default(),
     )
 
     assert set(lifecycle.preload.demand_configs_by_run_id) == {"a", "b"}
@@ -4641,8 +4357,7 @@ def test_workflow_lifecycle_pipeline_harness_merges_resources_overrides_into_com
         base_options=base_options,
         path_aliases=None,
         run_options_patches_by_run_id=run_options_patches_by_run_id,
-        workflow_resources_wait=None,
-        workflow_output_staging=None,
+        workflow_runtime_options=workflow_entrypoints_mod.WorkflowRuntimeOptions.preset_default(),
     )
 
     assert seen["overrides"] is not None
@@ -4682,8 +4397,7 @@ def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(
             base_options=base_options,
             path_aliases=None,
             run_options_patches_by_run_id=None,
-            workflow_resources_wait=None,
-            workflow_output_staging=None,
+            workflow_runtime_options=workflow_entrypoints_mod.WorkflowRuntimeOptions.preset_default(),
         )
 
 
@@ -5359,7 +5073,8 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
     )
 
     recorder = _WorkflowEventRecorder()
-    result = run_workflow(str(wf), options=_run_options(components=[recorder]))
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
     assert result.errors()
     assert not (out_root / "manifest" / "latest.json").exists()
     assert list(out_root.rglob("*.xlsx")) == []
@@ -5392,6 +5107,8 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         field_ids=["id", "value"],
     )
 
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+
     # on_conflict=error
     out_root_err = tmp_path / "out_err"
     wf_err = _write_workflow_yaml(
@@ -5412,7 +5129,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_err = run_workflow(str(wf_err), options=_run_options())
+    result_err = run_workflow(str(wf_err), options=_run_options(), workflow_runtime_options=runtime)
     assert result_err.errors()
     assert not (out_root_err / "manifest" / "latest.json").exists()
     assert list(out_root_err.rglob("*.xlsx")) == []
@@ -5437,7 +5154,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_over = run_workflow(str(wf_over), options=_run_options())
+    result_over = run_workflow(str(wf_over), options=_run_options(), workflow_runtime_options=runtime)
     assert not result_over.errors()
     workbook_over = _latest_book_path(out_root_over, book_id="report")
     assert workbook_over.exists()
@@ -5463,7 +5180,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_skip = run_workflow(str(wf_skip), options=_run_options())
+    result_skip = run_workflow(str(wf_skip), options=_run_options(), workflow_runtime_options=runtime)
     assert not result_skip.errors()
     workbook_skip = _latest_book_path(out_root_skip, book_id="report")
     assert workbook_skip.exists()
@@ -5770,7 +5487,8 @@ def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: P
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result = run_workflow(str(wf), options=_run_options())
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=1, failure_policy="primary_only"))
+    result = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
     assert result.errors()
     b_outcome = next(o for o in result.outcomes if o.run_id == "b")
     assert b_outcome.error is not None

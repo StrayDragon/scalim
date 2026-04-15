@@ -22,8 +22,8 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     FileConfig,
     ResourcesConfig,
 )
-from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, WorkflowOptions
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowRun, WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl.workflow import WorkflowConfig
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowRun, WorkflowRunOptionsPatch, WorkflowRuntimeOptions
 
 
 def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> None:
@@ -80,15 +80,14 @@ def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> No
 
 
 def test_workflow_entrypoints_workflow_resources_override_handles_missing_and_converts() -> None:
-    wf = WorkflowConfig(runs=(), options=WorkflowOptions(), resources="nope")  # type: ignore[arg-type]
+    wf = WorkflowConfig(runs=(), resources="nope")  # type: ignore[arg-type]
     assert entrypoints_mod._workflow_resources_override(wf) is None  # noqa: SLF001
 
-    wf_empty = WorkflowConfig(runs=(), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_empty = WorkflowConfig(runs=(), resources=ResourcesConfig())
     assert entrypoints_mod._workflow_resources_override(wf_empty) is None  # noqa: SLF001
 
     wf2 = WorkflowConfig(
         runs=(),
-        options=WorkflowOptions(),
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
@@ -146,7 +145,6 @@ def test_workflow_entrypoints_lifecycle_skips_merge_when_patch_resources_is_none
             WorkflowRun(id="r1", demand="d1.yaml"),
             WorkflowRun(id="r2", demand="d2.yaml"),
         ),
-        options=WorkflowOptions(),
         resources=ResourcesConfig(),
     )
 
@@ -178,8 +176,7 @@ def test_workflow_entrypoints_lifecycle_skips_merge_when_patch_resources_is_none
             base_options=base_options,
             path_aliases=None,
             run_options_patches_by_run_id=patches,
-            workflow_resources_wait=None,
-            workflow_output_staging=None,
+            workflow_runtime_options=WorkflowRuntimeOptions.preset_default(),
         )
 
 

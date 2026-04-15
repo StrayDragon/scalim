@@ -49,9 +49,6 @@ workflow:
       demand: b.yaml
       init_vars:
         node_key: "node_b"
-  options:
-    max_concurrency: 1
-    failure_policy: all_fail
 """
         ).lstrip(),
         encoding="utf-8",

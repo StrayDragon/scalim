@@ -7,11 +7,7 @@
 
 from .workflow_config import (
     ScalimWorkflowConfigError,
-    WorkflowCachePoolBudget,
-    WorkflowCachePoolOptions,
-    WorkflowCachePoolPin,
     WorkflowConfig,
-    WorkflowOptions,
     WorkflowOutputStagingOptions,
     WorkflowResourcesWaitDiagnosticsOptions,
     WorkflowResourcesWaitOptions,
@@ -24,11 +20,7 @@ from .workflow_config import (
 
 __all__ = (
     "ScalimWorkflowConfigError",
-    "WorkflowCachePoolBudget",
-    "WorkflowCachePoolOptions",
-    "WorkflowCachePoolPin",
     "WorkflowConfig",
-    "WorkflowOptions",
     "WorkflowOutputStagingOptions",
     "WorkflowResourcesWaitDiagnosticsOptions",
     "WorkflowResourcesWaitOptions",

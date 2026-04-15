@@ -30,20 +30,9 @@ from ..schema_dsl.output_enums import (
     FILE_KINDS,
 )
 from ._models import (
-    WorkflowCachePoolBudget,
-    WorkflowCachePoolOptions,
-    WorkflowCachePoolPin,
     WorkflowConfig,
-    WorkflowCtxOptions,
-    WorkflowOptions,
     WorkflowRun,
 )
-
-_FAILURE_POLICIES = ("all_fail", "primary_only")
-_CACHE_POOL_CONFLICT_POLICIES = ("error", "separate", "warn")
-_CACHE_POOL_RELEASE_POLICIES = ("dag_refcount", "workflow_end")
-_CACHE_POOL_OVER_BUDGET_POLICIES = ("fail_fast", "evict_lru")
-_CACHE_POOL_PIN_KINDS = ("preload_forever",)
 
 _INTERNAL_NODE_ID_PREFIX = "__wf__"
 _IMPORT_KEY = "$import"
@@ -61,6 +50,19 @@ def _raise_if_import_present(data: Mapping[str, Any], *, path: str) -> None:
         "Hint: inline the config under `workflow.resources.*`, or move the reuse to demand YAML via YAML anchors (`_templates`)."
     )
     raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, bad_key))
+
+
+def _raise_if_workflow_options_present(wf: Mapping[str, Any]) -> None:
+    if "options" not in wf:
+        return
+    msg = (
+        "workflow.options was moved out of workflow YAML (runtime policy boundary). "
+        "Migration: delete workflow.options from YAML and configure runtime via entrypoints "
+        "(e.g. run_workflow(..., workflow_runtime_options=WorkflowRuntimeOptions(...))). "
+        "Examples: WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2)); "
+        "cache_pool via WorkflowCachePoolPreloadForeverShared(max_entries=16)."
+    )
+    raise ScalimWorkflowConfigError(msg, path="workflow.options")
 
 
 def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[str, ...]:
@@ -524,195 +526,6 @@ def _parse_file_config(raw: object, *, path: str) -> FileConfig:
     return FileConfig(kind=kind, path=file_path, encoding=encoding)
 
 
-def _load_workflow_ctx_options(ctx_raw: object) -> WorkflowCtxOptions:
-    msg: str
-    ctx = WorkflowCtxOptions()
-    if ctx_raw is None:
-        return ctx
-    if not isinstance(ctx_raw, dict):
-        msg = "workflow.options.ctx must be a mapping"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx")
-    ctx_dict = cast("Dict[str, Any]", ctx_raw)  # pragma: allow-cast yaml mapping typed narrowing
-
-    max_value_bytes_raw = ctx_dict.get("max_value_bytes", 65536)
-    if isinstance(max_value_bytes_raw, bool) or not isinstance(max_value_bytes_raw, (int, float, str)):
-        msg = "workflow.options.ctx.max_value_bytes must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
-    try:
-        max_value_bytes = int(max_value_bytes_raw)
-    except (TypeError, ValueError) as exc:
-        msg = "workflow.options.ctx.max_value_bytes must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes") from exc
-    if max_value_bytes < 1:
-        msg = "workflow.options.ctx.max_value_bytes must be >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_value_bytes")
-
-    max_bytes_raw = ctx_dict.get("max_bytes", 1048576)
-    if isinstance(max_bytes_raw, bool) or not isinstance(max_bytes_raw, (int, float, str)):
-        msg = "workflow.options.ctx.max_bytes must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
-    try:
-        max_bytes = int(max_bytes_raw)
-    except (TypeError, ValueError) as exc:
-        msg = "workflow.options.ctx.max_bytes must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes") from exc
-    if max_bytes < 1:
-        msg = "workflow.options.ctx.max_bytes must be >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.ctx.max_bytes")
-
-    return WorkflowCtxOptions(
-        max_value_bytes=max_value_bytes,
-        max_bytes=max_bytes,
-    )
-
-
-def _parse_workflow_cache_pool_budget(budget_raw: object) -> WorkflowCachePoolBudget:
-    msg: str
-    if not isinstance(budget_raw, dict):
-        msg = "workflow.options.cache_pool.budget must be a mapping"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget")
-
-    data = cast("Dict[str, Any]", budget_raw)  # pragma: allow-cast yaml mapping typed narrowing
-    max_entries_raw = data.get("max_entries")
-    if isinstance(max_entries_raw, bool) or not isinstance(max_entries_raw, (int, float, str)):
-        msg = "workflow.options.cache_pool.budget.max_entries must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
-    try:
-        max_entries = int(max_entries_raw)
-    except (TypeError, ValueError) as exc:
-        msg = "workflow.options.cache_pool.budget.max_entries must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries") from exc
-    if max_entries < 1:
-        msg = "workflow.options.cache_pool.budget.max_entries must be >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.max_entries")
-
-    over_budget_policy = str(data.get("over_budget_policy", "") or "").strip()
-    if over_budget_policy not in _CACHE_POOL_OVER_BUDGET_POLICIES:
-        msg = "workflow.options.cache_pool.budget.over_budget_policy must be one of: {}".format("/".join(_CACHE_POOL_OVER_BUDGET_POLICIES))
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.budget.over_budget_policy")
-
-    return WorkflowCachePoolBudget(
-        max_entries=max_entries,
-        over_budget_policy=over_budget_policy,
-    )
-
-
-def _parse_workflow_cache_pool_pins(pin_raw: object) -> Tuple[WorkflowCachePoolPin, ...]:
-    msg: str
-    if pin_raw is None:
-        pin_raw = []
-
-    if not isinstance(pin_raw, list):
-        msg = "workflow.options.cache_pool.pin must be a list of mappings"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.pin")
-
-    pins: List[WorkflowCachePoolPin] = []
-    for idx, item in enumerate(cast("List[Any]", pin_raw)):  # pragma: allow-cast yaml list typed narrowing
-        pin_path = "workflow.options.cache_pool.pin.{}".format(idx)
-        if not isinstance(item, dict):
-            msg = "workflow.options.cache_pool.pin items must be mappings"
-            raise ScalimWorkflowConfigError(msg, path=pin_path)
-        pin_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
-        kind = str(pin_dict.get("kind", "") or "").strip()
-        if kind not in _CACHE_POOL_PIN_KINDS:
-            msg = "workflow.options.cache_pool.pin[*].kind must be one of: {}".format("/".join(_CACHE_POOL_PIN_KINDS))
-            raise ScalimWorkflowConfigError(msg, path="{}.kind".format(pin_path))
-        source_id = str(pin_dict.get("source_id", "") or "").strip()
-        if not source_id:
-            msg = "workflow.options.cache_pool.pin[*].source_id must be a non-empty string"
-            raise ScalimWorkflowConfigError(msg, path="{}.source_id".format(pin_path))
-        pins.append(WorkflowCachePoolPin(kind=kind, source_id=source_id))
-    return tuple(pins)
-
-
-def _load_workflow_cache_pool_options(cache_pool_raw: object) -> Optional[WorkflowCachePoolOptions]:
-    msg: str
-    if cache_pool_raw is None:
-        return None
-
-    if not isinstance(cache_pool_raw, dict):
-        msg = "workflow.options.cache_pool must be a mapping"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool")
-
-    cache_pool_dict = cast("Dict[str, Any]", cache_pool_raw)  # pragma: allow-cast yaml mapping typed narrowing
-
-    conflict_policy = str(cache_pool_dict.get("conflict_policy", "") or "").strip()
-    if conflict_policy not in _CACHE_POOL_CONFLICT_POLICIES:
-        msg = "workflow.options.cache_pool.conflict_policy must be one of: {}".format("/".join(_CACHE_POOL_CONFLICT_POLICIES))
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.conflict_policy")
-
-    release_policy = str(cache_pool_dict.get("release_policy", "") or "").strip()
-    if release_policy not in _CACHE_POOL_RELEASE_POLICIES:
-        msg = "workflow.options.cache_pool.release_policy must be one of: {}".format("/".join(_CACHE_POOL_RELEASE_POLICIES))
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.cache_pool.release_policy")
-
-    budget = _parse_workflow_cache_pool_budget(cache_pool_dict.get("budget"))
-    pins = _parse_workflow_cache_pool_pins(cache_pool_dict.get("pin"))
-    return WorkflowCachePoolOptions(
-        conflict_policy=conflict_policy,
-        release_policy=release_policy,
-        budget=budget,
-        pin=pins,
-    )
-
-
-def _load_workflow_options(wf: Mapping[str, Any]) -> WorkflowOptions:
-    msg: str
-    options_raw = wf.get("options", {})
-    if options_raw is None:
-        options_raw = {}
-    if not isinstance(options_raw, dict):
-        msg = "workflow.options must be a mapping"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options")
-    options_dict = cast("Dict[str, Any]", options_raw)  # pragma: allow-cast yaml mapping typed narrowing
-
-    max_concurrency_raw = options_dict.get("max_concurrency", 1)
-    if isinstance(max_concurrency_raw, bool) or not isinstance(max_concurrency_raw, (int, float, str)):
-        msg = "workflow.options.max_concurrency must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.max_concurrency")
-    try:
-        max_concurrency = int(max_concurrency_raw)
-    except (TypeError, ValueError) as exc:
-        msg = "workflow.options.max_concurrency must be an integer >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.max_concurrency") from exc
-    if max_concurrency < 1:
-        msg = "workflow.options.max_concurrency must be >= 1"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.max_concurrency")
-
-    failure_policy = str(options_dict.get("failure_policy", "all_fail") or "all_fail").strip()
-    if failure_policy not in _FAILURE_POLICIES:
-        msg = "workflow.options.failure_policy must be one of: {}".format("/".join(_FAILURE_POLICIES))
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.failure_policy")
-
-    ctx = _load_workflow_ctx_options(options_dict.get("ctx"))
-
-    if "share_preload_cache" in options_dict:
-        msg = "workflow.options.share_preload_cache was removed; use workflow.options.cache_pool"
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.share_preload_cache")
-
-    cache_pool = _load_workflow_cache_pool_options(options_dict.get("cache_pool"))
-
-    if "resources_wait" in options_dict:
-        msg = (
-            "workflow.options.resources_wait was moved out of workflow YAML (runtime policy boundary); "
-            "configure it via runtime entrypoints (e.g. run_workflow(..., workflow_resources_wait=...))."
-        )
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.resources_wait")
-    if "output_staging" in options_dict:
-        msg = (
-            "workflow.options.output_staging was moved out of workflow YAML (runtime policy boundary); "
-            "configure it via runtime entrypoints (e.g. run_workflow(..., workflow_output_staging=...))."
-        )
-        raise ScalimWorkflowConfigError(msg, path="workflow.options.output_staging")
-
-    return WorkflowOptions(
-        max_concurrency=max_concurrency,
-        failure_policy=failure_policy,
-        cache_pool=cache_pool,
-        ctx=ctx,
-    )
-
-
 def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:
     """从已解析的 `mapping` 加载 `workflow` 配置(用于文本校验/编辑器等无文件系统场景)."""
     msg: str
@@ -722,16 +535,15 @@ def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:
         raise ScalimWorkflowConfigError(msg, path="workflow")
     wf = cast("Dict[str, Any]", wf_raw)  # pragma: allow-cast yaml mapping typed narrowing
     _raise_if_import_present(wf, path="workflow")
+    _raise_if_workflow_options_present(wf)
 
     runs, seen_ids = _load_workflow_runs(wf)
     _validate_workflow_deps(runs, seen_ids=seen_ids)
     _validate_workflow_main_rows_from(runs, seen_ids=seen_ids)
     resources = _load_workflow_resources(wf)
-    options = _load_workflow_options(wf)
 
     return WorkflowConfig(
         runs=tuple(runs),
-        options=options,
         resources=resources,
     )
 

@@ -42,9 +42,6 @@ workflow:
   runs:
     - id: {run_id}
       demand: {demand_file}
-  options:
-    max_concurrency: 1
-    failure_policy: all_fail
 """.format(
         run_id=str(run_id),
         demand_file=str(demand_file),

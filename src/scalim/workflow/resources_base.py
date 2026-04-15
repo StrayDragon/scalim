@@ -238,7 +238,7 @@ class _WorkflowResourceManagerBase(ABC):
                         "staged_path={!r}".format(str(staged_path)),
                         "final_path={!r}".format(str(final_path)),
                         "keep_on_success={!r}".format(bool(self._output_staging_keep_on_success)),
-                        "hint=check_permissions_and_disk_space_or_set_workflow.options.output_staging.keep_on_success=true",
+                        "hint=check_permissions_and_disk_space_or_set_workflow_runtime_options.output_staging.keep_on_success=true",
                     ],
                 ) from exc
 

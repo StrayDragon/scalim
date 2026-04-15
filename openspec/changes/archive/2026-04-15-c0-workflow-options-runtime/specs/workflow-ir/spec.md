@@ -17,7 +17,7 @@
 - runtime 构造共享资源管理器时 MUST 仅依赖 IR options(不得再从资源定义隐式推断策略)
 
 #### Scenario: options are present in compiled IR
-- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime.resources_wait`
+- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime_options.resources_wait`
 - **WHEN** workflow 被编译为 Workflow IR
 - **THEN** IR 的 `options` MUST 包含对应字段且值与该 runtime policy 等价
 
@@ -30,6 +30,6 @@
 - `output_staging` MUST 至少包含: `dir_name`、`keep_on_success` 与 `keep_on_failure`
 
 #### Scenario: output_staging is present in compiled IR
-- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime.output_staging`
+- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime_options.output_staging`
 - **WHEN** workflow 被编译为 Workflow IR
 - **THEN** IR 的 `options` MUST 包含对应字段且值与该 runtime policy 等价

@@ -186,7 +186,7 @@ def test_fixture_snippet_extractor_supports_nesting_and_is_yaml_parseable() -> N
     # expected ids (coverage smoke)
     assert "outputs[*].aggregate" in all_snippets
     assert "outputs[*].aggregate.fields" in all_snippets
-    assert "workflow.options.cache_pool" in all_snippets
+    assert "workflow.runs" in all_snippets
     assert "yaml_dsl.import_roots" in all_snippets
     assert "yaml_dsl.import_roots[*]" in all_snippets
     assert "yaml_dsl.lsp.kind_overrides[*]" in all_snippets

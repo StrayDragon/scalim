@@ -4,6 +4,7 @@ from scalim.dsl.yaml_dsl import RunOptions, compile, run_workflow
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.template_precompile import maybe_precompile_yaml_text
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowExecutionOptions, WorkflowRuntimeOptions
 
 
 def test_template_vars_precompile_supports_unquoted_placeholders_in_demand_yaml(tmp_path) -> None:
@@ -228,23 +229,21 @@ outputs:
 workflow:
   runs:
     - id: a
-      demand: demand.yaml
-  options:
-    max_concurrency: {{ max_concurrency }}
-    failure_policy: all_fail
+      demand: {{ demand_path }}
 """.lstrip(),
         encoding="utf-8",
     )
 
-    cfg = load_workflow_config(str(wf), template_vars={"max_concurrency": 3})
-    assert cfg.options.max_concurrency == 3
+    cfg = load_workflow_config(str(wf), template_vars={"demand_path": "demand.yaml"})
+    assert cfg.runs[0].demand == "demand.yaml"
 
     result = run_workflow(
         str(wf),
         options=RunOptions(
             allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"max_concurrency": 3},
+            template_vars={"demand_path": "demand.yaml"},
         ),
+        workflow_runtime_options=WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=3, failure_policy="all_fail")),
     )
     assert result.errors() == []
 
@@ -257,9 +256,8 @@ workflow:
   runs:
     - id: a
       demand: demand.yaml
-  options:
-    max_concurrency: {{ missing }}
-    failure_policy: all_fail
+  resources:
+    books: {{ missing }}
 """.lstrip(),
         encoding="utf-8",
     )

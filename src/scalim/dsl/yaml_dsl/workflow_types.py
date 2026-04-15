@@ -9,14 +9,11 @@
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union, cast
 
 from ...vendor.dataclassesx import dataclass
+from ...vendor.dataclassesx import field as dataclass_field
 from .runtime.contracts import UNSET, DemandDiagnosticsOverride, RunOverrides, UnsetType
 from .workflow_config import (
     ScalimWorkflowConfigError,
-    WorkflowCachePoolBudget,
-    WorkflowCachePoolOptions,
-    WorkflowCachePoolPin,
     WorkflowConfig,
-    WorkflowOptions,
     WorkflowOutputStagingOptions,
     WorkflowResourcesWaitDiagnosticsOptions,
     WorkflowResourcesWaitOptions,
@@ -86,6 +83,50 @@ class WorkflowRunOptionsPatch:
     demand_diagnostics: Union[Optional[DemandDiagnosticsOverride], UnsetType] = UNSET
 
 
+@dataclass(frozen=True)
+class WorkflowExecutionOptions:
+    """工作流运行期编排策略(与环境相关; 运行期策略边界)."""
+
+    max_concurrency: int = 1
+    failure_policy: str = "all_fail"
+
+
+class WorkflowCachePoolPreset:
+    """工作流级 `cache pool` 的对外配置入口(封闭集合; 仅允许预设)."""
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolDisabled(WorkflowCachePoolPreset):
+    """禁用工作流级 `cache pool`(默认)."""
+
+
+@dataclass(frozen=True)
+class WorkflowCachePoolPreloadForeverShared(WorkflowCachePoolPreset):
+    """启用跨节点共享 `preload_forever` 缓存条目(仅暴露最小必要参数)."""
+
+    max_entries: int = 16
+
+
+@dataclass(frozen=True)
+class PipelineSchedulerOptions:
+    """默认调度策略: `DAG` 流水线(节点就绪即运行)."""
+
+
+@dataclass(frozen=True)
+class WorkflowRuntimeOptions:
+    """工作流运行期策略对象(正交组织; 避免大平铺)."""
+
+    execution: WorkflowExecutionOptions = dataclass_field(default_factory=WorkflowExecutionOptions)
+    cache_pool: WorkflowCachePoolPreset = dataclass_field(default_factory=WorkflowCachePoolDisabled)
+    resources_wait: WorkflowResourcesWaitOptions = dataclass_field(default_factory=WorkflowResourcesWaitOptions)
+    output_staging: WorkflowOutputStagingOptions = dataclass_field(default_factory=WorkflowOutputStagingOptions)
+    scheduler: PipelineSchedulerOptions = dataclass_field(default_factory=PipelineSchedulerOptions)
+
+    @classmethod
+    def preset_default(cls) -> "WorkflowRuntimeOptions":
+        return cls()
+
+
 __all__ = (
     "UNSET",
     "ComponentsExtend",
@@ -93,12 +134,14 @@ __all__ = (
     "ComponentsPatch",
     "ComponentsReplace",
     "ScalimWorkflowConfigError",
-    "WorkflowCachePoolBudget",
-    "WorkflowCachePoolOptions",
-    "WorkflowCachePoolPin",
+    "PipelineSchedulerOptions",
+    "WorkflowCachePoolDisabled",
+    "WorkflowCachePoolPreset",
+    "WorkflowCachePoolPreloadForeverShared",
     "WorkflowConfig",
-    "WorkflowOptions",
+    "WorkflowExecutionOptions",
     "WorkflowOutputStagingOptions",
+    "WorkflowRuntimeOptions",
     "WorkflowResourcesWaitDiagnosticsOptions",
     "WorkflowResourcesWaitOptions",
     "WorkflowRun",

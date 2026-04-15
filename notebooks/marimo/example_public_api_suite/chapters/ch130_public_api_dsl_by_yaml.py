@@ -60,9 +60,6 @@ workflow:
   runs:
     - id: dup
       demand: duplicate_headers.demand.yaml
-  options:
-    max_concurrency: 1
-    failure_policy: primary_only
 """,
     )
     return workflow_path
@@ -152,14 +149,6 @@ workflow:
       demand: demand.yaml
     - id: r2
       demand: demand.yaml
-  options:
-    max_concurrency: 2
-    cache_pool:
-      conflict_policy: error
-      release_policy: dag_refcount
-      budget:
-        max_entries: 16
-        over_budget_policy: fail_fast
 """
         _write_text(workflow_path, workflow_yaml)
 
@@ -213,6 +202,10 @@ workflow:
 
         reset_preload_counter_calls()
         workflow_batch_size_observer = _WorkflowBatchSizeObserver()
+        workflow_runtime_options = workflow_types_api.WorkflowRuntimeOptions(
+            execution=workflow_types_api.WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
+            cache_pool=workflow_types_api.WorkflowCachePoolPreloadForeverShared(max_entries=16),
+        )
         wf = api.run_workflow(
             str(workflow_path),
             options=api.RunOptions(
@@ -222,6 +215,7 @@ workflow:
                 init_vars=init_vars,
                 batch_size=2,
             ),
+            workflow_runtime_options=workflow_runtime_options,
             run_options_patches_by_run_id={
                 "r1": workflow_types_api.WorkflowRunOptionsPatch(batch_size=5),
             },

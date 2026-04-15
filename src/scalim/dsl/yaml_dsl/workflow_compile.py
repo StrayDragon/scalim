@@ -17,8 +17,6 @@ from ...spec.ir._workflow import (
     WorkflowArtifactsIr,
     WorkflowCachePoolBudgetIr,
     WorkflowCachePoolIr,
-    WorkflowCachePoolPinIr,
-    WorkflowCtxOptionsIr,
     WorkflowEdgeIr,
     WorkflowIr,
     WorkflowNodeIr,
@@ -90,11 +88,15 @@ from .schema_dsl.output_enums import (
 )
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig, resolve_workflow_demand_path
 from .workflow_config._models import (
-    WorkflowCachePoolOptions,
-    WorkflowCtxOptions,
     WorkflowOutputStagingOptions,
     WorkflowResourcesWaitDiagnosticsOptions,
     WorkflowResourcesWaitOptions,
+)
+from .workflow_types import (
+    WorkflowCachePoolDisabled,
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowExecutionOptions,
+    WorkflowRuntimeOptions,
 )
 
 
@@ -1537,26 +1539,98 @@ def _inject_xlsx_memory_write_dependencies(
                 nodes[int(pos)] = replace(consumer, deps=tuple(deps))
 
 
-def _build_workflow_cache_pool_ir(raw_cache_pool: Optional[WorkflowCachePoolOptions]) -> Optional[WorkflowCachePoolIr]:
-    if raw_cache_pool is None:
+_WORKFLOW_FAILURE_POLICIES = ("all_fail", "primary_only")
+
+
+def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowExecutionOptions:
+    if not isinstance(raw, WorkflowExecutionOptions):
+        msg = "workflow_runtime_options.execution must be a WorkflowExecutionOptions"
+        raise TypeError(msg)
+
+    max_concurrency_raw = raw.max_concurrency
+    if isinstance(max_concurrency_raw, bool) or not isinstance(max_concurrency_raw, int):
+        msg = "workflow_runtime_options.execution.max_concurrency must be an int >= 1"
+        raise TypeError(msg)
+    if int(max_concurrency_raw) < 1:
+        msg = "workflow_runtime_options.execution.max_concurrency must be >= 1"
+        raise ValueError(msg)
+
+    failure_policy_raw = raw.failure_policy
+    if not isinstance(failure_policy_raw, str):
+        msg = "workflow_runtime_options.execution.failure_policy must be a string"
+        raise TypeError(msg)
+    failure_policy = str(failure_policy_raw or "all_fail").strip() or "all_fail"
+    if failure_policy not in _WORKFLOW_FAILURE_POLICIES:
+        msg = "workflow_runtime_options.execution.failure_policy must be one of: {}".format("/".join(_WORKFLOW_FAILURE_POLICIES))
+        raise ValueError(msg)
+
+    return WorkflowExecutionOptions(
+        max_concurrency=int(max_concurrency_raw),
+        failure_policy=str(failure_policy),
+    )
+
+
+def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[WorkflowCachePoolIr]:
+    from .workflow_types import WorkflowCachePoolPreset  # 局部导入:避免循环依赖
+
+    if not isinstance(raw, WorkflowCachePoolPreset):
+        msg = "workflow_runtime_options.cache_pool must be a WorkflowCachePoolPreset"
+        raise TypeError(msg)
+
+    if isinstance(raw, WorkflowCachePoolDisabled):
         return None
-    budget = WorkflowCachePoolBudgetIr(
-        max_entries=int(raw_cache_pool.budget.max_entries),
-        over_budget_policy=str(raw_cache_pool.budget.over_budget_policy),
-    )
-    pins = tuple(WorkflowCachePoolPinIr(kind=str(pin.kind), source_id=str(pin.source_id)) for pin in (raw_cache_pool.pin or ()))
-    return WorkflowCachePoolIr(
-        conflict_policy=str(raw_cache_pool.conflict_policy),
-        release_policy=str(raw_cache_pool.release_policy),
-        budget=budget,
-        pin=pins,
-    )
+
+    if isinstance(raw, WorkflowCachePoolPreloadForeverShared):
+        max_entries_raw = raw.max_entries
+        if isinstance(max_entries_raw, bool) or not isinstance(max_entries_raw, int):
+            msg = "workflow_runtime_options.cache_pool.max_entries must be an int >= 1"
+            raise TypeError(msg)
+        if int(max_entries_raw) < 1:
+            msg = "workflow_runtime_options.cache_pool.max_entries must be >= 1"
+            raise ValueError(msg)
+        budget = WorkflowCachePoolBudgetIr(
+            max_entries=int(max_entries_raw),
+            over_budget_policy="fail_fast",
+        )
+        return WorkflowCachePoolIr(
+            conflict_policy="error",
+            release_policy="dag_refcount",
+            budget=budget,
+            pin=(),
+        )
+
+    msg = "Unsupported workflow_runtime_options.cache_pool preset: {!r}".format(type(raw).__name__)
+    raise TypeError(msg)
 
 
-def _build_workflow_ctx_ir(raw_ctx: WorkflowCtxOptions) -> WorkflowCtxOptionsIr:
-    return WorkflowCtxOptionsIr(
-        max_value_bytes=int(raw_ctx.max_value_bytes),
-        max_bytes=int(raw_ctx.max_bytes),
+def _normalize_and_validate_workflow_runtime_options(raw: object) -> WorkflowRuntimeOptions:
+    from .workflow_types import PipelineSchedulerOptions
+
+    if raw is None:
+        return WorkflowRuntimeOptions.preset_default()
+    if not isinstance(raw, WorkflowRuntimeOptions):
+        msg = "workflow_runtime_options must be a WorkflowRuntimeOptions"
+        raise TypeError(msg)
+
+    execution = _normalize_and_validate_workflow_execution_options(raw.execution)
+
+    resources_wait = _validate_workflow_resources_wait_override(raw.resources_wait)
+    output_staging = _normalize_workflow_output_staging_override(raw.output_staging)
+
+    scheduler = raw.scheduler
+    if not isinstance(scheduler, PipelineSchedulerOptions):
+        msg = "workflow_runtime_options.scheduler must be a PipelineSchedulerOptions (wave schedulers are not supported in this change)"
+        raise TypeError(msg)
+
+    _ = _build_workflow_cache_pool_ir_from_runtime(raw.cache_pool)
+
+    # 注意: 返回归一化实例供下游调用方/测试使用.
+    return WorkflowRuntimeOptions(
+        execution=execution,
+        cache_pool=raw.cache_pool,
+        resources_wait=resources_wait,
+        output_staging=output_staging,
+        scheduler=scheduler,
     )
 
 
@@ -1579,30 +1653,30 @@ def _parse_workflow_option_finite_number(raw: object, *, path: str, positive: bo
 
 def _validate_workflow_resources_wait_override(raw: object) -> WorkflowResourcesWaitOptions:
     if not isinstance(raw, WorkflowResourcesWaitOptions):
-        msg = "workflow_resources_wait must be a WorkflowResourcesWaitOptions"
+        msg = "workflow_runtime_options.resources_wait must be a WorkflowResourcesWaitOptions"
         raise TypeError(msg)
 
     diagnostics = raw.diagnostics
     if not isinstance(diagnostics, WorkflowResourcesWaitDiagnosticsOptions):
-        msg = "workflow_resources_wait.diagnostics must be a WorkflowResourcesWaitDiagnosticsOptions"
+        msg = "workflow_runtime_options.resources_wait.diagnostics must be a WorkflowResourcesWaitDiagnosticsOptions"
         raise TypeError(msg)
     if not isinstance(diagnostics.enabled, bool):
-        msg = "workflow_resources_wait.diagnostics.enabled must be a bool"
+        msg = "workflow_runtime_options.resources_wait.diagnostics.enabled must be a bool"
         raise TypeError(msg)
     if not isinstance(diagnostics.capture_owner_callsite, bool):
-        msg = "workflow_resources_wait.diagnostics.capture_owner_callsite must be a bool"
+        msg = "workflow_runtime_options.resources_wait.diagnostics.capture_owner_callsite must be a bool"
         raise TypeError(msg)
 
-    _ = _parse_workflow_option_finite_number(raw.max_wait_s, path="workflow_resources_wait.max_wait_s", positive=True)
+    _ = _parse_workflow_option_finite_number(raw.max_wait_s, path="workflow_runtime_options.resources_wait.max_wait_s", positive=True)
     _ = _parse_workflow_option_finite_number(
         diagnostics.warn_after_s,
-        path="workflow_resources_wait.diagnostics.warn_after_s",
+        path="workflow_runtime_options.resources_wait.diagnostics.warn_after_s",
         positive=False,
     )
     if diagnostics.repeat_every_s is not None:
         _ = _parse_workflow_option_finite_number(
             diagnostics.repeat_every_s,
-            path="workflow_resources_wait.diagnostics.repeat_every_s",
+            path="workflow_runtime_options.resources_wait.diagnostics.repeat_every_s",
             positive=True,
         )
     return raw
@@ -1623,21 +1697,21 @@ def _build_workflow_resources_wait_ir(raw_resources_wait: WorkflowResourcesWaitO
 
 def _normalize_workflow_output_staging_override(raw: object) -> WorkflowOutputStagingOptions:
     if not isinstance(raw, WorkflowOutputStagingOptions):
-        msg = "workflow_output_staging must be a WorkflowOutputStagingOptions"
+        msg = "workflow_runtime_options.output_staging must be a WorkflowOutputStagingOptions"
         raise TypeError(msg)
 
     dir_name = str(raw.dir_name or "").strip()
     if not dir_name:
-        msg = "workflow_output_staging.dir_name must be a non-empty string"
+        msg = "workflow_runtime_options.output_staging.dir_name must be a non-empty string"
         raise ValueError(msg)
     if dir_name in (".", "..") or "/" in dir_name or "\\" in dir_name:
-        msg = "workflow_output_staging.dir_name must be a simple directory name (no separators)"
+        msg = "workflow_runtime_options.output_staging.dir_name must be a simple directory name (no separators)"
         raise ValueError(msg)
     if not isinstance(raw.keep_on_success, bool):
-        msg = "workflow_output_staging.keep_on_success must be a bool"
+        msg = "workflow_runtime_options.output_staging.keep_on_success must be a bool"
         raise TypeError(msg)
     if not isinstance(raw.keep_on_failure, bool):
-        msg = "workflow_output_staging.keep_on_failure must be a bool"
+        msg = "workflow_runtime_options.output_staging.keep_on_failure must be a bool"
         raise TypeError(msg)
 
     return WorkflowOutputStagingOptions(
@@ -1656,27 +1730,18 @@ def _build_workflow_output_staging_ir(raw_output_staging: WorkflowOutputStagingO
 
 
 def _build_workflow_options_ir(
-    wf_obj: WorkflowConfig,
     *,
-    workflow_resources_wait: Optional[WorkflowResourcesWaitOptions] = None,
-    workflow_output_staging: Optional[WorkflowOutputStagingOptions] = None,
+    workflow_runtime_options: object,
 ) -> WorkflowOptionsIr:
-    cache_pool = _build_workflow_cache_pool_ir(wf_obj.options.cache_pool)
-    ctx = _build_workflow_ctx_ir(wf_obj.options.ctx)
-
-    raw_resources_wait = wf_obj.options.resources_wait if workflow_resources_wait is None else workflow_resources_wait
-    raw_resources_wait = _validate_workflow_resources_wait_override(raw_resources_wait)
-    resources_wait = _build_workflow_resources_wait_ir(raw_resources_wait)
-
-    raw_output_staging = wf_obj.options.output_staging if workflow_output_staging is None else workflow_output_staging
-    raw_output_staging = _normalize_workflow_output_staging_override(raw_output_staging)
-    output_staging = _build_workflow_output_staging_ir(raw_output_staging)
-
+    runtime = _normalize_and_validate_workflow_runtime_options(workflow_runtime_options)
+    cache_pool = _build_workflow_cache_pool_ir_from_runtime(runtime.cache_pool)
+    resources_wait = _build_workflow_resources_wait_ir(runtime.resources_wait)
+    output_staging = _build_workflow_output_staging_ir(runtime.output_staging)
+    execution = runtime.execution
     return WorkflowOptionsIr(
-        max_concurrency=int(wf_obj.options.max_concurrency),
-        failure_policy=str(wf_obj.options.failure_policy or "all_fail"),
+        max_concurrency=int(execution.max_concurrency),
+        failure_policy=str(execution.failure_policy or "all_fail"),
         cache_pool=cache_pool,
-        ctx=ctx,
         resources_wait=resources_wait,
         output_staging=output_staging,
     )
@@ -1693,8 +1758,7 @@ def compile_workflow_ir(
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
     init_vars: Optional[Dict[str, object]] = None,
     overrides: Optional[object] = None,
-    workflow_resources_wait: Optional[WorkflowResourcesWaitOptions] = None,
-    workflow_output_staging: Optional[WorkflowOutputStagingOptions] = None,
+    workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
 ) -> WorkflowCompileResult:
     """将工作流配置编译为工作流 `IR`.
 
@@ -1768,11 +1832,7 @@ def compile_workflow_ir(
         edges,
     )
 
-    workflow_options = _build_workflow_options_ir(
-        wf_obj,
-        workflow_resources_wait=workflow_resources_wait,
-        workflow_output_staging=workflow_output_staging,
-    )
+    workflow_options = _build_workflow_options_ir(workflow_runtime_options=workflow_runtime_options)
 
     artifacts = WorkflowArtifactsIr(slots_by_node_id=slots_by_node_id)
     resources_sorted = sorted(resources, key=lambda r: (str(r.resource_type), str(r.resource_id)))

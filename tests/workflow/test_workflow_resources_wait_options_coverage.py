@@ -17,18 +17,18 @@ def _base_root() -> Dict[str, Any]:
     }
 
 
-def test_load_workflow_config_from_mapping_resources_wait_defaults_are_present() -> None:
-    from scalim.dsl.yaml_dsl.workflow import load_workflow_config_from_mapping
+def test_workflow_runtime_options_resources_wait_defaults_are_present() -> None:
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowRuntimeOptions
 
-    cfg = load_workflow_config_from_mapping(_base_root())
-    assert cfg.options.resources_wait.max_wait_s == 600.0
-    assert cfg.options.resources_wait.diagnostics.enabled is False
-    assert cfg.options.resources_wait.diagnostics.warn_after_s == 30.0
-    assert cfg.options.resources_wait.diagnostics.repeat_every_s is None
-    assert cfg.options.resources_wait.diagnostics.capture_owner_callsite is False
+    runtime = WorkflowRuntimeOptions.preset_default()
+    assert runtime.resources_wait.max_wait_s == 600.0
+    assert runtime.resources_wait.diagnostics.enabled is False
+    assert runtime.resources_wait.diagnostics.warn_after_s == 30.0
+    assert runtime.resources_wait.diagnostics.repeat_every_s is None
+    assert runtime.resources_wait.diagnostics.capture_owner_callsite is False
 
 
-def test_load_workflow_config_from_mapping_rejects_resources_wait_key() -> None:
+def test_load_workflow_config_from_mapping_rejects_workflow_options_key() -> None:
     from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config_from_mapping
 
     root = _base_root()
@@ -36,17 +36,20 @@ def test_load_workflow_config_from_mapping_rejects_resources_wait_key() -> None:
 
     with pytest.raises(ScalimWorkflowConfigError, match="moved out of workflow YAML") as excinfo:
         _ = load_workflow_config_from_mapping(root)
-    assert excinfo.value.path == "workflow.options.resources_wait"
+    assert excinfo.value.path == "workflow.options"
 
 
 def test_resources_wait_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
-    from scalim.dsl.yaml_dsl.workflow import load_workflow_config_from_mapping
-    from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions
+    from scalim.dsl.yaml_dsl.workflow_types import (
+        WorkflowExecutionOptions,
+        WorkflowResourcesWaitDiagnosticsOptions,
+        WorkflowResourcesWaitOptions,
+        WorkflowRuntimeOptions,
+    )
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr
     from scalim.workflow import execute as workflow_execute_mod
 
-    wf_obj = load_workflow_config_from_mapping(_base_root())
     resources_wait = WorkflowResourcesWaitOptions(
         max_wait_s=12.5,
         diagnostics=WorkflowResourcesWaitDiagnosticsOptions(
@@ -56,7 +59,8 @@ def test_resources_wait_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> N
             capture_owner_callsite=True,
         ),
     )
-    options_ir = workflow_compile_mod._build_workflow_options_ir(wf_obj, workflow_resources_wait=resources_wait)  # noqa: SLF001
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(), resources_wait=resources_wait)
+    options_ir = workflow_compile_mod._build_workflow_options_ir(workflow_runtime_options=runtime)  # noqa: SLF001
     assert options_ir.resources_wait.max_wait_s == 12.5
     assert options_ir.resources_wait.diagnostics.enabled is True
     assert options_ir.resources_wait.diagnostics.warn_after_s == 0.1
@@ -138,9 +142,9 @@ def test_parse_workflow_option_finite_number_rejects_invalid_values(
 @pytest.mark.parametrize(
     ("raw", "exc_type", "match"),
     [
-        ({}, TypeError, r"workflow_resources_wait must be a WorkflowResourcesWaitOptions"),
-        ("x", TypeError, r"workflow_resources_wait must be a WorkflowResourcesWaitOptions"),
-        (None, TypeError, r"workflow_resources_wait must be a WorkflowResourcesWaitOptions"),
+        ({}, TypeError, r"workflow_runtime_options\.resources_wait must be a WorkflowResourcesWaitOptions"),
+        ("x", TypeError, r"workflow_runtime_options\.resources_wait must be a WorkflowResourcesWaitOptions"),
+        (None, TypeError, r"workflow_runtime_options\.resources_wait must be a WorkflowResourcesWaitOptions"),
     ],
 )
 def test_validate_workflow_resources_wait_override_rejects_wrong_type(raw: object, exc_type: type[Exception], match: str) -> None:
@@ -154,7 +158,7 @@ def test_validate_workflow_resources_wait_override_rejects_invalid_diagnostics_t
     from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
     from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitOptions
 
-    with pytest.raises(TypeError, match=r"workflow_resources_wait\.diagnostics must be a WorkflowResourcesWaitDiagnosticsOptions"):
+    with pytest.raises(TypeError, match=r"workflow_runtime_options\.resources_wait\.diagnostics must be a WorkflowResourcesWaitDiagnosticsOptions"):
         _ = workflow_compile_mod._validate_workflow_resources_wait_override(  # noqa: SLF001
             WorkflowResourcesWaitOptions(diagnostics="x")  # type: ignore[arg-type] intentional runtime boundary test
         )
@@ -165,7 +169,7 @@ def test_validate_workflow_resources_wait_override_rejects_non_bool_enabled() ->
     from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions
 
     diagnostics = WorkflowResourcesWaitDiagnosticsOptions(enabled="x")  # type: ignore[arg-type] intentional runtime boundary test
-    with pytest.raises(TypeError, match=r"workflow_resources_wait\.diagnostics\.enabled must be a bool"):
+    with pytest.raises(TypeError, match=r"workflow_runtime_options\.resources_wait\.diagnostics\.enabled must be a bool"):
         _ = workflow_compile_mod._validate_workflow_resources_wait_override(  # noqa: SLF001
             WorkflowResourcesWaitOptions(diagnostics=diagnostics)
         )
@@ -178,7 +182,7 @@ def test_validate_workflow_resources_wait_override_rejects_non_bool_capture_owne
     diagnostics = WorkflowResourcesWaitDiagnosticsOptions(
         capture_owner_callsite="x"  # type: ignore[arg-type] intentional runtime boundary test
     )
-    with pytest.raises(TypeError, match=r"workflow_resources_wait\.diagnostics\.capture_owner_callsite must be a bool"):
+    with pytest.raises(TypeError, match=r"workflow_runtime_options\.resources_wait\.diagnostics\.capture_owner_callsite must be a bool"):
         _ = workflow_compile_mod._validate_workflow_resources_wait_override(  # noqa: SLF001
             WorkflowResourcesWaitOptions(diagnostics=diagnostics)
         )

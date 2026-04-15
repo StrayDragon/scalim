@@ -15,32 +15,6 @@ class WorkflowRun:
 
 
 @dataclass(frozen=True)
-class WorkflowCtxOptions:
-    max_value_bytes: int = 65536
-    max_bytes: int = 1048576
-
-
-@dataclass(frozen=True)
-class WorkflowCachePoolBudget:
-    max_entries: int
-    over_budget_policy: str
-
-
-@dataclass(frozen=True)
-class WorkflowCachePoolPin:
-    kind: str
-    source_id: str
-
-
-@dataclass(frozen=True)
-class WorkflowCachePoolOptions:
-    conflict_policy: str
-    release_policy: str
-    budget: WorkflowCachePoolBudget
-    pin: Tuple[WorkflowCachePoolPin, ...] = ()
-
-
-@dataclass(frozen=True)
 class WorkflowResourcesWaitDiagnosticsOptions:
     enabled: bool = False
     warn_after_s: float = 30.0
@@ -62,19 +36,8 @@ class WorkflowOutputStagingOptions:
 
 
 @dataclass(frozen=True)
-class WorkflowOptions:
-    max_concurrency: int = 1
-    failure_policy: str = "all_fail"
-    cache_pool: Optional[WorkflowCachePoolOptions] = None
-    ctx: WorkflowCtxOptions = dataclass_field(default_factory=WorkflowCtxOptions)
-    resources_wait: WorkflowResourcesWaitOptions = dataclass_field(default_factory=WorkflowResourcesWaitOptions)
-    output_staging: WorkflowOutputStagingOptions = dataclass_field(default_factory=WorkflowOutputStagingOptions)
-
-
-@dataclass(frozen=True)
 class WorkflowConfig:
     runs: Tuple[WorkflowRun, ...]
-    options: WorkflowOptions
     resources: ResourcesConfig = dataclass_field(default_factory=ResourcesConfig)
 
 

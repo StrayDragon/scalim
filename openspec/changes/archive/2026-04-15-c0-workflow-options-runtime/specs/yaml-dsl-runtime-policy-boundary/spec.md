@@ -19,11 +19,11 @@ workflow 中明显与环境、性能预算或发布策略绑定的 runtime knobs
 - **GIVEN** workflow YAML 声明 `workflow.options`（例如 `workflow.options.max_concurrency`）
 - **WHEN** 用户执行 workflow validate 或运行入口解析
 - **THEN** 系统 MUST fail-fast
-- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime=...)`）
+- **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)`）
 
 #### Scenario: workflow staging/wait policy is configured through runtime entrypoints
 - **WHEN** 用户需要调整共享资源等待超时或 staging 保留策略
-- **THEN** 系统 MUST 通过 Python / CLI runtime entrypoints（`workflow_runtime.resources_wait` / `workflow_runtime.output_staging`）表达这些策略
+- **THEN** 系统 MUST 通过 Python / CLI runtime entrypoints（`workflow_runtime_options.resources_wait` / `workflow_runtime_options.output_staging`）表达这些策略
 - **AND** MUST NOT 继续依赖 workflow YAML 中的对应字段
 
 ### Requirement: workflow `failure_policy` MUST remain a stable orchestration knob
@@ -35,6 +35,6 @@ workflow `failure_policy` MUST 保持为稳定的 orchestration 语义并与 dem
 - workflow YAML MUST NOT 再接受 `workflow.options.failure_policy` 作为 authoring 字段
 
 #### Scenario: workflow failure policy is configured through runtime entrypoints
-- **GIVEN** 调用方在运行入口提供 `workflow_runtime.execution.failure_policy=primary_only`
+- **GIVEN** 调用方在运行入口提供 `workflow_runtime_options.execution.failure_policy=primary_only`
 - **WHEN** 用户执行 `run_workflow(...)`
 - **THEN** workflow MUST 继续执行后续 nodes（符合 `primary_only` 语义）

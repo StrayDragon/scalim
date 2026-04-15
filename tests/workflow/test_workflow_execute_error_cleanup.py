@@ -59,15 +59,6 @@ workflow:
   runs:
     - id: a
       demand: {demand_file}
-  options:
-    max_concurrency: 1
-    failure_policy: all_fail
-    cache_pool:
-      conflict_policy: warn
-      release_policy: dag_refcount
-      budget:
-        max_entries: 1
-        over_budget_policy: fail_fast
 """
         )
         .format(demand_file=str(demand_path.name))
@@ -114,5 +105,11 @@ def test_prepare_workflow_run_closes_cache_pool_and_observers_on_error(tmp_path:
 
     monkeypatch.setattr(workflow_execute_mod, "WorkflowResourceManager", _boom)
 
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowRuntimeOptions
+
     with pytest.raises(RuntimeError, match="boom"):
-        _ = run_workflow(str(wf_path), options=RunOptions(allowed_modules=_ALLOWED_MODULES))
+        _ = run_workflow(
+            str(wf_path),
+            options=RunOptions(allowed_modules=_ALLOWED_MODULES),
+            workflow_runtime_options=WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=1)),
+        )

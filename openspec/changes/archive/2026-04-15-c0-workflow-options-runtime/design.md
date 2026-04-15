@@ -61,11 +61,11 @@ workflow YAML 的初衷是作为“可审阅、可版本化”的编排 SSOT（D
 
 设计要点：
 - workflow YAML 若出现 `workflow.options`（或其子字段），解析阶段直接报错（fail-fast），并提示迁移到 runtime entrypoints。
-- 错误信息必须指向新的 runtime entrypoints（例如 `run_workflow(..., workflow_runtime=...)` 或等价接口），并说明默认行为与迁移方式。
+- 错误信息必须指向新的 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)` 或等价接口），并说明默认行为与迁移方式。
 
-### 2) 新增 `workflow_runtime` typed surface（Python；非大平铺；支持 preset 工厂方法）
+### 2) 新增 `workflow_runtime_options` typed surface（Python；非大平铺；支持 preset 工厂方法）
 
-在稳定导入路径下提供一个 workflow-level runtime options 类型（建议新增到 `scalim.dsl.yaml_dsl.workflow_types` 并 re-export 到 facade），并在 `run_workflow(...)` 增加一个新的入口参数 `workflow_runtime=...`。
+在稳定导入路径下提供一个 workflow-level runtime options 类型（建议新增到 `scalim.dsl.yaml_dsl.workflow_types` 并 re-export 到 facade），并在 `run_workflow(...)` 增加一个新的入口参数 `workflow_runtime_options=...`。
 
 设计约束：
 - **接口受限**：避免把运行期策略散落成多个顶层 kwargs，也避免“字符串 + 多散字段”的自由组合。
@@ -89,9 +89,9 @@ workflow YAML 的初衷是作为“可审阅、可版本化”的编排 SSOT（D
 
 运行入口形态（示意）：
 - 旧：`run_workflow(..., workflow_resources_wait=..., workflow_output_staging=..., ...)`
-- 新：`run_workflow(..., workflow_runtime=WorkflowRuntimeOptions(...), ...)`
+- 新：`run_workflow(..., workflow_runtime_options=WorkflowRuntimeOptions(...), ...)`
 
-并在编译 workflow IR 前将 `workflow_runtime` 注入到 IR 的 options（编译产物仍落入 `WorkflowOptionsIr`，以最大化复用现有执行路径）。
+并在编译 workflow IR 前将 `workflow_runtime_options` 注入到 IR 的 options（编译产物仍落入 `WorkflowOptionsIr`，以最大化复用现有执行路径）。
 
 Python 3.6 兼容性约束：
 - `src/scalim/` 运行时仍需兼容 Python 3.6：不使用 `X | Y`、`list[T]` 等新语法；必要时使用 `typing`/`typing_extensions` 兼容层。
@@ -111,7 +111,7 @@ Python 3.6 兼容性约束：
 
 建议：
 - 将 `cache_pool` 迁出 workflow YAML
-- 在 `workflow_runtime` 内以 **preset + 极小 knobs** 的形式注入，并与 `execution/resources_wait/output_staging/scheduler` 等保持正交（避免对外接口过度开放）
+- 在 `workflow_runtime_options` 内以 **preset + 极小 knobs** 的形式注入，并与 `execution/resources_wait/output_staging/scheduler` 等保持正交（避免对外接口过度开放）
 - `cache_pool` 的内部实现仍保留现有的 signature/冲突策略/生命周期/预算/事件机制，但对外配置面 **不再暴露** 全量细节字段（避免“外部接口太开放 → core 框架维护复杂度上升”）
 
 #### cache_pool 的现有使用场景（当前主要用于 `preload_forever`）
@@ -158,7 +158,7 @@ Python 3.6 兼容性约束：
 - YAML（旧）：
   - `workflow.options.cache_pool.budget.max_entries: 16`
 - Python（新）：
-  - `run_workflow(..., workflow_runtime=WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16)))`
+  - `run_workflow(..., workflow_runtime_options=WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16)))`
 
 ### 5) workflow IR 编译阶段接收 runtime options，并写入 IR（保持执行器 API 不变）
 
@@ -184,7 +184,7 @@ Python 3.6 兼容性约束：
 
 - 对每个 workflow YAML：
   - 删除 `workflow.options`（或至少删除 `workflow.options.*` 下所有 runtime knobs）。
-  - 在调用 `run_workflow(...)` 的 Python/CLI 集成处用 `workflow_runtime=...` 注入等价的 runtime policy（默认值不需要显式传入）。
+  - 在调用 `run_workflow(...)` 的 Python/CLI 集成处用 `workflow_runtime_options=...` 注入等价的 runtime policy（默认值不需要显式传入）。
 - 运行生成与门禁：
   - `just gen-yaml-dsl-schema`（更新 schema 生成物）
   - `just gen-agent-skill`（更新 syntax catalog / CLI-LSP references）

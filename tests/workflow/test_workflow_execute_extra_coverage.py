@@ -36,7 +36,7 @@ def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
             logical_keys_by_node_id=None,
             consumers_by_logical_key=None,
         )
-    assert excinfo.value.path == "workflow.options.cache_pool"
+    assert excinfo.value.path == "workflow_runtime_options.cache_pool"
 
 
 def test_run_workflow_ir_works_without_build_demand_run_result_fn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

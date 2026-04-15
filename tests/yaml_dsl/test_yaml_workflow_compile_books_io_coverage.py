@@ -18,7 +18,7 @@ from scalim.dsl.yaml_dsl import (
     RunOverrides,
 )
 from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
-from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowOptions, WorkflowRun
+from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowRun
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
@@ -221,7 +221,7 @@ def test_workflow_compile_extra_sheets_unsupported_mode_branch_is_defensive_and_
                 return self._items.pop(0)
             return default
 
-    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), resources=ResourcesConfig())
     cfg = DemandConfig(
         outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(book="report", sheet="S"), fields=("a",)),),
         meta=OutputExtraSheetConfig(sheet="__meta__"),
@@ -397,7 +397,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
     run_a = WorkflowRun(id="a", demand="a.yaml")
     run_b = WorkflowRun(id="b", demand="b.yaml")
-    wf_obj = WorkflowConfig(runs=(run_a, run_b), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(run_a, run_b), resources=ResourcesConfig())
 
     # missing cfg branch in demand collection loop
     _resources, _effective, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -412,7 +412,6 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # kind mismatch between workflow and demand
     wf_obj = WorkflowConfig(
         runs=(run_a,),
-        options=WorkflowOptions(),
         resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(1, 1))}))
@@ -429,7 +428,6 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # workflow overrides demand book definition when kind is compatible
     wf_obj = WorkflowConfig(
         runs=(run_a,),
-        options=WorkflowOptions(),
         resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="wf_out")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="d_out")}))
@@ -444,7 +442,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     assert effective_books["report"].path == "wf_out"
 
     # conflicting demand book definitions for same book_id
-    wf_obj = WorkflowConfig(runs=(run_a, run_b), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(run_a, run_b), resources=ResourcesConfig())
     demand_cfg_a = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a_out")}))
     demand_cfg_b = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="b_out")}))
     with pytest.raises(ScalimWorkflowConfigError, match=r"Conflicting demand book definitions"):
@@ -501,7 +499,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     assert "detail_csv" in effective_files and "extra_csv" in effective_files
 
     # demand-only book is accepted and uses demand YAML base_dir semantics
-    wf_obj = WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(run_a,), resources=ResourcesConfig())
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}))
     resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
@@ -517,7 +515,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
     # overrides.resources.books keys mismatch (non-str) triggers "continue" branch for unresolved book_id
     resources, effective_books, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
-        WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig()),
+        WorkflowConfig(runs=(run_a,), resources=ResourcesConfig()),
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": DemandConfig()},
         demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
@@ -529,7 +527,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"overrides\.resources\.books\.report must be a BookResourceOverride"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
-            WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig()),
+            WorkflowConfig(runs=(run_a,), resources=ResourcesConfig()),
             workflow_base_dir=workflow_base_dir,
             demand_cfg_by_run_id={"a": DemandConfig()},
             demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
@@ -539,7 +537,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
     # overrides.resources.books can create a book definition from scratch (IO-only deep-merge)
     resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
-        WorkflowConfig(runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig()),
+        WorkflowConfig(runs=(run_a,), resources=ResourcesConfig()),
         workflow_base_dir=workflow_base_dir,
         demand_cfg_by_run_id={"a": DemandConfig()},
         demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
@@ -552,7 +550,8 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
     # exception wrap branch when export options invalid (xlsx_memory missing budget)
     wf_obj = WorkflowConfig(
-        runs=(run_a,), options=WorkflowOptions(), resources=ResourcesConfig(books={"bad": BookConfig(kind="xlsx_memory")})
+        runs=(run_a,),
+        resources=ResourcesConfig(books={"bad": BookConfig(kind="xlsx_memory")}),
     )
     with pytest.raises(ScalimWorkflowConfigError, match=r"requires budget"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -567,7 +566,6 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # legacy file-path semantics are rejected (xlsx_file.path expects output root dir, not *.xlsx)
     wf_obj = WorkflowConfig(
         runs=(),
-        options=WorkflowOptions(),
         resources=ResourcesConfig(
             books={
                 "a": BookConfig(kind="xlsx_file", path=str(tmp_path / "same.xlsx")),
@@ -587,7 +585,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
 
 
 def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields(tmp_path: Path) -> None:
-    wf_obj = WorkflowConfig(runs=(), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(), resources=ResourcesConfig())
     overrides_resources = ResourcesOverride(
         books={
             "report": BookResourceOverride(
@@ -682,7 +680,6 @@ def test_workflow_compile_resources_override_to_patch_supports_partial_overrides
 def test_workflow_compile_resources_override_updates_existing_workflow_book(tmp_path: Path) -> None:
     wf_obj = WorkflowConfig(
         runs=(),
-        options=WorkflowOptions(),
         resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./wf")}),
     )
     resources, books, _files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -815,7 +812,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
     assert outs2[0].write is None
 
     # build nodes: cfg missing in mapping -> continue branch
-    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), resources=ResourcesConfig())
     nodes: list[WorkflowAnyNodeIr] = []
     edges: list[WorkflowEdgeIr] = []
     assert (
@@ -848,7 +845,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
 
     # sheet name validation error path
     cfg = DemandConfig(outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(book="report", sheet="A/B"), fields=("a",)),))
-    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), resources=ResourcesConfig())
     with pytest.raises(ScalimWorkflowConfigError, match=r"invalid character"):
         _ = workflow_compile_mod._append_write_nodes_from_runs(  # noqa: SLF001
             wf_obj,
@@ -882,7 +879,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
 
 
 def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
-    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), resources=ResourcesConfig())
     cfg = DemandConfig(
         outputs=(
             OutputTargetConfig(
@@ -913,7 +910,7 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
 
 
 def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_branches() -> None:
-    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), resources=ResourcesConfig())
 
     base_cfg = DemandConfig(
         outputs=(OutputTargetConfig(name="detail", to=OutputToConfig(book="report", sheet="S"), fields=("a",)),),
@@ -1045,7 +1042,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
 
 
 def test_workflow_compile_compile_workflow_ir_overrides_mapping_parsing_cover_branches(tmp_path: Path) -> None:
-    wf_obj = WorkflowConfig(runs=(), options=WorkflowOptions(), resources=ResourcesConfig())
+    wf_obj = WorkflowConfig(runs=(), resources=ResourcesConfig())
     with pytest.raises(ScalimWorkflowConfigError, match=r"overrides must be a RunOverrides"):
         _ = workflow_compile_mod.compile_workflow_ir(  # noqa: SLF001
             wf_obj,

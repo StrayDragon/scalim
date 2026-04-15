@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRuntimeOptions
 from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
@@ -109,6 +110,10 @@ def run_workflow_demo_big_data_report(
                 prev_cwd = os.getcwd()
                 os.chdir(str(out_dir))
                 try:
+                    workflow_runtime_options = WorkflowRuntimeOptions(
+                        execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
+                        cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
+                    )
                     result = run_workflow(
                         str(wf_copy),
                         options=RunOptions(
@@ -117,6 +122,7 @@ def run_workflow_demo_big_data_report(
                             batch_size=30,
                             allowed_yaml_roots=(str(repo_root),),
                         ),
+                        workflow_runtime_options=workflow_runtime_options,
                         path_aliases={"@": str(repo_root)},
                     )
                 finally:
