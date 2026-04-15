@@ -223,8 +223,7 @@ def test_validate_yaml_text_minimal_valid_config_ok() -> None:
     assert result.errors == []
 
 
-@pytest.mark.parametrize("enable_jsonschema_validation", [False, True])
-def test_validate_yaml_text_allows_builtin_callable_reference(enable_jsonschema_validation: bool) -> None:
+def test_validate_yaml_text_allows_builtin_callable_reference() -> None:
     yaml_text = "\n".join(
         [
             "name: demo",
@@ -235,7 +234,7 @@ def test_validate_yaml_text_allows_builtin_callable_reference(enable_jsonschema_
             "",
         ]
     )
-    result = validate_yaml_text(yaml_text, enable_jsonschema_validation=enable_jsonschema_validation)
+    result = validate_yaml_text(yaml_text)
     assert result.ok is True
     assert result.errors == []
 
@@ -270,23 +269,6 @@ def test_validate_yaml_text_allows_null_batch_size() -> None:
         ]
     )
     result = validate_yaml_text(yaml_text)
-    assert result.ok is False
-    assert any(issue.path == "batch_size" for issue in result.errors)
-
-
-def test_validate_yaml_text_allows_null_batch_size_with_jsonschema_enabled() -> None:
-    yaml_text = "\n".join(
-        [
-            "name: demo",
-            "batch_size: null",
-            "main_source:",
-            "  source_id: orders",
-            "  loader: tests.fixtures.mock_loaders.mock_loader",
-            "sources: {}",
-            "",
-        ]
-    )
-    result = validate_yaml_text(yaml_text, enable_jsonschema_validation=True)
     assert result.ok is False
     assert any(issue.path == "batch_size" for issue in result.errors)
 
@@ -393,77 +375,6 @@ def test_validate_yaml_text_rejects_reserved_field_id_builtin_conflict() -> None
     result = validate_yaml_text(yaml_text)
     assert result.ok is False
     assert any(issue.path == "fields.sum" for issue in result.errors)
-
-
-def test_config_validator_reports_jsonschema_missing_as_warning_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.dsl.yaml_dsl._internal.config_parsing import validator as validator_module  # noqa: PLC0415
-
-    monkeypatch.setattr(validator_module, "HAS_JSONSCHEMA", False, raising=True)
-    monkeypatch.setattr(validator_module, "jsonschema", None, raising=True)
-
-    config = {
-        "name": "demo",
-        "main_source": {
-            "source_id": "orders",
-            "loader": "tests.fixtures.mock_loaders.mock_loader",
-        },
-        "sources": {},
-    }
-    report = ConfigValidator().validate_report(dict(config), enable_jsonschema_validation=True)
-    warnings = report.warnings()
-    assert warnings
-    assert any(issue.path == "(schema)" and issue.severity == "warning" for issue in warnings)
-
-
-def test_config_validator_reports_jsonschema_internal_error_as_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.dsl.yaml_dsl._internal.config_parsing import validator as validator_module  # noqa: PLC0415
-
-    class DummyJsonSchema:
-        class ValidationError(Exception):
-            pass
-
-        @staticmethod
-        def validate(_config: object, _schema: object) -> None:
-            raise RuntimeError("boom")
-
-    monkeypatch.setattr(validator_module, "HAS_JSONSCHEMA", True, raising=True)
-    monkeypatch.setattr(validator_module, "jsonschema", DummyJsonSchema, raising=True)
-
-    config = {
-        "name": "demo",
-        "main_source": {
-            "source_id": "orders",
-            "loader": "tests.fixtures.mock_loaders.mock_loader",
-        },
-        "sources": {},
-    }
-    report = ConfigValidator().validate_report(dict(config), enable_jsonschema_validation=True)
-    warnings = report.warnings()
-    assert warnings
-    assert any("JSONSchema validation failed unexpectedly" in issue.message for issue in warnings)
-
-
-def test_config_validator_jsonschema_validate_fn_hook_short_circuits() -> None:
-    called = []
-
-    def _validate_fn(_config: object, _schema: object) -> None:
-        called.append("ok")
-
-    config = {
-        "name": "demo",
-        "main_source": {
-            "source_id": "orders",
-            "loader": "tests.fixtures.mock_loaders.mock_loader",
-        },
-        "sources": {},
-    }
-
-    report = ConfigValidator(jsonschema_validate_fn=_validate_fn).validate_report(
-        dict(config),
-        enable_jsonschema_validation=True,
-    )
-    assert called
-    assert report.ok() is True
 
 
 def test_validate_yaml_text_json_roundtrip() -> None:

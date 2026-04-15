@@ -194,9 +194,8 @@ def test_loader_warning_logs_skip_root_path_suffix_for_load_and_load_string(capl
             _data,
             *,
             strict_unknown_fields: bool,
-            enable_jsonschema_validation: bool,
         ) -> ValidationReport:
-            _ = (strict_unknown_fields, enable_jsonschema_validation)
+            _ = strict_unknown_fields
             report = ValidationReport()
             report.add_warning("warn", path="")
             return report

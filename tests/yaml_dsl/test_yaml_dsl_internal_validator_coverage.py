@@ -31,12 +31,11 @@ def test_config_validator_rejects_import_only_output_target_shape() -> None:
             "outputs": [{"$import": "common.outputs"}],
         },
         strict_unknown_fields=True,
-        enable_jsonschema_validation=True,
     )
 
     errors = report.errors()
     assert errors != []
-    assert any(issue.path == "outputs.0" and "Schema validation error" in issue.message for issue in errors)
+    assert any(issue.path == "outputs.0.$import" and "Unknown field" in issue.message for issue in errors)
 
 
 def test_validator_sources_skip_import_and_cover_key_edge_cases() -> None:
@@ -59,7 +58,6 @@ def test_validator_sources_skip_import_and_cover_key_edge_cases() -> None:
             },
         },
         strict_unknown_fields=False,
-        enable_jsonschema_validation=False,
     )
 
     errors = report.errors()

@@ -15,7 +15,7 @@
 
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/_internal/loggingx.py` (统一 logger 命名空间、前缀、`k=v` 追加字段、context 绑定;导入时安装 `NullHandler`)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (`jsonschema` 不可用/不兼容时的 warning 统一输出)
+- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (runtime YAML 语义校验 + unknown-fields;不输出 JSONSchema skip warnings)
 - `src/IMPL_ROOT/execution/output_composition.py` (派生输出护栏 warnings 的统一输出)
 - `src/IMPL_ROOT/ob/presets/performance.py` (性能阈值 warnings 的统一输出)
 ## Requirements
@@ -45,14 +45,19 @@
 - 当 subsystem 非空时,前缀 MUST 为 `[scalim] <subsystem>: `。
 - 当 subsystem 为空时,前缀 MUST 为 `[scalim] `。
 
-#### Scenario: YAML 校验提示包含 `schema` 前缀
-- **GIVEN** 运行环境 `jsonschema` 不可用或依赖不兼容
-- **WHEN** 用户运行 YAML DSL `validate`
-- **THEN** 输出 warnings 的 message MUST 包含 `[scalim] schema:` 且包含“已跳过 schema 校验”的说明
-
 #### Scenario: 性能阈值提示包含 `performance` 前缀
 - **WHEN** 性能观测检测到 `memory_increase` 超过阈值
 - **THEN** warning message MUST 包含 `[scalim] performance:` 且包含 `memory_increase_mb` 字段
+
+### Requirement: runtime MUST NOT emit JSONSchema skip warnings
+系统 MUST NOT 在 runtime 的 YAML parse/validate/compile/run 路径中输出“jsonschema 不可用/已跳过 schema 校验”的 warning。
+
+如果需要执行 JSONSchema 校验,应通过工具链的 schema-only 入口完成（例如 CLI/LSP），而不是在 runtime 主线隐式尝试可选依赖。
+
+#### Scenario: runtime does not log jsonschema-skip noise
+- **GIVEN** 运行环境未安装 `jsonschema`(或依赖不兼容导致无法导入)
+- **WHEN** 用户运行 runtime 入口解析一个在语义校验层面有效的 YAML DSL 配置
+- **THEN** 输出 MUST NOT 包含任何提示 “已跳过 schema 校验” 或 “jsonschema 不可用” 的 warning message
 
 ### Requirement: 诊断字段追加采用稳定 `k=v` 约定,并提供 context 绑定机制
 系统 MUST 在需要输出附加诊断字段时采用 `k=v, k2=v2` 的稳定追加格式,并提供上下文绑定机制以支持下游扩展。

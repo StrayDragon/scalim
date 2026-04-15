@@ -2,7 +2,6 @@ import copy
 
 import pytest
 
-import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_module
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimConversionError, ScalimResolverError
 from scalim.dsl.yaml_dsl.runtime.references import PythonReferenceResolver, SecurePythonReferenceResolver
@@ -15,17 +14,11 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     SourceConfig,
     SourceFieldConfig,
 )
-from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
-from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator, HAS_JSONSCHEMA
+from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from scalim.spec.ir import FieldIr
 
 _ORDER_LOADER = "scalim_misc.example_report_ir:DAL.paged_get_order_list"
 _CUSTOMER_LOADER = "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
-
-
-def _require_jsonschema() -> None:
-    if not HAS_JSONSCHEMA or validator_module.jsonschema is None:
-        pytest.skip("jsonschema not available")
 
 
 def _base_validator_config() -> dict:
@@ -81,33 +74,6 @@ def _base_converter_config() -> DemandConfig:
             ),
         },
     )
-
-
-@pytest.mark.parametrize(
-    "raise_validation_error",
-    [False, True],
-    ids=["ignore-exception", "schema-validation-error"],
-)
-def test_validator_schema_validation_paths(raise_validation_error: bool) -> None:
-    _require_jsonschema()
-    config = _base_validator_config()
-
-    def _raise_exception(*_args, **_kwargs):  # type: ignore[no-untyped-def]
-        raise Exception("boom")
-
-    def _raise_validation(*_args, **_kwargs):  # type: ignore[no-untyped-def]
-        raise validator_module.jsonschema.ValidationError("bad schema")
-
-    validator = ConfigValidator(
-        jsonschema_validate_fn=_raise_validation if raise_validation_error else _raise_exception,
-    )
-
-    if raise_validation_error:
-        with pytest.raises(ScalimConfigValidationError) as exc_info:
-            validator.validate(config)
-        assert any("Schema validation error" in error for error in exc_info.value.errors)
-    else:
-        validator.validate(config)
 
 
 def test_validator_loader_reference_variants() -> None:

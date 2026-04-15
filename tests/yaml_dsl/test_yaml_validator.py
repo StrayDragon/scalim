@@ -1,10 +1,7 @@
-import importlib
-
 import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
-from tests.support.testing_utils import missing_optional_dependency
 
 
 def _base_config() -> dict:
@@ -215,6 +212,22 @@ def test_validator_errors_include_paths() -> None:
     assert any(msg.startswith("main_source.loader: ") for msg in exc.value.errors)
 
 
+def test_validator_errors_include_pathless_issue_messages(monkeypatch) -> None:
+    from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import ValidationReport  # noqa: PLC0415
+
+    validator = ConfigValidator()
+
+    def _fake_validate_report(_config, *, strict_unknown_fields: bool = False):  # type: ignore[no-untyped-def]
+        _ = strict_unknown_fields
+        return ValidationReport.from_errors(["boom"])
+
+    monkeypatch.setattr(validator, "validate_report", _fake_validate_report)
+
+    with pytest.raises(ScalimConfigValidationError) as exc:
+        validator.validate({"name": "demo", "main_source": {}, "sources": {}})
+    assert "boom" in exc.value.errors
+
+
 def test_validator_errors_are_truncated_but_issues_are_preserved() -> None:
     validator = ConfigValidator(max_validation_error_lines=1)
     with pytest.raises(ScalimConfigValidationError) as exc:
@@ -234,16 +247,6 @@ def test_validator_derived_field_compute_allows_not() -> None:
     config["fields"]["inactive"] = {"compute": "not is_active"}
 
     validator.validate(config)
-
-
-def test_validator_import_error_path(monkeypatch) -> None:
-    import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_mod
-
-    with missing_optional_dependency(monkeypatch, "jsonschema"):
-        reloaded = importlib.reload(validator_mod)
-        assert reloaded.HAS_JSONSCHEMA is False
-        assert reloaded.jsonschema is None
-    importlib.reload(validator_mod)
 
 
 def test_validator_rejects_non_positive_max_validation_error_lines() -> None:

@@ -158,7 +158,6 @@ class YamlDemandLoader(
             report = self._validator.validate_report(
                 raw_demand.data,
                 strict_unknown_fields=True,
-                enable_jsonschema_validation=True,
             )
             errors = [
                 envelope_from_validation_issue(
@@ -238,7 +237,6 @@ class YamlDemandLoader(
             report = self._validator.validate_report(
                 raw_demand.data,
                 strict_unknown_fields=True,
-                enable_jsonschema_validation=True,
             )
             errors = [
                 envelope_from_validation_issue(

@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 
 import scalim_cli.yaml_dsl as yaml_dsl
-import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_mod
 
 
 def _write_yaml(path: Path) -> None:
@@ -194,10 +193,7 @@ output:
     assert "ERROR" in out
 
 
-def test_yaml_dsl_validate_warns_when_jsonschema_missing_but_still_succeeds(tmp_path, capsys, monkeypatch) -> None:
-    monkeypatch.setattr(validator_mod, "HAS_JSONSCHEMA", False)
-    monkeypatch.setattr(validator_mod, "jsonschema", None)
-
+def test_yaml_dsl_validate_does_not_warn_about_jsonschema(tmp_path, capsys) -> None:
     yaml_path = tmp_path / "minimal.yaml"
     yaml_path.write_text(
         """
@@ -215,17 +211,13 @@ main_source:
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["errors"] == []
-    assert any("[scalim] schema:" in item["message"] and "jsonschema" in item["message"] for item in payload["warnings"])
+    assert payload["warnings"] == []
 
 
-def test_yaml_dsl_validate_still_flags_outputs_container_path_init_var_shape_errors_without_jsonschema(
+def test_yaml_dsl_validate_flags_init_var_shape_errors(
     tmp_path,
     capsys,
-    monkeypatch,
 ) -> None:
-    monkeypatch.setattr(validator_mod, "HAS_JSONSCHEMA", False)
-    monkeypatch.setattr(validator_mod, "jsonschema", None)
-
     yaml_path = tmp_path / "invalid_outputs_path.yaml"
     yaml_path.write_text(
         """

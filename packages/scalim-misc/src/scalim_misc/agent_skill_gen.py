@@ -295,7 +295,6 @@ def validate_canonical_example(repo_root: Path, yaml_text: str, *, fragments: Di
         report = validator.validate_report(
             payload_dict,
             strict_unknown_fields=True,
-            enable_jsonschema_validation=False,
         )
         issues = report.errors() + report.warnings()
         if issues:

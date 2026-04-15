@@ -61,7 +61,6 @@ def _validate_demand_yaml(
     report = ConfigValidator().validate_report(
         yaml_data,
         strict_unknown_fields=True,
-        enable_jsonschema_validation=True,
     )
 
     errors: List[ErrorEnvelope] = []

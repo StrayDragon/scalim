@@ -482,7 +482,6 @@ def validate_demand_text(
     report = demand_validator.validate_report(
         yaml_data_dict,
         strict_unknown_fields=True,
-        enable_jsonschema_validation=True,
     )
     errors = [
         envelope_from_validation_issue(

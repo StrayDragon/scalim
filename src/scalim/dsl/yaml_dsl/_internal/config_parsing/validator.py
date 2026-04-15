@@ -2,11 +2,9 @@
 # pragma: allow-c901-file plan: c60
 import json
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
-from ....._internal.loggingx import format_kv, get_logger, prefix
 from ....._internal.type_narrowing import as_list, as_mapping
-from .....vendor.compact.importlibx import import_module
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import asdict, dataclass
 from .....vendor.dataclassesx import field as dataclass_field
@@ -14,13 +12,13 @@ from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValue
 from ...schema_dsl.models import (
     BOOK_KEYS,
     DEMAND_KEYS,
+    FILE_KEYS,
     OUTPUT_TARGET_KEYS,
     RESOURCES_KEYS,
 )
 from .error_envelope import ScalimYamlValidationError
 from .errors import ScalimConfigValidationError
 from .imports import contains_import_syntax
-from .jsonschema_issues import ScalimJsonSchemaCollectorError, collect_jsonschema_validation_issues
 from .models import FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
 from .unknown_fields import find_unknown_fields
@@ -39,20 +37,6 @@ from .yaml_load import (
     normalize_yaml_diagnostic_path,
 )
 
-try:
-    jsonschema = import_module("jsonschema")
-
-    _has_jsonschema: bool = True
-    _jsonschema_import_error: Optional[Exception] = None
-except Exception as exc:  # noqa: BLE001
-    jsonschema = None  # type: ignore[assignment]
-    _has_jsonschema = False
-    _jsonschema_import_error = exc
-
-HAS_JSONSCHEMA: bool = _has_jsonschema
-
-_VALIDATOR_LOGGER = get_logger("schema")
-
 __all__ = ()
 
 
@@ -70,13 +54,11 @@ class ConfigValidator(ValidatorFieldsMixin):
     _compute_engine: Optional[SecureComputeEngine]
     _step_allowed_fields_by_source: Dict[str, Set[str]]
     _max_validation_error_lines: int
-    _jsonschema_validate_fn: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]]
 
     def __init__(
         self,
         schema_path: Optional[str] = None,
         max_validation_error_lines: Optional[int] = None,
-        jsonschema_validate_fn: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]] = None,
     ) -> None:
         super().__init__()
         if schema_path is None:
@@ -88,7 +70,6 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._max_validation_error_lines = int(
             max_validation_error_lines if max_validation_error_lines is not None else MAX_VALIDATION_ERROR_LINES
         )
-        self._jsonschema_validate_fn = jsonschema_validate_fn
         if self._max_validation_error_lines < 1:
             msg = "max_validation_error_lines must be >= 1"
             raise ValueError(msg)
@@ -460,7 +441,7 @@ class ConfigValidator(ValidatorFieldsMixin):
         return cleaned
 
     def validate(self, config: Dict[str, Any]) -> None:
-        report = self.validate_report(config, enable_jsonschema_validation=True)
+        report = self.validate_report(config, strict_unknown_fields=True)
         issues = report.errors()
         if not issues:
             return
@@ -482,7 +463,6 @@ class ConfigValidator(ValidatorFieldsMixin):
         config: Dict[str, Any],
         *,
         strict_unknown_fields: bool = False,
-        enable_jsonschema_validation: bool = False,
     ) -> ValidationReport:
         errors: List[ValidationIssue] = []
         config = self._warn_and_strip_legacy_observability(config, errors)
@@ -500,16 +480,30 @@ class ConfigValidator(ValidatorFieldsMixin):
         self._step_allowed_fields_by_source = self._collect_step_allowed_fields(raw.data, main_source_id)
         relation_paths = self._validate_relations(raw.data, errors, sources_info, main_source_id)
         self._validate_fields(raw, errors, sources_info, main_source_id, relation_paths)
+        self._validate_outputs_shape(raw.data, errors)
         self._validate_outputs_fields_object_refs(raw, errors, main_source_id=main_source_id)
         self._validate_outputs_detail_requires_fields_or_from(raw.data, errors)
         self._validate_removed_output_container(raw.data, errors)
         self._validate_resource_output_paths(raw.data, errors)
 
-        if enable_jsonschema_validation:
-            self._validate_with_jsonschema(raw.data, errors, filter_additional_properties=strict_unknown_fields)
         self._validate_unknown_fields(raw.data, errors, strict=strict_unknown_fields)
 
         return ValidationReport(issues=errors)
+
+    def _validate_outputs_shape(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+        outputs_key = DEMAND_KEYS["outputs"]
+        outputs_raw = config.get(outputs_key)
+        if outputs_raw is None:
+            return
+        if not isinstance(outputs_raw, list):
+            self._add_error(errors, "'{}' must be a list".format(outputs_key), path=str(outputs_key))
+            return
+
+        outputs_list = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
+        for idx, item in enumerate(outputs_list):
+            if isinstance(item, dict):
+                continue
+            self._add_error(errors, "outputs.{} must be a dictionary".format(int(idx)), path="outputs.{}".format(int(idx)))
 
     def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
         outputs_raw: object = config.get(DEMAND_KEYS["outputs"])
@@ -695,58 +689,6 @@ class ConfigValidator(ValidatorFieldsMixin):
             raise RuntimeError(msg)
         return self._schema
 
-    def _validate_with_jsonschema(
-        self,
-        config: Dict[str, Any],
-        errors: List[ValidationIssue],
-        *,
-        filter_additional_properties: bool,
-    ) -> None:
-        if not HAS_JSONSCHEMA or jsonschema is None:  # pragma: no cover  # pragma: allow-no-cover optional dependency boundary
-            # `JSONSchema` 校验是可选项. 某些旧运行时可能存在但因依赖版本不匹配(例如旧 `attrs`)而不可用,因此这里不能直接失败.
-            reason = None
-            detail = None
-            if _jsonschema_import_error is not None:
-                reason = type(_jsonschema_import_error).__name__
-                detail = str(_jsonschema_import_error)
-
-            msg = "{}jsonschema 不可用, 已跳过 schema 校验".format(prefix("schema"))
-            kv = format_kv(reason=reason, detail=detail)
-            if kv:
-                msg = "{} {}".format(msg, kv)
-
-            _VALIDATOR_LOGGER.warning(msg)
-            errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
-            return
-        try:
-            schema = self._load_schema()
-            validate_fn = self._jsonschema_validate_fn
-
-            # 为兼容测试注入,保留 `jsonschema_validate_fn` 钩子(单条 `ValidationError`).
-            if validate_fn is not None:
-                _ = validate_fn(config, schema)
-                return
-
-            issues = collect_jsonschema_validation_issues(
-                config,
-                schema,
-                jsonschema_module=jsonschema,
-                include_context=False,
-                filter_additional_properties=bool(filter_additional_properties),
-            )
-            for issue in issues:
-                self._add_error(errors, issue.message, path=issue.path)
-        except jsonschema.ValidationError as e:  # type: ignore[union-attr]
-            absolute_path = getattr(e, "absolute_path", None)  # pragma: allow-dynattr third-party: jsonschema ValidationError
-            path = ".".join(str(p) for p in absolute_path) if absolute_path else ""
-            self._add_error(errors, "Schema validation error: {}".format(e.message), path=path)
-        except ScalimJsonSchemaCollectorError as exc:
-            msg = "JSONSchema validation failed unexpectedly: {}: {}".format(type(exc).__name__, exc)
-            errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
-        except Exception as exc:  # noqa: BLE001
-            msg = "JSONSchema validation failed unexpectedly: {}: {}".format(type(exc).__name__, exc)
-            errors.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="(schema)"))
-
     def _validate_unknown_fields(self, config: Dict[str, Any], issues: List[ValidationIssue], *, strict: bool) -> None:
         try:
             schema = self._load_schema()
@@ -764,7 +706,7 @@ class ConfigValidator(ValidatorFieldsMixin):
                 )
             )
 
-    def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912
+    def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912, PLR0915
         resources_raw = config.get(DEMAND_KEYS["resources"])
         if not isinstance(resources_raw, dict):
             return
@@ -776,14 +718,20 @@ class ConfigValidator(ValidatorFieldsMixin):
                 if not file_id or not isinstance(raw_file_cfg, dict):
                     continue
                 # 语义升级: `path` 应为 `output root` 目录 (旧语义常见为 `./out/detail.csv`)
-                path_value = cast("Any", raw_file_cfg).get("path")
+                file_cfg = cast("Dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+                kind_raw = file_cfg.get(FILE_KEYS["kind"])
+                kind = str(kind_raw or "").strip()
+                path_value = file_cfg.get(FILE_KEYS["path"])
+                if kind == "csv_file" and (path_value is None or (isinstance(path_value, str) and not path_value.strip())):
+                    msg = "resources.files.{}.path is required for kind=csv_file".format(file_id)
+                    self._add_error(errors, msg, path="resources.files.{}".format(file_id))
                 if isinstance(path_value, str) and Path(path_value).suffix.lower() == ".csv":
                     msg = (
                         "resources.files.{}.path now expects an output root directory, not a file path. "
                         "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
                     ).format(file_id)
                     self._add_error(errors, msg, path="resources.files.{}.path".format(file_id))
-                path_raw = cast("Any", raw_file_cfg).get("path")
+                path_raw = file_cfg.get(FILE_KEYS["path"])
                 if not isinstance(path_raw, dict):
                     continue
                 try:
@@ -923,7 +871,6 @@ def validate_yaml_text(
     yaml_text: str,
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
     schema_path: Optional[str] = None,
-    enable_jsonschema_validation: bool = False,  # noqa: FBT001, FBT002
 ) -> YamlValidationResult:
     """使用 `Scalim` 内置校验器对 `YAML DSL` 文本进行校验.
 
@@ -975,7 +922,6 @@ def validate_yaml_text(
     report = validator.validate_report(
         config_data,
         strict_unknown_fields=bool(strict_unknown_fields),
-        enable_jsonschema_validation=bool(enable_jsonschema_validation),
     )
 
     errors = _issues_to_rows(report.errors())
@@ -992,13 +938,11 @@ def validate_yaml_text_json(
     yaml_text: str,
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
     schema_path: Optional[str] = None,
-    enable_jsonschema_validation: bool = False,  # noqa: FBT001, FBT002
 ) -> str:
     """返回与 `YAML DSL` 编辑器的“精确校验器”兼容的 `JSON` 载荷."""
     result = validate_yaml_text(
         yaml_text,
         strict_unknown_fields,
         schema_path,
-        enable_jsonschema_validation,
     )
     return json.dumps(result.as_dict(), ensure_ascii=False)

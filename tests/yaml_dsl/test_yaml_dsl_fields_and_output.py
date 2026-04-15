@@ -336,6 +336,18 @@ def test_validator_outputs_object_ref_check_skips_non_object_outputs_items() -> 
         validator.validate(config)
 
 
+def test_validator_rejects_outputs_non_list() -> None:
+    validator = ConfigValidator()
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.mock_loaders.mock_loader"},
+        "sources": {},
+        "outputs": {},
+    }
+    report = validator.validate_report(config, strict_unknown_fields=True)
+    assert any(issue.path == "outputs" and "must be a list" in issue.message for issue in report.errors())
+
+
 def test_validator_allows_missing_top_level_fields() -> None:
     validator = ConfigValidator()
     config = {

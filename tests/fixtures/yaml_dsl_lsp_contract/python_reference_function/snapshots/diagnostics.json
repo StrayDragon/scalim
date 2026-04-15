@@ -52,38 +52,6 @@
       },
       {
         "code": "yaml_validate_error",
-        "message": "Schema validation error: 'main_source' is a required property",
-        "range": {
-          "end": {
-            "character": 1,
-            "line": 0
-          },
-          "start": {
-            "character": 0,
-            "line": 0
-          }
-        },
-        "severity": 1,
-        "source": "scalim"
-      },
-      {
-        "code": "yaml_validate_error",
-        "message": "Schema validation error: 'name' is a required property",
-        "range": {
-          "end": {
-            "character": 1,
-            "line": 0
-          },
-          "start": {
-            "character": 0,
-            "line": 0
-          }
-        },
-        "severity": 1,
-        "source": "scalim"
-      },
-      {
-        "code": "yaml_validate_error",
         "message": "Unknown field 'loader'",
         "range": {
           "end": {
