@@ -270,6 +270,9 @@ def main() -> int:
         print("")
         print("已修改文件数：{}".format(len(changed_files)))
 
+    if args.check and rule_total:
+        return 1
+
     return 0
 
 

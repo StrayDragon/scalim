@@ -166,26 +166,48 @@ gen-viz-schedule-plan RUN_DIR="":
 validate-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
 
-# 检查: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认 dry-run; 需要 YES 才执行)
-openspec-sanitize CONFIRM="":
+# 工具: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认强制 apply)
+openspec-sanitize:
+    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
+
+# 检查: `openspec/` 脱敏 (dry-run; 若存在命中则失败)
+openspec-sanitize-check:
     #!/usr/bin/env bash
     set -euo pipefail
-    confirm="{{ CONFIRM }}"
-    if [ "$confirm" = "YES" ] || [ "$confirm" = "CONFIRM=YES" ]; then
-        uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
-        exit 0
-    fi
-    if [ -n "$confirm" ]; then
-        echo "[warn] confirm token ignored (expected 'YES'):" "$confirm" >&2
-    fi
+    set +e
     uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root openspec
-    echo ""
-    echo "[info] dry-run only. Apply with: just openspec-sanitize CONFIRM=YES"
+    rc=$?
+    set -e
+    if [ "$rc" -ne 0 ]; then
+        echo ""
+        echo "[error] openspec sanitize check failed; run: just openspec-sanitize" >&2
+        exit "$rc"
+    fi
 
 # 检查: OpenSpec 提案/规范的脱敏与结构校验 (自动叠加本地 `sanitize_rules.local.yaml`; 缺失时脚本仅在非 CI 告警)
-openspec-check: openspec-sanitize
+#
+# 注意:
+# - 本 gate 默认严格检查：若发现命中，将自动 apply 脱敏并失败退出（避免敏感字面量继续停留在工作区/产物中）。
+openspec-check:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    set +e
+    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root openspec
+    rc=$?
+    set -e
+    if [ "$rc" -eq 1 ]; then
+        echo "" >&2
+        echo "[error] openspec sanitize check failed; applying sanitize in-place..." >&2
+        uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
+        echo "" >&2
+        echo "[error] sanitization applied; please review & commit changes, then rerun: just openspec-check" >&2
+        exit 1
+    fi
+    if [ "$rc" -ne 0 ]; then
+        exit "$rc"
+    fi
+
     if command -v openspec >/dev/null 2>&1; then
         uv {{ UV_OPTIONS }} run openspec validate --all --strict --no-interactive
         exit 0

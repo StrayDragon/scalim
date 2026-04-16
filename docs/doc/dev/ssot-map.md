@@ -16,7 +16,7 @@
 | docs-site 手工页 | `docs/doc/**/*.md`(非 `.gen.`) | `.gen.` 页 + 注入区块 | `just gen-docs` | `uv run python scripts/gen-docs.py --check`、`uv run python scripts/check-doc-governance.py`、`just qa` |
 | OpenSpec 规范 | `openspec/specs/**/spec.md` | 站内索引/摘要(部分为 `.gen.`) | `just gen-docs`(如涉及站内生成页) | `just openspec-check`、`just qa` |
 | OpenSpec 变更(正式) | `openspec/changes/<active>/` | 归档后的 change | `openspec sync` / `openspec archive` | `just openspec-check`、`just qa` |
-| OpenSpec 脱敏规则 | `openspec/sanitize_rules.yaml` | (无) | `just openspec-sanitize CONFIRM=YES`(一般只在发布/共享前需要) | `just openspec-check`(默认 dry-run) |
+| OpenSpec 脱敏规则 | `openspec/sanitize_rules.yaml` | (无) | `just openspec-sanitize`(默认强制 apply) | `just openspec-check`(默认严格检查; 命中则自动 apply 并失败) |
 | YAML DSL schema | `src/scalim/dsl/yaml_dsl/schema_dsl/**` | `src/scalim/dsl/yaml_dsl/schema/*.gen.json` | `just gen-yaml-dsl-schema` | `just qa`(包含 schema drift check) |
 | Agent Skill (YAML DSL) | schema + CLI + specs + canonical example | `agentdev/skills/scalim-yaml-dsl/references/**/*.gen.*` + manifest | `just gen-agent-skill` | `just validate-agent-skill`、`just qa` |
 | notebooks 示例回归 | `notebooks/marimo/**` | `notebooks/marimo/marimo_coverage.gen.toon` | `just gen-marimo-coverage` | `just marimo-coverage-drift-check`、`just examples`、`just qa` |
