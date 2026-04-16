@@ -36,6 +36,7 @@ workflow 中明显与环境、性能预算或发布策略绑定的 runtime knobs
 - 以下旧字段（含子字段）MUST 被视为 runtime policy 并从 YAML 迁出：
   - `workflow.options.max_concurrency`
   - `workflow.options.failure_policy`
+  - `workflow.options.scheduler`
   - `workflow.options.cache_pool`
   - `workflow.options.resources_wait`
   - `workflow.options.output_staging`
@@ -127,4 +128,3 @@ workflow `failure_policy` MUST 保持为稳定的 orchestration 语义并与 dem
 - **WHEN** 调用方显式传入 `RunOptions(batch_size=8000)`
 - **THEN** effective `batch_size` MUST 为 `8000`
 - **AND** 系统 MUST NOT 发射 `pre_use_batch_size` policy signal
-

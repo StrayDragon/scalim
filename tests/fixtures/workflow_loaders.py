@@ -28,6 +28,11 @@ def load_main_slow() -> Iterable[Mapping[str, object]]:
     return [{"ref_id": 1}]
 
 
+def load_main_very_slow() -> Iterable[Mapping[str, object]]:
+    time.sleep(0.2)
+    return [{"ref_id": 1}]
+
+
 def load_main_raises() -> Iterable[Mapping[str, object]]:
     raise ValueError("boom")
 

@@ -70,7 +70,9 @@ def test_workflow_compile_normalize_and_validate_workflow_runtime_options_reject
     with pytest.raises(TypeError, match="workflow_runtime_options must be a WorkflowRuntimeOptions"):
         workflow_compile_mod._normalize_and_validate_workflow_runtime_options(object())  # noqa: SLF001
 
-    with pytest.raises(TypeError, match="workflow_runtime_options.scheduler must be a PipelineSchedulerOptions"):
+    with pytest.raises(
+        TypeError, match="workflow_runtime_options.scheduler must be a PipelineSchedulerOptions or StageBarrierSchedulerOptions"
+    ):
         workflow_compile_mod._normalize_and_validate_workflow_runtime_options(  # noqa: SLF001
             WorkflowRuntimeOptions(scheduler=object())  # type: ignore[arg-type]
         )

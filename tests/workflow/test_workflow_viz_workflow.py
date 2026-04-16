@@ -149,7 +149,7 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
     workflow_ir = WorkflowIr(
         nodes=(node_missing, node_b, node_a, dup_1, dup_2, condition, write, write_missing_res, append),
         edges=(),
-        options=WorkflowOptionsIr(),
+        options=WorkflowOptionsIr(schedule_mode="stage_barrier"),
         resources=(res_ok, res_bad),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
@@ -175,6 +175,8 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
     assert nodes["workflow_node:cond"]["data"]["kind"] == "workflow_node"
     assert nodes["workflow_node:w"]["data"]["kind"] == "workflow_write"
     assert nodes["workflow_node:p"]["data"]["kind"] == "workflow_write"
+    assert nodes["workflow_node:w"]["data"]["level"] == nodes["workflow_node:a"]["data"]["level"]
+    assert nodes["workflow_node:p"]["data"]["level"] == nodes["workflow_node:w"]["data"]["level"]
 
     edge_types = {(e.get("source"), e.get("target"), e.get("type")) for e in edges}
     assert ("workflow_node:b", "workflow_node:a", "depends_on") in edge_types
@@ -182,6 +184,7 @@ def test_build_workflow_viz_graph_snapshot_builds_nodes_edges_and_resources() ->
     assert ("workflow_node:w", "workflow_node:p", "depends_on") in edge_types
     assert ("workflow_node:w", "workflow_resource:excel:res_ok", "writes_to") in edge_types
     assert ("workflow_node:p", "workflow_resource:excel:res_missing", "writes_to") not in edge_types
+    assert (snapshot.get("meta") or {}).get("metadata", {}).get("schedule_mode") == "stage_barrier"
 
 
 def test_build_workflow_viz_graph_snapshot_handles_missing_stage_id_for_flaky_node_id() -> None:

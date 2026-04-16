@@ -421,6 +421,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/workflow-sheetbook-resources/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 workflow YAML 的共享 `.xlsx` book 资源(以 `workflow.resources.books` 表达)的迁移约束与运行期契约: 预算护栏、确定性写入、冲突安全、可观测且可原子导出为最终 xlsx,并提供可稳定引用的内置 loader 供下游节点读取 sheet rows.
 
+### `workflow-stage-scheduling`
+- Title: workflow-stage-scheduling Specification
+- Source: [spec.md](#code=openspec/specs/workflow-stage-scheduling/spec.md)
+- Summary: **状态: ✅ 已实现** 为 workflow DAG 提供可配置的调度 preset，使调用方可以在保持默认 pipeline 行为不变的前提下，选择严格的 stage barrier（阶段屏障）调度，以提升可预期性、资源规划与可解释性。
+
 ### `workflow-versioned-outputs`
 - Title: workflow-versioned-outputs Specification
 - Source: [spec.md](#code=openspec/specs/workflow-versioned-outputs/spec.md)

@@ -50,6 +50,7 @@ from .report import WorkflowRunError, WorkflowRunOutcome
 from .resource_lifecycle import WorkflowResourceLifecycle
 from .resources import WorkflowResourceManager
 from .scheduler_rules import can_schedule_more, should_cancel_on_failure
+from .stage_attribution import derive_workflow_struct_levels, derive_workflow_user_stages
 
 _ERR_WRITE_NODE_SCHEDULED_WHILE_FUTURES_IN_FLIGHT = "write node must not be scheduled while demand futures are in-flight"
 
@@ -179,6 +180,12 @@ class WorkflowRunController:
     _index_by_node_id: Dict[str, int]
     _dependents_by_node_id: Dict[str, List[str]]
 
+    _schedule_mode: str
+    _stage_by_node_id: Dict[str, int]
+    _stage_order: List[int]
+    _current_stage_idx: int
+    _node_ids_by_stage: Dict[int, FrozenSet[str]]
+
     def __init__(  # noqa: PLR0913
         self,
         *,
@@ -236,6 +243,24 @@ class WorkflowRunController:
                 self._dependents_by_node_id.setdefault(str(dep_id), []).append(node.node_id)
         for children in self._dependents_by_node_id.values():
             children.sort(key=lambda nid: self._index_by_node_id.get(str(nid), 0))
+
+        schedule_mode = str(workflow_ir.options.schedule_mode or "pipeline").strip() or "pipeline"
+        self._schedule_mode = schedule_mode
+
+        struct_levels = derive_workflow_struct_levels(workflow_ir)
+        stage_by_node_id = derive_workflow_user_stages(workflow_ir, struct_levels=struct_levels)
+        self._stage_by_node_id = stage_by_node_id
+
+        tmp_stage_nodes: Dict[int, Set[str]] = {}
+        for node in workflow_ir.nodes:
+            node_id = str(node.node_id or "").strip()
+            if not node_id:
+                continue
+            stage = int(stage_by_node_id.get(node_id, 0))
+            tmp_stage_nodes.setdefault(int(stage), set()).add(str(node_id))
+        self._node_ids_by_stage = {int(stage): frozenset(sorted(ids)) for stage, ids in tmp_stage_nodes.items()}
+        self._stage_order = sorted(self._node_ids_by_stage.keys())
+        self._current_stage_idx = 0
 
     @classmethod
     def build_for_prepared_run(  # noqa: PLR0913
@@ -334,8 +359,46 @@ class WorkflowRunController:
                 self.process_completed_future(fut)
             self.submit_ready_nodes()
 
+    def _current_stage(self) -> int:
+        if not self._stage_order:
+            return 0
+        idx = int(self._current_stage_idx)
+        if idx < 0:
+            return int(self._stage_order[0])
+        if idx >= len(self._stage_order):
+            return int(self._stage_order[-1])
+        return int(self._stage_order[idx])
+
+    def _maybe_advance_stage_barrier(self) -> None:
+        if str(self._schedule_mode) != "stage_barrier":
+            return
+        terminal = {"done", "failed", "cancelled"}
+        while True:
+            if not self._stage_order:
+                return
+            stage = self._current_stage()
+            members = self._node_ids_by_stage.get(int(stage), frozenset())
+            if not members:
+                if self._current_stage_idx + 1 >= len(self._stage_order):
+                    return
+                self._current_stage_idx += 1
+                continue
+
+            all_terminal = True
+            for node_id in members:
+                if self._state.node_state.get(str(node_id)) not in terminal:
+                    all_terminal = False
+                    break
+            if not all_terminal:
+                return
+
+            if self._current_stage_idx + 1 >= len(self._stage_order):
+                return
+            self._current_stage_idx += 1
+
     def submit_ready_nodes(self) -> None:
         while True:
+            self._maybe_advance_stage_barrier()
             if not self._state.ready_queue:
                 return
             if should_cancel_on_failure(self._state.failure_policy, self._state.failed_outcome):
@@ -369,6 +432,8 @@ class WorkflowRunController:
         for idx, node_id in enumerate(list(self._state.ready_queue)):
             node = self._node_by_id.get(str(node_id))
             if isinstance(node, WorkflowNodeIr):
+                if self._schedule_mode == "stage_barrier" and int(self._stage_by_node_id.get(str(node_id), 0)) != self._current_stage():
+                    continue
                 return str(self._state.ready_queue.pop(int(idx)))
         return None
 
@@ -376,6 +441,8 @@ class WorkflowRunController:
         for idx, node_id in enumerate(list(self._state.ready_queue)):
             node = self._node_by_id.get(str(node_id))
             if node is not None and not isinstance(node, WorkflowNodeIr):
+                if self._schedule_mode == "stage_barrier" and int(self._stage_by_node_id.get(str(node_id), 0)) != self._current_stage():
+                    continue
                 return str(self._state.ready_queue.pop(int(idx)))
         return None
 
@@ -726,6 +793,7 @@ class WorkflowRunController:
     def _emit_workflow_node_start(self, node: WorkflowAnyNodeIr) -> None:
         node_id = str(node.node_id)
         demand_path = self._node_demand_path(node)
+        stage = int(self._stage_by_node_id.get(str(node_id), 0))
         _ = self._workflow_instrumentation.emit(
             EVENT_WORKFLOW_NODE_START,
             WorkflowNodeStartEvent(
@@ -733,6 +801,8 @@ class WorkflowRunController:
                 workflow_node_id=str(node_id),
                 node_type=self._node_type_str(node),
                 demand_path=str(demand_path) if demand_path is not None else None,
+                schedule_mode=str(self._schedule_mode),
+                stage=int(stage),
             ),
             meta={
                 "workflow_exec_id": self._workflow_exec_id,
@@ -743,6 +813,7 @@ class WorkflowRunController:
     def _emit_workflow_node_end(self, node: WorkflowAnyNodeIr, *, status: str, exc: Optional[BaseException]) -> None:
         node_id = str(node.node_id)
         demand_path = self._node_demand_path(node)
+        stage = int(self._stage_by_node_id.get(str(node_id), 0))
         error_type = None
         error_message = None
         if status != WORKFLOW_NODE_END_STATUS_OK and exc is not None:
@@ -758,6 +829,8 @@ class WorkflowRunController:
                 demand_path=str(demand_path) if demand_path is not None else None,
                 error_type=error_type,
                 error_message=error_message,
+                schedule_mode=str(self._schedule_mode),
+                stage=int(stage),
             ),
             meta={
                 "workflow_exec_id": self._workflow_exec_id,
@@ -768,6 +841,7 @@ class WorkflowRunController:
     def _emit_workflow_node_cancelled(self, node: WorkflowAnyNodeIr, *, reason: str, message: str) -> None:
         node_id = str(node.node_id)
         demand_path = self._node_demand_path(node)
+        stage = int(self._stage_by_node_id.get(str(node_id), 0))
         _ = self._workflow_instrumentation.emit(
             EVENT_WORKFLOW_NODE_CANCELLED,
             WorkflowNodeCancelledEvent(
@@ -777,6 +851,8 @@ class WorkflowRunController:
                 reason=str(reason),
                 message=str(message),
                 demand_path=str(demand_path) if demand_path is not None else None,
+                schedule_mode=str(self._schedule_mode),
+                stage=int(stage),
             ),
             meta={
                 "workflow_exec_id": self._workflow_exec_id,

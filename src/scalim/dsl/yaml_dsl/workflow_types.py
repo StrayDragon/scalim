@@ -122,6 +122,11 @@ class PipelineSchedulerOptions:
 
 
 @dataclass(frozen=True)
+class StageBarrierSchedulerOptions:
+    """阶段屏障调度策略: 下一阶段必须等待上一阶段全部终态后才可启动."""
+
+
+@dataclass(frozen=True)
 class WorkflowRuntimeOptions:
     """工作流运行期策略对象(正交组织; 避免大平铺)."""
 
@@ -129,7 +134,7 @@ class WorkflowRuntimeOptions:
     cache_pool: WorkflowCachePoolPreset = dataclass_field(default_factory=WorkflowCachePoolDisabled)
     resources_wait: WorkflowResourcesWaitOptions = dataclass_field(default_factory=WorkflowResourcesWaitOptions)
     output_staging: WorkflowOutputStagingOptions = dataclass_field(default_factory=WorkflowOutputStagingOptions)
-    scheduler: PipelineSchedulerOptions = dataclass_field(default_factory=PipelineSchedulerOptions)
+    scheduler: Union[PipelineSchedulerOptions, StageBarrierSchedulerOptions] = dataclass_field(default_factory=PipelineSchedulerOptions)
 
     @classmethod
     def preset_default(cls) -> "WorkflowRuntimeOptions":
@@ -144,6 +149,7 @@ __all__ = (
     "ComponentsReplace",
     "PipelineSchedulerOptions",
     "ScalimWorkflowConfigError",
+    "StageBarrierSchedulerOptions",
     "WorkflowCachePoolDisabled",
     "WorkflowCachePoolPin",
     "WorkflowCachePoolPreloadForeverShared",

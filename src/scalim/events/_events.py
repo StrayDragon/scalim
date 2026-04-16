@@ -451,6 +451,12 @@ class WorkflowNodeStartEvent:
     demand_path: Optional[str] = None
     """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
 
+    schedule_mode: Optional[str] = None
+    """本次 `workflow` 的调度模式(例如 `pipeline` / `stage_barrier`,可选)."""
+
+    stage: Optional[int] = None
+    """该节点的阶段归因(可选)."""
+
 
 @dataclass(frozen=True)
 class WorkflowNodeEndEvent:
@@ -480,6 +486,12 @@ class WorkflowNodeEndEvent:
     error_message: Optional[str] = None
     """失败时的异常消息(可选)."""
 
+    schedule_mode: Optional[str] = None
+    """本次 `workflow` 的调度模式(例如 `pipeline` / `stage_barrier`,可选)."""
+
+    stage: Optional[int] = None
+    """该节点的阶段归因(可选)."""
+
 
 @dataclass(frozen=True)
 class WorkflowNodeCancelledEvent:
@@ -505,6 +517,12 @@ class WorkflowNodeCancelledEvent:
 
     demand_path: Optional[str] = None
     """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
+
+    schedule_mode: Optional[str] = None
+    """本次 `workflow` 的调度模式(例如 `pipeline` / `stage_barrier`,可选)."""
+
+    stage: Optional[int] = None
+    """该节点的阶段归因(可选)."""
 
 
 @dataclass(frozen=True)

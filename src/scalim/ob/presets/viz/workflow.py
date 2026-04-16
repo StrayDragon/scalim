@@ -28,7 +28,6 @@ from ....events._events import (
 )
 from ....spec.ir._workflow import (
     AppendSheetNodeIr,
-    WorkflowAnyNodeIr,
     WorkflowIr,
     WorkflowNodeIr,
     WorkflowNodeType,
@@ -36,6 +35,7 @@ from ....spec.ir._workflow import (
     WriteSheetNodeIr,
 )
 from ....vendor.dataclassesx import asdict
+from ....workflow.stage_attribution import derive_workflow_struct_levels, derive_workflow_user_stages
 from ...observer import EventDispatchObserver as _EventDispatchObserver
 from .._internal.viz_config import VizObserverConfig
 from .._internal.viz_nodes import VizObserverNodeMixin
@@ -74,42 +74,8 @@ def _workflow_resource_ref(resource_type: str, resource_id: str) -> Dict[str, st
 
 
 def _derive_workflow_stage_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
-    node_by_id: Dict[str, WorkflowAnyNodeIr] = {}
-    for node in workflow_ir.nodes:
-        node_id = _as_node_id(node.node_id)
-        if node_id:
-            node_by_id[node_id] = node
-
-    visiting: Set[str] = set()
-    memo: Dict[str, int] = {}
-
-    def _level(node_id: str) -> int:
-        cached = memo.get(node_id)
-        if cached is not None:
-            return int(cached)
-        if node_id in visiting:
-            # 环检测回退: 保证布局计算可用.
-            return 0
-        visiting.add(node_id)
-        node = node_by_id.get(node_id)
-        deps = node.deps if node is not None else ()
-        max_dep = -1
-        for dep_id in deps or ():
-            dep_key = _as_node_id(dep_id)
-            if not dep_key or dep_key == node_id:
-                continue
-            max_dep = max(max_dep, _level(dep_key))
-        visiting.remove(node_id)
-        value = max_dep + 1 if max_dep >= 0 else 0
-        memo[node_id] = int(value)
-        return int(value)
-
-    for node in workflow_ir.nodes:
-        node_id = _as_node_id(node.node_id)
-        if node_id:
-            _ = _level(node_id)
-
-    return memo
+    struct_levels = derive_workflow_struct_levels(workflow_ir)
+    return derive_workflow_user_stages(workflow_ir, struct_levels=struct_levels)
 
 
 def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
@@ -277,6 +243,7 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
             "workflow_yaml_path": str(workflow_yaml_path) if workflow_yaml_path is not None else None,
             "workflow_node_count": len([n for n in workflow_ir.nodes if _as_node_id(n.node_id)]),
             "workflow_resource_count": len(workflow_ir.resources),
+            "schedule_mode": str(workflow_ir.options.schedule_mode or "pipeline"),
         },
     }
 

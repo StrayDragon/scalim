@@ -226,6 +226,9 @@ workflow 同时 MUST 发出最小集合的 workflow-level 事件:
 - `Event.run_id` MUST 等于 `workflow_exec_id`(形成 workflow 事件流的稳定分区)
 - `Event.seq` MUST 在该 `run_id` 内单调递增
 - `Event.meta` MUST 同时包含 `workflow_exec_id` 与 `workflow_node_id`
+- workflow node 事件 payload MUST 增量暴露以下字段,用于解释执行顺序（详见 `workflow-stage-scheduling`）:
+  - `schedule_mode`（例如 `pipeline` / `stage_barrier`）
+  - `stage`（节点阶段归因）
 
 #### Scenario: demand events can be joined back to workflow node ids
 - **GIVEN** workflow YAML 声明 runs: A/B
@@ -290,6 +293,29 @@ workflow 同时 MUST 发出最小集合的 workflow-level 事件:
 - **THEN** 系统 MUST fail-fast
 - **AND** 错误信息 MUST 指向 runtime entrypoints（例如 `run_workflow(..., workflow_runtime_options=...)`）
 
+### Requirement: workflow scheduler preset MUST be configured through runtime entrypoints
+系统 MUST 允许调用方通过运行入口（runtime entrypoints）配置 workflow 的 scheduler preset（而不是通过 YAML authoring surface）：
+
+- workflow YAML MUST NOT 新增任何与 scheduler 相关的 authoring 字段
+- runtime entrypoints MUST 允许通过 `workflow_runtime_options.scheduler`（或等价 typed surface）提供 scheduler preset
+- 当调用方未显式提供 scheduler preset 时,默认值 MUST 等价于 `pipeline`
+
+#### Scenario: scheduler preset is configured through runtime entrypoints (not YAML)
+- **GIVEN** workflow YAML 仅声明 `workflow.runs` 与 `depends_on`
+- **WHEN** 调用方以 `workflow_runtime_options.scheduler=stage_barrier` 运行 workflow
+- **THEN** 系统 MUST 以 stage_barrier 语义调度执行
+- **AND** workflow YAML 本身 MUST 无需新增任何字段即可表达该行为
+
+### Requirement: yaml_dsl public facade MUST export scheduler preset types under a stable import path
+系统 MUST 在稳定导入路径上暴露 workflow scheduler preset 的类型,以便调用方以最小成本配置:
+
+- `scalim.dsl.yaml_dsl.workflow_types` MUST 导出 `PipelineSchedulerOptions`
+- `scalim.dsl.yaml_dsl.workflow_types` MUST 导出 `StageBarrierSchedulerOptions`
+
+#### Scenario: caller can import scheduler presets from yaml_dsl facade
+- **WHEN** 调用方执行 `from scalim.dsl.yaml_dsl.workflow_types import PipelineSchedulerOptions, StageBarrierSchedulerOptions`
+- **THEN** 导入 MUST 成功
+
 ### Requirement: `run_workflow(...)` MUST orchestrate parse/preload/effective-merge/preflight via a single lifecycle SSOT
 为避免出现“多入口各自拼装生命周期”导致的 drift 与 workaround 修复点扩散，系统 MUST 将 workflow 生命周期的编排收敛为单一 SSOT（lifecycle pipeline），并要求 `run_workflow(...)` 复用该 SSOT：
 
@@ -301,4 +327,3 @@ workflow 同时 MUST 发出最小集合的 workflow-level 事件:
 - **WHEN** 用户调用 `run_workflow(...)`
 - **THEN** 系统 MUST 在 engine 启动前直接 raise
 - **AND** workflow engine MUST NOT 被启动
-

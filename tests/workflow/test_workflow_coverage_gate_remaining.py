@@ -276,6 +276,327 @@ def test_workflow_controller_state_property_exposes_internal_state() -> None:
     assert controller.state is controller._state
 
 
+def test_workflow_controller_stage_barrier_helpers_handle_empty_stage_order() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.workflow.execute_controller import WorkflowRunController, WorkflowRunState
+
+    workflow_ir = WorkflowIr(
+        nodes=(WorkflowNodeIr(node_id="", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="demand.yaml"),),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail", schedule_mode="stage_barrier"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+
+    state = WorkflowRunState(
+        outcomes=[None],
+        node_state={"": "ready"},
+        ready_queue=[""],
+        submitted={},
+        remaining_prereqs={"": 0},
+        prereq_failed={"": False},
+        max_concurrency=1,
+        failure_policy="all_fail",
+    )
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        controller = WorkflowRunController(
+            executor=executor,
+            state=state,
+            workflow_exec_id="wf_test",
+            workflow_ir=workflow_ir,
+            artifacts_dir=SimpleNamespace(),
+            ctx_store=SimpleNamespace(
+                visible_producer_node_ids=lambda *_a, **_k: frozenset(),
+                publish_default_summary=lambda *_a, **_k: None,
+            ),
+            bundle_viz_base_config=None,
+            workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
+            workflow_cache_pool=None,
+            resource_manager=object(),
+            resource_lifecycle=SimpleNamespace(),
+            write_output_ids_by_run_id={},
+            compile_demand_node_fn=lambda *_a, **_k: (object(), object()),
+            compile_demand_fn=lambda *_a, **_k: object(),
+            build_demand_run_result_fn=None,
+            run_ir_fn=lambda *_a, **_k: object(),
+            run_workflow_write_node_fn=lambda *_a, **_k: None,
+            capture_observability=False,
+            workflow_replay_instrumentation=None,
+            workflow_components=(),
+        )
+
+    assert controller._stage_order == []
+    assert controller._current_stage() == 0
+    controller._maybe_advance_stage_barrier()
+
+
+def test_workflow_controller_current_stage_clamps_idx_out_of_range() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.workflow.artifacts import WorkflowArtifactsDirectory
+    from scalim.workflow.execute_controller import WorkflowRunController
+
+    workflow_ir = WorkflowIr(
+        nodes=(WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="demand.yaml"),),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail", schedule_mode="stage_barrier"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
+
+    class _Ctx:
+        def visible_producer_node_ids(self, consumer_node_id: str) -> object:
+            return frozenset([str(consumer_node_id)])
+
+        def publish_default_summary(self, producer_node_id: str, result: object) -> None:
+            _ = producer_node_id
+            _ = result
+
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        controller = WorkflowRunController.build_for_prepared_run(
+            executor=executor,
+            workflow_exec_id="wf_test",
+            workflow_ir=workflow_ir,
+            artifacts_dir=artifacts_dir,
+            ctx_store=_Ctx(),
+            max_concurrency=1,
+            failure_policy="all_fail",
+            bundle_viz_base_config=None,
+            workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
+            workflow_cache_pool=None,
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
+            write_output_ids_by_run_id={},
+            write_consumers_remaining_by_output_key={},
+            main_rows_consumers_remaining_by_run_id={},
+            captured_demand_events_by_node_id={},
+            captured_demand_hook_events_by_node_id={},
+            captured_demand_viz_observer_by_node_id={},
+            captured_demand_request_by_node_id={},
+            compile_demand_node_fn=lambda *_a, **_k: (object(), object()),
+            compile_demand_fn=lambda *_a, **_k: object(),
+            build_demand_run_result_fn=None,
+            run_ir_fn=lambda *_a, **_k: object(),
+            run_workflow_write_node_fn=lambda *_a, **_k: None,
+            capture_observability=False,
+            workflow_replay_instrumentation=None,
+            workflow_components=(),
+        )
+
+    controller._current_stage_idx = -1
+    assert controller._current_stage() == 0
+    controller._current_stage_idx = 99
+    assert controller._current_stage() == 0
+
+
+def test_workflow_controller_stage_barrier_returns_when_stage_members_empty_and_last() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.workflow.artifacts import WorkflowArtifactsDirectory
+    from scalim.workflow.execute_controller import WorkflowRunController
+
+    workflow_ir = WorkflowIr(
+        nodes=(WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="demand.yaml"),),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail", schedule_mode="stage_barrier"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
+
+    class _Ctx:
+        def visible_producer_node_ids(self, consumer_node_id: str) -> object:
+            return frozenset([str(consumer_node_id)])
+
+        def publish_default_summary(self, producer_node_id: str, result: object) -> None:
+            _ = producer_node_id
+            _ = result
+
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        controller = WorkflowRunController.build_for_prepared_run(
+            executor=executor,
+            workflow_exec_id="wf_test",
+            workflow_ir=workflow_ir,
+            artifacts_dir=artifacts_dir,
+            ctx_store=_Ctx(),
+            max_concurrency=1,
+            failure_policy="all_fail",
+            bundle_viz_base_config=None,
+            workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
+            workflow_cache_pool=None,
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
+            write_output_ids_by_run_id={},
+            write_consumers_remaining_by_output_key={},
+            main_rows_consumers_remaining_by_run_id={},
+            captured_demand_events_by_node_id={},
+            captured_demand_hook_events_by_node_id={},
+            captured_demand_viz_observer_by_node_id={},
+            captured_demand_request_by_node_id={},
+            compile_demand_node_fn=lambda *_a, **_k: (object(), object()),
+            compile_demand_fn=lambda *_a, **_k: object(),
+            build_demand_run_result_fn=None,
+            run_ir_fn=lambda *_a, **_k: object(),
+            run_workflow_write_node_fn=lambda *_a, **_k: None,
+            capture_observability=False,
+            workflow_replay_instrumentation=None,
+            workflow_components=(),
+        )
+
+    assert controller._stage_order == [0]
+    controller._node_ids_by_stage[0] = frozenset()
+    controller._maybe_advance_stage_barrier()
+    assert controller._current_stage_idx == 0
+
+
+def test_workflow_controller_stage_barrier_advances_when_stage_members_empty_and_next() -> None:
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
+    from scalim.workflow.artifacts import WorkflowArtifactsDirectory
+    from scalim.workflow.execute_controller import WorkflowRunController
+
+    node_a = WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml")
+    node_b = WorkflowNodeIr(node_id="b", node_type=WorkflowNodeType.DEMAND, decl_order=1, deps=("a",), demand_path="b.yaml")
+    workflow_ir = WorkflowIr(
+        nodes=(node_a, node_b),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail", schedule_mode="stage_barrier"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
+
+    class _Ctx:
+        def visible_producer_node_ids(self, consumer_node_id: str) -> object:
+            return frozenset([str(consumer_node_id)])
+
+        def publish_default_summary(self, producer_node_id: str, result: object) -> None:
+            _ = producer_node_id
+            _ = result
+
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        controller = WorkflowRunController.build_for_prepared_run(
+            executor=executor,
+            workflow_exec_id="wf_test",
+            workflow_ir=workflow_ir,
+            artifacts_dir=artifacts_dir,
+            ctx_store=_Ctx(),
+            max_concurrency=1,
+            failure_policy="all_fail",
+            bundle_viz_base_config=None,
+            workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
+            workflow_cache_pool=None,
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
+            write_output_ids_by_run_id={},
+            write_consumers_remaining_by_output_key={},
+            main_rows_consumers_remaining_by_run_id={},
+            captured_demand_events_by_node_id={},
+            captured_demand_hook_events_by_node_id={},
+            captured_demand_viz_observer_by_node_id={},
+            captured_demand_request_by_node_id={},
+            compile_demand_node_fn=lambda *_a, **_k: (object(), object()),
+            compile_demand_fn=lambda *_a, **_k: object(),
+            build_demand_run_result_fn=None,
+            run_ir_fn=lambda *_a, **_k: object(),
+            run_workflow_write_node_fn=lambda *_a, **_k: None,
+            capture_observability=False,
+            workflow_replay_instrumentation=None,
+            workflow_components=(),
+        )
+
+    assert controller._stage_order == [0, 1]
+    controller._node_ids_by_stage[0] = frozenset()
+    controller._maybe_advance_stage_barrier()
+    assert controller._current_stage_idx == 1
+
+
+def test_workflow_controller_stage_barrier_skips_ready_write_node_in_future_stage() -> None:
+    from scalim.spec.ir._workflow import (
+        WorkflowArtifactsIr,
+        WorkflowIr,
+        WorkflowNodeIr,
+        WorkflowNodeType,
+        WorkflowOptionsIr,
+        WriteSheetNodeIr,
+    )
+    from scalim.workflow.artifacts import WorkflowArtifactsDirectory
+    from scalim.workflow.execute_controller import WorkflowRunController
+
+    node_a = WorkflowNodeIr(node_id="a", node_type=WorkflowNodeType.DEMAND, decl_order=0, deps=(), demand_path="a.yaml")
+    node_b = WorkflowNodeIr(node_id="b", node_type=WorkflowNodeType.DEMAND, decl_order=2, deps=("a",), demand_path="b.yaml")
+    write_node = WriteSheetNodeIr(
+        node_id="w",
+        node_type=WorkflowNodeType.WRITE_SHEET,
+        decl_order=1,
+        deps=(),
+        resource_type="excel",
+        resource_id="book",
+        sheet="Sheet1",
+        input_node_id="b",
+        input_output_id="out",
+        on_conflict="error",
+    )
+    workflow_ir = WorkflowIr(
+        nodes=(node_a, write_node, node_b),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail", schedule_mode="stage_barrier"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
+
+    class _Ctx:
+        def visible_producer_node_ids(self, consumer_node_id: str) -> object:
+            return frozenset([str(consumer_node_id)])
+
+        def publish_default_summary(self, producer_node_id: str, result: object) -> None:
+            _ = producer_node_id
+            _ = result
+
+    resource_manager = object()
+    resource_lifecycle = WorkflowResourceLifecycle(resource_manager=resource_manager, artifacts_dir=artifacts_dir, cache_pool=None)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        controller = WorkflowRunController.build_for_prepared_run(
+            executor=executor,
+            workflow_exec_id="wf_test",
+            workflow_ir=workflow_ir,
+            artifacts_dir=artifacts_dir,
+            ctx_store=_Ctx(),
+            max_concurrency=1,
+            failure_policy="all_fail",
+            bundle_viz_base_config=None,
+            workflow_instrumentation=SimpleNamespace(emit=lambda *_a, **_k: None),
+            workflow_cache_pool=None,
+            resource_manager=resource_manager,
+            resource_lifecycle=resource_lifecycle,
+            write_output_ids_by_run_id={},
+            write_consumers_remaining_by_output_key={},
+            main_rows_consumers_remaining_by_run_id={},
+            captured_demand_events_by_node_id={},
+            captured_demand_hook_events_by_node_id={},
+            captured_demand_viz_observer_by_node_id={},
+            captured_demand_request_by_node_id={},
+            compile_demand_node_fn=lambda *_a, **_k: (object(), object()),
+            compile_demand_fn=lambda *_a, **_k: object(),
+            build_demand_run_result_fn=None,
+            run_ir_fn=lambda *_a, **_k: object(),
+            run_workflow_write_node_fn=lambda *_a, **_k: None,
+            capture_observability=False,
+            workflow_replay_instrumentation=None,
+            workflow_components=(),
+        )
+
+    assert controller.state.ready_queue == ["a", "w"]
+    assert controller._pop_next_ready_write_node_id() is None
+    assert controller.state.ready_queue == ["a", "w"]
+
+
 def test_workflow_artifacts_directory_rejects_write_when_owner_thread_mismatch() -> None:
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
     from scalim.workflow.artifacts import WorkflowArtifactsDirectory

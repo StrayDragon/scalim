@@ -343,7 +343,7 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 其中：
 
 - 所有 demand 运行期 knobs MUST 通过 `RunOptions` 提供（例如 allowlist、模板、并行、重试、护栏、overrides、batch_size、diagnostics）。
-- workflow-scope 的 runtime policy MUST 通过一个封闭且 typed 的 `WorkflowRuntimeOptions`（或等价）提供（例如 `workflow_runtime_options.execution/cache_pool/resources_wait/output_staging`）。
+- workflow-scope 的 runtime policy MUST 通过一个封闭且 typed 的 `WorkflowRuntimeOptions`（或等价）提供（例如 `workflow_runtime_options.execution/scheduler/cache_pool/resources_wait/output_staging`）。
 - workflow-scope 的编排参数 MAY 继续以独立 kwargs 形式存在（例如 `run_patches_by_id` / `path_aliases`），但 MUST NOT 再以独立 kwargs 暴露 workflow runtime policy（避免签名继续膨胀）。
 
 #### Scenario: options-object drives workflow runs
@@ -374,4 +374,3 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 - **WHEN** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import run, compile, run_workflow`
 - **AND** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import RunOptions, RunOverrides, ResolverTrustedMode`
 - **THEN** 导入 MUST 成功且行为与实现一致
-

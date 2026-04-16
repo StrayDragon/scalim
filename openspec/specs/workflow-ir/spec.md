@@ -89,3 +89,14 @@ Workflow IR MUST 至少包含:
 - **WHEN** workflow 被编译为 Workflow IR
 - **THEN** IR 的 `options` MUST 包含对应字段且值与该 runtime policy 等价
 
+### Requirement: WorkflowOptionsIr MUST carry schedule_mode from runtime to executor
+系统 MUST 在 workflow 编译产物的 options(IR) 中携带调度模式,以便执行层可区分 `pipeline` 与 `stage_barrier` 的调度语义:
+
+- Workflow IR 的 `options` MUST 包含字段 `schedule_mode`
+- `schedule_mode` MUST 为字符串且取值 MUST 属于 `pipeline` 或 `stage_barrier`
+- 当调用方未显式配置 scheduler preset 时,`schedule_mode` MUST 等价于 `pipeline`
+
+#### Scenario: schedule_mode is present in compiled IR
+- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime_options.scheduler=stage_barrier`
+- **WHEN** workflow 被编译为 Workflow IR
+- **THEN** IR 的 `options.schedule_mode` MUST 等于 `stage_barrier`

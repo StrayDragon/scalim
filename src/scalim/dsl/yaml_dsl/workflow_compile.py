@@ -95,6 +95,7 @@ from .workflow_config._models import (
 )
 from .workflow_types import (
     PipelineSchedulerOptions,
+    StageBarrierSchedulerOptions,
     WorkflowCachePoolDisabled,
     WorkflowCachePoolPreloadForeverShared,
     WorkflowCachePoolPreset,
@@ -1617,8 +1618,8 @@ def _normalize_and_validate_workflow_runtime_options(raw: object) -> WorkflowRun
     output_staging = _normalize_workflow_output_staging_override(raw.output_staging)
 
     scheduler = raw.scheduler
-    if not isinstance(scheduler, PipelineSchedulerOptions):
-        msg = "workflow_runtime_options.scheduler must be a PipelineSchedulerOptions (wave schedulers are not supported in this change)"
+    if not isinstance(scheduler, (PipelineSchedulerOptions, StageBarrierSchedulerOptions)):
+        msg = "workflow_runtime_options.scheduler must be a PipelineSchedulerOptions or StageBarrierSchedulerOptions"
         raise TypeError(msg)
 
     _ = _build_workflow_cache_pool_ir_from_runtime(raw.cache_pool)
@@ -1737,9 +1738,14 @@ def _build_workflow_options_ir(
     resources_wait = _build_workflow_resources_wait_ir(runtime.resources_wait)
     output_staging = _build_workflow_output_staging_ir(runtime.output_staging)
     execution = runtime.execution
+    scheduler = runtime.scheduler
+    schedule_mode = "pipeline"
+    if isinstance(scheduler, StageBarrierSchedulerOptions):
+        schedule_mode = "stage_barrier"
     return WorkflowOptionsIr(
         max_concurrency=int(execution.max_concurrency),
         failure_policy=str(execution.failure_policy or "all_fail"),
+        schedule_mode=str(schedule_mode),
         cache_pool=cache_pool,
         resources_wait=resources_wait,
         output_staging=output_staging,

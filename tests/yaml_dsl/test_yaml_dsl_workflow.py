@@ -19,6 +19,7 @@ from scalim.dsl.yaml_dsl.runtime import compiler as by_yaml_compiler_mod
 from scalim.dsl.yaml_dsl.workflow_types import (
     ComponentsExtend,
     ComponentsReplace,
+    StageBarrierSchedulerOptions,
     WorkflowCachePoolPreloadForeverShared,
     WorkflowExecutionOptions,
     WorkflowRuntimeOptions,
@@ -73,13 +74,16 @@ def _workflow_runtime_options(  # type: ignore[no-untyped-def] test helper
     max_concurrency: int = 1,
     failure_policy: str = "all_fail",
     cache_pool_max_entries: Optional[int] = None,
+    schedule_mode: str = "pipeline",
 ):
     execution = WorkflowExecutionOptions(max_concurrency=int(max_concurrency), failure_policy=str(failure_policy))
+    kwargs: Dict[str, Any] = {}
+    if str(schedule_mode).strip() == "stage_barrier":
+        kwargs["scheduler"] = StageBarrierSchedulerOptions()
     if cache_pool_max_entries is None:
-        return WorkflowRuntimeOptions(execution=execution)
+        return WorkflowRuntimeOptions(execution=execution, **kwargs)
     return WorkflowRuntimeOptions(
-        execution=execution,
-        cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=int(cache_pool_max_entries)),
+        execution=execution, cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=int(cache_pool_max_entries)), **kwargs
     )
 
 
@@ -1556,6 +1560,114 @@ def test_workflow_dag_respects_depends_on_under_concurrency(tmp_path: Path) -> N
     by_end = {e.payload.workflow_node_id: e for e in end}
 
     assert by_start["b"].seq > by_end["a"].seq
+
+
+def test_workflow_pipeline_allows_cross_stage_overlap_under_concurrency(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="x.yaml",
+        name="x",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_very_slow",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "x", "demand": "x.yaml"},
+            {"id": "b", "demand": "b.yaml", "depends_on": ["a"]},
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    recorder = _WorkflowEventRecorder()
+    runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="primary_only", schedule_mode="pipeline")
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
+    assert not result.errors()
+
+    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+
+    by_start = {e.payload.workflow_node_id: e for e in start}
+    by_end = {e.payload.workflow_node_id: e for e in end}
+
+    assert by_start["b"].timestamp >= by_end["a"].timestamp
+    assert by_start["b"].timestamp < by_end["x"].timestamp
+    assert by_start["b"].payload.schedule_mode == "pipeline"
+    assert by_start["b"].payload.stage == 1
+
+
+def test_workflow_stage_barrier_blocks_next_stage_until_all_nodes_in_stage_terminal(tmp_path: Path) -> None:
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="x.yaml",
+        name="x",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_very_slow",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table",
+        cache_mode="none",
+    )
+    _ = _write_demand_yaml(
+        tmp_path,
+        file_name="b.yaml",
+        name="b",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
+        cache_mode="none",
+    )
+
+    wf = _write_workflow_yaml(
+        tmp_path,
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+            {"id": "x", "demand": "x.yaml"},
+            {"id": "b", "demand": "b.yaml", "depends_on": ["a"]},
+        ],
+        max_concurrency=2,
+        failure_policy="primary_only",
+    )
+
+    recorder = _WorkflowEventRecorder()
+    runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="primary_only", schedule_mode="stage_barrier")
+    result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
+    assert not result.errors()
+
+    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+
+    by_start = {e.payload.workflow_node_id: e for e in start}
+    by_end = {e.payload.workflow_node_id: e for e in end}
+
+    assert by_start["b"].timestamp >= by_end["a"].timestamp
+    assert by_start["b"].timestamp >= by_end["x"].timestamp
+    assert by_start["b"].payload.schedule_mode == "stage_barrier"
+    assert by_start["b"].payload.stage == 1
 
 
 def test_workflow_concurrency_does_not_call_components_concurrently_by_default(tmp_path: Path) -> None:

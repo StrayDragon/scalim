@@ -118,6 +118,7 @@ class WorkflowOutputStagingOptionsIr:
 class WorkflowOptionsIr:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
+    schedule_mode: str = "pipeline"
     cache_pool: Optional[WorkflowCachePoolIr] = None
     resources_wait: WorkflowResourcesWaitOptionsIr = field(default_factory=WorkflowResourcesWaitOptionsIr)
     output_staging: WorkflowOutputStagingOptionsIr = field(default_factory=WorkflowOutputStagingOptionsIr)
