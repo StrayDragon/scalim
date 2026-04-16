@@ -30,14 +30,14 @@ Sources:
 | `scalim.dsl.yaml_dsl` | 24 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
 | `scalim.dsl.yaml_dsl.tools` | 3 | YAML DSL 辅助工具(输出配置/路径推导) | 工具链集成/排错 |
 | `scalim.dsl.yaml_dsl.workflow` | 10 | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
-| `scalim.dsl.yaml_dsl.workflow_types` | 19 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
+| `scalim.dsl.yaml_dsl.workflow_types` | 20 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
 | `scalim.dsl.yaml_dsl.workflow_paths` | 1 | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
 | `scalim.spec.ir` | 40 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
 | `scalim.execution` | 1 | 执行层入口 | `ScalimEngine` 执行 |
 | `scalim.ob` | 1 | 可观测性入口 | 构建 observer manager / 采集事件 |
-| `scalim.events` | 48 | 事件 envelope + 事件类型常量 + 事件目录查询入口 | 写 Observer/Hook；按 `event_type` 订阅/过滤 |
+| `scalim.events` | 48 | 事件envelope+事件类型常量+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
 | `scalim.sinks` | 22 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 | `scalim.sinks.rows` | 4 | workflow typed rows artifact 稳定入口 | `InMemoryRows` 中间态 / 转换与适配 |
 | `scalim.shortcuts.resources` | 1 | 资源类 shortcut 稳定入口 | 从 output root 定位产物/资源 |
@@ -155,7 +155,7 @@ from scalim.dsl.yaml_dsl.workflow import (
 
 #### `scalim.dsl.yaml_dsl.workflow_types`
 
-- Export count: `19`
+- Export count: `20`
 
 ```python
 from scalim.dsl.yaml_dsl.workflow_types import (
@@ -166,6 +166,7 @@ from scalim.dsl.yaml_dsl.workflow_types import (
     ComponentsReplace,
     PipelineSchedulerOptions,
     ScalimWorkflowConfigError,
+    StageBarrierSchedulerOptions,
     WorkflowCachePoolDisabled,
     WorkflowCachePoolPin,
     WorkflowCachePoolPreloadForeverShared,

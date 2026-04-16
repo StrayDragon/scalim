@@ -148,7 +148,7 @@ def _module_name_for_path(path: Path, *, src_root: Path) -> str:
 
 
 def _extract_module_all(path: Path, *, repo_root: Path) -> Tuple[str, ...] | None:
-    """Return the last literal `__all__` assignment in the module, if any."""
+    """返回模块中最后一次出现的 `__all__` 字面量赋值(如果存在)。"""
     text = path.read_text(encoding="utf-8")
     rel = str(path.relative_to(repo_root)).replace("\\", "/")
     tree = ast.parse(text, filename=rel)
@@ -234,9 +234,7 @@ def _discover_public_api_entrypoints(repo_root: Path, *, tier: int) -> Tuple[_Pu
             )
 
     if errors:
-        raise RuntimeError(
-            "public API entrypoints markers invalid (showing up to 20):\n{}".format("\n".join("- {}".format(e) for e in errors[:20]))
-        )
+        raise RuntimeError("检测到公共 `API` 入口标记不合法(最多展示 20 条):\n{}".format("\n".join("- {}".format(e) for e in errors[:20])))
 
     by_module: Dict[str, _PublicApiEntrypoint] = {}
     duplicates: List[str] = []
@@ -247,13 +245,13 @@ def _discover_public_api_entrypoints(repo_root: Path, *, tier: int) -> Tuple[_Pu
         by_module[entry.module] = entry
 
     if duplicates:
-        raise RuntimeError("duplicate public API entrypoints markers: {}".format(", ".join(sorted(set(duplicates)))))
+        raise RuntimeError("检测到重复的公共 `API` 入口标记: {}".format(", ".join(sorted(set(duplicates)))))
 
     discovered = sorted(by_module.values(), key=lambda e: (int(e.order), str(e.module)))
     if not discovered:
         raise RuntimeError(
-            "no public API entrypoints markers found for tier={}. Add markers like:\n"
-            "# pragma: scalim-public-api tier1:10:scalim.dsl.yaml_dsl|...|...".format(tier)
+            "未找到公共 `API` 入口标记(层级={})。请添加类似如下的标记:\n"
+            "`# pragma: scalim-public-api tier1:10:scalim.dsl.yaml_dsl|...|...`".format(tier)
         )
     return tuple(discovered)
 
@@ -264,9 +262,7 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
 
     missing_tier1 = sorted({e.module for e in tier1_entrypoints if e.module not in exports_by_module})
     if missing_tier1:
-        raise RuntimeError(
-            "Tier 1 entrypoints missing `__all__` (or not parseable as literals): {}".format(", ".join(missing_tier1))
-        )
+        raise RuntimeError("入口列表缺少 `__all__`(或无法解析为字面量): {}".format(", ".join(missing_tier1)))
 
     sources = [
         "`src/scalim/**` module-level `__all__` exports (AST-scanned; excludes `src/scalim/vendor/**`)",

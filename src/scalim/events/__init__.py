@@ -6,7 +6,7 @@
 类型化 `payload` 数据类属于内部实现细节,不作为公共导入契约.
 """
 
-# pragma: scalim-public-api tier1:110:scalim.events|事件 envelope + 事件类型常量 + 事件目录查询入口|写 Observer/Hook；按 `event_type` 订阅/过滤
+# pragma: scalim-public-api tier1:110:scalim.events|事件envelope+事件类型常量+事件目录查询入口|写 Observer/Hook;按 `event_type` 订阅/过滤
 
 from .api import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,

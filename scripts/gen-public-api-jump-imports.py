@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""生成一个 `.tmp/` 内的“public API 跳转辅助 imports”文件.
+"""生成一个 `.tmp/` 内的“公共接口跳转辅助导入文件”.
 
 目的:
-- 方便在编辑器/LSP 中快速跳转到 public API 符号定义(无需在项目里手写大量 import)。
+- 方便在编辑器/语言服务器中快速跳转到公共接口符号定义(无需在项目里手写大量 `import`)。
 - 生成物放在 `.tmp/`，不提交，也不影响 `basedpyright` 门禁。
 
-SSOT:
-- Tier 1 curated entrypoints 通过 `src/scalim/**/__init__.py` 中的注释标注发现:
+单一事实来源:
+- 入口列表通过 `src/scalim/**/__init__.py` 中的注释标注发现:
   `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`
-- 每个模块的导出符号集合来自该模块的 `__all__` 字面量(tuple/list)。
+- 每个模块的导出符号集合来自该模块的 `__all__` 字面量(`tuple`/`list`)。
 """
 
 from __future__ import annotations
@@ -82,9 +82,7 @@ def _discover_entrypoints(repo_root: Path, *, tier: int) -> Tuple[PublicApiEntry
             entrypoints.append(PublicApiEntrypoint(order=order, module=module, description=desc, common_scenario=scenario))
 
     if errors:
-        raise RuntimeError(
-            "public API entrypoints markers invalid (showing up to 20):\n{}".format("\n".join("- {}".format(e) for e in errors[:20]))
-        )
+        raise RuntimeError("检测到公共 `API` 入口标记不合法(最多展示 20 条):\n{}".format("\n".join("- {}".format(e) for e in errors[:20])))
 
     by_module: Dict[str, PublicApiEntrypoint] = {}
     duplicates: List[str] = []
@@ -94,11 +92,11 @@ def _discover_entrypoints(repo_root: Path, *, tier: int) -> Tuple[PublicApiEntry
             continue
         by_module[entry.module] = entry
     if duplicates:
-        raise RuntimeError("duplicate public API entrypoints markers: {}".format(", ".join(sorted(set(duplicates)))))
+        raise RuntimeError("检测到重复的公共 `API` 入口标记: {}".format(", ".join(sorted(set(duplicates)))))
 
     discovered = sorted(by_module.values(), key=lambda e: (int(e.order), str(e.module)))
     if not discovered:
-        raise RuntimeError("no public API entrypoints markers found for tier={}".format(tier))
+        raise RuntimeError("未找到公共 `API` 入口标记(层级={})".format(tier))
     return tuple(discovered)
 
 
@@ -121,7 +119,7 @@ def _module_name_for_path(path: Path, *, src_root: Path) -> str:
 
 
 def _extract_module_all(path: Path, *, repo_root: Path) -> Tuple[str, ...] | None:
-    """Return the last literal `__all__` assignment in the module, if any."""
+    """返回模块中最后一次出现的 `__all__` 字面量赋值(如果存在)。"""
     text = path.read_text(encoding="utf-8")
     rel = str(path.relative_to(repo_root)).replace("\\", "/")
     tree = ast.parse(text, filename=rel)
@@ -166,7 +164,7 @@ def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
 
 
 def _as_ident(value: str) -> str:
-    # Module name -> valid python identifier
+    # 模块名 -> 合法的 `Python` 标识符
     return re.sub(r"[^A-Za-z0-9_]", "_", str(value))
 
 
@@ -192,11 +190,11 @@ def _render_jump_file(
     for entry in entrypoints:
         exports = exports_by_module.get(entry.module)
         if exports is None:
-            raise RuntimeError("missing `__all__` for curated module: {}".format(entry.module))
+            raise RuntimeError("入口模块缺少 `__all__`: {}".format(entry.module))
 
         func_name = "_jump_{}".format(_as_ident(entry.module))
         lines.append("    def {}() -> None:".format(func_name))
-        lines.append("        \"\"\"{} | {}\"\"\"".format(entry.description, entry.common_scenario))
+        lines.append('        """{} | {}"""'.format(entry.description, entry.common_scenario))
 
         if not exports:
             lines.append("        return")
@@ -232,10 +230,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
         encoding="utf-8",
     )
-    print("wrote", str(out_path.relative_to(repo_root)))
+    print("已写入", str(out_path.relative_to(repo_root)))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-
