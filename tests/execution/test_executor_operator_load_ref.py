@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from scalim.events import EVENT_LOADER_CALL, EVENT_RELATION_LOOKUP
+from scalim.events import EventType
 from scalim.execution.context import BatchContext
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.executor.operators.load_ref.context import LoadRefExecutionContext
@@ -43,7 +43,7 @@ def test_load_ref_trigger_loader_call_handles_missing_binding() -> None:
             self.calls: List[Dict[str, Any]] = []
 
         def wants(self, event_type: str) -> bool:
-            return event_type == EVENT_LOADER_CALL
+            return event_type == EventType.LOADER_CALL
 
         def emit_loader_call(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
             self.calls.append(kwargs)
@@ -292,7 +292,7 @@ def test_load_ref_relation_lookup_diagnostics_still_work_when_wanted(monkeypatch
     runtime_bindings = RuntimeBindings()
 
     class _RelationLookupObserver(EventDispatchObserver):
-        event_types = {EVENT_RELATION_LOOKUP}
+        event_types = {EventType.RELATION_LOOKUP}
 
         def __init__(self) -> None:
             self.events: List[object] = []
@@ -439,7 +439,7 @@ def test_load_ref_rows_cache_does_not_retain_batch_rows_in_cache() -> None:
 
 def test_load_ref_cache_hit_uses_cached_batch_rows_in_context() -> None:
     class _CaptureLoaderCallObserver(Observer):
-        event_types = {EVENT_LOADER_CALL}
+        event_types = {EventType.LOADER_CALL}
 
         def __init__(self) -> None:
             self.events: List[object] = []
@@ -1486,14 +1486,13 @@ def test_load_ref_cached_mapping_key_normalization_collision_fail_fast() -> None
 
 
 def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_equal_and_warns_redacted() -> None:
-    from scalim.events import EVENT_DIAGNOSTIC_WARNING
-    from scalim.events import Event
+    from scalim.events import Event, EventType
     from scalim.ob.manager import ObserverManager
     from scalim.ob.observer import Observer
 
     class _CaptureWarningObserver(Observer):
         def __init__(self) -> None:
-            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.event_types = {EventType.DIAGNOSTIC_WARNING}
             self.events = []
 
         def on_event(self, event: Event) -> None:
@@ -1543,14 +1542,13 @@ def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_
 
 
 def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_redacted() -> None:
-    from scalim.events import EVENT_DIAGNOSTIC_WARNING
-    from scalim.events import Event
+    from scalim.events import Event, EventType
     from scalim.ob.manager import ObserverManager
     from scalim.ob.observer import Observer
 
     class _CaptureWarningObserver(Observer):
         def __init__(self) -> None:
-            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.event_types = {EventType.DIAGNOSTIC_WARNING}
             self.events = []
 
         def on_event(self, event: Event) -> None:
@@ -1607,14 +1605,13 @@ def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_r
 
 
 def test_load_ref_key_normalization_auto_str_with_explicit_cast_unnormalizable_key_probe_is_skipped() -> None:
-    from scalim.events import EVENT_DIAGNOSTIC_WARNING
-    from scalim.events import Event
+    from scalim.events import Event, EventType
     from scalim.ob.manager import ObserverManager
     from scalim.ob.observer import Observer
 
     class _CaptureWarningObserver(Observer):
         def __init__(self) -> None:
-            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.event_types = {EventType.DIAGNOSTIC_WARNING}
             self.events = []
 
         def on_event(self, event: Event) -> None:

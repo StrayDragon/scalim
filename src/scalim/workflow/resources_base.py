@@ -17,12 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from .._internal import loggingx
-from ..events import (
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
-    EVENT_WORKFLOW_RESOURCE_CREATE,
-    EVENT_WORKFLOW_RESOURCE_DISCARD,
-    EVENT_WORKFLOW_RESOURCE_WRITE,
-)
+from ..events import EventType
 from ..events._events import (
     WorkflowResourceCommitEvent,
     WorkflowResourceCreateEvent,
@@ -319,7 +314,7 @@ class _WorkflowResourceManagerBase(ABC):
 
     def _emit_resource_create(self, *, workflow_node_id: str, resource_type: str, resource_id: str, path: str) -> None:
         _ = self._instrumentation.emit(
-            EVENT_WORKFLOW_RESOURCE_CREATE,
+            EventType.WORKFLOW_RESOURCE_CREATE,
             WorkflowResourceCreateEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(workflow_node_id),
@@ -347,7 +342,7 @@ class _WorkflowResourceManagerBase(ABC):
         sheet: Optional[str] = None,
     ) -> None:
         _ = self._instrumentation.emit(
-            EVENT_WORKFLOW_RESOURCE_WRITE,
+            EventType.WORKFLOW_RESOURCE_WRITE,
             WorkflowResourceWriteEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(workflow_node_id),
@@ -368,7 +363,7 @@ class _WorkflowResourceManagerBase(ABC):
 
     def _emit_resource_commit(self, *, workflow_node_id: str, resource_type: str, resource_id: str, path: str) -> None:
         _ = self._instrumentation.emit(
-            EVENT_WORKFLOW_RESOURCE_COMMIT,
+            EventType.WORKFLOW_RESOURCE_COMMIT,
             WorkflowResourceCommitEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(workflow_node_id),
@@ -384,7 +379,7 @@ class _WorkflowResourceManagerBase(ABC):
 
     def _emit_resource_discard(self, *, workflow_node_id: str, resource_type: str, resource_id: str, path: str, reason: str) -> None:
         _ = self._instrumentation.emit(
-            EVENT_WORKFLOW_RESOURCE_DISCARD,
+            EventType.WORKFLOW_RESOURCE_DISCARD,
             WorkflowResourceDiscardEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(workflow_node_id),

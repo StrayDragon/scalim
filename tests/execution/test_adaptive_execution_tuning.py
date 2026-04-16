@@ -4,7 +4,7 @@ from typing import Any, Hashable, List, Tuple, cast
 
 import pytest
 
-from scalim.events import EVENT_ADAPTIVE_SCHEDULER_DECISION
+from scalim.events import EventType
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
@@ -483,7 +483,7 @@ def test_adaptive_scheduler_decision_events_are_wants_gated() -> None:
 def test_adaptive_scheduler_decision_events_reach_hooks_on_event() -> None:
     class _RecordingHook(BaseHook):
         def __init__(self) -> None:
-            self.event_types = {EVENT_ADAPTIVE_SCHEDULER_DECISION}
+            self.event_types = {EventType.ADAPTIVE_SCHEDULER_DECISION}
             self.events = []
 
         def on_event(self, event):  # type: ignore[no-untyped-def]
@@ -506,7 +506,7 @@ def test_adaptive_scheduler_decision_events_reach_hooks_on_event() -> None:
     hook_manager.register(hook)
     runtime = _make_runtime(plan, hook_manager=hook_manager, main_source=None)
 
-    assert runtime.instrumentation.wants(EVENT_ADAPTIVE_SCHEDULER_DECISION) is True
+    assert runtime.instrumentation.wants(EventType.ADAPTIVE_SCHEDULER_DECISION) is True
 
     scheduler.execute_segment(
         [op_a, op_b],
@@ -519,7 +519,7 @@ def test_adaptive_scheduler_decision_events_reach_hooks_on_event() -> None:
         after_operator=None,
     )
 
-    assert any(event.event_type == EVENT_ADAPTIVE_SCHEDULER_DECISION for event in hook.events)
+    assert any(event.event_type == EventType.ADAPTIVE_SCHEDULER_DECISION for event in hook.events)
 
 
 def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -> None:  # type: ignore[no-untyped-def]

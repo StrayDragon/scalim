@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .._internal.warningsx import ScalimExperimentalWarning
-from ..events import EVENT_DIAGNOSTIC_WARNING, Event, generate_run_id
+from ..events import Event, EventType, generate_run_id
 from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
-from ..ob.observability import Observability
+from ..ob.observability import Observability, ObservabilityOptions
 from ..ob.presets.viz import VizObserver, VizObserverConfig
 from ..ob.structured_logging import log_context, maybe_install_jsonl_logging_from_env
 from ..planning.builder import PlanBuilder
@@ -451,7 +451,7 @@ def _build_observer_and_hook_managers(
         fallback_logger_enabled = request.observability.fallback_logger_enabled
         viz_config = request.observability.viz_config
 
-    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager(
+    observer_manager = Observability(options=ObservabilityOptions(fallback_logger_enabled=fallback_logger_enabled)).build_manager(
         run_id=str(run_id),
         event_meta_defaults=event_meta_defaults,
     )
@@ -496,8 +496,8 @@ def _emit_key_normalization_warning_if_needed(
         return
     msg = "EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(request.key_normalization)
 
-    hooks_want = hook_manager.wants_typed(EVENT_DIAGNOSTIC_WARNING)
-    event_want = observer_manager.wants(EVENT_DIAGNOSTIC_WARNING) or hook_manager.wants_on_event(EVENT_DIAGNOSTIC_WARNING)
+    hooks_want = hook_manager.wants_typed(EventType.DIAGNOSTIC_WARNING)
+    event_want = observer_manager.wants(EventType.DIAGNOSTIC_WARNING) or hook_manager.wants_on_event(EventType.DIAGNOSTIC_WARNING)
     has_visible_channel = hooks_want or event_want or hook_manager.fallback_logger_enabled or observer_manager.fallback_logger_enabled
 
     if has_visible_channel:

@@ -4,7 +4,7 @@ from typing import Dict, List, Sequence
 import pytest
 
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.events import EVENT_RELATION_LOOKUP
+from scalim.events import EventType
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
@@ -48,7 +48,7 @@ def _bench_info(scenario: str, row_count: int) -> Dict[str, object]:
 
 
 class _NoopRelationLookupObserver(EventDispatchObserver):
-    event_types = {EVENT_RELATION_LOOKUP}
+    event_types = {EventType.RELATION_LOOKUP}
 
     def on_relation_lookup(self, _payload) -> None:  # type: ignore[no-untyped-def]
         return

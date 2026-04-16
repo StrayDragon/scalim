@@ -2,7 +2,7 @@ import secrets
 import time
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
 
-from ..events import EVENT_LOADER_RETRY
+from ..events import EventType
 from ..vendor.dataclassesx import dataclass, field
 
 CALLSITE_LOAD = "load"
@@ -302,7 +302,7 @@ def _emit_loader_retry_event(
 ) -> None:
     if instrumentation is None:
         return
-    if not instrumentation.wants(EVENT_LOADER_RETRY):
+    if not instrumentation.wants(EventType.LOADER_RETRY):
         return
 
     instrumentation.emit_loader_retry(

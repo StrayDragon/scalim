@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 import pytest
 
-from scalim.events import EVENT_RELATION_LOOKUP, Event
+from scalim.events import Event, EventType
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
@@ -20,7 +20,7 @@ from scalim.spec.ir.binding import LoaderIr
 
 
 class _RecordingRelationLookupObserver(Observer):
-    event_types: Optional[Set[str]] = {EVENT_RELATION_LOOKUP}
+    event_types: Optional[Set[str]] = {EventType.RELATION_LOOKUP}
 
     def __init__(self) -> None:
         self.events: List[Event] = []

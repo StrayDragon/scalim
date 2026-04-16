@@ -7,7 +7,7 @@
 from typing import TYPE_CHECKING, Dict, Hashable, List, Set
 
 from ....._internal.utils.converters import auto_str_normalize_key
-from .....events import EVENT_RELATION_LOOKUP
+from .....events import EventType
 from .....planning.operators import LoadRefOperatorIr, SupportedOperatorIr
 from .....spec.ir import LookupStepIr
 from .....typedefs import LoaderResultMapping
@@ -93,7 +93,7 @@ class LoadRefOperatorExecutor(OperatorExecutor):
         group_enabled = can_group_by_relation(steps)
         if group_enabled and relation_key in runtime.load_ref_group_executed:
             return
-        wants_relation_lookup = runtime.instrumentation.wants(EVENT_RELATION_LOOKUP)
+        wants_relation_lookup = runtime.instrumentation.wants(EventType.RELATION_LOOKUP)
 
         exec_ctx = LoadRefExecutionContext(runtime, context, batch_row_nth, field_key, relation_key)
         group_field_keys = runtime.load_ref_group_fields.get(relation_key, (field_key,))

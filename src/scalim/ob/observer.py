@@ -4,51 +4,33 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Set
 
 from ..events import (
-    EVENT_ADAPTIVE_SCHEDULER_DECISION,
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_COLUMN_WRITE,
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_ERROR,
-    EVENT_FIELD_COMPUTE,
-    EVENT_FIELD_SLIM,
-    EVENT_LOADER_CALL,
-    EVENT_LOADER_RETRY,
-    EVENT_LOADER_SLIM,
-    EVENT_OPERATOR_SPAN,
-    EVENT_OUTPUT_TARGET_END,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_RELATION_LOOKUP,
-    EVENT_ROW_RELEASE,
-    EVENT_ROW_WRITE,
-    EVENT_STAGE_SPAN,
     Event,
+    EventType,
 )
 from ..vendor.compact.typing_extensionsx import override
 
 # endregion
 
-_DISPATCH_MAP = {
-    EVENT_PIPELINE_START: "on_pipeline_start",
-    EVENT_PIPELINE_END: "on_pipeline_end",
-    EVENT_BATCH_START: "on_batch_start",
-    EVENT_BATCH_END: "on_batch_end",
-    EVENT_LOADER_CALL: "on_loader_call",
-    EVENT_LOADER_RETRY: "on_loader_retry",
-    EVENT_FIELD_COMPUTE: "on_field_compute",
-    EVENT_ERROR: "on_error",
-    EVENT_DIAGNOSTIC_WARNING: "on_diagnostic_warning",
-    EVENT_FIELD_SLIM: "on_field_slim",
-    EVENT_ROW_WRITE: "on_row_write",
-    EVENT_ROW_RELEASE: "on_row_release",
-    EVENT_LOADER_SLIM: "on_loader_slim",
-    EVENT_COLUMN_WRITE: "on_column_write",
-    EVENT_RELATION_LOOKUP: "on_relation_lookup",
-    EVENT_STAGE_SPAN: "on_stage_span",
-    EVENT_OPERATOR_SPAN: "on_operator_span",
-    EVENT_ADAPTIVE_SCHEDULER_DECISION: "on_adaptive_scheduler_decision",
-    EVENT_OUTPUT_TARGET_END: "on_output_target_end",
+_DISPATCH_MAP: Dict[str, str] = {
+    EventType.PIPELINE_START.value: "on_pipeline_start",
+    EventType.PIPELINE_END.value: "on_pipeline_end",
+    EventType.BATCH_START.value: "on_batch_start",
+    EventType.BATCH_END.value: "on_batch_end",
+    EventType.LOADER_CALL.value: "on_loader_call",
+    EventType.LOADER_RETRY.value: "on_loader_retry",
+    EventType.FIELD_COMPUTE.value: "on_field_compute",
+    EventType.ERROR.value: "on_error",
+    EventType.DIAGNOSTIC_WARNING.value: "on_diagnostic_warning",
+    EventType.FIELD_SLIM.value: "on_field_slim",
+    EventType.ROW_WRITE.value: "on_row_write",
+    EventType.ROW_RELEASE.value: "on_row_release",
+    EventType.LOADER_SLIM.value: "on_loader_slim",
+    EventType.COLUMN_WRITE.value: "on_column_write",
+    EventType.RELATION_LOOKUP.value: "on_relation_lookup",
+    EventType.STAGE_SPAN.value: "on_stage_span",
+    EventType.OPERATOR_SPAN.value: "on_operator_span",
+    EventType.ADAPTIVE_SCHEDULER_DECISION.value: "on_adaptive_scheduler_decision",
+    EventType.OUTPUT_TARGET_END.value: "on_output_target_end",
 }
 
 

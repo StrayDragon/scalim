@@ -3,7 +3,7 @@ import marimo
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from scalim.events import EVENT_LOADER_CALL, EVENT_PIPELINE_END, EVENT_PIPELINE_START
+from scalim.events import EventType
 from scalim.execution import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
@@ -25,7 +25,7 @@ class _HookStats:
 
 class _CounterHook(BaseHook):
     def __init__(self) -> None:
-        self.event_types: Optional[Set[str]] = {EVENT_PIPELINE_START, EVENT_PIPELINE_END, EVENT_LOADER_CALL}
+        self.event_types: Optional[Set[str]] = {EventType.PIPELINE_START, EventType.PIPELINE_END, EventType.LOADER_CALL}
         self.stats = _HookStats()
 
     def on_pipeline_start(self, event: Any) -> None:
@@ -44,7 +44,7 @@ class _CounterHook(BaseHook):
 
 class _TraceObserver(Observer):
     def __init__(self) -> None:
-        self.event_types: Optional[Set[str]] = {EVENT_PIPELINE_START, EVENT_PIPELINE_END, EVENT_LOADER_CALL}
+        self.event_types: Optional[Set[str]] = {EventType.PIPELINE_START, EventType.PIPELINE_END, EventType.LOADER_CALL}
         self.seen_event_types: List[str] = []
 
     def on_event(self, event: Any) -> None:
@@ -87,9 +87,9 @@ def run_public_api_hooks_events() -> ExampleResult:
         and hook.stats.pipeline_start == 1
         and hook.stats.pipeline_end == 1
         and hook.stats.loader_calls == ["items"]
-        and observer.seen_event_types.count(EVENT_PIPELINE_START) == 1
-        and observer.seen_event_types.count(EVENT_PIPELINE_END) == 1
-        and observer.seen_event_types.count(EVENT_LOADER_CALL) == 1
+        and observer.seen_event_types.count(str(EventType.PIPELINE_START)) == 1
+        and observer.seen_event_types.count(str(EventType.PIPELINE_END)) == 1
+        and observer.seen_event_types.count(str(EventType.LOADER_CALL)) == 1
     )
     summary = "rows={} hook(pipeline_start={}, pipeline_end={}, loader_calls={}) observer_events={}".format(
         len(rows),

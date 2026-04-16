@@ -1,14 +1,7 @@
 import logging
 
 import pytest
-from scalim.events import (
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_LOADER_CALL,
-    EVENT_LOADER_SLIM,
-    EVENT_PIPELINE_START,
-    EVENT_STAGE_SPAN,
-)
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.events._events import PipelineStartEvent, StageSpanEvent
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.pipeline.overrides import PipelineOverrides
@@ -41,11 +34,11 @@ class _CaptureOnEventHook(BaseHook):
 
 
 class _CaptureSubsetOnEventHook(_CaptureOnEventHook):
-    event_types = {EVENT_PIPELINE_START}
+    event_types = {EventType.PIPELINE_START}
 
 
 class _CaptureObserver(Observer):
-    event_types = {EVENT_PIPELINE_START}
+    event_types = {EventType.PIPELINE_START}
 
     def __init__(self) -> None:
         self.events = []
@@ -60,7 +53,7 @@ def test_hub_emit_lazy_does_not_call_factory_when_unwanted() -> None:
     def _factory():  # type: ignore[no-untyped-def]
         raise AssertionError("unexpected payload factory call")
 
-    assert hub.emit_lazy(EVENT_PIPELINE_START, _factory) is None
+    assert hub.emit_lazy(EventType.PIPELINE_START, _factory) is None
 
 
 def test_hub_emit_field_compute_short_circuits_when_unwanted() -> None:
@@ -93,7 +86,7 @@ def test_hub_emit_lazy_calls_factory_when_wanted() -> None:
         calls["n"] += 1
         return PipelineStartEvent(targets=["x"], batch_size=1)
 
-    event = hub.emit_lazy(EVENT_PIPELINE_START, _factory)
+    event = hub.emit_lazy(EventType.PIPELINE_START, _factory)
     assert event is not None
     assert calls["n"] == 1
 
@@ -106,7 +99,7 @@ def test_hub_on_event_receives_catalog_events() -> None:
     hub.emit_pipeline_start(targets=["x"], batch_size=1)
     hub.emit_stage_span(stage="compute", batch_num=1, duration=0.01)
 
-    assert [e.event_type for e in hook.events] == [EVENT_PIPELINE_START, EVENT_STAGE_SPAN]
+    assert [e.event_type for e in hook.events] == [EventType.PIPELINE_START, EventType.STAGE_SPAN]
     assert isinstance(hook.events[0].payload, PipelineStartEvent)
     assert isinstance(hook.events[1].payload, StageSpanEvent)
 
@@ -119,12 +112,12 @@ def test_hub_on_event_supports_subset_subscription_via_event_types() -> None:
     hub.emit_pipeline_start(targets=["x"], batch_size=1)
     hub.emit_pipeline_end(total_batches=0, total_duration=0.0)
 
-    assert [e.event_type for e in hook.events] == [EVENT_PIPELINE_START]
+    assert [e.event_type for e in hook.events] == [EventType.PIPELINE_START]
 
 
 def test_hub_on_event_and_typed_callbacks_are_both_invoked() -> None:
     class _DualHook(BaseHook):
-        event_types = {EVENT_PIPELINE_START}
+        event_types = {EventType.PIPELINE_START}
 
         def __init__(self) -> None:
             self.on_event_events = []
@@ -143,18 +136,18 @@ def test_hub_on_event_and_typed_callbacks_are_both_invoked() -> None:
     hub.emit_pipeline_start(targets=["x"], batch_size=1)
 
     assert hook.typed_events and isinstance(hook.typed_events[0], PipelineStartEvent)
-    assert hook.on_event_events and hook.on_event_events[0].event_type == EVENT_PIPELINE_START
+    assert hook.on_event_events and hook.on_event_events[0].event_type == EventType.PIPELINE_START
 
 
 def test_base_hook_does_not_enable_typed_subscription_by_default() -> None:
     hooks = HookManager()
     hooks.register(BaseHook())
 
-    assert hooks.wants_typed(EVENT_PIPELINE_START) is False
-    assert hooks.wants(EVENT_PIPELINE_START) is False
+    assert hooks.wants_typed(EventType.PIPELINE_START) is False
+    assert hooks.wants(EventType.PIPELINE_START) is False
 
     hub = InstrumentationHub(hook_manager=hooks, observer_manager=ObserverManager())
-    assert hub.wants(EVENT_PIPELINE_START) is False
+    assert hub.wants(EventType.PIPELINE_START) is False
 
 
 def test_hub_register_unregister_and_clear_cover_observer_and_hook_paths() -> None:
@@ -195,7 +188,7 @@ def test_hub_setstate_rebuilds_lock_and_backfills_warning_flag() -> None:
 
 def test_hub_emit_returns_none_when_unwanted() -> None:
     hub = InstrumentationHub()
-    assert hub.emit(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1)) is None
+    assert hub.emit(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1)) is None
 
 
 def test_hub_emit_returns_event_when_wanted() -> None:
@@ -204,10 +197,10 @@ def test_hub_emit_returns_event_when_wanted() -> None:
     hub.register(hook)
 
     payload = PipelineStartEvent(targets=["x"], batch_size=1)
-    event = hub.emit(EVENT_PIPELINE_START, payload)
+    event = hub.emit(EventType.PIPELINE_START, payload)
 
     assert event is not None
-    assert event.event_type == EVENT_PIPELINE_START
+    assert event.event_type == EventType.PIPELINE_START
     assert hook.events and hook.events[0] is event
 
 
@@ -247,7 +240,7 @@ def test_hub_emit_loader_call_triggers_typed_hooks_without_building_event() -> N
 
 def test_hub_emit_loader_call_on_event_honors_loader_result_policy_variants() -> None:
     hook = _CaptureOnEventHook()
-    hook.event_types = {EVENT_LOADER_CALL}  # type: ignore[assignment]
+    hook.event_types = {EventType.LOADER_CALL}  # type: ignore[assignment]
 
     manager_none = ObserverManager(loader_result_policy="none")
     hub_none = InstrumentationHub(hook_manager=HookManager(), observer_manager=manager_none)
@@ -283,7 +276,7 @@ def test_hub_emit_diagnostic_warning_falls_back_when_unsubscribed(caplog) -> Non
 
 def test_hub_emit_diagnostic_warning_emits_event_when_on_event_hook_present() -> None:
     class _DiagHook(BaseHook):
-        event_types = {EVENT_DIAGNOSTIC_WARNING}
+        event_types = {EventType.DIAGNOSTIC_WARNING}
 
         def __init__(self) -> None:
             self.events = []
@@ -295,12 +288,12 @@ def test_hub_emit_diagnostic_warning_emits_event_when_on_event_hook_present() ->
     hub = InstrumentationHub()
     hub.register(hook)
     hub.emit_diagnostic_warning(message="msg", source_id="s", field_id="f", lookup_key=1, row_id=1)
-    assert hook.events and hook.events[0].event_type == EVENT_DIAGNOSTIC_WARNING
+    assert hook.events and hook.events[0].event_type == EventType.DIAGNOSTIC_WARNING
 
 
 def test_hub_emit_loader_slim_emits_when_wanted() -> None:
     class _LoaderSlimHook(BaseHook):
-        event_types = {EVENT_LOADER_SLIM}
+        event_types = {EventType.LOADER_SLIM}
 
         def __init__(self) -> None:
             self.events = []
@@ -312,7 +305,7 @@ def test_hub_emit_loader_slim_emits_when_wanted() -> None:
     hub = InstrumentationHub()
     hub.register(hook)
     hub.emit_loader_slim(loader_name="l", original_keys=2, extracted_fields=["a"], batch_num=1)
-    assert hook.events and hook.events[0].event_type == EVENT_LOADER_SLIM
+    assert hook.events and hook.events[0].event_type == EventType.LOADER_SLIM
 
 
 def test_hub_typed_helpers_return_when_unwanted() -> None:

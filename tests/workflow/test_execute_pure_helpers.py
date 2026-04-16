@@ -1,9 +1,4 @@
-from scalim.events import (
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
-    Event,
-)
+from scalim.events import Event, EventType
 from scalim.events._events import WorkflowResourceCommitEvent
 from scalim.workflow._internal.replay_event_classification import classify_workflow_events_for_replay
 from scalim.workflow.outcome_builder import build_outcome_from_exception
@@ -27,7 +22,7 @@ def test_classify_workflow_events_for_replay_buckets() -> None:
     events = [
         Event(event_type="workflow_started", timestamp=0.0, run_id="wf", payload=None, meta={}, seq=1),
         Event(
-            event_type=EVENT_WORKFLOW_NODE_START,
+            event_type=EventType.WORKFLOW_NODE_START,
             timestamp=0.0,
             run_id="wf",
             payload=None,
@@ -43,7 +38,7 @@ def test_classify_workflow_events_for_replay_buckets() -> None:
             seq=3,
         ),
         Event(
-            event_type=EVENT_WORKFLOW_NODE_END,
+            event_type=EventType.WORKFLOW_NODE_END,
             timestamp=0.0,
             run_id="wf",
             payload=None,
@@ -51,7 +46,7 @@ def test_classify_workflow_events_for_replay_buckets() -> None:
             seq=4,
         ),
         Event(
-            event_type=EVENT_WORKFLOW_NODE_START,
+            event_type=EventType.WORKFLOW_NODE_START,
             timestamp=0.0,
             run_id="wf",
             payload=None,
@@ -60,7 +55,7 @@ def test_classify_workflow_events_for_replay_buckets() -> None:
         ),
         Event(event_type="no_node_meta", timestamp=0.0, run_id="wf", payload=None, meta={"x": 1}, seq=6),
         Event(
-            event_type=EVENT_WORKFLOW_RESOURCE_COMMIT,
+            event_type=EventType.WORKFLOW_RESOURCE_COMMIT,
             timestamp=0.0,
             run_id="wf",
             payload=WorkflowResourceCommitEvent(

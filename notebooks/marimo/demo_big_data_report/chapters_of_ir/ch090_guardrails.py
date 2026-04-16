@@ -2,7 +2,7 @@ import marimo
 
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.events import EVENT_ERROR
+from scalim.events import EventType
 from scalim.execution.engine import ScalimEngine
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, ScalimGuardrailViolationError
 from scalim.execution.runtime_bindings import RuntimeBindings
@@ -39,7 +39,7 @@ def _to_int(value: Any) -> int:
 
 class _ErrorCollector(EventDispatchObserver):
     def __init__(self) -> None:
-        self.event_types = {EVENT_ERROR}
+        self.event_types = {EventType.ERROR}
         self.errors: List[Any] = []
 
     def on_error(self, payload: Any) -> None:

@@ -4,14 +4,10 @@ import contextlib
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
 
 from ..events import (
-    EVENT_WORKFLOW_NODE_CANCELLED,
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED,
-    WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
-    WORKFLOW_NODE_END_STATUS_ERROR,
-    WORKFLOW_NODE_END_STATUS_OK,
     Event,
+    EventType,
+    WorkflowNodeCancelledReason,
+    WorkflowNodeEndStatus,
 )
 from ..events._events import (
     WorkflowNodeCancelledEvent,
@@ -26,7 +22,7 @@ from ..execution.workflow_cache_pool import ScalimWorkflowCachePoolError, Workfl
 from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
-from ..ob.observability import Observability
+from ..ob.observability import Observability, ObservabilityOptions
 from ..ob.observer import Observer
 from ..spec.ir import DemandIr
 from ..spec.ir._workflow import (
@@ -130,7 +126,7 @@ def _build_demand_replay_instrumentation(  # noqa: C901
     if viz_observer is None and not observers and not hooks:
         return None
 
-    observer_manager = Observability(fallback_logger_enabled=fallback_logger_enabled).build_manager()
+    observer_manager = Observability(options=ObservabilityOptions(fallback_logger_enabled=fallback_logger_enabled)).build_manager()
     for observer in observers:
         observer_manager.register(observer)
     if viz_observer is not None:
@@ -469,7 +465,7 @@ class WorkflowRunController:
             self._state.outcomes[idx] = WorkflowRunOutcome(run_id=str(node_id), demand_path="", result=None, error=None)
             self._maybe_release_workflow_main_rows_artifact(node)
             self._state.node_state[str(node_id)] = "done"
-            self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
+            self._emit_workflow_node_end(node, status=WorkflowNodeEndStatus.OK, exc=None)
             self._resource_lifecycle.on_node_terminal(str(node_id), ok=True)
             self._on_terminal(str(node_id), ok=True)
         except Exception as exc:  # noqa: BLE001
@@ -560,7 +556,7 @@ class WorkflowRunController:
 
             self._maybe_release_workflow_main_rows_artifact(node)
             self._state.node_state[str(node_id)] = "done"
-            self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_OK, exc=None)
+            self._emit_workflow_node_end(node, status=WorkflowNodeEndStatus.OK, exc=None)
             self._resource_lifecycle.on_node_terminal(str(node_id), ok=True)
             self._on_terminal(str(node_id), ok=True)
         except Exception as exc:
@@ -587,7 +583,7 @@ class WorkflowRunController:
         outcome = build_outcome_from_exception(exc, run_id=str(node_id), demand_path=str(demand_path))
         self._state.outcomes[idx] = outcome
         self._state.node_state[str(node_id)] = "failed"
-        self._emit_workflow_node_end(node, status=WORKFLOW_NODE_END_STATUS_ERROR, exc=exc)
+        self._emit_workflow_node_end(node, status=WorkflowNodeEndStatus.ERROR, exc=exc)
         self._maybe_release_workflow_main_rows_artifact(node)
         self._resource_lifecycle.on_node_terminal(str(node_id), ok=False)
         self._on_terminal(str(node_id), ok=False)
@@ -795,7 +791,7 @@ class WorkflowRunController:
         demand_path = self._node_demand_path(node)
         stage = int(self._stage_by_node_id.get(str(node_id), 0))
         _ = self._workflow_instrumentation.emit(
-            EVENT_WORKFLOW_NODE_START,
+            EventType.WORKFLOW_NODE_START,
             WorkflowNodeStartEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(node_id),
@@ -816,11 +812,11 @@ class WorkflowRunController:
         stage = int(self._stage_by_node_id.get(str(node_id), 0))
         error_type = None
         error_message = None
-        if status != WORKFLOW_NODE_END_STATUS_OK and exc is not None:
+        if status != WorkflowNodeEndStatus.OK and exc is not None:
             error_type = safe_error_type(exc)
             error_message = safe_error_message(exc)
         _ = self._workflow_instrumentation.emit(
-            EVENT_WORKFLOW_NODE_END,
+            EventType.WORKFLOW_NODE_END,
             WorkflowNodeEndEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(node_id),
@@ -843,7 +839,7 @@ class WorkflowRunController:
         demand_path = self._node_demand_path(node)
         stage = int(self._stage_by_node_id.get(str(node_id), 0))
         _ = self._workflow_instrumentation.emit(
-            EVENT_WORKFLOW_NODE_CANCELLED,
+            EventType.WORKFLOW_NODE_CANCELLED,
             WorkflowNodeCancelledEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(node_id),
@@ -891,7 +887,7 @@ class WorkflowRunController:
                 if self._state.prereq_failed[str(child_id)]:
                     self._cancel_node(
                         str(child_id),
-                        reason=WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED,
+                        reason=WorkflowNodeCancelledReason.DEPENDENCY_FAILED,
                         message="Cancelled due to dependency failure",
                     )
                     self._on_terminal(str(child_id), ok=False)
@@ -905,7 +901,7 @@ class WorkflowRunController:
             if self._state.node_state.get(node.node_id) in {"pending", "ready"}:
                 self._cancel_node(
                     node.node_id,
-                    reason=WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
+                    reason=WorkflowNodeCancelledReason.POLICY_ALL_FAIL,
                     message="Cancelled due to failure_policy=all_fail",
                 )
         self._state.ready_queue = []

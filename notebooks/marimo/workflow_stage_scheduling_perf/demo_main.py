@@ -117,12 +117,7 @@ def _():
         WorkflowExecutionOptions,
         WorkflowRuntimeOptions,
     )
-    from scalim.events import (
-        EVENT_WORKFLOW_NODE_CANCELLED,
-        EVENT_WORKFLOW_NODE_END,
-        EVENT_WORKFLOW_NODE_START,
-        Event,
-    )
+    from scalim.events import Event, EventType
     from scalim.ob.observer import Observer
 
     return (
@@ -130,10 +125,8 @@ def _():
         Dict,
         DemandRunOptions,
         DemandRunSecurityOptions,
-        EVENT_WORKFLOW_NODE_CANCELLED,
-        EVENT_WORKFLOW_NODE_END,
-        EVENT_WORKFLOW_NODE_START,
         Event,
+        EventType,
         List,
         Observer,
         PipelineSchedulerOptions,
@@ -147,12 +140,12 @@ def _():
 
 
 @app.cell
-def _(EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NODE_START, List, Observer, Event, threading):
+def _(EventType, List, Observer, Event, threading):
     class _WorkflowNodeEventRecorder(Observer):
         event_types = {
-            EVENT_WORKFLOW_NODE_START,
-            EVENT_WORKFLOW_NODE_END,
-            EVENT_WORKFLOW_NODE_CANCELLED,
+            EventType.WORKFLOW_NODE_START,
+            EventType.WORKFLOW_NODE_END,
+            EventType.WORKFLOW_NODE_CANCELLED,
         }
 
         def __init__(self) -> None:
@@ -220,15 +213,15 @@ def _(
 
 
 @app.cell
-def _(EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NODE_START, _run_once):
+def _(EventType, _run_once):
     pipeline_run = _run_once(schedule_mode="pipeline")
     stage_barrier_run = _run_once(schedule_mode="stage_barrier")
-    _ = (EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NODE_START)
+    _ = (EventType.WORKFLOW_NODE_CANCELLED, EventType.WORKFLOW_NODE_END, EventType.WORKFLOW_NODE_START)
     return pipeline_run, stage_barrier_run
 
 
 @app.cell
-def _(Any, Dict, EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NODE_START, mo, pipeline_run, stage_barrier_run):
+def _(Any, Dict, EventType, mo, pipeline_run, stage_barrier_run):
     def _summarize_run(run: dict) -> Dict[str, Any]:
         events = list(run.get("events") or [])
         start_by_node_id: Dict[str, float] = {}
@@ -237,7 +230,7 @@ def _(Any, Dict, EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_W
         end_status_by_node_id: Dict[str, str] = {}
 
         for e in events:
-            if e.event_type not in {EVENT_WORKFLOW_NODE_START, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NODE_CANCELLED}:
+            if e.event_type not in {EventType.WORKFLOW_NODE_START, EventType.WORKFLOW_NODE_END, EventType.WORKFLOW_NODE_CANCELLED}:
                 continue
             payload = e.to_dict().get("payload") or {}
             node_id = str(payload.get("workflow_node_id") or "").strip()
@@ -248,12 +241,12 @@ def _(Any, Dict, EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_W
                     stage_by_node_id[node_id] = int(payload.get("stage"))
                 except Exception:
                     pass
-            if e.event_type == EVENT_WORKFLOW_NODE_START:
+            if e.event_type == EventType.WORKFLOW_NODE_START:
                 start_by_node_id[node_id] = float(e.timestamp)
-            elif e.event_type == EVENT_WORKFLOW_NODE_END:
+            elif e.event_type == EventType.WORKFLOW_NODE_END:
                 end_by_node_id[node_id] = float(e.timestamp)
                 end_status_by_node_id[node_id] = str(payload.get("status") or "unknown")
-            elif e.event_type == EVENT_WORKFLOW_NODE_CANCELLED:
+            elif e.event_type == EventType.WORKFLOW_NODE_CANCELLED:
                 end_by_node_id[node_id] = float(e.timestamp)
                 end_status_by_node_id[node_id] = str(payload.get("reason") or "cancelled")
 
@@ -335,7 +328,7 @@ def _(Any, Dict, EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_W
         },
     ]
 
-    _ = (EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NODE_START)
+    _ = (EventType.WORKFLOW_NODE_CANCELLED, EventType.WORKFLOW_NODE_END, EventType.WORKFLOW_NODE_START)
     return pipeline_summary, stage_barrier_summary, summary_rows
 
 

@@ -2,18 +2,7 @@
 import time
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, cast
 
-from ....events import (
-    EVENT_WORKFLOW_CACHE_ACQUIRE,
-    EVENT_WORKFLOW_CACHE_EVICT,
-    EVENT_WORKFLOW_CACHE_RELEASE,
-    EVENT_WORKFLOW_NODE_CANCELLED,
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
-    EVENT_WORKFLOW_RESOURCE_CREATE,
-    EVENT_WORKFLOW_RESOURCE_DISCARD,
-    EVENT_WORKFLOW_RESOURCE_WRITE,
-)
+from ....events import EventType
 from ....events._events import (
     WorkflowCacheAcquireEvent,
     WorkflowCacheEvictEvent,
@@ -42,16 +31,16 @@ from .._internal.viz_nodes import VizObserverNodeMixin
 from .._internal.viz_output import VizObserverOutputMixin
 
 _WORKFLOW_DISPATCH_MAP = {
-    EVENT_WORKFLOW_NODE_START: "on_workflow_node_start",
-    EVENT_WORKFLOW_NODE_END: "on_workflow_node_end",
-    EVENT_WORKFLOW_NODE_CANCELLED: "on_workflow_node_cancelled",
-    EVENT_WORKFLOW_CACHE_ACQUIRE: "on_workflow_cache_acquire",
-    EVENT_WORKFLOW_CACHE_RELEASE: "on_workflow_cache_release",
-    EVENT_WORKFLOW_CACHE_EVICT: "on_workflow_cache_evict",
-    EVENT_WORKFLOW_RESOURCE_CREATE: "on_workflow_resource_create",
-    EVENT_WORKFLOW_RESOURCE_WRITE: "on_workflow_resource_write",
-    EVENT_WORKFLOW_RESOURCE_COMMIT: "on_workflow_resource_commit",
-    EVENT_WORKFLOW_RESOURCE_DISCARD: "on_workflow_resource_discard",
+    EventType.WORKFLOW_NODE_START: "on_workflow_node_start",
+    EventType.WORKFLOW_NODE_END: "on_workflow_node_end",
+    EventType.WORKFLOW_NODE_CANCELLED: "on_workflow_node_cancelled",
+    EventType.WORKFLOW_CACHE_ACQUIRE: "on_workflow_cache_acquire",
+    EventType.WORKFLOW_CACHE_RELEASE: "on_workflow_cache_release",
+    EventType.WORKFLOW_CACHE_EVICT: "on_workflow_cache_evict",
+    EventType.WORKFLOW_RESOURCE_CREATE: "on_workflow_resource_create",
+    EventType.WORKFLOW_RESOURCE_WRITE: "on_workflow_resource_write",
+    EventType.WORKFLOW_RESOURCE_COMMIT: "on_workflow_resource_commit",
+    EventType.WORKFLOW_RESOURCE_DISCARD: "on_workflow_resource_discard",
     # 工作流运行时额外发出的事件类型(用于回放体验).
     "workflow_started": "on_workflow_started",
     "workflow_finished": "on_workflow_finished",
@@ -429,49 +418,49 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
 
     def on_workflow_cache_acquire(self, payload: WorkflowCacheAcquireEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_CACHE_ACQUIRE,
+            EventType.WORKFLOW_CACHE_ACQUIRE,
             _workflow_node_ref(str(payload.workflow_node_id)),
             asdict(payload),
         )
 
     def on_workflow_cache_release(self, payload: WorkflowCacheReleaseEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_CACHE_RELEASE,
+            EventType.WORKFLOW_CACHE_RELEASE,
             _workflow_node_ref(str(payload.workflow_node_id)),
             asdict(payload),
         )
 
     def on_workflow_cache_evict(self, payload: WorkflowCacheEvictEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_CACHE_EVICT,
+            EventType.WORKFLOW_CACHE_EVICT,
             _workflow_node_ref(str(payload.workflow_node_id)),
             asdict(payload),
         )
 
     def on_workflow_resource_create(self, payload: WorkflowResourceCreateEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_RESOURCE_CREATE,
+            EventType.WORKFLOW_RESOURCE_CREATE,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )
 
     def on_workflow_resource_write(self, payload: WorkflowResourceWriteEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_RESOURCE_WRITE,
+            EventType.WORKFLOW_RESOURCE_WRITE,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )
 
     def on_workflow_resource_commit(self, payload: WorkflowResourceCommitEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_RESOURCE_COMMIT,
+            EventType.WORKFLOW_RESOURCE_COMMIT,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )
 
     def on_workflow_resource_discard(self, payload: WorkflowResourceDiscardEvent) -> None:
         self._emit_workflow_event(
-            EVENT_WORKFLOW_RESOURCE_DISCARD,
+            EventType.WORKFLOW_RESOURCE_DISCARD,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )

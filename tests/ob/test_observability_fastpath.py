@@ -1,4 +1,4 @@
-from scalim.events import EVENT_PIPELINE_END, EVENT_PIPELINE_START
+from scalim.events import EventType
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.observer import Observer
 from scalim.ob.manager import ObserverManager
@@ -21,7 +21,7 @@ class _ExplodingSampleObserverManager(ObserverManager):
 
 
 class _CaptureObserver(Observer):
-    event_types = {EVENT_PIPELINE_START}
+    event_types = {EventType.PIPELINE_START}
 
     def __init__(self) -> None:
         self.events = []
@@ -49,7 +49,7 @@ def test_observer_manager_subscription_cache_gates_typed_emits() -> None:
     manager.emit_pipeline_end(total_batches=0, total_duration=0.0)
 
     assert len(observer.events) == 1
-    assert observer.events[0].event_type == EVENT_PIPELINE_START
+    assert observer.events[0].event_type == EventType.PIPELINE_START
 
     assert manager.unregister(observer) is True
     manager.emit_pipeline_start(targets=["x"], batch_size=1)
@@ -61,9 +61,9 @@ def test_observer_manager_capture_mode_still_records_typed_events() -> None:
     manager.emit_pipeline_start(targets=["x"], batch_size=1)
     events = manager.drain_events()
     assert len(events) == 1
-    assert events[0].event_type == EVENT_PIPELINE_START
+    assert events[0].event_type == EventType.PIPELINE_START
 
-    manager.emit_event(EVENT_PIPELINE_END, {"x": 1})
+    manager.emit_event(EventType.PIPELINE_END, {"x": 1})
     assert len(manager.drain_events()) == 1
 
 
@@ -162,7 +162,7 @@ def test_observer_manager_emit_skips_when_custom_supports_returns_false() -> Non
     observer = _SupportsNeverObserver()
     manager = ObserverManager(observers=[observer])
 
-    manager.emit_event(EVENT_PIPELINE_START, {"x": 1})
+    manager.emit_event(EventType.PIPELINE_START, {"x": 1})
     assert observer.events == []
 
 

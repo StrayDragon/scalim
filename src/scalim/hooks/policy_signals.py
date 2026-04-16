@@ -7,7 +7,7 @@
 
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence
 
-from ..events import EVENT_PRE_USE_BATCH_SIZE
+from ..events import EventType
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
 from ._base import HookManager
@@ -97,7 +97,7 @@ def emit_pre_use_batch_size_signal(hooks: Sequence["ExecutionHookLike"], decisio
     manager = HookManager()
     for hook in hooks:
         manager.register(hook)
-    manager.emit_typed_policy(EVENT_PRE_USE_BATCH_SIZE, decision)
+    manager.emit_typed_policy(EventType.PRE_USE_BATCH_SIZE, decision)
 
 
 __all__ = (

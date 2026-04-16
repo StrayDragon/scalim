@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, Hashable, List, Tuple, cast
 
-from .....events import EVENT_FIELD_COMPUTE
+from .....events import EventType
 from .....planning.operators import ComputeOperatorIr, SupportedOperatorIr
 from .....spec.ir import ComputeCallContextIr, DerivedFieldIr
 from .....vendor.compact.typing_extensionsx import override
@@ -169,7 +169,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
             return
         guardrails = runtime.guardrails
         compute_mode = guardrails.effective_compute_mode()
-        wants_field_compute = runtime.instrumentation.wants(EVENT_FIELD_COMPUTE)
+        wants_field_compute = runtime.instrumentation.wants(EventType.FIELD_COMPUTE)
 
         if field_spec.is_constant_compute:
             _execute_constant_compute(

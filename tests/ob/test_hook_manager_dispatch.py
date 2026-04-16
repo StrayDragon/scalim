@@ -2,22 +2,7 @@ import time
 
 import pytest
 
-from scalim.events import (
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_COLUMN_WRITE,
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_ERROR,
-    EVENT_FIELD_COMPUTE,
-    EVENT_FIELD_SLIM,
-    EVENT_LOADER_CALL,
-    EVENT_LOADER_SLIM,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_ROW_RELEASE,
-    EVENT_ROW_WRITE,
-)
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.hooks import BaseHook, HookManager
 from scalim.hooks import HookDispatchStrategy
 
@@ -46,7 +31,7 @@ def test_hook_manager_partial_hook_subscription_inference() -> None:
 
 def test_hook_manager_wants_diagnostic_warning_when_empty_and_fallback_enabled() -> None:
     manager = HookManager(fallback_logger_enabled=True)
-    assert manager.wants(EVENT_DIAGNOSTIC_WARNING) is False
+    assert manager.wants(EventType.DIAGNOSTIC_WARNING) is False
 
 
 def test_hook_manager_emit_typed_returns_when_non_catalog_event_type() -> None:
@@ -74,7 +59,7 @@ def test_hook_manager_emit_typed_skips_hooks_with_missing_handler() -> None:
     manager = HookManager()
     manager.register(hook)  # type: ignore[arg-type]
 
-    manager.emit_typed(EVENT_PIPELINE_START, payload=None)
+    manager.emit_typed(EventType.PIPELINE_START, payload=None)
     assert hook.called is False
 
 
@@ -101,7 +86,7 @@ def test_hook_manager_emit_typed_does_not_use_getattr_after_cache_build() -> Non
     manager.register(hook)
     initial_calls = hook.getattr_calls
 
-    manager.emit_typed(EVENT_PIPELINE_START, payload=None)
+    manager.emit_typed(EventType.PIPELINE_START, payload=None)
 
     assert hook.called == 1
     assert hook.getattr_calls == initial_calls
@@ -109,7 +94,7 @@ def test_hook_manager_emit_typed_does_not_use_getattr_after_cache_build() -> Non
 
 def test_hook_manager_event_types_filters_typed_subscriptions() -> None:
     class _FilteredTypedHook(BaseHook):
-        event_types = {EVENT_PIPELINE_END}
+        event_types = {EventType.PIPELINE_END}
 
         def __init__(self) -> None:
             self.called = False
@@ -137,7 +122,7 @@ def test_hook_manager_register_rejects_invalid_event_types_type() -> None:
 
 def test_hook_manager_register_rejects_event_types_with_non_str_entries() -> None:
     class _InvalidEventTypesHook(BaseHook):
-        event_types = {EVENT_PIPELINE_START, 123}  # type: ignore[assignment]
+        event_types = {EventType.PIPELINE_START, 123}  # type: ignore[assignment]
 
     manager = HookManager()
     with pytest.raises(TypeError, match="contain only str"):
@@ -146,7 +131,7 @@ def test_hook_manager_register_rejects_event_types_with_non_str_entries() -> Non
 
 def test_hook_manager_emit_typed_skips_when_handler_missing_and_event_types_is_set() -> None:
     class _GetattrNoneTypedHook(object):
-        event_types = {EVENT_PIPELINE_START}
+        event_types = {EventType.PIPELINE_START}
 
         def __init__(self) -> None:
             self.called = False
@@ -169,7 +154,7 @@ def test_hook_manager_emit_typed_skips_when_handler_missing_and_event_types_is_s
 
 
 class _SubsetOnEventHook(BaseHook):
-    event_types = {EVENT_PIPELINE_START}
+    event_types = {EventType.PIPELINE_START}
 
     def on_event(self, event: Event) -> None:  # type: ignore[override]
         _ = event
@@ -179,7 +164,7 @@ def test_hook_manager_emit_on_event_returns_when_unsubscribed() -> None:
     manager = HookManager()
     manager.register(_SubsetOnEventHook())
 
-    manager.emit_on_event(Event(event_type=EVENT_PIPELINE_END, timestamp=time.time(), run_id="r", payload=None))
+    manager.emit_on_event(Event(event_type=EventType.PIPELINE_END, timestamp=time.time(), run_id="r", payload=None))
 
 
 def test_hook_manager_emit_on_event_skips_hooks_missing_on_event_handler() -> None:
@@ -195,7 +180,7 @@ def test_hook_manager_emit_on_event_skips_hooks_missing_on_event_handler() -> No
     manager = HookManager()
     manager.register(_GetattrNoneOnEventHook())
 
-    manager.emit_on_event(Event(event_type=EVENT_PIPELINE_START, timestamp=time.time(), run_id="r", payload=None))
+    manager.emit_on_event(Event(event_type=EventType.PIPELINE_START, timestamp=time.time(), run_id="r", payload=None))
 
 
 def test_hook_manager_triggers_return_when_empty() -> None:
@@ -217,40 +202,40 @@ class _CaptureManyHook(BaseHook):
         self.events = []
 
     def on_pipeline_end(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_PIPELINE_END, event))
+        self.events.append((EventType.PIPELINE_END, event))
 
     def on_batch_start(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_BATCH_START, event))
+        self.events.append((EventType.BATCH_START, event))
 
     def on_batch_end(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_BATCH_END, event))
+        self.events.append((EventType.BATCH_END, event))
 
     def on_loader_call(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_LOADER_CALL, event))
+        self.events.append((EventType.LOADER_CALL, event))
 
     def on_field_compute(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_FIELD_COMPUTE, event))
+        self.events.append((EventType.FIELD_COMPUTE, event))
 
     def on_error(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_ERROR, event))
+        self.events.append((EventType.ERROR, event))
 
     def on_diagnostic_warning(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_DIAGNOSTIC_WARNING, event))
+        self.events.append((EventType.DIAGNOSTIC_WARNING, event))
 
     def on_field_slim(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_FIELD_SLIM, event))
+        self.events.append((EventType.FIELD_SLIM, event))
 
     def on_row_write(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_ROW_WRITE, event))
+        self.events.append((EventType.ROW_WRITE, event))
 
     def on_row_release(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_ROW_RELEASE, event))
+        self.events.append((EventType.ROW_RELEASE, event))
 
     def on_loader_slim(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_LOADER_SLIM, event))
+        self.events.append((EventType.LOADER_SLIM, event))
 
     def on_column_write(self, event) -> None:  # type: ignore[override]
-        self.events.append((EVENT_COLUMN_WRITE, event))
+        self.events.append((EventType.COLUMN_WRITE, event))
 
 
 def test_hook_manager_triggers_dispatch_and_sampling_paths() -> None:
@@ -287,7 +272,7 @@ def test_hook_manager_triggers_dispatch_and_sampling_paths() -> None:
     manager.trigger_column_write(field_key="f", row_count=1, batch_num=1)
 
     seen_types = [t for t, _ in hook.events]
-    assert EVENT_DIAGNOSTIC_WARNING in seen_types
+    assert EventType.DIAGNOSTIC_WARNING in seen_types
 
 
 def test_hook_manager_trigger_diagnostic_warning_returns_when_not_subscribed() -> None:

@@ -1,6 +1,6 @@
 from typing import Dict, Tuple
 
-from .....events import EVENT_STAGE_SPAN
+from .....events import EventType
 from .....planning.operators import OperatorType
 from ...runtime.runtime import ExecutionRuntime
 
@@ -8,7 +8,7 @@ from ...runtime.runtime import ExecutionRuntime
 def init_stage_span_tracking(
     runtime: ExecutionRuntime,
 ) -> Tuple[bool, Dict[str, float], Dict[str, str]]:
-    wants_stage_spans = runtime.instrumentation.wants(EVENT_STAGE_SPAN)
+    wants_stage_spans = runtime.instrumentation.wants(EventType.STAGE_SPAN)
     if not wants_stage_spans:
         return False, {}, {}
 

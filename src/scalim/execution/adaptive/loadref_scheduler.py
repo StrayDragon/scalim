@@ -2,7 +2,7 @@
 from concurrent.futures import Executor, Future
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
-from ...events import EVENT_ADAPTIVE_SCHEDULER_DECISION
+from ...events import EventType
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
 from ...utils.relation_signature import build_relation_signature, has_rows_binding
@@ -84,7 +84,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
         if not ops:
             return
 
-        wants_scheduler_decisions = runtime.instrumentation.wants(EVENT_ADAPTIVE_SCHEDULER_DECISION)
+        wants_scheduler_decisions = runtime.instrumentation.wants(EventType.ADAPTIVE_SCHEDULER_DECISION)
         backend = runtime.adaptive_backend or self._policy.choose_backend(plan=self._plan, runtime=runtime, tuning=self._tuning)
         if backend in (ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC):
             # `NOTE`: 若需回加 `process`/`async` 后端,请恢复对应实现模块与测试.

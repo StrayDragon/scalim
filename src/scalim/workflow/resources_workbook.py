@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Type, cast
 
 from .._internal.utils.excel import escape_excel_formula
-from ..events import EVENT_DIAGNOSTIC_WARNING
+from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..vendor.compact.importlibx import require_optional_dependency
@@ -299,7 +299,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             plan.last_workflow_node_id = str(workflow_node_id)
 
         if pending_warning is not None:
-            _ = self._instrumentation.emit(EVENT_DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)
+            _ = self._instrumentation.emit(EventType.DIAGNOSTIC_WARNING, pending_warning, meta=pending_warning_meta)
 
         if pending_skip:
             self._emit_resource_write(

@@ -39,21 +39,7 @@ from scalim.execution import versioned_outputs
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.workflow import loaders as workflow_loaders_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError as WorkflowRuntimeConfigError
-from scalim.events import (
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_LOADER_CALL,
-    EVENT_PIPELINE_START,
-    EVENT_WORKFLOW_CACHE_ACQUIRE,
-    EVENT_WORKFLOW_CACHE_EVICT,
-    EVENT_WORKFLOW_CACHE_RELEASE,
-    EVENT_WORKFLOW_NODE_CANCELLED,
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
-    EVENT_WORKFLOW_RESOURCE_CREATE,
-    EVENT_WORKFLOW_RESOURCE_DISCARD,
-    EVENT_WORKFLOW_RESOURCE_WRITE,
-)
+from scalim.events import EventType
 from scalim.hooks import BaseHook
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import Observer
@@ -171,18 +157,18 @@ def run_workflow(  # type: ignore[no-untyped-def] test helper
 
 class _WorkflowEventRecorder(Observer):
     event_types = {
-        EVENT_DIAGNOSTIC_WARNING,
-        EVENT_PIPELINE_START,
-        EVENT_WORKFLOW_CACHE_ACQUIRE,
-        EVENT_WORKFLOW_CACHE_EVICT,
-        EVENT_WORKFLOW_CACHE_RELEASE,
-        EVENT_WORKFLOW_NODE_START,
-        EVENT_WORKFLOW_NODE_END,
-        EVENT_WORKFLOW_NODE_CANCELLED,
-        EVENT_WORKFLOW_RESOURCE_CREATE,
-        EVENT_WORKFLOW_RESOURCE_WRITE,
-        EVENT_WORKFLOW_RESOURCE_COMMIT,
-        EVENT_WORKFLOW_RESOURCE_DISCARD,
+        EventType.DIAGNOSTIC_WARNING,
+        EventType.PIPELINE_START,
+        EventType.WORKFLOW_CACHE_ACQUIRE,
+        EventType.WORKFLOW_CACHE_EVICT,
+        EventType.WORKFLOW_CACHE_RELEASE,
+        EventType.WORKFLOW_NODE_START,
+        EventType.WORKFLOW_NODE_END,
+        EventType.WORKFLOW_NODE_CANCELLED,
+        EventType.WORKFLOW_RESOURCE_CREATE,
+        EventType.WORKFLOW_RESOURCE_WRITE,
+        EventType.WORKFLOW_RESOURCE_COMMIT,
+        EventType.WORKFLOW_RESOURCE_DISCARD,
     }
 
     def __init__(self) -> None:
@@ -196,7 +182,7 @@ class _WorkflowEventRecorder(Observer):
 
 class _LoaderCallObserverRecorder(Observer):
     event_types = {
-        EVENT_LOADER_CALL,
+        EventType.LOADER_CALL,
     }
 
     def __init__(self) -> None:
@@ -210,7 +196,7 @@ class _LoaderCallObserverRecorder(Observer):
 
 class _LoaderCallHookRecorder(BaseHook):
     event_types = {
-        EVENT_LOADER_CALL,
+        EventType.LOADER_CALL,
     }
 
     def __init__(self) -> None:
@@ -1067,7 +1053,7 @@ def test_run_workflow_concurrency_capture_replay_summarizes_loader_call_payload_
 
     preload_payloads: List[Any] = []
     for event in observer.events:
-        if str(getattr(event, "event_type", "")) != EVENT_LOADER_CALL:
+        if str(getattr(event, "event_type", "")) != EventType.LOADER_CALL:
             continue
         payload = getattr(event, "payload", None)
         if payload is None:
@@ -1635,8 +1621,8 @@ def test_workflow_dag_respects_depends_on_under_concurrency(tmp_path: Path) -> N
     result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert [o.run_id for o in result.outcomes] == ["a", "b"]
 
-    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
-    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    start = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
 
     by_start = {e.payload.workflow_node_id: e for e in start}
     by_end = {e.payload.workflow_node_id: e for e in end}
@@ -1686,8 +1672,8 @@ def test_workflow_pipeline_allows_cross_stage_overlap_under_concurrency(tmp_path
     result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
     assert not result.errors()
 
-    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
-    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    start = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
 
     by_start = {e.payload.workflow_node_id: e for e in start}
     by_end = {e.payload.workflow_node_id: e for e in end}
@@ -1740,8 +1726,8 @@ def test_workflow_stage_barrier_blocks_next_stage_until_all_nodes_in_stage_termi
     result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
     assert not result.errors()
 
-    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
-    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    start = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
 
     by_start = {e.payload.workflow_node_id: e for e in start}
     by_end = {e.payload.workflow_node_id: e for e in end}
@@ -1776,7 +1762,7 @@ def test_workflow_concurrency_does_not_call_components_concurrently_by_default(t
     )
 
     class _ConcurrentCallProbe(Observer):
-        event_types = {EVENT_PIPELINE_START}
+        event_types = {EventType.PIPELINE_START}
 
         def __init__(self) -> None:
             self._guard = threading.Lock()
@@ -1857,8 +1843,8 @@ params:
     result = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert not result.errors()
 
-    start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
-    end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    start = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_START]
+    end = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
     by_start = {e.payload.workflow_node_id: e for e in start}
     by_end = {e.payload.workflow_node_id: e for e in end}
     assert by_start["down"].seq > by_end["up"].seq
@@ -2013,7 +1999,7 @@ def test_workflow_primary_only_cancels_downstream_when_dep_fails(tmp_path: Path)
     assert result.outcomes[1].error is not None
     assert "dependency" in result.outcomes[1].error.message.lower()
 
-    cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
+    cancelled = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
     assert cancelled[0].payload.workflow_node_id == "down"
     assert cancelled[0].payload.reason == "dependency_failed"
@@ -2044,9 +2030,9 @@ def test_workflow_observability_bridge_injects_meta_and_emits_workflow_events(tm
     recorder = _WorkflowEventRecorder()
     _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
 
-    workflow_start = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_START]
-    workflow_end = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
-    pipeline_start = [e for e in recorder.events if e.event_type == EVENT_PIPELINE_START]
+    workflow_start = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_START]
+    workflow_end = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
+    pipeline_start = [e for e in recorder.events if e.event_type == EventType.PIPELINE_START]
 
     assert {e.payload.workflow_node_id for e in workflow_start} == {"slow", "fast"}
     assert {e.payload.workflow_node_id for e in workflow_end} == {"slow", "fast"}
@@ -2096,7 +2082,7 @@ def test_workflow_observability_bridge_emits_cancelled_reason_for_all_fail(tmp_p
     with pytest.raises(Exception):
         _ = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
 
-    cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
+    cancelled = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
     assert cancelled[0].payload.workflow_node_id == "ok"
     assert cancelled[0].payload.reason == "policy_all_fail"
@@ -2145,12 +2131,12 @@ def test_workflow_all_fail_skips_already_cancelled_nodes_on_late_terminal(tmp_pa
     with pytest.raises(Exception):
         _ = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
 
-    cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
+    cancelled = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
     assert cancelled[0].payload.workflow_node_id == "child"
     assert cancelled[0].payload.reason == "policy_all_fail"
 
-    ended = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    ended = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
     assert any(e.payload.workflow_node_id == "slow" for e in ended)
 
 
@@ -2184,11 +2170,11 @@ def test_workflow_all_fail_compile_error_marks_end_and_cancels_pending(tmp_path:
         _ = run_workflow(str(wf), options=_run_options(components=[recorder]))
     assert "run_id=bad" in str(excinfo.value)
 
-    ended = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_END]
+    ended = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_END]
     by_node = {e.payload.workflow_node_id: e for e in ended}
     assert by_node["bad"].payload.status == "error"
 
-    cancelled = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_NODE_CANCELLED]
+    cancelled = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_NODE_CANCELLED]
     assert len(cancelled) == 1
     assert cancelled[0].payload.workflow_node_id == "ok"
     assert cancelled[0].payload.reason == "policy_all_fail"
@@ -2248,7 +2234,7 @@ def test_workflow_observability_bridge_registers_hooks(tmp_path: Path) -> None:
 
     hook = _HookRecorder()
     _ = run_workflow(str(wf), options=_run_options(components=[hook]))
-    assert any(e.event_type == EVENT_WORKFLOW_NODE_START for e in hook.events)
+    assert any(e.event_type == EventType.WORKFLOW_NODE_START for e in hook.events)
 
 
 def test_cache_pool_reuses_preload_forever_across_runs(tmp_path: Path) -> None:
@@ -2281,15 +2267,15 @@ def test_cache_pool_reuses_preload_forever_across_runs(tmp_path: Path) -> None:
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
-    acquires = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_ACQUIRE]
+    acquires = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_CACHE_ACQUIRE]
     acquires.sort(key=lambda e: e.seq)
     assert [e.payload.cache_status for e in acquires] == ["miss", "hit"]
     assert {e.payload.workflow_node_id for e in acquires} == {"a", "b"}
 
-    releases = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_RELEASE]
+    releases = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_CACHE_RELEASE]
     assert {e.payload.workflow_node_id for e in releases} == {"a", "b"}
 
-    evicts = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_EVICT]
+    evicts = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_CACHE_EVICT]
     assert len(evicts) == 1
     assert evicts[0].payload.reason == "refcount_zero"
     assert evicts[0].payload.workflow_node_id == "b"
@@ -2376,7 +2362,7 @@ params:
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
-    acquires = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_ACQUIRE]
+    acquires = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_CACHE_ACQUIRE]
     assert acquires
     assert all(e.payload.conflict_detected is False for e in acquires)
 
@@ -3387,11 +3373,11 @@ relations:
     assert not result.errors()
     assert workflow_loaders.preload_calls() == 1
 
-    acquires = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_ACQUIRE]
+    acquires = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_CACHE_ACQUIRE]
     assert len(acquires) == 1
     assert acquires[0].payload.cache_status == "miss"
 
-    evicts = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_CACHE_EVICT]
+    evicts = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_CACHE_EVICT]
     assert len(evicts) == 1
     assert evicts[0].payload.reason == "refcount_zero"
 
@@ -3492,9 +3478,9 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
         ["b2", "B2"],
     ]
 
-    creates = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_CREATE]
-    writes = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_WRITE]
-    commits = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_COMMIT]
+    creates = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_CREATE]
+    writes = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE]
+    commits = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_COMMIT]
     assert len(creates) == 1
     assert creates[0].payload.resource_id == "report"
     assert creates[0].payload.workflow_node_id == "__wf__write.a.0"
@@ -3564,9 +3550,9 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
         ["b2", "B2"],
     ]
 
-    creates = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_CREATE]
-    writes = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_WRITE]
-    commits = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_COMMIT]
+    creates = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_CREATE]
+    writes = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE]
+    commits = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_COMMIT]
     assert len(creates) == 1
     assert creates[0].payload.resource_type == "sheetbook"
     assert creates[0].payload.resource_id == "report"
@@ -3641,7 +3627,9 @@ outputs:
     write_events = [
         e
         for e in recorder.events
-        if e.event_type == EVENT_WORKFLOW_RESOURCE_WRITE and e.payload.resource_type == "sheetbook" and e.payload.resource_id == "report"
+        if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE
+        and e.payload.resource_type == "sheetbook"
+        and e.payload.resource_id == "report"
     ]
     assert [e.payload.workflow_node_id for e in write_events] == ["__wf__write.report.0", "__wf__write.report.1"]
 
@@ -5254,12 +5242,12 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
 
         order_signature: List[Any] = []
         for event in recorder.events:
-            if event.event_type == EVENT_PIPELINE_START:
+            if event.event_type == EventType.PIPELINE_START:
                 meta = event.meta if isinstance(event.meta, dict) else {}
                 order_signature.append((event.event_type, str(meta.get("workflow_node_id") or ""), list(event.payload.targets)))
-            if event.event_type in (EVENT_WORKFLOW_NODE_START, EVENT_WORKFLOW_NODE_END):
+            if event.event_type in (EventType.WORKFLOW_NODE_START, EventType.WORKFLOW_NODE_END):
                 order_signature.append((event.event_type, str(event.payload.workflow_node_id)))
-            if event.event_type == EVENT_WORKFLOW_RESOURCE_COMMIT:
+            if event.event_type == EventType.WORKFLOW_RESOURCE_COMMIT:
                 order_signature.append(
                     (
                         event.event_type,
@@ -5273,7 +5261,9 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         else:
             assert list(order_signature) == list(expected_order_signature)
 
-        write_events = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_WRITE and e.payload.resource_id == "report"]
+        write_events = [
+            e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE and e.payload.resource_id == "report"
+        ]
         assert [e.payload.workflow_node_id for e in write_events] == ["__wf__write.slow.0", "__wf__write.fast.0"]
 
 
@@ -5453,7 +5443,7 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
         assert workbook_path.exists()
         assert _read_xlsx_rows(workbook_path, "All") == expected_rows
 
-        skips = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_WRITE and e.payload.action == "skip"]
+        skips = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE and e.payload.action == "skip"]
         assert bool(skips) is bool(expect_skips)
 
 
@@ -5498,7 +5488,7 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
     assert list(out_root.rglob("*.xlsx")) == []
     assert list(out_root.rglob("*.scalim.lock")) == []
 
-    discards = [e for e in recorder.events if e.event_type == EVENT_WORKFLOW_RESOURCE_DISCARD and e.payload.resource_id == "report"]
+    discards = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_DISCARD and e.payload.resource_id == "report"]
     assert discards
 
 

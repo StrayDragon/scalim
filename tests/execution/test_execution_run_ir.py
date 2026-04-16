@@ -6,8 +6,7 @@ import pytest
 import importlib
 
 run_ir_mod = importlib.import_module("scalim.execution.run_ir")
-from scalim.events import EVENT_DIAGNOSTIC_WARNING
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.execution.output_composition import OutputCompositionSpec, OutputTargetSpec
 from scalim.execution import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.execution.runtime_bindings import RuntimeBindings
@@ -399,7 +398,7 @@ def test_run_ir_rejects_unknown_key_normalization() -> None:
 def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> None:
     class _CaptureWarningObserver(Observer):
         def __init__(self) -> None:
-            self.event_types = {EVENT_DIAGNOSTIC_WARNING}
+            self.event_types = {EventType.DIAGNOSTIC_WARNING}
             self.events = []
 
         def on_event(self, event: Event) -> None:
@@ -424,7 +423,7 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
 
     assert len(observer.events) == 1
     evt = observer.events[0]
-    assert evt.event_type == EVENT_DIAGNOSTIC_WARNING
+    assert evt.event_type == EventType.DIAGNOSTIC_WARNING
     assert "EXPERIMENTAL" in str(evt.payload.message)
     assert "key_normalization='auto_str'" in str(evt.payload.message)
     assert evt.payload.source_id == "(run)"

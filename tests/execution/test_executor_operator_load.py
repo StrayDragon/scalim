@@ -3,7 +3,7 @@
 import pytest
 
 from scalim.execution.context import BatchContext
-from scalim.events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM, Event
+from scalim.events import Event, EventType
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
@@ -34,14 +34,14 @@ def test_load_operator_build_loader_call_kwargs_is_wants_gated() -> None:
     runtime_bindings.params_builders[("main", "k")] = _params_builder
     binding = BindingIr(key_field="k", params_builder_ref=RuntimeHandleIdIr(handle_id="params_builder:main:k"))
     loader_context = LoaderCallContextIr(source_id="main")
-    runtime = _Runtime(_WantsInstrumentation(EVENT_LOADER_CALL), runtime_bindings=runtime_bindings)
+    runtime = _Runtime(_WantsInstrumentation(EventType.LOADER_CALL), runtime_bindings=runtime_bindings)
 
     executor = LoadOperatorExecutor()
     assert executor._build_loader_call_kwargs(runtime, binding, loader_context) == {"src": "main"}  # noqa: SLF001
 
 
 def test_load_operator_maybe_emit_loader_slim_extracts_key_count() -> None:
-    instrumentation = _WantsInstrumentation(EVENT_LOADER_SLIM)
+    instrumentation = _WantsInstrumentation(EventType.LOADER_SLIM)
     runtime = _Runtime(instrumentation, batch_num=7)
     executor = LoadOperatorExecutor()
 
@@ -59,7 +59,7 @@ def test_load_operator_maybe_emit_loader_slim_extracts_key_count() -> None:
 
 
 def test_load_operator_maybe_emit_loader_slim_handles_empty_and_non_mapping_values() -> None:
-    instrumentation = _WantsInstrumentation(EVENT_LOADER_SLIM)
+    instrumentation = _WantsInstrumentation(EventType.LOADER_SLIM)
     runtime = _Runtime(instrumentation, batch_num=1)
     executor = LoadOperatorExecutor()
 
@@ -279,7 +279,7 @@ def test_load_operator_applies_source_normalize_index_by_key() -> None:
 
 def test_load_operator_emits_loader_call_skipped_none_rows_for_index_by_key_on_none_skip() -> None:
     class _CaptureLoaderCallHook(BaseHook):
-        event_types = {EVENT_LOADER_CALL}
+        event_types = {EventType.LOADER_CALL}
 
         def __init__(self) -> None:
             self.events = []
@@ -326,7 +326,7 @@ def test_load_operator_emits_loader_call_skipped_none_rows_for_index_by_key_on_n
 
     assert context.get_field_value("amount", 1) == 7
     assert context.get_field_value("amount", 2) == 9
-    assert hook.events and hook.events[-1].event_type == EVENT_LOADER_CALL
+    assert hook.events and hook.events[-1].event_type == EventType.LOADER_CALL
     assert hook.events[-1].payload.skipped_none_rows == 1
 
 

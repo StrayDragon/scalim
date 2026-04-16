@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from scalim.events import EVENT_OPERATOR_SPAN, EVENT_STAGE_SPAN
+from scalim.events import EventType
 from scalim.events._events import OperatorSpanEvent
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.pipeline.base.pipeline import Pipeline
@@ -15,7 +15,7 @@ def test_instrumentation_hub_emit_operator_span_wants_gated() -> None:
     hub.emit_operator_span("compute", field_key="a", batch_num=1, duration=0.1)
 
     class _Observer(EventDispatchObserver):
-        event_types = {EVENT_OPERATOR_SPAN}
+        event_types = {EventType.OPERATOR_SPAN}
 
         def __init__(self) -> None:
             self.payloads = []
@@ -37,7 +37,7 @@ def test_pipeline_iter_row_batches_records_stream_duration_when_unbatched_and_wa
 
     class _Instr:
         def wants(self, event_type):  # type: ignore[no-untyped-def]
-            return event_type == EVENT_STAGE_SPAN
+            return event_type == EventType.STAGE_SPAN
 
     fake_self = SimpleNamespace(
         batch_size=None,
@@ -62,7 +62,7 @@ def test_batch_executor_emits_operator_span_for_compute_when_wanted() -> None:
             self.spans = []
 
         def wants(self, event_type):  # type: ignore[no-untyped-def]
-            return event_type == EVENT_OPERATOR_SPAN
+            return event_type == EventType.OPERATOR_SPAN
 
         def emit_operator_span(self, **kwargs):  # type: ignore[no-untyped-def]
             self.spans.append(kwargs)

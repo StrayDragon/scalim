@@ -18,22 +18,7 @@ from scalim.events._events import (
     RowWriteEvent,
     StageSpanEvent,
 )
-from scalim.events import Event
-from scalim.events import (
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_ERROR,
-    EVENT_FIELD_SLIM,
-    EVENT_LOADER_CALL,
-    EVENT_OPERATOR_SPAN,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_ROW_RELEASE,
-    EVENT_ROW_WRITE,
-    get_event_catalog,
-    get_event_catalog_map,
-)
+from scalim.events import Event, EventType, get_event_catalog, get_event_catalog_map
 from scalim.ob.observability import Observability
 from scalim.ob.observer import EventDispatchObserver, Observer
 from scalim.ob.manager import (
@@ -84,16 +69,16 @@ def test_event_catalog_includes_core_events() -> None:
 
     catalog_map = get_event_catalog_map()
     required = [
-        EVENT_PIPELINE_START,
-        EVENT_PIPELINE_END,
-        EVENT_BATCH_START,
-        EVENT_BATCH_END,
-        EVENT_LOADER_CALL,
-        EVENT_ERROR,
-        EVENT_DIAGNOSTIC_WARNING,
-        EVENT_ROW_WRITE,
-        EVENT_ROW_RELEASE,
-        EVENT_FIELD_SLIM,
+        EventType.PIPELINE_START,
+        EventType.PIPELINE_END,
+        EventType.BATCH_START,
+        EventType.BATCH_END,
+        EventType.LOADER_CALL,
+        EventType.ERROR,
+        EventType.DIAGNOSTIC_WARNING,
+        EventType.ROW_WRITE,
+        EventType.ROW_RELEASE,
+        EventType.FIELD_SLIM,
     ]
     for name in required:
         assert name in catalog_map
@@ -338,12 +323,12 @@ def test_performance_observer_event_types_include_operator_span_when_enabled() -
     disabled = PerformanceObserver(
         config=PerformanceConfig(metrics={"duration"}, report_format="none", include_field_compute_top_n=0, logger=logger)
     )
-    assert EVENT_OPERATOR_SPAN not in (disabled.event_types or set())
+    assert EventType.OPERATOR_SPAN not in (disabled.event_types or set())
 
     enabled = PerformanceObserver(
         config=PerformanceConfig(metrics={"duration"}, report_format="none", include_field_compute_top_n=3, logger=logger)
     )
-    assert EVENT_OPERATOR_SPAN in (enabled.event_types or set())
+    assert EventType.OPERATOR_SPAN in (enabled.event_types or set())
 
 
 def test_performance_observer_field_compute_profiling_reports_top(caplog) -> None:
@@ -646,7 +631,7 @@ def test_observer_manager_swallows_errors(caplog) -> None:
     manager = ObserverManager(observers=[observer])
 
     with caplog.at_level(logging.WARNING, logger="scalim.ob.manager"):
-        manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+        manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
 
     expected = OBSERVER_RAISED_EXCEPTION_WARNING % ("_ExplodingObserver", "on_event")
     assert any(expected == record.getMessage() for record in caplog.records)
@@ -657,14 +642,14 @@ def test_observer_manager_debug_mode_raises() -> None:
     manager = ObserverManager(observers=[observer], enable_debugging=True)
 
     with pytest.raises(RuntimeError):
-        manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+        manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
 
 
 def test_observer_manager_unregister_clear_and_drain() -> None:
     observer = _CaptureObserver()
     manager = ObserverManager(observers=[observer], mode="capture")
 
-    manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+    manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
     assert manager.drain_events()
     assert manager.drain_events() == []
 
@@ -679,10 +664,10 @@ def test_observer_manager_unregister_clear_and_drain() -> None:
 
 def test_observer_manager_skips_unsupported_events() -> None:
     observer = _CaptureObserver()
-    observer.event_types = {EVENT_PIPELINE_START}
+    observer.event_types = {EventType.PIPELINE_START}
     manager = ObserverManager(observers=[observer])
 
-    manager.emit_event(EVENT_PIPELINE_END, PipelineEndEvent(total_batches=0, total_duration=0.0))
+    manager.emit_event(EventType.PIPELINE_END, PipelineEndEvent(total_batches=0, total_duration=0.0))
     assert observer.events == []
 
 
@@ -700,7 +685,7 @@ def test_observer_manager_swallows_supports_errors() -> None:
     observer = _ExplodingSupportsObserver()
     manager = ObserverManager(observers=[observer])
 
-    manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+    manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
     assert observer.events == []
 
 
@@ -757,10 +742,10 @@ def test_event_dispatch_observer_caches_handler_callable() -> None:
 
     observer = _CaptureObserver()
     payload = PipelineStartEvent(targets=["a"], batch_size=1)
-    event = Event(event_type=EVENT_PIPELINE_START, timestamp=0.0, run_id="run", payload=payload, meta={}, seq=0)
+    event = Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="run", payload=payload, meta={}, seq=0)
 
     observer.on_event(event)
-    observer.dispatch_map = {EVENT_PIPELINE_START: "missing"}  # type: ignore[assignment]
+    observer.dispatch_map = {EventType.PIPELINE_START: "missing"}  # type: ignore[assignment]
     observer.on_event(event)
 
     assert observer.calls == 2
@@ -781,7 +766,7 @@ def test_event_dispatch_observer_caches_none_for_missing_handler() -> None:
 
 def test_event_to_dict_with_dataclass_payload() -> None:
     payload = PipelineStartEvent(targets=["a"], batch_size=1)
-    event = Event(event_type=EVENT_PIPELINE_START, timestamp=1.0, run_id="run", payload=payload, meta={"x": 1}, seq=2)
+    event = Event(event_type=EventType.PIPELINE_START, timestamp=1.0, run_id="run", payload=payload, meta={"x": 1}, seq=2)
     data = event.to_dict()
     assert data["payload"]["targets"] == ["a"]
     assert data["meta"]["x"] == 1

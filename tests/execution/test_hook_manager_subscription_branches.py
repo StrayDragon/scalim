@@ -1,6 +1,6 @@
 from collections.abc import Iterator, Set as AbstractSet
 
-from scalim.events import EVENT_PIPELINE_START
+from scalim.events import EventType
 from scalim.hooks import BaseHook, HookManager
 
 
@@ -37,11 +37,11 @@ class _CaptureLoaderCallHook(BaseHook):
 def test_hook_manager_ignores_unknown_on_event_types() -> None:
     manager = HookManager()
     hook = _CaptureOnEventHook()
-    hook.event_types = _OrderedEventTypes(["unknown", EVENT_PIPELINE_START])
+    hook.event_types = _OrderedEventTypes(["unknown", EventType.PIPELINE_START])
     manager.register(hook)
 
     assert manager.wants_on_event("unknown") is False
-    assert manager.wants_on_event(EVENT_PIPELINE_START) is True
+    assert manager.wants_on_event(EventType.PIPELINE_START) is True
 
 
 def test_hook_manager_loader_call_policy_falls_back_when_unknown() -> None:

@@ -2,7 +2,7 @@ import marimo
 
 from typing import Any, Dict
 
-from scalim.events import EVENT_PIPELINE_END, EVENT_PIPELINE_START
+from scalim.events import EventType
 from scalim import ob as api
 from scalim_misc.examples._types import EXAMPLE_KIND_SMOKE, ExampleResult
 
@@ -19,7 +19,7 @@ def run_public_api_ob() -> ExampleResult:
     manager.emit_pipeline_end(total_batches=1, total_duration=0.01)
 
     events = manager.drain_events()
-    passed = bool([e.event_type for e in events] == [EVENT_PIPELINE_START, EVENT_PIPELINE_END])
+    passed = bool([e.event_type for e in events] == [EventType.PIPELINE_START, EventType.PIPELINE_END])
     summary = "events={} types={}".format(len(events), ",".join(e.event_type for e in events))
     details: Dict[str, Any] = {"event_types": [e.event_type for e in events], "symbols_count": len(symbols)}
     return ExampleResult(

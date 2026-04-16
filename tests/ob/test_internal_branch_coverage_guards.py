@@ -7,10 +7,10 @@ import pytest
 import threading
 
 from scalim.events import Event
+from scalim.events import EventType
 from scalim.ob.manager import ObserverManager
 from scalim.ob._internal.manager_capture import ObserverManagerCaptureMixin
 from scalim.ob._internal.manager_emit import ObserverManagerEmitMixin
-from scalim.events import EVENT_PIPELINE_START
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets._internal import viz_config as viz_config_module
 from scalim.ob.presets._internal import viz_output as viz_output_module
@@ -29,7 +29,7 @@ class _NoopObserver(Observer):
 
 
 class _InvalidDispatchObserver(EventDispatchObserver):
-    dispatch_map = {EVENT_PIPELINE_START: 1}  # type: ignore[assignment]
+    dispatch_map = {EventType.PIPELINE_START: 1}  # type: ignore[assignment]
 
 
 class _CaptureOnlyManager(ObserverManagerCaptureMixin):
@@ -112,7 +112,7 @@ def test_internal_observer_manager_lazy_branches_and_viz_node_cache() -> None:
     emit_only._has_observers = True  # noqa: SLF001
     emit_only.emit(
         Event(
-            event_type=EVENT_PIPELINE_START,
+            event_type=EventType.PIPELINE_START,
             timestamp=0.0,
             run_id="run",
             payload={},
@@ -146,7 +146,7 @@ def test_internal_observer_manager_lazy_branches_and_viz_node_cache() -> None:
 
     manager._has_observers = True  # noqa: SLF001
     manager._supported_event_types = None  # noqa: SLF001
-    assert manager.wants(EVENT_PIPELINE_START) is False
+    assert manager.wants(EventType.PIPELINE_START) is False
 
     assert manager._infer_eventdispatch_observer_event_types(_InvalidDispatchObserver()) == ()  # noqa: SLF001
 

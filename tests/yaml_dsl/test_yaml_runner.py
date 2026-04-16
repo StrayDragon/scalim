@@ -23,7 +23,7 @@ from scalim.dsl.yaml_dsl import (
 from scalim.execution import ExecutionResult, export_layout_from_demand_ir
 from scalim.planning import PlanBuilder
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
-from scalim.events import EVENT_PIPELINE_START
+from scalim.events import EventType
 from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
@@ -239,7 +239,7 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
     output_root = tmp_path / "out_component_observer"
 
     class _CaptureObserver(Observer):
-        event_types = {EVENT_PIPELINE_START}
+        event_types = {EventType.PIPELINE_START}
 
         def __init__(self) -> None:
             self.events = []
@@ -260,7 +260,7 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
     )
 
     assert observer.events
-    assert observer.events[0].event_type == EVENT_PIPELINE_START
+    assert observer.events[0].event_type == EventType.PIPELINE_START
 
 
 def test_run_raises_typeerror_on_invalid_component(example_model, tmp_path: Path) -> None:

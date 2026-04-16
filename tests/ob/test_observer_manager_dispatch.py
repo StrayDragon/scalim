@@ -1,7 +1,6 @@
 import pytest
 
-from scalim.events import EVENT_BATCH_END, EVENT_BATCH_START, EVENT_LOADER_RETRY, EVENT_PIPELINE_END, EVENT_PIPELINE_START
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.events._events import PipelineStartEvent
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver, Observer
@@ -29,11 +28,11 @@ class _BadDispatchObserver(EventDispatchObserver):
 
 def test_observer_manager_infers_no_subscriptions_when_dispatch_map_is_not_dict() -> None:
     manager = ObserverManager(observers=[_BadDispatchObserver()])
-    assert manager.wants(EVENT_PIPELINE_START) is False
+    assert manager.wants(EventType.PIPELINE_START) is False
 
 
 class _NonCatalogDispatchObserver(EventDispatchObserver):
-    dispatch_map = {"non_catalog": "on_pipeline_start", EVENT_PIPELINE_START: "on_pipeline_start"}
+    dispatch_map = {"non_catalog": "on_pipeline_start", EventType.PIPELINE_START: "on_pipeline_start"}
 
     def __init__(self) -> None:
         self.events = []
@@ -45,13 +44,13 @@ class _NonCatalogDispatchObserver(EventDispatchObserver):
 def test_observer_manager_inference_skips_non_catalog_event_types_in_dispatch_map() -> None:
     obs = _NonCatalogDispatchObserver()
     manager = ObserverManager(observers=[obs])
-    manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+    manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
     assert obs.events
 
 
 class _CustomSupportsObserver(Observer):
     def supports(self, event_type: str) -> bool:
-        return event_type == EVENT_PIPELINE_START
+        return event_type == str(EventType.PIPELINE_START)
 
     def __init__(self) -> None:
         self.events = []
@@ -62,8 +61,8 @@ class _CustomSupportsObserver(Observer):
 
 def test_observer_manager_infers_subscriptions_via_custom_supports() -> None:
     manager = ObserverManager(observers=[_CustomSupportsObserver()])
-    assert manager.wants(EVENT_PIPELINE_START) is True
-    assert manager.wants(EVENT_PIPELINE_END) is False
+    assert manager.wants(EventType.PIPELINE_START) is True
+    assert manager.wants(EventType.PIPELINE_END) is False
 
 
 def test_observer_manager_does_not_dispatch_unknown_event_types_without_explicit_opt_in() -> None:
@@ -146,9 +145,9 @@ def test_observer_manager_typed_emit_helpers_cover_all_event_types() -> None:
     manager.emit_stage_span(stage="compute", batch_num=1, duration=0.01)
 
     emitted = [e.event_type for e in obs.events]
-    assert EVENT_BATCH_START in emitted
-    assert EVENT_BATCH_END in emitted
-    assert EVENT_LOADER_RETRY in emitted
+    assert EventType.BATCH_START in emitted
+    assert EventType.BATCH_END in emitted
+    assert EventType.LOADER_RETRY in emitted
 
 
 def test_observer_manager_typed_emit_helpers_return_when_unwanted() -> None:
@@ -171,7 +170,7 @@ def test_observer_manager_typed_emit_helpers_return_when_unwanted() -> None:
 
 def test_observer_manager_typed_emit_helpers_return_when_unsubscribed() -> None:
     class _PipelineStartOnlyObserver(Observer):
-        event_types = {EVENT_PIPELINE_START}
+        event_types = {EventType.PIPELINE_START}
 
         def on_event(self, event: Event) -> None:  # type: ignore[override]
             _ = event
@@ -209,7 +208,7 @@ def test_observer_manager_register_rejects_invalid_event_types_type() -> None:
 
 def test_observer_manager_register_rejects_event_types_with_non_str_entries() -> None:
     class _InvalidEventTypesObserver(Observer):
-        event_types = {EVENT_PIPELINE_START, 123}  # type: ignore[assignment]
+        event_types = {EventType.PIPELINE_START, 123}  # type: ignore[assignment]
 
         def on_event(self, event: Event) -> None:  # type: ignore[override]
             _ = event
@@ -257,7 +256,7 @@ def test_observer_manager_wants_unknown_event_type_is_true_with_opt_in_observer(
 def test_observer_manager_emit_unknown_event_skips_observer_when_supports_returns_false() -> None:
     class _SkipUnknownObserver(Observer):
         supports_unknown_event_types = True
-        event_types = {EVENT_PIPELINE_START}
+        event_types = {EventType.PIPELINE_START}
 
         def __init__(self) -> None:
             self.events = []
@@ -287,6 +286,6 @@ def test_observer_manager_emit_unknown_event_skips_observer_when_supports_return
 def test_observer_manager_emit_returns_when_subscription_tuple_is_empty() -> None:
     manager = ObserverManager()
     manager._has_observers = True  # noqa: SLF001
-    manager._observers_by_event_type = {EVENT_PIPELINE_START: ()}  # noqa: SLF001
+    manager._observers_by_event_type = {EventType.PIPELINE_START: ()}  # noqa: SLF001
 
-    manager.emit_event(EVENT_PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
+    manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))

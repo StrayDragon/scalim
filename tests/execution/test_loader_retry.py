@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pytest
 
 import scalim.execution.loader_retry as lr
-from scalim.events import EVENT_LOADER_RETRY
+from scalim.events import EventType
 from scalim.execution.loader_retry import CALLSITE_LOAD, LoaderRetryContext, LoaderRetryPolicy, call_with_loader_retry
 
 
@@ -14,7 +14,7 @@ class _CaptureInstrumentation(object):
         self.error_events: List[Tuple[Exception, Dict[str, Any]]] = []
 
     def wants(self, event_type: str) -> bool:
-        return bool(self._wants_retry and event_type == EVENT_LOADER_RETRY)
+        return bool(self._wants_retry and event_type == EventType.LOADER_RETRY)
 
     def emit_loader_retry(
         self,

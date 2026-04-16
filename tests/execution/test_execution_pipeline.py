@@ -5,8 +5,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from scalim.events import EVENT_STAGE_SPAN
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.execution.adaptive.policy import ADAPTIVE_BACKEND_ASYNC, ADAPTIVE_BACKEND_PROCESS, AdaptivePolicy
 from scalim.execution.adaptive.policy import ADAPTIVE_BACKEND_THREAD
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
@@ -499,7 +498,7 @@ def test_seq_pipeline_adaptive_invalid_backend_raises() -> None:
 
 
 class _StageSpanHook(BaseHook):
-    event_types = {EVENT_STAGE_SPAN}
+    event_types = {EventType.STAGE_SPAN}
 
     def __init__(self) -> None:
         self.events: List[Event] = []
@@ -579,4 +578,4 @@ def test_stage_spans_emitted(sink_mode: str) -> None:
         _ = engine.run(main_rows=list(load_orders()))
 
     assert hook.events
-    assert all(e.event_type == EVENT_STAGE_SPAN for e in hook.events)
+    assert all(e.event_type == EventType.STAGE_SPAN for e in hook.events)

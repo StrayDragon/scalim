@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Hashable, List, Optional, Set, cast
 from typing import Mapping as TypingMapping
 
-from ....events import EVENT_LOADER_CALL, EVENT_LOADER_SLIM
+from ....events import EventType
 from ....planning.operators import LoadOperatorIr, SupportedOperatorIr
 from ....spec.ir import FieldIr, SourceIr
 from ....spec.ir._helpers import coerce_loader_result_mapping
@@ -46,7 +46,7 @@ class LoadOperatorExecutor(OperatorExecutor):
     ) -> LoaderCallKwargs:
         if binding is None:
             return {}
-        if not runtime.instrumentation.wants(EVENT_LOADER_CALL):
+        if not runtime.instrumentation.wants(EventType.LOADER_CALL):
             return {}
         _, call_kwargs = build_loader_call_params(
             binding=binding,
@@ -63,7 +63,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         result: object,
         field_keys: List[str],
     ) -> None:
-        if not runtime.instrumentation.wants(EVENT_LOADER_SLIM):
+        if not runtime.instrumentation.wants(EventType.LOADER_SLIM):
             return
         original_keys = 0
         if isinstance(result, Mapping) and result:

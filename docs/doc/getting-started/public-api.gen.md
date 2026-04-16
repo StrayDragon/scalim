@@ -36,8 +36,9 @@ Sources:
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
 | `scalim.execution` | 7 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
-| `scalim.ob` | 1 | 可观测性入口 | 构建 observer manager / 采集事件 |
-| `scalim.events` | 48 | 事件envelope+事件类型常量+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
+| `scalim.ob` | 2 | 可观测性入口 | 构建 observer manager / 采集事件 |
+| `scalim.events` | 12 | 事件envelope+事件类型入口+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
+| `scalim.events.type_groups` | 15 | 事件类型分组视图 | 按主题探索 `EventType`(不引入新值) |
 | `scalim.sinks` | 15 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 | `scalim.sinks.memory` | 4 | memory sinks(调试/测试/捕获) | `InMemoryRowDataSink`/`InMemoryCsv` 等 |
 | `scalim.sinks.pandas` | 2 | pandas sinks(可选依赖) | 需要 `pandas` 时显式使用该子模块 |
@@ -68,10 +69,10 @@ from scalim.dsl.yaml_dsl.workflow import WorkflowConfig, load_workflow_config
 from scalim.spec import ir as ir
 ```
 
-需要事件常量/目录查询入口时:
+需要事件类型/目录查询入口时:
 
 ```python
-from scalim.events import Event, EVENT_PIPELINE_START, get_event_catalog
+from scalim.events import Event, EventType, get_event_catalog
 ```
 
 需要常用 sinks 时:
@@ -304,68 +305,57 @@ from scalim.execution import (
 
 #### `scalim.ob`
 
-- Export count: `1`
+- Export count: `2`
 
 ```python
 from scalim.ob import (
     Observability,
+    ObservabilityOptions,
 )
 ```
 
 #### `scalim.events`
 
-- Export count: `48`
+- Export count: `12`
 
 ```python
 from scalim.events import (
-    EVENT_ADAPTIVE_SCHEDULER_DECISION,
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_COLUMN_WRITE,
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_ERROR,
-    EVENT_FIELD_COMPUTE,
-    EVENT_FIELD_SLIM,
-    EVENT_LOADER_CALL,
-    EVENT_LOADER_RETRY,
-    EVENT_LOADER_SLIM,
-    EVENT_OPERATOR_SPAN,
-    EVENT_OUTPUT_TARGET_END,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_PRE_USE_BATCH_SIZE,
-    EVENT_RELATION_LOOKUP,
-    EVENT_ROW_RELEASE,
-    EVENT_ROW_WRITE,
-    EVENT_STAGE_SPAN,
-    EVENT_WORKFLOW_CACHE_ACQUIRE,
-    EVENT_WORKFLOW_CACHE_EVICT,
-    EVENT_WORKFLOW_CACHE_RELEASE,
-    EVENT_WORKFLOW_NODE_CANCELLED,
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
-    EVENT_WORKFLOW_RESOURCE_CREATE,
-    EVENT_WORKFLOW_RESOURCE_DISCARD,
-    EVENT_WORKFLOW_RESOURCE_WRITE,
     WORKFLOW_ATTRIBUTION_META_KEYS,
-    WORKFLOW_EVENT_PREFIXES,
-    WORKFLOW_EVENT_PREFIX_CACHE,
-    WORKFLOW_EVENT_PREFIX_NODE,
-    WORKFLOW_EVENT_PREFIX_RESOURCE,
     WORKFLOW_EXEC_ID_META_KEY,
-    WORKFLOW_NODE_CANCELLED_REASON_DEPENDENCY_FAILED,
-    WORKFLOW_NODE_CANCELLED_REASON_POLICY_ALL_FAIL,
-    WORKFLOW_NODE_CANCELLED_REASON_UPSTREAM_CANCELLED,
-    WORKFLOW_NODE_END_STATUS_ERROR,
-    WORKFLOW_NODE_END_STATUS_OK,
     WORKFLOW_NODE_ID_META_KEY,
     Event,
     EventDescriptor,
+    EventType,
+    WorkflowNodeCancelledReason,
+    WorkflowNodeEndStatus,
     generate_run_id,
     get_event_catalog,
     get_event_catalog_map,
     now_ts,
+)
+```
+
+#### `scalim.events.type_groups`
+
+- Export count: `15`
+
+```python
+from scalim.events.type_groups import (
+    adaptive,
+    batch,
+    column,
+    diagnostic,
+    error,
+    field,
+    loader,
+    operator,
+    output,
+    pipeline,
+    pre,
+    relation,
+    row,
+    stage,
+    workflow,
 )
 ```
 

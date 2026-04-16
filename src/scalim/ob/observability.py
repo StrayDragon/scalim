@@ -2,35 +2,50 @@
 
 from typing import Any, Dict, List, Optional
 
+from ..vendor.dataclassesx import dataclass
 from .manager import ObserverManager
 from .observer import Observer
 
 # endregion
 
 
+@dataclass(frozen=True)
+class ObservabilityOptions:
+    """`Observability` 构造选项(集中校验 + `fail-fast`)."""
+
+    enable_debugging: bool = False
+    fallback_logger_enabled: bool = False
+    loader_result_policy: str = "full"
+    loader_result_sample_size: int = 5
+
+    def __post_init__(self) -> None:
+        policy = (self.loader_result_policy or "full").strip().lower()
+        if policy not in ("full", "summary", "sample", "none"):
+            msg = "ObservabilityOptions.loader_result_policy: Unknown policy: {!r}".format(self.loader_result_policy)
+            raise ValueError(msg)
+        object.__setattr__(self, "loader_result_policy", policy)
+
+        sample_size = int(self.loader_result_sample_size)
+        if sample_size < 1:
+            msg = "ObservabilityOptions.loader_result_sample_size: must be >= 1, got: {!r}".format(self.loader_result_sample_size)
+            raise ValueError(msg)
+        object.__setattr__(self, "loader_result_sample_size", sample_size)
+
+
 class Observability:
     """可观测性门面:注册观察者并构建 `ObserverManager`."""
 
     observers: List[Observer]
-    enable_debugging: bool
-    fallback_logger_enabled: bool
-    loader_result_policy: str
-    loader_result_sample_size: int
+    options: ObservabilityOptions
 
     def __init__(
         self,
         observers: Optional[List[Observer]] = None,
         *,
-        enable_debugging: bool = False,
-        fallback_logger_enabled: bool = False,
-        loader_result_policy: str = "full",
-        loader_result_sample_size: int = 5,
+        options: Optional[ObservabilityOptions] = None,
     ) -> None:
         self.observers = list(observers or [])
-        self.enable_debugging = enable_debugging
-        self.fallback_logger_enabled = fallback_logger_enabled
-        self.loader_result_policy = loader_result_policy
-        self.loader_result_sample_size = loader_result_sample_size
+        self.options = options or ObservabilityOptions()
 
     def register(self, observer: Observer) -> None:
         self.observers.append(observer)
@@ -44,14 +59,14 @@ class Observability:
     ) -> ObserverManager:
         return ObserverManager(
             observers=list(self.observers),
-            enable_debugging=self.enable_debugging,
-            fallback_logger_enabled=self.fallback_logger_enabled,
-            loader_result_policy=self.loader_result_policy,
-            loader_result_sample_size=self.loader_result_sample_size,
+            enable_debugging=self.options.enable_debugging,
+            fallback_logger_enabled=self.options.fallback_logger_enabled,
+            loader_result_policy=self.options.loader_result_policy,
+            loader_result_sample_size=self.options.loader_result_sample_size,
             run_id=run_id,
             event_meta_defaults=event_meta_defaults,
             mode=mode,
         )
 
 
-__all__ = ("Observability",)
+__all__ = ("Observability", "ObservabilityOptions")

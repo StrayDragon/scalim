@@ -1,11 +1,8 @@
 from typing import Dict, List, Set
 
 from ...events import (
-    EVENT_WORKFLOW_NODE_CANCELLED,
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
     Event,
+    EventType,
 )
 from ...vendor.dataclassesx import dataclass
 
@@ -52,13 +49,13 @@ def classify_workflow_events_for_replay(workflow_events: List[Event], *, known_n
     global_buckets: Dict[str, List[Event]] = {
         "workflow_started": started_events,
         "workflow_finished": finished_events,
-        str(EVENT_WORKFLOW_RESOURCE_COMMIT): resource_commit_events,
+        str(EventType.WORKFLOW_RESOURCE_COMMIT): resource_commit_events,
     }
 
     node_event_buckets: Dict[str, Dict[str, List[Event]]] = {
-        str(EVENT_WORKFLOW_NODE_START): node_start_events_by_node_id,
-        str(EVENT_WORKFLOW_NODE_END): node_end_events_by_node_id,
-        str(EVENT_WORKFLOW_NODE_CANCELLED): node_cancelled_events_by_node_id,
+        str(EventType.WORKFLOW_NODE_START): node_start_events_by_node_id,
+        str(EventType.WORKFLOW_NODE_END): node_end_events_by_node_id,
+        str(EventType.WORKFLOW_NODE_CANCELLED): node_cancelled_events_by_node_id,
     }
 
     for event in workflow_events:

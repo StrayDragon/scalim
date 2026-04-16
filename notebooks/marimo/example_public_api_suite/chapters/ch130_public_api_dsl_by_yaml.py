@@ -76,7 +76,7 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
     from scalim.dsl.yaml_dsl import workflow as workflow_api
     from scalim.dsl.yaml_dsl import workflow_paths as workflow_paths_api
     from scalim.dsl.yaml_dsl import workflow_types as workflow_types_api
-    from scalim.events import EVENT_PIPELINE_START, WORKFLOW_NODE_ID_META_KEY
+    from scalim.events import EventType, WORKFLOW_NODE_ID_META_KEY
     from scalim.ob.observer import Observer
     from scalim.spec import ir as spec_ir_api
     from scalim.workflow import loaders as workflow_loaders_api
@@ -103,11 +103,11 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
 
     class _WorkflowBatchSizeObserver(Observer):
         def __init__(self) -> None:
-            self.event_types: Optional[Set[str]] = {EVENT_PIPELINE_START}
+            self.event_types: Optional[Set[str]] = {EventType.PIPELINE_START}
             self.batch_size_by_workflow_node_id: Dict[str, Optional[int]] = {}
 
         def on_event(self, event: Any) -> None:
-            if getattr(event, "event_type", None) != EVENT_PIPELINE_START:
+            if getattr(event, "event_type", None) != EventType.PIPELINE_START:
                 return
             meta = getattr(event, "meta", None) or {}
             raw_node_id = meta.get(WORKFLOW_NODE_ID_META_KEY)

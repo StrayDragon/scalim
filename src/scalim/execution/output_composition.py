@@ -8,7 +8,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 from .._internal.loggingx import format_kv, get_logger, prefix
 from .._internal.utils.iterables import ordered_unique_str
 from .._project_constants import VERSION as SCALIM_VERSION
-from ..events import EVENT_OUTPUT_TARGET_END
+from ..events import EventType
 from ..events._events import OutputTargetEndEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
@@ -703,7 +703,7 @@ class RouterRowSink(BaseRowSink):
             return
         for stat in self.get_target_stats():
             _ = self._instrumentation.emit(
-                EVENT_OUTPUT_TARGET_END,
+                EventType.OUTPUT_TARGET_END,
                 OutputTargetEndEvent(
                     target_id=stat.target_id,
                     output_path=stat.output_path,

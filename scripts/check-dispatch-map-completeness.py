@@ -2,7 +2,8 @@ import argparse
 import sys
 from typing import Iterable, List, Optional, Sequence, Set
 
-from scalim.events import WORKFLOW_EVENT_PREFIXES, get_event_catalog
+from scalim.events import get_event_catalog
+from scalim.events._catalog import WORKFLOW_EVENT_PREFIXES
 from scalim.ob.observer import _DISPATCH_MAP as _OBSERVER_DISPATCH_MAP
 from scalim.ob.presets.viz.workflow import _WORKFLOW_DISPATCH_MAP as _VIZ_WORKFLOW_DISPATCH_MAP
 

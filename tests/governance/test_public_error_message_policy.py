@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import pytest
 
-from scalim.events import EVENT_WORKFLOW_NODE_END, Event
+from scalim.events import Event, EventType
 from scalim.exceptions import REDACTED_ERROR_MESSAGE, ScalimError, safe_error_message
 from scalim.ob.observer import Observer
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
@@ -40,7 +40,7 @@ def _make_single_node_workflow_ir(*, node_id: str, demand_path: str, failure_pol
 
 def _last_workflow_node_end(observer: _CollectingObserver) -> Optional[Event]:
     for event in reversed(observer.events):
-        if str(event.event_type) == EVENT_WORKFLOW_NODE_END:
+        if str(event.event_type) == str(EventType.WORKFLOW_NODE_END):
             return event
     return None
 

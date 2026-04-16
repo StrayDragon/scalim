@@ -4,7 +4,7 @@ import time
 from collections.abc import Mapping
 from typing import List, Optional, Tuple, cast
 
-from .....events import EVENT_LOADER_CALL
+from .....events import EventType
 from .....spec.ir import LookupStepIr
 from .....spec.ir._helpers import coerce_loader_result_mapping
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
@@ -58,7 +58,7 @@ def _trigger_ref_loader_call(
     event_field_keys: Tuple[str, ...],
     cache_status: Optional[str],
 ) -> None:
-    if not runtime.instrumentation.wants(EVENT_LOADER_CALL):
+    if not runtime.instrumentation.wants(EventType.LOADER_CALL):
         return
     call_kwargs: LoaderCallKwargs = {}
     if binding:

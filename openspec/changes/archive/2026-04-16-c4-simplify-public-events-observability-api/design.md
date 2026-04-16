@@ -40,7 +40,7 @@
 对外新增一个**唯一的事件类型入口**：
 
 - `scalim.events.EventType`：推荐实现为 `enum.Enum`（可用 `class EventType(str, Enum)`），其 `.value` 必须与现有 `EVENT_*` 字符串完全一致，确保 `Event.event_type` 的稳定性不变。
--（可选）`scalim.events.types`：一个“分组视图”（namespace 对象），仅用于提升可发现性；内部引用 `EventType`，不引入任何新值。
+-（可选）`scalim.events.type_groups`：一个“分组视图”（namespace 对象），仅用于提升可发现性；内部引用 `EventType`，不引入任何新值。（说明：由于 stdlib 同名模块冲突门禁，避免使用 `scalim.events.types` 作为模块名）
 
 分组边界（推荐：确定性 + 可维护）：
 
@@ -101,7 +101,7 @@
   - `scalim.events.EventType`
   - `scalim.events.WorkflowNodeEndStatus`
   - `scalim.events.WorkflowNodeCancelledReason`
-  -（可选）`scalim.events.types`（分组视图）
+  -（可选）`scalim.events.type_groups`（分组视图）
   - `scalim.ob.ObservabilityOptions`（或等价 options dataclass）
 - **移除 / 收敛（从 `scalim.events` 顶层）**：
   - 平铺 `EVENT_*` 常量从 `scalim.events.__all__` 移除

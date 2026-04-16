@@ -7,16 +7,7 @@ from collections.abc import Sized
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
-from ...events import (
-    EVENT_ADAPTIVE_SCHEDULER_DECISION,
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_LOADER_CALL,
-    EVENT_OPERATOR_SPAN,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_STAGE_SPAN,
-)
+from ...events import EventType
 from ...events._events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
@@ -127,17 +118,17 @@ class PerformanceObserver(EventDispatchObserver):
             config = PerformanceConfig.default()
         self.config = config
         self.event_types = {
-            EVENT_PIPELINE_START,
-            EVENT_PIPELINE_END,
-            EVENT_BATCH_START,
-            EVENT_BATCH_END,
-            EVENT_LOADER_CALL,
-            EVENT_STAGE_SPAN,
+            EventType.PIPELINE_START,
+            EventType.PIPELINE_END,
+            EventType.BATCH_START,
+            EventType.BATCH_END,
+            EventType.LOADER_CALL,
+            EventType.STAGE_SPAN,
         }
         if config.include_scheduler_decisions:
-            self.event_types.add(EVENT_ADAPTIVE_SCHEDULER_DECISION)
+            self.event_types.add(EventType.ADAPTIVE_SCHEDULER_DECISION)
         if int(config.include_field_compute_top_n) > 0:
-            self.event_types.add(EVENT_OPERATOR_SPAN)
+            self.event_types.add(EventType.OPERATOR_SPAN)
         self.metrics = PerformanceMetrics()
         self._on_threshold_exceeded = on_threshold_exceeded
         self._presentation = config.presentation or PerformancePresentationLayer()

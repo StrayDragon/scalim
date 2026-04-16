@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from scalim.events import EVENT_OUTPUT_TARGET_END
+from scalim.events import EventType
 from scalim.events import Event
 from scalim.events._events import (
     AdaptiveSchedulerDecisionEvent,
@@ -393,7 +393,7 @@ def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
     hook.on_batch_end(BatchEndEvent(batch_num=1, duration=0.02))
     hook.on_event(
         Event(
-            event_type=EVENT_OUTPUT_TARGET_END,
+            event_type=EventType.OUTPUT_TARGET_END,
             timestamp=0.0,
             run_id="run_test",
             payload=OutputTargetEndEvent(

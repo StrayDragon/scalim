@@ -10,11 +10,7 @@ from scalim.workflow import resources as resources_mod
 from scalim.workflow import resources_csv as resources_csv_mod
 from scalim.workflow import resources_sheetbook as resources_sheetbook_mod
 from scalim.workflow import resources_workbook as resources_workbook_mod
-from scalim.events import (
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_WORKFLOW_RESOURCE_DISCARD,
-    EVENT_WORKFLOW_RESOURCE_WRITE,
-)
+from scalim.events import EventType
 from scalim.events._events import DiagnosticWarningEvent, WorkflowResourceWriteEvent
 
 from tests.support.testing_utils import CI_TIMEOUT_S
@@ -27,7 +23,7 @@ class _Instrumentation:
 
     def emit(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> None:
         self.events.append({"event_type": str(event_type), "payload": payload, "meta": dict(meta or {})})
-        if str(event_type) == EVENT_DIAGNOSTIC_WARNING:
+        if str(event_type) == str(EventType.DIAGNOSTIC_WARNING):
             self.warning_event.set()
 
 
@@ -310,7 +306,7 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
         header_policy="once",
         on_mismatch="warn",
     )
-    assert [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+    assert [e for e in instrumentation.events if e["event_type"] == str(EventType.DIAGNOSTIC_WARNING)]
     manager.discard_all(workflow_node_id="n_discard", reason="test")
 
     instrumentation = _Instrumentation()
@@ -345,7 +341,9 @@ def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Pat
         header_policy="once",
         on_mismatch="skip",
     )
-    skip_events = [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "skip"]
+    skip_events = [
+        e for e in instrumentation.events if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_WRITE) and e["payload"].action == "skip"
+    ]
     assert skip_events
     manager.discard_all(workflow_node_id="n_discard", reason="test")
 
@@ -423,7 +421,7 @@ def test_resource_manager_csv_append_mismatch_warn_and_skip(tmp_path: Path) -> N
         header_policy="once",
         on_mismatch="warn",
     )
-    assert [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+    assert [e for e in instrumentation.events if e["event_type"] == str(EventType.DIAGNOSTIC_WARNING)]
 
     mismatch2 = _write_csv(tmp_path / "c.csv", [["id", "another"], ["c1", "C1"]])
     manager.apply_csv_append(
@@ -436,7 +434,9 @@ def test_resource_manager_csv_append_mismatch_warn_and_skip(tmp_path: Path) -> N
         header_policy="once",
         on_mismatch="skip",
     )
-    skip_events = [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "skip"]
+    skip_events = [
+        e for e in instrumentation.events if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_WRITE) and e["payload"].action == "skip"
+    ]
     assert skip_events
 
     manager.discard_all(workflow_node_id="n_discard", reason="test")
@@ -483,7 +483,9 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
         input_csv=str(second),
         on_conflict="skip",
     )
-    assert [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "skip"]
+    assert [
+        e for e in instrumentation.events if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_WRITE) and e["payload"].action == "skip"
+    ]
 
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Sheet conflict"):
         manager.apply_sheetbook_sheet(
@@ -508,7 +510,9 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
         on_conflict="overwrite",
     )
     overwrite_events = [
-        e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "overwrite"
+        e
+        for e in instrumentation.events
+        if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_WRITE) and e["payload"].action == "overwrite"
     ]
     assert overwrite_events
 
@@ -653,7 +657,7 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         header_policy="once",
         on_mismatch="warn",
     )
-    assert [e for e in instrumentation.events if e["event_type"] == EVENT_DIAGNOSTIC_WARNING]
+    assert [e for e in instrumentation.events if e["event_type"] == str(EventType.DIAGNOSTIC_WARNING)]
     manager.discard_all(workflow_node_id="n_discard", reason="test")
 
     instrumentation = _Instrumentation()
@@ -695,7 +699,9 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         header_policy="once",
         on_mismatch="skip",
     )
-    skip_events = [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE and e["payload"].action == "skip"]
+    skip_events = [
+        e for e in instrumentation.events if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_WRITE) and e["payload"].action == "skip"
+    ]
     assert skip_events
     manager.discard_all(workflow_node_id="n_discard", reason="test")
 
@@ -928,7 +934,7 @@ def test_workflow_resource_manager_emit_does_not_deadlock_on_reentry(tmp_path: P
             _ = event_type, meta
             if self._reentered:
                 return
-            if str(event_type) != EVENT_WORKFLOW_RESOURCE_WRITE:
+            if str(event_type) != str(EventType.WORKFLOW_RESOURCE_WRITE):
                 return
             write_payload = payload
             if not isinstance(write_payload, WorkflowResourceWriteEvent):
@@ -1035,7 +1041,7 @@ def test_resource_manager_workbook_sheet_conflict_unknown_on_conflict_is_treated
         on_conflict="unknown",
     )
 
-    write_events = [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_WRITE]
+    write_events = [e for e in instrumentation.events if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_WRITE)]
     assert isinstance(write_events[-1]["payload"], WorkflowResourceWriteEvent)
     assert write_events[-1]["payload"].action == "write"
 
@@ -1380,7 +1386,7 @@ def test_resource_manager_sheetbook_discard_does_not_remove_external_files(tmp_p
 
     manager.discard_all(workflow_node_id="n_discard", reason="test")
     assert external_path.exists()
-    assert [e for e in instrumentation.events if e["event_type"] == EVENT_WORKFLOW_RESOURCE_DISCARD]
+    assert [e for e in instrumentation.events if e["event_type"] == str(EventType.WORKFLOW_RESOURCE_DISCARD)]
 
 
 def test_resource_manager_commit_all_skips_empty_plans(tmp_path: Path) -> None:

@@ -3,26 +3,7 @@
 import threading
 from typing import Any, Callable, Dict, Hashable, List, Optional, TypeVar, Union
 
-from ..events import (
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_COLUMN_WRITE,
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_ERROR,
-    EVENT_FIELD_COMPUTE,
-    EVENT_FIELD_SLIM,
-    EVENT_LOADER_CALL,
-    EVENT_LOADER_RETRY,
-    EVENT_LOADER_SLIM,
-    EVENT_OPERATOR_SPAN,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_RELATION_LOOKUP,
-    EVENT_ROW_RELEASE,
-    EVENT_ROW_WRITE,
-    EVENT_STAGE_SPAN,
-    Event,
-)
+from ..events import Event, EventType
 from ..events._events import (
     BatchEndEvent,
     BatchStartEvent,
@@ -155,24 +136,24 @@ class InstrumentationHub:
     # ---- 类型化辅助方法(执行热路径优先使用) ----
 
     def emit_pipeline_start(self, targets: List[str], batch_size: Optional[int]) -> None:
-        if not self.wants(EVENT_PIPELINE_START):
+        if not self.wants(EventType.PIPELINE_START):
             return
-        _ = self._emit_assume_wanted(EVENT_PIPELINE_START, PipelineStartEvent(targets, batch_size))
+        _ = self._emit_assume_wanted(EventType.PIPELINE_START, PipelineStartEvent(targets, batch_size))
 
     def emit_pipeline_end(self, total_batches: int, total_duration: float) -> None:
-        if not self.wants(EVENT_PIPELINE_END):
+        if not self.wants(EventType.PIPELINE_END):
             return
-        _ = self._emit_assume_wanted(EVENT_PIPELINE_END, PipelineEndEvent(total_batches, total_duration))
+        _ = self._emit_assume_wanted(EventType.PIPELINE_END, PipelineEndEvent(total_batches, total_duration))
 
     def emit_batch_start(self, batch_num: int, row_ids: List[Any]) -> None:
-        if not self.wants(EVENT_BATCH_START):
+        if not self.wants(EventType.BATCH_START):
             return
-        _ = self._emit_assume_wanted(EVENT_BATCH_START, BatchStartEvent(batch_num, row_ids))
+        _ = self._emit_assume_wanted(EventType.BATCH_START, BatchStartEvent(batch_num, row_ids))
 
     def emit_batch_end(self, batch_num: int, duration: float) -> None:
-        if not self.wants(EVENT_BATCH_END):
+        if not self.wants(EventType.BATCH_END):
             return
-        _ = self._emit_assume_wanted(EVENT_BATCH_END, BatchEndEvent(batch_num, duration))
+        _ = self._emit_assume_wanted(EventType.BATCH_END, BatchEndEvent(batch_num, duration))
 
     def emit_loader_call(
         self,
@@ -190,7 +171,7 @@ class InstrumentationHub:
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         # 类型化钩子的 `loader_result_policy` 可能与观测器/事件路径不同.
-        if self.hook_manager.wants_typed(EVENT_LOADER_CALL):
+        if self.hook_manager.wants_typed(EventType.LOADER_CALL):
             self.hook_manager.trigger_loader_call(
                 loader_name=loader_name,
                 params=params,
@@ -204,7 +185,7 @@ class InstrumentationHub:
                 skipped_none_rows=skipped_none_rows,
             )
 
-        if not (self.observer_manager.wants(EVENT_LOADER_CALL) or self.hook_manager.wants_on_event(EVENT_LOADER_CALL)):
+        if not (self.observer_manager.wants(EventType.LOADER_CALL) or self.hook_manager.wants_on_event(EventType.LOADER_CALL)):
             return
 
         payload = result
@@ -228,7 +209,7 @@ class InstrumentationHub:
             skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
         )
-        event = self.observer_manager.emit_event(EVENT_LOADER_CALL, event_payload, meta=meta)
+        event = self.observer_manager.emit_event(EventType.LOADER_CALL, event_payload, meta=meta)
         if self.observer_manager.mode != "capture":
             self.hook_manager.emit_on_event(event)
 
@@ -246,10 +227,10 @@ class InstrumentationHub:
         batch_num: Optional[int] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_LOADER_RETRY):
+        if not self.wants(EventType.LOADER_RETRY):
             return
         _ = self._emit_assume_wanted(
-            EVENT_LOADER_RETRY,
+            EventType.LOADER_RETRY,
             LoaderRetryEvent(
                 loader_name=loader_name,
                 callsite=callsite,
@@ -272,14 +253,14 @@ class InstrumentationHub:
         result: Any,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_FIELD_COMPUTE):
+        if not self.wants(EventType.FIELD_COMPUTE):
             return
-        _ = self._emit_assume_wanted(EVENT_FIELD_COMPUTE, FieldComputeEvent(field_key, row_id, dependencies, result), meta=meta)
+        _ = self._emit_assume_wanted(EventType.FIELD_COMPUTE, FieldComputeEvent(field_key, row_id, dependencies, result), meta=meta)
 
     def emit_error(self, error: Exception, context: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> None:
-        if not self.wants(EVENT_ERROR):
+        if not self.wants(EventType.ERROR):
             return
-        _ = self._emit_assume_wanted(EVENT_ERROR, ErrorEvent(error, context), meta=meta)
+        _ = self._emit_assume_wanted(EventType.ERROR, ErrorEvent(error, context), meta=meta)
 
     def emit_diagnostic_warning(
         self,
@@ -298,8 +279,10 @@ class InstrumentationHub:
                     return
                 self._diagnostic_warning_emitted = True
 
-        hooks_want = self.hook_manager.wants_typed(EVENT_DIAGNOSTIC_WARNING)
-        event_want = self.observer_manager.wants(EVENT_DIAGNOSTIC_WARNING) or self.hook_manager.wants_on_event(EVENT_DIAGNOSTIC_WARNING)
+        hooks_want = self.hook_manager.wants_typed(EventType.DIAGNOSTIC_WARNING)
+        event_want = self.observer_manager.wants(EventType.DIAGNOSTIC_WARNING) or self.hook_manager.wants_on_event(
+            EventType.DIAGNOSTIC_WARNING
+        )
 
         if not hooks_want and not event_want:
             if self.hook_manager.fallback_logger_enabled or self.observer_manager.fallback_logger_enabled:
@@ -323,12 +306,12 @@ class InstrumentationHub:
         )
 
         if hooks_want:
-            self.hook_manager.emit_typed(EVENT_DIAGNOSTIC_WARNING, payload)
+            self.hook_manager.emit_typed(EventType.DIAGNOSTIC_WARNING, payload)
 
         if not event_want:
             return
 
-        event = self.observer_manager.emit_event(EVENT_DIAGNOSTIC_WARNING, payload, meta=meta)
+        event = self.observer_manager.emit_event(EventType.DIAGNOSTIC_WARNING, payload, meta=meta)
         if self.observer_manager.mode != "capture":
             self.hook_manager.emit_on_event(event)
 
@@ -340,10 +323,10 @@ class InstrumentationHub:
         remaining_fields: int,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_FIELD_SLIM):
+        if not self.wants(EventType.FIELD_SLIM):
             return
         _ = self._emit_assume_wanted(
-            EVENT_FIELD_SLIM,
+            EventType.FIELD_SLIM,
             FieldSlimEvent(field_key, reason, batch_num, remaining_fields),
             meta=meta,
         )
@@ -356,9 +339,9 @@ class InstrumentationHub:
         row_index: int,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_ROW_WRITE):
+        if not self.wants(EventType.ROW_WRITE):
             return
-        _ = self._emit_assume_wanted(EVENT_ROW_WRITE, RowWriteEvent(row_id, field_count, batch_num, row_index), meta=meta)
+        _ = self._emit_assume_wanted(EventType.ROW_WRITE, RowWriteEvent(row_id, field_count, batch_num, row_index), meta=meta)
 
     def emit_row_release(
         self,
@@ -368,10 +351,10 @@ class InstrumentationHub:
         batch_num: int,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_ROW_RELEASE):
+        if not self.wants(EventType.ROW_RELEASE):
             return
         _ = self._emit_assume_wanted(
-            EVENT_ROW_RELEASE,
+            EventType.ROW_RELEASE,
             RowReleaseEvent(row_id, released_fields, retained_fields, batch_num),
             meta=meta,
         )
@@ -384,10 +367,10 @@ class InstrumentationHub:
         batch_num: int,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_LOADER_SLIM):
+        if not self.wants(EventType.LOADER_SLIM):
             return
         _ = self._emit_assume_wanted(
-            EVENT_LOADER_SLIM,
+            EventType.LOADER_SLIM,
             LoaderSlimEvent(loader_name, original_keys, extracted_fields, batch_num),
             meta=meta,
         )
@@ -399,9 +382,9 @@ class InstrumentationHub:
         batch_num: int,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_COLUMN_WRITE):
+        if not self.wants(EventType.COLUMN_WRITE):
             return
-        _ = self._emit_assume_wanted(EVENT_COLUMN_WRITE, ColumnWriteEvent(field_key, row_count, batch_num), meta=meta)
+        _ = self._emit_assume_wanted(EventType.COLUMN_WRITE, ColumnWriteEvent(field_key, row_count, batch_num), meta=meta)
 
     def emit_relation_lookup(
         self,
@@ -416,7 +399,7 @@ class InstrumentationHub:
         error_message: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_RELATION_LOOKUP):
+        if not self.wants(EventType.RELATION_LOOKUP):
             return
         payload = RelationLookupEvent(
             field_key=field_key,
@@ -429,12 +412,12 @@ class InstrumentationHub:
             expected_type=expected_type,
             error_message=error_message,
         )
-        _ = self._emit_assume_wanted(EVENT_RELATION_LOOKUP, payload, meta=meta)
+        _ = self._emit_assume_wanted(EventType.RELATION_LOOKUP, payload, meta=meta)
 
     def emit_stage_span(self, stage: str, batch_num: int, duration: float, meta: Optional[Dict[str, Any]] = None) -> None:
-        if not self.wants(EVENT_STAGE_SPAN):
+        if not self.wants(EventType.STAGE_SPAN):
             return
-        _ = self._emit_assume_wanted(EVENT_STAGE_SPAN, StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration), meta=meta)
+        _ = self._emit_assume_wanted(EventType.STAGE_SPAN, StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration), meta=meta)
 
     def emit_operator_span(
         self,
@@ -445,7 +428,7 @@ class InstrumentationHub:
         duration: float,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
-        if not self.wants(EVENT_OPERATOR_SPAN):
+        if not self.wants(EventType.OPERATOR_SPAN):
             return
         payload = OperatorSpanEvent(
             operator_type=str(operator_type),
@@ -453,7 +436,7 @@ class InstrumentationHub:
             batch_num=int(batch_num),
             duration=float(duration),
         )
-        _ = self._emit_assume_wanted(EVENT_OPERATOR_SPAN, payload, meta=meta)
+        _ = self._emit_assume_wanted(EventType.OPERATOR_SPAN, payload, meta=meta)
 
 
 __all__ = ("InstrumentationHub",)

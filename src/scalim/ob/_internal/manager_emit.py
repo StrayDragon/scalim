@@ -5,24 +5,9 @@ from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
 from ..._internal.loggingx import format_kv, prefix
 from ...events import (
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_COLUMN_WRITE,
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_ERROR,
-    EVENT_FIELD_COMPUTE,
-    EVENT_FIELD_SLIM,
-    EVENT_LOADER_CALL,
-    EVENT_LOADER_RETRY,
-    EVENT_LOADER_SLIM,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
-    EVENT_RELATION_LOOKUP,
-    EVENT_ROW_RELEASE,
-    EVENT_ROW_WRITE,
-    EVENT_STAGE_SPAN,
     WORKFLOW_ATTRIBUTION_META_KEYS,
     Event,
+    EventType,
     now_ts,
 )
 from ...events._events import (
@@ -190,28 +175,28 @@ class ObserverManagerEmitMixin(ABC):
                 self._close_observer_safely(observer)
 
     def emit_pipeline_start(self, targets: List[str], batch_size: Optional[int]) -> None:
-        if not self._should_emit_event_type(EVENT_PIPELINE_START):
+        if not self._should_emit_event_type(EventType.PIPELINE_START):
             return
         payload = PipelineStartEvent(targets, batch_size)
-        _ = self.emit_event(EVENT_PIPELINE_START, payload)
+        _ = self.emit_event(EventType.PIPELINE_START, payload)
 
     def emit_pipeline_end(self, total_batches: int, total_duration: float) -> None:
-        if not self._should_emit_event_type(EVENT_PIPELINE_END):
+        if not self._should_emit_event_type(EventType.PIPELINE_END):
             return
         payload = PipelineEndEvent(total_batches, total_duration)
-        _ = self.emit_event(EVENT_PIPELINE_END, payload)
+        _ = self.emit_event(EventType.PIPELINE_END, payload)
 
     def emit_batch_start(self, batch_num: int, row_ids: List[Any]) -> None:
-        if not self._should_emit_event_type(EVENT_BATCH_START):
+        if not self._should_emit_event_type(EventType.BATCH_START):
             return
         payload = BatchStartEvent(batch_num, row_ids)
-        _ = self.emit_event(EVENT_BATCH_START, payload)
+        _ = self.emit_event(EventType.BATCH_START, payload)
 
     def emit_batch_end(self, batch_num: int, duration: float) -> None:
-        if not self._should_emit_event_type(EVENT_BATCH_END):
+        if not self._should_emit_event_type(EventType.BATCH_END):
             return
         payload = BatchEndEvent(batch_num, duration)
-        _ = self.emit_event(EVENT_BATCH_END, payload)
+        _ = self.emit_event(EventType.BATCH_END, payload)
 
     def emit_loader_call(
         self,
@@ -226,7 +211,7 @@ class ObserverManagerEmitMixin(ABC):
         lookup_key_count: Optional[int] = None,
         field_keys: Optional[List[str]] = None,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_LOADER_CALL):
+        if not self._should_emit_event_type(EventType.LOADER_CALL):
             return
         payload = result
         if self.loader_result_policy != "full":
@@ -247,7 +232,7 @@ class ObserverManagerEmitMixin(ABC):
             lookup_key_count=lookup_key_count,
             field_keys=field_keys,
         )
-        _ = self.emit_event(EVENT_LOADER_CALL, event_payload)
+        _ = self.emit_event(EventType.LOADER_CALL, event_payload)
 
     def emit_loader_retry(
         self,
@@ -262,7 +247,7 @@ class ObserverManagerEmitMixin(ABC):
         error_message: Optional[str],
         batch_num: Optional[int] = None,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_LOADER_RETRY):
+        if not self._should_emit_event_type(EventType.LOADER_RETRY):
             return
         payload = LoaderRetryEvent(
             loader_name=loader_name,
@@ -275,7 +260,7 @@ class ObserverManagerEmitMixin(ABC):
             error_message=error_message,
             batch_num=batch_num,
         )
-        _ = self.emit_event(EVENT_LOADER_RETRY, payload)
+        _ = self.emit_event(EventType.LOADER_RETRY, payload)
 
     def emit_field_compute(
         self,
@@ -284,16 +269,16 @@ class ObserverManagerEmitMixin(ABC):
         dependencies: Dict[str, Any],
         result: Any,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_FIELD_COMPUTE):
+        if not self._should_emit_event_type(EventType.FIELD_COMPUTE):
             return
         payload = FieldComputeEvent(field_key, row_id, dependencies, result)
-        _ = self.emit_event(EVENT_FIELD_COMPUTE, payload)
+        _ = self.emit_event(EventType.FIELD_COMPUTE, payload)
 
     def emit_error(self, error: Exception, context: Dict[str, Any]) -> None:
-        if not self._should_emit_event_type(EVENT_ERROR):
+        if not self._should_emit_event_type(EventType.ERROR):
             return
         payload = ErrorEvent(error, context)
-        _ = self.emit_event(EVENT_ERROR, payload)
+        _ = self.emit_event(EventType.ERROR, payload)
 
     def emit_diagnostic_warning(
         self,
@@ -311,7 +296,7 @@ class ObserverManagerEmitMixin(ABC):
             if sample_once:
                 self._diagnostic_warning_emitted = True
 
-        if self._should_emit_event_type(EVENT_DIAGNOSTIC_WARNING):
+        if self._should_emit_event_type(EventType.DIAGNOSTIC_WARNING):
             payload = DiagnosticWarningEvent(
                 message=message,
                 source_id=source_id,
@@ -319,7 +304,7 @@ class ObserverManagerEmitMixin(ABC):
                 lookup_key=lookup_key,
                 row_id=row_id,
             )
-            _ = self.emit_event(EVENT_DIAGNOSTIC_WARNING, payload)
+            _ = self.emit_event(EventType.DIAGNOSTIC_WARNING, payload)
         elif self.fallback_logger_enabled:
             kv = format_kv(
                 message=message,
@@ -337,10 +322,10 @@ class ObserverManagerEmitMixin(ABC):
         batch_num: int,
         remaining_fields: int,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_FIELD_SLIM):
+        if not self._should_emit_event_type(EventType.FIELD_SLIM):
             return
         payload = FieldSlimEvent(field_key, reason, batch_num, remaining_fields)
-        _ = self.emit_event(EVENT_FIELD_SLIM, payload)
+        _ = self.emit_event(EventType.FIELD_SLIM, payload)
 
     def emit_row_write(
         self,
@@ -349,10 +334,10 @@ class ObserverManagerEmitMixin(ABC):
         batch_num: int,
         row_index: int,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_ROW_WRITE):
+        if not self._should_emit_event_type(EventType.ROW_WRITE):
             return
         payload = RowWriteEvent(row_id, field_count, batch_num, row_index)
-        _ = self.emit_event(EVENT_ROW_WRITE, payload)
+        _ = self.emit_event(EventType.ROW_WRITE, payload)
 
     def emit_row_release(
         self,
@@ -361,10 +346,10 @@ class ObserverManagerEmitMixin(ABC):
         retained_fields: List[str],
         batch_num: int,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_ROW_RELEASE):
+        if not self._should_emit_event_type(EventType.ROW_RELEASE):
             return
         payload = RowReleaseEvent(row_id, released_fields, retained_fields, batch_num)
-        _ = self.emit_event(EVENT_ROW_RELEASE, payload)
+        _ = self.emit_event(EventType.ROW_RELEASE, payload)
 
     def emit_loader_slim(
         self,
@@ -373,10 +358,10 @@ class ObserverManagerEmitMixin(ABC):
         extracted_fields: List[str],
         batch_num: int,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_LOADER_SLIM):
+        if not self._should_emit_event_type(EventType.LOADER_SLIM):
             return
         payload = LoaderSlimEvent(loader_name, original_keys, extracted_fields, batch_num)
-        _ = self.emit_event(EVENT_LOADER_SLIM, payload)
+        _ = self.emit_event(EventType.LOADER_SLIM, payload)
 
     def emit_column_write(
         self,
@@ -384,10 +369,10 @@ class ObserverManagerEmitMixin(ABC):
         row_count: int,
         batch_num: int,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_COLUMN_WRITE):
+        if not self._should_emit_event_type(EventType.COLUMN_WRITE):
             return
         payload = ColumnWriteEvent(field_key, row_count, batch_num)
-        _ = self.emit_event(EVENT_COLUMN_WRITE, payload)
+        _ = self.emit_event(EventType.COLUMN_WRITE, payload)
 
     def emit_relation_lookup(
         self,
@@ -401,7 +386,7 @@ class ObserverManagerEmitMixin(ABC):
         expected_type: Optional[str] = None,
         error_message: Optional[str] = None,
     ) -> None:
-        if not self._should_emit_event_type(EVENT_RELATION_LOOKUP):
+        if not self._should_emit_event_type(EventType.RELATION_LOOKUP):
             return
         payload = RelationLookupEvent(
             field_key=field_key,
@@ -414,13 +399,13 @@ class ObserverManagerEmitMixin(ABC):
             expected_type=expected_type,
             error_message=error_message,
         )
-        _ = self.emit_event(EVENT_RELATION_LOOKUP, payload)
+        _ = self.emit_event(EventType.RELATION_LOOKUP, payload)
 
     def emit_stage_span(self, stage: str, batch_num: int, duration: float) -> None:
-        if not self._should_emit_event_type(EVENT_STAGE_SPAN):
+        if not self._should_emit_event_type(EventType.STAGE_SPAN):
             return
         payload = StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration)
-        _ = self.emit_event(EVENT_STAGE_SPAN, payload)
+        _ = self.emit_event(EventType.STAGE_SPAN, payload)
 
 
 __all__ = ()

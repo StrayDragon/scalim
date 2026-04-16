@@ -5,7 +5,7 @@ import pytest
 
 from scalim_benchlib import BenchmarkRunner
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.events import EVENT_PIPELINE_START
+from scalim.events import EventType
 from scalim.hooks import HookManager
 from scalim.ob.hub import InstrumentationHub
 from scalim.ob.manager import ObserverManager
@@ -96,7 +96,7 @@ def _make_runner(scenario: str, iters: int) -> Callable[[], int]:
 
         def _run() -> int:
             for _idx in range(iters):
-                _ = hub.emit_lazy(EVENT_PIPELINE_START, _payload_factory)
+                _ = hub.emit_lazy(EventType.PIPELINE_START, _payload_factory)
             return iters
 
         return _run

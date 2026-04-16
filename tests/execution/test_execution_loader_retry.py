@@ -2,8 +2,7 @@ from typing import List, Optional, Set
 
 import pytest
 
-from scalim.events import EVENT_ERROR, EVENT_LOADER_RETRY
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.execution.loader_retry import LoaderRetryPolicies, LoaderRetryPolicy
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, run_ir
@@ -16,7 +15,7 @@ from scalim.spec.ir import MainSourceIr, RuntimeHandleIdIr
 
 class _CaptureObserver(Observer):
     def __init__(self) -> None:
-        self.event_types: Optional[Set[str]] = {EVENT_LOADER_RETRY, EVENT_ERROR}
+        self.event_types: Optional[Set[str]] = {EventType.LOADER_RETRY, EventType.ERROR}
         self.events: List[Event] = []
 
     def on_event(self, event: Event) -> None:
@@ -73,8 +72,8 @@ def test_run_ir_retries_main_source_and_emits_loader_retry_event() -> None:
     assert sink.get_data() == [{"order_id": 1}]
     assert calls["n"] == 2
 
-    retry_events = [e for e in observer.events if e.event_type == EVENT_LOADER_RETRY]
-    error_events = [e for e in observer.events if e.event_type == EVENT_ERROR]
+    retry_events = [e for e in observer.events if e.event_type == EventType.LOADER_RETRY]
+    error_events = [e for e in observer.events if e.event_type == EventType.ERROR]
     assert len(retry_events) == 1
     assert error_events == []
     assert retry_events[0].payload.callsite == "main_source"
@@ -123,8 +122,8 @@ def test_run_ir_retry_give_up_emits_single_error_event() -> None:
         _ = run_ir(demand_ir, request)
 
     assert calls["n"] == 2
-    retry_events = [e for e in observer.events if e.event_type == EVENT_LOADER_RETRY]
-    error_events = [e for e in observer.events if e.event_type == EVENT_ERROR]
+    retry_events = [e for e in observer.events if e.event_type == EventType.LOADER_RETRY]
+    error_events = [e for e in observer.events if e.event_type == EventType.ERROR]
 
     assert len(retry_events) == 1
     assert len(error_events) == 1

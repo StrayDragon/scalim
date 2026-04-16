@@ -4,13 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from scalim.events import (
-    EVENT_PIPELINE_START,
-    EVENT_WORKFLOW_NODE_END,
-    EVENT_WORKFLOW_NODE_START,
-    EVENT_WORKFLOW_RESOURCE_COMMIT,
-    Event,
-)
+from scalim.events import Event, EventType
 from scalim.events._events import PipelineStartEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent, WorkflowResourceCommitEvent
 from scalim.execution.adaptive.capture import HookRecordedEvent
 from scalim.execution import ExecutionRequest, ExportLayout, ObservabilitySpec
@@ -125,7 +119,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
     workflow_events: List[Event] = [
         Event(event_type="workflow_started", timestamp=ts, run_id=workflow_exec_id, payload={"x": 1}, meta={}, seq=1),
         Event(
-            event_type=EVENT_WORKFLOW_RESOURCE_COMMIT,
+            event_type=EventType.WORKFLOW_RESOURCE_COMMIT,
             timestamp=ts,
             run_id=workflow_exec_id,
             payload=WorkflowResourceCommitEvent(
@@ -139,7 +133,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
             seq=2,
         ),
         Event(
-            event_type=EVENT_WORKFLOW_NODE_START,
+            event_type=EventType.WORKFLOW_NODE_START,
             timestamp=ts,
             run_id=workflow_exec_id,
             payload=WorkflowNodeStartEvent(workflow_exec_id=workflow_exec_id, workflow_node_id=node_id, node_type="demand"),
@@ -147,7 +141,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
             seq=3,
         ),
         Event(
-            event_type=EVENT_WORKFLOW_NODE_END,
+            event_type=EventType.WORKFLOW_NODE_END,
             timestamp=ts,
             run_id=workflow_exec_id,
             payload=WorkflowNodeEndEvent(
@@ -171,7 +165,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
         Event(event_type="workflow_finished", timestamp=ts, run_id=workflow_exec_id, payload={"x": 2}, meta={}, seq=7),
     ]
     workflow_hook_events = [
-        HookRecordedEvent(event_type=EVENT_PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
+        HookRecordedEvent(event_type=EventType.PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
     ]
 
     extra_hook = _RecordingHook()
@@ -184,11 +178,11 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
     )
 
     demand_hook_events = [
-        HookRecordedEvent(event_type=EVENT_PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
+        HookRecordedEvent(event_type=EventType.PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
     ]
     demand_observer_events = [
         Event(
-            event_type=EVENT_PIPELINE_START,
+            event_type=EventType.PIPELINE_START,
             timestamp=ts,
             run_id=node_id,
             payload=PipelineStartEvent(targets=[], batch_size=None),
@@ -196,7 +190,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
             seq=2,
         ),
         Event(
-            event_type=EVENT_PIPELINE_START,
+            event_type=EventType.PIPELINE_START,
             timestamp=ts,
             run_id=node_id,
             payload=PipelineStartEvent(targets=[], batch_size=None),

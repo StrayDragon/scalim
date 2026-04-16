@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from ...events import EVENT_LOADER_CALL
+from ...events import EventType
 from ...events._events import LoaderCallEvent
 from ...hooks import HookManager
 from ...vendor.compact.typing_extensionsx import override
@@ -66,7 +66,7 @@ class HookCaptureManager(HookManager):
     ) -> None:
         if not self._has_hooks:
             return
-        if EVENT_LOADER_CALL not in self._typed_handlers_by_event_type:
+        if EventType.LOADER_CALL not in self._typed_handlers_by_event_type:
             return
 
         payload = result
@@ -89,7 +89,7 @@ class HookCaptureManager(HookManager):
             skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
         )
-        self._recorded_events.append(HookRecordedEvent(event_type=EVENT_LOADER_CALL, payload=event))
+        self._recorded_events.append(HookRecordedEvent(event_type=EventType.LOADER_CALL, payload=event))
 
 
 __all__ = ("HookCaptureManager", "HookRecordedEvent")

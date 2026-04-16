@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
-from scalim.events import EVENT_BATCH_START, EVENT_LOADER_CALL
+from scalim.events import EventType
 from scalim.events._events import BatchStartEvent
 from scalim.execution.adaptive.capture import HookCaptureManager
 from scalim.execution.engine import ScalimEngine
@@ -34,7 +34,7 @@ class _LoaderCallHook(BaseHook):
 def test_hook_capture_manager_emit_typed_gates_and_records() -> None:
     empty = HookManager()
     capture = HookCaptureManager(empty)
-    capture.emit_typed(EVENT_BATCH_START, BatchStartEvent(batch_num=1, row_ids=[1]))
+    capture.emit_typed(EventType.BATCH_START, BatchStartEvent(batch_num=1, row_ids=[1]))
     assert capture.drain_events() == []
 
     source = HookManager()
@@ -43,10 +43,10 @@ def test_hook_capture_manager_emit_typed_gates_and_records() -> None:
     capture.emit_typed("not-a-real-event-type", object())
     assert capture.drain_events() == []
 
-    capture.emit_typed(EVENT_BATCH_START, BatchStartEvent(batch_num=1, row_ids=[1]))
+    capture.emit_typed(EventType.BATCH_START, BatchStartEvent(batch_num=1, row_ids=[1]))
     events = capture.drain_events()
     assert len(events) == 1
-    assert events[0].event_type == EVENT_BATCH_START
+    assert events[0].event_type == EventType.BATCH_START
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_hook_capture_manager_trigger_loader_call_policies(policy: str, sample_s
     events = capture.drain_events()
     assert len(events) == 1
     recorded = events[0]
-    assert recorded.event_type == EVENT_LOADER_CALL
+    assert recorded.event_type == EventType.LOADER_CALL
     assert recorded.payload.loader_name == "customers"
     assert recorded.payload.result == expected
 
@@ -352,7 +352,7 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
     seen_loader_names: List[str] = []
 
     class _OnEventHook(BaseHook):
-        event_types = {EVENT_LOADER_CALL}
+        event_types = {EventType.LOADER_CALL}
 
         def on_event(self, event) -> None:  # type: ignore[override]
             payload = event.payload

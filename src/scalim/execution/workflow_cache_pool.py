@@ -5,12 +5,7 @@ from collections import OrderedDict
 from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, overload
 
 from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
-from ..events import (
-    EVENT_DIAGNOSTIC_WARNING,
-    EVENT_WORKFLOW_CACHE_ACQUIRE,
-    EVENT_WORKFLOW_CACHE_EVICT,
-    EVENT_WORKFLOW_CACHE_RELEASE,
-)
+from ..events import EventType
 from ..events._events import (
     DiagnosticWarningEvent,
     WorkflowCacheAcquireEvent,
@@ -284,7 +279,7 @@ class WorkflowCachePool:
                 )
                 pending_emits.append(
                     (
-                        EVENT_DIAGNOSTIC_WARNING,
+                        EventType.DIAGNOSTIC_WARNING,
                         DiagnosticWarningEvent(
                             message=warn_msg,
                             source_id=str(logical_key[1]),
@@ -316,7 +311,7 @@ class WorkflowCachePool:
 
             pending_emits.append(
                 (
-                    EVENT_WORKFLOW_CACHE_ACQUIRE,
+                    EventType.WORKFLOW_CACHE_ACQUIRE,
                     WorkflowCacheAcquireEvent(
                         workflow_exec_id=self._workflow_exec_id,
                         workflow_node_id=node_id,
@@ -384,7 +379,7 @@ class WorkflowCachePool:
             remaining = len(self._remaining_consumers_by_logical_key.get(logical_key, set()))
             pending_emits.append(
                 (
-                    EVENT_WORKFLOW_CACHE_RELEASE,
+                    EventType.WORKFLOW_CACHE_RELEASE,
                     WorkflowCacheReleaseEvent(
                         workflow_exec_id=self._workflow_exec_id,
                         workflow_node_id=node_id,
@@ -496,7 +491,7 @@ class WorkflowCachePool:
                 _ = self._remaining_consumers_by_logical_key.pop(logical_key, None)
 
         return (
-            EVENT_WORKFLOW_CACHE_EVICT,
+            EventType.WORKFLOW_CACHE_EVICT,
             WorkflowCacheEvictEvent(
                 workflow_exec_id=self._workflow_exec_id,
                 workflow_node_id=str(workflow_node_id),

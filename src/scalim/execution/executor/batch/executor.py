@@ -9,7 +9,7 @@ import time
 from concurrent.futures import Executor
 from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
 
-from ....events import EVENT_OPERATOR_SPAN
+from ....events import EventType
 from ....planning.operators import ComputeOperatorIr, OperatorType, SupportedOperatorIr
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
 from ....planning.plan import ExecutionPlan
@@ -122,7 +122,7 @@ class BatchExecutor:
         after_operator: Optional[Callable[[object], None]],
     ) -> Optional[Dict[str, float]]:
         wants_stage_spans, stage_durations, stage_map = init_stage_span_tracking(runtime)
-        wants_operator_spans = runtime.instrumentation.wants(EVENT_OPERATOR_SPAN)
+        wants_operator_spans = runtime.instrumentation.wants(EventType.OPERATOR_SPAN)
 
         resolved_workers = 1
         if runtime.parallel_mode == "adaptive":

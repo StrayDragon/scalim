@@ -10,7 +10,7 @@ from scalim.dsl.yaml_dsl.runtime.contracts import UNSET
 from scalim.dsl.yaml_dsl.runtime.entrypoints import run as run_demand
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch, WorkflowRunOptions
 from scalim.execution import run_ir as run_ir_real
-from scalim.events import EVENT_PRE_USE_BATCH_SIZE
+from scalim.events import EventType
 from scalim.hooks import BaseHook, HookManager, PreUseBatchSizeDecision
 
 
@@ -269,7 +269,7 @@ def test_emit_pre_use_batch_size_signal_works_without_enter_exit_contract() -> N
     payload = SimpleNamespace(value=1000)
     manager = HookManager()
     manager.register(hook)
-    manager.emit_typed_policy(EVENT_PRE_USE_BATCH_SIZE, payload)
+    manager.emit_typed_policy(EventType.PRE_USE_BATCH_SIZE, payload)
 
     assert hook.calls == 1
 

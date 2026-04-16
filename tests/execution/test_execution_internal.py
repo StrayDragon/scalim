@@ -306,7 +306,7 @@ def test_pipeline_iter_row_batches_batch_size_none_empty_rows_yields_nothing() -
 
 
 def test_pipeline_iter_row_batches_emits_stream_duration_only_when_stage_spans_wanted() -> None:
-    from scalim.events import EVENT_STAGE_SPAN
+    from scalim.events import EventType
     from scalim.ob.observer import Observer
 
     class _Clock:
@@ -356,7 +356,7 @@ def test_pipeline_iter_row_batches_emits_stream_duration_only_when_stage_spans_w
     assert items[1][2] is None
 
     class _WantsStageSpans(Observer):
-        event_types = {EVENT_STAGE_SPAN}
+        event_types = {EventType.STAGE_SPAN}
 
         def on_event(self, event):  # type: ignore[override,no-untyped-def]
             _ = event

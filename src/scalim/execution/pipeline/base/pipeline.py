@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from concurrent.futures import Executor
 from typing import Any, Callable, Dict, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
 
-from ....events import EVENT_STAGE_SPAN
+from ....events import EventType
 from ....hooks import HookManager
 from ....ob.manager import ObserverManager
 from ....planning.operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
@@ -324,7 +324,7 @@ class Pipeline(ABC):
         """按行顺序产出批次(`row_ids`, `row_map`, `stream_duration_s`)."""
         row_iter = iter(main_rows)
         next_row_id = 0
-        wants_stage_spans = self.runtime.instrumentation.wants(EVENT_STAGE_SPAN)
+        wants_stage_spans = self.runtime.instrumentation.wants(EventType.STAGE_SPAN)
         perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
 
         def _make_row_ids(start: int, count: int) -> List[Hashable]:

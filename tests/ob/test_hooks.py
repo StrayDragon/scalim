@@ -2,7 +2,7 @@ import json
 import logging
 
 import pytest
-from scalim.events import Event
+from scalim.events import Event, EventType
 from scalim.events._events import (
     ColumnWriteEvent,
     DiagnosticWarningEvent,
@@ -10,12 +10,6 @@ from scalim.events._events import (
     FieldSlimEvent,
     LoaderCallEvent,
     LoaderSlimEvent,
-)
-from scalim.events import (
-    EVENT_BATCH_END,
-    EVENT_BATCH_START,
-    EVENT_PIPELINE_END,
-    EVENT_PIPELINE_START,
 )
 from scalim.hooks import HOOK_RAISED_EXCEPTION_WARNING, BaseHook, HookManager
 from scalim.ob.observer import EventDispatchObserver, Observer
@@ -484,11 +478,11 @@ def test_seq_pipeline_emits_event_order(plan_builder, engine_factory, example_ru
 
     events = observer.events
     assert events
-    assert events[0] == EVENT_PIPELINE_START
-    assert events[-1] == EVENT_PIPELINE_END
+    assert events[0] == EventType.PIPELINE_START
+    assert events[-1] == EventType.PIPELINE_END
 
-    batch_starts = [idx for idx, name in enumerate(events) if name == EVENT_BATCH_START]
-    batch_ends = [idx for idx, name in enumerate(events) if name == EVENT_BATCH_END]
+    batch_starts = [idx for idx, name in enumerate(events) if name == EventType.BATCH_START]
+    batch_ends = [idx for idx, name in enumerate(events) if name == EventType.BATCH_END]
     assert len(batch_starts) == len(batch_ends) > 0
     assert batch_starts[0] > 0
     assert batch_ends[-1] < len(events) - 1

@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
-from scalim.events import EVENT_LOADER_CALL
+from scalim.events import EventType
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager
 from scalim.ob.observer import Observer
@@ -12,7 +12,7 @@ from scalim.spec.ir import BindingIr, DemandIr, FieldIr, KeyIr, LoaderIr, MainSo
 
 
 class _LoaderCallObserver(Observer):
-    event_types = {EVENT_LOADER_CALL}
+    event_types = {EventType.LOADER_CALL}
 
     def __init__(self) -> None:
         self.thread_ids: Set[int] = set()
