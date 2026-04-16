@@ -21,6 +21,10 @@
 - **Dev artifacts**:
   - Rebuildable sample data / reports MUST be generated under `.tmp/` and MUST NOT be committed (e.g. viz examples under `.tmp/artifacts/scalim-viz/`).
   - Known legacy exception (do not rename yet): `src/scalim/_project_constants.py` and `frontend/**/src/generated/project_constants.ts` are generated but not suffixed with `.gen.`.
+- **Project directives**: do not remove repository-specific machine-readable directives; they are consumed by governance scripts/generators.
+  - `# pragma: scalim-public-api tier1:...` (Tier 1 public API catalog for `docs/doc/getting-started/public-api.gen.md`)
+  - `# pragma: allow-c901-file ...` (complexity gate exceptions; see `scripts/check-noqa-c901.py`)
+  - `# pragma: allow-cast-file ...` (cast-usage gate exceptions; see `scripts/check-cast-usage.py`)
 - **Skills extraction markers**: do not remove `# region SCALIM-SKILL:<tag>` / `# endregion` markers (used for automated skill example extraction).
 - **Privacy**: do not quote, enumerate, or summarize the contents of `.tmp/known-outer-paths-using-this-package.txt`; only reference the file path.
 
