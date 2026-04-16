@@ -255,7 +255,7 @@ flowchart TD
 
   RS --> CSV[CSVSink]
   RS --> Excel[ExcelSink]
-  RS --> MemR[InMemoryRowSink]
+  RS --> MemR[InMemoryRowDataSink]
 
   CS --> ColCSV[ColumnCSVSink]
   CS --> ColExcel[ColumnExcelSink]

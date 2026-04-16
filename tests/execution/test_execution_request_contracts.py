@@ -1,7 +1,7 @@
 import pytest
 
 from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec
-from scalim.sinks import InMemoryListSink
+from scalim.sinks.memory import InMemoryRowDataSink
 
 
 def test_execution_request_rejects_invalid_export_layout_type() -> None:
@@ -58,7 +58,7 @@ def test_execution_request_rejects_invalid_key_normalization_type() -> None:
 
 
 def test_execution_request_accepts_valid_sink_and_none_batch_size() -> None:
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     req = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("id",)),
         sink=sink,

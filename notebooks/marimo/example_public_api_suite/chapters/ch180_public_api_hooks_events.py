@@ -7,7 +7,7 @@ from scalim.events import EVENT_LOADER_CALL, EVENT_PIPELINE_END, EVENT_PIPELINE_
 from scalim.execution import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.memory import InMemoryRowDataSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir, build_minimal_public_api_runtime_bindings
 
@@ -60,7 +60,7 @@ def run_public_api_hooks_events() -> ExampleResult:
         header_fields_output_by="field_id",
     )
 
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     hook = _CounterHook()
     observer = _TraceObserver()
     request = ExecutionRequest(

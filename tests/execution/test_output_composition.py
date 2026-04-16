@@ -18,7 +18,7 @@ from scalim.execution.output_composition import (
 )
 from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, run_ir
 from scalim.sinks import ExcelWorkbookSink
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from tests.cases.minimal_ir import build_minimal_ir_case
 
 
@@ -156,7 +156,7 @@ def test_run_ir_output_composition_can_tee_to_row_sink(tmp_path: Path) -> None:
     )
     spec = OutputCompositionSpec(targets=(detail,), derived_targets=(), meta_sheet=None, audit_sheet=None, failure_policy="all_fail")
 
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),

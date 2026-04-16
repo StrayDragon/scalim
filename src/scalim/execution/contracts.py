@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ..ob.observer import Observer
     from ..ob.presets.viz import VizObserverConfig
     from ..planning.plan import ExecutionPlan
-    from ..sinks import InMemoryCsv
+    from ..sinks.memory import InMemoryCsv
     from ..sinks.rows import InMemoryRows
     from ..spec.ir import DemandIr
     from .guardrails import GuardrailsPolicy

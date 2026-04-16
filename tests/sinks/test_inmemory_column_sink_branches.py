@@ -1,4 +1,4 @@
-from scalim.sinks import InMemoryColumnSink
+from scalim.sinks.memory import InMemoryColumnSink
 
 
 def test_inmemory_column_sink_get_rows_skips_missing_cells_and_2d_list_has_no_header() -> None:

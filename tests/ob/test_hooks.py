@@ -28,7 +28,7 @@ from scalim.ob.presets.logs import (
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY
 from scalim.execution.runtime_bindings import RuntimeBindings
 
@@ -64,7 +64,7 @@ def test_streaming_hooks_capture_events(plan_builder, engine_factory, example_ru
     main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
 
     with caplog.at_level(logging.INFO, logger=logger.name):
-        engine.run(main_rows=main_rows, sink=InMemoryRowSink())
+        engine.run(main_rows=main_rows, sink=InMemoryRowDataSink())
 
     assert memory_observer.row_write_events
     assert memory_observer.row_release_events
@@ -459,7 +459,7 @@ def test_seq_pipeline_emits_pipeline_and_batch_events(plan_builder, engine_facto
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
 
     main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
-    engine.run(main_rows=main_rows, sink=InMemoryRowSink())
+    engine.run(main_rows=main_rows, sink=InMemoryRowDataSink())
 
     assert observer.pipeline_start_events
     assert observer.pipeline_end_events
@@ -480,7 +480,7 @@ def test_seq_pipeline_emits_event_order(plan_builder, engine_factory, example_ru
 
     engine = engine_factory(plan, observer_manager=observer_manager, batch_size=2)
     main_rows = _get_main_rows(plan_builder.demand, example_runtime_bindings, limit=3)
-    engine.run(main_rows=main_rows, sink=InMemoryRowSink())
+    engine.run(main_rows=main_rows, sink=InMemoryRowDataSink())
 
     events = observer.events
     assert events

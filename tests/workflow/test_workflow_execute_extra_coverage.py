@@ -100,7 +100,7 @@ outputs:
 
 
 def test_workflow_artifacts_directory_discard_variants() -> None:
-    from scalim.sinks import InMemoryCsv
+    from scalim.sinks.memory import InMemoryCsv
     from scalim.sinks.rows import InMemoryRows
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod

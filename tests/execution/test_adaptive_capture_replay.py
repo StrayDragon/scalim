@@ -12,7 +12,7 @@ from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook, HookManager
 from scalim.planning import PlanBuilder
 from scalim.planning.operators import LoadRefOperatorIr
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.memory import InMemoryRowDataSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
@@ -382,7 +382,7 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
         max_workers=2,
         hook_manager=hooks,
     )
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     result = engine.run(main_rows=list(_load_orders()), sink=sink)
 
     assert result == []

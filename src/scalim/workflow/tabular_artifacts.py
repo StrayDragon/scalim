@@ -10,7 +10,7 @@ import csv
 from pathlib import Path
 from typing import Iterator, List, Sequence, Union
 
-from ..sinks import InMemoryCsv
+from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows
 from ..typedefs import FieldValue
 from .resources_base import ScalimWorkflowWriteError

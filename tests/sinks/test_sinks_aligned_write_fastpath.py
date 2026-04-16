@@ -4,12 +4,12 @@ import pytest
 
 from scalim.sinks import BlockColumnCSVSink, CSVSink, ColumnCSVSink
 from scalim.sinks import ColumnExcelSink, ExcelSink
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
-from scalim.sinks import PandasColumnSink, PandasRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
+from scalim.sinks.pandas import PandasColumnSink, PandasRowSink
 
 
 def test_in_memory_row_sink_write_row_aligned_and_mismatch() -> None:
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     sink.write_row_aligned(["a", "b"], [1, 2])
     assert sink.get_data() == [{"a": 1, "b": 2}]
 

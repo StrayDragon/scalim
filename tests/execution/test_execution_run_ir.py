@@ -16,7 +16,7 @@ from scalim.ob.observer import Observer
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim.sinks import BaseRowSink, BaseSink, IColumnSink, IRowSink
 from scalim.sinks import ColumnCSVSink
-from scalim.sinks import InMemoryColumnSink, InMemoryListSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.sinks._internal.rows import InMemoryRows
 from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 from scalim._internal.warningsx import ScalimExperimentalWarning
@@ -50,7 +50,7 @@ def test_run_ir_explicit_none_batch_size_disables_chunking() -> None:
         main_source=main_source,
     )
 
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     hook = _BatchCounterHook()
     req_no_chunking = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",)),
@@ -62,7 +62,7 @@ def test_run_ir_explicit_none_batch_size_disables_chunking() -> None:
     _ = run_ir(demand_ir, req_no_chunking)
     assert hook.batch_starts == 1
 
-    sink2 = InMemoryListSink()
+    sink2 = InMemoryRowDataSink()
     hook2 = _BatchCounterHook()
     req_chunking = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",)),
@@ -81,8 +81,8 @@ def test_export_layout_rejects_misaligned_header_names() -> None:
 
 
 def test_tee_row_sink_write_batch_writes_to_both_sinks() -> None:
-    primary = InMemoryListSink()
-    secondary = InMemoryListSink()
+    primary = InMemoryRowDataSink()
+    secondary = InMemoryRowDataSink()
     tee = run_ir_mod._TeeRowSink(primary, secondary)  # noqa: SLF001
 
     tee.write_batch([{"id": 1}, {"id": 2}])
@@ -147,7 +147,7 @@ def test_run_ir_registers_viz_observer_and_writes_artifacts(tmp_path: Path) -> N
 
     events_path = tmp_path / "viz_events.jsonl"
     snapshot_path = tmp_path / "viz_snapshot.json"
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(),
@@ -186,7 +186,7 @@ def test_run_ir_includes_partial_event_meta_defaults_in_log_context(tmp_path: Pa
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=str(tmp_path / "out.csv")),
@@ -203,7 +203,7 @@ def test_run_ir_capture_events_covers_optional_meta_defaults() -> None:
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
@@ -235,7 +235,7 @@ def test_run_ir_rejects_missing_runtime_bindings() -> None:
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
-        sink=InMemoryListSink(),
+        sink=InMemoryRowDataSink(),
         runtime_bindings=None,
     )
 
@@ -252,7 +252,7 @@ def test_run_ir_passes_main_rows_to_engine_and_bypasses_loader() -> None:
     demand_ir = DemandIr.from_irs(
         sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
     )
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
@@ -388,7 +388,7 @@ def test_run_ir_rejects_unknown_key_normalization() -> None:
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
-        sink=InMemoryListSink(),
+        sink=InMemoryRowDataSink(),
         key_normalization="nope",  # type: ignore[arg-type]
         runtime_bindings=runtime_bindings,
     )
@@ -414,7 +414,7 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
-        sink=InMemoryListSink(),
+        sink=InMemoryRowDataSink(),
         components=[observer],
         key_normalization="auto_str",  # type: ignore[arg-type]
         runtime_bindings=runtime_bindings,
@@ -441,7 +441,7 @@ def test_run_ir_experimental_warning_is_visible_by_default_when_key_normalizatio
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
         output=OutputSpec(path=None),
-        sink=InMemoryListSink(),
+        sink=InMemoryRowDataSink(),
         key_normalization="auto_str",  # type: ignore[arg-type]
         runtime_bindings=runtime_bindings,
     )
@@ -569,7 +569,7 @@ def test_create_tee_sink_column_mode_delegates_to_both_sinks() -> None:
 
 
 def test_create_tee_sink_rejects_incompatible_sinks() -> None:
-    primary = InMemoryRowSink()
+    primary = InMemoryRowDataSink()
     secondary = InMemoryColumnSink(field_names=["id"])
 
     with pytest.raises(ValueError, match="Incompatible sinks for tee"):
@@ -672,7 +672,7 @@ def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
 
 def test_wrap_sink_for_row_count_row_sink_counts_write_batch() -> None:
     tracker = run_ir_mod.InternalStatsCollector()
-    underlying = InMemoryRowSink()
+    underlying = InMemoryRowDataSink()
 
     wrapped = run_ir_mod._wrap_sink_for_row_count(underlying, tracker)  # noqa: SLF001
     assert isinstance(wrapped, IRowSink)
@@ -722,7 +722,7 @@ def test_create_output_plan_returns_tee_sink_for_compatible_row_sinks(tmp_path: 
     plan = run_ir_mod._create_output_plan(  # noqa: SLF001
         OutputSpec(format="csv", path=str(output_path), streaming=True),
         layout,
-        sink=InMemoryRowSink(),
+        sink=InMemoryRowDataSink(),
     )
 
     assert plan.output_path == str(output_path)

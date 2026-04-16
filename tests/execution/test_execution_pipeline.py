@@ -24,7 +24,7 @@ from scalim.ob.manager import ObserverManager
 from scalim.planning import PlanBuilder
 from scalim.planning.plan import ExecutionPlan
 from scalim.sinks import ISink
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.spec.ir import BindingIr, DemandIr, FieldIr, KeyIr, LoaderIr, LookupStepIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 
 
@@ -94,7 +94,7 @@ def test_pipeline_runs_gc_when_interval_hits(plan_builder, engine_factory) -> No
 def test_streaming_pipeline_uses_context_when_not_cached(plan_builder, engine_factory) -> None:
     plan = plan_builder.build(targets=["order_id", "amount"])
     engine = engine_factory(plan, batch_size=2)
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
 
     result = engine.run(main_rows=[{"order_id": 0}, {"order_id": 1}], sink=sink)
 

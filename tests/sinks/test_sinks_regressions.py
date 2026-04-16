@@ -16,8 +16,8 @@ from scalim.sinks import (
     ColumnCSVSink,
 )
 from scalim.sinks._internal.sink_csv import COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED, CSV_SINK_REMOVE_TEMP_FILE_FAILED
-from scalim.sinks import InMemoryColumnSink
-from scalim.sinks import PandasColumnSink, PandasRowSink
+from scalim.sinks.memory import InMemoryColumnSink
+from scalim.sinks.pandas import PandasColumnSink, PandasRowSink
 
 
 class _RowSink(IRowSink):

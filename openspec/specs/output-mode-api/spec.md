@@ -8,7 +8,7 @@
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/execution/run_ir.py` (output plan, tee, `total_rows`, null sink)
 - `src/IMPL_ROOT/sinks/sink_base.py` (`ISink`/`IRowSink`/`IColumnSink`)
-- `src/IMPL_ROOT/sinks/sink_memory.py` (`InMemoryRowSink`)
+- `src/IMPL_ROOT/sinks/_internal/memory.py` (`InMemoryRowDataSink`)
 - `src/IMPL_ROOT/sinks/sink_csv.py` / `src/IMPL_ROOT/sinks/sink_excel.py` (file sinks)
 
 ## Requirements
@@ -18,7 +18,7 @@
 
 #### Scenario: 需要内存数据时显式使用内存 sink
 - **WHEN** 用户需要在运行后获取内存数据
-- **THEN** 用户应显式传入内存 sink(例如 `InMemoryRowSink`)并通过 sink 读取数据,而不是通过 `return_data=True` 触发 runtime 侧隐式拼装
+- **THEN** 用户应显式传入内存 sink(例如 `InMemoryRowDataSink`)并通过 sink 读取数据,而不是通过 `return_data=True` 触发 runtime 侧隐式拼装
 
 ### Requirement: 无输出时避免构造返回列表
 系统 MUST 在“无文件输出且未提供显式 sink”的情况下避免 pipeline 构造返回列表造成的内存分配.
@@ -36,7 +36,7 @@ execution 编排入口 MUST 使用 NullSink/DiscardSink(或等价实现)作为�
 若二者类型不兼容,系统 MUST 抛出清晰错误并提示如何修正.
 
 #### Scenario: streaming 输出同时写文件与内存 sink
-- **WHEN** `output.streaming=true` 且提供 `InMemoryRowSink`
+- **WHEN** `output.streaming=true` 且提供 `InMemoryRowDataSink`
 - **THEN** 系统应通过 tee 同时写文件与内存 sink,且二者内容一致
 
 ### Requirement: total_rows 为稳定元数据

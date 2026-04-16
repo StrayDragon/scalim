@@ -25,3 +25,10 @@ def test_optional_sink_import_errors(monkeypatch, module_path: str, missing_dep:
                 _ = sink.to_dataframe()
             else:
                 raise AssertionError("Unexpected module_path: {}".format(module_path))
+
+
+def test_pandas_sinks_are_not_exported_from_default_facade() -> None:
+    with pytest.raises(ImportError, match=r"PandasRowSink"):
+        from scalim.sinks import PandasRowSink  # noqa: F401
+
+    from scalim.sinks.pandas import PandasRowSink  # noqa: F401

@@ -12,7 +12,7 @@ from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr
 from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.execution.context import BatchContext
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.memory import InMemoryRowDataSink
 
 
 # region Mock Data Loaders
@@ -633,7 +633,7 @@ class TestAdaptiveExecution:
             max_workers=2,
         )
 
-        sink = InMemoryRowSink()
+        sink = InMemoryRowDataSink()
         result = engine.run(sink=sink)
 
         assert result == []

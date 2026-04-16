@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from scalim.sinks import InMemoryCsv
+from scalim.sinks.memory import InMemoryCsv
 from scalim.workflow.resources import WorkflowResourceManager
 from scalim.workflow.resources_sheetbook import SheetBookDef
 

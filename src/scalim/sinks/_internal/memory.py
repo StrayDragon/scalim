@@ -12,14 +12,14 @@ if TYPE_CHECKING:
 # endregion
 
 
-class InMemoryRowSink(BaseRowSink):
+class InMemoryRowDataSink(BaseRowSink):
     """内存行写入器:支持行级写入并存储在内存中(FR023).
 
     主要用于测试与调试.
 
     示例:
     ```python
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     sink.write_row({"id": 1, "name": "张三"})
     sink.write_batch([{"id": 2, "name": "李四"}])
     data = sink.get_data()
@@ -51,9 +51,6 @@ class InMemoryRowSink(BaseRowSink):
 
     def get_data(self) -> List[RowData]:
         return self._data
-
-
-InMemoryListSink = InMemoryRowSink
 
 
 class InMemoryColumnSink(IColumnSink):

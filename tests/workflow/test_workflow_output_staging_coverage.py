@@ -152,7 +152,7 @@ def test_output_staging_flows_from_runtime_to_ir_to_runtime(tmp_path: Path) -> N
 
 def test_output_staging_publish_cleans_exec_dir_by_default(tmp_path: Path) -> None:
     from scalim.execution import versioned_outputs
-    from scalim.sinks import InMemoryCsv
+    from scalim.sinks.memory import InMemoryCsv
     from scalim.workflow.resources import WorkflowResourceManager
 
     out_root = tmp_path / "out"
@@ -188,7 +188,7 @@ def test_output_staging_publish_cleans_exec_dir_by_default(tmp_path: Path) -> No
 
 def test_output_staging_keep_on_success_preserves_staged_file(tmp_path: Path) -> None:
     from scalim.execution import versioned_outputs
-    from scalim.sinks import InMemoryCsv
+    from scalim.sinks.memory import InMemoryCsv
     from scalim.workflow.resources import WorkflowResourceManager
 
     out_root = tmp_path / "out"

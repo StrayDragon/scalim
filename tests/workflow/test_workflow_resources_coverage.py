@@ -124,7 +124,7 @@ def test_read_csv_header_errors(tmp_path: Path) -> None:
 
 
 def test_read_csv_header_in_memory_invalid_header_raises() -> None:
-    from scalim.sinks import InMemoryCsv
+    from scalim.sinks.memory import InMemoryCsv
 
     bad = InMemoryCsv(header=["", "ok"], rows=[])
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="<in_memory>"):
@@ -1867,7 +1867,7 @@ def test_resource_manager_commit_workbook_missing_openpyxl_does_not_write_output
 
 
 def test_csv_commit_replace_failure_raises_workflow_write_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.sinks import InMemoryCsv
+    from scalim.sinks.memory import InMemoryCsv
 
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(
@@ -1905,7 +1905,7 @@ def test_csv_commit_replace_failure_raises_workflow_write_error(tmp_path: Path, 
 
 
 def test_workbook_commit_save_failure_raises_workflow_write_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.sinks import InMemoryCsv
+    from scalim.sinks.memory import InMemoryCsv
 
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(

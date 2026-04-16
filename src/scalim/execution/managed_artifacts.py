@@ -7,7 +7,8 @@
 
 from typing import TYPE_CHECKING, Optional, Tuple
 
-from ..sinks import InMemoryCsvSink, IRowSink
+from ..sinks import IRowSink
+from ..sinks.memory import InMemoryCsvSink
 from ..sinks.rows import InMemoryRowsSink, in_memory_rows_to_in_memory_csv
 from ..vendor.dataclassesx import dataclass
 from .output_contracts import ExportLayout, OutputSpec
@@ -16,7 +17,7 @@ MANAGED_ARTIFACT_KIND_CSV = "csv"
 MANAGED_ARTIFACT_KIND_ROWS = "rows"
 
 if TYPE_CHECKING:
-    from ..sinks import InMemoryCsv
+    from ..sinks.memory import InMemoryCsv
     from ..sinks.rows import InMemoryRows
 
 

@@ -24,10 +24,10 @@ from ..sinks import (
     CSVSink,
     ExcelSink,
     IColumnSink,
-    InMemoryCsv,
     IRowSink,
     ISink,
 )
+from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows, InMemoryRowsSink
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import RowData, SinkRowKeySeq
@@ -640,7 +640,7 @@ def _assemble_outputs(
             msg = (
                 "ExecutionRequest.sink: Incompatible sinks for tee: composed_sink={}({}) vs sink={}({}). "
                 "Both sinks must be IRowSink (output_composition only supports streaming row sinks). "
-                "Hint: use InMemoryRowSink (or another IRowSink) when teeing with composed outputs."
+                "Hint: use InMemoryRowDataSink (or another IRowSink) when teeing with composed outputs."
             ).format(
                 type(router_sink).__name__,
                 _describe_sink_kind(router_sink),

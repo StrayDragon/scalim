@@ -7,7 +7,7 @@ from scalim_benchlib import BenchmarkRunner
 from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.memory import InMemoryRowDataSink
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import DerivedFieldIr, FieldIr
 from scalim.spec.ir import MainSourceIr
@@ -70,7 +70,7 @@ def _make_pipeline_runner(row_count: int) -> Callable[[], int]:
 
     def _run() -> int:
         engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=50)
-        with InMemoryRowSink() as sink:
+        with InMemoryRowDataSink() as sink:
             engine.run(main_rows=rows, sink=sink)
         return row_count
 

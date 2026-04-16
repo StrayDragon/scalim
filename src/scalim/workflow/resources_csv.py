@@ -13,8 +13,8 @@ from typing import Dict, Iterator, List, Optional, Sequence, Union, cast
 
 from ..events import EVENT_DIAGNOSTIC_WARNING
 from ..events._events import DiagnosticWarningEvent
-from ..sinks import InMemoryCsv
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
+from ..sinks.memory import InMemoryCsv
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase

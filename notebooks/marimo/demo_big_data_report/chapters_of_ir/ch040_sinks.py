@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks import ColumnCSVSink, CSVSink
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
@@ -32,7 +32,7 @@ def _run_engine_to_rows(cfg: ECommerceConfig, targets: Sequence[str], *, batch_s
     runtime_bindings = build_ecommerce_runtime_bindings()
     plan = PlanBuilder(demand).build(targets=list(targets))
     engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=int(batch_size))
-    with InMemoryRowSink() as sink:
+    with InMemoryRowDataSink() as sink:
         _ = engine.run(main_rows=None, sink=sink)
         rows: List[RowData] = sink.get_data()
         return rows

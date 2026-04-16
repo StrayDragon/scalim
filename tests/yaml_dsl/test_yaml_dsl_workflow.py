@@ -1036,10 +1036,10 @@ def test_run_workflow_rejects_sink_in_base_options(tmp_path: Path) -> None:
         failure_policy="all_fail",
     )
 
-    from scalim.sinks import InMemoryRowSink
+    from scalim.sinks.memory import InMemoryRowDataSink
 
     with pytest.raises(TypeError, match=r"sink"):
-        _ = run_workflow(str(wf), options=_run_options(sink=InMemoryRowSink()))
+        _ = run_workflow(str(wf), options=_run_options(sink=InMemoryRowDataSink()))
 
 
 def test_run_workflow_concurrency_capture_replay_summarizes_loader_call_payload_for_observer(tmp_path: Path) -> None:

@@ -34,7 +34,7 @@ from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tup
 
 from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
-from scalim.sinks import InMemoryColumnSink
+from scalim.sinks.memory import InMemoryColumnSink
 from scalim.spec.ir import SourceNormalizeIr
 from scalim.typedefs import RowData
 

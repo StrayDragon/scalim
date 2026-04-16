@@ -11,8 +11,8 @@ except Exception as exc:
 
 from scalim.sinks import BlockColumnCSVSink
 from scalim.sinks import ColumnExcelSink, ExcelSink
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
-from scalim.sinks import PandasColumnSink, PandasRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
+from scalim.sinks.pandas import PandasColumnSink, PandasRowSink
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def sample_rows(example_report_ir_module) -> List[Dict[str, object]]:
 def test_inmemory_sinks_collect_data(sample_rows) -> None:
     rows = sample_rows
 
-    row_sink = InMemoryRowSink()
+    row_sink = InMemoryRowDataSink()
     row_sink.write_batch(rows)
     row_sink.close()
     assert row_sink.get_data() == rows

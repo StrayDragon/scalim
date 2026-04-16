@@ -5,7 +5,7 @@ from scalim.execution.executor.operators.write import WriteColumnOperatorExecuto
 from scalim.hooks import HookManager
 from scalim.planning.operators import OperatorType, WriteColumnOperatorIr, WriteRowOperatorIr
 from scalim.planning.plan import ExecutionPlan
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 
 from tests.fixtures.executor_operator_fixtures import _CaptureHook, _make_runtime
 
@@ -22,7 +22,7 @@ def test_write_column_operator_writes_column_and_emits_hooks() -> None:
     context.set_field_value("amount", 1, 100)
     context.set_field_value("amount", 2, 200)
 
-    runtime.sink = InMemoryRowSink()
+    runtime.sink = InMemoryRowDataSink()
     WriteColumnOperatorExecutor().execute(
         WriteColumnOperatorIr(
             operator_id="write_amount",
@@ -107,7 +107,7 @@ def test_write_row_operator_writes_rows() -> None:
     )
     assert hook.row_writes == []
 
-    runtime.sink = InMemoryRowSink()
+    runtime.sink = InMemoryRowDataSink()
     WriteRowOperatorExecutor().execute(
         WriteRowOperatorIr(
             operator_id="write_rows",

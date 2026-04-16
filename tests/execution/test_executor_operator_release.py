@@ -5,7 +5,7 @@ from scalim.execution.executor.operators.release import ReleaseOperatorExecutor
 from scalim.hooks import HookManager
 from scalim.planning.operators import OperatorType, ReleaseOperatorIr
 from scalim.planning.plan import ExecutionPlan
-from scalim.sinks import InMemoryColumnSink
+from scalim.sinks.memory import InMemoryColumnSink
 
 from tests.fixtures.executor_operator_fixtures import _CaptureHook, _make_runtime
 

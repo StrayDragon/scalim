@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.sinks import InMemoryCsv
+from scalim.sinks.memory import InMemoryCsv
 from scalim.sinks.rows import InMemoryRows
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
 from scalim.workflow.artifacts import WorkflowArtifactsDirectory

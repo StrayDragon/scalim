@@ -17,7 +17,7 @@ from scalim.planning import PlanBuilder
 from scalim.planning.operators import LoadOperatorIr, LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.sinks import IColumnSink
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import CallBySpecIr, CallByValueIr, DerivedFieldIr, FieldIr, RuntimeHandleIdIr
@@ -506,7 +506,7 @@ def test_pipeline_execute_batch_streaming_mode_writes_load_operator_fields() -> 
 
     row_ids = [0]
     batch_rows = {0: {"id": 1}}
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
 
     pipeline._execute_batch_streaming_mode(row_ids, batch_rows, sink, batch_num=1)
 
@@ -514,7 +514,7 @@ def test_pipeline_execute_batch_streaming_mode_writes_load_operator_fields() -> 
 
 
 def test_pipeline_true_row_streaming_writes_null_fk_row_before_ref_loader_call() -> None:
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
 
     def _build_keys_params(field_name: str, param_name: str):  # type: ignore[no-untyped-def]
         def _builder(ctx):  # type: ignore[no-untyped-def]
@@ -576,7 +576,7 @@ def test_pipeline_true_row_streaming_writes_null_fk_row_before_ref_loader_call()
 
 
 def test_pipeline_true_row_streaming_releases_written_rows_before_next_compute_row() -> None:
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     capture = _CaptureHook()
 
     calls = []
@@ -691,7 +691,7 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
         def on_row_release(self, event) -> None:  # type: ignore[override]
             events.append(("release", event.row_id))
 
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     hook = _OrderHook()
 
     def _build_rows_params(field_name: str, param_name: str):  # type: ignore[no-untyped-def]
@@ -804,7 +804,7 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
 def test_row_emission_coordinator_flush_noops_when_write_order_missing() -> None:
     plan = _make_plan({}, ["a"])
     runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
         sink=sink,
@@ -823,7 +823,7 @@ def test_row_emission_coordinator_flush_noops_when_write_order_missing() -> None
 def test_row_emission_coordinator_defers_release_when_disabled() -> None:
     plan = _make_plan({}, ["a"])
     runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
         sink=sink,
@@ -846,7 +846,7 @@ def test_row_emission_coordinator_defers_release_when_disabled() -> None:
 def test_row_emission_coordinator_finalize_writes_rows_even_when_not_ready() -> None:
     plan = _make_plan({}, ["a"])
     runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
         sink=sink,
@@ -948,7 +948,7 @@ def test_pipeline_streaming_order_by_sorts_rows_and_stable() -> None:
 
     row_ids = [0, 1, 2]
     batch_rows = {0: {"order_id": 2}, 1: {"order_id": 1}, 2: {"order_id": 2}}
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
 
     pipeline._execute_batch_streaming_mode(row_ids, batch_rows, sink, batch_num=1)
 
@@ -969,7 +969,7 @@ def test_pipeline_streaming_order_by_desc_nulls_last() -> None:
 
     row_ids = [0, 1, 2, 3]
     batch_rows = {0: {"score": None}, 1: {"score": 3}, 2: {"score": 5}, 3: {"score": 5}}
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
 
     pipeline._execute_batch_streaming_mode(row_ids, batch_rows, sink, batch_num=1)
 
@@ -1013,7 +1013,7 @@ def test_pipeline_streaming_mode_emits_row_events() -> None:
     row_ids = [0, 1]
     batch_rows = {0: {"id": 1}, 1: {"id": 2}}
 
-    pipeline._execute_batch_streaming_mode(row_ids, batch_rows, InMemoryRowSink(), batch_num=1)
+    pipeline._execute_batch_streaming_mode(row_ids, batch_rows, InMemoryRowDataSink(), batch_num=1)
 
     assert len(hook.row_writes) == 2
     assert len(hook.row_releases) == 2

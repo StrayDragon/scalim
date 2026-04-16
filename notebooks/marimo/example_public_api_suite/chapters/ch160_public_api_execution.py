@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from scalim import execution as api
 from scalim.planning import PlanBuilder
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.memory import InMemoryRowDataSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir, build_minimal_public_api_runtime_bindings
 
@@ -19,7 +19,7 @@ def run_public_api_execution() -> ExampleResult:
     runtime_bindings = build_minimal_public_api_runtime_bindings()
     plan = PlanBuilder(demand_ir).build()
 
-    sink = InMemoryRowSink()
+    sink = InMemoryRowDataSink()
     request = api.ExecutionRequest(
         export_layout=api.export_layout_from_demand_ir(demand_ir, plan.target_fields),
         output=api.OutputSpec(path=None),

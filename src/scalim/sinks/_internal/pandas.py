@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def _get_pandas_module() -> Any:
-    return require_optional_dependency("pandas", context="scalim.sinks")
+    return require_optional_dependency("pandas", context="scalim.sinks.pandas")
 
 
 class PandasRowSink(IRowSink):

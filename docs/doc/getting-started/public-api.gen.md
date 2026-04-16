@@ -38,8 +38,9 @@ Sources:
 | `scalim.execution` | 7 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
 | `scalim.ob` | 1 | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 48 | 事件envelope+事件类型常量+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
-| `scalim.sinks` | 22 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
-| `scalim.sinks.rows` | 4 | workflow typed rows artifact 稳定入口 | `InMemoryRows` 中间态 / 转换与适配 |
+| `scalim.sinks` | 15 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
+| `scalim.sinks.memory` | 4 | memory sinks(调试/测试/捕获) | `InMemoryRowDataSink`/`InMemoryCsv` 等 |
+| `scalim.sinks.pandas` | 2 | pandas sinks(可选依赖) | 需要 `pandas` 时显式使用该子模块 |
 | `scalim.shortcuts.resources` | 1 | 资源类 shortcut 稳定入口 | 从 output root 定位产物/资源 |
 | `scalim.shortcuts.resources.outputs` | 5 | outputs discovery facade | 定位最新一次发布的 workbook/books 与 files |
 
@@ -76,13 +77,19 @@ from scalim.events import Event, EVENT_PIPELINE_START, get_event_catalog
 需要常用 sinks 时:
 
 ```python
-from scalim.sinks import CSVSink, InMemoryRowSink
+from scalim.sinks import CSVSink
 ```
 
-需要 workflow typed rows artifact (`InMemoryRows`) 时:
+需要内存 sinks(调试/测试/捕获) 时:
 
 ```python
-from scalim.sinks.rows import InMemoryRows, InMemoryRowsSink
+from scalim.sinks.memory import InMemoryRowDataSink
+```
+
+需要 pandas sinks(可选依赖) 时:
+
+```python
+from scalim.sinks.pandas import PandasRowSink
 ```
 
 ### Tier 1: `__all__` 导出清单（自动生成）
@@ -364,7 +371,7 @@ from scalim.events import (
 
 #### `scalim.sinks`
 
-- Export count: `22`
+- Export count: `15`
 
 ```python
 from scalim.sinks import (
@@ -383,26 +390,30 @@ from scalim.sinks import (
     IColumnSink,
     IRowSink,
     ISink,
-    InMemoryColumnSink,
-    InMemoryCsv,
-    InMemoryCsvSink,
-    InMemoryListSink,
-    InMemoryRowSink,
-    PandasColumnSink,
-    PandasRowSink,
 )
 ```
 
-#### `scalim.sinks.rows`
+#### `scalim.sinks.memory`
 
 - Export count: `4`
 
 ```python
-from scalim.sinks.rows import (
-    InMemoryRows,
-    InMemoryRowsSink,
-    in_memory_rows_to_in_memory_csv,
-    iter_in_memory_rows_as_main_rows,
+from scalim.sinks.memory import (
+    InMemoryColumnSink,
+    InMemoryCsv,
+    InMemoryCsvSink,
+    InMemoryRowDataSink,
+)
+```
+
+#### `scalim.sinks.pandas`
+
+- Export count: `2`
+
+```python
+from scalim.sinks.pandas import (
+    PandasColumnSink,
+    PandasRowSink,
 )
 ```
 

@@ -19,7 +19,7 @@
 from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.memory import InMemoryRowDataSink
 from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 
 
@@ -60,7 +60,7 @@ runtime_bindings = RuntimeBindings(
 )
 engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1000, parallel_mode="seq")
 
-sink = InMemoryRowSink()
+sink = InMemoryRowDataSink()
 engine.run(sink=sink)
 rows = sink.get_data()
 ```

@@ -8,7 +8,7 @@ from scalim.execution.loader_retry import LoaderRetryPolicies, LoaderRetryPolicy
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, run_ir
 from scalim.ob.observer import Observer
-from scalim.sinks import InMemoryListSink
+from scalim.sinks.memory import InMemoryRowDataSink
 from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import MainSourceIr, RuntimeHandleIdIr
@@ -47,7 +47,7 @@ def test_run_ir_retries_main_source_and_emits_loader_retry_event() -> None:
     )
 
     observer = _CaptureObserver()
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     policy = LoaderRetryPolicy(
         enabled=True,
         should_retry=_should_retry,
@@ -99,7 +99,7 @@ def test_run_ir_retry_give_up_emits_single_error_event() -> None:
     )
 
     observer = _CaptureObserver()
-    sink = InMemoryListSink()
+    sink = InMemoryRowDataSink()
     policy = LoaderRetryPolicy(
         enabled=True,
         should_retry=_should_retry,

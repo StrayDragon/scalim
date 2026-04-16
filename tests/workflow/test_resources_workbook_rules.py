@@ -1,4 +1,4 @@
-from scalim.sinks import InMemoryCsv
+from scalim.sinks.memory import InMemoryCsv
 from scalim.workflow import resources_workbook as workbook_mod
 from scalim.workflow.resources_csv import AppendSegment
 

@@ -31,7 +31,7 @@ from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.planning import PlanBuilder
-from scalim.sinks import InMemoryColumnSink, InMemoryRowSink
+from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 
 
 def _bench_scale() -> str:
@@ -118,8 +118,8 @@ def test_bench_pipeline_full_column(benchmark) -> None:
 def test_bench_pipeline_basic_row(benchmark) -> None:
     cfg = _build_model()
 
-    def _sink() -> InMemoryRowSink:
-        return InMemoryRowSink()
+    def _sink() -> InMemoryRowDataSink:
+        return InMemoryRowDataSink()
 
     runner = BenchmarkRunner(benchmark)
     runner.run(
