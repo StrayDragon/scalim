@@ -11,5 +11,5 @@
 
 #### Scenario: syntax-catalog key paths match workflow schema
 - **WHEN** 维护者运行 `just gen-agent-skill`
-- **THEN** `artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md` 的 workflow “Key Paths” MUST 包含 `workflow.resources.books`
+- **THEN** `agentdev/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md` 的 workflow “Key Paths” MUST 包含 `workflow.resources.books`
 - **AND** MUST NOT 包含任何已移除的 workflow IO authoring surface

@@ -29,7 +29,7 @@ def _repo_root() -> Path:
 
 
 def _default_skill_doc_path() -> Path:
-    return _repo_root() / "artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    return _repo_root() / "agentdev/skills/scalim-yaml-dsl/SKILL.md"
 
 
 def _read_text(path: Path) -> str:

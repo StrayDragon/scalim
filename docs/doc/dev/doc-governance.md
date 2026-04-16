@@ -17,7 +17,7 @@
 
 为避免在 docs 与 skill 中重复维护 YAML DSL 的 breaking/migration 说明:
 
-- **SSOT**: `artifacts/skills/scalim-yaml-dsl/references/upgrades/`
+- **SSOT**: `agentdev/skills/scalim-yaml-dsl/references/upgrades/`
 - docs-site 页面 `docs/doc/yaml-dsl/upgrades/*.gen.md`（除 `index.md` 外）由 SSOT 自动生成,不单独维护(运行 `just gen-docs`)
 - 新增/更新升级指南后跑 `just gen` 以刷新 docs 与 skill 的升级索引/摘要(供 agent 使用)
 

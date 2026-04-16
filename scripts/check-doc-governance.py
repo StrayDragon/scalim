@@ -69,7 +69,7 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
     errors: list[str] = []
 
     docs_dir = root / "docs" / "doc" / "yaml-dsl" / "upgrades"
-    ssot_dir = root / "artifacts" / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
+    ssot_dir = root / "agentdev" / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
 
     if not docs_dir.exists():
         return ["missing directory: {}".format(docs_dir)]
@@ -97,7 +97,7 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
     if "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades-index -->" not in text or "<!-- END AUTOGEN:yaml-dsl-upgrades-index -->" not in text:
         errors.append("`{}` MUST include injected upgrades index block markers.".format(index_md))
 
-    ssot_dir_rel = "artifacts/skills/scalim-yaml-dsl/references/upgrades/"
+    ssot_dir_rel = "agentdev/skills/scalim-yaml-dsl/references/upgrades/"
     if "#code={}".format(ssot_dir_rel) not in text:
         errors.append("`{}` upgrades links MUST point to SSOT under `#code={}`.".format(index_md, ssot_dir_rel))
 

@@ -110,7 +110,7 @@ uv-lock-check:
 build-dist:
     uv {{ UV_OPTIONS }} build --wheel --sdist --no-create-gitignore --no-sources
 
-# 检查: wheel/sdist 内容边界 (不应包含 tests/docs/notebooks/frontend/artifacts)
+# 检查: wheel/sdist 内容边界 (不应包含 tests/docs/notebooks/frontend/agentdev/artifacts)
 dist-check: build-dist
     uv {{ UV_OPTIONS }} run python scripts/check-build-artifacts.py
 

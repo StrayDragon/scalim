@@ -9,7 +9,7 @@
 
 - Demand schema: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
 - Workflow schema: `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
-- 语法索引（generated）：`artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`
+- 语法索引（generated）：`agentdev/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`
 
 约定：
 

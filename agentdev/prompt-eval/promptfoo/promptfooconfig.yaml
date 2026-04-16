@@ -87,7 +87,7 @@ tests:
         `yaml-dsl schema validate` 报错说 `$schema` 路径不对。
         我不想猜路径,希望你给出最小排错步骤与要看的材料。
     options:
-      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+      prefix: "file://../../../agentdev/skills/scalim-yaml-dsl/SKILL.md"
     assert:
       - type: "python"
         value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
@@ -103,7 +103,7 @@ tests:
         但我没有被明确要求兼容,我只想一步到位升级到当前结构,并给出最小验证命令。
         你会怎么看材料? 如何组织升级步骤?
     options:
-      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+      prefix: "file://../../../agentdev/skills/scalim-yaml-dsl/SKILL.md"
     assert:
       - type: "python"
         value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
@@ -119,7 +119,7 @@ tests:
         我不想硬记语法,只想按最小材料/最小命令把骨架先跑通并通过校验。
         你会先看哪些 reference? 用什么命令做最小验证?
     options:
-      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+      prefix: "file://../../../agentdev/skills/scalim-yaml-dsl/SKILL.md"
     assert:
       - type: "python"
         value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
@@ -135,7 +135,7 @@ tests:
         我需要一个“分阶段”的最小迁移方案: 先保证本地能 validate,再逐步替换数据处理逻辑。
         你会先读哪些材料? 下一步最小命令是什么?
     options:
-      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+      prefix: "file://../../../agentdev/skills/scalim-yaml-dsl/SKILL.md"
     assert:
       - type: "python"
         value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"
@@ -151,7 +151,7 @@ tests:
         我不想逐个文件瞎改,想先按“升级批次”快速定位可能的 breaking 点,然后分批修复。
         你会先看哪些 reference? 用什么命令快速验证?
     options:
-      prefix: "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+      prefix: "file://../../../agentdev/skills/scalim-yaml-dsl/SKILL.md"
     assert:
       - type: "python"
         value: "file://assertions/validate_yaml_dsl_routing.py:get_assert"

@@ -31,7 +31,7 @@ USER_GUIDE_SOURCE_FIELD_EXTRACT_END = "<!-- END AUTOGEN:yaml-dsl-source-field-ex
 
 UPGRADES_INDEX_BEGIN = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades-index -->"
 UPGRADES_INDEX_END = "<!-- END AUTOGEN:yaml-dsl-upgrades-index -->"
-UPGRADES_SSOT_DIR_REL = Path("artifacts") / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
+UPGRADES_SSOT_DIR_REL = Path("agentdev") / "skills" / "scalim-yaml-dsl" / "references" / "upgrades"
 
 
 @dataclass(frozen=True)
@@ -810,7 +810,7 @@ def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, 
         repo_root,
         command_docs,
         generated_by="just gen-docs",
-        canonical_example_path="artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml",
+        canonical_example_path="agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml",
     )
 
     expected: Dict[Path, str] = {

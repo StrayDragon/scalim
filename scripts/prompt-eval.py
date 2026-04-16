@@ -367,7 +367,7 @@ def _extract_git_archive(*, root: Path, ref: str, rel_path: str, dest_dir: Path)
 
 
 def _materialize_skill_snapshot_candidate(*, root: Path, dest_dir: Path) -> Path:
-    src = root / "artifacts/skills/scalim-yaml-dsl"
+    src = root / "agentdev/skills/scalim-yaml-dsl"
     if not src.exists() or not src.is_dir():
         msg = "candidate skill directory not found: {}".format(src)
         raise FileNotFoundError(msg)
@@ -392,9 +392,9 @@ def _materialize_skill_snapshot_baseline(*, root: Path, ref: str, dest_dir: Path
         shutil.rmtree(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    _extract_git_archive(root=root, ref=ref, rel_path="artifacts/skills/scalim-yaml-dsl", dest_dir=dest_dir)
+    _extract_git_archive(root=root, ref=ref, rel_path="agentdev/skills/scalim-yaml-dsl", dest_dir=dest_dir)
 
-    extracted = dest_dir / "artifacts/skills/scalim-yaml-dsl"
+    extracted = dest_dir / "agentdev/skills/scalim-yaml-dsl"
     if not extracted.exists():
         msg = "baseline skill directory not found in git archive output: {} (ref={})".format(extracted, ref)
         raise FileNotFoundError(msg)
@@ -404,9 +404,9 @@ def _materialize_skill_snapshot_baseline(*, root: Path, ref: str, dest_dir: Path
         shutil.rmtree(out_dir)
     shutil.move(str(extracted), str(out_dir))
 
-    artifacts_dir = dest_dir / "artifacts"
-    if artifacts_dir.exists():
-        shutil.rmtree(artifacts_dir)
+    agentdev_dir = dest_dir / "agentdev"
+    if agentdev_dir.exists():
+        shutil.rmtree(agentdev_dir)
 
     skill_md = out_dir / "SKILL.md"
     if not skill_md.exists():
@@ -417,7 +417,7 @@ def _materialize_skill_snapshot_baseline(*, root: Path, ref: str, dest_dir: Path
 
 def _render_promptfoo_config_for_skill(*, ssot_path: Path, dest_path: Path, skill_md_path: Path) -> None:
     ssot_text = read_text(ssot_path)
-    needle = "file://../../../artifacts/skills/scalim-yaml-dsl/SKILL.md"
+    needle = "file://../../../agentdev/skills/scalim-yaml-dsl/SKILL.md"
     if needle not in ssot_text:
         msg = "promptfoo SSOT config missing expected prefix reference: {}".format(needle)
         raise RuntimeError(msg)
@@ -556,7 +556,7 @@ def _setup_agent_workspace(*, root: Path, workspace_dir: Path, skill_dir: Path, 
         msg = "unknown agent scenario: {}".format(scenario)
         raise ValueError(msg)
 
-    skill_dest = workspace_dir / "artifacts/skills/scalim-yaml-dsl"
+    skill_dest = workspace_dir / "agentdev/skills/scalim-yaml-dsl"
     skill_dest.parent.mkdir(parents=True, exist_ok=True)
     if skill_dest.exists():
         shutil.rmtree(skill_dest)

@@ -2,7 +2,7 @@
 """
 检查 `wheel`/`sdist` 的内容边界,避免把非运行时目录打进发行物.
 
-本仓库是多资产工作区(例如:`docs/`、`frontend/`、`notebooks/`、`artifacts/`、`tests/` 等).
+本仓库是多资产工作区(例如:`docs/`、`frontend/`、`notebooks/`、`agentdev/`、`tests/` 等).
 对 `PyPI` 发行物,我们希望边界尽量“瘦”:仅包含运行时代码 + 必要资源 + 元数据.
 
 检查项:
@@ -36,6 +36,7 @@ BANNED_TOPLEVEL_PREFIXES: Tuple[str, ...] = (
     "docs/",
     "notebooks/",
     "frontend/",
+    "agentdev/",
     "artifacts/",
 )
 

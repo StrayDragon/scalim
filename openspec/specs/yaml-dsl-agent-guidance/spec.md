@@ -6,16 +6,16 @@
 定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计.
 
 ## Context
-实现位于 `artifacts/skills/scalim-yaml-dsl/`.
+实现位于 `agentdev/skills/scalim-yaml-dsl/`.
 该能力与自动生成的参考产物配合工作: `SKILL.md` 负责任务路由和最小操作入口,手工 references 负责场景预设与迁移 heuristics,受控参考产物负责完整语法/API catalog.
 
 ## Related Code (as implemented)
-- `artifacts/skills/scalim-yaml-dsl/SKILL.md`
-- `artifacts/skills/scalim-yaml-dsl/agents/openai.yaml`
-- `artifacts/skills/scalim-yaml-dsl/references/task-authoring.md`
-- `artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`
-- `artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md`
-- `artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`
+- `agentdev/skills/scalim-yaml-dsl/SKILL.md`
+- `agentdev/skills/scalim-yaml-dsl/agents/openai.yaml`
+- `agentdev/skills/scalim-yaml-dsl/references/task-authoring.md`
+- `agentdev/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`
+- `agentdev/skills/scalim-yaml-dsl/references/task-validate-debug.md`
+- `agentdev/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`
 - `tests/test_agent_skill_generator.py`
 - `docs/doc/yaml-dsl/agent-skill.md`
 ## Requirements
@@ -87,7 +87,7 @@ skill MUST 明确指出 canonical example 不应固化本机 `.venv/...`、`site
 - **THEN** skill 必须提供 `$schema` header 示例与 schema path 获取方式
 
 #### Scenario: hand-written snippets outside injected blocks are rejected
-- **WHEN** 维护者在 `artifacts/skills/scalim-yaml-dsl/SKILL.md` 的 injected block marker 外手写可复制命令片段
+- **WHEN** 维护者在 `agentdev/skills/scalim-yaml-dsl/SKILL.md` 的 injected block marker 外手写可复制命令片段
 - **THEN** `just qa` MUST 失败并提示通过 `just gen-agent-skill` 修复
 
 ### Requirement: Skill Provides Sanitized Migration Playbook
@@ -141,7 +141,7 @@ skill MUST 为这类报表迁移任务提供清晰的职责切分准则,让 agen
 - **THEN** 不得默认拆出大量 `_loaders.py`、`_helpers.py`、`_adapters.py`
 
 ### Requirement: `scalim-yaml-dsl` skill 提示相对模块引用与 allowlist 配置
-系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**`,使其在解释 YAML DSL 的 Python 引用(loader / `call_by` / retry 回调)时覆盖相对模块引用语法:
+系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其在解释 YAML DSL 的 Python 引用(loader / `call_by` / retry 回调)时覆盖相对模块引用语法:
 - 允许 `.` / `..` 前缀的 module path,且其基准为 YAML 文件所在目录
 - 相对引用在运行期会先归一化为绝对引用,并继续受 allowlist(`allowed_modules`/`allowed_functions`)约束
 - 当 allowlist 不包含归一化后的模块前缀时,应提示如何调整 allowlist 或改用绝对引用
@@ -152,7 +152,7 @@ skill MUST 为这类报表迁移任务提供清晰的职责切分准则,让 agen
 - **AND** MUST 同时提示需要将归一化后的 module 前缀纳入 allowlist
 
 ### Requirement: `scalim-yaml-dsl` skill documents `$keys/$rows` inline params directives
-系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**` 使其覆盖新的 params 模板指令写法,并将其作为首选方案用于解决 nested params 绑定问题.
+系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**` 使其覆盖新的 params 模板指令写法,并将其作为首选方案用于解决 nested params 绑定问题.
 
 skill 文档 MUST 至少包含:
 - `$keys` 与 `$rows` 的最小示例
@@ -174,7 +174,7 @@ skill 文档 MUST 至少包含:
 - **AND** 必须以 `params` 模板作为默认方案
 
 ### Requirement: `scalim-yaml-dsl` skill guides field-level `extract` usage
-系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**`,使其在“loader 返回嵌套 row value”场景下优先推荐字段级 `extract`,而不是先建议编写 Python wrapper。
+系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其在“loader 返回嵌套 row value”场景下优先推荐字段级 `extract`,而不是先建议编写 Python wrapper。
 
 skill 文档 MUST 至少说明:
 - `extract` 相对当前 key 对应的 row value 解析
@@ -229,7 +229,7 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 - **THEN** 并说明已完成哪些静态校验与 YAML 校验
 
 ### Requirement: `scalim-yaml-dsl` skill explains when to use `normalize`
-系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**`,使其能区分:
+系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其能区分:
 - 需要先把整个 source 返回值 reshape 成 `key -> row` 的场景: 优先使用 `normalize`
 - 只是当前 row value 内部字段嵌套: 优先使用字段级 `extract`
 
@@ -244,7 +244,7 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 - **AND** MUST 明确说明此时不需要源代码级 `normalize`
 
 ### Requirement: Workflow CLI and LSP Guidance Is Explicit
-系统 MUST 更新 `artifacts/skills/scalim-yaml-dsl/**`,使其在 workflow YAML 场景下也能提供明确、可复制的校验与 LSP 指引,并与当前实现边界保持一致:
+系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其在 workflow YAML 场景下也能提供明确、可复制的校验与 LSP 指引,并与当前实现边界保持一致:
 
 - workflow YAML 仅支持 schema-only 校验（`yaml-dsl schema validate`）；不得引导用户对 workflow YAML 运行 `yaml-dsl validate` 作为“语义校验入口”.
 - workflow YAML 的仓库内 schema-only 校验 MUST 提供显式 `--schema` 写法（schema 位置以仓库内 `workflow.gen.json` 为准）。

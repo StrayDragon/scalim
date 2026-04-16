@@ -8,23 +8,23 @@
 
 说明:
 
-- 升级指南 SSOT 仅维护在 `artifacts/skills/scalim-yaml-dsl/references/upgrades/`。
+- 升级指南 SSOT 仅维护在 `agentdev/skills/scalim-yaml-dsl/references/upgrades/`。
 - docs-site 不再生成升级页副本；本页仅提供到 SSOT 的链接索引(运行 `just gen-docs` 更新索引区块)。
 
 升级清单:
 
 <!-- BEGIN AUTOGEN:yaml-dsl-upgrades-index -->
-- [2026-03-10: yaml-field-extract](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-10-yaml-field-extract.md)
-- [2026-03-10: yaml-source-normalize](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-10-yaml-source-normalize.md)
-- [2026-03-11: yaml-params-template](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-11-yaml-params-template.md)
-- [2026-03-13: demand-dsl-breaking](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-demand-dsl-breaking.md)
-- [2026-03-13: derived-outputs-set-aggregations](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-derived-outputs-set-aggregations.md)
-- [2026-03-13: yaml-dsl-outputs](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-dsl-outputs.md)
-- [2026-03-13: yaml-reuse-workflow](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-reuse-workflow.md)
-- [2026-03-13: yaml-source-normalize-shapes](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-source-normalize-shapes.md)
-- [2026-03-14: yaml-dsl-output-fields-alias](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md)
-- [2026-03-16: yaml-dsl-outputs-aggregate-fields](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md)
-- [2026-03-18: yaml-workflow-dag-ctx-resources](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md)
-- [2026-04-07: yaml-dsl-import-roots-registry](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md)
-- [2026-04-08: yaml-dsl-api-naming-alignment](#code=artifacts/skills/scalim-yaml-dsl/references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md)
+- [2026-03-10: yaml-field-extract](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-10-yaml-field-extract.md)
+- [2026-03-10: yaml-source-normalize](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-10-yaml-source-normalize.md)
+- [2026-03-11: yaml-params-template](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-11-yaml-params-template.md)
+- [2026-03-13: demand-dsl-breaking](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-demand-dsl-breaking.md)
+- [2026-03-13: derived-outputs-set-aggregations](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-derived-outputs-set-aggregations.md)
+- [2026-03-13: yaml-dsl-outputs](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-dsl-outputs.md)
+- [2026-03-13: yaml-reuse-workflow](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-reuse-workflow.md)
+- [2026-03-13: yaml-source-normalize-shapes](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-13-yaml-source-normalize-shapes.md)
+- [2026-03-14: yaml-dsl-output-fields-alias](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md)
+- [2026-03-16: yaml-dsl-outputs-aggregate-fields](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md)
+- [2026-03-18: yaml-workflow-dag-ctx-resources](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md)
+- [2026-04-07: yaml-dsl-import-roots-registry](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md)
+- [2026-04-08: yaml-dsl-api-naming-alignment](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

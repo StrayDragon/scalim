@@ -6,7 +6,7 @@
 
 ??? note "维护提示"
     - 生成与产物结构:[`scripts/gen-agent-skill.py`](#code=scripts/gen-agent-skill.py)、[`packages/scalim-misc/src/scalim_misc/agent_skill_gen.py`](#code=packages/scalim-misc/src/scalim_misc/agent_skill_gen.py)
-    - 默认产物目录:[`artifacts/skills/scalim-yaml-dsl/`](#code=artifacts/skills/scalim-yaml-dsl/)
+    - 默认产物目录:[`agentdev/skills/scalim-yaml-dsl/`](#code=agentdev/skills/scalim-yaml-dsl/)
     - 若改动 schema/示例来源/输出目录结构,需要同步更新本页
     - Python 侧稳定导入入口与治理边界见:[公共 API 导入指南](../getting-started/public-api.gen.md)
 
@@ -14,25 +14,25 @@
 
 ## 1. 产物在哪里(直接用)
 
-- 技能入口:[`artifacts/skills/scalim-yaml-dsl/SKILL.md`](#code=artifacts/skills/scalim-yaml-dsl/SKILL.md)
+- 技能入口:[`agentdev/skills/scalim-yaml-dsl/SKILL.md`](#code=agentdev/skills/scalim-yaml-dsl/SKILL.md)
 - 手工 task references:
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-authoring.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-authoring.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-authoring.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-authoring.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-validate-debug.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-authoring.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-authoring.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-workflow-authoring.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-workflow-authoring.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-validate-debug.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-validate-debug.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-workflow-validate-debug.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-downstream-adaptation.md)
 - 受控生成 references:
-  - [`artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md)
-  - [`artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml)
-  - [`artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md`](#code=artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md) (breaking/migration 快速索引)
-  - `artifacts/skills/scalim-yaml-dsl/references/upgrades/*.md` (升级指南 SSOT; docs-site 对应页面由此生成)
+  - [`agentdev/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md`](#code=agentdev/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md`](#code=agentdev/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md)
+  - [`agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`](#code=agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml)
+  - [`agentdev/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md`](#code=agentdev/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md) (breaking/migration 快速索引)
+  - `agentdev/skills/scalim-yaml-dsl/references/upgrades/*.md` (升级指南 SSOT; docs-site 对应页面由此生成)
 
-一般把整个目录 `artifacts/skills/scalim-yaml-dsl/` 交给你的 Agent 就行: `SKILL.md` 负责分流,细节再按需从 `references/` 读取。
+一般把整个目录 `agentdev/skills/scalim-yaml-dsl/` 交给你的 Agent 就行: `SKILL.md` 负责分流,细节再按需从 `references/` 读取。
 `references/generated/` 由 `scripts/gen-agent-skill.py` 根据 schema、CLI 与相关 `openspec/specs/` 自动摘录生成; `references/` 里的 task 文档则保留人工维护的任务预设与迁移经验.
 
 ## 2. 怎么让智能助手用它写/改 YAML
@@ -80,7 +80,7 @@ workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
 
 ## 3. 安装到常见 skills 目录(可选)
 
-生成器默认只写入仓库内的 `artifacts/skills/`,并拒绝直接写入用户 skills 目录(避免误覆盖).
+生成器默认只写入仓库内的 `agentdev/skills/`,并拒绝直接写入用户 skills 目录(避免误覆盖).
 
 如果你的工具约定从用户 skills 目录读取,你可以手动复制/软链到类似位置:
 
@@ -98,8 +98,8 @@ workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
 
 漂移校验会在临时目录重建受控输出并逐字节对拍,覆盖范围仅包含:
 
-- `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`
-- `artifacts/skills/scalim-yaml-dsl/references/generated/`
+- `agentdev/skills/scalim-yaml-dsl/references/*.gen.*`
+- `agentdev/skills/scalim-yaml-dsl/references/generated/`
 
 ## 5. 贡献者:如何评估 skill 效果(prompt-eval)
 

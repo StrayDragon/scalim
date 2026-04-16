@@ -11,7 +11,7 @@
 
 本仓库的 T1 以 **可复现的临时工作区** 为准,每个 test case 都会生成独立 workspace,并在其中:
 
-- 注入 `artifacts/skills/scalim-yaml-dsl/**` 的快照(用于对拍 baseline/candidate)
+- 注入 `agentdev/skills/scalim-yaml-dsl/**` 的快照(用于对拍 baseline/candidate)
 - 提供最小 fixture 项目与工具(避免依赖你本机的 scalim/uv 环境)
 
 ??? note "维护提示"

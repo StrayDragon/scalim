@@ -21,7 +21,7 @@ def test_yaml_dsl_cli_governance_fails_when_marker_missing(tmp_path: Path) -> No
 
     _write(repo_root / "docs" / "doc" / "yaml-dsl" / "workflow.md", "# workflow\n")
     _write(repo_root / "docs" / "doc" / "yaml-dsl" / "agent-skill.md", "# agent\n")
-    _write(repo_root / "artifacts" / "skills" / "scalim-yaml-dsl" / "SKILL.md", "# skill\n")
+    _write(repo_root / "agentdev" / "skills" / "scalim-yaml-dsl" / "SKILL.md", "# skill\n")
 
     errors = check_yaml_dsl_cli_snippet_governance(repo_root)
     assert any("missing required marker" in item for item in errors)
@@ -67,7 +67,7 @@ def test_yaml_dsl_cli_governance_fails_on_hand_written_snippet_outside_markers(t
 
     _write(repo_root / "docs" / "doc" / "yaml-dsl" / "workflow.md", workflow)
     _write(repo_root / "docs" / "doc" / "yaml-dsl" / "agent-skill.md", agent)
-    _write(repo_root / "artifacts" / "skills" / "scalim-yaml-dsl" / "SKILL.md", skill)
+    _write(repo_root / "agentdev" / "skills" / "scalim-yaml-dsl" / "SKILL.md", skill)
 
     errors = check_yaml_dsl_cli_snippet_governance(repo_root)
     assert any("hand-written CLI snippet outside injected blocks" in item for item in errors)
@@ -113,7 +113,7 @@ def test_yaml_dsl_cli_governance_passes_when_snippets_are_only_inside_markers(tm
 
     _write(repo_root / "docs" / "doc" / "yaml-dsl" / "workflow.md", workflow)
     _write(repo_root / "docs" / "doc" / "yaml-dsl" / "agent-skill.md", agent)
-    _write(repo_root / "artifacts" / "skills" / "scalim-yaml-dsl" / "SKILL.md", skill)
+    _write(repo_root / "agentdev" / "skills" / "scalim-yaml-dsl" / "SKILL.md", skill)
 
     errors = check_yaml_dsl_cli_snippet_governance(repo_root)
     assert errors == []

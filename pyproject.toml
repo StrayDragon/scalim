@@ -138,7 +138,7 @@ exclude = [
     ".vscode",
     "__pypackages__",
     "_build",
-    "artifacts/skills/**",
+    "agentdev/skills/**",
     "buck-out",
     "build",
     "dist",
@@ -245,7 +245,7 @@ exclude = [
 ]
 ignore = [
     "scripts",
-    "artifacts/skills/scalim-yaml-dsl/scripts/**",
+    "agentdev/skills/scalim-yaml-dsl/scripts/**",
     "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py",
     "src/scalim/vendor/dataclassesx/__init__.py",
     "src/scalim/vendor/dataclassesx/_backport.py",

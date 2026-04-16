@@ -11,4 +11,4 @@
 
 #### Scenario: skill docs no longer advertise legacy workflow write fields
 - **WHEN** 维护者运行 `just gen-agent-skill`
-- **THEN** `artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md` 不得将已移除的旧 workflow 写入字段作为当前字段/路径进行描述
+- **THEN** `agentdev/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md` 不得将已移除的旧 workflow 写入字段作为当前字段/路径进行描述

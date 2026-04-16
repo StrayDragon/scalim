@@ -37,11 +37,11 @@ def _git_ls_files(root: Path, pattern: str) -> List[str]:
 
 def _is_allowed_markdown(rel_posix: str) -> bool:
     # 迁移/历史区域允许保留旧写法(辅助作者升级或回溯)
-    if rel_posix.startswith("artifacts/skills/scalim-yaml-dsl/references/upgrades/"):
+    if rel_posix.startswith("agentdev/skills/scalim-yaml-dsl/references/upgrades/"):
         return True
-    if rel_posix == "artifacts/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md":
+    if rel_posix == "agentdev/skills/scalim-yaml-dsl/references/syntax-catalog.gen.md":
         return True
-    if rel_posix == "artifacts/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md":
+    if rel_posix == "agentdev/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md":
         return True
     if rel_posix.startswith("openspec/changes/archive/"):
         return True
@@ -137,7 +137,7 @@ def main() -> int:
     if errors:
         sys.stderr.write("`Markdown` SSOT 检查失败: 检测到遗留写法.\n")
         sys.stderr.write(
-            "允许的例外: `artifacts/skills/.../references/upgrades/`, `yaml-dsl-upgrades.gen.md`, `openspec/changes/archive/`\n"
+            "允许的例外: `agentdev/skills/.../references/upgrades/`, `yaml-dsl-upgrades.gen.md`, `openspec/changes/archive/`\n"
         )
         sys.stderr.write("违规项:\n")
         for item in errors[:200]:

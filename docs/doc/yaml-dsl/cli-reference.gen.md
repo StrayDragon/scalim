@@ -14,7 +14,7 @@ Sources:
 - Project identity constants: `src/scalim/_project_constants.py`
 - Demand schema file: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`
 - Workflow schema file: `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
-- Canonical example: `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`
+- Canonical example: `agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`
 
 ## Command Variants
 ### Repo

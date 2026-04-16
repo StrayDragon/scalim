@@ -49,7 +49,7 @@
 - runtime conversion/compile: `src/scalim/dsl/yaml_dsl/runtime/**`
 - CLI 辅助与一致性: `packages/scalim-cli/src/scalim_cli/yaml_dsl.py`
 - docs: `docs/doc/yaml-dsl/**`(如涉及 `.gen.*` 或注入区块,只通过 `just gen-docs` 刷新)
-- skills: `artifacts/skills/scalim-yaml-dsl/**`(如变更影响 authoring/校验入口)
+- skills: `agentdev/skills/scalim-yaml-dsl/**`(如变更影响 authoring/校验入口)
 
 ## 3) “是否需要进 YAML”的判定提示
 

@@ -5,10 +5,10 @@
 """
 生成 `scalim-yaml-dsl` 技能的受控参考产物:
 
-- 只生成 `artifacts/skills/scalim-yaml-dsl/references/*.gen.*`、
-  `artifacts/skills/scalim-yaml-dsl/references/generated/`.
-- 若存在 `artifacts/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`,
-  会在约定的“标记区块”内注入“升级批次索引”(来源: `artifacts/skills/scalim-yaml-dsl/references/upgrades/`).
+- 只生成 `agentdev/skills/scalim-yaml-dsl/references/*.gen.*`、
+  `agentdev/skills/scalim-yaml-dsl/references/generated/`.
+- 若存在 `agentdev/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`,
+  会在约定的“标记区块”内注入“升级批次索引”(来源: `agentdev/skills/scalim-yaml-dsl/references/upgrades/`).
 - 语法目录来自 `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`.
 - CLI/LSP 参考来自 `packages/scalim-cli/src/scalim_cli/yaml_dsl.py`.
 - 部分需求索引摘要来自 `openspec/specs/`.
@@ -28,7 +28,7 @@ from scalim_misc import agent_skill_gen
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="生成 Scalim YAML DSL skill 的受控参考产物。")
-    parser.add_argument("--output-root", help="技能输出根目录(默认: artifacts/skills)。")
+    parser.add_argument("--output-root", help="技能输出根目录(默认: agentdev/skills)。")
     parser.add_argument("--validate", action="store_true", help="校验现有受控产物是否与重新生成结果一致。")
     return parser.parse_args(argv)
 
@@ -36,7 +36,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     repo_root = Path(__file__).resolve().parents[1]
-    output_root = Path(args.output_root) if args.output_root else repo_root / "artifacts" / "skills"
+    output_root = Path(args.output_root) if args.output_root else repo_root / "agentdev" / "skills"
     skill_dir = output_root / agent_skill_gen.SKILL_NAME
 
     if agent_skill_gen.is_forbidden_output(skill_dir):

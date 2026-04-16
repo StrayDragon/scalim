@@ -26,7 +26,7 @@
 
 ## 5. Skills / Docs Example Updates
 
-- [ ] 5.1 更新版本化输出参考文档示例为 facade 写法（SSOT: `artifacts/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md`；手工维护,非生成物）
+- [ ] 5.1 更新版本化输出参考文档示例为 facade 写法（SSOT: `agentdev/skills/scalim-yaml-dsl/references/task-workflow-versioned-outputs.md`；手工维护,非生成物）
 - [ ] 5.2 确保 docs/skills/notebooks 不再出现“手写读取 `<root>/manifest/latest.json` + 拼路径”作为官方推荐写法（验收: `scripts/check-user-material-import-boundaries.py --check` + 人工 review）
 
 ## 6. Change QA

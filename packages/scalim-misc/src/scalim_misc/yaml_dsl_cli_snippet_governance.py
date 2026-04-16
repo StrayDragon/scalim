@@ -85,7 +85,7 @@ def check_yaml_dsl_cli_snippet_governance(repo_root: Path) -> List[str]:
             "just gen-docs",
         ),
         (
-            repo_root / "artifacts" / "skills" / "scalim-yaml-dsl" / "SKILL.md",
+            repo_root / "agentdev" / "skills" / "scalim-yaml-dsl" / "SKILL.md",
             SKILL_CLI_MIN_COMMANDS_BEGIN,
             SKILL_CLI_MIN_COMMANDS_END,
             "just gen-agent-skill",

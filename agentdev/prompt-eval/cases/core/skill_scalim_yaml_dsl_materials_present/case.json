@@ -3,7 +3,7 @@
   "title": "scalim-yaml-dsl skill references canonical materials",
   "kind": "file_assert",
   "inputs": {
-    "file": "artifacts/skills/scalim-yaml-dsl/SKILL.md",
+    "file": "agentdev/skills/scalim-yaml-dsl/SKILL.md",
     "must_contain": [
       "references/syntax-catalog.gen.md",
       "references/generated/cli-lsp-reference.gen.md",
@@ -15,4 +15,3 @@
     "ok": true
   }
 }
-

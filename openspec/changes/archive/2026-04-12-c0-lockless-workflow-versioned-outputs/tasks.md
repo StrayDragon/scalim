@@ -41,4 +41,4 @@
 
 - [x] 7.1 将本 change 的 delta specs 同步回 `openspec/specs/*/spec.md`（SSOT：本 change 的 `openspec/changes/.../specs/`；入口：`openspec sync specs` 或对应工作流）
 - [x] 7.2 若 docs 站点存在 specs 注入区块，运行 `just gen-docs` 刷新（避免 injected-block drift）；验收：`just qa` 不再报文档漂移
-- [x] 7.3 更新用户侧文档（SSOT 放在 skill）：在 `artifacts/skills/` 中补齐“服务端 per-request 输出 root + latest.json 定位 + 清理 + 并发注意事项 + 测试写法”的指引；`docs/doc/` 仅添加简短指向说明（不复制内容）
+- [x] 7.3 更新用户侧文档（SSOT 放在 skill）：在 `agentdev/skills/` 中补齐“服务端 per-request 输出 root + latest.json 定位 + 清理 + 并发注意事项 + 测试写法”的指引；`docs/doc/` 仅添加简短指向说明（不复制内容）

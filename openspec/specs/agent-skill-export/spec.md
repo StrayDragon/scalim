@@ -7,21 +7,21 @@
 
 ## Context
 实现位于 `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py` 与 `scripts/gen-agent-skill.py`.
-该生成器为手工维护的 `artifacts/skills/scalim-yaml-dsl/` 提供受控参考产物,并在校验模式下检测生成内容漂移.
+该生成器为手工维护的 `agentdev/skills/scalim-yaml-dsl/` 提供受控参考产物,并在校验模式下检测生成内容漂移.
 
 ## Related Code (as implemented)
 - `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py`
 - `scripts/gen-agent-skill.py`
 - `tests/test_agent_skill_generator.py`
-- `artifacts/skills/scalim-yaml-dsl/`
+- `agentdev/skills/scalim-yaml-dsl/`
 - `justfile` (`gen-agent-skill`, `validate-agent-skill`)
 ## Requirements
 ### Requirement: Safe Output Destination
-系统 MUST 默认输出到 `artifacts/skills/`,允许通过参数指定输出根目录,但必须拒绝写入用户 skill 目录(如 `~/.codex/skills`、`~/.claude/skills`、`/etc/codex/skills`).
+系统 MUST 默认输出到 `agentdev/skills/`,允许通过参数指定输出根目录,但必须拒绝写入用户 skill 目录(如 `~/.codex/skills`、`~/.claude/skills`、`/etc/codex/skills`).
 
 #### Scenario: 默认输出目录
 - **WHEN** 生成器在未指定输出根目录时运行
-- **THEN** 受控产物输出到 `artifacts/skills/scalim-yaml-dsl/`
+- **THEN** 受控产物输出到 `agentdev/skills/scalim-yaml-dsl/`
 
 #### Scenario: 禁止用户目录
 - **WHEN** 输出根目录指向用户 skill 目录
@@ -30,7 +30,7 @@
 ### Requirement: Skill Output Artifacts
 系统 MUST 仅生成和校验受控参考产物,不得再把完整 skill 包视为自动生成产物.
 
-受控输出 MUST 位于 `artifacts/skills/scalim-yaml-dsl/references/`,并至少包含:
+受控输出 MUST 位于 `agentdev/skills/scalim-yaml-dsl/references/`,并至少包含:
 - `references/syntax-catalog.gen.md`
 - `references/generated/cli-lsp-reference.gen.md`
 - `references/generated/example-full/ecommerce_report.gen.yaml`
@@ -66,7 +66,7 @@
 - **THEN** 不得手工复制一份独立且易漂移的 YAML DSL 规范摘要
 
 ### Requirement: Example Selection and Validation
-系统 MUST 仅导出一个 canonical full example,目标路径固定为 `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`.
+系统 MUST 仅导出一个 canonical full example,目标路径固定为 `agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`.
 
 该 canonical example MUST:
 - 仅通过静态读取 `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml` 获得,不得执行 notebook
@@ -110,7 +110,7 @@
 - **THEN** 校验模式返回非零并报告差异
 
 ### Requirement: Manual Skill Files Are Preserved
-系统 MUST 将 `artifacts/skills/scalim-yaml-dsl/SKILL.md`、`agents/openai.yaml` 与非 generated references 视为手工维护文件.
+系统 MUST 将 `agentdev/skills/scalim-yaml-dsl/SKILL.md`、`agents/openai.yaml` 与非 generated references 视为手工维护文件.
 生成器在 build 与 validate 模式下 MUST NOT 创建、覆盖、删除或重排这些手工维护文件.
 
 #### Scenario: 保留手工维护的 SKILL.md

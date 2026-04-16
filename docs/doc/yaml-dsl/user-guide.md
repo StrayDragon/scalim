@@ -1356,7 +1356,7 @@ base_module_path = derive_base_module_path("path/to/config.yaml")
 
 运行时/服务端集成的故障处理(包括上述 `base_module_path` 推导报错)见:
 
-- [`artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=artifacts/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
+- [`agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
 
 ---
 
@@ -2171,7 +2171,7 @@ result = run(
 ### A. 完整配置示例位置
 
 - **简单订单报表**: `tests/fixtures/order_report.yaml`
-- **电商报表(完整)**: `artifacts/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`
+- **电商报表(完整)**: `agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`
 
 ### B. 相关文档
 

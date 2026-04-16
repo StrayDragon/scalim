@@ -272,9 +272,6 @@ go.sum
 # Viz replay artifacts (generated; not committed)
 artifacts/scalim-viz/
 
-# Agent skill build manifests (deprecated)
-artifacts/skills/*.build-manifest.json
-
 # Docs artifacts (generated)
 docs/doc/notebooks/**/*.html
 

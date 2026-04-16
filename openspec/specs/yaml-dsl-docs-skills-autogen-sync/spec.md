@@ -19,7 +19,7 @@ TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update 
 
 #### Scenario: skill provides a generated CLI/LSP reference
 - **WHEN** 维护者运行 `just gen-agent-skill`
-- **THEN** MUST 生成 `artifacts/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md`
+- **THEN** MUST 生成 `agentdev/skills/scalim-yaml-dsl/references/generated/cli-lsp-reference.gen.md`
 - **AND** 该 reference MUST 覆盖 `yaml-dsl upsert-lsp-comment`（不允许缺失）
 
 ### Requirement: Copyable CLI/LSP snippets MUST be injected and hand-written snippets MUST be rejected
@@ -29,7 +29,7 @@ TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update 
 
 - `docs/doc/yaml-dsl/workflow.md`
 - `docs/doc/yaml-dsl/agent-skill.md`
-- `artifacts/skills/scalim-yaml-dsl/SKILL.md`
+- `agentdev/skills/scalim-yaml-dsl/SKILL.md`
 
 #### Scenario: required markers exist
 - **WHEN** 维护者查看上述文件

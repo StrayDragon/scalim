@@ -212,7 +212,7 @@ def test_generated_syntax_catalog_covers_top_level_and_definitions(tmp_path: Pat
 
 def test_manual_skill_contract_matches_generated_layout() -> None:
     repo_root = _repo_root()
-    skill_dir = repo_root / "artifacts" / "skills" / agent_skill_gen.SKILL_NAME
+    skill_dir = repo_root / "agentdev" / "skills" / agent_skill_gen.SKILL_NAME
     skill_md = skill_dir / "SKILL.md"
     openai_yaml = skill_dir / "agents" / "openai.yaml"
 

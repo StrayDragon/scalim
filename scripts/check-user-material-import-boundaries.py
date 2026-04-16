@@ -4,7 +4,7 @@
 扫描范围(用户可见材料):
 - `docs/doc/**`
 - `notebooks/marimo/**`
-- `artifacts/skills/**`
+- `agentdev/skills/**`
 
 约束(约定优先):
 - 用户材料中不得出现内部/不安全导入路径(例如 `._internal`、`._foo`、`runtime.*` 等)
@@ -141,7 +141,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     parser.add_argument("--docs-root", default="docs/doc", help="文档根目录(默认: docs/doc).")
     parser.add_argument("--notebooks-root", default="notebooks/marimo", help="notebooks 根目录(默认: notebooks/marimo).")
-    parser.add_argument("--skills-root", default="artifacts/skills", help="skills 根目录(默认: artifacts/skills).")
+    parser.add_argument("--skills-root", default="agentdev/skills", help="skills 根目录(默认: agentdev/skills).")
     parser.add_argument("--check", action="store_true", help="执行检查; 发现问题时返回非 0 退出码.")
     return parser.parse_args(list(argv))
 
