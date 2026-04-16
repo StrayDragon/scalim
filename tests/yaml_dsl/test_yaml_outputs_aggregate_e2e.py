@@ -2,7 +2,7 @@ import csv
 from decimal import Decimal
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, run
 
 
 def _read_csv_rows(path: Path) -> "list[dict[str, str]]":
@@ -57,7 +57,10 @@ outputs:
         encoding="utf-8",
     )
 
-    result = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result = run(
+        str(yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"]))),
+    )
     assert result.core.outputs is not None
     detail_path = Path(str(result.core.outputs["detail_direct"]))
     summary_path = Path(str(result.core.outputs["summary_direct"]))
@@ -114,7 +117,10 @@ outputs:
         encoding="utf-8",
     )
 
-    result = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result = run(
+        str(yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"]))),
+    )
     assert result.core.outputs is not None
     summary_path = Path(str(result.core.outputs["summary_direct"]))
 

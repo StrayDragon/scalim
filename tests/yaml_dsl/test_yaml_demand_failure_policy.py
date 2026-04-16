@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, compile
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
@@ -25,7 +25,7 @@ sources: {}
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=_ALLOWED_MODULES))
+        _ = compile(str(yaml_path), options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES)))
 
     assert any(env.path == "failure_policy" for env in excinfo.value.errors)
 
@@ -54,9 +54,9 @@ outputs:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            demand_failure_policy="primary_only",
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+            runtime=DemandRunRuntimeOptions(demand_failure_policy="primary_only"),
         ),
     )
 
@@ -83,8 +83,8 @@ sources: {}
     with pytest.raises(ValueError, match="expected one of"):
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                demand_failure_policy="nope",
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                runtime=DemandRunRuntimeOptions(demand_failure_policy="nope"),
             ),
         )

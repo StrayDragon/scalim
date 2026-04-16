@@ -27,10 +27,10 @@ Sources:
 
 | 模块 | `__all__` 导出数 | 说明 | 常见场景 |
 | --- | ---: | --- | --- |
-| `scalim.dsl.yaml_dsl` | 24 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
+| `scalim.dsl.yaml_dsl` | 32 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
 | `scalim.dsl.yaml_dsl.tools` | 3 | YAML DSL 辅助工具(输出配置/路径推导) | 工具链集成/排错 |
 | `scalim.dsl.yaml_dsl.workflow` | 10 | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
-| `scalim.dsl.yaml_dsl.workflow_types` | 20 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
+| `scalim.dsl.yaml_dsl.workflow_types` | 21 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
 | `scalim.dsl.yaml_dsl.workflow_paths` | 1 | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
 | `scalim.spec.ir` | 40 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
@@ -91,7 +91,7 @@ from scalim.sinks.rows import InMemoryRows, InMemoryRowsSink
 
 #### `scalim.dsl.yaml_dsl`
 
-- Export count: `24`
+- Export count: `32`
 
 ```python
 from scalim.dsl.yaml_dsl import (
@@ -100,9 +100,18 @@ from scalim.dsl.yaml_dsl import (
     BookExportXlsxOverride,
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    CaptureNone,
+    CapturePolicy,
+    CaptureRows,
     Compilation,
     DemandDiagnosticsOverride,
     DemandDiagnosticsPolicy,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunResult,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
     FileResourceOverride,
     OutputDefaultsToOverride,
     OutputExtraSheetOverride,
@@ -113,9 +122,8 @@ from scalim.dsl.yaml_dsl import (
     OutputsDefaultsOverride,
     ResolverTrustedMode,
     ResourcesOverride,
-    RunOptions,
     RunOverrides,
-    RunResult,
+    WorkflowRunOptions,
     compile,
     run,
     run_workflow,
@@ -155,7 +163,7 @@ from scalim.dsl.yaml_dsl.workflow import (
 
 #### `scalim.dsl.yaml_dsl.workflow_types`
 
-- Export count: `20`
+- Export count: `21`
 
 ```python
 from scalim.dsl.yaml_dsl.workflow_types import (
@@ -173,11 +181,12 @@ from scalim.dsl.yaml_dsl.workflow_types import (
     WorkflowCachePoolPreset,
     WorkflowConfig,
     WorkflowExecutionOptions,
+    WorkflowNodePatch,
     WorkflowOutputStagingOptions,
     WorkflowResourcesWaitDiagnosticsOptions,
     WorkflowResourcesWaitOptions,
     WorkflowRun,
-    WorkflowRunOptionsPatch,
+    WorkflowRunOptions,
     WorkflowRuntimeOptions,
 )
 ```

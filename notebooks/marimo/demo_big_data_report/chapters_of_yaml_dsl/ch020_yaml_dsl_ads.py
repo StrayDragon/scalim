@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl import run as run_yaml
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario import (
@@ -58,21 +59,23 @@ def run_yaml_dsl_ads(
         try:
             run_result = run_yaml(
                 str(yaml_path),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    init_vars=init_vars,
-                    batch_size=10,
-                    loader_retry=LoaderRetryPoliciesSpec(
-                        default=LoaderRetryPolicySpec(
-                            enabled=True,
-                            should_retry=should_retry_ads_transient,
-                            max_attempts=2,
-                            max_elapsed_seconds=2,
-                            backoff="fixed",
-                            base_delay_seconds=0,
-                            max_delay_seconds=0,
-                            jitter=False,
-                        )
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=DemandRunRuntimeOptions(
+                        batch_size=10,
+                        loader_retry=LoaderRetryPoliciesSpec(
+                            default=LoaderRetryPolicySpec(
+                                enabled=True,
+                                should_retry=should_retry_ads_transient,
+                                max_attempts=2,
+                                max_elapsed_seconds=2,
+                                backoff="fixed",
+                                base_delay_seconds=0,
+                                max_delay_seconds=0,
+                                jitter=False,
+                            )
+                        ),
                     ),
                 ),
             )

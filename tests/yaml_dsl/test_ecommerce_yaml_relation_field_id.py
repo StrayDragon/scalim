@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, compile as compile_yaml
 from scalim.spec.ir import FieldIr
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
@@ -12,9 +12,9 @@ def test_ecommerce_yaml_relation_steps_support_field_id_alias(ecommerce_config_s
 
     compilation = compile_yaml(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
-            init_vars={"order_ids": []},
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"])),
+            template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
         ),
     )
 

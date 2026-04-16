@@ -1,6 +1,13 @@
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, compile, run_workflow
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    WorkflowRunOptions,
+    compile,
+    run_workflow,
+)
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.template_precompile import maybe_precompile_yaml_text
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config
@@ -35,9 +42,9 @@ outputs:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"output_path": "./output"},
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+            template=DemandRunTemplateOptions(template_vars={"output_path": "./output"}),
         ),
     )
     assert compilation.config.resources.files["detail_csv"].path == "./output"
@@ -69,7 +76,10 @@ outputs:
         encoding="utf-8",
     )
 
-    compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    compilation = compile(
+        str(yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"]))),
+    )
     assert compilation.config.resources.files["detail_csv"].path == "{{ output_path }}"
 
 
@@ -104,9 +114,9 @@ sources:
 
     compilation = compile(
         str(demand),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"chunk_size": 10},
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+            template=DemandRunTemplateOptions(template_vars={"chunk_size": 10}),
         ),
     )
     assert compilation.config.sources["customers"].lookup_chunk_size == 10
@@ -141,9 +151,9 @@ outputs:
     with pytest.raises(ValueError) as exc_info:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures"]),
-                template_vars={},
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+                template=DemandRunTemplateOptions(template_vars={}),
             ),
         )
     assert "missing" in str(exc_info.value)
@@ -182,9 +192,9 @@ sources:
     with pytest.raises(ScalimYamlValidationError) as exc_info:
         _ = compile(
             str(demand),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures"]),
-                template_vars={},
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+                template=DemandRunTemplateOptions(template_vars={}),
             ),
         )
     msg = "\n".join(env.message for env in exc_info.value.errors)
@@ -239,11 +249,13 @@ workflow:
 
     result = run_workflow(
         str(wf),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_vars={"demand_path": "demand.yaml"},
+        options=WorkflowRunOptions(
+            demand=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+                template=DemandRunTemplateOptions(template_vars={"demand_path": "demand.yaml"}),
+            ),
+            runtime=WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=3, failure_policy="all_fail")),
         ),
-        workflow_runtime_options=WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=3, failure_policy="all_fail")),
     )
     assert result.errors() == []
 
@@ -359,9 +371,9 @@ outputs: []
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_sandbox=" safe ",
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+            template=DemandRunTemplateOptions(template_sandbox=" safe "),
         ),
     )
     assert compilation.config.name == "demo"
@@ -396,10 +408,9 @@ outputs:
     with pytest.raises(ValueError) as exc_info:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures"]),
-                template_vars={"output_path": "  ./out  "},
-                template_sandbox="legacy",
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+                template=DemandRunTemplateOptions(template_vars={"output_path": "  ./out  "}, template_sandbox="legacy"),
             ),
         )
     msg = str(exc_info.value)
@@ -620,10 +631,9 @@ pad: "{{ big }}"
     with pytest.raises(ValueError) as exc_info:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures"]),
-                template_vars={"big": big},
-                rendered_yaml_max_len=50,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+                template=DemandRunTemplateOptions(template_vars={"big": big}, rendered_yaml_max_len=50),
             ),
         )
     msg = str(exc_info.value)
@@ -696,10 +706,9 @@ outputs: []
     with pytest.raises(ScalimYamlValidationError) as exc_info:
         _ = compile(
             str(demand),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures"]),
-                template_vars={"big": big},
-                rendered_yaml_max_len=250,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+                template=DemandRunTemplateOptions(template_vars={"big": big}, rendered_yaml_max_len=250),
             ),
         )
     msg = "\n".join(env.message for env in exc_info.value.errors)

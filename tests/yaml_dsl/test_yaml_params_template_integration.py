@@ -3,8 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, run
-from scalim.sinks import InMemoryRowSink
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, run
 
 import tests.fixtures.params_template_loaders as loaders
 
@@ -47,13 +46,9 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-            sink=sink,
-        ),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]))),
     )
 
     assert loaders.CALL_COUNTS.get("customers_by_keys") == 1
@@ -92,13 +87,9 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-            sink=sink,
-        ),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]))),
     )
 
     assert loaders.CALL_COUNTS.get("customers_static") == 1
@@ -150,13 +141,9 @@ sources:
 """.format(cache_mode=cache_mode),
     )
 
-    sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-            sink=sink,
-        ),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]))),
     )
 
     assert loaders.CALL_COUNTS.get("customers_by_rows") == expected_calls
@@ -197,13 +184,9 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-            sink=sink,
-        ),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]))),
     )
 
     assert loaders.CALL_COUNTS.get("preload_refdata") == 1
@@ -229,13 +212,11 @@ main_source:
     )
 
     end_dt = datetime(2024, 1, 31)
-    sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-            sink=sink,
-            init_vars={"end_dt": end_dt},
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.params_template_loaders"])),
+            template=DemandRunTemplateOptions(init_vars={"end_dt": end_dt}),
         ),
     )
 
@@ -275,13 +256,11 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.params_template_loaders"]),
-            sink=sink,
-            init_vars={"group_by": "level"},
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.params_template_loaders"])),
+            template=DemandRunTemplateOptions(init_vars={"group_by": "level"}),
         ),
     )
 

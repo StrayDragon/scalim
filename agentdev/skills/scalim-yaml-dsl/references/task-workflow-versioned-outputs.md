@@ -66,7 +66,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, WorkflowRunOptions, run_workflow
 from scalim.shortcuts.resources import outputs
 
 
@@ -79,9 +79,11 @@ def run_report_and_return_xlsx_bytes(
     try:
         run_workflow(
             workflow_yaml_path,
-            options=RunOptions(
-                allowed_modules=frozenset({"myapp.loaders"}),
-                init_vars={"out_root": str(out_root)},
+            options=WorkflowRunOptions(
+                demand=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=frozenset({"myapp.loaders"})),
+                    template=DemandRunTemplateOptions(init_vars={"out_root": str(out_root)}),
+                )
             ),
         )
 
@@ -100,7 +102,7 @@ def run_report_and_return_xlsx_bytes(
 ```python
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, WorkflowRunOptions, run_workflow
 from scalim.shortcuts.resources import outputs
 
 
@@ -109,10 +111,12 @@ def test_workflow_outputs_are_versioned(tmp_path: Path) -> None:
 
     run_workflow(
         "path/to/workflow.yaml",
-        options=RunOptions(
-            allowed_modules=frozenset({"tests.fixtures.workflow_loaders"}),
-            init_vars={"out_root": str(out_root)},
-        ),
+        options=WorkflowRunOptions(
+            demand=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset({"tests.fixtures.workflow_loaders"})),
+                template=DemandRunTemplateOptions(init_vars={"out_root": str(out_root)}),
+            ),
+        )
     )
 
     report_xlsx = outputs.latest_book_path(out_root, book_id="report")

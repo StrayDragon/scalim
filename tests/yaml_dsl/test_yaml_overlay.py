@@ -6,6 +6,11 @@ import pytest
 from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
     DemandDiagnosticsPolicy,
     FileResourceOverride,
     OutputOverride,
@@ -14,12 +19,22 @@ from scalim.dsl.yaml_dsl import (
     OutputWriteOverride,
     ResourcesOverride,
     UNSET,
-    RunOptions,
     RunOverrides,
     compile,
 )
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.ob.presets.viz import VizObserverConfig
+
+_ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
+
+
+def _options(*, allowed_modules=_ALLOWED_MODULES, init_vars=None, batch_size=UNSET, overrides=None, demand_diagnostics=None):  # type: ignore[no-untyped-def] test helper
+    return DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+        template=DemandRunTemplateOptions(init_vars=init_vars),
+        runtime=DemandRunRuntimeOptions(batch_size=batch_size, demand_diagnostics=demand_diagnostics),
+        outputs=DemandRunOutputOptions(overrides=overrides),
+    )
 
 
 def _write_yaml(tmp_path: Path, text: str) -> Path:
@@ -63,10 +78,7 @@ sources: {}
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            overrides=overrides,
-        ),
+        options=_options(overrides=overrides),
     )
     request = compilation.request
     assert request.output_composition is not None
@@ -225,10 +237,7 @@ sources: {}
         overrides = make_overrides()
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-                overrides=overrides,
-            ),
+            options=_options(overrides=overrides),
         )
 
 
@@ -249,8 +258,7 @@ sources: {}
     output_root = str(tmp_path / "out")
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+        options=_options(
             init_vars={"out_path": output_root},
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
@@ -286,12 +294,11 @@ sources: {}
     output_root = tmp_path / "out"
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+        options=_options(
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
                 resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_root)}),
-            ),
+            )
         ),
     )
 
@@ -321,13 +328,12 @@ sources: {}
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+        options=_options(
             overrides=RunOverrides(
                 output_extras=OutputExtrasOverride(meta=True),
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
                 resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out")}),
-            ),
+            )
         ),
     )
 
@@ -353,8 +359,7 @@ sources: {}
     with pytest.raises(ValueError, match=r"Duplicate effective field display names detected"):
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            options=_options(
                 overrides=RunOverrides(
                     outputs=(
                         OutputOverride(
@@ -365,7 +370,7 @@ sources: {}
                         ),
                     ),
                     resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path="./out")}),
-                ),
+                )
             ),
         )
 
@@ -477,7 +482,7 @@ resources:
     )
 
     with pytest.raises(ValueError, match=r"Duplicate effective field display names detected") as excinfo:
-        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+        _ = compile(str(yaml_path), options=_options())
     msg = str(excinfo.value)
     assert "'ID'" in msg
     assert "order_id" in msg
@@ -513,7 +518,7 @@ outputs:
     )
 
     with pytest.raises(ValueError, match=r"Duplicate effective field display names detected") as excinfo:
-        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+        _ = compile(str(yaml_path), options=_options())
     msg = str(excinfo.value)
     assert "'ID'" in msg
     assert "order_id" in msg
@@ -548,10 +553,7 @@ resources:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False),
-        ),
+        options=_options(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
     )
     assert compilation.config.validate_unique_field_names is False
     assert compilation.request.output_composition is not None
@@ -580,10 +582,7 @@ sources: {}
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            overrides=overrides,
-        ),
+        options=_options(overrides=overrides),
     )
     assert compilation.request.observability is not None
     assert compilation.request.observability.viz_config is viz_config
@@ -611,7 +610,7 @@ observability:
     )
 
     caplog.set_level(logging.WARNING)
-    compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+    compilation = compile(str(yaml_path), options=_options())
     assert compilation.request.observability is None
     assert any("Legacy YAML key 'observability' is no longer supported" in str(r.message) for r in caplog.records)
 
@@ -643,10 +642,7 @@ observability:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            overrides=overrides,
-        ),
+        options=_options(overrides=overrides),
     )
     assert compilation.request.observability is not None
     assert compilation.request.observability.viz_config is viz_config
@@ -669,7 +665,7 @@ sources: {}
     )
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+        _ = compile(str(yaml_path), options=_options())
 
     assert any(env.path == "batch_size" for env in excinfo.value.errors)
 
@@ -691,10 +687,7 @@ sources: {}
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            batch_size=256,
-        ),
+        options=_options(batch_size=256),
     )
     config = compilation.config
     request = compilation.request
@@ -718,13 +711,10 @@ sources: {}
 """,
     )
 
-    with pytest.raises(TypeError, match=r"batch_size must be an integer >= 1 or None"):
+    with pytest.raises(TypeError, match=r"batch_size must be an integer >= 1"):
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-                batch_size=True,  # type: ignore[arg-type] intentional runtime boundary test
-            ),
+            options=_options(batch_size=True),  # type: ignore[arg-type] intentional runtime boundary test
         )
 
 
@@ -746,10 +736,7 @@ sources: {}
     with pytest.raises(ValueError, match=r"batch_size must be >= 1"):
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-                batch_size=0,
-            ),
+            options=_options(batch_size=0),
         )
 
 

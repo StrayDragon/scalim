@@ -5,7 +5,15 @@ from typing import List
 import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    ResolverTrustedMode,
+    run,
+)
 from scalim.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
 from scalim.sinks import CSVSink, ColumnCSVSink
@@ -149,7 +157,7 @@ class TestAllowlistRequired:
     def test_run_requires_allowlist(self, tmp_path: Path) -> None:
         yaml_path = _write_simple_yaml(tmp_path, "test.loader")
         with pytest.raises(ScalimAllowlistRequiredError, match="Allowlist is required"):
-            run(str(yaml_path), options=RunOptions(allowed_modules=frozenset()))
+            run(str(yaml_path), options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset())))
 
     def test_converter_does_not_require_allowlist(self) -> None:
         yaml_content = """
@@ -178,7 +186,7 @@ sources: {}
     )
     def test_run_with_allowlist_passes_check(self, tmp_path: Path, allow_kwargs: dict) -> None:
         yaml_path = _write_simple_yaml(tmp_path, "tests.fixtures.mock_loaders.mock_loader")
-        options = RunOptions(**allow_kwargs)
+        options = DemandRunOptions(security=DemandRunSecurityOptions(**allow_kwargs))
         result = run(str(yaml_path), options=options)
         assert result.total_rows == 0
 
@@ -224,6 +232,111 @@ class TestIncludeHeader:
 
         lines = output_path.read_text(encoding="utf-8").strip().splitlines()
         assert lines == expected_lines
+
+
+class TestDemandRunOptionsContractsCoverage:
+    def test_coerce_iterable_str_helpers_cover_error_branches(self) -> None:
+        import scalim.dsl.yaml_dsl.runtime.contracts as contracts_mod
+
+        with pytest.raises(TypeError, match=r"iterable of str"):
+            _ = contracts_mod._coerce_iterable_str_frozenset(None, field_name="x")  # noqa: SLF001
+        with pytest.raises(TypeError, match=r"not a str"):
+            _ = contracts_mod._coerce_iterable_str_frozenset("abc", field_name="x")  # noqa: SLF001
+        with pytest.raises(TypeError, match=r"iterable of str"):
+            _ = contracts_mod._coerce_iterable_str_frozenset(123, field_name="x")  # noqa: SLF001
+
+        with pytest.raises(TypeError, match=r"iterable of str"):
+            _ = contracts_mod._coerce_iterable_str_tuple(None, field_name="x")  # noqa: SLF001
+        with pytest.raises(TypeError, match=r"not a str"):
+            _ = contracts_mod._coerce_iterable_str_tuple("abc", field_name="x")  # noqa: SLF001
+        with pytest.raises(TypeError, match=r"iterable of str"):
+            _ = contracts_mod._coerce_iterable_str_tuple(123, field_name="x")  # noqa: SLF001
+
+    def test_security_options_normalizes_str_enum_and_rejects_bad_mode_type(self) -> None:
+        security = DemandRunSecurityOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            resolver_trusted_mode="strict_allowlist",  # type: ignore[arg-type] contract normalization boundary
+        )
+        assert security.resolver_trusted_mode == ResolverTrustedMode.STRICT_ALLOWLIST
+
+        with pytest.raises(TypeError, match=r"resolver_trusted_mode"):
+            _ = DemandRunSecurityOptions(
+                allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+                resolver_trusted_mode=1,  # type: ignore[arg-type] contract validation boundary
+            )
+
+    def test_security_options_normalizes_public_builtin_callable_ids(self) -> None:
+        security = DemandRunSecurityOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+            public_builtin_callable_ids=["foo"],  # type: ignore[arg-type] contract normalization boundary
+        )
+        assert security.public_builtin_callable_ids == ("foo",)
+
+    def test_template_options_rendered_yaml_max_len_validation_cover_branches(self) -> None:
+        with pytest.raises(TypeError, match=r"rendered_yaml_max_len"):
+            _ = DemandRunTemplateOptions(rendered_yaml_max_len=True)
+
+        with pytest.raises(ValueError, match=r"rendered_yaml_max_len"):
+            _ = DemandRunTemplateOptions(rendered_yaml_max_len=0)
+
+    def test_runtime_options_parallel_mode_and_max_workers_validation_cover_branches(self) -> None:
+        with pytest.raises(ValueError, match=r"parallel_mode"):
+            _ = DemandRunRuntimeOptions(parallel_mode="nope")  # type: ignore[arg-type] contract validation boundary
+
+        with pytest.raises(TypeError, match=r"max_workers"):
+            _ = DemandRunRuntimeOptions(max_workers=True)
+
+        with pytest.raises(ValueError, match=r"max_workers"):
+            _ = DemandRunRuntimeOptions(max_workers=-1)
+
+    def test_output_options_capture_validation_cover_branch(self) -> None:
+        with pytest.raises(TypeError, match=r"capture"):
+            _ = DemandRunOutputOptions(capture="nope")  # type: ignore[arg-type] contract validation boundary
+
+    def test_demand_run_options_type_checks_cover_branches(self) -> None:
+        security = DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+
+        with pytest.raises(TypeError, match=r"DemandRunOptions.security must be a DemandRunSecurityOptions"):
+            _ = DemandRunOptions(security="nope")  # type: ignore[arg-type] contract validation boundary
+
+        with pytest.raises(TypeError, match=r"DemandRunOptions.template must be a DemandRunTemplateOptions"):
+            _ = DemandRunOptions(security=security, template="nope")  # type: ignore[arg-type] contract validation boundary
+
+        with pytest.raises(TypeError, match=r"DemandRunOptions.runtime must be a DemandRunRuntimeOptions"):
+            _ = DemandRunOptions(security=security, runtime="nope")  # type: ignore[arg-type] contract validation boundary
+
+        with pytest.raises(TypeError, match=r"DemandRunOptions.outputs must be a DemandRunOutputOptions"):
+            _ = DemandRunOptions(security=security, outputs="nope")  # type: ignore[arg-type] contract validation boundary
+
+    def test_normalize_public_demand_run_options_replaces_when_template_sandbox_needs_trimming(self) -> None:
+        from scalim.dsl.yaml_dsl.runtime.normalize import normalize_public_demand_run_options
+
+        options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+        object.__setattr__(options.template, "template_sandbox", " safe ")
+
+        normalized = normalize_public_demand_run_options(options)
+        assert normalized is not options
+        assert normalized.template.template_sandbox == "safe"
+
+    def test_apply_demand_runtime_policy_overrides_rejects_invalid_batch_size_values_cover_branches(self) -> None:
+        from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
+        from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
+
+        options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+
+        object.__setattr__(options.runtime, "batch_size", "nope")
+        with pytest.raises(TypeError, match=r"batch_size must be an integer"):
+            _ = compiler_mod._apply_demand_runtime_policy_overrides(  # noqa: SLF001
+                DemandConfig(),
+                options=options,
+            )
+
+        object.__setattr__(options.runtime, "batch_size", 0)
+        with pytest.raises(ValueError, match=r"batch_size must be >= 1"):
+            _ = compiler_mod._apply_demand_runtime_policy_overrides(  # noqa: SLF001
+                DemandConfig(),
+                options=options,
+            )
 
 
 class TestExcelIncludeHeader:

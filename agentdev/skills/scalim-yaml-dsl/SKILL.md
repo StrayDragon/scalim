@@ -41,20 +41,28 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 运行入口已迁出 CLI,统一使用 Python API(需 allowlist):
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run, run_workflow
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunSecurityOptions,
+    WorkflowRunOptions,
+    run,
+    run_workflow,
+)
 
-run(
-    "path/to/demand.yaml",
-    options=RunOptions(
+demand = DemandRunOptions(
+    security=DemandRunSecurityOptions(
         allowed_modules=frozenset(["myapp.loaders"]),
     ),
 )
 
+run(
+    "path/to/demand.yaml",
+    options=demand,
+)
+
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(
-        allowed_modules=frozenset(["myapp.loaders"]),
-    ),
+    options=WorkflowRunOptions(demand=demand),
 )
 ```
 

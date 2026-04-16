@@ -16,8 +16,8 @@ from ....hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch
 from ....ob.components import split_components
 from ....vendor.dataclassesx import replace
 from .compiler import compile as _compile
-from .contracts import Compilation, RunOptions, RunResult, UnsetType
-from .normalize import normalize_public_run_options
+from .contracts import CaptureRows, Compilation, DemandRunOptions, DemandRunResult, UnsetType
+from .normalize import normalize_public_demand_run_options
 
 _policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.runtime.policy")
 
@@ -62,7 +62,7 @@ def _ensure_versioned_output_dirs(compilation: Compilation) -> None:  # noqa: C9
         _ = ensure_version_dir(layout, version_id=str(version_id))
 
 
-def _update_versioned_output_manifests(result: "RunResult") -> None:
+def _update_versioned_output_manifests(result: DemandRunResult) -> None:
     outputs = result.core.outputs or {}
     if not outputs:
         return
@@ -111,29 +111,31 @@ def _update_versioned_output_manifests(result: "RunResult") -> None:
 def run(
     yaml_path: str,
     *,
-    options: RunOptions,
-) -> RunResult:
+    options: DemandRunOptions,
+) -> DemandRunResult:
     """运行 `YAML DSL` 官方入口.
 
     优先级(高 -> 低):
-    - `options.overrides.outputs`(完全覆盖 `YAML` 的 `outputs`; 整体替换,即 `replace`; 非空)
+    - `options.outputs.overrides.outputs`(完全覆盖 `YAML` 的 `outputs`; 整体替换,即 `replace`; 非空)
     - `YAML` 的 `outputs`(若声明)
     - 执行默认值
 
     注意:
     - YAML 主线不再支持 `observability.*`(旧字段会发出迁移告警并被忽略);可观测性通过 `components=[Observer()/Hook()]` 与
-      `RunOptions(components=[...], overrides=RunOverrides(viz_config=VizObserverConfig(...)))` 装配.
-    - `options.overrides.viz_config` 可启用/禁用 `viz` 并控制落盘路径、`trace` 输出与 `payload_policy` 策略等.
-    - 当 `options.overrides.outputs` 把 `YAML` 中的 `workbook` 输出整体替换为非 `workbook` 输出时,未显式设置 `path` 的 `meta/audit`
+      `DemandRunOptions(runtime=DemandRunRuntimeOptions(components=[...]),`
+      `outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(...))))`
+      装配.
+    - `options.outputs.overrides.viz_config` 可启用/禁用 `viz` 并控制落盘路径、`trace` 输出与 `payload_policy` 策略等.
+    - 当 `options.outputs.overrides.outputs` 把 `YAML` 中的 `workbook` 输出整体替换为非 `workbook` 输出时,未显式设置 `path` 的 `meta/audit`
       会被跳过;若仍需保留,请为 `meta.path` / `audit.path` 提供独立 `workbook` 路径.
-    - 输出数据的保留完全由 `options.sink`(例如 `InMemoryRowSink`)决定,而不是由布尔开关控制.
+    - 输出数据的捕获通过 `options.outputs.capture=CaptureRows()` 显式启用;默认不捕获.
     """
-    options = normalize_public_run_options(options)
+    options = normalize_public_demand_run_options(options)
     compilation = _compile(yaml_path, options=options)
     _ensure_versioned_output_dirs(compilation)
 
     request = compilation.request
-    if isinstance(options.batch_size, UnsetType):
+    if isinstance(options.runtime.batch_size, UnsetType):
         _observers, hooks = split_components(request.components)
         runtime_bindings = request.runtime_bindings
         main_source_id = compilation.demand_ir.main_source.source_id
@@ -141,7 +143,7 @@ def run(
         decision = PreUseBatchSizeDecision(
             value=request.batch_size,
             demand_path=str(yaml_path),
-            init_vars=options.init_vars,
+            init_vars=options.template.init_vars,
             main_loader=main_loader,
         )
         emit_pre_use_batch_size_signal(hooks, decision)
@@ -153,7 +155,15 @@ def run(
             _policy_logger.debug("`pre_use_batch_size` 决策完成: 批大小=%s 改写轨迹=%s", decision.value, decision.history)
 
     core = run_ir(compilation.demand_ir, request)
-    result = RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=options.sink)
+    captured_rows = None
+    if isinstance(options.outputs.capture, CaptureRows):
+        in_memory_rows = core.in_memory_rows
+        if in_memory_rows is None:
+            msg = "CaptureRows enabled but no rows were captured. This is unexpected; please report a bug."
+            raise RuntimeError(msg)
+        captured_rows = in_memory_rows
+
+    result = DemandRunResult(core, config=compilation.config, yaml_path=yaml_path, captured_rows=captured_rows)
     _update_versioned_output_manifests(result)
     return result
 
@@ -161,9 +171,9 @@ def run(
 def compile(  # noqa: A001
     yaml_path: str,
     *,
-    options: RunOptions,
+    options: DemandRunOptions,
 ) -> Compilation:
-    options = normalize_public_run_options(options)
+    options = normalize_public_demand_run_options(options)
     return _compile(yaml_path, options=options)
 
 

@@ -22,7 +22,7 @@ from .compiler import (
     load_config,
     validate_allowlist,
 )
-from .contracts import RunOptions
+from .contracts import DemandRunOptions
 from .references import SecurePythonReferenceResolver
 from .runtime_linking import resolve_runtime_bindings
 
@@ -32,7 +32,7 @@ def stage_validate_allowlist(*, allowed_modules: FrozenSet[str], allowed_functio
 
 
 class ScalimStageAllowlistMismatchError(ScalimYamlError):
-    MESSAGE: str = "Stage context allowlist must match RunOptions allowlist"
+    MESSAGE: str = "Stage context allowlist must match DemandRunOptions.security allowlist"
 
     def __init__(self) -> None:
         super(ScalimStageAllowlistMismatchError, self).__init__(self.MESSAGE)
@@ -72,10 +72,10 @@ def stage_build_execution_request(
     demand_ir: DemandIr,
     *,
     yaml_base_dir: str,
-    options: RunOptions,
+    options: DemandRunOptions,
     context: YamlDslStageContext,
 ) -> ExecutionRequest:
-    if options.allowed_modules != context.allowed_modules or options.allowed_functions != context.allowed_functions:
+    if options.security.allowed_modules != context.allowed_modules or options.security.allowed_functions != context.allowed_functions:
         raise ScalimStageAllowlistMismatchError
     runtime_bindings = resolve_runtime_bindings(demand_ir, resolver=context.resolver)
     return build_request(

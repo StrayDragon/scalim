@@ -4,9 +4,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
-from scalim.dsl.yaml_dsl import run as run_yaml
-from scalim.sinks import InMemoryRowSink
+from scalim.dsl.yaml_dsl import (
+    CaptureRows,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    compile as compile_yaml,
+    run as run_yaml,
+)
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
@@ -46,12 +52,11 @@ def run_yaml_dsl_ecommerce(
 
         # 1) `compile`: 语义校验 + 生成编译产物(执行请求等),供下游运行入口复用
         try:
+            security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
+            template = DemandRunTemplateOptions(init_vars=init_vars)
             compilation = compile_yaml(
                 str(yaml_path),
-                options=RunOptions(
-                    allowed_modules=allowed_modules,
-                    init_vars=init_vars,
-                ),
+                options=DemandRunOptions(security=security, template=template),
             )
         except Exception as exc:
             summary = "compile failed: {}".format(exc)
@@ -65,20 +70,20 @@ def run_yaml_dsl_ecommerce(
 
         demand_config = compilation.config
 
-        # 2) `run`: 用内存 `sink` 获取行数据
-        sink = InMemoryRowSink()
+        # 2) `run`: 显式启用 `CaptureRows`,在内存中拿到行数据
         start = time.time()
         result = run_yaml(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=allowed_modules,
-                sink=sink,
-                init_vars=init_vars,
+            options=DemandRunOptions(
+                security=security,
+                template=template,
+                outputs=DemandRunOutputOptions(capture=CaptureRows()),
             ),
         )
         elapsed = time.time() - start
 
-        rows = sink.get_data()
+        captured_rows = result.captured_rows
+        rows = [] if captured_rows is None else list(captured_rows.iter_row_data())
         if not rows:
             return ExampleResult(
                 example_id=_EXAMPLE_ID,

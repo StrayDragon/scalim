@@ -9,7 +9,7 @@
 # pragma: scalim-public-api tier1:40:scalim.dsl.yaml_dsl.workflow_types|workflow 类型(拆分给 typing/依赖方用)|仅用类型,或避免重导入
 # pragma: scalim-public-api tier1:50:scalim.dsl.yaml_dsl.workflow_paths|workflow 路径解析(稳定导入路径)|解析 workflow 引用的 demand 路径
 
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
+from typing import TYPE_CHECKING
 
 from ...vendor.compact.importlibx import import_module
 from .runtime.contracts import (
@@ -18,9 +18,18 @@ from .runtime.contracts import (
     BookExportXlsxOverride,
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    CaptureNone,
+    CapturePolicy,
+    CaptureRows,
     Compilation,
     DemandDiagnosticsOverride,
     DemandDiagnosticsPolicy,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunResult,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
     FileResourceOverride,
     OutputDefaultsToOverride,
     OutputExtraSheetOverride,
@@ -31,46 +40,34 @@ from .runtime.contracts import (
     OutputWriteOverride,
     ResolverTrustedMode,
     ResourcesOverride,
-    RunOptions,
     RunOverrides,
-    RunResult,
 )
+from .workflow_types import WorkflowRunOptions
 
 if TYPE_CHECKING:
     from ...workflow.report import WorkflowResult
     from .runtime.entrypoints import compile as compile  # noqa: A004
     from .runtime.entrypoints import run as run
     from .workflow_entrypoints import run_workflow as run_workflow
-    from .workflow_types import WorkflowRunOptionsPatch, WorkflowRuntimeOptions
 else:
 
-    def compile(yaml_path: str, *, options: RunOptions) -> Compilation:  # noqa: A001
+    def compile(yaml_path: str, *, options: DemandRunOptions) -> Compilation:  # noqa: A001
         entrypoints = import_module("scalim.dsl.yaml_dsl.runtime.entrypoints")
         return entrypoints.compile(yaml_path, options=options)
 
-    def run(yaml_path: str, *, options: RunOptions) -> RunResult:
+    def run(yaml_path: str, *, options: DemandRunOptions) -> DemandRunResult:
         entrypoints = import_module("scalim.dsl.yaml_dsl.runtime.entrypoints")
         return entrypoints.run(yaml_path, options=options)
 
     def run_workflow(
         workflow_yaml_path: str,
         *,
-        options: RunOptions,
-        run_options_patches_by_run_id: Optional[Mapping[str, "WorkflowRunOptionsPatch"]] = None,
-        workflow_runtime_options: Optional["WorkflowRuntimeOptions"] = None,
-        path_aliases: Optional[Mapping[str, str]] = None,
-        run_ir_fn: Optional[Callable[..., Any]] = None,
-        compile_demand_yaml_fn: Optional[Callable[..., Any]] = None,
+        options: WorkflowRunOptions,
     ) -> "WorkflowResult":
         entrypoints = import_module("scalim.dsl.yaml_dsl.workflow_entrypoints")
         return entrypoints.run_workflow(
             workflow_yaml_path,
             options=options,
-            run_options_patches_by_run_id=run_options_patches_by_run_id,
-            workflow_runtime_options=workflow_runtime_options,
-            path_aliases=path_aliases,
-            run_ir_fn=run_ir_fn,
-            compile_demand_yaml_fn=compile_demand_yaml_fn,
         )
 
 
@@ -80,9 +77,18 @@ __all__ = (
     "BookExportXlsxOverride",
     "BookResourceOverride",
     "BookWriteDefaultsOverride",
+    "CaptureNone",
+    "CapturePolicy",
+    "CaptureRows",
     "Compilation",
     "DemandDiagnosticsOverride",
     "DemandDiagnosticsPolicy",
+    "DemandRunOptions",
+    "DemandRunOutputOptions",
+    "DemandRunResult",
+    "DemandRunRuntimeOptions",
+    "DemandRunSecurityOptions",
+    "DemandRunTemplateOptions",
     "FileResourceOverride",
     "OutputDefaultsToOverride",
     "OutputExtraSheetOverride",
@@ -93,9 +99,8 @@ __all__ = (
     "OutputsDefaultsOverride",
     "ResolverTrustedMode",
     "ResourcesOverride",
-    "RunOptions",
     "RunOverrides",
-    "RunResult",
+    "WorkflowRunOptions",
     "compile",
     "run",
     "run_workflow",

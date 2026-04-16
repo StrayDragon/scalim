@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl import run as run_yaml
 from scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario import GuardrailCaptureObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -56,12 +57,14 @@ def run_yaml_dsl_guardrails_compute_on_error(*, yaml_path: Optional[Path] = None
         try:
             result = run_yaml(
                 str(yaml_path),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    components=[guardrail_capture],
-                    batch_size=2,
-                    guardrails=guardrails,
-                    init_vars=init_vars,
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=DemandRunRuntimeOptions(
+                        components=[guardrail_capture],
+                        batch_size=2,
+                        guardrails=guardrails,
+                    ),
                 ),
             )
             core = result.core

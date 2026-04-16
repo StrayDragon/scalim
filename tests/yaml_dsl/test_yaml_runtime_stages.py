@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimAllowlistRequiredError
 from scalim.dsl.yaml_dsl.runtime.stages import (
     ScalimStageAllowlistMismatchError,
@@ -45,7 +45,7 @@ def test_stage_parse_convert_and_map_request(tmp_path: Path) -> None:
 
     demand_ir = stage_compile_demand_ir(config, context=context)
 
-    options = RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))
+    options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
     request = stage_build_execution_request(
         config,
         demand_ir,
@@ -66,7 +66,11 @@ def test_stage_map_request_rejects_allowlist_mismatch(tmp_path: Path) -> None:
     config = stage_load_yaml_config(yaml_path)
     demand_ir = stage_compile_demand_ir(config, context=context)
 
-    options = RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders", "tests.fixtures.loader_retry_allowlist_mod"]))
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(
+            allowed_modules=frozenset(["tests.fixtures.mock_loaders", "tests.fixtures.loader_retry_allowlist_mod"])
+        )
+    )
     with pytest.raises(ScalimStageAllowlistMismatchError, match=ScalimStageAllowlistMismatchError.MESSAGE):
         _ = stage_build_execution_request(
             config,

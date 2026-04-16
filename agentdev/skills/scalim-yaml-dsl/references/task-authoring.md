@@ -71,9 +71,9 @@ resources:
 运行期策略提示:
 
 - `batch_size`/`loader_retry`/`guardrails`/demand `failure_policy` 已迁出 YAML 主线(运行期策略边界);请在 runtime entrypoints 中配置:
-  - `scalim.dsl.yaml_dsl.run/compile(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
-  - `scalim.dsl.yaml_dsl.run_workflow(..., options=RunOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))`
-- workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `run_workflow(..., run_options_patches_by_run_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowRunOptionsPatch`(不支持 dict patch)。
+  - `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)))`
+  - `scalim.dsl.yaml_dsl.run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))))`
+- workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `WorkflowRunOptions(patches_by_run_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowNodePatch`(不支持 dict patch)。
 
 ## 关键规则
 
@@ -127,13 +127,13 @@ outputs:
 调用侧(Python):
 
 ```py
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, run
 
 run(
     "report.yaml",
-    options=RunOptions(
-        allowed_modules=frozenset(["myapp"]),
-        template_vars={"out_root": "./out"},
+    options=DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp"])),
+        template=DemandRunTemplateOptions(template_vars={"out_root": "./out"}),
     ),
 )
 ```
@@ -159,16 +159,16 @@ fields:
 `loader_retry`/`guardrails` 等运行期策略已迁出 YAML,调用侧可直接在 Python 中导入回调/策略对象并注入:
 
 ```py
-from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, compile
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 
 from myapp.reports import retry as retry_mod
 
 compile(
     "report.yaml",
-    options=RunOptions(
-        allowed_modules=frozenset(["myapp"]),
-        loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(should_retry=retry_mod.should_retry)),
+    options=DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp"])),
+        runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(should_retry=retry_mod.should_retry))),
     ),
 )
 ```

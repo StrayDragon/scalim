@@ -1,4 +1,4 @@
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, compile as compile_yaml
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
 
@@ -8,9 +8,9 @@ def test_output_fields_yaml_alias_list_is_flattened(ecommerce_config_small) -> N
 
     compilation = compile_yaml(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
-            init_vars={"order_ids": []},
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"])),
+            template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
         ),
     )
     comp = compilation

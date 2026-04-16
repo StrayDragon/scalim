@@ -1,7 +1,7 @@
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from scalim.vendor.dataclassesx import replace
 
 
 def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
@@ -41,7 +41,7 @@ def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:
 
 def test_run_workflow_ir_works_without_build_demand_run_result_fn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr, WorkflowNodeType, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
 
@@ -79,13 +79,13 @@ outputs:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": ()}),
     )
 
-    base_options = RunOptions(allowed_modules=frozenset(["tests.fixtures"]))
+    base_options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     def _compile_demand(demand_path: str, **kwargs: object) -> object:
         node_init_vars = kwargs.get("node_init_vars") or {}
         options = base_options
         if node_init_vars:
-            options = replace(base_options, init_vars=dict(node_init_vars))
+            options = replace(options, template=replace(options.template, init_vars=dict(node_init_vars)))
         return compile_demand_yaml(str(demand_path), options=options)
 
     result = workflow_execute_mod.run_workflow_ir(
@@ -638,7 +638,7 @@ def test_workflow_artifacts_directory_get_optional_variants() -> None:
 
 def test_workflow_write_consumer_counts_missing_is_best_effort(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
@@ -700,16 +700,19 @@ resources:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "w": ()}),
     )
 
-    base_options = RunOptions(allowed_modules=frozenset(["tests.fixtures"]))
+    base_options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     def _compile_demand_node(demand_path: str, **kwargs: object) -> object:
         node_init_vars = kwargs.get("node_init_vars") or {}
         managed_output_ids = kwargs.get("managed_output_ids")
         node_options = base_options
         if node_init_vars:
-            node_options = replace(base_options, init_vars=dict(node_init_vars))
+            node_options = replace(node_options, template=replace(node_options.template, init_vars=dict(node_init_vars)))
         if managed_output_ids:
-            node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
+            node_options = replace(
+                node_options,
+                outputs=replace(node_options.outputs, workflow_managed_output_ids=managed_output_ids),
+            )
         return compile_demand_yaml(str(demand_path), options=node_options)
 
     prepared = workflow_execute_mod._prepare_workflow_run_ir(
@@ -792,7 +795,7 @@ def test_run_workflow_ir_reraises_config_error_from_commit(tmp_path: Path, monke
 
 def test_workflow_negative_write_consumer_count_is_reported(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
@@ -854,16 +857,19 @@ resources:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "w": ()}),
     )
 
-    base_options = RunOptions(allowed_modules=frozenset(["tests.fixtures"]))
+    base_options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     def _compile_demand_node(demand_path: str, **kwargs: object) -> object:
         node_init_vars = kwargs.get("node_init_vars") or {}
         managed_output_ids = kwargs.get("managed_output_ids")
         node_options = base_options
         if node_init_vars:
-            node_options = replace(base_options, init_vars=dict(node_init_vars))
+            node_options = replace(node_options, template=replace(node_options.template, init_vars=dict(node_init_vars)))
         if managed_output_ids:
-            node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
+            node_options = replace(
+                node_options,
+                outputs=replace(node_options.outputs, workflow_managed_output_ids=managed_output_ids),
+            )
         return compile_demand_yaml(str(demand_path), options=node_options)
 
     prepared = workflow_execute_mod._prepare_workflow_run_ir(
@@ -895,7 +901,7 @@ resources:
 
 def test_workflow_write_consumer_count_decrements_for_multiple_write_nodes(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
-    from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+    from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
     from scalim.execution.run_ir import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
@@ -974,16 +980,19 @@ resources:
         artifacts=WorkflowArtifactsIr(slots_by_node_id={"a": (), "w0": (), "w1": ()}),
     )
 
-    base_options = RunOptions(allowed_modules=frozenset(["tests.fixtures"]))
+    base_options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])))
 
     def _compile_demand_node(demand_path: str, **kwargs: object) -> object:
         node_init_vars = kwargs.get("node_init_vars") or {}
         managed_output_ids = kwargs.get("managed_output_ids")
         node_options = base_options
         if node_init_vars:
-            node_options = replace(base_options, init_vars=dict(node_init_vars))
+            node_options = replace(node_options, template=replace(node_options.template, init_vars=dict(node_init_vars)))
         if managed_output_ids:
-            node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
+            node_options = replace(
+                node_options,
+                outputs=replace(node_options.outputs, workflow_managed_output_ids=managed_output_ids),
+            )
         return compile_demand_yaml(str(demand_path), options=node_options)
 
     prepared = workflow_execute_mod._prepare_workflow_run_ir(

@@ -142,7 +142,7 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 
 如果你的 YAML 里出现 `{{ ... }}` / `{% ... %}`:
 
-- 这是 **调用侧** 的编译期开关(例如 `run/compile/run_workflow(..., options=RunOptions(template_vars=...))`),不属于 YAML schema 字段。
+- 这是 **调用侧** 的编译期开关(例如 `run/compile(..., options=DemandRunOptions(..., template=DemandRunTemplateOptions(template_vars=...)))`),不属于 YAML schema 字段。
 - `scalim-cli yaml-dsl schema validate/validate` 当前不暴露 `template_vars` 注入;直接对含模板语法的 YAML 跑 CLI 校验,通常会在 YAML parse 阶段失败。
 
 推荐做法:

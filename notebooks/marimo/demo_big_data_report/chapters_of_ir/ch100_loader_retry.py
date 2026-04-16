@@ -5,9 +5,15 @@ import textwrap
 from pathlib import Path
 from typing import Any, Dict
 
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import (
+    CaptureRows,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    run,
+)
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
-from scalim.sinks import InMemoryRowSink
 from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -37,22 +43,17 @@ def run_loader_retry() -> ExampleResult:
 
         # 1) 不启用 `retry`: 第一次失败直接抛错
         demo_mod.reset()
-        sink_no_retry = InMemoryRowSink()
         no_retry_ok = False
         try:
             _ = run(
                 str(demand_path),
-                options=RunOptions(
-                    allowed_modules=allowed_modules,
-                    sink=sink_no_retry,
-                ),
+                options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=allowed_modules)),
             )
         except demo_mod.TransientError:
             no_retry_ok = True
 
         # 2) 启用 `retry`: 通过运行时注入(`loader_retry=...`)自动重试后成功
         demo_mod.reset()
-        sink_with_retry = InMemoryRowSink()
         injected_retry = LoaderRetryPoliciesSpec(
             default=LoaderRetryPolicySpec(
                 enabled=True,
@@ -65,16 +66,18 @@ def run_loader_retry() -> ExampleResult:
                 jitter=False,
             )
         )
-        _ = run(
+        result = run(
             str(demand_path),
-            options=RunOptions(
-                allowed_modules=allowed_modules,
-                sink=sink_with_retry,
-                loader_retry=injected_retry,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+                runtime=DemandRunRuntimeOptions(loader_retry=injected_retry),
+                outputs=DemandRunOutputOptions(capture=CaptureRows()),
             ),
         )
         expected_call_count = 2
-        with_retry_ok = sink_with_retry.get_data() == [{"order_id": 1}] and demo_mod.get_call_count() == expected_call_count
+        captured = result.captured_rows
+        captured_rows = [] if captured is None else list(captured.iter_row_data())
+        with_retry_ok = captured_rows == [{"order_id": 1}] and demo_mod.get_call_count() == expected_call_count
 
     passed = bool(no_retry_ok and with_retry_ok)
     summary = "no_retry_ok={} with_retry_ok={}".format(no_retry_ok, with_retry_ok)

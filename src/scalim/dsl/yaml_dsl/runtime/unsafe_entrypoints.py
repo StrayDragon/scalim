@@ -24,7 +24,19 @@ from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.dataclassesx import replace
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .compiler import compile as _compile
-from .contracts import UNSET, Compilation, ResolverTrustedMode, RunOptions, RunOverrides, RunResult, UnsetType
+from .contracts import (
+    UNSET,
+    Compilation,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunResult,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    ResolverTrustedMode,
+    RunOverrides,
+    UnsetType,
+)
 
 _unsafe_logger = logging.getLogger("scalim.dsl.yaml_dsl.unsafe")
 _policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.unsafe.policy")
@@ -81,37 +93,42 @@ def unsafe_run(  # noqa: PLR0913
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
-) -> RunResult:
+) -> DemandRunResult:
     """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
 
     仅用于可信输入/内部测试;普通用户请使用 `scalim.dsl.yaml_dsl.run`.
     """
     sandbox = _validate_unsafe_template_sandbox(template_sandbox)
     _audit_unsafe_call("unsafe_run", template_sandbox=sandbox)
-    options = RunOptions(
-        allowed_modules=allowed_modules,
-        allowed_functions=allowed_functions,
-        resolver_trusted_mode=resolver_trusted_mode,
-        components=components,
-        sink=sink,
-        overrides=overrides,
-        guardrails=guardrails,
-        loader_retry=loader_retry,
-        batch_size=batch_size,
-        demand_failure_policy=demand_failure_policy,
-        parallel_mode=parallel_mode,
-        max_workers=max_workers,
-        key_normalization=normalize_key_normalization(key_normalization),
-        init_vars=init_vars,
-        template_vars=template_vars,
-        template_sandbox=sandbox,
-        rendered_yaml_max_len=rendered_yaml_max_len,
-        allowed_yaml_roots=allowed_yaml_roots,
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(
+            allowed_modules=allowed_modules,
+            allowed_functions=allowed_functions,
+            resolver_trusted_mode=resolver_trusted_mode,
+            allowed_yaml_roots=allowed_yaml_roots,
+        ),
+        template=DemandRunTemplateOptions(
+            template_vars=template_vars,
+            template_sandbox=sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
+            init_vars=init_vars,
+        ),
+        runtime=DemandRunRuntimeOptions(
+            components=components,
+            guardrails=guardrails,
+            loader_retry=loader_retry,
+            batch_size=batch_size,
+            demand_failure_policy=demand_failure_policy,
+            parallel_mode=parallel_mode,
+            max_workers=max_workers,
+            key_normalization=normalize_key_normalization(key_normalization),
+        ),
+        outputs=DemandRunOutputOptions(overrides=overrides),
     )
     compilation = _compile(yaml_path, options=options)
 
     request = compilation.request
-    if isinstance(options.batch_size, UnsetType):
+    if isinstance(options.runtime.batch_size, UnsetType):
         _observers, hooks = split_components(request.components)
         runtime_bindings = request.runtime_bindings
         main_source_id = compilation.demand_ir.main_source.source_id
@@ -119,7 +136,7 @@ def unsafe_run(  # noqa: PLR0913
         decision = PreUseBatchSizeDecision(
             value=request.batch_size,
             demand_path=str(yaml_path),
-            init_vars=options.init_vars,
+            init_vars=options.template.init_vars,
             main_loader=main_loader,
         )
         emit_pre_use_batch_size_signal(hooks, decision)
@@ -130,8 +147,10 @@ def unsafe_run(  # noqa: PLR0913
         else:
             _policy_logger.debug("`pre_use_batch_size` 决策完成: 批大小=%s 改写轨迹=%s", decision.value, decision.history)
 
+    if sink is not None:
+        request = replace(request, sink=sink)
     core = run_ir(compilation.demand_ir, request)
-    return RunResult(core, config=compilation.config, yaml_path=yaml_path, sink=sink)
+    return DemandRunResult(core, config=compilation.config, yaml_path=yaml_path, captured_rows=None)
 
 
 def unsafe_compile(  # noqa: PLR0913
@@ -141,7 +160,6 @@ def unsafe_compile(  # noqa: PLR0913
     allowed_functions: Optional[FrozenSet[str]] = None,
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     components: Optional[List[Union[Observer, IExecutionHook]]] = None,
-    sink: Optional[ISink] = None,
     overrides: Optional[RunOverrides] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
@@ -162,25 +180,30 @@ def unsafe_compile(  # noqa: PLR0913
     """
     sandbox = _validate_unsafe_template_sandbox(template_sandbox)
     _audit_unsafe_call("unsafe_compile", template_sandbox=sandbox)
-    options = RunOptions(
-        allowed_modules=allowed_modules,
-        allowed_functions=allowed_functions,
-        resolver_trusted_mode=resolver_trusted_mode,
-        components=components,
-        sink=sink,
-        overrides=overrides,
-        guardrails=guardrails,
-        loader_retry=loader_retry,
-        batch_size=batch_size,
-        demand_failure_policy=demand_failure_policy,
-        parallel_mode=parallel_mode,
-        max_workers=max_workers,
-        key_normalization=normalize_key_normalization(key_normalization),
-        init_vars=init_vars,
-        template_vars=template_vars,
-        template_sandbox=sandbox,
-        rendered_yaml_max_len=rendered_yaml_max_len,
-        allowed_yaml_roots=allowed_yaml_roots,
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(
+            allowed_modules=allowed_modules,
+            allowed_functions=allowed_functions,
+            resolver_trusted_mode=resolver_trusted_mode,
+            allowed_yaml_roots=allowed_yaml_roots,
+        ),
+        template=DemandRunTemplateOptions(
+            template_vars=template_vars,
+            template_sandbox=sandbox,
+            rendered_yaml_max_len=rendered_yaml_max_len,
+            init_vars=init_vars,
+        ),
+        runtime=DemandRunRuntimeOptions(
+            components=components,
+            guardrails=guardrails,
+            loader_retry=loader_retry,
+            batch_size=batch_size,
+            demand_failure_policy=demand_failure_policy,
+            parallel_mode=parallel_mode,
+            max_workers=max_workers,
+            key_normalization=normalize_key_normalization(key_normalization),
+        ),
+        outputs=DemandRunOutputOptions(overrides=overrides),
     )
     return _compile(yaml_path, options=options)
 

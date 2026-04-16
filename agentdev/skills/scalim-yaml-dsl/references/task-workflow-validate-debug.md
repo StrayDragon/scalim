@@ -50,12 +50,12 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 3. validate 过了但 workflow 仍失败时,用 Python 入口跑一次,定位运行期的 fail-fast 校验(例如 cycle、ctx 越界、输出路径冲突等)
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
 
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(
-        allowed_modules=frozenset(["myapp.loaders"]),
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
     ),
 )
 ```
@@ -94,7 +94,7 @@ run_workflow(
 
 - 确保 `depends_on` 里每个 id 都存在于 `workflow.runs[*].id`
 - 如果有环,按业务语义拆开或改写依赖方向
-- 如果你在 Python 入口使用了 `run_workflow(..., run_options_patches_by_run_id=...)`,也必须保证 `run_options_patches_by_run_id` 的 keys 都是合法的 `workflow.runs[*].id`(否则同样会 fail-fast 并列出已知 ids)。
+- 如果你在 Python 入口使用了 `WorkflowRunOptions(patches_by_run_id=...)`,也必须保证 `patches_by_run_id` 的 keys 都是合法的 `workflow.runs[*].id`(否则同样会 fail-fast 并列出已知 ids)。
 
 ### 4) `$ctx` 引用越界(不在 deps 可见范围)
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions, run
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.field_extract import (
     ScalimFieldExtractCompileError,
@@ -11,7 +11,6 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.field_extract import (
 )
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.execution.executor.helpers.field_access import extract_field_segments
-from scalim.sinks import InMemoryRowSink
 
 
 def test_compile_field_extract_parses_dot_and_bracket_segments() -> None:
@@ -172,15 +171,15 @@ sources:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")
 
-    sink = InMemoryRowSink()
-    _ = run(
+    result = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.field_extract_loaders"]),
-            sink=sink,
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.field_extract_loaders"])),
+            outputs=DemandRunOutputOptions(capture=CaptureRows()),
         ),
     )
-    rows = sink.get_data()
+    assert result.captured_rows is not None
+    rows = list(result.captured_rows.iter_row_data())
     by_order_id = {row["order_id"]: row for row in rows}
 
     assert by_order_id[1]["good_level"] == 2

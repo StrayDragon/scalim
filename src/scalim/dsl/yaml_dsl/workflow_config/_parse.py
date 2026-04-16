@@ -58,7 +58,7 @@ def _raise_if_workflow_options_present(wf: Mapping[str, Any]) -> None:
     msg = (
         "workflow.options was moved out of workflow YAML (runtime policy boundary). "
         "Migration: delete workflow.options from YAML and configure runtime via entrypoints "
-        "(e.g. run_workflow(..., workflow_runtime_options=WorkflowRuntimeOptions(...))). "
+        "(e.g. run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(...), runtime=WorkflowRuntimeOptions(...)))). "
         "Examples: WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2)); "
         "cache_pool via WorkflowCachePoolPreloadForeverShared(max_entries=16)."
     )

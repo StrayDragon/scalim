@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
 from scalim.workflow import execute as workflow_execute_mod
 from scalim.ob.observer import Observer
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
@@ -108,8 +108,11 @@ def test_prepare_workflow_run_closes_cache_pool_and_observers_on_error(tmp_path:
     from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowRuntimeOptions
 
     with pytest.raises(RuntimeError, match="boom"):
+        options = WorkflowRunOptions(
+            demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES)),
+            runtime=WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=1)),
+        )
         _ = run_workflow(
             str(wf_path),
-            options=RunOptions(allowed_modules=_ALLOWED_MODULES),
-            workflow_runtime_options=WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=1)),
+            options=options,
         )

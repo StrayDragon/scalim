@@ -5,9 +5,10 @@
 本批次做一次性 **BREAKING** 命名收敛,目标是让 YAML DSL 的 Python public API 在“模块路径 / 名词 / 参数名”层面更一致、更可搜索：
 
 - canonical public facade: `scalim.dsl.by_yaml` → `scalim.dsl.yaml_dsl`
-- workflow per-run patch 命名显式化为 RunOptions patch:
-  - `WorkflowRunPatch` → `WorkflowRunOptionsPatch`
-  - `run_patches_by_id` → `run_options_patches_by_run_id`
+- **(后续变更已覆盖)** `RunOptions` 已拆分为 `DemandRunOptions` / `WorkflowRunOptions`；`run_workflow` 变为 options-only
+- workflow per-run patch 更新为:
+  - `WorkflowRunOptionsPatch` → `WorkflowNodePatch`
+  - `run_options_patches_by_run_id` → `WorkflowRunOptions.patches_by_run_id`
 
 本批次 **不提供兼容层/弃用期**：旧路径与旧名字会直接失效.
 
@@ -25,7 +26,7 @@
 from scalim.dsl.by_yaml import RunOptions, run, compile, run_workflow
 
 # After
-from scalim.dsl.yaml_dsl import RunOptions, run, compile, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, WorkflowRunOptions, run, compile, run_workflow
 ```
 
 同理,curated stable modules 也统一切换:
@@ -52,14 +53,18 @@ _ = run_workflow(
 )
 
 # After
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch
 
 _ = run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(...),
-    run_options_patches_by_run_id={
-        "A": WorkflowRunOptionsPatch(batch_size=5000),
-    },
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=...),
+            runtime=DemandRunRuntimeOptions(batch_size=2000),  # 全局默认
+        ),
+        patches_by_run_id={"A": WorkflowNodePatch(batch_size=5000)},
+    ),
 )
 ```
 

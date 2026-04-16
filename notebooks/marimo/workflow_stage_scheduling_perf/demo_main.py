@@ -110,7 +110,7 @@ def _():
     import threading
     from typing import Any, Dict, List
 
-    from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+    from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
     from scalim.dsl.yaml_dsl.workflow_types import (
         PipelineSchedulerOptions,
         StageBarrierSchedulerOptions,
@@ -128,6 +128,8 @@ def _():
     return (
         Any,
         Dict,
+        DemandRunOptions,
+        DemandRunSecurityOptions,
         EVENT_WORKFLOW_NODE_CANCELLED,
         EVENT_WORKFLOW_NODE_END,
         EVENT_WORKFLOW_NODE_START,
@@ -135,10 +137,10 @@ def _():
         List,
         Observer,
         PipelineSchedulerOptions,
-        RunOptions,
         StageBarrierSchedulerOptions,
         WorkflowExecutionOptions,
         WorkflowRuntimeOptions,
+        WorkflowRunOptions,
         run_workflow,
         threading,
     )
@@ -166,11 +168,13 @@ def _(EVENT_WORKFLOW_NODE_CANCELLED, EVENT_WORKFLOW_NODE_END, EVENT_WORKFLOW_NOD
 
 @app.cell
 def _(
+    DemandRunOptions,
+    DemandRunSecurityOptions,
     PipelineSchedulerOptions,
-    RunOptions,
     StageBarrierSchedulerOptions,
     WorkflowExecutionOptions,
     WorkflowRuntimeOptions,
+    WorkflowRunOptions,
     _WorkflowNodeEventRecorder,
     loaders_module,
     run_workflow,
@@ -180,9 +184,8 @@ def _(
     def _run_once(*, schedule_mode: str, max_concurrency: int = 2) -> dict:
         recorder = _WorkflowNodeEventRecorder()
 
-        run_options = RunOptions(
-            allowed_modules=frozenset([str(loaders_module)]),
-            components=[recorder],
+        demand_options = DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset([str(loaders_module)])),
         )
         if str(schedule_mode) == "stage_barrier":
             scheduler = StageBarrierSchedulerOptions()
@@ -198,7 +201,14 @@ def _(
         )
 
         t0 = time.perf_counter()
-        _ = run_workflow(str(workflow_yaml), options=run_options, workflow_runtime_options=runtime_options)
+        _ = run_workflow(
+            str(workflow_yaml),
+            options=WorkflowRunOptions(
+                demand=demand_options,
+                runtime=runtime_options,
+                workflow_components=(recorder,),
+            ),
+        )
         t1 = time.perf_counter()
         return {
             "schedule_mode": str(schedule_mode),

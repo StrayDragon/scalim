@@ -3,7 +3,7 @@ import marimo
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, WorkflowRunOptions, run_workflow
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRuntimeOptions
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
@@ -41,13 +41,13 @@ def run_workflow_yaml(
                 execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
                 cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
             )
+            demand_options = DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+                template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
+            )
             result = run_workflow(
                 str(workflow_yaml_path),
-                options=RunOptions(
-                    allowed_modules=allowed_modules,
-                    init_vars={"order_ids": []},
-                ),
-                workflow_runtime_options=workflow_runtime_options,
+                options=WorkflowRunOptions(demand=demand_options, runtime=workflow_runtime_options),
             )
         except Exception as exc:  # noqa: BLE001
             summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)

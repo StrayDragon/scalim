@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, compile as compile_yaml
 from scalim.dsl.yaml_dsl._internal.config_parsing.call_by import ScalimCallByParseError, parse_call_by
 from scalim.dsl.yaml_dsl._internal.config_parsing.errors import ScalimConfigValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
@@ -189,7 +189,7 @@ def test_compile_raises_clear_error_when_relative_reference_cannot_derive_base_m
     with pytest.raises(ScalimResolverError, match="无法根据 `yaml_path="):
         compile_yaml(
             str(yaml_path),
-            options=RunOptions(allowed_modules=frozenset(["relpkg"])),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["relpkg"]))),
         )
 
 
@@ -198,7 +198,10 @@ def test_compile_accepts_relative_and_absolute_loader_refs(monkeypatch: pytest.M
     monkeypatch.syspath_prepend(str(tmp_path))
     _purge_modules("relpkg")
 
-    _ = compile_yaml(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["relpkg"])))
+    _ = compile_yaml(
+        str(yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["relpkg"]))),
+    )
 
     abs_yaml_path = tmp_path / "relpkg/sub/abs.yaml"
     _write_text(
@@ -216,7 +219,10 @@ def test_compile_accepts_relative_and_absolute_loader_refs(monkeypatch: pytest.M
             ]
         ),
     )
-    _ = compile_yaml(str(abs_yaml_path), options=RunOptions(allowed_modules=frozenset(["relpkg"])))
+    _ = compile_yaml(
+        str(abs_yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["relpkg"]))),
+    )
 
 
 def test_config_validator_and_call_by_parser_accept_relative_references() -> None:
@@ -330,7 +336,7 @@ def test_validator_retry_should_retry_must_be_string() -> None:
 
 def test_run_options_accepts_allowed_modules_for_relative_loader_smoke() -> None:
     # Ensure the public-facing typing contract remains stable when the options object is constructed.
-    _ = RunOptions(allowed_modules=frozenset(["relpkg"]))
+    _ = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["relpkg"])))
 
 
 def test_config_uses_relative_references_return_paths() -> None:

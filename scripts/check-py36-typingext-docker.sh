@@ -128,7 +128,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, run
 from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.loaders import load_orders
 
@@ -147,10 +147,10 @@ out_root = tmp_root / "ecommerce_rank_score_report.out"
 
 _ = run(
     str(yaml_path),
-    options=RunOptions(
-        allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"]),
-        batch_size=10,
-        init_vars={"out_root_rank": str(out_root)},
+    options=DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=frozenset(["scalim_misc.demo_big_data_report.loaders"])),
+        template=DemandRunTemplateOptions(init_vars={"out_root_rank": str(out_root)}),
+        runtime=DemandRunRuntimeOptions(batch_size=10),
     ),
 )
 

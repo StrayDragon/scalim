@@ -69,7 +69,7 @@ Sources:
 ### `dsl-runtime-structure`
 - Title: dsl-runtime-structure Specification
 - Source: [spec.md](#code=openspec/specs/dsl-runtime-structure/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 by_yaml runtime 作为 DSL adapter/编译器的边界与对外入口,并明确 YAML `output`/`observability` 在编译期映射为 DSL-agnostic 运行请求对象的规则.
+- Summary: **状态: ✅ 已实现** 定义 yaml_dsl runtime 作为 DSL adapter/编译器的边界与对外入口,并明确 YAML `outputs`/可观测性配置在编译期映射为 DSL-agnostic 运行请求对象的规则.
 
 ### `error-taxonomy`
 - Title: error-taxonomy Specification

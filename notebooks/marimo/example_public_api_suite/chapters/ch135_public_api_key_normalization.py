@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, FrozenSet, Optional
 
 from scalim.dsl import yaml_dsl as api
-from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -68,29 +67,27 @@ sources:
 """
         _write_text(demand_path, demand_yaml)
 
-        sink_raw = InMemoryRowSink()
-        _ = api.run(
+        result_raw = api.run(
             str(demand_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                sink=sink_raw,
-                key_normalization="raw",
-                batch_size=10,
+            options=api.DemandRunOptions(
+                security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                runtime=api.DemandRunRuntimeOptions(key_normalization="raw", batch_size=10),
+                outputs=api.DemandRunOutputOptions(capture=api.CaptureRows()),
             ),
         )
-        raw_rows = sink_raw.get_data()
+        captured_raw = result_raw.captured_rows
+        raw_rows = [] if captured_raw is None else list(captured_raw.iter_row_data())
 
-        sink_norm = InMemoryRowSink()
-        _ = api.run(
+        result_norm = api.run(
             str(demand_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                sink=sink_norm,
-                key_normalization="auto_str",
-                batch_size=10,
+            options=api.DemandRunOptions(
+                security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                runtime=api.DemandRunRuntimeOptions(key_normalization="auto_str", batch_size=10),
+                outputs=api.DemandRunOutputOptions(capture=api.CaptureRows()),
             ),
         )
-        norm_rows = sink_norm.get_data()
+        captured_norm = result_norm.captured_rows
+        norm_rows = [] if captured_norm is None else list(captured_norm.iter_row_data())
 
         raw_dim_name = _first_dim_name(raw_rows)
         norm_dim_name = _first_dim_name(norm_rows)

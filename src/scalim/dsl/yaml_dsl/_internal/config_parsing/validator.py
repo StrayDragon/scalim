@@ -81,8 +81,10 @@ class ConfigValidator(ValidatorFieldsMixin):
         msg = (
             "Legacy YAML key 'observability' is no longer supported and will be ignored. "
             "Hint: configure observability via Python runtime entrypoints: "
-            "scalim.dsl.yaml_dsl.run/compile(..., components=[Observer()/Hook()], "
-            "overrides=RunOverrides(viz_config=VizObserverConfig(...)))."
+            "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            "runtime=DemandRunRuntimeOptions(components=[Observer()/Hook()]), "
+            "outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(...))), "
+            "...))."
         )
         issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="observability"))
 
@@ -115,14 +117,18 @@ class ConfigValidator(ValidatorFieldsMixin):
         meta_msg = (
             meta_msg
             + "Hint: configure meta sheet via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True)))."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "outputs=DemandRunOutputOptions(overrides=RunOverrides("
+            + "output_extras=OutputExtrasOverride(meta=True))), ...))."
         )
 
         audit_msg = "YAML key 'audit' was moved out of YAML mainline (output extras boundary). "
         audit_msg = (
             audit_msg
             + "Hint: configure audit sheet via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., overrides=RunOverrides(output_extras=OutputExtrasOverride(audit=True)))."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "outputs=DemandRunOutputOptions(overrides=RunOverrides("
+            + "output_extras=OutputExtrasOverride(audit=True))), ...))."
         )
 
         removed: Tuple[Tuple[str, str], ...] = (
@@ -305,28 +311,32 @@ class ConfigValidator(ValidatorFieldsMixin):
         guardrails_msg = (
             guardrails_msg
             + "Hint: configure guardrails via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., guardrails=GuardrailsPolicy(...))."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "runtime=DemandRunRuntimeOptions(guardrails=GuardrailsPolicy(...)), ...))."
         )
 
         batch_size_msg = "YAML key 'batch_size' was moved out of YAML mainline (runtime policy boundary). "
         batch_size_msg = (
             batch_size_msg
             + "Hint: configure batch size via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., batch_size=<int|None>)."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "runtime=DemandRunRuntimeOptions(batch_size=<int|None>), ...))."
         )
 
         demand_failure_policy_msg = "YAML key 'failure_policy' was moved out of demand YAML mainline (runtime policy boundary). "
         demand_failure_policy_msg = (
             demand_failure_policy_msg
             + "Hint: configure demand output failure policy via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., demand_failure_policy='all_fail'|'primary_only')."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "runtime=DemandRunRuntimeOptions(demand_failure_policy='all_fail'|'primary_only'), ...))."
         )
 
         retry_msg = "YAML key 'retry' was moved out of YAML mainline (runtime policy boundary). "
         retry_msg = (
             retry_msg
             + "Hint: configure loader retry via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(...))."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(...)), ...))."
         )
 
         validate_unique_field_names_msg = (
@@ -335,7 +345,9 @@ class ConfigValidator(ValidatorFieldsMixin):
         validate_unique_field_names_msg = (
             validate_unique_field_names_msg
             + "Hint: configure demand diagnostics via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False))."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "runtime=DemandRunRuntimeOptions(demand_diagnostics=DemandDiagnosticsPolicy("
+            + "validate_unique_field_names=False)), ...))."
         )
 
         include_full_error_message_msg = (
@@ -344,7 +356,9 @@ class ConfigValidator(ValidatorFieldsMixin):
         include_full_error_message_msg = (
             include_full_error_message_msg
             + "Hint: configure demand diagnostics via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True))."
+            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+            + "runtime=DemandRunRuntimeOptions(demand_diagnostics=DemandDiagnosticsPolicy("
+            + "include_full_error_message=True)), ...))."
         )
 
         removed: Tuple[Tuple[str, str], ...] = (
@@ -397,7 +411,8 @@ class ConfigValidator(ValidatorFieldsMixin):
             msg=(
                 "YAML key 'main_source.retry' was moved out of YAML mainline (runtime policy boundary). "
                 "Hint: configure loader retry via runtime entrypoints: "
-                "scalim.dsl.yaml_dsl.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(by_loader={...}))."
+                "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+                "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
             ),
         )
         next_main: Dict[str, Any] = dict(main_source)
@@ -429,7 +444,8 @@ class ConfigValidator(ValidatorFieldsMixin):
                 msg=(
                     "YAML key 'sources.*.retry' was moved out of YAML mainline (runtime policy boundary). "
                     "Hint: configure loader retry via runtime entrypoints: "
-                    "scalim.dsl.yaml_dsl.run/compile(..., loader_retry=LoaderRetryPoliciesSpec(by_loader={...}))."
+                    "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+                    "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
                 ),
             )
             next_cfg: Dict[str, Any] = dict(source_cfg)

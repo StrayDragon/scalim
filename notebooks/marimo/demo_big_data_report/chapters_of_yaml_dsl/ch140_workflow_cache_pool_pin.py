@@ -5,7 +5,15 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run_workflow
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    RunOverrides,
+    WorkflowRunOptions,
+    run_workflow,
+)
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPin, WorkflowCachePoolPreloadForeverShared, WorkflowRuntimeOptions
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -94,12 +102,14 @@ def run_workflow_cache_pool_pin(
             # 1) 基线: 没有 `pin` -> 引用计数归零时会触发 `refcount_zero` 淘汰
             _ = run_workflow(
                 str(workflow_yaml_no_pin),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    init_vars={"order_ids": []},
-                    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin))),
+                options=WorkflowRunOptions(
+                    demand=DemandRunOptions(
+                        security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                        template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
+                        outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin)))),
+                    ),
+                    runtime=runtime_no_pin,
                 ),
-                workflow_runtime_options=runtime_no_pin,
             )
             events_no_pin = _read_jsonl(_workflow_events_path(viz_no_pin))
             reasons_no_pin, releases_no_pin = _extract_cache_signals(events_no_pin)
@@ -107,12 +117,14 @@ def run_workflow_cache_pool_pin(
             # 2) 启用 `pin`: 引用计数归零时不淘汰,仅在 `workflow_end` 统一释放
             _ = run_workflow(
                 str(workflow_yaml_pin),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    init_vars={"order_ids": []},
-                    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin))),
+                options=WorkflowRunOptions(
+                    demand=DemandRunOptions(
+                        security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                        template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
+                        outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin)))),
+                    ),
+                    runtime=runtime_pin,
                 ),
-                workflow_runtime_options=runtime_pin,
             )
             events_pin = _read_jsonl(_workflow_events_path(viz_pin))
             reasons_pin, releases_pin = _extract_cache_signals(events_pin)

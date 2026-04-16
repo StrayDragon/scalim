@@ -6,11 +6,11 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple, Union, cast
 
 from ...vendor.dataclassesx import dataclass
 from ...vendor.dataclassesx import field as dataclass_field
-from .runtime.contracts import UNSET, DemandDiagnosticsOverride, RunOverrides, UnsetType
+from .runtime.contracts import UNSET, DemandDiagnosticsOverride, DemandRunOptions, RunOverrides, UnsetType
 from .workflow_config import (
     ScalimWorkflowConfigError,
     WorkflowConfig,
@@ -32,7 +32,7 @@ WorkflowComponent = Union["Observer", "IExecutionHook"]
 
 @dataclass(frozen=True)
 class ComponentsInherit:
-    """继承 `run_workflow(..., options=RunOptions(components=[...]))` 的全局 `components` 列表用于本次运行."""
+    """继承 `WorkflowRunOptions.demand.runtime.components` 的全局 `components` 列表用于本次运行."""
 
 
 @dataclass(frozen=True)
@@ -65,11 +65,11 @@ ComponentsPatch = Union[ComponentsInherit, ComponentsReplace, ComponentsExtend]
 
 
 @dataclass(frozen=True)
-class WorkflowRunOptionsPatch:
-    """用于 `run_workflow(..., run_options_patches_by_run_id=...)` 的单节点运行期补丁.
+class WorkflowNodePatch:
+    """用于 `WorkflowRunOptions.patches_by_run_id` 的单节点运行期补丁.
 
     三态约定:
-    - `UNSET`: 继承 `run_workflow(..., options=RunOptions(...))` 的全局值
+    - `UNSET`: 继承 `WorkflowRunOptions.demand` 的全局值
     - `None`: 显式禁用/清空(当字段支持时)
     - 非 `None`: 显式覆盖
     """
@@ -141,6 +141,48 @@ class WorkflowRuntimeOptions:
         return cls()
 
 
+@dataclass(frozen=True)
+class WorkflowRunOptions:
+    """`workflow` 官方运行入口(`run_workflow`)的 `options` 契约."""
+
+    demand: DemandRunOptions
+    """每个节点默认使用的 `demand` `options`(`SSOT`)."""
+
+    patches_by_run_id: Optional[Mapping[str, WorkflowNodePatch]] = None
+    """可选:按 `run_id` 的补丁(作用于节点的 `demand` `options` 子集)."""
+
+    runtime: WorkflowRuntimeOptions = dataclass_field(default_factory=WorkflowRuntimeOptions.preset_default)
+    """可选:`workflow` 编排策略(调度/并发/资源等待等)."""
+
+    path_aliases: Optional[Mapping[str, str]] = None
+    """可选:`workflow` 解析 `demand` 路径的别名表."""
+
+    workflow_components: Optional[Tuple[WorkflowComponent, ...]] = None
+    """可选:`workflow` 编排层观测组件(不作用于单个 `demand` 执行)."""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.demand, DemandRunOptions):
+            msg = "WorkflowRunOptions.demand must be a DemandRunOptions"
+            raise TypeError(msg)
+
+        if self.patches_by_run_id is not None and not isinstance(self.patches_by_run_id, Mapping):
+            msg = "WorkflowRunOptions.patches_by_run_id must be a mapping from run_id to WorkflowNodePatch"
+            raise TypeError(msg)
+
+        aliases = self.path_aliases
+        if aliases is not None and not isinstance(aliases, Mapping):
+            msg = "WorkflowRunOptions.path_aliases must be a mapping"
+            raise TypeError(msg)
+
+        comps = self.workflow_components
+        if comps is not None and not isinstance(comps, tuple):
+            object.__setattr__(
+                self,
+                "workflow_components",
+                tuple(cast("Iterable[WorkflowComponent]", comps)),  # pragma: allow-cast components normalization boundary
+            )
+
+
 __all__ = (
     "UNSET",
     "ComponentsExtend",
@@ -156,10 +198,11 @@ __all__ = (
     "WorkflowCachePoolPreset",
     "WorkflowConfig",
     "WorkflowExecutionOptions",
+    "WorkflowNodePatch",
     "WorkflowOutputStagingOptions",
     "WorkflowResourcesWaitDiagnosticsOptions",
     "WorkflowResourcesWaitOptions",
     "WorkflowRun",
-    "WorkflowRunOptionsPatch",
+    "WorkflowRunOptions",
     "WorkflowRuntimeOptions",
 )

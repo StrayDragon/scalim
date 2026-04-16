@@ -4,7 +4,15 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
-from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    RunOverrides,
+    run,
+)
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.notebook_support.pathing import demo_big_data_report_yaml_path
 
@@ -246,14 +254,18 @@ def main(argv: List[str]) -> int:
         parallel_mode = _parallel_mode_for_scenario(scenario)
         result = run(
             yaml_path,
-            options=RunOptions(
-                allowed_modules=allowed_modules,
-                overrides=RunOverrides(
-                    viz_config=viz_config,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+                template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
+                runtime=DemandRunRuntimeOptions(
+                    parallel_mode=parallel_mode,
+                    max_workers=int(args.max_workers or 0),
                 ),
-                parallel_mode=parallel_mode,
-                max_workers=int(args.max_workers or 0),
-                init_vars={"order_ids": []},
+                outputs=DemandRunOutputOptions(
+                    overrides=RunOverrides(
+                        viz_config=viz_config,
+                    )
+                ),
             ),
         )
 

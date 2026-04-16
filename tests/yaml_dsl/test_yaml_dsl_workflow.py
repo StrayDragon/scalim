@@ -9,12 +9,19 @@ from scalim.dsl.yaml_dsl import DemandDiagnosticsOverride
 from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy
 from scalim.dsl.yaml_dsl import OutputOverride, OutputToOverride, OutputWriteOverride
 from scalim.dsl.yaml_dsl import RunOverrides
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunResult,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+)
 from scalim.dsl.yaml_dsl import FileResourceOverride
 from scalim.dsl.yaml_dsl import OutputExtrasOverride
 from scalim.dsl.yaml_dsl import ResourcesOverride
-from scalim.dsl.yaml_dsl import RunResult
-from scalim.dsl.yaml_dsl import RunOptions
-from scalim.dsl.yaml_dsl import run_workflow
+from scalim.dsl.yaml_dsl import run_workflow as run_workflow_public
+from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_workflow_injected
 from scalim.dsl.yaml_dsl.runtime import compiler as by_yaml_compiler_mod
 from scalim.dsl.yaml_dsl.workflow_types import (
     ComponentsExtend,
@@ -22,8 +29,9 @@ from scalim.dsl.yaml_dsl.workflow_types import (
     StageBarrierSchedulerOptions,
     WorkflowCachePoolPreloadForeverShared,
     WorkflowExecutionOptions,
+    WorkflowNodePatch,
+    WorkflowRunOptions,
     WorkflowRuntimeOptions,
-    WorkflowRunOptionsPatch,
 )
 from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.exceptions import ScalimInternalError
@@ -66,7 +74,50 @@ _ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", 
 
 
 def _run_options(*, allowed_modules=_ALLOWED_MODULES, **kwargs):  # type: ignore[no-untyped-def] test helper
-    return RunOptions(allowed_modules=allowed_modules, **kwargs)
+    overrides = kwargs.pop("overrides", None)
+    components = kwargs.pop("components", None)
+    batch_size = kwargs.pop("batch_size", None)
+    parallel_mode = kwargs.pop("parallel_mode", None)
+    max_workers = kwargs.pop("max_workers", None)
+    init_vars = kwargs.pop("init_vars", None)
+    demand_failure_policy = kwargs.pop("demand_failure_policy", None)
+    demand_diagnostics = kwargs.pop("demand_diagnostics", None)
+    sink = kwargs.pop("sink", None)
+
+    if kwargs:
+        msg = "Unknown run options keys: {}".format(", ".join(sorted(str(k) for k in kwargs.keys())))
+        raise TypeError(msg)
+    if sink is not None:
+        raise TypeError("sink is not supported in DemandRunOptions")
+
+    template_kwargs: Dict[str, Any] = {}
+    if init_vars is not None:
+        template_kwargs["init_vars"] = init_vars
+
+    runtime_kwargs: Dict[str, Any] = {}
+    if components is not None:
+        runtime_kwargs["components"] = components
+    if batch_size is not None:
+        runtime_kwargs["batch_size"] = batch_size
+    if parallel_mode is not None:
+        runtime_kwargs["parallel_mode"] = parallel_mode
+    if max_workers is not None:
+        runtime_kwargs["max_workers"] = max_workers
+    if demand_failure_policy is not None:
+        runtime_kwargs["demand_failure_policy"] = demand_failure_policy
+    if demand_diagnostics is not None:
+        runtime_kwargs["demand_diagnostics"] = demand_diagnostics
+
+    outputs_kwargs: Dict[str, Any] = {}
+    if overrides is not None:
+        outputs_kwargs["overrides"] = overrides
+
+    return DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+        template=DemandRunTemplateOptions(**template_kwargs),
+        runtime=DemandRunRuntimeOptions(**runtime_kwargs),
+        outputs=DemandRunOutputOptions(**outputs_kwargs),
+    )
 
 
 def _workflow_runtime_options(  # type: ignore[no-untyped-def] test helper
@@ -84,6 +135,37 @@ def _workflow_runtime_options(  # type: ignore[no-untyped-def] test helper
         return WorkflowRuntimeOptions(execution=execution, **kwargs)
     return WorkflowRuntimeOptions(
         execution=execution, cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=int(cache_pool_max_entries)), **kwargs
+    )
+
+
+def run_workflow(  # type: ignore[no-untyped-def] test helper
+    workflow_yaml_path: str,
+    *,
+    options: DemandRunOptions,
+    workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
+    path_aliases: Optional[Dict[str, str]] = None,
+    run_options_patches_by_run_id: Optional[Dict[str, WorkflowNodePatch]] = None,
+    run_ir_fn=None,
+    compile_demand_yaml_fn=None,
+):
+    if workflow_runtime_options is None:
+        workflow_runtime_options = WorkflowRuntimeOptions.preset_default()
+
+    workflow_components = None if options.runtime.components is None else tuple(options.runtime.components)
+    wf_options = WorkflowRunOptions(
+        demand=options,
+        patches_by_run_id=run_options_patches_by_run_id,
+        runtime=workflow_runtime_options,
+        path_aliases=path_aliases,
+        workflow_components=workflow_components,
+    )
+    if run_ir_fn is None and compile_demand_yaml_fn is None:
+        return run_workflow_public(workflow_yaml_path, options=wf_options)
+    return run_workflow_injected(
+        workflow_yaml_path,
+        options=wf_options,
+        run_ir_fn=run_ir_fn,
+        compile_demand_yaml_fn=compile_demand_yaml_fn,
     )
 
 
@@ -1058,13 +1140,13 @@ def test_run_workflow_run_options_patches_by_run_id_batch_size_overrides_global(
     seen_batch_size_by_name: Dict[str, object] = {}
 
     def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
-        seen_batch_size_by_name[Path(str(yaml_path)).name] = options.batch_size
+        seen_batch_size_by_name[Path(str(yaml_path)).name] = options.runtime.batch_size
         return by_yaml_compiler_mod.compile(yaml_path, options=options)
 
     result = run_workflow(
         str(wf),
         options=_run_options(batch_size=2000),
-        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(batch_size=5000)},
+        run_options_patches_by_run_id={"a": WorkflowNodePatch(batch_size=5000)},
         compile_demand_yaml_fn=_compile_with_capture,
     )
     assert not result.errors()
@@ -1097,13 +1179,13 @@ def test_run_workflow_run_options_patches_by_run_id_parallel_mode_overrides_glob
     seen_parallel_mode_by_name: Dict[str, object] = {}
 
     def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
-        seen_parallel_mode_by_name[Path(str(yaml_path)).name] = options.parallel_mode
+        seen_parallel_mode_by_name[Path(str(yaml_path)).name] = options.runtime.parallel_mode
         return by_yaml_compiler_mod.compile(yaml_path, options=options)
 
     result = run_workflow(
         str(wf),
         options=_run_options(parallel_mode="seq"),
-        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(parallel_mode="adaptive")},
+        run_options_patches_by_run_id={"a": WorkflowNodePatch(parallel_mode="adaptive")},
         compile_demand_yaml_fn=_compile_with_capture,
     )
     assert not result.errors()
@@ -1136,13 +1218,13 @@ def test_run_workflow_run_options_patches_by_run_id_max_workers_overrides_global
     seen_max_workers_by_name: Dict[str, object] = {}
 
     def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
-        seen_max_workers_by_name[Path(str(yaml_path)).name] = options.max_workers
+        seen_max_workers_by_name[Path(str(yaml_path)).name] = options.runtime.max_workers
         return by_yaml_compiler_mod.compile(yaml_path, options=options)
 
     result = run_workflow(
         str(wf),
         options=_run_options(max_workers=0),
-        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(max_workers=4)},
+        run_options_patches_by_run_id={"a": WorkflowNodePatch(max_workers=4)},
         compile_demand_yaml_fn=_compile_with_capture,
     )
     assert not result.errors()
@@ -1169,28 +1251,28 @@ def test_run_workflow_run_options_patches_by_run_id_rejects_invalid_parallelism_
         _ = run_workflow(
             str(wf),
             options=_run_options(),
-            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(parallel_mode="thread")},
+            run_options_patches_by_run_id={"ok": WorkflowNodePatch(parallel_mode="thread")},
         )
 
     with pytest.raises((TypeError, ValueError), match=r"parallel_mode=seq\\|adaptive"):
         _ = run_workflow(
             str(wf),
             options=_run_options(),
-            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(parallel_mode=123)},  # type: ignore[arg-type] intentional runtime boundary test
+            run_options_patches_by_run_id={"ok": WorkflowNodePatch(parallel_mode=123)},  # type: ignore[arg-type] intentional runtime boundary test
         )
 
     with pytest.raises((TypeError, ValueError), match=r"max_workers>=0"):
         _ = run_workflow(
             str(wf),
             options=_run_options(),
-            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(max_workers=-1)},
+            run_options_patches_by_run_id={"ok": WorkflowNodePatch(max_workers=-1)},
         )
 
     with pytest.raises((TypeError, ValueError), match=r"max_workers>=0"):
         _ = run_workflow(  # type: ignore[arg-type] intentional runtime boundary test
             str(wf),
             options=_run_options(),
-            run_options_patches_by_run_id={"ok": WorkflowRunOptionsPatch(max_workers="4")},
+            run_options_patches_by_run_id={"ok": WorkflowNodePatch(max_workers="4")},
         )
 
 
@@ -1213,7 +1295,7 @@ def test_run_workflow_run_options_patches_by_run_id_rejects_unknown_id(tmp_path:
         _ = run_workflow(
             str(wf),
             options=_run_options(),
-            run_options_patches_by_run_id={"nope": WorkflowRunOptionsPatch(batch_size=5000)},
+            run_options_patches_by_run_id={"nope": WorkflowNodePatch(batch_size=5000)},
         )
     assert "nope" in str(excinfo.value)
     assert "ok" in str(excinfo.value)
@@ -1270,15 +1352,15 @@ def test_run_workflow_run_options_patches_by_run_id_components_extend_and_replac
     seen_components_by_name: Dict[str, object] = {}
 
     def _compile_with_capture(yaml_path: str, *, options):  # type: ignore[no-untyped-def] test hook
-        seen_components_by_name[Path(str(yaml_path)).name] = list(options.components or [])
+        seen_components_by_name[Path(str(yaml_path)).name] = list(options.runtime.components or [])
         return by_yaml_compiler_mod.compile(yaml_path, options=options)
 
     result = run_workflow(
         str(wf),
         options=_run_options(components=[base]),
         run_options_patches_by_run_id={
-            "a": WorkflowRunOptionsPatch(components=ComponentsExtend([extra])),
-            "b": WorkflowRunOptionsPatch(components=ComponentsReplace(())),
+            "a": WorkflowNodePatch(components=ComponentsExtend([extra])),
+            "b": WorkflowNodePatch(components=ComponentsReplace(())),
         },
         compile_demand_yaml_fn=_compile_with_capture,
     )
@@ -1305,8 +1387,8 @@ def test_validate_run_options_patches_by_run_id_rejects_non_str_key() -> None:
     from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
     with pytest.raises(TypeError, match=r"keys must be workflow run ids"):
-        _ = workflow_entrypoints_mod._validate_run_options_patches_by_run_id(  # type: ignore[arg-type] intentional runtime boundary test
-            {1: WorkflowRunOptionsPatch(batch_size=5000)},
+        _ = workflow_entrypoints_mod._validate_patches_by_run_id(  # type: ignore[arg-type] intentional runtime boundary test
+            {1: WorkflowNodePatch(batch_size=5000)},
             known_run_ids=frozenset(["ok"]),
         )
 
@@ -1314,8 +1396,8 @@ def test_validate_run_options_patches_by_run_id_rejects_non_str_key() -> None:
 def test_validate_run_options_patches_by_run_id_rejects_non_patch_payload() -> None:
     from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
-    with pytest.raises(TypeError, match=r"must be a WorkflowRunOptionsPatch"):
-        _ = workflow_entrypoints_mod._validate_run_options_patches_by_run_id(
+    with pytest.raises(TypeError, match=r"must be a WorkflowNodePatch"):
+        _ = workflow_entrypoints_mod._validate_patches_by_run_id(
             {"ok": object()},  # type: ignore[arg-type] intentional runtime boundary test
             known_run_ids=frozenset(["ok"]),
         )
@@ -1324,29 +1406,29 @@ def test_validate_run_options_patches_by_run_id_rejects_non_patch_payload() -> N
 def test_apply_workflow_run_options_patch_applies_demand_failure_policy_guardrails_loader_retry() -> None:
     from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
-    base = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES, demand_failure_policy="global")
+    base = _run_options(demand_failure_policy="global")
     guardrails = GuardrailsPolicy(enabled=True)
     loader_retry = LoaderRetryPoliciesSpec()
-    patch = WorkflowRunOptionsPatch(
+    patch = WorkflowNodePatch(
         demand_failure_policy="patch",
         guardrails=guardrails,
         loader_retry=loader_retry,
     )
 
-    next_options = workflow_entrypoints_mod._apply_workflow_run_options_patch(base, patch)
-    assert next_options.demand_failure_policy == "patch"
-    assert next_options.guardrails == guardrails
-    assert next_options.loader_retry == loader_retry
+    next_options = workflow_entrypoints_mod._apply_workflow_node_patch(base, patch)
+    assert next_options.runtime.demand_failure_policy == "patch"
+    assert next_options.runtime.guardrails == guardrails
+    assert next_options.runtime.loader_retry == loader_retry
 
 
 def test_apply_workflow_run_options_patch_rejects_unknown_components_patch() -> None:
     from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
-    base = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
-    with pytest.raises(TypeError, match=r"WorkflowRunOptionsPatch\.components must be"):
-        _ = workflow_entrypoints_mod._apply_workflow_run_options_patch(
+    base = _run_options()
+    with pytest.raises(TypeError, match=r"WorkflowNodePatch\.components must be"):
+        _ = workflow_entrypoints_mod._apply_workflow_node_patch(
             base,
-            WorkflowRunOptionsPatch(components=object()),  # type: ignore[arg-type] intentional runtime boundary test
+            WorkflowNodePatch(components=object()),  # type: ignore[arg-type] intentional runtime boundary test
         )
 
 
@@ -1428,7 +1510,7 @@ outputs:
 
     patch_detail_a_root = tmp_path / "patch_detail_a"
     run_options_patches_by_run_id = {
-        "a": WorkflowRunOptionsPatch(
+        "a": WorkflowNodePatch(
             overrides=RunOverrides(
                 resources=ResourcesOverride(
                     files={
@@ -1451,8 +1533,8 @@ outputs:
     outcomes = {str(o.run_id): o for o in result.outcomes}
     out_a = outcomes["a"]
     out_b = outcomes["b"]
-    assert isinstance(out_a.result, RunResult)
-    assert isinstance(out_b.result, RunResult)
+    assert isinstance(out_a.result, DemandRunResult)
+    assert isinstance(out_b.result, DemandRunResult)
 
     assert out_a.result.core.outputs is not None
     assert out_b.result.core.outputs is not None
@@ -3615,7 +3697,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     assert not result.errors()
     outcomes = {str(o.run_id): o for o in result.outcomes}
     consume_outcome = outcomes["consume"]
-    assert isinstance(consume_outcome.result, RunResult)
+    assert isinstance(consume_outcome.result, DemandRunResult)
     assert consume_outcome.result.core.outputs is not None
     consume_out_path = Path(str(consume_outcome.result.core.outputs["detail"]))
     assert consume_out_path.exists()
@@ -3723,7 +3805,7 @@ outputs:
     assert not result.errors()
     outcomes = {str(o.run_id): o for o in result.outcomes}
     consume_outcome = outcomes["consume_named"]
-    assert isinstance(consume_outcome.result, RunResult)
+    assert isinstance(consume_outcome.result, DemandRunResult)
     assert consume_outcome.result.core.outputs is not None
     consume_path = Path(str(consume_outcome.result.core.outputs["detail"]))
     assert consume_path.exists()
@@ -3842,7 +3924,7 @@ outputs:
     assert not result.errors()
     outcomes = {str(o.run_id): o for o in result.outcomes}
     consume_outcome = outcomes["consume_typed"]
-    assert isinstance(consume_outcome.result, RunResult)
+    assert isinstance(consume_outcome.result, DemandRunResult)
     assert consume_outcome.result.core.outputs is not None
     consume_out_path = Path(str(consume_outcome.result.core.outputs["detail"]))
     assert consume_out_path.exists()
@@ -4367,7 +4449,7 @@ def test_run_workflow_demand_diagnostics_can_disable_duplicate_name_validation(t
 
     assert not result.errors()
     outcome = next(o for o in result.outcomes if o.run_id == "dup")
-    assert isinstance(outcome.result, RunResult)
+    assert isinstance(outcome.result, DemandRunResult)
     assert outcome.result.core.outputs is not None
     out_path = Path(str(outcome.result.core.outputs["detail"]))
     assert out_path.exists()
@@ -4429,7 +4511,7 @@ outputs:
             str(wf),
             options=_run_options(),
             run_options_patches_by_run_id={
-                "a": WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
+                "a": WorkflowNodePatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
             },
         )
 
@@ -4505,8 +4587,8 @@ outputs:
 
     a_result = a_outcome.result
     b_result = b_outcome.result
-    assert isinstance(a_result, RunResult)
-    assert isinstance(b_result, RunResult)
+    assert isinstance(a_result, DemandRunResult)
+    assert isinstance(b_result, DemandRunResult)
     assert a_result.config.validate_unique_field_names is False
     assert b_result.config.validate_unique_field_names is False
     assert a_result.core.outputs is not None
@@ -4570,7 +4652,7 @@ outputs:
         _ = run_workflow(
             str(wf),
             options=_run_options(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
-            run_options_patches_by_run_id={"b": WorkflowRunOptionsPatch(demand_diagnostics=None)},
+            run_options_patches_by_run_id={"b": WorkflowNodePatch(demand_diagnostics=None)},
         )
 
     assert not a_out.exists()
@@ -4631,18 +4713,17 @@ def test_workflow_lifecycle_pipeline_harness_runs_to_preflight_without_engine_an
 
     from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
 
-    base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES, batch_size=1000)
-    lifecycle = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
-        str(wf),
-        base_options=base_options,
+    wf_options = WorkflowRunOptions(
+        demand=_run_options(batch_size=1000),
+        patches_by_run_id={"b": WorkflowNodePatch(batch_size=123)},
+        runtime=WorkflowRuntimeOptions.preset_default(),
         path_aliases=None,
-        run_options_patches_by_run_id={"b": WorkflowRunOptionsPatch(batch_size=123)},
-        workflow_runtime_options=workflow_entrypoints_mod.WorkflowRuntimeOptions.preset_default(),
     )
+    lifecycle = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(str(wf), options=wf_options)
 
     assert set(lifecycle.preload.demand_configs_by_run_id) == {"a", "b"}
-    assert lifecycle.effective.options_by_run_id["a"].batch_size == 1000
-    assert lifecycle.effective.options_by_run_id["b"].batch_size == 123
+    assert lifecycle.effective.options_by_run_id["a"].runtime.batch_size == 1000
+    assert lifecycle.effective.options_by_run_id["b"].runtime.batch_size == 123
 
     assert not a_root.exists()
     assert not b_root.exists()
@@ -4682,20 +4763,19 @@ def test_workflow_lifecycle_pipeline_harness_merges_resources_overrides_into_com
 
     file_id = "a_detail_csv"
     patch_out_root = tmp_path / "patch_out"
-    run_options_patches_by_run_id = {
-        "a": WorkflowRunOptionsPatch(
+    patches_by_run_id = {
+        "a": WorkflowNodePatch(
             overrides=RunOverrides(resources=ResourcesOverride(files={file_id: FileResourceOverride(path=str(patch_out_root))}))
         )
     }
 
-    base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
-    _ = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
-        str(wf),
-        base_options=base_options,
+    wf_options = WorkflowRunOptions(
+        demand=_run_options(),
+        patches_by_run_id=patches_by_run_id,
+        runtime=WorkflowRuntimeOptions.preset_default(),
         path_aliases=None,
-        run_options_patches_by_run_id=run_options_patches_by_run_id,
-        workflow_runtime_options=workflow_entrypoints_mod.WorkflowRuntimeOptions.preset_default(),
     )
+    _ = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(str(wf), options=wf_options)
 
     assert seen["overrides"] is not None
 
@@ -4727,15 +4807,13 @@ def test_workflow_lifecycle_pipeline_rejects_missing_structural_preload_results(
 
     monkeypatch.setattr(workflow_entrypoints_mod, "compile_workflow_ir", _compile_drop_preload_results)
 
-    base_options = workflow_entrypoints_mod.RunOptions(allowed_modules=_ALLOWED_MODULES)
+    wf_options = WorkflowRunOptions(
+        demand=_run_options(),
+        runtime=WorkflowRuntimeOptions.preset_default(),
+        path_aliases=None,
+    )
     with pytest.raises(ScalimWorkflowConfigError, match=r"Missing workflow structural preload result for run_id"):
-        _ = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(
-            str(wf),
-            base_options=base_options,
-            path_aliases=None,
-            run_options_patches_by_run_id=None,
-            workflow_runtime_options=workflow_entrypoints_mod.WorkflowRuntimeOptions.preset_default(),
-        )
+        _ = workflow_entrypoints_mod.run_workflow_lifecycle_until_preflight(str(wf), options=wf_options)
 
 
 def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4768,7 +4846,7 @@ def test_run_workflow_runtime_compile_rejects_unknown_run_id(tmp_path: Path, mon
             workflow_ir=lifecycle.effective.workflow_ir,
             runs=lifecycle.effective.runs,
             options_by_run_id=bad_options,
-            run_options_patches_by_run_id=lifecycle.effective.run_options_patches_by_run_id,
+            patches_by_run_id=lifecycle.effective.patches_by_run_id,
             bundle_viz_base_config=lifecycle.effective.bundle_viz_base_config,
         )
         return workflow_entrypoints_mod.WorkflowLifecyclePreflightResult(
@@ -4816,13 +4894,16 @@ def test_run_workflow_bundle_viz_requires_overrides_in_runtime_compile(tmp_path:
     def _lifecycle_drop_overrides(*args: Any, **kwargs: Any) -> workflow_entrypoints_mod.WorkflowLifecyclePreflightResult:
         lifecycle = original(*args, **kwargs)
         bad_options = dict(lifecycle.effective.options_by_run_id)
-        bad_options["a"] = workflow_entrypoints_mod.replace(bad_options["a"], overrides=None)
+        bad_options["a"] = workflow_entrypoints_mod.replace(
+            bad_options["a"],
+            outputs=workflow_entrypoints_mod.replace(bad_options["a"].outputs, overrides=None),
+        )
         bad_effective = workflow_entrypoints_mod.WorkflowLifecycleEffectiveMergeResult(
             workflow_yaml_path=lifecycle.effective.workflow_yaml_path,
             workflow_ir=lifecycle.effective.workflow_ir,
             runs=lifecycle.effective.runs,
             options_by_run_id=bad_options,
-            run_options_patches_by_run_id=lifecycle.effective.run_options_patches_by_run_id,
+            patches_by_run_id=lifecycle.effective.patches_by_run_id,
             bundle_viz_base_config=lifecycle.effective.bundle_viz_base_config,
         )
         return workflow_entrypoints_mod.WorkflowLifecyclePreflightResult(
@@ -4870,7 +4951,7 @@ def test_run_workflow_preflight_uses_effective_overrides_outputs_header_policy(t
     )
     assert not result.errors()
     outcome = next(o for o in result.outcomes if o.run_id == "dup")
-    assert isinstance(outcome.result, RunResult)
+    assert isinstance(outcome.result, DemandRunResult)
     assert outcome.result.core.outputs is not None
     out_path = Path(str(outcome.result.core.outputs["detail"]))
     assert out_path.exists()
@@ -4974,7 +5055,7 @@ def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_err
         str(wf),
         options=_run_options(),
         run_options_patches_by_run_id={
-            "a": WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(include_full_error_message=True))
+            "a": WorkflowNodePatch(demand_diagnostics=DemandDiagnosticsOverride(include_full_error_message=True))
         },
     )
     assert not result.errors()
@@ -4987,8 +5068,8 @@ def test_run_workflow_run_patch_demand_diagnostics_can_override_include_full_err
 
     a_result = a_outcome.result
     b_result = b_outcome.result
-    assert isinstance(a_result, RunResult)
-    assert isinstance(b_result, RunResult)
+    assert isinstance(a_result, DemandRunResult)
+    assert isinstance(b_result, DemandRunResult)
     assert a_result.config.include_full_error_message is True
     assert b_result.config.include_full_error_message is False
 
@@ -5007,13 +5088,13 @@ def test_run_workflow_run_patch_can_disable_duplicate_name_validation(tmp_path: 
         str(wf),
         options=_run_options(),
         run_options_patches_by_run_id={
-            "dup": WorkflowRunOptionsPatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
+            "dup": WorkflowNodePatch(demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False))
         },
     )
 
     assert not result.errors()
     outcome = next(o for o in result.outcomes if o.run_id == "dup")
-    assert isinstance(outcome.result, RunResult)
+    assert isinstance(outcome.result, DemandRunResult)
     assert outcome.result.core.outputs is not None
     out_path = Path(str(outcome.result.core.outputs["detail"]))
     assert out_path.exists()
@@ -5659,7 +5740,7 @@ def test_workflow_main_rows_from_wires_upstream_typed_rows_into_downstream_main_
     assert not result.errors()
 
     b_outcome = next(o for o in result.outcomes if o.run_id == "b")
-    assert isinstance(b_outcome.result, RunResult)
+    assert isinstance(b_outcome.result, DemandRunResult)
     assert b_outcome.result.core.outputs is not None
     b_out_path = Path(str(b_outcome.result.core.outputs["detail"]))
     assert _read_csv_rows(b_out_path) == [
@@ -5742,8 +5823,8 @@ def test_workflow_main_rows_from_releases_typed_rows_after_final_consumer(tmp_pa
     outcomes = {str(o.run_id): o for o in result.outcomes}
     b_outcome = outcomes["b"]
     c_outcome = outcomes["c"]
-    assert isinstance(b_outcome.result, RunResult)
-    assert isinstance(c_outcome.result, RunResult)
+    assert isinstance(b_outcome.result, DemandRunResult)
+    assert isinstance(c_outcome.result, DemandRunResult)
     assert b_outcome.result.core.outputs is not None
     assert c_outcome.result.core.outputs is not None
     b_out_path = Path(str(b_outcome.result.core.outputs["detail"]))

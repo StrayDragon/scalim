@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand
-from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
+from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions
 from scalim.execution.run_ir import run_ir
 
 
@@ -35,9 +35,9 @@ outputs:
         encoding="utf-8",
     )
 
-    opts = RunOptions(
-        allowed_modules=_ALLOWED_MODULES,
-        workflow_managed_output_ids=frozenset(["detail"]),
+    opts = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+        outputs=DemandRunOutputOptions(workflow_managed_output_ids=frozenset(["detail"])),
     )
     compilation = compile_demand(str(yaml_path), options=opts)
     result = run_ir(compilation.demand_ir, compilation.request)

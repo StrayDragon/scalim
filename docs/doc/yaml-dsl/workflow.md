@@ -7,7 +7,7 @@
 这页讲 **workflow YAML**(编排文件)的语法,以及对应的 Python 运行入口。workflow YAML 和 demand YAML 是两套配置:
 
 - demand YAML: `name/main_source/sources/relations/fields/...`
-- workflow YAML: `workflow.runs/options/resources`(只负责“编排多个 demand”与“声明共享输出资源”)
+- workflow YAML: `workflow.runs/resources`(只负责“编排多个 demand”与“声明共享输出资源”)
 
 ## 0) 校验与编辑器($schema)配置
 
@@ -53,15 +53,6 @@ workflow:
       demand: ./orders_report.yaml
     - id: customers
       demand: ./customers_report.yaml
-  options:
-    max_concurrency: 2
-    failure_policy: primary_only
-    cache_pool:
-      conflict_policy: error
-      release_policy: dag_refcount
-      budget:
-        max_entries: 16
-        over_budget_policy: fail_fast
 ```
 
 语义约束(启动前 fail-fast):
@@ -69,13 +60,8 @@ workflow:
 - `workflow.runs` 必须非空
 - `workflow.runs[*].id` 必须非空且全局唯一
 - `workflow.runs[*].demand` 必须为非空字符串
-- `workflow.options.max_concurrency` 必须为整数且 >= 1(默认 `1`)
-- `workflow.options.failure_policy` 为 `all_fail` 或 `primary_only`(默认 `all_fail`)
-- `workflow.options.resources_wait` 与 `workflow.options.output_staging` 已迁出 workflow YAML(运行期策略边界);请通过 runtime entrypoints 配置:
-  - `run_workflow(..., workflow_resources_wait=..., workflow_output_staging=...)`
-- `workflow.options.cache_pool` MAY 缺省(表示不启用 workflow-scope cache pool)
-  - 当存在时,其 `conflict_policy/release_policy/budget` 为必填
-  - `budget.max_entries` 必须为整数且 >= 1
+- workflow 运行期策略(并发/失败策略/调度/cache pool/resources wait/output staging)已迁出 workflow YAML(运行期策略边界),并统一在 Python 入口通过 `WorkflowRunOptions.runtime=WorkflowRuntimeOptions(...)` 配置。
+  - workflow YAML 中若出现 `workflow.options.*` 会因 unknown-fields 在 validate/compile 阶段 fail-fast。
 
 ### 1.1) `workflow_resources_wait`: 共享资源 join/wait 超时与诊断(runtime entrypoint)
 
@@ -87,24 +73,28 @@ workflow 的共享输出资源(book/csv/sheetbook)在并发模式下会用 joina
 
 注意:
 
-- `workflow.options.resources_wait` 已从 workflow YAML 迁出;若继续在 YAML 中声明会 fail-fast.
+- workflow YAML 不再包含 `workflow.options.*`(属于运行期策略边界);如需配置 resources wait,请在 Python 入口使用 `WorkflowRunOptions.runtime=WorkflowRuntimeOptions(resources_wait=...)`。
 
 示例(Python):
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowResourcesWaitDiagnosticsOptions, WorkflowResourcesWaitOptions, WorkflowRuntimeOptions
 
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(allowed_modules=frozenset(["myapp"])),
-    workflow_resources_wait=WorkflowResourcesWaitOptions(
-        max_wait_s=600.0,
-        diagnostics=WorkflowResourcesWaitDiagnosticsOptions(
-            enabled=True,
-            warn_after_s=30.0,
-            repeat_every_s=60.0,
-            capture_owner_callsite=True,
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp"]))),
+        runtime=WorkflowRuntimeOptions(
+            resources_wait=WorkflowResourcesWaitOptions(
+                max_wait_s=600.0,
+                diagnostics=WorkflowResourcesWaitDiagnosticsOptions(
+                    enabled=True,
+                    warn_after_s=30.0,
+                    repeat_every_s=60.0,
+                    capture_owner_callsite=True,
+                ),
+            ),
         ),
     ),
 )
@@ -128,21 +118,25 @@ workflow 的共享输出(例如 `workflow.resources.books` 导出的 `.xlsx` / �
 
 注意:
 
-- `workflow.options.output_staging` 已从 workflow YAML 迁出;若继续在 YAML 中声明会 fail-fast.
+- workflow 输出 staging 策略属于运行期策略边界,需通过 `WorkflowRunOptions.runtime=WorkflowRuntimeOptions(output_staging=...)` 配置(不在 YAML 中声明).
 
 示例(Python):
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowOutputStagingOptions, WorkflowRuntimeOptions
 
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(allowed_modules=frozenset(["myapp"])),
-    workflow_output_staging=WorkflowOutputStagingOptions(
-        dir_name=".scalim-staging",
-        keep_on_success=False,
-        keep_on_failure=True,
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp"]))),
+        runtime=WorkflowRuntimeOptions(
+            output_staging=WorkflowOutputStagingOptions(
+                dir_name=".scalim-staging",
+                keep_on_success=False,
+                keep_on_failure=True,
+            ),
+        ),
     ),
 )
 ```
@@ -221,15 +215,7 @@ workflow 在一次执行中维护 workflow-level ctx store,用于在依赖边上
 - ctx 以 `workflow_node_id` 为命名空间(对 demand 节点即 `runs[*].id`)
 - ctx 只能在 **依赖闭包**内读取(没有声明依赖的节点不能读上游)
 - 系统禁止把 rows/dataset/大型输出塞进 ctx; 大对象必须走 artifacts/resources 路径
-- 护栏可通过 `workflow.options.ctx` 配置:
-
-```yaml
-workflow:
-  options:
-    ctx:
-      max_value_bytes: 65536
-      max_bytes: 1048576
-```
+- ctx 护栏目前属于内部策略,不在 workflow YAML 中声明,也不作为公开 runtime options 暴露。
 
 需求节点完成时会发布一组稳定的默认 ctx keys(用于减少 Python glue):
 
@@ -239,7 +225,7 @@ workflow:
 
 ## 5) `cache_pool`: workflow-scope cache pool
 
-当 `workflow.options.cache_pool` 存在时:
+当 `WorkflowRuntimeOptions.cache_pool` 启用时(运行期策略边界;通过 `WorkflowRunOptions.runtime` 配置):
 
 - 系统会在同一次 workflow 执行内提供 workflow-scope cache pool,用于承载可共享的缓存条目(v0: `cache_mode: preload_forever` 的预加载结果)
 - cache pool 以“可复现的 signature”作为 key,避免复用错误数据;signature 至少包含:
@@ -263,13 +249,13 @@ workflow:
 
 迁移:
 
-- `workflow.options.share_preload_cache` 已移除,请改用 `workflow.options.cache_pool`
+- `workflow.options.share_preload_cache` 已移除(旧 YAML 入口不再支持),请改用 `WorkflowRuntimeOptions(cache_pool=...)`
 
 ## 6) `workflow.resources.books`: 共享 book 资源（无 `writes`）
 
 workflow YAML 只负责两件事:
 
-- 编排多条 demand(`workflow.runs/options/ctx/cache_pool`)
+- 编排多条 demand(`workflow.runs`)
 - 声明 workflow-scope 的共享 IO 资源: `workflow.resources.books`
 
 当前实现里,workflow **不再**提供显式的“写入意图”字段;共享输出的写入由 demand 的 outputs 绑定表达,并由 workflow 编译期推导写入节点。
@@ -329,12 +315,14 @@ outputs:
 当前暂不扩展 workflow runner CLI; 先用 Python 入口:
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
 
 result = run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"])),
-    path_aliases={"@": "/abs/project_root"},
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
+        path_aliases={"@": "/abs/project_root"},
+    ),
 )
 
 for outcome in result.outcomes:
@@ -344,7 +332,7 @@ for outcome in result.outcomes:
         print("OK:", outcome.run_id, outcome.result.total_rows)
 ```
 
-### 7.1) `run_options_patches_by_run_id`: per-run runtime policy(按 run id 注入差异化运行策略)
+### 7.1) `patches_by_run_id`: per-run runtime policy(按 run id 注入差异化运行策略)
 
 当 workflow DAG 中存在多个 runs 时,真实生产场景往往需要“不同 run 使用不同运行策略”:
 
@@ -352,65 +340,72 @@ for outcome in result.outcomes:
 - `components`: 仅对某个 run 追加调试 observer/hook(不污染整张图)
 - `guardrails/loader_retry/overrides`: 对特定 run 单独加强或关闭
 
-使用方式:在 Python 入口 `run_workflow(..., run_options_patches_by_run_id=...)` 中按 `workflow.runs[*].id` 提供 patch:
+使用方式:在 Python 入口 `run_workflow(..., options=WorkflowRunOptions(patches_by_run_id=...))` 中按 `workflow.runs[*].id` 提供 patch:
 
 - key: `workflow.runs[*].id`(字符串)
-- value: **typed** 的 `WorkflowRunOptionsPatch`(不支持 dict 形状 patch)
-- patch 优先级高于 `run_workflow(..., options=RunOptions(...))` 的全局 knobs
+- value: **typed** 的 `WorkflowNodePatch`(不支持 dict 形状 patch)
+- patch 优先级高于 `WorkflowRunOptions.demand` 的全局默认
 - omission / `UNSET` 表示继承;`None` 在支持的字段上表示显式禁用
 
 示例 1: per-run `batch_size` 覆盖全局默认
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch
 
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"]), batch_size=2000),  # 全局默认
-    run_options_patches_by_run_id={
-        "d10_paid_orders": WorkflowRunOptionsPatch(batch_size=5000),  # 仅该 run 用更大 batch
-    },
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"])),
+            runtime=DemandRunRuntimeOptions(batch_size=2000),  # 全局默认
+        ),
+        patches_by_run_id={"d10_paid_orders": WorkflowNodePatch(batch_size=5000)},  # 仅该 run 用更大 batch
+    ),
 )
 ```
 
 示例 2: 仅对某个 run 追加一个调试组件(append,保序)
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-from scalim.dsl.yaml_dsl.workflow_types import ComponentsExtend, WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import ComponentsExtend, WorkflowNodePatch
 
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"]), components=[my_prod_observer]),
-    run_options_patches_by_run_id={
-        "d70_summary_ranking": WorkflowRunOptionsPatch(
-            components=ComponentsExtend([my_debug_observer]),
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"])),
+            runtime=DemandRunRuntimeOptions(components=[my_prod_observer]),
         ),
-    },
+        patches_by_run_id={"d70_summary_ranking": WorkflowNodePatch(components=ComponentsExtend([my_debug_observer]))},
+    ),
 )
 ```
 
 示例 3: 对单个 run 显式禁用全局 `batch_size`(该 run 不分批)
 
 ```python
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch
 
 run_workflow(
     "path/to/workflow.yaml",
-    options=RunOptions(allowed_modules=frozenset(["myapp.loaders"]), batch_size=2000),
-    run_options_patches_by_run_id={
-        "d20_registered_users": WorkflowRunOptionsPatch(batch_size=None),
-    },
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"])),
+            runtime=DemandRunRuntimeOptions(batch_size=2000),
+        ),
+        patches_by_run_id={"d20_registered_users": WorkflowNodePatch(batch_size=None)},
+    ),
 )
 ```
 
 常见错误与诊断:
 
 - unknown run id: fail-fast 并列出当前 workflow 的合法 ids
-- dict patch payload: `run_options_patches_by_run_id={"A": {"batch_size": 5000}}` 会报错;请改为 `WorkflowRunOptionsPatch(batch_size=5000)`
-- 安全边界(`allowed_modules/allowed_functions/resolver_trusted_mode`)不允许在 per-run patch 中覆盖;只能通过 `run_workflow(..., options=RunOptions(...))` 的全局 `options` 提供
+- dict patch payload: `patches_by_run_id={"A": {"batch_size": 5000}}` 会报错;请改为 `WorkflowNodePatch(batch_size=5000)`
+- 安全边界(`allowed_modules/allowed_functions/resolver_trusted_mode/...`)不允许在 per-run patch 中覆盖;只能通过 `WorkflowRunOptions.demand.security` 的全局 `security` 提供
 
 失败策略:
 
@@ -419,7 +414,7 @@ run_workflow(
 
 并发契约:
 
-- 当 `max_concurrency>1` 且提供了 `components`(hooks/observers)时,系统会在并发执行阶段 capture 事件,并在 workflow 结束后以单线程按稳定顺序 replay 给 components(仍满足 `no-external-callback-under-lock`)
-  - components 默认不要求线程安全(同一时刻最多一个回调在执行)
-  - 代价: 并发模式下 components 的回调可能非实时(在 replay 阶段触发)
-- 如需严格实时回调,请将 `max_concurrency` 设为 `1`
+- 当 `WorkflowRuntimeOptions.execution.max_concurrency>1` 且提供了 `WorkflowRunOptions.workflow_components`(hooks/observers)时,系统会在并发执行阶段 capture 事件,并在 workflow 结束后以单线程按稳定顺序 replay 给这些 components(仍满足 `no-external-callback-under-lock`)
+  - workflow_components 默认不要求线程安全(同一时刻最多一个回调在执行)
+  - 代价: 并发模式下回调可能非实时(在 replay 阶段触发)
+- 如需严格实时回调,请将 `WorkflowRuntimeOptions.execution.max_concurrency` 设为 `1`

@@ -305,7 +305,8 @@ class YamlDemandLoader(
             msg = (
                 msg
                 + "Hint: configure demand diagnostics via runtime entrypoints: "
-                + "scalim.dsl.yaml_dsl.run/compile(..., demand_diagnostics=DemandDiagnosticsPolicy(...))."
+                + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+                + "runtime=DemandRunRuntimeOptions(demand_diagnostics=DemandDiagnosticsPolicy(...)), ...))."
             )
             raise ValueError(msg)
 

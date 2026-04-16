@@ -6,7 +6,14 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy, RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import (
+    DemandDiagnosticsPolicy,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+)
+from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim.execution.output_composition import OutputTargetStats
 from scalim.execution.run_ir import run_ir
 from scalim.execution import versioned_outputs
@@ -114,12 +121,16 @@ def run_yaml_dsl_output_failure_policy(
             try:
                 redacted_compilation = compile_yaml(
                     str(yaml_redacted_path),
-                    options=RunOptions(
-                        allowed_modules=_ALLOWED_MODULES,
-                        demand_failure_policy="primary_only",
-                        batch_size=2,
-                        init_vars=init_vars_redacted,
-                        allowed_yaml_roots=allowed_yaml_roots,
+                    options=DemandRunOptions(
+                        security=DemandRunSecurityOptions(
+                            allowed_modules=_ALLOWED_MODULES,
+                            allowed_yaml_roots=allowed_yaml_roots,
+                        ),
+                        template=DemandRunTemplateOptions(init_vars=init_vars_redacted),
+                        runtime=DemandRunRuntimeOptions(
+                            demand_failure_policy="primary_only",
+                            batch_size=2,
+                        ),
                     ),
                 )
                 redacted_spec = redacted_compilation.request.output_composition
@@ -187,13 +198,17 @@ def run_yaml_dsl_output_failure_policy(
             try:
                 full_compilation = compile_yaml(
                     str(yaml_full_path),
-                    options=RunOptions(
-                        allowed_modules=_ALLOWED_MODULES,
-                        demand_failure_policy="primary_only",
-                        demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
-                        batch_size=2,
-                        init_vars=init_vars_full,
-                        allowed_yaml_roots=allowed_yaml_roots,
+                    options=DemandRunOptions(
+                        security=DemandRunSecurityOptions(
+                            allowed_modules=_ALLOWED_MODULES,
+                            allowed_yaml_roots=allowed_yaml_roots,
+                        ),
+                        template=DemandRunTemplateOptions(init_vars=init_vars_full),
+                        runtime=DemandRunRuntimeOptions(
+                            demand_failure_policy="primary_only",
+                            demand_diagnostics=DemandDiagnosticsPolicy(include_full_error_message=True),
+                            batch_size=2,
+                        ),
                     ),
                 )
                 full_spec = full_compilation.request.output_composition
@@ -259,12 +274,16 @@ def run_yaml_dsl_output_failure_policy(
             try:
                 all_fail_compilation = compile_yaml(
                     str(yaml_all_fail_path),
-                    options=RunOptions(
-                        allowed_modules=_ALLOWED_MODULES,
-                        demand_failure_policy="all_fail",
-                        batch_size=2,
-                        init_vars=init_vars_all_fail,
-                        allowed_yaml_roots=allowed_yaml_roots,
+                    options=DemandRunOptions(
+                        security=DemandRunSecurityOptions(
+                            allowed_modules=_ALLOWED_MODULES,
+                            allowed_yaml_roots=allowed_yaml_roots,
+                        ),
+                        template=DemandRunTemplateOptions(init_vars=init_vars_all_fail),
+                        runtime=DemandRunRuntimeOptions(
+                            demand_failure_policy="all_fail",
+                            batch_size=2,
+                        ),
                     ),
                 )
                 all_fail_spec = all_fail_compilation.request.output_composition

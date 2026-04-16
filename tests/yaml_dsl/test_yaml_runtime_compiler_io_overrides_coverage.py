@@ -9,6 +9,9 @@ from scalim.dsl.yaml_dsl.runtime.contracts import (
     BookExportXlsxOverride,
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunSecurityOptions,
     FileResourceOverride,
     OutputDefaultsToOverride,
     OutputsDefaultsOverride,
@@ -16,7 +19,6 @@ from scalim.dsl.yaml_dsl.runtime.contracts import (
     OutputToOverride,
     OutputWriteOverride,
     ResourcesOverride,
-    RunOptions,
     RunOverrides,
 )
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
@@ -109,9 +111,11 @@ def test_runtime_compiler_resolve_effective_outputs_and_path_apply_defaults_cove
             OutputTargetConfig(name="sheet_only", to=OutputToConfig(sheet="S"), fields=("order_id",)),
         )
     )
-    options = RunOptions(
-        allowed_modules=frozenset(["tests.fixtures"]),
-        overrides=RunOverrides(outputs_defaults=OutputsDefaultsOverride(to=OutputDefaultsToOverride(book="report"))),
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+        outputs=DemandRunOutputOptions(
+            overrides=RunOverrides(outputs_defaults=OutputsDefaultsOverride(to=OutputDefaultsToOverride(book="report")))
+        ),
     )
     outputs, outputs_ref = compiler_mod._resolve_effective_outputs_and_path(config, object(), options=options)  # type: ignore[arg-type]  # noqa: SLF001
     assert outputs_ref == "outputs"
@@ -566,9 +570,11 @@ def test_runtime_compiler_apply_resources_override_and_io_overrides_cover_branch
             ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="x")}),  # type: ignore[dict-item]
         )
 
-    options = RunOptions(
-        allowed_modules=frozenset(["tests.fixtures"]),
-        overrides=RunOverrides(resources=ResourcesOverride(files={"detail": FileResourceOverride(path="c")})),
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
+        outputs=DemandRunOutputOptions(
+            overrides=RunOverrides(resources=ResourcesOverride(files={"detail": FileResourceOverride(path="c")}))
+        ),
     )
     out = compiler_mod._apply_io_overrides(base, options=options)  # noqa: SLF001
     assert out.resources is not None

@@ -2,11 +2,18 @@ import json
 import threading
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions
 from scalim.dsl.yaml_dsl import run_workflow as run_workflow_public
+from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_workflow_injected
 from scalim.dsl.yaml_dsl.workflow_entrypoints import run_workflow as run_workflow_stable
 
 from tests.support.testing_utils import CI_TIMEOUT_S
+
+_ALLOWED_MODULES = frozenset(["tests.fixtures"])
+
+
+def _workflow_options() -> WorkflowRunOptions:
+    return WorkflowRunOptions(demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES)))
 
 
 def _write_demand_yaml(tmp_path: Path, *, file_name: str, name: str, output_root: Path) -> Path:
@@ -62,7 +69,7 @@ def test_stable_workflow_entrypoints_are_importable_and_runnable(tmp_path: Path)
         output_root=wf1_dir / "out",
     )
     wf1 = _write_workflow_yaml(wf1_dir, file_name="wf.yaml", run_id="a", demand_file="a.yaml")
-    result1 = run_workflow_public(str(wf1), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result1 = run_workflow_public(str(wf1), options=_workflow_options())
     assert not result1.errors()
 
     wf2_dir = tmp_path / "wf2"
@@ -74,7 +81,7 @@ def test_stable_workflow_entrypoints_are_importable_and_runnable(tmp_path: Path)
         output_root=wf2_dir / "out",
     )
     wf2 = _write_workflow_yaml(wf2_dir, file_name="wf.yaml", run_id="b", demand_file="b.yaml")
-    result2 = run_workflow_stable(str(wf2), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result2 = run_workflow_stable(str(wf2), options=_workflow_options())
     assert not result2.errors()
 
 
@@ -127,11 +134,7 @@ def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurre
 
     def _run(tag: str, wf: Path, fake):  # type: ignore[no-untyped-def]
         try:
-            results[tag] = run_workflow_stable(
-                str(wf),
-                options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])),
-                run_ir_fn=fake,
-            )
+            results[tag] = run_workflow_injected(str(wf), options=_workflow_options(), run_ir_fn=fake)
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
 

@@ -6,7 +6,7 @@
 
 约束:
 - 运行时需兼容 `Python 3.6`
-- 必须基于每个 `run` 的有效运行期策略/覆盖项(由调用侧准备好 `RunOptions`)进行判断
+- 必须基于每个 `run` 的有效运行期策略/覆盖项(由调用侧准备好 `DemandRunOptions`)进行判断
 """
 
 from typing import Dict, List, Sequence, Tuple
@@ -14,7 +14,7 @@ from typing import Dict, List, Sequence, Tuple
 from ...vendor.compact.typing_extensionsx import Protocol
 from ...vendor.dataclassesx import dataclass
 from .diagnostics import format_duplicate_effective_field_display_names_message
-from .runtime.contracts import RunOptions
+from .runtime.contracts import DemandRunOptions
 from .runtime.effective_outputs import options_require_unique_effective_field_display_names
 from .schema_dsl.models import DemandConfig
 from .workflow import ScalimWorkflowConfigError
@@ -31,7 +31,7 @@ class WorkflowPreflightRun:
     demand_path: str
     decl_order: int
     demand_config: DemandConfig
-    options: RunOptions
+    options: DemandRunOptions
 
 
 class WorkflowPreflightCheck(Protocol):
@@ -74,7 +74,7 @@ class ValidateUniqueFieldNamesPreflightCheck:
     def run(self, ctx: WorkflowPreflightContext, run: WorkflowPreflightRun) -> None:
         _ = ctx
 
-        demand_diagnostics = run.options.demand_diagnostics
+        demand_diagnostics = run.options.runtime.demand_diagnostics
         validate_unique = True if demand_diagnostics is None else bool(demand_diagnostics.validate_unique_field_names)
         if not validate_unique:
             return

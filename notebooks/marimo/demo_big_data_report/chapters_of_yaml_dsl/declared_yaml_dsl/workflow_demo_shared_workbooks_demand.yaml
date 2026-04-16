@@ -10,8 +10,8 @@ description: |
   - workbook write policy is controlled by `resources.books.*.write_defaults` (in this demo, declared in workflow YAML)
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
-# Pass via workflow runtime entrypoints, e.g. `run_workflow(..., options=RunOptions(batch_size=30))`.
-# If different runs need different runtime policies, use `run_workflow(..., run_options_patches_by_run_id={"<run_id>": WorkflowRunOptionsPatch(batch_size=...)})`.
+# Pass via workflow runtime entrypoints, e.g. `WorkflowRunOptions(demand=DemandRunOptions(runtime=DemandRunRuntimeOptions(batch_size=30), ...))`.
+# If different runs need different runtime policies, use `WorkflowRunOptions(patches_by_run_id={"<run_id>": WorkflowNodePatch(batch_size=...)})`.
 
 main_source:
   source_id: orders

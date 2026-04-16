@@ -4,10 +4,11 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_workflow_injected
 from scalim.dsl.yaml_dsl.runtime.contracts import UNSET
 from scalim.dsl.yaml_dsl.runtime.entrypoints import run as run_demand
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowRunOptionsPatch
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch, WorkflowRunOptions
 from scalim.execution.run_ir import run_ir as run_ir_real
 from scalim.events import EVENT_PRE_USE_BATCH_SIZE
 from scalim.hooks import BaseHook, HookManager, PreUseBatchSizeDecision
@@ -110,10 +111,9 @@ def test_pre_use_batch_size_signal_skipped_when_explicit_batch_size(tmp_path: Pa
     # Explicit value => MUST skip signal, so exploding hook must not run.
     result = run_demand(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            batch_size=8000,
-            components=[hook],
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+            runtime=DemandRunRuntimeOptions(batch_size=8000, components=[hook]),
         ),
     )
     assert result is not None
@@ -136,9 +136,9 @@ def test_pre_use_batch_size_signal_override_takes_effect_when_unset(tmp_path: Pa
 
     _ = run_demand(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            components=[hook_a, hook_b],
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+            runtime=DemandRunRuntimeOptions(components=[hook_a, hook_b]),
         ),
     )
     assert int(captured["request"].batch_size) == 10000
@@ -167,9 +167,9 @@ def test_pre_use_batch_size_signal_is_fail_fast_by_default(tmp_path: Path, monke
     with pytest.raises(RuntimeError, match="boom"):
         _ = run_demand(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                components=[hook],
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                runtime=DemandRunRuntimeOptions(components=[hook]),
             ),
         )
 
@@ -189,10 +189,9 @@ def test_explicit_none_skips_signal_and_propagates_to_execution_request(tmp_path
 
     _ = run_demand(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            batch_size=None,
-            components=[hook],
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+            runtime=DemandRunRuntimeOptions(batch_size=None, components=[hook]),
         ),
     )
     assert hook.calls == 0
@@ -224,17 +223,16 @@ def test_run_workflow_per_run_patch_batch_size_skips_signal_and_other_runs_can_o
         captured[node_id] = request.batch_size
         return run_ir_real(demand_ir, request, *_args, **kwargs)
 
-    result = run_workflow(
-        str(workflow_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            components=[hook],
-            init_vars={"base_key": "base"},
-            batch_size=UNSET,
-        ),
-        run_options_patches_by_run_id={"a": WorkflowRunOptionsPatch(batch_size=5000)},
-        run_ir_fn=_run_ir_capture,
+    demand_options = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+        template=DemandRunTemplateOptions(init_vars={"base_key": "base"}),
+        runtime=DemandRunRuntimeOptions(batch_size=UNSET, components=[hook]),
     )
+    options = WorkflowRunOptions(
+        demand=demand_options,
+        patches_by_run_id={"a": WorkflowNodePatch(batch_size=5000)},
+    )
+    result = run_workflow_injected(str(workflow_path), options=options, run_ir_fn=_run_ir_capture)
     assert result is not None
 
     assert captured["a"] == 5000

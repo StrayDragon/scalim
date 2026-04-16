@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions
+from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -43,11 +44,13 @@ main_source:
         try:
             _ = compile_yaml(
                 str(yaml_path),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    batch_size=2,
-                    loader_retry=LoaderRetryPoliciesSpec(
-                        default=LoaderRetryPolicySpec(enabled=True, should_retry=bad_should_retry, max_attempts=2)
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    runtime=DemandRunRuntimeOptions(
+                        batch_size=2,
+                        loader_retry=LoaderRetryPoliciesSpec(
+                            default=LoaderRetryPolicySpec(enabled=True, should_retry=bad_should_retry, max_attempts=2)
+                        ),
                     ),
                 ),
             )

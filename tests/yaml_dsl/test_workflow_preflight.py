@@ -8,6 +8,10 @@ from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
     DemandDiagnosticsPolicy,
+    DemandRunOutputOptions,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
     OutputDefaultsToOverride,
     OutputOverride,
     OutputToOverride,
@@ -16,7 +20,6 @@ from scalim.dsl.yaml_dsl import (
     ResourcesOverride,
     RunOverrides,
 )
-from scalim.dsl.yaml_dsl.runtime.contracts import RunOptions
 from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookConfig,
@@ -51,21 +54,21 @@ def test_workflow_preflight_run_workflow_preflight_orders_and_dispatches() -> No
             demand_path="./d2.yaml",
             decl_order=2,
             demand_config=DemandConfig(),
-            options=RunOptions(allowed_modules=cast_frozenset()),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
         ),
         preflight_mod.WorkflowPreflightRun(
             run_id="r0",
             demand_path="./d0.yaml",
             decl_order=0,
             demand_config=DemandConfig(),
-            options=RunOptions(allowed_modules=cast_frozenset()),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
         ),
         preflight_mod.WorkflowPreflightRun(
             run_id="r1",
             demand_path="./d1.yaml",
             decl_order=1,
             demand_config=DemandConfig(),
-            options=RunOptions(allowed_modules=cast_frozenset()),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
         ),
     )
 
@@ -101,14 +104,14 @@ def test_workflow_preflight_run_workflow_preflight_fail_fast_stops_on_first_erro
             demand_path="./d1.yaml",
             decl_order=1,
             demand_config=DemandConfig(),
-            options=RunOptions(allowed_modules=cast_frozenset()),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
         ),
         preflight_mod.WorkflowPreflightRun(
             run_id="r0",
             demand_path="./d0.yaml",
             decl_order=0,
             demand_config=DemandConfig(),
-            options=RunOptions(allowed_modules=cast_frozenset()),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
         ),
     )
 
@@ -515,15 +518,19 @@ outputs:
 """
     )
 
-    opts_with_outputs_override = RunOptions(
-        allowed_modules=cast_frozenset(),
-        overrides=RunOverrides(outputs=(OutputOverride(name="detail", fields=("id",), to=OutputToOverride(file="detail_csv")),)),
+    opts_with_outputs_override = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=cast_frozenset()),
+        outputs=DemandRunOutputOptions(
+            overrides=RunOverrides(outputs=(OutputOverride(name="detail", fields=("id",), to=OutputToOverride(file="detail_csv")),))
+        ),
     )
     assert effective_outputs_mod.options_require_unique_effective_field_display_names(config, options=opts_with_outputs_override) is True
 
-    opts_with_defaults = RunOptions(
-        allowed_modules=cast_frozenset(),
-        overrides=RunOverrides(outputs_defaults=OutputsDefaultsOverride(to=OutputDefaultsToOverride(book="report"))),
+    opts_with_defaults = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=cast_frozenset()),
+        outputs=DemandRunOutputOptions(
+            overrides=RunOverrides(outputs_defaults=OutputsDefaultsOverride(to=OutputDefaultsToOverride(book="report")))
+        ),
     )
     assert effective_outputs_mod.options_require_unique_effective_field_display_names(config, options=opts_with_defaults) is True
 
@@ -542,16 +549,18 @@ sources: {}
 """
     )
 
-    options = RunOptions(
-        allowed_modules=cast_frozenset(),
-        overrides=RunOverrides(
-            outputs=(
-                OutputOverride(
-                    name="detail",
-                    fields=("id",),
-                    to=OutputToOverride(file="detail_csv"),
-                    write=OutputWriteOverride(header_fields_output_by="field_id"),
-                ),
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=cast_frozenset()),
+        outputs=DemandRunOutputOptions(
+            overrides=RunOverrides(
+                outputs=(
+                    OutputOverride(
+                        name="detail",
+                        fields=("id",),
+                        to=OutputToOverride(file="detail_csv"),
+                        write=OutputWriteOverride(header_fields_output_by="field_id"),
+                    ),
+                )
             )
         ),
     )
@@ -577,7 +586,7 @@ outputs:
 """
     )
 
-    options = RunOptions(allowed_modules=cast_frozenset())
+    options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset()))
     assert effective_outputs_mod.options_require_unique_effective_field_display_names(config, options=options) is False
 
 
@@ -620,7 +629,10 @@ def test_workflow_preflight_validate_unique_field_names_check_run_branches(tmp_p
         demand_path=str(tmp_path / "missing.yaml"),
         decl_order=0,
         demand_config=DemandConfig(),
-        options=RunOptions(allowed_modules=cast_frozenset(), demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=cast_frozenset()),
+            runtime=DemandRunRuntimeOptions(demand_diagnostics=DemandDiagnosticsPolicy(validate_unique_field_names=False)),
+        ),
     )
     check.run(ctx, run_disabled)
 
@@ -646,16 +658,18 @@ outputs:
         demand_path=str(tmp_path / "missing_ok.yaml"),
         decl_order=1,
         demand_config=ok_config,
-        options=RunOptions(
-            allowed_modules=cast_frozenset(),
-            overrides=RunOverrides(
-                outputs=(
-                    OutputOverride(
-                        name="detail",
-                        fields=("a",),
-                        to=OutputToOverride(file="detail_csv"),
-                        write=OutputWriteOverride(header_fields_output_by="field_id"),
-                    ),
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=cast_frozenset()),
+            outputs=DemandRunOutputOptions(
+                overrides=RunOverrides(
+                    outputs=(
+                        OutputOverride(
+                            name="detail",
+                            fields=("a",),
+                            to=OutputToOverride(file="detail_csv"),
+                            write=OutputWriteOverride(header_fields_output_by="field_id"),
+                        ),
+                    )
                 )
             ),
         ),
@@ -668,7 +682,7 @@ outputs:
         demand_path=str(tmp_path / "missing_ok.yaml"),
         decl_order=2,
         demand_config=ok_config,
-        options=RunOptions(allowed_modules=cast_frozenset()),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
     )
     check.run(ctx, run_no_duplicates)
 
@@ -695,7 +709,7 @@ outputs:
         demand_path=str(tmp_path / "missing_dup.yaml"),
         decl_order=3,
         demand_config=dup_config,
-        options=RunOptions(allowed_modules=cast_frozenset()),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=cast_frozenset())),
     )
     with pytest.raises(preflight_mod.ScalimWorkflowConfigError, match=r"Workflow preflight failed: run_id='r3'"):
         check.run(ctx, run_has_duplicates)
@@ -708,5 +722,5 @@ def test_yaml_dsl_parser_only_loader_rejects_validate_unique_field_names_kwarg()
 
 
 def cast_frozenset() -> FrozenSet[str]:
-    # `RunOptions.allowed_modules` is required but irrelevant for these pure preflight helpers.
-    return frozenset()
+    # `DemandRunOptions.security.allowed_modules` is required but irrelevant for these pure preflight helpers.
+    return frozenset(["tests.fixtures"])

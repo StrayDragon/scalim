@@ -1,6 +1,14 @@
 import pytest
 
-from scalim.dsl.yaml_dsl import OutputExtraSheetOverride, OutputExtrasOverride, RunOptions, RunOverrides, compile
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunSecurityOptions,
+    OutputExtraSheetOverride,
+    OutputExtrasOverride,
+    RunOverrides,
+    compile,
+)
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
 from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import ScalimYamlValidationError
@@ -96,12 +104,14 @@ outputs:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
-            overrides=RunOverrides(
-                output_extras=OutputExtrasOverride(
-                    meta=True,
-                    audit=OutputExtraSheetOverride(sheet="__audit__"),
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])),
+            outputs=DemandRunOutputOptions(
+                overrides=RunOverrides(
+                    output_extras=OutputExtrasOverride(
+                        meta=True,
+                        audit=OutputExtraSheetOverride(sheet="__audit__"),
+                    )
                 )
             ),
         ),
@@ -149,7 +159,10 @@ def test_runtime_compiler_parse_output_extra_sheet_override_error_branches() -> 
 def test_runtime_compiler_apply_output_extras_overrides_rejects_invalid_extras_type() -> None:
     overrides = RunOverrides()
     object.__setattr__(overrides, "output_extras", object())
-    options = RunOptions(allowed_modules=frozenset(), overrides=overrides)
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])),
+        outputs=DemandRunOutputOptions(overrides=overrides),
+    )
 
     with pytest.raises(TypeError, match=r"overrides\.output_extras must be an OutputExtrasOverride"):
         _ = compiler_mod._apply_output_extras_overrides(DemandConfig(), options=options)  # noqa: SLF001

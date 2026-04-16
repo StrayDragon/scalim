@@ -2,33 +2,34 @@
 
 **状态: ✅ 已实现**
 ## Purpose
-定义 by_yaml runtime 作为 DSL adapter/编译器的边界与对外入口,并明确 YAML `output`/`observability` 在编译期映射为 DSL-agnostic 运行请求对象的规则.
+定义 yaml_dsl runtime 作为 DSL adapter/编译器的边界与对外入口,并明确 YAML `outputs`/可观测性配置在编译期映射为 DSL-agnostic 运行请求对象的规则.
 ## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/entrypoints.py` (`run`, `compile`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/compiler.py` (`load_config`, `compile_ir`, `build_request`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/contracts.py` (`RunOptions`, `RunOverrides`, `RunResult`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/conversion.py` (`ConfigToIRConverter`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/introspection.py` (`resolve_required_field_ids`, `build_viz_observer`, `load_output_config`)
-- `src/IMPL_ROOT/dsl/by_yaml/runtime/stages.py` (stage boundaries)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/entrypoints.py` (`run`, `compile`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/compiler.py` (`load_config`, `compile_ir`, `build_request`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/contracts.py` (`DemandRunOptions`, `RunOverrides`, `DemandRunResult`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (`ConfigToIRConverter`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/introspection.py` (`resolve_required_field_ids`, `build_viz_observer`, `load_output_config`)
+- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/stages.py` (stage boundaries)
+- `src/IMPL_ROOT/dsl/yaml_dsl/workflow_entrypoints.py` (`run_workflow`)
 - `src/IMPL_ROOT/execution/run_ir.py` (unified IR execution entrypoint)
 ## Requirements
-### Requirement: by_yaml runtime 是纯 adapter/编译器
-系统 MUST 将 `IMPL_ROOT.dsl.by_yaml.runtime`(以及其对外入口)的职责收敛为 DSL adapter:
+### Requirement: yaml_dsl runtime 是纯 adapter/编译器
+系统 MUST 将 `IMPL_ROOT.dsl.yaml_dsl.runtime`(以及其对外入口)的职责收敛为 DSL adapter:
 - YAML 解析/校验
 - allowlist 安全边界(动态引用解析)
 - `DemandConfig -> DemandIr` 编译
 - 将 `output`/`observability` 编译为 DSL-agnostic 的运行请求对象
 - 将 execution core result 包装为 YAML wrapper result
 
-by_yaml runtime MUST NOT 直接承担执行编排主流程(如 plan 构建、engine 实例化/调用、sink finalize、observer manager 生命周期),这些 MUST 由 execution 的统一 IR 编排入口负责.
+yaml_dsl runtime MUST NOT 直接承担执行编排主流程(如 plan 构建、engine 实例化/调用、sink finalize、observer manager 生命周期),这些 MUST 由 execution 的统一 IR 编排入口负责.
 
-by_yaml runtime 同时 MUST NOT 承载 workflow 的执行编排；workflow runtime MUST 位于 framework 层(例如 `scalim.workflow.*`),YAML workflow 入口仅做前端编译与依赖注入.
+yaml_dsl runtime 同时 MUST NOT 承载 workflow 的执行编排；workflow runtime MUST 位于 framework 层(例如 `scalim.workflow.*`),YAML workflow 入口仅做前端编译与依赖注入.
 
 #### Scenario: runtime 仅作为适配层
 - **WHEN** 审阅 YAML DSL 的运行路径
 - **THEN** 运行编排应委托 execution 层统一入口,而非在 by_yaml/runtime 内部自行拼装完整执行链
 
-#### Scenario: workflow orchestration is not implemented in by_yaml runtime
+#### Scenario: workflow orchestration is not implemented in yaml_dsl runtime
 - **WHEN** 调用方通过 workflow 的稳定入口运行 workflow YAML
 - **THEN** workflow 的调度执行与资源/ctx/事件桥接 MUST 由 framework 层实现,而不是 by_yaml/runtime
 
@@ -36,29 +37,32 @@ by_yaml runtime 同时 MUST NOT 承载 workflow 的执行编排；workflow runti
 
 在公共表面收敛过程中，系统 MUST 保持当前已确认的受控扩展点继续可经由官方 facade 使用，而不是通过删减能力来完成“收敛”。
 
-本轮至少包括（均通过 `RunOptions` 承载并注入）：
+本轮至少包括（分别通过 `DemandRunOptions` / `WorkflowRunOptions` 承载并注入）：
 
-- `sink`
-- `components`
-- `allowed_modules` / `allowed_functions`
-- `allowed_yaml_roots`
+- `CapturePolicy`（`CaptureNone`/`CaptureRows`）：显式控制是否捕获内存行数据（不再暴露 `sink`）
+- `DemandRunRuntimeOptions.components`：demand 执行层的 observers/hooks
+- `WorkflowRunOptions.workflow_components`：workflow 编排层的 observers/hooks
+- `DemandRunSecurityOptions.allowed_modules` / `allowed_functions`
+- `DemandRunSecurityOptions.allowed_yaml_roots`
+- `RunOverrides`：输出覆盖、viz 配置等（通过 `DemandRunOutputOptions.overrides` 提供）
 
 系统 MUST 保持多输出组合能力为“受控 authoring surface”：由 YAML `outputs/resources` 与 `RunOverrides` 的受控覆盖项表达；官方 facade 不新增 `output_composition` 之类的通用注入面，避免公共 API 膨胀。
 
 #### Scenario: public facade remains behavior-complete for supported extension seams
-- **WHEN** 调用方通过 `IMPL_ROOT.dsl.by_yaml.run(..., options=RunOptions(...))` 或 `compile(..., options=RunOptions(...))` 使用上述受控扩展点
+- **WHEN** 调用方通过 `IMPL_ROOT.dsl.yaml_dsl.run(..., options=DemandRunOptions(...))` 或 `compile(..., options=DemandRunOptions(...))` 使用上述受控扩展点
+- **OR** 调用方通过 `IMPL_ROOT.dsl.yaml_dsl.run_workflow(..., options=WorkflowRunOptions(...))` 使用 workflow 编排入口
 - **THEN** 系统 MUST 继续支持这些能力
 - **AND** 公共表面收敛 MUST 体现为“入口与契约明确”,而不是静默删除这些受支持能力
 
-### Requirement: by_yaml runtime compiles `runtime_vars` into loader params templates
-系统 SHALL 扩展 by_yaml runtime 的对外入口 `run/compile` 与 `RunOptions`,允许调用方提供可选的 `init_vars` 用于 loader 参数模板注入.
+### Requirement: yaml_dsl runtime compiles `runtime_vars` into loader params templates
+系统 SHALL 允许调用方通过 `DemandRunTemplateOptions.init_vars`(位于 `DemandRunOptions.template`)提供可选的 `init_vars`,用于 loader 参数模板注入.
 adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$init_var: <name>}` 指令节点解析,以确保:
 - `DemandIr` 内持有的静态 params 可包含初始化对象(例如 `datetime`)
 - execution 层无需理解 `$init_var` 指令语法
 - preload 与 ref loader 共用同一份编译后的 params template representation,而不是各自维护一套 params 透传逻辑
 
 #### Scenario: 编译期完成占位符解析
-- **WHEN** 调用方执行 `compile(..., init_vars=...)`
+- **WHEN** 调用方执行 `compile(..., options=DemandRunOptions(template=DemandRunTemplateOptions(init_vars=...)))`
 - **THEN** adapter 返回的 `Compilation.demand_ir` MUST 已反映占位符解析后的 params 值
 - **AND** execution 层不需要再做二次解析
 
@@ -87,7 +91,7 @@ adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$init_var: <name>}
 ### Requirement: YAML 缺省 outputs 时使用默认输出策略且 overrides 仍生效
 系统 MUST 允许 YAML DSL 配置缺省顶层 `outputs` 节点。
 
-当 `outputs` 缺省时,by_yaml runtime adapter MUST 以 execution 层的默认输出策略作为基线(例如默认不写文件),并在调用方提供 `overrides.outputs` 时正确应用覆盖。
+当 `outputs` 缺省时,yaml_dsl runtime adapter MUST 以 execution 层的默认输出策略作为基线(例如默认不写文件),并在调用方提供 `overrides.outputs` 时正确应用覆盖。
 
 #### Scenario: 缺省 outputs 但提供 overrides.outputs
 - **WHEN** YAML 配置未声明顶层 `outputs`
@@ -98,43 +102,59 @@ adapter MUST 在 `DemandConfig -> DemandIr` 转换前完成 `{$init_var: <name>}
 - **WHEN** YAML 配置未声明顶层 `outputs`
 - **AND** 调用方未提供 `overrides.outputs`
 - **THEN** adapter 编译产出的请求 MUST 仍为合法默认值
-- **AND** 不应产生文件写出(除非调用方通过显式 sink/容器配置启用)
+- **AND** 不应产生文件写出(除非 YAML/overrides 显式启用 outputs/resources)
 
-### Requirement: run 移除 return_data 并支持显式 sink
+### Requirement: run 移除 return_data/sink 并改为显式 capture policy
 系统 MUST 破坏性移除对外运行入口中的 `return_data: Optional[bool]`(及其隐式推断/tee 逻辑),
-并支持通过显式 `sink=...` 表达是否在内存中保留数据.
+并破坏性移除 public `sink=...` 输入路径。
+
+系统 MUST 改为通过 `DemandRunOutputOptions.capture` 显式表达是否在内存中保留行数据:
+
+- `CaptureNone`（默认）：不捕获
+- `CaptureRows`：捕获行数据,结果对外以 `InMemoryRows` 承诺
+
+当同时启用“写文件输出”与 capture 时,系统 MUST 将其视为显式、可预测的组合(tee),并且 MUST NOT 再通过“多传一个参数”隐式推导 tee.
 
 #### Scenario: run 不再接受 return_data
 - **WHEN** 用户调用 `run(..., return_data=...)`
-- **THEN** 系统应报错(参数不存在)并提示迁移为显式 sink(例如 `InMemoryRowSink`)
+- **THEN** 系统应报错(参数不存在)并提示迁移为显式 capture（例如 `DemandRunOutputOptions(capture=CaptureRows())`）
 
-#### Scenario: run 支持显式 sink
-- **WHEN** 用户调用 `run(..., sink=InMemoryRowSink())`
-- **THEN** 系统应将结果写入该 sink 且用户可通过 sink 获取数据
+#### Scenario: run 不再接受 sink
+- **WHEN** 用户调用 `run(..., sink=...)`
+- **THEN** 系统应报错(参数不存在)并提示迁移为 capture（例如 `DemandRunOutputOptions(capture=CaptureRows())`）
+
+#### Scenario: run 支持显式 capture rows
+- **WHEN** 用户调用 `run(..., options=DemandRunOptions(outputs=DemandRunOutputOptions(capture=CaptureRows()), ...))`
+- **THEN** 系统返回的 `DemandRunResult.captured_rows` MUST 为非空(可迭代)的 `InMemoryRows`
+
+#### Scenario: to_dataframe fail-fast when capture is disabled
+- **GIVEN** 调用方未显式启用 capture(保持为 `CaptureNone`)
+- **WHEN** 调用方调用 `DemandRunResult.to_dataframe()`
+- **THEN** 系统 MUST fail-fast 并给出如何启用 capture 的指引
 
 ### Requirement: DSL 返回 wrapper(core 为 `ExecutionResult`)
-系统 MUST 使 execution 返回 DSL-agnostic 的 `ExecutionResult`,并使 YAML 运行入口返回 YAML wrapper result(例如 `RunResult`)以承载 YAML-only 元信息并包含/引用 core result.
+系统 MUST 使 execution 返回 DSL-agnostic 的 `ExecutionResult`,并使 YAML 运行入口返回 YAML wrapper result(例如 `DemandRunResult`)以承载 YAML-only 元信息并包含/引用 core result.
 
 #### Scenario: execution 不依赖 YAML result 类型
 - **WHEN** 另一个 DSL 已产出 `DemandIr` 并调用 execution 统一入口
 - **THEN** 它应获得同一个 `ExecutionResult` 结构,不需要依赖 YAML wrapper/result 类型
 
 ### Requirement: runtime 子包化且入口明确
-系统 MUST 将 by_yaml runtime 从 legacy 单文件模块 `src/IMPL_ROOT/dsl/by_yaml/runtime.py`(已移除)拆为 `src/IMPL_ROOT/dsl/by_yaml/runtime/` 子包,并提供明确且可维护的入口模块(例如 `entrypoints`/`contracts`/`introspection`).
+系统 MUST 将 yaml_dsl runtime 从 legacy 单文件模块 `src/IMPL_ROOT/dsl/yaml_dsl/runtime.py`(已移除)拆为 `src/IMPL_ROOT/dsl/yaml_dsl/runtime/` 子包,并提供明确且可维护的入口模块(例如 `entrypoints`/`contracts`/`introspection`).
 
-系统 SHOULD 避免在 `IMPL_ROOT.dsl.by_yaml.runtime`(包根)重导出大量符号:API 尚在演进,过多 re-export 会导致 import-time 成本与循环依赖风险,也容易误导调用方把包根当作“稳定 API”.
+系统 SHOULD 避免在 `IMPL_ROOT.dsl.yaml_dsl.runtime`(包根)重导出大量符号:API 尚在演进,过多 re-export 会导致 import-time 成本与循环依赖风险,也容易误导调用方把包根当作“稳定 API”.
 
 调用方 SHOULD 从显式子模块导入所需符号:
-- 运行/编译入口:`from IMPL_ROOT.dsl.by_yaml.runtime.entrypoints import run, compile`
-- introspection 入口:`from IMPL_ROOT.dsl.by_yaml.runtime.introspection import resolve_required_field_ids, build_viz_observer, load_output_config`
-- overrides/结果契约类型:`from IMPL_ROOT.dsl.by_yaml.runtime.contracts import RunOverrides, RunResult`
+- 运行/编译入口:`from IMPL_ROOT.dsl.yaml_dsl.runtime.entrypoints import run, compile`
+- introspection 入口:`from IMPL_ROOT.dsl.yaml_dsl.runtime.introspection import resolve_required_field_ids, build_viz_observer, load_output_config`
+- overrides/结果契约类型:`from IMPL_ROOT.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunResult, RunOverrides`
 
-公开编译链路 API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.compiler`)MUST 为:
+公开编译链路 API(位于 `IMPL_ROOT.dsl.yaml_dsl.runtime.compiler`)MUST 为:
 - `load_config`
 - `compile_ir`
 - `build_request`
 
-stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
+stage API(位于 `IMPL_ROOT.dsl.yaml_dsl.runtime.stages`)MUST 为:
 - `stage_validate_allowlist`
 - `stage_create_context`
 - `stage_load_yaml_config`
@@ -146,14 +166,14 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 旧命名(例如 `run_yaml`、`parse_yaml_dsl`、`run_stage_*`、`types`、`inspect`)MUST NOT 再作为公开 API 提供.
 
 #### Scenario: 显式导入入口可用
-- **WHEN** 使用 `from IMPL_ROOT.dsl.by_yaml.runtime.entrypoints import run, compile`
-- **AND** 使用 `from IMPL_ROOT.dsl.by_yaml.runtime.introspection import load_output_config`
-- **AND** 使用 `from IMPL_ROOT.dsl.by_yaml.runtime.conversion import ConfigToIRConverter`
+- **WHEN** 使用 `from IMPL_ROOT.dsl.yaml_dsl.runtime.entrypoints import run, compile`
+- **AND** 使用 `from IMPL_ROOT.dsl.yaml_dsl.runtime.introspection import load_output_config`
+- **AND** 使用 `from IMPL_ROOT.dsl.yaml_dsl.runtime.conversion import ConfigToIRConverter`
 - **THEN** 可正常导入且行为一致
 
 #### Scenario: 仅新命名可导入
 - **WHEN** 调用方尝试从旧入口导入 `run_yaml`/`YamlDSLOverlay`/`OutputOverlay`/`load_yaml_export_config`(例如 `from IMPL_ROOT.dsl.by_yaml.runtime.api import run_yaml`)
-- **OR** 调用方尝试从旧模块入口导入 `IMPL_ROOT.dsl.by_yaml.runtime.types`/`IMPL_ROOT.dsl.by_yaml.runtime.inspect`
+- **OR** 调用方尝试从旧模块入口导入 `IMPL_ROOT.dsl.yaml_dsl.runtime.types`/`IMPL_ROOT.dsl.yaml_dsl.runtime.inspect`
 - **THEN** 导入 MUST 失败
 
 #### Scenario: 无兼容别名
@@ -161,7 +181,7 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 - **THEN** 不应存在将旧命名转发到新命名的兼容别名或 shim
 
 ### Requirement: schema_dsl 模型必须域内拆分且对外入口稳定
-系统 MUST 将 by_yaml `schema_dsl` 的模型按领域拆分(例如 source/field/output/observability 等),并保持模型入口的稳定可导入性.
+系统 MUST 将 yaml_dsl `schema_dsl` 的模型按领域拆分(例如 source/field/output/observability 等),并保持模型入口的稳定可导入性.
 系统 MUST NOT 依赖单个超大模型文件作为长期承载点.
 
 #### Scenario: 模型拆分后入口保持兼容
@@ -174,8 +194,8 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 - **THEN** 字段定义 MUST 落在对应领域子模块
 - **AND** MUST NOT 继续将全部新增字段堆叠到单一聚合文件
 
-### Requirement: by_yaml runtime 编译链路必须按阶段边界组织
-系统 MUST 将 by_yaml runtime 的主链路明确为“解析/校验/编译/运行请求映射”四段边界,并以显式契约对象连接各阶段.
+### Requirement: yaml_dsl runtime 编译链路必须按阶段边界组织
+系统 MUST 将 yaml_dsl runtime 的主链路明确为“解析/校验/编译/运行请求映射”四段边界,并以显式契约对象连接各阶段.
 系统 MUST 保持该边界可测试,不允许在单一阶段函数中混合多阶段职责.
 
 #### Scenario: 编译链路职责边界可被独立验证
@@ -187,7 +207,7 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 系统 MUST 将 YAML DSL 的解析/校验/安全/索引逻辑拆分到 `config_parsing` 子模块中,并保持运行行为一致.
 
 #### Scenario: 子模块导入可用
-- **WHEN** 使用 `from IMPL_ROOT.dsl.by_yaml.config_parsing.loader import YamlDemandLoader`
+- **WHEN** 使用 `from IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader`
 - **THEN** 可正常导入且行为一致
 
 #### Scenario: 运行行为不变
@@ -195,7 +215,7 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 - **THEN** 输出与错误语义保持一致
 
 ### Requirement: config_parsing loader/validator 的稳定导出面
-系统 MUST 保持 `IMPL_ROOT.dsl.by_yaml.config_parsing.loader` 与 `IMPL_ROOT.dsl.by_yaml.config_parsing.validator` 的稳定导出面:调用方可从明确路径导入下列符号,且行为稳定(模块内部可按领域拆分):
+系统 MUST 保持 `IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.loader` 与 `IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.validator` 的稳定导出面:调用方可从明确路径导入下列符号,且行为稳定(模块内部可按领域拆分):
 
 - `YamlDemandLoader`
 - `ParsedFieldsResult`
@@ -204,22 +224,22 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 - `ValidationReport`
 
 #### Scenario: 既有导入路径保持可用
-- **WHEN** 调用方执行 `from IMPL_ROOT.dsl.by_yaml.config_parsing.loader import YamlDemandLoader`
+- **WHEN** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader`
 - **THEN** 导入 MUST 成功且运行行为与拆分前一致
 
 #### Scenario: validator 关键类型可导入
-- **WHEN** 调用方执行 `from IMPL_ROOT.dsl.by_yaml.config_parsing.validator import ConfigValidator, ValidationReport`
+- **WHEN** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator, ValidationReport`
 - **THEN** 导入 MUST 成功且校验行为与拆分前一致
 
 ### Requirement: Allowlist 安全语义保持
 系统 MUST 继续要求显式 allowlist 才能执行 YAML 中的 Python 引用,并在 allowlist 缺失或为空时抛出 `AllowlistRequiredError`(或等价错误).
 
 对外 API 合约 MUST 与该安全语义对齐:
-- `RunOptions.allowed_modules` MUST 为必填字段(类型上去 `Optional`).
-- `run`/inspect 入口 MUST 要求显式传入 allowlist 参数,且不得默认为 `None`.
+- `DemandRunSecurityOptions.allowed_modules` MUST 为必填字段(类型上去 `Optional`).
+- `DemandRunOptions.security` MUST 为必填字段,且 `run/compile` 入口不得隐式设置 allowlist.
 
 #### Scenario: 未提供 allowlist 或 allowlist 为空
-- **WHEN** 调用 `run` 且 allowlist 缺失或为空(例如 `allowed_modules=None` 或 `allowed_modules=frozenset()` 且未提供有效的 `allowed_functions`)
+- **WHEN** 调用方构造 `DemandRunSecurityOptions(allowed_modules=frozenset())` 且未提供有效的 `allowed_functions`
 - **THEN** 系统 MUST 抛出 `AllowlistRequiredError`
 
 ### Requirement: 动态解析边界收敛
@@ -234,16 +254,16 @@ stage API(位于 `IMPL_ROOT.dsl.by_yaml.runtime.stages`)MUST 为:
 
 - YAML DSL MUST NOT 将 `observability:` 作为稳定 authoring surface(legacy key 可 warning + ignore 作为迁移过渡)
 - 运行入口 SHOULD 通过 typed runtime entrypoints 承载装配:
-  - `components=[Observer()/Hook()]`
-  - `RunOverrides(viz_config=VizObserverConfig(...))`
+  - `DemandRunRuntimeOptions(components=[Observer()/Hook()])`
+  - `DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(...)))`
 - 不得引入与上述装配面并列的零散 bool 开关(例如单独的 `use_memory_hook`)
 
 #### Scenario: 通过 runtime entrypoints 启用可观测性
 - **WHEN** 用户希望启用内存/CPU/性能/可视化等观测能力
-- **THEN** 用户应通过 `components`/`RunOverrides.viz_config` 完成装配,无需额外 bool 开关
+- **THEN** 用户应通过 `DemandRunRuntimeOptions.components` / `RunOverrides.viz_config` 完成装配,无需额外 bool 开关
 
 ### Requirement: 运行入口不暴露 pretty_logging bool
-系统 MUST 从对外运行入口(`run`/`RunOptions`)移除 `pretty_logging: bool` 这类用于选择实现的参数,并改为:
+系统 MUST 从对外运行期契约(例如 `DemandRunRuntimeOptions`)移除 `pretty_logging: bool` 这类用于选择实现的参数,并改为:
 - 通过统一 `components` 列表装配内置 logging observer(如 `PrettyLoggingObserver`/`LoggingObserver`)
 - 通过统一 `components` 列表装配自定义 `Observer`/`IExecutionHook`
 
@@ -261,13 +281,13 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 
 当需要决定 effective batch_size 时,系统 MUST 使用显式空值判断,并在 `batch_size` 未显式提供时允许通过 policy signal（hook override）推导:
 
-- 若调用方显式提供 `RunOptions(batch_size=<int|None>)`(即不为 `UNSET`),系统 MUST 使用该显式值。
+- 若调用方显式提供 `DemandRunRuntimeOptions(batch_size=<int|None>)`(即不为 `UNSET`),系统 MUST 使用该显式值。
 - 否则,系统 MUST 在进入 engine 前发射 `pre_use_batch_size` policy signal,允许 hook 改写候选值并使用其最终结果。
 - 若无任何 hook 改写,系统 MUST 使用框架默认/配置候选 `batch_size`。
 - `None` 必须被视为合法值并保留给 execution 层解释为 no-chunking。
 
 #### Scenario: explicit None disables chunking and skips policy signal
-- **WHEN** 调用方显式传入 `RunOptions(batch_size=None)`
+- **WHEN** 调用方显式传入 `DemandRunRuntimeOptions(batch_size=None)`
 - **THEN** compiler/entrypoint 产出的 `ExecutionRequest.batch_size` MUST 为 `None`
 - **AND** 系统 MUST 跳过 `pre_use_batch_size` policy signal
 
@@ -277,7 +297,7 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 - **THEN** 传给 engine 的 `ExecutionRequest.batch_size` MUST 为 `20000`
 
 ### Requirement: YAML retry 编译为 DSL-agnostic 的 execution request
-系统 MUST 在 by_yaml runtime 编译期将 YAML 的 retry 配置编译为 DSL-agnostic 的 execution request(例如 `ExecutionRequest`)中的 loader retry policy 字段,并在执行期由 execution 层统一消费.
+系统 MUST 在 yaml_dsl runtime 编译期将 YAML 的 retry 配置编译为 DSL-agnostic 的 execution request(例如 `ExecutionRequest`)中的 loader retry policy 字段,并在执行期由 execution 层统一消费.
 当未提供任何 retry 配置时,该 request 字段 MUST 保持缺省/disabled,从而不改变现有执行行为.
 
 #### Scenario: YAML retry 缺省时 request 不启用 retry
@@ -297,7 +317,7 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 
 #### Scenario: fields validator 拆分后稳定入口保持
 - **WHEN** 维护者拆分 `config_parsing/validators/fields.py`
-- **THEN** 调用方通过 `IMPL_ROOT.dsl.by_yaml.config_parsing.validator` 的既有关键类型导入 MUST 继续成功
+- **THEN** 调用方通过 `IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.validator` 的既有关键类型导入 MUST 继续成功
 - **AND** YAML 校验输出与错误语义 MUST 与重构前保持等价
 
 ### Requirement: runtime conversion 热点必须按阶段职责拆分并保持编译链路边界
@@ -308,49 +328,50 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 - **THEN** Config→IR 转换、运行请求映射与辅助 registry 逻辑 MUST 具备可独立验证的边界
 - **AND** 现有 YAML runtime 入口行为 MUST 与重构前保持一致
 
-### Requirement: by_yaml runtime accepts template_vars for YAML precompile
-系统 SHALL 扩展 by_yaml runtime 的对外入口 `run/compile` 与 `RunOptions`,允许调用方提供可选的 `template_vars: Mapping[str, object]`,用于在 YAML parse 前执行 LiteJinja2 文本预编译.
+### Requirement: yaml_dsl runtime accepts template_vars for YAML precompile
+系统 SHALL 允许调用方通过 `DemandRunTemplateOptions.template_vars`(位于 `DemandRunOptions.template`)提供可选的 `template_vars: Mapping[str, object]`,用于在 YAML parse 前执行 LiteJinja2 文本预编译.
 
 当调用方未提供 `template_vars` 时,adapter MUST 不启用模板渲染步骤,并保持既有 YAML parse/校验/编译语义.
 
 #### Scenario: compile receives template_vars and precompiles YAML
 - **GIVEN** YAML 文本包含 LiteJinja2 模板语法 `{{ ... }}`
-- **WHEN** 调用方执行 `compile(..., template_vars={...})`
+- **WHEN** 调用方执行 `compile(..., options=DemandRunOptions(template=DemandRunTemplateOptions(template_vars={...})))`
 - **THEN** adapter MUST 在 YAML parse 前完成预编译
 - **AND** 后续编译链路(validator/`DemandConfig -> DemandIr`) MUST 基于预编译后的配置继续执行
 
-### Requirement: by_yaml entrypoints MUST accept a single `RunOptions` object
-系统 MUST 将 by_yaml facade 的运行入口收敛为 options-object 形态：
+### Requirement: demand entrypoints MUST accept a single `DemandRunOptions` object
+系统 MUST 将 demand 的运行入口收敛为 options-object 形态：
 
-- `run(yaml_path, *, options: RunOptions) -> RunResult`
-- `compile(yaml_path, *, options: RunOptions) -> Compilation`
+- `run(yaml_path, *, options: DemandRunOptions) -> DemandRunResult`
+- `compile(yaml_path, *, options: DemandRunOptions) -> Compilation`
 
-该 `RunOptions` MUST 作为运行期 knobs 的唯一承载对象（allowlist、模板、imports roots、并行、重试、护栏、overrides 等），以避免继续扩大公开函数签名。
+该 `DemandRunOptions` MUST 作为运行期 knobs 的唯一承载对象（安全边界、模板、并行、重试、护栏、overrides、输出/capture 等），以避免继续扩大公开函数签名。
 
 #### Scenario: options-object drives compile and run
-- **GIVEN** 调用方构造 `RunOptions(allowed_modules=..., batch_size=..., template_vars=...)`
+- **GIVEN** 调用方构造 `DemandRunOptions(security=DemandRunSecurityOptions(...), runtime=DemandRunRuntimeOptions(batch_size=...), template=DemandRunTemplateOptions(template_vars=...))`
 - **WHEN** 调用方执行 `run("path/to/demand.yaml", options=options)`
-- **THEN** 系统 MUST 使用该 `RunOptions` 完成加载/编译/执行
+- **THEN** 系统 MUST 使用该 `DemandRunOptions` 完成加载/编译/执行
 - **AND** 运行行为 MUST 与同等配置通过旧入口实现时一致
 
-### Requirement: workflow entrypoint MUST accept a single `RunOptions` object
+### Requirement: workflow entrypoint MUST accept a single `WorkflowRunOptions` object
 系统 MUST 将 workflow 的 Python 运行入口 `run_workflow` 收敛为 options-object 形态，以确保 runtime knobs 的承载对象保持受控且正交（避免继续扩大 `run_workflow` 的公开函数签名）。
 
 该入口 MUST 形如：
 
-- `run_workflow(workflow_yaml_path, *, options: RunOptions, workflow_runtime_options: WorkflowRuntimeOptions, ...) -> WorkflowResult`
+- `run_workflow(workflow_yaml_path, *, options: WorkflowRunOptions) -> WorkflowResult`
 
 其中：
 
-- 所有 demand 运行期 knobs MUST 通过 `RunOptions` 提供（例如 allowlist、模板、并行、重试、护栏、overrides、batch_size、diagnostics）。
-- workflow-scope 的 runtime policy MUST 通过一个封闭且 typed 的 `WorkflowRuntimeOptions`（或等价）提供（例如 `workflow_runtime_options.execution/scheduler/cache_pool/resources_wait/output_staging`）。
-- workflow-scope 的编排参数 MAY 继续以独立 kwargs 形式存在（例如 `run_patches_by_id` / `path_aliases`），但 MUST NOT 再以独立 kwargs 暴露 workflow runtime policy（避免签名继续膨胀）。
+- 节点的 demand 运行期 knobs MUST 通过 `WorkflowRunOptions.demand: DemandRunOptions` 提供（例如 allowlist、模板、并行、重试、护栏、overrides、batch_size、diagnostics、capture）。
+- per-run patch MUST 通过 `WorkflowRunOptions.patches_by_run_id: Mapping[str, WorkflowNodePatch]` 提供,并且 patch MUST NOT 覆盖安全边界。
+- workflow-scope 的 runtime policy MUST 通过 `WorkflowRunOptions.runtime: WorkflowRuntimeOptions`（或等价）提供（例如 `runtime.execution/scheduler/cache_pool/resources_wait/output_staging`）。
+- workflow-scope 的编排参数(例如 `path_aliases`) MUST 收敛在 `WorkflowRunOptions` 内部,不再以独立 kwargs 形式暴露。
 
 #### Scenario: options-object drives workflow runs
-- **GIVEN** 调用方构造 `RunOptions(allowed_modules=..., batch_size=..., template_vars=...)`
-- **AND** 调用方提供 `WorkflowRuntimeOptions(...)`
-- **WHEN** 调用方执行 `run_workflow("path/to/workflow.yaml", options=options, workflow_runtime_options=workflow_runtime_options)`
-- **THEN** 系统 MUST 使用该 `RunOptions` 作为每个 demand run 的 base options
+- **GIVEN** 调用方构造 `DemandRunOptions(security=DemandRunSecurityOptions(...), runtime=DemandRunRuntimeOptions(batch_size=...), template=DemandRunTemplateOptions(template_vars=...))`
+- **AND** 调用方构造 `WorkflowRunOptions(demand=demand_options, runtime=WorkflowRuntimeOptions(...), patches_by_run_id={...})`
+- **WHEN** 调用方执行 `run_workflow("path/to/workflow.yaml", options=workflow_options)`
+- **THEN** 系统 MUST 使用该 `DemandRunOptions` 作为每个 demand run 的 base options
 - **AND** 后续 per-run patches(若提供) MUST 在该 base options 上应用
 
 ### Requirement: `IMPL_ROOT.dsl.yaml_dsl` MUST be the preferred public facade
@@ -368,9 +389,76 @@ yaml_dsl runtime compiler MUST 将运行期的 `batch_size` 编译为 `Execution
 
 该官方入口 MUST 以“受控 re-export”方式提供最小 facade,并 MUST 导出以下符号:
 - 运行入口: `run` / `compile` / `run_workflow`
-- 运行期契约: `UNSET`、`ResolverTrustedMode`、`RunOptions`、`RunOverrides`、`Compilation`、`RunResult`
+- 运行期契约: `UNSET`、`ResolverTrustedMode`、`DemandRunOptions`、`DemandRunResult`、`RunOverrides`、`WorkflowRunOptions`、`Compilation`
 
 #### Scenario: caller can import facade entrypoints and contracts from yaml_dsl
 - **WHEN** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import run, compile, run_workflow`
-- **AND** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import RunOptions, RunOverrides, ResolverTrustedMode`
+- **AND** 调用方执行 `from IMPL_ROOT.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions`
 - **THEN** 导入 MUST 成功且行为与实现一致
+
+### Requirement: public run entrypoints MUST keep a single `options` object per entrypoint
+系统 MUST 保持公开运行入口为“单一 `options` 对象驱动”，且 `workflow` 入口也 MUST 将其所有运行期策略（例如 runtime options、path aliases、per-run patches）收敛在该 `options` 对象内，而不是通过额外参数拼装。
+
+> 注：本条要求的是“每个入口只有一个 options 参数”，不要求不同入口复用同一个 options 类型。
+
+#### Scenario: workflow entrypoint takes only `options`
+- **GIVEN** 调用方运行 `workflow`
+- **WHEN** 调用方调用公开入口
+- **THEN** 公开入口 MUST 只接受一个 `options` 对象作为运行期契约承载
+- **AND** 原本作为独立参数出现的 knobs MUST 迁移到 `options` 的子结构中
+
+系统 MUST 在构造期进行 fail-fast 校验（在 `RunOptions`/其子对象的 `__post_init__` 或等价位置），使非法组合在进入执行链路前即可被拒绝。
+
+#### Scenario: invalid option combinations are rejected before execution
+- **GIVEN** 调用方构造运行入口的 `options` 对象
+- **WHEN** `options` 中出现违反安全边界或输出策略约束的非法组合
+- **THEN** 系统 MUST 在构造/校验阶段 fail-fast 抛出异常
+- **AND** 异常信息 MUST 指向冲突的字段/分组,便于调用方修正
+
+### Requirement: public options MUST split demand vs workflow concerns (no mixed `RunOptions`)
+系统 MUST 将独立 `demand` 与 `workflow` 的公开运行契约拆分为两个类型（例如 `DemandRunOptions` 与 `WorkflowRunOptions`），并在 `workflow` options 中以显式子对象承载默认的 `demand` options（例如 `WorkflowRunOptions.demand`）。
+
+系统 MUST 避免继续扩大单一“扁平 `RunOptions`”公开字段集合（尤其是同时服务 demand/workflow 两种入口的字段），以消除“哪些字段在 workflow 无效”的记忆负担。
+
+#### Scenario: workflow uses embedded demand options
+- **GIVEN** 调用方运行 `workflow`
+- **WHEN** 调用方构造 `WorkflowRunOptions`
+- **THEN** 系统 MUST 提供一个明确的子对象用于承载每个节点默认的 demand options（例如 `options.demand`）
+- **AND** per-run patch MUST 以该子对象为主要 patch 目标（而不是 patch workflow 本身）
+
+### Requirement: output capture/write/tee semantics MUST be explicit and consistent across demand/workflow
+系统 MUST 将“是否落盘/是否保留内存/是否镜像(tee)”等选择以显式、强类型的输出策略表达，而不是通过“额外传入一个参数即可隐式改变 sink 行为”的方式组合语义。
+
+系统 MUST 在公开运行入口中移除 `sink` 这类会引入隐式 tee 语义的参数/字段；若框架内部仍使用 `sink` 概念，其必须属于 internal/execution 层边界，不得作为 DSL public facade 的运行期契约暴露。
+
+系统 MUST 确保 demand 与 workflow 的输出/捕获规则边界一致：相同的输出策略输入在两条入口链路中应得到一致的行为。
+
+#### Scenario: demand file output plus capture does not change behavior implicitly
+- **GIVEN** 调用方运行一个会产生文件输出的 demand/workflow
+- **WHEN** 调用方同时启用“写文件”与“捕获到内存”
+- **THEN** 系统 MUST 通过显式输出策略表达“tee”这一组合
+- **AND** 系统 MUST NOT 通过“额外传入一个参数”隐式推导 tee
+
+### Requirement: workflow per-run patch MUST be explicit and policy-aware
+系统 MUST 为 `workflow` 提供 per-run patch 能力，但该 patch MUST 满足：
+
+- patch 的对象是 “节点的 demand options”（例如 `WorkflowRunOptions.demand`），而不是 “workflow 自身的 runtime options”
+- patch 的可变更字段集合 MUST 明确，并在合并阶段 fail-fast 校验
+- patch MUST NOT 覆盖安全边界（例如 allowlist/trusted mode 等）
+
+#### Scenario: illegal patch to security boundary is rejected
+- **GIVEN** 调用方为某个 run_id 提供 patch
+- **WHEN** patch 尝试覆盖安全边界字段
+- **THEN** 系统 MUST fail-fast 拒绝该 patch
+- **AND** 错误信息 MUST 指向具体 run_id 与字段路径，便于修正
+
+### Requirement: public workflow facade MUST NOT expose injection/test-only knobs
+系统 MUST 收口 workflow 入口的 public surface：`scalim.dsl.yaml_dsl.run_workflow` 这类公共 facade MUST NOT 暴露注入型/测试专用参数（例如 `run_ir_fn` / `compile_demand_yaml_fn`），且这些注入点也 MUST NOT 出现在公开 options 对象中。
+
+若框架内部仍需要这些注入点，系统 MUST 将其放置在 internal/test-only 边界（例如 `scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints.run_workflow_injected` 或 tests 专用 helper），避免用户材料固化内部实现结构。
+
+#### Scenario: passing injection knobs to public facade fails fast
+- **WHEN** 调用方对 `scalim.dsl.yaml_dsl.run_workflow` 传入 `run_ir_fn` 或 `compile_demand_yaml_fn`
+- **THEN** 该调用 MUST 失败（参数不存在或被拒绝）
+- **AND** 错误信息 SHOULD 指向 internal/test-only 注入入口或迁移方式（例如 `scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints.run_workflow_injected`）
+

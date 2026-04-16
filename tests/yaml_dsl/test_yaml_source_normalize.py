@@ -3,10 +3,9 @@ from pathlib import Path
 import pytest
 
 import scalim.dsl.yaml_dsl._internal.config_parsing.validator as validator_module
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions, run
 from scalim.dsl.yaml_dsl._internal.config_parsing.parsers.sources import ParserSourcesMixin
 from scalim.dsl.yaml_dsl._internal.config_parsing.validators.sources import ValidatorSourcesMixin
-from scalim.sinks import InMemoryRowSink
 
 import tests.fixtures.source_normalize_loaders as loaders
 
@@ -201,16 +200,16 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
-    _ = run(
+    result = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
-            sink=sink,
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"])),
+            outputs=DemandRunOutputOptions(capture=CaptureRows()),
         ),
     )
 
-    rows = sink.get_data()
+    assert result.captured_rows is not None
+    rows = list(result.captured_rows.iter_row_data())
     by_order_id = {row["order_id"]: row for row in rows}
     assert by_order_id[101]["recommend_score"] == 0.9
     assert by_order_id[102]["recommend_score"] == 0.7
@@ -247,16 +246,16 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
-    _ = run(
+    result = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
-            sink=sink,
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"])),
+            outputs=DemandRunOutputOptions(capture=CaptureRows()),
         ),
     )
 
-    rows = sink.get_data()
+    assert result.captured_rows is not None
+    rows = list(result.captured_rows.iter_row_data())
     by_order_id = {row["order_id"]: row for row in rows}
     assert by_order_id[101]["recommend_score"] == 0.9
     assert by_order_id[102]["recommend_score"] == 0.7
@@ -292,16 +291,16 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
-    _ = run(
+    result = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
-            sink=sink,
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"])),
+            outputs=DemandRunOutputOptions(capture=CaptureRows()),
         ),
     )
 
-    rows = sink.get_data()
+    assert result.captured_rows is not None
+    rows = list(result.captured_rows.iter_row_data())
     by_order_id = {row["order_id"]: row for row in rows}
     assert by_order_id[101]["recommend_score"] == 0.9
     assert by_order_id[102]["recommend_score"] == 0.7
@@ -340,13 +339,11 @@ sources:
     """,
     )
 
-    sink = InMemoryRowSink()
     with pytest.raises(ScalimAllowlistViolationError, match=r"source_normalize_call_by.*allowed_modules"):
         _ = run(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
-                sink=sink,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]))
             ),
         )
 
@@ -381,13 +378,13 @@ sources:
 """,
     )
 
-    sink = InMemoryRowSink()
     with pytest.raises(TypeError, match=r"must return Mapping.*sources\.recommends\.normalize\.call_by"):
         _ = run(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders", "tests.fixtures.source_normalize_call_by"]),
-                sink=sink,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(
+                    allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders", "tests.fixtures.source_normalize_call_by"])
+                )
             ),
         )
 

@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl import run as run_yaml
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, GuardrailsRelationsPolicy
 from scalim.ob.presets.row_gap import RowGapObserver
 from scalim.shortcuts.resources import outputs as outputs_api
@@ -75,12 +76,14 @@ def run_yaml_dsl_support(
         try:
             run_result = run_yaml(
                 str(yaml_path),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    components=[guardrail_capture, row_gap_observer],
-                    init_vars=init_vars,
-                    guardrails=guardrails_policy,
-                    batch_size=None,
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=DemandRunRuntimeOptions(
+                        components=[guardrail_capture, row_gap_observer],
+                        guardrails=guardrails_policy,
+                        batch_size=None,
+                    ),
                 ),
             )
             core = run_result.core

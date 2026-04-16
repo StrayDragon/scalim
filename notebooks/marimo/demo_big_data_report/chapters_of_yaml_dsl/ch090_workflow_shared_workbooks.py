@@ -5,7 +5,14 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    WorkflowRunOptions,
+    run_workflow,
+)
 from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
@@ -76,15 +83,20 @@ def run_workflow_shared_workbooks(
             )
 
             try:
-                wf_result = run_workflow(
-                    str(wf_copy),
-                    options=RunOptions(
+                demand_options = DemandRunOptions(
+                    security=DemandRunSecurityOptions(
                         allowed_modules=allowed_modules,
-                        batch_size=30,
-                        init_vars={"order_ids": []},
                         allowed_yaml_roots=(str(repo_root),),
                     ),
-                    path_aliases={"@": str(repo_root)},
+                    template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
+                    runtime=DemandRunRuntimeOptions(batch_size=30),
+                )
+                wf_result = run_workflow(
+                    str(wf_copy),
+                    options=WorkflowRunOptions(
+                        demand=demand_options,
+                        path_aliases={"@": str(repo_root)},
+                    ),
                 )
             except Exception as exc:  # noqa: BLE001
                 summary = "workflow failed: {}: {}".format(type(exc).__name__, exc)

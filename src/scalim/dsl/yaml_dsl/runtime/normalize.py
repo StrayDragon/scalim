@@ -1,25 +1,24 @@
-from ....execution.key_normalization import normalize_key_normalization
 from ....vendor.dataclassesx import replace
 from .._public_template_sandbox import validate_public_template_sandbox
-from .contracts import RunOptions
+from .contracts import DemandRunOptions
 
 
-def normalize_public_run_options(options: RunOptions) -> RunOptions:
-    template_sandbox = validate_public_template_sandbox(options.template_sandbox)
-    key_normalization = normalize_key_normalization(options.key_normalization)
-    max_workers = int(options.max_workers)
-    if (
-        template_sandbox == options.template_sandbox
-        and key_normalization == options.key_normalization
-        and max_workers == options.max_workers
-    ):
+def normalize_public_demand_run_options(options: DemandRunOptions) -> DemandRunOptions:
+    """公开 `YAML` `DSL` 运行期契约在 `__post_init__` 中完成规范化/校验.
+
+    该辅助函数为调用方提供一个统一的规范化边界,避免直接依赖底层规范化工具的实现细节.
+    """
+
+    template_sandbox = validate_public_template_sandbox(options.template.template_sandbox)
+    if template_sandbox == options.template.template_sandbox:
         return options
     return replace(
         options,
-        template_sandbox=template_sandbox,
-        key_normalization=key_normalization,
-        max_workers=max_workers,
+        template=replace(
+            options.template,
+            template_sandbox=template_sandbox,
+        ),
     )
 
 
-__all__ = ("normalize_public_run_options",)
+__all__ = ("normalize_public_demand_run_options",)

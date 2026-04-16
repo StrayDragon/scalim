@@ -18,7 +18,7 @@ from ..schema_dsl.output_enums import (
     AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
 )
 from .compiler import compile  # noqa: A004
-from .contracts import RunOptions
+from .contracts import DemandRunOptions, DemandRunSecurityOptions
 
 
 class OutputConfigDict(TypedDict):
@@ -53,9 +53,11 @@ def resolve_required_field_ids(  # noqa: C901
     allowed_functions: Optional[FrozenSet[str]] = None,
     output_fields: Optional[List[str]] = None,
 ) -> List[str]:
-    options = RunOptions(
-        allowed_modules=allowed_modules,
-        allowed_functions=allowed_functions,
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(
+            allowed_modules=allowed_modules,
+            allowed_functions=allowed_functions,
+        )
     )
     compilation = compile(yaml_path, options=options)
 
@@ -103,9 +105,11 @@ def build_viz_observer(
     output_fields: Optional[List[str]] = None,
     config: Optional[VizObserverConfig] = None,
 ) -> VizObserver:
-    options = RunOptions(
-        allowed_modules=allowed_modules,
-        allowed_functions=allowed_functions,
+    options = DemandRunOptions(
+        security=DemandRunSecurityOptions(
+            allowed_modules=allowed_modules,
+            allowed_functions=allowed_functions,
+        )
     )
     compilation = compile(yaml_path, options=options)
 

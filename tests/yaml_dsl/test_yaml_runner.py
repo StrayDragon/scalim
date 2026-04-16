@@ -5,14 +5,19 @@ import pytest
 
 from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
+    CaptureNone,
+    CaptureRows,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunResult,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
     FileResourceOverride,
     OutputOverride,
     OutputToOverride,
     OutputWriteOverride,
     ResourcesOverride,
-    RunOptions,
     RunOverrides,
-    RunResult,
     run,
 )
 from scalim.execution.run_ir import ExecutionResult, export_layout_from_demand_ir
@@ -23,13 +28,24 @@ from scalim.events._events import BatchEndEvent, BatchStartEvent, LoaderCallEven
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
-from scalim.sinks import InMemoryRowSink
+from scalim.sinks.rows import InMemoryRows
 from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr
 from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from tests.support.pathing import fixtures_dir
 from tests.support.testing_utils import missing_optional_dependency
 
 _ALLOWED_MODULES = frozenset(["scalim_misc.example_report_ir"])
+
+
+def _options(*, overrides=None, capture: bool = False, components=None):  # type: ignore[no-untyped-def] test helper
+    return DemandRunOptions(
+        security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+        runtime=DemandRunRuntimeOptions(components=components),
+        outputs=DemandRunOutputOptions(
+            overrides=overrides,
+            capture=CaptureRows() if capture else CaptureNone(),
+        ),
+    )
 
 
 def _demo_yaml_path() -> Path:
@@ -77,14 +93,6 @@ def _write_yaml_with_named_headers(tmp_path: Path, source_path: Path, output_pat
     return yaml_path
 
 
-def _build_default_yaml(_tmp_path: Path) -> Path:
-    return _demo_yaml_path()
-
-
-def _build_column_yaml(tmp_path: Path) -> Path:
-    return _write_yaml_with_column_output(tmp_path, _demo_yaml_path())
-
-
 class _CaptureHook(BaseHook):
     def __init__(self) -> None:
         self.pipeline_started = False
@@ -93,52 +101,25 @@ class _CaptureHook(BaseHook):
         self.pipeline_started = True
 
 
-@pytest.mark.parametrize(
-    "yaml_builder,output_name,sink_factory,check_header",
-    [
-        (
-            _build_default_yaml,
-            "order_report.csv",
-            InMemoryRowSink,
-            True,
-        ),
-    ],
-    ids=["default-streaming"],
-)
-def test_run_outputs_and_returns_data(
-    example_model,
-    tmp_path: Path,
-    yaml_builder,
-    output_name: str,
-    sink_factory,
-    check_header: bool,
-) -> None:
-    yaml_path = yaml_builder(tmp_path)
+def test_run_outputs_and_returns_data(example_model, tmp_path: Path) -> None:
+    yaml_path = _demo_yaml_path()
     output_root = tmp_path / "nested"
 
-    sink = sink_factory() if sink_factory is not None else None
-    result = run(
-        str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            overrides=RunOverrides(
-                outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
-            ),
-            sink=sink,
-        ),
+    overrides = RunOverrides(
+        outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
+        resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
     )
+    result = run(str(yaml_path), options=_options(overrides=overrides, capture=True))
 
     assert result.total_rows > 0
     assert result.output_path is not None
     out_path = Path(str(result.output_path))
     assert out_path.exists()
-    if sink is not None:
-        assert sink.get_data()
+    assert result.captured_rows is not None
+    assert result.captured_rows.rows
 
-    if check_header:
-        header = out_path.read_text(encoding="utf-8").splitlines()[0]
-        assert "订单ID" in header
+    header = out_path.read_text(encoding="utf-8").splitlines()[0]
+    assert "订单ID" in header
 
 
 def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_path: Path) -> None:
@@ -148,8 +129,7 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
     fields = ["order_id"]
     result = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
+        options=_options(
             overrides=RunOverrides(
                 outputs=(
                     OutputOverride(
@@ -160,7 +140,7 @@ def test_run_header_fields_output_by_name_uses_field_names(example_model, tmp_pa
                     ),
                 ),
                 resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
-            ),
+            )
         ),
     )
 
@@ -197,8 +177,7 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
 
     result = run(
         str(_demo_yaml_path()),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
+        options=_options(
             overrides=RunOverrides(
                 outputs=(
                     OutputOverride(
@@ -209,7 +188,7 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
                     ),
                 ),
                 resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_root))}),
-            ),
+            )
         ),
     )
 
@@ -221,21 +200,16 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
     assert header == expected_header
 
 
-def test_run_in_memory_sink_without_output_path_returns_data(example_model, tmp_path: Path) -> None:
+def test_run_capture_rows_without_output_path_returns_data(example_model, tmp_path: Path) -> None:
     yaml_path = _write_yaml_without_output(tmp_path, _demo_yaml_path())
-    sink = InMemoryRowSink()
 
-    result = run(
-        str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
-            sink=sink,
-        ),
-    )
+    result = run(str(yaml_path), options=_options(capture=True))
 
     assert result.output_path is None
-    assert sink.get_data()
-    assert "order_id" in sink.get_data()[0]
+    assert result.captured_rows is not None
+    rows = list(result.captured_rows.iter_row_data())
+    assert rows
+    assert "order_id" in rows[0]
 
 
 def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None:
@@ -245,13 +219,12 @@ def test_run_column_sink_and_custom_hooks(example_model, tmp_path: Path) -> None
 
     result = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
+        options=_options(
+            components=[hook],
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
                 resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=str(output_root))}),
             ),
-            components=[hook],
         ),
     )
 
@@ -277,8 +250,7 @@ def test_run_registers_observer_components(example_model, tmp_path: Path) -> Non
     observer = _CaptureObserver()
     _ = run(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=_ALLOWED_MODULES,
+        options=_options(
             components=[observer],
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
@@ -296,10 +268,7 @@ def test_run_raises_typeerror_on_invalid_component(example_model, tmp_path: Path
     with pytest.raises(TypeError, match=r"Invalid component at index 0"):
         _ = run(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                components=[object()],  # type: ignore[list-item]
-            ),
+            options=_options(components=[object()]),  # type: ignore[list-item]
         )
 
 
@@ -309,7 +278,7 @@ def test_run_uses_config_output_path(example_model, tmp_path: Path) -> None:
 
     result = run(
         str(yaml_path),
-        options=RunOptions(allowed_modules=_ALLOWED_MODULES),
+        options=_options(),
     )
 
     assert result.output_path is not None
@@ -464,21 +433,21 @@ def test_pretty_logging_observer_formats_cache_status() -> None:
     assert stats["cache_miss"] == 1
 
 
-def test_yaml_run_result_to_dataframe_requires_pandas(monkeypatch) -> None:
+def test_demand_run_result_to_dataframe_requires_pandas(monkeypatch) -> None:
     main_source = MainSourceIr(source_id="demo", loader_ref=RuntimeHandleIdIr(handle_id="demo.loader"))
     demand_ir = DemandIr.from_irs([], [], main_source)
     plan = PlanBuilder(demand_ir).build(targets=[])
-    sink = InMemoryRowSink()
-    sink.write_row({"id": 1})
+    captured_rows = InMemoryRows(header=["id"], rows=[[1]])
     core = ExecutionResult(
         output_path=None,
         total_rows=1,
         duration=0.0,
         demand_ir=demand_ir,
         plan=plan,
+        in_memory_rows=captured_rows,
     )
     config = DemandConfig(name="demo")
-    result = RunResult(core, config=config, yaml_path="demo.yaml", sink=sink)
+    result = DemandRunResult(core, config=config, yaml_path="demo.yaml", captured_rows=captured_rows)
     assert result.duration == 0.0
     assert result.plan is plan
 
@@ -487,7 +456,7 @@ def test_yaml_run_result_to_dataframe_requires_pandas(monkeypatch) -> None:
             result.to_dataframe()
 
 
-def test_yaml_run_result_to_dataframe_requires_in_memory_sink() -> None:
+def test_demand_run_result_to_dataframe_requires_capture() -> None:
     main_source = MainSourceIr(source_id="demo", loader_ref=RuntimeHandleIdIr(handle_id="demo.loader"))
     demand_ir = DemandIr.from_irs([], [], main_source)
     plan = PlanBuilder(demand_ir).build(targets=[])
@@ -499,27 +468,27 @@ def test_yaml_run_result_to_dataframe_requires_in_memory_sink() -> None:
         plan=plan,
     )
     config = DemandConfig(name="demo")
-    result = RunResult(core, config=config, yaml_path="demo.yaml", sink=None)
+    result = DemandRunResult(core, config=config, yaml_path="demo.yaml", captured_rows=None)
 
-    with pytest.raises(ValueError, match=r"in-memory sink"):
+    with pytest.raises(ValueError, match=r"requires capture enabled"):
         _ = result.to_dataframe()
 
 
-def test_yaml_run_result_to_dataframe_ok() -> None:
+def test_demand_run_result_to_dataframe_ok() -> None:
     main_source = MainSourceIr(source_id="demo", loader_ref=RuntimeHandleIdIr(handle_id="demo.loader"))
     demand_ir = DemandIr.from_irs([], [], main_source)
     plan = PlanBuilder(demand_ir).build(targets=[])
-    sink = InMemoryRowSink()
-    sink.write_row({"id": 1})
+    captured_rows = InMemoryRows(header=["id"], rows=[[1]])
     core = ExecutionResult(
         output_path=None,
         total_rows=1,
         duration=0.0,
         demand_ir=demand_ir,
         plan=plan,
+        in_memory_rows=captured_rows,
     )
     config = DemandConfig(name="demo")
-    result = RunResult(core, config=config, yaml_path="demo.yaml", sink=sink)
+    result = DemandRunResult(core, config=config, yaml_path="demo.yaml", captured_rows=captured_rows)
     assert result.duration == 0.0
     assert result.plan is plan
 

@@ -2,18 +2,20 @@
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from ....execution.guardrails import GuardrailsPolicy
+from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.run_ir import ExecutionResult
 from ....hooks import IExecutionHook
 from ....ob.observer import Observer
-from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
+from ....vendor.dataclassesx import field as dataclass_field
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
+from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError
 
 if TYPE_CHECKING:
     import os
@@ -23,6 +25,7 @@ if TYPE_CHECKING:
     from ....execution.run_ir import ExecutionRequest
     from ....ob.presets.viz import VizObserverConfig
     from ....planning.plan import ExecutionPlan
+    from ....sinks.rows import InMemoryRows
     from ....spec.ir import DemandIr
 
 
@@ -363,7 +366,50 @@ class DemandDiagnosticsOverride:
 
 
 @dataclass(frozen=True)
-class RunOptions:
+class CaptureNone:
+    """默认:不捕获内存行数据."""
+
+
+@dataclass(frozen=True)
+class CaptureRows:
+    """捕获本次运行产生的行数据(显式开启)."""
+
+
+CapturePolicy = Union[CaptureNone, CaptureRows]
+
+
+def _coerce_iterable_str_frozenset(value: Any, *, field_name: str) -> FrozenSet[str]:
+    if value is None:
+        msg = "{} must be an iterable of str".format(field_name)
+        raise TypeError(msg)
+    if isinstance(value, str):
+        msg = "{} must be an iterable of str (not a str)".format(field_name)
+        raise TypeError(msg)
+    try:
+        return frozenset(str(item) for item in value)
+    except TypeError:
+        msg = "{} must be an iterable of str".format(field_name)
+        raise TypeError(msg) from None
+
+
+def _coerce_iterable_str_tuple(value: Any, *, field_name: str) -> Tuple[str, ...]:
+    if value is None:
+        msg = "{} must be an iterable of str".format(field_name)
+        raise TypeError(msg)
+    if isinstance(value, str):
+        msg = "{} must be an iterable of str (not a str)".format(field_name)
+        raise TypeError(msg)
+    try:
+        return tuple(str(item) for item in value)
+    except TypeError:
+        msg = "{} must be an iterable of str".format(field_name)
+        raise TypeError(msg) from None
+
+
+@dataclass(frozen=True)
+class DemandRunSecurityOptions:
+    """`demand` 运行的安全边界选项."""
+
     allowed_modules: FrozenSet[str]
     """允许被引用/导入的模块白名单(用于安全解析)."""
 
@@ -371,17 +417,105 @@ class RunOptions:
     """可选:允许被引用/导入的函数白名单(用于更细粒度的安全控制)."""
 
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST
-    """`Python` 引用 `resolver` 的安全模式.
+    """`Python` 引用 `resolver` 的安全模式."""
 
-    - `strict_allowlist`(默认): 禁止 `wildcard`,并要求显式 `allowlist`.
-    - `trusted_allow_all_modules`: 仅用于可信输入/内部测试;显式放宽为允许任意模块,并产生强告警.
-    """
+    allowed_yaml_roots: Optional[Tuple[str, ...]] = None
+    """可选:允许读取 `YAML` 文件的根目录集合."""
+
+    builtin_callables: Optional[Mapping[str, object]] = None
+    """可选:内置可调用对象词表(用于 `^<id>` 引用)."""
+
+    public_builtin_callable_ids: Optional[Tuple[str, ...]] = None
+    """可选:用户可见的内置 `<id>` 列表(用于错误信息/文档提示;应为保守子集)."""
+
+    def __post_init__(self) -> None:
+        allowed_modules = _coerce_iterable_str_frozenset(
+            self.allowed_modules,
+            field_name="DemandRunSecurityOptions.allowed_modules",
+        )
+        allowed_functions = (
+            None
+            if self.allowed_functions is None
+            else _coerce_iterable_str_frozenset(
+                self.allowed_functions,
+                field_name="DemandRunSecurityOptions.allowed_functions",
+            )
+        )
+        object.__setattr__(self, "allowed_modules", allowed_modules)
+        object.__setattr__(self, "allowed_functions", allowed_functions)
+
+        if not allowed_modules and not allowed_functions:
+            raise ScalimAllowlistRequiredError(ALLOWLIST_REQUIRED_MSG)
+
+        mode = self.resolver_trusted_mode
+        # 注意: `ResolverTrustedMode` 是 `str-enum`,因此枚举成员同时也是 `str` 实例.
+        # 必须先判断枚举类型本身,避免对已是枚举成员的值再次执行 `ResolverTrustedMode(str(mode))`,
+        # 因为 `str(enum_member)` 形如 `ResolverTrustedMode.X` 并不是合法枚举值.
+        if isinstance(mode, ResolverTrustedMode):
+            pass
+        elif isinstance(mode, str):
+            object.__setattr__(self, "resolver_trusted_mode", ResolverTrustedMode(str(mode)))
+        else:
+            msg = "DemandRunSecurityOptions.resolver_trusted_mode must be a ResolverTrustedMode"
+            raise TypeError(msg)
+
+        if self.allowed_yaml_roots is not None:
+            object.__setattr__(
+                self,
+                "allowed_yaml_roots",
+                _coerce_iterable_str_tuple(
+                    self.allowed_yaml_roots,
+                    field_name="DemandRunSecurityOptions.allowed_yaml_roots",
+                ),
+            )
+
+        if self.public_builtin_callable_ids is not None:
+            object.__setattr__(
+                self,
+                "public_builtin_callable_ids",
+                _coerce_iterable_str_tuple(
+                    self.public_builtin_callable_ids,
+                    field_name="DemandRunSecurityOptions.public_builtin_callable_ids",
+                ),
+            )
+
+
+@dataclass(frozen=True)
+class DemandRunTemplateOptions:
+    """`demand` 编译期模板/注入相关选项."""
+
+    template_vars: Optional[Mapping[str, object]] = None
+    """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""
+
+    template_sandbox: str = "safe"
+    """模板预编译的 `template_sandbox` 模式(公开入口仅允许 `safe`)."""
+
+    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN
+    """当启用 `template_vars` 预编译时,渲染后 `YAML` 文本长度上限(字符数)."""
+
+    init_vars: Optional[Dict[str, object]] = None
+    """可选:初始化变量注入(编译期使用,用于解析 `params` 中的 `{$init_var: <name>}` 指令节点)."""
+
+    def __post_init__(self) -> None:
+        sandbox = str(self.template_sandbox or "").strip() or "safe"
+        object.__setattr__(self, "template_sandbox", sandbox)
+
+        max_len = self.rendered_yaml_max_len
+        if isinstance(max_len, bool) or not isinstance(max_len, int):
+            msg = "DemandRunTemplateOptions.rendered_yaml_max_len must be an int"
+            raise TypeError(msg)
+        if int(max_len) <= 0:
+            msg = "DemandRunTemplateOptions.rendered_yaml_max_len must be > 0"
+            raise ValueError(msg)
+        object.__setattr__(self, "rendered_yaml_max_len", int(max_len))
+
+
+@dataclass(frozen=True)
+class DemandRunRuntimeOptions:
+    """`demand` 执行期选项(与执行编排相关)."""
 
     components: Optional[List[Union[Observer, IExecutionHook]]] = None
-    """可选:要挂载的 `Observer`/`Hook` 组件列表."""
-
-    sink: Optional[ISink] = None
-    """可选:显式指定输出端;若为 `None` 则按配置创建."""
+    """可选:要挂载的 `Observer`/`Hook` 组件列表(作用于 `demand` 执行层)."""
 
     guardrails: Optional[GuardrailsPolicy] = None
     """可选:运行时护栏策略."""
@@ -401,7 +535,7 @@ class RunOptions:
     """可选:覆盖 `demand` 多输出失败策略(`None` 表示不覆盖)."""
 
     demand_diagnostics: Optional["DemandDiagnosticsPolicy"] = None
-    """可选:`demand` 诊断/治理策略(从 YAML 主线迁出,通过运行入口参数装配)."""
+    """可选:`demand` 诊断/治理策略."""
 
     parallel_mode: ParallelMode = "seq"
     """并行模式(`seq` 或 `adaptive`)."""
@@ -412,53 +546,91 @@ class RunOptions:
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""
 
+    def __post_init__(self) -> None:
+        parallel_mode = self.parallel_mode
+        if parallel_mode not in ("seq", "adaptive"):
+            msg = "DemandRunRuntimeOptions.parallel_mode must be 'seq' or 'adaptive'"
+            raise ValueError(msg)
+
+        max_workers = self.max_workers
+        if isinstance(max_workers, bool) or not isinstance(max_workers, int):
+            msg = "DemandRunRuntimeOptions.max_workers must be an int"
+            raise TypeError(msg)
+        if int(max_workers) < 0:
+            msg = "DemandRunRuntimeOptions.max_workers must be >= 0"
+            raise ValueError(msg)
+        object.__setattr__(self, "max_workers", int(max_workers))
+
+        object.__setattr__(self, "key_normalization", normalize_key_normalization(self.key_normalization))
+
+        raw = self.batch_size
+        if isinstance(raw, UnsetType):
+            return
+        if raw is None:
+            return
+        if isinstance(raw, bool) or not isinstance(raw, int):
+            msg = "DemandRunRuntimeOptions.batch_size must be an integer >= 1, None, or UNSET"
+            raise TypeError(msg)
+        if int(raw) < 1:
+            msg = "DemandRunRuntimeOptions.batch_size must be >= 1 when provided"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True)
+class DemandRunOutputOptions:
+    """`demand` 输出与捕获选项."""
+
     overrides: Optional[RunOverrides] = None
     """可选:运行期覆盖项(例如输出与 `viz` 配置覆盖)."""
 
-    init_vars: Optional[Dict[str, object]] = None
-    """可选:初始化变量注入(编译期使用,用于解析 `params` 中的 `{$init_var: <name>}` 指令节点)."""
-
     output_version_id: Optional[str] = None
-    """可选:覆盖版本化输出(`D-2`)的 `version_id`.
-
-    约定:
-    - 独立 `demand`: 默认由框架生成随机 `run_id` 并作为 `version_id`
-    - `workflow`: 由 `run_workflow` 注入 `workflow_exec_id` 作为 `version_id`
-    """
-
-    template_vars: Optional[Mapping[str, object]] = None
-    """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""
-
-    template_sandbox: str = "safe"
-    """模板预编译的 `template_sandbox` 模式.
-
-    - `safe`(默认): 禁止无参 `method call`,并禁止访问以下划线开头属性(含 `__dunder__`).
-    - `legacy`: 显式放宽(不安全);仅用于可信输入/内部测试.
-    """
-
-    rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN
-    """当启用 `template_vars` 预编译时,渲染后 `YAML` 文本长度上限(字符数)."""
-
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None
-    """可选:允许读取 `YAML` 文件的根目录集合.
-
-    - 若为 `None`(默认),仅允许读取入口 `YAML` 所在目录树内的文件.
-    - 若显式提供,仍会自动包含入口 `YAML` 所在目录;用于“受控跨目录复用”(例如 `imports` 或工作流需求引用上层共享目录).
-    """
+    """可选:覆盖版本化输出(`D-2`)的 `version_id`."""
 
     workflow_managed_output_ids: Optional[FrozenSet[str]] = None
-    """可选: `workflow` 托管的 `output_id` 白名单(用于 `workflow-managed` 的无路径 `CSV` 输出的内存物化)."""
+    """可选: `workflow` 托管的 `output_id` 白名单."""
 
-    builtin_callables: Optional[Mapping[str, object]] = None
-    """可选:内置可调用对象词表(用于 `^<id>` 引用).
+    capture: CapturePolicy = dataclass_field(default_factory=CaptureNone)
+    """显式捕获策略(默认关闭)."""
 
-    - 键: `<id>` (不包含前缀 `^`)
-    - 值: `callable` 或 `Python` 引用字符串(例如 `pkg.mod:fn`)
-    - 该词表作为“显式受控白名单”: `^<id>` 的解析与执行不要求把其目标模块加入 `allowlist`
-    """
+    def __post_init__(self) -> None:
+        if self.workflow_managed_output_ids is not None:
+            object.__setattr__(
+                self,
+                "workflow_managed_output_ids",
+                _coerce_iterable_str_frozenset(
+                    self.workflow_managed_output_ids,
+                    field_name="DemandRunOutputOptions.workflow_managed_output_ids",
+                ),
+            )
 
-    public_builtin_callable_ids: Optional[Tuple[str, ...]] = None
-    """可选:用户可见的内置 `<id>` 列表(用于错误信息/文档提示;应为保守子集)."""
+        capture = self.capture
+        if not isinstance(capture, (CaptureNone, CaptureRows)):
+            msg = "DemandRunOutputOptions.capture must be CaptureNone or CaptureRows"
+            raise TypeError(msg)
+
+
+@dataclass(frozen=True)
+class DemandRunOptions:
+    """`demand` 官方运行入口(`compile/run`)的 `options` 契约."""
+
+    security: DemandRunSecurityOptions
+    template: DemandRunTemplateOptions = dataclass_field(default_factory=DemandRunTemplateOptions)
+    runtime: DemandRunRuntimeOptions = dataclass_field(default_factory=DemandRunRuntimeOptions)
+    outputs: DemandRunOutputOptions = dataclass_field(default_factory=DemandRunOutputOptions)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.security, DemandRunSecurityOptions):
+            msg = "DemandRunOptions.security must be a DemandRunSecurityOptions"
+            raise TypeError(msg)
+        if not isinstance(self.template, DemandRunTemplateOptions):
+            msg = "DemandRunOptions.template must be a DemandRunTemplateOptions"
+            raise TypeError(msg)
+        if not isinstance(self.runtime, DemandRunRuntimeOptions):
+            msg = "DemandRunOptions.runtime must be a DemandRunRuntimeOptions"
+            raise TypeError(msg)
+        if not isinstance(self.outputs, DemandRunOutputOptions):
+            msg = "DemandRunOptions.outputs must be a DemandRunOutputOptions"
+            raise TypeError(msg)
 
 
 @dataclass(frozen=True)
@@ -468,11 +640,11 @@ class Compilation:
     request: "ExecutionRequest"
 
 
-class RunResult:
+class DemandRunResult:
     core: ExecutionResult
     config: DemandConfig
     yaml_path: str
-    sink: Optional[ISink]
+    captured_rows: Optional["InMemoryRows"]
 
     def __init__(
         self,
@@ -480,12 +652,12 @@ class RunResult:
         *,
         config: DemandConfig,
         yaml_path: str,
-        sink: Optional[ISink] = None,
+        captured_rows: Optional["InMemoryRows"] = None,
     ) -> None:
         self.core = core
         self.config = config
         self.yaml_path = yaml_path
-        self.sink = sink
+        self.captured_rows = captured_rows
 
     @property
     def output_path(self) -> Optional[str]:
@@ -508,14 +680,13 @@ class RunResult:
         return self.core.plan
 
     def to_dataframe(self) -> "pd.DataFrame":
-        sink = self.sink
-        if sink is None or not hasattr(sink, "get_data"):  # pragma: allow-dynattr optional-interface: sink.get_data
-            msg = "to_dataframe() requires an in-memory sink with get_data() (e.g. InMemoryRowSink)"
+        captured_rows = self.captured_rows
+        if captured_rows is None:
+            msg = "to_dataframe() requires capture enabled: DemandRunOptions(outputs=DemandRunOutputOptions(capture=CaptureRows()))"
             raise ValueError(msg)
         try:
             pd = import_module("pandas")
-            sink_with_data = cast("Any", sink)  # pragma: allow-cast sink get_data typed narrowing
-            return pd.DataFrame(sink_with_data.get_data())  # type: ignore[no-any-return]
+            return pd.DataFrame(list(captured_rows.iter_row_data()))  # type: ignore[no-any-return]
         except ImportError as e:
             msg = "pandas is required for to_dataframe()"
             raise ImportError(msg) from e
@@ -523,12 +694,19 @@ class RunResult:
 
 __all__ = (
     "UNSET",
+    "CaptureNone",
+    "CapturePolicy",
+    "CaptureRows",
     "Compilation",
     "DemandDiagnosticsOverride",
     "DemandDiagnosticsPolicy",
+    "DemandRunOptions",
+    "DemandRunOutputOptions",
+    "DemandRunResult",
+    "DemandRunRuntimeOptions",
+    "DemandRunSecurityOptions",
+    "DemandRunTemplateOptions",
     "ResolverTrustedMode",
-    "RunOptions",
     "RunOverrides",
-    "RunResult",
     "UnsetType",
 )

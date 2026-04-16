@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, FrozenSet, Optional, Set
 
 from scalim.dsl import yaml_dsl as api
-from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import get_preload_counter_calls, reset_preload_counter_calls
 
@@ -159,10 +158,10 @@ workflow:
 
         compilation: api.Compilation = api.compile(
             str(demand_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                init_vars=init_vars,
-                batch_size=2,
+            options=api.DemandRunOptions(
+                security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                template=api.DemandRunTemplateOptions(init_vars=init_vars),
+                runtime=api.DemandRunRuntimeOptions(batch_size=2),
             ),
         )
         if not compilation.demand_ir.fields:
@@ -174,23 +173,23 @@ workflow:
                 details={"demand_ir_fields": len(compilation.demand_ir.fields)},
             )
 
-        sink = InMemoryRowSink()
         overrides = api.RunOverrides.csv_file(
             output_root=str(tmp / "out"),
             fields=["item_id", "dim_id"],
             header_fields_output_by="name",
         )
-        run_result: api.RunResult = api.run(
+
+        run_result: api.DemandRunResult = api.run(
             str(demand_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                sink=sink,
-                overrides=overrides,
-                init_vars=init_vars,
-                batch_size=2,
+            options=api.DemandRunOptions(
+                security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                template=api.DemandRunTemplateOptions(init_vars=init_vars),
+                runtime=api.DemandRunRuntimeOptions(batch_size=2),
+                outputs=api.DemandRunOutputOptions(overrides=overrides, capture=api.CaptureRows()),
             ),
         )
-        rows = sink.get_data()
+        captured_rows = run_result.captured_rows
+        rows = [] if captured_rows is None else list(captured_rows.iter_row_data())
         if not rows:
             return ExampleResult(
                 example_id=_EXAMPLE_ID,
@@ -208,36 +207,44 @@ workflow:
         )
         wf = api.run_workflow(
             str(workflow_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                components=[workflow_batch_size_observer],
-                max_workers=0,
-                init_vars=init_vars,
-                batch_size=2,
+            options=workflow_types_api.WorkflowRunOptions(
+                demand=api.DemandRunOptions(
+                    security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=api.DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=api.DemandRunRuntimeOptions(
+                        components=[workflow_batch_size_observer],
+                        batch_size=2,
+                        max_workers=0,
+                    ),
+                ),
+                runtime=workflow_runtime_options,
+                patches_by_run_id={"r1": workflow_types_api.WorkflowNodePatch(batch_size=5)},
             ),
-            workflow_runtime_options=workflow_runtime_options,
-            run_options_patches_by_run_id={
-                "r1": workflow_types_api.WorkflowRunOptionsPatch(batch_size=5),
-            },
         )
         workflow_batch_sizes = dict(workflow_batch_size_observer.batch_size_by_workflow_node_id)
         preload_calls = get_preload_counter_calls()
         errors = wf.errors()
         duplicate_global = api.run_workflow(
             str(duplicate_workflow_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                demand_diagnostics=api.DemandDiagnosticsPolicy(validate_unique_field_names=False),
+            options=workflow_types_api.WorkflowRunOptions(
+                demand=api.DemandRunOptions(
+                    security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    runtime=api.DemandRunRuntimeOptions(
+                        demand_diagnostics=api.DemandDiagnosticsPolicy(validate_unique_field_names=False),
+                    ),
+                ),
             ),
         )
         duplicate_patch = api.run_workflow(
             str(duplicate_workflow_path),
-            options=api.RunOptions(allowed_modules=_ALLOWED_MODULES),
-            run_options_patches_by_run_id={
-                "dup": workflow_types_api.WorkflowRunOptionsPatch(
-                    demand_diagnostics=api.DemandDiagnosticsOverride(validate_unique_field_names=False)
-                )
-            },
+            options=workflow_types_api.WorkflowRunOptions(
+                demand=api.DemandRunOptions(security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES)),
+                patches_by_run_id={
+                    "dup": workflow_types_api.WorkflowNodePatch(
+                        demand_diagnostics=api.DemandDiagnosticsOverride(validate_unique_field_names=False),
+                    )
+                },
+            ),
         )
         duplicate_global_errors = duplicate_global.errors()
         duplicate_patch_errors = duplicate_patch.errors()

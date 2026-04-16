@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
-from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, compile
 from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
 
 
@@ -27,7 +27,9 @@ main_source:
     with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]))
+            ),
         )
 
     assert any(env.path == "retry" for env in excinfo.value.errors)
@@ -50,10 +52,12 @@ main_source:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]),
-            loader_retry=LoaderRetryPoliciesSpec(
-                default=LoaderRetryPolicySpec(enabled=True, should_retry=mod.should_retry, max_attempts=5)
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+            runtime=DemandRunRuntimeOptions(
+                loader_retry=LoaderRetryPoliciesSpec(
+                    default=LoaderRetryPolicySpec(enabled=True, should_retry=mod.should_retry, max_attempts=5)
+                )
             ),
         ),
     )
@@ -81,9 +85,9 @@ main_source:
     with pytest.raises(ValueError, match="requires should_retry"):
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]),
-                loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(enabled=True)),
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+                runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(enabled=True))),
             ),
         )
 
@@ -104,9 +108,11 @@ main_source:
     with pytest.raises(ValueError, match="Unknown loader_retry.by_loader keys"):
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]),
-                loader_retry=LoaderRetryPoliciesSpec(by_loader={"unknown": LoaderRetryPolicySpec(enabled=False)}),
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+                runtime=DemandRunRuntimeOptions(
+                    loader_retry=LoaderRetryPoliciesSpec(by_loader={"unknown": LoaderRetryPolicySpec(enabled=False)})
+                ),
             ),
         )
 
@@ -137,7 +143,9 @@ sources:
     with pytest.raises(ScalimYamlValidationError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]))
+            ),
         )
 
     assert any(env.path in {"main_source.retry", "sources.customers.retry"} for env in excinfo.value.errors)
@@ -164,13 +172,15 @@ sources:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]),
-            loader_retry=LoaderRetryPoliciesSpec(
-                by_loader={
-                    "orders": LoaderRetryPolicySpec(enabled=True, should_retry=mod.should_retry, max_attempts=2),
-                    "customers": LoaderRetryPolicySpec(enabled=True, should_retry=mod.should_retry, max_attempts=3),
-                }
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+            runtime=DemandRunRuntimeOptions(
+                loader_retry=LoaderRetryPoliciesSpec(
+                    by_loader={
+                        "orders": LoaderRetryPolicySpec(enabled=True, should_retry=mod.should_retry, max_attempts=2),
+                        "customers": LoaderRetryPolicySpec(enabled=True, should_retry=mod.should_retry, max_attempts=3),
+                    }
+                )
             ),
         ),
     )
@@ -196,9 +206,9 @@ main_source:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"]),
-            loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(enabled=False)),
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.loader_retry_allowlist_mod"])),
+            runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(enabled=False))),
         ),
     )
     assert compilation.request.loader_retry is None

@@ -13,7 +13,7 @@ from ....vendor.dataclassesx import replace
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig
 from ..schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
-from .contracts import OutputOverride, OutputsDefaultsOverride, ResourcesOverride, RunOptions
+from .contracts import DemandRunOptions, OutputOverride, OutputsDefaultsOverride, ResourcesOverride
 
 
 def apply_default_book_binding_to_outputs(
@@ -210,9 +210,9 @@ def output_overrides_require_unique_effective_field_display_names(
 def options_require_unique_effective_field_display_names(
     config: DemandConfig,
     *,
-    options: RunOptions,
+    options: DemandRunOptions,
 ) -> bool:
-    overrides = options.overrides
+    overrides = options.outputs.overrides
     outputs_override = None if overrides is None else overrides.outputs
     defaults = None if overrides is None else overrides.outputs_defaults
     resources_override = None if overrides is None else overrides.resources

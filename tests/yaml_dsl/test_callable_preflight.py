@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, compile
 from scalim.dsl.yaml_dsl.params_template import CompiledParamsTemplate, LiteralNode
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
 from scalim.dsl.yaml_dsl.runtime._internal.callable_preflight import ScalimCallablePreflightError
@@ -42,12 +42,14 @@ sources:
     with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(
-                    [
-                        "tests.fixtures.callable_preflight_mod",
-                        "tests.fixtures.source_normalize_loaders",
-                    ]
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(
+                    allowed_modules=frozenset(
+                        [
+                            "tests.fixtures.callable_preflight_mod",
+                            "tests.fixtures.source_normalize_loaders",
+                        ]
+                    )
                 )
             ),
         )
@@ -97,12 +99,14 @@ sources:
     yaml_path = _write(tmp_path, yaml_text)
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(
-                [
-                    "tests.fixtures.callable_preflight_mod",
-                    "tests.fixtures.source_normalize_loaders",
-                ]
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(
+                allowed_modules=frozenset(
+                    [
+                        "tests.fixtures.callable_preflight_mod",
+                        "tests.fixtures.source_normalize_loaders",
+                    ]
+                )
             )
         ),
     )
@@ -129,12 +133,14 @@ sources:
     with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(
-                    [
-                        "tests.fixtures.callable_preflight_mod",
-                        "tests.fixtures.source_normalize_loaders",
-                    ]
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(
+                    allowed_modules=frozenset(
+                        [
+                            "tests.fixtures.callable_preflight_mod",
+                            "tests.fixtures.source_normalize_loaders",
+                        ]
+                    )
                 )
             ),
         )
@@ -163,12 +169,14 @@ sources:
     with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(
-                    [
-                        "tests.fixtures.callable_preflight_mod",
-                        "tests.fixtures.source_normalize_loaders",
-                    ]
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(
+                    allowed_modules=frozenset(
+                        [
+                            "tests.fixtures.callable_preflight_mod",
+                            "tests.fixtures.source_normalize_loaders",
+                        ]
+                    )
                 )
             ),
         )
@@ -193,12 +201,8 @@ main_source:
     with pytest.raises(ScalimResolverError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(
-                    [
-                        "tests.fixtures.callable_preflight_mod",
-                    ]
-                )
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.callable_preflight_mod"]))
             ),
         )
     msg = str(excinfo.value)
@@ -225,10 +229,12 @@ main_source:
     with pytest.raises(ScalimCallablePreflightError) as excinfo:
         _ = compile(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
-                loader_retry=LoaderRetryPoliciesSpec(
-                    default=LoaderRetryPolicySpec(enabled=True, should_retry=bad_should_retry, max_attempts=2)
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"])),
+                runtime=DemandRunRuntimeOptions(
+                    loader_retry=LoaderRetryPoliciesSpec(
+                        default=LoaderRetryPolicySpec(enabled=True, should_retry=bad_should_retry, max_attempts=2)
+                    )
                 ),
             ),
         )
@@ -288,10 +294,12 @@ main_source:
 
     compilation = compile(
         str(yaml_path),
-        options=RunOptions(
-            allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"]),
-            loader_retry=LoaderRetryPoliciesSpec(
-                default=LoaderRetryPolicySpec(enabled=True, should_retry=_NoNameCallable(), max_attempts=2)
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.source_normalize_loaders"])),
+            runtime=DemandRunRuntimeOptions(
+                loader_retry=LoaderRetryPoliciesSpec(
+                    default=LoaderRetryPolicySpec(enabled=True, should_retry=_NoNameCallable(), max_attempts=2)
+                )
             ),
         ),
     )

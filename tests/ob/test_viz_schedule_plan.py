@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, compile
 from scalim.planning import PlanBuilder
 from scalim.planning.viz_schedule import _build_layers, _build_ref_deps
 
@@ -60,7 +60,10 @@ sources:
 """,
     )
 
-    compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+    compilation = compile(
+        str(yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))),
+    )
     plan = PlanBuilder(compilation.demand_ir).build(targets=["country_name", "pay_method", "country_id"])
 
     schedule_plan = plan.to_viz_schedule_plan()

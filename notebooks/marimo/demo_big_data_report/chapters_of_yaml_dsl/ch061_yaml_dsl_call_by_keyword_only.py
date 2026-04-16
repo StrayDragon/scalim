@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim.execution.run_ir import run_ir
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -84,10 +85,10 @@ outputs:
         try:
             _ = compile_yaml(
                 str(bad_yaml),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    init_vars=init_vars,
-                    batch_size=2,
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=DemandRunRuntimeOptions(batch_size=2),
                 ),
             )
         except Exception as exc:  # noqa: BLE001
@@ -135,10 +136,10 @@ outputs:
         try:
             compilation = compile_yaml(
                 str(good_yaml),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    init_vars=init_vars,
-                    batch_size=2,
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=DemandRunRuntimeOptions(batch_size=2),
                 ),
             )
             core = run_ir(compilation.demand_ir, compilation.request)

@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -52,10 +53,10 @@ outputs:
         try:
             _ = compile_yaml(
                 str(bad_yaml),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    init_vars={"out_path_detail": str(out_csv)},
-                    batch_size=2,
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars={"out_path_detail": str(out_csv)}),
+                    runtime=DemandRunRuntimeOptions(batch_size=2),
                 ),
             )
         except Exception as exc:  # noqa: BLE001

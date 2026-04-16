@@ -8,11 +8,13 @@ from scalim.dsl.yaml_dsl import (
     BookExportXlsxOverride,
     BookWriteDefaultsOverride,
     BookResourceOverride,
+    DemandRunOptions,
+    DemandRunSecurityOptions,
     FileResourceOverride,
     ResourcesOverride,
-    RunOptions,
     RunOverrides,
 )
+from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_workflow_injected
 from scalim.dsl.yaml_dsl import workflow_entrypoints as entrypoints_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookBudgetConfig,
@@ -23,7 +25,7 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
     ResourcesConfig,
 )
 from scalim.dsl.yaml_dsl.workflow import WorkflowConfig
-from scalim.dsl.yaml_dsl.workflow_types import WorkflowRun, WorkflowRunOptionsPatch, WorkflowRuntimeOptions
+from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch, WorkflowRun, WorkflowRunOptions, WorkflowRuntimeOptions
 
 
 def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> None:
@@ -167,23 +169,24 @@ def test_workflow_entrypoints_lifecycle_skips_merge_when_patch_resources_is_none
     monkeypatch.setattr(entrypoints_mod, "load_workflow_config_from_path", _fake_load_workflow_config_from_path)
     monkeypatch.setattr(entrypoints_mod, "compile_workflow_ir", _stop_compile)
 
-    base_options = RunOptions(allowed_modules=frozenset(["tests"]))
-    patches = {"r1": WorkflowRunOptionsPatch(overrides=RunOverrides())}
+    demand = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests"])))
+    options = WorkflowRunOptions(
+        demand=demand,
+        patches_by_run_id={"r1": WorkflowNodePatch(overrides=RunOverrides())},
+        runtime=WorkflowRuntimeOptions.preset_default(),
+    )
 
     with pytest.raises(_Stop):
         entrypoints_mod.run_workflow_lifecycle_until_preflight(
             "wf.yaml",
-            base_options=base_options,
-            path_aliases=None,
-            run_options_patches_by_run_id=patches,
-            workflow_runtime_options=WorkflowRuntimeOptions.preset_default(),
+            options=options,
         )
 
 
 def test_workflow_entrypoints_run_workflow_skips_bundle_viz_injection_when_patch_overrides_is_explicit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    base_options = RunOptions(allowed_modules=frozenset(["tests"]))
+    base_options = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests"])))
 
     lifecycle = SimpleNamespace(
         parse=SimpleNamespace(workflow_yaml_path="wf.yaml"),
@@ -195,7 +198,7 @@ def test_workflow_entrypoints_run_workflow_skips_bundle_viz_injection_when_patch
         effective=SimpleNamespace(
             bundle_viz_base_config=None,
             options_by_run_id={"r1": base_options},
-            run_options_patches_by_run_id={"r1": WorkflowRunOptionsPatch(overrides=None)},
+            patches_by_run_id={"r1": WorkflowNodePatch(overrides=None)},
         ),
     )
     monkeypatch.setattr(entrypoints_mod, "run_workflow_lifecycle_until_preflight", lambda *_a, **_k: lifecycle)
@@ -205,7 +208,7 @@ def test_workflow_entrypoints_run_workflow_skips_bundle_viz_injection_when_patch
 
     captured: dict = {}
 
-    def _fake_compile_demand_yaml(path: str, *, options: RunOptions):  # type: ignore[no-untyped-def]
+    def _fake_compile_demand_yaml(path: str, *, options: DemandRunOptions):  # type: ignore[no-untyped-def]
         captured["path"] = path
         captured["options"] = options
         return object()
@@ -231,12 +234,8 @@ def test_workflow_entrypoints_run_workflow_skips_bundle_viz_injection_when_patch
 
     monkeypatch.setattr(entrypoints_mod, "run_workflow_ir", _fake_run_workflow_ir)
 
+    options = WorkflowRunOptions(demand=base_options, patches_by_run_id={"r1": WorkflowNodePatch(overrides=None)})
     with pytest.raises(_Stop):
-        entrypoints_mod.run_workflow(
-            "wf.yaml",
-            options=base_options,
-            run_options_patches_by_run_id={"r1": WorkflowRunOptionsPatch(overrides=None)},
-            compile_demand_yaml_fn=_fake_compile_demand_yaml,
-        )
+        run_workflow_injected("wf.yaml", options=options, compile_demand_yaml_fn=_fake_compile_demand_yaml)
 
-    assert captured["options"].overrides is None
+    assert captured["options"].outputs.overrides is None

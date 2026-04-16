@@ -58,7 +58,9 @@ from .contracts import (
     BookExportXlsxOverride,
     BookResourceOverride,
     BookWriteDefaultsOverride,
+    CaptureRows,
     Compilation,
+    DemandRunOptions,
     FileResourceOverride,
     OutputExtraSheetOverride,
     OutputExtrasOverride,
@@ -68,7 +70,6 @@ from .contracts import (
     OutputWriteOverride,
     ResolverTrustedMode,
     ResourcesOverride,
-    RunOptions,
     UnsetType,
 )
 from .conversion import ConfigToIRConverter
@@ -182,11 +183,11 @@ def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) 
     return OutputWriteConfig(include_header=include_header, header_fields_output_by=header_fields_output_by)
 
 
-def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
+def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: DemandRunOptions) -> DemandConfig:
     next_config = config
 
-    if not isinstance(options.batch_size, UnsetType):
-        raw = options.batch_size
+    if not isinstance(options.runtime.batch_size, UnsetType):
+        raw = options.runtime.batch_size
         if raw is None:
             next_config = replace(next_config, batch_size=None)
         else:
@@ -198,14 +199,14 @@ def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: Run
                 raise ValueError(msg)
             next_config = replace(next_config, batch_size=int(raw))
 
-    if options.demand_failure_policy is not None:
-        normalized = str(options.demand_failure_policy or "").strip()
+    if options.runtime.demand_failure_policy is not None:
+        normalized = str(options.runtime.demand_failure_policy or "").strip()
         if normalized not in _DEMAND_FAILURE_POLICIES:
             msg = "demand_failure_policy={!r} is invalid; expected one of: {}".format(normalized, ", ".join(_DEMAND_FAILURE_POLICIES))
             raise ValueError(msg)
         next_config = replace(next_config, failure_policy=str(normalized))
 
-    demand_diagnostics = options.demand_diagnostics
+    demand_diagnostics = options.runtime.demand_diagnostics
     if demand_diagnostics is not None:
         next_config = replace(
             next_config,
@@ -251,8 +252,8 @@ def _parse_output_extra_sheet_override(
     )
 
 
-def _apply_output_extras_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
-    overrides = options.overrides
+def _apply_output_extras_overrides(config: DemandConfig, *, options: DemandRunOptions) -> DemandConfig:
+    overrides = options.outputs.overrides
     if overrides is None or overrides.output_extras is None:
         return config
     extras = overrides.output_extras
@@ -639,9 +640,9 @@ def _resolve_effective_outputs_and_path(
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
-    options: RunOptions,
+    options: DemandRunOptions,
 ) -> Tuple[Tuple[OutputTargetConfig, ...], str]:
-    overrides = options.overrides
+    overrides = options.outputs.overrides
     overrides_outputs = overrides.outputs if overrides is not None else None
     default_book_id = _parse_overrides_outputs_defaults_book_id(
         None if overrides is None else overrides.outputs_defaults,
@@ -972,8 +973,8 @@ def _apply_resources_override(config: DemandConfig, override: ResourcesOverride)
     return replace(config, resources=ResourcesConfig(books=merged_books, files=merged_files))
 
 
-def _apply_io_overrides(config: DemandConfig, *, options: RunOptions) -> DemandConfig:
-    overrides = options.overrides
+def _apply_io_overrides(config: DemandConfig, *, options: DemandRunOptions) -> DemandConfig:
+    overrides = options.outputs.overrides
     if overrides is None:
         return config
 
@@ -993,7 +994,7 @@ def _compile_output_composition_for_outputs(
     effective_outputs: Tuple[OutputTargetConfig, ...],
     outputs_path: str,
     yaml_base_dir: str,
-    options: RunOptions,
+    options: DemandRunOptions,
     resolver: SecurePythonReferenceResolver,
     version_id: str,
 ) -> Optional["OutputCompositionSpec"]:
@@ -1011,11 +1012,11 @@ def _compile_output_composition_for_outputs(
             demand_ir,
             version_id=str(version_id),
             resolver=resolver,
-            init_vars=options.init_vars,
+            init_vars=options.template.init_vars,
             yaml_base_dir=str(yaml_base_dir),
-            workflow_managed_output_ids=options.workflow_managed_output_ids,
+            workflow_managed_output_ids=options.outputs.workflow_managed_output_ids,
             outputs_path=outputs_path,
-            skip_extra_sheets_without_workbook=options.overrides is not None and options.overrides.outputs is not None,
+            skip_extra_sheets_without_workbook=(options.outputs.overrides is not None and options.outputs.overrides.outputs is not None),
         ),
     )
 
@@ -1025,7 +1026,7 @@ def build_request(
     demand_ir: DemandIr,
     *,
     yaml_base_dir: str,
-    options: RunOptions,
+    options: DemandRunOptions,
     resolver: SecurePythonReferenceResolver,
     runtime_bindings: "RuntimeBindings",
 ) -> ExecutionRequest:
@@ -1033,7 +1034,7 @@ def build_request(
     effective_config = _apply_demand_runtime_policy_overrides(effective_config, options=options)
     effective_config = _apply_output_extras_overrides(effective_config, options=options)
     effective_outputs, outputs_path = _resolve_effective_outputs_and_path(effective_config, demand_ir, options=options)
-    version_id = str(options.output_version_id) if options.output_version_id is not None else generate_run_id()
+    version_id = str(options.outputs.output_version_id) if options.outputs.output_version_id is not None else generate_run_id()
     output_composition = _compile_output_composition_for_outputs(
         effective_config,
         demand_ir,
@@ -1057,62 +1058,63 @@ def build_request(
         )
 
     observability: Optional[ObservabilitySpec] = None
-    components = list(options.components or [])
+    components = list(options.runtime.components or [])
 
-    if options.overrides is not None:
-        viz_config = options.overrides.viz_config
+    if options.outputs.overrides is not None:
+        viz_config = options.outputs.overrides.viz_config
         if not isinstance(viz_config, UnsetType) and viz_config is not None:
             observability = ObservabilitySpec(viz_config=viz_config)
     if not components:
         components = None
 
-    guardrails = options.guardrails or GuardrailsPolicy.disabled()
-    loader_retry = _compile_loader_retry_policies(effective_config, overrides=options.loader_retry)
-    batch_size = effective_config.batch_size if isinstance(options.batch_size, UnsetType) else options.batch_size
+    guardrails = options.runtime.guardrails or GuardrailsPolicy.disabled()
+    loader_retry = _compile_loader_retry_policies(effective_config, overrides=options.runtime.loader_retry)
+    batch_size = effective_config.batch_size if isinstance(options.runtime.batch_size, UnsetType) else options.runtime.batch_size
 
     return ExecutionRequest(
         export_layout=export_layout,
         output=output_spec,
-        sink=options.sink,
+        sink=None,
         output_composition=output_composition,
         observability=observability,
         guardrails=guardrails,
         loader_retry=loader_retry,
         components=components,
         batch_size=batch_size,
-        parallel_mode=options.parallel_mode,
-        max_workers=options.max_workers,
-        key_normalization=options.key_normalization,
+        parallel_mode=options.runtime.parallel_mode,
+        max_workers=options.runtime.max_workers,
+        key_normalization=options.runtime.key_normalization,
         runtime_bindings=runtime_bindings,
+        capture_in_memory_rows=isinstance(options.outputs.capture, CaptureRows),
     )
 
 
 def compile(  # noqa: A001
     yaml_path: str,
     *,
-    options: RunOptions,
+    options: DemandRunOptions,
 ) -> Compilation:
-    validate_allowlist(allowed_modules=options.allowed_modules, allowed_functions=options.allowed_functions)
+    validate_allowlist(allowed_modules=options.security.allowed_modules, allowed_functions=options.security.allowed_functions)
     config = load_config(
         yaml_path,
-        template_vars=options.template_vars,
-        template_sandbox=options.template_sandbox,
-        rendered_yaml_max_len=options.rendered_yaml_max_len,
-        allowed_yaml_roots=options.allowed_yaml_roots,
+        template_vars=options.template.template_vars,
+        template_sandbox=options.template.template_sandbox,
+        rendered_yaml_max_len=options.template.rendered_yaml_max_len,
+        allowed_yaml_roots=options.security.allowed_yaml_roots,
     )
     config = _apply_demand_runtime_policy_overrides(config, options=options)
     base_module_path = None
     if _config_uses_relative_references(config):
         base_module_path = derive_base_module_path(yaml_path)
     resolver = create_reference_resolver(
-        allowed_modules=options.allowed_modules,
-        allowed_functions=options.allowed_functions,
-        resolver_trusted_mode=options.resolver_trusted_mode,
+        allowed_modules=options.security.allowed_modules,
+        allowed_functions=options.security.allowed_functions,
+        resolver_trusted_mode=options.security.resolver_trusted_mode,
         base_module_path=base_module_path,
-        builtin_callables=options.builtin_callables,
-        public_builtin_callable_ids=options.public_builtin_callable_ids,
+        builtin_callables=options.security.builtin_callables,
+        public_builtin_callable_ids=options.security.public_builtin_callable_ids,
     )
-    demand_ir = compile_ir(config, init_vars=options.init_vars)
+    demand_ir = compile_ir(config, init_vars=options.template.init_vars)
     runtime_bindings = resolve_runtime_bindings(
         demand_ir,
         resolver=resolver,

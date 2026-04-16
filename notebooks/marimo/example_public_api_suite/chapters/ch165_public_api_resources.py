@@ -6,7 +6,6 @@ from typing import Any, Dict, FrozenSet
 
 from scalim.dsl import yaml_dsl as api
 from scalim.shortcuts.resources import outputs
-from scalim.sinks import InMemoryRowSink
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -87,16 +86,16 @@ sources: {}
             outputs_defaults=api.OutputsDefaultsOverride(to=api.OutputDefaultsToOverride(book="report")),
         )
 
-        sink = InMemoryRowSink()
-        _ = api.run(
+        run_result = api.run(
             str(demand_path),
-            options=api.RunOptions(
-                allowed_modules=_ALLOWED_MODULES,
-                overrides=overrides,
-                sink=sink,
-                batch_size=10,
+            options=api.DemandRunOptions(
+                security=api.DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                runtime=api.DemandRunRuntimeOptions(batch_size=10),
+                outputs=api.DemandRunOutputOptions(overrides=overrides, capture=api.CaptureRows()),
             ),
         )
+        captured_rows = run_result.captured_rows
+        rows = [] if captured_rows is None else list(captured_rows.iter_row_data())
 
         latest = outputs.load_latest_outputs(output_root)
         report_xlsx = outputs.latest_book_path(output_root, book_id="report")
@@ -113,7 +112,7 @@ sources: {}
             "report_xlsx": str(report_xlsx),
             "detail_csv": str(detail_csv),
             "touched_public_all": touched,
-            "rows": len(sink.get_data()),
+            "rows": len(rows),
         }
         return ExampleResult(
             example_id=_EXAMPLE_ID,

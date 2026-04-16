@@ -101,12 +101,16 @@ def _(mo, yaml_path):
 @app.cell
 def _(yaml_path):
     # region SCALIM-SKILL:example-full:constraints
-    from scalim.dsl.yaml_dsl import RunOptions, compile
+    from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, compile
 
     _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
     try:
-        compilation = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset([_loaders_module])))
+        allowed_modules = frozenset([_loaders_module])
+        compilation = compile(
+            str(yaml_path),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=allowed_modules)),
+        )
         print("✅ `compile()` 校验/加载通过!")
         validation_passed = True
         demand_config = compilation.config
@@ -179,26 +183,33 @@ def _(mo):
 @app.cell
 def _(Path, yaml_path):
     # region SCALIM-SKILL:example-full:run-yaml
-    from scalim.dsl.yaml_dsl import RunOptions, run
-    from scalim.sinks import InMemoryRowSink
+    from scalim.dsl.yaml_dsl import (
+        CaptureRows,
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunSecurityOptions,
+        DemandRunTemplateOptions,
+        run,
+    )
 
     # 注意: `run()` 需要 `allowlist` 配置
     _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
     try:
-        sink = InMemoryRowSink()
+        allowed_modules = frozenset([_loaders_module])
         _init_vars = {"order_ids": []}
         result = run(
             str(yaml_path),
-            options=RunOptions(
-                allowed_modules=frozenset([_loaders_module]),
-                sink=sink,
-                init_vars=_init_vars,
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+                template=DemandRunTemplateOptions(init_vars=_init_vars),
+                outputs=DemandRunOutputOptions(capture=CaptureRows()),
             ),
         )
         print("✅ `run()` 执行成功!")
         print("   总行数:", result.total_rows)
         print("   输出路径:", result.output_path or "(内存)")
+        print("   captured_rows:", "enabled" if result.captured_rows is not None else "disabled")
     except Exception as e:
         print("⚠️ `run()` 执行失败:", e)
         result = None

@@ -8,7 +8,14 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from scalim.dsl.yaml_dsl import RunOptions, run_workflow
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    WorkflowRunOptions,
+    run_workflow,
+)
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRuntimeOptions
 from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -114,16 +121,21 @@ def run_workflow_demo_big_data_report(
                         execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
                         cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
                     )
-                    result = run_workflow(
-                        str(wf_copy),
-                        options=RunOptions(
+                    demand_options = DemandRunOptions(
+                        security=DemandRunSecurityOptions(
                             allowed_modules=allowed_modules,
-                            init_vars={"order_ids": []},
-                            batch_size=30,
                             allowed_yaml_roots=(str(repo_root),),
                         ),
-                        workflow_runtime_options=workflow_runtime_options,
-                        path_aliases={"@": str(repo_root)},
+                        template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
+                        runtime=DemandRunRuntimeOptions(batch_size=30),
+                    )
+                    result = run_workflow(
+                        str(wf_copy),
+                        options=WorkflowRunOptions(
+                            demand=demand_options,
+                            runtime=workflow_runtime_options,
+                            path_aliases={"@": str(repo_root)},
+                        ),
                     )
                 finally:
                     os.chdir(prev_cwd)

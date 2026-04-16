@@ -6,7 +6,15 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, RunOverrides, run as run_yaml
+from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    RunOverrides,
+    run as run_yaml,
+)
 from scalim.ob.presets.viz import VizObserverConfig
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -57,11 +65,11 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
         try:
             result = run_yaml(
                 str(yaml_path),
-                options=RunOptions(
-                    allowed_modules=_ALLOWED_MODULES,
-                    batch_size=2,
-                    init_vars=init_vars,
-                    overrides=overrides,
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    template=DemandRunTemplateOptions(init_vars=init_vars),
+                    runtime=DemandRunRuntimeOptions(batch_size=2),
+                    outputs=DemandRunOutputOptions(overrides=overrides),
                 ),
             )
             core = result.core

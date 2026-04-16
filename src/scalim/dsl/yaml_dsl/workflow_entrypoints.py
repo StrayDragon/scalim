@@ -9,7 +9,7 @@
 # pragma: allow-c901-file plan: c10
 
 import logging
-from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, cast
 
 from ...execution.run_ir import ExecutionRequest, ExecutionResult
 from ...hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch_size_signal
@@ -28,23 +28,30 @@ from .runtime.contracts import (
     BookWriteDefaultsOverride,
     DemandDiagnosticsOverride,
     DemandDiagnosticsPolicy,
+    DemandRunOptions,
+    DemandRunResult,
     FileResourceOverride,
     ResourcesOverride,
-    RunOptions,
     RunOverrides,
-    RunResult,
     UnsetType,
 )
-from .runtime.normalize import normalize_public_run_options
+from .runtime.normalize import normalize_public_demand_run_options
 from .schema_dsl.models import BookConfig, DemandConfig, FileConfig, ResourcesConfig
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig
 from .workflow_compile import compile_workflow_ir, derive_cache_pool_consumers
 from .workflow_load import load_workflow_config_from_path
 from .workflow_preflight import WORKFLOW_PREFLIGHT_CHECKS, WorkflowPreflightContext, WorkflowPreflightRun, run_workflow_preflight
-from .workflow_types import ComponentsExtend, ComponentsInherit, ComponentsReplace, WorkflowRunOptionsPatch, WorkflowRuntimeOptions
+from .workflow_types import (
+    ComponentsExtend,
+    ComponentsInherit,
+    ComponentsReplace,
+    WorkflowNodePatch,
+    WorkflowRunOptions,
+)
 
 _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = (
-    "workflow bundle viz requires run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))"
+    "workflow bundle viz requires run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions("
+    "outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=...)))))"
 )
 
 _policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.workflow.policy")
@@ -217,20 +224,20 @@ def _merge_node_overrides(
     return replace(base_overrides, resources=merged_resources)
 
 
-def _validate_run_options_patches_by_run_id(
-    patches: Optional[Mapping[str, object]],
+def _validate_patches_by_run_id(  # noqa: C901
+    patches: Optional[Mapping[str, Any]],
     *,
     known_run_ids: FrozenSet[str],
-) -> Optional[Mapping[str, WorkflowRunOptionsPatch]]:
+) -> Optional[Mapping[str, WorkflowNodePatch]]:
     if patches is None:
         return None
     items = patches.items()
 
     unknown: List[str] = []
-    typed: Dict[str, WorkflowRunOptionsPatch] = {}
+    typed: Dict[str, WorkflowNodePatch] = {}
     for raw_run_id, raw_patch in items:
         if not isinstance(raw_run_id, str):
-            msg = "run_options_patches_by_run_id keys must be workflow run ids (str)"
+            msg = "patches_by_run_id keys must be workflow run ids (str)"
             raise TypeError(msg)
         run_id = raw_run_id
         if run_id not in known_run_ids:
@@ -238,41 +245,58 @@ def _validate_run_options_patches_by_run_id(
             continue
 
         if isinstance(raw_patch, dict):
-            msg = "run_options_patches_by_run_id['{}'] must be a typed WorkflowRunOptionsPatch (dict patches are not supported). ".format(
+            raw_patch_mapping = cast("Mapping[object, object]", raw_patch)  # pragma: allow-cast dict patch introspection boundary
+            forbidden_field_names = frozenset(
+                {
+                    "allowed_modules",
+                    "allowed_functions",
+                    "resolver_trusted_mode",
+                    "allowed_yaml_roots",
+                    "builtin_callables",
+                    "public_builtin_callable_ids",
+                }
+            )
+            forbidden: List[str] = []
+            for raw_key in raw_patch_mapping:
+                if isinstance(raw_key, str) and raw_key in forbidden_field_names:
+                    forbidden.append(raw_key)
+            forbidden.sort()
+            if forbidden:
+                msg = "patches_by_run_id['{}'].{} is not patchable (security boundary)".format(run_id, forbidden[0])
+                raise TypeError(msg)
+            msg = "patches_by_run_id['{}'] must be a typed WorkflowNodePatch (dict patches are not supported). ".format(
                 run_id,
-            ) + "Example: run_options_patches_by_run_id={{'{}': WorkflowRunOptionsPatch(batch_size=5000)}}".format(run_id)
+            ) + "Example: patches_by_run_id={{'{}': WorkflowNodePatch(batch_size=5000)}}".format(run_id)
             raise TypeError(msg)
-        if not isinstance(raw_patch, WorkflowRunOptionsPatch):
-            msg = "run_options_patches_by_run_id['{}'] must be a WorkflowRunOptionsPatch".format(run_id)
+        if not isinstance(raw_patch, WorkflowNodePatch):
+            msg = "patches_by_run_id['{}'] must be a WorkflowNodePatch".format(run_id)
             raise TypeError(msg)
         typed[run_id] = raw_patch
 
     if unknown:
         known_ids_text = ", ".join(sorted(known_run_ids))
-        msg = "Unknown workflow run id(s) in run_options_patches_by_run_id: {}. Known run ids: {}".format(
-            ", ".join(sorted(unknown)), known_ids_text
-        )
-        raise ScalimWorkflowConfigError(msg, path="run_workflow.run_options_patches_by_run_id")
+        msg = "Unknown workflow run id(s) in patches_by_run_id: {}. Known run ids: {}".format(", ".join(sorted(unknown)), known_ids_text)
+        raise ScalimWorkflowConfigError(msg, path="run_workflow.options.patches_by_run_id")
 
     return typed
 
 
-def _apply_workflow_run_options_patch_demand_diagnostics(base: RunOptions, patch: WorkflowRunOptionsPatch) -> RunOptions:
+def _apply_workflow_node_patch_demand_diagnostics(base: DemandRunOptions, patch: WorkflowNodePatch) -> DemandRunOptions:
     demand_diagnostics = patch.demand_diagnostics
     if isinstance(demand_diagnostics, UnsetType):
         return base
     if demand_diagnostics is None:
-        return replace(base, demand_diagnostics=None)
+        return replace(base, runtime=replace(base.runtime, demand_diagnostics=None))
 
     if not isinstance(demand_diagnostics, DemandDiagnosticsOverride):
-        msg = "WorkflowRunOptionsPatch.demand_diagnostics must be a DemandDiagnosticsOverride or None"
+        msg = "WorkflowNodePatch.demand_diagnostics must be a DemandDiagnosticsOverride or None"
         raise TypeError(msg)
     if isinstance(demand_diagnostics.include_full_error_message, UnsetType) and isinstance(
         demand_diagnostics.validate_unique_field_names, UnsetType
     ):
         return base
 
-    base_policy = base.demand_diagnostics
+    base_policy = base.runtime.demand_diagnostics
     base_include_full = False if base_policy is None else bool(base_policy.include_full_error_message)
     base_validate_unique = True if base_policy is None else bool(base_policy.validate_unique_field_names)
 
@@ -289,14 +313,17 @@ def _apply_workflow_run_options_patch_demand_diagnostics(base: RunOptions, patch
 
     return replace(
         base,
-        demand_diagnostics=DemandDiagnosticsPolicy(
-            include_full_error_message=include_full_error_message,
-            validate_unique_field_names=validate_unique_field_names,
+        runtime=replace(
+            base.runtime,
+            demand_diagnostics=DemandDiagnosticsPolicy(
+                include_full_error_message=include_full_error_message,
+                validate_unique_field_names=validate_unique_field_names,
+            ),
         ),
     )
 
 
-def _apply_workflow_run_options_patch_parallelism(base: RunOptions, patch: WorkflowRunOptionsPatch) -> RunOptions:
+def _apply_workflow_node_patch_parallelism(base: DemandRunOptions, patch: WorkflowNodePatch) -> DemandRunOptions:
     parallel_mode = patch.parallel_mode
     max_workers = patch.max_workers
     if isinstance(parallel_mode, UnsetType) and isinstance(max_workers, UnsetType):
@@ -306,64 +333,65 @@ def _apply_workflow_run_options_patch_parallelism(base: RunOptions, patch: Workf
 
     if not isinstance(parallel_mode, UnsetType):
         if not isinstance(parallel_mode, str):
-            msg = "WorkflowRunOptionsPatch.parallel_mode must be one of: seq|adaptive (parallel_mode=seq|adaptive)"
+            msg = "WorkflowNodePatch.parallel_mode must be one of: seq|adaptive (parallel_mode=seq|adaptive)"
             raise TypeError(msg)
         normalized_parallel_mode = str(parallel_mode).strip().lower()
         if normalized_parallel_mode not in ("seq", "adaptive"):
-            msg = "WorkflowRunOptionsPatch.parallel_mode must be one of: seq|adaptive (parallel_mode=seq|adaptive)"
+            msg = "WorkflowNodePatch.parallel_mode must be one of: seq|adaptive (parallel_mode=seq|adaptive)"
             raise ValueError(msg)
-        next_options = replace(next_options, parallel_mode=normalized_parallel_mode)
+        next_options = replace(next_options, runtime=replace(next_options.runtime, parallel_mode=normalized_parallel_mode))
 
     if not isinstance(max_workers, UnsetType):
         if not isinstance(max_workers, int) or isinstance(max_workers, bool):
-            msg = "WorkflowRunOptionsPatch.max_workers must be an int and satisfy max_workers>=0 (0=auto)"
+            msg = "WorkflowNodePatch.max_workers must be an int and satisfy max_workers>=0 (0=auto)"
             raise TypeError(msg)
         if int(max_workers) < 0:
-            msg = "WorkflowRunOptionsPatch.max_workers must satisfy max_workers>=0 (0=auto)"
+            msg = "WorkflowNodePatch.max_workers must satisfy max_workers>=0 (0=auto)"
             raise ValueError(msg)
-        next_options = replace(next_options, max_workers=int(max_workers))
+        next_options = replace(next_options, runtime=replace(next_options.runtime, max_workers=int(max_workers)))
 
     return next_options
 
 
-def _apply_workflow_run_options_patch(base: RunOptions, patch: WorkflowRunOptionsPatch) -> RunOptions:
+def _apply_workflow_node_patch(base: DemandRunOptions, patch: WorkflowNodePatch) -> DemandRunOptions:
     next_options = base
 
     batch_size = patch.batch_size
     if not isinstance(batch_size, UnsetType):
-        next_options = replace(next_options, batch_size=batch_size)
+        next_options = replace(next_options, runtime=replace(next_options.runtime, batch_size=batch_size))
 
-    next_options = _apply_workflow_run_options_patch_parallelism(next_options, patch)
+    next_options = _apply_workflow_node_patch_parallelism(next_options, patch)
 
     demand_failure_policy = patch.demand_failure_policy
     if not isinstance(demand_failure_policy, UnsetType):
-        next_options = replace(next_options, demand_failure_policy=demand_failure_policy)
+        next_options = replace(next_options, runtime=replace(next_options.runtime, demand_failure_policy=demand_failure_policy))
 
-    next_options = _apply_workflow_run_options_patch_demand_diagnostics(next_options, patch)
+    next_options = _apply_workflow_node_patch_demand_diagnostics(next_options, patch)
 
     guardrails = patch.guardrails
     if not isinstance(guardrails, UnsetType):
-        next_options = replace(next_options, guardrails=guardrails)
+        next_options = replace(next_options, runtime=replace(next_options.runtime, guardrails=guardrails))
 
     loader_retry = patch.loader_retry
     if not isinstance(loader_retry, UnsetType):
-        next_options = replace(next_options, loader_retry=loader_retry)
+        next_options = replace(next_options, runtime=replace(next_options.runtime, loader_retry=loader_retry))
 
     overrides = patch.overrides
     if not isinstance(overrides, UnsetType):
-        next_options = replace(next_options, overrides=overrides)
+        next_options = replace(next_options, outputs=replace(next_options.outputs, overrides=overrides))
 
     components_patch = patch.components
+    base_components = list(next_options.runtime.components or [])
     if isinstance(components_patch, ComponentsInherit):
         return next_options
     if isinstance(components_patch, ComponentsReplace):
-        return replace(next_options, components=list(components_patch.items))
+        return replace(next_options, runtime=replace(next_options.runtime, components=list(components_patch.items)))
     if isinstance(components_patch, ComponentsExtend):
-        merged = list(next_options.components or [])
+        merged = base_components
         merged.extend(list(components_patch.items))
-        return replace(next_options, components=merged)
+        return replace(next_options, runtime=replace(next_options.runtime, components=merged))
 
-    msg = "WorkflowRunOptionsPatch.components must be one of ComponentsInherit/ComponentsReplace/ComponentsExtend"
+    msg = "WorkflowNodePatch.components must be one of ComponentsInherit/ComponentsReplace/ComponentsExtend"
     raise TypeError(msg)
 
 
@@ -371,7 +399,7 @@ if TYPE_CHECKING:
     from ...ob.presets.viz import VizObserverConfig
 
 
-class _CompilationLike(Protocol):
+class WorkflowCompilationLike(Protocol):
     @property
     def config(self) -> DemandConfig: ...
 
@@ -383,7 +411,10 @@ class _CompilationLike(Protocol):
 
 
 def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional["VizObserverConfig"]:
-    # 工作流 `bundle` 可视化: 通过 `run_workflow(..., options=RunOptions(overrides=RunOverrides(viz_config=...)))` 显式启用.
+    # 工作流 `bundle` 可视化: 通过
+    # `run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(outputs=DemandRunOutputOptions(`
+    # `overrides=RunOverrides(viz_config=...)))))`
+    # 显式启用.
     if overrides is None:
         return None
     viz_config = overrides.viz_config
@@ -393,27 +424,48 @@ def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Option
     bundle_viz_base_config: "VizObserverConfig" = viz_config
     if getattr(bundle_viz_base_config, "has_explicit_paths", lambda: False)():  # pragma: allow-dynattr optional-interface: viz_config
         msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`(请勿设置 `output_path`/`snapshot_path`/`trace_path`)."
-        raise ScalimWorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+        raise ScalimWorkflowConfigError(msg, path="run_workflow.options.demand.outputs.overrides.viz_config")
     output_dir = getattr(bundle_viz_base_config, "output_dir", None)  # pragma: allow-dynattr optional-interface: viz_config
     use_default_output_dir = bool(
         getattr(bundle_viz_base_config, "use_default_output_dir", False)  # pragma: allow-dynattr optional-interface: viz_config
     )
     if not output_dir and not use_default_output_dir:
         msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`, 或设置 `use_default_output_dir=True`."
-        raise ScalimWorkflowConfigError(msg, path="run_workflow.overrides.viz_config")
+        raise ScalimWorkflowConfigError(msg, path="run_workflow.options.demand.outputs.overrides.viz_config")
     return bundle_viz_base_config
 
 
 def _build_demand_run_result_impl(
     core: ExecutionResult,
     *,
-    compilation: _CompilationLike,
+    compilation: WorkflowCompilationLike,
     demand_yaml_path: str,
     workflow_exec_id: str,
     workflow_node_id: str,
 ) -> object:
     _ = workflow_exec_id, workflow_node_id
-    return RunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), sink=None)
+    captured_rows = None
+    capture_enabled = False
+    with_request = compilation
+    try:
+        capture_enabled = bool(
+            getattr(
+                with_request.request,
+                "capture_in_memory_rows",
+                False,
+            )  # pragma: allow-dynattr optional-interface: ExecutionRequest.capture_in_memory_rows
+        )
+    except AttributeError:
+        capture_enabled = False
+
+    if capture_enabled:
+        in_memory_rows = core.in_memory_rows
+        if in_memory_rows is None:
+            msg = "CaptureRows enabled but no rows were captured. This is unexpected; please report a bug."
+            raise RuntimeError(msg)
+        captured_rows = in_memory_rows
+
+    return DemandRunResult(core, config=compilation.config, yaml_path=str(demand_yaml_path), captured_rows=captured_rows)
 
 
 @dataclass(frozen=True)
@@ -438,7 +490,7 @@ class WorkflowLifecycleEffectiveRun:
     demand_path: str
     decl_order: int
     demand_config: DemandConfig
-    options: RunOptions
+    options: DemandRunOptions
 
 
 @dataclass(frozen=True)
@@ -446,8 +498,8 @@ class WorkflowLifecycleEffectiveMergeResult:
     workflow_yaml_path: str
     workflow_ir: WorkflowIr
     runs: Tuple[WorkflowLifecycleEffectiveRun, ...]
-    options_by_run_id: Dict[str, RunOptions]
-    run_options_patches_by_run_id: Optional[Mapping[str, WorkflowRunOptionsPatch]]
+    options_by_run_id: Dict[str, DemandRunOptions]
+    patches_by_run_id: Optional[Mapping[str, WorkflowNodePatch]]
     bundle_viz_base_config: Optional["VizObserverConfig"]
 
 
@@ -458,47 +510,45 @@ class WorkflowLifecyclePreflightResult:
     effective: WorkflowLifecycleEffectiveMergeResult
 
 
-def _normalize_and_validate_workflow_base_options(options: RunOptions) -> RunOptions:
-    base_options = normalize_public_run_options(options)
-    if base_options.sink is not None:
-        msg = (
-            "run_workflow(..., options=RunOptions(sink=...)) is not supported. "
-            "Workflow executes multiple demand runs and closes sinks per-run, so a single shared sink instance would be unsafe. "
-            "Migration: set RunOptions(sink=None). (Per-run sinks may be added via a future sink_factory; not in this release.)"
-        )
-        raise TypeError(msg)
-    return base_options
+def _normalize_and_validate_workflow_options(options: WorkflowRunOptions) -> WorkflowRunOptions:
+    normalized_demand = normalize_public_demand_run_options(options.demand)
+    if normalized_demand is options.demand:
+        return options
+    return replace(options, demand=normalized_demand)
 
 
 def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
     workflow_yaml_path: str,
     *,
-    base_options: RunOptions,
-    path_aliases: Optional[Mapping[str, str]],
-    run_options_patches_by_run_id: Optional[Mapping[str, WorkflowRunOptionsPatch]],
-    workflow_runtime_options: WorkflowRuntimeOptions,
+    options: WorkflowRunOptions,
 ) -> WorkflowLifecyclePreflightResult:
     """测试用 `harness` + `lifecycle` `pipeline` 的 `SSOT`: 执行到 `preflight` 为止(不会启动 `engine`)."""
+    options = _normalize_and_validate_workflow_options(options)
+    base_demand_options = options.demand
+    workflow_runtime_options = options.runtime
+    path_aliases = options.path_aliases
+    patches_by_run_id = options.patches_by_run_id
+
     # 阶段: `parse`
     workflow_path, wf = load_workflow_config_from_path(
         workflow_yaml_path,
-        template_vars=base_options.template_vars,
-        template_sandbox=base_options.template_sandbox,
-        rendered_yaml_max_len=base_options.rendered_yaml_max_len,
+        template_vars=base_demand_options.template.template_vars,
+        template_sandbox=base_demand_options.template.template_sandbox,
+        rendered_yaml_max_len=base_demand_options.template.rendered_yaml_max_len,
     )
     parse = WorkflowLifecycleParseResult(workflow_yaml_path=str(workflow_path), workflow_config=wf)
 
     run_ids = frozenset(run.id for run in wf.runs)
-    typed_run_options_patches_by_run_id = _validate_run_options_patches_by_run_id(run_options_patches_by_run_id, known_run_ids=run_ids)
+    typed_patches_by_run_id = _validate_patches_by_run_id(patches_by_run_id, known_run_ids=run_ids)
 
     # `workflow IR` 的资源编译需要看到每个 `run` 的 `patch` 中对 `resources` 的覆盖,否则会导致:
     # - `demand` 编译期按 `patch` 解析输出路径
     # - 资源管理器按 `base`/`workflow` 资源写入,最终产物路径不一致
-    compile_overrides = base_options.overrides
+    compile_overrides = base_demand_options.outputs.overrides
     compile_resources = None if compile_overrides is None else compile_overrides.resources
-    if typed_run_options_patches_by_run_id is not None:
+    if typed_patches_by_run_id is not None:
         for run in wf.runs:
-            patch = typed_run_options_patches_by_run_id.get(str(run.id))
+            patch = typed_patches_by_run_id.get(str(run.id))
             if patch is None:
                 continue
             patch_overrides = patch.overrides
@@ -520,11 +570,11 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
         wf,
         workflow_yaml_path=workflow_path,
         path_aliases=path_aliases,
-        template_vars=base_options.template_vars,
-        template_sandbox=base_options.template_sandbox,
-        rendered_yaml_max_len=base_options.rendered_yaml_max_len,
-        allowed_yaml_roots=base_options.allowed_yaml_roots,
-        init_vars=base_options.init_vars,
+        template_vars=base_demand_options.template.template_vars,
+        template_sandbox=base_demand_options.template.template_sandbox,
+        rendered_yaml_max_len=base_demand_options.template.rendered_yaml_max_len,
+        allowed_yaml_roots=base_demand_options.security.allowed_yaml_roots,
+        init_vars=base_demand_options.template.init_vars,
         overrides=compile_overrides,
         workflow_runtime_options=workflow_runtime_options,
     )
@@ -551,10 +601,10 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
     # 阶段: 合并 `per-run` `effective options`(`policy-aware` 边界从这里开始)
     workflow_resources_override = _workflow_resources_override(wf)
 
-    bundle_viz_base_config = _extract_bundle_viz_base_config(base_options.overrides)
+    bundle_viz_base_config = _extract_bundle_viz_base_config(base_demand_options.outputs.overrides)
 
     runs: List[WorkflowLifecycleEffectiveRun] = []
-    options_by_run_id: Dict[str, RunOptions] = {}
+    options_by_run_id: Dict[str, DemandRunOptions] = {}
     for node in workflow_ir.nodes:
         if not isinstance(node, WorkflowNodeIr):
             continue
@@ -565,23 +615,23 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
             msg = "Missing workflow structural preload result for run_id={!r}".format(run_id)
             raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
 
-        node_options = base_options
+        node_options = base_demand_options
         if node.init_vars:
-            merged = dict(base_options.init_vars or {})
+            merged = dict(base_demand_options.template.init_vars or {})
             merged.update(dict(node.init_vars))
-            node_options = replace(node_options, init_vars=merged)
+            node_options = replace(node_options, template=replace(node_options.template, init_vars=merged))
 
-        if typed_run_options_patches_by_run_id is not None:
-            patch = typed_run_options_patches_by_run_id.get(run_id)
+        if typed_patches_by_run_id is not None:
+            patch = typed_patches_by_run_id.get(run_id)
             if patch is not None:
-                node_options = _apply_workflow_run_options_patch(node_options, patch)
+                node_options = _apply_workflow_node_patch(node_options, patch)
 
         merged_overrides = _merge_node_overrides(
-            node_options.overrides,
+            node_options.outputs.overrides,
             workflow_resources_override=workflow_resources_override,
         )
-        if merged_overrides is not node_options.overrides:
-            node_options = replace(node_options, overrides=merged_overrides)
+        if merged_overrides is not node_options.outputs.overrides:
+            node_options = replace(node_options, outputs=replace(node_options.outputs, overrides=merged_overrides))
 
         runs.append(
             WorkflowLifecycleEffectiveRun(
@@ -600,7 +650,7 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
         workflow_ir=workflow_ir,
         runs=runs_sorted,
         options_by_run_id=options_by_run_id,
-        run_options_patches_by_run_id=typed_run_options_patches_by_run_id,
+        patches_by_run_id=typed_patches_by_run_id,
         bundle_viz_base_config=bundle_viz_base_config,
     )
 
@@ -624,26 +674,28 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
     return WorkflowLifecyclePreflightResult(parse=parse, preload=preload, effective=effective)
 
 
-def run_workflow(  # noqa: C901, PLR0915
+def run_workflow(
     workflow_yaml_path: str,
     *,
-    options: RunOptions,
-    run_options_patches_by_run_id: Optional[Mapping[str, WorkflowRunOptionsPatch]] = None,
-    workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
-    path_aliases: Optional[Mapping[str, str]] = None,
-    run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    compile_demand_yaml_fn: Optional[Callable[..., _CompilationLike]] = None,
+    options: WorkflowRunOptions,
 ) -> WorkflowResult:
-    base_options = _normalize_and_validate_workflow_base_options(options)
-    typed_workflow_runtime_options = (
-        WorkflowRuntimeOptions.preset_default() if workflow_runtime_options is None else workflow_runtime_options
-    )
+    return run_workflow_injected(workflow_yaml_path, options=options)
+
+
+def run_workflow_injected(  # noqa: C901, PLR0915
+    workflow_yaml_path: str,
+    *,
+    options: WorkflowRunOptions,
+    run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
+    compile_demand_yaml_fn: Optional[Callable[..., WorkflowCompilationLike]] = None,
+) -> WorkflowResult:
+    options = _normalize_and_validate_workflow_options(options)
+    base_demand_options = options.demand
+    workflow_components = options.workflow_components
+
     lifecycle = run_workflow_lifecycle_until_preflight(
         workflow_yaml_path,
-        base_options=base_options,
-        path_aliases=path_aliases,
-        run_options_patches_by_run_id=run_options_patches_by_run_id,
-        workflow_runtime_options=typed_workflow_runtime_options,
+        options=options,
     )
     workflow_path = lifecycle.parse.workflow_yaml_path
     workflow_ir = lifecycle.preload.workflow_ir
@@ -651,7 +703,7 @@ def run_workflow(  # noqa: C901, PLR0915
     cache_pool_consumers_by_logical_key = lifecycle.preload.cache_pool_consumers_by_logical_key
     bundle_viz_base_config = lifecycle.effective.bundle_viz_base_config
     effective_options_by_run_id = lifecycle.effective.options_by_run_id
-    effective_run_options_patches_by_run_id = lifecycle.effective.run_options_patches_by_run_id
+    effective_patches_by_run_id = lifecycle.effective.patches_by_run_id
 
     if compile_demand_yaml_fn is None:
         compile_demand_yaml_fn = _compile_demand_default
@@ -666,7 +718,7 @@ def run_workflow(  # noqa: C901, PLR0915
         node_init_vars: Dict[str, object],
         managed_output_ids: Optional[FrozenSet[str]],
         viz_config: Optional["VizObserverConfig"],
-    ) -> _CompilationLike:
+    ) -> WorkflowCompilationLike:
         _ = workflow_node_decl_order
 
         run_id = str(workflow_node_id)
@@ -679,38 +731,38 @@ def run_workflow(  # noqa: C901, PLR0915
 
         # 注意: `node_init_vars` 已由 `engine` 渲染(`$ctx` 已解析).
         # 不得复用 `preflight` 合并阶段使用的未渲染 `workflow_ir.nodes[*].init_vars`.
-        init_vars = base_options.init_vars
+        init_vars = base_demand_options.template.init_vars
         if node_init_vars:
-            merged = dict(base_options.init_vars or {})
+            merged = dict(base_demand_options.template.init_vars or {})
             merged.update(node_init_vars)
             init_vars = merged
-        node_options = replace(node_options, init_vars=init_vars)
-        node_options = replace(node_options, output_version_id=str(workflow_exec_id))
+        node_options = replace(node_options, template=replace(node_options.template, init_vars=init_vars))
+        node_options = replace(node_options, outputs=replace(node_options.outputs, output_version_id=str(workflow_exec_id)))
 
         # `bundle viz` 注入必须保留 `legacy` 语义: 当 `run options patch` 覆盖 `overrides` 时,
         # 允许通过整体替换 `overrides` 对象来丢弃 `viz_config`.
         if viz_config is not None:
-            patch = None if effective_run_options_patches_by_run_id is None else effective_run_options_patches_by_run_id.get(run_id)
+            patch = None if effective_patches_by_run_id is None else effective_patches_by_run_id.get(run_id)
             if patch is None or isinstance(patch.overrides, UnsetType):
-                if node_options.overrides is None:
+                if node_options.outputs.overrides is None:
                     raise ScalimWorkflowConfigError(
                         _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG,
-                        path="run_workflow.overrides.viz_config",
+                        path="run_workflow.options.demand.outputs.overrides.viz_config",
                     )
                 node_options = replace(
                     node_options,
-                    overrides=replace(
-                        node_options.overrides,
-                        viz_config=viz_config,
+                    outputs=replace(
+                        node_options.outputs,
+                        overrides=replace(node_options.outputs.overrides, viz_config=viz_config),
                     ),
                 )
 
         if managed_output_ids:
-            node_options = replace(node_options, workflow_managed_output_ids=managed_output_ids)
+            node_options = replace(node_options, outputs=replace(node_options.outputs, workflow_managed_output_ids=managed_output_ids))
 
         compilation = compile_demand(str(demand_path), options=node_options)
 
-        if isinstance(node_options.batch_size, UnsetType):
+        if isinstance(node_options.runtime.batch_size, UnsetType):
             try:
                 request = compilation.request
                 demand_ir = compilation.demand_ir
@@ -726,7 +778,7 @@ def run_workflow(  # noqa: C901, PLR0915
                 value=request.batch_size,
                 run_id=str(run_id),
                 demand_path=str(demand_path),
-                init_vars=node_options.init_vars,
+                init_vars=node_options.template.init_vars,
                 main_loader=main_loader,
             )
             emit_pre_use_batch_size_signal(hooks, decision)
@@ -754,7 +806,7 @@ def run_workflow(  # noqa: C901, PLR0915
     def _build_demand_run_result(
         core: ExecutionResult,
         *,
-        compilation: _CompilationLike,
+        compilation: WorkflowCompilationLike,
         demand_yaml_path: str,
         workflow_exec_id: str,
         workflow_node_id: str,
@@ -774,7 +826,7 @@ def run_workflow(  # noqa: C901, PLR0915
         compile_demand_fn=_compile_demand_node,
         build_demand_run_result_fn=_build_demand_run_result,
         run_ir_fn=run_ir_fn,
-        components=base_options.components,
+        components=list(workflow_components) if workflow_components is not None else None,
         bundle_viz_base_config=bundle_viz_base_config,
         cache_pool_logical_keys_by_node_id=cache_pool_logical_keys_by_node_id,
         cache_pool_consumers_by_logical_key=cache_pool_consumers_by_logical_key,

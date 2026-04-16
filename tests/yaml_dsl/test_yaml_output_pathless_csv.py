@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.dsl.yaml_dsl import RunOptions, compile
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, compile
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl.runtime.output_path_resolve import resolve_output_container_path
 
@@ -31,7 +31,10 @@ outputs:
     )
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
-        _ = compile(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+        _ = compile(
+            str(yaml_path),
+            options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"]))),
+        )
     assert any(e.path == "resources.files.detail_csv" for e in excinfo.value.errors)
 
 

@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Mapping
 
-from scalim.dsl.yaml_dsl import RunOptions, compile as compile_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions
+from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"
@@ -75,7 +76,13 @@ sources:
         unknown_msg = ""
         unknown_failed = False
         try:
-            _ = compile_yaml(str(bad_unknown_yaml), options=RunOptions(allowed_modules=_ALLOWED_MODULES, batch_size=2))
+            _ = compile_yaml(
+                str(bad_unknown_yaml),
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    runtime=DemandRunRuntimeOptions(batch_size=2),
+                ),
+            )
         except Exception as exc:  # noqa: BLE001
             unknown_msg = str(exc)
             unknown_failed = bool(("sources.customers.params" in unknown_msg) and ("bad_key" in unknown_msg))
@@ -83,7 +90,13 @@ sources:
         missing_msg = ""
         missing_failed = False
         try:
-            _ = compile_yaml(str(bad_missing_yaml), options=RunOptions(allowed_modules=_ALLOWED_MODULES, batch_size=2))
+            _ = compile_yaml(
+                str(bad_missing_yaml),
+                options=DemandRunOptions(
+                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                    runtime=DemandRunRuntimeOptions(batch_size=2),
+                ),
+            )
         except Exception as exc:  # noqa: BLE001
             missing_msg = str(exc)
             missing_failed = bool(("sources.s1.params" in missing_msg) and ("missing" in missing_msg or "required" in missing_msg))

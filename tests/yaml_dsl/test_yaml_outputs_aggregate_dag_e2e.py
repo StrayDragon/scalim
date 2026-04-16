@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 from textwrap import dedent
 
-from scalim.dsl.yaml_dsl import RunOptions, run
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, run
 from tests.support.yaml_fixtures import make_yaml_config
 
 
@@ -80,7 +80,10 @@ outputs:
     yaml_path = tmp_path / "demo.demand.yaml"
     yaml_path.write_text(yaml_content, encoding="utf-8")
 
-    result = run(str(yaml_path), options=RunOptions(allowed_modules=frozenset(["tests.fixtures"])))
+    result = run(
+        str(yaml_path),
+        options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"]))),
+    )
 
     assert result.output_path is not None
     out_path = Path(str(result.output_path))

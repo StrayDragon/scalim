@@ -70,7 +70,7 @@ yaml_dsl:
 
 ## 注意事项
 
-- 当调用侧显式提供 `allowed_yaml_roots`(例如 Python API 的 `RunOptions(allowed_yaml_roots=...)` 或 CLI 的 `--allowed-yaml-root`)时,该值优先生效,`import_roots` 不会隐式扩展它。
+- 当调用侧显式提供 `allowed_yaml_roots`(例如 Python API 的 `DemandRunSecurityOptions(allowed_yaml_roots=...)` 或 CLI 的 `--allowed-yaml-root`)时,该值优先生效,`import_roots` 不会隐式扩展它。
 - 当调用侧未提供 `allowed_yaml_roots` 时,imports 默认 allow-roots 将包含:
   - 入口 YAML 文件所在目录
   - `scalim.yaml` 中 `import_roots[*].path`

@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.dsl.yaml_dsl import RunOptions, run as run_yaml
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
+from scalim.dsl.yaml_dsl import run as run_yaml
 from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.by_yaml_dsl.ecommerce_rank_score_oracle import verify_ecommerce_rank_score_csv_rows
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -53,10 +54,10 @@ def run_yaml_dsl_row_number_score_by_rank(
             try:
                 result = run_yaml(
                     str(yaml_path),
-                    options=RunOptions(
-                        allowed_modules=_ALLOWED_MODULES,
-                        batch_size=10,
-                        init_vars=init_vars,
+                    options=DemandRunOptions(
+                        security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
+                        template=DemandRunTemplateOptions(init_vars=init_vars),
+                        runtime=DemandRunRuntimeOptions(batch_size=10),
                     ),
                 )
                 core = result.core

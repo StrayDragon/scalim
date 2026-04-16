@@ -19,7 +19,7 @@ description: |
   - 断言: CSV 输出逐行对拍(稳定排序后比较)
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
-# Pass via runtime entrypoints, e.g. `run(..., options=RunOptions(batch_size=10))`.
+# Pass via runtime entrypoints, e.g. `run(..., options=DemandRunOptions(runtime=DemandRunRuntimeOptions(batch_size=10), ...))`.
 
 main_source:
   source_id: orders
