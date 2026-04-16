@@ -3,6 +3,12 @@
 普通用户建议仅从此处导入最常用的运行入口与运行期契约,避免误用内部实现细节.
 """
 
+# pragma: scalim-public-api tier1:10:scalim.dsl.yaml_dsl|YAML DSL 官方运行入口 + 运行期契约|运行 demand/workflow YAML
+# pragma: scalim-public-api tier1:20:scalim.dsl.yaml_dsl.tools|YAML DSL 辅助工具(输出配置/路径推导)|工具链集成/排错
+# pragma: scalim-public-api tier1:30:scalim.dsl.yaml_dsl.workflow|workflow 配置(稳定导入路径)|解析/校验 workflow YAML
+# pragma: scalim-public-api tier1:40:scalim.dsl.yaml_dsl.workflow_types|workflow 类型(拆分给 typing/依赖方用)|仅用类型,或避免重导入
+# pragma: scalim-public-api tier1:50:scalim.dsl.yaml_dsl.workflow_paths|workflow 路径解析(稳定导入路径)|解析 workflow 引用的 demand 路径
+
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
 from ...vendor.compact.importlibx import import_module

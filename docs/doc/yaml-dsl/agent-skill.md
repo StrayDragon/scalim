@@ -8,7 +8,7 @@
     - 生成与产物结构:[`scripts/gen-agent-skill.py`](#code=scripts/gen-agent-skill.py)、[`packages/scalim-misc/src/scalim_misc/agent_skill_gen.py`](#code=packages/scalim-misc/src/scalim_misc/agent_skill_gen.py)
     - 默认产物目录:[`artifacts/skills/scalim-yaml-dsl/`](#code=artifacts/skills/scalim-yaml-dsl/)
     - 若改动 schema/示例来源/输出目录结构,需要同步更新本页
-    - Python 侧稳定导入入口与治理边界见:[公共 API 导入指南](../getting-started/public-api.md)
+    - Python 侧稳定导入入口与治理边界见:[公共 API 导入指南](../getting-started/public-api.gen.md)
 
 仓库里维护了一套 **Scalim YAML DSL 的 Agent Skill**: 把任务分流、最小命令入口、校验入口、生成的 catalog、迁移 playbook 放在同一个目录里,方便直接交给智能助手用,少踩坑。
 

@@ -6,4 +6,6 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
+# pragma: scalim-public-api tier1:70:scalim.workflow.loaders|workflow 内置 loader 的上下文与实现|在自定义 loader/运行器中复用
+
 __all__ = ()

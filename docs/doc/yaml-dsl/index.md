@@ -19,7 +19,7 @@ YAML DSL 的主线演进遵循以下上位原则(后续提案/变更默认不得
 推荐阅读顺序(按使用目的):
 
 - 写配置/跑起来: [语法速查](syntax.md) → [用户指南](user-guide.md) → [编辑器](editor.md)
-- 想从 Python 侧调用/集成: [公共 API 导入指南](../getting-started/public-api.md)
+- 想从 Python 侧调用/集成: [公共 API 导入指南](../getting-started/public-api.gen.md)
 - 想理解 YAML 与 IR/运行入口的边界: [YAML→IR 能力矩阵](capability-matrix.md)
 - 看一条端到端主线 demo(含对拍/排错命令): [主线教程: demo_big_data_report](../getting-started/demo-big-data-report.md)
 - 编排多条 demand: [Workflow](workflow.md)

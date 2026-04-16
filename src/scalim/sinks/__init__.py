@@ -5,6 +5,9 @@
 实现细节位于 `scalim.sinks._internal` (非公共契约).
 """
 
+# pragma: scalim-public-api tier1:120:scalim.sinks|sink 契约与常用 sinks|使用内置 sinks / 实现自定义 sink
+# pragma: scalim-public-api tier1:130:scalim.sinks.rows|workflow typed rows artifact 稳定入口|`InMemoryRows` 中间态 / 转换与适配
+
 from .api import (
     BaseColumnSink,
     BaseRowSink,

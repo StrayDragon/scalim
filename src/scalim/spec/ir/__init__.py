@@ -3,6 +3,8 @@
 此包提供稳定的 IR 类型导入路径,供用户侧直接构造/读取 IR 结构.
 """
 
+# pragma: scalim-public-api tier1:60:scalim.spec.ir|IR(中间表示)数据结构(稳定导入路径)|写自定义组件/扩展点/高级调试
+
 from ._demand import DemandIr
 from ._fields import (
     CallBySpecIr,

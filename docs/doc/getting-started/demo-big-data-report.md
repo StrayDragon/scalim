@@ -19,7 +19,7 @@
 
 - 主线 demo 章节（面向工程使用方写 YAML 的主路径）
 - YAML DSL fixtures（`chapters_of_yaml_dsl/declared_yaml_dsl/` 下的可校验示例）
-- Python 导入入口与结构评估: [公共 API 导入指南](public-api.md)
+- Python 导入入口与结构评估: [公共 API 导入指南](public-api.gen.md)
 
 另外，本仓库维护一套 **独立** 的 public API 覆盖套件：`notebooks/marimo/example_public_api_suite/`，用于：
 
