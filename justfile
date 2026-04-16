@@ -170,6 +170,10 @@ validate-agent-skill:
 gen-public-api-jump-imports:
     uv {{ UV_OPTIONS }} run python scripts/gen-public-api-jump-imports.py
 
+# 工具: 生成 public API exports 审计视图(用于 review/对齐; 生成物在 `.tmp/`)
+gen-public-api-exports-catalog:
+    uv {{ UV_OPTIONS }} run python scripts/gen-public-api-exports-catalog.py
+
 # 工具: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认强制 apply)
 openspec-sanitize:
     uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
@@ -731,6 +735,10 @@ check-noqa-c901:
 check-api-surface-governance:
     uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
 
+# 检查: Tier 1 curated entrypoints 一致性(marker 语法 + 去重 + 模块存在 + 字面量 `__all__`)
+check-public-api-curated-entrypoints:
+    uv {{ UV_OPTIONS }} run python scripts/check-public-api-curated-entrypoints.py --check
+
 # 检查: export API(`__all__`) 必须使用 tuple 字面量
 check-export-api-must-tuple:
     uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check
@@ -764,7 +772,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
-quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check
+quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check
 
 # QA: 仅py轻量的检查
 quick-check-only-py: quick-check-only-py-no-test-gate test-gate

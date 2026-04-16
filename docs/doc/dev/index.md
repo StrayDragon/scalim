@@ -25,6 +25,14 @@ just prompt-eval
 just prompt-eval-agent
 ```
 
+public API 治理/工具链（生成物写入 `.tmp/`，不要提交）：
+
+```bash
+just gen-public-api-jump-imports
+just gen-public-api-exports-catalog
+just check-public-api-curated-entrypoints
+```
+
 更多:
 
 - [Prompt 评测(workflow)](prompt-eval.md)

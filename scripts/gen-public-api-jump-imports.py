@@ -13,154 +13,19 @@
 
 from __future__ import annotations
 
-import ast
 import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
-
-@dataclass(frozen=True)
-class PublicApiEntrypoint:
-    order: int
-    module: str
-    description: str
-    common_scenario: str
-
-
-_MARKER_RE = re.compile(
-    r"^#\s*pragma:\s*scalim-public-api\s+tier(?P<tier>\d+):(?P<order>\d+):(?P<module>[A-Za-z0-9_\\.]+)\|(?P<desc>[^|]*)\|(?P<scenario>.*)$",
-    flags=re.IGNORECASE,
+from public_api_tooling import (
+    PublicApiEntrypointMarker,
+    PublicApiProblem,
+    discover_public_api_entrypoints,
+    extract_literal_module_all,
+    repo_root_for_script,
+    resolve_module_source_path,
 )
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def _is_relative_to(path: Path, maybe_parent: Path) -> bool:
-    try:
-        path.relative_to(maybe_parent)
-    except ValueError:
-        return False
-    return True
-
-
-def _discover_entrypoints(repo_root: Path, *, tier: int) -> Tuple[PublicApiEntrypoint, ...]:
-    scan_root = repo_root / "src" / "scalim"
-    exclude_dirs = (scan_root / "vendor",)
-
-    entrypoints: List[PublicApiEntrypoint] = []
-    errors: List[str] = []
-
-    for path in sorted(scan_root.rglob("__init__.py"), key=lambda p: str(p)):
-        if any(_is_relative_to(path, ex) for ex in exclude_dirs):
-            continue
-        rel = str(path.relative_to(repo_root)).replace("\\", "/")
-        text = path.read_text(encoding="utf-8")
-        for lineno, line in enumerate(text.splitlines(), start=1):
-            m = _MARKER_RE.match(line.strip())
-            if not m:
-                continue
-            got_tier = int(m.group("tier"))
-            if got_tier != int(tier):
-                continue
-            order = int(m.group("order"))
-            module = str(m.group("module") or "").strip()
-            desc = str(m.group("desc") or "").strip()
-            scenario = str(m.group("scenario") or "").strip()
-            if not module:
-                errors.append("{}:{}: missing module".format(rel, lineno))
-                continue
-            if not desc:
-                errors.append("{}:{}: missing description for {}".format(rel, lineno, module))
-                continue
-            if not scenario:
-                errors.append("{}:{}: missing scenario for {}".format(rel, lineno, module))
-                continue
-            entrypoints.append(PublicApiEntrypoint(order=order, module=module, description=desc, common_scenario=scenario))
-
-    if errors:
-        raise RuntimeError("检测到公共 `API` 入口标记不合法(最多展示 20 条):\n{}".format("\n".join("- {}".format(e) for e in errors[:20])))
-
-    by_module: Dict[str, PublicApiEntrypoint] = {}
-    duplicates: List[str] = []
-    for entry in entrypoints:
-        if entry.module in by_module:
-            duplicates.append(entry.module)
-            continue
-        by_module[entry.module] = entry
-    if duplicates:
-        raise RuntimeError("检测到重复的公共 `API` 入口标记: {}".format(", ".join(sorted(set(duplicates)))))
-
-    discovered = sorted(by_module.values(), key=lambda e: (int(e.order), str(e.module)))
-    if not discovered:
-        raise RuntimeError("未找到公共 `API` 入口标记(层级={})".format(tier))
-    return tuple(discovered)
-
-
-def _iter_py_files(root: Path, *, exclude_dirs: Sequence[Path]) -> Iterable[Path]:
-    for path in sorted(root.rglob("*.py"), key=lambda p: str(p)):
-        if not path.is_file():
-            continue
-        if any(_is_relative_to(path, ex) for ex in exclude_dirs):
-            continue
-        yield path
-
-
-def _module_name_for_path(path: Path, *, src_root: Path) -> str:
-    rel = path.relative_to(src_root)
-    if rel.name == "__init__.py":
-        rel = rel.parent
-    else:
-        rel = rel.with_suffix("")
-    return ".".join(rel.parts)
-
-
-def _extract_module_all(path: Path, *, repo_root: Path) -> Tuple[str, ...] | None:
-    """返回模块中最后一次出现的 `__all__` 字面量赋值(如果存在)。"""
-    text = path.read_text(encoding="utf-8")
-    rel = str(path.relative_to(repo_root)).replace("\\", "/")
-    tree = ast.parse(text, filename=rel)
-
-    last_value: ast.AST | None = None
-    for node in getattr(tree, "body", []):
-        if isinstance(node, ast.Assign):
-            if any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
-                last_value = node.value
-        elif isinstance(node, ast.AnnAssign):
-            if isinstance(node.target, ast.Name) and node.target.id == "__all__":
-                last_value = node.value
-
-    if last_value is None:
-        return None
-
-    if not isinstance(last_value, (ast.List, ast.Tuple)):
-        return None
-
-    values: List[str] = []
-    for elt in list(last_value.elts):
-        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-            values.append(str(elt.value))
-            continue
-        return None
-    return tuple(values)
-
-
-def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
-    src_root = repo_root / "src"
-    scan_root = src_root / "scalim"
-    exclude_dirs = (scan_root / "vendor",)
-
-    all_by_module: Dict[str, Tuple[str, ...]] = {}
-    for path in _iter_py_files(scan_root, exclude_dirs=exclude_dirs):
-        mod = _module_name_for_path(path, src_root=src_root)
-        exported = _extract_module_all(path, repo_root=repo_root)
-        if exported is None:
-            continue
-        all_by_module[mod] = exported
-    return all_by_module
 
 
 def _as_ident(value: str) -> str:
@@ -169,7 +34,7 @@ def _as_ident(value: str) -> str:
 
 
 def _render_jump_file(
-    entrypoints: Sequence[PublicApiEntrypoint],
+    entrypoints: Sequence[PublicApiEntrypointMarker],
     *,
     exports_by_module: Dict[str, Tuple[str, ...]],
     generated_by: str,
@@ -188,24 +53,20 @@ def _render_jump_file(
     ]
 
     for entry in entrypoints:
-        exports = exports_by_module.get(entry.module)
-        if exports is None:
-            raise RuntimeError("入口模块缺少 `__all__`: {}".format(entry.module))
+        exports = exports_by_module.get(entry.module, ())
 
         func_name = "_jump_{}".format(_as_ident(entry.module))
         lines.append("    def {}() -> None:".format(func_name))
         lines.append('        """{} | {}"""'.format(entry.description, entry.common_scenario))
 
-        if not exports:
+        names = [n for n in exports if str(n).isidentifier()]
+        if not names:
             lines.append("        return")
             lines.append("")
             continue
 
         lines.append("        from {} import (".format(entry.module))
-        for name in exports:
-            if not str(name).isidentifier():
-                # 极少见: 若 `__all__` 里出现非法标识符,这里跳过以保证生成物可解析.
-                continue
+        for name in names:
             lines.append("            {},".format(name))
         lines.append("        )")
         lines.append("")
@@ -213,11 +74,72 @@ def _render_jump_file(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _as_relpath(path: Path, *, repo_root: Path) -> str:
+    return str(path.relative_to(repo_root)).replace("\\", "/")
+
+
+def _format_problems(problems: Sequence[PublicApiProblem], *, repo_root: Path) -> str:
+    lines: List[str] = []
+    for p in problems:
+        rel = _as_relpath(p.path, repo_root=repo_root) if p.path.exists() else str(p.path)
+        module = str(p.module or "(unknown)")
+        lines.append("- {}:{}: {}: {}".format(rel, int(p.lineno), module, p.reason))
+    return "\n".join(lines)
+
+
+def _collect_entrypoint_exports(
+    entrypoints: Sequence[PublicApiEntrypointMarker], *, repo_root: Path
+) -> Tuple[Dict[str, Tuple[str, ...]], Tuple[PublicApiProblem, ...]]:
+    problems: List[PublicApiProblem] = []
+    exports_by_module: Dict[str, Tuple[str, ...]] = {}
+
+    for entry in entrypoints:
+        module_path = resolve_module_source_path(repo_root, entry.module)
+        if module_path is None:
+            problems.append(
+                PublicApiProblem(
+                    path=entry.marker_path,
+                    lineno=entry.marker_lineno,
+                    module=entry.module,
+                    reason="在 `src/` 下找不到入口模块（期望存在 `src/{}.py` 或 `src/{}/__init__.py`）".format(
+                        entry.module.replace(".", "/"),
+                        entry.module.replace(".", "/"),
+                    ),
+                )
+            )
+            continue
+
+        all_literal, err = extract_literal_module_all(module_path, repo_root=repo_root)
+        if all_literal is None:
+            problems.append(
+                PublicApiProblem(
+                    path=entry.marker_path,
+                    lineno=entry.marker_lineno,
+                    module=entry.module,
+                    reason="入口模块必须声明字面量 `__all__`（模块文件: {}）：{}".format(
+                        _as_relpath(module_path, repo_root=repo_root),
+                        str(err or "unknown error"),
+                    ),
+                )
+            )
+            continue
+
+        exports_by_module[str(entry.module)] = all_literal.values
+
+    return exports_by_module, tuple(sorted(problems, key=lambda p: (str(p.path), int(p.lineno), str(p.module), str(p.reason))))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     _ = argv
-    repo_root = _repo_root()
-    entrypoints = _discover_entrypoints(repo_root, tier=1)
-    exports_by_module = _scan_public_exports(repo_root)
+    repo_root = repo_root_for_script(Path(__file__))
+    entrypoints, marker_problems = discover_public_api_entrypoints(repo_root, tier=1)
+    exports_by_module, export_problems = _collect_entrypoint_exports(entrypoints, repo_root=repo_root)
+    problems = tuple(marker_problems) + tuple(export_problems)
+    if problems:
+        sys.stderr.write("[错误] 公共接口跳转辅助文件生成失败 ({} 个问题):\n".format(len(problems)))
+        sys.stderr.write(_format_problems(problems, repo_root=repo_root))
+        sys.stderr.write("\n")
+        return 1
 
     out_dir = repo_root / ".tmp"
     out_dir.mkdir(parents=True, exist_ok=True)

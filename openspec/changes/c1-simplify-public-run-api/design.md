@@ -97,7 +97,8 @@ tests 若需要注入点，改为使用 internal/test-only 入口（例如 `scal
 本 change 涉及大量 public surface 变更，必须明确以下边界：
 
 - SSOT：public API 的符号级 SSOT 仍是各模块的 `__all__`（不引入手工维护的硬 manifest）。
-- 本 change 使用 `openspec/changes/c0-simplify-public-run-api/gen-public-api-exports.py` 生成审计快照 `public-api-exports.md`，用于 review 与门禁对齐（快照不是 SSOT）。
+- 本 change 使用 `openspec/changes/c1-simplify-public-run-api/gen-public-api-exports.py` 生成审计快照 `public-api-exports.md`，用于 review 与门禁对齐（快照不是 SSOT）。
+- 仓库级 public API 治理工具链见 `c0-public-api-governance-tooling`：`just gen-public-api-exports-catalog`/`just check-public-api-curated-entrypoints`（产物写入 `.tmp/`，不提交）。
 - docs 站点的生成物与 injected-block 必须通过 `just gen-docs` 刷新；禁止手工编辑 `.gen.` 文件与注入区块内容。
 - 验收以门禁命令为准：`just qa`（lint/tests + drift checks）与 `just openspec-check`（sanitize + validate）。
 
@@ -262,7 +263,7 @@ internal 入口要求：
 4. 全量更新 tests/notebooks/docs 与 public API exports catalog（用门禁命令验证漂移闭环）。
 5. 适配下游 `INTEGRATION_APP`（目录 `INTEGRATION_DIR`）并核对默认值语义。
 6. 运行验收：
-   - `python openspec/changes/c0-simplify-public-run-api/gen-public-api-exports.py`
+   - `python openspec/changes/c1-simplify-public-run-api/gen-public-api-exports.py`
    - `just gen-docs`（如涉及 docs 注入/生成物）
    - `just qa`
    - `just openspec-check`

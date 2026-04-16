@@ -30,9 +30,9 @@
 ## 6. Public API Exports & Governance (C8)
 
 - [ ] 6.1 更新 `scalim.dsl.yaml_dsl` 的 public re-export（`__all__`）：新增 `DemandRunOptions/WorkflowRunOptions/...`，移除旧 `RunOptions`/注入 knobs/`sink` 暴露（验收：`public-api-exports.md` 的差异与 design 的变更点一致）。
-- [ ] 6.2 重新生成 public API exports 审计快照（验收：运行 `python openspec/changes/c0-simplify-public-run-api/gen-public-api-exports.py` 后 `public-api-exports.md` 与源码 `__all__` 一致）。
+- [ ] 6.2 重新生成 public API exports 审计快照（验收：运行 `python openspec/changes/c1-simplify-public-run-api/gen-public-api-exports.py` 后 `public-api-exports.md` 与源码 `__all__` 一致）。
   - SSOT：源码各模块 `__all__`
-  - 生成入口：`python openspec/changes/c0-simplify-public-run-api/gen-public-api-exports.py`
+  - 生成入口：`python openspec/changes/c1-simplify-public-run-api/gen-public-api-exports.py`
 
 ## 7. Tests / Notebooks / Docs Migration (C8)
 
