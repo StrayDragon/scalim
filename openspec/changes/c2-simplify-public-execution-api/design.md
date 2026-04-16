@@ -60,8 +60,8 @@ execution 层已经有清晰的“DSL-agnostic request/result”边界：
   - `OutputSpec` / `ExportLayout` / `ObservabilitySpec`
   -（可选）`export_layout_from_demand_ir`
 - `ScalimEngine`：
-  - 保留为高级入口（是否继续位于 `scalim.execution.__all__` 由实现阶段决定）
-  - 若保留，必须在 docs 中明确其为 advanced/low-level
+  - **从 `scalim.execution.__all__` 移除**（不再作为 Tier1 facade 的默认导出）
+  - 仍允许从 `scalim.execution.engine import ScalimEngine` 导入并用于继承/覆写行为，但该路径不属于 curated surface；兼容性与维护责任在导入方
 
 这样用户材料可以统一写：
 
@@ -76,6 +76,19 @@ from scalim.execution import ExecutionRequest, run_ir
 - 对纯结构性约束（如类型/空值/范围）优先在 dataclass `__post_init__` 校验。
 - 对跨字段组合约束（如 output_composition 与 sink 的互斥/覆盖规则）优先在 `run_ir` 入口集中校验，避免 contracts 过度复杂化。
 
+## Public Surface Diffs
+
+以 “Tier1 curated entrypoint = `scalim.execution`” 为基准，预期对外变化为：
+
+- **新增（Tier1）**：
+  - `scalim.execution.run_ir`
+  - `scalim.execution.ExecutionRequest` / `scalim.execution.ExecutionResult`
+  - `scalim.execution.OutputSpec` / `scalim.execution.ExportLayout` / `scalim.execution.ObservabilitySpec`
+- **移除（从 Tier1）**：
+  - `scalim.execution.ScalimEngine`（仍可从 `scalim.execution.engine.ScalimEngine` 导入，但不再属于 curated surface）
+- **更新**：
+  - `src/scalim/execution/__init__.py` 的 Tier1 marker 描述从 “`ScalimEngine` 执行” 调整为 “execution facade（run_ir + contracts）”
+
 ## Risks / Trade-offs
 
 - [风险] public exports 变更会影响导入路径 → [缓解] 不做兼容层，一次性升级全仓；用 public API suite + import-boundary gate 保证闭环。
@@ -88,7 +101,3 @@ from scalim.execution import ExecutionRequest, run_ir
 2. 更新 docs/skills/notebooks/tests 的导入路径，确保用户材料只使用 curated entrypoints。
 3. 增补/更新 public API catalog 与 import smoke（`just gen-public-api-jump-imports` 可用于快速核对）。
 4. 跑门禁：`just qa`、`just openspec-check`。
-
-## Open Questions
-
-- `ScalimEngine` 是否仍应作为 Tier1 facade 的默认导出？还是仅保留在子模块并从 curated surface 移除（更激进但更清晰）。

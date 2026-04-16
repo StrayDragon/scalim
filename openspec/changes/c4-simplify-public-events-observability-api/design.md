@@ -35,29 +35,46 @@
 
 ## Decisions
 
-### Decision 1: 将事件类型常量的“导入体验”从平铺改为分组对象 + catalog
+### Decision 1: 事件类型常量收敛为 Enum + 确定性分组视图（保持 `event_type` 字符串稳定）
 
-建议提供一个新的稳定组织方式（示例命名，最终以实现为准）：
+对外新增一个**唯一的事件类型入口**：
 
-- `scalim.events.types`：按主题分组的命名空间对象（例如 `pipeline.*`、`workflow.*`、`loader.*`、`diagnostic.*`）
-- `scalim.events.get_event_catalog()`：仍保留作为“可枚举/可检索”的单一入口（已有能力可复用）
+- `scalim.events.EventType`：推荐实现为 `enum.Enum`（可用 `class EventType(str, Enum)`），其 `.value` 必须与现有 `EVENT_*` 字符串完全一致，确保 `Event.event_type` 的稳定性不变。
+-（可选）`scalim.events.types`：一个“分组视图”（namespace 对象），仅用于提升可发现性；内部引用 `EventType`，不引入任何新值。
+
+分组边界（推荐：确定性 + 可维护）：
+
+- **workflow 子分组**：按现有 `WORKFLOW_EVENT_PREFIX_*` 的三类边界组织为 `workflow.node` / `workflow.cache` / `workflow.resource`。
+- **其余事件**：按 `event_type` 字符串的第一个 token（`event_type.split("_", 1)[0]`）确定一级分组，例如：
+  - `pipeline_start` / `pipeline_end` → `pipeline`
+  - `batch_start` / `batch_end` → `batch`
+  - `loader_call` / `loader_retry` / `loader_slim` → `loader`
+  - `diagnostic_warning` → `diagnostic`
+
+注意：
+
+- 分组只改变“导入体验/可发现性”，不改变底层分发逻辑与 `Event.event_type` 的值域。
+- 为避免 `Enum` 的 `str(x)` 默认输出为 `EventType.X` 导致误用，建议实现 `EventType.__str__ -> self.value`（或在代码/示例中强制使用 `.value`）。
 
 并将 `scalim.events.__all__` 收敛到：
 
 - `Event` / `EventDescriptor`
+- `EventType`（以及可选的 `types` 分组视图）
 - `get_event_catalog` / `get_event_catalog_map`
-- “分组对象”（而不是导出所有单个常量）
-
-理由：
-
-- 满足“可发现、可学习”的目标，同时不改变底层 `event_type` 的稳定性。
-- 与 `public-api-surface-governance` 的“减少内部符号泄漏”方向一致：顶层不应无限增长。
+-（视需要保留）workflow attribution meta keys（数量少且语义明确）
 
 备选方案：
 
-- 保持平铺常量不变，仅加文档 → 无法降低符号噪声，也无法形成可 gate 的收敛目标。
+- 保持平铺 `EVENT_*` 常量不变，仅加文档 → 无法降低符号噪声，也无法形成可 gate 的收敛目标。
 
-### Decision 2: Observability 引入强类型 options（并保持组件装配主线不变）
+### Decision 2: workflow status/reason 等有限取值常量同样 enum 化
+
+将以下集合从“可随意被改写的字符串常量”升级为 enum（值保持不变）：
+
+- `WORKFLOW_NODE_END_STATUS_{OK,ERROR}` → `WorkflowNodeEndStatus`
+- `WORKFLOW_NODE_CANCELLED_REASON_*` → `WorkflowNodeCancelledReason`
+
+### Decision 3: Observability 引入强类型 options（并保持组件装配主线不变）
 
 建议引入：
 
@@ -68,13 +85,29 @@
 
 - execution/DSL 装配仍以 `components=[Observer/Hook]` 为主线；options 只管理 “manager 构建策略”，不引入额外开关分叉。
 
-### Decision 3: 文档与生成边界
+### Decision 4: 文档与生成边界
 
 - SSOT：`src/scalim/events/__init__.py` 与 `src/scalim/ob/__init__.py` 的 `__all__`。
 - 生成物：
   - public API docs：由 `just gen-docs` 刷新 `.gen.` 页面（不得手改生成物/注入区块）。
   - public surface 审计/跳转：由 `just gen-public-api-jump-imports` 与相关 catalog 生成器写入 `.tmp/`（不提交）。
 - 门禁：`just qa` 需要能 fail-fast 指出 exports 漂移与用户材料导入边界问题。
+
+## Public Surface Diffs
+
+以 “Tier1 curated entrypoint = `scalim.events` / `scalim.ob`” 为基准，预期对外变化为：
+
+- **新增（Tier1）**：
+  - `scalim.events.EventType`
+  - `scalim.events.WorkflowNodeEndStatus`
+  - `scalim.events.WorkflowNodeCancelledReason`
+  -（可选）`scalim.events.types`（分组视图）
+  - `scalim.ob.ObservabilityOptions`（或等价 options dataclass）
+- **移除 / 收敛（从 `scalim.events` 顶层）**：
+  - 平铺 `EVENT_*` 常量从 `scalim.events.__all__` 移除
+  - `WORKFLOW_EVENT_PREFIX_*` / `WORKFLOW_EVENT_PREFIXES` 从 `scalim.events.__all__` 移除（若仍需要，仅作为内部实现常量保留）
+- **更新**：
+  - docs/示例：从 `from scalim.events import EVENT_PIPELINE_START` 迁移为 `from scalim.events import EventType`（以及可选的 `types` 视图）
 
 ## Risks / Trade-offs
 
@@ -84,11 +117,7 @@
 
 ## Migration Plan
 
-1. 设计并落地 events 分组对象（保持 `event_type` 值不变），收敛 `scalim.events.__all__`。
+1. 引入 `EventType` + workflow enums，并提供（可选）`types` 分组视图；保持所有 `.value` 与现有 `event_type` 字符串一致，同时收敛 `scalim.events.__all__`（移除平铺常量）。
 2. 引入 `ObservabilityOptions` 并调整 `Observability` 构造方式，补足校验与测试。
 3. 全仓升级 imports（docs/skills/notebooks/tests），并更新 public API catalog/docs 生成物。
 4. 跑门禁：`just qa`、`just openspec-check`。
-
-## Open Questions
-
-- events 分组的“主题边界”是否需要与现有 `WORKFLOW_EVENT_PREFIX_*` 等常量完全一致，还是以用户理解优先重新组织（实现时需给出明确映射规则）。

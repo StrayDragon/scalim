@@ -12,9 +12,9 @@
 - **BREAKING**：调整 `scalim.sinks` 的对外导出与模块分组：
   - `scalim.sinks` 只承诺 contracts + 常用 sinks 的稳定入口（通过 `__all__` 明确）。
   - 可选依赖相关 sinks（例如 pandas）迁移到显式子模块（例如 `scalim.sinks.pandas`）或其它明确边界，避免被误认为默认 runtime 依赖。
-- **BREAKING**：统一对外推荐的“捕获 rows 工件”形态为 `scalim.sinks.rows.InMemoryRows`：
-  - 明确其字段顺序、值域与转换/适配入口。
-  - 降低 “拿到一个 sink 然后猜它有没有 get_data/to_dataframe” 的不稳定用法。
+- **BREAKING**：统一对外推荐的“捕获 rows 工件”形态为 `scalim.sinks.memory.InMemoryRowDataSink`（`List[RowData]`）：
+  - 调整为 `scalim.sinks.memory.InMemoryRowDataSink.get_data() -> List[RowData]`（最小概念、最一致的契约）。
+  - typed rows（例如现有 `InMemoryRows`）若仍对 workflow 内部有价值，仅作为 internal 实现保留，不进入 curated public surface。
 - 同步治理：public API catalog/docs、import-boundary gate、tests/notebooks 示例需要一次性升级。
 
 ## Capabilities
@@ -33,6 +33,6 @@
   - `src/scalim/sinks/__init__.py`、`src/scalim/sinks/api.py`、以及相关实现模块（exports 组织与分组）
   - tests/notebooks 中对 sinks 的直接导入
 - 受影响链路：
-  - YAML DSL 的 public run API 未来若进一步收敛 “capture” 语义，将更倾向返回 `InMemoryRows` 而不是暴露 sink
+  - YAML DSL 的 public run API 未来若进一步收敛 “capture” 语义，将更倾向返回 `List[RowData]`（或等价 rows 工件），而不是暴露多种近似 in-memory 类型
 - 风险：
   - public surface 变更，需一次性升级调用点（不做兼容层）

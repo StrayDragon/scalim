@@ -84,6 +84,24 @@
 
 - 错误必须包含“文件路径 + 行号（若可得）+ module 名 + 失败原因”，确保可定位可修复。
 
+### Decision 5: 本 change 的工具链只覆盖 Tier1；并明确 Tier2/Tier3 的语义（用于未来扩展）
+
+本仓库当前**只有 Tier1 markers**（`# pragma: scalim-public-api tier1:...`），因此本 change 的生成器与门禁 **只以 Tier1 为输入**。
+
+为避免概念误解，这里把 “Tier2/Tier3” 定义清楚（方便未来需要时扩展，但不在本 change 实现）：
+
+- **Tier1（curated public facade）**：显式编目的稳定入口模块（有 tier1 marker），会进入 public API catalog / docs 示例 / jump-imports，属于框架承诺的“官方主线导入路径”。
+  - 示例：`scalim.dsl.yaml_dsl`、`scalim.sinks`、`scalim.events`、`scalim.ob`。
+- **Tier2（non-curated but intentionally importable）**：允许高级用户按需直接导入（通常用于继承/覆写/深度集成），但**不进入 Tier1 curated surface**，不要求 docs/示例使用，也不承诺长期兼容（维护责任在导入方）。
+  - 示例（假设后续执行层做更激进收敛）：`scalim.execution.engine.ScalimEngine`。
+- **Tier3（internal / private implementation）**：实现细节模块，通常位于 `_internal/` 或命名上显式为内部；按治理要求应 `__all__ = ()`，禁止出现在 public API catalog / docs 示例中。
+  - 示例：`scalim.execution.executor.batch._internal`、`scalim.workflow._internal`。
+
+本 change 的结论：
+
+- 生成器（jump-imports / exports-catalog）与检查脚本 **只消费 Tier1 markers**。
+- 若未来确实需要 tier2/tier3 视图，应作为独立 change 引入明确的 marker 语法、docs 约束与门禁策略（否则会变成“半公共但不可审计”的灰区）。
+
 ## Risks / Trade-offs
 
 - [风险] AST-only 会拒绝动态 `__all__` → [缓解] 这是治理目标的一部分：动态 exports 属于不透明 public surface，应在 gate 中 fail-fast 并推动模块整改。
@@ -95,7 +113,3 @@
 1. 补齐 `just gen-public-api-exports-catalog` 与对应脚本（产物 `.tmp/public_api_exports_catalog.md`）。
 2. 引入 `scripts/check-public-api-curated.py --check`（或等价），并将其接入 `just qa`（或生成物漂移门禁的一部分）。
 3. 若 docs public API 页依赖 catalog，按 doc governance 更新 SSOT 并运行 `just gen-docs` 刷新 `.gen.` 生成物。
-
-## Open Questions
-
-- 生成器是否需要支持 tier2/tier3（当前脚本只聚焦 Tier1；若要扩展，需明确用户材料与门禁策略）。
