@@ -166,6 +166,10 @@ gen-viz-schedule-plan RUN_DIR="":
 validate-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
 
+# 工具: 生成公共接口跳转辅助导入文件(用于编辑器/LSP 快速跳转; 生成物在 `.tmp/`)
+gen-public-api-jump-imports:
+    uv {{ UV_OPTIONS }} run python scripts/gen-public-api-jump-imports.py
+
 # 工具: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认强制 apply)
 openspec-sanitize:
     uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
