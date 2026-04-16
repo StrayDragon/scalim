@@ -66,7 +66,7 @@ snapshot = plan.to_viz_graph_snapshot()
 推荐使用 `VizObserver` 输出 JSONL:
 
 ```python
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.ob import Observability
 from scalim.ob.presets.viz import VizObserverConfig, VizObserver
 

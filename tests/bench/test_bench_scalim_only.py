@@ -4,7 +4,7 @@ from typing import Callable, Dict, List
 import pytest
 
 from scalim_benchlib import BenchmarkRunner
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import pytest
 
 from scalim.hooks import BaseHook, HookManager
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.spec.ir.binding import BindingIr, LoaderIr

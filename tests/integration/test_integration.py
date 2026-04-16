@@ -7,7 +7,7 @@
 import pytest
 from typing import List, Optional
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 
 try:
     from scalim_misc.example_report_ir import build_order_report_model, build_order_report_runtime_bindings

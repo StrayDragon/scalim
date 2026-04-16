@@ -2,7 +2,7 @@ import marimo
 
 from typing import Any, Dict, List, Optional, Sequence
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryColumnSink
 from scalim.typedefs import RowData

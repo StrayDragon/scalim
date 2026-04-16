@@ -2,8 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
 
-from scalim.execution.output_contracts import ExportLayout
-from scalim.execution.run_ir import ExecutionRequest, ExecutionResult
+from scalim.execution import ExecutionRequest, ExecutionResult, ExportLayout
 from scalim.planning.plan import ExecutionPlan
 from scalim.sinks.rows import InMemoryRows
 from scalim.spec.ir import DemandIr, MainSourceIr

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand
 from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions
-from scalim.execution.run_ir import run_ir
+from scalim.execution import run_ir
 
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])

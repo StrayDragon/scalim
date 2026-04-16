@@ -20,7 +20,7 @@ from scalim.dsl.yaml_dsl import (
     RunOverrides,
     run,
 )
-from scalim.execution.run_ir import ExecutionResult, export_layout_from_demand_ir
+from scalim.execution import ExecutionResult, export_layout_from_demand_ir
 from scalim.planning import PlanBuilder
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
 from scalim.events import EVENT_PIPELINE_START

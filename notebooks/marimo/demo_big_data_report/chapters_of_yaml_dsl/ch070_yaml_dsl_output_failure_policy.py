@@ -15,7 +15,7 @@ from scalim.dsl.yaml_dsl import (
 )
 from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim.execution.output_composition import OutputTargetStats
-from scalim.execution.run_ir import run_ir
+from scalim.execution import run_ir
 from scalim.execution import versioned_outputs
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 

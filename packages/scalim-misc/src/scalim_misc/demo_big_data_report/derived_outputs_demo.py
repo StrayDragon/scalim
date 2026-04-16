@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
+from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
@@ -14,7 +15,6 @@ from scalim.execution.output_composition import (
     OutputTargetSpec,
     RankFieldSpec,
 )
-from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 
 from .cases import build_test_config_small
 from .loaders import get_config, set_config

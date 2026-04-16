@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Set
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.execution.context import BatchContext
 from scalim.sinks import InMemoryRowSink

@@ -5,7 +5,7 @@ import pytest
 
 from scalim_benchlib import BenchmarkRunner
 from scalim._project_constants import ENV_BENCH_MAX_WORKERS, ENV_BENCH_SCALE, ENV_BENCH_SCOPE
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.spec.ir import DemandIr

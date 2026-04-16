@@ -3,7 +3,7 @@ import marimo
 import time
 from typing import Any, Dict, Optional, Sequence
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryColumnSink
 from scalim_misc.demo_big_data_report.cases import build_test_config_small

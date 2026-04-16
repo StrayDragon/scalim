@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir.binding import LoaderIr

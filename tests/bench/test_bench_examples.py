@@ -24,7 +24,7 @@ from scalim.dsl.yaml_dsl import (
     RunOverrides,
     run,
 )
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver

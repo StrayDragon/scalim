@@ -35,7 +35,7 @@ Sources:
 | `scalim.spec.ir` | 40 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
-| `scalim.execution` | 1 | 执行层入口 | `ScalimEngine` 执行 |
+| `scalim.execution` | 7 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
 | `scalim.ob` | 1 | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 48 | 事件envelope+事件类型常量+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
 | `scalim.sinks` | 22 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
@@ -281,11 +281,17 @@ from scalim.planning import (
 
 #### `scalim.execution`
 
-- Export count: `1`
+- Export count: `7`
 
 ```python
 from scalim.execution import (
-    ScalimEngine,
+    ExecutionRequest,
+    ExecutionResult,
+    ExportLayout,
+    ObservabilitySpec,
+    OutputSpec,
+    export_layout_from_demand_ir,
+    run_ir,
 )
 ```
 

@@ -32,7 +32,7 @@ def plan_builder(example_model):
 
 @pytest.fixture
 def engine_factory(example_model, example_runtime_bindings):
-    from scalim.execution import ScalimEngine
+    from scalim.execution.engine import ScalimEngine
 
     def _factory(plan, **kwargs):
         return ScalimEngine(demand=example_model, plan=plan, runtime_bindings=example_runtime_bindings, **kwargs)

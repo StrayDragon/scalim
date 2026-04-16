@@ -2,7 +2,7 @@ import threading
 from typing import List
 
 from scalim.events import EVENT_PIPELINE_START
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager

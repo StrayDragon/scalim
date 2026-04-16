@@ -3,11 +3,13 @@ from typing import Any
 
 import pytest
 
-import scalim.execution.run_ir as run_ir_mod
+import importlib
+
+run_ir_mod = importlib.import_module("scalim.execution.run_ir")
 from scalim.events import EVENT_DIAGNOSTIC_WARNING
 from scalim.events import Event
 from scalim.execution.output_composition import OutputCompositionSpec, OutputTargetSpec
-from scalim.execution.run_ir import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
+from scalim.execution import ExecutionRequest, ExportLayout, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer

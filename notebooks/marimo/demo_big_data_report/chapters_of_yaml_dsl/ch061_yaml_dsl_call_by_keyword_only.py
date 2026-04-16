@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions
 from scalim.dsl.yaml_dsl import compile as compile_yaml
-from scalim.execution.run_ir import run_ir
+from scalim.execution import run_ir
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.20.2"

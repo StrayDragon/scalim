@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.memory import MemoryOptimizationObserver
 from scalim.planning import PlanBuilder

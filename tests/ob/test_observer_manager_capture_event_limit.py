@@ -211,7 +211,7 @@ def _build_two_ref_runtime_bindings() -> RuntimeBindings:
 
 
 def test_adaptive_capture_replay_replays_observer_events_on_main_thread_in_plan_order() -> None:
-    from scalim.execution import ScalimEngine
+    from scalim.execution.engine import ScalimEngine
 
     demand = _build_two_ref_plan()
     runtime_bindings = _build_two_ref_runtime_bindings()
@@ -248,7 +248,7 @@ def test_adaptive_capture_replay_replays_observer_events_on_main_thread_in_plan_
 
 
 def test_adaptive_capture_overflow_is_diagnosable() -> None:
-    from scalim.execution import ScalimEngine
+    from scalim.execution.engine import ScalimEngine
 
     demand = _build_two_ref_plan()
     runtime_bindings = _build_two_ref_runtime_bindings()

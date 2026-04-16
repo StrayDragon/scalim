@@ -3,9 +3,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
+from ....execution.managed_artifacts import MANAGED_ARTIFACT_KIND_CSV, MANAGED_ARTIFACT_KIND_ROWS
 from ....execution.output_composition import (
-    MANAGED_ARTIFACT_KIND_CSV,
-    MANAGED_ARTIFACT_KIND_ROWS,
     AggMetricSpec,
     AuditSheetSpec,
     DerivedGroupBySpec,

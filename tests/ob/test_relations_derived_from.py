@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.planning.builder_helpers.operators import derive_pre_ref_available_field_keys

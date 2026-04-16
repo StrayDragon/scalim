@@ -9,7 +9,7 @@ from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_work
 from scalim.dsl.yaml_dsl.runtime.contracts import UNSET
 from scalim.dsl.yaml_dsl.runtime.entrypoints import run as run_demand
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch, WorkflowRunOptions
-from scalim.execution.run_ir import run_ir as run_ir_real
+from scalim.execution import run_ir as run_ir_real
 from scalim.events import EVENT_PRE_USE_BATCH_SIZE
 from scalim.hooks import BaseHook, HookManager, PreUseBatchSizeDecision
 

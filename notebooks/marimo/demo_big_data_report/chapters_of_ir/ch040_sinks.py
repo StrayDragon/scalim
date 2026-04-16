@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks import ColumnCSVSink, CSVSink
 from scalim.sinks import InMemoryColumnSink, InMemoryRowSink

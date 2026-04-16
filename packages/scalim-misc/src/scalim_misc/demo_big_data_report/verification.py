@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryColumnSink
 from scalim.spec.ir import SourceNormalizeIr

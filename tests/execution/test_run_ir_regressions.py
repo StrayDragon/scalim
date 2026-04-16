@@ -1,7 +1,9 @@
+import importlib
 from dataclasses import replace
 
 from scalim.execution.managed_artifacts import ManagedArtifactPlan
-from scalim.execution import run_ir as run_ir_mod
+
+run_ir_mod = importlib.import_module("scalim.execution.run_ir")
 from scalim.execution.output_composition import (
     AggMetricSpec,
     DerivedGroupBySpec,

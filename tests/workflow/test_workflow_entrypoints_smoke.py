@@ -86,7 +86,7 @@ def test_stable_workflow_entrypoints_are_importable_and_runnable(tmp_path: Path)
 
 
 def test_injected_executor_does_not_mutate_globals_or_cross_contaminate_concurrent_runs(tmp_path: Path) -> None:
-    from scalim.execution.run_ir import run_ir as real_run_ir  # noqa: PLC0415
+    from scalim.execution import run_ir as real_run_ir  # noqa: PLC0415
     from scalim.workflow import execute as execute_mod  # noqa: PLC0415
 
     original_run_ir = execute_mod.run_ir

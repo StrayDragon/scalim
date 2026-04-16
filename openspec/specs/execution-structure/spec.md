@@ -36,6 +36,20 @@
 - **WHEN** 另一个 DSL 适配层已产出 `DemandIr`
 - **THEN** 可直接复用 execution 统一 IR 编排入口并获得同一个 `ExecutionResult` 结构
 
+### Requirement: execution Tier1 facade MUST expose an options-only `run_ir` entrypoint
+系统 MUST 将 execution 层的统一编排入口（`run_ir`）与其 DSL-agnostic contracts（`ExecutionRequest`/`ExecutionResult` 等）作为官方推荐 public facade 的一部分,
+确保用户材料无需引用内部模块路径即可完成执行编排.
+
+该 facade MUST 满足：
+
+- `scalim.execution` MUST 提供 `run_ir` 与 `ExecutionRequest` 的稳定导入路径（通过 re-export 或等价方式）。
+- 调用入口 MUST 以单一 request/options 对象驱动（`ExecutionRequest` 为唯一运行期契约承载）。
+
+#### Scenario: user imports and runs execution via curated facade
+- **WHEN** 调用方执行 `from scalim.execution import ExecutionRequest, run_ir`
+- **THEN** 导入 MUST 成功
+- **AND** 调用方 MUST 能以 `run_ir(demand_ir, request=ExecutionRequest(...))` 的方式运行而无需导入 `scalim.execution.run_ir` 模块路径
+
 ### Requirement: `ExecutionRequest`/`ExecutionResult` 不得包含 DSL config types
 系统 MUST 保持 execution 侧的请求/结果对象为 DSL-agnostic:
 - 请求中不得直接携带 `DemandConfig`/`ObservabilityConfig` 等 DSL config
@@ -217,4 +231,3 @@
 #### Scenario: existing run_ir imports remain stable after refactor
 - **WHEN** 调用方通过既有稳定入口导入并调用 `run_ir`
 - **THEN** 导入 MUST 成功且行为与重构前一致
-

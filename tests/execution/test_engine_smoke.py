@@ -1,6 +1,6 @@
 import pytest
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
 
 from tests.cases.minimal_ir import build_minimal_ir_case

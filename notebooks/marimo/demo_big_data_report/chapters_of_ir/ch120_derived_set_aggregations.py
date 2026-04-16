@@ -16,7 +16,7 @@ from scalim.execution.output_composition import (
     OutputTargetSpec,
     TwoStageGroupBySpec,
 )
-from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
+from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.derived_set_aggregations_demo import (
     DerivedSetAggregationsDemoResult,

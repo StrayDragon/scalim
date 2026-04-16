@@ -13,8 +13,7 @@ from scalim.events import (
 )
 from scalim.events._events import PipelineStartEvent, WorkflowNodeEndEvent, WorkflowNodeStartEvent, WorkflowResourceCommitEvent
 from scalim.execution.adaptive.capture import HookRecordedEvent
-from scalim.execution.output_contracts import ExportLayout
-from scalim.execution.run_ir import ExecutionRequest, ObservabilitySpec
+from scalim.execution import ExecutionRequest, ExportLayout, ObservabilitySpec
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.hub import InstrumentationHub
 from scalim.ob.manager import ObserverManager

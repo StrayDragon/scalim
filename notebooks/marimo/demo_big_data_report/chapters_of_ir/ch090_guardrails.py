@@ -3,7 +3,7 @@ import marimo
 from typing import Any, Dict, List, Optional, Sequence
 
 from scalim.events import EVENT_ERROR
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, ScalimGuardrailViolationError
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.ob.manager import ObserverManager

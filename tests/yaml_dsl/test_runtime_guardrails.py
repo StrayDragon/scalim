@@ -4,7 +4,7 @@ from typing import Any, Dict, Hashable, List, Optional, Set
 
 import pytest
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.guardrails import (
     ScalimGuardrailViolationError as GuardrailViolation,
     GuardrailsComputePolicy,

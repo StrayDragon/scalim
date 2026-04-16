@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
 from scalim.events import EVENT_LOADER_CALL, EVENT_PIPELINE_END, EVENT_PIPELINE_START
-from scalim.execution.run_ir import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
+from scalim.execution import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
 from scalim.sinks import InMemoryRowSink

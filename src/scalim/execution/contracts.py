@@ -7,6 +7,7 @@
 
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
+from ..sinks import ISink
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from ..ob.observer import Observer
     from ..ob.presets.viz import VizObserverConfig
     from ..planning.plan import ExecutionPlan
-    from ..sinks import InMemoryCsv, ISink
+    from ..sinks import InMemoryCsv
     from ..sinks.rows import InMemoryRows
     from ..spec.ir import DemandIr
     from .guardrails import GuardrailsPolicy
@@ -35,6 +36,66 @@ class ObservabilitySpec:
 
     fallback_logger_enabled: bool = False
     viz_config: Optional["VizObserverConfig"] = None
+
+
+def _validate_execution_request_export_layout(export_layout: object) -> None:
+    if not isinstance(export_layout, ExportLayout):
+        msg = "ExecutionRequest.export_layout must be an ExportLayout"
+        raise TypeError(msg)
+
+
+def _validate_execution_request_output(output: object) -> None:
+    if not isinstance(output, OutputSpec):
+        msg = "ExecutionRequest.output must be an OutputSpec"
+        raise TypeError(msg)
+
+
+def _validate_execution_request_sink(sink: object) -> None:
+    if sink is None:
+        return
+
+    if not isinstance(sink, ISink):
+        msg = "ExecutionRequest.sink must be an ISink or None"
+        raise TypeError(msg)
+
+
+def _validate_execution_request_batch_size(batch_size: Optional[int]) -> None:
+    if batch_size is None:
+        return
+
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int):
+        msg = "ExecutionRequest.batch_size must be an int >= 1 or None"
+        raise TypeError(msg)
+    if int(batch_size) < 1:
+        msg = "ExecutionRequest.batch_size must be >= 1 when provided"
+        raise ValueError(msg)
+
+
+def _validate_execution_request_max_workers(max_workers: int) -> None:
+    if isinstance(max_workers, bool) or not isinstance(max_workers, int):
+        msg = "ExecutionRequest.max_workers must be an int"
+        raise TypeError(msg)
+    if int(max_workers) < 0:
+        msg = "ExecutionRequest.max_workers must be >= 0"
+        raise ValueError(msg)
+
+
+def _validate_execution_request_parallel_mode(parallel_mode: object) -> None:
+    if parallel_mode not in ("seq", "adaptive"):
+        msg = "ExecutionRequest.parallel_mode must be 'seq' or 'adaptive'"
+        raise ValueError(msg)
+
+
+def _validate_execution_request_capture_in_memory_rows(capture_in_memory_rows: object) -> None:
+    if not isinstance(capture_in_memory_rows, bool):
+        msg = "ExecutionRequest.capture_in_memory_rows must be a boolean"
+        raise TypeError(msg)
+
+
+def _validate_execution_request_key_normalization(key_normalization: object) -> None:
+    if not isinstance(key_normalization, str):
+        msg = "ExecutionRequest.key_normalization must be a string"
+        raise TypeError(msg)
 
 
 @dataclass(frozen=True)
@@ -93,6 +154,16 @@ class ExecutionRequest:
 
     capture_in_memory_rows: bool = False
     """可选:捕获本次运行输出的 `InMemoryRows`(保留 `FieldValue` 类型域;默认关闭)."""
+
+    def __post_init__(self) -> None:
+        _validate_execution_request_export_layout(self.export_layout)
+        _validate_execution_request_output(self.output)
+        _validate_execution_request_sink(self.sink)
+        _validate_execution_request_batch_size(self.batch_size)
+        _validate_execution_request_max_workers(self.max_workers)
+        _validate_execution_request_parallel_mode(self.parallel_mode)
+        _validate_execution_request_capture_in_memory_rows(self.capture_in_memory_rows)
+        _validate_execution_request_key_normalization(self.key_normalization)
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,7 @@ import marimo
 
 from typing import Any, Dict, Optional, Sequence
 
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver

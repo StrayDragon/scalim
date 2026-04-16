@@ -12,7 +12,7 @@ from tests.support.pathing import repo_root as _repo_root
 def test_public_reexports_importable() -> None:
     from scalim.dsl import yaml_dsl
     from scalim.dsl.yaml_dsl import RunOverrides, compile, run
-    from scalim.execution import ScalimEngine
+    from scalim.execution import ExecutionRequest, run_ir
     from scalim.ob import Observability
     from scalim.planning import PlanBuilder
     from scalim.spec.ir import DemandIr
@@ -21,7 +21,8 @@ def test_public_reexports_importable() -> None:
     _ = DemandIr
     _ = PlanBuilder
     _ = RunOverrides
-    _ = ScalimEngine
+    _ = ExecutionRequest
+    _ = run_ir
     _ = Observability
     _ = compile
     _ = run

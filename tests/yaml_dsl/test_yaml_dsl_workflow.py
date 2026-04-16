@@ -5916,7 +5916,7 @@ def test_workflow_main_rows_from_rejects_non_in_memory_rows_artifact(tmp_path: P
 def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_entry(tmp_path: Path) -> None:
     from typing import Any
 
-    from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
+    from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec
     from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
         WorkflowEdgeIr,
@@ -6006,7 +6006,7 @@ def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_
 def test_workflow_execute_release_main_rows_artifact_raises_on_negative_count(tmp_path: Path) -> None:
     from typing import Any
 
-    from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
+    from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec
     from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
         WorkflowEdgeIr,

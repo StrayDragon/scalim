@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec
+from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec
 from scalim.execution import workbook_multi_root as wm_mod
 from scalim.execution.workbook_multi_root import run_multi_root_workbook
 from tests.cases.minimal_ir import build_minimal_ir_case

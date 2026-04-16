@@ -639,7 +639,7 @@ def test_workflow_artifacts_directory_get_optional_variants() -> None:
 def test_workflow_write_consumer_counts_missing_is_best_effort(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
-    from scalim.execution.run_ir import run_ir as real_run_ir
+    from scalim.execution import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
         WorkflowArtifactsIr,
@@ -796,7 +796,7 @@ def test_run_workflow_ir_reraises_config_error_from_commit(tmp_path: Path, monke
 def test_workflow_negative_write_consumer_count_is_reported(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
-    from scalim.execution.run_ir import run_ir as real_run_ir
+    from scalim.execution import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
         WorkflowArtifactsIr,
@@ -902,7 +902,7 @@ resources:
 def test_workflow_write_consumer_count_decrements_for_multiple_write_nodes(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand_yaml
     from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunSecurityOptions
-    from scalim.execution.run_ir import run_ir as real_run_ir
+    from scalim.execution import run_ir as real_run_ir
     from scalim.spec.ir._workflow import (
         AppendSheetNodeIr,
         WorkflowArtifactsIr,

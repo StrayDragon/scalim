@@ -6,7 +6,7 @@ from scalim.events import EVENT_ERROR, EVENT_LOADER_RETRY
 from scalim.events import Event
 from scalim.execution.loader_retry import LoaderRetryPolicies, LoaderRetryPolicy
 from scalim.execution.runtime_bindings import RuntimeBindings
-from scalim.execution.run_ir import ExecutionRequest, ExportLayout, OutputSpec, run_ir
+from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, run_ir
 from scalim.ob.observer import Observer
 from scalim.sinks import InMemoryListSink
 from scalim.spec.ir import DemandIr

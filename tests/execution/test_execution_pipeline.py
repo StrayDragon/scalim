@@ -12,7 +12,7 @@ from scalim.execution.adaptive.policy import ADAPTIVE_BACKEND_THREAD
 from scalim.execution.adaptive.loadref_scheduler import AdaptiveLoadRefScheduler
 from scalim.execution.adaptive.tuning import AdaptiveTuning
 from scalim.execution.context import BatchContext
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime

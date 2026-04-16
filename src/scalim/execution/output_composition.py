@@ -16,7 +16,6 @@ from ..sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink
 from ..typedefs import KeyNormalizationMode, RowData
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
-from . import managed_artifacts as ma
 from .derived_outputs import (
     AggMetricSpec,
     AggregatingRowSink,
@@ -30,14 +29,15 @@ from .derived_outputs import (
     build_finalize_dag_plan,
     fingerprint_for_meta,
 )
+from .managed_artifacts import (
+    MANAGED_ARTIFACT_KIND_CSV,
+    ManagedArtifactPlan,
+    create_managed_artifact_sink,
+)
 from .output_contracts import ExportLayout, OutputSpec
 
 OutputRowPredicate = Callable[[RowData], bool]
 _logger = get_logger("derived_outputs")
-MANAGED_ARTIFACT_KIND_CSV = ma.MANAGED_ARTIFACT_KIND_CSV
-MANAGED_ARTIFACT_KIND_ROWS = ma.MANAGED_ARTIFACT_KIND_ROWS
-ManagedArtifactPlan = ma.ManagedArtifactPlan
-create_managed_artifact_sink = ma.create_managed_artifact_sink
 
 
 @dataclass(frozen=True)

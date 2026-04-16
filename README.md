@@ -16,7 +16,7 @@
 - 可以用 Python 编写需求
 
 ```python
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.planning import PlanBuilder
 from scalim.sinks import InMemoryRowSink

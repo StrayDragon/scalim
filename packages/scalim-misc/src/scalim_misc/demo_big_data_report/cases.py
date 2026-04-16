@@ -79,7 +79,7 @@ def run_case(
     try:
         demand = build_ecommerce_model()
         runtime_bindings = build_ecommerce_runtime_bindings()
-        from scalim.execution import ScalimEngine  # noqa: PLC0415
+        from scalim.execution.engine import ScalimEngine  # noqa: PLC0415
         from scalim.planning import PlanBuilder  # noqa: PLC0415
 
         plan = PlanBuilder(demand).build(targets=list(case.targets))

@@ -4,7 +4,7 @@ from typing import List, Optional
 import pytest
 
 from scalim.execution.context import BatchContext
-from scalim.execution import ScalimEngine
+from scalim.execution.engine import ScalimEngine
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.runtime_bindings import RuntimeBindings

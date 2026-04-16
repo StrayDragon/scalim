@@ -61,7 +61,9 @@ def test_public_run_capture_rows_enabled_but_no_rows_raises(tmp_path: Path, monk
 
 def test_unsafe_run_injects_sink_when_provided(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     yaml_path = _write_minimal_demand_yaml(tmp_path)
-    sentinel_sink = object()
+    from scalim.sinks import InMemoryListSink
+
+    sentinel_sink = InMemoryListSink()
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)

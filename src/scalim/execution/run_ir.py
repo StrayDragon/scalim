@@ -386,7 +386,7 @@ def _create_output_plan(output: OutputSpec, layout: ExportLayout, sink: Optional
         tee_sink = _create_tee_sink(file_sink, sink)
     except ValueError as e:
         msg = (
-            "Incompatible sinks for tee: file_sink={}({}) vs sink={}({}). "
+            "ExecutionRequest.sink: Incompatible sinks for tee: file_sink={}({}) vs sink={}({}). "
             "Both sinks must be IRowSink or both must be IColumnSink. "
             "Hint: set output.streaming=true for a row file sink (CSV/Excel) when teeing with an IRowSink; "
             "or use a column sink such as InMemoryColumnSink when output.streaming=false. "
@@ -638,7 +638,7 @@ def _assemble_outputs(
             composed_sink = _create_tee_sink(router_sink, request.sink)
         except ValueError as e:
             msg = (
-                "Incompatible sinks for tee: composed_sink={}({}) vs sink={}({}). "
+                "ExecutionRequest.sink: Incompatible sinks for tee: composed_sink={}({}) vs sink={}({}). "
                 "Both sinks must be IRowSink (output_composition only supports streaming row sinks). "
                 "Hint: use InMemoryRowSink (or another IRowSink) when teeing with composed outputs."
             ).format(

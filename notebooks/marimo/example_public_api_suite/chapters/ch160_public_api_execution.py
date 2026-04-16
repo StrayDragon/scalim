@@ -18,10 +18,17 @@ def run_public_api_execution() -> ExampleResult:
     demand_ir = build_minimal_public_api_ir()
     runtime_bindings = build_minimal_public_api_runtime_bindings()
     plan = PlanBuilder(demand_ir).build()
-    engine = api.ScalimEngine(demand=demand_ir, plan=plan, runtime_bindings=runtime_bindings, batch_size=10, parallel_mode="seq")
 
     sink = InMemoryRowSink()
-    _ = engine.run(sink=sink)
+    request = api.ExecutionRequest(
+        export_layout=api.export_layout_from_demand_ir(demand_ir, plan.target_fields),
+        output=api.OutputSpec(path=None),
+        sink=sink,
+        runtime_bindings=runtime_bindings,
+        batch_size=10,
+        parallel_mode="seq",
+    )
+    _ = api.run_ir(demand_ir, request)
     rows = sink.get_data()
 
     passed = bool(len(rows) == 3 and rows and rows[0].get("value_plus_one") == 2)
@@ -47,7 +54,7 @@ def _(mo):
         # example_public_api_suite / ch160_public_api_execution
 
         本章目标:
-        - 最小可运行示例: `ScalimEngine` 创建/运行/内存 sink
+        - 最小可运行示例: execution facade(`run_ir` + `ExecutionRequest`)运行 + 内存 sink
 
         SSOT:
         - `notebooks/marimo/example_public_api_suite/chapters/ch160_public_api_execution.py::run_public_api_execution`
