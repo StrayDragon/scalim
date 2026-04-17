@@ -75,6 +75,8 @@
   - validate 对 `outputs.*.fields` object 条目给出可行动诊断
   - CLI can upsert schema modeline in YAML files (IntelliJ compatible)
   - upsert-lsp-comment resolves schema reference from type + schema-path
+  - CLI MUST provide a `PROJECT_CLI_NAME yaml-dsl lint` entrypoint for YAML DSL authoring linting
+  - CLI MUST provide a `PROJECT_CLI_NAME yaml-dsl format` entrypoint for idempotent formatting
 
 ## Command Details
 ### `yaml-dsl validate`

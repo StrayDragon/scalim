@@ -36,7 +36,7 @@ from scalim.dsl.yaml_dsl.validation_service import (
 )
 from scalim.vendor.compact.importlibx import import_module
 
-from . import yaml_dsl_lsp
+from . import yaml_dsl_authoring, yaml_dsl_lsp
 
 try:
     jsonschema = import_module("jsonschema")
@@ -55,6 +55,14 @@ def register(subparsers: Any) -> None:
     validate_parser = yaml_subparsers.add_parser("validate", help="Validate YAML DSL via internal validator")
     _add_validate_args(validate_parser)
     validate_parser.set_defaults(func=_run_validate)
+
+    lint_parser = yaml_subparsers.add_parser("lint", help="Lint YAML DSL authoring style (ruff-like)")
+    _add_lint_args(lint_parser)
+    lint_parser.set_defaults(func=_run_lint)
+
+    format_parser = yaml_subparsers.add_parser("format", help="Format YAML DSL authoring style (idempotent)")
+    _add_format_args(format_parser)
+    format_parser.set_defaults(func=_run_format)
 
     schema_parser = yaml_subparsers.add_parser("schema", help="Schema helpers")
     _set_help_default(schema_parser)
@@ -129,6 +137,28 @@ def _add_validate_args(parser: argparse.ArgumentParser) -> None:
     )
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
+
+
+def _add_lint_args(parser: argparse.ArgumentParser) -> None:
+    _ = parser.add_argument(
+        "paths",
+        type=Path,
+        nargs="+",
+        help="一个或多个 YAML 文件/目录 (递归扫描 .yaml/.yml; 默认排除 .tmp/ 与 dist/)",
+    )
+    _ = parser.add_argument("--fix", action="store_true", help="应用 safe fixes (仅确定性且语义安全的修复)")
+    _ = parser.add_argument("--json", action="store_true", help="输出 JSON payload (机器可消费)")
+
+
+def _add_format_args(parser: argparse.ArgumentParser) -> None:
+    _ = parser.add_argument(
+        "paths",
+        type=Path,
+        nargs="+",
+        help="一个或多个 YAML 文件/目录 (递归扫描 .yaml/.yml; 默认排除 .tmp/ 与 dist/)",
+    )
+    _ = parser.add_argument("--check", action="store_true", help="只检查是否需要改动 (不写回文件)")
+    _ = parser.add_argument("--diff", action="store_true", help="输出 unified diff (不写回文件)")
 
 
 def _add_schema_validate_args(parser: argparse.ArgumentParser) -> None:
@@ -504,6 +534,182 @@ def _run_validate(args: argparse.Namespace) -> int:
         allowed_yaml_roots=allowed_yaml_roots,
         args=args,
     )
+
+
+def _run_lint(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
+    args_dict = vars(args)
+    fix = bool(args_dict.get("fix"))
+    json_output = bool(args_dict.get("json"))
+
+    raw_paths = list(args_dict.get("paths", []) or [])
+    yaml_paths, discovery_errors = yaml_dsl_authoring.discover_yaml_files(raw_paths)
+    if discovery_errors:
+        for err in discovery_errors:
+            _write_line_stderr("error: {}".format(err))
+        return 2
+
+    issues: List[yaml_dsl_authoring.LintIssue] = []
+    had_fatal_error = False
+
+    for path in yaml_paths:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                yaml_dsl_authoring.LintIssue(
+                    code="YDL000",
+                    severity="error",
+                    message="Failed to read: {}: {}".format(type(exc).__name__, exc),
+                    path=str(path),
+                    range=yaml_dsl_authoring.TextRange(
+                        start=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                        end=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                    ),
+                )
+            )
+            had_fatal_error = True
+            continue
+
+        if fix:
+            new_text, changed, error = yaml_dsl_authoring.format_yaml_dsl_text(text)
+            if error is not None:
+                issues.append(
+                    yaml_dsl_authoring.LintIssue(
+                        code="YDL000",
+                        severity="error",
+                        message=error,
+                        path=str(path),
+                        range=yaml_dsl_authoring.TextRange(
+                            start=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                            end=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                        ),
+                    )
+                )
+                had_fatal_error = True
+                continue
+            if changed:
+                try:
+                    _ = path.write_text(new_text, encoding="utf-8")
+                except Exception as exc:  # noqa: BLE001
+                    issues.append(
+                        yaml_dsl_authoring.LintIssue(
+                            code="YDL000",
+                            severity="error",
+                            message="Failed to write: {}: {}".format(type(exc).__name__, exc),
+                            path=str(path),
+                            range=yaml_dsl_authoring.TextRange(
+                                start=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                                end=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                            ),
+                        )
+                    )
+                    had_fatal_error = True
+                    continue
+                text = new_text
+
+        file_issues, error = yaml_dsl_authoring.lint_yaml_dsl_text(text, source_path=str(path))
+        if error is not None:
+            issues.append(
+                yaml_dsl_authoring.LintIssue(
+                    code="YDL000",
+                    severity="error",
+                    message=error,
+                    path=str(path),
+                    range=yaml_dsl_authoring.TextRange(
+                        start=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                        end=yaml_dsl_authoring.TextPosition(line=1, character=1),
+                    ),
+                )
+            )
+            had_fatal_error = True
+            continue
+        issues.extend(file_issues)
+
+    if json_output:
+        payload = {
+            "ok": not issues and not had_fatal_error,
+            "issues": [item.as_dict() for item in issues],
+        }
+        _write_line(json.dumps(payload, ensure_ascii=False))
+    else:
+        for issue in issues:
+            start = issue.range.start
+            _write_line(
+                "{}:{}:{}: {} {} {}".format(
+                    issue.path,
+                    start.line,
+                    start.character,
+                    issue.severity.upper(),
+                    issue.code,
+                    issue.message,
+                )
+            )
+        if not issues:
+            _write_line("OK")
+
+    if had_fatal_error:
+        return 2
+    return 0 if not issues else 1
+
+
+def _run_format(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
+    args_dict = vars(args)
+    check = bool(args_dict.get("check"))
+    diff = bool(args_dict.get("diff"))
+    if diff:
+        check = True
+
+    raw_paths = list(args_dict.get("paths", []) or [])
+    yaml_paths, discovery_errors = yaml_dsl_authoring.discover_yaml_files(raw_paths)
+    if discovery_errors:
+        for err in discovery_errors:
+            _write_line_stderr("error: {}".format(err))
+        return 2
+
+    had_fatal_error = False
+    had_changes = False
+
+    for path in yaml_paths:
+        try:
+            old_text = path.read_text(encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            _write_line_stderr("error: Failed to read {}: {}: {}".format(path, type(exc).__name__, exc))
+            had_fatal_error = True
+            continue
+
+        new_text, changed, error = yaml_dsl_authoring.format_yaml_dsl_text(old_text)
+        if error is not None:
+            _write_line_stderr("error: {}: {}".format(path, error))
+            had_fatal_error = True
+            continue
+        if not changed:
+            if not check and not diff:
+                _write_line("OK {}".format(path))
+            continue
+
+        had_changes = True
+
+        if diff:
+            _write_raw(yaml_dsl_authoring.diff_text(old_text=old_text, new_text=new_text, path=path))
+            continue
+
+        if check:
+            _write_line("WOULD_FORMAT {}".format(path))
+            continue
+
+        try:
+            _ = path.write_text(new_text, encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            _write_line_stderr("error: Failed to write {}: {}: {}".format(path, type(exc).__name__, exc))
+            had_fatal_error = True
+            continue
+        _write_line("FORMATTED {}".format(path))
+
+    if had_fatal_error:
+        return 2
+    if check and had_changes:
+        return 1
+    return 0
 
 
 def _run_schema_validate(args: argparse.Namespace) -> int:

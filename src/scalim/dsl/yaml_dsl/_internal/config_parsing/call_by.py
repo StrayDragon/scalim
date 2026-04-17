@@ -68,7 +68,7 @@ def _parse_call_by_call(raw: str) -> Tuple[str, ast.Call]:
         raise ScalimCallByParseError(msg)
 
     rewritten_args = _rewrite_ctx_tokens(args_src)
-    call_src = "{}({})".format(_CALL_PLACEHOLDER, rewritten_args)
+    call_src = "{}(\n{}\n)".format(_CALL_PLACEHOLDER, rewritten_args)
 
     try:
         tree = ast.parse(call_src, mode="eval")
@@ -153,7 +153,7 @@ def _split_reference_and_args(raw: str) -> Tuple[str, str]:
     if close_idx is None:
         msg = "Invalid call_by syntax: missing closing ')'"
         raise ScalimCallByParseError(msg)
-    if raw[close_idx + 1 :].strip():
+    if not _is_only_whitespace_or_comment(raw[close_idx + 1 :]):
         msg = "Invalid call_by syntax: unexpected trailing content after ')'"
         raise ScalimCallByParseError(msg)
 
@@ -181,6 +181,11 @@ def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:
             i += 1
             continue
 
+        if ch == "#":
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            continue
+
         if ch == "(":
             depth += 1
         elif ch == ")":
@@ -190,6 +195,13 @@ def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:
         i += 1
 
     return None
+
+
+def _is_only_whitespace_or_comment(text: str) -> bool:
+    stripped = str(text or "").lstrip()
+    if not stripped:
+        return True
+    return stripped.startswith("#")
 
 
 def _rewrite_ctx_tokens(src: str) -> str:
@@ -219,6 +231,12 @@ def _rewrite_ctx_tokens(src: str) -> str:
             quote = ch
             out.append(ch)
             i += 1
+            continue
+
+        if ch == "#":
+            while i < len(src) and src[i] != "\n":
+                out.append(src[i])
+                i += 1
             continue
 
         if src.startswith(_CTX_TOKEN, i):
@@ -251,6 +269,11 @@ def _has_placeholder_token(src: str) -> bool:
             in_str = True
             quote = ch
             i += 1
+            continue
+
+        if ch == "#":
+            while i < len(src) and src[i] != "\n":
+                i += 1
             continue
 
         if src.startswith(_CTX_PLACEHOLDER, i):

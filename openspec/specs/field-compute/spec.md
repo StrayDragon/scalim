@@ -237,7 +237,10 @@
 `call_by` 仅允许出现在派生字段(顶层 `fields`)中,并与 `compute` 互斥.
 系统 SHALL 复用 loader 的 Python 引用解析与 allowlist 机制解析 `reference`.
 系统 SHALL 额外支持 `reference` 的 module path 使用 Python 风格相对模块引用前缀 `.` / `..`(例如 `.helpers:to_text(status)`),其基准为 YAML 文件所在目录对应的“当前 module 路径”(由运行时根据 `yaml_path` 计算).
-系统 SHALL 允许 `call_by` 参数中包含 Python 字面量与空白,并忽略参数周围空白.
+系统 SHALL 允许 `call_by` 参数中包含空白与换行符,并忽略参数周围空白.
+系统 MUST 支持在参数段内出现 Python 风格 `#` 注释（不在 string literal 内），并且这些注释 MUST 被忽略且不得影响括号匹配与参数绑定.
+系统 SHALL 允许参数段末尾的 trailing comma（最后一个参数后可选逗号）。
+系统 MUST 允许 close paren `)` 之后仅包含空白或 `# ...` 注释.
 系统 SHALL 拒绝非 Python 字面量(如 `true/false/null`).
 
 #### Scenario: 基本 call_by 解析
@@ -264,6 +267,17 @@
 #### Scenario: allowlist 缺失
 - **WHEN** 运行时未提供 allowlist 且配置包含 `call_by`
 - **THEN** 解析失败并提示需要 allowlist
+
+#### Scenario: multiline call_by with `#` comments is accepted
+- **GIVEN** 某派生字段配置为：
+  - `call_by: |`
+  - `  ..loaders:xx(`
+  - `    a=a,`
+  - `    t=t, # comment (trailing comma optional)`
+  - `  )`
+- **WHEN** 系统编译/校验该 YAML
+- **THEN** 解析 MUST 成功并得到函数引用 `..loaders:xx`
+- **AND** kwargs MUST 包含 `a` 与 `t`
 
 ### Requirement: derived field call_by MUST validate argument binding at compile time when possible
 当派生字段使用 `call_by: "reference(args...)"` 时,系统 MUST 在编译期执行可推理的参数绑定预检查:

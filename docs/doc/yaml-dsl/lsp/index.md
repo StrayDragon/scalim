@@ -102,6 +102,31 @@ uvx scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 # installed: scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 ```
 
+### 5) 推荐写法：长 `call_by` 用 block scalar（不丢跳转）
+
+当 `call_by` 参数很长时,推荐用 YAML block scalar（`|`/`>`）拆成多行,便于编辑与 review；同时 LSP 仍可在 block scalar 内提供：
+
+- `call_by` head reference 的 definition/hover/completion
+- kwargs `=` 右侧 field-id 的 definition/hover/completion
+
+示例（逗号可选；支持 Python 风格 `#` 行尾注释）：
+
+```yaml
+fields:
+  is_quick:
+    name: xx
+    call_by: |
+      ..loaders:xx(
+        a=a,
+        b=b,  # trailing comma optional
+      )
+```
+
+团队可执行入口（类似 ruff）：
+
+- `scalim-cli yaml-dsl format <paths...>`：幂等格式化（优先 plain scalar；不折叠 block scalar）
+- `scalim-cli yaml-dsl lint --fix <paths...>`：风格 lint + safe fixes（例如去除可安全的多余引号）
+
 若 client 支持 `workspace/executeCommand`,也可调用：
 
 - command id: `scalim.dumpDiscovery`

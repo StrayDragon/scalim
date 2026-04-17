@@ -71,6 +71,20 @@ yaml_dsl:
   - “Add yaml_dsl.lsp.python_roots”（最小/宽松）
   - “Explain resolution failure”（仅解释,不改写引用字符串）
 
+### 2.4 引号噪音 / 长 `call_by` 不易维护
+
+现象：
+
+- `loader`/`compute`/`call_by` 大量出现 `"..."` 引号导致 diff 噪音
+- `call_by` 参数过长,单行难以编辑与 review
+
+处理：
+
+- 团队入口（类似 ruff）：
+  - `scalim-cli yaml-dsl format <paths...>`：幂等格式化（优先 plain scalar；不折叠 block scalar）
+  - `scalim-cli yaml-dsl lint --fix <paths...>`：风格 lint + safe fixes（例如去除可安全的多余引号）
+- 推荐把长 `call_by` 改写为 YAML block scalar（`|`/`>`）多行,并可使用 Python 风格 `#` 行尾注释（LSP 仍可跳转/补全）
+
 ## 3) 日志获取
 
 server 日志默认输出到 stderr。为避免编辑器吞日志,推荐直接落盘：

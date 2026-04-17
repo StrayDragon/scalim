@@ -88,7 +88,7 @@ _templates:
     lookup_cast:
       name: int
 
-  perf_metrics_all: &perf_metrics_all [duration, memory, cpu]
+  perf_metrics_all: [duration, memory, cpu]
 
 # ==============================================================================
 # 主数据源
@@ -96,7 +96,7 @@ _templates:
 
 main_source:
   source_id: orders
-  loader: "scalim_misc.demo_big_data_report.loaders:load_orders"
+  loader: scalim_misc.demo_big_data_report.loaders:load_orders
   params:
     # init_vars 注入示例: 由调用方传入 `init_vars={"order_ids": [...]}`.
     # 为空列表时 loader 仍会读取全量订单(见 `load_orders` 实现),用于保证 canonical demo 可直接运行.
@@ -105,21 +105,21 @@ main_source:
     - order_id
   fields:
     # 主键
-    order_id: &order_id
+    order_id:
       name: 订单ID
 
     # 基础字段
-    quantity: &quantity
+    quantity:
       name: 数量
       value_cast: int
 
-    unit_price: &unit_price
+    unit_price:
       name: 单价
 
-    discount_rate: &discount_rate
+    discount_rate:
       name: 折扣率
 
-    order_date: &order_date
+    order_date:
       name: 订单日期
 
     # 外键/关联 key 字段 (relation.steps 引用必须声明)
@@ -153,58 +153,58 @@ main_source:
 
 relations:
   # 单级关联
-  orders_to_customers: &orders_to_customers
+  orders_to_customers:
     steps:
       - *step_orders_to_customers
 
   # rows 模式关联(默认复用/显式禁用对拍)
-  orders_to_customers_rows_cache: &orders_to_customers_rows_cache
+  orders_to_customers_rows_cache:
     steps:
       - from: orders.customer_id
         to: customers_rows_cached.customer_id
 
-  orders_to_customers_rows_nocache: &orders_to_customers_rows_nocache
+  orders_to_customers_rows_nocache:
     steps:
       - from: orders.customer_id
         to: customers_rows_nocache.customer_id
 
-  orders_to_products: &orders_to_products
+  orders_to_products:
     steps:
       - *step_orders_to_products_cast
 
-  orders_to_warehouses: &orders_to_warehouses
+  orders_to_warehouses:
     steps:
       - from: orders.warehouse_id
         to: warehouses.warehouse_id
 
-  orders_to_promotions: &orders_to_promotions
+  orders_to_promotions:
     steps:
       - from: orders.promotion_id
         to: promotions.promotion_id
 
-  orders_to_payment_methods: &orders_to_payment_methods
+  orders_to_payment_methods:
     steps:
       - from: orders.payment_method_id
         to: payment_methods.payment_method_id
 
-  orders_to_payment_methods_candidates: &orders_to_payment_methods_candidates
+  orders_to_payment_methods_candidates:
     steps:
       - from: orders.payment_method_id
         to: payment_methods_candidates.payment_method_id
 
-  orders_to_logistics: &orders_to_logistics
+  orders_to_logistics:
     steps:
       - from: orders.logistics_id
         to: logistics.logistics_id
 
   # 多级关联
-  orders_to_categories: &orders_to_categories
+  orders_to_categories:
     steps:
       - *step_orders_to_products
       - from: products.category_id
         to: categories.category_id
 
-  orders_to_regions: &orders_to_regions
+  orders_to_regions:
     steps:
       - from: orders.warehouse_id
         to: warehouses.warehouse_id
@@ -212,7 +212,7 @@ relations:
         to: regions.region_id
 
   # 复合键关联
-  orders_to_region_pricing: &orders_to_region_pricing
+  orders_to_region_pricing:
     steps:
       - from: [orders.region_id, orders.product_category_id]
         to: [region_pricing.region_id, region_pricing.product_category_id]
@@ -225,60 +225,60 @@ relations:
 
 sources:
   customers:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_customers"
+    loader: scalim_misc.demo_big_data_report.loaders:load_customers
     key: customer_id
     lookup_chunk_size: 5
     params:
       ids: {$keys: {as: list}}
     fields:
       # 单级关联 - 客户
-      customer_name: &customer_name
+      customer_name:
         name: 客户姓名
         relation: orders_to_customers
 
-      customer_level: &customer_level
+      customer_level:
         name: 会员等级
         relation: orders_to_customers
 
-      customer_phone: &customer_phone
+      customer_phone:
         name: 客户电话
         relation: orders_to_customers
 
-      registration_date: &registration_date
+      registration_date:
         name: 注册日期
         relation: orders_to_customers
 
   customers_rows_cached:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_customers_by_rows"
+    loader: scalim_misc.demo_big_data_report.loaders:load_customers_by_rows
     key: customer_id
     params:
       rows: {$rows: {cache_mode: batch}}
     fields:
       # rows 模式对拍字段
-      customer_name_rows_cached: &customer_name_rows_cached
+      customer_name_rows_cached:
         name: 客户姓名(rows缓存)
         relation: orders_to_customers_rows_cache
 
-      customer_level_rows_cached: &customer_level_rows_cached
+      customer_level_rows_cached:
         name: 会员等级(rows缓存)
         relation: orders_to_customers_rows_cache
 
   customers_rows_nocache:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_customers_by_rows"
+    loader: scalim_misc.demo_big_data_report.loaders:load_customers_by_rows
     key: customer_id
     params:
       rows: {$rows: {cache_mode: none}}
     fields:
-      customer_name_rows_nocache: &customer_name_rows_nocache
+      customer_name_rows_nocache:
         name: 客户姓名(rows不缓存)
         relation: orders_to_customers_rows_nocache
 
-      customer_level_rows_nocache: &customer_level_rows_nocache
+      customer_level_rows_nocache:
         name: 会员等级(rows不缓存)
         relation: orders_to_customers_rows_nocache
 
   products:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_products"
+    loader: scalim_misc.demo_big_data_report.loaders:load_products
     key: product_id
     lookup_cast:
       name: int
@@ -292,34 +292,34 @@ sources:
         - category_id
     fields:
       # 单级关联 - 产品
-      product_name: &product_name
+      product_name:
         name: 产品名称
         relation: orders_to_products
 
-      product_brand: &product_brand
+      product_brand:
         name: 产品品牌
         relation: orders_to_products
 
-      product_cost: &product_cost
+      product_cost:
         name: 产品成本
         relation: orders_to_products
-      category_id: &category_id
+      category_id:
         name: 产品分类ID(lookup)
         relation: orders_to_products
 
   categories:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_categories"
+    loader: scalim_misc.demo_big_data_report.loaders:load_categories
     key: category_id
     params:
       ids: {$keys: {as: set}}
     fields:
       # 多级关联 - 分类
-      category_name: &category_name
+      category_name:
         name: 产品分类
         relation: orders_to_categories
 
   warehouses:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_warehouses"
+    loader: scalim_misc.demo_big_data_report.loaders:load_warehouses
     key: warehouse_id
     params:
       ids: {$keys: {as: set}}
@@ -330,52 +330,52 @@ sources:
         relation: orders_to_warehouses
 
       # 多级关联 - 仓库
-      warehouse_name: &warehouse_name
+      warehouse_name:
         name: 仓库名称
         relation: orders_to_warehouses
 
   regions:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_regions"
+    loader: scalim_misc.demo_big_data_report.loaders:load_regions
     key: region_id
     params:
       ids: {$keys: {as: set}}
     fields:
       # 多级关联 - 区域
-      region_name_value: &region_name_value
+      region_name_value:
         name: 区域名称
         extract: region_name
         relation: orders_to_regions
 
       # 复用同一 field 值: 通过不同字段名/展示名表达不同语义
-      region_name_display: &region_name_display
+      region_name_display:
         name: 区域名称(展示)
         extract: region_name
         relation: orders_to_regions
 
-      region_manager: &region_manager
+      region_manager:
         name: 区域经理
         relation: orders_to_regions
 
   region_pricing:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_region_pricing"
+    loader: scalim_misc.demo_big_data_report.loaders:load_region_pricing
     key: [region_id, product_category_id]
     cache_mode: preload_forever
     fields:
       # 复合键关联 - 区域定价
-      price_adjustment: &price_adjustment
+      price_adjustment:
         name: 价格调整系数
         relation: orders_to_region_pricing
 
-      shipping_fee: &shipping_fee
+      shipping_fee:
         name: 运费
         relation: orders_to_region_pricing
 
-      tax_rate: &tax_rate
+      tax_rate:
         name: 税率
         relation: orders_to_region_pricing
 
   promotions:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_promotions"
+    loader: scalim_misc.demo_big_data_report.loaders:load_promotions
     key: promotion_id
     cache_mode: preload_forever
     params:
@@ -385,19 +385,19 @@ sources:
         - promotion_discount
     fields:
       # 单级关联 - 促销 (可能为空)
-      promotion_name: &promotion_name
+      promotion_name:
         name: 促销名称
         relation:
           steps:
             - from: orders.promotion_id
               to: promotions.promotion_id
 
-      promotion_discount: &promotion_discount
+      promotion_discount:
         name: 促销折扣
         relation: orders_to_promotions
 
   payment_methods:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_payment_methods"
+    loader: scalim_misc.demo_big_data_report.loaders:load_payment_methods
     key: payment_method_id
     cache_mode: preload_forever
     normalize:
@@ -405,12 +405,12 @@ sources:
       on_conflict: error
     fields:
       # 单级关联 - 支付方式
-      payment_method_name: &payment_method_name
+      payment_method_name:
         name: 支付方式
         relation: orders_to_payment_methods
 
   payment_methods_candidates:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_payment_methods_candidates"
+    loader: scalim_misc.demo_big_data_report.loaders:load_payment_methods_candidates
     key: payment_method_id
     cache_mode: preload_forever
     normalize:
@@ -424,22 +424,22 @@ sources:
             payment_method_id: {from_key: true}
             payment_fee_rate: {extract: payment_fee_rate}
     fields:
-      payment_fee_rate_candidates: &payment_fee_rate_candidates
+      payment_fee_rate_candidates:
         name: 手续费率(候选取首条)
         extract: payment_fee_rate
         relation: orders_to_payment_methods_candidates
 
   logistics:
-    loader: "scalim_misc.demo_big_data_report.loaders:load_logistics"
+    loader: scalim_misc.demo_big_data_report.loaders:load_logistics
     key: logistics_id
     cache_mode: preload_forever
     fields:
       # 单级关联 - 物流
-      logistics_name: &logistics_name
+      logistics_name:
         name: 物流公司
         relation: orders_to_logistics
 
-      logistics_speed: &logistics_speed
+      logistics_speed:
         name: 配送时效
         relation: orders_to_logistics
 
@@ -448,33 +448,43 @@ sources:
 # ==============================================================================
 fields:
   # 派生字段
-  order_amount: &order_amount
+  order_amount:
     name: 订单金额
-    compute: "round(quantity * unit_price * discount_rate, 2)"
+    compute: round(quantity * unit_price * discount_rate, 2)
 
-  profit: &profit
+  profit:
     name: 利润
-    call_by: "scalim_misc.demo_big_data_report.loaders:calc_profit(order_amount=order_amount, product_cost=product_cost, quantity=quantity)"
+    call_by: |
+      scalim_misc.demo_big_data_report.loaders:calc_profit(
+        order_amount=order_amount,
+        product_cost=product_cost,
+        quantity=quantity,  # trailing comma optional
+      )
 
-  tax_amount: &tax_amount
+  tax_amount:
     name: 税费
-    compute: "round(order_amount * tax_rate, 2)"
+    compute: round(order_amount * tax_rate, 2)
 
-  final_price: &final_price
+  final_price:
     name: 最终价格
-    call_by: "scalim_misc.demo_big_data_report.loaders:calc_final_price(order_amount=order_amount, price_adjustment=price_adjustment, shipping_fee=shipping_fee)"
+    call_by: |
+      scalim_misc.demo_big_data_report.loaders:calc_final_price(
+        order_amount=order_amount,
+        price_adjustment=price_adjustment,
+        shipping_fee=shipping_fee,
+      )
 
-  no_promotion: &no_promotion
+  no_promotion:
     name: 无促销
-    compute: "not promotion_name"
+    compute: not promotion_name
 
-  rows_name_match: &rows_name_match
+  rows_name_match:
     name: rows对拍-姓名一致
-    compute: "customer_name_rows_cached == customer_name_rows_nocache"
+    compute: customer_name_rows_cached == customer_name_rows_nocache
 
-  rows_level_match: &rows_level_match
+  rows_level_match:
     name: rows对拍-等级一致
-    compute: "customer_level_rows_cached == customer_level_rows_nocache"
+    compute: customer_level_rows_cached == customer_level_rows_nocache
 
 # ==============================================================================
 # 输出配置(composed outputs)

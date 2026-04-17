@@ -39,6 +39,25 @@ lspconfig.scalim_yaml_dsl_lsp = {
 lspconfig.scalim_yaml_dsl_lsp.setup({})
 ```
 
+### 1.1) 推荐：长 `call_by` 用 block scalar（不丢跳转）
+
+你可以把很长的 `call_by` 写成 block scalar 多行（`|`/`>`），便于编辑；LSP 仍可在 block scalar 内对 head reference 与 kwargs RHS field-id 提供跳转/hover/补全。
+
+推荐写法（示例）：
+
+- head reference（`..loaders:xx`）可跳转
+- kwargs `=` 右侧的 field-id（例如 `a=a` 的右侧 `a`）可 hover/definition/completion
+- 参数行允许 Python 风格 `#` 注释（不在 string literal 内）
+- trailing comma 可选（`b=b,` 这种逗号可保留也可省略）
+
+```yaml
+call_by: |
+  ..loaders:xx(
+    a=a,
+    b=b,  # trailing comma optional
+  )
+```
+
 ## 2) YAML 文件匹配建议
 
 如果你不希望对所有 YAML 都启动 YAML DSL LSP,可以按目录/路径做限制（示例思路）：

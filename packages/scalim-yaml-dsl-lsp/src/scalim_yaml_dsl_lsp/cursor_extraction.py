@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
@@ -67,6 +67,16 @@ class YamlCursorExtractionResult:
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
+
+
+@dataclass(frozen=True)
+class _BlockScalarView:
+    header_line0: int
+    content_start_line0: int
+    content_end_line0: int
+    content_indent: int
+    first_nonempty_line0: Optional[int]
+    content_lines: Tuple[str, ...]
 
 
 def extract_yaml_dsl_python_reference_by_cursor(
@@ -570,7 +580,7 @@ def _is_call_by_kwargs_value_callsite(path: List[str]) -> bool:
     )
 
 
-def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911
+def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911, PLR0912
     node: object,
     *,
     lines: List[str],
@@ -581,7 +591,15 @@ def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911
     reference_raw = str(getattr(node, "value", "") or "")
     bounds = _scalar_content_bounds(node, lines)
     if bounds is None:
-        return None
+        block_view = _block_scalar_view(node, lines=lines)
+        if block_view is None:
+            return None
+        return _extract_call_by_kwargs_value_token_from_block_scalar(
+            block_view,
+            yaml_path=yaml_path,
+            position=position,
+            warnings=warnings,
+        )
     line, content_start0, content_end0 = bounds
 
     if not _position_in_slice(position, line=line, start_col0=content_start0, end_col0=content_end0):
@@ -643,8 +661,8 @@ def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911
             warnings=(),
         )
 
-    # Empty value extraction for Ctrl+Space completion: `x=` / `x= <cursor>`.
-    if int(rhs_start) >= int(seg_end):
+    # Empty value extraction for Ctrl+Space completion: `x=` / `x= <cursor>` / `x= # comment`.
+    if _is_only_ws_or_py_comments(reference_raw, start=int(rhs_start), end=int(seg_end)):
         rng = EditorRange(start=position, end=position)
         return YamlCursorExtractionResult(
             yaml_path=yaml_path,
@@ -659,7 +677,112 @@ def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911
     return None
 
 
-def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:
+def _extract_call_by_kwargs_value_token_from_block_scalar(  # noqa: C901, PLR0911, PLR0912
+    block_view: _BlockScalarView,
+    *,
+    yaml_path: str,
+    position: EditorPosition,
+    warnings: List[str],
+) -> Optional[YamlCursorExtractionResult]:
+    cursor_line0 = int(position.line) - 1
+    if not (int(block_view.content_start_line0) <= int(cursor_line0) <= int(block_view.content_end_line0)):
+        return None
+
+    cursor_col0 = int(position.column) - 1
+    if int(cursor_col0) < int(block_view.content_indent):
+        return None
+
+    rel_line0 = int(cursor_line0) - int(block_view.content_start_line0)
+    if not (0 <= int(rel_line0) < len(block_view.content_lines)):
+        return None
+
+    content_line = str(block_view.content_lines[int(rel_line0)])
+    rel_col0 = int(cursor_col0) - int(block_view.content_indent)
+    rel_col0 = max(0, min(int(rel_col0), len(content_line)))
+
+    value_lines = list(block_view.content_lines)
+    reference_raw = "\n".join(value_lines)
+
+    line_offsets: List[int] = []
+    offset = 0
+    for line_text in value_lines:
+        line_offsets.append(int(offset))
+        offset += len(line_text) + 1
+
+    cursor_offset = int(line_offsets[int(rel_line0)]) + int(rel_col0)
+    if cursor_offset < 0 or cursor_offset > len(reference_raw):
+        return None
+
+    open_idx = str(reference_raw).find("(")
+    if open_idx == -1:
+        return None
+    if int(cursor_offset) <= int(open_idx):
+        return None
+
+    close_idx = _find_matching_paren(reference_raw, open_idx)
+    if close_idx is None:
+        warnings.append("call_by missing closing ')': {}".format(str(yaml_path)))
+        close_idx = len(reference_raw)
+
+    if int(cursor_offset) > int(close_idx):
+        return None
+
+    args_start = int(open_idx) + 1
+    args_end = int(close_idx)
+
+    seg_start, seg_end = _call_by_top_level_segment_bounds(
+        reference_raw,
+        cursor_offset=cursor_offset,
+        start=args_start,
+        end=args_end,
+    )
+    if seg_start is None or seg_end is None:
+        return None
+
+    eq_pos = _call_by_top_level_equals(reference_raw, start=int(seg_start), end=int(seg_end))
+    if eq_pos is None:
+        return None
+    if int(cursor_offset) <= int(eq_pos):
+        return None
+
+    rhs_start = int(eq_pos) + 1
+    rhs_start = _skip_inline_ws(reference_raw, rhs_start, end=int(seg_end))
+
+    match = _identifier_token_at(reference_raw, cursor_offset=cursor_offset, start=int(rhs_start), end=int(seg_end))
+    if match is not None:
+        token, token_start, token_end = match
+        rng = _range_for_block_scalar_offsets(
+            block_view,
+            line_offsets=line_offsets,
+            start_offset=int(token_start),
+            end_offset=int(token_end),
+        )
+        return YamlCursorExtractionResult(
+            yaml_path=yaml_path,
+            kind="call_by_kwargs_value_field_ref",
+            reference=str(token),
+            range=rng,
+            value=str(token),
+            value_range=rng,
+            warnings=(),
+        )
+
+    if _is_only_ws_or_py_comments(reference_raw, start=int(rhs_start), end=int(seg_end)):
+        rng = EditorRange(start=position, end=position)
+        return YamlCursorExtractionResult(
+            yaml_path=yaml_path,
+            kind="call_by_kwargs_value_field_ref",
+            reference="",
+            range=rng,
+            value="",
+            value_range=rng,
+            warnings=(),
+        )
+
+    return None
+
+
+def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:  # noqa: C901
     depth = 0
     in_str = False
     quote = ""
@@ -684,6 +807,11 @@ def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:
             in_str = True
             quote = ch
             i += 1
+            continue
+
+        if ch == "#":
+            while i < len(text) and text[i] != "\n":
+                i += 1
             continue
 
         if ch == "(":
@@ -734,6 +862,11 @@ def _call_by_top_level_segment_bounds(  # noqa: C901, PLR0912
             in_str = True
             quote = ch
             i += 1
+            continue
+
+        if ch == "#":
+            while i < int(end) and text[i] != "\n":
+                i += 1
             continue
 
         if ch == "(":
@@ -792,6 +925,11 @@ def _call_by_top_level_equals(text: str, *, start: int, end: int) -> Optional[in
             i += 1
             continue
 
+        if ch == "#":
+            while i < int(end) and text[i] != "\n":
+                i += 1
+            continue
+
         if ch == "(":
             paren_depth += 1
         elif ch == ")":
@@ -817,7 +955,7 @@ def _skip_inline_ws(text: str, start: int, *, end: int) -> int:
     i = int(start)
     while i < int(end):
         ch = text[i]
-        if ch not in (" ", "\t"):
+        if ch not in (" ", "\t", "\r", "\n"):
             break
         i += 1
     return i
@@ -1456,7 +1594,7 @@ def cast_value(node: object) -> Any:
     return getattr(node, "value", [])
 
 
-def _extract_from_scalar_value(  # noqa: PLR0911
+def _extract_from_scalar_value(  # noqa: C901, PLR0911, PLR0912
     node: object,
     *,
     lines: List[str],
@@ -1471,7 +1609,50 @@ def _extract_from_scalar_value(  # noqa: PLR0911
     reference_raw = str(getattr(node, "value", "") or "")
     bounds = _scalar_content_bounds(node, lines)
     if bounds is None:
-        return None
+        block_view = _block_scalar_view(node, lines=lines)
+        if block_view is None:
+            return None
+
+        kind = _reference_kind(path)
+        if kind not in ("loader", "call_by"):
+            return None
+
+        cursor_line0 = int(position.line) - 1
+        if not (int(block_view.content_start_line0) <= int(cursor_line0) <= int(block_view.content_end_line0)):
+            return None
+        if block_view.first_nonempty_line0 is None or int(cursor_line0) != int(block_view.first_nonempty_line0):
+            return None
+
+        cursor_col0 = int(position.column) - 1
+        if int(cursor_col0) < int(block_view.content_indent):
+            return None
+
+        line_text = str(lines[int(cursor_line0)])
+        line_value = line_text[int(block_view.content_indent) :] if int(block_view.content_indent) <= len(line_text) else ""
+        line = int(position.line)
+        content_start0 = int(block_view.content_indent)
+        content_end0 = len(line_text)
+
+        cursor_result = _extract_reference_and_range(
+            line_value,
+            line=line,
+            content_start_col0=content_start0,
+            yaml_path=yaml_path,
+            path=path,
+        )
+        if cursor_result is None or cursor_result.range is None:
+            return None
+
+        if not _position_in_range(position, cursor_result.range):
+            if not str(cursor_result.reference or "").strip():
+                cursor_rng = EditorRange(start=position, end=position)
+                return YamlCursorExtractionResult(
+                    yaml_path=yaml_path,
+                    reference="",
+                    range=cursor_rng,
+                )
+            return None
+        return cursor_result
 
     line, content_start0, content_end0 = bounds
 
@@ -1547,6 +1728,55 @@ def _scalar_content_bounds(node: object, lines: List[str]) -> Optional[Tuple[int
     return line_index + 1, content_start0, content_end0
 
 
+def _block_scalar_view(node: object, *, lines: List[str]) -> Optional[_BlockScalarView]:
+    style = getattr(node, "style", None)
+    if style not in ("|", ">"):
+        return None
+
+    start_mark = getattr(node, "start_mark", None)
+    end_mark = getattr(node, "end_mark", None)
+    start_line0 = getattr(start_mark, "line", None)
+    end_line0 = getattr(end_mark, "line", None)
+    if not isinstance(start_line0, int) or not isinstance(end_line0, int):
+        return None
+
+    header_line0 = int(start_line0)
+    if not (0 <= header_line0 < len(lines)):
+        return None
+
+    content_start_line0 = int(header_line0) + 1
+    content_end_line0 = min(int(end_line0) - 1, len(lines) - 1)
+    if content_end_line0 < content_start_line0:
+        return None
+
+    content_indent = 0
+    first_nonempty_line0: Optional[int] = None
+    for idx in range(int(content_start_line0), int(content_end_line0) + 1):
+        line_text = str(lines[idx])
+        if not line_text.strip():
+            continue
+        first_nonempty_line0 = int(idx)
+        content_indent = len(line_text) - len(line_text.lstrip(" "))
+        break
+
+    content_lines: List[str] = []
+    for idx in range(int(content_start_line0), int(content_end_line0) + 1):
+        line_text = str(lines[idx])
+        if len(line_text) >= int(content_indent):
+            content_lines.append(line_text[int(content_indent) :])
+        else:
+            content_lines.append("")
+
+    return _BlockScalarView(
+        header_line0=int(header_line0),
+        content_start_line0=int(content_start_line0),
+        content_end_line0=int(content_end_line0),
+        content_indent=int(content_indent),
+        first_nonempty_line0=first_nonempty_line0,
+        content_lines=tuple(content_lines),
+    )
+
+
 def _strip_scalar_quotes(line_text: str, token_start0: int, token_end0: int) -> Tuple[int, int]:
     token = line_text[token_start0:token_end0]
     if len(token) >= _MIN_QUOTED_TOKEN_LEN and token[0] in ("'", '"') and token[-1] == token[0]:
@@ -1611,6 +1841,48 @@ def _range_for_offsets(line: int, content_start_col0: int, start_offset: int, en
         start=EditorPosition(line=int(line), column=int(start_col1)),
         end=EditorPosition(line=int(line), column=int(end_col1)),
     )
+
+
+def _range_for_block_scalar_offsets(
+    block_view: _BlockScalarView,
+    *,
+    line_offsets: Sequence[int],
+    start_offset: int,
+    end_offset: int,
+) -> EditorRange:
+    line_idx0 = 0
+    for idx, off in enumerate(line_offsets):
+        if int(off) <= int(start_offset):
+            line_idx0 = int(idx)
+        else:
+            break
+
+    line_start = int(line_offsets[int(line_idx0)]) if line_offsets else 0
+    token_start0 = max(0, int(start_offset) - int(line_start))
+    token_end0 = max(int(token_start0), int(end_offset) - int(line_start))
+
+    yaml_line1 = int(block_view.content_start_line0) + int(line_idx0) + 1
+    start_col1 = int(block_view.content_indent) + int(token_start0) + 1
+    end_col1 = int(block_view.content_indent) + int(token_end0) + 1
+    return EditorRange(
+        start=EditorPosition(line=int(yaml_line1), column=int(start_col1)),
+        end=EditorPosition(line=int(yaml_line1), column=int(end_col1)),
+    )
+
+
+def _is_only_ws_or_py_comments(text: str, *, start: int, end: int) -> bool:
+    i = int(start)
+    while i < int(end):
+        ch = text[i]
+        if ch in (" ", "\t", "\r", "\n"):
+            i += 1
+            continue
+        if ch == "#":
+            while i < int(end) and text[i] != "\n":
+                i += 1
+            continue
+        return False
+    return True
 
 
 def _trim_value(raw: str) -> Tuple[str, int, int]:

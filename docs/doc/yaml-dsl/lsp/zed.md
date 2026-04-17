@@ -41,6 +41,23 @@ Zed 支持为语言指定 language servers,并为每个 server 配置启动命�
     - `path`: `scalim-yaml-dsl-lsp`
     - `arguments`: `["serve", "--log-level", "INFO"]`
 
+## 1.1) 推荐：长 `call_by` 用 block scalar（不丢跳转）
+
+当 `call_by` 参数很长时,推荐用 YAML block scalar（`|`/`>`）拆成多行；LSP 仍可在 block scalar 内对 head reference 与 kwargs RHS field-id 提供跳转/hover/补全。
+
+推荐写法（示例）：
+
+- 参数行允许 Python 风格 `#` 注释（不在 string literal 内）
+- trailing comma 可选
+
+```yaml
+call_by: |
+  ..loaders:xx(
+    a=a,
+    b=b,  # trailing comma optional
+  )
+```
+
 ## 2) YAML 文件匹配建议
 
 最小接入通常直接对 YAML 启用即可；如果你希望限制到 YAML DSL 范围,建议按团队约定统一目录结构（例如 `demand/**`、`workflow/**`）,并在项目内配置中进行约束。

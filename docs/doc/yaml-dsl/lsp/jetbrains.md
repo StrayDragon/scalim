@@ -29,6 +29,23 @@ installed 模式等价写法：
 - **Command**: `scalim-yaml-dsl-lsp`
 - **Arguments**: `serve --log-level INFO`
 
+## 1.1) 推荐：长 `call_by` 用 block scalar（不丢跳转）
+
+当 `call_by` 参数很长时,推荐用 YAML block scalar（`|`/`>`）拆成多行；LSP 仍可在 block scalar 内对 head reference 与 kwargs RHS field-id 提供跳转/hover/补全。
+
+推荐写法（示例）：
+
+- 参数行允许 Python 风格 `#` 注释（不在 string literal 内）
+- trailing comma 可选
+
+```yaml
+call_by: |
+  ..loaders:xx(
+    a=a,
+    b=b,  # trailing comma optional
+  )
+```
+
 ## 2) Schema vs LSP：推荐组合
 
 JetBrains YAML plugin 负责结构校验/补全；YAML DSL LSP 负责语义能力（diagnostics + Python 引用跳转/hover/补全 + actions）。

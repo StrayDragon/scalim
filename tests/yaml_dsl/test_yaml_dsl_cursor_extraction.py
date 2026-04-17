@@ -69,6 +69,67 @@ def test_cursor_extraction_call_by_parses_head_and_range() -> None:
     assert result2.range is None
 
 
+def test_cursor_extraction_call_by_head_supports_block_scalar() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: scalim_misc.demo_big_data_report.loaders:load_orders}
+        sources: {}
+        fields:
+          profit:
+            call_by: |
+              pkg.mod:fn(
+                order_amount=order_amount,
+              )
+        """
+    )
+    pos = _pos(yaml_text, "pkg.mod:fn", offset=2)
+    result = editor_semantics.extract_yaml_dsl_python_reference_by_cursor(yaml_text, pos)
+    assert result.yaml_path == "fields.profit.call_by"
+    assert result.reference == "pkg.mod:fn"
+    assert result.range == _range_for(yaml_text, "pkg.mod:fn")
+
+    args_pos = _pos(yaml_text, "order_amount=order_amount", offset=2)
+    result2 = editor_semantics.extract_yaml_dsl_python_reference_by_cursor(yaml_text, args_pos)
+    assert result2.reference == ""
+    assert result2.range is None
+
+
+def test_cursor_extraction_call_by_kwargs_value_supports_block_scalar_multiline_and_comments() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: scalim_misc.demo_big_data_report.loaders:load_orders}
+        sources: {}
+        fields:
+          profit:
+            call_by: |
+              pkg.mod:fn(
+                order_amount=order_amount, # comment with ) should be ignored
+                other=, # empty for completion
+              )  # tail
+        """
+    )
+    rhs_start = _pos(yaml_text, "order_amount=order_amount", offset=len("order_amount="))
+    rhs_pos = editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + 2)
+    rhs = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, rhs_pos)
+    assert rhs.kind == "call_by_kwargs_value_field_ref"
+    assert rhs.yaml_path == "fields.profit.call_by"
+    assert rhs.reference == "order_amount"
+    assert rhs.range == editor_semantics.EditorRange(
+        start=rhs_start,
+        end=editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + len("order_amount")),
+    )
+
+    empty_pos = _pos(yaml_text, "other=", offset=len("other="))
+    empty = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, empty_pos)
+    assert empty.kind == "call_by_kwargs_value_field_ref"
+    assert empty.yaml_path == "fields.profit.call_by"
+    assert empty.reference == ""
+    assert empty.range == editor_semantics.EditorRange(start=empty_pos, end=empty_pos)
+    assert empty.value_range == empty.range
+
+
 def test_cursor_extraction_call_by_kwargs_value_extracts_rhs_field_id_and_ignores_lhs_name() -> None:
     yaml_text = textwrap.dedent(
         """\

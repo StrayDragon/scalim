@@ -208,6 +208,23 @@ def test_parse_call_by_handles_strings_and_does_not_rewrite_inside_string() -> N
     assert parsed.args == ()
 
 
+def test_parse_call_by_accepts_multiline_args_with_hash_comments() -> None:
+    parsed = parse_call_by("tests.fixtures.call_by_fns:echo(\n  a=a,\n  t=t, # comment (trailing comma optional)\n)\n")
+    assert parsed.reference == "tests.fixtures.call_by_fns:echo"
+    assert parsed.field_names == ("a", "t")
+
+
+def test_parse_call_by_does_not_match_parens_inside_hash_comments_and_allows_trailing_comment_after_close_paren() -> None:
+    parsed = parse_call_by("tests.fixtures.call_by_fns:echo(\n  a=a,\n  t=t, # a comment with ) should be ignored\n)  # tail comment\n")
+    assert parsed.reference == "tests.fixtures.call_by_fns:echo"
+    assert parsed.field_names == ("a", "t")
+
+
+def test_parse_call_by_ignores_placeholder_token_inside_hash_comments() -> None:
+    parsed = parse_call_by("tests.fixtures.call_by_fns:echo(\n  a=a, # __scalim_ctx__ inside comment\n)\n")
+    assert parsed.field_names == ("a",)
+
+
 def test_parse_call_by_rejects_placeholder_token() -> None:
     with pytest.raises(ScalimCallByParseError, match="Illegal token"):
         parse_call_by("tests.fixtures.call_by_fns:echo(__scalim_ctx__)")
