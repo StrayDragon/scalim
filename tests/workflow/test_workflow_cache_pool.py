@@ -234,6 +234,27 @@ def test_workflow_cache_pool_collect_refcount_evictions_skips_when_release_polic
     assert pool._collect_refcount_evictions(node_id="n1") == {}  # type: ignore[attr-defined]
 
 
+def test_workflow_cache_pool_budget_disabled_skips_over_budget_and_refcount_release() -> None:
+    signature = _sig("s1")
+    logical_key = signature.logical_key()
+    pool = _make_pool(
+        config=WorkflowCachePoolIr(
+            conflict_policy="warn",
+            release_policy="workflow_end",
+            budget=None,
+        ),
+        logical_keys_by_node_id={"n1": frozenset([logical_key])},
+        consumers_by_logical_key={logical_key: set(["n1"])},
+    )
+    _ = pool.get_or_load(signature, workflow_node_id="n1", load_fn=lambda: {1: {"id": 1}})
+    pool.on_workflow_node_done("n1")
+    assert signature.canonical_key() in pool._entries  # type: ignore[attr-defined]
+
+    _ = pool.get_or_load(_sig("s2"), workflow_node_id="n2", load_fn=lambda: {1: {"id": 1}})
+    pool.close()
+    assert signature.canonical_key() not in pool._entries  # type: ignore[attr-defined]
+
+
 def test_workflow_cache_pool_collect_refcount_evictions_skips_pinned_logical_key() -> None:
     signature = _sig("s1")
     logical_key = signature.logical_key()

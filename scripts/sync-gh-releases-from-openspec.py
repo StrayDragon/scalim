@@ -199,7 +199,7 @@ def _score_highlight(text: str) -> int:
     # `Highlights` 优先保留用户会“立刻感知”的破坏性变更；否则容易被“同步文档/示例”等条目抢走。
     if "BREAKING" in raw or "breaking" in raw_lower or "破坏性" in raw:
         score += 6
-    # 作者可感知的 authoring surface 变化（尤其是“YAML 不再允许/不再支持”的语义），比纯 API 细节更适合进 Highlights。
+    # 作者可感知的 `authoring surface` 变化（尤其是“YAML 不再允许/不再支持”的语义），比纯 `API` 细节更适合进 `Highlights`。
     if ("不再允许" in s or "不再支持" in s or "不再允许声明" in s) and ("yaml" in lower or "YAML" in s):
         score += 4
     # 更偏向“作者/用户可感知”的说明，而不是内部实现口径。
@@ -357,7 +357,7 @@ def _example_priority(change_id: str, proposal_text: str) -> int:
         return 6
     if "comment-style" in cid:
         return 7
-    # workflow authoring surface（迁出/运行期边界收敛）属于 YAML 作者会立刻感知的变化，但优先级低于核心语法主题。
+    # `workflow` 的 `authoring surface`（迁出/运行期边界收敛）属于 YAML 作者会立刻感知的变化，但优先级低于核心语法主题。
     if "workflow-options-runtime" in cid or ("workflow.options" in proposal_text and "workflow_runtime_options" in proposal_text):
         return 90
     # 回退：当 `change_id` 不带明确 `token` 时，用提案正文推断作者写法主题；避免错过 “YAML DSL 写法变化”
@@ -422,7 +422,7 @@ def _render_workflow_runtime_options_migration_example(proposal_text: str) -> Op
     lower = proposal_text.lower()
     if "workflow_runtime_options" not in lower and "workflow.options" not in lower:
         return None
-    # 目标：当变更涉及 workflow YAML 的 `workflow.options.*` 迁出 YAML 时，给一个最小“删掉旧字段”的示意，
+    # 目标：当变更涉及 `workflow` `YAML` 的 `workflow.options.*` 迁出 `YAML` 时，给一个最小“删掉旧字段”的示意，
     # 并明确运行期走 `workflow_runtime_options`。
     return [
         "# 示例为提案语义示意（不保证可直接运行）",
@@ -889,12 +889,12 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         cleaned = _clean_inline_markers(cand)
         if not cleaned:
             continue
-        # 提案里明确标注“BREAKING（内部实现）”的内容，通常不要求用户做迁移；避免挤占 Breaking/Upgrade 的版面。
+        # 提案里明确标注 `BREAKING`（内部实现）的内容，通常不要求用户做迁移；避免挤占 `Breaking/Upgrade` 的版面。
         if "内部实现" in cleaned and ("BREAKING" in cleaned or "breaking" in cleaned.lower()):
             continue
 
         # === 高价值的“公共 API 收敛/重组”升级点（仍完全基于提案文本，不做代码推断） ===
-        # 目标：把“BREAKING 但没有具体 token”的说明转成可执行的迁移指令，避免落到 `按提案升级` 兜底后被过滤掉。
+        # 目标：把“`BREAKING` 但没有具体 `token`”的说明转成可执行的迁移指令，避免落到 `按提案升级` 兜底后被过滤掉。
         if ("RunOptions" in cleaned or "`RunOptions`" in cleaned) and ("扁平" in cleaned or "flat" in cleaned.lower()):
             instructions.append("把运行入口的 options-object 升级为分组结构；不要再依赖扁平 `RunOptions` 的公开字段集合。")
             continue
@@ -908,13 +908,19 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
         if "run_ir_fn" in cleaned or "compile_demand_yaml_fn" in cleaned:
             instructions.append("不要再用 `run_ir_fn` / `compile_demand_yaml_fn` 这类注入型参数（已移到 internal/test-only）。")
             continue
-        if ("scalim.execution" in cleaned or "`scalim.execution`" in cleaned) and ("ExecutionRequest" in cleaned or "`ExecutionRequest`" in cleaned):
+        if ("scalim.execution" in cleaned or "`scalim.execution`" in cleaned) and (
+            "ExecutionRequest" in cleaned or "`ExecutionRequest`" in cleaned
+        ):
             if "ScalimEngine" in proposal_text or "`ScalimEngine`" in proposal_text:
-                instructions.append("执行层：把入口改为 `scalim.execution.run_ir` + `ExecutionRequest`/`ExecutionResult`；不要再把 `ScalimEngine` 当默认主入口。")
+                instructions.append(
+                    "执行层：把入口改为 `scalim.execution.run_ir` + `ExecutionRequest`/`ExecutionResult`；不要再把 `ScalimEngine` 当默认主入口。"
+                )
             else:
                 instructions.append("执行层：把入口改为 `scalim.execution.run_ir` + `ExecutionRequest`/`ExecutionResult`。")
             continue
-        if ("scalim.sinks" in cleaned or "`scalim.sinks`" in cleaned) and ("pandas" in cleaned.lower() or "`scalim.sinks.pandas`" in cleaned):
+        if ("scalim.sinks" in cleaned or "`scalim.sinks`" in cleaned) and (
+            "pandas" in cleaned.lower() or "`scalim.sinks.pandas`" in cleaned
+        ):
             instructions.append("把可选依赖 sinks 的导入改为从 `scalim.sinks.pandas` 等显式子模块进入（不要从 `scalim.sinks` 直接取）。")
             continue
         if "InMemoryRowDataSink" in cleaned or "`InMemoryRowDataSink`" in cleaned:
@@ -923,7 +929,9 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             else:
                 instructions.append("把捕获 rows 的 sink 统一为 `scalim.sinks.memory.InMemoryRowDataSink`（返回 `List[RowData]`）。")
             continue
-        if ("scalim.events" in cleaned or "`scalim.events`" in cleaned) and ("分组" in cleaned or "catalog" in cleaned.lower() or "namespace" in cleaned.lower()):
+        if ("scalim.events" in cleaned or "`scalim.events`" in cleaned) and (
+            "分组" in cleaned or "catalog" in cleaned.lower() or "namespace" in cleaned.lower()
+        ):
             instructions.append("events：把事件常量的入口改为分组后的 catalog/namespace（不再依赖平铺常量名）。")
             continue
         if ("scalim.ob.Observability" in cleaned or "`scalim.ob.Observability`" in cleaned) and (
@@ -932,12 +940,14 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             instructions.append("Observability：把策略字段迁移到强类型 options 对象（非法组合会 fail-fast）。")
             continue
 
-        # === 工作流 options 迁出 YAML：合并成一条“你要改什么”的升级指令（避免刷屏） ===
+        # === 工作流 `options` 迁出 `YAML`：合并成一条“你要改什么”的升级指令（避免刷屏） ===
         if ("workflow.options" in cleaned or "`workflow.options`" in cleaned) and (
             "不再允许" in cleaned or "不再支持" in cleaned or "fail-fast" in cleaned.lower() or "拒绝" in cleaned
         ):
             if "workflow_runtime_options" in proposal_text:
-                instructions.append("把 workflow YAML 里的 `workflow.options.*` 从 YAML 迁移为运行入口 `workflow_runtime_options`（旧写法会 fail-fast）。")
+                instructions.append(
+                    "把 workflow YAML 里的 `workflow.options.*` 从 YAML 迁移为运行入口 `workflow_runtime_options`（旧写法会 fail-fast）。"
+                )
             else:
                 instructions.append("把 workflow YAML 里的 `workflow.options.*` 删除（旧写法会 fail-fast）。")
             continue
@@ -1325,13 +1335,13 @@ def _render_notes(
             elif yaml_first is not None:
                 chosen = [yaml_first]
 
-        # `Highlights` 里尽量保留至少 1 条 workflow 相关变更（更贴近你给的优先级：workflow 语义/编排变化）。
+        # `Highlights` 里尽量保留至少 1 条 `workflow` 相关变更（更贴近你给的优先级：`workflow` 语义/编排变化）。
         workflow_changes = [c for c in new_changes if "workflow" in c.change_id.lower()]
         if workflow_changes and not any("workflow" in c.change_id.lower() for c in chosen):
             workflow_first = next((c for c in sorted_changes if "workflow" in c.change_id.lower()), None)
             if workflow_first is not None and chosen:
                 replace_idx = len(chosen) - 1
-                # 若本版本存在 YAML authoring 变更，避免把唯一的 YAML authoring highlight 替换掉。
+                # 若本版本存在 YAML `authoring` 变更，避免把唯一的 YAML `authoring` `highlight` 替换掉。
                 if yaml_authoring:
                     yaml_idxs = [i for i, c in enumerate(chosen) if c.is_yaml and c.example_priority < 99]
                     if len(yaml_idxs) == 1 and replace_idx == yaml_idxs[0]:

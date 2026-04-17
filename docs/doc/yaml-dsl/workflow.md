@@ -241,11 +241,36 @@ workflow 在一次执行中维护 workflow-level ctx store,用于在依赖边上
   - `dag_refcount`: 基于 workflow IR 推导 consumer set 上界,并在最后一个消费者完成后释放/可淘汰
   - `workflow_end`: 禁止按 refcount 自动释放,仅在 workflow 结束时统一清理
 - `cache_pool.pin`:
-  - 可选 escape hatch: 强制指定条目常驻到 workflow 结束(v0 仅支持 kind=preload_forever + source_id)
-- 预算 `cache_pool.budget`:
-  - `max_entries`: entries 数量上限(v0)
+  - bounded preset 可选 escape hatch: 强制指定条目常驻到 workflow 结束(v0 仅支持 kind=preload_forever + source_id)
+- 预算 `cache_pool.budget`(仅 bounded preset):
+  - `max_entries`: entries 数量上限(v0; **必须显式提供**,无隐式默认值)
   - `over_budget_policy`: `fail_fast|evict_lru`(仅淘汰 refcount=0 且未被 `cache_pool.pin` 固定的条目;否则 fail-fast)
 - 可观测性: 系统会发出 `workflow_cache_acquire/release/evict` 事件,并复用 `workflow_exec_id/workflow_node_id` 归因字段
+
+对外配置面为 preset-based(封闭集合).典型用法(Python):
+
+```python
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl.workflow_types import (
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowCachePoolPreloadForeverUnlimited,
+    WorkflowRuntimeOptions,
+)
+
+# unlimited: 不施加 entries 数量预算,并等价 `release_policy=workflow_end`(默认常驻到 workflow_end)
+unlimited = WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverUnlimited())
+
+# bounded: 显式预算上限(不再支持通过“大数”模拟无限)
+bounded = WorkflowRuntimeOptions(cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16))
+
+_ = run_workflow(
+    "path/to/workflow.yaml",
+    options=WorkflowRunOptions(
+        demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
+        runtime=unlimited,
+    ),
+)
+```
 
 迁移:
 

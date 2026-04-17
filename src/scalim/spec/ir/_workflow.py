@@ -89,7 +89,7 @@ class WorkflowCachePoolPinIr:
 class WorkflowCachePoolIr:
     conflict_policy: str
     release_policy: str
-    budget: WorkflowCachePoolBudgetIr
+    budget: Optional[WorkflowCachePoolBudgetIr] = None
     pin: Tuple[WorkflowCachePoolPinIr, ...] = ()
 
 

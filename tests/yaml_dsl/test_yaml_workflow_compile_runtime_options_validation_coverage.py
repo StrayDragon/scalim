@@ -4,6 +4,7 @@ from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.dsl.yaml_dsl.workflow_types import (
     WorkflowCachePoolPin,
     WorkflowCachePoolPreloadForeverShared,
+    WorkflowCachePoolPreloadForeverUnlimited,
     WorkflowCachePoolPreset,
     WorkflowExecutionOptions,
     WorkflowRuntimeOptions,
@@ -39,6 +40,9 @@ def test_workflow_compile_build_cache_pool_ir_from_runtime_rejects_invalid_input
     with pytest.raises(TypeError, match="workflow_runtime_options.cache_pool must be a WorkflowCachePoolPreset"):
         workflow_compile_mod._build_workflow_cache_pool_ir_from_runtime(object())  # noqa: SLF001
 
+    with pytest.raises(TypeError, match="max_entries"):
+        _ = WorkflowCachePoolPreloadForeverShared()  # type: ignore[call-arg]
+
     with pytest.raises(TypeError, match="workflow_runtime_options.cache_pool.max_entries must be an int >= 1"):
         workflow_compile_mod._build_workflow_cache_pool_ir_from_runtime(  # noqa: SLF001
             WorkflowCachePoolPreloadForeverShared(max_entries=True)
@@ -54,6 +58,11 @@ def test_workflow_compile_build_cache_pool_ir_from_runtime_rejects_invalid_input
 
     with pytest.raises(TypeError, match="Unsupported workflow_runtime_options.cache_pool preset"):
         workflow_compile_mod._build_workflow_cache_pool_ir_from_runtime(_OtherPreset())  # noqa: SLF001
+
+    unlimited = workflow_compile_mod._build_workflow_cache_pool_ir_from_runtime(WorkflowCachePoolPreloadForeverUnlimited())  # noqa: SLF001
+    assert unlimited is not None
+    assert unlimited.release_policy == "workflow_end"
+    assert unlimited.budget is None
 
     cfg = WorkflowCachePoolPreloadForeverShared(
         max_entries=16,

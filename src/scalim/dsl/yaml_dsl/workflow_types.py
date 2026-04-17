@@ -109,10 +109,15 @@ class WorkflowCachePoolDisabled(WorkflowCachePoolPreset):
 
 
 @dataclass(frozen=True)
+class WorkflowCachePoolPreloadForeverUnlimited(WorkflowCachePoolPreset):
+    """启用跨节点共享 `preload_forever` 缓存条目(不施加条目数量预算)."""
+
+
+@dataclass(frozen=True)
 class WorkflowCachePoolPreloadForeverShared(WorkflowCachePoolPreset):
     """启用跨节点共享 `preload_forever` 缓存条目(仅暴露最小必要参数)."""
 
-    max_entries: int = 16
+    max_entries: int
     pin: Tuple[WorkflowCachePoolPin, ...] = ()
 
 
@@ -195,6 +200,7 @@ __all__ = (
     "WorkflowCachePoolDisabled",
     "WorkflowCachePoolPin",
     "WorkflowCachePoolPreloadForeverShared",
+    "WorkflowCachePoolPreloadForeverUnlimited",
     "WorkflowCachePoolPreset",
     "WorkflowConfig",
     "WorkflowExecutionOptions",

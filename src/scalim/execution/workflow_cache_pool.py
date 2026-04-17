@@ -193,8 +193,8 @@ class WorkflowCachePool:
     _instrumentation: InstrumentationHub
     _conflict_policy: str
     _release_policy: str
-    _max_entries: int
-    _over_budget_policy: str
+    _max_entries: Optional[int]
+    _over_budget_policy: Optional[str]
     _pinned_logical_keys: FrozenSet[Tuple[str, str]]
     _logical_keys_by_node_id: Mapping[str, FrozenSet[Tuple[str, str]]]
     _remaining_consumers_by_logical_key: Dict[Tuple[str, str], Set[str]]
@@ -217,8 +217,12 @@ class WorkflowCachePool:
         self._instrumentation = instrumentation
         self._conflict_policy = str(config.conflict_policy)
         self._release_policy = str(config.release_policy)
-        self._max_entries = int(config.budget.max_entries)
-        self._over_budget_policy = str(config.budget.over_budget_policy)
+        if config.budget is None:
+            self._max_entries = None
+            self._over_budget_policy = None
+        else:
+            self._max_entries = int(config.budget.max_entries)
+            self._over_budget_policy = str(config.budget.over_budget_policy)
         self._pinned_logical_keys = frozenset((str(p.kind), str(p.source_id)) for p in (config.pin or ()))
 
         self._logical_keys_by_node_id = {
@@ -437,14 +441,17 @@ class WorkflowCachePool:
             _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
 
     def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> None:
-        if self._max_entries < 1:  # pragma: no cover  # pragma: allow-no-cover invariant: budget validated by config loader
+        max_entries = self._max_entries
+        if max_entries is None:
+            return
+        if max_entries < 1:  # pragma: no cover  # pragma: allow-no-cover invariant: budget validated by config loader
             msg = "cache_pool budget.max_entries must be >= 1"
             raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool.max_entries")
-        if len(self._entries) < self._max_entries:
+        if len(self._entries) < max_entries:
             return
 
         if self._over_budget_policy == "fail_fast":
-            msg = "cache_pool over budget: max_entries={} (over_budget_policy=fail_fast)".format(self._max_entries)
+            msg = "cache_pool over budget: max_entries={} (over_budget_policy=fail_fast)".format(max_entries)
             raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
         if self._over_budget_policy != "evict_lru":
@@ -453,7 +460,7 @@ class WorkflowCachePool:
 
         evicted = self._evict_lru_idle(workflow_node_id=workflow_node_id, pending_emits=pending_emits)
         if not evicted:
-            msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(self._max_entries)
+            msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(max_entries)
             raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
     def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> bool:

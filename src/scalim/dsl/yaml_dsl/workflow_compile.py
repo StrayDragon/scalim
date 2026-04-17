@@ -98,6 +98,7 @@ from .workflow_types import (
     StageBarrierSchedulerOptions,
     WorkflowCachePoolDisabled,
     WorkflowCachePoolPreloadForeverShared,
+    WorkflowCachePoolPreloadForeverUnlimited,
     WorkflowCachePoolPreset,
     WorkflowExecutionOptions,
     WorkflowRuntimeOptions,
@@ -1585,6 +1586,14 @@ def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[Workflow
 
     if isinstance(raw, WorkflowCachePoolDisabled):
         return None
+
+    if isinstance(raw, WorkflowCachePoolPreloadForeverUnlimited):
+        return WorkflowCachePoolIr(
+            conflict_policy="error",
+            release_policy="workflow_end",
+            budget=None,
+            pin=(),
+        )
 
     if isinstance(raw, WorkflowCachePoolPreloadForeverShared):
         max_entries_raw = raw.max_entries
