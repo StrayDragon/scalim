@@ -6,7 +6,9 @@
 
 ## 0) 前置条件
 
-- 可执行命令 `scalim-yaml-dsl-lsp` 已在 PATH 中
+- 二选一：
+  - `uv` 已安装（`uvx` 可用，推荐）
+  - 可执行命令 `scalim-yaml-dsl-lsp` 已在 PATH 中（installed 模式）
 - 推荐将配置放在项目内：`<repo>/.zed/settings.json`（便于团队共享与审计）
 
 ## 1) 最小配置（stdio）
@@ -23,8 +25,8 @@ Zed 支持为语言指定 language servers,并为每个 server 配置启动命�
   "lsp": {
     "scalim-yaml-dsl-lsp": {
       "binary": {
-        "path": "scalim-yaml-dsl-lsp",
-        "arguments": ["serve", "--log-level", "INFO"]
+        "path": "uvx",
+        "arguments": ["scalim-yaml-dsl-lsp", "serve", "--log-level", "INFO"]
       }
     }
   }
@@ -35,6 +37,9 @@ Zed 支持为语言指定 language servers,并为每个 server 配置启动命�
 
 - `language_servers` 中的 `...` 表示“保留其它已注册 server”。这有助于保留 schema/结构能力,避免把 YAML schema 插件生态替换掉。
 - 若需要排障,建议先把 `--log-level` 提到 `DEBUG`,并配合 `--log-file`（见 Troubleshooting）。
+  - installed 模式等价写法：
+    - `path`: `scalim-yaml-dsl-lsp`
+    - `arguments`: `["serve", "--log-level", "INFO"]`
 
 ## 2) YAML 文件匹配建议
 
@@ -52,8 +57,8 @@ Zed 的 workspace root 通常为你打开的文件夹。为使 discovery 结果�
 优先使用 CLI dump discovery：
 
 ```bash
-scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+uvx scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+# installed: scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 ```
 
 更多排障项见：[Troubleshooting](troubleshooting.md)
-

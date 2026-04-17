@@ -6,7 +6,9 @@
 
 ## 0) 前置条件
 
-- 可执行命令 `scalim-yaml-dsl-lsp` 已在 PATH 中
+- 二选一：
+  - `uv` 已安装（`uvx` 可用，推荐）
+  - 可执行命令 `scalim-yaml-dsl-lsp` 已在 PATH 中（installed 模式）
 - 推荐使用 `nvim-lspconfig` 管理 LSP 配置
 
 > 提示：本 LSP server 只做语义能力（diagnostics/跳转/hover/补全/actions）,schema 仍建议交给 `yaml-language-server`。
@@ -22,7 +24,12 @@ local util = require("lspconfig.util")
 -- 你也可以把它放到 lspconfig.configs 里注册自定义 server
 lspconfig.scalim_yaml_dsl_lsp = {
   default_config = {
-    cmd = { "scalim-yaml-dsl-lsp", "serve", "--log-level", "INFO" },
+    -- uvx（推荐：无需预安装二进制）
+    cmd = { "uvx", "scalim-yaml-dsl-lsp", "serve", "--log-level", "INFO" },
+    -- 如果你的环境只能配置为 “单字符串命令”，可用 shell 包一层：
+    -- cmd = { "bash", "-lc", "uvx scalim-yaml-dsl-lsp serve --log-level INFO" },
+    -- installed（备选：已安装二进制在 PATH 中）
+    -- cmd = { "scalim-yaml-dsl-lsp", "serve", "--log-level", "INFO" },
     filetypes = { "yaml" },
     root_dir = util.root_pattern("scalim.yaml", ".git"),
     single_file_support = true,
@@ -53,14 +60,15 @@ Neovim 的 `root_dir` 会影响 server 的 workspace root。推荐优先以 `sca
 推荐通过 `--log-file` 输出日志到文件,方便从编辑器外部查看：
 
 ```bash
-scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
+uvx scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
+# installed: scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
 ```
 
 排障时优先附上 discovery 摘要：
 
 ```bash
-scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+uvx scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+# installed: scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 ```
 
 更多排障项见：[Troubleshooting](troubleshooting.md)
-

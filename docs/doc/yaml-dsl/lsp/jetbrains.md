@@ -6,7 +6,9 @@
 
 ## 0) 前置条件
 
-- 可执行命令 `scalim-yaml-dsl-lsp` 已在 PATH 中
+- 二选一：
+  - `uv` 已安装（`uvx` 可用，推荐）
+  - 可执行命令 `scalim-yaml-dsl-lsp` 已在 PATH 中（installed 模式）
 - IDE 已启用/安装 YAML plugin（用于 schema/结构体验）
 - 安装 JetBrains Marketplace 插件：`LSP Support`（用于运行自定义 LSP server）
 
@@ -14,13 +16,18 @@
 
 在 `LSP Support` 的设置页中添加一个 server definition（不同 IDE/版本 UI 可能略有差异,关键词通常为 `Language Server Protocol` / `LSP Support`）：
 
-- **Command**: `scalim-yaml-dsl-lsp`
-- **Arguments**: `serve --log-level INFO`
+- **Command**: `uvx`
+- **Arguments**: `scalim-yaml-dsl-lsp serve --log-level INFO`
 - **Scope / File pattern**（建议）：
   - `scalim.yaml`
   - `demand/**/*.y*ml`
   - `workflow/**/*.y*ml`
 - **Working directory / Root**（若可配置）：设为项目根目录（包含 `scalim.yaml` 的目录）
+
+installed 模式等价写法：
+
+- **Command**: `scalim-yaml-dsl-lsp`
+- **Arguments**: `serve --log-level INFO`
 
 ## 2) Schema vs LSP：推荐组合
 
@@ -39,7 +46,8 @@ JetBrains YAML plugin 负责结构校验/补全；YAML DSL LSP 负责语义能�
 若发现 server 启动但功能不生效,优先获取 discovery 摘要：
 
 ```bash
-scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+uvx scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+# installed: scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 ```
 
 如需更详细日志,可在 server 启动参数中加：
@@ -48,4 +56,3 @@ scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 - `--log-file /tmp/scalim-yaml-dsl-lsp.log`
 
 更多排障项见：[Troubleshooting](troubleshooting.md)
-

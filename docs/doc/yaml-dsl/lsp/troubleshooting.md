@@ -7,7 +7,8 @@
 推荐把下面命令的输出粘贴到 issue/群聊里（避免靠猜）：
 
 ```bash
-scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+uvx scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+# installed: scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 ```
 
 你需要重点检查：
@@ -75,7 +76,8 @@ yaml_dsl:
 server 日志默认输出到 stderr。为避免编辑器吞日志,推荐直接落盘：
 
 ```bash
-scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
+uvx scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
+# installed: scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
 ```
 
 ## 4) Schema 与 LSP 的协作边界（避免误判）

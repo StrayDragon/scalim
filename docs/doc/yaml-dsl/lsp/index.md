@@ -10,16 +10,17 @@
 
 需要 `Python >= 3.10`。
 
-推荐使用 `uv` 安装（包含 server 依赖）：
-
-```bash
-uv tool install scalim-yaml-dsl-lsp
-```
-
-不安装、只跑一次：
+文档中的默认示例以 “**无需预安装二进制**” 为目标，优先推荐 `uvx`（ephemeral）模式：
 
 ```bash
 uvx scalim-yaml-dsl-lsp serve --log-level INFO
+```
+
+如需固定安装（离线/更快启动），可选使用 `uv tool install`（installed）模式：
+
+```bash
+uv tool install scalim-yaml-dsl-lsp
+# installed: scalim-yaml-dsl-lsp serve --log-level INFO
 ```
 
 ## 你会得到什么（LSP 负责）
@@ -60,13 +61,15 @@ YAML schema 插件负责结构校验/补全,本 LSP server **不替代** schema 
 最小启动命令：
 
 ```bash
-scalim-yaml-dsl-lsp serve --log-level INFO
+uvx scalim-yaml-dsl-lsp serve --log-level INFO
+# installed: scalim-yaml-dsl-lsp serve --log-level INFO
 ```
 
 写入日志文件（推荐用于排障,避免编辑器吞掉 stderr）：
 
 ```bash
-scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
+uvx scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
+# installed: scalim-yaml-dsl-lsp serve --log-level DEBUG --log-file /tmp/scalim-yaml-dsl-lsp.log
 ```
 
 ### 2) YAML 文件匹配/启用方式
@@ -95,7 +98,8 @@ discovery 输出至少包含：
 CLI（最通用,推荐作为 issue 附件）：
 
 ```bash
-scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+uvx scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
+# installed: scalim-yaml-dsl-lsp dump-discovery path/to/demo.yaml --json
 ```
 
 若 client 支持 `workspace/executeCommand`,也可调用：

@@ -93,14 +93,31 @@ def _cmd_serve(*, tcp: bool, host: str, port: int, log_file: str, log_level: str
             "[错误] `LSP` 服务端导入失败: {}: {}".format(type(exc).__name__, exc),
             "",
             "可能原因: 安装时使用了 `--no-deps`, 或环境损坏导致依赖缺失 (例如 `pygls`).",
-            "修复: 重新安装并确保依赖完整:",
+            "修复 (installed): 重新安装并确保依赖完整:",
             "  uv tool install scalim-yaml-dsl-lsp",
+            "",
+            "修复 (ephemeral): 不安装直接运行 (需要 uv/uvx):",
+            "  uvx scalim-yaml-dsl-lsp serve --log-level INFO",
             "",
         ]
         sys.stderr.write("\n".join(msg_lines))
         return 2
 
-    server = create_server()
+    try:
+        server = create_server()
+    except Exception as exc:  # noqa: BLE001
+        msg_lines = [
+            "[错误] `LSP` 服务端初始化失败: {}: {}".format(type(exc).__name__, exc),
+            "",
+            "修复 (installed): 重新安装并确保依赖完整:",
+            "  uv tool install scalim-yaml-dsl-lsp",
+            "",
+            "修复 (ephemeral): 不安装直接运行 (需要 uv/uvx):",
+            "  uvx scalim-yaml-dsl-lsp serve --log-level INFO",
+            "",
+        ]
+        sys.stderr.write("\n".join(msg_lines))
+        return 2
 
     try:
         if tcp:

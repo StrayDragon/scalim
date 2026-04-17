@@ -1,5 +1,7 @@
 import json
 import shutil
+import sys
+import types
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -64,6 +66,19 @@ def test_dump_discovery_emits_json_payload(tmp_path, capsys) -> None:
     assert payload["python_roots"] == [str(tmp_path)]
     assert payload["allowed_yaml_roots"] == [str(tmp_path)]
     assert payload.get("scalim_yaml_path") is None
+
+
+def test_serve_missing_dependency_emits_actionable_hints(monkeypatch, capsys) -> None:
+    dummy_server = types.ModuleType("scalim_yaml_dsl_lsp.server")
+    monkeypatch.setitem(sys.modules, "scalim_yaml_dsl_lsp.server", dummy_server)
+
+    code = lsp_cli.main(["serve", "--log-level", "INFO"])
+    assert code == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "uv tool install scalim-yaml-dsl-lsp" in captured.err
+    assert "uvx scalim-yaml-dsl-lsp serve --log-level INFO" in captured.err
 
 
 def test_lsp_contract_python_reference_function(tmp_path) -> None:
