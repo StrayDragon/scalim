@@ -39,6 +39,49 @@
 - v1 不解决“补全行参与聚合(before_aggregate)”；该能力作为未来扩展另开 RFC。
 - v1 不把 `default/default_by` 扩展为“对任意 None 做 coalesce”（仅限 relation miss）。
 
+## Clarifications (Deferred Semantics)
+
+本 RFC 中提到的 “before_aggregate” 与 “detail output” 常被误解；这里给出 v1 的明确边界与被 defer 的能力含义，方便实现/评审对齐。
+
+### `after_aggregate`（v1 采用）
+
+`ensure_keys` 在 derived output 的 finalize 阶段运行：
+- 先正常聚合得到 rows（包含 metrics / post fields / rank_fields 等）
+- 再从维度源拿到“期望键集合”，对缺失 keys 追加“补全行”
+
+优点：
+- **成本低**：不改 main_source 行集，不引入额外 lookup；只在 finalize 时补很少的行（常见是几十/几百行，而非事实行级别）。
+- **语义清晰**：补全仅影响“最终输出覆盖哪些 group”，不影响聚合本身。
+
+缺点（可接受）：
+- 若 output 含 `rank_fields`，补全行的 rank 默认只能是 `None`（Decision 9），因为排名已在 finalize 前完成。
+
+### `before_aggregate`（defer）
+
+含义：在聚合发生之前，把缺失 key 作为“空 group”注入，使其参与聚合、排名与 post field 计算。
+
+典型需求示例：
+- “员工排行榜”：按 `employee_id` 聚合后计算 `rank_by(amount_sum)`，希望零销售员工也能出现在榜单中，并且 **rank 为最后**（而不是 `None`）。
+
+优点：
+- **排名语义更自然**：补全行可以参与 rank/score_by_rank，避免 `None` rank。
+- **可覆盖更多 producer/post 语义**：某些 post fields 若依赖 rank 或聚合中间态，before_aggregate 更直观。
+
+缺点（因此 defer）：
+- **语义复杂度高**：需要定义“注入的空 group 在聚合前到底是什么形态”（是注入一条 synthetic main row？还是直接注入聚合器内部的 group？）
+- **执行成本可能爆炸**：若通过 synthetic main row 注入，则可能触发整条数据流（lookups/compute），从“补几行”退化为“补全量维度 × 全链路执行”。
+- **与现有模型冲突更大**：main_source 作为 row universe 的假设会被弱化，且多输出场景更难解释。
+
+结论：v1 明确不做；未来若确有强需求，建议另开 RFC，并优先考虑更窄的模式（例如 `before_rank`：只在排名/排序之前补全、但不触发 ref lookups），以控制成本与歧义。
+
+### detail output 上的 `ensure_keys`（defer）
+
+detail output 指不含 `aggregate` 的输出，其行数通常与 main_source 行数同阶或更大。对 detail output 做 “ensure_keys” 在语义上通常不成立：
+- detail 输出可能是“一对多”（同一 key 产生多行）；补一行还是补多行没有自然定义。
+- 大量非 key 字段没有合理默认值，补出来的行很可能是误导数据。
+
+结论：v1 不支持 detail output 的 ensure_keys；需要“维度完整性”的场景，优先用 derived output（group_by 维度键）表达。
+
 ## Decisions
 
 ### Decision 1: `ensure_keys` 为 output-level（且仅 derived output 可用）
@@ -134,13 +177,36 @@
 - schema 变更只改 `src/scalim/dsl/yaml_dsl/schema_dsl/models/**`（SSOT）与严格 validator；`src/scalim/dsl/yaml_dsl/schema/demand.gen.json` 仅通过 `just gen-yaml-dsl-schema` 刷新。
 - OpenSpec 规格变更通过本 change 的 `specs/**` 表达；落地后由 archive/sync 流程更新 `openspec/specs/**`。
 
+### Decision 11: `default_by` 提供内置 `^defaults/*` vocabulary（最小集合）
+
+**选择：**
+- 系统 MUST 提供 `^defaults/` 命名空间 builtin callables，可被 `default_by` 引用且不需要 allowlist。
+- v1 最小集合（可扩展，但先从最小面出发）：
+  - `^defaults/null`: 恒返回 `None`
+  - `^defaults/zero_of_value_cast`: 按字段 `value_cast` 推导“零/空”缺省值（int→0，decimal→Decimal(0)，str→""，bool→False，其它→None）
+- 这些 builtin 的返回值仍会遵循 Decision 5：最终写回前会经过字段的 `value_cast`/value transform。
+
+**理由：**
+- 覆盖最常见的“补 0/补空串”场景，且与字段类型语义一致，避免业务侧重复写字面量/自建函数。
+- 将常用策略作为稳定 vocabulary，降低维护与沟通成本（实现者只需支持小集合即可交付高收益）。
+
+### Decision 12: `ensure_keys` 必须复用 `preload_forever` cache（避免维度源重复加载）
+
+**选择：**
+- **WHEN** `ensure_keys.from` 指向的 source 启用了 `cache_mode: preload_forever`（或等价的全局预加载缓存）
+  - **THEN** ensure_keys MUST 从 PreloadCache 读取该 source 的 mapping/keys，且 MUST NOT 触发第二次 loader 调用。
+- **WHEN** 未启用 preload cache
+  - **THEN** ensure_keys MAY 在运行期加载维度源一次，并 SHOULD 在同一 run 内按 `source_id` memoize keys（避免多 output 重复 IO）。
+
+**理由：**
+- 键空间补全通常依赖全量维度 roster；重复加载会直接变成可观测性能回归，也会放大外部数据源的负载。
+
 ## Risks / Trade-offs
 
 - [default 可能掩盖数据质量问题] → 限定仅对 ref miss 生效；并建议在 guardrails/required_fields 场景下对关键字段继续 fail-fast。
 - [ensure_keys 依赖维度键空间的一致性]（key_normalization/lookup_cast/value_cast 不一致可能导致“补全行与实际 group 不可对齐”） → 编译期给出诊断提示；文档明确推荐对齐 key space。
-- [维度源非 preload_forever 时可能产生额外 IO] → 编译期提示推荐 `cache_mode: preload_forever`；实现上优先复用 preload cache（如工程结构允许），否则回退为一次性加载并输出 warn。
+- [维度源非 preload_forever 时可能产生额外 IO] → 编译期提示推荐 `cache_mode: preload_forever`；运行期在 preload_forever 场景 MUST 复用 PreloadCache；未启用 preload 时仍需一次性加载维度键集合并按 run memoize。
 - [多输出场景的复用需求] → 先做 output-level，后续如有强需求再加 demand-level sugar（不改变语义）。
-- [ensure_keys 可能导致维度源被重复加载]（preload_forever 已加载一次、ensure_keys 再加载一次） → v1 以简化实现为优先；未来可新增“将 preload cache 传递给输出层”的桥接优化。
 
 ## Implementation Outline (for Handoff)
 
@@ -204,7 +270,7 @@
   - 当 target 存在 ensure_keys 配置时，用 `EnsureKeysAggregator` 包装 `t.derived.build_aggregator(...)` 返回的 aggregator
   - wrapper 的 `finalize_rows()`：
     - 调用下游 finalize_rows 得到 base rows
-    - 调用“维度 keys provider”得到 expected keys
+    - 调用“维度 keys provider”得到 expected keys（Decision 12：优先复用 PreloadCache；否则加载一次并 memoize）
     - 计算 missing keys 并构造补全行（按 defaults/identity 推导/None）
     - 依据 Decision 9 处理顺序（无 rank_fields: merge 插入；有 rank_fields: 追加）
   - wrapper 的 `diagnostics()`：
@@ -229,6 +295,5 @@
 
 ## Open Questions (explicitly deferred)
 
-- 是否需要把 ensure_keys 维度源 keys 复用 preload_forever cache（避免重复加载）？
-- 是否需要内置 `^defaults/*` vocabulary（例如 zero-of-cast），还是依赖 “default + value_cast” 已足够？
 - ensure_keys 是否需要支持 “before_aggregate” 或 detail output？
+  - 见上文 Clarifications：这些能力语义与成本都显著更高；v1 以 after_aggregate/derived-only 交付最大性价比。

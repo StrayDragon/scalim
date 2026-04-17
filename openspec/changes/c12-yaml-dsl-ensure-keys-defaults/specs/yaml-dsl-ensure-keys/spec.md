@@ -73,3 +73,17 @@ identity 推导 MUST 至少覆盖：
 #### Scenario: ensure_keys output order is stable
 - **WHEN** 同一份输入在多次运行中生成聚合输出且启用 ensure_keys
 - **THEN** 输出行顺序 MUST 稳定一致（可对拍）
+
+### Requirement: ensure_keys MUST reuse `preload_forever` cache for dimension keys when available
+键空间补全常用维度 roster（全量 keys），因此系统 MUST 避免对同一维度源重复加载。
+
+- **GIVEN** `ensure_keys.from` 指向的维度 source 配置了 `cache_mode: preload_forever`
+- **WHEN** 同一 run 中该 source 已通过 preload cache 加载过（例如既用于 lookup，又用于 ensure_keys）
+- **THEN** ensure_keys MUST 复用 preload cache 中的 mapping/keys
+- **AND** MUST NOT 为 ensure_keys 再触发一次 loader IO（避免重复加载）
+
+#### Scenario: preload cache prevents double-load
+- **GIVEN** `employees` source 为 `cache_mode: preload_forever`
+- **AND** 某 output 配置 `ensure_keys.from: employees`
+- **WHEN** 该 run 中 `employees` 既参与 relation lookup，又参与 ensure_keys
+- **THEN** `employees` 的 loader MUST 仅被调用一次（可通过计数型 loader 测试验证）

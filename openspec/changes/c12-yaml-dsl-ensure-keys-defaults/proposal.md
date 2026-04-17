@@ -17,6 +17,9 @@
 - **新增字段**：
   - `default`: YAML 字面量
   - `default_by`: 受控 callable 引用（语法与 `call_by` 一致，支持 `^<id>` builtin 引用与 allowlist 约束）
+- **内置 vocabulary（v1）**：
+  - `default_by: ^defaults/zero_of_value_cast`：按字段 `value_cast` 推导“零/空”缺省值（int→0、decimal→Decimal(0)、str→""、bool→False，其它→None）
+  - `default_by: ^defaults/null`：显式返回 `None`（用于可读性/占位；语义等价于不写 default）
 - **适用条件**：仅当该字段发生 **relation lookup miss** 时生效（不改变 hit 行）
   - miss 覆盖范围包括：外键为 `None` / 无法归一化、任一步 miss、最终 step miss
 - **边界澄清（v1）**：
@@ -48,6 +51,7 @@ sources:
 - **语义**：在 derived output finalize 阶段补全缺失的 group-by 键（after-aggregate，不改变 main_source 行集）
 - **期望键集合来源**：`ensure_keys.from` 引用一个维度 source，系统将该 source loader 结果 mapping 的 keys 视为“期望键集合”
   - 推荐该 source 具有稳定、低成本、幂等的 loader；若同时用于 lookup，通常建议 `cache_mode: preload_forever`
+  - **性能契约（v1）**：当维度源启用 `cache_mode: preload_forever` 时，ensure_keys MUST 复用 preload cache（避免同一 source 被重复加载）
 - **配置形态（v1）**：
   - `from`: 必填，source_id
   - `on`: 可选；缺省等于 `aggregate.group_by`；若显式提供，必须与 `aggregate.group_by` 完全一致（避免多输出歧义并保留未来扩展空间）
@@ -75,6 +79,8 @@ outputs:
 ```
 
 > 备注（语法调整）：RFC 将 `ensure_keys` 放在 `main_source` 下，但其语义严格依赖 output 的 aggregate/group_by 与字段集合；为避免多输出歧义并降低维护成本，本变更将 `ensure_keys` 设计为 output-level 配置（仅对声明了 `aggregate` 的 output 生效）。如需“对所有输出复用同一补全策略”，后续可在不破坏语义的前提下增加 sugar（例如 demand-level defaults + per-output override）。
+>
+> 备注（范围边界）：`ensure_keys` v1 为 **after_aggregate** 且仅支持 derived outputs；“before_aggregate”/detail output 的含义与取舍见 `design.md` 的 Clarifications。
 
 ## Capabilities
 

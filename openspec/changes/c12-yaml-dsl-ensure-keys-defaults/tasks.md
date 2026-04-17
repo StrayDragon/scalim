@@ -23,16 +23,17 @@
 - [ ] 4.2 Populate default spec in YAML→IR conversion (`src/scalim/dsl/yaml_dsl/runtime/_internal/conversion_sources.py`) (DoD: config→IR includes defaults)
 - [ ] 4.3 Extend `RuntimeBindings` to register per-field default calculators (`src/scalim/execution/runtime_bindings.py`) (DoD: default_by calculator lookup works)
 - [ ] 4.4 Resolve `default_by` callables in runtime linking (`src/scalim/dsl/yaml_dsl/runtime/runtime_linking.py`) (DoD: allowlist/builtin 语义与 call_by 一致，签名预检查可复用)
-- [ ] 4.5 Apply defaults on relation miss in LoadRef writeback (`src/scalim/execution/executor/operators/load_ref/flow.py`) (DoD: miss 时写回 default 值且仍执行 value_cast)
-- [ ] 4.6 Add execution tests for: hit vs miss, null-fk miss, multi-step miss, default_by uses ctx/fields (DoD: tests cover semantics + guardrails mode)
+- [ ] 4.5 Add builtin default strategies under `^defaults/*` (suggest: `src/scalim/dsl/yaml_dsl/runtime/builtin_callables.py`) (DoD: `^defaults/null` + `^defaults/zero_of_value_cast` 可被 `default_by` 引用；未知 builtin id fail-fast)
+- [ ] 4.6 Apply defaults on relation miss in LoadRef writeback (`src/scalim/execution/executor/operators/load_ref/flow.py`) (DoD: miss 时写回 default 值且仍执行 value_cast)
+- [ ] 4.7 Add execution tests for: hit vs miss, null-fk miss, multi-step miss, default_by uses ctx/fields, `^defaults/*` builtins (DoD: tests cover semantics + guardrails mode)
 
 ## 5. `ensure_keys` for Derived Outputs
 
 - [ ] 5.1 Compile `outputs[*].ensure_keys` from YAML (`src/scalim/dsl/yaml_dsl/runtime/output_composition_yaml.py`) (DoD: derived target spec carries ensure_keys config)
 - [ ] 5.2 Implement `EnsureKeysAggregator` wrapper (suggest: `src/scalim/execution/derived_outputs.py` or `src/scalim/execution/output_composition.py`) (DoD: missing groups are filled with identity/defaults)
-- [ ] 5.3 Implement key provider for dimension source mapping keys (DoD: load once per run; respects normalize; handles composite keys)
+- [ ] 5.3 Implement key provider for dimension source mapping keys (DoD: load once per run; respects normalize; handles composite keys; **复用 preload_forever cache 避免重复加载**)
 - [ ] 5.4 Add ensure_keys diagnostics via `aggregator.diagnostics()` meta + audit_events (DoD: meta has filled_count/ratio; high ratio emits audit event)
-- [ ] 5.5 Add tests for ensure_keys: single key, composite key, rank_fields present ordering rule, stable determinism (DoD: tests pass on repeated runs)
+- [ ] 5.5 Add tests for ensure_keys: single key, composite key, rank_fields present ordering rule, stable determinism, preload_forever 不重复加载 (DoD: tests pass on repeated runs)
 
 ## 6. Generated Artifacts & Docs Governance
 

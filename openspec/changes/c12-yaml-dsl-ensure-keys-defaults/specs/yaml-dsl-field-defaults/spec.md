@@ -28,7 +28,7 @@ miss 的覆盖范围 MUST 包含：
 
 #### Scenario: default value is casted the same as hit value
 - **GIVEN** 某 ref 字段声明 `value_cast: int`
-- **AND** 声明 `default: \"0\"`
+- **AND** 声明 `default: "0"`
 - **WHEN** relation lookup miss
 - **THEN** 最终写回的字段值 MUST 为 `0`（int）
 
@@ -60,3 +60,26 @@ miss 的覆盖范围 MUST 包含：
 - **GIVEN** 某字段 `x` 是 ref 字段（依赖 LoadRef 才能得到值）
 - **WHEN** 另一个字段的 `default_by` 依赖 `x`
 - **THEN** 系统 MUST 在运行前 fail-fast 并提示该依赖不是 pre-ref 可用
+
+### Requirement: `default_by` MUST support builtin `^defaults/*` vocabulary
+系统 MUST 提供一个最小内置 vocabulary，用于覆盖最常见的“缺失补 0/补空值”场景，并确保与字段 `value_cast` 语义对齐。
+
+系统 MUST 至少提供以下 builtin callable ids（可扩展，但这些为 v1 契约）：
+- `^defaults/null`：恒返回 `None`
+- `^defaults/zero_of_value_cast`：按字段 `value_cast` 推导“零/空”缺省值：
+  - `value_cast: int` → `0`
+  - `value_cast: decimal` → `Decimal(0)`
+  - `value_cast: str` → `""`
+  - `value_cast: bool` → `False`
+  - 其它/无法推导 → `None`（并 SHOULD 发出可诊断提示）
+
+并且：
+- builtin `^defaults/*` 引用 MUST 不需要 allowlist（仍遵循 `default_by` 的 miss-only 语义）
+- **WHEN** `default_by` 引用了未知的 `^defaults/*` id
+  - **THEN** 编译/严格校验 MUST fail-fast 并指出未知 builtin id
+
+#### Scenario: builtin zero follows value_cast
+- **GIVEN** 某 ref 字段声明 `value_cast: int`
+- **AND** `default_by: ^defaults/zero_of_value_cast`
+- **WHEN** relation lookup miss
+- **THEN** 字段值 MUST 为 `0`
