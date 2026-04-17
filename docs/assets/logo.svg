@@ -1,30 +1,5 @@
 <svg width="2520" height="1080" viewBox="0 0 2520 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="2520" y2="1080" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#08101E"/>
-      <stop offset="50%" stop-color="#0B1326"/>
-      <stop offset="100%" stop-color="#091120"/>
-    </linearGradient>
-
-    <radialGradient id="centerGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
-      gradientTransform="translate(1260 540) rotate(0) scale(480 300)">
-      <stop offset="0%" stop-color="#47C6FF" stop-opacity="0.16"/>
-      <stop offset="45%" stop-color="#73F0D0" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#73F0D0" stop-opacity="0"/>
-    </radialGradient>
-
-    <radialGradient id="leftGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
-      gradientTransform="translate(430 540) rotate(0) scale(560 340)">
-      <stop offset="0%" stop-color="#73F0D0" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#73F0D0" stop-opacity="0"/>
-    </radialGradient>
-
-    <radialGradient id="rightGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
-      gradientTransform="translate(2090 540) rotate(0) scale(560 340)">
-      <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#7C5CFF" stop-opacity="0"/>
-    </radialGradient>
-
     <linearGradient id="pipeL" x1="220" y1="200" x2="1190" y2="540" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#73F0D0" stop-opacity="0.10"/>
       <stop offset="70%" stop-color="#4BCBFF" stop-opacity="0.38"/>
@@ -59,30 +34,8 @@
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-
-    <pattern id="grid" width="56" height="56" patternUnits="userSpaceOnUse">
-      <path d="M56 0H0V56" stroke="#C7D6F7" stroke-opacity="0.04" stroke-width="1"/>
-    </pattern>
   </defs>
 
-  <!-- background -->
-  <rect width="2520" height="1080" fill="url(#bg)"/>
-  <rect width="2520" height="1080" fill="url(#grid)"/>
-  <rect width="2520" height="1080" fill="url(#centerGlow)"/>
-  <rect width="2520" height="1080" fill="url(#leftGlow)"/>
-  <rect width="2520" height="1080" fill="url(#rightGlow)"/>
-
-  <!-- weak project name -->
-  <text x="1260" y="620"
-        text-anchor="middle"
-        font-family="Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
-        font-size="260"
-        font-weight="800"
-        letter-spacing="-8"
-        fill="#DCE7FF"
-        opacity="0.035">Scalim</text>
-
-  <!-- left fan-in pipes -->
   <g stroke-linecap="round" fill="none">
     <path d="M120 220C300 220 470 220 630 280C785 338 920 470 1135 500" stroke="url(#pipeL)" stroke-width="18"/>
     <path d="M70 330C290 330 510 330 690 370C860 408 970 490 1145 520" stroke="url(#pipeL)" stroke-width="26"/>
@@ -92,7 +45,6 @@
     <path d="M220 880C390 880 540 850 680 785C840 710 975 630 1130 585" stroke="url(#pipeL)" stroke-width="16"/>
   </g>
 
-  <!-- right fan-out pipes -->
   <g stroke-linecap="round" fill="none">
     <path d="M1400 500C1615 470 1750 338 1905 280C2065 220 2235 220 2415 220" stroke="url(#pipeR)" stroke-width="18"/>
     <path d="M1390 520C1565 490 1675 408 1845 370C2025 330 2245 330 2465 330" stroke="url(#pipeR)" stroke-width="26"/>
@@ -102,17 +54,13 @@
     <path d="M1390 585C1545 630 1680 710 1840 785C1980 850 2130 880 2300 880" stroke="url(#pipeR)" stroke-width="16"/>
   </g>
 
-  <!-- pipe joints / dots -->
   <g opacity="0.75">
-    <!-- left -->
     <circle cx="120" cy="220" r="7" fill="#73F0D0"/>
     <circle cx="70" cy="330" r="8" fill="#73F0D0"/>
     <circle cx="140" cy="460" r="9" fill="#47C6FF"/>
     <circle cx="90" cy="610" r="10" fill="#47C6FF"/>
     <circle cx="150" cy="760" r="8" fill="#61D8FF"/>
     <circle cx="220" cy="880" r="7" fill="#73F0D0"/>
-
-    <!-- right -->
     <circle cx="2415" cy="220" r="7" fill="#7C5CFF"/>
     <circle cx="2465" cy="330" r="8" fill="#7C5CFF"/>
     <circle cx="2380" cy="460" r="9" fill="#4BCBFF"/>
@@ -121,105 +69,15 @@
     <circle cx="2300" cy="880" r="7" fill="#7C5CFF"/>
   </g>
 
-  <!-- central symbol: scale-pattern slim diamond -->
   <g>
-    <!-- slim diamond outline -->
-    <path d="M1260 300L1380 540L1260 780L1140 540Z"
-          fill="#0B1528" fill-opacity="0.80" stroke="url(#accent)" stroke-opacity="0.12" stroke-width="2" stroke-linejoin="round"/>
-
-    <!-- layered scale tiles (fish-scale / roof-tile pattern inside diamond) -->
-    <!-- row 1 (top) -->
-    <ellipse cx="1260" cy="380" rx="32" ry="18" fill="none" stroke="#7EF3DB" stroke-opacity="0.18" stroke-width="1.5"/>
-
-    <!-- row 2 -->
-    <ellipse cx="1235" cy="420" rx="32" ry="18" fill="none" stroke="#6AEACC" stroke-opacity="0.16" stroke-width="1.5"/>
-    <ellipse cx="1285" cy="420" rx="32" ry="18" fill="none" stroke="#6AEACC" stroke-opacity="0.16" stroke-width="1.5"/>
-
-    <!-- row 3 -->
-    <ellipse cx="1210" cy="460" rx="32" ry="18" fill="none" stroke="#55D8F0" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1260" cy="460" rx="32" ry="18" fill="none" stroke="#55D8F0" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1310" cy="460" rx="32" ry="18" fill="none" stroke="#55D8F0" stroke-opacity="0.15" stroke-width="1.5"/>
-
-    <!-- row 4 (widest) -->
-    <ellipse cx="1190" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
-    <ellipse cx="1240" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
-    <ellipse cx="1290" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
-    <ellipse cx="1340" cy="500" rx="32" ry="18" fill="none" stroke="#47C6FF" stroke-opacity="0.16" stroke-width="1.5"/>
-
-    <!-- row 5 -->
-    <ellipse cx="1195" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1245" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1295" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1345" cy="540" rx="32" ry="18" fill="none" stroke="#4AAFFF" stroke-opacity="0.15" stroke-width="1.5"/>
-
-    <!-- row 6 -->
-    <ellipse cx="1210" cy="580" rx="32" ry="18" fill="none" stroke="#5B8FFF" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1260" cy="580" rx="32" ry="18" fill="none" stroke="#5B8FFF" stroke-opacity="0.15" stroke-width="1.5"/>
-    <ellipse cx="1310" cy="580" rx="32" ry="18" fill="none" stroke="#5B8FFF" stroke-opacity="0.15" stroke-width="1.5"/>
-
-    <!-- row 7 -->
-    <ellipse cx="1230" cy="620" rx="32" ry="18" fill="none" stroke="#6A78FF" stroke-opacity="0.16" stroke-width="1.5"/>
-    <ellipse cx="1280" cy="620" rx="32" ry="18" fill="none" stroke="#6A78FF" stroke-opacity="0.16" stroke-width="1.5"/>
-
-    <!-- row 8 (bottom) -->
-    <ellipse cx="1260" cy="660" rx="32" ry="18" fill="none" stroke="#7C5CFF" stroke-opacity="0.18" stroke-width="1.5"/>
-
-    <!-- inner glow core -->
-    <ellipse cx="1260" cy="540" rx="35" ry="55" fill="url(#accentSoft)" filter="url(#blurSoft)" opacity="0.4"/>
-
-    <!-- slim vertical accent line -->
-    <line x1="1260" y1="310" x2="1260" y2="770" stroke="url(#accent)" stroke-opacity="0.06" stroke-width="1.5"/>
-  </g>
-
-  <!-- central mascot/icon -->
-  <g filter="url(#glow)">
-    <!-- soft badge halo -->
-    <circle cx="1260" cy="540" r="190" fill="url(#accentSoft)" opacity="0.45"/>
-    <circle cx="1260" cy="540" r="220" stroke="#8FD8FF" stroke-opacity="0.07" stroke-width="1.5"/>
-    <circle cx="1260" cy="540" r="255" stroke="#8B7BFF" stroke-opacity="0.05" stroke-width="1.5"/>
-
-    <!-- stylized S scale spirit - shadow -->
-    <path d="M1320 340
-             C1265 315 1200 320 1175 365
-             C1152 405 1175 445 1240 458
-             C1335 476 1395 510 1390 575
-             C1383 650 1295 710 1195 698
-             C1148 690 1105 668 1078 642"
-          stroke="url(#accentSoft)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
-
-    <!-- stylized S scale spirit - main stroke -->
-    <path d="M1310 340
-             C1260 318 1205 322 1182 362
-             C1162 398 1182 430 1242 442
-             C1330 458 1398 490 1408 558
-             C1418 628 1358 698 1260 716
-             C1190 728 1120 708 1072 665"
-          stroke="url(#accent)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-
-    <!-- layered scales -->
-    <path d="M1225 375C1205 374 1190 382 1183 396C1178 410 1186 422 1204 428C1224 435 1248 440 1275 444"
-          stroke="#8CF8E2" stroke-width="14" stroke-linecap="round"/>
-    <path d="M1210 425C1235 438 1268 446 1302 452C1345 460 1380 476 1396 500"
-          stroke="#64D9FF" stroke-width="14" stroke-linecap="round"/>
-    <path d="M1240 510C1268 518 1296 524 1322 530C1360 538 1386 558 1390 585"
-          stroke="#48C5FF" stroke-width="14" stroke-linecap="round"/>
-    <path d="M1232 598C1260 606 1285 614 1306 624C1326 634 1336 650 1330 670"
-          stroke="#6B9FFF" stroke-width="14" stroke-linecap="round"/>
-    <path d="M1182 658C1215 676 1255 682 1288 674C1308 669 1322 658 1328 644"
-          stroke="#8D78FF" stroke-width="14" stroke-linecap="round"/>
-
-    <!-- spark particles -->
-    <circle cx="1115" cy="662" r="7" fill="#73F0D0" opacity="0.85"/>
-    <circle cx="1090" cy="645" r="4.5" fill="#47C6FF" opacity="0.80"/>
-    <circle cx="1362" cy="640" r="5.5" fill="#8B7BFF" opacity="0.80"/>
-    <circle cx="1400" cy="510" r="4.5" fill="#6AD7FF" opacity="0.80"/>
-  </g>
-
-  <!-- subtle top/bottom flow marks -->
-  <g opacity="0.18" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M1260 290L1260 320" stroke="#7EF3DB" stroke-width="2.5"/>
-    <path d="M1248 308L1260 320L1272 308" stroke="#7EF3DB" stroke-width="2.5"/>
-    <path d="M1260 760L1260 790" stroke="#7C5CFF" stroke-width="2.5"/>
-    <path d="M1248 778L1260 790L1272 778" stroke="#7C5CFF" stroke-width="2.5"/>
+    <path d="M1260 300L1380 540L1260 780L1140 540Z" fill="none" stroke="url(#accent)" stroke-opacity="0.3" stroke-width="2" stroke-linejoin="round"/>
+    <g filter="url(#glow)">
+      <circle cx="1260" cy="540" r="190" fill="url(#accentSoft)" opacity="0.45"/>
+      <path d="M1310 340 C1260 318 1205 322 1182 362 C1162 398 1182 430 1242 442 C1330 458 1398 490 1408 558 C1418 628 1358 698 1260 716 C1190 728 1120 708 1072 665" stroke="url(#accent)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="1115" cy="662" r="7" fill="#73F0D0" opacity="0.85"/>
+      <circle cx="1090" cy="645" r="4.5" fill="#47C6FF" opacity="0.80"/>
+      <circle cx="1362" cy="640" r="5.5" fill="#8B7BFF" opacity="0.80"/>
+      <circle cx="1400" cy="510" r="4.5" fill="#6AD7FF" opacity="0.80"/>
+    </g>
   </g>
 </svg>
