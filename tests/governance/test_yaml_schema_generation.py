@@ -8,6 +8,7 @@ import pytest
 from scalim.dsl.yaml_dsl.schema_dsl import constants as yaml_constants
 from scalim_misc.yaml_schema_generator import (
     SchemaBuilder,
+    _property_names_schema_allows_yaml_merge_key,
     build_demand_schema,
     build_scalim_yaml_schema,
     build_workflow_schema,
@@ -21,6 +22,25 @@ from scalim_misc.yaml_schema_generator import (
 from scalim.dsl.yaml_dsl.schema_dsl.models import LOOKUP_CAST_KEYS
 from scalim.dsl.yaml_dsl.schema_dsl import doc_texts as yaml_doc_texts
 from tests.support.pathing import repo_root as _repo_root
+
+
+def _iter_property_names_schemas(value: object) -> Tuple[dict, ...]:
+    found = []
+
+    def _walk(node: object) -> None:
+        if isinstance(node, dict):
+            prop_names = node.get("propertyNames")
+            if isinstance(prop_names, dict):
+                found.append(prop_names)
+            for child in node.values():
+                _walk(child)
+            return
+        if isinstance(node, list):
+            for item in node:
+                _walk(item)
+
+    _walk(value)
+    return tuple(found)
 
 
 def _schema_path(name: str) -> Path:
@@ -47,6 +67,19 @@ def test_scalim_yaml_generator_matches_generated_file() -> None:
     file_schema = load_schema(_schema_path("scalim_yaml.gen.json"))
 
     assert schemas_equivalent(generated, file_schema)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ("demand.gen.json", "workflow.gen.json", "scalim_yaml.gen.json"),
+)
+def test_generated_schemas_allow_yaml_merge_key_in_property_names(name: str) -> None:
+    schema = load_schema(_schema_path(name))
+    prop_names = _iter_property_names_schemas(schema)
+    if name != "scalim_yaml.gen.json":
+        assert prop_names, "expected schema to contain at least one propertyNames node"
+    for item in prop_names:
+        assert _property_names_schema_allows_yaml_merge_key(item)
 
 
 def test_generated_schema_has_comment() -> None:

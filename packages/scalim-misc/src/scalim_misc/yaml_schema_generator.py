@@ -23,6 +23,57 @@ _SCHEMA_DOC_FIXTURE_RELATIVE_PATHS: Tuple[str, ...] = (
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/scalim.yaml",
 )
 
+_YAML_MERGE_KEY = "<<"
+
+
+def _property_names_schema_allows_yaml_merge_key(schema: Any) -> bool:
+    if not isinstance(schema, dict):
+        return False
+
+    if schema.get("const") == _YAML_MERGE_KEY:
+        return True
+
+    enum = schema.get("enum")
+    if isinstance(enum, list) and _YAML_MERGE_KEY in enum:
+        return True
+
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        return any(_property_names_schema_allows_yaml_merge_key(item) for item in any_of)
+
+    one_of = schema.get("oneOf")
+    if isinstance(one_of, list):
+        return any(_property_names_schema_allows_yaml_merge_key(item) for item in one_of)
+
+    return False
+
+
+def _allow_yaml_merge_key_in_property_names(schema: Any) -> Any:
+    """对所有 `propertyNames` 统一允许 YAML merge key (`<<`).
+
+    说明:
+    - 该 post-process 目标是对齐 `yaml-language-server` 的 schema-only 校验行为
+    - 仅在存在 `propertyNames` 的位置注入 `<<`,不放宽其它 key 约束
+    - 幂等: 重复执行不应改变结果
+    """
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            prop_names = node.get("propertyNames")
+            if isinstance(prop_names, dict) and not _property_names_schema_allows_yaml_merge_key(prop_names):
+                node["propertyNames"] = {"anyOf": [{"const": _YAML_MERGE_KEY}, prop_names]}
+
+            for value in node.values():
+                _walk(value)
+            return
+
+        if isinstance(node, list):
+            for item in node:
+                _walk(item)
+
+    _walk(schema)
+    return schema
+
 
 def _find_repo_root(start: Path) -> Optional[Path]:
     current = start.parent if start.is_file() else start
@@ -176,7 +227,9 @@ class SchemaBuilder:
         )  # pragma: allow-dynattr metadata: schema meta
         if additional_props is not None:
             schema["additionalProperties"] = bool(additional_props)
-        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        schema = standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        _ = _allow_yaml_merge_key_in_property_names(schema)
+        return schema
 
     def build_workflow_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -205,7 +258,9 @@ class SchemaBuilder:
             "additionalProperties": False,
         }
         self._assert_schema_does_not_expose_import_key(schema, path="$")
-        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        schema = standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        _ = _allow_yaml_merge_key_in_property_names(schema)
+        return schema
 
     def build_scalim_yaml_schema(self) -> Dict[str, Any]:
         types_mod = self._types
@@ -247,7 +302,9 @@ class SchemaBuilder:
         }
         if "markdownDescription" in types_mod.SCALIM_YAML_SCHEMA_META:
             schema["markdownDescription"] = types_mod.SCALIM_YAML_SCHEMA_META["markdownDescription"]
-        return standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        schema = standardize_schema_docs(schema, fixture_paths=_resolve_schema_doc_fixture_paths())
+        _ = _allow_yaml_merge_key_in_property_names(schema)
+        return schema
 
     def _build_definition(self, cls: type, *, allow_import: bool = True) -> Dict[str, Any]:
         types_mod = self._types

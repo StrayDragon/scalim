@@ -1,9 +1,10 @@
+import copy
 from types import SimpleNamespace
 from typing import List
 
 import pytest
 
-from scalim_misc.yaml_schema_generator import SchemaBuilder, _build_default_types_module
+from scalim_misc.yaml_schema_generator import SchemaBuilder, _allow_yaml_merge_key_in_property_names, _build_default_types_module
 
 
 def test_schema_builder_schema_for_type_list_hits_container_branch() -> None:
@@ -102,3 +103,46 @@ def test_schema_builder_ref_schema_returns_empty_when_schema_name_is_not_str() -
         SCHEMA_NAME = 1
 
     assert builder._ref_schema(Dummy) == {}  # noqa: SLF001
+
+
+def test_allow_yaml_merge_key_in_property_names_wraps_pattern_property_names_and_is_idempotent() -> None:
+    schema = {
+        "type": "object",
+        "propertyNames": {"pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"},
+    }
+    _ = _allow_yaml_merge_key_in_property_names(schema)
+    assert schema["propertyNames"]["anyOf"][0] == {"const": "<<"}
+    assert schema["propertyNames"]["anyOf"][1] == {"pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"}
+
+    snapshot = copy.deepcopy(schema)
+    _ = _allow_yaml_merge_key_in_property_names(schema)
+    assert schema == snapshot
+
+
+def test_allow_yaml_merge_key_in_property_names_keeps_existing_anyof_const() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "fields": {
+                "type": "object",
+                "propertyNames": {"anyOf": [{"const": "<<"}, {"pattern": "^[a-z]+$"}]},
+            },
+        },
+    }
+    snapshot = copy.deepcopy(schema)
+    _ = _allow_yaml_merge_key_in_property_names(schema)
+    assert schema == snapshot
+
+
+def test_allow_yaml_merge_key_in_property_names_keeps_existing_enum() -> None:
+    schema = {"type": "object", "propertyNames": {"enum": ["<<", "a"]}}
+    snapshot = copy.deepcopy(schema)
+    _ = _allow_yaml_merge_key_in_property_names(schema)
+    assert schema == snapshot
+
+
+def test_allow_yaml_merge_key_in_property_names_wraps_ref_property_names() -> None:
+    schema = {"type": "object", "propertyNames": {"$ref": "#/definitions/field_id"}}
+    _ = _allow_yaml_merge_key_in_property_names(schema)
+    assert schema["propertyNames"]["anyOf"][0] == {"const": "<<"}
+    assert schema["propertyNames"]["anyOf"][1] == {"$ref": "#/definitions/field_id"}

@@ -23,8 +23,15 @@
       "description": "片段文件导入别名映射.",
       "markdownDescription": "#### imports\n\n片段文件导入别名映射.\n\n- key: alias\n- value: 片段文件路径(字符串)\n- V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录):\n  - `./x.yaml` / `x.yaml`\n  - `x/y.yaml`(子目录)\n  - `../x.yaml`(父目录)\n- 支持(编辑器侧放宽,运行时校验为准):\n  - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置)\n  - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单)\n- 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n- additionalProperties: string\n- propertyNames: configured\n\n##### 例子\n(兜底最小示例; 仅保证 schema-only 合法)\n```yaml\n{}\n```",
       "propertyNames": {
-        "type": "string",
-        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+        "anyOf": [
+          {
+            "const": "<<"
+          },
+          {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+          }
+        ]
       },
       "additionalProperties": {
         "type": "string",
@@ -83,13 +90,20 @@
       "propertyNames": {
         "anyOf": [
           {
-            "const": "$import"
+            "const": "<<"
           },
           {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "description": "格式: source_id (字母/数字/下划线, 首字符为字母或下划线)",
-            "markdownDescription": "格式: `source_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+            "anyOf": [
+              {
+                "const": "$import"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "格式: source_id (字母/数字/下划线, 首字符为字母或下划线)",
+                "markdownDescription": "格式: `source_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+              }
+            ]
           }
         ]
       },
@@ -130,13 +144,20 @@
       "propertyNames": {
         "anyOf": [
           {
-            "const": "$import"
+            "const": "<<"
           },
           {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+            "anyOf": [
+              {
+                "const": "$import"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+              }
+            ]
           }
         ]
       },
@@ -518,8 +539,15 @@
               "description": "#### sources.*.normalize.fields",
               "markdownDescription": "#### sources.*.normalize.steps[*].fields\n\n#### sources.*.normalize.fields\n投影字段映射.\n- key: 输出字段名(天然完成 rename)",
               "propertyNames": {
-                "type": "string",
-                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                "anyOf": [
+                  {
+                    "const": "<<"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                  }
+                ]
               },
               "additionalProperties": {
                 "type": "object",
@@ -625,8 +653,15 @@
                     "description": "#### sources.*.normalize.fields",
                     "markdownDescription": "#### sources.*.normalize.steps[*].fields\n\n#### sources.*.normalize.fields\n投影字段映射.\n- key: 输出字段名(天然完成 rename)",
                     "propertyNames": {
-                      "type": "string",
-                      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                      "anyOf": [
+                        {
+                          "const": "<<"
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                        }
+                      ]
                     },
                     "additionalProperties": {
                       "type": "object",
@@ -2287,10 +2322,17 @@
           "type": "object",
           "minProperties": 1,
           "propertyNames": {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-            "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
-            "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+            "anyOf": [
+              {
+                "const": "<<"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "格式: field_id (字母/数字/下划线, 首字符为字母或下划线)",
+                "markdownDescription": "格式: `field_id`.\n\n- 仅允许字母/数字/下划线\n- 首字符必须是字母或下划线"
+              }
+            ]
           },
           "additionalProperties": {
             "oneOf": [
