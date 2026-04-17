@@ -195,6 +195,7 @@ max-args = 16
 "packages/scalim-misc/src/scalim_misc/demo_big_data_report/loaders.py" = ["FBT001", "FBT002"]
 "packages/scalim-misc/src/scalim_misc/demo_big_data_report/verification.py" = ["C901", "PLR0912"]
 "src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
+".tmp/**/*.py" = ["ALL"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing_extensions".msg = "Use src/scalim/vendor/compact/typing_extensionsx.py instead (Python 3.6 + old typing_extensions compat)."
@@ -250,6 +251,8 @@ ignore = [
     "src/scalim/vendor/dataclassesx/__init__.py",
     "src/scalim/vendor/dataclassesx/_backport.py",
     "src/scalim/vendor/yamlx/**/*.py",
+    "*.gen.py",
+    ".tmp/**/*.py",
 ]
 extraPaths = ["./src/scalim/vendor/yamlx"]
 defineConstant = { DEBUG = true }
