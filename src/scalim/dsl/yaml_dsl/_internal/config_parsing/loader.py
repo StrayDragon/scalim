@@ -445,13 +445,9 @@ class YamlDemandLoader(
             if export_cfg is not None:
                 msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(base_path)
                 raise ValueError(msg)
-        if kind == "xlsx_memory":
-            if budget_cfg is None:
-                msg = "{}.budget is required for kind=xlsx_memory".format(base_path)
-                raise ValueError(msg)
-            if path is not None:
-                msg = "{}.path is not allowed for kind=xlsx_memory".format(base_path)
-                raise ValueError(msg)
+        if kind == "xlsx_memory" and path is not None:
+            msg = "{}.path is not allowed for kind=xlsx_memory".format(base_path)
+            raise ValueError(msg)
 
         return BookConfig(
             kind=kind,

@@ -26,7 +26,7 @@ Sources:
 ### `book`
 - `$import`: $import 引用.
 - `allow_formulas`: type=boolean; default=false; xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).
-- `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
+- `budget`: ref=book_budget; xlsx_memory: 可选预算配置(缺省为 unlimited)
 - `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
 - `kind`: type=string; enum=xlsx_file|xlsx_memory; book kind.
 - `path`: xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})
@@ -46,7 +46,7 @@ Sources:
 - `$import`: $import 引用.
 - `align_by`: type=string; default=field_id; enum=field_id|header; 字段对齐策略(仅 `mode=append` 生效).
 - `header_policy`: type=string; default=once; enum=once|always|never; 表头策略(仅 `mode=append` 生效).
-- `mode`: type=string; default=append; enum=sheet|append; 写入语义.
+- `mode`: type=string; default=sheet; enum=sheet|append; 写入语义.
 - `on_conflict`: type=string; default=error; enum=error|overwrite|skip; sheet 冲突策略(仅 `mode=sheet` 生效).
 - `on_mismatch`: type=string; default=error; enum=error|warn|skip; 字段不匹配策略(仅 `mode=append` 生效).
 
@@ -181,7 +181,7 @@ Sources:
 
 - Required: `kind`
 - `allow_formulas`: type=boolean; default=false; xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).
-- `budget`: ref=book_budget; xlsx_memory: 预算配置(必填)
+- `budget`: ref=book_budget; xlsx_memory: 可选预算配置(缺省为 unlimited)
 - `export_xlsx`: ref=book_export_xlsx; xlsx_memory: 可选导出配置
 - `kind` (required): type=string; enum=xlsx_file|xlsx_memory; book kind.
 - `path`: xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})
@@ -202,7 +202,7 @@ Sources:
 #### `book_write_defaults`
 - `align_by`: type=string; default=field_id; enum=field_id|header; 字段对齐策略(仅 `mode=append` 生效).
 - `header_policy`: type=string; default=once; enum=once|always|never; 表头策略(仅 `mode=append` 生效).
-- `mode`: type=string; default=append; enum=sheet|append; 写入语义.
+- `mode`: type=string; default=sheet; enum=sheet|append; 写入语义.
 - `on_conflict`: type=string; default=error; enum=error|overwrite|skip; sheet 冲突策略(仅 `mode=sheet` 生效).
 - `on_mismatch`: type=string; default=error; enum=error|warn|skip; 字段不匹配策略(仅 `mode=append` 生效).
 

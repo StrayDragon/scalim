@@ -336,7 +336,7 @@ def _parse_book_write_defaults(raw: object, *, path: str) -> BookWriteDefaultsCo
     )
 
 
-def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
+def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, PLR0912
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)
@@ -395,9 +395,6 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
             raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
 
     if kind == "xlsx_memory":
-        if budget_cfg is None:
-            msg = "{}.budget is required for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
         if book_path is not None:
             msg = "{}.path is not allowed for kind=xlsx_memory".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))

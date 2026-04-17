@@ -3562,6 +3562,43 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
     assert commits[0].payload.workflow_node_id == "__wf__write.b.0"
 
 
+def test_workflow_sheetbook_resources_budget_is_optional_and_unlimited(tmp_path: Path) -> None:
+    _ = _write_table_demand_yaml_with_book_output(
+        tmp_path,
+        file_name="a.yaml",
+        name="a",
+        loader_ref="tests.fixtures.workflow_loaders:load_table_a_fast",
+        output_name="detail",
+        book_id="report",
+        sheet="A",
+        field_ids=["id", "value"],
+    )
+
+    out_root = tmp_path / "out"
+    wf = _write_workflow_yaml(
+        tmp_path,
+        resources={
+            "books": {
+                "report": {
+                    "kind": "xlsx_memory",
+                    "export_xlsx": {"path": str(out_root)},
+                }
+            }
+        },
+        runs=[
+            {"id": "a", "demand": "a.yaml"},
+        ],
+        max_concurrency=1,
+        failure_policy="primary_only",
+    )
+
+    result = run_workflow(str(wf), options=_run_options())
+    assert not result.errors()
+    export_path = _latest_book_path(out_root, book_id="report")
+    assert export_path.exists()
+    assert _read_xlsx_sheetnames(export_path) == ["A"]
+
+
 def test_workflow_run_writes_two_outputs_to_same_sheetbook_sheets(tmp_path: Path) -> None:
     _ = _write_text(
         tmp_path / "report.yaml",
@@ -5127,6 +5164,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
                         "kind": "xlsx_memory",
                         "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root)},
+                        "write_defaults": {"mode": "append"},
                     }
                 }
             },
@@ -5224,7 +5262,15 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         out_root = tmp_path / "out_{}".format(int(idx))
         wf = _write_workflow_yaml(
             tmp_path,
-            resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root)}}},
+            resources={
+                "books": {
+                    "report": {
+                        "kind": "xlsx_file",
+                        "path": str(out_root),
+                        "write_defaults": {"mode": "append"},
+                    }
+                }
+            },
             runs=[
                 {"id": "slow", "demand": "slow.yaml"},
                 {"id": "fast", "demand": "fast.yaml"},

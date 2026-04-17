@@ -345,7 +345,9 @@ def test_compile_output_composition_missing_file_resource_raises_helpful_error()
 
 def test_compile_output_composition_append_mode_rejects_include_header() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="./out")}),
+        resources=ResourcesConfig(
+            books={"report": BookConfig(kind="xlsx_file", path="./out", write_defaults=BookWriteDefaultsConfig(mode="append"))}
+        ),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -590,6 +592,18 @@ def test_validate_xlsx_memory_write_contract_reports_book_default_align_by_path(
             book=book,
             book_id="report",
         )
+
+
+def test_validate_xlsx_memory_write_contract_accepts_field_id_alignment() -> None:
+    book = BookConfig(
+        kind="xlsx_memory",
+        write_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
+    )
+
+    oc_yaml._validate_xlsx_memory_write_contract(  # noqa: SLF001
+        book=book,
+        book_id="report",
+    )
 
 
 def test_to_decimal_handles_common_types_and_error_branches() -> None:

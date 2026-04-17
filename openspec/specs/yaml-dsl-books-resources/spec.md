@@ -62,9 +62,11 @@ legacy `write_lock` 配置面 MUST 被移除；若用户仍提供 `resources.boo
 
 当 `resources.books.<id>.kind=xlsx_memory` 时,该 book 表示 workflow scope 的内存工作簿,并满足:
 
-- `budget` MUST 存在且 MUST 为 mapping
-- `budget.max_sheets` MUST 为整数且 `>=1`
-- `budget.max_total_cells` MUST 为整数且 `>=1`
+- `budget` MAY 存在,且当存在时 MUST 为 mapping
+- 当 `budget` 存在时:
+  - `budget.max_sheets` MUST 为整数且 `>=1`
+  - `budget.max_total_cells` MUST 为整数且 `>=1`
+- 当 `budget` 缺省时,系统 MUST 将其视为 **unlimited**(不启用预算护栏检查)
 - internal rows MUST 使用 canonical field key + preserved `FieldValue` values 作为 SSOT
 - workflow 内部非结束节点若经由 `xlsx_memory` 传递数据,系统 MUST 保留基础类型,而不是强制走字符串化路径
 - 若上游内部值为 `Decimal`,系统 MUST 在 `xlsx_memory` internal path 中保持该 `Decimal`,不得隐式降级为 `float`
@@ -81,11 +83,10 @@ legacy `write_lock` 配置面 MUST 被移除；若用户仍提供 `resources.boo
 
 legacy `export_xlsx.write_lock` 配置面 MUST 被移除；若用户仍提供该字段，系统 MUST fail-fast 并给出迁移提示。
 
-#### Scenario: xlsx_memory budget is required
+#### Scenario: xlsx_memory budget can be omitted
 - **GIVEN** `resources.books.report.kind=xlsx_memory`
 - **WHEN** `resources.books.report.budget` 缺失
-- **THEN** 编译/校验 MUST fail-fast
-- **AND** 错误信息 MUST 指向 `resources.books.report.budget`
+- **THEN** 编译/校验 MUST 成功
 
 #### Scenario: xlsx_memory export_xlsx root can be injected via init_vars
 - **GIVEN** `resources.books.report.kind=xlsx_memory`
@@ -196,7 +197,7 @@ legacy `export_xlsx.write_lock` 配置面 MUST 被移除；若用户仍提供该
 系统 MUST 允许在 book 级别配置默认写入行为,并允许 outputs 按需覆盖:
 
 - `resources.books.<id>.write_defaults` MAY 存在且 MUST 为 mapping
-  - `mode` MUST 为 `sheet|append` 之一(默认 `append`)
+  - `mode` MUST 为 `sheet|append` 之一(默认 `sheet`)
   - `align_by` MUST 为 `field_id|header` 之一(默认 `field_id`; 仅 `append` 生效)
   - `header_policy` MUST 为 `once|always|never` 之一(默认 `once`; 仅 `append` 生效)
   - `on_mismatch` MUST 为 `error|warn|skip` 之一(默认 `error`; 仅 `append` 生效)
@@ -214,6 +215,11 @@ outputs 级覆盖:
 - 对 `books.kind=xlsx_memory`, 内部链路 MUST 仅使用 canonical field key
 - 对 `books.kind=xlsx_memory`, `write.header_fields_output_by` MUST 仅影响最终 `.xlsx` 导出显示
 - 对 `books.kind=xlsx_memory`, effective `mode=append` + `align_by=header` MUST fail-fast
+
+#### Scenario: write_defaults.mode defaults to sheet
+- **GIVEN** `resources.books.report.kind=xlsx_file`
+- **WHEN** `resources.books.report.write_defaults` 缺省
+- **THEN** effective `write_defaults.mode` MUST 等于 `sheet`
 
 #### Scenario: book write_defaults are schema-valid
 - **WHEN** `resources.books.report.write_defaults.mode=append`
@@ -309,4 +315,3 @@ loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
 - **WHEN** demand YAML 仍声明 `outputs[*].container`
 - **THEN** schema-only 与 runtime 校验 MUST fail-fast
 - **AND** 错误信息 MUST 提示迁移到 `resources.files/resources.books` + `outputs[*].to` + `outputs[*].write`
-

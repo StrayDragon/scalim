@@ -235,14 +235,16 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
             if on_conflict == "overwrite":
                 action = "overwrite"
-        elif len(plan.sheets) >= int(plan.budget_max_sheets):
-            msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-            diff = [
-                "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                "current_sheets={}".format(len(plan.sheets)),
-                "new_sheet={!r}".format(sheet_name),
-            ]
-            raise ScalimWorkflowWriteError(msg, diff=diff)
+        else:
+            max_sheets_limit = int(plan.budget_max_sheets)
+            if max_sheets_limit > 0 and len(plan.sheets) >= max_sheets_limit:
+                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
+                diff = [
+                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
+                    "current_sheets={}".format(len(plan.sheets)),
+                    "new_sheet={!r}".format(sheet_name),
+                ]
+                raise ScalimWorkflowWriteError(msg, diff=diff)
         return action, pending_skip
 
     def _sheetbook_sheet_store(
@@ -317,7 +319,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:
-            if len(plan.sheets) >= int(plan.budget_max_sheets):
+            max_sheets_limit = int(plan.budget_max_sheets)
+            if max_sheets_limit > 0 and len(plan.sheets) >= max_sheets_limit:
                 msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
                 diff = [
                     "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
@@ -464,6 +467,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         if allow_over_budget:  # pragma: no cover  # pragma: allow-no-cover test-only budget bypass
             return  # pragma: no cover  # pragma: allow-no-cover test-only budget bypass
         limit = int(plan.budget_max_total_cells)
+        if limit <= 0:
+            return
         if int(new_total_cells) <= limit:
             return
         diff = [

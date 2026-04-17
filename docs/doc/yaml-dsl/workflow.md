@@ -279,6 +279,9 @@ workflow YAML 只负责两件事:
 
 示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
 
+说明:
+- 对 `kind: xlsx_memory`, `budget` 为可选项；缺省时视为 unlimited(不启用预算护栏)。若需要护栏,请显式声明 `budget.max_sheets/max_total_cells`。
+
 workflow YAML:
 
 ```yaml
@@ -287,11 +290,10 @@ workflow:
     books:
       report:
         kind: xlsx_memory
-        budget:
-          max_sheets: 16
-          max_total_cells: 2000000
         export_xlsx:
           path: ./out
+        # 可选预算护栏:
+        # budget: {max_sheets: 16, max_total_cells: 2000000}
 
   runs:
     - id: main

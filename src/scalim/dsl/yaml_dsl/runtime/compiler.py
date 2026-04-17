@@ -833,7 +833,7 @@ def _overlay_book_export_xlsx_override(
     return BookExportXlsxConfig(path=export_path_any, allow_formulas=bool(allow_formulas))
 
 
-def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
+def _apply_book_override(  # noqa: C901, PLR0912
     base: Optional[BookConfig],
     override: BookResourceOverride,
     *,
@@ -889,9 +889,6 @@ def _apply_book_override(  # noqa: C901, PLR0912, PLR0915
     if kind == "xlsx_memory":
         if override.path is not None or override.allow_formulas is not None:
             msg = "{}.path/allow_formulas are not allowed for kind=xlsx_memory (use export_xlsx.*)".format(path)
-            raise ValueError(msg)
-        if budget is None:
-            msg = "{}.budget is required for kind=xlsx_memory".format(path)
             raise ValueError(msg)
         if book_path is not None:
             msg = "{}.path is not allowed for kind=xlsx_memory".format(path)

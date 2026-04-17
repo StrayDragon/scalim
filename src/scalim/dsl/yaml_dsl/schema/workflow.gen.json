@@ -198,14 +198,14 @@
         "mode": {
           "type": "string",
           "description": "写入语义.",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults.mode\n\n写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `sheet`, `append`\n- 默认值: `append`\n\n##### 例子\n```yaml\nappend\n```",
+          "markdownDescription": "#### workflow.resources.books.*.write_defaults.mode\n\n写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `sheet`, `append`\n- 默认值: `sheet`\n\n##### 例子\n```yaml\nsheet\n```",
           "enum": [
             "sheet",
             "append"
           ],
-          "default": "append",
+          "default": "sheet",
           "examples": [
-            "append"
+            "sheet"
           ]
         },
         "align_by": {
@@ -315,8 +315,8 @@
           "markdownDescription": "#### workflow.resources.books.*.path\n\nxlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "budget": {
-          "description": "xlsx_memory: 预算配置(必填)",
-          "markdownDescription": "#### workflow.resources.books.*.budget\n\nxlsx_memory: 预算配置(必填)",
+          "description": "xlsx_memory: 可选预算配置(缺省为 unlimited)",
+          "markdownDescription": "#### workflow.resources.books.*.budget\n\nxlsx_memory: 可选预算配置(缺省为 unlimited)",
           "allOf": [
             {
               "$ref": "#/definitions/book_budget"
@@ -393,9 +393,6 @@
             }
           },
           "then": {
-            "required": [
-              "budget"
-            ],
             "properties": {
               "path": {
                 "not": {}

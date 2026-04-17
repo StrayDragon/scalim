@@ -75,8 +75,9 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"budget is required for kind=xlsx_memory"):
-        _ = loader._parse_book_config({BOOK_KEYS["kind"]: "xlsx_memory"}, base_path="resources.books.report")  # noqa: SLF001
+    parsed = loader._parse_book_config({BOOK_KEYS["kind"]: "xlsx_memory"}, base_path="resources.books.report")  # noqa: SLF001
+    assert parsed.kind == "xlsx_memory"
+    assert parsed.budget is None
 
     with pytest.raises(ValueError, match=r"path is not allowed for kind=xlsx_memory"):
         _ = loader._parse_book_config(

@@ -512,8 +512,19 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
             path="p",
         )
 
-    with pytest.raises(ValueError, match=r"p\.budget is required for kind=xlsx_memory"):
-        _ = compiler_mod._apply_book_override(None, BookResourceOverride(kind="xlsx_memory"), path="p")  # noqa: SLF001
+    created_unlimited = compiler_mod._apply_book_override(None, BookResourceOverride(kind="xlsx_memory"), path="p")  # noqa: SLF001
+    assert created_unlimited.kind == "xlsx_memory"
+    assert created_unlimited.budget is None
+
+    with pytest.raises(ValueError, match=r"p\.budget\.max_sheets must be >= 1"):
+        _ = compiler_mod._apply_book_override(  # noqa: SLF001
+            None,
+            BookResourceOverride(
+                kind="xlsx_memory",
+                budget=BookBudgetOverride(max_sheets=0, max_total_cells=2),
+            ),
+            path="p",
+        )
 
     with pytest.raises(ValueError, match=r"p\.path/allow_formulas are not allowed for kind=xlsx_memory"):
         _ = compiler_mod._apply_book_override(  # noqa: SLF001

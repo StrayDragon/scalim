@@ -183,7 +183,6 @@ class BookConfig:
         {
             "if": {"required": ["kind"], "properties": {"kind": {"const": "xlsx_memory"}}},
             "then": {
-                "required": ["budget"],
                 "properties": {
                     "path": {"not": {}},
                     "allow_formulas": {"not": {}},
@@ -212,7 +211,7 @@ class BookConfig:
 
     budget: Optional[BookBudgetConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc="xlsx_memory: 预算配置(必填)", ref="book_budget"),
+        metadata=schema_meta(desc="xlsx_memory: 可选预算配置(缺省为 unlimited)", ref="book_budget"),
     )
 
     export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(

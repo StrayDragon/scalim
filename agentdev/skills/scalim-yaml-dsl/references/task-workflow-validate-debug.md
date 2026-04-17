@@ -108,15 +108,18 @@ run_workflow(
 - 下游 run 必须显式 `depends_on: [A]`(或依赖闭包中包含 A)
 - 避免把大对象塞进 ctx；只放小体量 summary/path 等
 
-### 5) `workflow.resources.books.*.kind=xlsx_memory` 缺少 budget 护栏
+### 5) `workflow.resources.books.*.kind=xlsx_memory` budget 配置问题(可选)
 
 症状:
 
-- schema validate 报错: 缺少 `budget.max_sheets/max_total_cells`(或类型不匹配)
+- schema validate / full validate 报错: `budget.max_sheets/max_total_cells` 类型不匹配或取值非法
+- 运行期报错: `Sheetbook budget exceeded ...`(命中预算护栏)
 
 修复:
 
-- 每个 `kind=xlsx_memory` 的 book 必须声明 `budget.max_sheets` 与 `budget.max_total_cells`
+- `budget` 为可选:
+  - 若需要预算护栏,显式声明 `budget.max_sheets` 与 `budget.max_total_cells`(整数且 `>=1`)
+  - 若不需要护栏(视为 unlimited),省略 `budget`
 
 ### 6) 把“写入意图”写进了 workflow YAML
 

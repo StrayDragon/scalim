@@ -22,7 +22,7 @@ BOOK_WRITE_MODE_ENUM: Tuple[str, ...] = (
 )
 """`resources.books.*.write_defaults.mode` 枚举."""
 
-DEFAULT_BOOK_WRITE_MODE: str = "append"
+DEFAULT_BOOK_WRITE_MODE: str = "sheet"
 """`resources.books.*.write_defaults.mode` 默认值."""
 
 BOOK_WRITE_ALIGN_BY_ENUM: Tuple[str, ...] = (

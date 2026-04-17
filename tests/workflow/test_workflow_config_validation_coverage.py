@@ -98,7 +98,6 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         ({"books": {"report": {"kind": "xlsx_file", "path": "out", "export_xlsx": {"path": "out2"}}}}, "export_xlsx is not allowed"),
         ({"books": {"report": {"kind": "xlsx_file", "path": "out", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
         ({"books": {"report": {"kind": "xlsx_file", "path": "out", "write_lock": "nope"}}}, "write_lock was removed"),
-        ({"books": {"mem": {"kind": "xlsx_memory"}}}, "budget is required for kind=xlsx_memory"),
         ({"books": {"mem": {"kind": "xlsx_memory", "budget": "nope"}}}, "budget must be a mapping"),
         (
             {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1, "nope": 1}}}},
@@ -258,6 +257,14 @@ def test_load_workflow_config_from_mapping_books_path_accepts_pathlike(tmp_path:
     root["workflow"]["resources"] = {"books": {"report": {"kind": "xlsx_file", "path": tmp_path / "out"}}}
     cfg = load_workflow_config_from_mapping(root)
     assert cfg.resources.books["report"].path.endswith("out")
+
+
+def test_load_workflow_config_from_mapping_xlsx_memory_budget_is_optional() -> None:
+    root = _base_root()
+    root["workflow"]["resources"] = {"books": {"mem": {"kind": "xlsx_memory"}}}
+    cfg = load_workflow_config_from_mapping(root)
+    assert cfg.resources.books["mem"].kind == "xlsx_memory"
+    assert cfg.resources.books["mem"].budget is None
 
 
 def test_load_workflow_config_from_mapping_allows_null_resource_groups() -> None:

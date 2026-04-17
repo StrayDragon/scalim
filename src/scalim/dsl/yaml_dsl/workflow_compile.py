@@ -427,6 +427,16 @@ def _apply_book_write_defaults_patch(
     return _overlay_book_write_defaults_patch(base_defaults, raw, path="{}.write_defaults".format(path))
 
 
+def _validate_xlsx_memory_budget_semantic_contracts(budget: BookBudgetConfig, *, path: str) -> None:
+    msg: str
+    if int(budget.max_sheets) < 1:
+        msg = "{}.budget.max_sheets must be >= 1".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_sheets".format(path))
+    if int(budget.max_total_cells) < 1:
+        msg = "{}.budget.max_total_cells must be >= 1".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.budget.max_total_cells".format(path))
+
+
 def _validate_book_kind_semantic_contracts(
     *,
     kind: str,
@@ -452,9 +462,8 @@ def _validate_book_kind_semantic_contracts(
         return
 
     if kind == "xlsx_memory":
-        if budget is None:
-            msg = "{}.budget is required for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+        if budget is not None:
+            _validate_xlsx_memory_budget_semantic_contracts(budget, path=str(path))
         if book_path is not None:
             msg = "{}.path is not allowed for kind=xlsx_memory".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
@@ -579,6 +588,7 @@ def _book_export_path_and_options(
     path_prefix: str,
 ) -> Tuple[str, Dict[str, object]]:
     kind = str(book.kind or "").strip()
+    book_options: Dict[str, object]
     if kind == "xlsx_file":
         output_root = resolve_yaml_relative_output_path(
             book.path,
@@ -592,19 +602,14 @@ def _book_export_path_and_options(
                 "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
             ).format(path_prefix)
             raise ValueError(msg)
-        options: Dict[str, object] = {
+        book_options = {
             "kind": "xlsx_file",
             "allow_formulas": bool(book.allow_formulas),
         }
-        return str(output_root), options
+        return str(output_root), book_options
 
     if kind == "xlsx_memory":
         budget = book.budget
-        if budget is None:
-            msg = "books.kind=xlsx_memory requires budget (book_id={!r})".format(str(book_id))
-            path_ref = "{}.budget".format(path_prefix)
-            err = "{} (path={})".format(msg, path_ref)
-            raise ValueError(err)
 
         export_cfg = book.export_xlsx
         output_root = ""
@@ -626,13 +631,12 @@ def _book_export_path_and_options(
                 "allow_formulas": bool(export_cfg.allow_formulas),
             }
 
-        options = {
-            "kind": "xlsx_memory",
-            "budget": {"max_sheets": int(budget.max_sheets), "max_total_cells": int(budget.max_total_cells)},
-        }
+        book_options = {"kind": "xlsx_memory"}
+        if budget is not None:
+            book_options["budget"] = {"max_sheets": int(budget.max_sheets), "max_total_cells": int(budget.max_total_cells)}
         if export_options is not None:
-            options["export_xlsx"] = export_options
-        return str(output_root), options
+            book_options["export_xlsx"] = export_options
+        return str(output_root), book_options
 
     msg = "Unknown book kind {!r} for book_id={!r}".format(kind, str(book_id))
     path_ref = "{}.kind".format(path_prefix)

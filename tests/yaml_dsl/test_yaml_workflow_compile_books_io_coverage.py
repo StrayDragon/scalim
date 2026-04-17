@@ -44,7 +44,7 @@ def test_workflow_compile_try_resolve_book_export_abs_path_cover_branches(tmp_pa
     # exception branch -> None
     assert (
         workflow_compile_mod._try_resolve_book_export_abs_path(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(kind="nope"),
             book_id="b",
             base_dir=str(tmp_path),
             init_vars=None,
@@ -295,9 +295,25 @@ def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"path is required for kind=xlsx_file"):
         _ = workflow_compile_mod._apply_book_patch(BookConfig(kind="xlsx_file"), {}, path="p")  # noqa: SLF001
 
-    # semantic: xlsx_memory requires budget
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget is required for kind=xlsx_memory"):
-        _ = workflow_compile_mod._apply_book_patch(BookConfig(kind="xlsx_memory"), {}, path="p")  # noqa: SLF001
+    # semantic: xlsx_memory budget is optional (defaults to unlimited)
+    patched_unlimited = workflow_compile_mod._apply_book_patch(BookConfig(kind="xlsx_memory"), {}, path="p")  # noqa: SLF001
+    assert patched_unlimited.budget is None
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget\.max_sheets must be >= 1") as exc_info:
+        _ = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
+            BookConfig(kind="xlsx_memory"),
+            {"budget": {"max_sheets": 0, "max_total_cells": 1}},
+            path="p",
+        )
+    assert exc_info.value.path == "p.budget.max_sheets"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget\.max_total_cells must be >= 1") as exc_info2:
+        _ = workflow_compile_mod._apply_book_patch(  # noqa: SLF001
+            BookConfig(kind="xlsx_memory"),
+            {"budget": {"max_sheets": 1, "max_total_cells": 0}},
+            path="p",
+        )
+    assert exc_info2.value.path == "p.budget.max_total_cells"
 
     # semantic: unknown kind
     with pytest.raises(ScalimWorkflowConfigError, match=r"kind='nope' is invalid"):
@@ -373,14 +389,15 @@ def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_mor
 
 
 def test_workflow_compile_book_export_path_and_options_error_branches_cover_budget_and_unknown_kind() -> None:
-    with pytest.raises(ValueError, match=r"requires budget"):
-        _ = workflow_compile_mod._book_export_path_and_options(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
-            book_id="b",
-            base_dir=".",
-            init_vars=None,
-            path_prefix="resources.books.b",
-        )
+    root, opts = workflow_compile_mod._book_export_path_and_options(  # noqa: SLF001
+        BookConfig(kind="xlsx_memory"),
+        book_id="b",
+        base_dir=".",
+        init_vars=None,
+        path_prefix="resources.books.b",
+    )
+    assert root == ""
+    assert opts == {"kind": "xlsx_memory"}
 
     with pytest.raises(ValueError, match=r"Unknown book kind"):
         _ = workflow_compile_mod._book_export_path_and_options(  # noqa: SLF001
@@ -548,20 +565,23 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     assert effective_files == {}
     assert [res.path for res in resources if res.resource_id == "report"] == [str((workflow_base_dir / "a").resolve())]
 
-    # exception wrap branch when export options invalid (xlsx_memory missing budget)
+    # xlsx_memory budget can be omitted (treated as unlimited)
     wf_obj = WorkflowConfig(
         runs=(run_a,),
         resources=ResourcesConfig(books={"bad": BookConfig(kind="xlsx_memory")}),
     )
-    with pytest.raises(ScalimWorkflowConfigError, match=r"requires budget"):
-        _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
-            wf_obj,
-            workflow_base_dir=workflow_base_dir,
-            demand_cfg_by_run_id={"a": DemandConfig()},
-            demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
-            init_vars=None,
-            overrides_resources=None,
-        )
+    resources, effective_books, effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
+        wf_obj,
+        workflow_base_dir=workflow_base_dir,
+        demand_cfg_by_run_id={"a": DemandConfig()},
+        demand_yaml_paths_by_run_id={"a": str(tmp_path / "d" / "a.yaml")},
+        init_vars=None,
+        overrides_resources=None,
+    )
+    assert effective_books["bad"].kind == "xlsx_memory"
+    assert effective_books["bad"].budget is None
+    assert effective_files == {}
+    assert [res.resource_id for res in resources] == ["bad"]
 
     # legacy file-path semantics are rejected (xlsx_file.path expects output root dir, not *.xlsx)
     wf_obj = WorkflowConfig(
@@ -907,6 +927,44 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
             overrides_outputs=None,
             default_book_id=None,
         )
+
+
+def test_workflow_compile_accepts_xlsx_memory_align_by_field_id() -> None:
+    workflow_compile_mod._validate_xlsx_memory_align_by(  # noqa: SLF001
+        book=BookConfig(
+            kind="xlsx_memory",
+            budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
+            write_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
+        ),
+        book_id="report",
+    )
+
+
+def test_workflow_compile_default_book_write_mode_is_sheet() -> None:
+    wf_obj = WorkflowConfig(runs=(WorkflowRun(id="a", demand="a.yaml"),), resources=ResourcesConfig())
+    cfg = DemandConfig(
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="S"),
+                fields=("a",),
+            ),
+        ),
+    )
+
+    nodes: list[WorkflowAnyNodeIr] = []
+    _ = workflow_compile_mod._append_write_nodes_from_runs(  # noqa: SLF001
+        wf_obj,
+        demand_cfg_by_run_id={"a": cfg},
+        nodes=nodes,
+        edges=[],
+        effective_books={"report": BookConfig(kind="xlsx_file", path="out")},
+        effective_files={},
+        overrides_outputs=None,
+        default_book_id=None,
+    )
+    assert any(isinstance(n, WriteSheetNodeIr) for n in nodes)
+    assert not any(isinstance(n, AppendSheetNodeIr) for n in nodes)
 
 
 def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_branches() -> None:
