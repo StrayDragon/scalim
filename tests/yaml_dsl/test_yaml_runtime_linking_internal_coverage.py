@@ -26,7 +26,7 @@ from scalim.spec.ir import (
 from scalim.spec.ir import DemandIr, DerivedFieldIr, KeyIr, MainSourceIr, SourceIr
 from scalim.spec.ir._fields import FieldDefaultCaseIr
 from scalim.spec.ir.binding import BindingIr, LoaderIr
-from scalim.dsl.yaml_dsl.runtime.builtin_callables import zero_of_value_cast
+from scalim.dsl.yaml_dsl.runtime.builtin_callables import default, default_of_value_cast
 
 
 class _DummyResolver:
@@ -263,7 +263,7 @@ def test_bind_field_runtime_bindings_binds_ref_default_call_by_calculator() -> N
     assert calc(ctx=ctx) == 7
 
 
-def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_for_str() -> None:
+def test_bind_field_runtime_bindings_inlines_defaults_default_for_str() -> None:
     source = SourceIr(
         source_id="s1",
         key=KeyIr(key="id"),
@@ -278,7 +278,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_for_str
             FieldDefaultCaseIr(
                 when="relation_miss",
                 kind="call_by",
-                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/zero_of_value_cast")),
+                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/default")),
             ),
         ),
     )
@@ -302,7 +302,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_for_str
     assert calc(ctx=ctx) == ""
 
 
-def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_for_int() -> None:
+def test_bind_field_runtime_bindings_inlines_defaults_default_for_int() -> None:
     source = SourceIr(
         source_id="s1",
         key=KeyIr(key="id"),
@@ -317,7 +317,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_for_int
             FieldDefaultCaseIr(
                 when="relation_miss",
                 kind="call_by",
-                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/zero_of_value_cast")),
+                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/default")),
             ),
         ),
     )
@@ -341,7 +341,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_for_int
     assert calc(ctx=ctx) == 0
 
 
-def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_without_value_cast() -> None:
+def test_bind_field_runtime_bindings_rejects_defaults_default_without_value_cast() -> None:
     source = SourceIr(
         source_id="s1",
         key=KeyIr(key="id"),
@@ -355,7 +355,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_without
             FieldDefaultCaseIr(
                 when="relation_miss",
                 kind="call_by",
-                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/zero_of_value_cast")),
+                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/default")),
             ),
         ),
     )
@@ -365,21 +365,16 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_without
         main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
     )
 
-    bindings = RuntimeBindings()
-    _bind_field_runtime_bindings(
-        demand_ir,
-        bindings=bindings,
-        resolver=_DummyResolver(),  # type: ignore[arg-type] internal tests: duck-typed resolver
-        compute_engine=build_compute_engine(),
-    )
-
-    calc = bindings.get_ref_default_calculator("x", 0)
-    assert calc is not None
-    ctx = ComputeCallContextIr(row_id=1, batch_num=0, field_id="x", deps=(), values={})
-    assert calc(ctx=ctx) is None
+    with pytest.raises(ScalimResolverError, match=r"requires explicit value_cast"):
+        _bind_field_runtime_bindings(
+            demand_ir,
+            bindings=RuntimeBindings(),
+            resolver=_DummyResolver(),  # type: ignore[arg-type] internal tests: duck-typed resolver
+            compute_engine=build_compute_engine(),
+        )
 
 
-def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_without_cast_op() -> None:
+def test_bind_field_runtime_bindings_rejects_defaults_default_without_cast_op() -> None:
     source = SourceIr(
         source_id="s1",
         key=KeyIr(key="id"),
@@ -399,7 +394,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_without
             FieldDefaultCaseIr(
                 when="relation_miss",
                 kind="call_by",
-                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/zero_of_value_cast")),
+                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/default")),
             ),
         ),
     )
@@ -409,18 +404,47 @@ def test_bind_field_runtime_bindings_inlines_defaults_zero_of_value_cast_without
         main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
     )
 
-    bindings = RuntimeBindings()
-    _bind_field_runtime_bindings(
-        demand_ir,
-        bindings=bindings,
-        resolver=_DummyResolver(),  # type: ignore[arg-type] internal tests: duck-typed resolver
-        compute_engine=build_compute_engine(),
+    with pytest.raises(ScalimResolverError, match=r"requires explicit value_cast"):
+        _bind_field_runtime_bindings(
+            demand_ir,
+            bindings=RuntimeBindings(),
+            resolver=_DummyResolver(),  # type: ignore[arg-type] internal tests: duck-typed resolver
+            compute_engine=build_compute_engine(),
+        )
+
+
+def test_bind_field_runtime_bindings_rejects_defaults_default_unknown_value_cast() -> None:
+    source = SourceIr(
+        source_id="s1",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
+    )
+    field = FieldIr(
+        field_id="x",
+        name="X",
+        source=source,
+        value_ops=(ValueOpIr(kind="cast", to="bad_cast"),),
+        default_cases=(
+            FieldDefaultCaseIr(
+                when="relation_miss",
+                kind="call_by",
+                call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/default")),
+            ),
+        ),
+    )
+    demand_ir = DemandIr.from_irs(
+        sources=[source],
+        fields=(field,),
+        main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader")),
     )
 
-    calc = bindings.get_ref_default_calculator("x", 0)
-    assert calc is not None
-    ctx = ComputeCallContextIr(row_id=1, batch_num=0, field_id="x", deps=(), values={})
-    assert calc(ctx=ctx) is None
+    with pytest.raises(ScalimResolverError, match=r"unsupported value_cast"):
+        _bind_field_runtime_bindings(
+            demand_ir,
+            bindings=RuntimeBindings(),
+            resolver=_DummyResolver(),  # type: ignore[arg-type] internal tests: duck-typed resolver
+            compute_engine=build_compute_engine(),
+        )
 
 
 def test_bind_field_runtime_bindings_skips_ref_default_case_when_not_call_by() -> None:
@@ -556,7 +580,7 @@ def test_field_default_case_ir_invariants() -> None:
             when="relation_miss",
             kind="literal",
             literal=0,
-            call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/zero_of_value_cast")),
+            call_by=CallBySpecIr(reference=BuiltinCallableIdIr(callable_id="defaults/default")),
         )
 
     with pytest.raises(ValueError, match=r"requires call_by"):
@@ -572,5 +596,6 @@ def test_field_default_case_ir_invariants() -> None:
         )
 
 
-def test_zero_of_value_cast_callable_is_available() -> None:
-    assert zero_of_value_cast() == 0
+def test_default_of_value_cast_callables_are_available() -> None:
+    assert default_of_value_cast() == 0
+    assert default() == 0

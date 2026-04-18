@@ -10,7 +10,7 @@ sources:
   workflow_schema: src/scalim/dsl/yaml_dsl/schema/workflow.gen.json
   canonical_example: references/generated/example-full/ecommerce_report.gen.yaml
   validator: src/scalim/dsl/yaml_dsl/_internal/config_parsing/validator.py
-builtin_callables[2	]: ^defaults/zero_of_value_cast	^workflow/book_sheet_rows
+builtin_callables[3	]: ^defaults/default	^defaults/default_of_value_cast	^workflow/book_sheet_rows
 demand_top_fields[10	]{name	required}:
   name	true
   imports	false

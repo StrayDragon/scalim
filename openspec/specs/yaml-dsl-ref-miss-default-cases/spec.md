@@ -12,7 +12,7 @@ TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Pur
 - v1 中 `when` MUST 仅允许 `relation_miss`
 - 每个 case MUST 在 `literal` 与 `call_by` 之间二选一（oneOf）
   - `literal` MUST 为 YAML 标量（`int|float|str|bool|null`）
-  - `call_by` MUST 为字符串，并且 MUST 显式包含 `()` 以表示“可调用表达式”（例如 `^defaults/zero_of_value_cast()`）
+  - `call_by` MUST 为字符串，并且 MUST 显式包含 `()` 以表示“可调用表达式”（例如 `^defaults/default()`）
 
 `default` MUST 仅允许出现在带 `relation:` 的 source field 上；若字段未声明 `relation`，系统 MUST 在校验阶段 fail-fast。
 
@@ -40,7 +40,7 @@ TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Pur
 - **THEN** 系统 MUST 在校验阶段 fail-fast
 
 #### Scenario: call_by requires explicit parentheses
-- **WHEN** 某个 default case 声明 `call_by: ^defaults/zero_of_value_cast`（不包含 `()`）
+- **WHEN** 某个 default case 声明 `call_by: ^defaults/default`（不包含 `()`）
 - **THEN** 系统 MUST 在校验阶段 fail-fast
 
 ### Requirement: default cases MUST only apply on relation miss and are first-match
@@ -108,18 +108,19 @@ pre-ref 可用字段 MUST 满足以下条件之一：
 - **THEN** 系统 MUST 在编译/校验阶段 fail-fast
 - **AND** 错误 MUST 可定位到该 `default[*].call_by` 的字段路径
 
-### Requirement: builtin `^defaults/zero_of_value_cast()` MUST be available for default call_by
+### Requirement: builtin `^defaults/default()` MUST be available for default call_by
 
-系统 MUST 在 builtin callable vocabulary 中提供 `^defaults/zero_of_value_cast()`，其行为 MUST 由字段 `value_cast` 决定：
+系统 MUST 在 builtin callable vocabulary 中提供 `^defaults/default()`（别名 `^defaults/default_of_value_cast()`），其行为 MUST 由字段 `value_cast` 决定：
 
 - `int` → `0`
 - `str` → `\"\"`
-- `bool` → `False`
-- 其他 cast → `None`（或由 cast 规则决定的“零值”）
+- `decimal` → `0`（并进入 value_cast 转换路径得到 `Decimal(0)`）
+- `auto` → `\"\"`
 
-#### Scenario: builtin zero_of_value_cast returns 0 for int fields
+该 builtin MUST 要求字段显式声明 `value_cast`；若缺失，系统 MUST 在编译/校验阶段 fail-fast（避免将缺省值静默回退为 `None`）。
+
+#### Scenario: builtin default returns 0 for int fields
 - **GIVEN** 某 ref 字段声明 `value_cast: int`
-- **AND** default case 声明 `call_by: ^defaults/zero_of_value_cast()`
+- **AND** default case 声明 `call_by: ^defaults/default()`
 - **WHEN** relation miss
 - **THEN** 写回值 MUST 为 `0`
-

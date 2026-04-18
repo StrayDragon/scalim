@@ -553,6 +553,20 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
                     msg = "Field '{}' default[{}] has invalid call_by: {}".format(field_config.field_id, int(idx), exc)
                     raise ScalimConversionError(msg) from exc
 
+                reference = str(parsed_call_by.reference or "").strip()
+                if reference == "^defaults/zero_of_value_cast":
+                    msg = (
+                        "Field '{}' default[{}] uses removed builtin '{}()'; "
+                        "use '^defaults/default()' (or '^defaults/default_of_value_cast()') instead"
+                    ).format(field_config.field_id, int(idx), reference)
+                    raise ScalimConversionError(msg)
+
+                if reference in ("^defaults/default_of_value_cast", "^defaults/default") and not field_config.value_cast:
+                    msg = ("Field '{}' default[{}] uses '{}()' which requires explicit value_cast; add value_cast or use literal").format(
+                        field_config.field_id, int(idx), reference
+                    )
+                    raise ScalimConversionError(msg)
+
                 call_by_spec = _convert_parsed_call_by_spec(
                     parsed_call_by,
                     field_id=field_config.field_id,

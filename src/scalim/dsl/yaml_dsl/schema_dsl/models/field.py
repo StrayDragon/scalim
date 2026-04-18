@@ -55,7 +55,7 @@ _REF_DEFAULT_CASE_SCHEMA = {
                 "- MUST 显式包含 `()`\n"
                 "- 支持内置引用: `^<id>(...)`\n"
             ),
-            "examples": ["^defaults/zero_of_value_cast()", "myapp.defaults:calc_default(status=employee_status)"],
+            "examples": ["^defaults/default()", "myapp.defaults:calc_default(status=employee_status)"],
         },
     },
     "oneOf": [
@@ -187,7 +187,7 @@ class SourceFieldConfig:
             ),
             examples=[
                 [{"when": "relation_miss", "literal": 0}],
-                [{"when": "relation_miss", "call_by": "^defaults/zero_of_value_cast()"}],
+                [{"when": "relation_miss", "call_by": "^defaults/default()"}],
             ],
         ),
     )

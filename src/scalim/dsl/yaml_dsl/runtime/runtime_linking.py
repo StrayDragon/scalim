@@ -423,7 +423,7 @@ def _bind_source_runtime_bindings(
             bindings.source_normalize_call_bys[str(source_id)] = fn
 
 
-def _bind_field_runtime_bindings(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
+def _bind_field_runtime_bindings(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c0
     demand_ir: DemandIr,
     *,
     bindings: RuntimeBindings,
@@ -467,7 +467,10 @@ def _bind_field_runtime_bindings(  # noqa: C901, PLR0912  # pragma: allow-c901 p
                     continue
 
                 ref = call_by.reference
-                if isinstance(ref, BuiltinCallableIdIr) and str(ref.callable_id) == "defaults/zero_of_value_cast":
+                if isinstance(ref, BuiltinCallableIdIr) and str(ref.callable_id) in (
+                    "defaults/default_of_value_cast",
+                    "defaults/default",
+                ):
                     # 在运行期 `runtime linking` 中内联内置策略: 其语义依赖当前字段的 `value_cast`.
                     # 该策略刻意不作为普通的 `callable` 暴露,因此绑定必须按字段(`per-field`)生成.
                     cast_to = None
@@ -476,13 +479,18 @@ def _bind_field_runtime_bindings(  # noqa: C901, PLR0912  # pragma: allow-c901 p
                         if op_kind == "cast":
                             cast_to = str(getattr(op, "to", "") or "").strip()  # pragma: allow-dynattr dsl: ValueOpIr contract
                             break
+                    if cast_to is None:
+                        msg = "Field '{}' default builtin '^{}()' requires explicit value_cast".format(fid, str(ref.callable_id))
+                        raise ScalimResolverError(msg)
 
                     zero: FieldValue = None
                     if cast_to in ("int", "decimal"):
                         zero = 0
                     elif cast_to in ("str", "auto"):
                         zero = ""
-                    # 否则: 未知/未配置 `value_cast` -> `None`
+                    else:
+                        msg = "Field '{}' has unsupported value_cast={!r} for '^{}()'".format(fid, cast_to, str(ref.callable_id))
+                        raise ScalimResolverError(msg)
 
                     def _zero_calc(*_dep_args: object, _zero: FieldValue = zero, **_kwargs: object) -> FieldValue:
                         return _zero

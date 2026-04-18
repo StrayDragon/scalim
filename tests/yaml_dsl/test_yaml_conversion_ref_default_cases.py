@@ -150,7 +150,7 @@ def test_converter_rejects_default_call_by_invalid() -> None:
                 default=(
                     {
                         "when": "relation_miss",
-                        "call_by": "^defaults/zero_of_value_cast",
+                        "call_by": "^defaults/default",
                     },
                 ),
             )
@@ -173,11 +173,11 @@ def test_converter_converts_default_call_by_case() -> None:
                 extract="metric",
                 name="metric",
                 relation="r",
-                value_cast=None,
+                value_cast="int",
                 default=(
                     {
                         "when": "relation_miss",
-                        "call_by": "^defaults/zero_of_value_cast()",
+                        "call_by": "^defaults/default()",
                     },
                 ),
             )
@@ -193,4 +193,58 @@ def test_converter_converts_default_call_by_case() -> None:
     assert field.default_cases[0].kind == "call_by"
     assert field.default_cases[0].call_by is not None
     assert isinstance(field.default_cases[0].call_by.reference, BuiltinCallableIdIr)
-    assert field.default_cases[0].call_by.reference.callable_id == "defaults/zero_of_value_cast"
+    assert field.default_cases[0].call_by.reference.callable_id == "defaults/default"
+
+
+def test_converter_rejects_removed_default_builtin_zero_of_value_cast() -> None:
+    converter = ConfigToIRConverter()
+    config = _make_config(
+        source_fields={
+            "metric": SourceFieldConfig(
+                field_id="metric",
+                source="cs",
+                extract="metric",
+                name="metric",
+                relation="r",
+                value_cast="int",
+                default=(
+                    {
+                        "when": "relation_miss",
+                        "call_by": "^defaults/zero_of_value_cast()",
+                    },
+                ),
+            )
+        },
+        sources=_make_sources(),
+        relations=_make_relation(),
+    )
+
+    with pytest.raises(ScalimConversionError, match=r"removed builtin"):
+        converter.convert(config)
+
+
+def test_converter_rejects_default_builtin_without_value_cast() -> None:
+    converter = ConfigToIRConverter()
+    config = _make_config(
+        source_fields={
+            "metric": SourceFieldConfig(
+                field_id="metric",
+                source="cs",
+                extract="metric",
+                name="metric",
+                relation="r",
+                value_cast=None,
+                default=(
+                    {
+                        "when": "relation_miss",
+                        "call_by": "^defaults/default()",
+                    },
+                ),
+            )
+        },
+        sources=_make_sources(),
+        relations=_make_relation(),
+    )
+
+    with pytest.raises(ScalimConversionError, match=r"requires explicit value_cast"):
+        converter.convert(config)

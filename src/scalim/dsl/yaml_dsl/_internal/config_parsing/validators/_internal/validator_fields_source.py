@@ -365,11 +365,36 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 continue
 
             try:
-                _ = parse_call_by(call_by_raw)
+                parsed = parse_call_by(call_by_raw)
             except ScalimCallByParseError as exc:
                 self._add_error(
                     errors,
                     "Field '{}' default[{}] has invalid call_by: {}".format(field_id, int(idx), exc),
+                    path="{}.call_by".format(case_path),
+                )
+                continue
+
+            reference = str(parsed.reference or "").strip()
+            if reference == "^defaults/zero_of_value_cast":
+                msg = (
+                    "Field '{}' default[{}].call_by uses removed builtin '{}()'; "
+                    "use '^defaults/default()' (or '^defaults/default_of_value_cast()') instead"
+                ).format(field_id, int(idx), reference)
+                self._add_error(
+                    errors,
+                    msg,
+                    path="{}.call_by".format(case_path),
+                )
+                continue
+
+            if reference in ("^defaults/default_of_value_cast", "^defaults/default") and _F.VALUE_CAST not in field_data:
+                msg = (
+                    "Field '{}' default[{}].call_by uses '{}()' which requires explicit value_cast; "
+                    "add 'value_cast: int/decimal/str/auto' or use 'literal: ...'"
+                ).format(field_id, int(idx), reference)
+                self._add_error(
+                    errors,
+                    msg,
                     path="{}.call_by".format(case_path),
                 )
 

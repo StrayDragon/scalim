@@ -576,6 +576,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-public-tools/spec.md)
 - Summary: 为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 by_yaml runtime 的内部实现模块路径。
 
+### `yaml-dsl-ref-miss-default-cases`
+- Title: yaml-dsl-ref-miss-default-cases Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-ref-miss-default-cases/spec.md)
+- Summary: TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Purpose after archive.
+
 ### `yaml-dsl-render-effective-yaml`
 - Title: yaml-dsl-render-effective-yaml Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-render-effective-yaml/spec.md)

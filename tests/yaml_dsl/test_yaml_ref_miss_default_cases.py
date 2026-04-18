@@ -75,7 +75,7 @@ def test_validator_rejects_default_case_oneof_violation() -> None:
             default_case={
                 "when": "relation_miss",
                 "literal": 0,
-                "call_by": "^defaults/zero_of_value_cast()",
+                "call_by": "^defaults/default()",
             }
         ),
         "must declare exactly one of: literal/call_by",
@@ -91,8 +91,22 @@ def test_validator_rejects_default_case_unknown_when() -> None:
 
 def test_validator_rejects_default_case_call_by_missing_parentheses() -> None:
     _assert_validation_error(
-        _minimal_ref_default_config(default_case={"when": "relation_miss", "call_by": "^defaults/zero_of_value_cast"}),
+        _minimal_ref_default_config(default_case={"when": "relation_miss", "call_by": "^defaults/default"}),
         "invalid call_by",
+    )
+
+
+def test_validator_rejects_removed_default_builtin_zero_of_value_cast() -> None:
+    _assert_validation_error(
+        _minimal_ref_default_config(default_case={"when": "relation_miss", "call_by": "^defaults/zero_of_value_cast()"}),
+        "uses removed builtin",
+    )
+
+
+def test_validator_rejects_default_builtin_without_value_cast() -> None:
+    _assert_validation_error(
+        _minimal_ref_default_config(default_case={"when": "relation_miss", "call_by": "^defaults/default()"}),
+        "requires explicit value_cast",
     )
 
 

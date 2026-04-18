@@ -1,8 +1,8 @@
 ## Why
 
-当前 `default` cases 支持通过 `call_by: ^defaults/zero_of_value_cast()` 在 relation miss 时回填“零/空”缺省值，以消除业务侧 `_safe_*` 中间字段膨胀。
+当前 `default` cases 支持通过 `call_by: ^defaults/default()`（或 `^defaults/default_of_value_cast()`）在 relation miss 时回填“零/空”缺省值，以消除业务侧 `_safe_*` 中间字段膨胀。
 
-但 `^defaults/zero_of_value_cast()` 的语义依赖“被写回字段”的 `value_cast`：
+但 `^defaults/default()` / `^defaults/default_of_value_cast()` 的语义依赖“被写回字段”的 `value_cast`：
 
 - 当字段显式声明 `value_cast` 时，它可以稳定推导出缺省值（例如 `int -> 0`、`str -> ""`）。
 - 当字段未声明 `value_cast` 时，系统无法可靠推断“默认值的目标类型”，若静默回退为 `None`，非常容易被误用：
@@ -13,7 +13,7 @@
 
 ## What Changes
 
-### 1) 新增 builtin：`^defaults/default_of_value_cast()`
+### 1) 新增 builtin：`^defaults/default_of_value_cast()`（并提供别名 `^defaults/default()`）
 
 提供一个推荐的 builtin，用于 `default[*].call_by` 场景，行为类似“按类型返回默认值”：
 
@@ -40,9 +40,9 @@
 
 ### 3) 迁移建议（不做兼容层）
 
-后续若将该 proposal 转正为 active change：
+后续若将该 proposal 转正为 active change（或在未发布阶段一步到位重命名）：
 
-- 推荐将既有配置中的 `^defaults/zero_of_value_cast()` 统一升级为 `^defaults/default_of_value_cast()`
+- 推荐将既有配置中的 `^defaults/zero_of_value_cast()` 统一升级为 `^defaults/default()`（或 `^defaults/default_of_value_cast()`）
 - 并对使用该 builtin 的字段补齐 `value_cast`，否则直接报错
 - 若业务确实希望“无条件补 0”（不依赖类型推导），使用 `literal: 0`
 
@@ -85,4 +85,3 @@ sources:
   - strict validator + LSP diagnostics 需新增一条规则：当引用该 builtin 时必须显式声明 `value_cast`
 - 运行期：
   - miss 分支按 `value_cast` 推导并写回缺省值；仍沿用 `value_cast` 作为最终类型边界
-

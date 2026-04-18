@@ -1288,9 +1288,9 @@
                 "minLength": 1,
                 "pattern": "^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$",
                 "description": "relation miss 时的函数调用(同 `call_by`).",
-                "markdownDescription": "#### fields.*.default[*].call_by\n\nrelation miss 时的函数调用(同 `call_by`).\n\n- 语法: `reference(args...)`\n- MUST 显式包含 `()`\n- 支持内置引用: `^<id>(...)`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n- pattern: `^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$`\n\n##### 例子\n```yaml\n^defaults/zero_of_value_cast()\n```\n```yaml\nmyapp.defaults:calc_default(status=employee_status)\n```",
+                "markdownDescription": "#### fields.*.default[*].call_by\n\nrelation miss 时的函数调用(同 `call_by`).\n\n- 语法: `reference(args...)`\n- MUST 显式包含 `()`\n- 支持内置引用: `^<id>(...)`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n- pattern: `^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$`\n\n##### 例子\n```yaml\n^defaults/default()\n```\n```yaml\nmyapp.defaults:calc_default(status=employee_status)\n```",
                 "examples": [
-                  "^defaults/zero_of_value_cast()",
+                  "^defaults/default()",
                   "myapp.defaults:calc_default(status=employee_status)"
                 ]
               }
@@ -1330,7 +1330,7 @@
             [
               {
                 "when": "relation_miss",
-                "call_by": "^defaults/zero_of_value_cast()"
+                "call_by": "^defaults/default()"
               }
             ]
           ]
@@ -1598,9 +1598,9 @@
                 "minLength": 1,
                 "pattern": "^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$",
                 "description": "relation miss 时的函数调用(同 `call_by`).",
-                "markdownDescription": "#### fields.*.default[*].call_by\n\nrelation miss 时的函数调用(同 `call_by`).\n\n- 语法: `reference(args...)`\n- MUST 显式包含 `()`\n- 支持内置引用: `^<id>(...)`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n- pattern: `^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$`\n\n##### 例子\n```yaml\n^defaults/zero_of_value_cast()\n```\n```yaml\nmyapp.defaults:calc_default(status=employee_status)\n```",
+                "markdownDescription": "#### fields.*.default[*].call_by\n\nrelation miss 时的函数调用(同 `call_by`).\n\n- 语法: `reference(args...)`\n- MUST 显式包含 `()`\n- 支持内置引用: `^<id>(...)`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n- pattern: `^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$`\n\n##### 例子\n```yaml\n^defaults/default()\n```\n```yaml\nmyapp.defaults:calc_default(status=employee_status)\n```",
                 "examples": [
-                  "^defaults/zero_of_value_cast()",
+                  "^defaults/default()",
                   "myapp.defaults:calc_default(status=employee_status)"
                 ]
               }
@@ -1640,7 +1640,7 @@
             [
               {
                 "when": "relation_miss",
-                "call_by": "^defaults/zero_of_value_cast()"
+                "call_by": "^defaults/default()"
               }
             ]
           ]
