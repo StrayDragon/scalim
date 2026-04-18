@@ -22,7 +22,7 @@ from scalim_misc.demo_big_data_report.verification import (
 )
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 
 

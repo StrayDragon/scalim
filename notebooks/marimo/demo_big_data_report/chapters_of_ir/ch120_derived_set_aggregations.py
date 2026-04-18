@@ -26,7 +26,7 @@ from scalim_misc.demo_big_data_report.loaders import get_config, set_config
 from scalim_misc.demo_big_data_report.shared import build_ecommerce_model, build_ecommerce_runtime_bindings
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 
 _SHEET_DETAIL = "Detail"

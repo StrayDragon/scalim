@@ -10,7 +10,7 @@ from scalim.dsl.yaml_dsl import compile as compile_yaml
 from scalim.execution import run_ir
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 
 _EXAMPLE_ID = "demo_big_data_report/yaml_dsl_call_by_keyword_only"

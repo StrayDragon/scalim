@@ -11,6 +11,8 @@ def test_public_api_mainline_chapters_pass() -> None:
             "ch165_public_api_resources",
             "ch170_public_api_ob",
             "ch180_public_api_hooks_events",
+            "ch182_public_api_event_type_groups",
+            "ch184_public_api_sinks_pandas",
         ]
     )
     failures = summarize_failures(results)

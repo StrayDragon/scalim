@@ -6,7 +6,7 @@ from scalim import planning as api
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 from scalim_misc.examples.public_api._fixtures import build_minimal_public_api_ir
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch150_public_api_planning"
 

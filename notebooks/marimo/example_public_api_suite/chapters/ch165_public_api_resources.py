@@ -8,7 +8,7 @@ from scalim.dsl import yaml_dsl as api
 from scalim.shortcuts.resources import outputs
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 
 _ALLOWED_MODULES: FrozenSet[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])

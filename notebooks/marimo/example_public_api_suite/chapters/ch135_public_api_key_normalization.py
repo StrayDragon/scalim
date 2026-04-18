@@ -7,7 +7,7 @@ from typing import Any, Dict, FrozenSet, Optional
 from scalim.dsl import yaml_dsl as api
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch135_public_api_key_normalization"
 

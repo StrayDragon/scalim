@@ -6,7 +6,7 @@ from scalim.events import EventType
 from scalim import ob as api
 from scalim_misc.examples._types import EXAMPLE_KIND_SMOKE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "example_public_api_suite/ch170_public_api_ob"
 

@@ -65,7 +65,7 @@ schema-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-schema.py --check
 
 # 检查: 受控生成物漂移 (约定: `*.gen.*` + injected blocks)
-generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill marimo-coverage-drift-check docs-drift-check
+generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill validate-public-api-skill marimo-coverage-drift-check docs-drift-check
 
 # 检查: 文档治理一致性(SSOT 入口/漂移源头)
 doc-governance-check:
@@ -165,6 +165,10 @@ gen-viz-schedule-plan RUN_DIR="":
 # 检查 Agent Skill 数据是否合法
 validate-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
+
+# 检查: scalim-public-api skill 受控产物漂移
+validate-public-api-skill:
+    uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py --validate
 
 # 工具: 生成公共接口跳转辅助导入文件(用于编辑器/LSP 快速跳转; 生成物在 `.tmp/`)
 gen-public-api-jump-imports:
@@ -300,6 +304,10 @@ sync-project-vendors PATH="" CONFIRM="":
 gen-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py
 
+# 生成: scalim-public-api skill 受控参考产物
+gen-public-api-skill:
+    uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py
+
 # 生成: notebooks/marimo 覆盖报告（generated）
 gen-marimo-coverage:
     uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py
@@ -317,7 +325,7 @@ docs-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
-gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
+gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
 
 # 检查: 类型检查
 type-check:
@@ -739,6 +747,10 @@ check-api-surface-governance:
 check-public-api-curated-entrypoints:
     uv {{ UV_OPTIONS }} run python scripts/check-public-api-curated-entrypoints.py --check
 
+# 检查: Tier1 curated entrypoints 与 examples/pytest public_api suite 覆盖漂移
+check-public-api-suite-coverage:
+    uv {{ UV_OPTIONS }} run python scripts/check-public-api-suite-coverage.py --check
+
 # 检查: export API(`__all__`) 必须使用 tuple 字面量
 check-export-api-must-tuple:
     uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check
@@ -772,7 +784,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
-quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check
+quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check
 
 # QA: 仅py轻量的检查
 quick-check-only-py: quick-check-only-py-no-test-gate test-gate

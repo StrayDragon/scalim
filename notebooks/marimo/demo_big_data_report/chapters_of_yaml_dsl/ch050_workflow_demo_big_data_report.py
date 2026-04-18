@@ -31,7 +31,7 @@ from scalim_misc.demo_big_data_report.verification import VerificationResult, ve
 from scalim_misc.examples.oracle import diff_first_mismatch, stable_sort_rows
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-__generated_with = "0.20.2"
+__generated_with = "0.22.0"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "demo_big_data_report/workflow_demo_big_data_report"
 

@@ -1,9 +1,9 @@
 generated_by: scripts/gen-marimo-coverage.py
 summary:
-  ok: 41
-  total: 41
+  ok: 43
+  total: 43
 warnings[0	]:
-rows[41	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
+rows[43	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   hub	demo_big_data_report/demo_main.py	notebooks/marimo/demo_big_data_report/demo_main.py	null	just examples	null	true	null
   hub	example_public_api_suite/demo_main.py	notebooks/marimo/example_public_api_suite/demo_main.py	null	just examples	null	true	null
   fixture	canonical_yaml/demand	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml	null	just examples	null	true	"schema_ok: ../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json"
@@ -45,4 +45,6 @@ rows[41	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   chapter	example_public_api_suite/ch165_public_api_resources	notebooks/marimo/example_public_api_suite/chapters/ch165_public_api_resources.py	notebooks/marimo/example_public_api_suite/chapters/ch165_public_api_resources.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
   chapter	example_public_api_suite/ch170_public_api_ob	notebooks/marimo/example_public_api_suite/chapters/ch170_public_api_ob.py	notebooks/marimo/example_public_api_suite/chapters/ch170_public_api_ob.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
   chapter	example_public_api_suite/ch180_public_api_hooks_events	notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py	notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
+  chapter	example_public_api_suite/ch182_public_api_event_type_groups	notebooks/marimo/example_public_api_suite/chapters/ch182_public_api_event_type_groups.py	notebooks/marimo/example_public_api_suite/chapters/ch182_public_api_event_type_groups.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
+  chapter	example_public_api_suite/ch184_public_api_sinks_pandas	notebooks/marimo/example_public_api_suite/chapters/ch184_public_api_sinks_pandas.py	notebooks/marimo/example_public_api_suite/chapters/ch184_public_api_sinks_pandas.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
 regenerate[2	]: just gen-marimo-coverage	uv --preview-features extra-build-dependencies run python scripts/gen-marimo-coverage.py
