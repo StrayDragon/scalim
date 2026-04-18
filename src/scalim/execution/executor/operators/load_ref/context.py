@@ -1,4 +1,4 @@
-from typing import Hashable, List, Optional
+from typing import Dict, Hashable, List, Optional
 
 from .....spec.ir import LookupStepIr
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
@@ -19,6 +19,7 @@ class LoadRefExecutionContext:
     batch_row_nth: List[Hashable]
     field_key: str
     relation_signature: RelationSignature
+    default_applied_counts: Dict[str, int]
 
     def __init__(
         self,
@@ -33,6 +34,11 @@ class LoadRefExecutionContext:
         self.batch_row_nth = batch_row_nth
         self.field_key = field_key
         self.relation_signature = relation_signature
+        self.default_applied_counts = {}
+
+    def record_default_applied(self, field_key: str) -> None:
+        key = str(field_key)
+        self.default_applied_counts[key] = int(self.default_applied_counts.get(key, 0)) + 1
 
     def record_lookup(
         self,

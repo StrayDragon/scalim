@@ -10,7 +10,7 @@ sources:
   workflow_schema: src/scalim/dsl/yaml_dsl/schema/workflow.gen.json
   canonical_example: references/generated/example-full/ecommerce_report.gen.yaml
   validator: src/scalim/dsl/yaml_dsl/_internal/config_parsing/validator.py
-builtin_callables[1	]: ^workflow/book_sheet_rows
+builtin_callables[2	]: ^defaults/zero_of_value_cast	^workflow/book_sheet_rows
 demand_top_fields[10	]{name	required}:
   name	true
   imports	false
@@ -70,11 +70,11 @@ entries[34	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	
   28	demand.definition	relation	definitions.relation	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
   29	demand.definition	resources	definitions.resources	false	null	object	null	null	null	null	null	additionalProperties=false
   30	demand.definition	source	definitions.source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  31	demand.definition	source_field_inline	definitions.source_field_inline	false	null	object	null	null	null	null	null	allOf=2
+  31	demand.definition	source_field_inline	definitions.source_field_inline	false	null	object	null	null	null	null	null	allOf=3
   32	workflow	workflow	properties.workflow	true	null	object	#### workflow workflow	null	null	null	null	additionalProperties=false
   33	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
   34	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"#### workflow.resources workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
-properties[111	]{entry_id	name	required	summary}:
+properties[113	]{entry_id	name	required	summary}:
   6	$import	false	string | array, oneOf(2)
   7	$import	false	string | array, oneOf(2)
   8	$import	false	string | array, oneOf(2)
@@ -101,6 +101,7 @@ properties[111	]{entry_id	name	required	summary}:
   15	$import	false	string | array, oneOf(2)
   15	call_by	false	string
   15	compute	false	string
+  15	default	false	array, items object, properties call_by, literal, when, oneOf(2)
   15	extract	false	string
   15	relation	false	string | object, oneOf(2)
   15	source	false	string
@@ -175,6 +176,7 @@ properties[111	]{entry_id	name	required	summary}:
   30	params	false	object, properties $import
   31	name	false	string
   31	$import	false	string | array, oneOf(2)
+  31	default	false	array, items object, properties call_by, literal, when, oneOf(2)
   31	extract	false	string
   31	relation	false	string | object, oneOf(2)
   31	source	false	string

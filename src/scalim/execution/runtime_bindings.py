@@ -19,6 +19,7 @@ SourceLoaderFn = Callable[..., object]
 ParamsBuilderFn = Callable[[LoaderCallContextIr], LoaderCallParams]
 NormalizeCallByFn = Callable[..., object]
 DerivedCalculatorFn = Callable[..., FieldValue]
+RefDefaultCalculatorFn = Callable[..., FieldValue]
 ValueTransformFn = Callable[[FieldValue], FieldValue]
 LookupKeyCastFn = Callable[[object], Optional[LookupKey]]
 
@@ -36,6 +37,7 @@ class RuntimeBindings:
     params_builders: Dict[Tuple[str, NormalizedLookupKeySpec], ParamsBuilderFn] = field(default_factory=dict)
     source_normalize_call_bys: Dict[str, NormalizeCallByFn] = field(default_factory=dict)
     derived_calculators: Dict[str, DerivedCalculatorFn] = field(default_factory=dict)
+    ref_default_calculators: Dict[Tuple[str, int], RefDefaultCalculatorFn] = field(default_factory=dict)
     value_transforms: Dict[str, ValueTransformFn] = field(default_factory=dict)
     lookup_key_casts: Dict[str, LookupKeyCastFn] = field(default_factory=dict)
     loader_extractors: Dict[str, Callable[[LookupKey, LoaderResultMapping], object]] = field(default_factory=dict)
@@ -68,6 +70,9 @@ class RuntimeBindings:
             raise KeyError(msg)
         return fn
 
+    def get_ref_default_calculator(self, field_id: str, idx: int) -> Optional[RefDefaultCalculatorFn]:
+        return self.ref_default_calculators.get((str(field_id), int(idx)))
+
     def get_value_transform(self, field_id: str) -> Optional[ValueTransformFn]:
         return self.value_transforms.get(str(field_id))
 
@@ -84,6 +89,7 @@ class RuntimeBindings:
             "params_builders": len(self.params_builders),
             "source_normalize_call_bys": len(self.source_normalize_call_bys),
             "derived_calculators": len(self.derived_calculators),
+            "ref_default_calculators": len(self.ref_default_calculators),
             "value_transforms": len(self.value_transforms),
             "lookup_key_casts": len(self.lookup_key_casts),
             "loader_extractors": len(self.loader_extractors),

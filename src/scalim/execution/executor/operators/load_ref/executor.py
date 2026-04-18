@@ -4,6 +4,7 @@
 请从 `scalim.execution.executor.operators.load_ref.executor` 导入 `LoadRefOperatorExecutor`.
 """
 
+import logging
 from typing import TYPE_CHECKING, Dict, Hashable, List, Set
 
 from ....._internal.utils.converters import auto_str_normalize_key
@@ -22,6 +23,9 @@ from .loader import load_step_data
 
 if TYPE_CHECKING:
     from .....typedefs import LookupKey
+
+
+_logger = logging.getLogger(__name__)
 
 
 def _maybe_emit_key_normalization_key_space_mismatch_warning(
@@ -68,11 +72,25 @@ def _maybe_emit_key_normalization_key_space_mismatch_warning(
             return
 
 
+def _maybe_emit_ref_default_applied_summary(*, runtime: ExecutionRuntime, exec_ctx: LoadRefExecutionContext) -> None:
+    counts = dict(exec_ctx.default_applied_counts or {})
+    if not counts:
+        return
+    text = ", ".join("{}={}".format(k, int(counts[k])) for k in sorted(counts.keys()))
+    _logger.info(
+        "`LoadRef` 已应用关联缺失缺省值: %s (批次=%s, 字段=%s, 关联=%s)",
+        text,
+        runtime.batch_num,
+        exec_ctx.field_key,
+        exec_ctx.relation_signature,
+    )
+
+
 class LoadRefOperatorExecutor(OperatorExecutor):
     """关联加载算子执行器."""
 
     @override
-    def execute(  # noqa: C901
+    def execute(  # noqa: C901, PLR0912
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
@@ -96,57 +114,60 @@ class LoadRefOperatorExecutor(OperatorExecutor):
         wants_relation_lookup = runtime.instrumentation.wants(EventType.RELATION_LOOKUP)
 
         exec_ctx = LoadRefExecutionContext(runtime, context, batch_row_nth, field_key, relation_key)
-        group_field_keys = runtime.load_ref_group_fields.get(relation_key, (field_key,))
-        if not group_enabled:
-            group_field_keys = (field_key,)
-        else:
-            runtime.load_ref_group_executed.add(relation_key)
-
-        pk_to_first_fk = init_first_fk_mapping(exec_ctx, steps[0], null_fill_fields=group_field_keys)
-        if not pk_to_first_fk:
-            return
-
-        current_mapping: Dict[Hashable, "LookupKey"] = pk_to_first_fk
-
-        for step_idx, step in enumerate(steps):
-            lookup_keys = set(current_mapping.values())
-            if not lookup_keys:
-                break
-
-            is_final_step = step_idx == len(steps) - 1
-            intermediate_result = load_step_data(
-                exec_ctx=exec_ctx,
-                step=step,
-                lookup_keys=lookup_keys,
-                is_final_step=is_final_step,
-                group_field_keys=group_field_keys,
-            )
-
-            _maybe_emit_key_normalization_key_space_mismatch_warning(
-                runtime=runtime,
-                relation_signature=relation_key,
-                step=step,
-                field_id=field_key,
-                lookup_keys=lookup_keys,
-                intermediate_result=intermediate_result,
-            )
-
-            # 热路径 `wants-gated`: 当无人订阅 `relation_lookup` 时,跳过逐行 `hit/miss` 分类诊断.
-            if wants_relation_lookup:
-                for row_id, fk_value in current_mapping.items():
-                    lookup_result = "hit" if fk_value in intermediate_result else "miss"
-                    exec_ctx.record_lookup(row_id, fk_value, fk_value, step.to_source, lookup_result)
-
-            if step_idx == len(steps) - 1:
-                write_final_step(exec_ctx, current_mapping, intermediate_result, step.to_source, group_field_keys)
+        try:
+            group_field_keys = runtime.load_ref_group_fields.get(relation_key, (field_key,))
+            if not group_enabled:
+                group_field_keys = (field_key,)
             else:
-                current_mapping = build_next_mapping(
-                    exec_ctx,
-                    current_mapping,
-                    intermediate_result,
-                    steps[step_idx + 1],
-                    null_fill_fields=group_field_keys,
+                runtime.load_ref_group_executed.add(relation_key)
+
+            pk_to_first_fk = init_first_fk_mapping(exec_ctx, steps[0], null_fill_fields=group_field_keys)
+            if not pk_to_first_fk:
+                return
+
+            current_mapping: Dict[Hashable, "LookupKey"] = pk_to_first_fk
+
+            for step_idx, step in enumerate(steps):
+                lookup_keys = set(current_mapping.values())
+                if not lookup_keys:
+                    break
+
+                is_final_step = step_idx == len(steps) - 1
+                intermediate_result = load_step_data(
+                    exec_ctx=exec_ctx,
+                    step=step,
+                    lookup_keys=lookup_keys,
+                    is_final_step=is_final_step,
+                    group_field_keys=group_field_keys,
                 )
+
+                _maybe_emit_key_normalization_key_space_mismatch_warning(
+                    runtime=runtime,
+                    relation_signature=relation_key,
+                    step=step,
+                    field_id=field_key,
+                    lookup_keys=lookup_keys,
+                    intermediate_result=intermediate_result,
+                )
+
+                # 热路径 `wants-gated`: 当无人订阅 `relation_lookup` 时,跳过逐行 `hit/miss` 分类诊断.
+                if wants_relation_lookup:
+                    for row_id, fk_value in current_mapping.items():
+                        lookup_result = "hit" if fk_value in intermediate_result else "miss"
+                        exec_ctx.record_lookup(row_id, fk_value, fk_value, step.to_source, lookup_result)
+
+                if step_idx == len(steps) - 1:
+                    write_final_step(exec_ctx, current_mapping, intermediate_result, step.to_source, group_field_keys)
+                else:
+                    current_mapping = build_next_mapping(
+                        exec_ctx,
+                        current_mapping,
+                        intermediate_result,
+                        steps[step_idx + 1],
+                        null_fill_fields=group_field_keys,
+                    )
+        finally:
+            _maybe_emit_ref_default_applied_summary(runtime=runtime, exec_ctx=exec_ctx)
 
 
 __all__ = ()

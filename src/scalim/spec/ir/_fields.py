@@ -77,6 +77,42 @@ class ValueOpIr:
 
 
 @dataclass(frozen=True)
+class FieldDefaultCaseIr:
+    """`ref` 字段缺省值 `case` (`IR`).
+
+    说明:
+    - `case` 选择在执行期按 `when` + `first-match` 决定.
+    - `v1` 仅使用 `when='relation_miss'`,但该结构显式预留扩展空间(例如 `hit_null`/`hit_empty_string`/`field_missing`).
+    """
+
+    when: str
+    kind: str
+    literal: FieldValue = None
+    call_by: Optional[CallBySpecIr] = None
+
+    def __post_init__(self) -> None:
+        when = str(self.when or "").strip()
+        kind = str(self.kind or "").strip()
+        object.__setattr__(self, "when", when)
+        object.__setattr__(self, "kind", kind)
+
+        if kind == "literal":
+            if self.call_by is not None:
+                msg = "FieldDefaultCaseIr(kind='literal') must not set call_by"
+                raise ValueError(msg)
+            return
+
+        if kind == "call_by":
+            if self.call_by is None:
+                msg = "FieldDefaultCaseIr(kind='call_by') requires call_by"
+                raise ValueError(msg)
+            return
+
+        msg = "Unknown FieldDefaultCaseIr.kind={!r}".format(kind)
+        raise ValueError(msg)
+
+
+@dataclass(frozen=True)
 class ComputeCallContextIr:
     """派生字段 `call_by` 上下文(IR): 运行时构建,用于提供受控上下文给用户函数."""
 
@@ -157,6 +193,9 @@ class FieldIr:
     """
     显式关联步骤(有序),优先于 `relation` 推断.
     """
+
+    default_cases: Tuple[FieldDefaultCaseIr, ...] = ()
+    """可选:`ref` 字段在 `relation miss` 时的缺省值 `cases`(有序)."""
 
     def __post_init__(self) -> None:
         if not self.data_key:

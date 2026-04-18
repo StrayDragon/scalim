@@ -1,7 +1,13 @@
 from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 
-from ....execution.runtime_bindings import DerivedCalculatorFn, MainSourceLoaderFn, RuntimeBindings, ValueTransformFn
+from ....execution.runtime_bindings import (
+    DerivedCalculatorFn,
+    MainSourceLoaderFn,
+    RefDefaultCalculatorFn,
+    RuntimeBindings,
+    ValueTransformFn,
+)
 from ....spec.ir import (
     CallBySpecIr,
     CallByValueIr,
@@ -98,6 +104,31 @@ def _preflight_call_by_signature(
     )
 
 
+def _preflight_ref_default_call_by_signature(
+    *,
+    field_id: str,
+    idx: int,
+    call_by: CallBySpecIr,
+    fn: Callable[..., Any],
+) -> None:
+    placeholder = object()
+    args = tuple(placeholder for _ in (call_by.args or ()))
+    kwargs = {str(k): placeholder for k, _v in (call_by.kwargs or ())}
+    display = "{}({})".format(
+        describe_callable_ref(call_by.reference),
+        ", ".join(["..."] * len(args) + ["{}=...".format(k) for k in sorted(kwargs.keys())]),
+    )
+    candidates = ((display, args, kwargs),)
+    validate_signature_accepts_any_candidate(
+        location="fields.{}.default[{}].call_by".format(field_id, int(idx)),
+        reference=describe_callable_ref(call_by.reference),
+        fn=fn,
+        candidates=candidates,
+        hint=None,
+        extra=None,
+    )
+
+
 def _preflight_normalize_call_by_signature(
     *,
     source_id: str,
@@ -178,6 +209,40 @@ def _build_call_by_calculator(
 
         returned = fn(*args, **kwargs)
         return _ensure_field_value(returned, field_id=field_id, producer="call_by")
+
+    return _calculator
+
+
+def _build_ref_default_call_by_calculator(
+    *,
+    field_id: str,
+    idx: int,
+    dep_keys: Sequence[str],
+    call_by: CallBySpecIr,
+    fn: Callable[..., Any],
+) -> RefDefaultCalculatorFn:
+    deps = tuple(str(x) for x in (dep_keys or ()))
+    args_spec = tuple(call_by.args or ())
+    kwargs_spec = tuple(call_by.kwargs or ())
+
+    def _calculator(*dep_args: object, **_kwargs: object) -> FieldValue:
+        ctx_obj = _kwargs.get("ctx")
+        if not isinstance(ctx_obj, ComputeCallContextIr):
+            msg = "Field '{}' default[{}].call_by requires ctx=ComputeCallContextIr".format(field_id, int(idx))
+            raise TypeError(msg)
+
+        dep_values = build_dep_values_payload(deps, dep_args)
+
+        args: List[object] = []
+        for item in args_spec:
+            args.append(_eval_call_by_value(item, field_id=field_id, dep_values=dep_values, ctx=ctx_obj))
+
+        kwargs: Dict[str, object] = {}
+        for key, item in kwargs_spec:
+            kwargs[str(key)] = _eval_call_by_value(item, field_id=field_id, dep_values=dep_values, ctx=ctx_obj)
+
+        returned = fn(*args, **kwargs)
+        return _ensure_field_value(returned, field_id=field_id, producer="default.call_by")
 
     return _calculator
 
@@ -358,7 +423,7 @@ def _bind_source_runtime_bindings(
             bindings.source_normalize_call_bys[str(source_id)] = fn
 
 
-def _bind_field_runtime_bindings(
+def _bind_field_runtime_bindings(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
     demand_ir: DemandIr,
     *,
     bindings: RuntimeBindings,
@@ -391,6 +456,53 @@ def _bind_field_runtime_bindings(
             else:
                 msg = "Derived field {!r} missing compute_expr/call_by".format(fid)
                 raise ValueError(msg)
+
+        if isinstance(field_spec, FieldIr):
+            for idx, case in enumerate(field_spec.default_cases or ()):
+                kind = str(getattr(case, "kind", "") or "").strip()  # pragma: allow-dynattr dsl: FieldDefaultCaseIr contract
+                if kind != "call_by":
+                    continue
+                call_by = getattr(case, "call_by", None)  # pragma: allow-dynattr dsl: FieldDefaultCaseIr contract
+                if not isinstance(call_by, CallBySpecIr):
+                    continue
+
+                ref = call_by.reference
+                if isinstance(ref, BuiltinCallableIdIr) and str(ref.callable_id) == "defaults/zero_of_value_cast":
+                    # 在运行期 `runtime linking` 中内联内置策略: 其语义依赖当前字段的 `value_cast`.
+                    # 该策略刻意不作为普通的 `callable` 暴露,因此绑定必须按字段(`per-field`)生成.
+                    cast_to = None
+                    for op in tuple(field_spec.value_ops or ()):
+                        op_kind = str(getattr(op, "kind", "") or "").strip()  # pragma: allow-dynattr dsl: ValueOpIr contract
+                        if op_kind == "cast":
+                            cast_to = str(getattr(op, "to", "") or "").strip()  # pragma: allow-dynattr dsl: ValueOpIr contract
+                            break
+
+                    zero: FieldValue = None
+                    if cast_to in ("int", "decimal"):
+                        zero = 0
+                    elif cast_to in ("str", "auto"):
+                        zero = ""
+                    # 否则: 未知/未配置 `value_cast` -> `None`
+
+                    def _zero_calc(*_dep_args: object, _zero: FieldValue = zero, **_kwargs: object) -> FieldValue:
+                        return _zero
+
+                    bindings.ref_default_calculators[(fid, int(idx))] = _zero_calc
+                    continue
+
+                fn = _resolve_callable_ref(call_by.reference, resolver=resolver)
+                try:
+                    _preflight_ref_default_call_by_signature(field_id=fid, idx=int(idx), call_by=call_by, fn=fn)
+                except ScalimCallablePreflightError as exc:
+                    raise ScalimResolverError(str(exc)) from exc
+
+                bindings.ref_default_calculators[(fid, int(idx))] = _build_ref_default_call_by_calculator(
+                    field_id=fid,
+                    idx=int(idx),
+                    dep_keys=tuple(call_by.field_names or ()),
+                    call_by=call_by,
+                    fn=fn,
+                )
 
         value_ops = field_spec.value_ops if isinstance(field_spec, (FieldIr, DerivedFieldIr)) else ()
         transform = _compose_value_ops(field_id=fid, ops=tuple(value_ops or ()), resolver=resolver)

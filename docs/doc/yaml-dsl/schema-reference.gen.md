@@ -54,6 +54,7 @@ Sources:
 - `$import`: $import 引用.
 - `call_by`: type=string; 派生字段函数调用(与 `compute` 互斥).
 - `compute`: type=string; 派生字段计算表达式(与 `call_by` 互斥).
+- `default`: type=array[object]; 可选:ref 字段缺省值规则(ordered cases;仅 relation miss).
 - `extract`: type=string; 从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).
 - `name`: type=string; 字段显示名称.
 - `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)
@@ -164,6 +165,7 @@ Sources:
 
 ### `source_field_inline`
 - `$import`: $import 引用.
+- `default`: type=array[object]; 可选:ref 字段缺省值规则(ordered cases;仅 relation miss).
 - `extract`: type=string; 从当前 key 对应的 row value 中提取字段值的路径表达式(不是相对整个 loader-result mapping).
 - `name`: type=string; 字段显示名称.
 - `relation`: 关系路径(支持 string ref / steps 对象 / YAML alias; alias 需先定义),表示从 main_source 到当前字段 source 的等值关联链 (例: relation: orders_to_customers)

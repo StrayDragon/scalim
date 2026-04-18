@@ -1,6 +1,7 @@
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from .....schema_dsl.constants import FIELD_KIND_SOURCE, VALUE_CAST_ENUM
+from ...call_by import ScalimCallByParseError, parse_call_by
 from ...field_extract import ScalimFieldExtractCompileError, compile_field_extract, derive_source_field_data_key
 from ...models import AliasIndex, FieldDef, RawDemand
 from ...parsers.utils import mapping_or_none
@@ -242,6 +243,15 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
 
         self._validate_source_field_value_cast(field_id, field_data, errors, field_path)
         relation_val = field_data.get(_F.RELATION)
+        default_val = field_data.get(_F.DEFAULT)
+        if default_val is not None:
+            self._validate_source_field_default_cases(
+                field_id=field_id,
+                field_data=field_data,
+                relation_val=relation_val,
+                errors=errors,
+                field_path=field_path,
+            )
         if relation_val is not None:
             self._validate_field_relation(
                 field_id,
@@ -256,6 +266,112 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             )
         elif source_id != main_source_id:
             self._validate_relation_paths_for_field(field_id, source_id, main_source_id, relation_paths, errors, field_path)
+
+    def _validate_source_field_default_cases(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
+        self,
+        *,
+        field_id: str,
+        field_data: Dict[str, Any],
+        relation_val: object,
+        errors: List[ValidationIssue],
+        field_path: str,
+    ) -> None:
+        default_val = field_data.get(_F.DEFAULT)
+        if default_val is None:
+            return
+
+        default_path = "{}.{}".format(field_path, _F.DEFAULT)
+        if relation_val is None:
+            self._add_error(
+                errors,
+                "Field '{}' default is only allowed for ref fields (requires '{}')".format(field_id, _F.RELATION),
+                path=default_path,
+            )
+            return
+
+        if not isinstance(default_val, list):
+            self._add_error(
+                errors,
+                "Field '{}' default must be a list".format(field_id),
+                path=default_path,
+            )
+            return
+
+        cases = cast("List[object]", default_val)  # pragma: allow-cast yaml scalar list boundary
+        if not cases:
+            self._add_error(
+                errors,
+                "Field '{}' default must not be empty".format(field_id),
+                path=default_path,
+            )
+            return
+
+        for idx, case_raw in enumerate(cases):
+            case_path = "{}.{}.{}".format(field_path, _F.DEFAULT, int(idx))
+            if not isinstance(case_raw, dict):
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}] must be an object".format(field_id, int(idx)),
+                    path=case_path,
+                )
+                continue
+
+            case_dict = cast("Dict[str, Any]", case_raw)  # pragma: allow-cast yaml mapping boundary
+            when_raw = case_dict.get("when")
+            when = when_raw.strip() if isinstance(when_raw, str) else ""
+            if not when:
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}] missing required 'when'".format(field_id, int(idx)),
+                    path=case_path,
+                )
+            elif when != "relation_miss":
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}] has unsupported when={!r} (v1 only supports 'relation_miss')".format(
+                        field_id, int(idx), when_raw
+                    ),
+                    path="{}.when".format(case_path),
+                )
+
+            has_literal = "literal" in case_dict
+            has_call_by = "call_by" in case_dict
+            if has_literal == has_call_by:
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}] must declare exactly one of: literal/call_by".format(field_id, int(idx)),
+                    path=case_path,
+                )
+                continue
+
+            if has_literal:
+                literal_val = case_dict.get("literal")
+                if literal_val is None or isinstance(literal_val, (bool, int, float, str)):
+                    continue
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}].literal must be a YAML scalar (int/float/str/bool/null)".format(field_id, int(idx)),
+                    path="{}.literal".format(case_path),
+                )
+                continue
+
+            call_by_raw = case_dict.get("call_by")
+            if not isinstance(call_by_raw, str) or not call_by_raw.strip():
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}].call_by must be a non-empty string".format(field_id, int(idx)),
+                    path="{}.call_by".format(case_path),
+                )
+                continue
+
+            try:
+                _ = parse_call_by(call_by_raw)
+            except ScalimCallByParseError as exc:
+                self._add_error(
+                    errors,
+                    "Field '{}' default[{}] has invalid call_by: {}".format(field_id, int(idx), exc),
+                    path="{}.call_by".format(case_path),
+                )
 
     def _resolve_source_id_for_field(
         self,

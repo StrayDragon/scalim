@@ -28,6 +28,8 @@ _OUTPUTS_AGGREGATE_FIELDS_RANK_BY_PATH_MIN_LEN = 7
 _OUTPUTS_AGGREGATE_FIELDS_RANK_LIST_ITEM_PATH_MIN_LEN = 8
 _OUTPUTS_AGGREGATE_FIELDS_SCORE_BY_RANK_PATH_MIN_LEN = 7
 _FIELDS_CALL_BY_PATH_MIN_LEN = 3
+_REF_DEFAULT_CALL_BY_MAIN_PATH_MIN_LEN = 6
+_REF_DEFAULT_CALL_BY_SOURCE_PATH_MIN_LEN = 7
 _OUTPUTS_AGGREGATE_CALL_BY_PATH_MIN_LEN = 6
 _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN = 3
 _EXPR_OUTPUTS_WHERE_PATH_MIN_LEN = 3
@@ -569,6 +571,18 @@ def _is_call_by_kwargs_value_callsite(path: List[str]) -> bool:
         return False
 
     if len(path) >= _FIELDS_CALL_BY_PATH_MIN_LEN and str(path[0]) == "fields":
+        return True
+
+    # sources.*.fields.*.default[*].call_by / main_source.fields.*.default[*].call_by
+    if (
+        len(path) >= _REF_DEFAULT_CALL_BY_MAIN_PATH_MIN_LEN
+        and str(path[-3]) == "default"
+        and _is_int_str(str(path[-2]))
+        and (
+            (str(path[0]) == "main_source" and len(path) >= _REF_DEFAULT_CALL_BY_MAIN_PATH_MIN_LEN and str(path[1]) == "fields")
+            or (str(path[0]) == "sources" and len(path) >= _REF_DEFAULT_CALL_BY_SOURCE_PATH_MIN_LEN and str(path[2]) == "fields")
+        )
+    ):
         return True
 
     return (

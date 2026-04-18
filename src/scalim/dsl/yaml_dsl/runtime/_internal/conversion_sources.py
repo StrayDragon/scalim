@@ -13,7 +13,7 @@ from .....spec.ir import (
     SourceNormalizeStepIr,
     SourceRefIr,
 )
-from .....spec.ir._fields import CallBySpecIr, CallByValueIr, ValueOpIr
+from .....spec.ir._fields import CallBySpecIr, CallByValueIr, FieldDefaultCaseIr, ValueOpIr
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr
@@ -53,7 +53,7 @@ _SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
     if value is None or isinstance(value, _SUPPORTED_FIELD_VALUE_TYPES):
         return value
-    msg = "Derived field '{}' {} has unsupported value type '{}'; expected int/float/Decimal/str/bool/None".format(
+    msg = "Field '{}' {} has unsupported value type '{}'; expected int/float/Decimal/str/bool/None".format(
         field_id,
         producer,
         type(value).__name__,
@@ -103,8 +103,13 @@ def _convert_call_by_value_ir(value: object, *, field_id: str) -> CallByValueIr:
     raise ScalimConversionError(msg)
 
 
-def _convert_parsed_call_by_spec(parsed: ParsedCallBy, *, field_id: str) -> CallBySpecIr:
-    ref = _parse_callable_ref(parsed.reference, context_label="derived_fields.{}.call_by reference".format(field_id))
+def _convert_parsed_call_by_spec(
+    parsed: ParsedCallBy,
+    *,
+    field_id: str,
+    context_label: Optional[str] = None,
+) -> CallBySpecIr:
+    ref = _parse_callable_ref(parsed.reference, context_label=context_label or "derived_fields.{}.call_by reference".format(field_id))
     args = tuple(_convert_call_by_value_ir(item, field_id=field_id) for item in parsed.args)
     kwargs = tuple((str(key), _convert_call_by_value_ir(item, field_id=field_id)) for key, item in parsed.kwargs)
     field_names = tuple(str(x) for x in parsed.field_names)
@@ -476,8 +481,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             raise ScalimConversionError(msg)
         return source_ir
 
-    def _convert_source_field(self, field_config: SourceFieldConfig, config: DemandConfig) -> FieldIr:
+    def _convert_source_field(self, field_config: SourceFieldConfig, config: DemandConfig) -> FieldIr:  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c0
         from_source_id = field_config.source
+        main_source_id = config.main_source.source_id
+        if from_source_id == main_source_id:
+            base_path = "main_source.fields.{}".format(field_config.field_id)
+        else:
+            base_path = "sources.{}.fields.{}".format(from_source_id, field_config.field_id)
+
         extract_expr = field_config.field_id if field_config.extract is None else str(field_config.extract)
         if not from_source_id:
             msg = "Field '{}' missing source".format(field_config.field_id)
@@ -506,6 +517,57 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         if isinstance(source_ir, SourceIr):
             lookup_steps = self._resolve_lookup_steps(field_config, config, source_ir)
 
+        default_cases: Tuple[FieldDefaultCaseIr, ...] = ()
+        if field_config.default is not None:
+            if lookup_steps is None:
+                msg = "Field '{}' default is only allowed for ref fields (requires relation)".format(field_config.field_id)
+                raise ScalimConversionError(msg)
+
+            converted_default_cases: List[FieldDefaultCaseIr] = []
+            for idx, case in enumerate(field_config.default):
+                when = str(case.get("when") or "").strip()
+                if when != "relation_miss":
+                    msg = "Field '{}' default[{}] has unsupported when={!r} (v1 only supports 'relation_miss')".format(
+                        field_config.field_id,
+                        int(idx),
+                        when,
+                    )
+                    raise ScalimConversionError(msg)
+
+                if "literal" in case:
+                    literal_val = _ensure_field_value(case.get("literal"), field_id=field_config.field_id, producer="default literal")
+                    converted_default_cases.append(
+                        FieldDefaultCaseIr(
+                            when="relation_miss",
+                            kind="literal",
+                            literal=literal_val,
+                            call_by=None,
+                        )
+                    )
+                    continue
+
+                call_by_raw = case.get("call_by")
+                try:
+                    parsed_call_by = parse_call_by(call_by_raw)
+                except ScalimCallByParseError as exc:
+                    msg = "Field '{}' default[{}] has invalid call_by: {}".format(field_config.field_id, int(idx), exc)
+                    raise ScalimConversionError(msg) from exc
+
+                call_by_spec = _convert_parsed_call_by_spec(
+                    parsed_call_by,
+                    field_id=field_config.field_id,
+                    context_label="{}.default[{}].call_by reference".format(base_path, int(idx)),
+                )
+                converted_default_cases.append(
+                    FieldDefaultCaseIr(
+                        when="relation_miss",
+                        kind="call_by",
+                        call_by=call_by_spec,
+                    )
+                )
+
+            default_cases = tuple(converted_default_cases)
+
         return FieldIr(
             field_id=field_config.field_id,
             name=field_config.name or field_config.field_id,
@@ -517,6 +579,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             value_ops=value_ops,
             relation=None,
             lookup_steps=lookup_steps,
+            default_cases=default_cases,
         )
 
     def _convert_derived_field(self, derived_config: DerivedFieldConfig) -> DerivedFieldIr:

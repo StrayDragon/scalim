@@ -53,6 +53,7 @@ class _FieldNames:
     TO: str = RELATION_STEP_KEYS["to"]
     TO_BIND: str = "to_bind"
     VALUE_CAST: str = SOURCE_FIELD_KEYS["value_cast"]
+    DEFAULT: str = SOURCE_FIELD_KEYS["default"]
     COMPUTE: str = DERIVED_FIELD_KEYS["compute"]
     CALL_BY: str = DERIVED_FIELD_KEYS["call_by"]
     DEPENDS_ON: str = "depends_on"

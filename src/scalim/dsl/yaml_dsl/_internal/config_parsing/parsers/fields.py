@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple, cast
 
 from ....schema_dsl.constants import FIELD_KIND_DERIVED, FIELD_KIND_SOURCE
 from ....schema_dsl.models import (
@@ -273,6 +273,22 @@ class ParserFieldsMixin(ParserRelationsMixin):
         extract_expr = str(extract_raw) if extract_raw is not None else None
         relation = self._parse_relation_ref(field_data.get(SOURCE_FIELD_KEYS["relation"]), relations=relations)
 
+        default_raw = field_data.get(SOURCE_FIELD_KEYS["default"])
+        default_cases: Optional[Tuple[Dict[str, Any], ...]] = None
+        if default_raw is not None:
+            if not isinstance(default_raw, list):
+                msg = "Source field '{}' default must be a list".format(field_id)
+                raise TypeError(msg)
+            default_items = cast("List[object]", default_raw)  # pragma: allow-cast yaml scalar list boundary
+            items: List[Dict[str, Any]] = []
+            for idx, item in enumerate(default_items):
+                if not isinstance(item, dict):
+                    msg = "Source field '{}' default[{}] must be an object".format(field_id, int(idx))
+                    raise TypeError(msg)
+                item_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping boundary
+                items.append(dict(item_dict))
+            default_cases = tuple(items)
+
         return SourceFieldConfig(
             field_id=field_id,
             source=resolved_source_id,
@@ -280,6 +296,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
             name=str(field_data.get(SOURCE_FIELD_KEYS["name"], field_id)),
             relation=relation,
             value_cast=str_or_none(field_data.get(SOURCE_FIELD_KEYS["value_cast"])),
+            default=default_cases,
         )
 
 

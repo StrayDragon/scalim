@@ -7,11 +7,25 @@ from .errors import ScalimResolverError
 
 _BUILTIN_ID_RE = re.compile(r"^[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$")
 
+
+def zero_of_value_cast() -> int:
+    """返回一个“零值”占位符.
+
+    注意:
+    - `^defaults/zero_of_value_cast()` 的完整语义依赖“被写回字段”的 `value_cast`,
+      因此在 YAML `runtime linking` 中会为 `default` `case` 做按字段(`per-field`)的内联处理。
+    - 这里保留一个可解析的 `builtin callable`,用于受控词表(`vocabulary`)/`LSP` 与兜底解析路径.
+    """
+
+    return 0
+
+
 _DEFAULT_BUILTIN_CALLABLES_BY_ID: Dict[str, Callable[..., Any]] = {
     "workflow/book_sheet_rows": book_sheet_rows,
+    "defaults/zero_of_value_cast": zero_of_value_cast,
 }
 
-_DEFAULT_PUBLIC_BUILTIN_CALLABLE_IDS: Tuple[str, ...] = ("workflow/book_sheet_rows",)
+_DEFAULT_PUBLIC_BUILTIN_CALLABLE_IDS: Tuple[str, ...] = ("defaults/zero_of_value_cast", "workflow/book_sheet_rows")
 
 
 def is_builtin_callable_reference(reference: str) -> bool:

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Set, Tuple
 
-from .....spec.ir import FieldIr, LookupStepIr
+from .....spec.ir import CallBySpecIr, ComputeCallContextIr, FieldIr, LookupStepIr
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....typedefs import FieldValue, LoaderResultMapping, LookupKey
 from ...helpers.field_access import extract_field, extract_field_segments
@@ -8,12 +8,135 @@ from .._internal.loader_guardrails import (
     handle_loader_extractor_error,
     handle_loader_transform_error,
     maybe_enforce_required_field_value,
-    record_or_fail_required_field_missing,
 )
+from .._internal.sentinels import MISSING
 from .context import LoadRefExecutionContext
 
 if TYPE_CHECKING:
     from ...runtime.runtime import ExecutionRuntime
+
+
+def _eval_ref_default_call_by(
+    exec_ctx: LoadRefExecutionContext,
+    row_id: Hashable,
+    *,
+    field_key: str,
+    idx: int,
+    call_by: CallBySpecIr,
+) -> FieldValue:
+    calculator = exec_ctx.runtime.runtime_bindings.get_ref_default_calculator(field_key, int(idx))
+    if calculator is None:
+        msg = "Missing runtime ref default calculator for field_id={!r}, default_idx={}".format(field_key, int(idx))
+        raise KeyError(msg)
+
+    deps = tuple(str(x) for x in (call_by.field_names or ()))
+    dep_values: List[FieldValue] = []
+    dep_payload: Dict[str, FieldValue] = {}
+    for dep in deps:
+        v: FieldValue = exec_ctx.context.get_field_value(dep, row_id)
+        dep_values.append(v)
+        dep_payload[str(dep)] = v
+
+    ctx_obj = ComputeCallContextIr(
+        row_id=row_id,
+        batch_num=int(exec_ctx.runtime.batch_num),
+        field_id=str(field_key),
+        deps=deps,
+        values=dep_payload,
+    )
+
+    return calculator(*dep_values, ctx=ctx_obj)
+
+
+def _resolve_ref_default_value_on_relation_miss(  # noqa: PLR0911
+    exec_ctx: LoadRefExecutionContext,
+    row_id: Hashable,
+    *,
+    field_key: str,
+) -> Tuple[FieldValue, bool]:
+    field_spec = exec_ctx.runtime.field_specs.get(field_key)
+    if not isinstance(field_spec, FieldIr):
+        return None, False
+
+    cases = tuple(field_spec.default_cases or ())
+    if not cases:
+        return None, False
+
+    for idx, case in enumerate(cases):
+        when = str(case.when or "").strip()
+        # 注意: `when` 枚举为扩展预留; `v1` 仅实现 `relation_miss`.
+        if when != "relation_miss":
+            continue
+
+        kind = str(case.kind or "").strip()
+        if kind == "literal":
+            return case.literal, True
+        if kind == "call_by":
+            call_by = case.call_by
+            if call_by is None:
+                return None, True
+            return _eval_ref_default_call_by(exec_ctx, row_id, field_key=field_key, idx=int(idx), call_by=call_by), True
+
+        return None, True
+
+    return None, False
+
+
+def _write_relation_miss_field_value(
+    exec_ctx: LoadRefExecutionContext,
+    row_id: Hashable,
+    *,
+    field_key: str,
+    required_field_keys: Set[str],
+    required_mode: str,
+    transform_mode: str,
+    reason: str,
+    lookup_key: object,
+) -> None:
+    field_spec = exec_ctx.runtime.field_specs.get(field_key)
+    source_id = "(unknown)"
+    data_key = "(default)"
+    if isinstance(field_spec, FieldIr):
+        source_id = str(field_spec.source.source_id or "")
+        data_key = str(field_spec.extract_expr or field_spec.data_key or data_key)
+
+    value, default_applied = _resolve_ref_default_value_on_relation_miss(exec_ctx, row_id, field_key=field_key)
+    if default_applied:
+        exec_ctx.record_default_applied(field_key)
+
+    value_transform = exec_ctx.runtime.runtime_bindings.get_value_transform(field_key)
+    try:
+        value = value_transform(value) if value_transform is not None else value
+    except Exception as exc:
+        guardrails = exec_ctx.runtime.guardrails
+        if not guardrails.enabled:
+            raise
+        handle_loader_transform_error(
+            exec_ctx.runtime,
+            source_id=source_id,
+            row_id=row_id,
+            field_key=field_key,
+            data_key=data_key,
+            exc=exc,
+            mode=transform_mode,
+            is_ref_loader=True,
+            lookup_key=lookup_key,
+        )
+        value = None
+
+    exec_ctx.context.set_field_value(field_key, row_id, value)
+    maybe_enforce_required_field_value(
+        exec_ctx.runtime,
+        source_id=source_id,
+        row_id=row_id,
+        field_key=field_key,
+        value=value,
+        required_field_keys=required_field_keys,
+        mode=required_mode,
+        reason=reason,
+        is_ref_loader=True,
+        lookup_key=lookup_key,
+    )
 
 
 def _null_fill_row(
@@ -24,8 +147,20 @@ def _null_fill_row(
 ) -> None:
     if not null_fill_fields:
         return
+    guardrails = exec_ctx.runtime.guardrails
+    required_mode = guardrails.mode
+    transform_mode = guardrails.effective_loader_transform_mode()
     for field_key in null_fill_fields:
-        exec_ctx.context.set_field_value(field_key, row_id, None)
+        _write_relation_miss_field_value(
+            exec_ctx,
+            row_id,
+            field_key=field_key,
+            required_field_keys=set(),
+            required_mode=required_mode,
+            transform_mode=transform_mode,
+            reason="relation lookup miss (null/invalid key or step miss)",
+            lookup_key=MISSING,
+        )
 
 
 def init_first_fk_mapping(
@@ -258,19 +393,17 @@ def _write_final_step_row(
     transform_mode: str,
 ) -> None:
     if lookup_key not in intermediate_result:
-        for required_field_key in required_field_keys:
-            record_or_fail_required_field_missing(
-                exec_ctx.runtime,
-                source_id=source.source_id,
-                row_id=row_id,
-                field_key=required_field_key,
+        for field_key in group_field_keys:
+            _write_relation_miss_field_value(
+                exec_ctx,
+                row_id,
+                field_key=field_key,
+                required_field_keys=required_field_keys,
+                required_mode=required_mode,
+                transform_mode=transform_mode,
                 reason="lookup key not found in loader result",
-                mode=required_mode,
-                is_ref_loader=True,
                 lookup_key=lookup_key,
             )
-        for field_key in group_field_keys:
-            exec_ctx.context.set_field_value(field_key, row_id, None)
         return
 
     data = intermediate_result[lookup_key]

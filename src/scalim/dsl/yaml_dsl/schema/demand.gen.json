@@ -1246,6 +1246,95 @@
             "decimal"
           ]
         },
+        "default": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "when"
+            ],
+            "properties": {
+              "when": {
+                "type": "string",
+                "enum": [
+                  "relation_miss"
+                ],
+                "description": "default case 触发条件.",
+                "markdownDescription": "#### fields.*.default[*].when\n\ndefault case 触发条件.\n\n- v1 仅支持 `relation_miss`(关联查找 miss)\n- NOTE: 该 enum 预留用于未来扩展(例如 hit_null/hit_empty_string/field_missing)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `relation_miss`\n\n##### 例子\n```yaml\nrelation_miss\n```",
+                "examples": [
+                  "relation_miss"
+                ]
+              },
+              "literal": {
+                "type": [
+                  "number",
+                  "string",
+                  "boolean",
+                  "null"
+                ],
+                "description": "relation miss 时的字面量缺省值(YAML scalar).",
+                "markdownDescription": "#### fields.*.default[*].literal\n\nrelation miss 时的字面量缺省值(YAML scalar).",
+                "examples": [
+                  0,
+                  "",
+                  false,
+                  null
+                ]
+              },
+              "call_by": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$",
+                "description": "relation miss 时的函数调用(同 `call_by`).",
+                "markdownDescription": "#### fields.*.default[*].call_by\n\nrelation miss 时的函数调用(同 `call_by`).\n\n- 语法: `reference(args...)`\n- MUST 显式包含 `()`\n- 支持内置引用: `^<id>(...)`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n- pattern: `^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$`\n\n##### 例子\n```yaml\n^defaults/zero_of_value_cast()\n```\n```yaml\nmyapp.defaults:calc_default(status=employee_status)\n```",
+                "examples": [
+                  "^defaults/zero_of_value_cast()",
+                  "myapp.defaults:calc_default(status=employee_status)"
+                ]
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "literal"
+                ],
+                "not": {
+                  "required": [
+                    "call_by"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "call_by"
+                ],
+                "not": {
+                  "required": [
+                    "literal"
+                  ]
+                }
+              }
+            ]
+          },
+          "description": "可选:ref 字段缺省值规则(ordered cases;仅 relation miss).",
+          "markdownDescription": "#### fields.*.default\n\n可选:ref 字段缺省值规则(ordered cases;仅 relation miss).\n- 仅允许用于带 `relation` 的字段\n- `default` 为 case 列表,按顺序 first-match",
+          "examples": [
+            [
+              {
+                "when": "relation_miss",
+                "literal": 0
+              }
+            ],
+            [
+              {
+                "when": "relation_miss",
+                "call_by": "^defaults/zero_of_value_cast()"
+              }
+            ]
+          ]
+        },
         "$import": {
           "oneOf": [
             {
@@ -1282,6 +1371,18 @@
           "not": {
             "required": [
               "field"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "default"
+            ]
+          },
+          "then": {
+            "required": [
+              "relation"
             ]
           }
         }
@@ -1453,6 +1554,95 @@
           ],
           "examples": [
             "decimal"
+          ]
+        },
+        "default": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "when"
+            ],
+            "properties": {
+              "when": {
+                "type": "string",
+                "enum": [
+                  "relation_miss"
+                ],
+                "description": "default case 触发条件.",
+                "markdownDescription": "#### fields.*.default[*].when\n\ndefault case 触发条件.\n\n- v1 仅支持 `relation_miss`(关联查找 miss)\n- NOTE: 该 enum 预留用于未来扩展(例如 hit_null/hit_empty_string/field_missing)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `relation_miss`\n\n##### 例子\n```yaml\nrelation_miss\n```",
+                "examples": [
+                  "relation_miss"
+                ]
+              },
+              "literal": {
+                "type": [
+                  "number",
+                  "string",
+                  "boolean",
+                  "null"
+                ],
+                "description": "relation miss 时的字面量缺省值(YAML scalar).",
+                "markdownDescription": "#### fields.*.default[*].literal\n\nrelation miss 时的字面量缺省值(YAML scalar).",
+                "examples": [
+                  0,
+                  "",
+                  false,
+                  null
+                ]
+              },
+              "call_by": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$",
+                "description": "relation miss 时的函数调用(同 `call_by`).",
+                "markdownDescription": "#### fields.*.default[*].call_by\n\nrelation miss 时的函数调用(同 `call_by`).\n\n- 语法: `reference(args...)`\n- MUST 显式包含 `()`\n- 支持内置引用: `^<id>(...)`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- minLength: `1`\n- pattern: `^[\\s\\S]*\\([\\s\\S]*\\)[\\s\\S]*$`\n\n##### 例子\n```yaml\n^defaults/zero_of_value_cast()\n```\n```yaml\nmyapp.defaults:calc_default(status=employee_status)\n```",
+                "examples": [
+                  "^defaults/zero_of_value_cast()",
+                  "myapp.defaults:calc_default(status=employee_status)"
+                ]
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "literal"
+                ],
+                "not": {
+                  "required": [
+                    "call_by"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "call_by"
+                ],
+                "not": {
+                  "required": [
+                    "literal"
+                  ]
+                }
+              }
+            ]
+          },
+          "description": "可选:ref 字段缺省值规则(ordered cases;仅 relation miss).",
+          "markdownDescription": "#### fields.*.default\n\n可选:ref 字段缺省值规则(ordered cases;仅 relation miss).\n- 仅允许用于带 `relation` 的字段\n- `default` 为 case 列表,按顺序 first-match",
+          "examples": [
+            [
+              {
+                "when": "relation_miss",
+                "literal": 0
+              }
+            ],
+            [
+              {
+                "when": "relation_miss",
+                "call_by": "^defaults/zero_of_value_cast()"
+              }
+            ]
           ]
         },
         "compute": {

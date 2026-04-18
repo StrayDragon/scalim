@@ -15,6 +15,55 @@ from ..constants import (
 from ..doc_texts import SOURCE_FIELD_EXTRACT_DESC, SOURCE_FIELD_EXTRACT_MD
 from .lookup_bind_relation import InlineRelationConfig
 
+_REF_DEFAULT_WHEN_ENUM: Tuple[str, ...] = ("relation_miss",)
+_REF_DEFAULT_CALL_BY_PAREN_PATTERN = r"^[\s\S]*\([\s\S]*\)[\s\S]*$"
+_REF_DEFAULT_LITERAL_SCHEMA = {
+    # 注意: YAML 标量边界,需要与 `FieldValue` 级别的 DSL 编写面保持一致:
+    # `int`/`float`/`str`/`bool`/`null` (YAML 中不支持 `Decimal` 对象字面量).
+    "type": ["number", "string", "boolean", "null"],
+}
+_REF_DEFAULT_CASE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["when"],
+    "properties": {
+        "when": {
+            "type": "string",
+            "enum": list(_REF_DEFAULT_WHEN_ENUM),
+            "description": "default case 触发条件(v1 仅支持 relation_miss)",
+            "markdownDescription": (
+                "default case 触发条件.\n\n"
+                "- v1 仅支持 `relation_miss`(关联查找 miss)\n"
+                "- NOTE: 该 enum 预留用于未来扩展(例如 hit_null/hit_empty_string/field_missing)"
+            ),
+            "examples": ["relation_miss"],
+        },
+        "literal": {
+            **_REF_DEFAULT_LITERAL_SCHEMA,
+            "description": "relation miss 时的字面量缺省值",
+            "markdownDescription": "relation miss 时的字面量缺省值(YAML scalar).",
+            "examples": [0, "", False, None],
+        },
+        "call_by": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": _REF_DEFAULT_CALL_BY_PAREN_PATTERN,
+            "description": "relation miss 时的函数调用(同 call_by;必须包含 ())",
+            "markdownDescription": (
+                "relation miss 时的函数调用(同 `call_by`).\n\n"
+                "- 语法: `reference(args...)`\n"
+                "- MUST 显式包含 `()`\n"
+                "- 支持内置引用: `^<id>(...)`\n"
+            ),
+            "examples": ["^defaults/zero_of_value_cast()", "myapp.defaults:calc_default(status=employee_status)"],
+        },
+    },
+    "oneOf": [
+        {"required": ["literal"], "not": {"required": ["call_by"]}},
+        {"required": ["call_by"], "not": {"required": ["literal"]}},
+    ],
+}
+
 
 @dataclass(frozen=True)
 class SourceFieldConfig:
@@ -24,6 +73,7 @@ class SourceFieldConfig:
     SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
         {"not": {"required": ["call_by"]}},
         {"not": {"required": ["field"]}},
+        {"if": {"required": ["default"]}, "then": {"required": ["relation"]}},
     ]
     """用于约束:源字段配置中禁止声明 `call_by` 与历史 `field`."""
 
@@ -117,6 +167,31 @@ class SourceFieldConfig:
         ),
     )
     """可选:字段值类型转换策略(仅源字段)."""
+
+    default: Optional[Tuple[Dict[str, Any], ...]] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema={
+                "type": "array",
+                "minItems": 1,
+                "items": _REF_DEFAULT_CASE_SCHEMA,
+            },
+            desc="可选:ref 字段缺省值规则(ordered cases;仅 relation miss)",
+            md=(
+                "可选:ref 字段缺省值规则(ordered cases;仅 relation miss).\n\n"
+                "- 仅允许用于带 `relation` 的字段\n"
+                "- `default` 为 case 列表,按顺序 first-match\n"
+                "- v1 仅支持 `when: relation_miss`\n"
+                "- 每个 case 在 `literal` 与 `call_by` 中二选一\n"
+                "- `call_by` MUST 显式包含 `()`\n"
+            ),
+            examples=[
+                [{"when": "relation_miss", "literal": 0}],
+                [{"when": "relation_miss", "call_by": "^defaults/zero_of_value_cast()"}],
+            ],
+        ),
+    )
+    """可选:关联缺失时的缺省值声明(仅对 `ref` 字段的 `relation miss` 生效)."""
 
 
 @dataclass(frozen=True)

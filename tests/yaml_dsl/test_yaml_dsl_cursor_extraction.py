@@ -232,6 +232,31 @@ def test_cursor_extraction_call_by_kwargs_value_supports_aggregate_callsite() ->
     )
 
 
+def test_cursor_extraction_call_by_kwargs_value_supports_ref_default_callsite() -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source: {source_id: orders, loader: pkg.mod:load}
+        sources:
+          s1:
+            loader: pkg.mod:load
+            key: id
+            fields:
+              f1:
+                relation: {steps: [{from: orders.id, to: s1.id}]}
+                default:
+                  - when: relation_miss
+                    call_by: "pkg.mod:fn(group=group_name)"
+        """
+    )
+    rhs_start = _pos(yaml_text, "group=group_name", offset=len("group="))
+    rhs_pos = editor_semantics.EditorPosition(line=rhs_start.line, column=rhs_start.column + 2)
+    result = editor_semantics.extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(yaml_text, rhs_pos)
+    assert result.kind == "call_by_kwargs_value_field_ref"
+    assert result.yaml_path == "sources.s1.fields.f1.default.0.call_by"
+    assert result.reference == "group_name"
+
+
 def test_cursor_extraction_retry_should_retry_supports_nested_path() -> None:
     yaml_text = textwrap.dedent(
         """\
