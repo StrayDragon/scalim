@@ -271,6 +271,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/prompt-eval-workflow/spec.md)
 - Summary: **状态: ✅ 已实现** 定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。
 
+### `public-api-agent-skill`
+- Title: public-api-agent-skill Specification
+- Source: [spec.md](#code=openspec/specs/public-api-agent-skill/spec.md)
+- Summary: TBD - created by archiving change c0-public-api-examples-governance. Update Purpose after archive.
+
 ### `public-api-manifest`
 - Title: public-api-manifest Specification
 - Source: [spec.md](#code=openspec/specs/public-api-manifest/spec.md)
