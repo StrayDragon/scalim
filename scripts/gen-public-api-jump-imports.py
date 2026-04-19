@@ -70,6 +70,8 @@ def _render_jump_file(
             lines.append("            {},".format(name))
         lines.append("        )")
         lines.append("")
+        lines.append("    {}()".format(func_name))
+        lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 

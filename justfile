@@ -391,9 +391,11 @@ test-gate-branch-report:
 core-coverage-report:
     uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100
 
+# 检查: core 覆盖率 (statements + branches; core 由 allow-non-core-file 治理标记决定)
 core-coverage-check:
     uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check
 
+# 检查: 测试门禁覆盖率 (statements + branches; core 由 allow-non-core-file 治理标记决定)
 test-gate-core-coverage:
     # 先执行 statements/line coverage gate(SSOT: --cov-fail-under=100),再执行 core branch gate.
     just test-gate
