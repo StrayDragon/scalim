@@ -414,7 +414,7 @@ def _extract_yaml_code_blocks(proposal_text: str) -> List[List[str]]:
 
         if line.strip().startswith("```"):
             if is_yaml:
-                # 去掉首尾空行，保持 snippet 更紧凑。
+                # 去掉首尾空行，保持 `snippet` 更紧凑。
                 while current and not current[0].strip():
                     current.pop(0)
                 while current and not current[-1].strip():
@@ -533,7 +533,7 @@ def _render_example_snippet_for_change(change: _Change) -> Optional[List[str]]:
     if change.is_yaml:
         yaml_blocks = _extract_yaml_code_blocks(change.proposal_text)
         if yaml_blocks:
-            # 选择最适合 release notes 的块：优先 9–19 行（加 1 行注释后变成 10–20）。
+            # 选择最适合 `release notes` 的块：优先 9–19 行（加 1 行注释后变成 10–20）。
             scored_blocks: List[Tuple[int, int, int, List[str]]] = []
             for idx, block in enumerate(yaml_blocks):
                 n = len(block)
@@ -1161,24 +1161,24 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
             instructions.append("workflow YAML：把 `write_to` 改为 `writes`（旧写法会 fail-fast）。")
             continue
 
-        # === “默认值变更/必填约束”这类高频 upgrade 点 ===
-        # 1) “默认值从 old -> new”：用户要做的动作通常是“显式写回 old（若要保持旧行为）”。
+        # === “默认值变更/必填约束”这类高频 `upgrade` 点 ===
+        # 1) “默认值从 `old -> new`”：用户要做的动作通常是“显式写回 `old`（若要保持旧行为）”。
         match = re.search(
             r"`([^`]+)`[^`]*默认值(?:从|由)\s*`([^`]+)`\s*(?:调整为|改为|变为|更新为|切换为)\s*`([^`]+)`",
             cleaned,
         )
         if match:
             key, old, new = match.group(1).strip(), match.group(2).strip(), match.group(3).strip()
-            # 保守：只在看起来像 authoring surface 的键路径时输出迁移指令。
+            # 保守：只在看起来像 `authoring surface` 的键路径时输出迁移指令。
             if "." in key or _tok_is_surface(key):
                 instructions.append("依赖旧默认 `{}` 的配置：显式写 `{}: {}`（新默认 `{}`）。".format(old, key, old, new))
                 continue
 
-        # 2) “改为必填/required”：直接告诉用户“必须显式填写”。
+        # 2) “改为必填/`required`”：直接告诉用户“必须显式填写”。
         match = re.search(r"`([^`]+)`[^`]*(?:改为|变为|调整为)[^\\n]*必填", cleaned)
         if match:
             key = match.group(1).strip()
-            # 若文本里给了具体上下文（例如某个 preset），尽量带上，避免用户对不上号。
+            # 若文本里给了具体上下文（例如某个 `preset`），尽量带上，避免用户对不上号。
             if "WorkflowCachePoolPreloadForeverShared" in cleaned:
                 instructions.append("bounded preset：为 `WorkflowCachePoolPreloadForeverShared` 显式填写 `max_entries`（默认值已移除）。")
             else:
