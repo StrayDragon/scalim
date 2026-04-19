@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from scalim.secure_compute_contracts import SecureComputeCalculatorContract, is_secure_compute_calculator
+from scalim.dsl.yaml_dsl._internal.config_parsing.security import (
+    SecureComputeCalculatorContract,
+    is_secure_compute_calculator,
+)
 from tests.support.pathing import repo_root as _repo_root
 
 

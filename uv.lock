@@ -11,6 +11,10 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 
+[options]
+exclude-newer = "2026-04-13T02:43:16.248662628Z"
+exclude-newer-span = "P7D"
+
 [manifest]
 members = [
     "scalim",

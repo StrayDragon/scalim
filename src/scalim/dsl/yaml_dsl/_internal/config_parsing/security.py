@@ -6,21 +6,29 @@ import operator
 import os
 import sys
 import threading
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from decimal import Decimal
 from types import CodeType
 from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
 
 from .....exceptions import ScalimYamlError
-from .....secure_compute_contracts import (
-    SecureComputeCalculatorContract,
-)
-from .....secure_compute_contracts import (
-    is_secure_compute_calculator as _is_secure_compute_calculator,
-)
 from .....vendor.compact.typing_extensionsx import override
 from .....vendor.dataclassesx import dataclass
 from ...runtime._internal.conversion_lookup import cast_decimal
+
+
+class SecureComputeCalculatorContract(ABC):
+    __slots__: Tuple[str, ...] = ()
+
+    @abstractmethod
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError
+
+
+def is_secure_compute_calculator(value: object) -> bool:
+    return isinstance(value, SecureComputeCalculatorContract)
+
 
 _PY38_PLUS = sys.version_info >= (3, 8)
 
@@ -139,10 +147,6 @@ class SecureComputeCalculator(SecureComputeCalculatorContract):
             args=args,
             field_values=field_values,
         )
-
-
-def is_secure_compute_calculator(value: object) -> bool:
-    return _is_secure_compute_calculator(value)
 
 
 def unsafe_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:

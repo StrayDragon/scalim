@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Tuple
 import pytest
 
 import scalim.dsl.yaml_dsl._internal.config_parsing.security as security
-from scalim.secure_compute_contracts import is_secure_compute_calculator
 from scalim.dsl.yaml_dsl._internal.config_parsing.security import (
     ScalimComputeExpressionError,
     SecureComputeEngine,
@@ -15,6 +14,7 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.security import (
     ScalimSecurityError,
     default_audit_callback,
     extract_dependencies_from_compute,
+    is_secure_compute_calculator,
 )
 
 
