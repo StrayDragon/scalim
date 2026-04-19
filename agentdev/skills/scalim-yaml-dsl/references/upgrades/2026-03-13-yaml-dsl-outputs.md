@@ -17,8 +17,8 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 
 对应主规范(节选):
 - `openspec/specs/yaml-dsl-schema/spec.md`
-- `openspec/specs/output-composition/spec.md`
-- `openspec/specs/derived-outputs/spec.md`
+- `openspec/specs/execution-output-composition/spec.md`
+- `openspec/specs/execution-derived-outputs/spec.md`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

@@ -5,7 +5,7 @@
 ## 关联工件
 
 - change 归档目录: `openspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
-- 主规范: `openspec/specs/derived-outputs/spec.md`
+- 主规范: `openspec/specs/execution-derived-outputs/spec.md`
 
 ## 变更摘要(IR/Python-only)
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过
-signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
+signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件/并发安全确保"复用正确且可诊断".
 
 ## Related Code (as implemented)
 - `src/IMPL_ROOT/dsl/yaml_dsl/workflow.py` (workflow options 解析 + cache_pool 语义校验)
@@ -13,7 +13,10 @@ signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测
 - `src/IMPL_ROOT/execution/workflow_cache_pool.py` (cache pool 实现: signature/budget/refcount/pin/事件)
 - `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (preload_forever 优先走 cache_pool.get_or_load)
 - `src/IMPL_ROOT/events/events.py` + `src/IMPL_ROOT/events/catalog.py` (workflow cache 事件定义/注册)
+
 ## Requirements
+
+
 ### Requirement: workflow options expose a stable `cache_pool` configuration (replacing `share_preload_cache`)
 系统 MUST 将 workflow cache pool 的配置入口收敛到 runtime policy boundary（`workflow_runtime_options.cache_pool`），并保持对外配置面受限（preset-based）：
 
@@ -54,14 +57,15 @@ signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测
 - **AND** MUST 按 `max_entries` 预算限制 cache entries 数量
 
 #### Scenario: bounded preset supports pin for selected logical keys
-- **GIVEN** 调用方传入 `WorkflowCachePoolPreloadForeverShared(max_entries=16, pin=(WorkflowCachePoolPin(kind=\"preload_forever\", source_id=\"s1\"),))`
+- **GIVEN** 调用方传入 `WorkflowCachePoolPreloadForeverShared(max_entries=16, pin=(WorkflowCachePoolPin(kind="preload_forever", source_id="s1"),))`
 - **WHEN** `s1` 的缓存条目 refcount 归零
 - **THEN** 系统 MUST NOT 释放该条目（等价常驻到 workflow_end）
+
 
 ### Requirement: workflow provides a cache pool with signature-based keys
 系统 MUST 在一次 workflow 执行内提供 workflow-scope cache pool,用于承载可共享的缓存条目(例如 preload_forever 结果、未来的 dataset/index 工件等)。
 
-cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用错误数据;signature 至少应包含:
+cache pool MUST 将"可复现的 signature"纳入缓存 key,以避免复用错误数据;signature 至少应包含:
 - 缓存条目 kind(例如 preload_forever / dataset_index)
 - `source_id`(或 artifact id)
 - loader 引用(或 artifact producer 节点信息)
@@ -78,7 +82,7 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **WHEN** 该 signature 当前为 miss
 - **THEN** 系统 MUST 保证同一时刻最多一个实际 `load_fn` 被执行
 - **AND** 其余请求 MUST 等待并复用该次 load 的结果或异常
-- Repro: `tests/test_workflow_cache_pool.py::test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature`
+- **Repro**: `tests/test_workflow_cache_pool.py::test_workflow_cache_pool_get_or_load_dedupes_concurrent_loads_per_signature`
 
 #### Scenario: different signature does not reuse cache entry
 - **GIVEN** 两个 workflow node 请求同一个 `source_id` 但 loader/params/normalize 不同导致 signature 不一致
@@ -98,6 +102,7 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **WHEN** 冲突策略为 `separate`
 - **THEN** 系统 MUST 创建/保留两个互不复用的缓存条目
 
+
 ### Requirement: cache pool supports lifecycle management and auto-release
 系统 MUST 支持 cache pool 的生命周期管理,以减少 workflow 常驻内存:
 - 系统 MUST 基于 workflow DAG 推导缓存条目的 consumer set 上界,并以此初始化 refcount
@@ -111,7 +116,7 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **THEN** 系统 MUST 释放该缓存条目以回收内存
 
 ### Requirement: cache pool refcount MUST be derived from Workflow IR when available
-当 workflow 具备 Workflow IR/DAG 信息时,系统 MUST 基于 IR 的静态依赖关系推导“哪个 node 会消费哪个缓存条目”,以支持 DAG-based refcount 并尽早释放内存:
+当 workflow 具备 Workflow IR/DAG 信息时,系统 MUST 基于 IR 的静态依赖关系推导"哪个 node 会消费哪个缓存条目",以支持 DAG-based refcount 并尽早释放内存:
 - 系统 MUST 在结构编译阶段推导 refcount 上界(consumer set),并在运行时随 node 完成递减
 - 对于必须常驻到 workflow 结束的条目,系统 MUST 提供 pin 机制覆盖 refcount 行为
 
@@ -119,6 +124,7 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **GIVEN** cache entry 仅会被 node A/B/C 消费,且 C 为最后一个消费者
 - **WHEN** node C 完成
 - **THEN** 系统 MUST 将该 entry 的 refcount 变为 0 并释放(或进入可淘汰状态),而不是默认常驻到 workflow 结束
+
 
 ### Requirement: cache pool enforces budgets with a clear policy
 系统 MUST 支持对 cache pool 设置预算(SSOT: `max_entries`),并在超限时采取明确策略:
@@ -131,12 +137,12 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 - **THEN** 系统 MUST 按该策略执行(报错或淘汰),且错误信息/事件 MUST 可用于排障
 
 ### Requirement: cache pool eviction MUST NOT evict in-flight (loading) entries
-当 cache pool 条目处于 in-flight load(`loading=True`)时,系统 MUST NOT 将其作为 refcount/LRU 的淘汰候选;否则可能导致条目被逐出后成为“孤儿”,从而触发重复加载与缓存不一致.
+当 cache pool 条目处于 in-flight load(`loading=True`)时,系统 MUST NOT 将其作为 refcount/LRU 的淘汰候选;否则可能导致条目被逐出后成为"孤儿",从而触发重复加载与缓存不一致.
 
-为避免“准备加载”与 eviction 之间的竞态窗口,系统 MUST 满足:
+为避免"准备加载"与 eviction 之间的竞态窗口,系统 MUST 满足:
 
 - 对任何 `get_or_load()` 调用,只要判定该次为 miss(`entry.value is None`)且将进入 load 流程,系统 MUST 在释放全局锁之前将该 entry 标记为 `loading=True`
-- 该规则 MUST 覆盖“已有 entry 但 value 为空”的重试路径(例如前一次 `load_fn()` 抛异常后再次重试)
+- 该规则 MUST 覆盖"已有 entry 但 value 为空"的重试路径(例如前一次 `load_fn()` 抛异常后再次重试)
 - `loading` MUST 在 load 完成(成功写入 value 或异常退出)后被恢复为 `False`
 
 #### Scenario: refcount eviction skips loading entries
@@ -147,13 +153,53 @@ cache pool MUST 将“可复现的 signature”纳入缓存 key,以避免复用�
 
 #### Scenario: budget eviction skips loading entries during retry miss window
 - **GIVEN** 某 signature 的缓存条目曾因 `load_fn()` 异常而处于 `value=None`
-- **AND** 另一线程对该 signature 发起重试 `get_or_load()` 并进入“准备加载”窗口
+- **AND** 另一线程对该 signature 发起重试 `get_or_load()` 并进入"准备加载"窗口
 - **WHEN** 并发触发 over-budget LRU eviction 扫描
 - **THEN** eviction MUST 将该条目视为 in-flight 并跳过(不得逐出)
 - **AND** 重试 load 成功后,该条目 MUST 仍保留在 cache pool 中以供后续 hit 复用
 
+
+### Requirement: `WorkflowCachePool.close` MUST synchronize with in-flight loads
+`WorkflowCachePool.close()` MUST 在逐出或销毁条目之前，等待当前处于 `loading=True` 的条目完成加载（成功或失败），以避免关闭路径与 `load_fn` 并发导致的孤儿条目、重复加载或关闭后仍运行的后台加载。
+
+- 等待逻辑 MUST 在获取 `entry.lock` 时与 `get_or_load` 的锁顺序一致：不得在持有全局 `self._lock` 的同时获取 `entry.lock`（与现有 `get_or_load` 约定一致），以避免死锁。
+- 等待 MAY 带超时；若采用超时，行为 MUST 可诊断（例如明确错误或日志），且测试 MUST 覆盖正常完成路径。
+
+#### Scenario: close waits for slow load
+- **GIVEN** 某缓存条目的 `load_fn` 被 `threading.Event` 人为延长执行时间
+- **WHEN** 另一线程在加载进行中调用 `close()`
+- **THEN** `close()` MUST 等待该加载完成（在无限等待或文档化超时语义下）后再完成清理
+- **AND** 不得留下对已逐出条目的写入或同一 key 的重复加载
+
+### Requirement: LRU / refcount eviction MUST skip loading entries
+`_evict_entry` 及由预算/refcount 触发的淘汰路径 MUST 跳过 `entry.loading` 为真的条目；该行为 MUST 与关闭路径协同，保证不会在加载持有 `entry.lock` 期间从 `_entries` 移除该条目。
+
+#### Scenario: eviction does not orphan a loading entry
+- **GIVEN** 某 signature 的条目处于 in-flight load（`loading=True`）
+- **WHEN** 并发触发 LRU 或 refcount 驱动的逐出
+- **THEN** 逐出逻辑 MUST NOT 将该条目从池中移除以致加载结果写入孤儿对象
+- **AND** 加载完成后状态 MUST 与池内元数据一致
+
+### Requirement: Concurrent safety MUST be covered by tests
+系统 MUST 在 `tests/workflow/test_workflow_cache_pool.py`（或等价模块）中提供并发回归用例，至少覆盖：
+- 加载进行中调用 `close()` 时，关闭与加载的交互符合上述要求。
+- eviction 与对同一 key 的并发 `get_or_load` 不产生重复加载或缓存不一致。
+
+#### Scenario: regression tests protect close vs load race
+- **WHEN** 运行默认非 bench 测试套件中的 workflow cache pool 并发用例
+- **THEN** 用例 MUST 通过并锁定上述安全语义
+
+### Requirement: Optional `_closing` flag MUST not weaken documented API semantics
+若实现引入 `_closing`（或等价）标志以使 `close()` 之后的新 `get_or_load` 快速失败，该行为 MUST 与现有对外 API 文档及错误语义一致，且 MUST 具备测试覆盖。
+
+#### Scenario: new loads after close are rejected consistently
+- **GIVEN** `close()` 已设置关闭状态（若采用 `_closing`）
+- **WHEN** 调用方在关闭后尝试 `get_or_load`
+- **THEN** 系统 MUST 以满足文档的方式失败（例如明确异常类型/消息），而不得静默返回陈旧或部分初始化的条目
+
+
 ### Requirement: cache pool MUST be observable via workflow-level events
-系统 MUST 为 cache pool 的关键生命周期动作提供可观测事件/钩子点,以便 hooks/observers/scalim-viz 能解释“复用/释放/淘汰”导致的行为变化:
+系统 MUST 为 cache pool 的关键生命周期动作提供可观测事件/钩子点,以便 hooks/observers/scalim-viz 能解释"复用/释放/淘汰"导致的行为变化:
 - 系统 MUST 发出以下事件类型:
   - `workflow_cache_acquire`
   - `workflow_cache_release`

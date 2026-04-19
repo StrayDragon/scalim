@@ -17,7 +17,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 - `openspec/specs/demand-dsl/spec.md`
 - `openspec/specs/yaml-dsl-schema/spec.md`
 - `openspec/specs/yaml-runtime-vars/spec.md`
-- `openspec/specs/source-relations/spec.md`
+- `openspec/specs/ir-source-relations/spec.md`
 - `openspec/specs/yaml-dsl-micro-tunes/spec.md`
 
 下游同步盘点:

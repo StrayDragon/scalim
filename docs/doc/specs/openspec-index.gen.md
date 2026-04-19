@@ -11,105 +11,120 @@ Sources:
 
 ## Specs
 
-### `agent-skill-export`
-- Title: agent-skill-export Specification
-- Source: [spec.md](#code=openspec/specs/agent-skill-export/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
-
-### `agent-skill-workflow-writes-docs`
-- Title: agent-skill-workflow-writes-docs Specification
-- Source: [spec.md](#code=openspec/specs/agent-skill-workflow-writes-docs/spec.md)
-- Summary: 定义并约束 `scalim-yaml-dsl` skill 的 workflow YAML 语法索引生成规则,确保生成物的关键 key paths 与 canonical workflow schema 一致,避免文档漂移误导作者与工具链.
-
-### `benchmarking`
-- Title: benchmarking Specification
-- Source: [spec.md](#code=openspec/specs/benchmarking/spec.md)
-- Summary: **状态: ✅ 已实现** 定义基准测试入口与依赖约束,覆盖 pytest-benchmark 执行、JSON 导出、baseline 对比、benchlib 复用与可选 memray 剖析.
-
-### `dataclassesx-vendor`
-- Title: dataclassesx-vendor Specification
-- Source: [spec.md](#code=openspec/specs/dataclassesx-vendor/spec.md)
-- Summary: **状态: ✅ 已实现** 为 `src/scalim/` 提供一个可 vendors 化、可审计的 dataclasses 能力入口,在保持 Python 3.6 运行时兼容的同时避免依赖外部 `dataclasses` backport,并避免包内绝对导入在多份包共存时混入错误实现。
-
 ### `demand-dsl`
 - Title: demand-dsl Specification
 - Source: [spec.md](#code=openspec/specs/demand-dsl/spec.md)
 - Summary: **状态: ✅ 已实现** 实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.
-
-### `dense-batch-context`
-- Title: dense-batch-context Specification
-- Source: [spec.md](#code=openspec/specs/dense-batch-context/spec.md)
-- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
-
-### `dependency-free-console-reports`
-- Title: dependency-free-console-reports Specification
-- Source: [spec.md](#code=openspec/specs/dependency-free-console-reports/spec.md)
-- Summary: TBD - created by archiving change c2-remove-literich. Update Purpose after archive.
-
-### `derived-outputs`
-- Title: derived-outputs Specification
-- Source: [spec.md](#code=openspec/specs/derived-outputs/spec.md)
-- Summary: **状态: ⚠️ 实验性** 支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界.
-
-### `deterministic-ordering`
-- Title: deterministic-ordering Specification
-- Source: [spec.md](#code=openspec/specs/deterministic-ordering/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 PROJECT_NAME 的稳定顺序最小契约,用于保证 planning/执行在相同输入下可复现,并避免 `PYTHONHASHSEED` 等非确定性因素影响结果. 本 spec 覆盖执行计划构建顺序、拓扑排序输出的 tie-break 规则、以及 keys 绑定列表的稳定顺序要求.
-
-### `doc-governance`
-- Title: doc-governance Specification
-- Source: [spec.md](#code=openspec/specs/doc-governance/spec.md)
-- Summary: **状态: ✅ 已实现** 定义仓库内文档的分层、生成边界(`*.gen.*` + `AUTOGEN` 注入区块)、统一生成入口与漂移门禁,以降低维护成本并防止“手工修改生成物/区块”导致的不一致.
-
-### `docs-site`
-- Title: docs-site Specification
-- Source: [spec.md](#code=openspec/specs/docs-site/spec.md)
-- Summary: **状态: ✅ 已实现** 定义仓库内文档站点的范围与组织规则:使用 Zensical(兼容 MkDocs 的配置格式)构建站点,以 `docs/doc/` 作为唯一文档真源,并避免将 `openspec/specs/**`、`_REPORT/**` 等规范/审计内容纳入站点.
 
 ### `dsl-runtime-structure`
 - Title: dsl-runtime-structure Specification
 - Source: [spec.md](#code=openspec/specs/dsl-runtime-structure/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 yaml_dsl runtime 作为 DSL adapter/编译器的边界与对外入口,并明确 YAML `outputs`/可观测性配置在编译期映射为 DSL-agnostic 运行请求对象的规则.
 
-### `error-taxonomy`
+### `examples-marimo`
+- Title: marimo-examples Specification
+- Source: [spec.md](#code=openspec/specs/examples-marimo/spec.md)
+- Summary: **状态: ✅ 已实现** 定义仓库内 `notebooks/marimo/` 的示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。
+
+### `execution-concurrency-safety`
+- Title: no-external-callback-under-lock Specification
+- Source: [spec.md](#code=openspec/specs/execution-concurrency-safety/spec.md)
+- Summary: 为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。
+
+### `execution-dense-batch`
+- Title: dense-batch-context Specification
+- Source: [spec.md](#code=openspec/specs/execution-dense-batch/spec.md)
+- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
+
+### `execution-derived-outputs`
+- Title: derived-outputs Specification
+- Source: [spec.md](#code=openspec/specs/execution-derived-outputs/spec.md)
+- Summary: **状态: ⚠️ 实验性** 支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界.
+
+### `execution-error-taxonomy`
 - Title: error-taxonomy Specification
-- Source: [spec.md](#code=openspec/specs/error-taxonomy/spec.md)
+- Source: [spec.md](#code=openspec/specs/execution-error-taxonomy/spec.md)
 - Summary: **状态: ✅ 已实现** 为 `scalim` 建立统一的异常体系规范:以 `ScalimError(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
 
-### `exception-chain-convention`
-- Title: exception-chain-convention Specification
-- Source: [spec.md](#code=openspec/specs/exception-chain-convention/spec.md)
-- Summary: TBD - created by archiving change c10-fix-exception-chain-consistency. Update Purpose after archive.
+### `execution-loader-retry`
+- Title: loader-retry-policy Specification
+- Source: [spec.md](#code=openspec/specs/execution-loader-retry/spec.md)
+- Summary: TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
+
+### `execution-micro-tunes`
+- Title: yaml-dsl-micro-tunes Specification
+- Source: [spec.md](#code=openspec/specs/execution-micro-tunes/spec.md)
+- Summary: TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
+
+### `execution-output-composition`
+- Title: output-composition Specification
+- Source: [spec.md](#code=openspec/specs/execution-output-composition/spec.md)
+- Summary: **状态: ✅ 已实现** 支持单次运行的多输出目标组合(多文件或同一容器多逻辑输出),并定义容器命名冲突策略与输出失败策略(`failure_policy`).
+
+### `execution-preload-cache`
+- Title: preload-cache Specification
+- Source: [spec.md](#code=openspec/specs/execution-preload-cache/spec.md)
+- Summary: 定义 `PreloadCache` 的完整行为契约：并发安全性、in-flight 去重、signature 冲突防护、诊断能力，以及并发场景下的幂等性期望。
+
+### `execution-ref-miss-default-cases`
+- Title: yaml-dsl-ref-miss-default-cases Specification
+- Source: [spec.md](#code=openspec/specs/execution-ref-miss-default-cases/spec.md)
+- Summary: TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Purpose after archive.
+
+### `execution-safety-single-writer`
+- Title: single-writer-model-safety Specification
+- Source: [spec.md](#code=openspec/specs/execution-safety-single-writer/spec.md)
+- Summary: TBD - created by archiving change c40-harden-single-writer-model-futureproof. Update Purpose after archive.
+
+### `execution-source-cache`
+- Title: source-cache Specification
+- Source: [spec.md](#code=openspec/specs/execution-source-cache/spec.md)
+- Summary: **状态: ✅ 已实现** 支持 cache_mode=preload_forever 的数据源在 pipeline 启动前预加载,结果写入 ExecutionRuntime.preloaded_cache 并在关联加载时复用;计划元数据记录已缓存的数据源.
 
 ### `execution-structure`
 - Title: execution-structure Specification
 - Source: [spec.md](#code=openspec/specs/execution-structure/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 execution 层的模块拆分与入口契约,并明确统一 IR 编排入口(如 `run_ir`)的边界,确保执行编排对 DSL 配置解耦且行为在重构后保持兼容.
 
-### `explicit-extension-points`
+### `governance-docs`
+- Title: doc-governance Specification
+- Source: [spec.md](#code=openspec/specs/governance-docs/spec.md)
+- Summary: **状态: ✅ 已实现** 定义仓库内文档的分层、生成边界(`*.gen.*` + `AUTOGEN` 注入区块)、统一生成入口与漂移门禁,以降低维护成本并防止“手工修改生成物/区块”导致的不一致.
+
+### `governance-docs-site`
+- Title: docs-site Specification
+- Source: [spec.md](#code=openspec/specs/governance-docs-site/spec.md)
+- Summary: **状态: ✅ 已实现** 定义仓库内文档站点的范围与组织规则:使用 Zensical(兼容 MkDocs 的配置格式)构建站点,以 `docs/doc/` 作为唯一文档真源,并避免将 `openspec/specs/**`、`_REPORT/**` 等规范/审计内容纳入站点.
+
+### `governance-extension-points`
 - Title: explicit-extension-points Specification
-- Source: [spec.md](#code=openspec/specs/explicit-extension-points/spec.md)
+- Source: [spec.md](#code=openspec/specs/governance-extension-points/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 PROJECT_NAME 内部扩展点的显式注入与编译式分发模型,减少模块级“魔法注入”与事件热路径反射,提升类型友好性、可维护性与性能稳定性.
 
-### `field-compute`
-- Title: field-compute Specification
-- Source: [spec.md](#code=openspec/specs/field-compute/spec.md)
-- Summary: **状态: ✅ 已实现** 定义源字段 `value_cast` 转换与派生字段 `compute/call_by` 的解析、校验与执行行为,并规范派生字段依赖推导(拒绝显式 `depends_on`)与表达式安全策略.
+### `governance-mainline-principles`
+- Title: yaml-dsl-mainline-principles Specification
+- Source: [spec.md](#code=openspec/specs/governance-mainline-principles/spec.md)
+- Summary: 定义 YAML DSL 的上位主线原则与设计护栏,用于约束后续变更的方向与评审口径: 单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式(拒绝 imports expansion)。
 
-### `flow-visualization`
-- Title: flow-visualization Specification
-- Source: [spec.md](#code=openspec/specs/flow-visualization/spec.md)
-- Summary: **状态: ✅ 已实现** - VizGraphSnapshot + VizEventStream 可视化机制已实现 提供执行过程的可视化输出:VizGraphSnapshot 从 ExecutionPlan 生成 XYFlow 兼容的 nodes/edges 结构用于依赖图展示;VizEventStream 将 Hook 事件映射为可视化事件流支持离线回放.
+### `governance-misc`
+- Title: misc Specification
+- Source: [spec.md](#code=openspec/specs/governance-misc/spec.md)
+- Summary: **状态: ✅ 已实现** 为“重构分析类文档”提供统一的规范入口与最低要求,确保依赖分析、边界说明、任务拆分、验证口径和约束声明一致,以便在不改动代码的前提下形成可复核的决策依据.
 
-### `framework-logging`
-- Title: framework-logging Specification
-- Source: [spec.md](#code=openspec/specs/framework-logging/spec.md)
-- Summary: **状态: ✅ 已实现** 为框架内部日志建立统一的 Python 标准库 `logging` 使用约定,以保证默认静默、命名空间稳定、输出前缀一致,并提供可扩展的诊断字段与 context 绑定机制。
+### `governance-module-organization`
+- Title: module-organization Specification
+- Source: [spec.md](#code=openspec/specs/governance-module-organization/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 `src/IMPL_ROOT/` 的模块边界、入口最小化与兼容约束,避免将内部实现路径误用为公共 API,并保持 Python 3.6 运行时可用性.
 
-### `generated-artifacts-manifest`
-- Title: generated-artifacts-manifest Specification
-- Source: [spec.md](#code=openspec/specs/generated-artifacts-manifest/spec.md)
-- Summary: 统一“生成物 / 注入区块”的约定与门禁,避免引入额外的 manifest SSOT 与重复维护成本.
+### `governance-package-identity`
+- Title: package-identity Specification
+- Source: [spec.md](#code=openspec/specs/governance-package-identity/spec.md)
+- Summary: TBD - created by archiving change projectlib-rename-uv-lib-migration. Update Purpose after archive.
+
+### `governance-public-api`
+- Title: public-api-governance Specification
+- Source: [spec.md](#code=openspec/specs/governance-public-api/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 public API 边界治理规则：稳定入口编目、`__all__` 治理、用户材料导入边界、agent skill 生成器，确保在不引入"符号级硬 manifest SSOT"的前提下维护清晰的公共契约。 定义 public API 边界治理规则：稳定入口编目、`__all__` 治理、用户材料导入边界、agent skill 生成器，确保在不引入"符号级硬 manifest SSOT"的前提下维护清晰的公共契约。
 
 ### `hooks-events`
 - Title: hooks-events Specification
@@ -121,175 +136,80 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/hooks-observability-structure/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 Hook/Observer/事件体系的统一边界:事件契约、分发路径、组件装配与高频路径性能语义.
 
-### `instrumentation-hub`
-- Title: instrumentation-hub Specification
-- Source: [spec.md](#code=openspec/specs/instrumentation-hub/spec.md)
-- Summary: TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
+### `ir-field-compute`
+- Title: field-compute Specification
+- Source: [spec.md](#code=openspec/specs/ir-field-compute/spec.md)
+- Summary: **状态: ✅ 已实现** 定义源字段 `value_cast` 转换与派生字段 `compute/call_by` 的解析、校验与执行行为,并规范派生字段依赖推导(拒绝显式 `depends_on`)与表达式安全策略.
+
+### `ir-key-normalization`
+- Title: key-normalization Specification
+- Source: [spec.md](#code=openspec/specs/ir-key-normalization/spec.md)
+- Summary: `key_normalization` 提供一个运行期可控的“稳定字符串口径”键匹配策略,用于解决 relations/derived outputs 中 `1` 与 `"1"` 等跨来源类型不一致导致的 miss/分组拆分问题. 该能力为 `EXPERIMENTAL`,默认关闭(`raw`).
+
+### `ir-source-relations`
+- Title: source-relations Specification
+- Source: [spec.md](#code=openspec/specs/ir-source-relations/spec.md)
+- Summary: **状态: ✅ 已实现** 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
 
 ### `ir-structure`
 - Title: ir-structure Specification
 - Source: [spec.md](#code=openspec/specs/ir-structure/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 IR 层的纯数据边界与依赖约束,确保 spec/ir 不依赖执行与规划层,便于稳定复用、演进与测试.
 
-### `key-normalization`
-- Title: key-normalization Specification
-- Source: [spec.md](#code=openspec/specs/key-normalization/spec.md)
-- Summary: `key_normalization` 提供一个运行期可控的“稳定字符串口径”键匹配策略,用于解决 relations/derived outputs 中 `1` 与 `"1"` 等跨来源类型不一致导致的 miss/分组拆分问题. 该能力为 `EXPERIMENTAL`,默认关闭(`raw`).
+### `observability-flow-visualization`
+- Title: flow-visualization Specification
+- Source: [spec.md](#code=openspec/specs/observability-flow-visualization/spec.md)
+- Summary: **状态: ✅ 已实现** - VizGraphSnapshot + VizEventStream 可视化机制已实现 提供执行过程的可视化输出:VizGraphSnapshot 从 ExecutionPlan 生成 XYFlow 兼容的 nodes/edges 结构用于依赖图展示;VizEventStream 将 Hook 事件映射为可视化事件流支持离线回放.
 
-### `legacy-vendors-sync`
-- Title: legacy-vendors-sync Specification
-- Source: [spec.md](#code=openspec/specs/legacy-vendors-sync/spec.md)
-- Summary: **状态: ✅ 已实现** 为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。
+### `observability-logging`
+- Title: framework-logging Specification
+- Source: [spec.md](#code=openspec/specs/observability-logging/spec.md)
+- Summary: **状态: ✅ 已实现** 为框架内部日志建立统一的 Python 标准库 `logging` 使用约定,以保证默认静默、命名空间稳定、输出前缀一致,并提供可扩展的诊断字段与 context 绑定机制。
 
-### `loader-retry-policy`
-- Title: loader-retry-policy Specification
-- Source: [spec.md](#code=openspec/specs/loader-retry-policy/spec.md)
-- Summary: TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
-
-### `marimo-demo-big-data-report-chapters`
-- Title: marimo-demo-big-data-report-chapters Specification
-- Source: [spec.md](#code=openspec/specs/marimo-demo-big-data-report-chapters/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 `demo_big_data_report` 主线示例在 `notebooks/marimo/` 下的章节化组织要求:以 `demo_main.py` 作为 hub,每个 SSOT chapter 对应一本 Marimo notebook,并与 headless runner/pytest 同源对拍.
-
-### `marimo-example-public-api-suite`
-- Title: marimo-example-public-api-suite Specification
-- Source: [spec.md](#code=openspec/specs/marimo-example-public-api-suite/spec.md)
-- Summary: TBD - created by archiving change c16-demo-big-data-report-yaml-mainline. Update Purpose after archive.
-
-### `marimo-notebooks-examples-suite`
-- Title: marimo-notebooks-examples-suite Specification
-- Source: [spec.md](#code=openspec/specs/marimo-notebooks-examples-suite/spec.md)
-- Summary: **状态: ✅ 已实现** 定义仓库内 `notebooks/marimo/` 的示例/教学套件治理边界:Marimo notebooks 作为唯一交互载体,headless runner/pytest 作为确定性回归入口,并要求执行真相来源位于 notebooks(同源复用).
-
-### `misc`
-- Title: misc Specification
-- Source: [spec.md](#code=openspec/specs/misc/spec.md)
-- Summary: **状态: ✅ 已实现** 为“重构分析类文档”提供统一的规范入口与最低要求,确保依赖分析、边界说明、任务拆分、验证口径和约束声明一致,以便在不改动代码的前提下形成可复核的决策依据.
-
-### `module-organization`
-- Title: module-organization Specification
-- Source: [spec.md](#code=openspec/specs/module-organization/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 `src/IMPL_ROOT/` 的模块边界、入口最小化与兼容约束,避免将内部实现路径误用为公共 API,并保持 Python 3.6 运行时可用性.
-
-### `no-external-callback-under-lock`
-- Title: no-external-callback-under-lock Specification
-- Source: [spec.md](#code=openspec/specs/no-external-callback-under-lock/spec.md)
-- Summary: 为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。
-
-### `observer-concurrency-contract`
+### `observability-observer-concurrency`
 - Title: observer-concurrency-contract Specification
-- Source: [spec.md](#code=openspec/specs/observer-concurrency-contract/spec.md)
+- Source: [spec.md](#code=openspec/specs/observability-observer-concurrency/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 workflow 并发执行（例如 `max_concurrency>1`）时 observers/hooks/components 的默认并发语义,确保在不要求 observer 实现方线程安全的前提下仍具备可解释、可复现的事件回放顺序,并保持 `no-external-callback-under-lock` 护栏不被破坏.
-
-### `ordered-unique-ssot`
-- Title: ordered-unique-ssot Specification
-- Source: [spec.md](#code=openspec/specs/ordered-unique-ssot/spec.md)
-- Summary: TBD - created by archiving change c40-ordered-unique-ssot. Update Purpose after archive.
-
-### `output-aggregate-producer-keys-ssot`
-- Title: output-aggregate-producer-keys-ssot Specification
-- Source: [spec.md](#code=openspec/specs/output-aggregate-producer-keys-ssot/spec.md)
-- Summary: TBD - created by archiving change c45-output-aggregate-producer-keys-ssot. Update Purpose after archive.
-
-### `output-composition`
-- Title: output-composition Specification
-- Source: [spec.md](#code=openspec/specs/output-composition/spec.md)
-- Summary: **状态: ✅ 已实现** 支持单次运行的多输出目标组合(多文件或同一容器多逻辑输出),并定义容器命名冲突策略与输出失败策略(`failure_policy`).
 
 ### `output-mode-api`
 - Title: output-mode-api Specification
 - Source: [spec.md](#code=openspec/specs/output-mode-api/spec.md)
 - Summary: **状态: ✅ 已实现** 定义运行时输出语义为“显式 sink 驱动”: 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配. 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理.
 
-### `outputs-parser-staged-design`
-- Title: outputs-parser-staged-design Specification
-- Source: [spec.md](#code=openspec/specs/outputs-parser-staged-design/spec.md)
-- Summary: TBD - created by archiving change c50-outputs-parser-split. Update Purpose after archive.
+### `output-sink-contracts`
+- Title: sinks-contracts Specification
+- Source: [spec.md](#code=openspec/specs/output-sink-contracts/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 sink 接口稳定性与可选依赖提示规范,确保内建与外部 sink 的长期兼容、可诊断性与一致行为.
 
-### `overlap-optimization`
-- Title: overlap-optimization Specification
-- Source: [spec.md](#code=openspec/specs/overlap-optimization/spec.md)
-- Summary: **状态: 📋 待实现** - 当前方案为暂不处理,跨批次复用缓存待实现 当前实现不提供跨批次的关联结果复用,除 preload_forever 外每个批次独立加载并在执行时重算;该状态与 ExecutionRuntime 仅持有预加载缓存的行为一致.
-
-### `package-identity`
-- Title: package-identity Specification
-- Source: [spec.md](#code=openspec/specs/package-identity/spec.md)
-- Summary: TBD - created by archiving change projectlib-rename-uv-lib-migration. Update Purpose after archive.
-
-### `package-metadata`
-- Title: package-metadata Specification
-- Source: [spec.md](#code=openspec/specs/package-metadata/spec.md)
-- Summary: **状态: ✅ 已实现** 为 `scalim` 提供一套轻量、稳定、Python 3.6 兼容的运行时版本号入口（`__version__`），用于排查与集成，并与 `pyproject.toml` 的 `project.version` 保持一致.
+### `output-sink-fastpath`
+- Title: sink-fastpath Specification
+- Source: [spec.md](#code=openspec/specs/output-sink-fastpath/spec.md)
+- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
 
 ### `parallel-execution`
 - Title: parallel-execution Specification
 - Source: [spec.md](#code=openspec/specs/parallel-execution/spec.md)
 - Summary: **状态: ⚠️ 实验性** 定义执行层对外并发语义 `seq|adaptive`,以及 `adaptive` 下的调度边界、后端选择、结果提交与事件回放契约.
 
-### `perf-regression-guardrails`
-- Title: perf-regression-guardrails Specification
-- Source: [spec.md](#code=openspec/specs/perf-regression-guardrails/spec.md)
-- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
-
 ### `performance-observability`
 - Title: performance-observability Specification
 - Source: [spec.md](#code=openspec/specs/performance-observability/spec.md)
 - Summary: **状态: ✅ 已实现** PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.
 
-### `preload-cache-concurrent-load-scenarios`
-- Title: preload-cache-concurrent-load-scenarios Specification
-- Source: [spec.md](#code=openspec/specs/preload-cache-concurrent-load-scenarios/spec.md)
-- Summary: TBD - created by archiving change c70-preload-cache-concurrent-load-scenarios. Update Purpose after archive.
+### `planning-deterministic-ordering`
+- Title: deterministic-ordering Specification
+- Source: [spec.md](#code=openspec/specs/planning-deterministic-ordering/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 PROJECT_NAME 的稳定顺序最小契约,用于保证 planning/执行在相同输入下可复现,并避免 `PYTHONHASHSEED` 等非确定性因素影响结果. 本 spec 覆盖执行计划构建顺序、拓扑排序输出的 tie-break 规则、以及 keys 绑定列表的稳定顺序要求.
 
-### `preload-cache-inflight-dedupe`
-- Title: preload-cache-inflight-dedupe Specification
-- Source: [spec.md](#code=openspec/specs/preload-cache-inflight-dedupe/spec.md)
-- Summary: TBD - created by archiving change c0-preload-cache-inflight-dedupe. Update Purpose after archive.
+### `quality-benchmarking`
+- Title: benchmarking Specification
+- Source: [spec.md](#code=openspec/specs/quality-benchmarking/spec.md)
+- Summary: **状态: ✅ 已实现** 定义基准测试入口与依赖约束,覆盖 pytest-benchmark 执行、JSON 导出、baseline 对比、benchlib 复用与可选 memray 剖析.
 
-### `preload-cache-inflight-wait-diagnostics`
-- Title: preload-cache-inflight-wait-diagnostics Specification
-- Source: [spec.md](#code=openspec/specs/preload-cache-inflight-wait-diagnostics/spec.md)
-- Summary: TBD - created by archiving change c75-preload-cache-inflight-wait-diagnostics. Update Purpose after archive.
-
-### `preload-cache-signature-guardrail`
-- Title: preload-cache-signature-guardrail Specification
-- Source: [spec.md](#code=openspec/specs/preload-cache-signature-guardrail/spec.md)
-- Summary: TBD - created by archiving change c700-preload-cache-signature-guardrail. Update Purpose after archive.
-
-### `preload-cache-thread-safety`
-- Title: preload-cache-thread-safety Specification
-- Source: [spec.md](#code=openspec/specs/preload-cache-thread-safety/spec.md)
-- Summary: TBD - created by archiving change c35-harden-preload-cache-thread-safety. Update Purpose after archive.
-
-### `prompt-eval-fixture-cli`
-- Title: prompt-eval-fixture-cli Specification
-- Source: [spec.md](#code=openspec/specs/prompt-eval-fixture-cli/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略,确保其不覆盖仓库真实 `scalim-cli`,同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现,并避免对 PyPI build 依赖/网络造成的 dry-run 波动。
-
-### `prompt-eval-workflow`
-- Title: prompt-eval-workflow Specification
-- Source: [spec.md](#code=openspec/specs/prompt-eval-workflow/spec.md)
-- Summary: **状态: ✅ 已实现** 定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。
-
-### `public-api-agent-skill`
-- Title: public-api-agent-skill Specification
-- Source: [spec.md](#code=openspec/specs/public-api-agent-skill/spec.md)
-- Summary: TBD - created by archiving change c0-public-api-examples-governance. Update Purpose after archive.
-
-### `public-api-manifest`
-- Title: public-api-manifest Specification
-- Source: [spec.md](#code=openspec/specs/public-api-manifest/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 public API 边界治理规则,并在不引入“符号级硬 manifest SSOT”的前提下,确保: - 稳定入口清晰(约定 + 文档) - `__all__` 显式治理(避免隐式暴露内部实现) - 用户材料不得引用内部导入路径(避免把内部实现写进教程/示例/skills)
-
-### `public-api-surface-governance`
-- Title: public-api-surface-governance Specification
-- Source: [spec.md](#code=openspec/specs/public-api-surface-governance/spec.md)
-- Summary: **状态: ✅ 已实现** 定义稳定公开入口的编目规则与回归门禁,避免内部实现路径在文档/skills/examples/tests 中被误固化为事实公共 API.
-
-### `resources-discovery`
-- Title: resources-discovery Specification
-- Source: [spec.md](#code=openspec/specs/resources-discovery/spec.md)
-- Summary: **状态: ✅ 已实现** 定义面向用户的稳定公开入口,用于从 output root 定位“最新一次成功发布”的产物集合(books/files),并隐藏底层 D-2 版本化输出协议的内部落盘细节.
+### `quality-perf-regression`
+- Title: perf-regression-guardrails Specification
+- Source: [spec.md](#code=openspec/specs/quality-perf-regression/spec.md)
+- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
 
 ### `runtime-guardrails`
 - Title: runtime-guardrails Specification
@@ -301,36 +221,6 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/runtime-pruning/spec.md)
 - Summary: **状态: ✅ 已实现** PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
 
-### `single-writer-model-safety`
-- Title: single-writer-model-safety Specification
-- Source: [spec.md](#code=openspec/specs/single-writer-model-safety/spec.md)
-- Summary: TBD - created by archiving change c40-harden-single-writer-model-futureproof. Update Purpose after archive.
-
-### `sink-fastpath`
-- Title: sink-fastpath Specification
-- Source: [spec.md](#code=openspec/specs/sink-fastpath/spec.md)
-- Summary: TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
-
-### `sinks-contracts`
-- Title: sinks-contracts Specification
-- Source: [spec.md](#code=openspec/specs/sinks-contracts/spec.md)
-- Summary: **状态: ✅ 已实现** 定义 sink 接口稳定性与可选依赖提示规范,确保内建与外部 sink 的长期兼容、可诊断性与一致行为.
-
-### `skill-docs-write-to-cleanup`
-- Title: skill-docs-write-to-cleanup Specification
-- Source: [spec.md](#code=openspec/specs/skill-docs-write-to-cleanup/spec.md)
-- Summary: 定义并约束 `scalim-yaml-dsl` skill 与相关 OpenSpec 文档对 workflow 写入语义的表述口径,确保作者不会被已移除的旧写入字段误导,并以 `workflow.resources.books` + demand outputs 的 `to/write` 绑定作为唯一可用的 authoring surface(SSOT).
-
-### `source-cache`
-- Title: source-cache Specification
-- Source: [spec.md](#code=openspec/specs/source-cache/spec.md)
-- Summary: **状态: ✅ 已实现** 支持 cache_mode=preload_forever 的数据源在 pipeline 启动前预加载,结果写入 ExecutionRuntime.preloaded_cache 并在关联加载时复用;计划元数据记录已缓存的数据源.
-
-### `source-relations`
-- Title: source-relations Specification
-- Source: [spec.md](#code=openspec/specs/source-relations/spec.md)
-- Summary: **状态: ✅ 已实现** 使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.
-
 ### `streaming-output`
 - Title: streaming-output Specification
 - Source: [spec.md](#code=openspec/specs/streaming-output/spec.md)
@@ -340,11 +230,6 @@ Sources:
 - Title: structured-logging Specification
 - Source: [spec.md](#code=openspec/specs/structured-logging/spec.md)
 - Summary: TBD - created by archiving change c1-perf-observability. Update Purpose after archive.
-
-### `testing-behavior-contracts`
-- Title: testing-behavior-contracts Specification
-- Source: [spec.md](#code=openspec/specs/testing-behavior-contracts/spec.md)
-- Summary: TBD - created by archiving change c0-testing-behavior-first. Update Purpose after archive.
 
 ### `testing-quality`
 - Title: testing-quality Specification
@@ -356,15 +241,45 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/tests-domain-suites/spec.md)
 - Summary: TBD - created by archiving change c2-tests-domain-suites. Update Purpose after archive.
 
+### `tools-agent-skill-export`
+- Title: agent-skill-export Specification
+- Source: [spec.md](#code=openspec/specs/tools-agent-skill-export/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
+
+### `tools-console-reports`
+- Title: dependency-free-console-reports Specification
+- Source: [spec.md](#code=openspec/specs/tools-console-reports/spec.md)
+- Summary: TBD - created by archiving change c2-remove-literich. Update Purpose after archive.
+
+### `tools-prompt-eval-cli`
+- Title: prompt-eval-fixture-cli Specification
+- Source: [spec.md](#code=openspec/specs/tools-prompt-eval-cli/spec.md)
+- Summary: **状态: ✅ 已实现** 定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略,确保其不覆盖仓库真实 `scalim-cli`,同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现,并避免对 PyPI build 依赖/网络造成的 dry-run 波动。
+
+### `tools-prompt-eval-workflow`
+- Title: prompt-eval-workflow Specification
+- Source: [spec.md](#code=openspec/specs/tools-prompt-eval-workflow/spec.md)
+- Summary: **状态: ✅ 已实现** 定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。
+
+### `tools-resources-discovery`
+- Title: resources-discovery Specification
+- Source: [spec.md](#code=openspec/specs/tools-resources-discovery/spec.md)
+- Summary: **状态: ✅ 已实现** 定义面向用户的稳定公开入口,用于从 output root 定位“最新一次成功发布”的产物集合(books/files),并隐藏底层 D-2 版本化输出协议的内部落盘细节.
+
+### `vendor-dataclassesx`
+- Title: dataclassesx-vendor Specification
+- Source: [spec.md](#code=openspec/specs/vendor-dataclassesx/spec.md)
+- Summary: **状态: ✅ 已实现** 为 `src/scalim/` 提供一个可 vendors 化、可审计的 dataclasses 能力入口,在保持 Python 3.6 运行时兼容的同时避免依赖外部 `dataclasses` backport,并避免包内绝对导入在多份包共存时混入错误实现。
+
+### `vendor-legacy-sync`
+- Title: legacy-vendors-sync Specification
+- Source: [spec.md](#code=openspec/specs/vendor-legacy-sync/spec.md)
+- Summary: **状态: ✅ 已实现** 为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。
+
 ### `workflow-cache-pool`
 - Title: workflow-cache-pool Specification
 - Source: [spec.md](#code=openspec/specs/workflow-cache-pool/spec.md)
-- Summary: **状态: ✅ 已实现** 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件确保“复用正确且可诊断”.
-
-### `workflow-cache-pool-safety`
-- Title: workflow-cache-pool-safety Specification
-- Source: [spec.md](#code=openspec/specs/workflow-cache-pool-safety/spec.md)
-- Summary: TBD - created by archiving change c30-harden-cache-pool-eviction-safety. Update Purpose after archive.
+- Summary: **状态: ✅ 已实现** 提供 workflow-scope 的缓存池(`cache_pool`),用于在同一次 workflow 执行内跨 nodes 复用可共享缓存条目(当前主要用于 `preload_forever` 结果),并通过 signature-based keys/冲突策略/生命周期(refcount+pin)/预算策略/观测事件/并发安全确保"复用正确且可诊断".
 
 ### `workflow-execute-organization`
 - Title: workflow-execute-organization Specification
@@ -446,11 +361,6 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-agent-guidance/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计.
 
-### `yaml-dsl-allowed-paths-policy`
-- Title: yaml-dsl-allowed-paths-policy Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-allowed-paths-policy/spec.md)
-- Summary: TBD - created by archiving change c25-yaml-path-escape-hardening. Update Purpose after archive.
-
 ### `yaml-dsl-allowlist-policy`
 - Title: yaml-dsl-allowlist-policy Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-allowlist-policy/spec.md)
@@ -470,11 +380,6 @@ Sources:
 - Title: yaml-dsl-callable-preflight Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-callable-preflight/spec.md)
 - Summary: **状态: ✅ 已实现** 定义 YAML DSL 在 demand compile / workflow preflight 阶段的 callable preflight: 在 resolver 安全边界就绪后,对用户可配置的 Python callable 执行“可推理的签名/形态/固定 contract”校验,并在失败时 fail-fast。
-
-### `yaml-dsl-cli-runner`
-- Title: yaml-dsl-cli-runner Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-cli-runner/spec.md)
-- Summary: 定义 `scalim-cli yaml-dsl` 的命令边界：CLI 仅承载 authoring/tooling（schema/validate/editor integration），执行入口统一收敛为 Python API。
 
 ### `yaml-dsl-cli-validation`
 - Title: yaml-dsl-cli-validation Specification
@@ -501,16 +406,6 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-docs-skills-autogen-sync/spec.md)
 - Summary: TBD - created by archiving change c30-yaml-dsl-docs-skills-autogen-sync. Update Purpose after archive.
 
-### `yaml-dsl-editor-project-discovery`
-- Title: yaml-dsl-editor-project-discovery Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-project-discovery/spec.md)
-- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
-
-### `yaml-dsl-editor-semantics-core`
-- Title: yaml-dsl-editor-semantics-core Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-editor-semantics-core/spec.md)
-- Summary: TBD - created by archiving change c50-yaml-dsl-editor-semantics-lsp-core. Update Purpose after archive.
-
 ### `yaml-dsl-file-resources`
 - Title: yaml-dsl-file-resources Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-file-resources/spec.md)
@@ -526,40 +421,30 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-imports/spec.md)
 - Summary: **状态: ✅ 已实现** 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开. 说明: - `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
 
-### `yaml-dsl-lsp-code-actions`
-- Title: yaml-dsl-lsp-code-actions Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-code-actions/spec.md)
-- Summary: 定义 YAML DSL LSP 的 Quick Fix（`textDocument/codeAction` + `workspace/executeCommand`）能力集合与安全约束，确保： - actions 由 shared core 的 diagnostics/discovery 驱动（避免在 server 层复制 DSL 语义） - edits 可撤销、可审计（通过 `WorkspaceEdit`） - 纯静态无副作用（不得执行用户代码） - edits 仅作用于 workspace 内文件（越界/不可写时降级为 explain-only）
-
-### `yaml-dsl-lsp-editor-integration-guides`
-- Title: yaml-dsl-lsp-editor-integration-guides Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-editor-integration-guides/spec.md)
-- Summary: 提供一套可复制、可审计、可排障的多编辑器接入指南，降低 YAML DSL LSP server 在 Neovim / Zed / JetBrains 等生态中的接入成本，并明确 schema 与 LSP 的职责边界。
-
-### `yaml-dsl-lsp-notebooks-regression`
-- Title: yaml-dsl-lsp-notebooks-regression Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-notebooks-regression/spec.md)
-- Summary: 复用仓库 `notebooks` 下的 YAML DSL fixtures 作为 editor semantics core 的静态回归输入， 用于持续回归 diagnostics 与 Python 引用相关的 editor/LSP 操作，避免仅基于合成 YAML 导致的行为漂移。
-
-### `yaml-dsl-lsp-serve`
+### `yaml-dsl-lsp-cli`
 - Title: yaml-dsl-lsp-serve Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-serve/spec.md)
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-cli/spec.md)
 - Summary: 提供一个跨编辑器可复用的 YAML DSL LSP server 启动入口（默认 stdio），并约束其日志/降级行为， 以保证编辑器集成稳定且可排障。
+
+### `yaml-dsl-lsp-editor-integration`
+- Title: yaml-dsl-editor-integration Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-editor-integration/spec.md)
+- Summary: 提供一套可复制、可审计、可排障的多编辑器接入指南与回归套件，降低 YAML DSL LSP server 在各编辑器生态中的接入成本，并持续验证 editor semantics core 的行为稳定性。
+
+### `yaml-dsl-lsp-project-discovery`
+- Title: yaml-dsl-editor-project-discovery Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-project-discovery/spec.md)
+- Summary: TBD - created by archiving change c999-yaml-dsl-lsp. Update Purpose after archive.
+
+### `yaml-dsl-lsp-semantics-core`
+- Title: yaml-dsl-editor-semantics-core Specification
+- Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-semantics-core/spec.md)
+- Summary: TBD - created by archiving change c50-yaml-dsl-editor-semantics-lsp-core. Update Purpose after archive.
 
 ### `yaml-dsl-lsp-server`
 - Title: yaml-dsl-lsp-server Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-lsp-server/spec.md)
 - Summary: 定义 YAML DSL LSP server 的语义 contract：诊断（diagnostics）与 Python 引用的 definition/hover/completion，并要求 server 侧复用 shared core， 以保证跨编辑器一致、静态无副作用且可诊断降级（不 crash、不退出、不依赖 shell-out CLI）。
-
-### `yaml-dsl-mainline-principles`
-- Title: yaml-dsl-mainline-principles Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-mainline-principles/spec.md)
-- Summary: 定义 YAML DSL 的上位主线原则与设计护栏,用于约束后续变更的方向与评审口径: 单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式(拒绝 imports expansion)。
-
-### `yaml-dsl-micro-tunes`
-- Title: yaml-dsl-micro-tunes Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-micro-tunes/spec.md)
-- Summary: TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
 
 ### `yaml-dsl-observability-boundary`
 - Title: yaml-dsl-observability-boundary Specification
@@ -580,11 +465,6 @@ Sources:
 - Title: yaml-dsl-public-tools Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-public-tools/spec.md)
 - Summary: 为 `YAML DSL` 的下游集成提供稳定“工具/自省”公开入口,避免下游依赖 by_yaml runtime 的内部实现模块路径。
-
-### `yaml-dsl-ref-miss-default-cases`
-- Title: yaml-dsl-ref-miss-default-cases Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-ref-miss-default-cases/spec.md)
-- Summary: TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Purpose after archive.
 
 ### `yaml-dsl-render-effective-yaml`
 - Title: yaml-dsl-render-effective-yaml Specification
@@ -611,11 +491,6 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-unified-loader/spec.md)
 - Summary: TBD - created by archiving change c30-yaml-dsl-rigor-ssot. Update Purpose after archive.
 
-### `yaml-dsl-vscode-extension`
-- Title: yaml-dsl-vscode-extension Specification
-- Source: [spec.md](#code=openspec/specs/yaml-dsl-vscode-extension/spec.md)
-- Summary: 为 VSCode 用户提供 YAML DSL 的默认入口：在扩展侧负责 LSP server provisioning / lifecycle / 诊断输出， 并与 `redhat.vscode-yaml` 协作完成 schema 绑定，从而实现“开箱即用 + 可排障”的编辑体验。 本仓库的扩展源代码固定在 `extras/vscode-scalim/`（不迁移到 `packages/`/`frontend/`；发布/签名策略不影响源码目录位置）。
-
 ### `yaml-dsl-workflow`
 - Title: yaml-dsl-workflow Specification
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-workflow/spec.md)
@@ -636,32 +511,7 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/yaml-dsl-write-policy-and-output-extras/spec.md)
 - Summary: TBD - created by archiving change c14-yaml-dsl-write-policy-and-output-extras. Update Purpose after archive.
 
-### `yaml-field-extract`
-- Title: yaml-field-extract Specification
-- Source: [spec.md](#code=openspec/specs/yaml-field-extract/spec.md)
-- Summary: **状态: ✅ 已实现** 为 YAML DSL 的源字段提供稳定、可维护的字段级取值能力:用 `extract` 从“当前 key 对应的 row value”读取嵌套字段与非字符串 key 字段,以消除仅为拍平/投影而编写 Python wrapper 的必要。
-
-### `yaml-inline-dynamic-params`
-- Title: yaml-inline-dynamic-params Specification
-- Source: [spec.md](#code=openspec/specs/yaml-inline-dynamic-params/spec.md)
-- Summary: **状态: ✅ 已实现** 为 YAML DSL 的 ref loader 参数构造提供“kwargs 模板 + 内联动态节点”的稳定入口:在 `sources.<id>.params` 中用 `$keys/$rows` 指令节点注入运行时上下文,支持任意嵌套位置注入,并保留 rows barrier 与批次内复用语义,以替代 legacy `bind/to_bind` 与 wrapper 方案.
-
-### `yaml-runtime-vars`
-- Title: yaml-runtime-vars Specification
-- Source: [spec.md](#code=openspec/specs/yaml-runtime-vars/spec.md)
-- Summary: **状态: ✅ 已实现** 为 yaml_dsl runtime 提供编译期的运行期变量注入入口: 调用方通过 `runtime_vars` 注入任意 Python 对象,并在 `main_source.params` / `sources.<id>.params` 的 kwargs 模板中用 `{$runtime: <name>}` 指令节点引用,由 adapter 在编译期解析并透传给 loader.
-
-### `yaml-source-normalize`
-- Title: yaml-source-normalize Specification
-- Source: [spec.md](#code=openspec/specs/yaml-source-normalize/spec.md)
-- Summary: TBD - created by archiving change yaml-source-normalize. Update Purpose after archive.
-
-### `yaml-template-vars-precompile`
-- Title: yaml-template-vars-precompile Specification
-- Source: [spec.md](#code=openspec/specs/yaml-template-vars-precompile/spec.md)
-- Summary: TBD - created by archiving change c5-yaml-template-vars-precompile. Update Purpose after archive.
-
-### `yaml-template-vars-sandbox`
-- Title: yaml-template-vars-sandbox Specification
-- Source: [spec.md](#code=openspec/specs/yaml-template-vars-sandbox/spec.md)
-- Summary: TBD - created by archiving change c20-yaml-template-vars-sandbox. Update Purpose after archive.
+### `yaml-template-vars`
+- Title: yaml-template-vars Specification
+- Source: [spec.md](#code=openspec/specs/yaml-template-vars/spec.md)
+- Summary: 定义 YAML 模板变量预编译能力：在 YAML parse 前通过 LiteJinja2 渲染 `{{ x }}`/`{% ... %}` 占位符，并提供安全的 sandbox 策略与输入护栏。

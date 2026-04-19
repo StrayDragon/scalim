@@ -40,7 +40,7 @@
 - 2026-03-13: derived-outputs-set-aggregations
   - SSOT: `references/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
-  - Spec: `openspec/specs/derived-outputs/spec.md`
+  - Spec: `openspec/specs/execution-derived-outputs/spec.md`
 - 2026-03-13: yaml-dsl-outputs
   - SSOT: `references/upgrades/2026-03-13-yaml-dsl-outputs.md`
   - OpenSpec: `openspec/changes/archive/2026-03-13-yaml-dsl-outputs/`

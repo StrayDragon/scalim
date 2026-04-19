@@ -18,7 +18,7 @@ OpenSpec 归档变更（含 proposal/design/spec/tasks）:
 
 对应主规范(节选):
 - `openspec/specs/demand-dsl/spec.md`
-- `openspec/specs/source-relations/spec.md`
+- `openspec/specs/ir-source-relations/spec.md`
 - `openspec/specs/yaml-dsl-schema/spec.md`
 
 ## 破坏性变更(Breaking)

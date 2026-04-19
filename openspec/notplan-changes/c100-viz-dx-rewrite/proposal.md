@@ -342,8 +342,8 @@ Webview UI 建议结构:
 
 后续实现可能需要扩展/新增以下 SSOT:
 
-- 现有: `openspec/specs/flow-visualization/spec.md`
-- 现有: `openspec/specs/observer-concurrency-contract/spec.md`
+- 现有: `openspec/specs/observability-flow-visualization/spec.md`
+- 现有: `openspec/specs/observability-observer-concurrency/spec.md`
 - 建议新增: `openspec/specs/viz-protocol/spec.md`
 - 相关: `openspec/specs/yaml-dsl-observability-boundary/spec.md` (运行时 knobs 的边界)
 
