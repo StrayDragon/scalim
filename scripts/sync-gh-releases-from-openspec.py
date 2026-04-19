@@ -392,6 +392,46 @@ def _example_priority(change_id: str, proposal_text: str) -> int:
 _CALL_BY_TOKEN_RE = re.compile(r"`call_by:\s*\"([^\"]+)\"`")
 
 
+def _extract_yaml_code_blocks(proposal_text: str) -> List[List[str]]:
+    lines = proposal_text.splitlines()
+    blocks: List[List[str]] = []
+    in_block = False
+    is_yaml = False
+    current: List[str] = []
+
+    fence_re = re.compile(r"^```(?:\s*([a-zA-Z0-9_-]+))?\s*$")
+    for raw in lines:
+        line = raw.rstrip("\n")
+        if not in_block:
+            match = fence_re.match(line.strip())
+            if not match:
+                continue
+            lang = (match.group(1) or "").strip().lower()
+            in_block = True
+            is_yaml = lang in ("yaml", "yml")
+            current = []
+            continue
+
+        if line.strip().startswith("```"):
+            if is_yaml:
+                # 去掉首尾空行，保持 snippet 更紧凑。
+                while current and not current[0].strip():
+                    current.pop(0)
+                while current and not current[-1].strip():
+                    current.pop()
+                if current:
+                    blocks.append(list(current))
+            in_block = False
+            is_yaml = False
+            current = []
+            continue
+
+        if is_yaml:
+            current.append(line)
+
+    return blocks
+
+
 def _render_workflow_demand_path_example(proposal_text: str) -> Optional[List[str]]:
     # 目标：当变更涉及工作流 `YAML` 的 `workflow.runs[*].demand`（例如 `LSP` `definition` 跳转支持）时，
     # 提供一个最小的“`demand` 路径写法”示例，并明确这是语义示意（避免被当成可直接运行配置）。
@@ -488,6 +528,22 @@ def _render_call_by_upgrade_example(proposal_text: str) -> Optional[List[str]]:
 
 
 def _render_example_snippet_for_change(change: _Change) -> Optional[List[str]]:
+    # 优先：若提案正文自带 YAML 片段，则直接复用（更贴题、更“像人写的说明”）。
+    # 约束：尽量把代码块控制在 10–20 行内（包含我们追加的 1 行“语义示意”注释）。
+    if change.is_yaml:
+        yaml_blocks = _extract_yaml_code_blocks(change.proposal_text)
+        if yaml_blocks:
+            # 选择最适合 release notes 的块：优先 9–19 行（加 1 行注释后变成 10–20）。
+            scored_blocks: List[Tuple[int, int, int, List[str]]] = []
+            for idx, block in enumerate(yaml_blocks):
+                n = len(block)
+                in_range = 1 if 9 <= n <= 19 else 0
+                # 更短更易读；同分时用出现顺序保证稳定。
+                scored_blocks.append((in_range, -n, -idx, block))
+            best = max(scored_blocks)[-1]
+            if 1 <= len(best) <= 19:
+                return ["# 示例为提案语义示意（不保证可直接运行）", *best]
+
     # 优先：从提案正文里直接提炼（避免纯模板“看起来像对但不贴题”）。
     workflow_runtime = _render_workflow_runtime_options_migration_example(change.proposal_text)
     if workflow_runtime:
@@ -504,6 +560,19 @@ def _render_example_snippet_for_change(change: _Change) -> Optional[List[str]]:
 
 def _render_example_snippet(change_id: str, priority: int) -> Optional[List[str]]:
     cid = change_id.lower()
+    if "schema-merge-key" in cid or "merge-key" in cid or "merge_key" in cid:
+        return [
+            "# 示例为提案语义示意（不保证可直接运行）",
+            "# 重点：fields mapping 支持 YAML merge key `<<`（编辑器 schema 校验不再报错）",
+            "common_fields: &common_fields",
+            "  user_id: {extract: id}",
+            "  name: {extract: profile.name}",
+            "main_source:",
+            "  fields:",
+            "    <<: *common_fields",
+            "    age: {extract: profile.age}",
+            "outputs: []",
+        ]
     if "versioned-outputs" in cid or "versioned_outputs" in cid:
         return [
             "# 示例为提案语义示意（不保证可直接运行）",
@@ -1090,6 +1159,30 @@ def _extract_breaking_instructions(proposal_text: str, change_id: str) -> List[s
                 instructions.append("把 `workflow.runs[*].write_to` 改为 `workflow.runs[*].writes`。")
                 continue
             instructions.append("workflow YAML：把 `write_to` 改为 `writes`（旧写法会 fail-fast）。")
+            continue
+
+        # === “默认值变更/必填约束”这类高频 upgrade 点 ===
+        # 1) “默认值从 old -> new”：用户要做的动作通常是“显式写回 old（若要保持旧行为）”。
+        match = re.search(
+            r"`([^`]+)`[^`]*默认值(?:从|由)\s*`([^`]+)`\s*(?:调整为|改为|变为|更新为|切换为)\s*`([^`]+)`",
+            cleaned,
+        )
+        if match:
+            key, old, new = match.group(1).strip(), match.group(2).strip(), match.group(3).strip()
+            # 保守：只在看起来像 authoring surface 的键路径时输出迁移指令。
+            if "." in key or _tok_is_surface(key):
+                instructions.append("依赖旧默认 `{}` 的配置：显式写 `{}: {}`（新默认 `{}`）。".format(old, key, old, new))
+                continue
+
+        # 2) “改为必填/required”：直接告诉用户“必须显式填写”。
+        match = re.search(r"`([^`]+)`[^`]*(?:改为|变为|调整为)[^\\n]*必填", cleaned)
+        if match:
+            key = match.group(1).strip()
+            # 若文本里给了具体上下文（例如某个 preset），尽量带上，避免用户对不上号。
+            if "WorkflowCachePoolPreloadForeverShared" in cleaned:
+                instructions.append("bounded preset：为 `WorkflowCachePoolPreloadForeverShared` 显式填写 `max_entries`（默认值已移除）。")
+            else:
+                instructions.append("为 `{}` 显式填写配置值（现在必填；默认值已移除）。".format(key))
             continue
 
         # 重命名：`old` -> `new`
