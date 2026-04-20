@@ -71,6 +71,13 @@ class ScalimEngine:
             `pipeline_overrides`: 可选的 `pipeline` 扩展点覆盖对象
             `guardrails`: 可选的防护策略
             `loader_retry`: 可选的加载重试策略
+            `preloaded_cache`: 可选:预加载缓存容器(用于 `preload_forever`).
+                - 单次 `run` 可用普通 `dict`.
+                - 若要跨多个并发 `runs` 共享缓存,不要共享普通 `dict`;推荐使用 `PreloadCache`(线程安全)或每次 `run` 使用独立 `cache`.
+
+        注意:
+            - `Hook`/`Observer` 的注册应在 `run` 前完成;一次 `run` 期间动态 `register`/`unregister`
+              属于不受支持用法(在 `adaptive` 并发下为快照语义,可能不会影响并发任务的捕获/回放).
         """
         self.demand = demand
         self.plan = plan

@@ -1,4 +1,5 @@
 from concurrent.futures import Future
+import warnings
 from typing import List, Tuple, cast
 
 import pytest
@@ -24,6 +25,21 @@ from tests.support.testing_utils import InlineExecutor, NoOpLoadRefExecutor, Rec
 def test_resolve_adaptive_max_workers_auto_uses_cpu_count() -> None:
     assert loadref_scheduler.resolve_adaptive_max_workers(0, cpu_count_fn=lambda: None) == 5
     assert loadref_scheduler.resolve_adaptive_max_workers(3) == 3
+
+
+def test_resolve_adaptive_max_workers_explicit_cap_emits_warning() -> None:
+    with pytest.warns(
+        UserWarning,
+        match=r"`adaptive` 模式 `max_workers` 被护栏裁剪: 请求=1000 解析=32 上限=32 `cpu_count`=4",
+    ):
+        assert loadref_scheduler.resolve_adaptive_max_workers(1000, cpu_count_fn=lambda: 4) == 32
+
+
+def test_resolve_adaptive_max_workers_explicit_below_cap_no_warning() -> None:
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        assert loadref_scheduler.resolve_adaptive_max_workers(10, cpu_count_fn=lambda: 4) == 10
+    assert recorded == []
 
 
 def test_build_layers_splits_layers_and_falls_back_on_cycle() -> None:

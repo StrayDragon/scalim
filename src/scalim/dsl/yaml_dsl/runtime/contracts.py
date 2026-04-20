@@ -541,7 +541,12 @@ class DemandRunRuntimeOptions:
     """并行模式(`seq` 或 `adaptive`)."""
 
     max_workers: int = 0
-    """最大并发工作数提示(`0` 表示自动)."""
+    """最大并发工作数提示(`0` 表示自动).
+
+    注意:
+    - 在 `parallel_mode="adaptive"` 下,显式 `max_workers > 0` 会被 `guardrails` 施加 `hard cap`,
+      且当发生裁剪时会发出 `warning`(避免外部输入不受控放大并发).
+    """
 
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""

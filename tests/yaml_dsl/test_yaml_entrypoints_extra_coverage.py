@@ -182,3 +182,18 @@ def test_workflow_run_options_contract_validation_and_normalization_cover_branch
     normalized = WorkflowRunOptions(demand=demand, workflow_components=[object()])  # type: ignore[arg-type] contract normalization boundary
     assert isinstance(normalized.workflow_components, tuple)
     assert len(normalized.workflow_components) == 1
+
+
+def test_apply_workflow_node_patch_parallelism_warns_on_extreme_max_workers() -> None:
+    from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions
+    from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch
+    from scalim.dsl.yaml_dsl import workflow_entrypoints as workflow_entrypoints_mod
+
+    base = DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"])))
+    patch = WorkflowNodePatch(
+        parallel_mode="adaptive",
+        max_workers=workflow_entrypoints_mod._ADAPTIVE_MAX_WORKERS_HARD_CAP + 1,  # noqa: SLF001
+    )
+
+    with pytest.warns(UserWarning, match=r"extremely large"):
+        _ = workflow_entrypoints_mod._apply_workflow_node_patch_parallelism(base, patch)  # noqa: SLF001

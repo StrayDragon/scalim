@@ -5,6 +5,7 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
+import warnings
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..sinks import ISink
@@ -25,6 +26,9 @@ if TYPE_CHECKING:
     from .loader_retry import LoaderRetryPolicies
     from .output_composition import OutputCompositionSpec, OutputTargetStats
     from .runtime_bindings import RuntimeBindings
+
+
+_ADAPTIVE_MAX_WORKERS_HARD_CAP = 256
 
 
 @dataclass(frozen=True)
@@ -78,6 +82,15 @@ def _validate_execution_request_max_workers(max_workers: int) -> None:
     if int(max_workers) < 0:
         msg = "ExecutionRequest.max_workers must be >= 0"
         raise ValueError(msg)
+    if int(max_workers) > _ADAPTIVE_MAX_WORKERS_HARD_CAP:
+        msg = "".join(
+            [
+                f"ExecutionRequest.max_workers is extremely large ({int(max_workers)}). ",
+                "adaptive guardrails will cap it at runtime; ",
+                "prefer smaller values and treat external inputs as untrusted.",
+            ]
+        )
+        warnings.warn(msg, stacklevel=2)
 
 
 def _validate_execution_request_parallel_mode(parallel_mode: object) -> None:
@@ -122,7 +135,12 @@ class ExecutionRequest:
     """并行模式(`seq` 或 `adaptive`)."""
 
     max_workers: int = 0
-    """最大并发工作数提示(`0` 表示自动)."""
+    """最大并发工作数提示(`0` 表示自动).
+
+    注意:
+    - 在 `parallel_mode="adaptive"` 下,显式 `max_workers > 0` 会被 `guardrails` 施加 `hard cap`,
+      且当发生裁剪时会发出 `warning`(避免外部输入不受控放大并发).
+    """
 
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性;默认 `raw`)."""

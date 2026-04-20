@@ -98,6 +98,7 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
                 pool_name,
                 resolved_max_workers=resolved,
             ),
+            timeout_seconds=self._require_tuning().task_timeout_s,
         )
         return results_by_key, layer_stats
 

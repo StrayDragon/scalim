@@ -18,6 +18,10 @@ class HookCaptureManager(HookManager):
 
     该管理器会记录类型化的 `hook` 负载,但不会调用用户 `hook`.
     `hook.on_event(Event)` 会通过 `ObserverManager` 的捕获模式被记录,并在提交时回放.
+
+    线程安全/生命周期约束:
+    - 订阅发现基于 `source.hooks` 的快照;在一次 `run` 期间动态 `register/unregister hooks`
+      属于不受支持用法(尤其在 `parallel_mode="adaptive"` 下,并发任务会各自创建捕获管理器).
     """
 
     _recorded_events: List[HookRecordedEvent]

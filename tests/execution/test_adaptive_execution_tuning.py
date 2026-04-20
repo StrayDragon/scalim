@@ -136,6 +136,17 @@ def test_adaptive_tuning_validation_covers_additional_error_branches() -> None:
     assert tuning.resolve_pool_limit("unknown", resolved_max_workers=3) == 3
 
 
+def test_adaptive_tuning_validation_rejects_invalid_task_timeout() -> None:
+    with pytest.raises(TypeError, match=r"task_timeout_s must be a float"):
+        AdaptiveTuning(task_timeout_s=True).validate()  # type: ignore[arg-type] contract boundary
+
+    with pytest.raises(ValueError, match=r"task_timeout_s must be finite"):
+        AdaptiveTuning(task_timeout_s=float("inf")).validate()
+
+    with pytest.raises(ValueError, match=r"task_timeout_s must be >= 0"):
+        AdaptiveTuning(task_timeout_s=-0.1).validate()
+
+
 def test_adaptive_policy_decisions_and_pool_selection() -> None:
     policy = AdaptivePolicy()
     plan = ExecutionPlan()

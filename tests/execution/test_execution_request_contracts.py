@@ -66,3 +66,8 @@ def test_execution_request_accepts_valid_sink_and_none_batch_size() -> None:
     )
     assert req.sink is sink
     assert req.batch_size is None
+
+
+def test_execution_request_warns_on_extreme_max_workers() -> None:
+    with pytest.warns(UserWarning, match=r"extremely large"):
+        _ = ExecutionRequest(export_layout=ExportLayout(field_ids=("id",)), max_workers=257)

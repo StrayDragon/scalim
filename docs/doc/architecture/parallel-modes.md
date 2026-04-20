@@ -180,6 +180,20 @@ sequenceDiagram
 - 任务内仍是串行执行 `LoadRef`(只是多个 relation 并发跑)
 - 提交点会把 overlay 归并回主上下文,并把捕获的事件集中回放
 
+#### 2.4.1 事件回放顺序(typed hooks vs observer/on_event)
+
+`adaptive` 下事件不是“边跑边发”,而是**捕获后在提交点回放**. 当前实现的回放顺序是:
+
+- 对每个 task: 先回放 typed hook 事件(`HookManager.emit_typed`),再回放 observer/on_event 事件
+- tasks 的提交顺序按算子顺序推进(同一 relation 去重后只提交一次)
+
+这意味着:
+
+- 与 `seq` 模式的逐事件 interleaving 语义不完全一致
+- 对 streaming sink/实时展示,可能出现“结果已写出,对应的部分事件稍后才出现”的观感差异
+
+如果你依赖严格的事件顺序(例如把事件流当作写出驱动),优先使用 `seq` 或把副作用放到更明确的边界事件里处理.
+
 ### 2.5 barrier: 遇到 `bind.use_rows` 会强制串行
 
 调度器会把 `bind.use_rows` 视为层级屏障(barrier),直接把这一层按串行执行:
@@ -214,6 +228,45 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
 
 - `0`/负数: 自动,按 CPU 等信息解析出上限,并保证 `>= 1`
 - 解析后 `<= 1`: 不会创建池,`adaptive` 会退化成 `seq` 行为(仍走同一条串行路径)
+- 显式 `max_workers > 0` 会被 guardrails 施加 hard cap(DoS hardening),避免外部输入放大并发:
+    - `cap = min(256, max(32, cpu_count * 5))`
+    - `resolved = min(requested, cap)`
+    - 当发生裁剪时会发出 warning,包含 `requested/resolved/cap/cpu`
+
+建议: 不要把未校验的外部输入(例如 HTTP 参数/配置文件)直接映射到 `max_workers`;先做 allowlist/上限收敛.
+
+### 3.4 可选 timeout: 卡死场景的 fail-fast 诊断
+
+`adaptive` 支持一个可选的“任务等待 timeout”(默认关闭),用于在 loader/用户代码卡住时 fail-fast 并给出定位信息.
+
+启用方式(仅 Python/IR 注入面):
+
+- `PipelineOverrides(adaptive_tuning=AdaptiveTuning(task_timeout_s=...))`
+- `task_timeout_s <= 0` 表示关闭(默认)
+
+当触发 timeout 时:
+
+- 抛出 `ScalimAdaptiveTaskTimeoutError`
+- 异常信息会包含 pending 的 task keys/字段标识等诊断线索
+
+重要限制:
+
+- Python 线程无法安全强杀;timeout 只能 fail-fast 返回,后台线程可能继续运行一段时间.
+- 如果你需要“硬超时/强隔离”,建议将不受信任的 loader/用户代码放到子进程中执行.
+
+### 3.5 并发使用约束(线程安全)
+
+#### 3.5.1 `preloaded_cache` 不要跨并发 runs 共享普通 `dict`
+
+`preloaded_cache` 用于缓存 `preload_forever` 的 loader 结果:
+
+- 单次 `run` 内使用普通 `dict` 没问题
+- 若要跨多个并发 `runs` 共享缓存,不要共享普通 `dict`(非线程安全);推荐使用 `PreloadCache`(线程安全)或每次 `run` 使用独立 cache
+
+#### 3.5.2 hooks 注册生命周期: 不要在一次 run 期间动态注册/卸载
+
+`adaptive` 会为并发任务创建捕获管理器,订阅发现基于 `HookManager.hooks` 的快照语义.
+因此在一次 `run` 期间动态 `register/unregister hooks` 属于不受支持用法,可能不会影响并发任务的捕获/回放.
 
 ## 4. 深度调参(需要 Python/IR 注入)
 

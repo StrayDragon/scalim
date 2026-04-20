@@ -1,5 +1,6 @@
 # region imports
 
+import math
 from typing import Dict
 
 from ...vendor.dataclassesx import dataclass, field
@@ -36,10 +37,15 @@ class AdaptiveTuning:
     # 若 >0,则当任一任务的首步查找键数量低于该阈值时,按串行执行.
     min_lookup_keys_per_task: int = 0
 
+    # 若 >0,则当某一层的任务在等待完成时超过该阈值,将快速失败(`fail-fast`)并抛出可诊断的异常.
+    # 默认关闭(<=0).
+    task_timeout_s: float = 0.0
+
     def validate(self) -> None:
         self._validate_pools()
         self._validate_source_pools()
         self._validate_thresholds()
+        self._validate_task_timeout()
 
     def _validate_pools(self) -> None:
         for pool_name, limit in self.pools.items():
@@ -71,6 +77,19 @@ class AdaptiveTuning:
             raise ValueError(msg)
         if int(self.min_lookup_keys_per_task) < 0:
             msg = "AdaptiveTuning.min_lookup_keys_per_task must be >= 0"
+            raise ValueError(msg)
+
+    def _validate_task_timeout(self) -> None:
+        raw = self.task_timeout_s
+        if isinstance(raw, bool):
+            msg = "AdaptiveTuning.task_timeout_s must be a float seconds value"
+            raise TypeError(msg)
+        value = float(raw)
+        if not math.isfinite(value):
+            msg = "AdaptiveTuning.task_timeout_s must be finite"
+            raise ValueError(msg)
+        if value < 0:
+            msg = "AdaptiveTuning.task_timeout_s must be >= 0"
             raise ValueError(msg)
 
     def pool_for_source(self, source_id: str) -> str:

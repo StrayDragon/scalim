@@ -9,6 +9,7 @@
 # pragma: allow-c901-file plan: c10
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, cast
 
 from ...execution.run_ir import ExecutionRequest, ExecutionResult
@@ -55,6 +56,8 @@ _WORKFLOW_BUNDLE_VIZ_REQUIRES_OVERRIDES_MSG = (
 )
 
 _policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.workflow.policy")
+
+_ADAPTIVE_MAX_WORKERS_HARD_CAP = 256
 
 
 def _merge_book_budget_overrides(
@@ -348,6 +351,16 @@ def _apply_workflow_node_patch_parallelism(base: DemandRunOptions, patch: Workfl
         if int(max_workers) < 0:
             msg = "WorkflowNodePatch.max_workers must satisfy max_workers>=0 (0=auto)"
             raise ValueError(msg)
+        effective_parallel_mode = next_options.runtime.parallel_mode
+        if effective_parallel_mode == "adaptive" and int(max_workers) > _ADAPTIVE_MAX_WORKERS_HARD_CAP:
+            msg = "".join(
+                [
+                    f"WorkflowNodePatch.max_workers is extremely large ({int(max_workers)}). ",
+                    "adaptive guardrails will cap it at runtime; ",
+                    "prefer smaller values and treat external inputs as untrusted.",
+                ]
+            )
+            warnings.warn(msg, stacklevel=2)
         next_options = replace(next_options, runtime=replace(next_options.runtime, max_workers=int(max_workers)))
 
     return next_options

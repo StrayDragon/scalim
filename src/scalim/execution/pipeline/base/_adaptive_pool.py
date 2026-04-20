@@ -1,6 +1,7 @@
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import ExitStack
-from typing import Optional
+from types import TracebackType
+from typing import Optional, Type
 
 from ....planning.plan import ExecutionPlan
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
@@ -43,7 +44,22 @@ def maybe_create_adaptive_pool(
         msg = "Invalid adaptive backend '{}'".format(backend)
         raise ValueError(msg)
 
-    return stack.enter_context(executor_cls(max_workers=resolved_workers))
+    executor = executor_cls(max_workers=resolved_workers)
+
+    def _shutdown_executor(
+        exc_type: Optional[Type[BaseException]],
+        _exc: Optional[BaseException],
+        _tb: Optional[TracebackType],
+    ) -> bool:
+        # 说明:
+        # - 正常路径: `wait=True` 保障线程池资源收敛.
+        # - 异常路径: `wait=False` 避免在“卡死任务”场景下 `shutdown(wait=True)` 无限等待.
+        #   注意: `Python` 线程无法安全强杀,因此 `wait=False` 仅用于快速失败(`fail-fast`);后台线程可能继续运行一段时间.
+        executor.shutdown(wait=exc_type is None)
+        return False
+
+    _ = stack.push(_shutdown_executor)
+    return executor
 
 
 __all__ = ()

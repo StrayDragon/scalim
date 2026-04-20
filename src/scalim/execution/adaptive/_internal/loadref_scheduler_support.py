@@ -1,4 +1,5 @@
 import os
+import warnings
 from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
 
 from ....events import Event
@@ -9,10 +10,24 @@ from ..capture import HookRecordedEvent
 
 
 def resolve_adaptive_max_workers(max_workers: int, cpu_count_fn: Optional[Callable[[], Optional[int]]] = None) -> int:
-    if max_workers and max_workers > 0:
-        return max(1, int(max_workers))
     resolver = cpu_count_fn or os.cpu_count
     cpu = resolver() or 1
+
+    if max_workers and max_workers > 0:
+        requested = max(1, int(max_workers))
+        hard_cap = min(256, max(32, int(cpu) * 5))
+        resolved = min(requested, hard_cap)
+        if resolved < requested:
+            warnings.warn(
+                "`adaptive` 模式 `max_workers` 被护栏裁剪: 请求={} 解析={} 上限={} `cpu_count`={}".format(
+                    requested,
+                    resolved,
+                    hard_cap,
+                    cpu,
+                ),
+                stacklevel=2,
+            )
+        return resolved
     return max(1, min(32, cpu + 4))
 
 
