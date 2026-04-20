@@ -3,7 +3,7 @@
 
 目的:
 - 方便在编辑器/语言服务器中快速跳转到公共接口符号定义(无需在项目里手写大量 `import`)。
-- 生成物也可直接执行,用于对 Tier 1 public API 做 import smoke（`python .tmp/public_api_jump_imports.py`）。
+- 生成物也可直接执行,用于对 `Tier 1 public API` 做 `import smoke`（`python .tmp/public_api_jump_imports.py`）。
 - 生成物放在 `.tmp/`，不提交，也不影响 `basedpyright` 门禁。
 
 单一事实来源:

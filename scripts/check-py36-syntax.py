@@ -7,7 +7,7 @@
 - 保持与运行时目标(`Python 3.6`)一致的语法门槛
 
 可选:
-- `--public-api-import-smoke`: 基于自动生成的 `.tmp/public_api_jump_imports.py` 对 Tier 1 public API 做 import smoke,
+- `--public-api-import-smoke`: 基于自动生成的 `.tmp/public_api_jump_imports.py` 对 `Tier 1 public API` 做 `import smoke`,
   并额外验证生成物本身也符合 `Python 3.6` 语法；生成物缺失时会自动生成。
 
 注意:
@@ -71,7 +71,7 @@ def _run_public_api_import_smoke(repo_root: Path, jump_imports_path: Path) -> No
         ast.parse(jump_text, filename=str(jump_imports_path), feature_version=(3, 6))
     except SyntaxError as exc:
         raise RuntimeError(
-            "生成物语法不兼容 Python 3.6: {}:{}: {}".format(
+            "生成物语法不兼容 `Python 3.6`: {}:{}: {}".format(
                 jump_imports_path,
                 getattr(exc, "lineno", "?"),
                 getattr(exc, "msg", str(exc)),
@@ -84,11 +84,11 @@ def _run_public_api_import_smoke(repo_root: Path, jump_imports_path: Path) -> No
         sys.modules.pop("public_api_jump_imports", None)
         jump_mod = importlib.import_module("public_api_jump_imports")
     except BaseException as exc:
-        raise RuntimeError("导入失败: public_api_jump_imports (path={})".format(jump_imports_path)) from exc
+        raise RuntimeError("导入失败: `public_api_jump_imports` (路径={})".format(jump_imports_path)) from exc
 
     run_all = getattr(jump_mod, "run_all", None)
     if run_all is None or not callable(run_all):
-        raise RuntimeError("生成物缺少可调用的 `run_all()` (path={})".format(jump_imports_path))
+        raise RuntimeError("生成物缺少可调用的 `run_all()` (路径={})".format(jump_imports_path))
 
     run_all()
 
@@ -129,9 +129,9 @@ def main() -> int:
             )
             _run_public_api_import_smoke(repo_root, jump_imports_path)
         except BaseException as exc:
-            print("[错误] Tier 1 public API import smoke 失败: {}".format(exc), file=sys.stderr)
+            print("[错误] `Tier 1 public API` 的 `import smoke` 失败: {}".format(exc), file=sys.stderr)
             return 1
-        print("通过: Tier 1 public API import smoke (`{}`)".format(jump_imports_path))
+        print("通过: `Tier 1 public API` 的 `import smoke` (`{}`)".format(jump_imports_path))
 
     print("通过: `src/scalim/` `Python 3.6` 语法兼容性检查通过 ({} 个文件)".format(len(py_files)))
     return 0

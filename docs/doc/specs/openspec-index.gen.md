@@ -24,7 +24,7 @@ Sources:
 ### `examples-marimo`
 - Title: marimo-examples Specification
 - Source: [spec.md](#code=openspec/specs/examples-marimo/spec.md)
-- Summary: **状态: ✅ 已实现** 定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。
+- Summary: 定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。
 
 ### `execution-concurrency-safety`
 - Title: no-external-callback-under-lock Specification
@@ -345,6 +345,11 @@ Sources:
 - Title: workflow-stage-scheduling Specification
 - Source: [spec.md](#code=openspec/specs/workflow-stage-scheduling/spec.md)
 - Summary: **状态: ✅ 已实现** 为 workflow DAG 提供可配置的调度 preset，使调用方可以在保持默认 pipeline 行为不变的前提下，选择严格的 stage barrier（阶段屏障）调度，以提升可预期性、资源规划与可解释性。
+
+### `workflow-stage-scheduling-residual-risks`
+- Title: workflow-stage-scheduling-residual-risks Specification
+- Source: [spec.md](#code=openspec/specs/workflow-stage-scheduling-residual-risks/spec.md)
+- Summary: 将 `workflow stage scheduling`（`pipeline` / `stage_barrier`）相关的“残留风险”收敛为稳定、可检索、可复核的 risk register，并明确在后续迭代/验收中必须检查的边界与可观测性约束。 本 spec 不引入新的 runtime 行为；其目标是把“真实项目里可能遇到的解释偏差、下游消费破坏或性能印象落差”显式化，作为后续变更的 checklist。
 
 ### `workflow-versioned-outputs`
 - Title: workflow-versioned-outputs Specification
