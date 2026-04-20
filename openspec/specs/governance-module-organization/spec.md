@@ -2,107 +2,77 @@
 
 **状态: ✅ 已实现**
 ## Purpose
-定义 `src/IMPL_ROOT/` 的模块边界、入口最小化与兼容约束,避免将内部实现路径误用为公共 API,并保持 Python 3.6 运行时可用性.
+定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性.
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/`
-- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/`
-- `src/IMPL_ROOT/execution/`
-- `src/IMPL_ROOT/planning/`
-- `src/IMPL_ROOT/vendor/README.md`
-- `src/IMPL_ROOT/vendor/compact/typing_extensionsx.py`
+## Related Concepts
+- 模块边界控制 (公共入口 vs 内部实现)
+- Facade 模块与显式导出白名单
+- 子包化组织 (yaml_dsl、execution、planning)
+- 层级依赖约束 (planning → execution → workflow → dsl)
+- 热点模块治理与职责拆分
+- Python 3.6 typing 兼容层
+
 ## Requirements
 ### Requirement: internal implementation paths MUST remain non-contract
 
-系统 MUST 将“可导入”与“可承诺”为两个不同层级：
-
-- 稳定公开入口由显式白名单定义
-- 其余实现路径即使暂时可导入,也 MUST 视为内部实现细节
-
-系统 MUST 不允许测试、示例、skills 或文档把内部实现路径反向固化为事实上的公共 API。
+系统 MUST 将"可导入"与"可承诺"分为两个层级：稳定公开入口由显式白名单定义,其余实现路径即使可导入也 MUST 视为内部实现细节.
 
 #### Scenario: implementation paths are not promoted to public contract
-- **WHEN** 某个内部实现模块仍然可以被 import
+- **WHEN** 某个内部实现模块可以被 import
 - **THEN** 系统 MUST NOT 因此自动将其视为稳定公开入口
 - **AND** 面向用户的回归门禁 MUST 仍以显式公共白名单为准
 
-### Requirement: curated facade modules MUST use explicit export whitelists
+### Requirement: facade modules MUST use explicit export whitelists
 
-系统 MUST 要求被认定为稳定公开入口的 facade 模块使用显式 `__all__` 或等价白名单控制导出面，避免内部符号随着重构被无意带出。
+稳定公开入口的 facade 模块 MUST 使用显式 `__all__` 或等价白名单控制导出面,避免内部符号随重构被无意带出.
 
 #### Scenario: facade export growth is deliberate
 - **WHEN** 维护者调整某个稳定 facade 模块中的导出符号
 - **THEN** 变更 MUST 通过显式白名单体现
 - **AND** 公共表面 gate MUST 能对新增或删除导出做出确定性回归提示
 
-### Requirement: yaml_dsl 解析与 runtime 模块保持子包化
-系统 MUST 保持 yaml_dsl 的解析与 runtime 为显式子包结构:
-- `_internal.config_parsing` 采用 package 形态,并保留 `loader.py`/`validator.py` 作为稳定入口;
-- 解析与校验实现应放在 `parsers/` 与 `validators/` 子包;
-- `runtime` 采用子模块组织(如 `entrypoints.py`、`contracts.py`、`introspection.py`),并通过 `IMPL_ROOT.dsl.yaml_dsl.runtime` 提供稳定入口.
+### Requirement: yaml_dsl MUST maintain subpackage structure
+
+yaml_dsl 的解析与 runtime MUST 保持显式子包结构：`_internal.config_parsing` 采用 package 形式,保留 `loader.py`/`validator.py` 作为稳定入口；`runtime` 采用子模块组织并通过稳定入口提供访问.
 
 #### Scenario: yaml_dsl 入口可稳定导入
-- **WHEN** 导入 `IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.loader`、`IMPL_ROOT.dsl.yaml_dsl._internal.config_parsing.validator`、`IMPL_ROOT.dsl.yaml_dsl.runtime`
+- **WHEN** 导入 yaml_dsl 的 loader、validator、runtime 入口
 - **THEN** 导入 MUST 成功且行为与现有实现一致
 
-### Requirement: execution/planning 实现按子模块拆分且入口最小化
-系统 MUST 将复杂实现放入显式子模块,`__init__.py` 仅允许最小 glue,不得承载大型实现.
+### Requirement: execution/planning MUST minimize __init__.py surface
 
-系统 MUST 限制 `__init__.py` 的 re-export 行为:
-
-- 对于 **内部实现子包**(至少包括 `execution/pipeline`、`execution/executor` 及其子包,以及 `planning` 的内部子包),`__init__.py` MUST NOT 通过 re-export 暴露实现符号;若定义 `__all__` 则 MUST 为空.
-- 对于 **领域 facade 包根**(`IMPL_ROOT.execution` 与 `IMPL_ROOT.planning`),系统 MAY 提供少量且明确的稳定符号 re-export,用于形成可维护的官方入口.该 re-export MUST 满足:
-  - MUST 使用显式 `__all__` 白名单(禁止 `import *`).
-  - MUST 仅导出小集合稳定符号(避免把包根变成杂货铺).
-  - MUST NOT 引入可选依赖要求或明显的导入副作用.
-  - MUST NOT 造成层级反转或循环依赖(例如 `planning -> execution`).
+复杂实现 MUST 放入显式子模块,`__init__.py` 仅允许最小 glue.对于内部实现子包,`__init__.py` MUST NOT 通过 re-export 暴露实现符号；对于领域 facade 包根,MAY 提供少量稳定符号 re-export 但 MUST 使用显式 `__all__` 且避免层级反转.
 
 #### Scenario: 子包入口不承载核心实现
-- **WHEN** 审阅 `src/IMPL_ROOT/execution/**/__init__.py` 与 `src/IMPL_ROOT/planning/**/__init__.py`
+- **WHEN** 审阅 execution/planning 的子包 `__init__.py`
 - **THEN** 文件中 MUST NOT 包含核心执行/规划算法实现
+- **AND** 内部实现子包 MUST NOT 通过 re-export 暴露实现符号
 
-#### Scenario: 内部实现子包不通过 __init__ 暴露实现符号
-- **WHEN** 审阅 `src/IMPL_ROOT/execution/pipeline/**/__init__.py` 与 `src/IMPL_ROOT/execution/executor/**/__init__.py`
-- **THEN** 这些 `__init__.py` MUST NOT 通过 re-export 暴露实现符号
-- **AND** 若存在 `__all__` 定义,其 MUST 为空
+### Requirement: cross-cutting helpers MUST have single SSOT implementation
 
-### Requirement: cross-cutting internal helpers MUST have a single SSOT implementation without layer inversion
-
-当同一类“基础设施级”逻辑被多个领域模块复用（例如 execution/workflow 都需要的异常 clone、线程等待诊断、路径处理等）时，系统 MUST 避免复制粘贴式的重复实现，并满足：
-
-- 系统 MUST 将该逻辑抽取到单一 SSOT 内部 util 模块（例如 `_internal/utils/`），作为权威实现
-- 该 util 模块 MUST 保持低耦合（不得依赖更高层领域模块），避免形成层级反转或循环依赖
-- 测试口径 MUST 覆盖该 SSOT util，而不是只覆盖某个领域模块的副本
+当"基础设施级"逻辑被多个领域模块复用时,系统 MUST 避免重复实现：MUST 将该逻辑抽取到单一 SSOT 内部 util 模块,该 util 模块 MUST 保持低耦合避免层级反转,测试口径 MUST 覆盖该 SSOT util.
 
 #### Scenario: exception clone helper is centralized
-- **GIVEN** workflow 与 execution 两条路径都需要“跨线程传播异常”的 clone 逻辑
+- **GIVEN** workflow 与 execution 都需要"跨线程传播异常"的 clone 逻辑
 - **WHEN** 维护者实现该能力
-- **THEN** 仓库 MUST 只有一份权威的 `clone_exception_for_reraise`（或等价）实现
-- **AND** workflow/execution 调用点 MUST 导入该 SSOT util 而不是各自维护副本
+- **THEN** 仓库 MUST 只有一份权威的 clone_exception_for_reraise 实现
+- **AND** workflow/execution 调用点 MUST 导入该 SSOT util
 
-### Requirement: `# noqa: C901` hotspots MUST be decomposed into named, testable boundaries
+### Requirement: C901 hotspots MUST be decomposed into testable boundaries
 
-当核心热点函数因复杂度门禁（C901）被 `# noqa: C901` 放行时，系统 MUST 将其视为治理对象，并满足：
-
-- 维护者 MUST 优先通过“纯函数/规则函数提取”降低复杂度，而不是仅增加 `noqa` 或在长函数中继续堆叠分支
-- 被提取的规则函数 MUST 具备明确输入输出，并可通过单元测试覆盖其分支矩阵
-- `# noqa: C901` SHOULD 作为阶段性措施；每个放行点 SHOULD 有对应的治理任务（在 change/tasks 中可追踪）
-- 新增或保留 `# noqa: C901` 时，维护者 MUST 同时标注可追踪的拆分计划引用（例如 `# pragma: allow-c901 plan: <ref>`），避免匿名/永久放行
+当核心热点函数因复杂度被 `# noqa: C901` 放行时,系统 MUST 将其视为治理对象：MUST 优先通过规则函数提取降低复杂度,被提取的规则函数 MUST 具备明确输入输出并可通过单元测试覆盖,新增或保留 `# noqa: C901` 时 MUST 同时标注可追踪的拆分计划引用.
 
 #### Scenario: rules extracted from a C901 function are unit-testable
-- **GIVEN** 某个热点函数包含多个 `on_mismatch` / alignment / budget 等规则分支
+- **GIVEN** 某个热点函数包含多个规则分支
 - **WHEN** 维护者治理该热点
-- **THEN** 规则决策 MUST 被提取到可单测的函数（例如返回 action=error/warn/skip）
+- **THEN** 规则决策 MUST 被提取到可单测的函数
 - **AND** 单元测试 MUST 覆盖主要分支组合
 
-### Requirement: 核心热点模块必须按职责拆分并保持稳定入口
-系统 MUST 对核心热点实现采用职责分层的子模块组织,避免单文件持续聚合多种职责.至少以下热点路径 MUST 被视为持续治理对象:
-- `src/IMPL_ROOT/dsl/yaml_dsl/schema_dsl/models`
-- `src/IMPL_ROOT/execution/adaptive`
-- `src/IMPL_ROOT/ob/presets`
-- `src/IMPL_ROOT/hooks`
+### Requirement: core hotspot modules MUST be split by responsibility
 
-在上述热点重构过程中,系统 MUST 保持既有稳定入口可用(直接导入路径或兼容导出路径),不得因内部拆分破坏调用方基本导入能力.
+系统 MUST 对核心热点实现采用职责分层的子模块组织,至少以下热点路径 MUST 被视为持续治理对象：schema_dsl models、execution adaptive、observability presets、hooks.
+
+在上述热点重构过程中,系统 MUST 保持既有稳定入口可用,不得因内部拆分破坏调用方基本导入能力.
 
 #### Scenario: 热点模块拆分后稳定入口仍可用
 - **WHEN** 维护者将热点模块按职责拆分为多个子模块
@@ -114,96 +84,71 @@
 - **THEN** 新逻辑 MUST 放入对应职责子模块
 - **AND** `__init__.py` MUST NOT 成为核心算法实现聚合点
 
-### Requirement: operator package 入口模块约定一致
-系统 MUST 对 package 形态的 operator 统一使用 `<op>/executor.py` 作为入口模块,`__init__.py` 不通过 re-export 暴露 `<Name>OperatorExecutor`.
+### Requirement: operator package MUST use consistent entry convention
+
+系统 MUST 对 package 形态的 operator 统一使用 `<op>/executor.py` 作为入口模块,`__init__.py` 不通过 re-export 暴露 executor 类.
 
 #### Scenario: operator 入口显式导入可用
-- **WHEN** 导入 `IMPL_ROOT.execution.executor.operators.compute.executor` 或 `...load_ref.executor`
+- **WHEN** 导入 operator 的 executor 模块
 - **THEN** 导入 MUST 成功
 - **AND** 从对应 package 的 `__init__.py` 不应获得 executor 类 re-export
 
-### Requirement: planning 与 execution 保持层次解耦
-系统 MUST 保持 `src/IMPL_ROOT/planning/**` 不依赖 `src/IMPL_ROOT/execution/**` 实现符号,避免层次反转与循环依赖.
+### Requirement: layer dependencies MUST remain unidirectional
 
-#### Scenario: planning 独立导入
-- **WHEN** 导入 `IMPL_ROOT.planning.builder` 与 `IMPL_ROOT.planning.plan`
-- **THEN** 导入 MUST 成功且不触发 execution 循环依赖错误
-
-### Requirement: 核心层级依赖方向必须保持单向
-系统 MUST 保持核心层级依赖方向可审计且单向,至少满足:
-- `planning` MUST NOT 依赖 `execution` 实现.
-- `dsl runtime` MUST NOT 直接依赖 `execution` 的内部私有实现路径.
-- `hooks/ob` MUST 通过事件契约与组件装配交互,不得反向依赖 DSL 专有配置模型.
+系统 MUST 保持核心层级依赖方向可审计且单向：planning MUST NOT 依赖 execution 实现,dsl runtime MUST NOT 直接依赖 execution 内部实现,hooks/observability MUST 通过事件契约交互不得反向依赖 DSL 专有配置,workflow runtime MUST NOT 反向依赖 DSL 层.
 
 #### Scenario: 层级依赖扫描不出现反向依赖
 - **WHEN** 执行模块依赖方向检查
-- **THEN** 结果 MUST 不出现 `planning -> execution` 的反向依赖
-- **AND** MUST 不出现 `hooks/ob -> dsl 专有配置` 的直接依赖
+- **THEN** 结果 MUST 不出现 `planning -> execution` 或 `workflow -> dsl` 的反向依赖
+- **AND** MUST 不出现 `hooks/observability -> dsl 专有配置` 的直接依赖
 
 ### Requirement: runtime core MUST NOT import dev tooling packages
 
-系统 MUST 保持依赖方向单向且可审计：
+runtime core MUST NOT 导入 dev tooling packages (例如 scalim-misc),dev tooling packages MAY 导入 runtime core 并消费其 SSOT/公共入口.该约束禁止通过 optional hook 或动态导入绕开.
 
-- runtime core（`src/IMPL_ROOT/**`）MUST NOT 导入 dev tooling packages（例如 `packages/scalim-misc`）
-- dev tooling packages MAY 导入 `IMPL_ROOT` 并消费其 SSOT/公共入口
-
-说明：禁止通过 optional hook / `importlib.import_module` 等动态导入方式绕开该限制。
-
-#### Scenario: importing IMPL_ROOT does not require scalim-misc
-- **GIVEN** 环境中未安装 `scalim-misc`
-- **WHEN** 用户仅导入并使用 runtime core（compile/validate/run/workflow）
+#### Scenario: importing runtime core does not require dev tooling
+- **GIVEN** 环境中未安装 dev tooling packages
+- **WHEN** 用户仅导入并使用 runtime core
 - **THEN** 导入与运行 MUST 成功
 
-### Requirement: workflow framework MUST NOT import DSL modules
-系统 MUST 保持核心层级依赖方向可审计且单向；workflow runtime/framework 层 MUST NOT 反向依赖 DSL 层实现符号（例如 `IMPL_ROOT.dsl.yaml_dsl` 及其子模块）。
+### Requirement: no new top-level public facades
 
-该约束 MUST 由可独立运行的自动化门禁守护（例如 `uv run scripts/check-workflow-layering.py --check`）,并在 `just qa` 的 fail-fast 阶段执行（pytest 之前）.
-
-补充约束: workflow 层 MUST NOT 通过动态导入绕开该限制（例如 `importlib.import_module("...dsl...")` 或等价字符串导入）。
-
-#### Scenario: workflow does not import dsl
-- **WHEN** 维护者运行 workflow layering 的静态门禁
-- **THEN** 结果 MUST 不出现 `workflow -> dsl` 的反向依赖
-- **AND** 结果 MUST 不出现通过动态导入引入 `dsl` 的行为
-
-### Requirement: 不新增顶层公共 facade
-系统 MUST NOT 新增 `src/IMPL_ROOT/api.py` 或在顶层 `src/IMPL_ROOT/__init__.py` 做公共 re-export 聚合;公共入口继续采用显式模块路径.
+系统 MUST NOT 新增顶层公共 facade (如 `api.py` 或在顶层 `__init__.py` 做公共 re-export 聚合),公共入口继续采用显式模块路径.
 
 #### Scenario: 公共入口保持显式路径
 - **WHEN** 调用方查找运行入口
 - **THEN** 仍通过既有显式模块导入,不依赖新的顶层 facade
 
-### Requirement: Python 3.6 typing 兼容入口唯一
-系统 MUST 保持 Python 3.6 兼容;`src/IMPL_ROOT/` 内扩展 typing 能力(如 `Self`/`override`)仅允许通过 `src/IMPL_ROOT/vendor/compact/typing_extensionsx.py` 引入.
-系统 MUST 通过 lint 禁止在 `src/IMPL_ROOT/` 内直接导入 `typing_extensions`.
+### Requirement: Python 3.6 typing compatibility MUST be centralized
+
+系统 MUST 保持 Python 3.6 兼容；运行时内扩展 typing 能力 (如 `Self`/`override`) 仅允许通过 `vendor/compact/typing_extensionsx.py` 引入,MUST 通过 lint 禁止直接导入 `typing_extensions`.
 
 #### Scenario: typing 扩展导入路径受控
-- **WHEN** 在 `src/IMPL_ROOT/` 内新增扩展类型引用
-- **THEN** MUST 通过 `typing_extensionsx.py` 引入且 lint 可阻止直接 `typing_extensions` 导入
+- **WHEN** 在运行时内新增扩展类型引用
+- **THEN** MUST 通过 typing_extensionsx.py 引入且 lint 可阻止直接 typing_extensions 导入
 
-### Requirement: vendor 模块必须可审计且有用途
-系统 MUST 在 `src/IMPL_ROOT/vendor/README.md` 维护每个 vendor 子模块的最小 provenance(来源与许可证)以及 usage/保留理由.
-版本/commit pin、本地修改点、更新策略在已知时 SHOULD 记录;历史条目允许临时缺省并在后续补齐.
-未被主路径使用的 vendor 子模块 MUST 记录明确保留理由与预计接入点,否则应移除.
+### Requirement: vendor modules MUST be auditable
+
+系统 MUST 在 vendor README 维护每个 vendor 子模块的最小 provenance (来源与许可证) 以及 usage/保留理由.未被主路径使用的 vendor 子模块 MUST 记录明确保留理由与预计接入点,否则应移除.
 
 #### Scenario: vendor 可审计
-- **WHEN** 审阅 `src/IMPL_ROOT/vendor/README.md`
+- **WHEN** 审阅 vendor README
 - **THEN** 每个 vendor 子模块 MUST 有来源/许可证与 usage/保留理由说明
 
-### Requirement: 避免 stdlib 同名冲突模块
-系统 MUST NOT 在 `src/IMPL_ROOT/` 引入与 Python 标准库同名且语义含混的模块文件(如 `types.py`、`inspect.py`、`trace.py`),以避免导入语义混淆与潜在 shadowing 风险.
-系统 MUST 提供自动化检查(脚本或 CI 任务)以阻止该类命名回归.
+### Requirement: stdlib naming conflicts MUST be avoided
+
+系统 MUST NOT 在运行时引入与 Python 标准库同名且语义含混的模块文件 (如 `types.py`、`inspect.py`、`trace.py`),以避免导入语义混淆与潜在 shadowing 风险.系统 MUST 提供自动化检查以阻止该类命名回归.
 
 #### Scenario: 历史冲突模块不回归
-- **WHEN** 审阅 yaml_dsl runtime 与 observability presets 的模块命名
+- **WHEN** 审阅模块命名
 - **THEN** 不应存在与 stdlib 高冲突且语义含混的模块命名
 
 #### Scenario: stdlib 同名检查可用
 - **WHEN** 运行 stdlib 同名模块检查脚本
 - **THEN** 若存在冲突模块,检查 MUST 失败并输出冲突路径列表
-- **AND** 若不存在冲突模块,检查 MUST 成功
 
-### Requirement: 一次性热点重构可以在单个 change 中覆盖多个核心热点模块
+### Requirement: batch hotspot refactoring MAY cover multiple modules in one change
+
 系统 MUST 允许将多个已确认热点模块的结构重构放在单个 change 中统一规划与实施,前提是各热点仍通过显式 phase 与任务分组保持边界清晰.
 
 #### Scenario: 单个 change 聚合多个热点模块
@@ -211,68 +156,39 @@
 - **THEN** 系统 MUST 允许单个 change 同时覆盖这些热点
 - **AND** tasks MUST 通过显式 phase 或任务分组区分不同热点主线
 
-### Requirement: 已确认热点模块必须按职责拆分并保持稳定入口
-系统 MUST 将以下路径视为本轮一次性重构的确认热点,并要求其内部实现按职责拆分:
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validators/fields.py`
-- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py`
-- `src/IMPL_ROOT/hooks/base.py`
-- `src/IMPL_ROOT/ob/manager.py`
-- `src/IMPL_ROOT/ob/presets/viz.py`
-- `src/IMPL_ROOT/execution/adaptive/loadref_scheduler.py`
+### Requirement: hotspot governance MAY be split into independent phases
 
-拆分后,系统 MUST 保持这些热点相关的官方稳定入口继续可用,不得要求调用方迁移到新的内部私有路径.
+系统 MUST 允许将热点模块治理拆分为多个 phase 独立推进；当维护者先处理 hooks/observability managers 时,不得强制与其它热点模块在同一 change 中一起重构.
 
-#### Scenario: 热点拆分后稳定入口仍可用
-- **WHEN** 上述任一热点模块被拆入新的内部子模块或 package
-- **THEN** 通过当前官方稳定入口的导入 MUST 继续成功
-- **AND** 调用方 MUST NOT 被要求直接导入新的内部私有模块
+#### Scenario: hooks / observability managers 可以单独作为一轮重构
+- **WHEN** 维护者选择先重构 HookManager / ObserverManager 相关热点模块
+- **THEN** 系统 MUST 允许该 change 仅覆盖 hooks/observability managers
+- **AND** 不应要求同一 change 同时包含其它热点模块的拆分
 
-### Requirement: 热点模块 phase 1 重构可以从 hooks 与 observability managers 独立推进
-系统 MUST 允许将热点模块治理拆分为多个 phase 独立推进;当维护者先处理 `hooks` / `ob` managers 时,不得强制与其它热点模块在同一 change 中一起重构.
+### Requirement: hotspot modules MUST be guarded against unbounded growth
 
-#### Scenario: hooks / ob managers 可以单独作为一轮重构
-- **WHEN** 维护者选择先重构 `HookManager` / `ObserverManager` 相关热点模块
-- **THEN** 系统 MUST 允许该 change 仅覆盖 hooks / observability managers
-- **AND** 不应要求同一 change 同时包含 YAML runtime、adaptive scheduler 或其它热点模块的拆分
-
-### Requirement: 热点模块内部拆分后必须保持官方稳定入口不变
-系统 MUST 在热点模块内部拆分后继续保持官方稳定入口可用;对于 `HookManager` / `ObserverManager` 这类已被测试和调用路径依赖的核心类型,实现拆分不得改变推荐导入路径.
-
-#### Scenario: 内部重构不改变推荐导入路径
-- **WHEN** `HookManager` / `ObserverManager` 的实现被拆入新的内部模块或 package
-- **THEN** 调用方通过当前推荐导入路径 MUST 继续可用
-- **AND** 模块布局测试 SHOULD 覆盖该稳定入口承诺
-
-### Requirement: hotspot modules MUST be splittable and guarded against unbounded growth
-
-系统 MUST 对热点模块提供可维护性护栏：
-- 当单个模块超过约定阈值（例如 >1000 行）时,维护者 MUST 拆分为多个职责单一的模块
-- 拆分 MUST 保持行为等价,并由自动化回归覆盖（输出/事件/错误语义一致）
+系统 MUST 对热点模块提供可维护性护栏：当单个模块超过约定阈值 (例如 >1000 行) 时,维护者 MUST 拆分为多个职责单一的模块,拆分 MUST 保持行为等价并由自动化回归覆盖.
 
 #### Scenario: module size guardrail fails fast
 - **WHEN** 热点模块超过阈值且继续增长
 - **THEN** guardrail gate MUST fail-fast 并提示拆分策略
 
-### Requirement: 主包导入图 MUST 无环且禁止函数内导入
-系统 MUST 保持 `src/IMPL_ROOT/`（排除 `src/IMPL_ROOT/vendor/**`）的模块导入图无环.
+### Requirement: import graph MUST be acyclic and ban function-local imports
 
-同时,主包模块 MUST NOT 在函数体内出现 `import ...` 或 `from ... import ...`（包括 `def` 与 `async def`）,以避免通过局部导入绕开依赖方向约束并隐藏导入副作用.
-
-该约束 MUST 由可独立运行的静态门禁守护,并在 `just qa` 的 fail-fast 阶段执行（例如 `uv run scripts/check-import-graph.py --check`）。
+系统 MUST 保持主包 (排除 vendor) 的模块导入图无环.同时,主包模块 MUST NOT 在函数体内出现 import 语句,以避免通过局部导入绕开依赖方向约束并隐藏导入副作用.该约束 MUST 由可独立运行的静态门禁守护.
 
 #### Scenario: import graph gate reports cycles
-- **WHEN** 开发者运行导入图门禁脚本（例如 `uv run scripts/check-import-graph.py --check`）
-- **THEN** 若导入图存在环,门禁 MUST 失败并输出至少一个可定位的最小导入环（模块序列）
+- **WHEN** 开发者运行导入图门禁脚本
+- **THEN** 若导入图存在环,门禁 MUST 失败并输出至少一个可定位的最小导入环
 
 #### Scenario: import graph gate reports function-local imports
-- **WHEN** 开发者运行导入图门禁脚本（例如 `uv run scripts/check-import-graph.py --check`）
+- **WHEN** 开发者运行导入图门禁脚本
 - **THEN** 若主包存在函数内导入,门禁 MUST 失败并输出文件路径与行号
 
 ### Requirement: yaml_dsl runtime MUST NOT contain workflow runtime modules
-系统 MUST 保持 `src/IMPL_ROOT/dsl/yaml_dsl/runtime/**` 不包含 workflow runtime 语义模块（例如 `workflow_*.py`）,以避免把 workflow 层实现符号误放入 DSL runtime 子包.
 
-该约束 MUST 由可独立运行的静态门禁守护,并在 `just qa` 的 fail-fast 阶段执行（例如 `uv run scripts/check-workflow-layering.py --check`）。
+系统 MUST 保持 yaml_dsl runtime 子包不包含 workflow runtime 语义模块 (例如 `workflow_*.py`),以避免把 workflow 层实现符号误放入 DSL runtime.该约束 MUST 由可独立运行的静态门禁守护.
 
 #### Scenario: workflow_* modules are rejected under yaml_dsl runtime
 - **WHEN** 维护者运行 workflow layering 的静态门禁
-- **THEN** 若 `src/IMPL_ROOT/dsl/yaml_dsl/runtime/**` 下出现 `workflow_*.py`,门禁 MUST 失败并输出违规路径列表
+- **THEN** 若 yaml_dsl runtime 下出现 `workflow_*.py`,门禁 MUST 失败并输出违规路径列表

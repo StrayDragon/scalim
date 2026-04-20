@@ -1,10 +1,21 @@
 # workflow-ir Specification
 
 ## Purpose
-TBD - created by archiving change c18-workflow-ir-roadmap. Update Purpose after archive.
+定义 Workflow IR 作为 workflow 的统一底座,并将 workflow 的 authoring surface(例如 YAML)视为"编译到 IR 的语法前端",而不是直接驱动执行器分支逻辑.
+
+## Related Concepts
+- Workflow IR 图
+- 两阶段编译模型
+- 节点集合与依赖
+- Workflow 选项
+- 工件/产物
+- 调度器
+- 编译/调度实现
+
 ## Requirements
+
 ### Requirement: workflow compiles to a Workflow IR graph
-系统 MUST 引入 Workflow IR 作为 workflow 的统一底座,并将 workflow 的 authoring surface(例如 YAML)视为“编译到 IR 的语法前端”,而不是直接驱动执行器分支逻辑。
+系统 MUST 引入 Workflow IR 作为 workflow 的统一底座,并将 workflow 的 authoring surface(例如 YAML)视为"编译到 IR 的语法前端",而不是直接驱动执行器分支逻辑.
 Workflow IR MUST 至少包含:
 - 节点集合(`nodes`),每个节点具备稳定 id 与 type
 - 显式依赖(`deps`),以表达 DAG 与就绪条件（IR MUST 以 `node_id -> [prereq_node_id, ...]` 的形式保留 deps 列表）
@@ -18,7 +29,7 @@ Workflow IR MUST 至少包含:
 - **AND** IR 中 node B 的 deps MUST 包含 `"A"`（等价于存在 A -> B 的依赖边）
 
 ### Requirement: Workflow IR defines stable node ids and a two-stage compilation boundary
-系统 MUST 将 workflow 的执行边界收敛为“两阶段编译”模型,并为后续 DAG/ctx/资源等能力提供稳定的依赖与命名空间契约:
+系统 MUST 将 workflow 的执行边界收敛为"两阶段编译"模型,并为后续 DAG/ctx/资源等能力提供稳定的依赖与命名空间契约:
 - **结构编译**: workflow YAML -> Workflow IR 图(节点/边/资源/选项 + 静态校验 + 确定性顺序)
 - **物化编译**: 当某个节点 deps 满足且就绪时,系统再物化编译该节点的执行单元(例如编译 demand YAML -> Demand IR 并执行)
 - Workflow IR 的 `node_id` MUST 稳定且全局唯一;对 demand 节点,`node_id` MUST 等于 workflow YAML 的 `runs[*].id`
@@ -40,9 +51,9 @@ Workflow IR MUST 至少包含:
 - **THEN** 节点启动选择与最终 outcomes 对齐规则 MUST 稳定(可对拍)
 
 ### Requirement: demand nodes only access upstream artifacts via explicit deps
-系统 MUST 将 demand 节点之间的输入收敛为“显式 deps + 显式 artifacts”,并禁止隐式全局共享状态:
+系统 MUST 将 demand 节点之间的输入收敛为"显式 deps + 显式 artifacts",并禁止隐式全局共享状态:
 - 下游 demand 仅允许引用其依赖链上可见的上游 artifacts
-- workflow 编译阶段 MUST 对“artifact 引用超出依赖范围”的情况 fail-fast
+- workflow 编译阶段 MUST 对"artifact 引用超出依赖范围"的情况 fail-fast
 
 #### Scenario: referencing a non-dependency artifact is rejected
 - **GIVEN** 下游 demand 尝试引用某个未声明为依赖的上游 run 产物
@@ -50,7 +61,7 @@ Workflow IR MUST 至少包含:
 - **THEN** 系统 MUST fail-fast 并报告非法引用的 run_id/artifact
 
 ### Requirement: Workflow IR runtime MUST remain Python 3.6 compatible
-系统 MUST 保持 Workflow IR 的核心运行时与编译/调度实现兼容 Python 3.6(与项目运行时边界一致),不得引入仅在较新 Python 版本可用的语言特性或标准库 API。
+系统 MUST 保持 Workflow IR 的核心运行时与编译/调度实现兼容 Python 3.6(与项目运行时边界一致),不得引入仅在较新 Python 版本可用的语言特性或标准库 API.
 
 #### Scenario: Workflow IR modules import under Python 3.6
 - **GIVEN** 运行时为 Python 3.6
@@ -58,7 +69,7 @@ Workflow IR MUST 至少包含:
 - **THEN** 系统 MUST 不因版本不兼容的语法/stdlib API 导致 `SyntaxError`/`ImportError`
 
 ### Requirement: WorkflowOptionsIr MUST carry resources_wait from YAML to runtime
-系统 MUST 扩展 workflow 编译产物中的 options(IR),确保 runtime 能消费 workflow-level 的资源等待与诊断策略。
+系统 MUST 扩展 workflow 编译产物中的 options(IR),确保 runtime 能消费 workflow-level 的资源等待与诊断策略.
 
 `resources_wait` 的配置来源 MUST 位于 runtime policy boundary（而不是 workflow YAML authoring surface）：
 
@@ -77,26 +88,9 @@ Workflow IR MUST 至少包含:
 - **THEN** IR 的 `options` MUST 包含对应字段且值与该 runtime policy 等价
 
 ### Requirement: WorkflowOptionsIr MUST carry output_staging from YAML to runtime
-系统 MUST 扩展 workflow 编译产物中的 options(IR),确保 runtime 能消费 workflow-level 的 staging/publish 策略。
+系统 MUST 扩展 workflow 编译产物中的 options(IR),确保 runtime 能消费 workflow-level 的 staging/publish 策略.
 
-`output_staging` 的配置来源 MUST 位于 runtime policy boundary（而不是 workflow YAML authoring surface）：
-
-- Workflow IR 的 `options` MUST 包含结构化字段 `output_staging`
-- `output_staging` MUST 至少包含: `dir_name`、`keep_on_success` 与 `keep_on_failure`
-
-#### Scenario: output_staging is present in compiled IR
-- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime_options.output_staging`
+#### Scenario: output_staging options are present in compiled IR
+- **GIVEN** workflow YAML 配置了 `workflow.options.output_staging`
 - **WHEN** workflow 被编译为 Workflow IR
-- **THEN** IR 的 `options` MUST 包含对应字段且值与该 runtime policy 等价
-
-### Requirement: WorkflowOptionsIr MUST carry schedule_mode from runtime to executor
-系统 MUST 在 workflow 编译产物的 options(IR) 中携带调度模式,以便执行层可区分 `pipeline` 与 `stage_barrier` 的调度语义:
-
-- Workflow IR 的 `options` MUST 包含字段 `schedule_mode`
-- `schedule_mode` MUST 为字符串且取值 MUST 属于 `pipeline` 或 `stage_barrier`
-- 当调用方未显式配置 scheduler preset 时,`schedule_mode` MUST 等价于 `pipeline`
-
-#### Scenario: schedule_mode is present in compiled IR
-- **GIVEN** 调用方通过 runtime entrypoints 提供 `workflow_runtime_options.scheduler=stage_barrier`
-- **WHEN** workflow 被编译为 Workflow IR
-- **THEN** IR 的 `options.schedule_mode` MUST 等于 `stage_barrier`
+- **THEN** IR 的 `options` MUST 包含对应 `output_staging` 字段且值与 YAML 配置等价

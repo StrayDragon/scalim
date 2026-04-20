@@ -11,13 +11,12 @@
 - 支持将原始值转换为目标类型(如 "123" → 123)
 - 支持派生字段依赖计算(如收入-成本)
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/security.py` (`SecureComputeEngine`)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/parsers/fields.py` (infer derived deps; reject explicit `depends_on`)
-- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (derived IR build + constant compute detection)
-- `src/IMPL_ROOT/execution/executor/operators/compute/executor.py` (compute execution)
-- `src/IMPL_ROOT/execution/executor/operators/compute/errors.py` (compute error/guardrails)
-- `src/IMPL_ROOT/utils/converters.py` (`value_cast:auto` helpers)
+## Related Concepts
+- 安全计算引擎 (SecureComputeEngine)
+- 派生字段解析器 (fields parser)
+- IR 构建与转换 (conversion)
+- 计算 operator (compute executor)
+- 值转换工具 (converters)
 ## Requirements
 ### Requirement: 字段值 value_cast
 系统 SHALL 在字段值被加载或关联获取后应用 `value_cast` 转换,并支持以下取值:`auto`、`int`、`str`、`decimal`.
@@ -319,4 +318,4 @@
 
 ## Notes
 - 计算表达式会在编译阶段校验名称是否在依赖列表中;依赖由表达式自动推导(按首次出现顺序去重).
-- `value_cast: auto` 使用 `auto_str_normalize`(详见 `src/IMPL_ROOT/utils/converters.py`).
+- `value_cast: auto` 使用 `auto_str_normalize` 工具函数.

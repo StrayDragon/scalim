@@ -1,7 +1,14 @@
 # yaml-dsl-import-aliases-and-presets Specification
 
 ## Purpose
-TBD - created by archiving change c80-yaml-dsl-import-aliases-and-presets. Update Purpose after archive.
+支持项目级配置文件治理 YAML DSL imports 路径解析，提供 alias 映射、allowed roots 约束和内置 presets 引用能力。
+
+## Related Concepts
+- scalim.yaml 项目配置
+- import_roots 与 alias 映射
+- allowed roots 安全校验
+- nearest-wins 配置发现
+- scalim:// presets 引用
 ## Requirements
 ### Requirement: Imports MUST support scalim.yaml configured aliases and allowed roots
 系统 MUST 支持可选的项目级配置文件 `scalim.yaml`，用于治理 YAML DSL 的 imports 路径解析。

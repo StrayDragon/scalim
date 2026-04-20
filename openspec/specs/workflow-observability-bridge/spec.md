@@ -3,16 +3,14 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约,使 demand 事件可稳定归因到 workflow 节点,并提供最小的 workflow-level 编排事件.
+定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约，使 demand 事件可稳定归因到 workflow 节点，并提供最小的 workflow-level 编排事件。
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/yaml_dsl/workflow_entrypoints.py` (workflow runner + workflow-level 事件)
-- `src/IMPL_ROOT/execution/run_ir.py` (按需注入事件 meta)
-- `src/IMPL_ROOT/ob/manager.py` (`ObserverManager` meta 合并)
-- `src/IMPL_ROOT/ob/hub.py` (`InstrumentationHub`)
-- `src/IMPL_ROOT/events/catalog.py` (workflow 事件目录与命名空间)
-- `src/IMPL_ROOT/events/event.py` (`Event` envelope)
-- `src/IMPL_ROOT/events/events.py` (workflow-level 事件 payload)
+## Related Concepts
+- workflow event envelope (Event.meta)
+- workflow_exec_id / workflow_node_id
+- workflow-level 事件（workflow_node_start/end/cancelled）
+- demand hooks/observers 语义
+- event catalog 命名空间
 
 ## Requirements
 

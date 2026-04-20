@@ -1,7 +1,14 @@
-# preload-cache Specification
+# execution-preload-cache Specification
 
 ## Purpose
 定义 `PreloadCache` 的完整行为契约：并发安全性、in-flight 去重、signature 冲突防护、诊断能力，以及并发场景下的幂等性期望。
+
+## Related Concepts
+- PreloadCache 模块
+- 并发缓存机制
+- In-flight 去重
+- Signature 验证
+- Workflow 缓存池
 
 ## Requirements
 

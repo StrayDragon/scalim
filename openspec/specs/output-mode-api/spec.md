@@ -1,27 +1,28 @@
 # output-mode-api Specification
 
-**状态: ✅ 已实现**
 ## Purpose
-定义运行时输出语义为“显式 sink 驱动”: 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配.
+定义运行时输出语义为"显式 sink 驱动": 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配.
 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理.
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/execution/run_ir.py` (output plan, tee, `total_rows`, null sink)
-- `src/IMPL_ROOT/sinks/sink_base.py` (`ISink`/`IRowSink`/`IColumnSink`)
-- `src/IMPL_ROOT/sinks/_internal/memory.py` (`InMemoryRowDataSink`)
-- `src/IMPL_ROOT/sinks/sink_csv.py` / `src/IMPL_ROOT/sinks/sink_excel.py` (file sinks)
+## Related Concepts
+- 输出计划 (run_ir.py)
+- Sink 接口 (ISink/IRowSink/IColumnSink)
+- 内存 Sink (InMemoryRowDataSink)
+- 文件 Sink (CSV/Excel)
+- Null/Discard Sink
+- Tee 机制
 
 ## Requirements
 
 ### Requirement: 输出是否保留内存数据由 sink 表达
-系统 MUST 将“是否在内存中保留结果数据”的表达权交还给 sink 选择,并破坏性移除 `return_data: Optional[bool]`(及其隐式推断/tee 装配).
+系统 MUST 将"是否在内存中保留结果数据"的表达权交还给 sink 选择,并破坏性移除 `return_data: Optional[bool]` 及其隐式推断/tee 装配.
 
 #### Scenario: 需要内存数据时显式使用内存 sink
 - **WHEN** 用户需要在运行后获取内存数据
 - **THEN** 用户应显式传入内存 sink(例如 `InMemoryRowDataSink`)并通过 sink 读取数据,而不是通过 `return_data=True` 触发 runtime 侧隐式拼装
 
 ### Requirement: 无输出时避免构造返回列表
-系统 MUST 在“无文件输出且未提供显式 sink”的情况下避免 pipeline 构造返回列表造成的内存分配.
+系统 MUST 在"无文件输出且未提供显式 sink"的情况下避免 pipeline 构造返回列表造成的内存分配.
 execution 编排入口 MUST 使用 NullSink/DiscardSink(或等价实现)作为默认 sink.
 
 #### Scenario: 无文件输出且无显式 sink
@@ -40,13 +41,10 @@ execution 编排入口 MUST 使用 NullSink/DiscardSink(或等价实现)作为�
 - **THEN** 系统应通过 tee 同时写文件与内存 sink,且二者内容一致
 
 ### Requirement: total_rows 为稳定元数据
-系统 MUST 在执行结果元数据中提供稳定的行数统计(例如 `ExecutionResult.total_rows`),且该值 MUST 不依赖“是否返回 data”.
+系统 MUST 在执行结果元数据中提供稳定的行数统计(例如 `ExecutionResult.total_rows`),且该值 MUST 不依赖"是否返回 data".
 系统 MUST 通过内部统计器计算该值,且统计口径 SHOULD 贴近用户直觉: **以实际写出/产出(emit)的行数为准**.
 系统 MUST 明确该口径为 emitted_rows: 以实际写出/产出(emit)到 effective sink 的行数为准(包括 NullSink),而非输入 `row_ids` 数量.
 若同时启用性能观测插件(例如 `PerformanceObserver`),其 `PerformanceMetrics.total_rows` 允许使用 input row_ids 口径用于吞吐估算;系统 SHOULD 在文档/类型注释中显式区分二者以避免监控误读.
-实现方式可以是:
-- 通过内部 `CountingSink`/row-counter wrapper 统计 sink 写入行数
-- 或基于批次/写入事件统计(需保证与写出行数一致)
 
 #### Scenario: total_rows 不依赖是否保留内存数据
 - **WHEN** 使用相同输入分别运行: (a) 仅写文件 (b) 仅写内存 sink (c) 无输出(NullSink)
@@ -54,7 +52,7 @@ execution 编排入口 MUST 使用 NullSink/DiscardSink(或等价实现)作为�
 
 ### Requirement: 成功路径 sink.close 失败必须使 run 失败
 系统 MUST 将 sink 的 close 视为输出落盘/提交的最终阶段.
-当 `engine.run(...)` 已成功完成时,`run_ir` MUST 调用 `sink.close()` 并将其异常向上传播,不得返回“成功”的 `ExecutionResult`.
+当 `engine.run(...)` 已成功完成时,`run_ir` MUST 调用 `sink.close()` 并将其异常向上传播,不得返回"成功"的 `ExecutionResult`.
 
 #### Scenario: run 成功但 close 失败导致 run_ir 失败
 - **GIVEN** `engine.run(...)` 成功完成

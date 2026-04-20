@@ -1,7 +1,15 @@
 # yaml-dsl-demand-imports-scope Specification
 
 ## Purpose
-TBD - created by archiving change c15-yaml-dsl-demand-imports-scope. Update Purpose after archive.
+定义 demand imports (`imports` / `$import`) 的作用域边界，确保其仅服务于稳定的 authoring 复用场景，而非 runtime overlay 或 output extras 的替代机制。
+
+## Related Concepts
+- Demand DSL imports 机制
+- 稳定 authoring surfaces (main_source, sources, fields, relations, resources)
+- Runtime policy 配置面
+- Output extras 机制
+- Workflow schema 与验证
+
 ## Requirements
 ### Requirement: demand imports MUST remain available for reusable authoring fragments
 demand `imports` / `$import` MUST 继续服务于跨文件 authoring 复用:
@@ -11,7 +19,7 @@ demand `imports` / `$import` MUST 继续服务于跨文件 authoring 复用:
 
 #### Scenario: demand reuses a resource declaration fragment from another file
 - **GIVEN** 某个 demand YAML 通过 `imports` 引入外部片段文件
-- **WHEN** 用户在 `resources.books.report` 或 `resources.files.detail_csv` 中使用 `$import`
+- **WHEN** 用户在稳定 authoring surface 中使用 `$import` 引用该片段
 - **THEN** 系统 MUST 成功展开该 authoring 片段
 
 ### Requirement: demand imports scope MUST be limited to stable authoring surfaces
@@ -24,7 +32,7 @@ demand `imports` / `$import` MUST 继续服务于跨文件 authoring 复用:
 - `resources.*` 中仍属于资源声明的部分
 
 #### Scenario: runtime-policy paths are not importable
-- **WHEN** 用户尝试在 runtime-policy 或 output extras 路径中使用 `$import`
+- **WHEN** 用户尝试在 runtime policy 或 output extras 等非稳定 authoring surface 中使用 `$import`
 - **THEN** 系统 MUST 拒绝该写法
 - **AND** MUST 给出 imports scope 不包含该路径的诊断
 
@@ -36,7 +44,7 @@ workflow MUST NOT 支持 imports expansion:
 
 #### Scenario: workflow import syntax is rejected
 - **GIVEN** 某个 workflow YAML 试图声明 `imports` 或 `$import`
-- **WHEN** 用户执行 workflow validate 或 schema 校验
+- **WHEN** 系统对该 workflow 进行 schema 校验或编译
 - **THEN** 系统 MUST 拒绝该结构
 
 ### Requirement: imports MUST NOT become a substitute for runtime overlay or output extras
@@ -46,7 +54,7 @@ imports MUST 仅解决“跨文件共享 authoring 片段”的问题,而不是�
 - imports MUST NOT 用于恢复已迁出的 output extras authoring surface
 
 #### Scenario: imports is evaluated by reuse value rather than overlay convenience
-- **WHEN** 某个新字段希望接入 imports
+- **WHEN** 某个新字段希望接入 imports 机制
 - **THEN** 审核标准 MUST 先判断它是否属于稳定 authoring surface
-- **AND** 若该字段本质是 runtime overlay 或 output extras,则 MUST NOT 接入 imports
+- **AND** 若该字段本质是 runtime overlay 或 output extras，则 MUST NOT 接入 imports
 

@@ -1,7 +1,14 @@
 # yaml-dsl-observability-boundary Specification
 
 ## Purpose
-TBD - created by archiving change c12-yaml-dsl-observability-out-of-yaml. Update Purpose after archive.
+将 observability 配置从 YAML 主线移除，迁移到 Python/CLI runtime entrypoints，并在迁移期内提供可执行的迁移警告。
+
+## Related Concepts
+- observability.* YAML 字段（legacy）
+- runtime entrypoints
+- migration warnings
+- custom hooks/observers
+- docs/skills/notebooks/examples 迁移
 ## Requirements
 ### Requirement: YAML mainline MUST NOT treat `observability.*` as authoring surface
 主线 YAML MUST 不再把 `observability.*` 作为稳定 authoring surface:

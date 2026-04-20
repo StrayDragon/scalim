@@ -1,7 +1,17 @@
 # workflow-shared-output-containers Specification
 
 ## Purpose
-TBD - created by archiving change c30-workflow-shared-output-containers. Update Purpose after archive.
+定义 workflow 共享输出容器的资源声明、写入节点、确定性顺序、追加/合并语义、原子提交、可观测性及并发安全契约。
+## Related Concepts
+- workflow shared resources (books)
+- workflow write nodes (write_sheet/append_sheet)
+- deterministic write order
+- append/merge semantics
+- atomic commit (staging → publish)
+- resource lifecycle observability
+- single-writer concurrency safety
+- versioned output roots
+
 ## Requirements
 ### Requirement: workflow YAML exposes a stable authoring surface for shared resources and write intents
 系统 MUST 为共享输出容器提供可实现、可校验的 workflow YAML authoring surface,并将“写入意图”从 workflow `writes` 收敛为 demand outputs 的 IO 绑定(由 workflow 编译期推导写入节点):

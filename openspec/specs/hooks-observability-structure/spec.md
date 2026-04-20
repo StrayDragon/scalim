@@ -1,32 +1,31 @@
 # hooks-observability-structure Specification
 
-**状态: ✅ 已实现**
 ## Purpose
 定义 Hook/Observer/事件体系的统一边界:事件契约、分发路径、组件装配与高频路径性能语义.
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/events/catalog.py`
-- `src/IMPL_ROOT/events/event.py`
-- `src/IMPL_ROOT/events/events.py`
-- `src/IMPL_ROOT/hooks/base.py` (`HookManager`)
-- `src/IMPL_ROOT/ob/manager.py` (`ObserverManager`)
-- `src/IMPL_ROOT/ob/hub.py` (`InstrumentationHub`)
-- `src/IMPL_ROOT/ob/components.py` (`split_components`)
-- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/compiler.py` (`build_request` 处理 `components`/`RunOverrides.viz_config`)
-- `src/IMPL_ROOT/execution/run_ir.py` (由 `ExecutionRequest.observability.viz_config` 物化 `VizObserver`)
-## Requirements
-### Requirement: 观测事件契约集中
-系统 MUST 以 `IMPL_ROOT.events` 作为事件定义中心,执行层、hooks、observers 通过统一 `Event` envelope 与稳定的 `event_type` + payload 字段语义交互,不得跨层依赖实现细节.
+## Related Concepts
+- 事件目录与契约 (events/catalog, events/event, events/events)
+- Hook 管理器 (HookManager)
+- Observer 管理器 (ObserverManager)
+- 观测中心 (InstrumentationHub)
+- 组件拆分 (split_components)
+- Runtime 编译器 (compiler.py build_request)
+- 执行入口 (run_ir.py)
 
-为避免“内部实现便利”反向固化为公共契约,系统 MUST 将 typed payload 数据类视为内部实现细节：
+## Requirements
+
+### Requirement: 观测事件契约集中
+系统 MUST 以 `events` 作为事件定义中心,执行层、hooks、observers 通过统一 `Event` envelope 与稳定的 `event_type` + payload 字段语义交互,不得跨层依赖实现细节.
+
+为避免"内部实现便利"反向固化为公共契约,系统 MUST 将 typed payload 数据类视为内部实现细节：
 
 - docs/examples/skills 等用户可见材料 MUST NOT 依赖 payload 数据类的导入路径或类名作为长期契约。
 - 用户侧订阅/分发以 `event_type`（及其常量/目录）为准,并通过 `Event.payload` 的稳定字段/键消费数据。
 
 #### Scenario: 用户侧以 event_type 订阅且不导入 payload 类型
 - **WHEN** 用户希望订阅 pipeline 生命周期事件
-- **THEN** 用户侧 MUST 通过 `IMPL_ROOT.events` 的事件类型常量/目录（例如 `EVENT_PIPELINE_START`）表达订阅
-- **AND** 用户侧 MUST 通过 `Event.payload` 的稳定字段/键（例如 `targets`/`batch_size`）消费负载,而不是依赖某个 payload 数据类的导入路径
+- **THEN** 用户侧 MUST 通过事件目录的事件类型常量表达订阅
+- **AND** 用户侧 MUST 通过 `Event.payload` 的稳定字段/键消费负载,而不是依赖某个 payload 数据类的导入路径
 
 ### Requirement: InstrumentationHub 是执行层唯一事件投递边界
 系统 MUST 通过 `InstrumentationHub` 统一分发到 hooks/observers.
@@ -53,7 +52,7 @@ execution 入口 MUST 消费 DSL-agnostic 的组件装配结果,不直接依赖 
 - **THEN** 不应直接 import/依赖 `ObservabilityConfig` 等 YAML 专有配置类型
 
 ### Requirement: 观测预设实现必须分离采集建模与展示职责
-系统 MUST 将 observability 预设实现按“事件采集、数据建模、展示/导出”职责分离组织,避免单个预设模块长期同时承载三类职责.
+系统 MUST 将 observability 预设实现按"事件采集、数据建模、展示/导出"职责分离组织,避免单个预设模块长期同时承载三类职责.
 
 #### Scenario: 展示层替换不影响采集契约
 - **WHEN** 维护者替换或调整可视化/导出实现
@@ -66,7 +65,7 @@ execution 入口 MUST 消费 DSL-agnostic 的组件装配结果,不直接依赖 
 - **AND** 展示层 MUST 能在不改调用方式下继续工作
 
 ### Requirement: HookManager 必须将注册管理与分发策略解耦
-系统 MUST 将 HookManager 的“订阅注册管理”与“事件分发策略”视为独立职责并保持实现解耦,防止单一基类持续增长.
+系统 MUST 将 HookManager 的"订阅注册管理"与"事件分发策略"视为独立职责并保持实现解耦,防止单一基类持续增长.
 
 #### Scenario: 扩展分发策略不影响订阅注册
 - **WHEN** 新增或调整事件分发策略
@@ -75,7 +74,7 @@ execution 入口 MUST 消费 DSL-agnostic 的组件装配结果,不直接依赖 
 
 ### Requirement: 事件分发热路径以缓存 callable 为主
 系统 MUST 在 HookManager 高频事件分发路径避免每次 `emit` 执行 `getattr/hasattr` 反射查找,并在注册阶段编译/缓存 callables 后直接分发.
-Observer 分发路径 MAY 使用“首次事件懒绑定 + 后续缓存复用”的策略;该一次性反射查找不应在后续同类事件重复发生.
+Observer 分发路径 MAY 使用"首次事件懒绑定 + 后续缓存复用"的策略;该一次性反射查找不应在后续同类事件重复发生.
 
 #### Scenario: Hook 高频分发无反射
 - **WHEN** 高并发/高频事件被触发且存在 hook 订阅者
@@ -111,7 +110,7 @@ diagnostic warning payload 至少包含 `message`、`source_id`、`field_id`、`
 - **THEN** loader 事件 payload MUST 返回摘要结构(含 `type` 与 `size`)
 
 ### Requirement: 默认静默与 logging 组件策略
-系统 SHALL 保持“无配置=无观测输出”.
+系统 SHALL 保持"无配置=无观测输出".
 诊断 fallback logger 默认关闭;仅在显式启用 logging 组件(或显式 fallback 策略)时输出.
 logging 渲染策略(如 `logger|pretty`)MUST 作为 logging 组件配置而非额外入口开关.
 
@@ -129,7 +128,7 @@ Hook capture 当前实现为任务内事件列表记录(无全局硬上限);调�
 - **THEN** emit MUST 仅记录事件,不直接执行用户 hook/observer 回调
 
 ### Requirement: hooks 与 observer managers 必须按内部职责拆分
-系统 MUST 允许将 `HookManager` 与 `ObserverManager` 的“订阅注册管理、handler 解析/缓存、高频事件分发、状态恢复”拆分为内部职责子模块,不得继续要求这些职责长期聚合在 `hooks/base.py` 与 `ob/manager.py` 单一热点文件内.
+系统 MUST 允许将 `HookManager` 与 `ObserverManager` 的"订阅注册管理、handler 解析/缓存、高频事件分发、状态恢复"拆分为内部职责子模块,不得继续要求这些职责长期聚合在单一热点文件内.
 
 #### Scenario: managers 拆分后职责可审计
 - **WHEN** 维护者重构 `HookManager` 或 `ObserverManager` 的内部结构
@@ -143,32 +142,12 @@ Hook capture 当前实现为任务内事件列表记录(无全局硬上限);调�
 - **WHEN** 完成 managers 内部职责拆分后运行相关测试
 - **THEN** wants、缓存复用、线程安全与 pickle roundtrip 行为 MUST 与重构前保持一致
 
-### Requirement: HookManager 与 ObserverManager 的内部职责拆分必须可审计
-系统 MUST 将 `HookManager` 与 `ObserverManager` 的“订阅注册管理、handler 解析/缓存、高频事件分发、状态恢复”视为独立职责,并允许通过内部子模块组织这些职责,而不是继续在单一热点文件中无限聚合.
-
-#### Scenario: 内部职责可以拆入子模块
-- **WHEN** 维护者重构 `HookManager` 或 `ObserverManager` 的内部实现
-- **THEN** 系统 MUST 允许将注册、缓存、分发、状态恢复拆入内部子模块
-- **AND** 不得要求这些职责继续长期共存于单一热点文件中
-
-### Requirement: Hook 与 Observer 管理器重构后必须保持稳定入口与行为语义
-系统 MUST 在 `HookManager` / `ObserverManager` 内部拆分后继续保持稳定导入入口与既有行为语义,至少包括: wants 语义、缓存复用语义、线程安全语义与 pickling 后锁恢复语义.
-
-#### Scenario: 稳定入口继续可用
-- **WHEN** 调用方继续通过既有稳定入口导入 `HookManager` 或 `ObserverManager`
-- **THEN** 导入 MUST 成功
-- **AND** 调用方不应被要求迁移到新的内部私有路径
-
-#### Scenario: 行为语义保持稳定
-- **WHEN** 完成内部职责拆分后运行现有 hooks / observer 管理器相关测试
-- **THEN** wants、缓存复用、线程安全与 pickle roundtrip 语义 MUST 与重构前保持一致
-
 ### Requirement: workflow attribution meta is injected incrementally and wants-gated
 系统 MUST 支持在 `Event.meta` 中注入 workflow 归因字段:
 - `workflow_exec_id`: 标识一次 workflow 执行(一次调用内稳定)
 - `workflow_node_id`: 标识事件来自哪个 workflow 节点(对 demand 节点等于 workflow YAML 的 `runs[*].id`)
 
-归因注入 MUST 通过“增量合并 meta”实现:
+归因注入 MUST 通过"增量合并 meta"实现:
 - MUST NOT 改写既有 `Event.run_id` 语义(仍表示一次 demand 执行)
 - MUST NOT 改写既有 `Event.seq` 语义(仍由发送端在 `run_id` 内单调递增)
 
@@ -205,7 +184,7 @@ Hook capture 当前实现为任务内事件列表记录(无全局硬上限);调�
 - **AND** 该事件 MUST 复用 `workflow_exec_id` 与 `workflow_node_id` 归因字段
 
 ### Requirement: High-cardinality diagnostics MUST be wants-gated at the callsite
-系统 MUST 对高基数诊断路径提供“调用点 wants-gated”语义：当 `InstrumentationHub.wants(event_type)=false` 时，执行层 MUST 不进行与数据规模成正比的诊断计算与中间结构构造（不仅仅是不构造 `Event` envelope）。
+系统 MUST 对高基数诊断路径提供"调用点 wants-gated"语义：当 `InstrumentationHub.wants(event_type)=false` 时，执行层 MUST 不进行与数据规模成正比的诊断计算与中间结构构造（不仅仅是不构造 `Event` envelope）。
 
 该要求适用于但不限于：
 - `relation_lookup`（逐行命中/缺失诊断）
@@ -220,16 +199,14 @@ Hook capture 当前实现为任务内事件列表记录(无全局硬上限);调�
 - **THEN** 系统 MUST 继续发出 `relation_lookup` 事件并保持既有 payload 结构
 
 ### Requirement: events public facade MUST provide structured access to event types
-
 系统 MUST 为用户提供结构化的事件类型访问方式，以降低平铺常量导入造成的学习与维护成本，同时保持 `event_type` 字符串值稳定。
 
 系统 MUST 满足：
 
-- `scalim.events` MUST 提供一个可枚举/可检索的事件目录入口（例如 `get_event_catalog`）。
-- `scalim.events` SHOULD 提供按主题分组的稳定入口（例如 `pipeline/workflow/loader/diagnostic` 分组对象或等价结构），避免要求用户直接导入大量平铺常量。
+- events facade MUST 提供一个可枚举/可检索的事件目录入口。
+- events facade SHOULD 提供按主题分组的稳定入口（例如 pipeline/workflow/loader/diagnostic 分组对象或等价结构），避免要求用户直接导入大量平铺常量。
 
 #### Scenario: user can enumerate known event types without importing internal payload types
-- **WHEN** 用户调用 `scalim.events.get_event_catalog()`
+- **WHEN** 用户调用事件目录入口
 - **THEN** 系统 MUST 返回一个可枚举的事件目录结构
 - **AND** 用户 MUST 能仅通过 `event_type` 与 `Event.payload` 的字段/键消费数据，而无需导入 typed payload 数据类
-

@@ -1,13 +1,14 @@
 # benchmarking Specification
 
-**状态: ✅ 已实现**
 ## Purpose
-定义基准测试入口与依赖约束,覆盖 pytest-benchmark 执行、JSON 导出、baseline 对比、benchlib 复用与可选 memray 剖析.
-## Related Code (as implemented)
-- `tests/bench/` (pytest-benchmark suites)
-- `packages/benchlib/src/benchlib/resources.py` (psutil optional sampling + `extra_info`)
-- `justfile` (`bench*` recipes, memray integration)
-- `pyproject.toml` (dev extras: pytest-benchmark/memray)
+定义基准测试入口与依赖约束，覆盖 pytest-benchmark 执行、JSON 导出、baseline 对比、benchlib 复用与可选 memray 剖析。
+
+## Related Concepts
+- pytest-benchmark 套件 (tests/bench/)
+- 资源采样 (packages/benchlib/src/benchlib/resources.py)
+- justfile 任务 (bench* recipes, memray integration)
+- dev extras 依赖 (pytest-benchmark, memray)
+
 ## Requirements
 ### Requirement: pytest-benchmark 基准入口
 - 基准 MUST 基于 pytest-benchmark 执行.

@@ -1,13 +1,12 @@
 # prompt-eval-fixture-cli Specification
 
-**状态: ✅ 已实现**
 ## Purpose
-定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略,确保其不覆盖仓库真实 `scalim-cli`,同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现,并避免对 PyPI build 依赖/网络造成的 dry-run 波动。
+定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略，确保其不覆盖仓库真实 `scalim-cli`，同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现，并避免对 PyPI build 依赖/网络造成的 dry-run 波动。
 
-## Related Code (as implemented)
-- `scripts/prompt-eval.py` (agent workspace 生成 + workspace venv 内 entrypoint 生成)
-- `agentdev/prompt-eval/fixtures/agent_stub_project/` (fixture 代码与最小 stub CLI)
-- `docs/doc/dev/prompt-eval-agent.md` (维护与排错说明)
+## Related Concepts
+- Agent workspace 生成脚本 (scripts/prompt-eval.py)
+- Fixture 代码与 stub CLI (agentdev/prompt-eval/fixtures/agent_stub_project/)
+- 维护与排错说明 (docs/doc/dev/prompt-eval-agent.md)
 
 ## Requirements
 ### Requirement: Fixture CLI 命令名与仓库 CLI 解耦

@@ -2,6 +2,15 @@
 
 ## Purpose
 定义 workflow runtime 的质量与测试稳定性要求,包括依赖注入契约、规则 SSOT 复用与并发测试的确定性护栏.
+
+## Related Concepts
+- dependency injection (no module-global mutation)
+- JSON-like validation SSOT
+- concurrency test determinism
+- timeout constants (CI_TIMEOUT_S, NEGATIVE_TIMEOUT_S)
+- event-driven synchronization
+- instrumentation diagnostics
+
 ## Requirements
 ### Requirement: workflow entrypoints MUST support dependency injection without module-global mutation
 系统 MUST 支持对 workflow 执行关键依赖（至少包括 `run_ir` 与 demand 编译回调）进行**每次调用级别**的显式依赖注入（用于单测与内部替换）,且该机制 MUST 不通过写模块全局变量实现,以保证并发执行可预期。

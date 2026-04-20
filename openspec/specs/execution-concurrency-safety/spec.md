@@ -3,17 +3,17 @@
 ## Purpose
 为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。
 
+## Related Concepts
+- WorkflowCachePool（工作流缓存池）
+- WorkflowResourceManager（工作流资源管理器）
+- Instrumentation emit（可观测性事件发射）
+
 ## Scope
 
-该规范适用于任何“内部使用互斥锁保护状态”的组件，只要其行为可能触发用户回调（hooks/observers），包括：
+该规范适用于任何”内部使用互斥锁保护状态”的组件，只要其行为可能触发用户回调（hooks/observers），包括：
 
 - 直接调用 `instrumentation.emit(...)`
 - 间接调用会触发 hooks/observers 的 helper（例如资源管理器的 `_emit_*` 封装）
-
-本变更的参考实现**至少**覆盖以下两个组件（其它组件可在后续变更中逐步纳入）：
-
-- `WorkflowCachePool`（`src/scalim/execution/workflow_cache_pool.py`）
-- `WorkflowResourceManager`（`src/scalim/workflow/resources.py`）
 ## Requirements
 ### Requirement: instrumentation emit MUST NOT run under internal locks
 当组件在内部使用互斥锁保护状态时（例如 cache pools、workflow resources 等），系统 MUST 禁止在持锁期间执行：

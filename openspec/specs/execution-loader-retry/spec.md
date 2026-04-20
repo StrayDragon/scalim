@@ -1,7 +1,14 @@
 # loader-retry-policy Specification
 
 ## Purpose
-TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
+提供可配置的 loader retry policy 机制，在 loader 调用因瞬态错误失败时执行有限的自动重试，支持全局默认策略与 per-source 覆盖，并通过可配置的退避策略、次数上限和耗时上限防止无限重试。
+
+## Related Concepts
+- Loader retry policy (loader_retry/)
+- Policy 配置解析与 overlay 机制 (policy_overlay/)
+- 签名预检查 (callable_preflight/)
+- 退避策略 (backoff_strategy/)
+
 ## Requirements
 ### Requirement: Loader retry policy 配置模型与默认值
 系统 SHALL 提供可配置的 loader retry policy,用于在 loader 调用因**瞬态错误**失败时执行有限的自动重试.

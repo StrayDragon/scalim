@@ -3,12 +3,14 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-提供用于 review/debug/对拍的**库侧 API**,将“作者写的 demand YAML”渲染为 effective YAML(展开后的单文件等价配置),避免 imports/template 复用在 review 时变成黑盒。
+提供用于 review/debug/对拍的库侧 API，将”作者写的 demand YAML”渲染为 effective YAML（展开后的单文件等价配置），避免 imports/template 复用在 review 时变成黑盒。
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/effective_yaml.py` (effective YAML loads/dumps API)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/imports.py` (imports/$import expansion)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/template_precompile.py` (LiteJinja2 template precompile)
+## Related Concepts
+- effective YAML API (load/dump)
+- imports/$import expansion
+- template precompile
+- outputs.fields flatten
+- YAML anchors/aliases expansion
 ## Requirements
 ### Requirement: Library MUST render effective demand YAML by expanding template_vars and imports
 系统 MUST 提供一个用于 review/debug/对拍的**库侧 API**,将“作者写的 demand YAML”渲染为 effective YAML(展开后的单文件等价配置)。

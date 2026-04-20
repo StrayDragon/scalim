@@ -1,7 +1,14 @@
 # yaml-dsl-unified-loader Specification
 
 ## Purpose
-TBD - created by archiving change c30-yaml-dsl-rigor-ssot. Update Purpose after archive.
+提供统一的 YAML load facade，确保 DSL 所有入口（CLI、runtime、workflow、imports、project config）共享相同的解析行为和错误结构。
+
+## Related Concepts
+- 统一 YAML load facade
+- vendored ruamel.yaml
+- duplicate key 检测
+- location index
+- ErrorEnvelope
 
 ## Requirements
 ### Requirement: YAML load MUST be centralized behind a single facade

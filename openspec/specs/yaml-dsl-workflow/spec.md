@@ -5,14 +5,14 @@
 ## Purpose
 提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/by_yaml/workflow.py` (workflow config 解析 + demand 路径解析)
-- `src/IMPL_ROOT/dsl/by_yaml/workflow_entrypoints.py` (run_workflow 实现)
-- `src/IMPL_ROOT/dsl/by_yaml/workflow_types.py` (workflow config 类型稳定导入路径)
-- `src/IMPL_ROOT/dsl/by_yaml/workflow_paths.py` (workflow demand 路径解析稳定导入路径)
-- `src/IMPL_ROOT/workflow/loaders.py` (workflow YAML 中可通过字符串引用的内置 loaders)
-- `src/IMPL_ROOT/execution/workflow_cache_pool.py` (workflow-scope cache pool)
-- `src/IMPL_ROOT/dsl/by_yaml/schema/workflow.gen.json` (workflow schema)
+## Related Concepts
+- Workflow 配置模块 (workflow.py)
+- Workflow 入口模块 (workflow_entrypoints.py)
+- Workflow 类型模块 (workflow_types.py)
+- Workflow 路径模块 (workflow_paths.py)
+- Workflow loaders (workflow/loaders.py)
+- Workflow 缓存池 (workflow_cache_pool.py)
+- Workflow JSON Schema (workflow.gen.json)
 ## Requirements
 ### Requirement: workflow public guidance MUST use curated stable entrypoints
 

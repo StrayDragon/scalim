@@ -1,7 +1,15 @@
 # package-identity Specification
 
 ## Purpose
-TBD - created by archiving change projectlib-rename-uv-lib-migration. Update Purpose after archive.
+定义项目包身份与分发边界的治理规范，确保 PyPI 发行名、导入根包名、CLI 命令名之间的清晰分离，以及运行时主包与 CLI 发行物的版本约束解耦。
+
+## Related Concepts
+- 包分发结构 (uv lib 结构, src/)
+- 构建后端 (uv_build)
+- PyPI 发行物 (wheel/sdist)
+- CLI 拆包发行物 (scalim-cli)
+- 可选依赖 (extras)
+
 ## Requirements
 ### Requirement: PyPI 发行名为 PROJECT_DIST_NAME
 系统 MUST 使用 `PROJECT_DIST_NAME` 作为唯一对外 PyPI 发行名(distribution name).
@@ -29,25 +37,25 @@ TBD - created by archiving change projectlib-rename-uv-lib-migration. Update Pur
 补充约束（分发边界）：
 
 - `PROJECT_CLI_NAME` MUST 由独立 CLI 发行物提供（例如 `scalim-cli`），并允许该发行物使用更高的 Python 版本约束（例如 requires-python >=3.10）。
-- runtime 主包（`PROJECT_DIST_NAME` / `src/IMPL_ROOT/`）MUST 保持 Python 3.6 兼容且不承载 CLI 入口实现。
+- runtime 主包 MUST 保持 Python 3.6 兼容且不承载 CLI 入口实现。
 
 #### Scenario: CLI 可运行
 - **WHEN** 用户在 Python>=3.10 环境安装并执行 `PROJECT_CLI_NAME --help`
 - **THEN** 命令 MUST 返回 0 且输出帮助信息
 
 ### Requirement: 使用 uv 标准 lib 结构与 uv_build 后端
-系统 MUST 采用 `uv init --lib` 的标准库结构进行分发:
-- 运行时包 MUST 位于 `src/IMPL_ROOT/`.
+系统 MUST 采用 uv 标准 lib 结构进行分发:
+- 运行时包 MUST 位于 src/ 布局的标准目录（uv init --lib 生成结构）。
 - build backend MUST 为 `uv_build`.
 - `uv build` 生成的 wheel/sdist MUST 仅包含运行时必要文件(代码/资源/元数据),不得携带仓库的开发资产目录.
 
 #### Scenario: wheel 内容边界可控
 - **WHEN** 执行 `uv build --wheel`
-- **THEN** wheel 顶层 SHOULD 仅包含 `PROJECT_DIST_NAME/` 与对应的 `*.dist-info/`(以及标准 wheel 元数据)
+- **THEN** wheel 顶层 SHOULD 仅包含运行时包目录与对应的 dist-info 元数据
 
 #### Scenario: sdist 不包含开发资产目录
 - **WHEN** 执行 `uv build --sdist`
-- **THEN** sdist 中 MUST NOT 包含 `tests/`、`docs/`、`notebooks/`、`frontend/`、`artifacts/` 等非运行时目录
+- **THEN** sdist 中 MUST NOT 包含测试、文档、笔记本、前端、构建产物等非运行时目录
 
 ### Requirement: 可选依赖通过 extras 暴露
 系统 MUST 通过 extras 提供 runtime 的可选能力依赖(例如 pandas/excel 等).

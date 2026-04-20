@@ -1,21 +1,24 @@
 # ir-structure Specification
 
-**状态: ✅ 已实现**
 ## Purpose
 定义 IR 层的纯数据边界与依赖约束,确保 spec/ir 不依赖执行与规划层,便于稳定复用、演进与测试.
-## Related Code (as implemented)
-- `src/IMPL_ROOT/spec/ir/__init__.py`
-- `src/IMPL_ROOT/spec/ir/demand.py`
-- `src/IMPL_ROOT/spec/ir/fields.py` (`FieldIr`)
-- `src/IMPL_ROOT/spec/ir/relations.py`
-- `src/IMPL_ROOT/spec/ir/sources.py`
+
+## Related Concepts
+- IR 模块 (spec/ir/)
+- 需求 IR (demand.py)
+- 字段 IR (fields.py, FieldIr)
+- 关系 IR (relations.py)
+- 来源 IR (sources.py)
+- 纯数据层边界
+
 ## Requirements
+
 ### Requirement: IR 纯数据层
-系统 MUST 保证 `src/IMPL_ROOT/spec/ir` 中的 IR 类型为纯数据/类型层,不依赖 `execution`/`planning`/`sinks` 等执行侧模块.
+系统 MUST 保证 `spec/ir` 中的 IR 类型为纯数据/类型层,不依赖 `execution`/`planning`/`sinks` 等执行侧模块.
 
 #### Scenario: IR 模块无执行层依赖
-- **WHEN** 仅导入 `IMPL_ROOT.spec.ir` 相关模块
-- **THEN** 不会触发 `IMPL_ROOT.execution`/`IMPL_ROOT.planning`/`IMPL_ROOT.sinks` 的导入
+- **WHEN** 仅导入 IR 相关模块
+- **THEN** 不会触发 execution/planning/sinks 的导入
 
 ### Requirement: IR 结构调整不引入执行依赖
 系统 MUST 在 IR 结构调整或拆分时保持纯数据层边界,避免引入执行侧依赖.

@@ -6,18 +6,16 @@
 定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计.
 
 ## Context
-实现位于 `agentdev/skills/scalim-yaml-dsl/`.
+实现位于 agent skill 模块.
 该能力与自动生成的参考产物配合工作: `SKILL.md` 负责任务路由和最小操作入口,手工 references 负责场景预设与迁移 heuristics,受控参考产物负责完整语法/API catalog.
 
-## Related Code (as implemented)
-- `agentdev/skills/scalim-yaml-dsl/SKILL.md`
-- `agentdev/skills/scalim-yaml-dsl/agents/openai.yaml`
-- `agentdev/skills/scalim-yaml-dsl/references/task-authoring.md`
-- `agentdev/skills/scalim-yaml-dsl/references/task-upgrade-legacy.md`
-- `agentdev/skills/scalim-yaml-dsl/references/task-validate-debug.md`
-- `agentdev/skills/scalim-yaml-dsl/references/task-report-migration-playbook.md`
-- `tests/test_agent_skill_generator.py`
-- `docs/doc/yaml-dsl/agent-skill.md`
+## Related Concepts
+- Agent skill 模块 (scalim-yaml-dsl/)
+- Skill 配置 (SKILL.md, agents/openai.yaml)
+- Skill references (task-authoring, task-upgrade-legacy, task-validate-debug, task-report-migration-playbook)
+- 技能生成器 (gen-agent-skill)
+- 文档生成 (agent-skill.md)
+- CLI 模块 (yaml_dsl.py)
 ## Requirements
 ### Requirement: Task-Driven Manual Skill Entry
 系统 MUST 提供手工维护的 YAML DSL skill 本体,用于把 agent 引导到正确的任务路径,而不是把 skill 退化为单个 schema 摘要页.
@@ -58,9 +56,9 @@
 
 同时，为避免命令文案随实现演进而漂移，该指引中的“可复制命令片段” MUST 通过 injected blocks 受控注入，并以 CLI parser 为 SSOT：
 
-- SSOT: `packages/scalim-cli/src/scalim_cli/yaml_dsl.py`
-- skill 生成入口: `just gen-agent-skill`（注入 marker 内部内容；禁止手改区块内部）
-- docs-site 入口: `just gen-docs`（对应 docs 页同样使用 injected blocks）
+- SSOT: CLI yaml_dsl 模块
+- skill 生成入口: agent skill 生成命令（注入 marker 内部内容；禁止手改区块内部）
+- docs-site 入口: 文档生成命令（对应 docs 页同样使用 injected blocks）
 
 指引 MUST 明确包含:
 - `uv run PROJECT_CLI_NAME yaml-dsl validate <file.yaml>`

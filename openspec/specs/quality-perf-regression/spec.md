@@ -1,7 +1,15 @@
 # perf-regression-guardrails Specification
 
 ## Purpose
-TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive.
+定义性能回归护栏、基准测试套件与内存剖析入口，确保执行热路径的确定性行为不被退化，并提供可测量的趋势指标。
+## Related Concepts
+- deterministic hotpath guardrails
+- benchmark suites
+- memory profiling (memray)
+- call counting assertions
+- branch path assertions
+- structured benchmark output
+
 ## Requirements
 ### Requirement: Deterministic hotpath regression guardrails
 系统 MUST 为执行热路径提供确定性的回归护栏（单元测试级别），用于防止“wants-gated 退化”与无订阅时的额外循环/分配被重新引入。

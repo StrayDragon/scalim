@@ -1,20 +1,14 @@
 # agent-skill-export Specification
 
-**状态: ✅ 已实现**
-
 ## Purpose
-定义 `scalim-yaml-dsl` skill 自动生成器的职责边界,确保自动化只负责受控参考产物,同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体.
+定义 `scalim-yaml-dsl` skill 自动生成器的职责边界，确保自动化只负责受控参考产物，同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体。
 
-## Context
-实现位于 `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py` 与 `scripts/gen-agent-skill.py`.
-该生成器为手工维护的 `agentdev/skills/scalim-yaml-dsl/` 提供受控参考产物,并在校验模式下检测生成内容漂移.
+## Related Concepts
+- Agent skill 生成器 (packages/scalim-misc/src/scalim_misc/agent_skill_gen.py)
+- 生成脚本 (scripts/gen-agent-skill.py)
+- Skill 目录 (agentdev/skills/scalim-yaml-dsl/)
+- justfile 任务 (gen-agent-skill, validate-agent-skill)
 
-## Related Code (as implemented)
-- `packages/scalim-misc/src/scalim_misc/agent_skill_gen.py`
-- `scripts/gen-agent-skill.py`
-- `tests/test_agent_skill_generator.py`
-- `agentdev/skills/scalim-yaml-dsl/`
-- `justfile` (`gen-agent-skill`, `validate-agent-skill`)
 ## Requirements
 ### Requirement: Safe Output Destination
 系统 MUST 默认输出到 `agentdev/skills/`,允许通过参数指定输出根目录,但必须拒绝写入用户 skill 目录(如 `~/.codex/skills`、`~/.claude/skills`、`/etc/codex/skills`).

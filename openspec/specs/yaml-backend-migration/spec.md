@@ -4,6 +4,14 @@
 定义 `scalim` 默认 YAML backend 迁移到 vendored `ruamel.yaml`(YAML 1.2) 的运行时契约,
 并为 CLI 的 YAML round-trip 编辑能力建立稳定性门禁(no-op 字节级幂等 + minimal edit)。
 
+## Related Concepts
+- vendored ruamel.yaml (YAML 1.2)
+- duplicate key policy
+- round-trip editing (YAML(typ="rt"))
+- byte-idempotent no-op
+- corpus parity
+- Python 3.6 runtime compatibility
+
 ## Requirements
 ### Requirement: scalim YAML parsing MUST use vendored `ruamel.yaml` (YAML 1.2) as the only runtime backend
 

@@ -6,14 +6,14 @@
 为 demand YAML 提供跨文件复用能力: 顶层 `imports` + **受 scope 限制**的 `$import`(编译期展开),并在 schema/语义校验前完成展开.
 
 说明:
-- `$import` 的允许范围以稳定 authoring surfaces 为准;详见 `openspec/specs/yaml-dsl-demand-imports-scope/spec.md`.
+- `$import` 的允许范围以稳定 authoring surfaces 为准;详见 yaml-dsl-demand-imports-scope 规范.
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/imports.py` (imports/$import 展开与合并)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/loader.py` (文件路径入口自动展开)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (校验基于展开后的最终配置)
-- `src/IMPL_ROOT/cli/yaml_dsl.py` (CLI validate/schema validate 行为)
-- `src/IMPL_ROOT/dsl/yaml_dsl/schema/demand.gen.json` (schema 支持 imports/$import)
+## Related Concepts
+- Imports 模块 (imports.py)
+- Loader 模块 (loader.py)
+- Validator 模块 (validator.py)
+- CLI yaml_dsl 模块
+- Demand JSON Schema (demand.gen.json)
 
 ## Requirements
 

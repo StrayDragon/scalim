@@ -1,6 +1,5 @@
 # runtime-pruning Specification
 
-**状态: ✅ 已实现**
 ## Purpose
 PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用.
 
@@ -13,15 +12,16 @@ PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅
 
 运行时关联过程需要支持智能剪枝不需要的部分,以减少内存占用.
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/planning/builder.py` (required_fields planning)
-- `src/IMPL_ROOT/execution/context.py` (BatchContext.required_fields pruning)
-- `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (column write slim + streaming mode)
-- `src/IMPL_ROOT/execution/executor/operators/write.py` / `src/IMPL_ROOT/execution/executor/operators/release.py` (FieldSlimEvent emission)
-- `src/IMPL_ROOT/execution/executor/operators/load.py` (LoaderSlimEvent emission)
-- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (YAML → DemandIr: required fields closure + field conversion pruning)
+## Related Concepts
+- 计划构建器 (builder.py)
+- 批次上下文 (BatchContext)
+- Pipeline (pipeline.py)
+- 写入/释放算子 (write/release operators)
+- Load 算子 (load operators)
+- YAML 转换器 (conversion.py)
 
 ## Requirements
+
 ### Requirement: 依赖剪枝与计划元数据
 系统 SHALL 基于目标字段收集依赖并构建仅包含必需字段的执行计划,并使用依赖图进行拓扑排序以保证计算顺序正确.
 系统 SHALL 在未显式指定 targets 时默认包含所有字段;可通过 output.fields 配置指定输出字段顺序.
@@ -57,4 +57,4 @@ PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅
 
 ## Notes
 - RowReleaseEvent 仅在行式流式写入路径中触发(详见 `streaming-output`).
-- LoaderSlimEvent 在 Load 路径提取字段并发生“瘦身”(loader 返回 row_data=dict 且包含多余 keys)时触发,且为 wants-gated.
+- LoaderSlimEvent 在 Load 路径提取字段并发生"瘦身"(loader 返回 row_data=dict 且包含多余 keys)时触发,且为 wants-gated.

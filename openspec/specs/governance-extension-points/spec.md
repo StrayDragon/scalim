@@ -1,14 +1,16 @@
 # explicit-extension-points Specification
 
 **状态: ✅ 已实现**
+
 ## Purpose
-定义 PROJECT_NAME 内部扩展点的显式注入与编译式分发模型,减少模块级“魔法注入”与事件热路径反射,提升类型友好性、可维护性与性能稳定性.
-## Related Code (as implemented)
-- `src/IMPL_ROOT/execution/pipeline/overrides.py` (`PipelineOverrides`)
-- `src/IMPL_ROOT/execution/adaptive/policy.py` / `src/IMPL_ROOT/execution/adaptive/tuning.py`
-- `src/IMPL_ROOT/hooks/base.py` (`HookManager`)
-- `src/IMPL_ROOT/ob/observer.py` (`EventDispatchObserver`)
-- `src/IMPL_ROOT/ob/components.py` (`split_components`)
+定义 PROJECT_NAME 内部扩展点的显式注入与编译式分发模型，减少模块级”魔法注入”与事件热路径反射，提升类型友好性、可维护性与性能稳定性。
+
+## Related Concepts
+- Pipeline overrides / adaptive execution
+- Hook 事件分发缓存
+- Observer 事件处理缓存
+- 组件装配校验
+
 ## Requirements
 ### Requirement: 执行层扩展点必须显式注入
 系统 MUST 提供显式的 overrides/config 对象用于覆盖 execution pipeline 的可变实现细节(例如批次切分策略与 `adaptive` 调度策略/并发池配置/执行器类型),并禁止通过 `sys.modules` 探测或模块级 `getattr` “魔法注入”实现覆盖.
@@ -18,22 +20,22 @@
 - **WHEN** 用户提供自定义 `chunk_iterable` overrides
 - **THEN** Pipeline 必须使用该 chunker 进行批次切分
 
-#### Scenario: 注入 adaptive tuning/policy
-- **WHEN** 用户通过 overrides 注入 `AdaptiveTuning` 或 `AdaptivePolicy`
-- **THEN** `parallel_mode=adaptive` 的调度 MUST 使用该 tuning/policy 决定并发行为
+#### Scenario: 注入 adaptive 策略
+- **WHEN** 用户通过 overrides 注入自定义的 adaptive 策略
+- **THEN** 调度器 MUST 使用该策略决定并发行为
 
-#### Scenario: 覆盖 adaptive 执行器类型
-- **WHEN** 用户通过 overrides 注入自定义的 `adaptive` thread backend executor(thread 的 factory 或等价扩展点)
-- **THEN** 调度器 MUST 使用该 executor 创建并发 worker
-- **AND** 若用户配置/策略选择到 process/async backend,系统 MUST 失败并说明当前仅支持 thread
+#### Scenario: 覆盖执行器类型
+- **WHEN** 用户通过 overrides 注入自定义的执行器
+- **THEN** 调度器 MUST 使用该执行器创建并发 worker
+- **AND** 若用户配置/策略选择到不支持的执行器类型，系统 MUST 失败并说明
 
 ### Requirement: HookManager 分发在注册阶段编译缓存
 系统 MUST 在 hook 注册/注销时编译并缓存事件分发 callables,使 emit 热路径不依赖 `getattr/hasattr` 查找 handler.
 缓存结构 SHOULD 以 `event_type -> tuple[(hook, handler_callable)]` 的形式存在,并在 hooks 变更时重建.
 
-#### Scenario: emit 热路径无需 getattr 查找 handler
+#### Scenario: emit 热路径无需动态查找
 - **WHEN** HookManager 触发已订阅事件的 emit
-- **THEN** 分发应直接调用缓存的 handler_callable,而不是在 emit 中 `getattr(hook, handler_name)`
+- **THEN** 分发应直接调用缓存的 handler callable，而不是在 emit 中动态查找
 
 ### Requirement: EventDispatchObserver 需缓存 handler callable
 系统 SHALL 使 `EventDispatchObserver.on_event` 在首次遇到某 event_type 时解析 handler,并缓存 bound method,后续事件分发不得重复执行 `getattr` 查找.
@@ -46,9 +48,9 @@
 系统 MUST 为跨模块所需状态提供公开、类型化的查询接口,并禁止通过 `getattr(obj, "_private", ...)` 等方式窥探私有字段来决定行为(例如判断 allowlist 是否配置).
 该要求不适用于已明确作为“受控动态边界”的 resolver 动态解析过程与安全 compute eval 过程(它们保持现状).
 
-#### Scenario: allowlist 状态通过公开接口查询
-- **WHEN** 转换/执行逻辑需要判断 resolver 是否配置 allowlist
-- **THEN** 必须通过公开接口完成判断,不得读取 resolver/policy 的私有字段
+#### Scenario: 跨模块状态通过公开接口查询
+- **WHEN** 模块需要查询另一模块的状态
+- **THEN** 必须通过公开接口完成判断，不得读取私有字段
 
 ### Requirement: components/subscribers 装配入口必须显式校验
 系统 MUST 在组件列表装配入口(例如 yaml_dsl runtime 的 `components`/`subscribers`、或 `InstrumentationHub.register`)对每个组件做显式校验:

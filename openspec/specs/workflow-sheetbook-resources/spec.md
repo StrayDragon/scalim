@@ -4,6 +4,17 @@
 
 ## Purpose
 定义 workflow YAML 的共享 `.xlsx` book 资源(以 `workflow.resources.books` 表达)的迁移约束与运行期契约: 预算护栏、确定性写入、冲突安全、可观测且可原子导出为最终 xlsx,并提供可稳定引用的内置 loader 供下游节点读取 sheet rows.
+
+## Related Concepts
+- xlsx_memory sheetbook
+- canonical field key (internal row key space)
+- export header metadata
+- append alignment (canonical field key only)
+- typed internal rows (FieldValue)
+- spreadsheet serialization at export boundary
+- book_sheet_rows loader
+- migration from legacy sheetbook
+
 ## Requirements
 ### Requirement: legacy sheetbook authoring surface MUST be rejected and migrated to books
 系统 MUST 将旧 sheetbook authoring surface 视为已移除,并在 workflow 入口给出可操作迁移路径:

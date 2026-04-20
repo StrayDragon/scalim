@@ -3,7 +3,15 @@
 **状态: ✅ 已实现**
 
 ## Purpose
-为 `scalim` 建立统一的异常体系规范:以 `ScalimError(Exception)` 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
+为 scalim 建立统一的异常体系规范:以 ScalimError 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
+
+## Related Concepts
+- 异常体系根类
+- 异常分类（YAML/Execution/Workflow 维度）
+- 敏感信息治理
+- Observer/Hook 错误事件
+- 异常链规范
+
 ## Requirements
 ### Requirement: scalim MUST 暴露单根异常类型
 系统 MUST 定义 `ScalimError(Exception)` 作为 scalim 内所有自定义异常的根。
@@ -74,15 +82,16 @@ token/密钥、原始 SQL、URL query、绝对路径、用户数据明文、完�
 - **WHEN** 维护者检索 workflow config error 类型定义
 - **THEN** 全库 MUST 仅存在一个 canonical 定义,其余入口仅做包装补充上下文
 
-### Requirement: `src/scalim/` 内 `raise ... from` 异常链规范
-在 `src/scalim/` 中，将捕获的异常重新包装为另一异常时，默认 MUST 使用 `from exc`（或等价的显式 cause）以保留异常链与根因诊断信息。
+### Requirement: 核心模块内 `raise ... from` 异常链规范
+在 scalim 核心模块中，将捕获的异常重新包装为另一异常时，默认 MUST 使用 `from exc`（或等价的显式 cause）以保留异常链与根因诊断信息。
 
 仅在公共 API 边界且显式需要向调用方隐藏第三方或内部实现细节时 MAY 使用 `from None`；每一处 `from None` MUST 附带相邻注释说明抑制链的原因与适用边界（例如 YAML 解析边界隐藏解析器内部栈）。
 
 内部配置/编译路径（例如将 `ValueError` / `TypeError` 包装为 `ScalimWorkflowConfigError`）MUST 使用 `from exc`，除非该路径属于上述已文档化的 API 边界例外。
 
 #### Scenario: 内部错误包装保留链
-- **WHEN** 代码在 `src/scalim/` 内捕获异常 `exc` 并抛出包装后的领域异常
+- **GIVEN** 核心模块内捕获到异常
+- **WHEN** 代码抛出包装后的领域异常
 - **AND** 该路径不属于已注释说明的允许 `from None` 的 API 边界
 - **THEN** `raise` MUST 使用 `from exc`
 

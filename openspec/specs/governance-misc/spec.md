@@ -4,18 +4,15 @@
 ## Purpose
 为“重构分析类文档”提供统一的规范入口与最低要求,确保依赖分析、边界说明、任务拆分、验证口径和约束声明一致,以便在不改动代码的前提下形成可复核的决策依据.
 
-## Context
-重构往往跨多个模块,需要先形成依赖地图与契约冻结清单,再进入覆盖率提升与实际改动.本 spec 用于承载这些分析文档的最低要求.
-## Related Code (as implemented)
-- `ARCH.md`
-- `openspec/changes/` (refactor change artifacts)
-- `justfile` (`type-check`, `lintfix`, `test`, `check`)
-- `src/IMPL_ROOT/vendor/compact/typing_extensionsx.py` (typing_extensions compat)
+## Related Concepts
+- 重构分析文档（依赖地图、契约清单、任务拆分）
+- yaml_dsl 提案与任务规范（分阶段计划）
+- yaml_dsl 兼容性约束（loader/validator、API 签名）
 ## Requirements
 ### Requirement: 分析文档最小内容要求
 重构分析文档 SHALL 至少包含模块依赖地图、入口与契约清单、风险点与回滚策略、测试映射与未覆盖风险点,并明确“不得改变对外行为”的约束.
 文档 MUST 将任务拆分为可并行子模块,明确输入/输出/验证方式与依赖顺序.
-文档 MUST 声明 `__init__.py` 不进行 re-export,`src/IMPL_ROOT/` 运行时保持 Python 3.6 兼容,并包含 Python 最佳实践与类型检查建议(含 `typing_extensions` 兼容策略,避免滥用 `getattr/hasattr/setattr`).
+文档 MUST 声明 `__init__.py` 不进行 re-export、运行时保持 Python 3.6 兼容,并包含 Python 最佳实践与类型检查建议.
 
 #### Scenario: 依赖分析可复核
 - **WHEN** 审阅者检查重构分析文档
@@ -42,7 +39,7 @@ yaml_dsl 的 loader 与 validator SHALL 使用同一 Raw 适配层归一化 YAML
 当变更目标明确为“统一公开 API 命名并去除历史歧义”时,系统 MAY 进行破坏性命名收敛,但系统 MUST 满足以下约束:
 - 在 `proposal.md` 中以 **BREAKING** 明确标注.
 - 在实现中一次性完成调用方迁移,不保留兼容别名.
-- 必须覆盖仓内关键业务调用路径(包括 `INTEGRATION_APP/execute_batch_tasks/INTEGRATION_DIR/**`).
+- 必须覆盖仓内关键业务调用路径.
 
 对于本类变更,迁移完成后旧命名 MUST NOT 继续可用.
 
@@ -65,7 +62,7 @@ notebooks 示例允许随内部接口调整,不要求向后兼容.
 
 #### Scenario: 关键调用路径同步迁移
 - **WHEN** 实施 API 命名收敛变更
-- **THEN** `INTEGRATION_DIR` 相关调用 MUST 全部使用新命名
+- **THEN** 关键业务调用路径 MUST 全部使用新命名
 - **AND** 不得依赖兼容层运行
 
 #### Scenario: 旧命名无残留

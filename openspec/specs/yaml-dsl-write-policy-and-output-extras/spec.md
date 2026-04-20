@@ -1,7 +1,15 @@
 # yaml-dsl-write-policy-and-output-extras Specification
 
 ## Purpose
-TBD - created by archiving change c14-yaml-dsl-write-policy-and-output-extras. Update Purpose after archive.
+明确输出资源的四层边界：resources 声明、write_defaults 策略、outputs 内容编排、runtime output extras（meta/audit），并将 write policy 和 extras 迁出 YAML 主线。
+
+## Related Concepts
+- resources.books/files（输出目标声明）
+- write_defaults（workbook 默认写策略）
+- outputs[*].write（output-local header override）
+- runtime output extras（meta/audit）
+- 四层输出边界
+- overlay/deep-merge
 ## Requirements
 ### Requirement: `resources` MUST distinguish authoring declarations from runtime overlays
 输出资源面 MUST 明确区分“authoring 声明”与“runtime overlay”:

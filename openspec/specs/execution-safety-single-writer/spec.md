@@ -1,19 +1,24 @@
 # single-writer-model-safety Specification
 
 ## Purpose
-TBD - created by archiving change c40-harden-single-writer-model-futureproof. Update Purpose after archive.
+Establish and enforce a single-writer threading model for workflow execution state, ensuring that write operations to shared runtime structures are either owned by a controller thread or protected by locks in free-threaded Python runtimes, with debug assertions to catch violations early.
+
+## Related Concepts
+- WorkflowCtxStore (workflow execution state storage)
+- WorkflowArtifactsDirectory (artifacts and outputs container)
+- Single-writer threading model (controller-thread ownership)
+- Free-threaded Python (no-GIL runtime)
+- Debug assertions (development-time contract validation)
+- Write-node scheduling (demand future management)
+
 ## Requirements
-### Requirement: WorkflowCtxStore write operations MUST assert controller-thread ownership in debug builds
+### Requirement: WorkflowCtxStore and WorkflowArtifactsDirectory write operations MUST assert controller-thread ownership in debug builds
 
-All mutating entry points on `WorkflowCtxStore` (e.g. publish and equivalent writes) MUST assert that `threading.current_thread().ident` equals the thread id recorded at construction (`_owner_thread_id`). Assertions MUST be disabled under Python `-O` so normal production runs incur no overhead.
+All mutating entry points on `WorkflowCtxStore` and `WorkflowArtifactsDirectory` (e.g. publish and equivalent writes) MUST assert that `threading.current_thread().ident` equals the thread id recorded at construction (`_owner_thread_id`). Assertions MUST be disabled under Python `-O` so normal production runs incur no overhead.
 
-#### Scenario: Wrong thread calls publish in debug mode
+#### Scenario: Wrong thread calls write method in debug mode
 - **WHEN** a write method runs on a thread other than the owner thread and assertions are enabled
 - **THEN** the implementation MUST fail fast with a clear assertion message identifying the single-writer contract violation
-
-### Requirement: WorkflowArtifactsDirectory write operations MUST assert controller-thread ownership in debug builds
-
-The same single-writer assertion pattern as `WorkflowCtxStore` MUST apply to mutating methods on `WorkflowArtifactsDirectory`, with zero cost when assertions are stripped.
 
 #### Scenario: Wrong thread mutates artifacts directory in debug mode
 - **WHEN** a write runs off the owner thread with assertions enabled
@@ -21,19 +26,19 @@ The same single-writer assertion pattern as `WorkflowCtxStore` MUST apply to mut
 
 ### Requirement: Write-node scheduling MUST assert no in-flight demand futures
 
-When the controller schedules a write node, the implementation MUST assert that `len(self._state.submitted) == 0` (no in-flight demand futures), preserving the invariant that writes run only when no concurrent demand work is submitted.
+When the controller schedules a write node, the implementation MUST assert that no demand futures are in-flight, preserving the invariant that writes run only when no concurrent demand work is submitted.
 
 #### Scenario: Write scheduled while submitted futures exist
-- **WHEN** a write node is about to be scheduled and `submitted` is non-empty
+- **WHEN** a write node is about to be scheduled while demand futures are in-flight
 - **THEN** assertions enabled MUST catch the violation; with assertions disabled, behavior follows existing code paths (no new semantic requirement beyond current model)
 
 ### Requirement: Free-threaded Python MUST enable lock-guarded access to shared workflow stores
 
-When the interpreter reports a free-threaded (no-GIL) runtime via `sys.flags` (e.g. `nogil` / `no_gil` as available on the running version), `WorkflowCtxStore` and `WorkflowArtifactsDirectory` MUST protect their read/write methods with `threading.Lock` (or equivalent) so dict-backed state remains correct without relying on GIL happens-before. On Python 3.6 and GIL-backed builds where the flag is absent, the lock MUST be a no-op path with no extra locking overhead.
+When the interpreter reports a free-threaded (no-GIL) runtime, `WorkflowCtxStore` and `WorkflowArtifactsDirectory` MUST protect their read/write methods with appropriate locking so dict-backed state remains correct without relying on GIL happens-before. On GIL-backed builds, locking MUST be a no-op path with no extra overhead.
 
 #### Scenario: Runtime is free-threaded
-- **WHEN** `_FREE_THREADED` is true for the process
-- **THEN** reads and writes on these structures MUST occur under the same lock discipline so concurrent access cannot corrupt internal dicts
+- **WHEN** the runtime is free-threaded
+- **THEN** reads and writes on these structures MUST occur under lock discipline so concurrent access cannot corrupt internal state
 
 ### Requirement: Single-writer model MUST be documented
 

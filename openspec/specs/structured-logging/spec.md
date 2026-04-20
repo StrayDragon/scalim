@@ -1,7 +1,15 @@
 # structured-logging Specification
 
 ## Purpose
-TBD - created by archiving change c1-perf-observability. Update Purpose after archive.
+定义结构化日志的 JSONL 输出格式、字段元信息、归因上下文自动注入及 CLI 渲染能力，确保日志可被机器解析与人类友好展示。
+## Related Concepts
+- JSONL (JSON Lines) logging
+- stable base fields (timestamp/level/logger/message)
+- compact/verbose profiles
+- joinable attribution context (run_id/workflow_exec_id)
+- single-write (no legacy k=v output)
+- scalim-cli renderers
+
 ## Requirements
 ### Requirement: when enabled, `scalim.*` logs MUST be emitted as JSONL (one JSON object per line)
 

@@ -1,10 +1,18 @@
 # hooks-events Specification
 
 ## Purpose
-TBD - created by archiving change add-loader-retry-policy. Update Purpose after archive.
+定义 hooks 和事件系统的事件类型和策略决策信号规范,包括 loader retry 事件和 policy decision signals。
+
+## Related Concepts
+- Loader retry 事件 (loader_retry)
+- Policy decision signals (pre_use_batch_size)
+- Hook 系统 (on_event hooks)
+- 策略改写机制 (override)
+
 ## Requirements
+
 ### Requirement: 新增 `loader_retry` 事件用于观测重试尝试
-系统 SHALL 新增事件类型 `loader_retry`,用于表达“某次 loader 调用失败且系统决定按 policy 重试”.
+系统 SHALL 新增事件类型 `loader_retry`,用于表达"某次 loader 调用失败且系统决定按 policy 重试".
 系统 MUST 在每次 retry runner 决定进入 sleep+下一次尝试之前发出该事件.
 系统 MUST NOT 将每次可重试失败当作 `error` 事件;`error` 事件仅用于最终失败(不再重试)或不可重试错误.
 
@@ -22,8 +30,7 @@ TBD - created by archiving change add-loader-retry-policy. Update Purpose after 
 - **AND** 不得在该次失败上发出 `error` 事件
 
 ### Requirement: runtime MUST emit policy decision signals that hooks can override (pre-run_ir)
-
-系统 MUST 支持一类 “policy decision signals”（不同于纯观测事件），用于在进入 `run_ir()` 之前允许 hook 改写候选 runtime policy 值。
+系统 MUST 支持一类 "policy decision signals"（不同于纯观测事件），用于在进入 `run_ir()` 之前允许 hook 改写候选 runtime policy 值。
 
 v0 MUST 提供 `pre_use_batch_size` signal，并满足：
 
@@ -37,7 +44,7 @@ v0 MUST 提供 `pre_use_batch_size` signal，并满足：
   - `history`（记录改写历史，至少包含 hook 标识与原因）
 - 结果注入：signal 分发完成后，系统 MUST 使用 decision 的最终 `value` 更新传给 engine 的 `ExecutionRequest.batch_size`。
 
-**Note:** 为避免破坏既有 “订阅全部事件的 on_event hooks”，policy decision signals SHOULD 采用 typed dispatch（例如 `on_pre_use_batch_size`）或其它 opt-in 机制；不得默认广播给所有 `on_event` 订阅者。
+**Note:** 为避免破坏既有 "订阅全部事件的 on_event hooks"，policy decision signals SHOULD 采用 typed dispatch（例如 `on_pre_use_batch_size`）或其它 opt-in 机制；不得默认广播给所有 `on_event` 订阅者。
 
 #### Scenario: explicit batch_size skips policy signal
 - **WHEN** 调用方显式传入 `RunOptions(batch_size=8000)`
@@ -55,4 +62,3 @@ v0 MUST 提供 `pre_use_batch_size` signal，并满足：
 - **WHEN** hook A `override(8000, reason="A")` 且 hook B `override(10000, reason="B")`
 - **THEN** 最终 `ExecutionRequest.batch_size` MUST 为 `10000`
 - **AND** decision.history MUST 记录 A 与 B 的改写历史
-

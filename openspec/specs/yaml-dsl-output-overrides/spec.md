@@ -4,7 +4,14 @@
 
 ## Purpose
 
-为下游“UI 动态选字段/动态输出”场景提供单一标准做法: demand YAML 保持可复用(通常不声明 `outputs`),调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。
+为下游”UI 动态选字段/动态输出”场景提供单一标准做法：demand YAML 保持可复用（通常不声明 `outputs`），调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。
+
+## Related Concepts
+- RunOverrides (typed dataclasses)
+- outputs 覆盖
+- resources/outputs_defaults 覆盖
+- 工厂方法
+- YAML DSL runtime 模块
 ## Requirements
 ### Requirement: `RunOverrides` MUST provide factory methods for the common “single-sheet dynamic fields export” scenario
 
@@ -70,7 +77,7 @@
 
 系统 MUST 在 YAML DSL runtime 的 `RunOverrides` 中提供 `outputs` 覆盖字段,用于在不修改 demand YAML 的前提下运行期指定输出编排。
 
-与旧的 YAML-shaped `list[dict]` 不同,`RunOverrides.outputs` MUST 为 typed dataclasses 序列,并且 MUST 可从 `scalim.dsl.yaml_dsl` 稳定导入。
+与旧的 YAML-shaped `list[dict]` 不同，`RunOverrides.outputs` MUST 为 typed dataclasses 序列，并且 MUST 可从 YAML DSL runtime 模块稳定导入。
 
 本 spec 仅承诺明细输出(detail)的最小子集,至少包含:
 

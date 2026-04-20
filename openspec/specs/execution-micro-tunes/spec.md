@@ -1,8 +1,15 @@
-# yaml-dsl-micro-tunes Specification
+# execution-micro-tunes Specification
 
 ## Purpose
-TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after archive.
+定义 YAML DSL 语法增强，简化常见场景的表达复杂度，包括 relation 引用语法糖、output.fields 简写、runtime vars 指令节点形式，以及改进的验证器诊断信息。
+
+## Related Concepts
+- Schema DSL (schema_dsl/)
+- Schema 校验器 (yaml_schema_validator)
+- Runtime 变量注入 (runtime/)
+
 ## Requirements
+
 ### Requirement: Relation references support string ref to relations.<id>
 系统 MUST 支持在字段定义中用字符串引用 relation:
 - `relation: <relation_id>` 作为 `relations.<relation_id>` 的显式引用
@@ -50,7 +57,7 @@ TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after arc
 - **THEN** schema-only 校验与 full validate MUST 通过,并在运行期注入对应 runtime 值
 
 #### Scenario: legacy $runtime.xxx placeholder is rejected
-- **WHEN** 用户在 params 中写 `ids: \"$runtime.order_ids\"`
+- **WHEN** 用户在 params 中写 `ids: "$runtime.order_ids"`
 - **THEN** full validate MUST 失败,并提示改用 `{$runtime: order_ids}`
 
 ### Requirement: Validator provides actionable diagnostics for field_id vs data_key mistakes
@@ -61,4 +68,3 @@ TBD - created by archiving change yaml-dsl-micro-tunes. Update Purpose after arc
 #### Scenario: validator suggests likely field_id and fix snippet
 - **WHEN** 用户在 relation steps 中误写 data_key
 - **THEN** full validate MUST 失败,并在错误信息中包含建议的 `field_id` 与可复制的修复片段
-

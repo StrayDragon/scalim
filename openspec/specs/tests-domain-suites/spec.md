@@ -1,7 +1,14 @@
 # tests-domain-suites Specification
 
 ## Purpose
-TBD - created by archiving change c2-tests-domain-suites. Update Purpose after archive.
+将测试按领域组织为显式套件目录，约束 YAML string-reference fixtures 放在 tests/fixtures/，禁止 additional 模式，并确保 governance 聚焦于契约测试和脚本单元测试。
+
+## Related Concepts
+- domain suites（tests/public_api/yaml_dsl/workflow/execution/governance/integration/bench）
+- tests/fixtures/（YAML string-reference fixtures）
+- tests/support/（Python import helpers）
+- 静态门禁脚本
+- QA gate
 ## Requirements
 ### Requirement: tests MUST be organized as domain suites
 仓库 MUST 将 `tests/` 下的测试用例按领域（domain）组织为显式套件目录,而不是长期依赖“平铺文件 + 文件名前缀”来表达归类.
@@ -15,7 +22,7 @@ TBD - created by archiving change c2-tests-domain-suites. Update Purpose after a
 - `tests/integration/`
 - `tests/bench/`（基准套件,保持 marker 隔离）
 
-该约束 MUST 由可独立运行的静态门禁守护,并在 `just qa` 的 fail-fast 阶段执行（例如 `uv run scripts/check-tests-domain-suites.py --check`）。
+该约束 MUST 由可独立运行的静态门禁守护，并在 QA gate 的 fail-fast 阶段执行。
 
 #### Scenario: domain suites exist under tests/
 - **WHEN** 维护者运行 tests domain suites 的静态门禁
@@ -27,17 +34,17 @@ TBD - created by archiving change c2-tests-domain-suites. Update Purpose after a
 
 系统 MUST 提供可重复运行的门禁,用于检测 `tests/**` 中所有字符串引用是否落在 `tests/fixtures/` 边界内;一旦发现散点引用,门禁 MUST fail-fast 并给出可定位的命中位置与建议迁移路径.
 
-该门禁 MUST 以可独立运行的脚本形式提供,并在 `just qa` 的 fail-fast 阶段执行（例如 `uv run scripts/check-tests-domain-suites.py --check`）。
+该门禁 MUST 以可独立运行的脚本形式提供，并在 QA gate 的 fail-fast 阶段执行。
 
 #### Scenario: string-reference boundary is enforced by a gate
 - **GIVEN** 某个测试 YAML/配置中存在 `loader:`/`call_by:` 的 `tests.<module>:<name>` 字符串引用
-- **WHEN** 维护者运行对应门禁（例如 `uv run scripts/check-tests-domain-suites.py --check`）
+- **WHEN** 维护者运行对应门禁
 - **THEN** 若引用目标不在 `tests/fixtures/` 下,门禁 MUST 失败并输出命中位置
 
 ### Requirement: tests/support MUST NOT be referenced by YAML strings
 系统 MUST 将 `tests/support/` 定义为“仅用于 Python import 的测试内部复用工具”目录;其中的模块 MUST NOT 被 YAML/Workflow 作为字符串引用目标（避免把可移动 helper 变成事实运行期契约）.
 
-该约束 MUST 由与 string-reference boundary 相同的静态门禁守护（例如 `uv run scripts/check-tests-domain-suites.py --check`）。
+该约束 MUST 由与 string-reference boundary 相同的静态门禁守护。
 
 #### Scenario: support helpers are not promoted into string-reference contracts
 - **WHEN** 某个 YAML/Workflow 配置尝试引用 `tests.support.*` 作为 `loader:`/`call_by:` 目标
@@ -47,7 +54,7 @@ TBD - created by archiving change c2-tests-domain-suites. Update Purpose after a
 系统 MUST 禁止通过 `test_*_additional.py` 的方式为同一主题引入并行套件.
 同一能力的测试 SSOT MUST 收敛为单一 domain suites 内的明确入口（可通过参数化覆盖更多场景,但不得以“additional 文件”扩散主题分散）.
 
-该约束 MUST 由可独立运行的静态门禁守护,并在 `just qa` 的 fail-fast 阶段执行（例如 `uv run scripts/check-tests-domain-suites.py --check`）。
+该约束 MUST 由可独立运行的静态门禁守护，并在 QA gate 的 fail-fast 阶段执行。
 
 #### Scenario: additional pattern is rejected
 - **WHEN** 仓库中出现新的 `tests/**/test_*_additional.py`
@@ -58,9 +65,9 @@ TBD - created by archiving change c2-tests-domain-suites. Update Purpose after a
 - 运行时契约测试（public entrypoints、optional deps boundary、vendor 兼容层等）
 - `scripts/check-*.py` 的单元测试（验证脚本行为、退出码与定位输出）
 
-`tests/governance/` MUST NOT 承载“纯静态扫描类门禁”的完整实现逻辑；该类门禁 MUST 以 `scripts/check-*.py` 的方式存在,并由 `just qa` 在 pytest 之前执行.
+`tests/governance/` MUST NOT 承载”纯静态扫描类门禁”的完整实现逻辑；该类门禁 MUST 以 scripts 的方式存在，并由 QA gate 在 pytest 之前执行。
 
 #### Scenario: governance gates are reachable without pytest
-- **WHEN** 开发者未运行 pytest,仅运行 `just qa` 的 fail-fast 阶段或直接运行 `scripts/check-*.py --check`
+- **WHEN** 开发者未运行 pytest，仅运行 QA gate 的 fail-fast 阶段或直接运行静态门禁脚本
 - **THEN** 静态治理门禁 MUST 仍可完成检查并 fail-fast
 

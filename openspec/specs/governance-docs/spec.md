@@ -2,21 +2,22 @@
 
 **状态: ✅ 已实现**
 ## Purpose
-定义仓库内文档的分层、生成边界(`*.gen.*` + `AUTOGEN` 注入区块)、统一生成入口与漂移门禁,以降低维护成本并防止“手工修改生成物/区块”导致的不一致.
+定义仓库内文档的分层、生成边界(`*.gen.*` + `AUTOGEN` 注入区块)、统一生成入口与漂移门禁,以降低维护成本并防止”手工修改生成物/区块”导致的不一致.
 
-## Related Code (as implemented)
-- `AGENTS.md` (doc governance rules for agents)
-- `scripts/gen-docs.py` (`--check` drift gate)
-- `scripts/check-doc-governance.py` (consistency checks)
-- `justfile` (`gen-docs`, `docs-drift-check`, `doc-governance-check`)
-- `docs/doc/**/*.gen.md` (generated reference pages)
+## Related Concepts
+- 文档生成器 (gen-docs.py)
+- 漂移检查 (scripts/check-doc-governance.py)
+- Just 任务入口 (gen-docs, docs-drift-check)
+- Agent 指令 (AGENTS.md)
+- OpenSpec 配置 (openspec/config.yaml)
 
 ## Requirements
 ### Requirement: Generated doc artifacts are identifiable and non-editable
 仓库 MUST 使用可机械识别的规则区分 “手工文档” 与 “生成文档/产物”,以避免漂移与误改:
 
 - 任何**全文件生成物** MUST 在文件名中包含 `.gen.`(例如 `*.gen.md`/`*.gen.json`/`*.gen.yaml`)
-- 全文件生成物 MUST 在文件头部包含“自动生成 + 生成入口(脚本或 just 目标)”提示
+- 全文件生成物 MUST 在文件头部包含”自动生成 + 生成入口(脚本或 just 目标)”提示
+- 手工页中的受控注入区块 MUST 使用 `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` markers
 - 生成器 MUST 只写入其受控输出集合,不得覆盖手工维护文件
 
 #### Scenario: `.gen.*` 文件带生成入口提示
@@ -60,8 +61,8 @@
 ### Requirement: Repository guidelines document doc boundaries for agents
 仓库 MUST 在 agent 指令文件中明确声明 doc governance 规则,以降低自动化修改时的风险.
 
-#### Scenario: `AGENTS.md` 包含生成边界规则
-- **WHEN** 维护者更新仓库级 `AGENTS.md`
+#### Scenario: 仓库级 agent 指令包含生成边界规则
+- **WHEN** 维护者更新仓库级 agent 指令
 - **THEN** 文档 MUST 包含对 `.gen.*` 文件与 `AUTOGEN` 注入区块的规则说明与生成入口提示
 
 ### Requirement: OpenSpec config includes doc governance writing rules
@@ -74,16 +75,6 @@
 - **WHEN** 维护者创建一个涉及文档/规范变更的 OpenSpec change
 - **THEN** 工件中的 tasks MUST 指明生成物的 SSOT 与生成入口(脚本或 `just` 目标)
 
-### Requirement: generated artifacts MUST follow naming/marker conventions
-系统 MUST 通过约定而非额外 manifest 来标识生成物边界:
-- 全文件生成物 MUST 使用 `*.gen.*` 命名(例如 `*.gen.md`/`*.gen.json`/`*.gen.yaml`)
-- 手工页中的受控注入区块 MUST 使用 `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` markers
-
-#### Scenario: drift checks are driven by generators (no manifest)
-- **WHEN** 维护者运行 drift checks
-- **THEN** drift checks MUST 直接调用各自生成器的 `--check/--validate` 模式,并在漂移时 fail-fast
-- **AND** 不应要求维护者同步维护一份"生成物列表 manifest"
-
-#### Scenario: adding a new generated artifact requires convention compliance
+#### Scenario: 新增生成物必须满足约定
 - **WHEN** 新增一个生成物文件
 - **THEN** 必须满足上述命名/marker 约定,否则 gate MUST fail-fast

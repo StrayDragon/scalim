@@ -13,11 +13,12 @@
 
 因此需要一套跨模块可复用的最小约定,并遵循库代码惯例: 不为下游做全局 `logging` 配置决定。
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/_internal/loggingx.py` (统一 logger 命名空间、前缀、`k=v` 追加字段、context 绑定;导入时安装 `NullHandler`)
-- `src/IMPL_ROOT/dsl/yaml_dsl/_internal/config_parsing/validator.py` (runtime YAML 语义校验 + unknown-fields;不输出 JSONSchema skip warnings)
-- `src/IMPL_ROOT/execution/output_composition.py` (派生输出护栏 warnings 的统一输出)
-- `src/IMPL_ROOT/ob/presets/performance.py` (性能阈值 warnings 的统一输出)
+## Related Concepts
+- 统一日志工具模块 (`loggingx`)
+- 运行时配置校验器 (`config_parsing/validator`)
+- 派生输出护栏模块 (`output_composition`)
+- 性能观测模块 (`ob/presets/performance`)
+
 ## Requirements
 ### Requirement: 框架内部日志使用标准库 `logging` 且默认静默
 系统 MUST 使用 Python 标准库 `logging` 输出框架内部日志,并遵循库代码“默认静默”约束。
@@ -79,5 +80,5 @@
 系统 MUST 将 runtime 的用户可见诊断输出统一为结构化 logger 输出（例如 `loggingx` 的 prefix + kv）,并禁止在 runtime 代码路径中直接使用 `print(...)`.
 
 #### Scenario: print usage in runtime fails fast
-- **WHEN** 在 `src/scalim/` 的 runtime 路径中出现 `print(...)`
+- **WHEN** 在 runtime 代码路径中出现 `print(...)`
 - **THEN** gate MUST fail-fast 并提示迁移到结构化 logger

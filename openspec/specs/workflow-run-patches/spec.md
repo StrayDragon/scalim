@@ -1,7 +1,17 @@
 # workflow-run-patches Specification
 
 ## Purpose
-TBD - created by archiving change c61-workflow-run-patches-by-id. Update Purpose after archive.
+允许 run_workflow 接受按 workflow run id 注入的 per-run runtime patches，支持覆盖 batch_size、parallel_mode、max_workers、demand_diagnostics、components 等参数，并确保安全边界参数不可覆盖。
+
+## Related Concepts
+- run_workflow
+- run_options_patches_by_run_id
+- WorkflowRunOptionsPatch（typed）
+- per-run diagnostics overrides
+- components patch（replace/extend）
+- workflow resources overlay
+- 三态语义（inherit/disable/override）
+- 安全边界参数（allowed_modules/allowed_functions/resolver_trusted_mode）
 ## Requirements
 ### Requirement: run_workflow MUST accept per-run patches keyed by workflow run id
 

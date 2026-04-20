@@ -1,25 +1,20 @@
 # execution-structure Specification
 
-**状态: ✅ 已实现**
 ## Purpose
 定义 execution 层的模块拆分与入口契约,并明确统一 IR 编排入口(如 `run_ir`)的边界,确保执行编排对 DSL 配置解耦且行为在重构后保持兼容.
-## Related Code (as implemented)
-- `src/IMPL_ROOT/execution/run_ir.py` (`run_ir` + DSL-agnostic request/result models)
-- `src/IMPL_ROOT/execution/engine.py` (`ScalesEngine`)
-- `src/IMPL_ROOT/execution/pipeline/base/pipeline.py` (`SeqPipeline` orchestration)
-- `src/IMPL_ROOT/execution/pipeline/overrides.py` (`PipelineOverrides`)
-- `src/IMPL_ROOT/execution/adaptive/config.py` (shared adaptive config resolver)
-- `src/IMPL_ROOT/execution/executor/batch/executor.py` (`BatchExecutor`)
-- `src/IMPL_ROOT/ob/components.py` (`split_components`)
-- `src/IMPL_ROOT/ob/observability.py` (`Observability.build_manager`)
 
-## Implementation Notes (Current Behavior)
-- `run_ir(...)` 当前在 execution 侧内部完成 `PlanBuilder(demand_ir).build(targets=...)`(不接受外部预构建 plan 注入).
-- `OutputSpec.path` 为 falsy 时不会创建文件 sink;当其为相对路径时以运行时进程 CWD 为基准;会自动创建父目录(`mkdir(parents=True, exist_ok=True)`)并可能覆盖同名文件;当 file sink 与自定义 `sink` 同时存在时,会尝试 tee(要求 row/column sink 类型一致,否则抛出带迁移提示的错误).
-- `ExecutionRequest.components` 通过 `split_components` 拆成 observers/hooks,分别注册到 `ObserverManager` 与 `HookManager`;`viz_config` 存在时会基于 plan 注册 `VizObserver.from_plan(...)`.
-- `ExecutionResult.total_rows` 统计口径为“实际写入 effective sink 的行数”(由 sink wrapper 计数),与部分 observability 指标的输入行计数口径不同.
-- `ScalesEngine` 实例不应被并发复用;当前实现会在单个 engine 实例内序列化 `run()` 调用以避免共享 runtime/caches 的并发竞态.
+## Related Concepts
+- 统一 IR 编排入口 (run_ir)
+- 执行引擎 (ScalesEngine)
+- 序列管线 (SeqPipeline)
+- 管线覆盖 (PipelineOverrides)
+- 自适应配置 (adaptive/config)
+- 批量执行器 (BatchExecutor)
+- 组件拆分 (split_components)
+- 可观测性构建器 (Observability.build_manager)
+
 ## Requirements
+
 ### Requirement: execution 提供统一 IR 编排入口并返回通用结果
 系统 MUST 在 execution 层提供统一 IR 执行编排入口(概念名: `run_ir`,具体模块/符号名可调整),负责:
 - 基于 `DemandIr` + `ExecutionRequest` 构建 plan
@@ -37,18 +32,17 @@
 - **THEN** 可直接复用 execution 统一 IR 编排入口并获得同一个 `ExecutionResult` 结构
 
 ### Requirement: execution Tier1 facade MUST expose an options-only `run_ir` entrypoint
-系统 MUST 将 execution 层的统一编排入口（`run_ir`）与其 DSL-agnostic contracts（`ExecutionRequest`/`ExecutionResult` 等）作为官方推荐 public facade 的一部分,
-确保用户材料无需引用内部模块路径即可完成执行编排.
+系统 MUST 将 execution 层的统一编排入口（`run_ir`）与其 DSL-agnostic contracts（`ExecutionRequest`/`ExecutionResult` 等）作为官方推荐 public facade 的一部分,确保用户材料无需引用内部模块路径即可完成执行编排.
 
 该 facade MUST 满足：
 
-- `scalim.execution` MUST 提供 `run_ir` 与 `ExecutionRequest` 的稳定导入路径（通过 re-export 或等价方式）。
+- execution facade MUST 提供 `run_ir` 与 `ExecutionRequest` 的稳定导入路径（通过 re-export 或等价方式）。
 - 调用入口 MUST 以单一 request/options 对象驱动（`ExecutionRequest` 为唯一运行期契约承载）。
 
 #### Scenario: user imports and runs execution via curated facade
-- **WHEN** 调用方执行 `from scalim.execution import ExecutionRequest, run_ir`
+- **WHEN** 调用方从 execution facade 导入 ExecutionRequest 与 run_ir
 - **THEN** 导入 MUST 成功
-- **AND** 调用方 MUST 能以 `run_ir(demand_ir, request=ExecutionRequest(...))` 的方式运行而无需导入 `scalim.execution.run_ir` 模块路径
+- **AND** 调用方 MUST 能以 `run_ir(demand_ir, request=ExecutionRequest(...))` 的方式运行而无需导入 run_ir 模块路径
 
 ### Requirement: `ExecutionRequest`/`ExecutionResult` 不得包含 DSL config types
 系统 MUST 保持 execution 侧的请求/结果对象为 DSL-agnostic:
@@ -60,18 +54,17 @@
 - **THEN** 不应出现对 DSL config 包的依赖
 
 ### Requirement: `run_ir` 模块默认导出面收敛
-系统 MUST 将 `IMPL_ROOT.execution.run_ir.__all__` 视为稳定的公开符号集合,并避免将纯内部辅助类型纳入默认导出面.
+系统 MUST 将 `run_ir.__all__` 视为稳定的公开符号集合,并避免将纯内部辅助类型纳入默认导出面.
 
 内部辅助类型可以继续作为模块属性存在(以保持兼容),但 MUST NOT 被加入到 `__all__` 里(避免被 `from ... import *` 视为公开 API).
 
-#### Scenario: `InternalStatsCollector` 不在 `__all__` 中
-- **WHEN** 导入 `IMPL_ROOT.execution.run_ir` 并读取其 `__all__`
-- **THEN** `__all__` MUST NOT 包含 `"InternalStatsCollector"`
+#### Scenario: 内部辅助类型不在 __all__ 中
+- **WHEN** 导入 run_ir 模块并读取其 `__all__`
+- **THEN** `__all__` MUST NOT 包含内部辅助类型
 
 ### Requirement: 执行层入口与行为一致
 系统 MUST 在执行层重构或拆分后保持对外行为一致,并避免将 `executor`/`pipeline` 的内部模块组织与 `__init__` re-export 作为稳定契约.
 调用方应优先通过 `run_ir` 与 `ScalesEngine` 等稳定入口完成执行;内部实现可按最小风险渐进调整.
-模块拆分与内部入口约定详见 `module-organization`.
 
 #### Scenario: 既有入口保持稳定
 - **WHEN** 使用 `run_ir` 或 `ScalesEngine` 完成执行
@@ -96,11 +89,11 @@
 - **THEN** 执行层 MUST 以单批方式处理全部 main rows
 
 #### Scenario: 非法 batch_size 直接失败
-- **WHEN** 使用 `batch_size=0` 或 `batch_size=-1` 或 `batch_size=True` 或 `batch_size=1.5` 或 `batch_size=\"oops\"`
+- **WHEN** 使用 `batch_size=0` 或 `batch_size=-1` 或 `batch_size=True` 或 `batch_size=1.5` 或 `batch_size="oops"`
 - **THEN** 构造或执行 MUST 抛出参数错误并指向 `batch_size`
 
 #### Scenario: adaptive 注入 tuning/policy
-- **WHEN** 使用 `ScalesEngine(..., parallel_mode=\"adaptive\", pipeline_overrides=overrides)` 且 overrides 包含 tuning/policy
+- **WHEN** 使用 `ScalesEngine(..., parallel_mode="adaptive", pipeline_overrides=overrides)` 且 overrides 包含 tuning/policy
 - **THEN** 执行 MUST 按 tuning/policy 的限流与阈值策略调度并发任务
 
 #### Scenario: 启用 guardrails
@@ -185,7 +178,7 @@
 - **AND** `AdaptiveLoadRefScheduler` 的本地解析实现应保持与该共享路径等价的默认值与校验语义
 
 ### Requirement: ExecutionRequest 支持 loader retry policy 且默认关闭
-系统 SHALL 在 execution 侧的请求对象(例如 `ExecutionRequest`)中提供可选的 loader retry policy 字段,用于控制所有 loader 调用点的重试行为.
+系统 SHALL 在 execution 侧的请求对象中提供可选的 loader retry policy 字段,用于控制所有 loader 调用点的重试行为.
 当该字段缺省/disabled 时,系统 MUST 保持现有行为(不重试).
 
 #### Scenario: request 未启用 retry 时行为不变
@@ -197,7 +190,7 @@
 - `load`(非 ref source loader 调用)
 - `load_ref`(ref loader 调用,含 lookup_keys 分片/多次调用)
 - `preload_forever`(预加载路径)
-- main_source loader 的“首次调用”(创建 iterable 的那次调用)
+- main_source loader 的"首次调用"(创建 iterable 的那次调用)
 
 对于 `load_ref` 的分片调用,系统 SHOULD 将每次实际 loader 调用视为独立一次 invocation,并对每次 invocation 单独应用 retry policy(仍受该 policy 的 attempt/elapsed 约束).
 
@@ -207,7 +200,7 @@
 - **THEN** 系统 MUST 对该片调用执行重试(不要求回滚其它已成功片段)
 
 ### Requirement: adaptive scheduler 热点必须进一步拆分为可替换协作单元
-系统 MUST 将 `execution/adaptive/loadref_scheduler.py` 视为确认热点,并允许其继续拆分为更清晰的协作单元,至少包括策略/worker 数解析、layer planning、任务提交、结果聚合与提交顺序维护.
+系统 MUST 将 `loadref_scheduler.py` 视为确认热点,并允许其继续拆分为更清晰的协作单元,至少包括策略/worker 数解析、layer planning、任务提交、结果聚合与提交顺序维护.
 
 #### Scenario: scheduler 拆分后协作单元边界清晰
 - **WHEN** 维护者重构 `AdaptiveLoadRefScheduler` 的内部结构

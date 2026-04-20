@@ -1,12 +1,14 @@
 # deterministic-ordering Specification
 
-**状态: ✅ 已实现**
 ## Purpose
-定义 PROJECT_NAME 的稳定顺序最小契约,用于保证 planning/执行在相同输入下可复现,并避免 `PYTHONHASHSEED` 等非确定性因素影响结果.
-本 spec 覆盖执行计划构建顺序、拓扑排序输出的 tie-break 规则、以及 keys 绑定列表的稳定顺序要求.
-## Related Code (as implemented)
-- `src/IMPL_ROOT/utils/graph.py` (`topological_sort`)
-- `src/IMPL_ROOT/spec/ir/binding/__init__.py` (`build_stable_lookup_key_list`)
+定义 PROJECT_NAME 的稳定顺序最小契约，用于保证 planning/执行在相同输入下可复现，并避免 `PYTHONHASHSEED` 等非确定性因素影响结果。
+
+本 spec 覆盖执行计划构建顺序、拓扑排序输出的 tie-break 规则、以及 keys 绑定列表的稳定顺序要求。
+
+## Related Concepts
+- 图拓扑排序 (utils/graph.py)
+- 绑定参数顺序处理 (spec/ir/binding/__init__.py)
+
 ## Requirements
 ### Requirement: 跨哈希种子的执行顺序可重复
 系统 SHALL 使执行计划的 `field_order` 与 compute 算子顺序在相同输入模型下不受 `PYTHONHASHSEED` 影响.

@@ -3,6 +3,13 @@
 **状态: ✅ 已实现**
 ## Purpose
 定义 demand/workflow 统一的 `resources.files` 文件输出资源入口,并约束 CSV 输出通过 `outputs[*].to.file` + `outputs[*].write` 绑定,取代 legacy `outputs[*].container`.
+
+## Related Concepts
+- resources.files 统一入口
+- CSV 输出绑定
+- temp-path 原子写入
+- TOCTOU 缓解
+- workflow merge precedence
 ## Requirements
 ### Requirement: demand and workflow YAML MUST support `resources.files` as the unified file-output resource surface
 

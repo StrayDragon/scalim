@@ -13,14 +13,13 @@
 
 关联键类型可能不同(如字符串 "123" vs 整数 123),需要在 lookup 前进行规范化以保证字典查找命中.
 
-## Related Code (as implemented)
-- `src/IMPL_ROOT/spec/ir/relations.py` (steps IR)
-- `src/IMPL_ROOT/spec/ir/sources.py` (`KeyIr.cast`)
-- `src/IMPL_ROOT/utils/converters.py` (`auto_normalize_key` + cast helpers)
-- `src/IMPL_ROOT/execution/executor/operators/load_ref/loader.py` (lookup execution + chunking)
-- `src/IMPL_ROOT/dsl/yaml_dsl/runtime/conversion.py` (YAML → relation IR compilation)
-- `src/IMPL_ROOT/planning/loader_ordering/deps.py` / `src/IMPL_ROOT/planning/loader_ordering/sequences.py`
-- `src/IMPL_ROOT/utils/relation_diagnostics.py`
+## Related Concepts
+- IR 层: relations steps、KeyIr.cast
+- 运行时: lookup 执行与分片、LoadRef 操作符
+- 类型转换: auto_normalize_key 与 cast helpers
+- 编译层: YAML → relation IR 转换
+- 计划层: loader ordering 与依赖排序
+- 诊断: relation_diagnostics
 ## Requirements
 ### Requirement: steps 结构与 relation 解析/推断规则
 系统 SHALL 将关系定义为有序 `steps` 列表并按声明顺序执行;每个 step 包含 `from`/`to`(source.field 或同源列表)以及可选 `lookup_cast`,相邻 steps 必须链式相连.

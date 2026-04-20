@@ -1,7 +1,14 @@
 # workflow-managed-temp-outputs Specification
 
 ## Purpose
-TBD - created by archiving change c50-workflow-managed-temp-outputs. Update Purpose after archive.
+允许 workflow 托管仅供写入节点消费的中间态 outputs，使用内存 artifact 而非强制落盘，并确保 typed artifact 在 xlsx_memory 路径保留值域。
+
+## Related Concepts
+- workflow-managed temp outputs
+- typed in-memory artifact
+- xlsx_memory 写节点
+- FieldValue 值域
+- artifact 生命周期管理
 ## Requirements
 ### Requirement: workflow MAY manage temp CSV outputs for write-node consumption
 当 demand outputs 仅用于 workflow 写入节点消费时,workflow MAY 托管这些 outputs 的中间态；**当 workflow 选择托管时,系统 MUST** 允许以实现细节选择合适的内存 artifact,而不是强制落盘。

@@ -2,6 +2,15 @@
 
 ## Purpose
 定义 workflow runtime 的包位置、子模块职责划分与稳定入口策略,确保其作为 framework 层能力与 DSL 层保持清晰边界.
+
+## Related Concepts
+- workflow runtime modularization
+- Controller + State pattern
+- dependency injection
+- stable entrypoints
+- visibility closure SSOT
+- transitive depends_on
+
 ## Requirements
 ### Requirement: workflow runtime MUST be modularized while preserving stable entrypoints
 系统 MUST 将 workflow runtime 作为 framework 层能力放置在独立包中(SSOT: `IMPL_ROOT.workflow`),并按职责拆分为更小的内部模块（例如 execute/scheduler、ctx、resources、loaders、report）。

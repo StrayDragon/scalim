@@ -1,7 +1,15 @@
 # yaml-dsl-runtime-policy-boundary Specification
 
 ## Purpose
-TBD - created by archiving change c13-yaml-dsl-runtime-policy-boundary. Update Purpose after archive.
+将 runtime policy 从 YAML 主线迁出到 Python/CLI runtime entrypoints，并建立清晰的 policy boundary：parser-only 路径不运行 runtime-only diagnostics，runtime-only diagnostics 仅在具备 effective runtime policy 的边界运行。
+
+## Related Concepts
+- runtime policy boundary
+- runtime entrypoints (Python/CLI)
+- parser-only vs policy-aware 边界
+- workflow preflight
+- runtime-only diagnostics
+- derived runtime policy
 ## Requirements
 ### Requirement: demand runtime-policy fields MUST move out of YAML mainline
 

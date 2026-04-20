@@ -1,7 +1,14 @@
-# yaml-dsl-mainline-principles Specification
+# governance-mainline-principles Specification
 
 ## Purpose
-定义 YAML DSL 的上位主线原则与设计护栏,用于约束后续变更的方向与评审口径: 单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式(拒绝 imports expansion)。
+定义 YAML DSL 的上位主线原则与设计护栏，用于约束后续变更的方向与评审口径：单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式（拒绝 imports expansion）。
+
+## Related Concepts
+- YAML DSL 主线演进策略
+- Authoring surface 与 runtime policy 分离
+- KV-first 设计模式
+- Workflow orchestration 边界
+
 ## Requirements
 ### Requirement: YAML DSL mainline MUST evolve as a single in-place line
 YAML DSL 主线演进 MUST 采用单主线原地升级模型:

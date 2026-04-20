@@ -1,7 +1,14 @@
 # yaml-dsl-schema-workflow-alignment Specification
 
 ## Purpose
-对齐 workflow `workflow.resources` 的 schema/runtime 契约(禁止 `$import` 暴露并提供迁移提示),并为 schema numeric constraints 引入生成期 fail-fast 与仓库级 drift gate.
+对齐 workflow `workflow.resources` 的 schema/runtime 契约（禁止 `$import` 暴露并提供迁移提示），并为 schema numeric constraints 引入生成期 fail-fast 与仓库级 drift gate。
+
+## Related Concepts
+- workflow resources schema
+- runtime parser/compiler
+- imports expansion
+- numeric constraints (minimum/maximum)
+- drift gate
 ## Requirements
 ### Requirement: workflow `resources` schema MUST expose only runtime-supported keys
 workflow `resources` 的 schema 与静态校验面 MUST 以 runtime parser / compiler 实际支持的结构为准:

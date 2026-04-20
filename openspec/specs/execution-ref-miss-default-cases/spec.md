@@ -1,34 +1,30 @@
-# yaml-dsl-ref-miss-default-cases Specification
+# execution-ref-miss-default-cases Specification
 
 ## Purpose
-TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Purpose after archive.
+定义 YAML DSL 中 source ref 字段的 relation miss 默认值机制。允许用户在关联查询未命中时使用有序的默认值替代 None，提高配置表达能力和错误容错性。
+
+## Related Concepts
+- YAML DSL schema 语义
+- Source ref 字段与 relation 查询
+- value_cast 类型转换系统
+- Builtin callable 调用机制
+- 编译时依赖分析
+
 ## Requirements
 ### Requirement: YAML ref fields MAY declare ordered default cases for relation miss
 
-系统 MUST 支持在 source ref 字段上声明 `default` ordered cases:
+系统 MUST 支持在 source ref 字段上声明 `default` ordered cases：
 
 - `default` MUST 为数组（按声明顺序 first-match）
-- 每个 case MUST 包含 `when`
-- v1 中 `when` MUST 仅允许 `relation_miss`
+- 每个 case MUST 包含 `when`（v1 中 MUST 仅允许 `relation_miss`）
 - 每个 case MUST 在 `literal` 与 `call_by` 之间二选一（oneOf）
-  - `literal` MUST 为 YAML 标量（`int|float|str|bool|null`）
-  - `call_by` MUST 为字符串，并且 MUST 显式包含 `()` 以表示“可调用表达式”（例如 `^defaults/default()`）
+  - `literal` MUST 为 YAML 标量
+  - `call_by` MUST 为字符串且显式包含 `()` 以表示可调用表达式
 
 `default` MUST 仅允许出现在带 `relation:` 的 source field 上；若字段未声明 `relation`，系统 MUST 在校验阶段 fail-fast。
 
 #### Scenario: ref field default literal is accepted
-- **WHEN** 用户在一个带 `relation` 的字段上声明：
-  ```yaml
-  sources:
-    create_metrics:
-      fields:
-        create_order_count:
-          relation: paid_to_create
-          value_cast: int
-          default:
-            - when: relation_miss
-              literal: 0
-  ```
+- **WHEN** 用户在一个带 `relation` 的字段上声明 `default: [{when: relation_miss, literal: 0}]`
 - **THEN** schema/strict validation MUST 通过
 
 #### Scenario: default on non-ref field is rejected
@@ -76,31 +72,15 @@ TBD - created by archiving change c0-yaml-dsl-ref-miss-default-cases. Update Pur
 
 ### Requirement: default call_by MUST only depend on pre-ref available fields (compile-time fail-fast)
 
-系统 MUST 对 `default[*].call_by` 执行依赖字段静态分析，并在编译/校验阶段 fail-fast 拒绝“依赖尚未就绪字段”的配置。
-
-#### Definition: pre-ref available fields
+系统 MUST 对 `default[*].call_by` 执行依赖字段静态分析，并在编译/校验阶段 fail-fast 拒绝”依赖尚未就绪字段”的配置。
 
 pre-ref 可用字段 MUST 满足以下条件之一：
-
-- main_source 的非 ref 字段（即：source field 且未声明 `relation`）
-- derived 字段，且其依赖闭包中不包含任何 ref 字段（source field 声明了 `relation`）或依赖 ref 的 derived 字段
+- main_source 的非 ref 字段
+- derived 字段，且其依赖闭包中不包含任何 ref 字段或依赖 ref 的 derived 字段
 
 #### Scenario: default call_by may reference main_source non-ref fields
-- **WHEN** 某 ref 字段 default case 声明：
-  ```yaml
-  main_source:
-    fields:
-      group_name: {extract: group_name}
-  sources:
-    create_metrics:
-      fields:
-        create_order_count:
-          relation: paid_to_create
-          value_cast: int
-          default:
-            - when: relation_miss
-              call_by: myapp.defaults:zero_by_group(group=group_name)
-  ```
+- **GIVEN** main_source 包含非 ref 字段 `group_name`
+- **WHEN** 某 ref 字段 default case 声明 `call_by: myapp.defaults:zero_by_group(group=group_name)`
 - **THEN** 编译/校验 MUST 通过（因为 `group_name` 为 pre-ref 可用字段）
 
 #### Scenario: default call_by that depends on a ref field is rejected
@@ -114,10 +94,10 @@ pre-ref 可用字段 MUST 满足以下条件之一：
 
 - `int` → `0`
 - `str` → `\"\"`
-- `decimal` → `0`（并进入 value_cast 转换路径得到 `Decimal(0)`）
+- `decimal` → `0`
 - `auto` → `\"\"`
 
-该 builtin MUST 要求字段显式声明 `value_cast`；若缺失，系统 MUST 在编译/校验阶段 fail-fast（避免将缺省值静默回退为 `None`）。
+该 builtin MUST 要求字段显式声明 `value_cast`；若缺失，系统 MUST 在编译/校验阶段 fail-fast。
 
 #### Scenario: builtin default returns 0 for int fields
 - **GIVEN** 某 ref 字段声明 `value_cast: int`

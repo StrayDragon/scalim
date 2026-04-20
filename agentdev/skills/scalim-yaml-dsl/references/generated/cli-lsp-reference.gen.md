@@ -55,28 +55,19 @@
 ## OpenSpec Requirement Map
 ### `yaml-dsl-cli-validation`
 - Source: `openspec/specs/yaml-dsl-cli-validation/spec.md`
-- Purpose: 定义 `PROJECT_CLI_NAME yaml-dsl ...` 的校验分层、严格模式、JSON 输出与诊断输出格式(含源码位置),以确保 CLI 校验结果可用于 IDE 跳转、CI 报告与脚本化消费,并避免与 schema 生成规范耦合.
+- Purpose: 定义 CLI 校验工具的行为契约，包括校验分层、诊断输出格式与错误定位，确保 CLI 结果可用于 IDE 跳转、CI 报告与脚本化消费。
 - Requirements:
-  - CLI implementation MAY live outside runtime core but MUST preserve validation contracts
-  - CLI validation MUST reuse the unified YAML load facade
-  - YAML validation contracts MUST be centralized as SSOT across entrypoints
-  - CLI validate MUST delegate validation logic to a reusable service layer
-  - CLI validate 与 schema validate 职责边界(避免重复诊断)
-  - validate and schema validate MUST catch known fail-late cases consistently
-  - CLI Schema-Only Validation
-  - JSONSchema 错误收集(完整 + 稳定 + 去噪)
-  - CLI Schema Discovery
-  - 严格未知字段校验
-  - 运行时 validator 错误列表包含 issue path
-  - 校验命令输出与 schema 一致性
-  - CLI 校验输出包含源码位置
-  - `ValidationIssue.path` MUST 使用单一 canonical 口径以稳定映射到源码位置
-  - Linter/编译器风格输出
-  - validate 对 `outputs.*.fields` object 条目给出可行动诊断
-  - CLI can upsert schema modeline in YAML files (IntelliJ compatible)
-  - upsert-lsp-comment resolves schema reference from type + schema-path
-  - CLI MUST provide a `PROJECT_CLI_NAME yaml-dsl lint` entrypoint for YAML DSL authoring linting
-  - CLI MUST provide a `PROJECT_CLI_NAME yaml-dsl format` entrypoint for idempotent formatting
+  - CLI 与 runtime core 职责分离
+  - 校验契约 SSOT
+  - CLI validate 职责边界
+  - 校验覆盖 fail-late 情况
+  - JSON 输出格式
+  - 源码位置定位
+  - Linter 风格输出
+  - Schema 发现与查看
+  - LSP comment 管理
+  - Lint 命令
+  - Format 命令
 
 ## Command Details
 ### `yaml-dsl validate`
