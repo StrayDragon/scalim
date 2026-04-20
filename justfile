@@ -824,6 +824,8 @@ py36-typingext-check:
     #!/usr/bin/env bash
     set -euo pipefail
 
+    just gen-public-api-jump-imports
+
     if docker version >/dev/null 2>&1; then
         docker run --rm -e CI -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
         exit 0

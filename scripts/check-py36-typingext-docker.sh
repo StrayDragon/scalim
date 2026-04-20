@@ -50,6 +50,16 @@ else
 fi
 
 PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python -m compileall -q "$repo_root/src/scalim"
+
+jump_imports_path="$repo_root/.tmp/public_api_jump_imports.py"
+if [ ! -f "$jump_imports_path" ]; then
+    echo "[error] missing `.tmp/public_api_jump_imports.py`; run: just gen-public-api-jump-imports" >&2
+    exit 1
+fi
+
+PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python "$jump_imports_path"
+echo "检查通过: py36 + typing-extensions 4.1.1 + Tier1 public API jump imports smoke"
+
 PYTHONPYCACHEPREFIX="$pycache_prefix" PYTHONPATH="$repo_root/src" python - <<'PY'
 # 说明:
 # - 该检查刻意不安装 openpyxl/pandas 等可选依赖,用于捕获“import 时炸”的回归.
