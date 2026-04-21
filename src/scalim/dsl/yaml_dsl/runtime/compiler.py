@@ -73,7 +73,7 @@ from .contracts import (
     UnsetType,
 )
 from .conversion import ConfigToIRConverter
-from .effective_outputs import outputs_require_unique_effective_field_display_names
+from .effective_outputs import apply_default_book_binding_to_outputs, outputs_require_unique_effective_field_display_names
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError, ScalimResolverError
 from .output_composition_yaml import compile_output_composition_from_yaml
 from .references import SecurePythonReferenceResolver, derive_base_module_path
@@ -124,27 +124,7 @@ def _apply_default_book_binding_to_outputs(
     *,
     default_book_id: str,
 ) -> Tuple[OutputTargetConfig, ...]:
-    if not outputs:
-        return outputs
-    if not default_book_id:
-        return outputs
-
-    updated: List[OutputTargetConfig] = []
-    for out_cfg in outputs:
-        to_cfg = out_cfg.to
-        if to_cfg is None:
-            updated.append(replace(out_cfg, to=OutputToConfig(book=str(default_book_id))))
-            continue
-
-        file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
-        book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
-        if file_id or book_id:
-            updated.append(out_cfg)
-            continue
-
-        updated.append(replace(out_cfg, to=replace(to_cfg, book=str(default_book_id))))
-
-    return tuple(updated)
+    return apply_default_book_binding_to_outputs(outputs, default_book_id=str(default_book_id))
 
 
 def _parse_typed_overrides_output_to(raw: OutputToOverride) -> OutputToConfig:

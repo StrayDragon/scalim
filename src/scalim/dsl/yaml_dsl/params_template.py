@@ -513,50 +513,57 @@ def compile_params_template(
     )
 
 
-def _parse_keys_options(options_raw: object, *, path: str) -> str:
+def _parse_single_option_str(
+    options_raw: object,
+    *,
+    path: str,
+    directive: str,
+    option_key: str,
+    default_value: str,
+    allowed_values: Tuple[str, ...],
+) -> str:
     if options_raw is None:
-        return "set"
+        return str(default_value)
     if not _is_dict(options_raw):
-        msg = "`$keys` options must be a mapping or null"
+        msg = "`{}` options must be a mapping or null".format(str(directive))
         raise ScalimParamsTemplateCompileError(msg, path=path)
     options = options_raw
     for k in options:
-        if str(k) != "as":
-            msg = "Unknown `$keys` option: {}".format(str(k))
+        if str(k) != str(option_key):
+            msg = "Unknown `{}` option: {}".format(str(directive), str(k))
             raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, k))
-    raw_as = options.get("as")
-    if raw_as is None:
-        return "set"
-    if not isinstance(raw_as, str):
-        msg = "`$keys.as` must be a string"
-        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "as"))
-    if raw_as not in {"set", "list"}:
-        msg = "`$keys.as` must be one of: set, list"
-        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "as"))
-    return raw_as
+    raw_value = options.get(option_key)
+    if raw_value is None:
+        return str(default_value)
+    if not isinstance(raw_value, str):
+        msg = "`{}.{}` must be a string".format(str(directive), str(option_key))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, option_key))
+    if raw_value not in allowed_values:
+        msg = "`{}.{}` must be one of: {}".format(str(directive), str(option_key), ", ".join(allowed_values))
+        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, option_key))
+    return raw_value
+
+
+def _parse_keys_options(options_raw: object, *, path: str) -> str:
+    return _parse_single_option_str(
+        options_raw,
+        path=path,
+        directive=_DIRECTIVE_KEYS,
+        option_key="as",
+        default_value="set",
+        allowed_values=("set", "list"),
+    )
 
 
 def _parse_rows_options(options_raw: object, *, path: str) -> str:
-    if options_raw is None:
-        return "batch"
-    if not _is_dict(options_raw):
-        msg = "`$rows` options must be a mapping or null"
-        raise ScalimParamsTemplateCompileError(msg, path=path)
-    options = options_raw
-    for k in options:
-        if str(k) != "cache_mode":
-            msg = "Unknown `$rows` option: {}".format(str(k))
-            raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, k))
-    raw_cache = options.get("cache_mode")
-    if raw_cache is None:
-        return "batch"
-    if not isinstance(raw_cache, str):
-        msg = "`$rows.cache_mode` must be a string"
-        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "cache_mode"))
-    if raw_cache not in {"batch", "none"}:
-        msg = "`$rows.cache_mode` must be one of: batch, none"
-        raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, "cache_mode"))
-    return raw_cache
+    return _parse_single_option_str(
+        options_raw,
+        path=path,
+        directive=_DIRECTIVE_ROWS,
+        option_key="cache_mode",
+        default_value="batch",
+        allowed_values=("batch", "none"),
+    )
 
 
 __all__ = (

@@ -26,6 +26,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/examples-marimo/spec.md)
 - Summary: 定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。
 
+### `execution-adaptive-guardrails`
+- Title: execution-adaptive-guardrails Specification
+- Source: [spec.md](#code=openspec/specs/execution-adaptive-guardrails/spec.md)
+- Summary: TBD - created by archiving change c0-deps-and-adaptive-guardrails. Update Purpose after archive.
+
 ### `execution-concurrency-safety`
 - Title: no-external-callback-under-lock Specification
 - Source: [spec.md](#code=openspec/specs/execution-concurrency-safety/spec.md)
