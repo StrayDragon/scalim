@@ -3,6 +3,10 @@
 Sources:
 - `openspec/specs/*/spec.md`
 -->
+
+??? warning "自动生成文件"
+    本文件由 `scripts/gen-docs.py` 自动生成，请勿手动编辑。如需修改，请编辑源文件或生成脚本。
+
 # OpenSpec 索引(生成)
 
 说明:

@@ -18,12 +18,12 @@ nav = [
   { "DSL" = [
     { "YAML-DSL" = [
       "yaml-dsl/index.md",
-      { "YAML 语法速查" = "yaml-dsl/syntax.md" },
-      { "YAML 用户指南" = "yaml-dsl/user-guide.md" },
+      { "语法速查" = "yaml-dsl/syntax.md" },
+      { "用户指南" = "yaml-dsl/user-guide.md" },
       { "YAML→IR 能力矩阵" = "yaml-dsl/capability-matrix.md" },
-      { "YAML DSL 升级指南" = "yaml-dsl/upgrades/index.md" },
+      { "升级指南" = "yaml-dsl/upgrades/index.md" },
       { "配置补全与编辑体验" = "yaml-dsl/editor.md" },
-      { "YAML DSL LSP/IDE 集成" = [
+      { "LSP/IDE 集成" = [
         "yaml-dsl/lsp/index.md",
         { "JetBrains" = "yaml-dsl/lsp/jetbrains.md" },
         { "Troubleshooting" = "yaml-dsl/lsp/troubleshooting.md" },
@@ -45,7 +45,7 @@ nav = [
     "architecture/index.md",
     { "架构详解" = "architecture/arch.md" },
     { "OpenSpec 规范" = "specs/index.md" },
-    { "OpenSpec 索引(生成)" = "specs/openspec-index.gen.md" },
+    { "OpenSpec 索引" = "specs/openspec-index.gen.md" },
   ] },
   { "参与开发" = [
     "dev/index.md",

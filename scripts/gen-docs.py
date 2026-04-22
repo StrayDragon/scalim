@@ -274,7 +274,10 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
 
     lines: List[str] = [
         _autogen_md_header(sources=sources).rstrip("\n"),
-        "# 公共 API 导入指南（生成）",
+        "# 公共 API 导入指南",
+        "",
+        '??? warning "自动生成文件"',
+        "    本文件由 `scripts/gen-docs.py` 自动生成，请勿手动编辑。如需修改，请编辑源文件或生成脚本。",
         "",
         '??? note "适用读者"',
         "    - 使用方:在 Python 里调用 Scalim,希望导入路径稳定、可回归",
@@ -584,6 +587,10 @@ def _render_openspec_index(repo_root: Path) -> str:
 
     lines = [
         _autogen_md_header(sources=["`openspec/specs/*/spec.md`"]).rstrip("\n"),
+        "",
+        '??? warning "自动生成文件"',
+        "    本文件由 `scripts/gen-docs.py` 自动生成，请勿手动编辑。如需修改，请编辑源文件或生成脚本。",
+        "",
         "# OpenSpec 索引(生成)",
         "",
         "说明:",
