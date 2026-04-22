@@ -1,23 +1,13 @@
 schema: spec-driven
 
 context: |
-  # Public placeholders (sanitized for release)
-  # - PROJECT_NAME: project display name
-  # - PROJECT_DIST_NAME: package/distribution name
-  # - PROJECT_CLI_NAME: CLI command name
-  # - IMPL_ROOT: Python import root
-  # - REPO_ROOT: repository root path
-  # - COMPANY_NAME: company name placeholder
-  # - INTEGRATION_APP: downstream integration system/app
-  # - INTEGRATION_DIR: downstream integration sample/config dir
-
-  PROJECT_NAME 是高性能报表生成框架:,核心为 YAML DSL + IR 驱动执行.
+  项目定义: 高性能(内存优先)报表生成框架:,核心为 YAML DSL + IR 驱动执行.
   目标能力: 多数据源关联、流式输出、可观测性与可视化事件流.
   运行时需兼容 Python 3.6(开发通常 3.10+).
   主要依赖: PyYAML、typing-extensions 兼容层;jsonschema/rich 为可选.
   工程风格: Python-only:,4 空格缩进:,140 行宽:,双引号.
   命名规范: 函数/变量 snake_case:,类 PascalCase.
-  `src/IMPL_ROOT/` 内优先相对导入:,避免 `from __future__ import annotations` 于核心运行时.
+  `src/<主库>/` 内优先相对导入:,避免 `from __future__ import annotations` 于核心运行时.
   核心领域概念: Demand、Source、Field、Relation、Observability.
   架构模式: Hook/Event 扩展机制 + Sink 抽象输出层.
   测试基线: pytest + xdist;慢测使用 `@pytest.mark.slow`.
@@ -30,14 +20,23 @@ context: |
   若缺少 `openspec/sanitize_rules.local.yaml`,sanitize 步骤会在非 CI 环境给出 warning;当 `CI` 环境变量为有效值时跳过该提示.
   若 CI 环境未安装 `openspec` CLI,`just openspec-check` 会在 sanitize 后给出 warning 并跳过结构校验;共享/发布前仍需在具备该 CLI 的环境完成完整校验.
   规范校验命令: `openspec validate --all --strict --no-interactive`.
-  提交前缀建议: `feat:`、`refactor:`、`fix:`、`docs:`、`specs:`、`qa:`、`tests:`、`chore:`、`PROJECT_DIST_NAME:`、`sync:`、`tmp:`.
+  提交前缀建议: `feat:`、`refactor:`、`fix:`、`docs:`、`specs:`、`qa:`、`tests:`、`chore:`、`package/distribution:`、`sync:`、`tmp:`.
   示例策略: 优先扩展现有 demo/YAML:,再新增文件.
   Active changes 命名规范(仅对 `openspec/changes/` 下未归档变更生效):
   - 统一使用 `c<priority>-<kebab-case>` 形式,例如 `c10-workflow-ir-roadmap`
-  - `priority` 建议按 10 递增(预留 `c0-`/`c5-` 等插队位),便于从名称直观看出推进顺序
+  - `priority` 建议按 10 递增(预留 `c0-`/`c5-` 等插队位),便于从名称直观看出推进顺序,优先级越小越优先.
   - `openspec/changes/archive/` 中的历史归档不做重命名
   提案引用约定:
   - 当在其它提案/文档中引用某个 change 时,仅使用其 `<kebab-case>` 名称(不带 `c<priority>-` 前缀),避免优先级调整导致跨文档引用漂移
+
+  ## YAML DSL 主线原则(摘要)
+
+  当你在 `openspec/changes/` 下创建/评审 YAML DSL 相关变更时,默认遵循这些上位原则(完整 SSOT 以 `openspec/specs/yaml-dsl-mainline-principles/spec.md` 为准):
+
+  - 单主线原地演进: 不引入 `dsl_version`、不维护并行 parser/validator/schema, 版本管理只依赖pypi包版本
+  - `YAML = authoring`, `Python/CLI = runtime policy`
+  - KV-first: 需要稳定 ID/引用/复用的结构优先 mapping
+  - workflow 小而声明式,并拒绝 workflow imports expansion
 
   ## Spec 命名与架构层级规范
 
