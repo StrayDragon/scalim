@@ -57,8 +57,8 @@ sources:
     params:
       ids: {$keys: {as: set}}
     normalize:
-      kind: index_by_key
       call_by: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:normalize_identity"
+      index_by_key: {}
     fields:
       customer_segment: {name: Customer Segment, relation: tickets_to_customers}
 

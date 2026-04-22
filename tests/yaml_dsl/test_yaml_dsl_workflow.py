@@ -3342,9 +3342,9 @@ sources:
       sep_first:
         sep: ","
     normalize:
-      kind: index_by_key
-      key_field: id
-      on_conflict: last
+      index_by_key:
+        key_field: id
+        on_conflict: last
     fields:
       value:
         name: value

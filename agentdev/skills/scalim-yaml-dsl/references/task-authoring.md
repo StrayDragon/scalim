@@ -215,7 +215,7 @@ relations:
         to: [price.region_id, price.product_category_id]
 ```
 
-### list-returning lookup source: `normalize.kind=index_by_key`
+### list-returning lookup source: `normalize.index_by_key`
 
 当 lookup loader 返回 `list[row]`(而不是 `key -> row` mapping)时,优先在 source 上用 `normalize` 归一化:
 
@@ -225,9 +225,9 @@ sources:
     loader: "myapp.loaders:load_payment_methods"
     key: payment_method_id
     normalize:
-      kind: index_by_key
-      key_field: payment_method_id
-      on_conflict: error
+      index_by_key:
+        key_field: payment_method_id
+        on_conflict: error
 ```
 
 字段级 `extract` 仍然只负责从“单条 row value”里取字段:

@@ -60,10 +60,33 @@ class ParserSourcesMixin:
             if step_dict is None:
                 continue
 
-            step_kind = str(step_dict.get("kind", "")).strip()
-            step_on_empty = self._normalize_opt_str(step_dict.get("on_empty"))
-            step_on_missing = self._normalize_opt_str(step_dict.get("on_missing"))
-            step_fields = self._parse_normalize_project_fields(step_dict.get("fields"))
+            if "kind" in step_dict:
+                msg = (
+                    "Legacy YAML syntax is not supported for normalize.map_values.steps: "
+                    "use a one-of step-branch object like `{take_first: {}}` or `{project_fields: {fields: {...}}}`"
+                )
+                raise TypeError(msg)
+
+            branches = [key for key in ("take_first", "project_fields") if key in step_dict]
+            if len(branches) != 1:
+                msg = "normalize.map_values.steps must select exactly one step branch: take_first/project_fields"
+                raise TypeError(msg)
+
+            branch = branches[0]
+            params_dict = mapping_or_none(step_dict.get(branch))
+            if params_dict is None:
+                msg = "normalize.map_values.steps.{} must be a dictionary".format(branch)
+                raise TypeError(msg)
+
+            step_kind = branch
+            step_on_empty = None
+            step_on_missing = None
+            step_fields: Dict[str, NormalizeProjectFieldRuleConfig] = {}
+            if branch == "take_first":
+                step_on_empty = self._normalize_opt_str(params_dict.get("on_empty"))
+            else:
+                step_on_missing = self._normalize_opt_str(params_dict.get("on_missing"))
+                step_fields = self._parse_normalize_project_fields(params_dict.get("fields"))
 
             steps_converted.append(
                 NormalizeStepConfig(
@@ -208,34 +231,112 @@ class ParserSourcesMixin:
         if norm_dict is None:
             return None
 
-        kind = str(norm_dict.get(NORMALIZE_KEYS["kind"], "")).strip()
-        key_field = str(norm_dict.get(NORMALIZE_KEYS["key_field"], "")).strip()
-        on_conflict = str(norm_dict.get(NORMALIZE_KEYS["on_conflict"], "error")).strip() or "error"
-        on_none = str(norm_dict.get(NORMALIZE_KEYS["on_none"], "raise")).strip() or "raise"
+        call_by = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["call_by"]))
+        if NORMALIZE_KEYS["kind"] in norm_dict:
+            msg = (
+                "Legacy YAML syntax is not supported for normalize: "
+                "replace `{kind: <...>, ...}` with a one-of normalize-branch object like `{index_by_key: {...}}` "
+                "(note: `call_by` stays as a sibling field under `normalize`)"
+            )
+            raise TypeError(msg)
 
-        on_empty = None
-        if NORMALIZE_KEYS["on_empty"] in norm_dict:
-            on_empty = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["on_empty"]))
+        branches = [key for key in ("index_by_key", "take_first", "project_fields", "map_values") if key in norm_dict]
+        if len(branches) != 1:
+            msg = "normalize must select exactly one branch: index_by_key/take_first/project_fields/map_values"
+            raise TypeError(msg)
 
-        on_missing = None
-        if NORMALIZE_KEYS["on_missing"] in norm_dict:
-            on_missing = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["on_missing"]))
+        branch = branches[0]
+        params_dict = mapping_or_none(norm_dict.get(branch))
+        if params_dict is None:
+            msg = "normalize.{} must be a dictionary".format(branch)
+            raise TypeError(msg)
 
-        call_by = None
-        if NORMALIZE_KEYS["call_by"] in norm_dict:
-            call_by = self._normalize_opt_str(norm_dict.get(NORMALIZE_KEYS["call_by"]))
+        if branch == "index_by_key":
+            return self._parse_normalize_index_by_key_params(params_dict, call_by=call_by)
 
-        fields_by_name = self._parse_normalize_project_fields(norm_dict.get(NORMALIZE_KEYS["fields"]))
-        steps_converted = self._parse_normalize_steps(norm_dict.get(NORMALIZE_KEYS["steps"]))
+        if branch == "take_first":
+            return self._parse_normalize_take_first_params(params_dict, call_by=call_by)
 
+        if branch == "project_fields":
+            return self._parse_normalize_project_fields_params(params_dict, call_by=call_by)
+
+        return self._parse_normalize_map_values_params(params_dict, call_by=call_by)
+
+    def _parse_normalize_index_by_key_params(
+        self,
+        params_dict: Dict[str, Any],
+        *,
+        call_by: Optional[str],
+    ) -> NormalizeConfig:
+        key_field = str(params_dict.get(NORMALIZE_KEYS["key_field"], "")).strip()
+        on_conflict = str(params_dict.get(NORMALIZE_KEYS["on_conflict"], "error")).strip() or "error"
+        on_none = str(params_dict.get(NORMALIZE_KEYS["on_none"], "raise")).strip() or "raise"
         return NormalizeConfig(
-            kind=kind,
+            kind="index_by_key",
             key_field=key_field,
             on_conflict=on_conflict,
             on_none=on_none,
+            on_empty=None,
+            on_missing=None,
+            fields={},
+            steps=(),
+            call_by=call_by,
+        )
+
+    def _parse_normalize_take_first_params(
+        self,
+        params_dict: Dict[str, Any],
+        *,
+        call_by: Optional[str],
+    ) -> NormalizeConfig:
+        on_empty = self._normalize_opt_str(params_dict.get(NORMALIZE_KEYS["on_empty"]))
+        return NormalizeConfig(
+            kind="take_first",
+            key_field="",
+            on_conflict="error",
+            on_none="raise",
             on_empty=on_empty,
+            on_missing=None,
+            fields={},
+            steps=(),
+            call_by=call_by,
+        )
+
+    def _parse_normalize_project_fields_params(
+        self,
+        params_dict: Dict[str, Any],
+        *,
+        call_by: Optional[str],
+    ) -> NormalizeConfig:
+        on_missing = self._normalize_opt_str(params_dict.get(NORMALIZE_KEYS["on_missing"]))
+        fields_by_name = self._parse_normalize_project_fields(params_dict.get(NORMALIZE_KEYS["fields"]))
+        return NormalizeConfig(
+            kind="project_fields",
+            key_field="",
+            on_conflict="error",
+            on_none="raise",
+            on_empty=None,
             on_missing=on_missing,
             fields=fields_by_name,
+            steps=(),
+            call_by=call_by,
+        )
+
+    def _parse_normalize_map_values_params(
+        self,
+        params_dict: Dict[str, Any],
+        *,
+        call_by: Optional[str],
+    ) -> NormalizeConfig:
+        steps_converted = self._parse_normalize_steps(params_dict.get(NORMALIZE_KEYS["steps"]))
+        return NormalizeConfig(
+            kind="map_values",
+            key_field="",
+            on_conflict="error",
+            on_none="raise",
+            on_empty=None,
+            on_missing=None,
+            fields={},
             steps=steps_converted,
             call_by=call_by,
         )

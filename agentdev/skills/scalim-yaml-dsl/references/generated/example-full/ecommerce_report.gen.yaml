@@ -398,8 +398,8 @@ sources:
     key: payment_method_id
     cache_mode: preload_forever
     normalize:
-      kind: index_by_key
-      on_conflict: error
+      index_by_key:
+        on_conflict: error
     fields:
       # 单级关联 - 支付方式
       payment_method_name:
@@ -411,15 +411,15 @@ sources:
     key: payment_method_id
     cache_mode: preload_forever
     normalize:
-      kind: map_values
-      steps:
-        - kind: take_first
-          on_empty: miss
-        - kind: project_fields
-          on_missing: error
-          fields:
-            payment_method_id: {from_key: true}
-            payment_fee_rate: {extract: payment_fee_rate}
+      map_values:
+        steps:
+          - take_first:
+              on_empty: miss
+          - project_fields:
+              on_missing: error
+              fields:
+                payment_method_id: {from_key: true}
+                payment_fee_rate: {extract: payment_fee_rate}
     fields:
       payment_fee_rate_candidates:
         name: 手续费率(候选取首条)

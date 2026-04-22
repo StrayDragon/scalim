@@ -172,7 +172,7 @@ properties[113	]{entry_id	name	required	summary}:
   30	loader	false	string
   30	lookup_cast	false	object, oneOf(4)
   30	lookup_chunk_size	false	integer | null, oneOf(2)
-  30	normalize	false	object, properties fields, call_by, key_field, kind, on_conflict, on_empty, on_missing, on_none, steps, allOf(1)
+  30	normalize	false	object, properties call_by, index_by_key, map_values, project_fields, take_first, allOf(1)
   30	params	false	object, properties $import
   31	name	false	string
   31	$import	false	string | array, oneOf(2)

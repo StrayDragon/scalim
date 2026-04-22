@@ -58,6 +58,46 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             msg = "{}\nSuggested:\n  {}".format(msg, suggested)
         return msg
 
+    @staticmethod
+    def _build_normalize_legacy_migration_hint(norm_path: str, norm_dict: Dict[str, Any]) -> str:
+        legacy_kind = str(norm_dict.get(_F.NORMALIZE_KIND) or "").strip()
+        suggested_branch = legacy_kind if legacy_kind in set(NORMALIZE_KIND_ENUM) else "index_by_key"
+
+        suggested = "normalize: {{{}: {{...}}}}".format(suggested_branch)
+        if _F.NORMALIZE_CALL_BY in norm_dict:
+            suggested = "normalize: {call_by: <ref>, " + "{}: {{...}}".format(suggested_branch) + "}"
+
+        msg = (
+            "Legacy YAML syntax is not supported: '{}'. ".format(norm_path)
+            + "Replace `normalize: {kind: <...>, ...}` with a one-of normalize-branch object."
+            + "\nMigration:\n"
+            + "  normalize: {kind: index_by_key, ...} -> normalize: {index_by_key: {...}}\n"
+            + "  normalize: {kind: take_first, ...} -> normalize: {take_first: {...}}\n"
+            + "  normalize: {kind: project_fields, ...} -> normalize: {project_fields: {...}}\n"
+            + "  normalize: {kind: map_values, ...} -> normalize: {map_values: {...}}\n"
+            + "\nExamples:\n"
+            + "  normalize: {index_by_key: {on_conflict: error}}\n"
+            + "  normalize: {take_first: {on_empty: miss}}\n"
+            + "  normalize: {project_fields: {fields: {id: {from_key: true}}}}\n"
+            + "  normalize: {map_values: {steps: [{take_first: {}}]}}\n"
+            + '  normalize: {call_by: "myapp.normalizes:normalize_source_x", index_by_key: {}}'
+        )
+        return "{}\nSuggested:\n  {}".format(msg, suggested)
+
+    @staticmethod
+    def _build_normalize_step_legacy_migration_hint(step_path: str, step_dict: Dict[str, Any]) -> str:
+        legacy_kind = str(step_dict.get(_F.NORMALIZE_KIND) or "").strip()
+        suggested_branch = legacy_kind if legacy_kind in {"take_first", "project_fields"} else "take_first"
+
+        msg = (
+            "Legacy YAML syntax is not supported: '{}.kind'. ".format(step_path)
+            + "Replace `steps: [{kind: <...>, ...}]` with one-of step-branch objects."
+            + "\nMigration:\n"
+            + "  steps: [{kind: take_first, ...}] -> steps: [{take_first: {...}}]\n"
+            + "  steps: [{kind: project_fields, ...}] -> steps: [{project_fields: {...}}]"
+        )
+        return "{}\nSuggested:\n  steps: [{{{}: {{...}}}}]".format(msg, suggested_branch)
+
     def _collect_field_data_key_map(self, fields_raw: object) -> Dict[str, Set[str]]:
         data_key_map: Dict[str, Set[str]] = {}
         fields_dict = mapping_or_none(fields_raw)
@@ -550,31 +590,34 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             self._add_error(errors, "'{}' must be a dictionary".format(norm_path), path=norm_path)
             return
 
-        kind = str(norm_dict.get(_F.NORMALIZE_KIND, "")).strip()
-        if kind not in set(NORMALIZE_KIND_ENUM):
-            self._add_error(
-                errors,
-                "sources.{} normalize.kind must be one of: {}".format(source_id, "/".join(NORMALIZE_KIND_ENUM)),
-                path="{}.{}".format(norm_path, _F.NORMALIZE_KIND),
-            )
-
         self._validate_normalize_call_by(norm_dict, errors, norm_path=norm_path, source_id=source_id)
 
-        if kind == "index_by_key":
-            self._validate_normalize_index_by_key(norm_dict, errors, norm_path=norm_path, source_id=source_id, key_raw=key_raw)
+        if _F.NORMALIZE_KIND in norm_dict:
+            msg = self._build_normalize_legacy_migration_hint(norm_path, norm_dict)
+            self._add_error(errors, msg, path="{}.{}".format(norm_path, _F.NORMALIZE_KIND))
             return
 
-        if kind == "take_first":
-            self._validate_normalize_take_first(norm_dict, errors, norm_path=norm_path, source_id=source_id)
+        branches = [key for key in NORMALIZE_KIND_ENUM if key in norm_dict]
+        if len(branches) != 1:
+            msg = "sources.{} normalize must select exactly one branch: {}".format(source_id, "/".join(NORMALIZE_KIND_ENUM))
+            self._add_error(errors, msg, path=norm_path)
             return
 
-        if kind == "project_fields":
-            self._validate_normalize_project_fields(norm_dict, errors, norm_path=norm_path, source_id=source_id)
+        branch = branches[0]
+        branch_path = "{}.{}".format(norm_path, branch)
+        branch_dict = mapping_or_none(norm_dict.get(branch))
+        if branch_dict is None:
+            self._add_error(errors, "'{}' must be a dictionary".format(branch_path), path=branch_path)
             return
 
-        if kind == "map_values":
-            self._validate_normalize_map_values(norm_dict, errors, norm_path=norm_path, source_id=source_id)
-            return
+        if branch == "index_by_key":
+            self._validate_normalize_index_by_key(branch_dict, errors, norm_path=branch_path, source_id=source_id, key_raw=key_raw)
+        elif branch == "take_first":
+            self._validate_normalize_take_first(branch_dict, errors, norm_path=branch_path, source_id=source_id)
+        elif branch == "project_fields":
+            self._validate_normalize_project_fields(branch_dict, errors, norm_path=branch_path, source_id=source_id)
+        else:
+            self._validate_normalize_map_values(branch_dict, errors, norm_path=branch_path, source_id=source_id)
 
     def _validate_normalize_call_by(
         self,
@@ -618,56 +661,154 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         source_id: str,
         key_raw: Any,
     ) -> None:
+        self._validate_normalize_index_by_key_reject_unsupported_fields(norm_dict, errors, norm_path=norm_path, source_id=source_id)
+        key_field = self._normalize_index_by_key_key_field(norm_dict, errors, norm_path=norm_path, source_id=source_id)
+        self._validate_normalize_index_by_key_reject_composite_key(key_raw, errors, source_id=source_id)
+        self._validate_normalize_index_by_key_key_field_matches_key(
+            key_field,
+            key_raw,
+            errors,
+            norm_path=norm_path,
+            source_id=source_id,
+        )
+        self._validate_normalize_index_by_key_on_conflict(norm_dict, errors, norm_path=norm_path, source_id=source_id)
+        self._validate_normalize_index_by_key_on_none(norm_dict, errors, norm_path=norm_path, source_id=source_id)
+
+    def _validate_normalize_index_by_key_reject_unsupported_fields(
+        self,
+        norm_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        *,
+        norm_path: str,
+        source_id: str,
+    ) -> None:
+        if _F.NORMALIZE_ON_EMPTY in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.index_by_key does not support on_empty".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_EMPTY),
+            )
+        if _F.NORMALIZE_ON_MISSING in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.index_by_key does not support on_missing".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_ON_MISSING),
+            )
+        if _F.NORMALIZE_FIELDS in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.index_by_key does not support fields".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_FIELDS),
+            )
+        if _F.NORMALIZE_STEPS in norm_dict:
+            self._add_error(
+                errors,
+                "sources.{} normalize.index_by_key does not support steps".format(source_id),
+                path="{}.{}".format(norm_path, _F.NORMALIZE_STEPS),
+            )
+
+    def _normalize_index_by_key_key_field(
+        self,
+        norm_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        *,
+        norm_path: str,
+        source_id: str,
+    ) -> str:
         key_field_raw = norm_dict.get(_F.NORMALIZE_KEY_FIELD)
-        key_field = ""
         if key_field_raw is None:
-            key_field = ""
-        elif isinstance(key_field_raw, str):
-            key_field = key_field_raw.strip()
-        else:
-            self._add_error(
-                errors,
-                "sources.{} normalize.key_field must be a string".format(source_id),
-                path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
-            )
-            key_field = str(key_field_raw).strip()
+            return ""
+        if isinstance(key_field_raw, str):
+            return key_field_raw.strip()
 
+        self._add_error(
+            errors,
+            "sources.{} normalize.index_by_key.key_field must be a string".format(source_id),
+            path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
+        )
+        return str(key_field_raw).strip()
+
+    def _validate_normalize_index_by_key_reject_composite_key(
+        self,
+        key_raw: Any,
+        errors: List[ValidationIssue],
+        *,
+        source_id: str,
+    ) -> None:
         key_items = list_or_none(key_raw)
-        if key_items is not None:
-            self._add_error(
-                errors,
-                "sources.{} normalize.kind=index_by_key does not support composite key yet".format(source_id),
-                path="sources.{}.{}".format(source_id, _F.KEY),
-            )
+        if key_items is None:
+            return
 
-        if isinstance(key_raw, str):
-            declared_key = key_raw.strip()
-            if declared_key and key_field and declared_key != key_field:
-                self._add_error(
-                    errors,
-                    "sources.{} normalize.key_field must equal sources.{}.key".format(source_id, source_id),
-                    path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
-                )
+        self._add_error(
+            errors,
+            "sources.{} normalize.index_by_key does not support composite key yet".format(source_id),
+            path="sources.{}.{}".format(source_id, _F.KEY),
+        )
 
+    def _validate_normalize_index_by_key_key_field_matches_key(
+        self,
+        key_field: str,
+        key_raw: Any,
+        errors: List[ValidationIssue],
+        *,
+        norm_path: str,
+        source_id: str,
+    ) -> None:
+        if not isinstance(key_raw, str):
+            return
+        declared_key = key_raw.strip()
+        if not declared_key or not key_field:
+            return
+        if declared_key == key_field:
+            return
+
+        self._add_error(
+            errors,
+            "sources.{} normalize.index_by_key.key_field must equal sources.{}.key".format(source_id, source_id),
+            path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
+        )
+
+    def _validate_normalize_index_by_key_on_conflict(
+        self,
+        norm_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        *,
+        norm_path: str,
+        source_id: str,
+    ) -> None:
         on_conflict_raw = norm_dict.get(_F.NORMALIZE_ON_CONFLICT)
-        if on_conflict_raw is not None:
-            on_conflict = str(on_conflict_raw).strip()
-            if on_conflict not in set(NORMALIZE_ON_CONFLICT_ENUM):
-                self._add_error(
-                    errors,
-                    "sources.{} normalize.on_conflict must be one of: error/first/last".format(source_id),
-                    path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
-                )
+        if on_conflict_raw is None:
+            return
+        on_conflict = str(on_conflict_raw).strip()
+        if on_conflict in set(NORMALIZE_ON_CONFLICT_ENUM):
+            return
 
+        self._add_error(
+            errors,
+            "sources.{} normalize.index_by_key.on_conflict must be one of: error/first/last".format(source_id),
+            path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
+        )
+
+    def _validate_normalize_index_by_key_on_none(
+        self,
+        norm_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        *,
+        norm_path: str,
+        source_id: str,
+    ) -> None:
         on_none_raw = norm_dict.get(_F.NORMALIZE_ON_NONE)
-        if on_none_raw is not None:
-            on_none = str(on_none_raw).strip()
-            if on_none not in set(NORMALIZE_ON_NONE_ENUM):
-                self._add_error(
-                    errors,
-                    "sources.{} normalize.on_none must be one of: raise/skip".format(source_id),
-                    path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
-                )
+        if on_none_raw is None:
+            return
+        on_none = str(on_none_raw).strip()
+        if on_none in set(NORMALIZE_ON_NONE_ENUM):
+            return
+
+        self._add_error(
+            errors,
+            "sources.{} normalize.index_by_key.on_none must be one of: raise/skip".format(source_id),
+            path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
+        )
 
     def _validate_normalize_take_first(
         self,
@@ -680,37 +821,37 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         if _F.NORMALIZE_KEY_FIELD in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=take_first does not support normalize.key_field".format(source_id),
+                "sources.{} normalize.take_first does not support key_field".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
             )
         if _F.NORMALIZE_ON_CONFLICT in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=take_first does not support normalize.on_conflict".format(source_id),
+                "sources.{} normalize.take_first does not support on_conflict".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
             )
         if _F.NORMALIZE_ON_NONE in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.on_none is only supported for normalize.kind=index_by_key".format(source_id),
+                "sources.{} normalize.on_none is only supported for normalize.index_by_key".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
             )
         if _F.NORMALIZE_ON_MISSING in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=take_first does not support normalize.on_missing".format(source_id),
+                "sources.{} normalize.take_first does not support on_missing".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_MISSING),
             )
         if _F.NORMALIZE_FIELDS in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=take_first does not support normalize.fields".format(source_id),
+                "sources.{} normalize.take_first does not support fields".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_FIELDS),
             )
         if _F.NORMALIZE_STEPS in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=take_first does not support normalize.steps".format(source_id),
+                "sources.{} normalize.take_first does not support steps".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_STEPS),
             )
 
@@ -721,7 +862,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         if on_empty not in set(NORMALIZE_ON_EMPTY_ENUM):
             self._add_error(
                 errors,
-                "sources.{} normalize.on_empty must be one of: miss/null/error".format(source_id),
+                "sources.{} normalize.take_first.on_empty must be one of: miss/null/error".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_EMPTY),
             )
 
@@ -736,31 +877,31 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         if _F.NORMALIZE_KEY_FIELD in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=project_fields does not support normalize.key_field".format(source_id),
+                "sources.{} normalize.project_fields does not support key_field".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
             )
         if _F.NORMALIZE_ON_CONFLICT in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=project_fields does not support normalize.on_conflict".format(source_id),
+                "sources.{} normalize.project_fields does not support on_conflict".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
             )
         if _F.NORMALIZE_ON_NONE in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.on_none is only supported for normalize.kind=index_by_key".format(source_id),
+                "sources.{} normalize.on_none is only supported for normalize.index_by_key".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
             )
         if _F.NORMALIZE_ON_EMPTY in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=project_fields does not support normalize.on_empty".format(source_id),
+                "sources.{} normalize.project_fields does not support on_empty".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_EMPTY),
             )
         if _F.NORMALIZE_STEPS in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=project_fields does not support normalize.steps".format(source_id),
+                "sources.{} normalize.project_fields does not support steps".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_STEPS),
             )
 
@@ -770,13 +911,13 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             if on_missing not in set(NORMALIZE_ON_MISSING_ENUM):
                 self._add_error(
                     errors,
-                    "sources.{} normalize.on_missing must be one of: error/null".format(source_id),
+                    "sources.{} normalize.project_fields.on_missing must be one of: error/null".format(source_id),
                     path="{}.{}".format(norm_path, _F.NORMALIZE_ON_MISSING),
                 )
 
         fields_path = "{}.{}".format(norm_path, _F.NORMALIZE_FIELDS)
         if _F.NORMALIZE_FIELDS not in norm_dict:
-            self._add_error(errors, "sources.{} normalize.fields is required".format(source_id), path=fields_path)
+            self._add_error(errors, "sources.{} normalize.project_fields.fields is required".format(source_id), path=fields_path)
             return
 
         self._validate_normalize_project_fields_rules(
@@ -796,37 +937,37 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         if _F.NORMALIZE_KEY_FIELD in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=map_values does not support normalize.key_field".format(source_id),
+                "sources.{} normalize.map_values does not support key_field".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_KEY_FIELD),
             )
         if _F.NORMALIZE_ON_CONFLICT in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=map_values does not support normalize.on_conflict".format(source_id),
+                "sources.{} normalize.map_values does not support on_conflict".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_CONFLICT),
             )
         if _F.NORMALIZE_ON_NONE in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.on_none is only supported for normalize.kind=index_by_key".format(source_id),
+                "sources.{} normalize.on_none is only supported for normalize.index_by_key".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_NONE),
             )
         if _F.NORMALIZE_ON_EMPTY in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=map_values does not support normalize.on_empty".format(source_id),
+                "sources.{} normalize.map_values does not support on_empty".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_EMPTY),
             )
         if _F.NORMALIZE_ON_MISSING in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=map_values does not support normalize.on_missing".format(source_id),
+                "sources.{} normalize.map_values does not support on_missing".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_ON_MISSING),
             )
         if _F.NORMALIZE_FIELDS in norm_dict:
             self._add_error(
                 errors,
-                "sources.{} normalize.kind=map_values does not support normalize.fields".format(source_id),
+                "sources.{} normalize.map_values does not support fields".format(source_id),
                 path="{}.{}".format(norm_path, _F.NORMALIZE_FIELDS),
             )
 
@@ -861,27 +1002,29 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 errors, "'{}' does not support 'call_by'".format(step_path), path="{}.{}".format(step_path, _F.NORMALIZE_CALL_BY)
             )
 
-        step_kind_raw = step_dict.get(_F.NORMALIZE_KIND)
-        if step_kind_raw is None:
-            self._add_error(errors, "'{}.kind' is required".format(step_path), path="{}.{}".format(step_path, _F.NORMALIZE_KIND))
-            return
-        if not isinstance(step_kind_raw, str):
-            self._add_error(errors, "'{}.kind' must be a string".format(step_path), path="{}.{}".format(step_path, _F.NORMALIZE_KIND))
-            return
-        step_kind = step_kind_raw.strip()
-        if step_kind not in {"take_first", "project_fields"}:
-            self._add_error(
-                errors,
-                "'{}.kind' must be one of: take_first/project_fields".format(step_path),
-                path="{}.{}".format(step_path, _F.NORMALIZE_KIND),
-            )
+        if _F.NORMALIZE_KIND in step_dict:
+            msg = self._build_normalize_step_legacy_migration_hint(step_path, step_dict)
+            self._add_error(errors, msg, path="{}.{}".format(step_path, _F.NORMALIZE_KIND))
             return
 
-        if step_kind == "take_first":
-            self._validate_normalize_step_take_first(step_dict, errors, step_path=step_path)
+        branches = [key for key in ("take_first", "project_fields") if key in step_dict]
+        if len(branches) != 1:
+            msg = "'{}' must select exactly one step branch: take_first/project_fields".format(step_path)
+            self._add_error(errors, msg, path=step_path)
             return
 
-        self._validate_normalize_step_project_fields(step_dict, errors, step_path=step_path)
+        branch = branches[0]
+        branch_path = "{}.{}".format(step_path, branch)
+        branch_dict = mapping_or_none(step_dict.get(branch))
+        if branch_dict is None:
+            self._add_error(errors, "'{}' must be a dictionary".format(branch_path), path=branch_path)
+            return
+
+        if branch == "take_first":
+            self._validate_normalize_step_take_first(branch_dict, errors, step_path=branch_path)
+            return
+
+        self._validate_normalize_step_project_fields(branch_dict, errors, step_path=branch_path)
 
     def _validate_normalize_step_take_first(
         self,

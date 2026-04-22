@@ -250,7 +250,7 @@ skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行�
 
 #### Scenario: list-returning loader 优先推荐 `normalize`
 - **WHEN** 用户给出的 lookup source loader 返回 `list[row]`,而不是 `key -> row` 映射
-- **THEN** skill MUST 优先给出 `normalize.kind=index_by_key` 的方案
+- **THEN** skill MUST 优先给出 `normalize.index_by_key` 的方案
 - **AND** MUST NOT 默认建议为此仅写一个 Python wrapper
 
 #### Scenario: 仅字段嵌套时不误导到 `normalize`

@@ -118,9 +118,10 @@ def test_schema_validate_accepts_normalize_on_none_skip_for_index_by_key() -> No
                 "loader": "tests.fixtures.mock_loaders.mock_loader",
                 "key": "order_id",
                 "normalize": {
-                    "kind": "index_by_key",
-                    "key_field": "order_id",
-                    "on_none": "skip",
+                    "index_by_key": {
+                        "key_field": "order_id",
+                        "on_none": "skip",
+                    },
                 },
             }
         },
@@ -141,9 +142,10 @@ def test_schema_validate_rejects_normalize_on_none_for_non_index_by_key() -> Non
                 "loader": "tests.fixtures.mock_loaders.mock_loader",
                 "key": "order_id",
                 "normalize": {
-                    "kind": "project_fields",
-                    "fields": {"id": {"from_key": True}},
-                    "on_none": "skip",
+                    "project_fields": {
+                        "fields": {"id": {"from_key": True}},
+                        "on_none": "skip",
+                    },
                 },
             }
         },

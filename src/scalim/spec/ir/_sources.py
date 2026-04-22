@@ -141,7 +141,7 @@ class SourceNormalizeIr:
     """`project_fields` 的投影规则(按顺序)."""
 
     steps: Tuple[SourceNormalizeStepIr, ...] = ()
-    """用于 `normalize.kind: map_values` 的归一化步骤(按顺序)."""
+    """用于 `normalize.map_values` 分支的归一化步骤(按顺序)."""
 
     call_by_ref: Optional[CallableRefIr] = None
     """可选: `normalize.call_by` 可调用引用描述(纯数据,不包含可调用对象)."""
@@ -323,7 +323,7 @@ def _normalize_index_by_key(
         return cast("LoaderResultMapping", result)  # pragma: allow-cast normalize.index_by_key mapping passthrough
 
     if on_none not in {"raise", "skip"}:
-        msg = "Source '{}' normalize.index_by_key has invalid on_none '{}' (config: sources.{}.normalize.on_none)".format(
+        msg = "Source '{}' normalize.index_by_key has invalid on_none '{}' (config: sources.{}.normalize.index_by_key.on_none)".format(
             source_id,
             on_none,
             source_id,
@@ -362,7 +362,7 @@ def _normalize_take_first(
     if isinstance(result, (list, tuple)):
         msg = (
             "Source '{}' normalize.take_first does not support loader result list[row]. "
-            "Use normalize.kind=index_by_key with on_conflict to handle duplicate keys."
+            "Use normalize.index_by_key with on_conflict to handle duplicate keys."
         ).format(source_id)
         raise TypeError(msg)
 
@@ -578,8 +578,8 @@ def _normalize_index_by_key_extract_key(
     idx: int,
     on_none: str,
 ) -> Optional[Hashable]:
-    config_key_field = "sources.{}.normalize.key_field".format(source_id)
-    config_on_none = "sources.{}.normalize.on_none".format(source_id)
+    config_key_field = "sources.{}.normalize.index_by_key.key_field".format(source_id)
+    config_on_none = "sources.{}.normalize.index_by_key.on_none".format(source_id)
     if key_field not in row:
         msg = "Source '{}' normalize.index_by_key missing key_field '{}' at row index {} (config: {})".format(
             source_id,
@@ -626,7 +626,7 @@ def _normalize_index_by_key_insert(
         indexed[key] = row
         return
     if on_conflict != "error":
-        config_on_conflict = "sources.{}.normalize.on_conflict".format(source_id)
+        config_on_conflict = "sources.{}.normalize.index_by_key.on_conflict".format(source_id)
         msg = "Source '{}' normalize.index_by_key has invalid on_conflict '{}' (config: {})".format(
             source_id, on_conflict, config_on_conflict
         )

@@ -44,7 +44,7 @@ def test_validator_rejects_main_source_normalize() -> None:
         "main_source": {
             "source_id": "orders",
             "loader": "tests.fixtures.source_normalize_loaders:load_orders_main",
-            "normalize": {"kind": "index_by_key", "key_field": "order_id"},
+            "normalize": {"index_by_key": {"key_field": "order_id"}},
         },
         "sources": {},
     }
@@ -63,7 +63,7 @@ def test_validator_allows_omitting_normalize_key_field_defaults_to_key() -> None
             "recommends": {
                 "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
                 "key": "order_id",
-                "normalize": {"kind": "index_by_key"},
+                "normalize": {"index_by_key": {}},
             }
         },
     }
@@ -86,7 +86,7 @@ def test_validator_requires_normalize_to_be_mapping() -> None:
     _assert_validation_errors(config, "normalize' must be a dictionary")
 
 
-def test_validator_rejects_unknown_normalize_kind() -> None:
+def test_validator_rejects_normalize_without_branch() -> None:
     config = {
         "name": "demo",
         "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
@@ -94,11 +94,100 @@ def test_validator_rejects_unknown_normalize_kind() -> None:
             "recommends": {
                 "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
                 "key": "order_id",
-                "normalize": {"kind": "bad", "key_field": "order_id"},
+                "normalize": {},
             }
         },
     }
-    _assert_validation_errors(config, "normalize.kind must be one of: index_by_key/take_first/project_fields/map_values")
+    _assert_validation_errors(config, "normalize must select exactly one branch")
+
+
+def test_validator_rejects_legacy_normalize_kind_with_migration_hint() -> None:
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
+                "key": "order_id",
+                "normalize": {"kind": "index_by_key", "on_conflict": "error"},
+            }
+        },
+    }
+    _assert_validation_errors(config, "Legacy YAML syntax is not supported", "normalize: {kind: index_by_key")
+
+
+def test_validator_rejects_legacy_normalize_kind_with_call_by_migration_hint() -> None:
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
+                "key": "order_id",
+                "normalize": {"call_by": "tests.fixtures.source_normalize_loaders:load_orders_main", "kind": "index_by_key"},
+            }
+        },
+    }
+    _assert_validation_errors(config, "normalize: {call_by: <ref>, index_by_key")
+
+
+def test_validator_rejects_normalize_multiple_branches() -> None:
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
+                "key": "order_id",
+                "normalize": {"index_by_key": {}, "take_first": {}},
+            }
+        },
+    }
+    _assert_validation_errors(config, "normalize must select exactly one branch")
+
+
+def test_validator_rejects_normalize_branch_value_non_dict() -> None:
+    errors = _validate_normalize_raw({"index_by_key": 123})
+    assert any("'sources.s1.normalize.index_by_key' must be a dictionary" in issue.message for issue in errors)
+
+
+def test_validator_rejects_legacy_map_values_steps_kind_with_migration_hint() -> None:
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
+                "key": "order_id",
+                "normalize": {"map_values": {"steps": [{"kind": "take_first"}]}},
+            }
+        },
+    }
+    _assert_validation_errors(config, "Legacy YAML syntax is not supported", "steps: [{kind: take_first")
+
+
+def test_validator_rejects_map_values_steps_multiple_branches() -> None:
+    config = {
+        "name": "demo",
+        "main_source": {"source_id": "orders", "loader": "tests.fixtures.source_normalize_loaders:load_orders_main"},
+        "sources": {
+            "recommends": {
+                "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
+                "key": "order_id",
+                "normalize": {
+                    "map_values": {
+                        "steps": [
+                            {
+                                "take_first": {},
+                                "project_fields": {"fields": {"id": {"from_key": True}}},
+                            }
+                        ]
+                    }
+                },
+            }
+        },
+    }
+    _assert_validation_errors(config, "must select exactly one step branch")
 
 
 def test_validator_rejects_normalize_for_composite_key() -> None:
@@ -109,7 +198,7 @@ def test_validator_rejects_normalize_for_composite_key() -> None:
             "recommends": {
                 "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
                 "key": ["region_id", "institution_id"],
-                "normalize": {"kind": "index_by_key", "key_field": "region_id"},
+                "normalize": {"index_by_key": {"key_field": "region_id"}},
             }
         },
     }
@@ -124,16 +213,34 @@ def test_validator_rejects_normalize_key_field_mismatch() -> None:
             "recommends": {
                 "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
                 "key": "order_id",
-                "normalize": {"kind": "index_by_key", "key_field": "other"},
+                "normalize": {"index_by_key": {"key_field": "other"}},
             }
         },
     }
-    _assert_validation_errors(config, "normalize.key_field must equal sources")
+    _assert_validation_errors(config, "normalize.index_by_key.key_field must equal sources")
+
+
+def test_validator_rejects_normalize_index_by_key_unsupported_fields() -> None:
+    errors = _validate_normalize_raw(
+        {
+            "index_by_key": {
+                "key_field": "id",
+                "on_empty": "miss",
+                "on_missing": "error",
+                "fields": {},
+                "steps": [],
+            }
+        }
+    )
+    assert any("normalize.index_by_key does not support on_empty" in issue.message for issue in errors)
+    assert any("normalize.index_by_key does not support on_missing" in issue.message for issue in errors)
+    assert any("normalize.index_by_key does not support fields" in issue.message for issue in errors)
+    assert any("normalize.index_by_key does not support steps" in issue.message for issue in errors)
 
 
 def test_validator_rejects_non_string_normalize_key_field() -> None:
-    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": 123}, key_raw="id")
-    assert any("normalize.key_field must be a string" in issue.message for issue in errors)
+    errors = _validate_normalize_raw({"index_by_key": {"key_field": 123}}, key_raw="id")
+    assert any("normalize.index_by_key.key_field must be a string" in issue.message for issue in errors)
 
 
 def test_validator_rejects_normalize_on_conflict_invalid() -> None:
@@ -144,16 +251,16 @@ def test_validator_rejects_normalize_on_conflict_invalid() -> None:
             "recommends": {
                 "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
                 "key": "order_id",
-                "normalize": {"kind": "index_by_key", "key_field": "order_id", "on_conflict": "bad"},
+                "normalize": {"index_by_key": {"key_field": "order_id", "on_conflict": "bad"}},
             }
         },
     }
-    _assert_validation_errors(config, "normalize.on_conflict must be one of")
+    _assert_validation_errors(config, "normalize.index_by_key.on_conflict must be one of")
 
 
 def test_validator_rejects_normalize_on_none_for_non_index_by_key() -> None:
-    errors = _validate_normalize_raw({"kind": "take_first", "on_none": "skip"})
-    assert any("normalize.on_none is only supported for normalize.kind=index_by_key" in issue.message for issue in errors)
+    errors = _validate_normalize_raw({"take_first": {"on_none": "skip"}})
+    assert any("normalize.on_none is only supported for normalize.index_by_key" in issue.message for issue in errors)
 
 
 def test_validator_rejects_normalize_on_none_invalid() -> None:
@@ -164,11 +271,11 @@ def test_validator_rejects_normalize_on_none_invalid() -> None:
             "recommends": {
                 "loader": "tests.fixtures.source_normalize_loaders:load_recommends_list",
                 "key": "order_id",
-                "normalize": {"kind": "index_by_key", "key_field": "order_id", "on_none": "bad"},
+                "normalize": {"index_by_key": {"key_field": "order_id", "on_none": "bad"}},
             }
         },
     }
-    _assert_validation_errors(config, "normalize.on_none must be one of: raise/skip")
+    _assert_validation_errors(config, "normalize.index_by_key.on_none must be one of: raise/skip")
 
 
 def test_run_applies_normalize_index_by_key_before_extract(tmp_path: Path) -> None:
@@ -189,7 +296,7 @@ sources:
     loader: tests.fixtures.source_normalize_loaders:load_recommends_list
     key: order_id
     normalize:
-      kind: index_by_key
+      index_by_key: {}
     fields:
       recommend_score:
         extract: payload.score
@@ -234,8 +341,8 @@ sources:
     loader: tests.fixtures.source_normalize_loaders:load_recommends_list_with_none_key
     key: order_id
     normalize:
-      kind: index_by_key
-      on_none: skip
+      index_by_key:
+        on_none: skip
     fields:
       recommend_score:
         extract: payload.score
@@ -280,7 +387,7 @@ sources:
     key: order_id
     cache_mode: preload_forever
     normalize:
-      kind: index_by_key
+      index_by_key: {}
     fields:
       recommend_score:
         extract: payload.score
@@ -326,9 +433,9 @@ sources:
     loader: tests.fixtures.source_normalize_loaders:load_recommends_list
     key: order_id
     normalize:
-      kind: index_by_key
-      key_field: order_id
       call_by: tests.fixtures.source_normalize_call_by:normalize_identity
+      index_by_key:
+        key_field: order_id
     fields:
       recommend_score:
         extract: payload.score
@@ -365,9 +472,9 @@ sources:
     loader: tests.fixtures.source_normalize_loaders:load_recommends_list
     key: order_id
     normalize:
-      kind: index_by_key
-      key_field: order_id
       call_by: tests.fixtures.source_normalize_call_by:normalize_bad_return
+      index_by_key:
+        key_field: order_id
     fields:
       recommend_score:
         extract: payload.score
@@ -506,10 +613,35 @@ def test_parser_sources_normalize_helpers_cover_skip_branches() -> None:
         pass
 
     parser = _Parser()
+    assert parser._parse_normalize_project_fields(None) == {}  # type: ignore[attr-defined]
     _ = parser._parse_normalize_project_fields({"": {"from_key": True}, "x": {"from_key": True}, "y": "not-a-dict"})  # type: ignore[attr-defined]
-    _ = parser._parse_normalize_steps(["not-a-dict", {"kind": "take_first"}])  # type: ignore[attr-defined]
-    norm = parser._parse_normalize({"kind": "take_first", "on_empty": "miss", "on_missing": "null"})  # type: ignore[attr-defined]
+    assert parser._parse_normalize_steps(None) == ()  # type: ignore[attr-defined]
+    _ = parser._parse_normalize_steps(["not-a-dict", {"take_first": {}}])  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match="Legacy YAML syntax is not supported for normalize.map_values.steps"):
+        _ = parser._parse_normalize_steps([{"kind": "take_first"}])  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match="must select exactly one step branch"):
+        _ = parser._parse_normalize_steps([{}])  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match=r"normalize\.map_values\.steps\.take_first must be a dictionary"):
+        _ = parser._parse_normalize_steps([{"take_first": 1}])  # type: ignore[attr-defined]
+
+    norm = parser._parse_normalize({"take_first": {"on_empty": "miss"}})  # type: ignore[attr-defined]
     assert norm is not None
+
+    with pytest.raises(TypeError, match="Legacy YAML syntax is not supported for normalize"):
+        _ = parser._parse_normalize({"kind": "take_first"})  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match="normalize must select exactly one branch"):
+        _ = parser._parse_normalize({})  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match=r"normalize\.take_first must be a dictionary"):
+        _ = parser._parse_normalize({"take_first": 1})  # type: ignore[attr-defined]
+
+    norm = parser._parse_normalize({"project_fields": {"fields": {"id": {"from_key": True}}}})  # type: ignore[attr-defined]
+    assert norm is not None
+    assert norm.kind == "project_fields"
 
 
 def test_parser_sources_lookup_cast_rejects_invalid_shapes() -> None:
@@ -532,76 +664,79 @@ def test_parser_sources_lookup_cast_rejects_invalid_shapes() -> None:
 
 
 def test_validator_sources_normalize_call_by_validation_branches() -> None:
-    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": 123})
+    errors = _validate_normalize_raw({"call_by": 123, "index_by_key": {"key_field": "id"}})
     assert any("normalize.call_by must be a string" in issue.message for issue in errors)
 
-    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": "  "})
+    errors = _validate_normalize_raw({"call_by": "  ", "index_by_key": {"key_field": "id"}})
     assert any("normalize.call_by must not be empty" in issue.message for issue in errors)
 
-    errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": "bad ref"})
+    errors = _validate_normalize_raw({"call_by": "bad ref", "index_by_key": {"key_field": "id"}})
     assert any("normalize.call_by 引用" in issue.message for issue in errors)
 
 
 def test_validator_sources_normalize_take_first_and_project_fields_branch_coverage() -> None:
     errors = _validate_normalize_raw(
         {
-            "kind": "take_first",
-            "key_field": "id",
-            "on_conflict": "error",
-            "on_missing": "error",
-            "fields": {},
-            "steps": [],
-            "on_empty": "bad",
+            "take_first": {
+                "key_field": "id",
+                "on_conflict": "error",
+                "on_missing": "error",
+                "fields": {},
+                "steps": [],
+                "on_empty": "bad",
+            }
         }
     )
     assert errors
 
-    errors = _validate_normalize_raw({"kind": "take_first"})
+    errors = _validate_normalize_raw({"take_first": {}})
     assert errors == []
 
     errors = _validate_normalize_raw(
         {
-            "kind": "project_fields",
-            "key_field": "id",
-            "on_conflict": "error",
-            "on_none": "skip",
-            "on_empty": "miss",
-            "steps": [],
-            "on_missing": "bad",
+            "project_fields": {
+                "key_field": "id",
+                "on_conflict": "error",
+                "on_none": "skip",
+                "on_empty": "miss",
+                "steps": [],
+                "on_missing": "bad",
+            }
         }
     )
     assert errors
 
-    errors = _validate_normalize_raw({"kind": "project_fields", "on_missing": "bad", "fields": "not-a-dict"})
+    errors = _validate_normalize_raw({"project_fields": {"on_missing": "bad", "fields": "not-a-dict"}})
     assert errors
 
 
 def test_validator_sources_normalize_map_values_branch_coverage() -> None:
-    errors = _validate_normalize_raw({"kind": "map_values", "steps": "not-a-list"})
+    errors = _validate_normalize_raw({"map_values": {"steps": "not-a-list"}})
     assert errors
 
-    errors = _validate_normalize_raw({"kind": "map_values", "steps": []})
+    errors = _validate_normalize_raw({"map_values": {"steps": []}})
     assert errors
 
     errors = _validate_normalize_raw(
         {
-            "kind": "map_values",
-            "key_field": "id",
-            "on_conflict": "error",
-            "on_none": "skip",
-            "on_empty": "miss",
-            "on_missing": "error",
-            "fields": {},
-            "steps": [
-                "not-a-dict",
-                {"call_by": "x"},
-                {},
-                {"kind": 123},
-                {"kind": "bad"},
-                {"kind": "take_first", "fields": {}, "on_missing": "error", "key_field": "id", "on_conflict": "error"},
-                {"kind": "take_first", "on_empty": "bad"},
-                {"kind": "project_fields", "on_empty": "miss", "key_field": "id", "on_conflict": "error", "on_missing": "bad"},
-            ],
+            "map_values": {
+                "key_field": "id",
+                "on_conflict": "error",
+                "on_none": "skip",
+                "on_empty": "miss",
+                "on_missing": "error",
+                "fields": {},
+                "steps": [
+                    "not-a-dict",
+                    {"call_by": "x"},
+                    {},
+                    {"kind": 123},
+                    {"take_first": 1},
+                    {"take_first": {"fields": {}, "on_missing": "error", "key_field": "id", "on_conflict": "error"}},
+                    {"take_first": {"on_empty": "bad"}},
+                    {"project_fields": {"on_empty": "miss", "key_field": "id", "on_conflict": "error", "on_missing": "bad"}},
+                ],
+            }
         }
     )
     assert errors
@@ -611,12 +746,12 @@ def test_validator_sources_normalize_map_values_branch_coverage() -> None:
     validator._validate_normalize_project_fields_rules(  # type: ignore[attr-defined]
         "not-a-dict",
         rules_errors,
-        fields_path="sources.s1.normalize.fields",
+        fields_path="sources.s1.normalize.project_fields.fields",
     )
     validator._validate_normalize_project_fields_rules(  # type: ignore[attr-defined]
         {},
         rules_errors,
-        fields_path="sources.s1.normalize.fields",
+        fields_path="sources.s1.normalize.project_fields.fields",
     )
     validator._validate_normalize_project_fields_rules(  # type: ignore[attr-defined]
         {
@@ -629,7 +764,7 @@ def test_validator_sources_normalize_map_values_branch_coverage() -> None:
             "extract_invalid": {"extract": "[x"},
         },
         rules_errors,
-        fields_path="sources.s1.normalize.fields",
+        fields_path="sources.s1.normalize.project_fields.fields",
     )
     assert rules_errors
 

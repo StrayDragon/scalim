@@ -144,14 +144,20 @@ DESC_SOURCE_NORMALIZE_MD = (
     "- 作用于 `loader` 的整个返回值,用于把整体结果整理成更适合字段读取的形状\n"
     "- 执行时机: 在字段级 `extract` 之前\n"
     "- 常见用法: 当 `loader` 返回 `list[row]` 时,用 `index_by_key` 归一化为 `key -> row`\n\n"
+    "写法(四选一;分支互斥):\n"
+    "- `{index_by_key: {...}}`\n"
+    "- `{take_first: {...}}`\n"
+    "- `{project_fields: {...}}`\n"
+    "- `{map_values: {...}}`\n"
+    "- 可选公共字段: `call_by`(受控扩展点;与分支并存,路径固定为 `sources.*.normalize.call_by`)\n\n"
     "`index_by_key` 默认行为:\n"
     "- `key_field` 可省略/为空字符串,缺省时取 `sources.<id>.key`(仅单字段 key)\n"
     "- 若显式填写 `key_field`,仍要求其与 `sources.<id>.key` 一致\n\n"
     "示例:\n"
     "```yaml\n"
     "normalize:\n"
-    "  kind: index_by_key\n"
-    "  on_conflict: error\n"
+    "  index_by_key:\n"
+    "    on_conflict: error\n"
     "```\n\n"
     "输入/输出形状:\n"
     "- 输入: `[{order_id: 101, ...}, ...]`\n"
@@ -402,23 +408,9 @@ _NORMALIZE_PROJECT_FIELDS_SCHEMA = {
     "additionalProperties": _NORMALIZE_PROJECT_FIELD_RULE_SCHEMA,
 }
 
-_NORMALIZE_STEP_KIND_ENUM = ["take_first", "project_fields"]
-
-_NORMALIZE_STEP_SCHEMA = {
+_NORMALIZE_STEP_TAKE_FIRST_SCHEMA = {
     "type": "object",
-    "required": ["kind"],
     "properties": {
-        "kind": {
-            "type": "string",
-            "enum": _NORMALIZE_STEP_KIND_ENUM,
-            "description": "normalize step 类型(take_first/project_fields)",
-            "markdownDescription": (
-                "normalize step 类型.\n\n"
-                "- `take_first`: 把当前 value 视为 list/tuple 并取第一项(可配 `on_empty`)\n"
-                "- `project_fields`: 在当前 value 上做字段投影/rename(必填 `fields`; 可配 `on_missing`)"
-            ),
-            "examples": ["take_first"],
-        },
         "on_empty": {
             "type": "string",
             "enum": NORMALIZE_ON_EMPTY_ENUM,
@@ -429,6 +421,14 @@ _NORMALIZE_STEP_SCHEMA = {
             ),
             "examples": ["miss"],
         },
+    },
+    "additionalProperties": False,
+}
+
+_NORMALIZE_STEP_PROJECT_FIELDS_SCHEMA = {
+    "type": "object",
+    "required": ["fields"],
+    "properties": {
         "on_missing": {
             "type": "string",
             "enum": NORMALIZE_ON_MISSING_ENUM,
@@ -440,22 +440,16 @@ _NORMALIZE_STEP_SCHEMA = {
         "fields": _NORMALIZE_PROJECT_FIELDS_SCHEMA,
     },
     "additionalProperties": False,
-    "allOf": [
-        {
-            "oneOf": [
-                {
-                    "required": ["kind"],
-                    "properties": {"kind": {"enum": ["take_first"]}},
-                    "not": {"anyOf": [{"required": ["on_missing"]}, {"required": ["fields"]}]},
-                },
-                {
-                    "required": ["kind", "fields"],
-                    "properties": {"kind": {"enum": ["project_fields"]}},
-                    "not": {"anyOf": [{"required": ["on_empty"]}]},
-                },
-            ]
-        }
-    ],
+}
+
+_NORMALIZE_STEP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "take_first": _NORMALIZE_STEP_TAKE_FIRST_SCHEMA,
+        "project_fields": _NORMALIZE_STEP_PROJECT_FIELDS_SCHEMA,
+    },
+    "additionalProperties": False,
+    "allOf": [{"oneOf": [{"required": ["take_first"]}, {"required": ["project_fields"]}]}],
 }
 
 _NORMALIZE_STEPS_SCHEMA = {
@@ -466,23 +460,15 @@ _NORMALIZE_STEPS_SCHEMA = {
     "markdownDescription": "按顺序执行的 normalize steps.\n\n- 对每个 `(key, value)` 依次执行",
 }
 
-NORMALIZE_SCHEMA = {
+_NORMALIZE_BRANCH_INDEX_BY_KEY_SCHEMA = {
     "type": "object",
-    "required": ["kind"],
     "properties": {
-        "kind": {
-            "type": "string",
-            "enum": NORMALIZE_KIND_ENUM,
-            "description": "normalize 预置类型",
-            "markdownDescription": _DESC_SOURCE_NORMALIZE_KIND_MD,
-            "examples": ["index_by_key", "take_first", "project_fields", "map_values"],
-        },
         "key_field": {
             "type": "string",
             "description": "用于建立索引的 row 字段名(index_by_key, 可选)",
             "markdownDescription": (
                 "用于建立索引的 row 字段名.\n\n"
-                "- 仅 `kind: index_by_key` 使用\n"
+                "- 仅 `normalize.index_by_key` 分支使用\n"
                 "- 可选: 省略/空字符串时默认取 `sources.<id>.key`\n"
                 "- 若显式填写,必须等于 `sources.<id>.key`"
             ),
@@ -503,12 +489,19 @@ NORMALIZE_SCHEMA = {
             "description": "key_field is None 策略(raise/skip; index_by_key)",
             "markdownDescription": (
                 "`key_field is None` 策略.\n\n"
-                "- 仅 `kind: index_by_key` 使用\n"
+                "- 仅 `normalize.index_by_key` 分支使用\n"
                 "- `raise`: fail-fast(默认)\n"
                 "- `skip`: 跳过 key_field 为 None 的行"
             ),
             "examples": ["raise"],
         },
+    },
+    "additionalProperties": False,
+}
+
+_NORMALIZE_BRANCH_TAKE_FIRST_SCHEMA = {
+    "type": "object",
+    "properties": {
         "on_empty": {
             "type": "string",
             "enum": NORMALIZE_ON_EMPTY_ENUM,
@@ -519,6 +512,14 @@ NORMALIZE_SCHEMA = {
             ),
             "examples": ["miss"],
         },
+    },
+    "additionalProperties": False,
+}
+
+_NORMALIZE_BRANCH_PROJECT_FIELDS_SCHEMA = {
+    "type": "object",
+    "required": ["fields"],
+    "properties": {
         "on_missing": {
             "type": "string",
             "enum": NORMALIZE_ON_MISSING_ENUM,
@@ -528,7 +529,26 @@ NORMALIZE_SCHEMA = {
             "examples": ["error"],
         },
         "fields": _NORMALIZE_PROJECT_FIELDS_SCHEMA,
+    },
+    "additionalProperties": False,
+}
+
+_NORMALIZE_BRANCH_MAP_VALUES_SCHEMA = {
+    "type": "object",
+    "required": ["steps"],
+    "properties": {
         "steps": _NORMALIZE_STEPS_SCHEMA,
+    },
+    "additionalProperties": False,
+}
+
+NORMALIZE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "index_by_key": _NORMALIZE_BRANCH_INDEX_BY_KEY_SCHEMA,
+        "take_first": _NORMALIZE_BRANCH_TAKE_FIRST_SCHEMA,
+        "project_fields": _NORMALIZE_BRANCH_PROJECT_FIELDS_SCHEMA,
+        "map_values": _NORMALIZE_BRANCH_MAP_VALUES_SCHEMA,
         "call_by": {
             "type": "string",
             "description": "Normalize 受控扩展点(安全引用,由 allowlist 约束)",
@@ -540,64 +560,21 @@ NORMALIZE_SCHEMA = {
     "allOf": [
         {
             "oneOf": [
-                {
-                    "required": ["kind"],
-                    "properties": {"kind": {"enum": ["index_by_key"]}},
-                    "not": {
-                        "anyOf": [
-                            {"required": ["on_empty"]},
-                            {"required": ["on_missing"]},
-                            {"required": ["fields"]},
-                            {"required": ["steps"]},
-                        ]
-                    },
-                },
-                {
-                    "required": ["kind"],
-                    "properties": {"kind": {"enum": ["take_first"]}},
-                    "not": {
-                        "anyOf": [
-                            {"required": ["key_field"]},
-                            {"required": ["on_conflict"]},
-                            {"required": ["on_none"]},
-                            {"required": ["on_missing"]},
-                            {"required": ["fields"]},
-                            {"required": ["steps"]},
-                        ]
-                    },
-                },
-                {
-                    "required": ["kind", "fields"],
-                    "properties": {"kind": {"enum": ["project_fields"]}},
-                    "not": {
-                        "anyOf": [
-                            {"required": ["key_field"]},
-                            {"required": ["on_conflict"]},
-                            {"required": ["on_none"]},
-                            {"required": ["on_empty"]},
-                            {"required": ["steps"]},
-                        ]
-                    },
-                },
-                {
-                    "required": ["kind", "steps"],
-                    "properties": {"kind": {"enum": ["map_values"]}},
-                    "not": {
-                        "anyOf": [
-                            {"required": ["key_field"]},
-                            {"required": ["on_conflict"]},
-                            {"required": ["on_none"]},
-                            {"required": ["on_empty"]},
-                            {"required": ["on_missing"]},
-                            {"required": ["fields"]},
-                        ]
-                    },
-                },
+                {"required": ["index_by_key"]},
+                {"required": ["take_first"]},
+                {"required": ["project_fields"]},
+                {"required": ["map_values"]},
             ]
         }
     ],
     "description": DESC_SOURCE_NORMALIZE,
     "markdownDescription": DESC_SOURCE_NORMALIZE_MD,
+    "examples": [
+        {"index_by_key": {}},
+        {"take_first": {}},
+        {"project_fields": {"fields": {"lookup_key": {"from_key": True}}}},
+        {"map_values": {"steps": [{"take_first": {}}]}},
+    ],
 }
 
 LOOKUP_CHUNK_SIZE_SCHEMA = {

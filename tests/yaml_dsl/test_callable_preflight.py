@@ -35,8 +35,8 @@ sources:
     loader: "tests.fixtures.source_normalize_loaders:load_recommends_list"
     key: order_id
     normalize:
-      kind: index_by_key
       call_by: "tests.fixtures.callable_preflight_mod:norm_kwonly_result"
+      index_by_key: {}
 """
     yaml_path = _write(tmp_path, yaml_text)
     with pytest.raises(ScalimResolverError) as excinfo:
@@ -93,8 +93,8 @@ sources:
     loader: "tests.fixtures.source_normalize_loaders:load_recommends_list"
     key: order_id
     normalize:
-      kind: index_by_key
       call_by: "{ref}"
+      index_by_key: {{}}
 """.format(ref=ref)
     yaml_path = _write(tmp_path, yaml_text)
     compilation = compile(

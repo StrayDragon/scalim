@@ -39,9 +39,9 @@ sources:
     params:
       ids: {$keys: {as: set}}
     normalize:
-      kind: index_by_key
       # NOTE: normalize_kwonly_result(*, result) 不接受任何位置参数,必须编译期 fast-fail。
       call_by: "scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario:normalize_kwonly_result"
+      index_by_key: {}
 """,
             encoding="utf-8",
         )

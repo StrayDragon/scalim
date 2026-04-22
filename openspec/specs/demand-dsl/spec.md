@@ -353,7 +353,7 @@ callable preflight MUST 覆盖所有可推理的 callable 误配（例如"参数
 系统 MUST 拒绝 `main_source.normalize`.
 
 #### Scenario: `sources.*.normalize` 通过校验
-- **WHEN** `sources.order_recommends.normalize.kind: index_by_key`
+- **WHEN** `sources.order_recommends.normalize: {index_by_key: {}}`
 - **THEN** YAML 校验与 IR 转换 MUST 通过
 
 #### Scenario: `main_source.normalize` 被拒绝

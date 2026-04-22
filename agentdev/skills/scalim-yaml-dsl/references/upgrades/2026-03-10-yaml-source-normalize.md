@@ -5,7 +5,7 @@
 这次升级为 lookup `sources.*` 引入源代码级 `normalize`,用于在字段级 `extract` 之前对 `loader` 的整体返回值做一次整体结果归一化。
 
 - 新增 `sources.<id>.normalize`(显式拒绝 `main_source.normalize`)
-- 支持 `normalize.kind: index_by_key`:把 `list[row]` 归一化为 `key -> row`
+- 支持 `normalize.index_by_key`:把 `list[row]` 归一化为 `key -> row`
 - `on_conflict` 默认 `error`,也可用 `first/last` 显式声明冲突策略
 - 归一化发生在 `extract` 之前;`extract` 仍然只负责从“单条 row value”里取字段
 
@@ -33,15 +33,15 @@ sources:
     loader: "myapp.loaders:load_payment_methods"
     key: payment_method_id
     normalize:
-      kind: index_by_key
-      key_field: payment_method_id
-      on_conflict: error
+      index_by_key:
+        key_field: payment_method_id
+        on_conflict: error
 ```
 
 约束:
 
-- `key_field` 必填
-- `key_field` 必须与 `sources.<id>.key` 一致(目前只支持单字段 key;复合键暂不支持 `index_by_key`)
+- `key_field` 可选: 省略/空字符串时默认取 `sources.<id>.key`(仅单字段 key)
+- 若显式填写 `key_field`,仍必须与 `sources.<id>.key` 一致(目前只支持单字段 key;复合键暂不支持 `index_by_key`)
 - 重复 key 默认快速失败;如要覆盖必须显式 `on_conflict: first|last`
 
 ### 2) 字段读取仍然用字段级 `extract`
@@ -63,10 +63,8 @@ sources:
 - `main_source.normalize`:
   - 报错: 校验器会指出 `main_source.normalize` 不允许
   - 修复: `normalize` 只能写在 `sources.*`
-- 缺少 `key_field` / `key_field` 为空:
-  - 修复: 补齐 `normalize.key_field`
 - 复合键:
-  - 报错: 当前不支持 `sources.<id>.key: [a, b]` 与 `normalize.kind=index_by_key` 同时使用
+  - 报错: 当前不支持 `sources.<id>.key: [a, b]` 与 `normalize.index_by_key` 同时使用
   - 修复: 保持 `loader` 返回映射,或在 Python 包装函数中完成复合键索引
 - 重复 key:
   - 默认 `on_conflict: error` 会直接报错

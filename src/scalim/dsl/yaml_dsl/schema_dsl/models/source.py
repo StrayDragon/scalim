@@ -161,7 +161,7 @@ class LoaderRetryConfig:
 @dataclass(frozen=True)
 class NormalizeProjectFieldRuleConfig:
     SCHEMA_NAME: ClassVar[str] = "normalize_project_field_rule"
-    """用于 `normalize.fields.<name>` 的规则对象(内部模型)."""
+    """用于 `project_fields` 的投影规则(内部模型)."""
 
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ()
     """该配置对象在 `YAML` 中的必填字段列表."""
@@ -179,7 +179,7 @@ class NormalizeProjectFieldRuleConfig:
 @dataclass(frozen=True)
 class NormalizeStepConfig:
     SCHEMA_NAME: ClassVar[str] = "normalize_step"
-    """用于 `normalize.steps` 的步骤配置对象(内部模型)."""
+    """用于 `normalize.map_values.steps` 的步骤配置对象(内部模型)."""
 
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind",)
     """该配置对象在 `YAML` 中的必填字段列表."""
@@ -233,7 +233,7 @@ class NormalizeConfig:
     """`project_fields` 的投影规则."""
 
     steps: Tuple[NormalizeStepConfig, ...] = dataclass_field(default_factory=tuple)
-    """用于 `normalize.kind: map_values` 的步骤列表."""
+    """用于 `normalize.map_values.steps` 的步骤列表."""
 
     call_by: Optional[str] = dataclass_field(default=None)
     """可选: `normalize` 受控扩展点(安全引用)."""
