@@ -20,7 +20,6 @@ YAML DSL 的语法有两层来源:
 
 1. JSON Schema(结构与类型)
    - CLI: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`
-   - 参考页: [YAML Schema 参考(生成)](schema-reference.gen.md)
 2. 内置 validator(语义规则,超出 schema 的部分)
    - 入口: `scalim-cli yaml-dsl validate ...`
 
@@ -31,9 +30,8 @@ YAML DSL 的语法有两层来源:
 顶层 key 的顺序在 schema 里是固定的(只是展示顺序,不影响解析). 当前 schema 要求:
 
 - 必填: `name`, `main_source`
-- 完整字段集合与 `required` 边界见: [YAML Schema 参考(生成)](schema-reference.gen.md)
 
-一个“只展示结构”的骨架长这样:
+一个”只展示结构”的骨架长这样:
 
 ```yaml
 name: my_report

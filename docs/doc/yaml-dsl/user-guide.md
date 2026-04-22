@@ -384,7 +384,6 @@ outputs:
 
 顶层字段集合、`required` 边界与默认值以 JSON Schema 为准(避免文档漂移):
 
-- [YAML Schema 参考(生成)](schema-reference.gen.md) (Top-Level Fields / Definitions)
 - CLI 导出 schema: `scalim-cli yaml-dsl schema show` / `scalim-cli yaml-dsl schema path`
 
 最小必填字段只有:
@@ -415,8 +414,6 @@ _templates:
 
 - `source_id` (required)
 - `loader` (required)
-
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `main_source` definition.
 
 **loader 引用格式**:
 
@@ -452,8 +449,6 @@ main_source:
 
 - `loader`
 - `key` (支持复合键)
-
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `source` definition.
 
 #### 3.3.1 loader kwargs 模板 (params)
 
@@ -494,8 +489,6 @@ sources:
 ```
 
 #### 3.3.2 缓存模式 (cache_mode)
-
-取值与默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `source.cache_mode`.
 
 语义:
 
@@ -624,8 +617,6 @@ normalize:
 - `value_cast`: 值转换(可选)
 - `relation`: 关联路径或 YAML 别名引用(可选)
 
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `field` / `source_field_inline` definition.
-
 **extract 的默认与语法**:
 
 <!-- BEGIN AUTOGEN:yaml-dsl-source-field-extract -->
@@ -737,8 +728,6 @@ sources:
 
 - `name`: 显示名称
 
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `field` definition.
-
 > 注: `depends_on` 不再作为用户侧配置字段.派生字段依赖由系统从 `compute` 表达式中自动推导;若配置中出现 `depends_on`,校验会失败.
 
 **示例**:
@@ -814,8 +803,6 @@ sources:
 可选:
 
 - `lookup_cast`: 键值归一化转换
-
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `relation` definition.
 
 **重要: steps 中的 `source.field` 使用 field_id**
 
@@ -922,8 +909,6 @@ relations:
 - `outputs.*.fields`: 明细输出的导出列顺序(field_id 列表)
 - `outputs.*.where`: 安全表达式过滤(用于分发多 sheet)
 - `outputs.*.aggregate`: 派生汇总输出(与 `fields` 互斥)
-
-完整字段集合/默认值见: [YAML Schema 参考(生成)](schema-reference.gen.md) 中的 `outputs` / `output_to` / `output_write` definitions.
 
 **示例**:
 

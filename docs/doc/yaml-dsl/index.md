@@ -26,7 +26,6 @@ YAML DSL 的主线演进遵循以下上位原则(后续提案/变更默认不得
 - 升级旧写法/破坏性变更: [升级指南](upgrades/index.md)
 - 想让智能助手协助写/改 YAML: [集成AI环境 (Agent Skill)](agent-skill.md)
 - 维护 schema/编辑器补全: [Schema Meta 参考](schema-meta.md)
-- 需要稳定 reference(字段集合): [YAML Schema 参考(生成)](schema-reference.gen.md)
 
 下一步:
 

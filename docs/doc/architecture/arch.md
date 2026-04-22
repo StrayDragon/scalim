@@ -148,11 +148,11 @@ flowchart TD
 flowchart TD
   WF_YAML[workflow.yaml] --> WF_ENTRY[scalim.dsl.yaml_dsl.run_workflow]
   WF_ENTRY --> WF_IR[WorkflowIr]
-  WF_IR --> WF_RUN[scalim.workflow.*]
+  WF_IR --> WF_RUN[scalim.workflow runtime]
 
   WF_RUN -->|compile_demand_fn| D_YAML[demand.yaml]
   D_YAML --> D_ADAPTER[scalim.dsl.yaml_dsl.compile]
-  D_ADAPTER --> D_IR[DemandIr + ExecutionRequest<br/>(+ RuntimeBindings)]
+  D_ADAPTER --> D_IR["DemandIr + ExecutionRequest<br>(+ RuntimeBindings)"]
   D_IR --> RUN_IR[scalim.execution.run_ir]
   RUN_IR --> RESULT[ExecutionResult]
 ```
