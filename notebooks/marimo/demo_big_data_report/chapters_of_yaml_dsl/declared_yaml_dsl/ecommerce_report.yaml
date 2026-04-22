@@ -218,6 +218,7 @@ relations:
         to: [region_pricing.region_id, region_pricing.product_category_id]
         lookup_cast:
           name: int
+          sep: "1"
 
 # ==============================================================================
 # 数据源定义

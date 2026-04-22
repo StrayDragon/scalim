@@ -37,6 +37,68 @@ def is_valid_group(*, group_name: object, **_kw: object) -> bool:
     return bool(text)
 
 
+def test_full_context(*, ticket_id: object, ctx: object) -> str:
+    """测试: 接收完整的 $ctx 上下文对象.
+
+    用于验证 $ctx 能正确传递 _AggregateCallByContext 对象.
+    """
+    return "full_ctx"
+
+
+def test_row_id(*, ticket_id: object, row_id: object) -> str:
+    """测试: 接收 $ctx.row_id.
+
+    用于验证 $ctx.row_id 能正确传递行 ID.
+    """
+    return "row_id:{}".format(row_id if row_id is not None else "null")
+
+
+def test_batch_num(*, ticket_id: object, batch_num: object) -> str:
+    """测试: 接收 $ctx.batch_num.
+
+    用于验证 $ctx.batch_num 能正确传递批次号.
+    """
+    return "batch:{}".format(batch_num)
+
+
+def test_field_id(*, ticket_id: object, field_id: object) -> str:
+    """测试: 接收 $ctx.field_id.
+
+    用于验证 $ctx.field_id 能正确传递字段 ID.
+    """
+    return "field:{}".format(field_id)
+
+
+def test_deps(*, ticket_id: object, deps: object) -> str:
+    """测试: 接收 $ctx.deps.
+
+    用于验证 $ctx.deps 能正确传递依赖项.
+    """
+    if isinstance(deps, (tuple, list)):
+        return "deps:{}".format(len(deps))
+    return "deps:?"
+
+
+def test_values(*, ticket_id: object, values: object) -> str:
+    """测试: 接收 $ctx.values.
+
+    用于验证 $ctx.values 能正确传递字段值字典.
+    """
+    if isinstance(values, dict):
+        return "values:{}".format(len(values))
+    return "values:?"
+
+
+def enrich_status_with_context(*, category: object, priority: object, ctx: object) -> str:
+    """测试: 混合使用字段值和 $ctx.
+
+    用于验证字段值和上下文对象可以同时传递.
+    """
+    cat_str = str(category or "")[:3]
+    pri_str = str(priority or "")[:2]
+    return "status_{}_{}_ctx".format(cat_str, pri_str)
+
+
 def normalize_identity(result: Mapping[object, Mapping[str, Any]], ctx: object) -> Mapping[object, Mapping[str, Any]]:
     """normalize.call_by 示例: identity normalize,用于 notebooks 回归门禁.
 
@@ -381,4 +443,12 @@ __all__ = [
     "load_support_tickets",
     "load_support_tickets_dirty_agent_id",
     "verify_support_outputs_csv_rows",
+    # $ctx 测试函数
+    "test_full_context",
+    "test_row_id",
+    "test_batch_num",
+    "test_field_id",
+    "test_deps",
+    "test_values",
+    "enrich_status_with_context",
 ]
