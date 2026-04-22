@@ -4,7 +4,7 @@
     - 维护 YAML DSL JSON Schema 的项目贡献者
     - 维护编辑器补全/hover 体验的开发者
 
-本页说明 `_schema_meta(...)` 的约定与能力边界,用于保持生成的 JSON Schema 风格一致.
+主框架提供了一个帮助函数 `_schema_meta(...)` 用于保持生成的 JSON Schema 风格一致, 此页面介绍其约定与能力边界
 
 ??? note "维护提示"
     本页内容通常会在以下变更后需要同步检查:
