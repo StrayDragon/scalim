@@ -2,7 +2,7 @@
 
 ??? note "适用读者"
     - 在编辑器里写 YAML DSL,希望获得语义 diagnostics 与 Python 引用跳转
-    - 需要把 YAML DSL LSP server 接入 Neovim / Zed / JetBrains 等编辑器
+    - 需要把 YAML DSL LSP server 接入 JetBrains 等编辑器
 
 本仓库提供可复用的 YAML DSL LSP server（命令行入口见下文）,用于补足 “YAML schema 只能做结构校验” 的语义空白。
 
@@ -38,7 +38,6 @@ uv tool install scalim-yaml-dsl-lsp
 YAML schema 插件负责结构校验/补全,本 LSP server **不替代** schema 插件生态：
 
 - VSCode: `redhat.vscode-yaml`
-- Neovim: `yaml-language-server` / `yamlls`
 - JetBrains: YAML plugin（配合 `$schema` modeline）
 
 推荐组合：**schema 插件提供结构体验 + YAML DSL LSP 提供语义体验**。
@@ -134,7 +133,5 @@ fields:
 
 ## 按编辑器选择
 
-- [Neovim](neovim.md)
-- [Zed](zed.md)
 - [JetBrains](jetbrains.md)
 - [Troubleshooting](troubleshooting.md)
