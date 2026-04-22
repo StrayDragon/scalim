@@ -505,7 +505,7 @@ sources:
     loader: "myapp.loaders:load_regions"
     key: region_id
     lookup_cast:
-      name: int                # 转换类型:auto/int/str/sep_first
+      int: {}                  # 转换类型:auto/int/str/sep_first
 ```
 
 **转换类型**:
@@ -513,20 +513,20 @@ sources:
 - `auto`: 自动归一化
 - `int`: 转为整数
 - `str`: 转为字符串
-- `sep_first`: 按分隔符截取首段再归一化
+- `sep_first`: 按分隔符截取首段再归一化(`sep` 可省略,默认 `,`)
 
 **注意(float key)**:
 
 - `auto` 会拒绝 float lookup key(返回 None 并忽略该键),以避免 `123.0` 与 `123` 的歧义.
-- 若你的外键可能以 float 形式出现(例如 JSON/YAML 数字、上游系统返回 123.0),请显式使用 `lookup_cast: {name: int|str}` 或在 loader 中修复类型.
+- 若你的外键可能以 float 形式出现(例如 JSON/YAML 数字、上游系统返回 123.0),请显式使用 `lookup_cast: {int: {}}` / `lookup_cast: {str: {}}` 或在 loader 中修复类型.
 
 **sep_first 示例**:
 
 ```yaml
 # 处理 "1,2,3" 这样的 CSV 多值字段
 lookup_cast:
-  name: sep_first
-  sep: ","          # 默认 ","
+  sep_first:
+    sep: ","        # 默认 ","
 ```
 
 #### 3.3.4 整体结果归一化 (normalize)
@@ -849,7 +849,7 @@ steps:
   - from: orders.customer_id
     to: customers.customer_id
     lookup_cast:
-      name: int
+      int: {}
 ```
 
 #### 3.5.4 关联类型
@@ -895,8 +895,8 @@ relations:
       - from: orders.small_group_ids
         to: small_groups.small_group_id
         lookup_cast:
-          name: sep_first
-          sep: ","
+          sep_first:
+            sep: ","
 ```
 
 ### 3.6 输出配置 (outputs)
@@ -1202,17 +1202,17 @@ def load_customers_by_rows(rows: list[dict]) -> dict:
 
 ```yaml
 lookup_cast:
-  name: auto        # 自动推断类型并归一化
+  auto: {}          # 自动推断类型并归一化
 ```
 
 #### 4.3.2 int/str: 类型转换
 
 ```yaml
 lookup_cast:
-  name: int         # 转为整数
+  int: {}           # 转为整数
 
 lookup_cast:
-  name: str         # 转为字符串
+  str: {}           # 转为字符串
 ```
 
 #### 4.3.3 sep_first: CSV 首值截取
@@ -1227,8 +1227,8 @@ relations:
       - from: orders.small_group_ids
         to: small_groups.small_group_id
         lookup_cast:
-          name: sep_first
-          sep: ","        # 按逗号分割,取 "1"
+          sep_first:
+            sep: ","      # 按逗号分割,取 "1"
 ```
 
 ### 4.4 缓存策略 (cache_mode)
@@ -1536,7 +1536,7 @@ sources:
     loader: "scalim_misc.demo_big_data_report.loaders:load_products"
     key: product_id
     lookup_cast:
-      name: int
+      int: {}
     params:
       ids: {$keys: {as: list}}
     fields:
@@ -1984,7 +1984,7 @@ relations:
       - from: orders.customer_id
         to: customers.customer_id
         lookup_cast:
-          name: int    # 确保 orders.customer_id 是整数
+          int: {}      # 确保 orders.customer_id 是整数
 
 # value_cast: 输出时转换
 main_source:

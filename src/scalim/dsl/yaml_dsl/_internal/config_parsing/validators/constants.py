@@ -4,7 +4,6 @@ from ....schema_dsl.constants import DEMAND_FIELDS_KEY
 from ....schema_dsl.models import (
     DEMAND_KEYS,
     DERIVED_FIELD_KEYS,
-    LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
     NORMALIZE_KEYS,
     RELATION_CONFIG_KEYS,
@@ -43,8 +42,6 @@ class _FieldNames:
     NORMALIZE_FIELDS: str = NORMALIZE_KEYS["fields"]
     NORMALIZE_STEPS: str = NORMALIZE_KEYS["steps"]
     NORMALIZE_CALL_BY: str = NORMALIZE_KEYS["call_by"]
-    NAME_KEY: str = LOOKUP_CAST_KEYS["name"]
-    SEP: str = LOOKUP_CAST_KEYS["sep"]
     SOURCE: str = SOURCE_FIELD_KEYS["source"]
     EXTRACT: str = SOURCE_FIELD_KEYS["extract"]
     RELATION: str = SOURCE_FIELD_KEYS["relation"]

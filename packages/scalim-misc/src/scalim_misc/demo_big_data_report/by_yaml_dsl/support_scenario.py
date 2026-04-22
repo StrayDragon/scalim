@@ -42,6 +42,7 @@ def test_full_context(*, ticket_id: object, ctx: object) -> str:
 
     用于验证 $ctx 能正确传递 _AggregateCallByContext 对象.
     """
+    _ = (ticket_id, ctx)
     return "full_ctx"
 
 
@@ -50,6 +51,7 @@ def test_row_id(*, ticket_id: object, row_id: object) -> str:
 
     用于验证 $ctx.row_id 能正确传递行 ID.
     """
+    _ = ticket_id
     return "row_id:{}".format(row_id if row_id is not None else "null")
 
 
@@ -58,6 +60,7 @@ def test_batch_num(*, ticket_id: object, batch_num: object) -> str:
 
     用于验证 $ctx.batch_num 能正确传递批次号.
     """
+    _ = ticket_id
     return "batch:{}".format(batch_num)
 
 
@@ -66,6 +69,7 @@ def test_field_id(*, ticket_id: object, field_id: object) -> str:
 
     用于验证 $ctx.field_id 能正确传递字段 ID.
     """
+    _ = ticket_id
     return "field:{}".format(field_id)
 
 
@@ -74,6 +78,7 @@ def test_deps(*, ticket_id: object, deps: object) -> str:
 
     用于验证 $ctx.deps 能正确传递依赖项.
     """
+    _ = ticket_id
     if isinstance(deps, (tuple, list)):
         return "deps:{}".format(len(deps))
     return "deps:?"
@@ -84,6 +89,7 @@ def test_values(*, ticket_id: object, values: object) -> str:
 
     用于验证 $ctx.values 能正确传递字段值字典.
     """
+    _ = ticket_id
     if isinstance(values, dict):
         return "values:{}".format(len(values))
     return "values:?"
@@ -94,6 +100,7 @@ def enrich_status_with_context(*, category: object, priority: object, ctx: objec
 
     用于验证字段值和上下文对象可以同时传递.
     """
+    _ = ctx
     cat_str = str(category or "")[:3]
     pri_str = str(priority or "")[:2]
     return "status_{}_{}_ctx".format(cat_str, pri_str)
@@ -435,6 +442,7 @@ def expected_support_guardrail_codes() -> Tuple[str, ...]:
 __all__ = [
     "GuardrailCaptureObserver",
     "GuardrailSignal",
+    "enrich_status_with_context",
     "expected_support_guardrail_codes",
     "expected_support_row_gap_totals",
     "load_support_agents",
@@ -442,13 +450,11 @@ __all__ = [
     "load_support_customers",
     "load_support_tickets",
     "load_support_tickets_dirty_agent_id",
-    "verify_support_outputs_csv_rows",
-    # $ctx 测试函数
+    "test_batch_num",
+    "test_deps",
+    "test_field_id",
     "test_full_context",
     "test_row_id",
-    "test_batch_num",
-    "test_field_id",
-    "test_deps",
     "test_values",
-    "enrich_status_with_context",
+    "verify_support_outputs_csv_rows",
 ]

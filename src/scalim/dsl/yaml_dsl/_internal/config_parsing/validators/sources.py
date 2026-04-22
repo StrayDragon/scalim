@@ -30,6 +30,34 @@ _IMPORT_KEY = "$import"
 class ValidatorSourcesMixin(ValidatorMixinBase):
     _step_field_ids_by_source_data_key: Dict[str, Dict[str, Set[str]]]
 
+    @staticmethod
+    def _build_lookup_cast_legacy_migration_hint(lookup_path: str, lookup_dict: Dict[str, Any]) -> str:
+        legacy_name = str(lookup_dict.get("name") or "").strip()
+        legacy_sep = lookup_dict.get("sep")
+
+        suggested: Optional[str] = None
+        if legacy_name in {"auto", "int", "str"}:
+            suggested = "lookup_cast: {{{}: {{}}}}".format(legacy_name)
+        elif legacy_name == "sep_first":
+            sep = legacy_sep if isinstance(legacy_sep, str) else None
+            if sep:
+                suggested = "lookup_cast: {sep_first: {sep: %r}}" % sep
+            else:
+                suggested = "lookup_cast: {sep_first: {}}"
+
+        msg = (
+            "Legacy YAML syntax is not supported: '{}'. ".format(lookup_path)
+            + "Replace `lookup_cast: {name: ...}` with a one-of cast-branch object."
+            + "\nMigration examples:\n"
+            + "  lookup_cast: {auto: {}}\n"
+            + "  lookup_cast: {int: {}}\n"
+            + "  lookup_cast: {str: {}}\n"
+            + '  lookup_cast: {sep_first: {sep: ","}}'
+        )
+        if suggested:
+            msg = "{}\nSuggested:\n  {}".format(msg, suggested)
+        return msg
+
     def _collect_field_data_key_map(self, fields_raw: object) -> Dict[str, Set[str]]:
         data_key_map: Dict[str, Set[str]] = {}
         fields_dict = mapping_or_none(fields_raw)
@@ -425,13 +453,87 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
             self._add_error(errors, "{} lookup_cast must be a dictionary".format(context), path=lookup_path)
             return
 
-        name = str(lookup_dict.get(_F.NAME_KEY, ""))
-        if name not in LOOKUP_CAST_NAME_ENUM:
+        if "name" in lookup_dict:
+            msg = self._build_lookup_cast_legacy_migration_hint(lookup_path, lookup_dict)
+            self._add_error(errors, msg, path=lookup_path)
+            return
+
+        self._validate_lookup_cast_oneof_shape(lookup_dict, errors, context, lookup_path)
+
+    def _validate_lookup_cast_oneof_shape(
+        self,
+        lookup_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        context: str,
+        lookup_path: str,
+    ) -> None:
+        branch_keys = tuple(LOOKUP_CAST_NAME_ENUM)
+        branch_key_set = set(branch_keys)
+        branches = [key for key in branch_keys if key in lookup_dict]
+        unknown_keys = sorted(str(key) for key in lookup_dict if str(key) not in branch_key_set)
+        if unknown_keys:
             self._add_error(
                 errors,
-                "{} lookup_cast has invalid name '{}'".format(context, name),
-                path="{}.{}".format(lookup_path, _F.NAME_KEY),
+                "{} lookup_cast has unknown keys: {}".format(context, ", ".join(unknown_keys)),
+                path=lookup_path,
             )
+
+        if len(branches) != 1:
+            msg = "{} lookup_cast must select exactly one branch: {}".format(context, "/".join(branch_keys))
+            self._add_error(errors, msg, path=lookup_path)
+            return
+
+        branch = branches[0]
+        params_path = "{}.{}".format(lookup_path, branch)
+        params_dict = mapping_or_none(lookup_dict.get(branch))
+        if params_dict is None:
+            self._add_error(errors, "{} lookup_cast.{} must be a dictionary".format(context, branch), path=params_path)
+            return
+
+        if branch == "sep_first":
+            self._validate_lookup_cast_sep_first_params(params_dict, errors, context, params_path)
+            return
+
+        self._validate_lookup_cast_empty_params(branch, params_dict, errors, context, params_path)
+
+    def _validate_lookup_cast_sep_first_params(
+        self,
+        params_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        context: str,
+        params_path: str,
+    ) -> None:
+        unexpected = sorted(str(key) for key in params_dict if str(key) != "sep")
+        if unexpected:
+            self._add_error(
+                errors,
+                "{} lookup_cast.sep_first has unknown keys: {}".format(context, ", ".join(unexpected)),
+                path=params_path,
+            )
+        if "sep" in params_dict and not isinstance(params_dict.get("sep"), str):
+            self._add_error(
+                errors,
+                "{} lookup_cast.sep_first.sep must be a string".format(context),
+                path="{}.sep".format(params_path),
+            )
+
+    def _validate_lookup_cast_empty_params(
+        self,
+        branch: str,
+        params_dict: Dict[str, Any],
+        errors: List[ValidationIssue],
+        context: str,
+        params_path: str,
+    ) -> None:
+        if not params_dict:
+            return
+        if "sep" in params_dict:
+            msg = ("{} lookup_cast.{} does not support 'sep'; only 'sep_first' branch accepts it").format(context, branch)
+            self._add_error(errors, msg, path="{}.sep".format(params_path))
+            return
+
+        msg = "{} lookup_cast.{} must be an empty object".format(context, branch)
+        self._add_error(errors, msg, path=params_path)
 
     def _validate_normalize(
         self,

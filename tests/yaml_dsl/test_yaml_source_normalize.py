@@ -512,6 +512,25 @@ def test_parser_sources_normalize_helpers_cover_skip_branches() -> None:
     assert norm is not None
 
 
+def test_parser_sources_lookup_cast_rejects_invalid_shapes() -> None:
+    class _Parser(ParserSourcesMixin):
+        pass
+
+    parser = _Parser()
+
+    with pytest.raises(TypeError, match="Legacy YAML syntax is not supported for lookup_cast"):
+        _ = parser._parse_lookup_cast({"name": "int"})  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match="lookup_cast must select exactly one branch"):
+        _ = parser._parse_lookup_cast({"int": {}, "str": {}})  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match=r"lookup_cast\.int must be a dictionary"):
+        _ = parser._parse_lookup_cast({"int": 1})  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match=r"lookup_cast\.int must be an empty object"):
+        _ = parser._parse_lookup_cast({"int": {"x": 1}})  # type: ignore[attr-defined]
+
+
 def test_validator_sources_normalize_call_by_validation_branches() -> None:
     errors = _validate_normalize_raw({"kind": "index_by_key", "key_field": "id", "call_by": 123})
     assert any("normalize.call_by must be a string" in issue.message for issue in errors)

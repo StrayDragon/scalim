@@ -407,33 +407,99 @@
         },
         "lookup_cast": {
           "type": "object",
-          "required": [
-            "name"
-          ],
-          "properties": {
-            "name": {
-              "type": "string",
-              "enum": [
-                "auto",
-                "int",
-                "str",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "auto"
+              ],
+              "properties": {
+                "auto": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "#### sources.*.lookup_cast.int",
+                  "markdownDescription": "#### sources.*.lookup_cast.str\n\n#### sources.*.lookup_cast.int\n#### sources.*.lookup_cast.auto\nsources.*.lookup_cast.auto"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "int"
+              ],
+              "properties": {
+                "int": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "#### sources.*.lookup_cast.int",
+                  "markdownDescription": "#### sources.*.lookup_cast.str\n\n#### sources.*.lookup_cast.int\n#### sources.*.lookup_cast.auto\nsources.*.lookup_cast.auto"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "str"
+              ],
+              "properties": {
+                "str": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "#### sources.*.lookup_cast.int",
+                  "markdownDescription": "#### sources.*.lookup_cast.str\n\n#### sources.*.lookup_cast.int\n#### sources.*.lookup_cast.auto\nsources.*.lookup_cast.auto"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
                 "sep_first"
               ],
-              "description": "转换名称.",
-              "markdownDescription": "#### sources.*.lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
-              "examples": [
-                "auto"
-              ]
-            },
-            "sep": {
-              "type": "string",
-              "description": "sep_first 的分隔符(默认 ,)",
-              "markdownDescription": "#### sources.*.lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
+              "properties": {
+                "sep_first": {
+                  "type": "object",
+                  "properties": {
+                    "sep": {
+                      "type": "string",
+                      "description": "sep_first 的分隔符(默认 ,)",
+                      "examples": [
+                        ","
+                      ],
+                      "markdownDescription": "#### sources.*.lookup_cast.sep_first.sep\n\nsep_first 的分隔符(默认 ,)"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "sources.*.lookup_cast.sep_first",
+                  "markdownDescription": "#### sources.*.lookup_cast.sep_first\n\nsources.*.lookup_cast.sep_first"
+                }
+              },
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false,
-          "description": "归一化 lookup key 的转换.",
-          "markdownDescription": "#### sources.*.lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
+          ],
+          "description": "归一化 lookup key 的转换(one-of 分支对象).",
+          "markdownDescription": "#### sources.*.lookup_cast\n\n归一化 lookup key 的转换(one-of 分支对象).\n\n写法(四选一):\n- `{auto: {}}`\n- `{int: {}}`\n- `{str: {}}`\n- `{sep_first: {sep: \",\"}}` (`sep` 可省略,默认 `,`)\n\n约束:\n- 同一个 `lookup_cast` 节点必须且只能选择一个分支\n- `sep` 仅允许出现在 `sep_first` 分支\n\n语义:\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n\n##### 例子\n```yaml\nauto: {}\n```\n```yaml\nint: {}\n```\n```yaml\nstr: {}\n```\n```yaml\nsep_first:\n  sep: ','\n```\n```yaml\nsep_first: {}\n```",
+          "examples": [
+            {
+              "auto": {}
+            },
+            {
+              "int": {}
+            },
+            {
+              "str": {}
+            },
+            {
+              "sep_first": {
+                "sep": ","
+              }
+            },
+            {
+              "sep_first": {}
+            }
+          ]
         },
         "lookup_chunk_size": {
           "oneOf": [
@@ -1188,33 +1254,99 @@
                       },
                       "lookup_cast": {
                         "type": "object",
-                        "required": [
-                          "name"
-                        ],
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "enum": [
-                              "auto",
-                              "int",
-                              "str",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "auto"
+                            ],
+                            "properties": {
+                              "auto": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "#### fields.*.relation.steps[*].lookup_cast.int",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.str\n\n#### fields.*.relation.steps[*].lookup_cast.int\n#### fields.*.relation.steps[*].lookup_cast.auto\nfields.*.relation.steps[*].lookup_cast.auto"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "int"
+                            ],
+                            "properties": {
+                              "int": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "#### fields.*.relation.steps[*].lookup_cast.int",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.str\n\n#### fields.*.relation.steps[*].lookup_cast.int\n#### fields.*.relation.steps[*].lookup_cast.auto\nfields.*.relation.steps[*].lookup_cast.auto"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "str"
+                            ],
+                            "properties": {
+                              "str": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "#### fields.*.relation.steps[*].lookup_cast.int",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.str\n\n#### fields.*.relation.steps[*].lookup_cast.int\n#### fields.*.relation.steps[*].lookup_cast.auto\nfields.*.relation.steps[*].lookup_cast.auto"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": [
                               "sep_first"
                             ],
-                            "description": "转换名称.",
-                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
-                            "examples": [
-                              "auto"
-                            ]
-                          },
-                          "sep": {
-                            "type": "string",
-                            "description": "sep_first 的分隔符(默认 ,)",
-                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
+                            "properties": {
+                              "sep_first": {
+                                "type": "object",
+                                "properties": {
+                                  "sep": {
+                                    "type": "string",
+                                    "description": "sep_first 的分隔符(默认 ,)",
+                                    "examples": [
+                                      ","
+                                    ],
+                                    "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep_first.sep\n\nsep_first 的分隔符(默认 ,)"
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "fields.*.relation.steps[*].lookup_cast.sep_first",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep_first\n\nfields.*.relation.steps[*].lookup_cast.sep_first"
+                              }
+                            },
+                            "additionalProperties": false
                           }
-                        },
-                        "additionalProperties": false,
-                        "description": "归一化 lookup key 的转换.",
-                        "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
+                        ],
+                        "description": "归一化 lookup key 的转换(one-of 分支对象).",
+                        "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast\n\n归一化 lookup key 的转换(one-of 分支对象).\n\n写法(四选一):\n- `{auto: {}}`\n- `{int: {}}`\n- `{str: {}}`\n- `{sep_first: {sep: \",\"}}` (`sep` 可省略,默认 `,`)\n\n约束:\n- 同一个 `lookup_cast` 节点必须且只能选择一个分支\n- `sep` 仅允许出现在 `sep_first` 分支\n\n语义:\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n\n##### 例子\n```yaml\nauto: {}\n```\n```yaml\nint: {}\n```\n```yaml\nstr: {}\n```\n```yaml\nsep_first:\n  sep: ','\n```\n```yaml\nsep_first: {}\n```",
+                        "examples": [
+                          {
+                            "auto": {}
+                          },
+                          {
+                            "int": {}
+                          },
+                          {
+                            "str": {}
+                          },
+                          {
+                            "sep_first": {
+                              "sep": ","
+                            }
+                          },
+                          {
+                            "sep_first": {}
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": false
@@ -1498,33 +1630,99 @@
                       },
                       "lookup_cast": {
                         "type": "object",
-                        "required": [
-                          "name"
-                        ],
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "enum": [
-                              "auto",
-                              "int",
-                              "str",
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "auto"
+                            ],
+                            "properties": {
+                              "auto": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "#### fields.*.relation.steps[*].lookup_cast.int",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.str\n\n#### fields.*.relation.steps[*].lookup_cast.int\n#### fields.*.relation.steps[*].lookup_cast.auto\nfields.*.relation.steps[*].lookup_cast.auto"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "int"
+                            ],
+                            "properties": {
+                              "int": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "#### fields.*.relation.steps[*].lookup_cast.int",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.str\n\n#### fields.*.relation.steps[*].lookup_cast.int\n#### fields.*.relation.steps[*].lookup_cast.auto\nfields.*.relation.steps[*].lookup_cast.auto"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "str"
+                            ],
+                            "properties": {
+                              "str": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "#### fields.*.relation.steps[*].lookup_cast.int",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.str\n\n#### fields.*.relation.steps[*].lookup_cast.int\n#### fields.*.relation.steps[*].lookup_cast.auto\nfields.*.relation.steps[*].lookup_cast.auto"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": [
                               "sep_first"
                             ],
-                            "description": "转换名称.",
-                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
-                            "examples": [
-                              "auto"
-                            ]
-                          },
-                          "sep": {
-                            "type": "string",
-                            "description": "sep_first 的分隔符(默认 ,)",
-                            "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
+                            "properties": {
+                              "sep_first": {
+                                "type": "object",
+                                "properties": {
+                                  "sep": {
+                                    "type": "string",
+                                    "description": "sep_first 的分隔符(默认 ,)",
+                                    "examples": [
+                                      ","
+                                    ],
+                                    "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep_first.sep\n\nsep_first 的分隔符(默认 ,)"
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "description": "fields.*.relation.steps[*].lookup_cast.sep_first",
+                                "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast.sep_first\n\nfields.*.relation.steps[*].lookup_cast.sep_first"
+                              }
+                            },
+                            "additionalProperties": false
                           }
-                        },
-                        "additionalProperties": false,
-                        "description": "归一化 lookup key 的转换.",
-                        "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
+                        ],
+                        "description": "归一化 lookup key 的转换(one-of 分支对象).",
+                        "markdownDescription": "#### fields.*.relation.steps[*].lookup_cast\n\n归一化 lookup key 的转换(one-of 分支对象).\n\n写法(四选一):\n- `{auto: {}}`\n- `{int: {}}`\n- `{str: {}}`\n- `{sep_first: {sep: \",\"}}` (`sep` 可省略,默认 `,`)\n\n约束:\n- 同一个 `lookup_cast` 节点必须且只能选择一个分支\n- `sep` 仅允许出现在 `sep_first` 分支\n\n语义:\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n\n##### 例子\n```yaml\nauto: {}\n```\n```yaml\nint: {}\n```\n```yaml\nstr: {}\n```\n```yaml\nsep_first:\n  sep: ','\n```\n```yaml\nsep_first: {}\n```",
+                        "examples": [
+                          {
+                            "auto": {}
+                          },
+                          {
+                            "int": {}
+                          },
+                          {
+                            "str": {}
+                          },
+                          {
+                            "sep_first": {
+                              "sep": ","
+                            }
+                          },
+                          {
+                            "sep_first": {}
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": false
@@ -1787,33 +1985,99 @@
               },
               "lookup_cast": {
                 "type": "object",
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "enum": [
-                      "auto",
-                      "int",
-                      "str",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "auto"
+                    ],
+                    "properties": {
+                      "auto": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "#### relations.*.steps[*].lookup_cast.int",
+                        "markdownDescription": "#### relations.*.steps[*].lookup_cast.str\n\n#### relations.*.steps[*].lookup_cast.int\n#### relations.*.steps[*].lookup_cast.auto\nrelations.*.steps[*].lookup_cast.auto"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "int"
+                    ],
+                    "properties": {
+                      "int": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "#### relations.*.steps[*].lookup_cast.int",
+                        "markdownDescription": "#### relations.*.steps[*].lookup_cast.str\n\n#### relations.*.steps[*].lookup_cast.int\n#### relations.*.steps[*].lookup_cast.auto\nrelations.*.steps[*].lookup_cast.auto"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "str"
+                    ],
+                    "properties": {
+                      "str": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "#### relations.*.steps[*].lookup_cast.int",
+                        "markdownDescription": "#### relations.*.steps[*].lookup_cast.str\n\n#### relations.*.steps[*].lookup_cast.int\n#### relations.*.steps[*].lookup_cast.auto\nrelations.*.steps[*].lookup_cast.auto"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
                       "sep_first"
                     ],
-                    "description": "转换名称.",
-                    "markdownDescription": "#### relations.*.steps[*].lookup_cast.name\n\n转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `auto`, `int`, `str`, `sep_first`\n\n##### 例子\n```yaml\nauto\n```",
-                    "examples": [
-                      "auto"
-                    ]
-                  },
-                  "sep": {
-                    "type": "string",
-                    "description": "sep_first 的分隔符(默认 ,)",
-                    "markdownDescription": "#### relations.*.steps[*].lookup_cast.sep\n\nsep_first 的分隔符(默认 ,)"
+                    "properties": {
+                      "sep_first": {
+                        "type": "object",
+                        "properties": {
+                          "sep": {
+                            "type": "string",
+                            "description": "sep_first 的分隔符(默认 ,)",
+                            "examples": [
+                              ","
+                            ],
+                            "markdownDescription": "#### relations.*.steps[*].lookup_cast.sep_first.sep\n\nsep_first 的分隔符(默认 ,)"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "relations.*.steps[*].lookup_cast.sep_first",
+                        "markdownDescription": "#### relations.*.steps[*].lookup_cast.sep_first\n\nrelations.*.steps[*].lookup_cast.sep_first"
+                      }
+                    },
+                    "additionalProperties": false
                   }
-                },
-                "additionalProperties": false,
-                "description": "归一化 lookup key 的转换.",
-                "markdownDescription": "#### relations.*.steps[*].lookup_cast\n\n归一化 lookup key 的转换.\n- `name`: auto / int / str / sep_first\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);"
+                ],
+                "description": "归一化 lookup key 的转换(one-of 分支对象).",
+                "markdownDescription": "#### relations.*.steps[*].lookup_cast\n\n归一化 lookup key 的转换(one-of 分支对象).\n\n写法(四选一):\n- `{auto: {}}`\n- `{int: {}}`\n- `{str: {}}`\n- `{sep_first: {sep: \",\"}}` (`sep` 可省略,默认 `,`)\n\n约束:\n- 同一个 `lookup_cast` 节点必须且只能选择一个分支\n- `sep` 仅允许出现在 `sep_first` 分支\n\n语义:\n- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n- `sep_first` 先按 `sep` 截取首段再做 normalize\n\n##### 字段约束\n- 必填: 否\n- 类型: object\n\n##### 例子\n```yaml\nauto: {}\n```\n```yaml\nint: {}\n```\n```yaml\nstr: {}\n```\n```yaml\nsep_first:\n  sep: ','\n```\n```yaml\nsep_first: {}\n```",
+                "examples": [
+                  {
+                    "auto": {}
+                  },
+                  {
+                    "int": {}
+                  },
+                  {
+                    "str": {}
+                  },
+                  {
+                    "sep_first": {
+                      "sep": ","
+                    }
+                  },
+                  {
+                    "sep_first": {}
+                  }
+                ]
               }
             },
             "additionalProperties": false

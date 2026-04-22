@@ -29,8 +29,8 @@ relations:
       - from: orders.tags
         to: tags.tag_id
         lookup_cast:
-          name: sep_first
-          sep: ","
+          sep_first:
+            sep: ","
 
 outputs:
   - id: out

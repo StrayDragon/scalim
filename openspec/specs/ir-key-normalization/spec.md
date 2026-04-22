@@ -103,7 +103,7 @@
 - `NaN/inf` MUST 视为规范化失败
 - 其余 float MUST 按 `auto_str_normalize` 规则规范化为稳定字符串(整数 float 去除小数部分;非整数 float 使用稳定格式化)
 
-注意: 该行为与 relations 的 `lookup_cast: {name: auto}`(会拒绝 float) 不同;启用 `key_normalization=auto_str` 或 `key_normalization=force_str` 表示用户接受按字符串语义做 key 匹配的风险.
+注意: 该行为与 relations 的 `lookup_cast: {auto: {}}`(会拒绝 float) 不同;启用 `key_normalization=auto_str` 或 `key_normalization=force_str` 表示用户接受按字符串语义做 key 匹配的风险.
 
 #### Semantics: multi-field keys
 当 key 为多字段复合键时(例如 `Tuple[object, ...]`):

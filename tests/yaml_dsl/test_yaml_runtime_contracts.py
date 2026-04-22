@@ -60,7 +60,7 @@ relations:
     steps:
       - from: orders.customer_id
         to: customers.customer_id
-        lookup_cast: {name: sep_first, sep: ","}
+        lookup_cast: {sep_first: {sep: ","}}
 sources:
   customers:
     loader: tests.fixtures.mock_loaders.mock_loader

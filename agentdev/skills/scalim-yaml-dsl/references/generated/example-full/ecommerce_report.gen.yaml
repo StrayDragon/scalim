@@ -83,7 +83,7 @@ _templates:
   step_orders_to_products_cast: &step_orders_to_products_cast
     <<: *step_orders_to_products
     lookup_cast:
-      name: int
+      int: {}
 
   perf_metrics_all: [duration, memory, cpu]
 
@@ -214,7 +214,7 @@ relations:
       - from: [orders.region_id, orders.product_category_id]
         to: [region_pricing.region_id, region_pricing.product_category_id]
         lookup_cast:
-          name: int
+          int: {}
 
 # ==============================================================================
 # 数据源定义
@@ -278,7 +278,7 @@ sources:
     loader: scalim_misc.demo_big_data_report.loaders:load_products
     key: product_id
     lookup_cast:
-      name: int
+      int: {}
     params:
       ids: {$keys: {as: list}}
       field_keys:

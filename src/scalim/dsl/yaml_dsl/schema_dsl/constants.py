@@ -89,16 +89,21 @@ DESC_LOADER_MD = (
     "- `.loaders.load_orders`\n"
     "- `^workflow/book_sheet_rows`"
 )
-DESC_LOOKUP_CAST = "归一化 lookup key 的转换(对象结构); sep_first 会先截取首段再做 auto_normalize_key, 例: {name: sep_first, sep: ','}"
+DESC_LOOKUP_CAST = '归一化 lookup key 的转换(one-of 分支对象); sep_first 会先截取首段再做 auto_normalize_key, 例: {sep_first: {sep: ","}}'
 DESC_LOOKUP_CAST_MD = (
-    "归一化 lookup key 的转换.\n\n"
-    "- `name`: auto / int / str / sep_first\n"
+    "归一化 lookup key 的转换(one-of 分支对象).\n\n"
+    "写法(四选一):\n"
+    "- `{auto: {}}`\n"
+    "- `{int: {}}`\n"
+    "- `{str: {}}`\n"
+    '- `{sep_first: {sep: ","}}` (`sep` 可省略,默认 `,`)\n\n'
+    "约束:\n"
+    "- 同一个 `lookup_cast` 节点必须且只能选择一个分支\n"
+    "- `sep` 仅允许出现在 `sep_first` 分支\n\n"
+    "语义:\n"
     "- `auto` 会拒绝 float lookup key(避免歧义,返回 None 并忽略该键);\n"
     "  若上游可能返回 float(例如 123.0/12.34),请用 `int`/`str` 显式归一化或在 loader 中修复\n"
     "- `sep_first` 先按 `sep` 截取首段再做 normalize"
-)
-DESC_LOOKUP_CAST_NAME_MD = (
-    "转换名称.\n\n- `auto`: 自动归一化\n- `int`: 转为 int\n- `str`: 转为 str\n- `sep_first`: 按 `sep` 截取首段再归一化"
 )
 DESC_BIND = "Legacy: bind/to_bind (已移除;请使用 params 模板 + `$keys/$rows`)"
 DESC_BIND_MD = "Legacy 绑定配置.已从稳定 YAML authoring surface 移除,请使用 `sources.<id>.params` 模板中的 `$keys/$rows` 指令节点."
@@ -268,25 +273,60 @@ RELATION_STEP_TO_SCHEMA = {
     "examples": ["customers.customer_id", ["regions.region_id", "mappings.institution_id"]],
 }
 
-LOOKUP_CAST_SCHEMA = {
+_LOOKUP_CAST_EMPTY_PARAMS_SCHEMA: Dict[str, Any] = {
     "type": "object",
-    "required": ["name"],
-    "properties": {
-        "name": {
-            "type": "string",
-            "enum": LOOKUP_CAST_NAME_ENUM,
-            "description": "转换名称(auto/int/str/sep_first)",
-            "markdownDescription": DESC_LOOKUP_CAST_NAME_MD,
-            "examples": ["auto"],
-        },
-        "sep": {
-            "type": "string",
-            "description": "sep_first 的分隔符(默认 ,)",
-        },
-    },
     "additionalProperties": False,
+}
+
+LOOKUP_CAST_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "oneOf": [
+        {
+            "type": "object",
+            "required": ["auto"],
+            "properties": {"auto": _LOOKUP_CAST_EMPTY_PARAMS_SCHEMA},
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "required": ["int"],
+            "properties": {"int": _LOOKUP_CAST_EMPTY_PARAMS_SCHEMA},
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "required": ["str"],
+            "properties": {"str": _LOOKUP_CAST_EMPTY_PARAMS_SCHEMA},
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "required": ["sep_first"],
+            "properties": {
+                "sep_first": {
+                    "type": "object",
+                    "properties": {
+                        "sep": {
+                            "type": "string",
+                            "description": "sep_first 的分隔符(默认 ,)",
+                            "examples": [","],
+                        }
+                    },
+                    "additionalProperties": False,
+                }
+            },
+            "additionalProperties": False,
+        },
+    ],
     "description": DESC_LOOKUP_CAST,
     "markdownDescription": DESC_LOOKUP_CAST_MD,
+    "examples": [
+        {"auto": {}},
+        {"int": {}},
+        {"str": {}},
+        {"sep_first": {"sep": ","}},
+        {"sep_first": {}},
+    ],
 }
 
 _DESC_SOURCE_NORMALIZE_KIND_MD = (
@@ -626,7 +666,7 @@ BIND_SCHEMA = {
     "markdownDescription": DESC_BIND_MD,
 }
 
-RELATION_STEPS_SCHEMA = {
+RELATION_STEPS_SCHEMA: Dict[str, Any] = {
     "type": "array",
     "items": {
         "type": "object",

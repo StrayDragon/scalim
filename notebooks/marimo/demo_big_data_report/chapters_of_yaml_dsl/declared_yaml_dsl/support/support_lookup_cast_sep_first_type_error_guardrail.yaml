@@ -10,7 +10,7 @@ description: |
   - 我能不能在 YAML 里声明 join key 的“清洗规则”,并且把清洗失败变成可回归的 guardrail 信号？
 
   方案:
-  - relation step 上使用 `lookup_cast: {name: sep_first, sep: ','}`:
+  - relation step 上使用 `lookup_cast: {sep_first: {sep: ","}}`:
     - 先按分隔符取第一段,再做 `auto_normalize_key`
   - runtime guardrails:
     - `GuardrailsPolicy(enabled=True, mode='quiet', relations=GuardrailsRelationsPolicy(type_error_max_rate=0))`
@@ -36,7 +36,7 @@ relations:
     steps:
       - from: tickets.agent_id
         to: agents.agent_id
-        lookup_cast: {name: sep_first, sep: ","}
+        lookup_cast: {sep_first: {sep: ","}}
 
 sources:
   agents:

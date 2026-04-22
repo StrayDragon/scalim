@@ -2385,8 +2385,8 @@ sources:
     key: id
     cache_mode: preload_forever
     lookup_cast:
-      name: sep_first
-      sep: "{sep}"
+      sep_first:
+        sep: "{sep}"
     fields:
       value:
         name: value
@@ -3339,8 +3339,8 @@ sources:
     key: id
     cache_mode: preload_forever
     lookup_cast:
-      name: sep_first
-      sep: ","
+      sep_first:
+        sep: ","
     normalize:
       kind: index_by_key
       key_field: id

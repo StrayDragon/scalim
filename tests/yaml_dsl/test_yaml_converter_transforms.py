@@ -230,14 +230,118 @@ orders_to_customers: &orders_to_customers
     - from: orders.customer_id
       to: customers.customer_id
       lookup_cast:
-        name: bad
+        bad: {}
     """,
     )
     loader = YamlDemandLoader()
     with pytest.raises(ScalimYamlValidationError) as exc:
         loader.load_string(yaml_content)
 
-    assert any("lookup_cast has invalid name" in env.message for env in exc.value.errors)
+    assert any("lookup_cast has unknown keys" in env.message for env in exc.value.errors)
+
+
+def test_legacy_lookup_cast_shape_fails_with_migration_hint() -> None:
+    yaml_content = make_yaml_config(
+        name="lookup_cast_legacy_shape",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    extract: order_id
+""",
+        sources="""
+customers:
+  loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
+  key: customer_id
+  fields:
+    customer_name:
+      extract: customer_name
+      relation: *orders_to_customers
+""",
+        relations="""
+orders_to_customers: &orders_to_customers
+  steps:
+    - from: orders.customer_id
+      to: customers.customer_id
+      lookup_cast:
+        name: int
+    """,
+    )
+    loader = YamlDemandLoader()
+    with pytest.raises(ScalimYamlValidationError) as exc:
+        loader.load_string(yaml_content)
+    assert any("Legacy YAML syntax is not supported" in env.message for env in exc.value.errors)
+    assert any("lookup_cast: {int: {}}" in env.message for env in exc.value.errors)
+
+
+def test_lookup_cast_multiple_branches_fails() -> None:
+    yaml_content = make_yaml_config(
+        name="lookup_cast_multiple_branches",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    extract: order_id
+""",
+        sources="""
+customers:
+  loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
+  key: customer_id
+  fields:
+    customer_name:
+      extract: customer_name
+      relation: *orders_to_customers
+""",
+        relations="""
+orders_to_customers: &orders_to_customers
+  steps:
+    - from: orders.customer_id
+      to: customers.customer_id
+      lookup_cast:
+        int: {}
+        str: {}
+    """,
+    )
+    loader = YamlDemandLoader()
+    with pytest.raises(ScalimYamlValidationError) as exc:
+        loader.load_string(yaml_content)
+    assert any("must select exactly one branch" in env.message for env in exc.value.errors)
+
+
+def test_lookup_cast_sep_under_int_fails() -> None:
+    yaml_content = make_yaml_config(
+        name="lookup_cast_sep_under_int",
+        main_source="""
+source_id: orders
+loader: "scalim_misc.example_report_ir:DAL.paged_get_order_list"
+fields:
+  order_id:
+    extract: order_id
+""",
+        sources="""
+customers:
+  loader: "scalim_misc.example_report_ir:BLL.get_customer_info_from_api_of_kw_params"
+  key: customer_id
+  fields:
+    customer_name:
+      extract: customer_name
+      relation: *orders_to_customers
+""",
+        relations="""
+orders_to_customers: &orders_to_customers
+  steps:
+    - from: orders.customer_id
+      to: customers.customer_id
+      lookup_cast:
+        int: {sep: ","}
+    """,
+    )
+    loader = YamlDemandLoader()
+    with pytest.raises(ScalimYamlValidationError) as exc:
+        loader.load_string(yaml_content)
+    assert any("does not support 'sep'" in env.message for env in exc.value.errors)
 
 
 def test_converter_private_lookup_cast_raises() -> None:

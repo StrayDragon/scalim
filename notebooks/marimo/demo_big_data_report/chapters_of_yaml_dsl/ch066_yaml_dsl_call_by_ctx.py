@@ -29,15 +29,15 @@ def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
 
 
 def run_yaml_dsl_call_by_ctx() -> ExampleResult:
-    """演示 call_by 中 $ctx 的各种用法.
+    """演示 `call_by` 中 `$ctx` 的各种用法.
 
     测试场景:
-    1. 使用 $ctx 传递整个上下文对象
-    2. 使用 $ctx.row_id 访问行 ID
-    3. 使用 $ctx.batch_num 访问批次号
-    4. 使用 $ctx.field_id 访问字段 ID
-    5. 使用 $ctx.deps 访问依赖项
-    6. 使用 $ctx.values 访问字段值字典
+    1. 使用 `$ctx` 传递整个上下文对象
+    2. 使用 `$ctx.row_id` 访问行 ID
+    3. 使用 `$ctx.batch_num` 访问批次号
+    4. 使用 `$ctx.field_id` 访问字段 ID
+    5. 使用 `$ctx.deps` 访问依赖项
+    6. 使用 `$ctx.values` 访问字段值字典
     """
 
     with tempfile.TemporaryDirectory(prefix="scalim-yaml-call-by-ctx-") as tmpdir:
@@ -45,7 +45,7 @@ def run_yaml_dsl_call_by_ctx() -> ExampleResult:
         yaml_file = tmp / "test_ctx.yaml"
         out_root = tmp / "out"
 
-        # 测试各种 $ctx 用法的 YAML 配置
+        # 测试各种 `$ctx` 用法的 `YAML` 配置
         yaml_content = """\
 name: yaml_dsl_call_by_ctx_demo
 

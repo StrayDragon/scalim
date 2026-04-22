@@ -56,7 +56,7 @@ relations:
       - from: impressions.creative_id
         to: creatives.creative_id
         lookup_cast:
-          name: int
+          int: {}
 
   impressions_to_clicks:
     steps:

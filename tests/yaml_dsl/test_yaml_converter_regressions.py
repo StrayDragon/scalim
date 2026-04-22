@@ -94,7 +94,7 @@ sources:
   mapping:
     loader: tests.fixtures.mock_loaders.mock_loader
     key: [region_id, institution_id]
-    lookup_cast: {name: int}
+    lookup_cast: {int: {}}
 """
     config = _load_config(yaml_content)
     converter = ConfigToIRConverter()

@@ -64,11 +64,11 @@ ref loader 的入参与绑定模式 MUST 通过目标 source 的 `params` 模板
 诊断告警文案应提示配置 `lookup_cast`/`value_cast` 或调整 relation 定义,并复用跨模块统一常量.
 
 #### Scenario: step 级 lookup_cast
-- **WHEN** step 配置 `lookup_cast: {name: sep_first, sep: ","}` 且 `from` 为 "1,2,3"
+- **WHEN** step 配置 `lookup_cast: {sep_first: {sep: ","}}` 且 `from` 为 "1,2,3"
 - **THEN** lookup key 为 "1"(再按 auto_normalize_key 规则归一化)
 
 #### Scenario: 浮点被拒绝
-- **WHEN** `lookup_cast: {name: auto}` 且外键值为 123.0 或 12.34
+- **WHEN** `lookup_cast: {auto: {}}` 且外键值为 123.0 或 12.34
 - **THEN** 归一化结果为 None 且该键被忽略,并触发诊断告警事件
 
 #### Scenario: 多字段缺失

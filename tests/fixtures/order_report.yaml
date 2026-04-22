@@ -77,8 +77,8 @@ relations:
       - from: orders.small_group_ids
         to: small_groups.small_group_id
         lookup_cast:
-          name: sep_first
-          sep: ","
+          sep_first:
+            sep: ","
 
   # 多级关联 + CSV 多值字段
   orders_to_big_groups:
@@ -86,8 +86,8 @@ relations:
       - from: orders.small_group_ids
         to: small_groups.small_group_id
         lookup_cast:
-          name: sep_first
-          sep: ","
+          sep_first:
+            sep: ","
       - from: small_groups.big_group_id
         to: big_groups.big_group_id
 
@@ -159,7 +159,7 @@ sources:
     loader: "scalim_misc.example_report_ir:data_loader.get_big_groups"
     key: big_group_id
     cache_mode: preload_forever
-    lookup_cast: {name: int}
+    lookup_cast: {int: {}}
     fields:
       big_group_name:
         extract: big_group_name

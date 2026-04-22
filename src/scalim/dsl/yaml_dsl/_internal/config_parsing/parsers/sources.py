@@ -5,7 +5,6 @@ from ....schema_dsl.constants import (
 )
 from ....schema_dsl.models import (
     DEMAND_KEYS,
-    LOOKUP_CAST_KEYS,
     MAIN_SOURCE_KEYS,
     NORMALIZE_KEYS,
     SOURCE_KEYS,
@@ -173,10 +172,36 @@ class ParserSourcesMixin:
         lookup_dict = mapping_or_none(raw_lookup)
         if lookup_dict is None:
             return None
-        return LookupCastConfig(
-            name=str(lookup_dict.get(LOOKUP_CAST_KEYS["name"], "")),
-            sep=str_or_none(lookup_dict.get(LOOKUP_CAST_KEYS["sep"])),
-        )
+
+        if "name" in lookup_dict:
+            msg = (
+                "Legacy YAML syntax is not supported for lookup_cast: "
+                'use a one-of cast-branch object like `{int: {}}` or `{sep_first: {sep: ","}}`'
+            )
+            raise TypeError(msg)
+
+        branches = [key for key in ("auto", "int", "str", "sep_first") if key in lookup_dict]
+        if len(branches) != 1:
+            msg = "lookup_cast must select exactly one branch: auto/int/str/sep_first"
+            raise TypeError(msg)
+
+        branch = branches[0]
+        params_dict = mapping_or_none(lookup_dict.get(branch))
+        if params_dict is None:
+            msg = "lookup_cast.{} must be a dictionary".format(branch)
+            raise TypeError(msg)
+
+        if branch == "sep_first":
+            return LookupCastConfig(
+                name="sep_first",
+                sep=str_or_none(params_dict.get("sep")),
+            )
+
+        if params_dict:
+            msg = "lookup_cast.{} must be an empty object".format(branch)
+            raise TypeError(msg)
+
+        return LookupCastConfig(name=branch, sep=None)
 
     def _parse_normalize(self, raw_value: object) -> Optional[NormalizeConfig]:
         norm_dict = mapping_or_none(raw_value)

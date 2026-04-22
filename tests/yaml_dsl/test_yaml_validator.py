@@ -128,7 +128,67 @@ def _config_relation_step_to_bind_is_rejected() -> dict:
 
 def _config_lookup_cast_invalid_name() -> dict:
     config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"bad": {}}
+    return config
+
+
+def _config_lookup_cast_legacy_shape_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"name": "int"}
+    return config
+
+
+def _config_lookup_cast_legacy_unknown_name_is_rejected() -> dict:
+    config = _base_config()
     config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"name": "bad"}
+    return config
+
+
+def _config_lookup_cast_legacy_sep_first_with_sep_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"name": "sep_first", "sep": ","}
+    return config
+
+
+def _config_lookup_cast_legacy_sep_first_without_sep_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"name": "sep_first"}
+    return config
+
+
+def _config_lookup_cast_sep_under_int_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"int": {"sep": ","}}
+    return config
+
+
+def _config_lookup_cast_branch_not_mapping_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"int": 1}
+    return config
+
+
+def _config_lookup_cast_sep_first_unexpected_key_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"sep_first": {"x": 1}}
+    return config
+
+
+def _config_lookup_cast_sep_first_sep_not_string_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"sep_first": {"sep": 1}}
+    return config
+
+
+def _config_lookup_cast_branch_non_empty_params_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"int": {"x": 1}}
+    return config
+
+
+def _config_lookup_cast_multiple_branches_is_rejected() -> dict:
+    config = _base_config()
+    config["relations"]["orders_to_customers"]["steps"][0]["lookup_cast"] = {"int": {}, "str": {}}
     return config
 
 
@@ -180,7 +240,23 @@ def _config_derived_field_compute_unknown_name() -> dict:
         (_config_field_requires_via_when_no_path, ["has no relation path"]),
         (_config_field_ambiguous_paths_requires_via, ["ambiguous relation paths"]),
         (_config_relation_step_to_bind_is_rejected, ["to_bind"]),
-        (_config_lookup_cast_invalid_name, ["lookup_cast has invalid name"]),
+        (_config_lookup_cast_invalid_name, ["lookup_cast has unknown keys"]),
+        (_config_lookup_cast_legacy_shape_is_rejected, ["Legacy YAML syntax is not supported", "lookup_cast: {int: {}}"]),
+        (_config_lookup_cast_legacy_unknown_name_is_rejected, ["Legacy YAML syntax is not supported"]),
+        (
+            _config_lookup_cast_legacy_sep_first_with_sep_is_rejected,
+            ["Legacy YAML syntax is not supported", "lookup_cast: {sep_first: {sep:"],
+        ),
+        (
+            _config_lookup_cast_legacy_sep_first_without_sep_is_rejected,
+            ["Legacy YAML syntax is not supported", "lookup_cast: {sep_first: {}}"],
+        ),
+        (_config_lookup_cast_sep_under_int_is_rejected, ["does not support 'sep'"]),
+        (_config_lookup_cast_branch_not_mapping_is_rejected, ["lookup_cast.int must be a dictionary"]),
+        (_config_lookup_cast_sep_first_unexpected_key_is_rejected, ["lookup_cast.sep_first has unknown keys"]),
+        (_config_lookup_cast_sep_first_sep_not_string_is_rejected, ["lookup_cast.sep_first.sep must be a string"]),
+        (_config_lookup_cast_branch_non_empty_params_is_rejected, ["lookup_cast.int must be an empty object"]),
+        (_config_lookup_cast_multiple_branches_is_rejected, ["must select exactly one branch"]),
         (_config_derived_field_depends_on_invalid_type, ["does not allow 'depends_on'"]),
         (_config_derived_field_compute_invalid_syntax, ["invalid compute expression"]),
         (_config_derived_field_compute_unknown_name, ["depends on unknown field 'amount'"]),
@@ -196,6 +272,16 @@ def _config_derived_field_compute_unknown_name() -> dict:
         "field-ambiguous-paths",
         "relation-step-to-bind",
         "lookup-cast-invalid-name",
+        "lookup-cast-legacy-shape",
+        "lookup-cast-legacy-unknown-name",
+        "lookup-cast-legacy-sep-first-with-sep",
+        "lookup-cast-legacy-sep-first-without-sep",
+        "lookup-cast-sep-under-int",
+        "lookup-cast-branch-not-mapping",
+        "lookup-cast-sep-first-unexpected-key",
+        "lookup-cast-sep-first-sep-not-string",
+        "lookup-cast-branch-non-empty-params",
+        "lookup-cast-multiple-branches",
         "derived-depends-on-invalid-type",
         "derived-compute-invalid-syntax",
         "derived-compute-unknown-field",
