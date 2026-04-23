@@ -25,7 +25,9 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 
 <!-- BEGIN AUTOGEN:yaml-dsl-skill-cli-min-commands -->
 - demand YAML 仓库内完整校验: `uv run scalim-cli yaml-dsl validate <demand.yaml>`
+- demand YAML workflow 上下文校验: `uv run scalim-cli yaml-dsl validate --workflow <workflow.yaml> <demand.yaml>`
 - demand YAML 仓库内 schema 校验: `uv run scalim-cli yaml-dsl schema validate <demand.yaml>`
+- demand YAML workflow 上下文 schema 校验: `uv run scalim-cli yaml-dsl schema validate --workflow <workflow.yaml> <demand.yaml>`
 - workflow YAML 仓库内完整校验(静态/编译期;递归校验引用的 demands;不执行 workflow): `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`
 - workflow YAML 仓库内 schema 校验(结构/unknown-fields; 必须显式 schema 路径): `uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>`
 - 仓库外完整校验: `uvx scalim-cli yaml-dsl validate <file.yaml>`

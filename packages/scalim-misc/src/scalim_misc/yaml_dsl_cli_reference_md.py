@@ -101,8 +101,10 @@ def render_yaml_dsl_cli_reference_markdown(
             "## Command Variants",
             "### Repo",
             "- `uv run {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+            "- `uv run {cli} yaml-dsl validate --workflow <workflow.yaml> <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uv run {cli} yaml-dsl validate --type workflow <workflow.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uv run {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+            "- `uv run {cli} yaml-dsl schema validate --workflow <workflow.yaml> <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uv run {cli} yaml-dsl schema validate --schema {workflow_schema} <workflow.yaml>`".format(
                 cli=_project_constants.CLI_NAME,
                 workflow_schema=workflow_repo_schema_path,
@@ -118,8 +120,10 @@ def render_yaml_dsl_cli_reference_markdown(
             "",
             "### External",
             "- `uvx {cli} yaml-dsl validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+            "- `uvx {cli} yaml-dsl validate --workflow <workflow.yaml> <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uvx {cli} yaml-dsl validate --type workflow <workflow.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uvx {cli} yaml-dsl schema validate <file.yaml>`".format(cli=_project_constants.CLI_NAME),
+            "- `uvx {cli} yaml-dsl schema validate --workflow <workflow.yaml> <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
             "- `uvx {cli} yaml-dsl schema show`".format(cli=_project_constants.CLI_NAME),
             "- `uvx {cli} yaml-dsl schema path`".format(cli=_project_constants.CLI_NAME),
             "- `uvx {cli} yaml-dsl upsert-lsp-comment --type demand --comment-style all <paths...>`".format(
@@ -132,11 +136,19 @@ def render_yaml_dsl_cli_reference_markdown(
             "## Validate Layering",
             "- `yaml-dsl validate --type demand`: 使用 internal validator,更适合语义校验、旧写法迁移收敛与输出路径定位.",
             (
+                "- `yaml-dsl validate --workflow <workflow.yaml>`: 仅对 demand 生效;注入 workflow.resources.{books,files} "
+                "作为 outputs 绑定校验上下文."
+            ),
+            (
                 "- `yaml-dsl validate --type workflow`: 静态/编译期 workflow 校验,递归校验 workflow 引用的 demands,"
                 "并检查 outputs/books 绑定一致性."
             ),
             "- `yaml-dsl validate` 默认 `--type auto`: 根据 YAML 顶层结构推断 demand/workflow;CI/脚本建议显式传 `--type workflow`.",
             "- `yaml-dsl schema validate`: 使用 JSON Schema,更适合 schema-only 校验、编辑器/LSP 对齐与 unknown-field strict 收敛.",
+            (
+                "- `yaml-dsl schema validate --workflow <workflow.yaml>`: 仅对 demand 生效;注入 workflow.resources.{books,files} "
+                "作为 outputs 绑定校验上下文."
+            ),
             "",
             "## LSP / Schema Header",
             "- Repo schema path: `{}`".format(repo_schema_path),
@@ -225,6 +237,10 @@ def render_yaml_dsl_cli_min_commands_markdown(*, placeholder_prefix: str = "path
             cli=_project_constants.CLI_NAME, p=placeholder_prefix
         ),
         (
+            "- demand YAML 在 workflow 上下文中校验(outputs 允许引用 workflow.resources.*): "
+            "`uv run {cli} yaml-dsl validate --workflow {p}/workflow.yaml {p}/demand.yaml`"
+        ).format(cli=_project_constants.CLI_NAME, p=placeholder_prefix),
+        (
             "- workflow YAML 仓库内 full validate(静态/编译期;递归校验引用的 demands;不执行 workflow): "
             "`uv run {cli} yaml-dsl validate --type workflow {p}/workflow.yaml`"
         ).format(cli=_project_constants.CLI_NAME, p=placeholder_prefix),
@@ -232,6 +248,10 @@ def render_yaml_dsl_cli_min_commands_markdown(*, placeholder_prefix: str = "path
         "- demand YAML 仓库内 schema-only(更快): `uv run {cli} yaml-dsl schema validate {p}/demand.yaml`".format(
             cli=_project_constants.CLI_NAME, p=placeholder_prefix
         ),
+        (
+            "- demand YAML 在 workflow 上下文中 schema-only(outputs 允许引用 workflow.resources.*): "
+            "`uv run {cli} yaml-dsl schema validate --workflow {p}/workflow.yaml {p}/demand.yaml`"
+        ).format(cli=_project_constants.CLI_NAME, p=placeholder_prefix),
         (
             "- workflow YAML schema-only(需显式 workflow schema): "
             "`uv run {cli} yaml-dsl schema validate --schema {workflow_schema} {p}/workflow.yaml`"
@@ -277,7 +297,13 @@ def render_yaml_dsl_skill_cli_min_commands_markdown() -> str:
     workflow_schema_path = _path_to_posix(WORKFLOW_SCHEMA_REL)
     lines = [
         "- demand YAML 仓库内完整校验: `uv run {cli} yaml-dsl validate <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
+        "- demand YAML workflow 上下文校验: `uv run {cli} yaml-dsl validate --workflow <workflow.yaml> <demand.yaml>`".format(
+            cli=_project_constants.CLI_NAME
+        ),
         "- demand YAML 仓库内 schema 校验: `uv run {cli} yaml-dsl schema validate <demand.yaml>`".format(cli=_project_constants.CLI_NAME),
+        (
+            "- demand YAML workflow 上下文 schema 校验: `uv run {cli} yaml-dsl schema validate --workflow <workflow.yaml> <demand.yaml>`"
+        ).format(cli=_project_constants.CLI_NAME),
         (
             "- workflow YAML 仓库内完整校验(静态/编译期;递归校验引用的 demands;不执行 workflow): "
             "`uv run {cli} yaml-dsl validate --type workflow <workflow.yaml>`"

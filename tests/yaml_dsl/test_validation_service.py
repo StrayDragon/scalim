@@ -164,57 +164,77 @@ def test_extract_demand_book_ids_handles_non_string_and_blank_keys() -> None:
     assert ids == {"a"}
 
 
-def test_find_demand_book_binding_errors_reports_missing_and_unknown_book_ids() -> None:
+def test_extract_demand_file_ids_handles_non_string_and_blank_keys() -> None:
+    assert service.extract_demand_file_ids(None) == set()
+    assert service.extract_demand_file_ids({"resources": None}) == set()
+    assert service.extract_demand_file_ids({"resources": {"files": None}}) == set()
+    assert service.extract_demand_file_ids({"resources": {"files": {}}}) == set()
+
+    ids = service.extract_demand_file_ids({"resources": {"files": {" a ": {}, "": {}, 1: {}}}})
+    assert ids == {"a"}
+
+
+def test_find_demand_output_destination_binding_errors_reports_missing_and_unknown_resource_ids() -> None:
     yaml_data, locations = _yaml_locations(
         """
         outputs:
           - container: {kind: csv_file, path: ./out.csv}
-          - name: out1
+          - name: missing_to
             to: {}
-          - name: out2
+          - name: missing_book
             to: {book: missing}
-          - name: out3
-            to: {book: known}
+          - name: missing_file
+            to: {file: missing}
+          - name: ok_file
+            to: {file: known_file}
+          - name: ok_book
+            to: {book: known_book}
+          - name: conflict
+            to: {file: known_file, book: known_book}
         """
     )
 
-    errors = service.find_demand_book_binding_errors(
+    errors = service.find_demand_output_destination_binding_errors(
         yaml_data,
         source_path="(memory)",
         locations=locations,
-        available_book_ids={"known"},
+        available_book_ids={"known_book"},
+        available_file_ids={"known_file"},
         default_code="e",
     )
     paths = {item.path for item in errors}
-    assert paths == {"outputs.1.to.book", "outputs.2.to.book"}
-    assert any("Missing outputs to.book binding" in item.message for item in errors)
+    assert paths == {"outputs.1.to.book", "outputs.2.to.book", "outputs.3.to.file", "outputs.6.to"}
+    assert any("Missing output destination" in item.message for item in errors)
     assert any("Unknown book id" in item.message for item in errors)
+    assert any("Unknown file id" in item.message for item in errors)
 
 
-def test_find_demand_book_binding_errors_handles_non_mapping_inputs_and_entries() -> None:
+def test_find_demand_output_destination_binding_errors_handles_non_mapping_inputs_and_entries() -> None:
     assert (
-        service.find_demand_book_binding_errors(
+        service.find_demand_output_destination_binding_errors(
             None,
             source_path="(memory)",
             locations=None,
             available_book_ids=set(),
+            available_file_ids=set(),
             default_code="e",
         )
         == []
     )
-    assert service._extract_demand_outputs_book_refs(None) == []
 
-    errors = service.find_demand_book_binding_errors(
+    errors = service.find_demand_output_destination_binding_errors(
         {
             "outputs": [
                 1,
                 {"name": "out1", "to": 1},
                 {"name": "out2"},
+                {"name": "out3", "to": {"file": "known"}},
             ]
         },
         source_path="(memory)",
         locations=None,
         available_book_ids=set(),
+        available_file_ids={"known"},
         default_code="e",
     )
     assert {item.path for item in errors} == {"outputs.1.to.book", "outputs.2.to.book"}
@@ -395,6 +415,70 @@ def test_validation_service_workflow_unexpected_exception_is_wrapped(tmp_path: P
     )
     assert result.payload.ok is False
     assert any("Unexpected error" in item.message for item in result.workflow_payload.errors)
+
+
+def test_load_workflow_resource_ids_from_text_wraps_workflow_config_error(tmp_path: Path) -> None:
+    workflow_path = tmp_path / "workflow.yaml"
+    book_ids, file_ids, errors, warnings = service.load_workflow_resource_ids_from_text(
+        "workflow: {resources: [], runs: []}\n",
+        yaml_path=workflow_path,
+    )
+    assert book_ids is None
+    assert file_ids is None
+    assert warnings == []
+    assert errors
+    assert errors[0].code == "workflow_context_error"
+
+
+def test_load_workflow_resource_ids_from_text_wraps_unexpected_exception(tmp_path: Path, monkeypatch) -> None:
+    def _boom(_yaml: object) -> object:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(service, "load_workflow_config_from_mapping", _boom)
+
+    workflow_path = tmp_path / "workflow.yaml"
+    book_ids, file_ids, errors, warnings = service.load_workflow_resource_ids_from_text(
+        "workflow: {runs: []}\n",
+        yaml_path=workflow_path,
+    )
+    assert book_ids is None
+    assert file_ids is None
+    assert warnings == []
+    assert errors
+    assert errors[0].code == "workflow_context_error"
+    assert "Unexpected error" in errors[0].message
+
+
+def test_load_workflow_resource_ids_from_file_handles_not_file_and_read_error(tmp_path: Path, monkeypatch) -> None:
+    yaml_dir = tmp_path / "dir"
+    yaml_dir.mkdir()
+    book_ids, file_ids, source_lines, errors, warnings = service.load_workflow_resource_ids_from_file(yaml_dir)
+    assert book_ids is None
+    assert file_ids is None
+    assert source_lines is None
+    assert warnings == []
+    assert errors
+    assert errors[0].code == "yaml_file_read_error"
+
+    workflow_path = tmp_path / "workflow.yaml"
+    workflow_path.write_text("workflow: {runs: []}\n", encoding="utf-8")
+
+    original_read_text = Path.read_text
+
+    def _read_text_boom(self: Path, *args, **kwargs) -> str:  # type: ignore[no-untyped-def]
+        if self == workflow_path:
+            raise OSError("boom")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", _read_text_boom)
+
+    book_ids, file_ids, source_lines, errors, warnings = service.load_workflow_resource_ids_from_file(workflow_path)
+    assert book_ids is None
+    assert file_ids is None
+    assert source_lines is None
+    assert warnings == []
+    assert errors
+    assert errors[0].code == "yaml_file_read_error"
 
 
 def test_validation_service_workflow_demand_file_not_found_yields_two_results(tmp_path: Path) -> None:

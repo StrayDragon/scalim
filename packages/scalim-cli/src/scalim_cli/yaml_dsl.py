@@ -3,7 +3,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.imports import (
@@ -26,11 +26,13 @@ from scalim.dsl.yaml_dsl.validation_service import (
     ValidationPayload,
     WorkflowValidationResult,
     extract_demand_book_ids,
-    find_demand_book_binding_errors,
+    extract_demand_file_ids,
+    find_demand_output_destination_binding_errors,
     find_legacy_field_errors,
     find_removed_outputs_defaults_errors,
     find_retry_enabled_missing_should_retry_errors,
     issues_to_rows,
+    load_workflow_resource_ids_from_file,
     validate_demand_text,
     validate_workflow_text,
 )
@@ -120,6 +122,13 @@ def _add_validate_args(parser: argparse.ArgumentParser) -> None:
         help="校验类型: auto/demand/workflow",
     )
     _ = parser.add_argument(
+        "--workflow",
+        dest="workflow",
+        type=Path,
+        default=None,
+        help="仅 demand validate: workflow YAML 上下文(用于 outputs→resources 绑定校验)",
+    )
+    _ = parser.add_argument(
         "--path-alias",
         dest="path_aliases",
         type=str,
@@ -164,6 +173,13 @@ def _add_format_args(parser: argparse.ArgumentParser) -> None:
 def _add_schema_validate_args(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("yaml_file", type=Path, help="YAML 文件路径")
     _ = parser.add_argument("--schema", "-s", type=Path, default=None, help="JSON Schema 文件路径")
+    _ = parser.add_argument(
+        "--workflow",
+        dest="workflow",
+        type=Path,
+        default=None,
+        help="仅 demand schema validate: workflow YAML 上下文(用于 outputs→resources 绑定校验)",
+    )
     _ = parser.add_argument("--json", action="store_true", help="输出 JSON 结果")
     _ = parser.add_argument("--verbose", "-v", action="store_true", help="显示详细错误信息")
 
@@ -361,6 +377,39 @@ def _emit_error(
     _write_line_stderr("错误: {}".format(message))
 
 
+def _emit_workflow_context_errors(
+    *,
+    mode: str,
+    args: argparse.Namespace,
+    yaml_path: Path,
+    schema_path: Path,
+    workflow_path: Path,
+    workflow_source_lines: Optional[List[str]],
+    errors: List[ErrorEnvelope],
+    warnings: List[ErrorEnvelope],
+) -> int:
+    if args.json:
+        payload = ValidationPayload(
+            mode=str(mode),
+            ok=False,
+            yaml_path=str(yaml_path),
+            schema_path=str(schema_path),
+            errors=errors,
+            warnings=warnings,
+        )
+        _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
+        return 1
+
+    _render_result(
+        workflow_path,
+        errors=errors,
+        warnings=warnings,
+        verbose=args.verbose,
+        source_lines=workflow_source_lines,
+    )
+    return 1
+
+
 def _infer_yaml_type(yaml_text: str) -> str:
     try:
         yaml_data, _locations, _lines = load_yaml_mapping_text(
@@ -452,6 +501,8 @@ def _run_validate_demand(
     yaml_text: Optional[str],
     schema_path: Path,
     allowed_yaml_roots: Optional[List[Path]],
+    available_book_ids: Optional[Set[str]],
+    available_file_ids: Optional[Set[str]],
     args: argparse.Namespace,
 ) -> int:
     try:
@@ -471,6 +522,8 @@ def _run_validate_demand(
         yaml_path=yaml_path,
         schema_path=schema_path,
         allowed_yaml_roots=allowed_yaml_roots,
+        available_book_ids=available_book_ids,
+        available_file_ids=available_file_ids,
     )
     payload = demand_result.payload
 
@@ -508,6 +561,37 @@ def _run_validate(args: argparse.Namespace) -> int:
     raw_allowed_yaml_roots = args_dict.get("allowed_yaml_roots")
     allowed_yaml_roots = list(raw_allowed_yaml_roots) if raw_allowed_yaml_roots else None
 
+    workflow_book_ids: Optional[Set[str]] = None
+    workflow_file_ids: Optional[Set[str]] = None
+    raw_workflow_path = args_dict.get("workflow")
+    workflow_path = None
+    if raw_workflow_path:
+        workflow_path = raw_workflow_path.resolve() if isinstance(raw_workflow_path, Path) else Path(str(raw_workflow_path)).resolve()
+    if workflow_path is not None:
+        if yaml_type == "workflow":
+            _emit_error(
+                "--workflow is only supported for demand validation",
+                json_output=bool(args.json),
+                yaml_path=yaml_path,
+                schema_path=schema_path,
+                mode="validate",
+            )
+            return 1
+        wf_books, wf_files, wf_lines, wf_errors, wf_warnings = load_workflow_resource_ids_from_file(workflow_path)
+        if wf_errors:
+            return _emit_workflow_context_errors(
+                mode="validate",
+                args=args,
+                yaml_path=yaml_path,
+                schema_path=schema_path,
+                workflow_path=workflow_path,
+                workflow_source_lines=wf_lines,
+                errors=wf_errors,
+                warnings=wf_warnings,
+            )
+        workflow_book_ids = wf_books
+        workflow_file_ids = wf_files
+
     if not schema_path.exists():
         _emit_error(
             "Schema 文件不存在: {}".format(schema_path),
@@ -532,6 +616,8 @@ def _run_validate(args: argparse.Namespace) -> int:
         yaml_text=inferred_yaml_text,
         schema_path=schema_path,
         allowed_yaml_roots=allowed_yaml_roots,
+        available_book_ids=workflow_book_ids,
+        available_file_ids=workflow_file_ids,
         args=args,
     )
 
@@ -712,6 +798,46 @@ def _run_format(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
     return 0
 
 
+def _load_workflow_context_for_schema_validate(
+    *,
+    args: argparse.Namespace,
+    yaml_path: Path,
+    schema_path: Path,
+    yaml_data_dict: Dict[str, Any],
+) -> Tuple[Optional[Set[str]], Optional[Set[str]], bool]:
+    args_dict = vars(args)
+    raw_workflow_path = args_dict.get("workflow")
+    if not raw_workflow_path:
+        return None, None, False
+
+    workflow_path = raw_workflow_path.resolve() if isinstance(raw_workflow_path, Path) else Path(str(raw_workflow_path)).resolve()
+    if "workflow" in yaml_data_dict:
+        _emit_error(
+            "--workflow is only supported for demand schema validation",
+            json_output=bool(args.json),
+            yaml_path=yaml_path,
+            schema_path=schema_path,
+            mode="schema-validate",
+        )
+        return None, None, True
+
+    wf_books, wf_files, wf_lines, wf_errors, wf_warnings = load_workflow_resource_ids_from_file(workflow_path)
+    if wf_errors:
+        _ = _emit_workflow_context_errors(
+            mode="schema-validate",
+            args=args,
+            yaml_path=yaml_path,
+            schema_path=schema_path,
+            workflow_path=workflow_path,
+            workflow_source_lines=wf_lines,
+            errors=wf_errors,
+            warnings=wf_warnings,
+        )
+        return None, None, True
+
+    return wf_books, wf_files, False
+
+
 def _run_schema_validate(args: argparse.Namespace) -> int:
     schema_path = _resolve_schema_path(args.schema)
     yaml_path = args.yaml_file.resolve()
@@ -732,6 +858,10 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
         return 1
     source_lines: Optional[List[str]] = yaml_text.splitlines()
 
+    errors: List[ErrorEnvelope] = []
+    warnings: List[ErrorEnvelope] = []
+    ok = False
+
     try:
         yaml_data_dict, locations, _lines = load_yaml_mapping_text(
             yaml_text,
@@ -739,45 +869,49 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
             detect_duplicate_keys=True,
         )
     except ScalimYamlValidationError as exc:
-        return _emit_schema_result(
-            yaml_path,
-            schema_path,
-            list(exc.errors),
-            list(exc.warnings),
-            args,
-            ok=False,
-            source_lines=source_lines,
+        errors = list(exc.errors)
+        warnings = list(exc.warnings)
+    else:
+        workflow_book_ids, workflow_file_ids, emitted = _load_workflow_context_for_schema_validate(
+            args=args,
+            yaml_path=yaml_path,
+            schema_path=schema_path,
+            yaml_data_dict=yaml_data_dict,
         )
+        if emitted:
+            return 1
 
-    jsonschema_module = _get_jsonschema_module(args, yaml_path=yaml_path, schema_path=schema_path)
-    if jsonschema_module is None:
-        return 1
+        jsonschema_module = _get_jsonschema_module(args, yaml_path=yaml_path, schema_path=schema_path)
+        if jsonschema_module is None:
+            return 1
 
-    try:
-        if contains_import_syntax(yaml_data_dict) and contains_import_syntax(schema):
-            _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
-    except ScalimYamlImportExpansionError as exc:
-        logical_path = str(exc.logical_path or "(root)")
-        errors = [
-            ErrorEnvelope(
-                code="yaml_import_expansion_error",
-                message=str(exc),
+        try:
+            if contains_import_syntax(yaml_data_dict) and contains_import_syntax(schema):
+                _ = expand_imports_inplace(yaml_data_dict, yaml_path=yaml_path)
+        except ScalimYamlImportExpansionError as exc:
+            logical_path = str(exc.logical_path or "(root)")
+            errors = [
+                ErrorEnvelope(
+                    code="yaml_import_expansion_error",
+                    message=str(exc),
+                    source_path=str(yaml_path),
+                    path=logical_path,
+                    loc=error_loc_for_yaml_path(logical_path, locations),
+                )
+            ]
+            warnings = []
+        else:
+            errors, warnings = _collect_schema_issues(
+                yaml_data_dict,
+                schema,
+                args,
+                jsonschema_module,
+                workflow_book_ids=workflow_book_ids,
+                workflow_file_ids=workflow_file_ids,
                 source_path=str(yaml_path),
-                path=logical_path,
-                loc=error_loc_for_yaml_path(logical_path, locations),
+                locations=locations,
             )
-        ]
-        return _emit_schema_result(yaml_path, schema_path, errors, [], args, ok=False, source_lines=source_lines)
-
-    errors, warnings = _collect_schema_issues(
-        yaml_data_dict,
-        schema,
-        args,
-        jsonschema_module,
-        source_path=str(yaml_path),
-        locations=locations,
-    )
-    ok = not errors
+        ok = not errors
 
     return _emit_schema_result(
         yaml_path,
@@ -843,6 +977,8 @@ def _collect_schema_issues(
     args: argparse.Namespace,
     jsonschema_module: Any,
     *,
+    workflow_book_ids: Optional[Set[str]],
+    workflow_file_ids: Optional[Set[str]],
     source_path: str,
     locations: YamlLocationIndex,
 ) -> Tuple[List[ErrorEnvelope], List[ErrorEnvelope]]:
@@ -888,6 +1024,13 @@ def _collect_schema_issues(
         )
     )
     demand_book_ids = extract_demand_book_ids(yaml_data)
+    demand_file_ids = extract_demand_file_ids(yaml_data)
+    visible_book_ids = set(demand_book_ids)
+    visible_file_ids = set(demand_file_ids)
+    if workflow_book_ids is not None:
+        visible_book_ids.update(workflow_book_ids)
+    if workflow_file_ids is not None:
+        visible_file_ids.update(workflow_file_ids)
     errors.extend(
         find_removed_outputs_defaults_errors(
             yaml_data,
@@ -897,11 +1040,12 @@ def _collect_schema_issues(
         )
     )
     errors.extend(
-        find_demand_book_binding_errors(
+        find_demand_output_destination_binding_errors(
             yaml_data,
             source_path=source_path,
             locations=locations,
-            available_book_ids=demand_book_ids,
+            available_book_ids=visible_book_ids,
+            available_file_ids=visible_file_ids,
             default_code="yaml_schema_validate_error",
         )
     )

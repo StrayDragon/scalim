@@ -268,86 +268,153 @@ def extract_demand_book_ids(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:
     return out
 
 
-def _extract_output_book_ref(item: Dict[str, Any], *, idx: int) -> Tuple[str, str]:
+def extract_demand_file_ids(yaml_data: Optional[Dict[str, Any]]) -> Set[str]:
+    if not isinstance(yaml_data, dict):
+        return set()
+    resources_obj = yaml_data.get("resources")
+    if not isinstance(resources_obj, dict):
+        return set()
+    resources = cast("Dict[str, Any]", resources_obj)  # pragma: allow-cast yaml mapping typed narrowing
+    files_obj = resources.get("files")
+    if not isinstance(files_obj, dict):
+        return set()
+    files = cast("Dict[str, Any]", files_obj)  # pragma: allow-cast yaml mapping typed narrowing
+    out: Set[str] = set()
+    for raw_file_id in files:
+        if not isinstance(raw_file_id, str):
+            continue
+        fid = str(raw_file_id or "").strip()
+        if fid:
+            out.add(fid)
+    return out
+
+
+def _demand_output_destination_spec(item: Dict[str, Any], *, idx: int) -> Tuple[str, str, str]:
     to_raw_obj = item.get("to")
     if isinstance(to_raw_obj, dict):
         to_raw = cast("Dict[str, Any]", to_raw_obj)  # pragma: allow-cast yaml mapping typed narrowing
-        book_raw = to_raw.get("book")
-        if isinstance(book_raw, str) and book_raw.strip():
-            return "outputs.{}.to.book".format(int(idx)), str(book_raw).strip()
-    return "outputs.{}.to.book".format(int(idx)), ""
+        file_id = str(to_raw.get("file") or "").strip()
+        book_id = str(to_raw.get("book") or "").strip()
+    else:
+        file_id = ""
+        book_id = ""
+
+    if file_id and book_id:
+        return "conflict", "", "outputs.{}.to".format(int(idx))
+    if file_id:
+        return "file", file_id, "outputs.{}.to.file".format(int(idx))
+    if book_id:
+        return "book", book_id, "outputs.{}.to.book".format(int(idx))
+    return "missing", "", "outputs.{}.to.book".format(int(idx))
 
 
-def _extract_demand_outputs_book_refs(yaml_data: Optional[Dict[str, Any]]) -> List[Tuple[str, str]]:
-    """提取需求 `outputs` 中绑定到 `books` 的引用信息.
+def _demand_output_destination_binding_error(
+    item: Dict[str, Any],
+    *,
+    idx: int,
+    source_path: str,
+    locations: Optional[YamlLocationIndex],
+    available_book_ids: Optional[Set[str]],
+    available_file_ids: Optional[Set[str]],
+    available_books: Tuple[str, ...],
+    available_files: Tuple[str, ...],
+    default_code: str,
+) -> Optional[ErrorEnvelope]:
+    kind, dest_id, ref_path = _demand_output_destination_spec(item, idx=int(idx))
+    loc = None if locations is None else error_loc_for_yaml_path(ref_path, locations)
 
-    返回 `(ref_path, book_id)` 列表:
-    - 对于包含 `container` 的 `outputs[*]`(`CSV` 文件输出),不返回任何项.
-    - 若某个输出缺失有效 `book_id`,仍返回其 `ref_path`,但 `book_id` 为空字符串.
-    """
+    if kind == "conflict":
+        return ErrorEnvelope(
+            code=default_code,
+            message="outputs[*].to must declare exactly one of to.file or to.book",
+            source_path=source_path,
+            path=ref_path,
+            loc=loc,
+        )
+
+    if kind == "file":
+        if available_file_ids is not None and dest_id not in available_file_ids:
+            return ErrorEnvelope(
+                code=default_code,
+                message=(
+                    "Unknown file id referenced by outputs binding: {!r} "
+                    "(declare resources.files.{} in demand or workflow.resources.files.{} in workflow)"
+                ).format(dest_id, dest_id, dest_id),
+                source_path=source_path,
+                path=ref_path,
+                loc=loc,
+                suggestions=available_files,
+            )
+        return None
+
+    if kind == "book":
+        if available_book_ids is not None and dest_id not in available_book_ids:
+            return ErrorEnvelope(
+                code=default_code,
+                message=(
+                    "Unknown book id referenced by outputs binding: {!r} "
+                    "(declare resources.books.{} in demand or workflow.resources.books.{} in workflow)"
+                ).format(dest_id, dest_id, dest_id),
+                source_path=source_path,
+                path=ref_path,
+                loc=loc,
+                suggestions=available_books,
+            )
+        return None
+
+    return ErrorEnvelope(
+        code=default_code,
+        message=(
+            "Missing output destination; set `outputs[*].to.file` or `outputs[*].to.book` explicitly. "
+            "Reuse the binding with YAML anchors (`_templates`) or `$import` if needed."
+        ),
+        source_path=source_path,
+        path=ref_path,
+        loc=loc,
+    )
+
+
+def find_demand_output_destination_binding_errors(
+    yaml_data: Optional[Dict[str, Any]],
+    *,
+    source_path: str,
+    locations: Optional[YamlLocationIndex],
+    available_book_ids: Optional[Set[str]],
+    available_file_ids: Optional[Set[str]],
+    default_code: str,
+) -> List[ErrorEnvelope]:
     if not isinstance(yaml_data, dict):
         return []
+
     outputs_raw = yaml_data.get("outputs")
     if not isinstance(outputs_raw, list):
         return []
     outputs_list = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml outputs typed narrowing
 
-    out: List[Tuple[str, str]] = []
+    available_books = tuple(sorted(available_book_ids or set()))
+    available_files = tuple(sorted(available_file_ids or set()))
+    errors: List[ErrorEnvelope] = []
+
     for idx, item in enumerate(outputs_list):
         if not isinstance(item, dict):
             continue
         item_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         if item_dict.get("container") is not None:
             continue
-        out.append(_extract_output_book_ref(item_dict, idx=int(idx)))
 
-    return out
-
-
-def find_demand_book_binding_errors(
-    yaml_data: Optional[Dict[str, Any]],
-    *,
-    source_path: str,
-    locations: Optional[YamlLocationIndex],
-    available_book_ids: Optional[Set[str]],
-    default_code: str,
-) -> List[ErrorEnvelope]:
-    if not isinstance(yaml_data, dict):
-        return []
-
-    available = tuple(sorted(available_book_ids or set()))
-    errors: List[ErrorEnvelope] = []
-    for ref_path, book_id in _extract_demand_outputs_book_refs(yaml_data):
-        loc = None if locations is None else error_loc_for_yaml_path(ref_path, locations)
-        if not book_id:
-            errors.append(
-                ErrorEnvelope(
-                    code=default_code,
-                    message=(
-                        "Missing outputs to.book binding; set `outputs[*].to.book` explicitly. "
-                        "Reuse the binding with YAML anchors (`_templates`) or `$import` if needed."
-                    ),
-                    source_path=source_path,
-                    path=ref_path,
-                    loc=loc,
-                    suggestions=available,
-                )
-            )
-            continue
-        if available_book_ids is not None and book_id not in available_book_ids:
-            errors.append(
-                ErrorEnvelope(
-                    code=default_code,
-                    message=(
-                        "Unknown book id referenced by outputs binding: {!r} "
-                        "(declare resources.books.{} in demand or workflow.resources.books.{} in workflow)"
-                    ).format(book_id, book_id, book_id),
-                    source_path=source_path,
-                    path=ref_path,
-                    loc=loc,
-                    suggestions=available,
-                )
-            )
+        error = _demand_output_destination_binding_error(
+            item_dict,
+            idx=int(idx),
+            source_path=source_path,
+            locations=locations,
+            available_book_ids=available_book_ids,
+            available_file_ids=available_file_ids,
+            available_books=available_books,
+            available_files=available_files,
+            default_code=default_code,
+        )
+        if error is not None:
+            errors.append(error)
     return errors
 
 
@@ -416,6 +483,7 @@ def validate_demand_text(
     validator: Optional[ConfigValidator] = None,
     allowed_yaml_roots: Optional[Sequence[Path]] = None,
     available_book_ids: Optional[Set[str]] = None,
+    available_file_ids: Optional[Set[str]] = None,
 ) -> DemandValidationResult:
     source_lines: List[str] = yaml_text.splitlines()
     if not schema_path.exists():
@@ -502,9 +570,13 @@ def validate_demand_text(
         for issue in report.warnings()
     ]
     demand_book_ids = extract_demand_book_ids(yaml_data_dict)
+    demand_file_ids = extract_demand_file_ids(yaml_data_dict)
     effective_book_ids = set(demand_book_ids)
+    effective_file_ids = set(demand_file_ids)
     if available_book_ids is not None:
         effective_book_ids.update(available_book_ids)
+    if available_file_ids is not None:
+        effective_file_ids.update(available_file_ids)
     errors.extend(
         find_removed_outputs_defaults_errors(
             yaml_data_dict,
@@ -514,11 +586,12 @@ def validate_demand_text(
         )
     )
     errors.extend(
-        find_demand_book_binding_errors(
+        find_demand_output_destination_binding_errors(
             yaml_data_dict,
             source_path=str(yaml_path),
             locations=locations,
             available_book_ids=effective_book_ids,
+            available_file_ids=effective_file_ids,
             default_code="yaml_validate_error",
         )
     )
@@ -550,6 +623,7 @@ def validate_demand_file(
     validator: Optional[ConfigValidator] = None,
     allowed_yaml_roots: Optional[Sequence[Path]] = None,
     available_book_ids: Optional[Set[str]] = None,
+    available_file_ids: Optional[Set[str]] = None,
 ) -> DemandValidationResult:
     if not schema_path.exists():
         payload = ValidationPayload(
@@ -619,7 +693,110 @@ def validate_demand_file(
         validator=validator,
         allowed_yaml_roots=allowed_yaml_roots,
         available_book_ids=available_book_ids,
+        available_file_ids=available_file_ids,
     )
+
+
+def load_workflow_resource_ids_from_text(
+    workflow_text: str,
+    *,
+    yaml_path: Path,
+) -> Tuple[Optional[Set[str]], Optional[Set[str]], List[ErrorEnvelope], List[ErrorEnvelope]]:
+    workflow_locations: YamlLocationIndex = {}
+    errors: List[ErrorEnvelope] = []
+    warnings: List[ErrorEnvelope] = []
+
+    try:
+        root, workflow_locations, _lines = load_yaml_mapping_text(
+            workflow_text,
+            source_path=str(yaml_path),
+            detect_duplicate_keys=True,
+        )
+    except ScalimYamlValidationError as exc:
+        errors.extend(list(exc.errors))
+        warnings.extend(list(exc.warnings))
+        return None, None, errors, warnings
+
+    try:
+        wf_config = load_workflow_config_from_mapping(root)
+    except ScalimWorkflowConfigError as exc:
+        path = str(exc.path or "(root)")
+        errors.append(
+            ErrorEnvelope(
+                code="workflow_context_error",
+                message=str(exc),
+                source_path=str(yaml_path),
+                path=path,
+                loc=error_loc_for_yaml_path(path, workflow_locations),
+            )
+        )
+        return None, None, errors, warnings
+    except Exception as exc:  # noqa: BLE001
+        safe_type = safe_error_type(exc)
+        safe_msg = safe_error_message(exc) or ""
+        errors.append(
+            ErrorEnvelope(
+                code="workflow_context_error",
+                message="Unexpected error: {}: {}".format(safe_type, safe_msg),
+                source_path=str(yaml_path),
+                path="(root)",
+                loc=error_loc_for_yaml_path("(root)", workflow_locations),
+            )
+        )
+        return None, None, errors, warnings
+
+    workflow_book_ids = set((wf_config.resources.books or {}).keys())
+    workflow_file_ids = set((wf_config.resources.files or {}).keys())
+    return workflow_book_ids, workflow_file_ids, errors, warnings
+
+
+def load_workflow_resource_ids_from_file(
+    yaml_path: Path,
+) -> Tuple[Optional[Set[str]], Optional[Set[str]], Optional[List[str]], List[ErrorEnvelope], List[ErrorEnvelope]]:
+    if not yaml_path.exists():
+        errors = [
+            ErrorEnvelope(
+                code="yaml_file_not_found",
+                message="YAML 文件不存在: {}".format(yaml_path),
+                source_path=str(yaml_path),
+                path="(file)",
+                loc=None,
+            )
+        ]
+        return None, None, None, errors, []
+
+    if not yaml_path.is_file():
+        errors = [
+            ErrorEnvelope(
+                code="yaml_file_read_error",
+                message="YAML 文件读取失败: {}".format(yaml_path),
+                source_path=str(yaml_path),
+                path="(file)",
+                loc=None,
+            )
+        ]
+        return None, None, None, errors, []
+
+    try:
+        workflow_text = yaml_path.read_text(encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        errors = [
+            ErrorEnvelope(
+                code="yaml_file_read_error",
+                message="YAML 文件读取失败: {}".format(yaml_path),
+                source_path=str(yaml_path),
+                path="(file)",
+                loc=None,
+            )
+        ]
+        return None, None, None, errors, []
+
+    source_lines: List[str] = workflow_text.splitlines()
+    book_ids, file_ids, errors, warnings = load_workflow_resource_ids_from_text(
+        workflow_text,
+        yaml_path=yaml_path,
+    )
+    return book_ids, file_ids, source_lines, errors, warnings
 
 
 def validate_workflow_text(
@@ -706,6 +883,7 @@ def validate_workflow_text(
     demand_validator = ConfigValidator(schema_path=str(schema_path))
     if wf_config is not None:
         workflow_book_ids = set((wf_config.resources.books or {}).keys())
+        workflow_file_ids = set((wf_config.resources.files or {}).keys())
         for run_idx, run in enumerate(wf_config.runs):
             try:
                 demand_path = resolve_workflow_demand_path(
@@ -768,6 +946,7 @@ def validate_workflow_text(
                     validator=demand_validator,
                     allowed_yaml_roots=allowed_yaml_roots,
                     available_book_ids=workflow_book_ids,
+                    available_file_ids=workflow_file_ids,
                 )
             )
 
