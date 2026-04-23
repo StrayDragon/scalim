@@ -32,11 +32,11 @@ workflow:
   resources:
     books:
       report:
-        kind: xlsx_file
-        path: ./a.xlsx
+        xlsx_file:
+          path: ./out_a
       report:
-        kind: xlsx_file
-        path: ./b.xlsx
+        xlsx_file:
+          path: ./out_b
 """
         ).lstrip(),
         encoding="utf-8",
@@ -83,65 +83,63 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}, "workflow.resources.sheetbooks was removed"),
         ({"oops": {}}, "workflow.resources contains unknown keys"),
         ({"books": "nope"}, "workflow.resources.books must be a mapping"),
-        ({"books": {1: {"kind": "xlsx_file", "path": "a.xlsx"}}}, "workflow.resources.books keys must be non-empty strings"),
+        ({"books": {1: {"xlsx_file": {"path": "out"}}}}, "workflow.resources.books keys must be non-empty strings"),
         ({"books": {"report": "nope"}}, "workflow.resources.books.report must be a mapping"),
-        ({"books": {"report": {}}}, "workflow.resources.books.report.kind is required"),
-        ({"books": {"report": {"kind": "nope"}}}, r"workflow.resources.books.report.kind=.*expected one of"),
-        ({"books": {"report": {"kind": "xlsx_file"}}}, "path is required for kind=xlsx_file"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": 1}}}, "must be a non-empty string"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "nope": 1}}}, "has unknown keys"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "a.xlsx"}}}, "output root directory"),
+        ({"books": {"report": {}}}, "must choose exactly one variant key"),
+        ({"books": {"report": {"kind": "nope"}}}, "kind was removed"),
+        ({"books": {"report": {"xlsx_file": {}}}}, "xlsx_file.path is required"),
+        ({"books": {"report": {"xlsx_file": {"path": 1}}}}, "must be a non-empty string"),
+        ({"books": {"report": {"xlsx_file": {"path": "out"}, "nope": 1}}}, "has unknown keys"),
+        ({"books": {"report": {"xlsx_file": {"path": "a.xlsx"}}}}, "output root directory"),
         (
-            {"books": {"report": {"kind": "xlsx_file", "path": "out", "budget": {"max_sheets": 1, "max_total_cells": 1}}}},
-            "budget is not allowed",
+            {"books": {"report": {"xlsx_file": {"path": "out", "budget": {"max_sheets": 1, "max_total_cells": 1}}}}},
+            "xlsx_file has unknown keys",
         ),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "export_xlsx": {"path": "out2"}}}}, "export_xlsx is not allowed"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "allow_formulas": "nope"}}}, "allow_formulas must be a bool"),
-        ({"books": {"report": {"kind": "xlsx_file", "path": "out", "write_lock": "nope"}}}, "write_lock was removed"),
-        ({"books": {"mem": {"kind": "xlsx_memory", "budget": "nope"}}}, "budget must be a mapping"),
+        ({"books": {"report": {"xlsx_file": {"path": "out", "export_xlsx": {"path": "out2"}}}}}, "xlsx_file has unknown keys"),
+        ({"books": {"report": {"xlsx_file": {"path": "out", "allow_formulas": "nope"}}}}, "allow_formulas must be a bool"),
+        ({"books": {"report": {"xlsx_file": {"path": "out"}, "write_lock": "nope"}}}, "write_lock was removed"),
+        ({"books": {"mem": {"xlsx_memory": {"budget": "nope"}}}}, "xlsx_memory.budget must be a mapping"),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1, "nope": 1}}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1, "nope": 1}}}}},
             "budget has unknown keys",
         ),
-        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {}}}}, "max_sheets must be an integer"),
-        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1}}}}, "max_total_cells must be an integer"),
+        ({"books": {"mem": {"xlsx_memory": {"budget": {}}}}}, "max_sheets must be an integer"),
+        ({"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1}}}}}, "max_total_cells must be an integer"),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": "nope", "max_total_cells": 1}}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": "nope", "max_total_cells": 1}}}}},
             "max_sheets must be an integer",
         ),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": "nope"}}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": "nope"}}}}},
             "max_total_cells must be an integer",
         ),
-        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 0, "max_total_cells": 1}}}}, "max_sheets must be"),
-        ({"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 0}}}}, "max_total_cells must be"),
+        ({"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 0, "max_total_cells": 1}}}}}, "max_sheets must be"),
+        ({"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 0}}}}}, "max_total_cells must be"),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "path": "a.xlsx"}}},
-            "path is not allowed",
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "path": "a.xlsx"}}}},
+            "xlsx_memory has unknown keys",
         ),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "allow_formulas": False}}},
-            "allow_formulas is not allowed",
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "allow_formulas": False}}}},
+            "xlsx_memory has unknown keys",
         ),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_lock": False}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "write_lock": False}}}},
             "write_lock was removed",
         ),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}}},
             "export_xlsx must be a mapping",
         ),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}}},
             "export_xlsx.path is required",
         ),
         (
             {
                 "books": {
                     "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "export_xlsx": {"path": "x.xlsx", "nope": 1},
+                        "xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "nope": 1}}
                     }
                 }
             },
@@ -151,9 +149,10 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
             {
                 "books": {
                     "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "export_xlsx": {"path": "x.xlsx", "write_lock": "nope"},
+                        "xlsx_memory": {
+                            "budget": {"max_sheets": 1, "max_total_cells": 1},
+                            "export_xlsx": {"path": "x.xlsx", "write_lock": "nope"},
+                        }
                     }
                 }
             },
@@ -163,46 +162,31 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
             {
                 "books": {
                     "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "export_xlsx": {"path": "out", "allow_formulas": "nope"},
+                        "xlsx_memory": {
+                            "budget": {"max_sheets": 1, "max_total_cells": 1},
+                            "export_xlsx": {"path": "out", "allow_formulas": "nope"},
+                        }
                     }
                 }
             },
             "export_xlsx.allow_formulas must be a bool",
         ),
         (
-            {"books": {"mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_defaults": "nope"}}},
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": "nope"}}},
             "write_defaults must be a mapping",
         ),
         (
-            {
-                "books": {
-                    "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "write_defaults": {"nope": 1},
-                    }
-                }
-            },
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"nope": 1}}}},
             "write_defaults has unknown keys",
         ),
         (
-            {
-                "books": {
-                    "mem": {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 1}, "write_defaults": {"mode": "nope"}}
-                }
-            },
+            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"mode": "nope"}}}},
             r"write_defaults.mode=.*expected one of",
         ),
         (
             {
                 "books": {
-                    "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "write_defaults": {"align_by": "nope"},
-                    }
+                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"align_by": "nope"}}
                 }
             },
             r"write_defaults.align_by=.*expected one of",
@@ -210,11 +194,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         (
             {
                 "books": {
-                    "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "write_defaults": {"header_policy": "nope"},
-                    }
+                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"header_policy": "nope"}}
                 }
             },
             r"write_defaults.header_policy=.*expected one of",
@@ -222,11 +202,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         (
             {
                 "books": {
-                    "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "write_defaults": {"on_mismatch": "nope"},
-                    }
+                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"on_mismatch": "nope"}}
                 }
             },
             r"write_defaults.on_mismatch=.*expected one of",
@@ -234,11 +210,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         (
             {
                 "books": {
-                    "mem": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 1, "max_total_cells": 1},
-                        "write_defaults": {"on_conflict": "nope"},
-                    }
+                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"on_conflict": "nope"}}
                 }
             },
             r"write_defaults.on_conflict=.*expected one of",
@@ -254,14 +226,14 @@ def test_load_workflow_config_from_mapping_resources_errors(resources_raw: Any, 
 
 def test_load_workflow_config_from_mapping_books_path_accepts_pathlike(tmp_path: Path) -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"books": {"report": {"kind": "xlsx_file", "path": tmp_path / "out"}}}
+    root["workflow"]["resources"] = {"books": {"report": {"xlsx_file": {"path": tmp_path / "out"}}}}
     cfg = load_workflow_config_from_mapping(root)
     assert cfg.resources.books["report"].path.endswith("out")
 
 
 def test_load_workflow_config_from_mapping_xlsx_memory_budget_is_optional() -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"books": {"mem": {"kind": "xlsx_memory"}}}
+    root["workflow"]["resources"] = {"books": {"mem": {"xlsx_memory": {}}}}
     cfg = load_workflow_config_from_mapping(root)
     assert cfg.resources.books["mem"].kind == "xlsx_memory"
     assert cfg.resources.books["mem"].budget is None

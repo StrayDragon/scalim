@@ -4,17 +4,17 @@ workflow:
   resources:
     books:
       shared_report_sheet:
-        kind: xlsx_file
-        path: ./out/shared_report_sheet
-        allow_formulas: false
+        xlsx_file:
+          path: ./out/shared_report_sheet
+          allow_formulas: false
         write_defaults:
           mode: sheet
           on_conflict: overwrite
 
       shared_report_append:
-        kind: xlsx_file
-        path: ./out/shared_report_append
-        allow_formulas: false
+        xlsx_file:
+          path: ./out/shared_report_append
+          allow_formulas: false
         write_defaults:
           mode: append
           align_by: header
@@ -22,25 +22,25 @@ workflow:
           on_mismatch: error
 
       sheetbook_report_sheet:
-        kind: xlsx_memory
-        budget:
-          max_sheets: 6
-          max_total_cells: 200000
-        export_xlsx:
-          path: ./out/sheetbook_report_sheet
-          allow_formulas: false
+        xlsx_memory:
+          budget:
+            max_sheets: 6
+            max_total_cells: 200000
+          export_xlsx:
+            path: ./out/sheetbook_report_sheet
+            allow_formulas: false
         write_defaults:
           mode: sheet
           on_conflict: overwrite
 
       sheetbook_report_append:
-        kind: xlsx_memory
-        budget:
-          max_sheets: 6
-          max_total_cells: 200000
-        export_xlsx:
-          path: ./out/sheetbook_report_append
-          allow_formulas: false
+        xlsx_memory:
+          budget:
+            max_sheets: 6
+            max_total_cells: 200000
+          export_xlsx:
+            path: ./out/sheetbook_report_append
+            allow_formulas: false
         write_defaults:
           mode: append
           align_by: field_id

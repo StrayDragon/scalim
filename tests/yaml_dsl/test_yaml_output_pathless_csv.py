@@ -20,7 +20,7 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
+      csv_file: {}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -35,7 +35,7 @@ outputs:
             str(yaml_path),
             options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"]))),
         )
-    assert any(e.path == "resources.files.detail_csv" for e in excinfo.value.errors)
+    assert any(e.path == "resources.files.detail_csv.csv_file.path" for e in excinfo.value.errors)
 
 
 def test_resolve_output_container_path_branches() -> None:

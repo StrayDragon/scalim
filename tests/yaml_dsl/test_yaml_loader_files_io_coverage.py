@@ -21,7 +21,7 @@ def test_loader_parse_resources_file_mapping_errors_cover_branches() -> None:
     with pytest.raises(TypeError, match=r"resources\.files must be an object"):
         _ = loader._parse_resources(raw)  # noqa: SLF001
 
-    raw = RawDemand.from_raw({DEMAND_KEYS["resources"]: {RESOURCES_KEYS["files"]: {"": {"kind": "csv_file", "path": "a.csv"}}}})
+    raw = RawDemand.from_raw({DEMAND_KEYS["resources"]: {RESOURCES_KEYS["files"]: {"": {FILE_KEYS["csv_file"]: {"path": "./out"}}}}})
     with pytest.raises(ValueError, match=r"resources\.files key must be a non-empty string"):
         _ = loader._parse_resources(raw)  # noqa: SLF001
 
@@ -33,24 +33,43 @@ def test_loader_parse_resources_file_mapping_errors_cover_branches() -> None:
 def test_loader_parse_file_config_semantic_errors_cover_branches() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.kind is required"):
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.csv_file is required"):
         _ = loader._parse_file_config({}, base_path="resources.files.detail_csv")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"expected one of"):
-        _ = loader._parse_file_config({FILE_KEYS["kind"]: "nope"}, base_path="resources.files.detail_csv")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.kind was removed"):
+        _ = loader._parse_file_config({"kind": "csv_file", "path": "./out"}, base_path="resources.files.detail_csv")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"path is required for kind=csv_file"):
-        _ = loader._parse_file_config({FILE_KEYS["kind"]: "csv_file"}, base_path="resources.files.detail_csv")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.csv_file\.path is required"):
+        _ = loader._parse_file_config({FILE_KEYS["csv_file"]: {}}, base_path="resources.files.detail_csv")  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"resources\.files\.detail_csv has unknown keys"):
-        _ = loader._parse_file_config(
-            {FILE_KEYS["kind"]: "csv_file", FILE_KEYS["path"]: "a.csv", "unknown": 1},
-            base_path="resources.files.detail_csv",
-        )  # noqa: SLF001
+        _ = loader._parse_file_config({FILE_KEYS["csv_file"]: {"path": "./out"}, "unknown": 1}, base_path="resources.files.detail_csv")  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.write_lock was removed"):
         _ = loader._parse_file_config(
-            {FILE_KEYS["kind"]: "csv_file", FILE_KEYS["path"]: "a.csv", "write_lock": "yes"},
+            {"write_lock": "yes", FILE_KEYS["csv_file"]: {"path": "./out"}},
+            base_path="resources.files.detail_csv",
+        )  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.csv_file\.write_lock was removed"):
+        _ = loader._parse_file_config(
+            {FILE_KEYS["csv_file"]: {"path": "./out", "write_lock": "yes"}},
+            base_path="resources.files.detail_csv",
+        )  # noqa: SLF001
+
+
+def test_loader_parse_file_config_additional_error_branches_cover_unknown_kind_and_types() -> None:
+    loader = YamlDemandLoader()
+
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.kind was removed"):
+        _ = loader._parse_file_config({"kind": "nope", "path": "./out"}, base_path="resources.files.detail_csv")  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"resources\.files\.detail_csv\.csv_file must be an object"):
+        _ = loader._parse_file_config({FILE_KEYS["csv_file"]: []}, base_path="resources.files.detail_csv")  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.csv_file has unknown keys: unknown"):
+        _ = loader._parse_file_config(
+            {FILE_KEYS["csv_file"]: {"path": "./out", "unknown": 1}},
             base_path="resources.files.detail_csv",
         )  # noqa: SLF001
 

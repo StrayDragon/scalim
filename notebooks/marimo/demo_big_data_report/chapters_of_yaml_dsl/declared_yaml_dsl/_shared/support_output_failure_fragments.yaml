@@ -15,10 +15,10 @@ base_resources:
   resources:
     files:
       detail_csv:
-        kind: csv_file
-        path: {$init_var: out_path_detail}
+        csv_file:
+          path: {$init_var: out_path_detail}
     books:
       secondary_debug:
-        kind: xlsx_file
-        path: {$init_var: out_path_secondary_workbook}
-        allow_formulas: false
+        xlsx_file:
+          path: {$init_var: out_path_secondary_workbook}
+          allow_formulas: false

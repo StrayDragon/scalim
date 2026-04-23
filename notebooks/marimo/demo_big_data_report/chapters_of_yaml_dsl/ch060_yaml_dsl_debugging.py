@@ -35,8 +35,8 @@ main_source:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {$init_var: out_path_detail}
+      csv_file:
+        path: {$init_var: out_path_detail}
 
 outputs:
   - name: detail

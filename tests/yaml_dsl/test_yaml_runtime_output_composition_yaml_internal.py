@@ -243,7 +243,7 @@ def test_compile_output_composition_resolves_file_resource_path_init_var() -> No
 def test_compile_output_composition_requires_file_resource_path_init_var_value() -> None:
     config = _csv_config({"$init_var": "output_path"})
 
-    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.path"):
+    with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.csv_file\.path"):
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
         )
@@ -255,7 +255,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
-    assert excinfo.value.path == "resources.files.detail_csv.path"
+    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path"
     assert excinfo.value.reason == "only supports {$init_var: <name>}; unexpected keys: other"
 
     config = _csv_config({})
@@ -263,7 +263,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
-    assert excinfo.value.path == "resources.files.detail_csv.path"
+    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path"
     assert excinfo.value.reason == "only supports {$init_var: <name>}; missing '$init_var'"
 
     config = _csv_config({"$init_var": None})
@@ -271,7 +271,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
-    assert excinfo.value.path == "resources.files.detail_csv.path.$init_var"
+    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path.$init_var"
     assert excinfo.value.reason == "must be a non-empty string"
 
     config = _csv_config({"$init_var": " "})
@@ -279,7 +279,7 @@ def test_compile_output_composition_rejects_file_resource_path_init_var_shape_er
         _ = oc_yaml.compile_output_composition_from_yaml(
             config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
         )
-    assert excinfo.value.path == "resources.files.detail_csv.path.$init_var"
+    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path.$init_var"
     assert excinfo.value.reason == "must be a non-empty string"
 
 
@@ -749,10 +749,10 @@ def test_compile_compute_post_field_executes_expression_and_validates_result_typ
 
 def test_validate_output_root_path_rejects_file_path_suffixes() -> None:
     with pytest.raises(ValueError, match=r"expects an output root directory"):
-        oc_yaml._validate_output_root_path("out.xlsx", path="resources.books.report.path")  # noqa: SLF001
+        oc_yaml._validate_output_root_path("out.xlsx", path="resources.books.report.xlsx_file.path")  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"expects an output root directory"):
-        oc_yaml._validate_output_root_path("out.csv", path="resources.files.detail_csv.path")  # noqa: SLF001
+        oc_yaml._validate_output_root_path("out.csv", path="resources.files.detail_csv.csv_file.path")  # noqa: SLF001
 
 
 def test_try_resolve_workflow_managed_book_export_path_returns_none_for_unknown_kind() -> None:

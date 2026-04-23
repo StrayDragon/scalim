@@ -61,7 +61,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -668,7 +668,7 @@ outputs:
     fields: [order_id]
 resources:
   files:
-    detail_csv: {{kind: csv_file, path: "{detail_path}"}}
+    detail_csv: {{csv_file: {{path: "{detail_path}"}}}}
     """
         )
         .format(detail_path=str(tmp_path / "out"))
@@ -825,7 +825,7 @@ outputs:
     fields: [order_id]
 resources:
   files:
-    detail_csv: {{kind: csv_file, path: "{detail_path}"}}
+    detail_csv: {{csv_file: {{path: "{detail_path}"}}}}
 """
         )
         .format(detail_path=str(tmp_path / "out"))
@@ -931,7 +931,7 @@ outputs:
     fields: [order_id]
 resources:
   files:
-    detail_csv: {{kind: csv_file, path: "{detail_path}"}}
+    detail_csv: {{csv_file: {{path: "{detail_path}"}}}}
 """
         )
         .format(detail_path=str(tmp_path / "out"))

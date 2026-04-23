@@ -34,7 +34,7 @@ def test_loader_parse_resources_book_mapping_errors_cover_branches() -> None:
     with pytest.raises(TypeError, match=r"resources\.books must be an object"):
         _ = loader._parse_resources(raw)  # noqa: SLF001
 
-    raw = RawDemand.from_raw({DEMAND_KEYS["resources"]: {RESOURCES_KEYS["books"]: {"": {"kind": "xlsx_file", "path": "a.xlsx"}}}})
+    raw = RawDemand.from_raw({DEMAND_KEYS["resources"]: {RESOURCES_KEYS["books"]: {"": {BOOK_KEYS["xlsx_file"]: {"path": "./out"}}}}})
     with pytest.raises(ValueError, match=r"resources\.books key must be a non-empty string"):
         _ = loader._parse_resources(raw)  # noqa: SLF001
 
@@ -46,58 +46,115 @@ def test_loader_parse_resources_book_mapping_errors_cover_branches() -> None:
 def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.kind is required"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report must choose exactly one variant key"):
         _ = loader._parse_book_config({}, base_path="resources.books.report")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"expected one of"):
-        _ = loader._parse_book_config({BOOK_KEYS["kind"]: "nope"}, base_path="resources.books.report")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.kind was removed"):
+        _ = loader._parse_book_config({"kind": "xlsx_file", "path": "./out"}, base_path="resources.books.report")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"path is required for kind=xlsx_file"):
-        _ = loader._parse_book_config({BOOK_KEYS["kind"]: "xlsx_file"}, base_path="resources.books.report")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"must choose exactly one variant key"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, BOOK_KEYS["xlsx_memory"]: {}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"budget is not allowed for kind=xlsx_file"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file\.path is required"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["kind"]: "xlsx_file",
-                BOOK_KEYS["path"]: "a.xlsx",
-                BOOK_KEYS["budget"]: {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
+                BOOK_KEYS["xlsx_file"]: {},
             },
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"export_xlsx is not allowed for kind=xlsx_file"):
+    with pytest.raises(ValueError, match=r"xlsx_file has unknown keys"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["kind"]: "xlsx_file",
-                BOOK_KEYS["path"]: "a.xlsx",
-                BOOK_KEYS["export_xlsx"]: {BOOK_EXPORT_XLSX_KEYS["path"]: "b.xlsx"},
+                BOOK_KEYS["xlsx_file"]: {
+                    "path": "./out",
+                    "budget": {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
+                },
             },
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    parsed = loader._parse_book_config({BOOK_KEYS["kind"]: "xlsx_memory"}, base_path="resources.books.report")  # noqa: SLF001
+    parsed = loader._parse_book_config({BOOK_KEYS["xlsx_memory"]: {}}, base_path="resources.books.report")  # noqa: SLF001
     assert parsed.kind == "xlsx_memory"
     assert parsed.budget is None
 
-    with pytest.raises(ValueError, match=r"path is not allowed for kind=xlsx_memory"):
+    with pytest.raises(ValueError, match=r"xlsx_memory has unknown keys"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["kind"]: "xlsx_memory",
-                BOOK_KEYS["path"]: "a.xlsx",
-                BOOK_KEYS["budget"]: {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
+                BOOK_KEYS["xlsx_memory"]: {"path": "./out"},
             },
             base_path="resources.books.report",
         )  # noqa: SLF001
 
     parsed = loader._parse_book_config(
         {
-            BOOK_KEYS["kind"]: "xlsx_file",
-            BOOK_KEYS["path"]: "a.xlsx",
+            BOOK_KEYS["xlsx_file"]: {"path": "./out"},
             BOOK_KEYS["write_defaults"]: {},
         },
         base_path="resources.books.report",
     )  # noqa: SLF001
     assert parsed.write_defaults is not None
+
+
+def test_loader_parse_book_config_additional_error_branches_cover_removed_write_lock_and_types() -> None:
+    loader = YamlDemandLoader()
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.write_lock was removed"):
+        _ = loader._parse_book_config(
+            {"write_lock": True, BOOK_KEYS["xlsx_file"]: {"path": "./out"}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.kind was removed"):
+        _ = loader._parse_book_config({"kind": "xlsx_memory"}, base_path="resources.books.report")  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.kind was removed"):
+        _ = loader._parse_book_config({"kind": "nope"}, base_path="resources.books.report")  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report has unknown keys: unknown"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, "unknown": 1},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"resources\.books\.report\.write_defaults must be an object"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, BOOK_KEYS["write_defaults"]: []},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"resources\.books\.report\.xlsx_file must be an object"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: []},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(TypeError, match=r"resources\.books\.report\.xlsx_memory must be an object"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_memory"]: []},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file\.write_lock was removed"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {"path": "./out", "write_lock": True}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_memory\.write_lock was removed"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_memory"]: {"write_lock": True}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    parsed = loader._parse_book_config(
+        {BOOK_KEYS["xlsx_memory"]: {"export_xlsx": {"path": "./out"}}},
+        base_path="resources.books.report",
+    )  # noqa: SLF001
+    assert parsed.export_xlsx is not None
 
 
 def test_loader_parse_path_or_init_var_branches_cover_dict_and_error() -> None:

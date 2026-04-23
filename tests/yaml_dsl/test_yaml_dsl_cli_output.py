@@ -232,8 +232,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {$init_var: output_path, other: 1}
+      csv_file:
+        path: {$init_var: output_path, other: 1}
       unknown_field: 1
 outputs:
   - name: detail
@@ -250,7 +250,7 @@ outputs:
     payload = json.loads(capsys.readouterr().out)
     errors = payload["errors"]
     paths = {item["path"] for item in errors}
-    assert "resources.files.detail_csv.path" in paths
+    assert "resources.files.detail_csv.csv_file.path" in paths
     assert "resources.files.detail_csv.unknown_field" in paths
 
 

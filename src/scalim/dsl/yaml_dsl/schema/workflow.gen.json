@@ -126,7 +126,7 @@
         "max_sheets": {
           "type": "integer",
           "description": "sheet 数量预算(>=1).",
-          "markdownDescription": "#### workflow.resources.books.*.budget.max_sheets\n\nsheet 数量预算(>=1).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.budget.max_sheets\n\nsheet 数量预算(>=1).",
           "minimum": 1,
           "examples": [
             64
@@ -135,7 +135,7 @@
         "max_total_cells": {
           "type": "integer",
           "description": "总 cell 数预算(>=1).",
-          "markdownDescription": "#### workflow.resources.books.*.budget.max_total_cells\n\n总 cell 数预算(>=1).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.budget.max_total_cells\n\n总 cell 数预算(>=1).",
           "minimum": 1,
           "examples": [
             1000000
@@ -165,7 +165,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### workflow.resources.books.*.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -182,12 +182,12 @@
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
           "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "markdownDescription": "#### workflow.resources.books.*.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "default": false,
           "examples": [
             false
@@ -273,21 +273,9 @@
       },
       "additionalProperties": false
     },
-    "book": {
+    "book_xlsx_file": {
       "type": "object",
       "properties": {
-        "kind": {
-          "type": "string",
-          "description": "book kind.",
-          "markdownDescription": "#### workflow.resources.books.*.kind\n\nbook kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `xlsx_file`, `xlsx_memory`\n\n##### 例子\n```yaml\nxlsx_file\n```",
-          "enum": [
-            "xlsx_file",
-            "xlsx_memory"
-          ],
-          "examples": [
-            "xlsx_file"
-          ]
-        },
         "path": {
           "oneOf": [
             {
@@ -302,7 +290,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### workflow.resources.books.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### workflow.resources.books.*.xlsx_file.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -312,18 +300,36 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})",
+          "description": "输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
             "./output",
             {
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.path\n\nxlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_file.path\n\n输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_file.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "book_xlsx_memory": {
+      "type": "object",
+      "properties": {
         "budget": {
-          "description": "xlsx_memory: 可选预算配置(缺省为 unlimited)",
-          "markdownDescription": "#### workflow.resources.books.*.budget\n\nxlsx_memory: 可选预算配置(缺省为 unlimited)",
+          "description": "可选: 预算配置(缺省为 unlimited)",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.budget\n\n可选: 预算配置(缺省为 unlimited)",
           "allOf": [
             {
               "$ref": "#/definitions/book_budget"
@@ -331,23 +337,20 @@
           ]
         },
         "export_xlsx": {
-          "description": "xlsx_memory: 可选导出配置",
-          "markdownDescription": "#### workflow.resources.books.*.export_xlsx\n\nxlsx_memory: 可选导出配置",
+          "description": "可选: 导出配置",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx\n\n可选: 导出配置",
           "allOf": [
             {
               "$ref": "#/definitions/book_export_xlsx"
             }
           ]
-        },
-        "allow_formulas": {
-          "type": "boolean",
-          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "markdownDescription": "#### workflow.resources.books.*.allow_formulas\n\nxlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "default": false,
-          "examples": [
-            false
-          ]
-        },
+        }
+      },
+      "additionalProperties": false
+    },
+    "book": {
+      "type": "object",
+      "properties": {
         "write_defaults": {
           "description": "可选:默认写入语义与冲突策略",
           "markdownDescription": "#### workflow.resources.books.*.write_defaults\n\n可选:默认写入语义与冲突策略",
@@ -356,76 +359,72 @@
               "$ref": "#/definitions/book_write_defaults"
             }
           ]
+        },
+        "xlsx_file": {
+          "description": "xlsx_file: 文件导出 book 配置.",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_file\n\nxlsx_file: 文件导出 book 配置.\n- 必填: `path`\n- 可选: `allow_formulas`",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_xlsx_file"
+            }
+          ]
+        },
+        "xlsx_memory": {
+          "description": "xlsx_memory: 内存 book 配置.",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory\n\nxlsx_memory: 内存 book 配置.\n- 可选: `budget`\n- 可选: `export_xlsx`",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_xlsx_memory"
+            }
+          ]
         }
       },
-      "required": [
-        "kind"
-      ],
       "additionalProperties": false,
       "allOf": [
         {
-          "if": {
-            "required": [
-              "kind"
-            ],
-            "properties": {
-              "kind": {
-                "const": "xlsx_file"
+          "anyOf": [
+            {
+              "required": [
+                "$import"
+              ],
+              "not": {
+                "required": [
+                  "xlsx_file",
+                  "xlsx_memory"
+                ]
               }
+            },
+            {
+              "oneOf": [
+                {
+                  "required": [
+                    "xlsx_file"
+                  ],
+                  "properties": {
+                    "xlsx_memory": {
+                      "not": {}
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "xlsx_memory"
+                  ],
+                  "properties": {
+                    "xlsx_file": {
+                      "not": {}
+                    }
+                  }
+                }
+              ]
             }
-          },
-          "then": {
-            "required": [
-              "path"
-            ],
-            "properties": {
-              "budget": {
-                "not": {}
-              },
-              "export_xlsx": {
-                "not": {}
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "kind"
-            ],
-            "properties": {
-              "kind": {
-                "const": "xlsx_memory"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "path": {
-                "not": {}
-              },
-              "allow_formulas": {
-                "not": {}
-              }
-            }
-          }
+          ]
         }
       ]
     },
-    "file": {
+    "file_csv_file": {
       "type": "object",
       "properties": {
-        "kind": {
-          "type": "string",
-          "description": "file kind.",
-          "markdownDescription": "#### workflow.resources.files.*.kind\n\nfile kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件\n\n##### 字段约束\n- 必填: 是\n- 类型: string\n- 取值: `csv_file`\n\n##### 例子\n```yaml\ncsv_file\n```",
-          "enum": [
-            "csv_file"
-          ],
-          "examples": [
-            "csv_file"
-          ]
-        },
         "path": {
           "oneOf": [
             {
@@ -440,7 +439,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### workflow.resources.files.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### workflow.resources.files.*.csv_file.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -450,19 +449,19 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "csv_file: 输出 root 目录(字符串或 {$init_var: <name>})",
+          "description": "输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
             "./output",
             {
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.files.*.path\n\ncsv_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### workflow.resources.files.*.csv_file.path\n\n输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "encoding": {
           "type": "string",
-          "description": "csv_file: 文件编码(默认 `utf-8`).",
-          "markdownDescription": "#### workflow.resources.files.*.encoding\n\ncsv_file: 文件编码(默认 `utf-8`).",
+          "description": "文件编码(默认 `utf-8`).",
+          "markdownDescription": "#### workflow.resources.files.*.csv_file.encoding\n\n文件编码(默认 `utf-8`).",
           "default": "utf-8",
           "examples": [
             "utf-8"
@@ -470,8 +469,25 @@
         }
       },
       "required": [
-        "kind",
         "path"
+      ],
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "properties": {
+        "csv_file": {
+          "description": "csv_file: CSV 文件导出配置.",
+          "markdownDescription": "#### workflow.resources.files.*.csv_file\n\ncsv_file: CSV 文件导出配置.\n- 必填: `path`\n- 可选: `encoding`",
+          "allOf": [
+            {
+              "$ref": "#/definitions/file_csv_file"
+            }
+          ]
+        }
+      },
+      "required": [
+        "csv_file"
       ],
       "additionalProperties": false
     },

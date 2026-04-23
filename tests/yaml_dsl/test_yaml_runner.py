@@ -72,7 +72,7 @@ def _write_yaml_with_output_path(tmp_path: Path, source_path: Path, output_path:
     config = yaml.safe_load(source_path.read_text(encoding="utf-8"))
     if not isinstance(config, dict):
         raise TypeError("expected mapping")
-    config["resources"] = {"files": {"detail_csv": {"kind": "csv_file", "path": str(output_path)}}}
+    config["resources"] = {"files": {"detail_csv": {"csv_file": {"path": str(output_path)}}}}
     config["outputs"] = [
         {
             "name": "detail",

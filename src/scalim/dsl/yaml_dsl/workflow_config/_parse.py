@@ -16,7 +16,6 @@ from ..schema_dsl.models import (
     ResourcesConfig,
 )
 from ..schema_dsl.output_enums import (
-    BOOK_KINDS,
     BOOK_WRITE_ALIGN_BY_ENUM,
     BOOK_WRITE_HEADER_POLICY_ENUM,
     BOOK_WRITE_MODE_ENUM,
@@ -27,7 +26,6 @@ from ..schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
-    FILE_KINDS,
 )
 from ._models import (
     WorkflowConfig,
@@ -337,7 +335,7 @@ def _parse_book_write_defaults(raw: object, *, path: str) -> BookWriteDefaultsCo
     )
 
 
-def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, PLR0912
+def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)
@@ -346,69 +344,117 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
     cfg = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
     _raise_if_import_present(cfg, path=path)
 
-    allowed_keys = {"kind", "path", "budget", "export_xlsx", "allow_formulas", "write_defaults"}
+    if "write_lock" in cfg:
+        msg = "{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+
+    if "kind" in cfg:
+        kind = str(cfg.get("kind") or "").strip()
+        if kind == "xlsx_file":
+            msg = (
+                "{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}}."
+            ).format(path, path)
+        elif kind == "xlsx_memory":
+            msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_memory: {{budget?: ..., export_xlsx?: ...}}.").format(
+                path, path
+            )
+        else:
+            msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{...}} or {}.xlsx_memory: {{...}}.").format(
+                path, path, path
+            )
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    allowed_keys = {"xlsx_file", "xlsx_memory", "write_defaults"}
     unknown = sorted({str(k) for k in cfg} - allowed_keys)
     if unknown:
-        if "write_lock" in unknown:
-            msg = "{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
         raise ScalimWorkflowConfigError(msg, path=path)
 
-    kind = str(cfg.get("kind") or "").strip()
-    if not kind:
-        msg = "{}.kind is required".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
-    if kind not in BOOK_KINDS:
-        msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(BOOK_KINDS))
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
-
-    has_allow_formulas = "allow_formulas" in cfg
-
-    book_path = _parse_path_or_init_var(cfg.get("path"), path="{}.path".format(path))
-    budget_cfg = _parse_book_budget(cfg.get("budget"), path="{}.budget".format(path)) if "budget" in cfg else None
-    export_cfg = _parse_book_export_xlsx(cfg.get("export_xlsx"), path="{}.export_xlsx".format(path)) if "export_xlsx" in cfg else None
     write_defaults_cfg = (
         _parse_book_write_defaults(cfg.get("write_defaults"), path="{}.write_defaults".format(path)) if "write_defaults" in cfg else None
     )
 
-    allow_formulas_raw = cfg.get("allow_formulas", False)
-    if not isinstance(allow_formulas_raw, bool):
-        msg = "{}.allow_formulas must be a bool".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+    has_xlsx_file = "xlsx_file" in cfg
+    has_xlsx_memory = "xlsx_memory" in cfg
+    if has_xlsx_file == has_xlsx_memory:
+        msg = "{} must choose exactly one variant key: xlsx_file or xlsx_memory".format(path)
+        raise ScalimWorkflowConfigError(msg, path=path)
 
-    # 语义层约束(即使 `schema` 已覆盖,仍保持 `fail-fast` 便于诊断).
-    if kind == "xlsx_file":
+    if has_xlsx_file:
+        xlsx_file_raw = cfg.get("xlsx_file")
+        if not isinstance(xlsx_file_raw, dict):
+            msg = "{}.xlsx_file must be a mapping".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file".format(path))
+        xlsx_file = cast("Dict[str, Any]", xlsx_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        _raise_if_import_present(xlsx_file, path="{}.xlsx_file".format(path))
+        unknown_branch = sorted({str(k) for k in xlsx_file} - {"path", "allow_formulas"})
+        if unknown_branch:
+            if "write_lock" in unknown_branch:
+                msg = (
+                    "{}.xlsx_file.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
+                ).format(path)
+                raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.write_lock".format(path))
+            msg = "{}.xlsx_file has unknown keys: {}".format(path, ", ".join(unknown_branch))
+            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file".format(path))
+
+        book_path = _parse_path_or_init_var(xlsx_file.get("path"), path="{}.xlsx_file.path".format(path))
         if not book_path or (isinstance(book_path, str) and not book_path.strip()):
-            msg = "{}.path is required for kind=xlsx_file".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+            msg = "{}.xlsx_file.path is required".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.path".format(path))
         if isinstance(book_path, str) and Path(book_path).suffix.lower() == ".xlsx":
             msg = (
-                "{}.path now expects an output root directory, not a file path. "
+                "{}.xlsx_file.path now expects an output root directory, not a file path. "
                 "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
             ).format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-        if budget_cfg is not None:
-            msg = "{}.budget is not allowed for kind=xlsx_file".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
-        if export_cfg is not None:
-            msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
+            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.path".format(path))
 
-    if kind == "xlsx_memory":
-        if book_path is not None:
-            msg = "{}.path is not allowed for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-        if has_allow_formulas:
-            msg = "{}.allow_formulas is not allowed for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+        allow_formulas_raw = xlsx_file.get("allow_formulas", False)
+        if not isinstance(allow_formulas_raw, bool):
+            msg = "{}.xlsx_file.allow_formulas must be a bool".format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.allow_formulas".format(path))
+
+        return BookConfig(
+            kind="xlsx_file",
+            path=book_path,
+            budget=None,
+            export_xlsx=None,
+            allow_formulas=bool(allow_formulas_raw),
+            write_defaults=write_defaults_cfg,
+        )
+
+    xlsx_memory_raw = cfg.get("xlsx_memory")
+    if not isinstance(xlsx_memory_raw, dict):
+        msg = "{}.xlsx_memory must be a mapping".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory".format(path))
+    xlsx_memory = cast("Dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(xlsx_memory, path="{}.xlsx_memory".format(path))
+    unknown_branch = sorted({str(k) for k in xlsx_memory} - {"budget", "export_xlsx"})
+    if unknown_branch:
+        if "write_lock" in unknown_branch:
+            msg = (
+                "{}.xlsx_memory.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
+            ).format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory.write_lock".format(path))
+        msg = "{}.xlsx_memory has unknown keys: {}".format(path, ", ".join(unknown_branch))
+        raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory".format(path))
+
+    budget_cfg = (
+        _parse_book_budget(xlsx_memory.get("budget"), path="{}.xlsx_memory.budget".format(path)) if "budget" in xlsx_memory else None
+    )
+    export_cfg = (
+        _parse_book_export_xlsx(xlsx_memory.get("export_xlsx"), path="{}.xlsx_memory.export_xlsx".format(path))
+        if "export_xlsx" in xlsx_memory
+        else None
+    )
+
+    # 路径语义: `export_xlsx.path` 也必须是输出根目录(版本化输出 `D-2`)。
 
     return BookConfig(
-        kind=kind,
-        path=book_path,
+        kind="xlsx_memory",
+        path=None,
         budget=budget_cfg,
         export_xlsx=export_cfg,
-        allow_formulas=bool(allow_formulas_raw),
+        allow_formulas=False,
         write_defaults=write_defaults_cfg,
     )
 
@@ -481,47 +527,69 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
     return ResourcesConfig(books=books, files=files)
 
 
-def _parse_file_config(raw: object, *, path: str) -> FileConfig:
+def _parse_file_config(raw: object, *, path: str) -> FileConfig:  # noqa: C901
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)
         raise ScalimWorkflowConfigError(msg, path=path)
     typed = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
     _raise_if_import_present(typed, path=path)
-    allowed_keys = {"kind", "path", "encoding"}
+    if "write_lock" in typed:
+        msg = "{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+
+    if "kind" in typed:
+        kind = str(typed.get("kind") or "").strip()
+        if kind == "csv_file":
+            msg = (
+                "{}.kind was removed. Migration: use oneOf branch object: {}.csv_file: {{path: <output_root>, encoding?: utf-8}}."
+            ).format(path, path)
+        else:
+            msg = "{}.kind was removed. Migration: use oneOf branch object: {}.csv_file: {{...}}.".format(path, path)
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    allowed_keys = {"csv_file"}
     unknown = sorted({str(k) for k in typed} - allowed_keys)
     if unknown:
-        if "write_lock" in unknown:
-            msg = "{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
         raise ScalimWorkflowConfigError(msg, path=path)
 
-    kind_raw = typed.get("kind")
-    kind = str(kind_raw or "").strip() if isinstance(kind_raw, str) else ""
-    if not kind:
-        msg = "{}.kind is required".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
-    if kind not in FILE_KINDS:
-        msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+    if "csv_file" not in typed:
+        msg = "{}.csv_file is required".format(path)
+        raise ScalimWorkflowConfigError(msg, path=path)
 
-    file_path = _parse_path_or_init_var(typed.get("path"), path="{}.path".format(path))
-    if file_path is None:
-        msg = "{}.path is required for kind=csv_file".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+    csv_file_raw = typed.get("csv_file")
+    if not isinstance(csv_file_raw, dict):
+        msg = "{}.csv_file must be a mapping".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_file".format(path))
+    csv_file = cast("Dict[str, Any]", csv_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
+    _raise_if_import_present(csv_file, path="{}.csv_file".format(path))
+    unknown_branch = sorted({str(k) for k in csv_file} - {"path", "encoding"})
+    if unknown_branch:
+        if "write_lock" in unknown_branch:
+            msg = (
+                "{}.csv_file.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
+            ).format(path)
+            raise ScalimWorkflowConfigError(msg, path="{}.csv_file.write_lock".format(path))
+        msg = "{}.csv_file has unknown keys: {}".format(path, ", ".join(unknown_branch))
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_file".format(path))
+
+    file_path = _parse_path_or_init_var(csv_file.get("path"), path="{}.csv_file.path".format(path))
+    if file_path is None or (isinstance(file_path, str) and not file_path.strip()):
+        msg = "{}.csv_file.path is required".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_file.path".format(path))
     if isinstance(file_path, str) and Path(file_path).suffix.lower() == ".csv":
         msg = (
-            "{}.path now expects an output root directory, not a file path. "
+            "{}.csv_file.path now expects an output root directory, not a file path. "
             "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
         ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+        raise ScalimWorkflowConfigError(msg, path="{}.csv_file.path".format(path))
 
-    encoding_raw = typed.get("encoding")
+    encoding_raw = csv_file.get("encoding")
     encoding = str(encoding_raw or "").strip() if isinstance(encoding_raw, str) else ""
     encoding = encoding or DEFAULT_OUTPUT_ENCODING
 
-    return FileConfig(kind=kind, path=file_path, encoding=encoding)
+    return FileConfig(kind="csv_file", path=file_path, encoding=encoding)
 
 
 def load_workflow_config_from_mapping(root: Dict[str, Any]) -> WorkflowConfig:

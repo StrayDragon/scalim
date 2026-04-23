@@ -96,9 +96,9 @@ fields:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {$init_var: out_root}
-      encoding: utf-8
+      csv_file:
+        path: {$init_var: out_root}
+        encoding: utf-8
 
 outputs:
   - name: detail

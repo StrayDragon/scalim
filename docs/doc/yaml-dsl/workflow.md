@@ -288,7 +288,7 @@ workflow YAML 只负责两件事:
 
 - book 资源声明: `resources.books.<book_id>`
   - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
-  - `kind: xlsx_file|xlsx_memory`
+  - oneOf 分支写法: `xlsx_file` / `xlsx_memory`
 - 输出到 book 的绑定: `outputs[*].to.book` / `outputs[*].to.sheet`
 - 写入策略: `resources.books.*.write_defaults`(workbook SSOT) + `outputs[*].write`(仅 output-local header 行为: `include_header` / `header_fields_output_by`)
 
@@ -305,7 +305,7 @@ workflow YAML 只负责两件事:
 示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
 
 说明:
-- 对 `kind: xlsx_memory`, `budget` 为可选项；缺省时视为 unlimited(不启用预算护栏)。若需要护栏,请显式声明 `budget.max_sheets/max_total_cells`。
+- 对 `xlsx_memory` 分支,`budget` 为可选项；缺省时视为 unlimited(不启用预算护栏)。若需要护栏,请显式声明 `budget.max_sheets/max_total_cells`。
 
 workflow YAML:
 
@@ -314,11 +314,11 @@ workflow:
   resources:
     books:
       report:
-        kind: xlsx_memory
-        export_xlsx:
-          path: ./out
-        # 可选预算护栏:
-        # budget: {max_sheets: 16, max_total_cells: 2000000}
+        xlsx_memory:
+          export_xlsx:
+            path: ./out
+          # 可选预算护栏:
+          # budget: {max_sheets: 16, max_total_cells: 2000000}
 
   runs:
     - id: main

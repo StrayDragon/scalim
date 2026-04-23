@@ -13,36 +13,16 @@ def _load_demand_schema() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def test_demand_schema_book_kind_if_requires_kind() -> None:
+def test_demand_schema_book_schema_does_not_expose_legacy_kind_discriminator() -> None:
     schema = _load_demand_schema()
     book = schema["definitions"]["book"]
-    all_of = book.get("allOf") or []
-    assert isinstance(all_of, list)
-
-    checked = 0
-    for item in all_of:
-        if not isinstance(item, dict):
-            continue
-        if_schema = item.get("if") or {}
-        if not isinstance(if_schema, dict):
-            continue
-        props = if_schema.get("properties") or {}
-        if not isinstance(props, dict):
-            continue
-        kind = props.get("kind") or {}
-        if not isinstance(kind, dict):
-            continue
-        if "const" not in kind:
-            continue
-        required = if_schema.get("required") or []
-        assert isinstance(required, list)
-        assert "kind" in required
-        checked += 1
-
-    assert checked >= 2
+    props = book.get("properties") or {}
+    assert isinstance(props, dict)
+    assert "kind" not in props
+    assert "xlsx_file" in props and "xlsx_memory" in props
 
 
-def test_demand_schema_import_based_book_mapping_does_not_require_budget() -> None:
+def test_demand_schema_import_only_book_mapping_is_schema_valid() -> None:
     schema = _load_demand_schema()
     wrapper = {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -52,7 +32,37 @@ def test_demand_schema_import_based_book_mapping_does_not_require_budget() -> No
 
     data = {
         "$import": "fragments.report_book",
-        "path": "./out.xlsx",
+    }
+    errors = list(jsonschema.Draft7Validator(wrapper).iter_errors(data))
+    assert errors == [], [err.message for err in errors]
+
+
+def test_demand_schema_import_based_book_mapping_allows_local_variant_override() -> None:
+    schema = _load_demand_schema()
+    wrapper = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/book",
+        "definitions": schema.get("definitions") or {},
+    }
+
+    data = {
+        "$import": "fragments.report_book",
+        "xlsx_file": {"path": "./out"},
+    }
+    errors = list(jsonschema.Draft7Validator(wrapper).iter_errors(data))
+    assert errors == [], [err.message for err in errors]
+
+
+def test_demand_schema_branch_import_only_mapping_does_not_require_path() -> None:
+    schema = _load_demand_schema()
+    wrapper = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/book",
+        "definitions": schema.get("definitions") or {},
+    }
+
+    data = {
+        "xlsx_file": {"$import": "fragments.report_book_xlsx_file"},
     }
     errors = list(jsonschema.Draft7Validator(wrapper).iter_errors(data))
     assert errors == [], [err.message for err in errors]

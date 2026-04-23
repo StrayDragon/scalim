@@ -30,8 +30,8 @@ sources:
 resources:
   files:
     metrics_csv:
-      kind: csv_file
-      path: ./out
+      csv_file:
+        path: ./out
 
 outputs:
   - name: metrics

@@ -23,8 +23,8 @@ main_source:
 resources:
   books:
     report:
-      kind: xlsx_memory
-      budget: {max_sheets: 10, max_total_cells: 1000}
+      xlsx_memory:
+        budget: {max_sheets: 10, max_total_cells: 1000}
 outputs:
   - name: detail
     to:

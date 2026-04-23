@@ -16,10 +16,11 @@ description: |
   - `scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario:verify_ads_outputs_csv_rows`
 
 _templates:
-  detail_all_csv_file: &detail_all_csv_file
-    kind: csv_file
+  detail_all_csv_file_cfg: &detail_all_csv_file_cfg
     path: {$init_var: out_root}
     encoding: utf-8
+  detail_all_csv_file: &detail_all_csv_file
+    csv_file: *detail_all_csv_file_cfg
   csv_write_field_id: &csv_write_field_id
     header_fields_output_by: field_id
     include_header: true
@@ -149,12 +150,10 @@ resources:
   files:
     detail_all_csv: *detail_all_csv_file
     detail_clicks_csv:
-      <<: *detail_all_csv_file
-      path: {$init_var: out_root}
-    metrics_by_campaign_csv:
-      kind: csv_file
-      path: {$init_var: out_root}
-      encoding: utf-8
+      csv_file:
+        <<: *detail_all_csv_file_cfg
+        path: {$init_var: out_root}
+    metrics_by_campaign_csv: *detail_all_csv_file
 
 outputs:
   - name: detail_all

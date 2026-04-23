@@ -26,7 +26,10 @@ from .resources import (
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
+    BookXlsxFileConfig,
+    BookXlsxMemoryConfig,
     FileConfig,
+    FileCsvFileConfig,
     ResourcesConfig,
 )
 from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, SourceConfig
@@ -86,7 +89,10 @@ OUTPUT_WRITE_KEYS = _build_key_map(OutputWriteConfig)
 BOOK_BUDGET_KEYS = _build_key_map(BookBudgetConfig)
 BOOK_EXPORT_XLSX_KEYS = _build_key_map(BookExportXlsxConfig)
 BOOK_WRITE_DEFAULTS_KEYS = _build_key_map(BookWriteDefaultsConfig)
+BOOK_XLSX_FILE_KEYS = _build_key_map(BookXlsxFileConfig)
+BOOK_XLSX_MEMORY_KEYS = _build_key_map(BookXlsxMemoryConfig)
 BOOK_KEYS = _build_key_map(BookConfig)
+FILE_CSV_FILE_KEYS = _build_key_map(FileCsvFileConfig)
 FILE_KEYS = _build_key_map(FileConfig)
 RESOURCES_KEYS = _build_key_map(ResourcesConfig)
 GUARDRAILS_LOADER_KEYS = _build_key_map(GuardrailsLoaderConfig)

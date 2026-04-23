@@ -34,8 +34,8 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: %s}
-    summary_csv: {kind: csv_file, path: %s}
+    detail_csv: {csv_file: {path: %s}}
+    summary_csv: {csv_file: {path: %s}}
 outputs:
   - name: detail_direct
     to: {file: detail_csv}
@@ -99,7 +99,7 @@ main_source:
 sources: {}
 resources:
   files:
-    summary_csv: {kind: csv_file, path: %s}
+    summary_csv: {csv_file: {path: %s}}
 outputs:
   - name: summary_direct
     to: {file: summary_csv}

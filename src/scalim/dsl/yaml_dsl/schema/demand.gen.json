@@ -1989,7 +1989,7 @@
         "max_sheets": {
           "type": "integer",
           "description": "sheet 数量预算(>=1).",
-          "markdownDescription": "#### resources.books.*.budget.max_sheets\n\nsheet 数量预算(>=1).",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.budget.max_sheets\n\nsheet 数量预算(>=1).",
           "minimum": 1,
           "examples": [
             64
@@ -1998,7 +1998,7 @@
         "max_total_cells": {
           "type": "integer",
           "description": "总 cell 数预算(>=1).",
-          "markdownDescription": "#### resources.books.*.budget.max_total_cells\n\n总 cell 数预算(>=1).",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.budget.max_total_cells\n\n总 cell 数预算(>=1).",
           "minimum": 1,
           "examples": [
             1000000
@@ -2018,7 +2018,7 @@
             }
           ],
           "description": "$import 引用.",
-          "markdownDescription": "#### resources.books.*.budget.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.budget.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -2060,7 +2060,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### resources.books.*.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -2077,12 +2077,12 @@
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.books.*.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
           "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "markdownDescription": "#### resources.books.*.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
           "default": false,
           "examples": [
             false
@@ -2102,7 +2102,7 @@
             }
           ],
           "description": "$import 引用.",
-          "markdownDescription": "#### resources.books.*.export_xlsx.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
             "common.sources",
             [
@@ -2223,21 +2223,9 @@
       },
       "additionalProperties": false
     },
-    "book": {
+    "book_xlsx_file": {
       "type": "object",
       "properties": {
-        "kind": {
-          "type": "string",
-          "description": "book kind.",
-          "markdownDescription": "#### resources.books.*.kind\n\nbook kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- 取值: `xlsx_file`, `xlsx_memory`\n\n##### 例子\n```yaml\nxlsx_file\n```",
-          "enum": [
-            "xlsx_file",
-            "xlsx_memory"
-          ],
-          "examples": [
-            "xlsx_file"
-          ]
-        },
         "path": {
           "oneOf": [
             {
@@ -2252,7 +2240,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### resources.books.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### resources.books.*.xlsx_file.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -2262,18 +2250,68 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})",
+          "description": "输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
             "./output",
             {
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.books.*.path\n\nxlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### resources.books.*.xlsx_file.path\n\n输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "markdownDescription": "#### resources.books.*.xlsx_file.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+          "default": false,
+          "examples": [
+            false
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.xlsx_file.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "book_xlsx_memory": {
+      "type": "object",
+      "properties": {
         "budget": {
-          "description": "xlsx_memory: 可选预算配置(缺省为 unlimited)",
-          "markdownDescription": "#### resources.books.*.budget\n\nxlsx_memory: 可选预算配置(缺省为 unlimited)\n- 或仅 `$import`(展开后再校验必填字段)",
+          "description": "可选: 预算配置(缺省为 unlimited)",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.budget\n\n可选: 预算配置(缺省为 unlimited)\n- 或仅 `$import`(展开后再校验必填字段)",
           "allOf": [
             {
               "$ref": "#/definitions/book_budget"
@@ -2281,29 +2319,67 @@
           ]
         },
         "export_xlsx": {
-          "description": "xlsx_memory: 可选导出配置",
-          "markdownDescription": "#### resources.books.*.export_xlsx\n\nxlsx_memory: 可选导出配置\n- 或仅 `$import`(展开后再校验必填字段)",
+          "description": "可选: 导出配置",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx\n\n可选: 导出配置\n- 或仅 `$import`(展开后再校验必填字段)",
           "allOf": [
             {
               "$ref": "#/definitions/book_export_xlsx"
             }
           ]
         },
-        "allow_formulas": {
-          "type": "boolean",
-          "description": "xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "markdownDescription": "#### resources.books.*.allow_formulas\n\nxlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "default": false,
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
           "examples": [
-            false
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
           ]
-        },
+        }
+      },
+      "additionalProperties": false
+    },
+    "book": {
+      "type": "object",
+      "properties": {
         "write_defaults": {
           "description": "可选:默认写入语义与冲突策略",
           "markdownDescription": "#### resources.books.*.write_defaults\n\n可选:默认写入语义与冲突策略",
           "allOf": [
             {
               "$ref": "#/definitions/book_write_defaults"
+            }
+          ]
+        },
+        "xlsx_file": {
+          "description": "xlsx_file: 文件导出 book 配置.",
+          "markdownDescription": "#### resources.books.*.xlsx_file\n\nxlsx_file: 文件导出 book 配置.\n- 必填: `path`\n- 或仅 `$import`(展开后再校验必填字段)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_xlsx_file"
+            }
+          ]
+        },
+        "xlsx_memory": {
+          "description": "xlsx_memory: 内存 book 配置.",
+          "markdownDescription": "#### resources.books.*.xlsx_memory\n\nxlsx_memory: 内存 book 配置.\n- 可选: `budget`\n- 可选: `export_xlsx`",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_xlsx_memory"
             }
           ]
         },
@@ -2331,83 +2407,52 @@
           ]
         }
       },
-      "anyOf": [
-        {
-          "required": [
-            "kind"
-          ]
-        },
-        {
-          "required": [
-            "$import"
-          ]
-        }
-      ],
       "additionalProperties": false,
       "allOf": [
         {
-          "if": {
-            "required": [
-              "kind"
-            ],
-            "properties": {
-              "kind": {
-                "const": "xlsx_file"
+          "anyOf": [
+            {
+              "required": [
+                "$import"
+              ],
+              "not": {
+                "required": [
+                  "xlsx_file",
+                  "xlsx_memory"
+                ]
               }
+            },
+            {
+              "oneOf": [
+                {
+                  "required": [
+                    "xlsx_file"
+                  ],
+                  "properties": {
+                    "xlsx_memory": {
+                      "not": {}
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "xlsx_memory"
+                  ],
+                  "properties": {
+                    "xlsx_file": {
+                      "not": {}
+                    }
+                  }
+                }
+              ]
             }
-          },
-          "then": {
-            "required": [
-              "path"
-            ],
-            "properties": {
-              "budget": {
-                "not": {}
-              },
-              "export_xlsx": {
-                "not": {}
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "kind"
-            ],
-            "properties": {
-              "kind": {
-                "const": "xlsx_memory"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "path": {
-                "not": {}
-              },
-              "allow_formulas": {
-                "not": {}
-              }
-            }
-          }
+          ]
         }
       ]
     },
-    "file": {
+    "file_csv_file": {
       "type": "object",
       "properties": {
-        "kind": {
-          "type": "string",
-          "description": "file kind.",
-          "markdownDescription": "#### resources.files.*.kind\n\nfile kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- 类型: string\n- 取值: `csv_file`\n\n##### 例子\n```yaml\ncsv_file\n```",
-          "enum": [
-            "csv_file"
-          ],
-          "examples": [
-            "csv_file"
-          ]
-        },
         "path": {
           "oneOf": [
             {
@@ -2422,7 +2467,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### resources.files.*.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### resources.files.*.csv_file.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -2432,22 +2477,72 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "csv_file: 输出 root 目录(字符串或 {$init_var: <name>})",
+          "description": "输出 root 目录(字符串或 {$init_var: <name>})",
           "examples": [
             "./output",
             {
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.files.*.path\n\ncsv_file: 输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### resources.files.*.csv_file.path\n\n输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "encoding": {
           "type": "string",
-          "description": "csv_file: 文件编码(默认 `utf-8`).",
-          "markdownDescription": "#### resources.files.*.encoding\n\ncsv_file: 文件编码(默认 `utf-8`).",
+          "description": "文件编码(默认 `utf-8`).",
+          "markdownDescription": "#### resources.files.*.csv_file.encoding\n\n文件编码(默认 `utf-8`).",
           "default": "utf-8",
           "examples": [
             "utf-8"
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.files.*.csv_file.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "path"
+          ]
+        },
+        {
+          "required": [
+            "$import"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "properties": {
+        "csv_file": {
+          "description": "csv_file: CSV 文件导出配置.",
+          "markdownDescription": "#### resources.files.*.csv_file\n\ncsv_file: CSV 文件导出配置.\n- 必填: `path`\n- 或仅 `$import`(展开后再校验必填字段)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/file_csv_file"
+            }
           ]
         },
         "$import": {
@@ -2477,8 +2572,7 @@
       "anyOf": [
         {
           "required": [
-            "kind",
-            "path"
+            "csv_file"
           ]
         },
         {
@@ -3939,7 +4033,7 @@
           },
           "minItems": 1,
           "description": "输出字段顺序(`field_id/out_field_id` 列表).",
-          "markdownDescription": "#### outputs[*].fields\n\n输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      kind: csv_file\n      path: ./out\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.\n\n##### 字段约束\n- 必填: 否\n- 类型: array\n- minItems: `1`\n\n##### 例子\n```yaml\n- order_id\n- user_id\n```",
+          "markdownDescription": "#### outputs[*].fields\n\n输出字段顺序(`field_id/out_field_id` 列表).\n\n两类输出的语义:\n\n- 明细输出(未声明 `aggregate`): `fields` **必填**,用于选择并编排行输出字段.\n- 聚合输出(声明了 `aggregate`): `fields` **可选**,用于 derived output 的输出编排(select + order).\n  - 可引用范围: `aggregate.group_by` + `aggregate.fields` 的 key\n  - 若省略 `fields`,则使用默认 derived output layout(实现细节;不承诺顺序,强合同请显式声明)\n\n支持两种等价写法:\n\n1) 直接写 `field_id` 字符串:\n\n```yaml\nfields: [order_id, total]\n```\n\n2) 使用 YAML alias 引用字段定义对象以推导 `field_id`:\n\n```yaml\nmain_source:\n  fields:\n    quantity: &quantity {extract: quantity}\noutputs:\n  - name: detail\n    to: {file: detail_csv}\n    fields:\n      - *quantity\n      - \"order_id\"\n\nresources:\n  files:\n    detail_csv:\n      csv_file:\n        path: ./out\n```\n\n注意: YAML merge(`<<`) 可能产生新对象并丢失 alias identity;此时建议直接使用字符串 `field_id`.\n\n可通过 `from` 继承.\n\n##### 字段约束\n- 必填: 否\n- 类型: array\n- minItems: `1`\n\n##### 例子\n```yaml\n- order_id\n- user_id\n```",
           "examples": [
             [
               "order_id",

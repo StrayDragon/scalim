@@ -595,9 +595,9 @@ def _resolve_file_export_path(
         file_cfg.path,
         base_dir=str(yaml_base_dir),
         init_vars=init_vars,
-        path="resources.files.{}.path".format(str(file_id)),
+        path="resources.files.{}.csv_file.path".format(str(file_id)),
     )
-    _validate_output_root_path(str(output_root), path="resources.files.{}.path".format(str(file_id)))
+    _validate_output_root_path(str(output_root), path="resources.files.{}.csv_file.path".format(str(file_id)))
     export_path = _versioned_file_output_path(output_root=str(output_root), version_id=str(version_id), file_id=str(file_id))
     return export_path, file_cfg
 
@@ -619,9 +619,9 @@ def _resolve_book_export_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.path".format(str(book_id)),
+            path="resources.books.{}.xlsx_file.path".format(str(book_id)),
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_file.path".format(str(book_id)))
         export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
         return export_path, bool(book.allow_formulas)
 
@@ -629,24 +629,24 @@ def _resolve_book_export_path(
         export = book.export_xlsx
         if export is None:
             msg = (
-                "books.kind=xlsx_memory requires export_xlsx for standalone xlsx export (book_id={!r}); "
-                "set resources.books.{}.export_xlsx.path or run in a workflow"
+                "resources.books.<book_id>.xlsx_memory requires export_xlsx for standalone xlsx export (book_id={!r}); "
+                "set resources.books.{}.xlsx_memory.export_xlsx.path or run in a workflow"
             ).format(str(book_id), str(book_id))
-            path_ref = "resources.books.{}.export_xlsx".format(str(book_id))
+            path_ref = "resources.books.{}.xlsx_memory.export_xlsx".format(str(book_id))
             err = "{} (path={})".format(msg, path_ref)
             raise ValueError(err)
         output_root = resolve_yaml_relative_output_path(
             export.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+            path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)),
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)))
         export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
         return export_path, bool(export.allow_formulas)
 
     msg = "Unknown book kind: {!r}".format(kind)
-    path_ref = "resources.books.{}.kind".format(str(book_id))
+    path_ref = "resources.books.{}".format(str(book_id))
     err = "{} (path={})".format(msg, path_ref)
     raise ValueError(err)
 
@@ -670,9 +670,9 @@ def _try_resolve_workflow_managed_book_export_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.path".format(str(book_id)),
+            path="resources.books.{}.xlsx_file.path".format(str(book_id)),
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_file.path".format(str(book_id)))
         return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
 
     if kind == "xlsx_memory":
@@ -683,9 +683,9 @@ def _try_resolve_workflow_managed_book_export_path(
             export.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+            path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)),
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)))
         return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
 
     return None

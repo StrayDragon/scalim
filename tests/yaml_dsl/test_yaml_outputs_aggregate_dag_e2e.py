@@ -37,8 +37,8 @@ fields:
 resources:
   files:
     summary_csv:
-      kind: csv_file
-      path: "{out_root}"
+      csv_file:
+        path: "{out_root}"
 outputs:
   - name: summary
     to: {{file: summary_csv}}

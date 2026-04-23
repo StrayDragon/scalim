@@ -66,8 +66,9 @@ def resolve_yaml_relative_output_path(
     """解析路径并将相对路径按 `base_dir` 归一化为绝对路径.
 
     用于:
-    - `resources.books.*.path`
-    - `resources.books.*.export_xlsx.path`
+    - `resources.files.*.csv_file.path`
+    - `resources.books.*.xlsx_file.path`
+    - `resources.books.*.xlsx_memory.export_xlsx.path`
 
     约束:
     - `raw` 支持静态字符串与 `{$init_var: <name>}` 指令节点

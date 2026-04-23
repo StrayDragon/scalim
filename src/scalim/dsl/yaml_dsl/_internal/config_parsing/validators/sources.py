@@ -214,7 +214,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                     "Minimal migration:\n"
                     "  resources:\n"
                     "    books:\n"
-                    "      report: {kind: xlsx_file, path: ./output}\n"
+                    "      report: {xlsx_file: {path: ./output}}\n"
                     "  outputs:\n"
                     "    - name: detail\n"
                     "      to: {book: report, sheet: Detail}\n"

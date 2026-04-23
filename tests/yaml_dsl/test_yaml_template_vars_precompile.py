@@ -29,8 +29,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {{ output_path }}
+      csv_file:
+        path: {{ output_path }}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -65,8 +65,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: "{{ output_path }}"
+      csv_file:
+        path: "{{ output_path }}"
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -137,8 +137,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {{ missing }}
+      csv_file:
+        path: {{ missing }}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -219,8 +219,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: "__OUT_PATH__"
+      csv_file:
+        path: "__OUT_PATH__"
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -394,8 +394,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {{ output_path.strip() }}
+      csv_file:
+        path: {{ output_path.strip() }}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -437,8 +437,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {{ output_path.strip() }}
+      csv_file:
+        path: {{ output_path.strip() }}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -477,8 +477,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./out
+      csv_file:
+        path: ./out
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -544,8 +544,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {{ output_path.strip() }}
+      csv_file:
+        path: {{ output_path.strip() }}
 outputs:
   - name: detail
     to: {file: detail_csv}

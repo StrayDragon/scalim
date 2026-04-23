@@ -325,8 +325,8 @@ main_source:
 resources:
   files:
     {file_id}:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: {output_name}
@@ -383,11 +383,11 @@ main_source:
 resources:
   files:
     {output1_file_id}:
-      kind: csv_file
-      path: "{output1_root}"
+      csv_file:
+        path: "{output1_root}"
     {output2_file_id}:
-      kind: csv_file
-      path: "{output2_root}"
+      csv_file:
+        path: "{output2_root}"
 
 outputs:
   - name: {output1_name}
@@ -495,8 +495,8 @@ main_source:
 resources:
   books:
     {output_name}_book:
-      kind: xlsx_file
-      path: "{output_path}"
+      xlsx_file:
+        path: "{output_path}"
 
 outputs:
   - name: {output_name}
@@ -552,8 +552,8 @@ main_source:
 resources:
   files:
     {file_id}:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: {output_name}
@@ -598,8 +598,8 @@ sources: {{}}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: detail
@@ -1474,8 +1474,8 @@ outputs:
         tmp_path,
         resources={
             "files": {
-                "detail_a": {"kind": "csv_file", "path": str(wf_detail_a_root)},
-                "detail_b": {"kind": "csv_file", "path": str(wf_detail_b_root)},
+                "detail_a": {"csv_file": {"path": str(wf_detail_a_root)}},
+                "detail_b": {"csv_file": {"path": str(wf_detail_b_root)}},
             }
         },
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
@@ -3037,7 +3037,7 @@ def test_load_workflow_config_from_mapping_accepts_resources_mapping() -> None:
             "workflow": {
                 "runs": [{"id": "a", "demand": "a.yaml"}],
                 "resources": {
-                    "books": {"report": {"kind": "xlsx_file", "path": "./out"}},
+                    "books": {"report": {"xlsx_file": {"path": "./out"}}},
                 },
             }
         }
@@ -3450,7 +3450,7 @@ def test_workflow_shared_workbook_sheet_writes_commit_and_emit_events(tmp_path: 
     out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root)}}},
+        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}}}},
         runs=[
             {"id": "a", "demand": "a.yaml"},
             {"id": "b", "demand": "b.yaml"},
@@ -3517,9 +3517,10 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root)},
+                    },
                 }
             }
         },
@@ -3580,8 +3581,7 @@ def test_workflow_sheetbook_resources_budget_is_optional_and_unlimited(tmp_path:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "export_xlsx": {"path": str(out_root)},
+                    "xlsx_memory": {"export_xlsx": {"path": str(out_root)}},
                 }
             }
         },
@@ -3630,9 +3630,10 @@ outputs:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root)},
+                    },
                     "write_defaults": {"mode": "sheet"},
                 }
             }
@@ -3696,7 +3697,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_memory", "budget": {"max_sheets": 8, "max_total_cells": 1000}}}},
+        resources={"books": {"report": {"xlsx_memory": {"budget": {"max_sheets": 8, "max_total_cells": 1000}}}}},
         runs=[
             {
                 "id": "a",
@@ -3735,7 +3736,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     # Outside depends_on closure: MUST fail-fast.
     wf_bad = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_memory", "budget": {"max_sheets": 8, "max_total_cells": 1000}}}},
+        resources={"books": {"report": {"xlsx_memory": {"budget": {"max_sheets": 8, "max_total_cells": 1000}}}}},
         runs=[
             {
                 "id": "a",
@@ -3807,9 +3808,10 @@ outputs:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root)},
+                    },
                 }
             }
         },
@@ -3905,8 +3907,8 @@ fields:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: "__OUT__"
+      csv_file:
+        path: "__OUT__"
 
 outputs:
   - name: detail
@@ -3925,9 +3927,10 @@ outputs:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root)},
+                    },
                 }
             }
         },
@@ -3996,9 +3999,10 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 1, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 1, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root)},
+                    },
                 }
             }
         },
@@ -4022,9 +4026,10 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 3},
-                    "export_xlsx": {"path": str(out_root2)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 3},
+                        "export_xlsx": {"path": str(out_root2)},
+                    },
                 }
             }
         },
@@ -4051,9 +4056,10 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root3)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root3)},
+                    },
                 }
             }
         },
@@ -4098,8 +4104,8 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         tmp_path,
         resources={
             "books": {
-                "a_book": {"kind": "xlsx_file", "path": str(out_root)},
-                "b_book": {"kind": "xlsx_file", "path": str(out_root)},
+                "a_book": {"xlsx_file": {"path": str(out_root)}},
+                "b_book": {"xlsx_file": {"path": str(out_root)}},
             }
         },
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
@@ -4153,11 +4159,12 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
         tmp_path,
         resources={
             "books": {
-                "file_book": {"kind": "xlsx_file", "path": str(out_root2)},
+                "file_book": {"xlsx_file": {"path": str(out_root2)}},
                 "mem_book": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": str(out_root2)},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": str(out_root2)},
+                    },
                 },
             }
         },
@@ -4200,8 +4207,8 @@ def test_workflow_excel_output_collision_precheck_allows_dynamic_init_var_paths(
         tmp_path,
         resources={
             "books": {
-                "a_book": {"kind": "xlsx_file", "path": {"$init_var": "a_path"}},
-                "b_book": {"kind": "xlsx_file", "path": {"$init_var": "b_path"}},
+                "a_book": {"xlsx_file": {"path": {"$init_var": "a_path"}}},
+                "b_book": {"xlsx_file": {"path": {"$init_var": "b_path"}}},
             }
         },
         runs=[
@@ -4245,8 +4252,8 @@ def test_workflow_excel_output_allows_dynamic_init_var_shared_output_root(tmp_pa
         tmp_path,
         resources={
             "books": {
-                "a_book": {"kind": "xlsx_file", "path": {"$init_var": "a_path"}},
-                "b_book": {"kind": "xlsx_file", "path": {"$init_var": "b_path"}},
+                "a_book": {"xlsx_file": {"path": {"$init_var": "a_path"}}},
+                "b_book": {"xlsx_file": {"path": {"$init_var": "b_path"}}},
             }
         },
         runs=[
@@ -4263,7 +4270,7 @@ def test_workflow_excel_output_allows_dynamic_init_var_shared_output_root(tmp_pa
 
 
 def test_workflow_resources_rejects_export_xlsx_write_lock(tmp_path: Path) -> None:
-    reserved_export = tmp_path / "reserved.xlsx"
+    reserved_export = tmp_path / "reserved_out"
 
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
@@ -4290,11 +4297,12 @@ def test_workflow_resources_rejects_export_xlsx_write_lock(tmp_path: Path) -> No
         tmp_path,
         resources={
             "books": {
-                "file_book": {"kind": "xlsx_file", "path": {"$init_var": "reserved_path"}},
+                "file_book": {"xlsx_file": {"path": {"$init_var": "reserved_path"}}},
                 "mem_book": {
-                    "kind": "xlsx_memory",
-                    "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                    "export_xlsx": {"path": {"$init_var": "reserved_path"}, "write_lock": True},
+                    "xlsx_memory": {
+                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                        "export_xlsx": {"path": {"$init_var": "reserved_path"}, "write_lock": True},
+                    },
                 },
             }
         },
@@ -4304,7 +4312,7 @@ def test_workflow_resources_rejects_export_xlsx_write_lock(tmp_path: Path) -> No
     )
     with pytest.raises(ScalimWorkflowConfigError, match="write_lock was removed") as excinfo:
         _ = run_workflow(str(wf), options=_run_options(init_vars={"reserved_path": str(reserved_export)}))
-    assert excinfo.value.path == "workflow.resources.books.mem_book.export_xlsx.write_lock"
+    assert excinfo.value.path == "workflow.resources.books.mem_book.xlsx_memory.export_xlsx.write_lock"
 
 
 def test_workflow_excel_output_runtime_precheck_includes_meta_and_audit_paths(tmp_path: Path) -> None:
@@ -4333,7 +4341,7 @@ outputs:
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root), "write_defaults": {"mode": "sheet"}}}},
+        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}, "write_defaults": {"mode": "sheet"}}}},
         runs=[{"id": "a", "demand": "demand.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -4507,8 +4515,8 @@ sources: {{}}
 resources:
   files:
     {file_id}:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: detail
@@ -4571,8 +4579,8 @@ sources: {{}}
 resources:
   files:
     {file_id}:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: detail
@@ -4649,8 +4657,8 @@ sources: {{}}
 resources:
   files:
     {file_id}:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: detail
@@ -5006,8 +5014,8 @@ sources: {{}}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: "{output_root}"
+      csv_file:
+        path: "{output_root}"
 
 outputs:
   - name: detail
@@ -5161,9 +5169,10 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
             resources={
                 "books": {
                     "report": {
-                        "kind": "xlsx_memory",
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
-                        "export_xlsx": {"path": str(out_root)},
+                        "xlsx_memory": {
+                            "budget": {"max_sheets": 8, "max_total_cells": 1000},
+                            "export_xlsx": {"path": str(out_root)},
+                        },
                         "write_defaults": {"mode": "append"},
                     }
                 }
@@ -5265,8 +5274,7 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
             resources={
                 "books": {
                     "report": {
-                        "kind": "xlsx_file",
-                        "path": str(out_root),
+                        "xlsx_file": {"path": str(out_root)},
                         "write_defaults": {"mode": "append"},
                     }
                 }
@@ -5380,8 +5388,7 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
             resources={
                 "books": {
                     "report": {
-                        "kind": "xlsx_file",
-                        "path": str(out_root),
+                        "xlsx_file": {"path": str(out_root)},
                         "write_defaults": {"mode": "append", "header_policy": str(header_policy)},
                     }
                 }
@@ -5467,8 +5474,7 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
             resources={
                 "books": {
                     "report": {
-                        "kind": "xlsx_file",
-                        "path": str(out_root),
+                        "xlsx_file": {"path": str(out_root)},
                         "write_defaults": {"mode": "append", "header_policy": "once", "on_mismatch": str(on_mismatch)},
                     }
                 }
@@ -5517,7 +5523,7 @@ def test_workflow_shared_resources_discard_on_failure(tmp_path: Path) -> None:
     out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root)}}},
+        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}}}},
         runs=[
             {"id": "ok", "demand": "ok.yaml"},
             {"id": "bad", "demand": "bad.yaml"},
@@ -5570,8 +5576,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_file",
-                    "path": str(out_root_err),
+                    "xlsx_file": {"path": str(out_root_err)},
                     "write_defaults": {"mode": "sheet", "on_conflict": "error"},
                 }
             }
@@ -5595,8 +5600,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_file",
-                    "path": str(out_root_over),
+                    "xlsx_file": {"path": str(out_root_over)},
                     "write_defaults": {"mode": "sheet", "on_conflict": "overwrite"},
                 }
             }
@@ -5621,8 +5625,7 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_file",
-                    "path": str(out_root_skip),
+                    "xlsx_file": {"path": str(out_root_skip)},
                     "write_defaults": {"mode": "sheet", "on_conflict": "skip"},
                 }
             }
@@ -5659,8 +5662,7 @@ def test_workflow_resources_rejects_write_lock_for_xlsx_file(tmp_path: Path) -> 
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_file",
-                    "path": str(out_root),
+                    "xlsx_file": {"path": str(out_root)},
                     "write_lock": True,
                     "write_defaults": {"mode": "sheet"},
                 }
@@ -5695,7 +5697,7 @@ outputs:
 resources:
   files:
     detail_csv:
-      kind: csv_file
+      csv_file: {}
 """
         ).lstrip(),
     )
@@ -5726,7 +5728,7 @@ def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_a
     out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"kind": "xlsx_file", "path": str(out_root), "write_defaults": {"mode": "sheet"}}}},
+        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}, "write_defaults": {"mode": "sheet"}}}},
         runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -6199,8 +6201,7 @@ def test_workflow_shared_book_commit_failure_raises_workflow_config_error(tmp_pa
         resources={
             "books": {
                 "report": {
-                    "kind": "xlsx_file",
-                    "path": str(workbook_dir),
+                    "xlsx_file": {"path": str(workbook_dir)},
                     "write_lock": True,
                     "write_defaults": {"mode": "sheet"},
                 }

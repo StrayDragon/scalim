@@ -64,8 +64,8 @@ outputs:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {$init_var: out_root}
+      csv_file:
+        path: {$init_var: out_root}
 ```
 
 运行期策略提示:
@@ -88,7 +88,7 @@ resources:
   - `relation: {steps: [...]}` (内联)
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
-- 初始化变量用 `init_vars` 注入,并在 `main_source.params` / `sources.<id>.params` / `resources.files.*.path` / `resources.books.*.(path|export_xlsx.path)` 中用 `{$init_var: <name>}` 指令节点引用(对象节点;编译期解析一次;不做子串插值)
+- 初始化变量用 `init_vars` 注入,并在 `main_source.params` / `sources.<id>.params` / `resources.files.*.csv_file.path` / `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path` 中用 `{$init_var: <name>}` 指令节点引用(对象节点;编译期解析一次;不做子串插值)
 - `outputs` 是 **有序列表**(顺序决定 primary 输出); 每个 output 必填唯一 `name`,可用 `from` 复用字段集合与 `to/write` 编排
 - `outputs.*.fields` 是字段选择列表;推荐优先用 `field_id` 字符串以保持稳定与可维护性(允许的形态以 schema 为准)
 - `field_id` 必须全局唯一(不再依赖输出层做消歧)
@@ -96,7 +96,7 @@ resources:
 
 输出路径注入提示:
 
-- `resources.files.*.path: {$init_var: ...}` / `resources.books.*.(path|export_xlsx.path)` 会将“输出 root 决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
+- `resources.files.*.csv_file.path: {$init_var: ...}` / `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path` 会将“输出 root 决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
 
 ## YAML 模板预编译(可选): `template_vars`
 
@@ -115,8 +115,8 @@ resources:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {{ out_root | default("./output") }}
+      csv_file:
+        path: {{ out_root | default("./output") }}
 
 outputs:
   - name: detail

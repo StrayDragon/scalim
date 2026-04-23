@@ -48,8 +48,8 @@ main_source:
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults: {mode: sheet}
 
 outputs:
@@ -89,8 +89,8 @@ main_source:
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults: {mode: sheet}
 
 outputs:

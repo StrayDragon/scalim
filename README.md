@@ -117,8 +117,8 @@ outputs:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./output/orders_report.csv
+      csv_file:
+        path: ./output
 ```
 
 ## 快速上手

@@ -152,8 +152,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
         header_policy: never
@@ -199,8 +199,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
         header_policy: once
@@ -231,8 +231,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
         header_policy: never
@@ -263,8 +263,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
         header_policy: once
@@ -332,8 +332,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: append
         header_policy: once
@@ -378,8 +378,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
         header_policy: once
@@ -461,8 +461,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: append
         header_policy: once

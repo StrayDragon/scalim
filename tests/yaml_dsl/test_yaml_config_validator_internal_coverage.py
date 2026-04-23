@@ -27,8 +27,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
 """,
@@ -50,8 +50,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
       write_defaults:
         mode: sheet
 """,
@@ -94,16 +94,16 @@ def test_validator_validate_resource_output_paths_covers_init_var_errors_and_con
             "resources": {
                 "files": {
                     "": {},  # continue branch
-                    "detail_csv": {"path": {"$init_var": None}},
+                    "detail_csv": {"csv_file": {"path": {"$init_var": None}}},
                 },
                 "books": {
                     "": {},  # continue branch
                     "report": {
-                        "path": {"$init_var": None},
-                        "export_xlsx": {"path": {"$init_var": None}},
+                        "xlsx_file": {"path": {"$init_var": None}},
+                        "xlsx_memory": {"export_xlsx": {"path": {"$init_var": None}}},
                     },
                     "report2": {
-                        "export_xlsx": {"path": "x.xlsx"},
+                        "xlsx_memory": {"export_xlsx": {"path": "x.xlsx"}},
                     },
                 },
             }
@@ -111,9 +111,9 @@ def test_validator_validate_resource_output_paths_covers_init_var_errors_and_con
         errors,
     )
     assert errors
-    assert any(i.path == "resources.files.detail_csv.path.$init_var" for i in errors)
-    assert any(i.path == "resources.books.report.path.$init_var" for i in errors)
-    assert any(i.path == "resources.books.report.export_xlsx.path.$init_var" for i in errors)
+    assert any(i.path == "resources.files.detail_csv.csv_file.path.$init_var" for i in errors)
+    assert any(i.path == "resources.books.report.xlsx_file.path.$init_var" for i in errors)
+    assert any(i.path == "resources.books.report.xlsx_memory.export_xlsx.path.$init_var" for i in errors)
 
 
 def test_output_target_requires_unique_effective_display_names_rejects_missing_destination_and_field_id_headers() -> None:
@@ -197,12 +197,10 @@ def test_validator_validate_resource_output_paths_reports_migration_for_xlsx_pat
             "resources": {
                 "books": {
                     "report": {
-                        "kind": "xlsx_file",
-                        "path": "report.xlsx",
+                        "xlsx_file": {"path": "report.xlsx"},
                     },
                     "mem": {
-                        "kind": "xlsx_memory",
-                        "export_xlsx": {"path": "mem.xlsx"},
+                        "xlsx_memory": {"export_xlsx": {"path": "mem.xlsx"}},
                     },
                 }
             }
@@ -210,5 +208,5 @@ def test_validator_validate_resource_output_paths_reports_migration_for_xlsx_pat
         errors,
     )
     assert errors
-    assert any(i.path == "resources.books.report.path" for i in errors)
-    assert any(i.path == "resources.books.mem.export_xlsx.path" for i in errors)
+    assert any(i.path == "resources.books.report.xlsx_file.path" for i in errors)
+    assert any(i.path == "resources.books.mem.xlsx_memory.export_xlsx.path" for i in errors)

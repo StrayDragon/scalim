@@ -11,7 +11,10 @@ from ...schema_dsl.models import (
     BOOK_EXPORT_XLSX_KEYS,
     BOOK_KEYS,
     BOOK_WRITE_DEFAULTS_KEYS,
+    BOOK_XLSX_FILE_KEYS,
+    BOOK_XLSX_MEMORY_KEYS,
     DEMAND_KEYS,
+    FILE_CSV_FILE_KEYS,
     FILE_KEYS,
     RESOURCES_KEYS,
     BookBudgetConfig,
@@ -23,7 +26,6 @@ from ...schema_dsl.models import (
     ResourcesConfig,
 )
 from ...schema_dsl.output_enums import (
-    BOOK_KINDS,
     BOOK_WRITE_ALIGN_BY_ENUM,
     BOOK_WRITE_HEADER_POLICY_ENUM,
     BOOK_WRITE_MODE_ENUM,
@@ -34,7 +36,6 @@ from ...schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
-    FILE_KINDS,
 )
 from .error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
@@ -406,55 +407,128 @@ class YamlDemandLoader(
 
         return ResourcesConfig(books=books, files=files)
 
-    def _parse_book_config(self, raw: Dict[str, Any], *, base_path: str) -> BookConfig:  # noqa: C901
-        kind = str(raw.get(BOOK_KEYS["kind"]) or "").strip()
-        if not kind:
-            msg = "{}.kind is required".format(base_path)
+    def _parse_book_config(self, raw: Dict[str, Any], *, base_path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
+        if "write_lock" in raw:
+            msg = (
+                "{}.write_lock was removed. "
+                "Migration: set xlsx_file/xlsx_memory.export_xlsx path to an output root directory "
+                "(e.g. './out'), and locate outputs via <root>/manifest/latest.json."
+            ).format(base_path)
             raise ValueError(msg)
-        if kind not in BOOK_KINDS:
-            msg = "{}.kind={!r} is invalid; expected one of: {}".format(base_path, kind, ", ".join(BOOK_KINDS))
+
+        if "kind" in raw:
+            kind = str(raw.get("kind") or "").strip()
+            if kind == "xlsx_file":
+                msg = (
+                    "{}.kind was removed. "
+                    "Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}} "
+                    "(and keep {}.write_defaults as a sibling key)."
+                ).format(base_path, base_path, base_path)
+            elif kind == "xlsx_memory":
+                msg = (
+                    "{}.kind was removed. "
+                    "Migration: use oneOf branch object: {}.xlsx_memory: {{budget?: ..., export_xlsx?: ...}} "
+                    "(and keep {}.write_defaults as a sibling key)."
+                ).format(base_path, base_path, base_path)
+            else:
+                msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{...}} or {}.xlsx_memory: {{...}}.").format(
+                    base_path, base_path, base_path
+                )
             raise ValueError(msg)
 
-        path = self._parse_path_or_init_var(raw.get(BOOK_KEYS["path"]), path="{}.path".format(base_path))
-
-        budget_cfg = None
-        budget_raw = mapping_or_none(raw.get(BOOK_KEYS["budget"]))
-        if budget_raw is not None:
-            budget_cfg = self._parse_book_budget(budget_raw, base_path="{}.budget".format(base_path))
-
-        export_cfg = None
-        export_raw = mapping_or_none(raw.get(BOOK_KEYS["export_xlsx"]))
-        if export_raw is not None:
-            export_cfg = self._parse_book_export_xlsx(export_raw, base_path="{}.export_xlsx".format(base_path))
-
-        allow_formulas = bool(raw.get(BOOK_KEYS["allow_formulas"], False))
+        allowed_keys = {BOOK_KEYS["xlsx_file"], BOOK_KEYS["xlsx_memory"], BOOK_KEYS["write_defaults"]}
+        unknown = sorted({str(k) for k in raw} - allowed_keys)
+        if unknown:
+            msg = "{} has unknown keys: {}".format(base_path, ", ".join(unknown))
+            raise ValueError(msg)
 
         write_defaults_cfg = None
-        write_defaults_raw = mapping_or_none(raw.get(BOOK_KEYS["write_defaults"]))
-        if write_defaults_raw is not None:
+        if BOOK_KEYS["write_defaults"] in raw:
+            write_defaults_raw = mapping_or_none(raw.get(BOOK_KEYS["write_defaults"]))
+            if write_defaults_raw is None:
+                msg = "{}.write_defaults must be an object".format(base_path)
+                raise TypeError(msg)
             write_defaults_cfg = self._parse_book_write_defaults(write_defaults_raw, base_path="{}.write_defaults".format(base_path))
 
-        # 语义层防御性校验(即使 `schema` 已覆盖,仍保持 `fail-fast` 便于诊断).
-        if kind == "xlsx_file":
-            if not path or (isinstance(path, str) and not path.strip()):
-                msg = "{}.path is required for kind=xlsx_file".format(base_path)
-                raise ValueError(msg)
-            if budget_cfg is not None:
-                msg = "{}.budget is not allowed for kind=xlsx_file".format(base_path)
-                raise ValueError(msg)
-            if export_cfg is not None:
-                msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(base_path)
-                raise ValueError(msg)
-        if kind == "xlsx_memory" and path is not None:
-            msg = "{}.path is not allowed for kind=xlsx_memory".format(base_path)
+        file_branch = None
+        if BOOK_KEYS["xlsx_file"] in raw:
+            file_branch = mapping_or_none(raw.get(BOOK_KEYS["xlsx_file"]))
+            if file_branch is None:
+                msg = "{}.xlsx_file must be an object".format(base_path)
+                raise TypeError(msg)
+
+        mem_branch = None
+        if BOOK_KEYS["xlsx_memory"] in raw:
+            mem_branch = mapping_or_none(raw.get(BOOK_KEYS["xlsx_memory"]))
+            if mem_branch is None:
+                msg = "{}.xlsx_memory must be an object".format(base_path)
+                raise TypeError(msg)
+
+        has_file = file_branch is not None
+        has_mem = mem_branch is not None
+        if has_file == has_mem:
+            msg = "{} must choose exactly one variant key: xlsx_file or xlsx_memory".format(base_path)
             raise ValueError(msg)
 
+        if file_branch is not None:
+            branch_path = "{}.xlsx_file".format(base_path)
+            allowed_branch_keys = {BOOK_XLSX_FILE_KEYS["path"], BOOK_XLSX_FILE_KEYS["allow_formulas"]}
+            unknown_branch = sorted({str(k) for k in file_branch} - allowed_branch_keys)
+            if unknown_branch:
+                if "write_lock" in unknown_branch:
+                    msg = (
+                        "{}.write_lock was removed. "
+                        "Migration: set path to an output root directory and locate outputs via <root>/manifest/latest.json."
+                    ).format(branch_path)
+                    raise ValueError(msg)
+                msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
+                raise ValueError(msg)
+
+            path = self._parse_path_or_init_var(
+                file_branch.get(BOOK_XLSX_FILE_KEYS["path"]),
+                path="{}.path".format(branch_path),
+            )
+            if not path or (isinstance(path, str) and not path.strip()):
+                msg = "{}.path is required".format(branch_path)
+                raise ValueError(msg)
+
+            allow_formulas = bool(file_branch.get(BOOK_XLSX_FILE_KEYS["allow_formulas"], False))
+            return BookConfig(
+                kind="xlsx_file",
+                path=path,
+                budget=None,
+                export_xlsx=None,
+                allow_formulas=allow_formulas,
+                write_defaults=write_defaults_cfg,
+            )
+
+        assert mem_branch is not None  # noqa: S101  # pragma: allow-no-cover invariant: has_mem checked above
+        branch_path = "{}.xlsx_memory".format(base_path)
+        allowed_branch_keys = {BOOK_XLSX_MEMORY_KEYS["budget"], BOOK_XLSX_MEMORY_KEYS["export_xlsx"]}
+        unknown_branch = sorted({str(k) for k in mem_branch} - allowed_branch_keys)
+        if unknown_branch:
+            if "write_lock" in unknown_branch:
+                msg = ("{}.write_lock was removed. Migration: locate outputs via <root>/manifest/latest.json.").format(branch_path)
+                raise ValueError(msg)
+            msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
+            raise ValueError(msg)
+
+        budget_cfg = None
+        budget_raw = mapping_or_none(mem_branch.get(BOOK_XLSX_MEMORY_KEYS["budget"]))
+        if budget_raw is not None:
+            budget_cfg = self._parse_book_budget(budget_raw, base_path="{}.budget".format(branch_path))
+
+        export_cfg = None
+        export_raw = mapping_or_none(mem_branch.get(BOOK_XLSX_MEMORY_KEYS["export_xlsx"]))
+        if export_raw is not None:
+            export_cfg = self._parse_book_export_xlsx(export_raw, base_path="{}.export_xlsx".format(branch_path))
+
         return BookConfig(
-            kind=kind,
-            path=path,
+            kind="xlsx_memory",
+            path=None,
             budget=budget_cfg,
             export_xlsx=export_cfg,
-            allow_formulas=allow_formulas,
+            allow_formulas=False,
             write_defaults=write_defaults_cfg,
         )
 
@@ -462,31 +536,55 @@ class YamlDemandLoader(
         if "write_lock" in raw:
             msg = (
                 "{}.write_lock was removed. "
-                "Migration: set path to an output root directory (e.g. './out'), and locate outputs via <root>/manifest/latest.json."
+                "Migration: set resources.files.<id>.csv_file.path to an output root directory "
+                "(e.g. './out'), and locate outputs via <root>/manifest/latest.json."
             ).format(base_path)
             raise ValueError(msg)
 
-        allowed_keys = {FILE_KEYS["kind"], FILE_KEYS["path"], FILE_KEYS["encoding"]}
+        if "kind" in raw:
+            kind = str(raw.get("kind") or "").strip()
+            if kind == "csv_file":
+                msg = (
+                    "{}.kind was removed. Migration: use oneOf branch object: {}.csv_file: {{path: <output_root>, encoding?: utf-8}}."
+                ).format(base_path, base_path)
+            else:
+                msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.csv_file: {{...}}.").format(base_path, base_path)
+            raise ValueError(msg)
+
+        allowed_keys = {FILE_KEYS["csv_file"]}
         unknown = sorted({str(k) for k in raw} - allowed_keys)
         if unknown:
             msg = "{} has unknown keys: {}".format(base_path, ", ".join(unknown))
             raise ValueError(msg)
 
-        kind = str(raw.get(FILE_KEYS["kind"]) or "").strip()
-        if not kind:
-            msg = "{}.kind is required".format(base_path)
-            raise ValueError(msg)
-        if kind not in FILE_KINDS:
-            msg = "{}.kind={!r} is invalid; expected one of: {}".format(base_path, kind, ", ".join(FILE_KINDS))
+        if FILE_KEYS["csv_file"] not in raw:
+            msg = "{}.csv_file is required".format(base_path)
             raise ValueError(msg)
 
-        path = self._parse_path_or_init_var(raw.get(FILE_KEYS["path"]), path="{}.path".format(base_path))
+        csv_branch = mapping_or_none(raw.get(FILE_KEYS["csv_file"]))
+        if csv_branch is None:
+            msg = "{}.csv_file must be an object".format(base_path)
+            raise TypeError(msg)
+
+        branch_path = "{}.csv_file".format(base_path)
+        allowed_branch_keys = {FILE_CSV_FILE_KEYS["path"], FILE_CSV_FILE_KEYS["encoding"]}
+        unknown_branch = sorted({str(k) for k in csv_branch} - allowed_branch_keys)
+        if unknown_branch:
+            if "write_lock" in unknown_branch:
+                msg = ("{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json").format(
+                    branch_path
+                )
+                raise ValueError(msg)
+            msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
+            raise ValueError(msg)
+
+        path = self._parse_path_or_init_var(csv_branch.get(FILE_CSV_FILE_KEYS["path"]), path="{}.path".format(branch_path))
         if not path or (isinstance(path, str) and not path.strip()):
-            msg = "{}.path is required for kind=csv_file".format(base_path)
+            msg = "{}.path is required".format(branch_path)
             raise ValueError(msg)
 
-        encoding = str(raw.get(FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
-        return FileConfig(kind=kind, path=path, encoding=encoding)
+        encoding = str(csv_branch.get(FILE_CSV_FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
+        return FileConfig(kind="csv_file", path=path, encoding=encoding)
 
     def _parse_path_or_init_var(self, raw: object, *, path: str) -> Any:
         if isinstance(raw, dict):

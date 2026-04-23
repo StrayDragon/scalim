@@ -392,7 +392,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 """
     )
 
@@ -437,7 +437,7 @@ main_source:
 sources: {}
 resources:
   books:
-    report: {kind: xlsx_file, path: ./out}
+    report: {xlsx_file: {path: ./out}}
 """
     )
 
@@ -477,7 +477,7 @@ outputs:
     fields: [order_id, amount]
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 """,
     )
 
@@ -508,8 +508,8 @@ sources: {}
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
 outputs:
   - name: detail
     to: {book: report, sheet: 明细}
@@ -547,7 +547,7 @@ outputs:
     fields: [order_id, amount]
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 """,
     )
 

@@ -28,7 +28,7 @@ main_source:
 sources: {{}}
 resources:
   files:
-    detail_csv: {{kind: csv_file, path: {output_root}}}
+    detail_csv: {{csv_file: {{path: {output_root}}}}}
 outputs:
   - name: detail
     to: {{file: detail_csv}}

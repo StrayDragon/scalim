@@ -4,12 +4,12 @@ workflow:
   resources:
     books:
       report:
-        kind: xlsx_memory
-        budget:
-          max_sheets: 8
-          max_total_cells: 200000
-        export_xlsx:
-          path: ./out
+        xlsx_memory:
+          budget:
+            max_sheets: 8
+            max_total_cells: 200000
+          export_xlsx:
+            path: ./out
         write_defaults:
           mode: sheet
           on_conflict: overwrite

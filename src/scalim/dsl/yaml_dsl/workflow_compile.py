@@ -588,20 +588,22 @@ def _book_export_path_and_options(
     init_vars: Optional[Dict[str, object]],
     path_prefix: str,
 ) -> Tuple[str, Dict[str, object]]:
+    is_override = str(path_prefix).startswith("overrides.")
     kind = str(book.kind or "").strip()
     book_options: Dict[str, object]
     if kind == "xlsx_file":
+        path_ref = "{}.path".format(path_prefix) if is_override else "{}.xlsx_file.path".format(path_prefix)
         output_root = resolve_yaml_relative_output_path(
             book.path,
             base_dir=str(base_dir),
             init_vars=init_vars,
-            path="{}.path".format(path_prefix),
+            path=str(path_ref),
         )
         if Path(str(output_root)).suffix.lower() == ".xlsx":
             msg = (
-                "{}.path now expects an output root directory, not a file path. "
+                "{} now expects an output root directory, not a file path. "
                 "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-            ).format(path_prefix)
+            ).format(path_ref)
             raise ValueError(msg)
         book_options = {
             "kind": "xlsx_file",
@@ -616,17 +618,20 @@ def _book_export_path_and_options(
         output_root = ""
         export_options = None
         if export_cfg is not None:
+            export_path_ref = (
+                "{}.export_xlsx.path".format(path_prefix) if is_override else "{}.xlsx_memory.export_xlsx.path".format(path_prefix)
+            )
             output_root = resolve_yaml_relative_output_path(
                 export_cfg.path,
                 base_dir=str(base_dir),
                 init_vars=init_vars,
-                path="{}.export_xlsx.path".format(path_prefix),
+                path=str(export_path_ref),
             )
             if Path(str(output_root)).suffix.lower() == ".xlsx":
                 msg = (
-                    "{}.export_xlsx.path now expects an output root directory, not a file path. "
+                    "{} now expects an output root directory, not a file path. "
                     "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-                ).format(path_prefix)
+                ).format(export_path_ref)
                 raise ValueError(msg)
             export_options = {
                 "allow_formulas": bool(export_cfg.allow_formulas),
@@ -640,7 +645,7 @@ def _book_export_path_and_options(
         return str(output_root), book_options
 
     msg = "Unknown book kind {!r} for book_id={!r}".format(kind, str(book_id))
-    path_ref = "{}.kind".format(path_prefix)
+    path_ref = "{}.kind".format(path_prefix) if is_override else str(path_prefix)
     err = "{} (path={})".format(msg, path_ref)
     raise ValueError(err)
 
@@ -653,24 +658,26 @@ def _file_export_path_and_options(
     init_vars: Optional[Dict[str, object]],
     path_prefix: str,
 ) -> Tuple[str, Dict[str, object]]:
+    is_override = str(path_prefix).startswith("overrides.")
     kind = str(file_cfg.kind or "").strip()
     if kind != "csv_file":
         msg = "Unknown file kind {!r} for file_id={!r}".format(kind, str(file_id))
-        path_ref = "{}.kind".format(path_prefix)
+        path_ref = "{}.kind".format(path_prefix) if is_override else str(path_prefix)
         err = "{} (path={})".format(msg, path_ref)
         raise ValueError(err)
 
+    path_ref = "{}.path".format(path_prefix) if is_override else "{}.csv_file.path".format(path_prefix)
     output_root = resolve_yaml_relative_output_path(
         file_cfg.path,
         base_dir=str(base_dir),
         init_vars=init_vars,
-        path="{}.path".format(path_prefix),
+        path=str(path_ref),
     )
     if Path(str(output_root)).suffix.lower() == ".csv":
         msg = (
-            "{}.path now expects an output root directory, not a file path. "
+            "{} now expects an output root directory, not a file path. "
             "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-        ).format(path_prefix)
+        ).format(path_ref)
         raise ValueError(msg)
     return str(output_root), {
         "kind": "csv_file",

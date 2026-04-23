@@ -40,9 +40,9 @@ fields:
 resources:
   files:
     rank_csv:
-      kind: csv_file
-      path: {$init_var: out_root_rank}
-      encoding: utf-8
+      csv_file:
+        path: {$init_var: out_root_rank}
+        encoding: utf-8
 
 outputs:
   - name: top2_by_region_category

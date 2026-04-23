@@ -26,7 +26,7 @@ def test_validator_reports_resources_files_path_suffix_csv_migration_issue() -> 
             "resources": {
                 "files": {
                     "detail_csv": {
-                        "path": "./out/detail.csv",
+                        "csv_file": {"path": "./out/detail.csv"},
                     }
                 }
             }
@@ -34,7 +34,133 @@ def test_validator_reports_resources_files_path_suffix_csv_migration_issue() -> 
         issues,
     )
     assert any("output root directory" in str(issue.message) for issue in issues)
-    assert any(str(issue.path) == "resources.files.detail_csv.path" for issue in issues)
+    assert any(str(issue.path) == "resources.files.detail_csv.csv_file.path" for issue in issues)
+
+
+def test_validator_strips_removed_resources_write_lock_fields_under_new_paths() -> None:
+    v = ConfigValidator()
+    issues = []
+    config = {
+        "resources": {
+            "files": {
+                "csv_only": {
+                    "csv_file": {"path": "./out", "write_lock": True},
+                },
+            },
+            "books": {
+                "legacy_export": {
+                    "export_xlsx": {"path": "./out", "write_lock": True},
+                },
+                "file_branch": {
+                    "xlsx_file": {"path": "./out", "write_lock": True},
+                },
+                "mem_branch": {
+                    "xlsx_memory": {"write_lock": True},
+                },
+                "mem_export": {
+                    "xlsx_memory": {"export_xlsx": {"path": "./out", "write_lock": True}},
+                },
+            },
+        }
+    }
+
+    cleaned = v._error_and_strip_removed_resources_write_lock_fields(config, issues)  # noqa: SLF001
+    paths = {str(item.path) for item in issues}
+    assert "resources.files.csv_only.csv_file.write_lock" in paths
+    assert "resources.books.legacy_export.export_xlsx.write_lock" in paths
+    assert "resources.books.file_branch.xlsx_file.write_lock" in paths
+    assert "resources.books.mem_branch.xlsx_memory.write_lock" in paths
+    assert "resources.books.mem_export.xlsx_memory.export_xlsx.write_lock" in paths
+
+    assert "write_lock" not in cleaned["resources"]["files"]["csv_only"]["csv_file"]
+    assert "write_lock" not in cleaned["resources"]["books"]["legacy_export"]["export_xlsx"]
+    assert "write_lock" not in cleaned["resources"]["books"]["file_branch"]["xlsx_file"]
+    assert "write_lock" not in cleaned["resources"]["books"]["mem_branch"]["xlsx_memory"]
+    assert "write_lock" not in cleaned["resources"]["books"]["mem_export"]["xlsx_memory"]["export_xlsx"]
+
+
+def test_validator_strips_removed_resources_write_lock_fields_when_next_cfg_already_exists_and_export_has_no_lock() -> None:
+    v = ConfigValidator()
+    issues = []
+    config = {
+        "resources": {
+            "files": {
+                "csv_both": {
+                    "write_lock": True,
+                    "csv_file": {"path": "./out", "write_lock": True},
+                },
+            },
+            "books": {
+                "file_and_root": {
+                    "write_lock": True,
+                    "xlsx_file": {"path": "./out", "write_lock": True},
+                },
+                "mem_and_root": {
+                    "write_lock": True,
+                    "xlsx_memory": {"write_lock": True},
+                },
+                "mem_export_no_lock": {
+                    "xlsx_memory": {"export_xlsx": {"path": "./out"}},
+                },
+                "mem_export_with_mem_lock": {
+                    "xlsx_memory": {"write_lock": True, "export_xlsx": {"path": "./out", "write_lock": True}},
+                },
+            },
+        }
+    }
+
+    cleaned = v._error_and_strip_removed_resources_write_lock_fields(config, issues)  # noqa: SLF001
+
+    assert "write_lock" not in cleaned["resources"]["files"]["csv_both"]
+    assert "write_lock" not in cleaned["resources"]["files"]["csv_both"]["csv_file"]
+    assert "write_lock" not in cleaned["resources"]["books"]["file_and_root"]
+    assert "write_lock" not in cleaned["resources"]["books"]["file_and_root"]["xlsx_file"]
+    assert "write_lock" not in cleaned["resources"]["books"]["mem_and_root"]
+    assert "write_lock" not in cleaned["resources"]["books"]["mem_and_root"]["xlsx_memory"]
+    assert "write_lock" not in cleaned["resources"]["books"]["mem_export_with_mem_lock"]["xlsx_memory"]
+    assert "write_lock" not in cleaned["resources"]["books"]["mem_export_with_mem_lock"]["xlsx_memory"]["export_xlsx"]
+
+
+def test_validator_reports_resources_files_and_books_kind_and_shape_migrations() -> None:
+    v = ConfigValidator()
+    issues = []
+    v._validate_resource_output_paths(  # noqa: SLF001
+        {
+            "resources": {
+                "files": {
+                    "legacy_csv": {"kind": "csv_file", "csv_file": {"path": "./out"}},
+                    "legacy_other": {"kind": "nope", "csv_file": {"path": "./out"}},
+                    "missing_csv_file": {},
+                    "csv_file_not_object": {"csv_file": []},
+                },
+                "books": {
+                    "kind_xlsx_file": {"kind": "xlsx_file", "xlsx_file": {"path": "./out"}},
+                    "kind_xlsx_memory": {"kind": "xlsx_memory", "xlsx_memory": {}},
+                    "kind_other": {"kind": "nope", "xlsx_file": {"path": "./out"}},
+                    "file_not_object": {"xlsx_file": []},
+                    "file_path_missing": {"xlsx_file": {}},
+                    "mem_not_object": {"xlsx_memory": []},
+                    "mem_export_not_object": {"xlsx_memory": {"export_xlsx": []}},
+                    "mem_export_path_missing": {"xlsx_memory": {"export_xlsx": {}}},
+                },
+            }
+        },
+        issues,
+    )
+    paths = {str(item.path) for item in issues}
+    assert "resources.files.legacy_csv.kind" in paths
+    assert "resources.files.legacy_other.kind" in paths
+    assert "resources.files.missing_csv_file" in paths
+    assert "resources.files.csv_file_not_object.csv_file" in paths
+
+    assert "resources.books.kind_xlsx_file.kind" in paths
+    assert "resources.books.kind_xlsx_memory.kind" in paths
+    assert "resources.books.kind_other.kind" in paths
+    assert "resources.books.file_not_object.xlsx_file" in paths
+    assert "resources.books.file_path_missing.xlsx_file.path" in paths
+    assert "resources.books.mem_not_object.xlsx_memory" in paths
+    assert "resources.books.mem_export_not_object.xlsx_memory.export_xlsx" in paths
+    assert "resources.books.mem_export_path_missing.xlsx_memory.export_xlsx.path" in paths
 
 
 def test_workflow_config_parse_rejects_export_xlsx_path_with_xlsx_suffix() -> None:
@@ -54,7 +180,7 @@ def test_workflow_config_parse_rejects_legacy_write_lock_and_csv_file_path() -> 
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"now expects an output root directory"):
         _ = parse_mod._parse_file_config(  # noqa: SLF001
-            {"kind": "csv_file", "path": "out.csv"},
+            {"csv_file": {"path": "out.csv"}},
             path="workflow.resources.files.detail_csv",
         )
 

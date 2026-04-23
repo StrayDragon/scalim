@@ -117,8 +117,8 @@ workflow:
   resources:
     books:
       report:
-        kind: xlsx_file
-        path: ./out.xlsx
+        xlsx_file:
+          path: ./out.xlsx
         $import: common.books.report
   runs:
     - id: r1
@@ -191,8 +191,8 @@ workflow:
   resources:
     files:
       out:
-        kind: csv_file
-        path: ./out.csv
+        csv_file:
+          path: ./out.csv
         unknown_key: 1
   runs:
     - id: r1

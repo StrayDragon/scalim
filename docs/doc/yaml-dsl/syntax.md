@@ -257,7 +257,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 |---|---|---|---|
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
-| `resources.files.<id>.path` | ✅ | ❌ | ❌ |
+| `resources.files.<id>.csv_file.path` | ✅ | ❌ | ❌ |
 
 补充:
 
@@ -276,7 +276,7 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 - `to` 描述输出目标绑定:
   - `to.file` 绑定到 `resources.files.<file_id>`
   - `to.book` / `to.sheet` 绑定到 `resources.books.<book_id>`
-- 输出路径写在 `resources.files.*.path` / `resources.books.*.(path|export_xlsx.path)`;支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
+- 输出路径写在 `resources.files.*.csv_file.path` / `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path`;支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值)
 - 明细输出使用 `fields: [field_id, ...]` 指定导出列顺序
 - `where` 是安全表达式,用于分发过滤;其依赖字段会在编译期注入 required fields
 - 派生汇总输出使用 `aggregate`(与 `fields` 互斥)
@@ -294,8 +294,8 @@ Scalim 把 loader 的调用参数统一收敛到 `params` kwargs 模板:
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./out
+      xlsx_file:
+        path: ./out
 
 _templates:
   report_to: &report_to {book: report}

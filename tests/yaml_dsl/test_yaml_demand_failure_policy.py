@@ -42,7 +42,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: detail
     to: {file: detail_csv}

@@ -47,7 +47,7 @@ main_source:
 sources: {}
 resources:
   files:
-    base_csv: {kind: csv_file, path: ./out}
+    base_csv: {csv_file: {path: ./out}}
 outputs:
   - name: base
     to: {file: base_csv}
@@ -87,8 +87,8 @@ main_source:
 sources: {}
 resources:
   files:
-    a_csv: {kind: csv_file, path: ./out_a}
-    b_csv: {kind: csv_file, path: ./out_b}
+    a_csv: {csv_file: {path: ./out_a}}
+    b_csv: {csv_file: {path: ./out_b}}
 outputs:
   - name: dup
     to: {file: a_csv}
@@ -113,7 +113,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: child
     from: missing
@@ -139,7 +139,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: a
     from: b
@@ -166,8 +166,8 @@ main_source:
 sources: {}
 resources:
   files:
-    agg_csv: {kind: csv_file, path: ./out_agg}
-    child_csv: {kind: csv_file, path: ./out_child}
+    agg_csv: {csv_file: {path: ./out_agg}}
+    child_csv: {csv_file: {path: ./out_child}}
 outputs:
   - name: base_agg
     to: {file: agg_csv}
@@ -213,7 +213,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: detail
     to: {file: detail_csv}
@@ -244,7 +244,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: by_id
     to: {file: detail_csv}
@@ -293,7 +293,7 @@ main_source:
 sources: {}
 resources:
   files:
-    detail_csv: {kind: csv_file, path: ./out}
+    detail_csv: {csv_file: {path: ./out}}
 outputs:
   - name: detail
     to: {file: detail_csv}

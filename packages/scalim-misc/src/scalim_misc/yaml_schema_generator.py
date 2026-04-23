@@ -193,7 +193,10 @@ class SchemaBuilder:
             "book_budget": self._build_definition(types_mod.BookBudgetConfig),
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
             "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
+            "book_xlsx_file": self._build_definition(types_mod.BookXlsxFileConfig),
+            "book_xlsx_memory": self._build_definition(types_mod.BookXlsxMemoryConfig),
             "book": self._build_definition(types_mod.BookConfig),
+            "file_csv_file": self._build_definition(types_mod.FileCsvFileConfig),
             "file": self._build_definition(types_mod.FileConfig),
             "resources": self._build_definition(types_mod.ResourcesConfig),
             # `c15-yaml-dsl-demand-imports-scope`: 输出相关配置不支持 `$import` (仅允许在稳定编写入口使用)。
@@ -238,7 +241,10 @@ class SchemaBuilder:
             "book_budget": self._build_definition(types_mod.BookBudgetConfig, allow_import=False),
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig, allow_import=False),
             "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig, allow_import=False),
+            "book_xlsx_file": self._build_definition(types_mod.BookXlsxFileConfig, allow_import=False),
+            "book_xlsx_memory": self._build_definition(types_mod.BookXlsxMemoryConfig, allow_import=False),
             "book": self._build_definition(types_mod.BookConfig, allow_import=False),
+            "file_csv_file": self._build_definition(types_mod.FileCsvFileConfig, allow_import=False),
             "file": self._build_definition(types_mod.FileConfig, allow_import=False),
             "resources": self._build_definition(types_mod.ResourcesConfig, allow_import=False),
         }

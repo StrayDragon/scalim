@@ -2,9 +2,8 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 from .....vendor.dataclassesx import dataclass
 from .....vendor.dataclassesx import field as dataclass_field
-from ..constants import DEFAULT_OUTPUT_ENCODING, schema_meta, schema_ref
+from ..constants import DEFAULT_OUTPUT_ENCODING, schema_meta, schema_omit, schema_ref
 from ..output_enums import (
-    BOOK_KINDS,
     BOOK_WRITE_ALIGN_BY_ENUM,
     BOOK_WRITE_HEADER_POLICY_ENUM,
     BOOK_WRITE_MODE_ENUM,
@@ -15,7 +14,6 @@ from ..output_enums import (
     DEFAULT_BOOK_WRITE_MODE,
     DEFAULT_BOOK_WRITE_ON_CONFLICT,
     DEFAULT_BOOK_WRITE_ON_MISMATCH,
-    FILE_KINDS,
 )
 
 _PATH_OR_INIT_VAR_SCHEMA = {
@@ -165,68 +163,91 @@ class BookWriteDefaultsConfig:
 
 
 @dataclass(frozen=True)
-class BookConfig:
-    SCHEMA_NAME: ClassVar[str] = "book"
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind",)
+class BookXlsxFileConfig:
+    SCHEMA_NAME: ClassVar[str] = "book_xlsx_file"
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
-        {
-            "if": {"required": ["kind"], "properties": {"kind": {"const": "xlsx_file"}}},
-            "then": {
-                "required": ["path"],
-                "properties": {
-                    "budget": {"not": {}},
-                    "export_xlsx": {"not": {}},
-                },
-            },
-        },
-        {
-            "if": {"required": ["kind"], "properties": {"kind": {"const": "xlsx_memory"}}},
-            "then": {
-                "properties": {
-                    "path": {"not": {}},
-                    "allow_formulas": {"not": {}},
-                },
-            },
-        },
-    ]
-
-    kind: str = dataclass_field(
-        default="",
-        metadata=schema_meta(
-            desc="book kind(xlsx_file/xlsx_memory)",
-            md="book kind.\n\n- `xlsx_file`: 导出为单个 `.xlsx` 文件\n- `xlsx_memory`: workflow-scope 内存工作簿(可选导出)",
-            choices=list(BOOK_KINDS),
-            examples=["xlsx_file"],
-        ),
-    )
 
     path: Any = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
-            desc="xlsx_file: 输出 root 目录(字符串或 {$init_var: <name>})",
+            desc="输出 root 目录(字符串或 {$init_var: <name>})",
         ),
-    )
-
-    budget: Optional[BookBudgetConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(desc="xlsx_memory: 可选预算配置(缺省为 unlimited)", ref="book_budget"),
-    )
-
-    export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
-        default=None,
-        metadata=schema_meta(desc="xlsx_memory: 可选导出配置", ref="book_export_xlsx"),
     )
 
     allow_formulas: bool = dataclass_field(
         default=False,
         metadata=schema_meta(
-            desc="xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-            md="xlsx_file: 允许 Excel 公式(可信输入显式 opt-out;默认 false).",
+            desc="允许 Excel 公式(可信输入显式 opt-out;默认 false)",
+            md="允许 Excel 公式(可信输入显式 opt-out;默认 false).",
             default=False,
             examples=[False],
         ),
+    )
+
+
+@dataclass(frozen=True)
+class BookXlsxMemoryConfig:
+    SCHEMA_NAME: ClassVar[str] = "book_xlsx_memory"
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+
+    budget: Optional[BookBudgetConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(desc="可选: 预算配置(缺省为 unlimited)", ref="book_budget"),
+    )
+
+    export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(desc="可选: 导出配置", ref="book_export_xlsx"),
+    )
+
+
+@dataclass(frozen=True)
+class BookConfig:
+    SCHEMA_NAME: ClassVar[str] = "book"
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
+        {
+            "anyOf": [
+                {
+                    "required": ["$import"],
+                    # 允许 `$import + override` 形态,但仍拒绝显式声明两个分支.
+                    "not": {"required": ["xlsx_file", "xlsx_memory"]},
+                },
+                {
+                    "oneOf": [
+                        {"required": ["xlsx_file"], "properties": {"xlsx_memory": {"not": {}}}},
+                        {"required": ["xlsx_memory"], "properties": {"xlsx_file": {"not": {}}}},
+                    ]
+                },
+            ]
+        },
+    ]
+
+    kind: str = dataclass_field(
+        default="",
+        metadata=schema_omit(),
+    )
+
+    path: Any = dataclass_field(
+        default=None,
+        metadata=schema_omit(),
+    )
+
+    budget: Optional[BookBudgetConfig] = dataclass_field(
+        default=None,
+        metadata=schema_omit(),
+    )
+
+    export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
+        default=None,
+        metadata=schema_omit(),
+    )
+
+    allow_formulas: bool = dataclass_field(
+        default=False,
+        metadata=schema_omit(),
     )
 
     write_defaults: Optional[BookWriteDefaultsConfig] = dataclass_field(
@@ -234,36 +255,75 @@ class BookConfig:
         metadata=schema_meta(desc="可选:默认写入语义与冲突策略", ref="book_write_defaults"),
     )
 
+    xlsx_file: Optional[BookXlsxFileConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            desc="xlsx_file: 文件导出 book 配置",
+            md="xlsx_file: 文件导出 book 配置.\n\n- 必填: `path`\n- 可选: `allow_formulas`",
+            ref="book_xlsx_file",
+        ),
+    )
+
+    xlsx_memory: Optional[BookXlsxMemoryConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            desc="xlsx_memory: 内存 book 配置(可选预算与导出)",
+            md="xlsx_memory: 内存 book 配置.\n\n- 可选: `budget`\n- 可选: `export_xlsx`",
+            ref="book_xlsx_memory",
+        ),
+    )
+
 
 @dataclass(frozen=True)
 class FileConfig:
     SCHEMA_NAME: ClassVar[str] = "file"
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind", "path")
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("csv_file",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
     kind: str = dataclass_field(
         default="",
+        metadata=schema_omit(),
+    )
+
+    path: Any = dataclass_field(
+        default=None,
+        metadata=schema_omit(),
+    )
+
+    encoding: str = dataclass_field(
+        default=DEFAULT_OUTPUT_ENCODING,
+        metadata=schema_omit(),
+    )
+
+    csv_file: Optional["FileCsvFileConfig"] = dataclass_field(
+        default=None,
         metadata=schema_meta(
-            desc="file kind(csv_file)",
-            md="file kind.\n\n- `csv_file`: 导出为单个 `.csv` 文件",
-            choices=list(FILE_KINDS),
-            examples=["csv_file"],
+            desc="csv_file: CSV 文件导出配置",
+            md="csv_file: CSV 文件导出配置.\n\n- 必填: `path`\n- 可选: `encoding`",
+            ref="file_csv_file",
         ),
     )
+
+
+@dataclass(frozen=True)
+class FileCsvFileConfig:
+    SCHEMA_NAME: ClassVar[str] = "file_csv_file"
+    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
     path: Any = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
-            desc="csv_file: 输出 root 目录(字符串或 {$init_var: <name>})",
+            desc="输出 root 目录(字符串或 {$init_var: <name>})",
         ),
     )
 
     encoding: str = dataclass_field(
         default=DEFAULT_OUTPUT_ENCODING,
         metadata=schema_meta(
-            desc="csv_file: 文件编码(默认 utf-8)",
-            md="csv_file: 文件编码(默认 `utf-8`).",
+            desc="文件编码(默认 utf-8)",
+            md="文件编码(默认 `utf-8`).",
             default=DEFAULT_OUTPUT_ENCODING,
             examples=[DEFAULT_OUTPUT_ENCODING],
         ),

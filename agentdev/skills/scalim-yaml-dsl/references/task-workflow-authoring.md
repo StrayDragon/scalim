@@ -25,9 +25,9 @@ workflow:
   resources:
     books:
       report:
-        kind: xlsx_memory
-        budget: {max_sheets: 16, max_total_cells: 2000000}
-        export_xlsx: {path: ./out}
+        xlsx_memory:
+          budget: {max_sheets: 16, max_total_cells: 2000000}
+          export_xlsx: {path: ./out}
 
   runs:
     - id: extract
@@ -68,7 +68,7 @@ workflow:
   - 读取必须在依赖闭包内(没声明依赖就不能读上游)
 - `workflow.resources.books`:
   - workflow-scope 的共享 book 资源入口(Excel 输出的目标/中间态)
-  - `kind: xlsx_file|xlsx_memory`；`xlsx_memory` 必须声明 `budget.max_sheets/max_total_cells`
+  - oneOf 分支写法: `xlsx_file` / `xlsx_memory`；对 `xlsx_memory` 分支,`budget` 为可选项(缺省时视为 unlimited)
   - Excel 输出通过 demand 的 `outputs[*].to` 绑定到 book+sheet；workbook 写入策略以 `resources.books.*.write_defaults` 为 SSOT,`outputs[*].write` 仅用于 output-local header 行为
 
 demand YAML(示意): 绑定输出到 workflow 声明的 book:
@@ -84,7 +84,7 @@ outputs:
 
 ### 读取上游 book sheet rows 作为下游 demand 的输入
 
-workflow 的 `books.kind=xlsx_memory` 是 workflow scope 的共享资源. 若下游 demand 需要读取上游写入的某个 sheet,可以用内置 loader:
+workflow 的 `books.xlsx_memory` 是 workflow scope 的共享资源. 若下游 demand 需要读取上游写入的某个 sheet,可以用内置 loader:
 
 ```yaml
 main_source:

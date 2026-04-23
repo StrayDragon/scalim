@@ -42,8 +42,8 @@ sources: {}
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: "%s"
+      csv_file:
+        path: "%s"
 
 outputs:
   - name: detail

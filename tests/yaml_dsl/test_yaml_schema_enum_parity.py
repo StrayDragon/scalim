@@ -28,32 +28,9 @@ def _enum(schema: Dict[str, Any], *path: str) -> List[str]:
 
 def test_schema_enums_match_runtime_validation_for_file_resources() -> None:
     schema = _load_schema()
-    file_kinds = _enum(schema, "definitions", "file", "properties", "kind")
     header_by_values = _enum(schema, "definitions", "output_write", "properties", "header_fields_output_by")
 
-    for kind in file_kinds:
-        _load_ok(
-            "\n".join(
-                [
-                    "name: demo",
-                    "main_source:",
-                    "  source_id: orders",
-                    "  loader: tests.fixtures.mock_loaders.mock_loader",
-                    "  fields:",
-                    "    order_id: {extract: order_id}",
-                    "sources: {}",
-                    "resources:",
-                    "  files:",
-                    "    detail_csv: {kind: %s, path: ./out}" % kind,
-                    "outputs:",
-                    "  - name: detail",
-                    "    to: {file: detail_csv}",
-                    "    write: {header_fields_output_by: field_id}",
-                    "    fields: [order_id]",
-                    "",
-                ]
-            )
-        )
+    assert "csv_file" in schema["definitions"]["file"]["properties"]
 
     for header_by in header_by_values:
         _load_ok(
@@ -68,7 +45,7 @@ def test_schema_enums_match_runtime_validation_for_file_resources() -> None:
                     "sources: {}",
                     "resources:",
                     "  files:",
-                    "    detail_csv: {kind: csv_file, path: ./out}",
+                    "    detail_csv: {csv_file: {path: ./out}}",
                     "outputs:",
                     "  - name: detail",
                     "    to: {file: detail_csv}",
@@ -97,7 +74,7 @@ def test_schema_enums_match_runtime_validation_for_books_header_fields_output_by
                     "sources: {}",
                     "resources:",
                     "  books:",
-                    "    report: {kind: xlsx_file, path: ./out}",
+                    "    report: {xlsx_file: {path: ./out}}",
                     "outputs:",
                     "  - name: detail",
                     "    to: {book: report, sheet: Detail}",
@@ -135,7 +112,7 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
                     "sources: {}",
                     "resources:",
                     "  files:",
-                    "    detail_csv: {kind: csv_file, path: ./out}",
+                    "    detail_csv: {csv_file: {path: ./out}}",
                     "outputs:",
                     "  - name: agg",
                     "    to: {file: detail_csv}",
@@ -162,7 +139,7 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
                     "sources: {}",
                     "resources:",
                     "  files:",
-                    "    detail_csv: {kind: csv_file, path: ./out}",
+                    "    detail_csv: {csv_file: {path: ./out}}",
                     "outputs:",
                     "  - name: agg",
                     "    to: {file: detail_csv}",
@@ -187,7 +164,7 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
             "sources: {}",
             "resources:",
             "  files:",
-            "    detail_csv: {kind: csv_file, path: ./out}",
+            "    detail_csv: {csv_file: {path: ./out}}",
             "outputs:",
             "  - name: agg",
             "    to: {file: detail_csv}",

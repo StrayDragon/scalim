@@ -78,8 +78,8 @@ result = run(
 resources:
   books:
     minimal_order_report:
-      kind: xlsx_file
-      path: ./output
+      xlsx_file:
+        path: ./output
 
 outputs:
   - name: detail
@@ -135,8 +135,8 @@ outputs:
 resources:
   files:
     order_report:
-      kind: csv_file
-      path: ./output
+      csv_file:
+        path: ./output
 ```
 
 ### 1.3 运行配置的方法
@@ -214,14 +214,14 @@ main_source:
     end_dt: {$init_var: end_dt}
 ```
 
-`resources.files.*.path`(CSV 输出)也支持同样的注入语法:
+`resources.files.*.csv_file.path`(CSV 输出)也支持同样的注入语法:
 
 ```yaml
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {$init_var: out_root}
+      csv_file:
+        path: {$init_var: out_root}
 
 outputs:
   - name: detail
@@ -229,14 +229,14 @@ outputs:
     fields: [order_id]
 ```
 
-Excel 输出路径注入在 `resources.books.*.path` / `resources.books.*.export_xlsx.path`:
+Excel 输出路径注入在 `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path`:
 
 ```yaml
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: {$init_var: out_root}
+      xlsx_file:
+        path: {$init_var: out_root}
 ```
 
 ```python
@@ -263,8 +263,8 @@ result = run(
 |---|---|---|---|
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
-| `resources.files.<id>.path` | ✅ | ❌ | ❌ |
-| `resources.books.<id>.path` / `resources.books.<id>.export_xlsx.path` | ✅ | ❌ | ❌ |
+| `resources.files.<id>.csv_file.path` | ✅ | ❌ | ❌ |
+| `resources.books.<id>.xlsx_file.path` / `resources.books.<id>.xlsx_memory.export_xlsx.path` | ✅ | ❌ | ❌ |
 
 ---
 
@@ -345,8 +345,8 @@ relations:
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./output
+      xlsx_file:
+        path: ./output
 
 _templates:
   report_to: &report_to {book: report}
@@ -925,8 +925,8 @@ outputs:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./output
+      csv_file:
+        path: ./output
 ```
 
 ### 3.7 可观测性(Observability)（runtime entrypoints）
@@ -1285,8 +1285,8 @@ sources:
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./output
+      xlsx_file:
+        path: ./output
 
 _templates:
   report_to: &report_to {book: report}
@@ -1451,8 +1451,8 @@ outputs:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./.tmp/output
+      csv_file:
+        path: ./.tmp/output
 ```
 
 运行提示:
@@ -1618,8 +1618,8 @@ outputs:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./.tmp/output
+      csv_file:
+        path: ./.tmp/output
 ```
 
 可观测性(可选)请通过 runtime entrypoints 装配(示例):
@@ -1756,8 +1756,8 @@ sources:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./output
+      csv_file:
+        path: ./output
 
 outputs:
   - name: detail
@@ -2038,8 +2038,8 @@ run(
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: ./output
+      csv_file:
+        path: ./output
 
 outputs:
   - name: detail
@@ -2122,8 +2122,8 @@ _ = compile(
 resources:
   books:
     report:
-      kind: xlsx_file
-      path: ./output
+      xlsx_file:
+        path: ./output
 
 outputs:
   - name: detail

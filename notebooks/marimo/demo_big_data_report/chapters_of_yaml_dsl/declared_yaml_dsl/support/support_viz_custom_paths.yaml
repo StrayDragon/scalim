@@ -30,9 +30,9 @@ main_source:
 resources:
   files:
     detail_csv:
-      kind: csv_file
-      path: {$init_var: out_path_detail}
-      encoding: utf-8
+      csv_file:
+        path: {$init_var: out_path_detail}
+        encoding: utf-8
 
 outputs:
   - name: detail
