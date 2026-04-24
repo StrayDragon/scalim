@@ -60,6 +60,16 @@
           </select>
         </label>
 
+        {#if activeRun() && !activeRun()?.eventsFile}
+          <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-[11px] text-amber-700">
+	            当前 run 未找到 <span class="font-mono">viz_events.jsonl</span>,时序图不可用.
+	            <div class="mt-1 text-amber-600/90">
+	              说明: <span class="font-mono">yaml-dsl viz compile</span> 仅导出静态产物(<span class="font-mono">viz_snapshot.json</span> /
+	              <span class="font-mono">viz_schedule_plan.json</span>),不会生成运行时事件流.
+	            </div>
+	          </div>
+	        {/if}
+
         <label class="flex flex-col gap-1 text-xs" for="event-source-select-replay">
           <span class="text-[11px] text-slate-500">事件源</span>
           <select

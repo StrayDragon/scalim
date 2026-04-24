@@ -1742,6 +1742,7 @@ const setRunSources = async (label: string, runs: RunSource[]) => {
 
 const activateRun = async (run: RunSource) => {
   state.status = "正在加载";
+  state.mode = "idle";
   state.baseEventsAll = [];
   state.traceEventsAll = [];
   state.schedulePlan = null;
@@ -1783,10 +1784,14 @@ const activateRun = async (run: RunSource) => {
 
   if (eventsText) {
     const parsed = parseJsonl(eventsText);
-    state.baseEventsAll = normalizeVizEvents(parsed);
-    applyEffectiveEvents();
-    state.mode = "replay";
-  } else {
+    if (parsed.length) {
+      state.mode = "replay";
+      state.baseEventsAll = normalizeVizEvents(parsed);
+      applyEffectiveEvents();
+    }
+  }
+  if (state.mode !== "replay") {
+    state.viewMode = "graph";
     state.events = [];
     state.eventsAll = [];
     state.baseEventsAll = [];

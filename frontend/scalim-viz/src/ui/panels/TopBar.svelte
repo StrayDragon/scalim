@@ -123,18 +123,20 @@
             >
               依赖图
             </Button>
-            <Button
-              variant={state.viewMode === "timeline" ? "default" : "ghost"}
-              size="sm"
-              title="按事件推进展示数据流转"
-              on:click={() => {
-                state.viewMode = "timeline";
-                stopPlayback();
-                setPlaybackIndex(0, true, true);
-              }}
-            >
-              时序图
-            </Button>
+            {#if state.mode !== "idle"}
+              <Button
+                variant={state.viewMode === "timeline" ? "default" : "ghost"}
+                size="sm"
+                title="按事件推进展示数据流转"
+                on:click={() => {
+                  state.viewMode = "timeline";
+                  stopPlayback();
+                  setPlaybackIndex(0, true, true);
+                }}
+              >
+                时序图
+              </Button>
+            {/if}
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
