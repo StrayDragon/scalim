@@ -15,6 +15,11 @@ Sources:
 
 ## Specs
 
+### `cli-yaml-dsl-viz-compile`
+- Title: cli-yaml-dsl-viz-compile Specification
+- Source: [spec.md](#code=openspec/specs/cli-yaml-dsl-viz-compile/spec.md)
+- Summary: TBD - created by archiving change c0-yaml-dsl-viz-compile-cli. Update Purpose after archive.
+
 ### `demand-dsl`
 - Title: demand-dsl Specification
 - Source: [spec.md](#code=openspec/specs/demand-dsl/spec.md)
