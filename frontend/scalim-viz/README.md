@@ -17,7 +17,7 @@ pnpm dev
 
 ### DevTools 快速打开(开发模式)
 
-开发模式支持通过 URL 参数自动加载回放目录/回放包(无需目录选择;路径相对仓库根目录,仅允许读取 `artifacts/scalim-viz/` 与 `.tmp/artifacts/scalim-viz/` 下的文件):
+开发模式支持通过 URL 参数自动加载回放目录/回放包(无需目录选择;路径相对仓库根目录;仅支持读取 `.json`/`.jsonl`):
 
 - Seq/Adaptive:`/?replay=.tmp/artifacts/scalim-viz/examples/demo_big_data_report/events-only/scalim-viz/run_demo_big_data_events`
   - 该样例目录内已包含 `viz_schedule_plan.json`,因此可直接在 UI 中切换到 Adaptive(计划视角)。

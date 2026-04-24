@@ -38,7 +38,7 @@ from scalim.dsl.yaml_dsl.validation_service import (
 )
 from scalim.vendor.compact.importlibx import import_module
 
-from . import yaml_dsl_authoring, yaml_dsl_lsp
+from . import yaml_dsl_authoring, yaml_dsl_lsp, yaml_dsl_viz
 
 try:
     jsonschema = import_module("jsonschema")
@@ -100,6 +100,14 @@ def register(subparsers: Any) -> None:
     )
     _add_upsert_lsp_comment_args(upsert_parser)
     upsert_parser.set_defaults(func=_run_upsert_lsp_comment)
+
+    viz_parser = yaml_subparsers.add_parser("viz", help="Viz helpers")
+    _set_help_default(viz_parser)
+    viz_subparsers = viz_parser.add_subparsers(dest="yaml_dsl_viz_command")
+
+    viz_compile_parser = viz_subparsers.add_parser("compile", help="Export static viz artifacts (snapshot + schedule)")
+    _add_viz_compile_args(viz_compile_parser)
+    viz_compile_parser.set_defaults(func=_run_viz_compile)
 
 
 def _set_help_default(parser: argparse.ArgumentParser) -> None:
@@ -212,6 +220,25 @@ def _add_upsert_lsp_comment_args(parser: argparse.ArgumentParser) -> None:
         choices=list(yaml_dsl_lsp.COMMENT_STYLE_CHOICES),
         default=yaml_dsl_lsp.DEFAULT_COMMENT_STYLE,
         help="Schema modeline 风格: all/jetbrains/redhat",
+    )
+
+
+def _add_viz_compile_args(parser: argparse.ArgumentParser) -> None:
+    _ = parser.add_argument(
+        "--type",
+        dest="viz_type",
+        type=str,
+        choices=["demand", "workflow"],
+        required=True,
+        help="入口 YAML 类型: demand/workflow",
+    )
+    _ = parser.add_argument("yaml_file", type=Path, help="入口 YAML 文件路径(demand/workflow)")
+    _ = parser.add_argument(
+        "--output-dir",
+        dest="output_dir",
+        type=Path,
+        required=True,
+        help="输出目录(demand: run dir; workflow: bundle root, will create a scalim-viz/ folder inside)",
     )
 
 
@@ -620,6 +647,64 @@ def _run_validate(args: argparse.Namespace) -> int:
         available_file_ids=workflow_file_ids,
         args=args,
     )
+
+
+def _run_viz_compile_demand(yaml_path: Path, *, output_dir: Path) -> int:
+    try:
+        snapshot_path, schedule_path = yaml_dsl_viz.compile_demand_viz(yaml_path, output_dir=output_dir)
+    except Exception as exc:  # noqa: BLE001
+        _write_line_stderr(
+            "[错误] viz compile 失败: {}: {}: {}".format(
+                str(yaml_path),
+                type(exc).__name__,
+                exc,
+            )
+        )
+        return 1
+    _write_line("OK {}".format(str(output_dir)))
+    _write_line("snapshot: {}".format(str(snapshot_path)))
+    _write_line("schedule: {}".format(str(schedule_path)))
+    return 0
+
+
+def _run_viz_compile_workflow(yaml_path: Path, *, output_dir: Path) -> int:
+    try:
+        out_paths = yaml_dsl_viz.compile_workflow_viz(yaml_path, output_dir=output_dir)
+    except Exception as exc:  # noqa: BLE001
+        _write_line_stderr(
+            "[错误] viz compile 失败: {}: {}: {}".format(
+                str(yaml_path),
+                type(exc).__name__,
+                exc,
+            )
+        )
+        return 1
+    manifest_path = out_paths.get("bundle:manifest")
+    _write_line("OK {}".format(str(output_dir)))
+    if manifest_path is not None:
+        _write_line("manifest: {}".format(str(manifest_path)))
+    return 0
+
+
+def _run_viz_compile(args: argparse.Namespace) -> int:
+    yaml_path = args.yaml_file.expanduser().resolve(strict=False)
+    output_dir = args.output_dir.expanduser().resolve(strict=False)
+    viz_type = str(getattr(args, "viz_type", "") or "").strip()
+
+    if not yaml_path.exists() or not yaml_path.is_file():
+        _write_line_stderr("[错误] YAML 文件不存在: {}".format(str(yaml_path)))
+        return 2
+    if output_dir.exists() and not output_dir.is_dir():
+        _write_line_stderr("[错误] --output-dir 必须是目录: {}".format(str(output_dir)))
+        return 2
+
+    if viz_type == "demand":
+        return _run_viz_compile_demand(yaml_path, output_dir=output_dir)
+    if viz_type == "workflow":
+        return _run_viz_compile_workflow(yaml_path, output_dir=output_dir)
+
+    _write_line_stderr("[错误] Unknown --type: {!r}".format(viz_type))
+    return 2
 
 
 def _run_lint(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912

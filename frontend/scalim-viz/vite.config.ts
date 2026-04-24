@@ -1,16 +1,16 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve, sep } from 'path';
+import { dirname, resolve } from 'path';
 import { defineConfig, type Plugin } from 'vite';
 import { fileURLToPath } from 'url';
 import { svelte, vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 import tailwindConfig from './tailwind.config';
-import { VIZ_ARTIFACTS_ROOT, VIZ_REPLAY_ROUTE } from './src/generated/project_constants';
+import { VIZ_REPLAY_ROUTE } from './src/generated/project_constants';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../..');
-const REPLAY_ALLOWED_ROOTS = [resolve(REPO_ROOT, VIZ_ARTIFACTS_ROOT), resolve(REPO_ROOT, '.tmp', VIZ_ARTIFACTS_ROOT)];
+// Dev-only file replay loader.
 
 const scalimVizReplayPlugin = (): Plugin => {
   return {
@@ -32,12 +32,6 @@ const scalimVizReplayPlugin = (): Plugin => {
 
           const cleaned = relPath.replace(/^\/+/, '');
           const abs = resolve(REPO_ROOT, cleaned);
-          const allowed = REPLAY_ALLOWED_ROOTS.some((root) => abs === root || abs.startsWith(root + sep));
-          if (!allowed) {
-            res.statusCode = 403;
-            res.end('forbidden');
-            return;
-          }
 
           if (!abs.endsWith('.json') && !abs.endsWith('.jsonl')) {
             res.statusCode = 415;

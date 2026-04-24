@@ -18,6 +18,18 @@ scalim-cli --help
 scalim-cli yaml-dsl --help
 ```
 
+## YAML DSL viz export (static)
+
+`scalim-cli yaml-dsl viz compile` exports **static** viz artifacts for `frontend/scalim-viz` replay/inspection.
+
+```bash
+# demand -> writes <dir>/viz_snapshot.json + <dir>/viz_schedule_plan.json
+scalim-cli yaml-dsl viz compile --type demand path/to/report.demand.yaml --output-dir .tmp/viz_report
+
+# workflow -> writes a scalim-viz bundle under <dir>/scalim-viz/
+scalim-cli yaml-dsl viz compile --type workflow path/to/report.workflow.yaml --output-dir .tmp/viz_bundle
+```
+
 ## YAML DSL validation layers
 
 `scalim-cli yaml-dsl` exposes two validation entrypoints with different responsibilities:
