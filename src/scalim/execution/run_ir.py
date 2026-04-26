@@ -4,6 +4,7 @@ import warnings as py_warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from .._internal.utils.loader_result import LoaderResultPolicy
 from .._internal.warningsx import ScalimExperimentalWarning
 from ..events import Event, EventType, generate_run_id
 from ..hooks import HookManager
@@ -783,16 +784,23 @@ def _run_ir_with_plan_and_managers(
     )
 
 
-def run_ir_capture_events(
+@dataclass
+class _RunIrBootstrap:
+    """`run_ir` 和 `run_ir_capture_events` 共享的预计算状态."""
+
+    run_id: str
+    plan: ExecutionPlan
+    request: ExecutionRequest
+    ctx: Dict[str, Any]
+    start_time: float
+    wall_start_time: float
+
+
+def _bootstrap_run_ir(
     demand_ir: DemandIr,
     request: ExecutionRequest,
-    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
     event_meta_defaults: Optional[Dict[str, Any]] = None,
-) -> Tuple[ExecutionResult, List[HookRecordedEvent], List[Event], Optional[VizObserver]]:
-    """运行一次 `demand IR`,但不调用用户 `hooks/observers`;改为捕获事件供上层按确定顺序回放.
-
-    主要用于工作流并发执行时实现 `capture+replay`.
-    """
+) -> _RunIrBootstrap:
     maybe_install_jsonl_logging_from_env()
     run_id = generate_run_id(prefix="run")
 
@@ -808,30 +816,52 @@ def run_ir_capture_events(
     wall_start_time = time.time()
 
     request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
-
     plan = _build_execution_plan(demand_ir, request)
-    with log_context(**ctx):
+
+    return _RunIrBootstrap(
+        run_id=str(run_id),
+        plan=plan,
+        request=request,
+        ctx=ctx,
+        start_time=start_time,
+        wall_start_time=wall_start_time,
+    )
+
+
+def run_ir_capture_events(
+    demand_ir: DemandIr,
+    request: ExecutionRequest,
+    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+    event_meta_defaults: Optional[Dict[str, Any]] = None,
+) -> Tuple[ExecutionResult, List[HookRecordedEvent], List[Event], Optional[VizObserver]]:
+    """运行一次 `demand IR`,但不调用用户 `hooks/observers`;改为捕获事件供上层按确定顺序回放.
+
+    主要用于工作流并发执行时实现 `capture+replay`.
+    """
+    boot = _bootstrap_run_ir(demand_ir, request, event_meta_defaults)
+
+    with log_context(**boot.ctx):
         replay_observer_manager, replay_hook_manager, viz_observer = _build_observer_and_hook_managers(
-            plan=plan,
-            request=request,
-            run_id=str(run_id),
+            plan=boot.plan,
+            request=boot.request,
+            run_id=boot.run_id,
             event_meta_defaults=event_meta_defaults,
         )
 
         hook_manager = HookCaptureManager(replay_hook_manager)
-        hook_manager.loader_result_policy = "summary"
+        hook_manager.loader_result_policy = LoaderResultPolicy.SUMMARY
         observer_manager = replay_observer_manager.create_capture_manager()
-        observer_manager.loader_result_policy = "summary"
+        observer_manager.loader_result_policy = LoaderResultPolicy.SUMMARY
         observer_manager.max_recorded_events = None
 
         result = _run_ir_with_plan_and_managers(
             demand_ir,
-            plan,
-            request,
+            boot.plan,
+            boot.request,
             hook_manager=hook_manager,
             observer_manager=observer_manager,
-            wall_start_time=wall_start_time,
-            start_time=start_time,
+            wall_start_time=boot.wall_start_time,
+            start_time=boot.start_time,
             engine_factory=engine_factory,
         )
         hook_events = hook_manager.drain_events()
@@ -845,38 +875,23 @@ def run_ir(
     engine_factory: Optional[Callable[..., ScalimEngine]] = None,
     event_meta_defaults: Optional[Dict[str, Any]] = None,
 ) -> ExecutionResult:
-    maybe_install_jsonl_logging_from_env()
-    run_id = generate_run_id(prefix="run")
+    boot = _bootstrap_run_ir(demand_ir, request, event_meta_defaults)
 
-    ctx: Dict[str, Any] = {"run_id": str(run_id)}
-    if demand_ir.name:
-        ctx["demand"] = str(demand_ir.name)
-    if event_meta_defaults:
-        for key in ("workflow_exec_id", "workflow_node_id", "workflow_node_decl_order", "demand_path"):
-            if key in event_meta_defaults:
-                ctx[key] = event_meta_defaults[key]
-
-    start_time = time.perf_counter()
-    wall_start_time = time.time()
-
-    request = replace(request, key_normalization=normalize_key_normalization(request.key_normalization))
-
-    plan = _build_execution_plan(demand_ir, request)
-    with log_context(**ctx):
+    with log_context(**boot.ctx):
         observer_manager, hook_manager, _viz_observer = _build_observer_and_hook_managers(
-            plan=plan,
-            request=request,
-            run_id=str(run_id),
+            plan=boot.plan,
+            request=boot.request,
+            run_id=boot.run_id,
             event_meta_defaults=event_meta_defaults,
         )
         return _run_ir_with_plan_and_managers(
             demand_ir,
-            plan,
-            request,
+            boot.plan,
+            boot.request,
             hook_manager=hook_manager,
             observer_manager=observer_manager,
-            wall_start_time=wall_start_time,
-            start_time=start_time,
+            wall_start_time=boot.wall_start_time,
+            start_time=boot.start_time,
             engine_factory=engine_factory,
         )
 

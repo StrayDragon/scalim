@@ -239,21 +239,21 @@ def test_normalize_call_by_signature_matrix(
     factory: object,
     expects_ctx: bool,
 ) -> None:
-    import scalim.spec.ir._sources as sources_module
+    import scalim.spec.ir._source_normalize as normalize_module
 
     if force_fallback:
 
         def _raise_value_error(_: object) -> object:
             raise ValueError("no signature")
 
-        monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+        monkeypatch.setattr(normalize_module.inspect, "signature", _raise_value_error)
 
     seen: dict = {}
     fn = factory(seen)
 
-    ctx = sources_module.NormalizeCallByContext(source_id="s1", kind="index_by_key", config_path="sources.s1.normalize.call_by")
+    ctx = normalize_module.NormalizeCallByContext(source_id="s1", kind="index_by_key", config_path="sources.s1.normalize.call_by")
     result: object = {}
-    returned = sources_module._call_normalize_call_by(fn, result, ctx)
+    returned = normalize_module._call_normalize_call_by(fn, result, ctx)
 
     assert returned is result
     if expects_ctx:
@@ -271,63 +271,63 @@ def test_source_normalize_step_apply_value_rejects_unknown_kind() -> None:
 
 
 def test_normalize_call_by_rejects_non_mapping_input() -> None:
-    from scalim.spec.ir._sources import _normalize_call_by
+    from scalim.spec.ir._source_normalize import normalize_call_by
 
     def identity(result: object) -> object:
         return result
 
     with pytest.raises(TypeError, match="expected Mapping input"):
-        _ = _normalize_call_by(123, source_id="s1", kind="index_by_key", call_by=identity)
+        _ = normalize_call_by(123, source_id="s1", kind="index_by_key", call_by=identity)
 
 
 def test_normalize_call_by_rejects_fn_without_args() -> None:
-    from scalim.spec.ir._sources import _normalize_call_by
+    from scalim.spec.ir._source_normalize import normalize_call_by
 
     def bad_call_by() -> object:  # type: ignore[no-untyped-def]
         return {}
 
     with pytest.raises(TypeError, match="failed to call function"):
-        _ = _normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=bad_call_by)
+        _ = normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=bad_call_by)
 
 
 def test_normalize_call_by_falls_back_when_signature_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir._sources as sources_module
+    import scalim.spec.ir._source_normalize as normalize_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
 
-    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+    monkeypatch.setattr(normalize_module.inspect, "signature", _raise_value_error)
 
     def identity(result: object) -> object:
         return result
 
-    returned = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    returned = normalize_module.normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
     assert returned == {}
 
 
 def test_normalize_call_by_fallback_supports_ctx_keyword(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir._sources as sources_module
+    import scalim.spec.ir._source_normalize as normalize_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
 
-    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+    monkeypatch.setattr(normalize_module.inspect, "signature", _raise_value_error)
 
     def identity(result: object, *, ctx: object) -> object:
         _ = ctx
         return result
 
-    returned = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    returned = normalize_module.normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
     assert returned == {}
 
 
 def test_normalize_call_by_fallback_does_not_swallow_type_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir._sources as sources_module
+    import scalim.spec.ir._source_normalize as normalize_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
 
-    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+    monkeypatch.setattr(normalize_module.inspect, "signature", _raise_value_error)
 
     def boom(result: object, ctx: object) -> object:
         _ = result
@@ -335,16 +335,16 @@ def test_normalize_call_by_fallback_does_not_swallow_type_error(monkeypatch: pyt
         raise TypeError("boom")
 
     with pytest.raises(TypeError, match="boom"):
-        _ = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=boom)
+        _ = normalize_module.normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=boom)
 
 
 def test_normalize_call_by_fallback_does_not_swallow_type_error_from_ctx_keyword_call(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir._sources as sources_module
+    import scalim.spec.ir._source_normalize as normalize_module
 
     def _raise_value_error(_: object) -> object:
         raise ValueError("no signature")
 
-    monkeypatch.setattr(sources_module.inspect, "signature", _raise_value_error)
+    monkeypatch.setattr(normalize_module.inspect, "signature", _raise_value_error)
 
     def boom_kwonly_ctx(result: object, *, ctx: object) -> object:
         _ = result
@@ -352,13 +352,13 @@ def test_normalize_call_by_fallback_does_not_swallow_type_error_from_ctx_keyword
         raise TypeError("boom")
 
     with pytest.raises(TypeError, match="boom"):
-        _ = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=boom_kwonly_ctx)
+        _ = normalize_module.normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=boom_kwonly_ctx)
 
 
 def test_normalize_call_by_works_when_positional_only_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    import scalim.spec.ir._sources as sources_module
+    import scalim.spec.ir._source_normalize as normalize_module
 
-    parameter_cls = sources_module.inspect.Parameter
+    parameter_cls = normalize_module.inspect.Parameter
     if not hasattr(parameter_cls, "POSITIONAL_ONLY"):
         pytest.skip("inspect.Parameter.POSITIONAL_ONLY not available")
 
@@ -368,28 +368,28 @@ def test_normalize_call_by_works_when_positional_only_is_unavailable(monkeypatch
         _ = ctx
         return result
 
-    returned = sources_module._normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    returned = normalize_module.normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
     assert returned == {}
 
 
 def test_normalize_call_by_accepts_varargs() -> None:
-    from scalim.spec.ir._sources import _normalize_call_by
+    from scalim.spec.ir._source_normalize import normalize_call_by
 
     def identity(*args: object) -> object:
         return args[0]
 
-    returned = _normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    returned = normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
     assert returned == {}
 
 
 def test_normalize_call_by_accepts_varargs_with_ctx_kwonly() -> None:
-    from scalim.spec.ir._sources import _normalize_call_by
+    from scalim.spec.ir._source_normalize import normalize_call_by
 
     def identity(*args: object, ctx: object) -> object:
         _ = ctx
         return args[0]
 
-    returned = _normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
+    returned = normalize_call_by({}, source_id="s1", kind="index_by_key", call_by=identity)
     assert returned == {}
 
 
@@ -462,13 +462,13 @@ def test_source_normalize_map_values_rejects_non_mapping_result() -> None:
 
 
 def test_extract_segments_with_presence_branches() -> None:
-    from scalim.spec.ir._sources import _extract_segments_with_presence
+    from scalim.spec.ir._source_normalize import extract_segments_with_presence
 
-    ok, value = _extract_segments_with_presence({"x": None}, ("x", "y"))
+    ok, value = extract_segments_with_presence({"x": None}, ("x", "y"))
     assert ok is False
     assert value is None
 
-    ok, value = _extract_segments_with_presence({"x": {}}, ("x", "missing"))
+    ok, value = extract_segments_with_presence({"x": {}}, ("x", "missing"))
     assert ok is False
     assert value is None
 
@@ -476,7 +476,7 @@ def test_extract_segments_with_presence_branches() -> None:
 def test_extract_segment_with_presence_branches() -> None:
     from types import SimpleNamespace
 
-    from scalim.spec.ir._sources import _extract_segment_with_presence
+    from scalim.spec.ir._source_normalize import _extract_segment_with_presence
 
     ok, value = _extract_segment_with_presence(SimpleNamespace(x=1), "x")
     assert ok is True

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import IO, Any, Dict, Mapping, Optional, Sequence, Union, cast
 
 from ....._internal.loggingx import get_logger, prefix
+from .....typedefs import FailurePolicy
 from ...init_var_nodes import parse_init_var_mapping_node
 from ...schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ...schema_dsl.models import (
@@ -332,7 +333,7 @@ class YamlDemandLoader(
 
         validate_unique_field_names = True
 
-        failure_policy = "all_fail"
+        failure_policy = FailurePolicy.ALL_FAIL.value
 
         include_full_error_message = False
         meta = None

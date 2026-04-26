@@ -1,5 +1,4 @@
 import logging
-import pickle
 import threading
 
 import pytest
@@ -10,7 +9,7 @@ from tests.support.testing_utils import CI_TIMEOUT_S
 _TIMEOUT_S = CI_TIMEOUT_S
 
 
-def test_preload_cache_supports_basic_mapping_protocol_and_pickle_roundtrip() -> None:
+def test_preload_cache_supports_basic_mapping_protocol() -> None:
     cache = PreloadCache()
     assert len(cache) == 0
 
@@ -33,13 +32,6 @@ def test_preload_cache_supports_basic_mapping_protocol_and_pickle_roundtrip() ->
     assert first == {1: {"value": "y"}}
     assert second == {1: {"value": "y"}}
     assert len(calls) == 1
-
-    data = pickle.dumps(cache)
-    restored = pickle.loads(data)
-    assert restored["src"] == {1: {"value": "y"}}
-
-    restored.__setstate__({"_data": [], "_signature_digests": []})  # type: ignore[attr-defined]
-    assert len(restored) == 0
 
 
 def test_preload_cache_get_or_load_returns_cached_value_inside_lock() -> None:

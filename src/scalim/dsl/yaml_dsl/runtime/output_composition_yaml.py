@@ -20,7 +20,7 @@ from ....execution.output_contracts import ExportLayout, OutputSpec
 from ....execution.run_ir import export_layout_from_demand_ir
 from ....execution.versioned_outputs import book_output_relpath, file_output_relpath, validate_version_id
 from ....spec.ir import DemandIr
-from ....typedefs import FieldValue, RowData
+from ....typedefs import FailurePolicy, FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
 from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
 from .._internal.config_parsing.security import (
@@ -1034,7 +1034,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         derived_targets=tuple(derived_targets),
         meta_sheet=meta_sheet_spec,
         audit_sheet=audit_sheet_spec,
-        failure_policy=str(config.failure_policy or "all_fail"),
+        failure_policy=str(config.failure_policy or FailurePolicy.ALL_FAIL.value),
         include_full_error_message=bool(config.include_full_error_message),
     )
 

@@ -2,19 +2,20 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
 
+from ..._internal.utils.loader_result import LoaderResultPolicy
 from ...events import Event
 from ..observer import Observer
-from .common import ScalimObserverCaptureOverflowError
+from .common import CaptureOverflowPolicy, ScalimObserverCaptureOverflowError
 
 
 class ObserverManagerCaptureMixin:
     debug_mode: bool = False
     fallback_logger_enabled: bool = False
-    loader_result_policy: str = "full"
+    loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL
     loader_result_sample_size: int = 5
     run_id: str = ""
     max_recorded_events: Optional[int] = None
-    capture_overflow_policy: str = "raise"
+    capture_overflow_policy: CaptureOverflowPolicy = CaptureOverflowPolicy.RAISE
     _lock: "threading.RLock" = threading.RLock()
     _supported_event_types: Optional[Set[str]] = None
     _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
@@ -36,7 +37,7 @@ class ObserverManagerCaptureMixin:
 
             limit = int(max_recorded_events)
             if limit <= 0:
-                if self.capture_overflow_policy == "raise":
+                if self.capture_overflow_policy == CaptureOverflowPolicy.RAISE:
                     msg = (
                         "ObserverManager capture recorded events overflow (limit=0). "
                         "Set max_recorded_events to a positive value, or set capture_overflow_policy to 'drop-oldest'/'drop-newest'."
@@ -49,9 +50,9 @@ class ObserverManagerCaptureMixin:
                 return
 
             policy = self.capture_overflow_policy
-            if policy == "drop-newest":
+            if policy == CaptureOverflowPolicy.DROP_NEWEST:
                 return
-            if policy == "drop-oldest":
+            if policy == CaptureOverflowPolicy.DROP_OLDEST:
                 _ = recorded_events.popleft()
                 recorded_events.append(event)
                 return

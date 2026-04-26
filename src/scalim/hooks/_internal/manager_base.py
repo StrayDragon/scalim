@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
+from ..._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyLike
 from ...events import Event
 from ...events._events import (
     BatchEndEvent,
@@ -51,6 +52,8 @@ class ExecutionHookLike(Protocol):
 
     def on_column_write(self, event: ColumnWriteEvent) -> None: ...
 
+    def on_pre_use_batch_size(self, decision: Any) -> None: ...
+
 
 HookTypedHandler = Callable[[Any], Any]
 HookOnEventHandler = Callable[[Event], Any]
@@ -62,8 +65,10 @@ class HookManagerLike(Protocol):
     hooks: List[ExecutionHookLike]
     debug_mode: bool
     fallback_logger_enabled: bool
-    loader_result_policy: str
+    loader_result_policy: LoaderResultPolicy
     loader_result_sample_size: int
+
+    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicy: ...
 
     @property
     def has_hooks(self) -> bool: ...

@@ -57,7 +57,7 @@ def test_run_multi_root_workbook_rejects_unknown_failure_policy(tmp_path: Path) 
         sink=None,
         runtime_bindings=case.runtime_bindings,
     )
-    with pytest.raises(ValueError, match="Unsupported failure_policy"):
+    with pytest.raises(ValueError, match="failure_policy must be one of"):
         _ = run_multi_root_workbook(output_path=str(tmp_path / "x.xlsx"), runs=(("S", case.demand, req),), failure_policy="bad")
 
 

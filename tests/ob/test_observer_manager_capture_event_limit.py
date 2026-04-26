@@ -78,6 +78,11 @@ def test_observer_manager_rejects_unknown_capture_overflow_policy() -> None:
         _ = ObserverManager(capture_overflow_policy="unknown")
 
 
+def test_observer_manager_rejects_non_str_capture_overflow_policy() -> None:
+    with pytest.raises(TypeError, match="capture_overflow_policy must be a str"):
+        _ = ObserverManager(capture_overflow_policy=1)  # type: ignore[arg-type]
+
+
 def test_observer_manager_setstate_backfills_recorded_events_when_missing() -> None:
     state = ObserverManager().__getstate__()
     state.pop("_recorded_events", None)

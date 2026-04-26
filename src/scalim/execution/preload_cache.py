@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterator, Optional
 from .._internal import loggingx
 from .._internal.utils.exceptions import clone_exception_for_reraise
 from ..typedefs import LoaderResultMapping
+from ..vendor.compact import StrEnum
 from ..vendor.compact.typing_extensionsx import override
 
 if TYPE_CHECKING:
@@ -80,12 +81,20 @@ class PreloadCacheSignatureGuardrail(object):
     - 默认关闭: 不改变既有行为.
     """
 
+    class Policy(StrEnum):
+        ERROR = "error"
+        WARN = "warn"
+
     def __init__(self, *, enabled: bool, policy: str = "error") -> None:
         self.enabled: bool = bool(enabled)
-        self.policy: str = str(policy or "").strip() or "error"
-        if self.policy not in ("error", "warn"):
+        normalized_policy = (policy or "").strip().lower() or PreloadCacheSignatureGuardrail.Policy.ERROR.value
+        if normalized_policy not in (
+            PreloadCacheSignatureGuardrail.Policy.ERROR.value,
+            PreloadCacheSignatureGuardrail.Policy.WARN.value,
+        ):
             msg = "policy must be 'error' or 'warn'"
             raise ValueError(msg)
+        self.policy: str = normalized_policy
 
     @classmethod
     def disabled(cls) -> "PreloadCacheSignatureGuardrail":
@@ -119,31 +128,6 @@ class PreloadCache(_PreloadCacheBase):
         self._global_lock: threading.Lock = threading.Lock()
         self._wait_diagnostics: PreloadCacheWaitDiagnostics = wait_diagnostics or PreloadCacheWaitDiagnostics.disabled()
         self._signature_guardrail: PreloadCacheSignatureGuardrail = signature_guardrail or PreloadCacheSignatureGuardrail.disabled()
-
-    def __getstate__(self) -> Dict[str, object]:
-        # 仅序列化数据,锁在反序列化后重建.
-        # 说明:
-        # - `adaptive` 的 `process` 后端会 `pickle` `preloaded_cache`,因此此对象必须可被 `pickle`.
-        # - 共享锁只在同一进程内有意义.
-        return {
-            "_data": self._data,
-            "_signature_digests": self._signature_digests,
-        }
-
-    def __setstate__(self, state: Dict[str, object]) -> None:
-        raw_data = state.get("_data", {})
-        if not isinstance(raw_data, dict):
-            raw_data = {}
-        self._data = raw_data  # type: ignore[assignment]
-        raw_signatures = state.get("_signature_digests", {})
-        if not isinstance(raw_signatures, dict):
-            raw_signatures = {}
-        self._signature_digests = raw_signatures  # type: ignore[assignment]
-        self._inflight = {}
-        self._locks = {}
-        self._global_lock = threading.Lock()
-        self._wait_diagnostics = PreloadCacheWaitDiagnostics.disabled()
-        self._signature_guardrail = PreloadCacheSignatureGuardrail.disabled()
 
     @override
     def __getitem__(self, key: str) -> LoaderResultMapping:

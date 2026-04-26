@@ -11,6 +11,27 @@ from scalim.dsl.yaml_dsl.workflow_types import (
 )
 
 
+def test_workflow_cache_pool_pin_validates_and_normalizes_values_cover_branches() -> None:
+    pin = WorkflowCachePoolPin(kind=" PRELOAD-FOREVER ", source_id=" s1 ")
+    assert pin.kind == "preload_forever"
+    assert pin.source_id == "s1"
+
+    with pytest.raises(TypeError, match="WorkflowCachePoolPin.kind must be a str"):
+        _ = WorkflowCachePoolPin(kind=1, source_id="s1")  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="WorkflowCachePoolPin.kind must not be empty"):
+        _ = WorkflowCachePoolPin(kind="  ", source_id="s1")
+
+    with pytest.raises(ValueError, match="WorkflowCachePoolPin.kind must be one of"):
+        _ = WorkflowCachePoolPin(kind="other", source_id="s1")
+
+    with pytest.raises(TypeError, match="WorkflowCachePoolPin.source_id must be a str"):
+        _ = WorkflowCachePoolPin(kind="preload_forever", source_id=1)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match="WorkflowCachePoolPin.source_id must not be empty"):
+        _ = WorkflowCachePoolPin(kind="preload_forever", source_id="  ")
+
+
 def test_workflow_compile_normalize_and_validate_execution_options_rejects_invalid_inputs_cover_branches() -> None:
     with pytest.raises(TypeError, match="workflow_runtime_options.execution must be a WorkflowExecutionOptions"):
         workflow_compile_mod._normalize_and_validate_workflow_execution_options(object())  # noqa: SLF001

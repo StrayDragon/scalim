@@ -138,6 +138,7 @@ exclude = [
     ".vscode",
     "__pypackages__",
     "_build",
+    ".agents/skills/**",
     "agentdev/skills/**",
     "buck-out",
     "build",

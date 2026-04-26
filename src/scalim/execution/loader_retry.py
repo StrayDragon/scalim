@@ -3,6 +3,7 @@ import time
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
 
 from ..events import EventType
+from ..vendor.compact import StrEnum
 from ..vendor.dataclassesx import dataclass, field
 
 CALLSITE_LOAD = "load"
@@ -17,6 +18,12 @@ DEFAULT_BACKOFF = "exponential"
 DEFAULT_BASE_DELAY_SECONDS = 0.2
 DEFAULT_MAX_DELAY_SECONDS = 2.0
 DEFAULT_JITTER = True
+
+
+class LoaderRetryBackoffPolicy(StrEnum):
+    FIXED = "fixed"
+    EXPONENTIAL = "exponential"
+
 
 HARD_CAP_MAX_ATTEMPTS = 5
 HARD_CAP_MAX_ELAPSED_SECONDS = 20.0
@@ -86,8 +93,8 @@ class LoaderRetryPolicy:
         return cls(enabled=False)
 
     def next_sleep_seconds(self, *, attempt_num: int) -> float:
-        backoff = str(self.backoff or "").strip().lower()
-        if backoff == "fixed":
+        backoff = (self.backoff or "").strip().lower()
+        if backoff == LoaderRetryBackoffPolicy.FIXED:
             delay = self.base_delay_seconds
         else:
             # `attempt_num` 从 1 开始;第 1 次失败使用基准延迟乘 `2**0`.
@@ -205,8 +212,8 @@ def _validate_backoff(*, backoff: Any) -> None:
     if not isinstance(backoff, str):
         msg = "LoaderRetryPolicy.backoff must be a string"
         raise TypeError(msg)
-    normalized = str(backoff or "").strip().lower()
-    if normalized not in ("fixed", "exponential"):
+    normalized = (backoff or "").strip().lower()
+    if normalized not in (LoaderRetryBackoffPolicy.FIXED, LoaderRetryBackoffPolicy.EXPONENTIAL):
         msg = "LoaderRetryPolicy.backoff must be 'fixed' or 'exponential'"
         raise ValueError(msg)
 

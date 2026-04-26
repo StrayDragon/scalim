@@ -137,6 +137,17 @@ def test_excel_workbook_sink_close_twice_and_rejects_new_sheet(monkeypatch, tmp_
         _ = wb.create_sheet_row_sink("Sheet2", field_names=["id"])
 
 
+def test_excel_workbook_sink_context_manager_closes_and_rejects_new_sheet(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(excel_mod, "Workbook", _FakeWorkbook)
+
+    output_path = tmp_path / "ctx.xlsx"
+    with excel_mod.ExcelWorkbookSink(str(output_path)) as wb:
+        _ = wb.create_sheet_row_sink("Sheet1", field_names=["id"])
+
+    with pytest.raises(RuntimeError, match="ExcelWorkbookSink is closed"):
+        _ = wb.create_sheet_row_sink("Sheet2", field_names=["id"])
+
+
 def test_column_excel_sink_write_columns_and_batch(tmp_path: Path) -> None:
     output_path = tmp_path / "cols.xlsx"
     sink = excel_mod.ColumnExcelSink(str(output_path), ["id", "name"])

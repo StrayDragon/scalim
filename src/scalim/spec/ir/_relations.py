@@ -1,12 +1,21 @@
 from collections import deque
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
 
+from ...exceptions import ScalimError
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 from ._source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
 from .aliases import LookupKeySpec
 from .binding import BindingIr
 from .lookup_casts import LookupCastSpecIr
+
+
+class ScalimRelationInferenceError(ScalimError, ValueError):
+    """关联路径推断失败时抛出.
+
+    同时继承 `ScalimError` 和 `ValueError`,使调用方既可按 `ScalimError`
+    统一捕获框架异常,也可按 `ValueError` 做更细粒度的处理.
+    """
 
 
 @dataclass(frozen=True)
@@ -168,7 +177,7 @@ class RelationIr:
         # 使用广度优先搜索查找路径
         if from_source.source_id not in adjacency:
             msg = f"起始数据源 {from_source.source_id!r} 不在关联关系中"
-            raise ValueError(msg)
+            raise ScalimRelationInferenceError(msg)
 
         queue: "deque[Tuple[SourceRefIrBase, List[Tuple[str, SourceRefIrBase, str]]]]" = deque([(from_source, [])])
         visited: Set[str] = {from_source.source_id}
@@ -188,7 +197,7 @@ class RelationIr:
                     queue.append((next_source, new_path))
 
         msg = f"无法从 {from_source.source_id!r} 到达 {to_source.source_id!r}"
-        raise ValueError(msg)
+        raise ScalimRelationInferenceError(msg)
 
     def infer_multi_field_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "Tuple[LookupStepIr, ...]":
         """

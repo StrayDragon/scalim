@@ -13,12 +13,13 @@ from tests.fixtures.planning_fixtures import make_main_source, make_source
 
 def test_build_dependency_graph_includes_unknown_field() -> None:
     main_source = make_main_source("orders")
-    fields = [
+    fields: list = [
         FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True),
         FieldIr(field_id="amount", name="金额", source=main_source),
     ]
+    unknown_field = FieldIr(field_id="unknown", name="unknown", source=main_source)
+    fields.append(unknown_field)
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=main_source)
-    demand.fields["unknown"] = object()  # type: ignore[assignment]
 
     dep_graph = build_dependency_graph(demand=demand, resolver=LookupStepsResolver())
     assert "unknown" in dep_graph.nodes()
@@ -100,11 +101,6 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
 
     main_source = make_main_source("orders")
     source = make_source("dummy", key_field="id")
-    demand = DemandIr.from_irs(
-        sources=[source],
-        fields=[FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True)],
-        main_source=main_source,
-    )
 
     derived = DerivedFieldIr(
         field_id="derived",
@@ -116,7 +112,11 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
             field_names=("order_id",),
         ),
     )
-    demand.fields["derived"] = derived
+    demand = DemandIr.from_irs(
+        sources=[source],
+        fields=[FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True), derived],
+        main_source=main_source,
+    )
 
     # 1) not FieldIr -> skipped
     ops = build_plan_operators(
@@ -136,10 +136,14 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
         source=source,
         relation=main_source["order_id"].join(source["id"]),
     )
-    demand.fields["ref"] = relation_field
-    object.__setattr__(demand, "main_source", None)
+    demand_with_ref = DemandIr.from_irs(
+        sources=[source],
+        fields=[FieldIr(field_id="order_id", name="订単ID", source=main_source, is_primary=True), derived, relation_field],
+        main_source=main_source,
+    )
+    object.__setattr__(demand_with_ref, "main_source", None)
     ops = build_plan_operators(
-        demand=demand,
+        demand=demand_with_ref,
         resolver=LookupStepsResolver(),
         required_fields=set(),
         field_order=(),
@@ -149,10 +153,14 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     assert ops == ()
 
     # 3) no inferred steps -> skipped
-    object.__setattr__(demand, "main_source", main_source)
+    demand_with_ref = DemandIr.from_irs(
+        sources=[source],
+        fields=[FieldIr(field_id="order_id", name="訂単ID", source=main_source, is_primary=True), derived, relation_field],
+        main_source=main_source,
+    )
     resolver = LookupStepsResolver(infer_lookup_steps_fn=_no_steps)
     ops = build_plan_operators(
-        demand=demand,
+        demand=demand_with_ref,
         resolver=resolver,
         required_fields=set(),
         field_order=(),
@@ -172,9 +180,13 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
         source=_FakeSource("dummy"),
         relation=main_source["order_id"].join(source["id"]),
     )
-    demand.fields["fake_ref"] = fake_relation_field
+    demand_with_fake = DemandIr.from_irs(
+        sources=[source],
+        fields=[FieldIr(field_id="order_id", name="訂単ID", source=main_source, is_primary=True), derived, fake_relation_field],
+        main_source=main_source,
+    )
     ops = build_plan_operators(
-        demand=demand,
+        demand=demand_with_fake,
         resolver=LookupStepsResolver(),
         required_fields=set(),
         field_order=(),

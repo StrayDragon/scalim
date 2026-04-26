@@ -11,7 +11,7 @@ from scalim.events._events import (
     LoaderCallEvent,
     LoaderSlimEvent,
 )
-from scalim.hooks import HOOK_RAISED_EXCEPTION_WARNING, BaseHook, HookManager
+from scalim.hooks import HOOK_RAISED_EXCEPTION_WARNING, BaseHook, HookManager, IExecutionHook
 from scalim.ob.observer import EventDispatchObserver, Observer
 from scalim.ob.manager import ObserverManager
 from scalim.ob.presets.logs import (
@@ -231,9 +231,27 @@ def test_hook_manager_unregister_and_clear() -> None:
     assert hook_manager.hooks == []
 
 
+def test_base_hook_pre_use_batch_size_noops() -> None:
+    hook = BaseHook()
+    decision = {"batch_size": 1}
+
+    hook.on_pre_use_batch_size(decision)
+    IExecutionHook.on_pre_use_batch_size(hook, decision)
+
+
 def test_hook_manager_loader_result_policy_invalid() -> None:
     with pytest.raises(ValueError):
         HookManager(loader_result_policy="bad")
+
+
+def test_hook_manager_loader_result_policy_rejects_non_str() -> None:
+    with pytest.raises(TypeError, match=r"loader_result_policy must be a str"):
+        HookManager(loader_result_policy=123)  # type: ignore[arg-type]
+
+
+def test_hook_manager_loader_result_policy_whitespace_is_invalid() -> None:
+    with pytest.raises(ValueError, match=r"loader_result_policy must not be empty"):
+        HookManager(loader_result_policy="   ")
 
 
 def test_hook_manager_loader_result_policy_summary_and_none() -> None:

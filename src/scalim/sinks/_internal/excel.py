@@ -391,6 +391,12 @@ class ExcelWorkbookSink:
 
         self._closed = True
 
+    def __enter__(self) -> "Self":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
+
 
 class ColumnExcelSink(IColumnSink):
     """列式 `Excel` 写入器:用于生产环境的高性能列式写入(FR023).

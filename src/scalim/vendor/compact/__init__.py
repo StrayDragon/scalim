@@ -2,7 +2,7 @@ import sys
 from enum import Enum
 from typing import List
 
-from .typing_extensionsx import Self
+from .typing_extensionsx import Self, override
 
 if sys.version_info >= (3, 11):
     from enum import StrEnum  # pragma: no cover  # pyright: ignore[reportUnreachable]
@@ -17,6 +17,11 @@ else:
         """
         成员也是(且必须是)字符串的枚举.
         """
+
+        @override
+        def __str__(self) -> str:
+            # 对齐 `Python 3.11+` 的 `enum.StrEnum` 行为: `str(member)` 返回 `value` 而不是 `EnumClass.MEMBER`.
+            return self.value
 
         def __new__(cls, *values: str) -> Self:
             "参数 `values` 必须已经是 `str` 类型"

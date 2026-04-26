@@ -151,13 +151,18 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             return
 
         payload: Any = result
-        if manager.loader_result_policy != "full":
-            if manager.loader_result_policy == "none":
-                payload = None
-            elif manager.loader_result_policy == "summary":
-                payload = self._summarize_result(result)
-            elif manager.loader_result_policy == "sample":
-                payload = self._sample_result(result)
+        policy = manager.loader_result_policy
+        if policy not in ("full", "none", "summary", "sample"):
+            policy = self._normalize_loader_result_policy(policy)
+            manager.loader_result_policy = policy
+        if policy == "none":
+            payload = None
+        elif policy == "summary":
+            payload = self._summarize_result(result)
+        elif policy == "sample":
+            payload = self._sample_result(result)
+        else:
+            payload = result
         event = LoaderCallEvent(
             loader_name=loader_name,
             params=params,

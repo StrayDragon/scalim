@@ -2,11 +2,12 @@
 # pragma: allow-c901-file plan: c60
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
-from ....._internal.type_narrowing import as_list, as_mapping
-from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import asdict, dataclass
+
+if TYPE_CHECKING:
+    from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.dataclassesx import field as dataclass_field
 from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ...schema_dsl.models import (
@@ -24,12 +25,11 @@ from .errors import ScalimConfigValidationError
 from .imports import contains_import_syntax
 from .models import FieldDefIndex, RawDemand, collect_field_defs, ensure_mapping
 from .security import SecureComputeEngine, build_compute_engine
-from .unknown_fields import find_unknown_fields
+from .validator_migrations import ValidatorMigrationsMixin
+from .validator_unknown_fields import ValidatorUnknownFieldsMixin
 from .validators.fields import ValidatorFieldsMixin
 from .validators.issues import (
     MAX_VALIDATION_ERROR_LINES,
-    VALIDATION_SEVERITY_ERROR,
-    VALIDATION_SEVERITY_WARNING,
     ValidationIssue,
     ValidationReport,
 )
@@ -43,15 +43,15 @@ from .yaml_load import (
 __all__ = ()
 
 
-def _is_list(value: object) -> TypeGuard[List[object]]:
+def _is_list(value: object) -> "TypeGuard[List[object]]":
     return isinstance(value, list)
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: object) -> "TypeGuard[Dict[object, object]]":
     return isinstance(value, dict)
 
 
-class ConfigValidator(ValidatorFieldsMixin):
+class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, ValidatorFieldsMixin):
     _schema_path: str
     _schema: Optional[Dict[str, Any]]
     _compute_engine: Optional[SecureComputeEngine]
@@ -76,453 +76,6 @@ class ConfigValidator(ValidatorFieldsMixin):
         if self._max_validation_error_lines < 1:
             msg = "max_validation_error_lines must be >= 1"
             raise ValueError(msg)
-
-    def _warn_and_strip_legacy_observability(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
-        if "observability" not in config:
-            return config
-
-        msg = (
-            "Legacy YAML key 'observability' is no longer supported and will be ignored. "
-            "Hint: configure observability via Python runtime entrypoints: "
-            "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            "runtime=DemandRunRuntimeOptions(components=[Observer()/Hook()]), "
-            "outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(...))), "
-            "...))."
-        )
-        issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="observability"))
-
-        cleaned = dict(config)
-        cleaned.pop("observability", None)
-        return cleaned
-
-    @staticmethod
-    def _append_removed_runtime_policy_error(issues: List["ValidationIssue"], *, path: str, msg: str) -> None:
-        issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_ERROR, message=msg, path=path))
-
-    def _error_and_strip_removed_demand_runtime_policy_fields(
-        self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        cleaned = dict(config)
-        cleaned = self._strip_removed_demand_runtime_policy_top_level(cleaned, issues)
-        cleaned = self._strip_removed_demand_runtime_policy_main_source_retry(cleaned, issues)
-        return self._strip_removed_demand_runtime_policy_sources_retry(cleaned, issues)
-
-    def _error_and_strip_removed_output_extras_fields(
-        self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        cleaned = dict(config)
-
-        meta_msg = "YAML key 'meta' was moved out of YAML mainline (output extras boundary). "
-        meta_msg = (
-            meta_msg
-            + "Hint: configure meta sheet via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "outputs=DemandRunOutputOptions(overrides=RunOverrides("
-            + "output_extras=OutputExtrasOverride(meta=True))), ...))."
-        )
-
-        audit_msg = "YAML key 'audit' was moved out of YAML mainline (output extras boundary). "
-        audit_msg = (
-            audit_msg
-            + "Hint: configure audit sheet via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "outputs=DemandRunOutputOptions(overrides=RunOverrides("
-            + "output_extras=OutputExtrasOverride(audit=True))), ...))."
-        )
-
-        removed: Tuple[Tuple[str, str], ...] = (
-            ("meta", meta_msg),
-            ("audit", audit_msg),
-        )
-
-        for key, msg in removed:
-            if key not in cleaned:
-                continue
-            ConfigValidator._append_removed_runtime_policy_error(issues, path=str(key), msg=msg)
-            cleaned.pop(key, None)
-
-        return cleaned
-
-    def _error_and_strip_removed_output_write_workbook_fields(
-        self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        outputs = as_list(config.get("outputs"), path="outputs")
-        if not outputs:
-            return config
-
-        next_config: Optional[Dict[str, Any]] = None
-        for idx, out_raw in enumerate(outputs):
-            out = as_mapping(out_raw, path="outputs.{}".format(int(idx)))
-            if out is None:
-                continue
-
-            write_raw = out.get("write")
-            write_cfg = as_mapping(write_raw, path="outputs.{}.write".format(int(idx)))
-            if write_cfg is None:
-                continue
-
-            removed: Tuple[str, ...] = (
-                "mode",
-                "align_by",
-                "header_policy",
-                "on_mismatch",
-                "on_conflict",
-            )
-
-            removed_any = False
-            next_write = dict(write_cfg)
-            for key in removed:
-                if key not in write_cfg:
-                    continue
-                removed_any = True
-                ConfigValidator._append_removed_runtime_policy_error(
-                    issues,
-                    path="outputs.{}.write.{}".format(int(idx), str(key)),
-                    msg=(
-                        "YAML key 'outputs[*].write.{}' was moved out of output-local write config. "
-                        "Hint: configure workbook write policy via resources.books.*.write_defaults.{}."
-                    ).format(str(key), str(key)),
-                )
-                next_write.pop(key, None)
-
-            if not removed_any:
-                continue
-
-            if next_config is None:
-                next_config = dict(config)
-
-            existing_outputs = as_list(next_config.get("outputs"), path="outputs") or []
-            next_outputs = list(existing_outputs)
-            next_out = dict(out)
-            if next_write:
-                next_out["write"] = next_write
-            else:
-                next_out.pop("write", None)
-            next_outputs[int(idx)] = next_out
-            next_config["outputs"] = next_outputs
-
-        return config if next_config is None else next_config
-
-    def _error_and_strip_removed_resources_write_lock_fields(  # noqa: C901, PLR0912, PLR0915
-        self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        resources_raw: object = config.get(DEMAND_KEYS["resources"])
-        if not _is_dict(resources_raw):
-            return config
-
-        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
-        next_config: Optional[Dict[str, Any]] = None
-
-        def _ensure_next_config() -> Dict[str, Any]:
-            nonlocal next_config
-            if next_config is None:
-                next_config = dict(config)
-            return next_config
-
-        def _ensure_next_resources() -> Dict[str, Any]:
-            c = _ensure_next_config()
-            existing_resources = cast("Dict[str, Any]", c.get(DEMAND_KEYS["resources"]) or {})
-            next_resources = dict(existing_resources)
-            c[DEMAND_KEYS["resources"]] = next_resources
-            return next_resources
-
-        write_lock_hint = (
-            "write_lock was removed (lockless versioned outputs). "
-            "Migration: set resources.files.*.csv_file.path / resources.books.*.*.path to an output root directory "
-            "and locate outputs via <root>/manifest/latest.json."
-        )
-
-        files_raw: object = resources.get(RESOURCES_KEYS["files"])
-        if _is_dict(files_raw):
-            files = cast("Dict[str, Any]", files_raw)  # pragma: allow-cast yaml mapping typed narrowing
-            for raw_file_id, raw_file_cfg in files.items():
-                file_id = str(raw_file_id or "").strip()
-                if not file_id or not _is_dict(raw_file_cfg):
-                    continue
-                file_cfg = cast("Dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
-                next_file_cfg: Optional[Dict[str, Any]] = None
-
-                if "write_lock" in file_cfg:
-                    self._add_error(
-                        issues,
-                        "resources.files.{}.write_lock was removed; {}".format(file_id, write_lock_hint),
-                        path="resources.files.{}.write_lock".format(file_id),
-                    )
-                    next_file_cfg = dict(file_cfg)
-                    next_file_cfg.pop("write_lock", None)
-
-                csv_raw = file_cfg.get(FILE_KEYS["csv_file"])
-                if _is_dict(csv_raw):
-                    csv_cfg = cast("Dict[str, Any]", csv_raw)  # pragma: allow-cast yaml mapping typed narrowing
-                    if "write_lock" in csv_cfg:
-                        self._add_error(
-                            issues,
-                            "resources.files.{}.csv_file.write_lock was removed; {}".format(file_id, write_lock_hint),
-                            path="resources.files.{}.csv_file.write_lock".format(file_id),
-                        )
-                        if next_file_cfg is None:
-                            next_file_cfg = dict(file_cfg)
-                        next_csv = dict(csv_cfg)
-                        next_csv.pop("write_lock", None)
-                        next_file_cfg[FILE_KEYS["csv_file"]] = next_csv
-
-                if next_file_cfg is not None:
-                    next_resources = _ensure_next_resources()
-                    next_files = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["files"]) or files))
-                    next_files[str(raw_file_id)] = next_file_cfg
-                    next_resources[RESOURCES_KEYS["files"]] = next_files
-
-        books_raw: object = resources.get(RESOURCES_KEYS["books"])
-        if _is_dict(books_raw):
-            books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
-            for raw_book_id, raw_book_cfg in books.items():
-                book_id = str(raw_book_id or "").strip()
-                if not book_id or not _is_dict(raw_book_cfg):
-                    continue
-                book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
-                next_book_cfg: Optional[Dict[str, Any]] = None
-
-                if "write_lock" in book_cfg:
-                    self._add_error(
-                        issues,
-                        "resources.books.{}.write_lock was removed; {}".format(book_id, write_lock_hint),
-                        path="resources.books.{}.write_lock".format(book_id),
-                    )
-                    next_book_cfg = dict(book_cfg)
-                    next_book_cfg.pop("write_lock", None)
-
-                # 旧字段: `resources.books.*.export_xlsx.write_lock`
-                export_raw = book_cfg.get("export_xlsx")
-                if _is_dict(export_raw):
-                    export_cfg = cast("Dict[str, Any]", export_raw)  # pragma: allow-cast yaml mapping typed narrowing
-                    if "write_lock" in export_cfg:
-                        self._add_error(
-                            issues,
-                            "resources.books.{}.export_xlsx.write_lock was removed; {}".format(book_id, write_lock_hint),
-                            path="resources.books.{}.export_xlsx.write_lock".format(book_id),
-                        )
-                        if next_book_cfg is None:
-                            next_book_cfg = dict(book_cfg)
-                        next_export_cfg = dict(export_cfg)
-                        next_export_cfg.pop("write_lock", None)
-                        next_book_cfg["export_xlsx"] = next_export_cfg
-
-                xlsx_file_raw = book_cfg.get(BOOK_KEYS["xlsx_file"])
-                if _is_dict(xlsx_file_raw):
-                    xlsx_file_cfg = cast("Dict[str, Any]", xlsx_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
-                    if "write_lock" in xlsx_file_cfg:
-                        self._add_error(
-                            issues,
-                            "resources.books.{}.xlsx_file.write_lock was removed; {}".format(book_id, write_lock_hint),
-                            path="resources.books.{}.xlsx_file.write_lock".format(book_id),
-                        )
-                        if next_book_cfg is None:
-                            next_book_cfg = dict(book_cfg)
-                        next_xlsx_file = dict(xlsx_file_cfg)
-                        next_xlsx_file.pop("write_lock", None)
-                        next_book_cfg[BOOK_KEYS["xlsx_file"]] = next_xlsx_file
-
-                xlsx_memory_raw = book_cfg.get(BOOK_KEYS["xlsx_memory"])
-                if _is_dict(xlsx_memory_raw):
-                    xlsx_memory_cfg = cast("Dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
-                    if "write_lock" in xlsx_memory_cfg:
-                        self._add_error(
-                            issues,
-                            "resources.books.{}.xlsx_memory.write_lock was removed; {}".format(book_id, write_lock_hint),
-                            path="resources.books.{}.xlsx_memory.write_lock".format(book_id),
-                        )
-                        if next_book_cfg is None:
-                            next_book_cfg = dict(book_cfg)
-                        next_xlsx_memory = dict(xlsx_memory_cfg)
-                        next_xlsx_memory.pop("write_lock", None)
-                        next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
-
-                    export_mem_raw = xlsx_memory_cfg.get(BOOK_XLSX_MEMORY_KEYS["export_xlsx"])
-                    if _is_dict(export_mem_raw):
-                        export_mem_cfg = cast("Dict[str, Any]", export_mem_raw)  # pragma: allow-cast yaml mapping typed narrowing
-                        if "write_lock" in export_mem_cfg:
-                            self._add_error(
-                                issues,
-                                "resources.books.{}.xlsx_memory.export_xlsx.write_lock was removed; {}".format(book_id, write_lock_hint),
-                                path="resources.books.{}.xlsx_memory.export_xlsx.write_lock".format(book_id),
-                            )
-                            if next_book_cfg is None:
-                                next_book_cfg = dict(book_cfg)
-                            next_xlsx_memory = dict(cast("Dict[str, Any]", next_book_cfg.get(BOOK_KEYS["xlsx_memory"]) or xlsx_memory_cfg))
-                            next_export_mem = dict(export_mem_cfg)
-                            next_export_mem.pop("write_lock", None)
-                            next_xlsx_memory[BOOK_XLSX_MEMORY_KEYS["export_xlsx"]] = next_export_mem
-                            next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
-
-                if next_book_cfg is not None:
-                    next_resources = _ensure_next_resources()
-                    next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
-                    next_books[str(raw_book_id)] = next_book_cfg
-                    next_resources[RESOURCES_KEYS["books"]] = next_books
-
-        return config if next_config is None else next_config
-
-    @staticmethod
-    def _strip_removed_demand_runtime_policy_top_level(
-        cleaned: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        guardrails_msg = "YAML key 'guardrails' was moved out of YAML mainline (runtime policy boundary). "
-        guardrails_msg = (
-            guardrails_msg
-            + "Hint: configure guardrails via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "runtime=DemandRunRuntimeOptions(guardrails=GuardrailsPolicy(...)), ...))."
-        )
-
-        batch_size_msg = "YAML key 'batch_size' was moved out of YAML mainline (runtime policy boundary). "
-        batch_size_msg = (
-            batch_size_msg
-            + "Hint: configure batch size via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "runtime=DemandRunRuntimeOptions(batch_size=<int|None>), ...))."
-        )
-
-        demand_failure_policy_msg = "YAML key 'failure_policy' was moved out of demand YAML mainline (runtime policy boundary). "
-        demand_failure_policy_msg = (
-            demand_failure_policy_msg
-            + "Hint: configure demand output failure policy via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "runtime=DemandRunRuntimeOptions(demand_failure_policy='all_fail'|'primary_only'), ...))."
-        )
-
-        retry_msg = "YAML key 'retry' was moved out of YAML mainline (runtime policy boundary). "
-        retry_msg = (
-            retry_msg
-            + "Hint: configure loader retry via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(...)), ...))."
-        )
-
-        validate_unique_field_names_msg = (
-            "YAML key 'validate_unique_field_names' was moved out of demand YAML mainline (runtime policy boundary). "
-        )
-        validate_unique_field_names_msg = (
-            validate_unique_field_names_msg
-            + "Hint: configure demand diagnostics via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "runtime=DemandRunRuntimeOptions(demand_diagnostics=DemandDiagnosticsPolicy("
-            + "validate_unique_field_names=False)), ...))."
-        )
-
-        include_full_error_message_msg = (
-            "YAML key 'include_full_error_message' was moved out of demand YAML mainline (runtime policy boundary). "
-        )
-        include_full_error_message_msg = (
-            include_full_error_message_msg
-            + "Hint: configure demand diagnostics via runtime entrypoints: "
-            + "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-            + "runtime=DemandRunRuntimeOptions(demand_diagnostics=DemandDiagnosticsPolicy("
-            + "include_full_error_message=True)), ...))."
-        )
-
-        removed: Tuple[Tuple[str, str], ...] = (
-            (
-                "guardrails",
-                guardrails_msg,
-            ),
-            (
-                "batch_size",
-                batch_size_msg,
-            ),
-            (
-                "failure_policy",
-                demand_failure_policy_msg,
-            ),
-            (
-                "retry",
-                retry_msg,
-            ),
-            (
-                "validate_unique_field_names",
-                validate_unique_field_names_msg,
-            ),
-            (
-                "include_full_error_message",
-                include_full_error_message_msg,
-            ),
-        )
-
-        for key, msg in removed:
-            if key not in cleaned:
-                continue
-            ConfigValidator._append_removed_runtime_policy_error(issues, path=str(key), msg=msg)
-            cleaned.pop(key, None)
-
-        return cleaned
-
-    @staticmethod
-    def _strip_removed_demand_runtime_policy_main_source_retry(
-        cleaned: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        main_source = as_mapping(cleaned.get("main_source"), path="main_source")
-        if main_source is None or "retry" not in main_source:
-            return cleaned
-
-        ConfigValidator._append_removed_runtime_policy_error(
-            issues,
-            path="main_source.retry",
-            msg=(
-                "YAML key 'main_source.retry' was moved out of YAML mainline (runtime policy boundary). "
-                "Hint: configure loader retry via runtime entrypoints: "
-                "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-                "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
-            ),
-        )
-        next_main: Dict[str, Any] = dict(main_source)
-        next_main.pop("retry", None)
-        cleaned["main_source"] = next_main
-        return cleaned
-
-    @staticmethod
-    def _strip_removed_demand_runtime_policy_sources_retry(
-        cleaned: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
-        sources = as_mapping(cleaned.get("sources"), path="sources")
-        if sources is None:
-            return cleaned
-
-        next_sources: Optional[Dict[str, Any]] = None
-        for source_id, source_cfg_raw in sources.items():
-            source_cfg = as_mapping(source_cfg_raw, path="sources.{}".format(str(source_id)))
-            if source_cfg is None or "retry" not in source_cfg:
-                continue
-
-            if next_sources is None:
-                next_sources = dict(sources)
-
-            ConfigValidator._append_removed_runtime_policy_error(
-                issues,
-                path="sources.{}.retry".format(str(source_id)),
-                msg=(
-                    "YAML key 'sources.*.retry' was moved out of YAML mainline (runtime policy boundary). "
-                    "Hint: configure loader retry via runtime entrypoints: "
-                    "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-                    "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
-                ),
-            )
-            next_cfg: Dict[str, Any] = dict(source_cfg)
-            next_cfg.pop("retry", None)
-            next_sources[str(source_id)] = next_cfg
-
-        if next_sources is not None:
-            cleaned["sources"] = next_sources
-        return cleaned
 
     def validate(self, config: Dict[str, Any]) -> None:
         report = self.validate_report(config, strict_unknown_fields=True)
@@ -605,7 +158,6 @@ class ConfigValidator(ValidatorFieldsMixin):
                 continue
             out_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
 
-            # `$import` 会在编译期展开; 允许仅声明 `$import` 的形态绕过结构性约束.
             if "$import" in out_dict and set(out_dict.keys()) == {"$import"}:
                 continue
 
@@ -727,8 +279,6 @@ class ConfigValidator(ValidatorFieldsMixin):
         *,
         main_source_id: str,
     ) -> None:
-        # 注意: `jsonschema` 校验是可选项; `schema-only` 校验不应阻断 `YAML` `alias` 写法.
-        # 这里做语义校验,确保 `outputs[*].fields` 的 `object` 条目可解析为唯一 `field_id`.
         field_def_index = collect_field_defs(raw, main_source_id=main_source_id)
 
         outputs_key = DEMAND_KEYS["outputs"]
@@ -764,32 +314,6 @@ class ConfigValidator(ValidatorFieldsMixin):
                 agg_field_index=agg_field_index,
             )
 
-    def _load_schema(self) -> Dict[str, Any]:
-        if self._schema is None:
-            with Path(self._schema_path).open("r", encoding="utf-8") as f:
-                self._schema = json.load(f)
-        if self._schema is None:  # pragma: no cover  # pragma: allow-no-cover invariant: schema loaded or raised above
-            msg = "Schema failed to load"
-            raise RuntimeError(msg)
-        return self._schema
-
-    def _validate_unknown_fields(self, config: Dict[str, Any], issues: List[ValidationIssue], *, strict: bool) -> None:
-        try:
-            schema = self._load_schema()
-        except Exception:  # noqa: BLE001
-            return
-
-        severity = VALIDATION_SEVERITY_ERROR if strict else VALIDATION_SEVERITY_WARNING
-        for unknown in find_unknown_fields(config, schema):
-            issues.append(
-                ValidationIssue(
-                    severity=severity,
-                    message=unknown.message,
-                    path=unknown.path,
-                    suggestions=unknown.suggestions,
-                )
-            )
-
     def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912, PLR0915
         resources_raw = config.get(DEMAND_KEYS["resources"])
         if not isinstance(resources_raw, dict):
@@ -801,7 +325,6 @@ class ConfigValidator(ValidatorFieldsMixin):
                 file_id = str(raw_file_id or "").strip()
                 if not file_id or not isinstance(raw_file_cfg, dict):
                     continue
-                # 语义升级: `resources.files.*.csv_file.path` 应为 `output root` 目录 (旧语义常见为 `./out/detail.csv`)
                 file_cfg = cast("Dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
 
                 if "kind" in file_cfg:
@@ -1098,7 +621,7 @@ def validate_yaml_text_json(
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
     schema_path: Optional[str] = None,
 ) -> str:
-    """返回与 `YAML DSL` 编辑器的“精确校验器”兼容的 `JSON` 载荷."""
+    """返回与 `YAML DSL` 编辑器的"精确校验器"兼容的 `JSON` 载荷."""
     result = validate_yaml_text(
         yaml_text,
         strict_unknown_fields,

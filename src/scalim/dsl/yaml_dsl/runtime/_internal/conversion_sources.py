@@ -45,9 +45,27 @@ from .conversion_relations import ConfigToIRConversionRelationMixin
 
 if TYPE_CHECKING:
     from .....spec.ir import LookupStepIr
+    from .....spec.ir._source_normalize import NormalizeOnConflict, NormalizeOnEmpty, NormalizeOnMissing, NormalizeOnNone
+    from .....vendor.compact.typing_extensionsx import TypeGuard
 
 
 _SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
+
+
+def _is_normalize_on_conflict(value: str) -> "TypeGuard[NormalizeOnConflict]":
+    return value in {"error", "first", "last"}
+
+
+def _is_normalize_on_none(value: str) -> "TypeGuard[NormalizeOnNone]":
+    return value in {"raise", "skip"}
+
+
+def _is_normalize_on_empty(value: str) -> "TypeGuard[NormalizeOnEmpty]":
+    return value in {"miss", "null", "error"}
+
+
+def _is_normalize_on_missing(value: str) -> "TypeGuard[NormalizeOnMissing]":
+    return value in {"error", "null"}
 
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
@@ -276,12 +294,12 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         source_id = source_config.source_id
 
         on_conflict = str(norm.on_conflict or "error").strip() or "error"
-        if on_conflict not in {"error", "first", "last"}:
+        if not _is_normalize_on_conflict(on_conflict):
             msg = "sources.{}.normalize.on_conflict must be one of: error/first/last".format(source_id)
             raise ScalimConversionError(msg)
 
         on_none = str(norm.on_none or "raise").strip() or "raise"
-        if on_none not in {"raise", "skip"}:
+        if not _is_normalize_on_none(on_none):
             msg = "sources.{}.normalize.on_none must be one of: raise/skip".format(source_id)
             raise ScalimConversionError(msg)
 
@@ -318,7 +336,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         call_by_ref: Optional[CallableRefIr],
     ) -> SourceNormalizeIr:
         on_empty = str(norm.on_empty or "miss").strip() or "miss"
-        if on_empty not in {"miss", "null", "error"}:
+        if not _is_normalize_on_empty(on_empty):
             msg = "sources.{}.normalize.on_empty must be one of: miss/null/error".format(source_id)
             raise ScalimConversionError(msg)
         return SourceNormalizeIr(kind="take_first", on_empty=on_empty, call_by_ref=call_by_ref)
@@ -331,7 +349,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         call_by_ref: Optional[CallableRefIr],
     ) -> SourceNormalizeIr:
         on_missing = str(norm.on_missing or "error").strip() or "error"
-        if on_missing not in {"error", "null"}:
+        if not _is_normalize_on_missing(on_missing):
             msg = "sources.{}.normalize.on_missing must be one of: error/null".format(source_id)
             raise ScalimConversionError(msg)
 
@@ -371,14 +389,14 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
         if step_kind == "take_first":
             step_on_empty = str(step.on_empty or "miss").strip() or "miss"
-            if step_on_empty not in {"miss", "null", "error"}:
+            if not _is_normalize_on_empty(step_on_empty):
                 msg = "{}.on_empty must be one of: miss/null/error".format(step_path)
                 raise ScalimConversionError(msg)
             return SourceNormalizeStepIr(kind="take_first", on_empty=step_on_empty)
 
         if step_kind == "project_fields":
             step_on_missing = str(step.on_missing or "error").strip() or "error"
-            if step_on_missing not in {"error", "null"}:
+            if not _is_normalize_on_missing(step_on_missing):
                 msg = "{}.on_missing must be one of: error/null".format(step_path)
                 raise ScalimConversionError(msg)
             step_fields = self._convert_source_normalize_project_fields_rules(

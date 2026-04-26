@@ -15,7 +15,7 @@ from ._fields import (
     SupportedFieldIr,
     ValueOpIr,
 )
-from ._relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr
+from ._relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr, ScalimRelationInferenceError
 from ._sources import (
     KeyIr,
     MainSourceIr,
@@ -83,6 +83,7 @@ __all__ = (
     "PythonReferenceIr",
     "RelationIr",
     "RuntimeHandleIdIr",
+    "ScalimRelationInferenceError",
     "SourceIr",
     "SourceNormalizeIr",
     "SourceRefIr",

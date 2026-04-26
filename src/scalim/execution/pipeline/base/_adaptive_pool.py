@@ -5,7 +5,7 @@ from typing import Optional, Type
 
 from ....planning.plan import ExecutionPlan
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
-from ...adaptive.policy import ADAPTIVE_BACKEND_ASYNC, ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_THREAD
+from ...adaptive.policy import ADAPTIVE_BACKEND_THREAD
 from ...executor.runtime.runtime import ExecutionRuntime
 from ..overrides import PipelineOverrides
 
@@ -29,20 +29,13 @@ def maybe_create_adaptive_pool(
     _ = sys_module
     _ = warnings_module
     backend = policy.choose_backend(plan=plan, runtime=runtime, tuning=tuning)
-
-    if backend in (ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC):
-        # `NOTE`: 若需回加 `process`/`async` 后端,请恢复对应实现模块与测试.
-        msg = "adaptive backend '{}' 暂不支持: 当前仅支持 thread;请将 backend 改为 'thread'".format(backend)
+    if backend != ADAPTIVE_BACKEND_THREAD:
+        msg = "adaptive backend '{}' is not supported; only 'thread' is currently available".format(backend)
         raise ValueError(msg)
 
     runtime.adaptive_backend = backend
     runtime.adaptive_process_failure_mode = None
-
-    if backend == ADAPTIVE_BACKEND_THREAD:
-        executor_cls = overrides.adaptive_executor_cls or ThreadPoolExecutor
-    else:
-        msg = "Invalid adaptive backend '{}'".format(backend)
-        raise ValueError(msg)
+    executor_cls = overrides.adaptive_executor_cls or ThreadPoolExecutor
 
     executor = executor_cls(max_workers=resolved_workers)
 

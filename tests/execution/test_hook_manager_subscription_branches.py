@@ -1,5 +1,7 @@
 from collections.abc import Iterator, Set as AbstractSet
 
+import pytest
+
 from scalim.events import EventType
 from scalim.hooks import BaseHook, HookManager
 
@@ -34,21 +36,47 @@ class _CaptureLoaderCallHook(BaseHook):
         self.seen_results.append(event.result)
 
 
-def test_hook_manager_ignores_unknown_on_event_types() -> None:
+def test_hook_manager_rejects_unknown_on_event_types() -> None:
     manager = HookManager()
     hook = _CaptureOnEventHook()
     hook.event_types = _OrderedEventTypes(["unknown", EventType.PIPELINE_START])
-    manager.register(hook)
-
-    assert manager.wants_on_event("unknown") is False
-    assert manager.wants_on_event(EventType.PIPELINE_START) is True
+    with pytest.raises(ValueError, match=r"unknown event type"):
+        manager.register(hook)
 
 
-def test_hook_manager_loader_call_policy_falls_back_when_unknown() -> None:
+def test_hook_manager_loader_call_policy_rejects_unknown() -> None:
     manager = HookManager()
     hook = _CaptureLoaderCallHook()
     manager.register(hook)
 
     manager.loader_result_policy = "unknown"
+    with pytest.raises(ValueError, match=r"Unknown loader_result_policy"):
+        manager.trigger_loader_call(loader_name="x", params={}, result={"a": 1}, duration=0.0)
+
+
+def test_hook_manager_loader_call_policy_normalizes_case_and_updates_manager_state() -> None:
+    manager = HookManager()
+    hook = _CaptureLoaderCallHook()
+    manager.register(hook)
+
+    manager.loader_result_policy = "SUMMARY"
     manager.trigger_loader_call(loader_name="x", params={}, result={"a": 1}, duration=0.0)
-    assert hook.seen_results == [{"a": 1}]
+
+    assert manager.loader_result_policy == "summary"
+    assert hook.seen_results == [{"type": "dict", "size": 1}]
+
+
+def test_hook_manager_on_event_subscriptions_ignore_typed_only_event_types() -> None:
+    class _CaptureOnEvent(BaseHook):
+        def __init__(self) -> None:
+            self.seen: list[str] = []
+
+        def on_event(self, event) -> None:  # type: ignore[override]
+            self.seen.append(event.event_type)
+
+    manager = HookManager()
+    hook = _CaptureOnEvent()
+    hook.event_types = {EventType.PRE_USE_BATCH_SIZE}
+    manager.register(hook)
+
+    assert manager.wants_on_event(EventType.PRE_USE_BATCH_SIZE) is False

@@ -4,12 +4,12 @@ from typing import Deque, Dict, List, Optional, Set, Tuple, cast
 
 from ...events import Event
 from ..observer import EventDispatchObserver, Observer
-from .common import CATALOG_EVENT_TYPES, CATALOG_EVENT_TYPES_SET, validate_event_types
+from .common import CATALOG_EVENT_TYPES, CATALOG_EVENT_TYPES_SET, ObserverManagerMode, validate_event_types
 
 
 class ObserverManagerRegistryMixin:
     observers: Optional[List[Observer]] = None
-    mode: str = "process"
+    mode: ObserverManagerMode = ObserverManagerMode.PROCESS
     _has_observers: bool = False
     _supports_all: bool = False
     _supported_event_types: Optional[Set[str]] = None

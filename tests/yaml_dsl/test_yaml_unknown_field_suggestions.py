@@ -181,6 +181,34 @@ def test_validator_skips_unknown_fields_when_schema_unloadable(tmp_path) -> None
     assert not any(issue.message.startswith("Unknown field") for issue in report.issues)
 
 
+def test_validator_strict_unknown_fields_errors_when_schema_unloadable(tmp_path) -> None:
+    schema_path = tmp_path / "bad-schema.json"
+    schema_path.write_text("{ invalid json", encoding="utf-8")
+
+    config = {
+        "name": "demo",
+        "main_source": {
+            "source_id": "orders",
+            "loader": "tests.fixtures.mock_loaders.mock_loader",
+        },
+        "sources": {},
+        "fields": {
+            "profit": {
+                "compute": "1",
+                "commpute": "2",
+            }
+        },
+    }
+
+    validator = ConfigValidator(schema_path=str(schema_path))
+    report = validator.validate_report(config)
+    assert report.ok()
+
+    strict_report = validator.validate_report(config, strict_unknown_fields=True)
+    assert not strict_report.ok()
+    assert any(issue.path == "schema" and issue.message.startswith("加载 `JSON Schema`") for issue in strict_report.errors())
+
+
 def test_find_unknown_fields_schema_ref_resolution_edge_cases() -> None:
     assert (
         find_unknown_fields(

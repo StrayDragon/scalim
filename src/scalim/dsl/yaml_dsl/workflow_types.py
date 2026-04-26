@@ -97,10 +97,38 @@ class WorkflowCachePoolPreset:
     """工作流级 `cache pool` 的对外配置入口(封闭集合; 仅允许预设)."""
 
 
+_WORKFLOW_CACHE_POOL_PIN_KINDS = frozenset(("preload_forever",))
+_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL = "preload_forever"
+
+
 @dataclass(frozen=True)
 class WorkflowCachePoolPin:
     kind: str
     source_id: str
+
+    def __post_init__(self) -> None:
+        kind_raw = self.kind
+        if not isinstance(kind_raw, str):
+            msg = "WorkflowCachePoolPin.kind must be a str"
+            raise TypeError(msg)
+        normalized_kind = kind_raw.strip().lower().replace("-", "_")
+        if not normalized_kind:
+            msg = "WorkflowCachePoolPin.kind must not be empty; expected one of: {}".format(_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL)
+            raise ValueError(msg)
+        if normalized_kind not in _WORKFLOW_CACHE_POOL_PIN_KINDS:
+            msg = "WorkflowCachePoolPin.kind must be one of: {} (got {!r})".format(_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL, kind_raw)
+            raise ValueError(msg)
+        object.__setattr__(self, "kind", str(normalized_kind))
+
+        source_id_raw = self.source_id
+        if not isinstance(source_id_raw, str):
+            msg = "WorkflowCachePoolPin.source_id must be a str"
+            raise TypeError(msg)
+        normalized_source_id = str(source_id_raw).strip()
+        if not normalized_source_id:
+            msg = "WorkflowCachePoolPin.source_id must not be empty"
+            raise ValueError(msg)
+        object.__setattr__(self, "source_id", normalized_source_id)
 
 
 @dataclass(frozen=True)

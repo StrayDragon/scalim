@@ -2,9 +2,9 @@
 
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
-from ..planning.operators import PlanOperatorIr
 from ..spec.ir import SupportedFieldIr
 from ..vendor.dataclassesx import dataclass, field
+from .operators import PlanOperatorIr
 from .viz import build_viz_graph_snapshot
 from .viz_schedule import build_viz_schedule_plan
 

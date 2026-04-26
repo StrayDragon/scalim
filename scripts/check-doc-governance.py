@@ -18,7 +18,7 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="ignore")
 
 
-def _check_claude_symlink(root: Path) -> list[str]:
+def _check_claude_redirect(root: Path) -> list[str]:
     claude = root / "CLAUDE.md"
     agents = root / "AGENTS.md"
     if not claude.exists():
@@ -26,23 +26,16 @@ def _check_claude_symlink(root: Path) -> list[str]:
     if not agents.exists():
         return ["missing file: {}".format(agents)]
 
-    if not claude.is_symlink():
-        return ["`CLAUDE.md` MUST be a symlink to `AGENTS.md` (got regular file)."]
+    if claude.is_symlink():
+        # 论坛取证: CLAUDE.md 不能依赖软链接(部分平台/打包产物不生效),
+        # 因此治理规则只接受 “单行 @ 重定向” 作为 SSOT 入口.
+        return ["`CLAUDE.md` MUST be a regular file containing a single-line '@AGENTS.md' redirect (symlink is not supported)."]
 
-    try:
-        resolved = claude.resolve()
-    except Exception as exc:
-        return ["failed to resolve `CLAUDE.md` symlink: {}".format(exc)]
-
-    if resolved != agents.resolve():
-        try:
-            raw = claude.readlink()
-        except Exception:
-            raw = None
-        hint = " (readlink={!r})".format(str(raw)) if raw is not None else ""
-        return ["`CLAUDE.md` MUST point to `AGENTS.md`{}.".format(hint)]
-
-    return []
+    # 约定: 文件内容必须严格为 `@AGENTS.md`(忽略首尾空白).
+    redirect = _read_text(claude).strip()
+    if redirect == "@AGENTS.md":
+        return []
+    return ["`CLAUDE.md` MUST contain a single-line '@AGENTS.md' redirect."]
 
 
 def _check_repo_guide_single_link(root: Path) -> list[str]:
@@ -107,7 +100,7 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
 def main() -> int:
     root = _repo_root()
     errors: list[str] = []
-    errors.extend(_check_claude_symlink(root))
+    errors.extend(_check_claude_redirect(root))
     errors.extend(_check_repo_guide_single_link(root))
     errors.extend(_check_yaml_dsl_upgrades_ssot(root))
     errors.extend(check_yaml_dsl_cli_snippet_governance(root))

@@ -277,9 +277,8 @@ def test_maybe_create_adaptive_pool_rejects_pruned_backend(backend: str) -> None
             )
 
     msg = str(excinfo.value)
-    assert "暂不支持" in msg
-    assert "当前仅支持 thread" in msg
-    assert "backend 改为 'thread'" in msg
+    assert "not supported" in msg
+    assert "'thread'" in msg
 
 
 def test_adaptive_scheduler_rejects_invalid_backend() -> None:
@@ -317,7 +316,7 @@ def test_adaptive_scheduler_rejects_invalid_backend() -> None:
     ctx = BatchContext()
     ctx.set_field_value("fk1", 0, 1)
 
-    with pytest.raises(ValueError, match="Invalid adaptive backend"):
+    with pytest.raises(ValueError, match="not supported"):
         scheduler.execute_segment(
             [op_a],
             context=ctx,
@@ -379,9 +378,8 @@ def test_adaptive_scheduler_rejects_pruned_backend_selected_in_runtime(backend: 
         )
 
     msg = str(excinfo.value)
-    assert "暂不支持" in msg
-    assert "当前仅支持 thread" in msg
-    assert "backend 改为 'thread'" in msg
+    assert "not supported" in msg
+    assert "'thread'" in msg
 
 
 def test_adaptive_scheduler_uses_runtime_backend_selected_by_pool() -> None:
@@ -493,7 +491,7 @@ def test_seq_pipeline_adaptive_invalid_backend_raises() -> None:
         adaptive_tuning=AdaptiveTuning(max_workers=2),
     )
     pipeline = _make_pipeline(overrides=overrides)
-    with pytest.raises(ValueError, match="Invalid adaptive backend"):
+    with pytest.raises(ValueError, match="not supported"):
         _ = pipeline.run(main_rows=[])
 
 

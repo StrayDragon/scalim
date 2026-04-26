@@ -1,5 +1,5 @@
 from types import MappingProxyType
-from typing import Hashable, Mapping, Optional, Set, Tuple, Union
+from typing import Any, Dict, Hashable, Mapping, Optional, Set, Tuple, Union
 
 from ...typedefs import FieldValue
 from ...vendor.dataclassesx import dataclass
@@ -125,6 +125,18 @@ class ComputeCallContextIr:
     def __post_init__(self) -> None:
         if not isinstance(self.values, MappingProxyType):
             object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state: Dict[str, Any] = dict(self.__dict__)
+        values = state.get("values")
+        if isinstance(values, MappingProxyType):
+            state["values"] = dict(values)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        self.__post_init__()
 
 
 @dataclass(frozen=True)

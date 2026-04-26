@@ -2,7 +2,9 @@
 
 from typing import Any, Dict, List, Optional
 
+from .._internal.utils.loader_result import LoaderResultPolicyLike, normalize_loader_result_policy
 from ..vendor.dataclassesx import dataclass
+from ._internal.common import ObserverManagerModeLike
 from .manager import ObserverManager
 from .observer import Observer
 
@@ -15,14 +17,15 @@ class ObservabilityOptions:
 
     enable_debugging: bool = False
     fallback_logger_enabled: bool = False
-    loader_result_policy: str = "full"
+    loader_result_policy: LoaderResultPolicyLike = "full"
     loader_result_sample_size: int = 5
 
     def __post_init__(self) -> None:
-        policy = (self.loader_result_policy or "full").strip().lower()
-        if policy not in ("full", "summary", "sample", "none"):
-            msg = "ObservabilityOptions.loader_result_policy: Unknown policy: {!r}".format(self.loader_result_policy)
-            raise ValueError(msg)
+        try:
+            policy = normalize_loader_result_policy(self.loader_result_policy)
+        except (TypeError, ValueError) as exc:
+            msg = "ObservabilityOptions.loader_result_policy: {}".format(str(exc))
+            raise ValueError(msg) from exc
         object.__setattr__(self, "loader_result_policy", policy)
 
         sample_size = int(self.loader_result_sample_size)
@@ -55,7 +58,7 @@ class Observability:
         *,
         run_id: Optional[str] = None,
         event_meta_defaults: Optional[Dict[str, Any]] = None,
-        mode: str = "process",
+        mode: ObserverManagerModeLike = "process",
     ) -> ObserverManager:
         return ObserverManager(
             observers=list(self.observers),

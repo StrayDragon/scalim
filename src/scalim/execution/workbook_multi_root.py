@@ -5,6 +5,7 @@ from typing import List, Optional, Sequence, Tuple
 from ..exceptions import ScalimExecutionError
 from ..sinks import ExcelWorkbookSink
 from ..spec.ir import DemandIr
+from ..typedefs import FailurePolicy, normalize_failure_policy
 from ..vendor.dataclassesx import replace
 from .run_ir import ExecutionRequest, ExecutionResult, OutputSpec, run_ir
 
@@ -33,10 +34,7 @@ def run_multi_root_workbook(
       - `primary_only`: 失败的 `sheet` 会被跳过,继续执行后续 `sheet`(仍会保存已完成内容)
     """
 
-    policy = str(failure_policy or "all_fail")
-    if policy not in ("all_fail", "primary_only"):
-        msg = "Unsupported failure_policy: {!r}".format(failure_policy)
-        raise ValueError(msg)
+    policy = normalize_failure_policy(failure_policy, label="run_multi_root_workbook.failure_policy")
 
     wb = ExcelWorkbookSink(str(output_path))
     results: List[ExecutionResult] = []
@@ -65,7 +63,7 @@ def run_multi_root_workbook(
             except Exception as exc:
                 if first_error is None:
                     first_error = exc
-                if policy == "all_fail":
+                if policy == FailurePolicy.ALL_FAIL:
                     raise ScalimMultiRootWorkbookRunError(str(sheet_name), exc) from exc
                 # `primary_only`: `best-effort` 跳过该 `sheet`
                 continue
@@ -73,7 +71,7 @@ def run_multi_root_workbook(
         # 始终保存 `workbook`(原子替换).当 `all_fail` 抛错时也尽量保存已完成内容供诊断.
         wb.close()
 
-    if first_error is not None and policy == "primary_only":
+    if first_error is not None and policy == FailurePolicy.PRIMARY_ONLY:
         # `primary_only` 不抛错,但允许调用方在 `result` 层检查.
         return results
 

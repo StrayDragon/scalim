@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
 from ..._internal.loggingx import format_kv, prefix
+from ..._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
 from ...events import (
     WORKFLOW_ATTRIBUTION_META_KEYS,
     Event,
@@ -34,6 +35,7 @@ from .common import (
     CATALOG_EVENT_TYPES_SET,
     OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
     OBSERVER_RAISED_EXCEPTION_WARNING,
+    ObserverManagerMode,
 )
 
 _logger = logging.getLogger(__name__)
@@ -43,9 +45,9 @@ class ObserverManagerEmitMixin(ABC):
     observers: Optional[List[Observer]] = None
     debug_mode: bool = False
     fallback_logger_enabled: bool = False
-    loader_result_policy: str = "full"
+    loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL
     run_id: str = ""
-    mode: str = "process"
+    mode: ObserverManagerMode = ObserverManagerMode.PROCESS
     _lock: "threading.RLock" = threading.RLock()
     _has_observers: bool = False
     _observers_by_event_type: Optional[Dict[str, Tuple[Observer, ...]]] = None
@@ -214,13 +216,18 @@ class ObserverManagerEmitMixin(ABC):
         if not self._should_emit_event_type(EventType.LOADER_CALL):
             return
         payload = result
-        if self.loader_result_policy != "full":
-            if self.loader_result_policy == "none":
-                payload = None
-            elif self.loader_result_policy == "summary":
-                payload = self._summarize_result(result)
-            elif self.loader_result_policy == "sample":
-                payload = self._sample_result(result)
+        policy = self.loader_result_policy
+        if policy not in ("full", "none", "summary", "sample"):
+            policy = normalize_loader_result_policy(policy)
+            self.loader_result_policy = policy
+        if policy == "none":
+            payload = None
+        elif policy == "summary":
+            payload = self._summarize_result(result)
+        elif policy == "sample":
+            payload = self._sample_result(result)
+        else:
+            payload = result
         event_payload = LoaderCallEvent(
             loader_name=loader_name,
             params=params,

@@ -29,6 +29,7 @@ from ...spec.ir._workflow import (
     WorkflowResourcesWaitOptionsIr,
     WriteSheetNodeIr,
 )
+from ...typedefs import FailurePolicy, normalize_failure_policy
 from ...vendor.dataclassesx import dataclass, replace
 from ._internal.config_parsing.loader import YamlDemandLoader
 from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
@@ -1555,7 +1556,7 @@ def _inject_xlsx_memory_write_dependencies(
                 nodes[int(pos)] = replace(consumer, deps=tuple(deps))
 
 
-_WORKFLOW_FAILURE_POLICIES = ("all_fail", "primary_only")
+_WORKFLOW_FAILURE_POLICIES = (FailurePolicy.ALL_FAIL, FailurePolicy.PRIMARY_ONLY)
 
 
 def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowExecutionOptions:
@@ -1575,14 +1576,14 @@ def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowE
     if not isinstance(failure_policy_raw, str):
         msg = "workflow_runtime_options.execution.failure_policy must be a string"
         raise TypeError(msg)
-    failure_policy = str(failure_policy_raw or "all_fail").strip() or "all_fail"
-    if failure_policy not in _WORKFLOW_FAILURE_POLICIES:
-        msg = "workflow_runtime_options.execution.failure_policy must be one of: {}".format("/".join(_WORKFLOW_FAILURE_POLICIES))
-        raise ValueError(msg)
+    failure_policy = normalize_failure_policy(
+        failure_policy_raw,
+        label="workflow_runtime_options.execution.failure_policy",
+    )
 
     return WorkflowExecutionOptions(
         max_concurrency=int(max_concurrency_raw),
-        failure_policy=str(failure_policy),
+        failure_policy=failure_policy,
     )
 
 
@@ -1764,7 +1765,7 @@ def _build_workflow_options_ir(
         schedule_mode = "stage_barrier"
     return WorkflowOptionsIr(
         max_concurrency=int(execution.max_concurrency),
-        failure_policy=str(execution.failure_policy or "all_fail"),
+        failure_policy=str(execution.failure_policy or FailurePolicy.ALL_FAIL.value),
         schedule_mode=str(schedule_mode),
         cache_pool=cache_pool,
         resources_wait=resources_wait,

@@ -35,7 +35,7 @@ Sources:
 | `scalim.dsl.yaml_dsl.workflow` | 10 | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
 | `scalim.dsl.yaml_dsl.workflow_types` | 22 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
 | `scalim.dsl.yaml_dsl.workflow_paths` | 1 | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
-| `scalim.spec.ir` | 40 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
+| `scalim.spec.ir` | 41 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
 | `scalim.execution` | 7 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
@@ -215,7 +215,7 @@ from scalim.dsl.yaml_dsl.workflow_paths import (
 
 #### `scalim.spec.ir`
 
-- Export count: `40`
+- Export count: `41`
 
 ```python
 from scalim.spec.ir import (
@@ -251,6 +251,7 @@ from scalim.spec.ir import (
     PythonReferenceIr,
     RelationIr,
     RuntimeHandleIdIr,
+    ScalimRelationInferenceError,
     SourceIr,
     SourceNormalizeIr,
     SourceRefIr,

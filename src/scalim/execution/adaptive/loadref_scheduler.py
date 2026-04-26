@@ -16,8 +16,6 @@ from ._internal.loadref_scheduler_support import build_layers as _build_layers
 from ._internal.loadref_scheduler_support import build_ref_deps as _build_ref_deps
 from ._internal.loadref_scheduler_support import resolve_adaptive_max_workers
 from .policy import (
-    ADAPTIVE_BACKEND_ASYNC,
-    ADAPTIVE_BACKEND_PROCESS,
     ADAPTIVE_BACKEND_THREAD,
     AdaptivePolicy,
     DefaultAdaptivePolicy,
@@ -69,7 +67,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
     def __repr__(self) -> str:
         return "AdaptiveLoadRefScheduler(min_parallel_tasks={})".format(self._tuning.min_parallel_tasks_per_layer)
 
-    def execute_segment(  # noqa: C901, PLR0912, PLR0915
+    def execute_segment(  # noqa: C901, PLR0912
         self,
         ops: Sequence[LoadRefOperatorIr],
         *,
@@ -86,12 +84,8 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
 
         wants_scheduler_decisions = runtime.instrumentation.wants(EventType.ADAPTIVE_SCHEDULER_DECISION)
         backend = runtime.adaptive_backend or self._policy.choose_backend(plan=self._plan, runtime=runtime, tuning=self._tuning)
-        if backend in (ADAPTIVE_BACKEND_PROCESS, ADAPTIVE_BACKEND_ASYNC):
-            # `NOTE`: 若需回加 `process`/`async` 后端,请恢复对应实现模块与测试.
-            msg = "adaptive backend '{}' 暂不支持: 当前仅支持 thread;请将 backend 改为 'thread'".format(backend)
-            raise ValueError(msg)
         if backend != ADAPTIVE_BACKEND_THREAD:
-            msg = "Invalid adaptive backend '{}'".format(backend)
+            msg = "adaptive backend '{}' is not supported; only 'thread' is currently available".format(backend)
             raise ValueError(msg)
 
         ordered_ops = list(ops)

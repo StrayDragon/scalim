@@ -16,6 +16,7 @@ from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir import DemandIr
+from ....typedefs import FailurePolicy
 from ....vendor.dataclassesx import replace
 from .._internal.config_parsing.loader import YamlDemandLoader
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
@@ -103,7 +104,7 @@ def validate_allowlist(
 
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
-_DEMAND_FAILURE_POLICIES: Tuple[str, ...] = ("all_fail", "primary_only")
+_DEMAND_FAILURE_POLICIES: Tuple[str, ...] = (FailurePolicy.ALL_FAIL, FailurePolicy.PRIMARY_ONLY)
 
 
 def _parse_overrides_outputs_defaults_book_id(defaults: Optional[object], *, path: str) -> Optional[str]:

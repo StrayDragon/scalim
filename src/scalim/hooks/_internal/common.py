@@ -1,11 +1,8 @@
-import logging
 from collections.abc import Set as AbstractSet
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from ..._internal.loggingx import prefix
 from ...events import EventType
-
-_logger = logging.getLogger(__name__)
 
 HOOK_RAISED_EXCEPTION_WARNING = prefix("hooks") + "钩子 %s.%s 抛出异常"
 
@@ -75,6 +72,9 @@ def read_callable_attr(obj: Any, name: str) -> Optional[Callable[..., Any]]:
     return value
 
 
+_CATALOG_EVENT_TYPES_SET: Set[str] = set(CATALOG_EVENT_TYPES) | set(_HOOK_TYPED_DISPATCH_MAP.keys())
+
+
 def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
     if value is None:
         return None
@@ -88,6 +88,9 @@ def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
                 type(item).__name__, item, type(hook).__name__
             )
             raise TypeError(msg)
+        if item not in _CATALOG_EVENT_TYPES_SET:
+            msg = "hook.event_types contains unknown event type {!r} for {}".format(item, type(hook).__name__)
+            raise ValueError(msg)
         validated.add(item)
     return validated
 

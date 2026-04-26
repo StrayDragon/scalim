@@ -1,7 +1,7 @@
 # region imports
 
 import logging
-from typing import Any, Dict, FrozenSet, Hashable, List, MutableMapping, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, Hashable, List, Mapping, MutableMapping, Optional, Set, Tuple
 
 from ...._internal.utils.converters import auto_str_normalize_key
 from ....hooks import HookManager
@@ -78,7 +78,7 @@ class ExecutionRuntime:
         hook_manager: HookManager,
         observer_manager: ObserverManager,
         main_source: Optional[MainSourceIr],
-        sources: Dict[str, SourceIr],
+        sources: Mapping[str, SourceIr],
         runtime_bindings: RuntimeBindings,
         guardrails: Optional[GuardrailsPolicy] = None,
         loader_retry: Optional[LoaderRetryPolicies] = None,

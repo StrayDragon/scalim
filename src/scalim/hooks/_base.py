@@ -2,8 +2,9 @@
 
 import threading
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyLike
 from ..events import Event
 from ..events._events import (
     BatchEndEvent,
@@ -87,6 +88,10 @@ class IExecutionHook(ABC):
     def on_column_write(self, event: ColumnWriteEvent) -> None:
         """当列被写入列式输出端时调用 (FR023)."""
 
+    def on_pre_use_batch_size(self, decision: Any) -> None:
+        """策略决策钩子: 在使用 `batch_size` 前允许钩子改写候选值 (`opt-in`)."""
+        _ = decision
+
 
 Hook = IExecutionHook
 
@@ -152,6 +157,11 @@ class BaseHook(IExecutionHook):
     def on_column_write(self, event: ColumnWriteEvent) -> None:
         """空操作实现"""
 
+    @override
+    def on_pre_use_batch_size(self, decision: Any) -> None:
+        """策略决策钩子: 在使用 `batch_size` 前允许钩子改写候选值 (`opt-in`)."""
+        _ = decision
+
 
 class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManagerRegistryMixin, HookManagerEventMixin):
     """钩子管理器 - 管理并触发所有钩子.
@@ -165,7 +175,7 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
     _on_event_handlers_by_event_type: Dict[str, Tuple[HookOnEventHandlerPair, ...]]
     debug_mode: bool
     fallback_logger_enabled: bool
-    loader_result_policy: str
+    loader_result_policy: LoaderResultPolicy
     loader_result_sample_size: int
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
@@ -177,7 +187,7 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
         self,
         enable_debugging: bool = False,  # noqa: FBT001, FBT002
         fallback_logger_enabled: bool = False,  # noqa: FBT001, FBT002
-        loader_result_policy: str = "full",
+        loader_result_policy: LoaderResultPolicyLike = "full",
         loader_result_sample_size: int = 5,
         dispatch_strategy: Optional[HookDispatchStrategy] = None,
     ) -> None:

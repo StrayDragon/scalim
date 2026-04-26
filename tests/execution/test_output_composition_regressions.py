@@ -188,7 +188,7 @@ def test_validate_excel_workbook_sheet_names_continue_and_error(tmp_path: Path) 
 
 
 def test_normalize_failure_policy_rejects_unknown_value() -> None:
-    with pytest.raises(ValueError, match="Unsupported failure_policy"):
+    with pytest.raises(ValueError, match="failure_policy must be one of"):
         _ = mod._normalize_failure_policy("bad")  # noqa: SLF001
 
 

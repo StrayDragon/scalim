@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple, cast
 
 from ...typedefs import LoaderResultMapping, RuntimeValue
-from ._relations import JoinConditionIr, LookupStepIr, RelationIr
+from ._relations import JoinConditionIr, LookupStepIr, RelationIr, ScalimRelationInferenceError
 from ._sources import SourceIr, SourceRefIr
 from .aliases import LoaderResultMapCallable
 from .binding import BindingIr, LoaderCallContextIr
@@ -40,12 +40,11 @@ def infer_lookup_steps(
 
     try:
         if isinstance(relation, JoinConditionIr):
-            # 单个条件,转换为 `RelationIr`
             rel = RelationIr(conditions=(relation,))
             return rel.infer_multi_field_lookup_path(from_source, to_source)
         if isinstance(relation, RelationIr):
             return relation.infer_multi_field_lookup_path(from_source, to_source)
-    except ValueError:
+    except ScalimRelationInferenceError:
         return None
 
     return None

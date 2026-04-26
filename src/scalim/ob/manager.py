@@ -5,9 +5,14 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
+from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyLike
 from ..events import Event, generate_run_id
 from ._internal.common import (
     DEFAULT_MAX_RECORDED_EVENTS,
+    CaptureOverflowPolicy,
+    CaptureOverflowPolicyLike,
+    ObserverManagerMode,
+    ObserverManagerModeLike,
     ScalimObserverCaptureOverflowError,
 )
 from ._internal.common import (
@@ -51,13 +56,13 @@ class ObserverManager(
     _capture_unknown_event_types: bool
     debug_mode: bool
     fallback_logger_enabled: bool
-    loader_result_policy: str
+    loader_result_policy: LoaderResultPolicy
     loader_result_sample_size: int
     run_id: str
     _event_meta_defaults: Optional[Dict[str, Any]]
-    mode: str
+    mode: ObserverManagerMode
     max_recorded_events: Optional[int]
-    capture_overflow_policy: str
+    capture_overflow_policy: CaptureOverflowPolicy
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
     _seq: int
@@ -69,13 +74,13 @@ class ObserverManager(
         *,
         enable_debugging: bool = False,
         fallback_logger_enabled: bool = False,
-        loader_result_policy: str = "full",
+        loader_result_policy: LoaderResultPolicyLike = "full",
         loader_result_sample_size: int = 5,
         run_id: Optional[str] = None,
         event_meta_defaults: Optional[Dict[str, Any]] = None,
-        mode: str = "process",
+        mode: ObserverManagerModeLike = "process",
         max_recorded_events: Optional[int] = DEFAULT_MAX_RECORDED_EVENTS,
-        capture_overflow_policy: str = "raise",
+        capture_overflow_policy: CaptureOverflowPolicyLike = "raise",
     ) -> None:
         self.observers = list(observers or [])
         self._has_observers = False
@@ -91,7 +96,7 @@ class ObserverManager(
         self.loader_result_sample_size = max(1, loader_result_sample_size)
         self.run_id = run_id or generate_run_id()
         self._event_meta_defaults = dict(event_meta_defaults) if event_meta_defaults else None
-        self.mode = mode
+        self.mode = self._normalize_mode(mode)
         self.max_recorded_events = self._normalize_max_recorded_events(max_recorded_events)
         self.capture_overflow_policy = self._normalize_capture_overflow_policy(capture_overflow_policy)
         self._lock = threading.RLock()

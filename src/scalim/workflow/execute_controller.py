@@ -33,6 +33,7 @@ from ..spec.ir._workflow import (
     WorkflowNodeType,
     WriteSheetNodeIr,
 )
+from ..typedefs import FailurePolicy, normalize_failure_policy
 from ..vendor.compact.typing_extensionsx import Protocol
 from ..vendor.dataclassesx import dataclass, field
 from ._internal.replay_event_classification import (
@@ -312,7 +313,10 @@ class WorkflowRunController:
             remaining_prereqs=remaining_prereqs,
             prereq_failed=prereq_failed,
             max_concurrency=int(max_concurrency),
-            failure_policy=str(failure_policy or "all_fail"),
+            failure_policy=normalize_failure_policy(
+                failure_policy,
+                label="workflow_runtime_options.execution.failure_policy",
+            ),
             write_consumers_remaining_by_output_key=write_consumers_remaining_by_output_key,
             main_rows_consumers_remaining_by_run_id=main_rows_consumers_remaining_by_run_id,
             captured_demand_events_by_node_id=captured_demand_events_by_node_id,
@@ -588,7 +592,7 @@ class WorkflowRunController:
         self._resource_lifecycle.on_node_terminal(str(node_id), ok=False)
         self._on_terminal(str(node_id), ok=False)
 
-        if self._state.failure_policy == "all_fail" and self._state.failed_outcome is None:
+        if self._state.failure_policy == FailurePolicy.ALL_FAIL and self._state.failed_outcome is None:
             self._state.failed_outcome = outcome
             self._state.failed_exc = exc
             self._cancel_all_not_started_due_to_all_fail()

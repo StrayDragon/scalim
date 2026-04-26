@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional,
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
 from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...vendor.compact import StrEnum
 from ...vendor.compact.typing_extensionsx import Self, override
 from ...vendor.dataclassesx import dataclass
 from .base import (
@@ -44,6 +45,11 @@ CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = CSV_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
 
 COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ColumnCSVSink 删除临时文件失败"
 COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_CSV_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
+
+
+class CsvFlushPolicy(StrEnum):
+    ALWAYS = "always"
+    EVERY_N_ROWS = "every_n_rows"
 
 
 def _normalize_csv_value(value: Any) -> str:
@@ -104,10 +110,16 @@ class InMemoryCsvSink(BaseRowSink):
 
     @override
     def write_row(self, row: RowData) -> None:
+        if self._closed:
+            msg = "InMemoryCsvSink is closed"
+            raise RuntimeError(msg)
         self._artifact.rows.append(self._format_row(row))
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
+        if self._closed:
+            msg = "InMemoryCsvSink is closed"
+            raise RuntimeError(msg)
         for row in rows:
             self._artifact.rows.append(self._format_row(row))
 
@@ -195,10 +207,10 @@ class CSVSink(BaseRowSink):
         self.field_names = field_names
         self.header_names = header_names if header_names is not None else field_names
 
-        if self.flush_policy not in ("always", "every_n_rows"):
+        if self.flush_policy not in (CsvFlushPolicy.ALWAYS, CsvFlushPolicy.EVERY_N_ROWS):
             msg = "Unknown flush_policy: '{}'".format(self.flush_policy)
             raise ValueError(msg)
-        if self.flush_policy == "every_n_rows" and self.flush_every_rows < 1:
+        if self.flush_policy == CsvFlushPolicy.EVERY_N_ROWS and self.flush_every_rows < 1:
             msg = "flush_every_rows must be >= 1"
             raise ValueError(msg)
 
@@ -223,10 +235,10 @@ class CSVSink(BaseRowSink):
         ]
 
     def _maybe_flush(self, rows_written: int) -> None:
-        if self.flush_policy == "always":
+        if self.flush_policy == CsvFlushPolicy.ALWAYS:
             self._file.flush()
             return
-        if self.flush_policy == "every_n_rows":
+        if self.flush_policy == CsvFlushPolicy.EVERY_N_ROWS:
             self._rows_since_flush += rows_written
             if self._rows_since_flush >= self.flush_every_rows:
                 self._file.flush()

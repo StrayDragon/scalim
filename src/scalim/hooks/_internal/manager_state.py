@@ -1,13 +1,14 @@
-import contextlib
 import threading
 from abc import ABC
-from collections.abc import Mapping as MappingABC
-from collections.abc import Sequence as SequenceABC
-from collections.abc import Set as AbstractSet
-from collections.abc import Sized as SizedABC
-from itertools import islice
-from typing import Any, Dict, List, Mapping, Sequence, Set, Tuple, cast
+from typing import Any, Dict, Tuple
 
+from ..._internal.utils.loader_result import (
+    LoaderResultPolicy,
+    LoaderResultPolicyLike,
+    normalize_loader_result_policy,
+    sample_loader_result,
+    summarize_loader_result,
+)
 from ...vendor.compact.typing_extensionsx import override
 from .._dispatch import HookDispatchStrategy
 from .manager_base import HookManagerBase, HookOnEventHandlerPair, HookTypedHandlerPair
@@ -54,46 +55,17 @@ class HookManagerStateMixin(HookManagerBase, ABC):
             manager.dispatch_strategy = HookDispatchStrategy()
         self._rebuild_subscription_cache()
 
-    def _normalize_loader_result_policy(self, policy: str) -> str:
-        normalized = (policy or "full").lower()
-        if normalized not in ("full", "summary", "sample", "none"):
-            msg = "Unknown loader_result_policy: '{}'".format(policy)
-            raise ValueError(msg)
-        return normalized
+    @override
+    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicy:
+        return normalize_loader_result_policy(policy)
 
     @override
     def _summarize_result(self, result: Any) -> Dict[str, Any]:
-        summary: Dict[str, Any] = {"type": type(result).__name__}
-        if isinstance(result, SizedABC):
-            with contextlib.suppress(Exception):
-                summary["size"] = len(result)
-        return summary
+        return summarize_loader_result(result)
 
     @override
     def _sample_result(self, result: Any) -> Any:
-        sample_size = self._manager().loader_result_sample_size
-        sample: Any = None
-        if isinstance(result, MappingABC):
-            mapping = cast("Mapping[Any, Any]", result)  # pragma: allow-cast mapping typed narrowing
-            sample = dict(list(mapping.items())[:sample_size])
-        elif isinstance(result, list):
-            items = cast("List[Any]", result)  # pragma: allow-cast list typed narrowing
-            sample = items[:sample_size]
-        elif isinstance(result, tuple):
-            items = cast("Tuple[Any, ...]", result)  # pragma: allow-cast tuple typed narrowing
-            sample = list(items[:sample_size])
-        elif isinstance(result, AbstractSet):
-            iterable = cast("Set[Any]", result)  # pragma: allow-cast set typed narrowing
-            sample = list(islice(iterable, sample_size))
-        elif isinstance(result, (str, bytes)):
-            sample = result[:sample_size]
-        elif isinstance(result, SequenceABC):
-            sequence = cast("Sequence[Any]", result)  # pragma: allow-cast sequence typed narrowing
-            with contextlib.suppress(Exception):
-                sample = list(sequence[:sample_size])
-        if sample is None:
-            return self._summarize_result(result)
-        return sample
+        return sample_loader_result(result, sample_size=self._manager().loader_result_sample_size)
 
 
 __all__ = ()

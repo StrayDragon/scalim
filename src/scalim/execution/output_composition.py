@@ -13,9 +13,10 @@ from ..events._events import OutputTargetEndEvent
 from ..exceptions import ScalimExecutionError
 from ..ob.hub import InstrumentationHub
 from ..sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink
-from ..typedefs import KeyNormalizationMode, RowData
+from ..typedefs import FailurePolicy, KeyNormalizationMode, RowData, normalize_failure_policy
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
+from ._output_composition_policies import DedupOnConflictPolicy, DerivedOverflowPolicy
 from .derived_outputs import (
     AggMetricSpec,
     AggregatingRowSink,
@@ -126,7 +127,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
         parts.append("group_by=" + ",".join(str(x) for x in self.group_by))
         parts.append("max_groups=" + str(int(self.max_groups)))
         parts.append("max_distinct=" + str(int(self.max_distinct)))
-        parts.append("distinct_on_overflow=" + str(self.distinct_on_overflow or "error").lower())
+        parts.append("distinct_on_overflow=" + (self.distinct_on_overflow or DerivedOverflowPolicy.ERROR).lower())
         parts.append("metrics=")
         for m in self.metrics:
             parts.append("  " + _metric_fingerprint_part(m))
@@ -153,8 +154,8 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
     @override
     def validate_parallel_mode(self, parallel_mode: str) -> None:
         _ = str(parallel_mode or "").lower()
-        overflow = str(self.distinct_on_overflow or "error").lower()
-        if overflow not in ("error", "truncate"):
+        overflow = (self.distinct_on_overflow or DerivedOverflowPolicy.ERROR).lower()
+        if overflow not in (DerivedOverflowPolicy.ERROR, DerivedOverflowPolicy.TRUNCATE):
             msg = "Unsupported distinct_on_overflow: {!r}".format(self.distinct_on_overflow)
             raise ValueError(msg)
 
@@ -192,22 +193,22 @@ class DedupBySpec:
         parts: List[str] = []
         parts.append("kind=dedup_by")
         parts.append("key_fields=" + ",".join(str(x) for x in self.key_fields))
-        parts.append("on_conflict=" + str(self.on_conflict or "error").lower())
+        parts.append("on_conflict=" + (self.on_conflict or DedupOnConflictPolicy.ERROR).lower())
         parts.append("max_distinct=" + str(int(self.max_distinct)))
-        parts.append("on_overflow=" + str(self.on_overflow or "error").lower())
+        parts.append("on_overflow=" + (self.on_overflow or DerivedOverflowPolicy.ERROR).lower())
         return tuple(parts)
 
     def validate_parallel_mode(self, parallel_mode: str) -> None:
         mode = str(parallel_mode or "").lower()
-        on_conflict = str(self.on_conflict or "error").lower()
-        if on_conflict not in ("error", "first", "last"):
+        on_conflict = (self.on_conflict or DedupOnConflictPolicy.ERROR).lower()
+        if on_conflict not in (DedupOnConflictPolicy.ERROR, DedupOnConflictPolicy.FIRST, DedupOnConflictPolicy.LAST):
             msg = "Unsupported dedup_by.on_conflict: {!r}".format(self.on_conflict)
             raise ValueError(msg)
-        on_overflow = str(self.on_overflow or "error").lower()
-        if on_overflow not in ("error", "truncate"):
+        on_overflow = (self.on_overflow or DerivedOverflowPolicy.ERROR).lower()
+        if on_overflow not in (DerivedOverflowPolicy.ERROR, DerivedOverflowPolicy.TRUNCATE):
             msg = "Unsupported dedup_by.on_overflow: {!r}".format(self.on_overflow)
             raise ValueError(msg)
-        if mode == "adaptive" and on_conflict in ("first", "last"):
+        if mode == "adaptive" and on_conflict in (DedupOnConflictPolicy.FIRST, DedupOnConflictPolicy.LAST):
             msg = (
                 "dedup_by.on_conflict={!r} is order-dependent and is not supported in parallel_mode='adaptive'; "
                 "use parallel_mode='seq' or switch to on_conflict='error'"
@@ -361,7 +362,7 @@ class OutputCompositionSpec:
     derived_targets: Tuple[DerivedOutputTargetSpec, ...] = ()
     meta_sheet: Optional[MetaSheetSpec] = None
     audit_sheet: Optional[AuditSheetSpec] = None
-    failure_policy: str = "all_fail"
+    failure_policy: str = FailurePolicy.ALL_FAIL.value
     include_full_error_message: bool = False
 
 
@@ -563,7 +564,7 @@ class RouterRowSink(BaseRowSink):
         include_full_error_message: bool = False,
     ) -> None:
         self._routes = list(routes)
-        self._failure_policy = str(failure_policy or "all_fail")
+        self._failure_policy = normalize_failure_policy(failure_policy, label="output_composition.failure_policy")
         self._workbook_resources = list(workbook_resources)
         self._meta_target = meta_target
         self._audit_target = audit_target
@@ -638,7 +639,7 @@ class RouterRowSink(BaseRowSink):
                 route.error_count += 1
                 if route.first_error is None:
                     route.first_error = exc
-                if self._failure_policy == "primary_only" and not route.is_primary:
+                if self._failure_policy == FailurePolicy.PRIMARY_ONLY and not route.is_primary:
                     route.disabled = True
                     continue
                 raise ScalimOutputTargetWriteError(route.target_id, exc) from exc
@@ -652,7 +653,7 @@ class RouterRowSink(BaseRowSink):
             route.error_count += 1
             if route.first_error is None:
                 route.first_error = exc
-            if self._failure_policy == "primary_only" and not route.is_primary:
+            if self._failure_policy == FailurePolicy.PRIMARY_ONLY and not route.is_primary:
                 route.disabled = True
                 return
             raise ScalimOutputTargetWriteError(route.target_id, exc) from exc
@@ -691,7 +692,7 @@ class RouterRowSink(BaseRowSink):
 
             self._record_routes_error(related, exc)
 
-            if self._failure_policy == "primary_only" and not self._has_primary_route(related):
+            if self._failure_policy == FailurePolicy.PRIMARY_ONLY and not self._has_primary_route(related):
                 self._disable_routes(related)
                 return
 
@@ -899,12 +900,8 @@ class OutputCompositionPlan:
     managed_artifact_plans: Dict[str, ManagedArtifactPlan]
 
 
-def _normalize_failure_policy(failure_policy: str) -> str:
-    policy = str(failure_policy or "all_fail")
-    if policy not in ("all_fail", "primary_only"):
-        msg = "Unsupported failure_policy: {!r}".format(failure_policy)
-        raise ValueError(msg)
-    return policy
+def _normalize_failure_policy(failure_policy: object) -> str:
+    return normalize_failure_policy(failure_policy, label="output_composition.failure_policy")
 
 
 def _validate_excel_workbook_sheet_names(spec: OutputCompositionSpec) -> None:

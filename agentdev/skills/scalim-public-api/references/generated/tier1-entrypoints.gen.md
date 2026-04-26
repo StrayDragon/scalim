@@ -78,7 +78,7 @@
 - desc: workflow 类型(拆分给 typing/依赖方用)
 - scenario: 仅用类型,或避免重导入
 - marker: `src/scalim/dsl/yaml_dsl/__init__.py:9`
-- source: `src/scalim/dsl/yaml_dsl/workflow_types.py:191`
+- source: `src/scalim/dsl/yaml_dsl/workflow_types.py:219`
 - exports (`__all__`, tuple, count=22):
   - `UNSET`
   - `ComponentsExtend`
@@ -116,7 +116,7 @@
 - scenario: 写自定义组件/扩展点/高级调试
 - marker: `src/scalim/spec/ir/__init__.py:6`
 - source: `src/scalim/spec/ir/__init__.py:53`
-- exports (`__all__`, tuple, count=40):
+- exports (`__all__`, tuple, count=41):
   - `BindingIr`
   - `BuiltinCallableIdIr`
   - `CallBySpecIr`
@@ -149,6 +149,7 @@
   - `PythonReferenceIr`
   - `RelationIr`
   - `RuntimeHandleIdIr`
+  - `ScalimRelationInferenceError`
   - `SourceIr`
   - `SourceNormalizeIr`
   - `SourceRefIr`

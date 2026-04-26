@@ -106,6 +106,16 @@ def test_in_memory_csv_sink_normalizes_values_like_csv_sink(tmp_path):
     assert file_rows == artifact.rows
 
 
+def test_in_memory_csv_sink_rejects_writes_when_closed() -> None:
+    mem_sink = InMemoryCsvSink(field_names=["id"])
+    mem_sink.close()
+
+    with pytest.raises(RuntimeError, match="InMemoryCsvSink is closed"):
+        mem_sink.write_row({"id": 1})
+    with pytest.raises(RuntimeError, match="InMemoryCsvSink is closed"):
+        mem_sink.write_batch([{"id": 1}])
+
+
 def test_in_memory_csv_sink_requires_field_names() -> None:
     with pytest.raises(ValueError, match="field_names"):
         _ = InMemoryCsvSink()

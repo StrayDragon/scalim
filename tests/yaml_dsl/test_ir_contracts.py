@@ -301,6 +301,48 @@ def test_demand_ir_validation_and_duplicates() -> None:
     assert demand_no_primary.get_primary_field() is None
 
 
+def test_demand_ir_keeps_mapping_proxy_inputs() -> None:
+    from types import MappingProxyType
+
+    main_source = _make_main_source("orders")
+    demand = DemandIr(
+        sources=MappingProxyType({}),
+        fields=MappingProxyType({}),
+        main_source=main_source,
+    )
+
+    assert isinstance(demand.sources, MappingProxyType)
+    assert isinstance(demand.fields, MappingProxyType)
+
+
+def test_demand_ir_freezes_non_dict_mappings_and_rejects_invalid_inputs() -> None:
+    from collections import ChainMap
+    from types import MappingProxyType
+
+    main_source = _make_main_source("orders")
+    demand = DemandIr(
+        sources=ChainMap({}),
+        fields=ChainMap({}),
+        main_source=main_source,
+    )
+    assert isinstance(demand.sources, MappingProxyType)
+    assert isinstance(demand.fields, MappingProxyType)
+
+    with pytest.raises(TypeError, match="DemandIr.sources must be a mapping"):
+        _ = DemandIr(  # type: ignore[arg-type]
+            sources=[],
+            fields={},
+            main_source=main_source,
+        )
+
+    with pytest.raises(TypeError, match="DemandIr.fields must be a mapping"):
+        _ = DemandIr(  # type: ignore[arg-type]
+            sources={},
+            fields=[],
+            main_source=main_source,
+        )
+
+
 def test_infer_lookup_steps_and_extract_fields() -> None:
     orders = _make_source("orders", pk_key="order_id")
     customers = _make_source("customers", pk_key="customer_id")

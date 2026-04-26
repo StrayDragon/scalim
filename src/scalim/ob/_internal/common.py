@@ -1,9 +1,10 @@
 from collections.abc import Set as AbstractSet
-from typing import Any, Optional, Set, Tuple
+from typing import Any, Optional, Set, Tuple, Union
 
 from ..._internal.loggingx import prefix
 from ...events import EventType
 from ...exceptions import ScalimObserverError
+from ...vendor.compact import StrEnum
 
 OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
 OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s 关闭时抛出异常"
@@ -42,11 +43,48 @@ CATALOG_EVENT_TYPES: Tuple[str, ...] = (
 
 CATALOG_EVENT_TYPES_SET: Set[str] = set(CATALOG_EVENT_TYPES)
 DEFAULT_MAX_RECORDED_EVENTS = 10_000
-CAPTURE_OVERFLOW_POLICIES = ("raise", "drop-oldest", "drop-newest")
+
+
+class CaptureOverflowPolicy(StrEnum):
+    RAISE = "raise"
+    DROP_OLDEST = "drop-oldest"
+    DROP_NEWEST = "drop-newest"
+
+
+CaptureOverflowPolicyLike = Union[str, CaptureOverflowPolicy]
+
+CAPTURE_OVERFLOW_POLICIES = (CaptureOverflowPolicy.RAISE, CaptureOverflowPolicy.DROP_OLDEST, CaptureOverflowPolicy.DROP_NEWEST)
+
+
+class ObserverManagerMode(StrEnum):
+    PROCESS = "process"
+    CAPTURE = "capture"
+
+
+ObserverManagerModeLike = Union[str, ObserverManagerMode]
+
+_OBSERVER_MANAGER_MODES_LABEL = "process/capture"
 
 
 class ScalimObserverCaptureOverflowError(ScalimObserverError):
     pass
+
+
+def normalize_observer_manager_mode(value: Any) -> ObserverManagerMode:
+    if isinstance(value, ObserverManagerMode):
+        return value
+    if not isinstance(value, str):
+        msg = "observer_manager.mode must be a str, got '{}'".format(type(value).__name__)
+        raise TypeError(msg)
+    normalized = value.strip().lower()
+    if not normalized:
+        msg = "observer_manager.mode must not be empty; expected one of: {}".format(_OBSERVER_MANAGER_MODES_LABEL)
+        raise ValueError(msg)
+    try:
+        return ObserverManagerMode(normalized)
+    except ValueError as exc:
+        msg = "Unknown observer_manager.mode: '{}'".format(value)
+        raise ValueError(msg) from exc
 
 
 def validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
@@ -64,6 +102,9 @@ def validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
                 type(observer).__name__,
             )
             raise TypeError(msg)
+        if item not in CATALOG_EVENT_TYPES_SET:
+            msg = "observer.event_types contains unknown event type {!r} for {}".format(item, type(observer).__name__)
+            raise ValueError(msg)
         normalized.add(item)
     return normalized
 

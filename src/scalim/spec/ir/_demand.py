@@ -1,4 +1,6 @@
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Mapping as MappingABC
+from types import MappingProxyType
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from ...vendor.dataclassesx import dataclass
 from ._fields import FieldIr, SupportedFieldIr
@@ -12,14 +14,16 @@ class DemandIr:
     需求(IR): IR 层的顶层结构, 包含完整的数据需求定义, 包括数据源、字段、关系等
     """
 
-    sources: Dict[str, SourceIr]
+    sources: Mapping[str, SourceIr]
     """
     数据源字典(内部使用:`source_id` -> `SourceIr`).
+    运行时为 `MappingProxyType` — 浅不可变.
     """
 
-    fields: Dict[str, SupportedFieldIr]
+    fields: Mapping[str, SupportedFieldIr]
     """
     字段字典(内部使用:`field_key` -> `SupportedFieldIr`).
+    运行时为 `MappingProxyType` — 浅不可变.
     """
 
     main_source: MainSourceIr
@@ -48,7 +52,22 @@ class DemandIr:
     """
 
     def __post_init__(self) -> None:
-        # 验证主数据源与 `sources` 无冲突
+        state: Dict[str, Any] = vars(self)
+
+        sources_raw = state.get("sources")
+        if not isinstance(sources_raw, MappingABC):
+            msg = "DemandIr.sources must be a mapping from source_id to SourceIr"
+            raise TypeError(msg)
+        if not isinstance(sources_raw, MappingProxyType):
+            object.__setattr__(self, "sources", MappingProxyType(dict(self.sources)))
+
+        fields_raw = state.get("fields")
+        if not isinstance(fields_raw, MappingABC):
+            msg = "DemandIr.fields must be a mapping from field_key to SupportedFieldIr"
+            raise TypeError(msg)
+        if not isinstance(fields_raw, MappingProxyType):
+            object.__setattr__(self, "fields", MappingProxyType(dict(self.fields)))
+
         if self.main_source.source_id in self.sources:
             msg = f"主数据源 {self.main_source.source_id!r} 不应出现在 sources 中"
             raise ValueError(msg)
@@ -60,6 +79,21 @@ class DemandIr:
                 if source_id != self.main_source.source_id and source_id not in self.sources:
                     msg = f"字段 {field_key!r} 引用的数据源 {source_id!r} 不存在"
                     raise ValueError(msg)
+
+    def __getstate__(self) -> Dict[str, object]:
+        state = dict(self.__dict__)
+        sources = state.get("sources")
+        if isinstance(sources, MappingProxyType):
+            state["sources"] = dict(sources)
+        fields = state.get("fields")
+        if isinstance(fields, MappingProxyType):
+            state["fields"] = dict(fields)
+        return state
+
+    def __setstate__(self, state: Dict[str, object]) -> None:
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        self.__post_init__()
 
     @classmethod
     def from_irs(
