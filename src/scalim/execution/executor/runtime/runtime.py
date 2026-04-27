@@ -43,7 +43,7 @@ class ExecutionRuntime:
     _preload_source_ids: FrozenSet[str]
     _preloaded_cache_str_views: Dict[str, LoaderResultMapping]
     load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
-    key_normalize_cache: Dict[RelationSignature, Dict[Tuple[Hashable, Tuple[str, ...]], Optional[LookupKey]]]
+    key_normalize_cache: Dict[RelationSignature, Dict[Tuple[str, ...], Dict[Hashable, Optional[LookupKey]]]]
     load_ref_group_fields: Dict[RelationSignature, Tuple[str, ...]]
     load_ref_group_executed: Set[RelationSignature]
     rows_cache_logged: Set[RelationSignature]

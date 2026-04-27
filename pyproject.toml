@@ -74,6 +74,7 @@ dev = [
     "memory-profiler>=0.61.0",  # 3.6+
     "matplotlib>=3.10.8",
     "psutil>=5.9.0",
+    "py-spy>=0.4.0",
     "scalim-benchlib",
     "scalim-cli",
     "scalim-misc",

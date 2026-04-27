@@ -156,8 +156,10 @@ class DenseBatchContext(BatchContext):
     def _idx_of(self, row_id: Hashable) -> Optional[int]:
         if not isinstance(row_id, int):
             return None
-        idx = int(row_id) - int(self._base_row_id)
-        if idx < 0 or idx >= int(self._row_count):
+        base = self._base_row_id
+        row_count = self._row_count
+        idx = row_id - base
+        if idx < 0 or idx >= row_count:
             return None
         return idx
 
@@ -182,13 +184,15 @@ class DenseBatchContext(BatchContext):
             raise ValueError(msg)
 
         storage = self._ensure_storage(field_key)
-        if storage.present[idx] == 0:
-            storage.present[idx] = 1
+        present = storage.present
+        if present[idx] == 0:
+            present[idx] = 1
             storage.present_count += 1
         storage.values[idx] = value
 
-        if self._on_field_set is not None:
-            self._on_field_set(field_key, row_id)
+        on_field_set = self._on_field_set
+        if on_field_set is not None:
+            on_field_set(field_key, row_id)
 
     @override
     def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
@@ -198,7 +202,8 @@ class DenseBatchContext(BatchContext):
         idx = self._idx_of(row_id)
         if idx is None:
             return default
-        if storage.present[idx] == 0:
+        present = storage.present
+        if present[idx] == 0:
             return default
         return storage.values[idx]
 

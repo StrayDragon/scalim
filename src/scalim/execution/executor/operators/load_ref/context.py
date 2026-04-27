@@ -1,4 +1,4 @@
-from typing import Dict, Hashable, List, Optional
+from typing import Dict, Hashable, List, Optional, Tuple
 
 from .....spec.ir import LookupStepIr
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
@@ -76,25 +76,39 @@ class LoadRefExecutionContext:
             sample_once=True,
         )
 
-    def normalize_key(self, row_id: Hashable, raw_key: object, step: LookupStepIr) -> Optional[LookupKey]:
+    def normalize_key(
+        self,
+        row_id: Hashable,
+        raw_key: object,
+        step: LookupStepIr,
+        *,
+        from_fields: Optional[Tuple[str, ...]] = None,
+    ) -> Optional[LookupKey]:
+        if from_fields is None:
+            from_fields = step.get_from_fields()
+
         relation_cache = self.runtime.key_normalize_cache.get(self.relation_signature)
         if relation_cache is None:
             relation_cache = {}
             self.runtime.key_normalize_cache[self.relation_signature] = relation_cache
 
-        cache_key = (row_id, step.get_from_fields())
-        cached = relation_cache.get(cache_key, MISSING)
+        fields_cache = relation_cache.get(from_fields)
+        if fields_cache is None:
+            fields_cache = {}
+            relation_cache[from_fields] = fields_cache
+
+        cached = fields_cache.get(row_id, MISSING)
         if cached is not MISSING:
             return cached
 
         self.maybe_warn_float_lookup_key(row_id, raw_key, step)
         normalized, status, error_message = self.runtime.normalize_lookup_key_with_status(raw_key, step)
         if status == "ok":
-            relation_cache[cache_key] = normalized
+            fields_cache[row_id] = normalized
             return normalized
         lookup_result = "null_key" if status == "null_key" else "type_error"
         self.record_lookup(row_id, raw_key, normalized, step.to_source, lookup_result, error_message)
-        relation_cache[cache_key] = None
+        fields_cache[row_id] = None
         return None
 
     def build_batch_rows(self) -> List[RowData]:

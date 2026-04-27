@@ -45,9 +45,7 @@ def extract_field_segments(data: Any, segments: Tuple[Union[str, int], ...]) -> 
 def _extract_field_segment(data: Any, segment: Union[str, int]) -> Any:
     if isinstance(data, Mapping):
         mapping = cast("Mapping[Any, Any]", data)  # pragma: allow-cast mapping typed narrowing
-        if segment in mapping:
-            return mapping[segment]
-        return None
+        return mapping.get(segment)
 
     if isinstance(segment, str):
         try:

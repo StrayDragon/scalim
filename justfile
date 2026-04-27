@@ -435,6 +435,16 @@ bench-memray-most MOST:
     mkdir -p .benchmarks/memray
     uv {{ UV_OPTIONS }} run pytest tests/bench -v -m bench --benchmark-only -n 0 --no-cov -o addopts="" --memray --memray-bin-path .benchmarks/memray --most-allocations {{ MOST }}
 
+# Profiling: execution hotspots (dev-only)
+profile-cpu SCALE="stress" TARGETS="relations" BATCH_SIZE="100":
+    mkdir -p .tmp/artifacts/perf
+    uv {{ UV_OPTIONS }} run py-spy record -o .tmp/artifacts/perf/ecommerce_{{ TARGETS }}_{{ SCALE }}_pyspy.svg -- \
+        python scripts/profile-execution-hotspots.py --scale {{ SCALE }} --targets {{ TARGETS }} --batch-size {{ BATCH_SIZE }}
+
+profile-cpu-top SCALE="stress" TARGETS="relations" BATCH_SIZE="100":
+    uv {{ UV_OPTIONS }} run py-spy top -- \
+        python scripts/profile-execution-hotspots.py --scale {{ SCALE }} --targets {{ TARGETS }} --batch-size {{ BATCH_SIZE }}
+
 # 交互笔记: 打开笔记首页
 notebook:
     uv {{ UV_OPTIONS }} run marimo edit notebooks/marimo/

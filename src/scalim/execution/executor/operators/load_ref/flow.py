@@ -171,13 +171,21 @@ def init_first_fk_mapping(
 ) -> Dict[Hashable, LookupKey]:
     pk_to_first_fk: Dict[Hashable, LookupKey] = {}
 
+    from_fields = first_step.get_from_fields()
+    if first_step.is_multi_field():
+        for row_id in exec_ctx.batch_row_nth:
+            normalized_key = _collect_multi_field_fk(exec_ctx, row_id, first_step, from_fields=from_fields)
+
+            if normalized_key is not None:
+                pk_to_first_fk[row_id] = normalized_key
+            else:
+                _null_fill_row(exec_ctx, row_id, null_fill_fields=null_fill_fields)
+        return pk_to_first_fk
+
+    from_field = from_fields[0]
     for row_id in exec_ctx.batch_row_nth:
-        if first_step.is_multi_field():
-            normalized_key = _collect_multi_field_fk(exec_ctx, row_id, first_step)
-        else:
-            from_field = first_step.get_from_fields()[0]
-            single_fk_value: FieldValue = exec_ctx.context.get_field_value(from_field, row_id)
-            normalized_key = exec_ctx.normalize_key(row_id, single_fk_value, first_step)
+        single_fk_value: FieldValue = exec_ctx.context.get_field_value(from_field, row_id)
+        normalized_key = exec_ctx.normalize_key(row_id, single_fk_value, first_step, from_fields=from_fields)
 
         if normalized_key is not None:
             pk_to_first_fk[row_id] = normalized_key
@@ -191,17 +199,18 @@ def _collect_multi_field_fk(
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
     step: LookupStepIr,
+    *,
+    from_fields: Tuple[str, ...],
 ) -> Optional[Hashable]:
-    from_fields = step.get_from_fields()
     fk_values: List[FieldValue] = []
     for key in from_fields:
         val: FieldValue = exec_ctx.context.get_field_value(key, row_id)
         if val is None:
-            _ = exec_ctx.normalize_key(row_id, None, step)
+            _ = exec_ctx.normalize_key(row_id, None, step, from_fields=from_fields)
             return None
         fk_values.append(val)
     raw_tuple = tuple(fk_values)
-    return exec_ctx.normalize_key(row_id, raw_tuple, step)
+    return exec_ctx.normalize_key(row_id, raw_tuple, step, from_fields=from_fields)
 
 
 def _resolve_next_step_fk(
@@ -209,15 +218,17 @@ def _resolve_next_step_fk(
     row_id: Hashable,
     data: object,
     step: LookupStepIr,
+    *,
+    from_field: Optional[str],
+    from_fields: Tuple[str, ...],
 ) -> Optional[LookupKey]:
-    from_field = step.from_field
-    if isinstance(from_field, str):
-        next_fk: FieldValue = extract_field(data, from_field)
+    if from_field is not None:
+        next_fk: FieldValue = extract_field(data, str(from_field))
         if next_fk is None:
-            _ = exec_ctx.normalize_key(row_id, None, step)
+            _ = exec_ctx.normalize_key(row_id, None, step, from_fields=from_fields)
             return None
-        return exec_ctx.normalize_key(row_id, next_fk, step)
-    return _collect_multi_field_fk_from_data(exec_ctx, row_id, data, step)
+        return exec_ctx.normalize_key(row_id, next_fk, step, from_fields=from_fields)
+    return _collect_multi_field_fk_from_data(exec_ctx, row_id, data, step, from_fields=from_fields)
 
 
 def build_next_mapping(
@@ -230,6 +241,10 @@ def build_next_mapping(
 ) -> Dict[Hashable, LookupKey]:
     new_mapping: Dict[Hashable, LookupKey] = {}
 
+    next_from_fields = next_step.get_from_fields()
+    step_from_field_obj = next_step.from_field
+    next_from_field = step_from_field_obj if isinstance(step_from_field_obj, str) else None
+
     for row_id, fk_value in current_mapping.items():
         if fk_value not in intermediate_result:
             _null_fill_row(exec_ctx, row_id, null_fill_fields=null_fill_fields)
@@ -237,7 +252,14 @@ def build_next_mapping(
 
         data = intermediate_result[fk_value]
 
-        normalized_key = _resolve_next_step_fk(exec_ctx, row_id, data, next_step)
+        normalized_key = _resolve_next_step_fk(
+            exec_ctx,
+            row_id,
+            data,
+            next_step,
+            from_field=next_from_field,
+            from_fields=next_from_fields,
+        )
         if normalized_key is not None:
             new_mapping[row_id] = normalized_key
         else:
@@ -251,17 +273,18 @@ def _collect_multi_field_fk_from_data(
     row_id: Hashable,
     data: object,
     step: LookupStepIr,
+    *,
+    from_fields: Tuple[str, ...],
 ) -> Optional[LookupKey]:
-    from_fields = step.get_from_fields()
     fk_values: List[FieldValue] = []
     for key in from_fields:
         val: FieldValue = extract_field(data, key)
         if val is None:
-            _ = exec_ctx.normalize_key(row_id, None, step)
+            _ = exec_ctx.normalize_key(row_id, None, step, from_fields=from_fields)
             return None
         fk_values.append(val)
     raw_tuple = tuple(fk_values)
-    return exec_ctx.normalize_key(row_id, raw_tuple, step)
+    return exec_ctx.normalize_key(row_id, raw_tuple, step, from_fields=from_fields)
 
 
 def _resolve_ref_required_field_keys(
