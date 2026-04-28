@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import pytest
@@ -289,22 +290,42 @@ def test_project_config_editor_python_roots_allows_outside_project_root(tmp_path
     assert cfg.lsp.python_roots == (outside,)
 
 
-def test_project_config_editor_python_roots_rejects_empty_string(tmp_path: Path) -> None:
+def test_project_config_editor_python_roots_ignores_empty_string_with_warning(tmp_path: Path, caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.dsl.yaml_dsl.project_config")
     (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ['']\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
-    with pytest.raises(TypeError) as excinfo:
-        _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "must be a non-empty directory path" in str(excinfo.value)
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.lsp is not None
+    assert cfg.lsp.python_roots == ()
+    assert any(
+        "yaml_dsl.lsp.python_roots[0]" in record.getMessage()
+        and "空路径" in record.getMessage()
+        and "`raw`=''" in record.getMessage()
+        and "`project_root`=" in record.getMessage()
+        and "`resolved`=" in record.getMessage()
+        for record in caplog.records
+    )
 
 
-def test_project_config_editor_python_roots_rejects_missing_dir(tmp_path: Path) -> None:
+def test_project_config_editor_python_roots_ignores_missing_dir_with_warning(tmp_path: Path, caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.dsl.yaml_dsl.project_config")
     (tmp_path / "scalim.yaml").write_text("yaml_dsl:\n  lsp:\n    python_roots: ['../missing_py']\n", encoding="utf-8")
     demand = tmp_path / "demand.yaml"
     demand.write_text("name: demo\nsources: {}\n", encoding="utf-8")
-    with pytest.raises(ValueError) as excinfo:
-        _ = project_config_mod.load_yaml_dsl_project_config(demand)
-    assert "must be an existing directory" in str(excinfo.value)
+    cfg = project_config_mod.load_yaml_dsl_project_config(demand)
+    assert cfg is not None
+    assert cfg.lsp is not None
+    assert cfg.lsp.python_roots == ()
+    assert any(
+        "yaml_dsl.lsp.python_roots[0]" in record.getMessage()
+        and "目录不存在或不是目录" in record.getMessage()
+        and "`raw`='../missing_py'" in record.getMessage()
+        and "`project_root`=" in record.getMessage()
+        and "`resolved`=" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_project_config_scalim_yaml_override_must_exist_and_be_file(tmp_path: Path) -> None:

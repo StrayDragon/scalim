@@ -344,6 +344,40 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         self._security_check(reference)
         return super(SecurePythonReferenceResolver, self).resolve(reference)
 
+    def _security_check_attr_traversal_part(self, part: str) -> None:
+        """`defense-in-depth`: 遍历属性链时逐级校验 `denylist`.
+
+        注意:
+        - 即使上游已对整个 `reference` 做过 `_security_check`,遍历实现也应保持最小自保能力,
+          避免未来引用字符串校验逻辑调整造成空窗.
+        """
+        if part in self.DANGEROUS_FUNCTIONS or part == "lambda":
+            msg = "安全限制: 函数 '{}' 位于危险函数列表中".format(part)
+            raise ScalimResolverError(msg)
+        if "__" in part:
+            msg = "安全限制: 引用中包含危险模式 '__'"
+            raise ScalimResolverError(msg)
+
+    @override
+    def _resolve_class_style(self, parsed: ParsedReference) -> Callable[..., Any]:
+        self._policy.check(parsed.module_path, ".".join(parsed.attr_path))
+
+        module = self._import_module(parsed.module_path)
+
+        obj: Any = module
+        for attr_name in parsed.attr_path:
+            self._security_check_attr_traversal_part(attr_name)
+            if not hasattr(obj, attr_name):  # pragma: allow-dynattr dsl: resolver attr traversal
+                msg = "对象 '{}' 不存在属性 '{}'".format(obj, attr_name)
+                raise ScalimResolverError(msg)
+            obj = getattr(obj, attr_name)  # pragma: allow-dynattr dsl: resolver attr traversal
+
+        if not callable(obj):
+            msg = "'{}:{}' 不是可调用对象".format(parsed.module_path, ".".join(parsed.attr_path))
+            raise ScalimResolverError(msg)
+
+        return obj
+
     def _normalize_reference(self, reference: str) -> str:
         parsed = self._parser.parse(reference)
         absolute_module_path = self._normalize_relative_module_path(parsed.module_path, reference=reference)
@@ -374,7 +408,6 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
     def _security_check(self, reference: str) -> None:
         parsed = self._parser.parse(reference)
         module_path = parsed.module_path
-        attr_parts = list(parsed.attr_path)
 
         module_parts = module_path.split(".")
         for part in module_parts:
@@ -388,7 +421,11 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
                 msg = "安全限制: 引用中包含危险模式 'lambda'"
                 raise ScalimResolverError(msg)
 
-        for part in attr_parts:
+        # `class-style` 的属性链 `denylist` 校验在遍历实现中逐级执行(避免未来上游校验调整出现空窗).
+        if parsed.style == "class":
+            return
+
+        for part in parsed.attr_path:
             if part in self.DANGEROUS_FUNCTIONS or part == "lambda":
                 msg = "安全限制: 函数 '{}' 位于危险函数列表中".format(part)
                 raise ScalimResolverError(msg)

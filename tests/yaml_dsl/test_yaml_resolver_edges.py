@@ -130,6 +130,31 @@ def test_secure_resolver_blocks_dangerous_reference(ref: str, match: str) -> Non
         resolver.resolve(ref)
 
 
+def test_secure_resolver_enforces_denylist_during_class_style_traversal_in_trusted_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SCALIM_ALLOW_TRUSTED_ALL_MODULES", "1")
+    resolver = SecurePythonReferenceResolver(
+        allowed_modules=frozenset(["*"]),
+        resolver_trusted_mode=ResolverTrustedMode.TRUSTED_ALLOW_ALL_MODULES,
+    )
+
+    with pytest.raises(ScalimResolverError, match="危险函数列表"):
+        resolver.resolve("pathlib:Path.open")
+
+    with pytest.raises(ScalimResolverError, match="危险函数列表"):
+        resolver.resolve("tests.fixtures.resolver_denylist_parts_mod:Obj.lambda")
+
+    with pytest.raises(ScalimResolverError, match="危险模式 '__'"):
+        resolver.resolve("tests.fixtures.resolver_denylist_parts_mod:Obj.a__b")
+
+
+def test_secure_resolver_blocks_dotted_style_dangerous_function_name() -> None:
+    resolver = SecurePythonReferenceResolver()
+    with pytest.raises(ScalimResolverError, match="危险函数列表"):
+        resolver.resolve("tests.fixtures.resolver_denylist_dotted_mod.open")
+
+
 @pytest.mark.parametrize(
     "allowed_fn",
     [
