@@ -6,26 +6,27 @@ from typing import Any, Deque, Dict, Optional, cast
 from typing import Iterable as TypingIterable
 
 from ..._internal.utils.loader_result import (
-    LoaderResultPolicy,
     LoaderResultPolicyLike,
+    LoaderResultPolicyValue,
     normalize_loader_result_policy,
     sample_loader_result,
     summarize_loader_result,
 )
 from ...events import Event
 from .common import (
-    CAPTURE_OVERFLOW_POLICIES,
     DEFAULT_MAX_RECORDED_EVENTS,
-    CaptureOverflowPolicy,
-    ObserverManagerMode,
+    CaptureOverflowPolicyValue,
+    ObserverManagerModeValue,
+    normalize_capture_overflow_policy,
     normalize_observer_manager_mode,
 )
 
 
 class ObserverManagerStateMixin(ABC):
-    mode: ObserverManagerMode = ObserverManagerMode.PROCESS
+    mode: ObserverManagerModeValue = "process"
     max_recorded_events: Optional[int] = None
-    capture_overflow_policy: CaptureOverflowPolicy = CaptureOverflowPolicy.RAISE
+    capture_overflow_policy: CaptureOverflowPolicyValue = "raise"
+    loader_result_policy: LoaderResultPolicyValue = "full"
     loader_result_sample_size: int = 5
     _lock: "threading.RLock" = threading.RLock()
     _recorded_events: Optional[Deque[Event]] = None
@@ -60,6 +61,12 @@ class ObserverManagerStateMixin(ABC):
         max_recorded_events = state_map.get("max_recorded_events")
         self.max_recorded_events = self._normalize_max_recorded_events(max_recorded_events)
         self.capture_overflow_policy = self._normalize_capture_overflow_policy(state_map.get("capture_overflow_policy") or "raise")
+        # 确保状态/序列化边界仅存储内置 `str` 字面量值.
+        state_map["mode"] = self.mode
+        state_map["capture_overflow_policy"] = self.capture_overflow_policy
+        normalized_policy = normalize_loader_result_policy(state_map.get("loader_result_policy"))
+        state_map["loader_result_policy"] = normalized_policy
+        self.loader_result_policy = normalized_policy
 
         recorded = state_map.get("_recorded_events")
         if recorded is None:
@@ -81,22 +88,13 @@ class ObserverManagerStateMixin(ABC):
             raise ValueError(msg)
         return resolved
 
-    def _normalize_capture_overflow_policy(self, policy: object) -> CaptureOverflowPolicy:
-        if isinstance(policy, CaptureOverflowPolicy):
-            return policy
-        if not isinstance(policy, str):
-            msg = "capture_overflow_policy must be a str, got '{}'".format(type(policy).__name__)
-            raise TypeError(msg)
-        normalized = (policy or "raise").strip().lower().replace("_", "-")
-        if normalized not in CAPTURE_OVERFLOW_POLICIES:
-            msg = "Unknown capture_overflow_policy: '{}'".format(policy)
-            raise ValueError(msg)
-        return CaptureOverflowPolicy(normalized)
+    def _normalize_capture_overflow_policy(self, policy: object) -> CaptureOverflowPolicyValue:
+        return normalize_capture_overflow_policy(policy)
 
-    def _normalize_mode(self, value: object) -> ObserverManagerMode:
+    def _normalize_mode(self, value: object) -> ObserverManagerModeValue:
         return normalize_observer_manager_mode(value)
 
-    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicy:
+    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicyValue:
         return normalize_loader_result_policy(policy)
 
     def _summarize_result(self, result: Any) -> Dict[str, Any]:

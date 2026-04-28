@@ -5,14 +5,14 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
-from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyLike
+from .._internal.utils.loader_result import LoaderResultPolicyLike, LoaderResultPolicyValue
 from ..events import Event, generate_run_id
 from ._internal.common import (
     DEFAULT_MAX_RECORDED_EVENTS,
-    CaptureOverflowPolicy,
     CaptureOverflowPolicyLike,
-    ObserverManagerMode,
+    CaptureOverflowPolicyValue,
     ObserverManagerModeLike,
+    ObserverManagerModeValue,
     ScalimObserverCaptureOverflowError,
 )
 from ._internal.common import (
@@ -56,13 +56,13 @@ class ObserverManager(
     _capture_unknown_event_types: bool
     debug_mode: bool
     fallback_logger_enabled: bool
-    loader_result_policy: LoaderResultPolicy
+    loader_result_policy: LoaderResultPolicyValue
     loader_result_sample_size: int
     run_id: str
     _event_meta_defaults: Optional[Dict[str, Any]]
-    mode: ObserverManagerMode
+    mode: ObserverManagerModeValue
     max_recorded_events: Optional[int]
-    capture_overflow_policy: CaptureOverflowPolicy
+    capture_overflow_policy: CaptureOverflowPolicyValue
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
     _seq: int

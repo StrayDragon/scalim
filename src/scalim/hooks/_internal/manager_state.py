@@ -3,8 +3,8 @@ from abc import ABC
 from typing import Any, Dict, Tuple
 
 from ..._internal.utils.loader_result import (
-    LoaderResultPolicy,
     LoaderResultPolicyLike,
+    LoaderResultPolicyValue,
     normalize_loader_result_policy,
     sample_loader_result,
     summarize_loader_result,
@@ -53,10 +53,13 @@ class HookManagerStateMixin(HookManagerBase, ABC):
             manager.dispatch_strategy = dispatch_strategy
         else:
             manager.dispatch_strategy = HookDispatchStrategy()
+
+        # 确保状态/序列化边界仅存储内置 `str` 字面量值.
+        manager.loader_result_policy = normalize_loader_result_policy(state.get("loader_result_policy"))
         self._rebuild_subscription_cache()
 
     @override
-    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicy:
+    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicyValue:
         return normalize_loader_result_policy(policy)
 
     @override

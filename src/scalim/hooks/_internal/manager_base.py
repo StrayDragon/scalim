@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
-from ..._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyLike
+from ..._internal.utils.loader_result import LoaderResultPolicyLike, LoaderResultPolicyValue
 from ...events import Event
 from ...events._events import (
     BatchEndEvent,
@@ -65,10 +65,10 @@ class HookManagerLike(Protocol):
     hooks: List[ExecutionHookLike]
     debug_mode: bool
     fallback_logger_enabled: bool
-    loader_result_policy: LoaderResultPolicy
+    loader_result_policy: LoaderResultPolicyValue
     loader_result_sample_size: int
 
-    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicy: ...
+    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicyValue: ...
 
     @property
     def has_hooks(self) -> bool: ...

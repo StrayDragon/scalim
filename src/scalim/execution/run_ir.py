@@ -4,7 +4,7 @@ import warnings as py_warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 
-from .._internal.utils.loader_result import LoaderResultPolicy
+from .._internal.utils.loader_result import normalize_loader_result_policy
 from .._internal.warningsx import ScalimExperimentalWarning
 from ..events import Event, EventType, generate_run_id
 from ..hooks import HookManager
@@ -849,9 +849,9 @@ def run_ir_capture_events(
         )
 
         hook_manager = HookCaptureManager(replay_hook_manager)
-        hook_manager.loader_result_policy = LoaderResultPolicy.SUMMARY
+        hook_manager.loader_result_policy = normalize_loader_result_policy("summary")
         observer_manager = replay_observer_manager.create_capture_manager()
-        observer_manager.loader_result_policy = LoaderResultPolicy.SUMMARY
+        observer_manager.loader_result_policy = normalize_loader_result_policy("summary")
         observer_manager.max_recorded_events = None
 
         result = _run_ir_with_plan_and_managers(

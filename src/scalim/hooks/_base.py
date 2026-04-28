@@ -4,7 +4,7 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyLike
+from .._internal.utils.loader_result import LoaderResultPolicyLike, LoaderResultPolicyValue
 from ..events import Event
 from ..events._events import (
     BatchEndEvent,
@@ -175,7 +175,7 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
     _on_event_handlers_by_event_type: Dict[str, Tuple[HookOnEventHandlerPair, ...]]
     debug_mode: bool
     fallback_logger_enabled: bool
-    loader_result_policy: LoaderResultPolicy
+    loader_result_policy: LoaderResultPolicyValue
     loader_result_sample_size: int
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
 from ..._internal.loggingx import format_kv, prefix
-from ..._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
+from ..._internal.utils.loader_result import LoaderResultPolicyValue, normalize_loader_result_policy
 from ...events import (
     WORKFLOW_ATTRIBUTION_META_KEYS,
     Event,
@@ -35,7 +35,7 @@ from .common import (
     CATALOG_EVENT_TYPES_SET,
     OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING,
     OBSERVER_RAISED_EXCEPTION_WARNING,
-    ObserverManagerMode,
+    ObserverManagerModeValue,
 )
 
 _logger = logging.getLogger(__name__)
@@ -45,9 +45,9 @@ class ObserverManagerEmitMixin(ABC):
     observers: Optional[List[Observer]] = None
     debug_mode: bool = False
     fallback_logger_enabled: bool = False
-    loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL
+    loader_result_policy: LoaderResultPolicyValue = "full"
     run_id: str = ""
-    mode: ObserverManagerMode = ObserverManagerMode.PROCESS
+    mode: ObserverManagerModeValue = "process"
     _lock: "threading.RLock" = threading.RLock()
     _has_observers: bool = False
     _observers_by_event_type: Optional[Dict[str, Tuple[Observer, ...]]] = None
