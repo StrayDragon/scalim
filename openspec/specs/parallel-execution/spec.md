@@ -35,6 +35,21 @@
 - **WHEN** 同层存在任一 `bind.mode=rows` 的 LoadRef
 - **THEN** 该层 LoadRef MUST 串行执行
 
+### Requirement: adaptive runtime shared caches MUST document CPython+GIL-only safety
+系统 MUST 明确声明:`parallel_mode=adaptive` 并发路径中的共享 `dict/set` 缓存与计数器仅在 **GIL-backed CPython** 下承诺正确性(依赖实现细节而非语言语义保证)。
+
+当 `parallel_mode=adaptive` 启用批次内并发时,执行层会在多个 worker 线程间共享部分 `dict/set` 缓存与计数器(例如 key normalize cache 与 load-ref cache)。系统 MUST 明确声明以下契约:
+- 这些结构当前不提供显式锁保护
+- 其并发正确性仅在 **GIL-backed CPython** 下成立
+- free-threaded/no-GIL Python 不在支持范围内(若要支持,必须引入锁或等价同步策略)
+
+系统 MUST 在对应实现的模块/类级别或关键字段附近以 `NOTE:` / `WARN:` 注释形式写出上述信息,使维护者在阅读热点代码时能直接看到契约边界。
+
+#### Scenario: maintainer can discover the CPython+GIL-only contract near the hot caches
+- **WHEN** 维护者阅读 `ExecutionRuntime` 及 `LoadRef` key-normalize cache 相关实现
+- **THEN** 必须能在关键共享缓存/计数器附近看到 `NOTE:` / `WARN:` 注释
+- **AND** 注释必须明确包含 "CPython" 与 "GIL" 的支持边界说明
+
 ### Requirement: 阈值 gate 与并发上限决定退化行为
 系统 MUST 使用阈值策略决定是否启用并发(如同层任务数、keys 规模).
 当任务规模不足或 `resolve_adaptive_max_workers(...)<=1` 时 MUST 退化为串行语义.

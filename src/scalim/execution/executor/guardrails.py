@@ -115,6 +115,9 @@ def record_guardrail(
 ) -> None:
     payload = build_guardrail_context(runtime, code=code, action_mode=action_mode, context=context)
     if once_key is not None:
+        # `NOTE:` `guardrail_logged` 在 `parallel_mode="adaptive"` 下可能被多个工作线程并发读写。
+        # `NOTE:` 这里的 `check-then-act`(`in` + `add`) 不是原子语义;当前依赖 `CPython` `GIL` 的实现细节避免集合损坏。
+        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,需引入显式锁或线程安全集合。
         if once_key in runtime.guardrail_logged:
             return
         runtime.guardrail_logged.add(once_key)
