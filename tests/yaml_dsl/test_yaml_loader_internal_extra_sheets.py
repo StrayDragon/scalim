@@ -9,11 +9,13 @@ from scalim.dsl.yaml_dsl import (
     RunOverrides,
     compile,
 )
+from scalim.dsl.yaml_dsl._internal import resource_override as resource_override_mod
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
 from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import ScalimYamlValidationError
 from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig
+from scalim.workflow.errors import ScalimWorkflowConfigError
 
 
 def test_loader_parse_config_ignores_failure_policy_key() -> None:
@@ -141,19 +143,22 @@ def test_output_extras_override_rejects_invalid_item_type() -> None:
 
 
 def test_runtime_compiler_parse_output_extra_sheet_override_error_branches() -> None:
-    assert compiler_mod._parse_output_extra_sheet_override(False, path="p") is None  # noqa: SLF001
+    assert resource_override_mod.parse_output_extra_sheet_override(False, path="p") is None  # noqa: SLF001
 
-    with pytest.raises(TypeError, match=r"p must be a boolean or an OutputExtraSheetOverride"):
-        _ = compiler_mod._parse_output_extra_sheet_override(1, path="p")  # noqa: SLF001
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+        _ = resource_override_mod.parse_output_extra_sheet_override(1, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p"
 
-    with pytest.raises(TypeError, match=r"p\.path must be a string or PathLike"):
-        _ = compiler_mod._parse_output_extra_sheet_override(OutputExtraSheetOverride(path=1), path="p")  # noqa: SLF001
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+        _ = resource_override_mod.parse_output_extra_sheet_override(OutputExtraSheetOverride(path=1), path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p.path"
 
-    with pytest.raises(TypeError, match=r"p\.allow_formulas must be a bool"):
-        _ = compiler_mod._parse_output_extra_sheet_override(
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+        _ = resource_override_mod.parse_output_extra_sheet_override(
             OutputExtraSheetOverride(allow_formulas="nope"),
             path="p",
         )  # noqa: SLF001
+    assert exc_info.value.path == "p.allow_formulas"
 
 
 def test_runtime_compiler_apply_output_extras_overrides_rejects_invalid_extras_type() -> None:
@@ -164,5 +169,6 @@ def test_runtime_compiler_apply_output_extras_overrides_rejects_invalid_extras_t
         outputs=DemandRunOutputOptions(overrides=overrides),
     )
 
-    with pytest.raises(TypeError, match=r"overrides\.output_extras must be an OutputExtrasOverride"):
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = compiler_mod._apply_output_extras_overrides(DemandConfig(), options=options)  # noqa: SLF001
+    assert exc_info.value.path == "overrides.output_extras"

@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
+from scalim.dsl.yaml_dsl._internal import resource_override as resource_override_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
@@ -187,11 +188,12 @@ def test_workflow_config_parse_rejects_legacy_write_lock_and_csv_file_path() -> 
 
 def test_workflow_compile_helpers_cover_output_root_dir_migration_edges(tmp_path: Path) -> None:
     export_xlsx = BookExportXlsxConfig(path="out", allow_formulas=False)
-    patched = compile_mod._apply_book_export_xlsx_patch(  # noqa: SLF001
+    patched = resource_override_mod._apply_optional_book_export_xlsx_patch(  # noqa: SLF001
         export_xlsx,
         {"allow_formulas": True},
         path="workflow.resources.books.mem",
     )
+    assert patched is not None
     assert patched.path == "out"
     assert patched.allow_formulas is True
 

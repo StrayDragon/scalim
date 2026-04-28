@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl import FileResourceOverride, OutputOverride, OutputToOverride, ResourcesOverride
+from scalim.dsl.yaml_dsl._internal import resource_override as resource_override_mod
 from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowRun
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
@@ -17,24 +18,24 @@ from scalim.dsl.yaml_dsl.schema_dsl.models import (
 
 def test_workflow_compile_apply_file_patch_cover_branches() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys"):
-        _ = workflow_compile_mod._apply_file_patch(None, {"nope": 1}, path="p")  # noqa: SLF001
+        _ = resource_override_mod._apply_file_patch(None, {"nope": 1}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p\.kind must be a non-empty string"):
-        _ = workflow_compile_mod._apply_file_patch(None, {"kind": ""}, path="p")  # noqa: SLF001
+        _ = resource_override_mod._apply_file_patch(None, {"kind": ""}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p\.kind='json_file' is invalid"):
-        _ = workflow_compile_mod._apply_file_patch(None, {"kind": "json_file"}, path="p")  # noqa: SLF001
+        _ = resource_override_mod._apply_file_patch(None, {"kind": "json_file"}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p\.path is required for kind=csv_file"):
-        _ = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file"}, path="p")  # noqa: SLF001
+        _ = resource_override_mod._apply_file_patch(None, {"kind": "csv_file"}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p\.encoding must be a string"):
-        _ = workflow_compile_mod._apply_file_patch(FileConfig(kind="csv_file", path="a"), {"encoding": 1}, path="p")  # noqa: SLF001
+        _ = resource_override_mod._apply_file_patch(FileConfig(kind="csv_file", path="a"), {"encoding": 1}, path="p")  # noqa: SLF001
 
-    patched = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a", "encoding": None}, path="p")  # noqa: SLF001
+    patched = resource_override_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a", "encoding": None}, path="p")  # noqa: SLF001
     assert patched.encoding
 
-    patched2 = workflow_compile_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a", "encoding": " latin1 "}, path="p")  # noqa: SLF001
+    patched2 = resource_override_mod._apply_file_patch(None, {"kind": "csv_file", "path": "a", "encoding": " latin1 "}, path="p")  # noqa: SLF001
     assert patched2.encoding == "latin1"
 
 
@@ -141,7 +142,7 @@ def test_workflow_compile_resources_files_invalid_kind_is_wrapped(tmp_path: Path
 
 
 def test_workflow_compile_effective_outputs_rejects_file_and_book_destination() -> None:
-    with pytest.raises(ScalimWorkflowConfigError, match=r"declare only one destination"):
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = workflow_compile_mod._effective_outputs_for_workflow_compile(  # noqa: SLF001
             DemandConfig(),
             overrides_outputs=[
@@ -153,6 +154,7 @@ def test_workflow_compile_effective_outputs_rejects_file_and_book_destination() 
             ],
             default_book_id=None,
         )
+    assert exc_info.value.path == "overrides.outputs.0.to"
 
 
 def test_workflow_compile_append_write_nodes_requires_file_resource_id() -> None:

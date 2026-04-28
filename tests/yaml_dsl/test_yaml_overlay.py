@@ -24,6 +24,7 @@ from scalim.dsl.yaml_dsl import (
 )
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from scalim.ob.presets.viz import VizObserverConfig
+from scalim.workflow.errors import ScalimWorkflowConfigError
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
 
@@ -119,12 +120,12 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
         (lambda: RunOverrides(outputs=["detail"]), TypeError, r"RunOverrides\.outputs must be a sequence of OutputOverride"),
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="", fields=("order_id",), to=OutputToOverride(file="detail_csv")),)),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.name: .*Hint:",
         ),
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="bad-name", fields=("order_id",), to=OutputToOverride(file="detail_csv")),)),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.name: Invalid identifier.*Hint:",
         ),
         (
@@ -134,36 +135,36 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                     OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),
                 )
             ),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs has duplicate output name: detail",
         ),
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="detail", fields=(), to=OutputToOverride(file="detail_csv")),)),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.fields must not be empty",
         ),
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="detail", fields=("unknown",), to=OutputToOverride(file="detail_csv")),)),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.fields reference unknown fields: unknown",
         ),
         (
             lambda: RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv", sheet="Detail")),)
             ),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.to\.sheet is not allowed with to\.file",
         ),
         (
             lambda: RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv", book="report")),)
             ),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.to must declare exactly one of to\.file or to\.book",
         ),
         (
             lambda: RunOverrides(outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(sheet="Detail")),)),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"Missing output destination for overrides\.outputs\.0\.to",
         ),
         (
@@ -177,7 +178,7 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                     ),
                 )
             ),
-            ValueError,
+            ScalimWorkflowConfigError,
             r"overrides\.outputs\.0\.write\.header_fields_output_by='bad' is invalid",
         ),
         (
