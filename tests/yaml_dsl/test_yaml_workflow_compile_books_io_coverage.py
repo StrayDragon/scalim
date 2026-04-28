@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import os
 import pytest
 
 from scalim.dsl.yaml_dsl import (
@@ -20,6 +21,7 @@ from scalim.dsl.yaml_dsl import (
 from scalim.dsl.yaml_dsl._internal import resource_override as resource_override_mod
 from scalim.dsl.yaml_dsl import workflow_compile as workflow_compile_mod
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, WorkflowConfig, WorkflowRun
+from scalim.dsl.yaml_dsl.init_var_nodes import ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BookBudgetConfig,
     BookConfig,
@@ -176,6 +178,38 @@ def test_workflow_compile_parse_output_extra_sheet_override_branches_cover_error
     assert cfg.path == "./a.xlsx"
     assert cfg.sheet == "S"
     assert cfg.allow_formulas is True
+
+
+class _BlankPathLike(os.PathLike):
+    def __init__(self, value: str) -> None:
+        self._value = str(value)
+
+    def __fspath__(self) -> str:
+        return self._value
+
+
+def test_resource_override_as_opt_non_empty_str_or_pathlike_cover_branches() -> None:
+    assert resource_override_mod._as_opt_non_empty_str_or_pathlike(None, path="p") is None  # noqa: SLF001
+    assert resource_override_mod._as_opt_non_empty_str_or_pathlike(_BlankPathLike(" x "), path="p") == "x"  # noqa: SLF001
+
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+        _ = resource_override_mod._as_opt_non_empty_str_or_pathlike(_BlankPathLike("   "), path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p"
+
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+        _ = resource_override_mod._as_opt_non_empty_str_or_pathlike("   ", path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p"
+
+    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+        _ = resource_override_mod._as_opt_non_empty_str_or_pathlike(1, path="p")  # noqa: SLF001
+    assert exc_info.value.path == "p"
+
+
+def test_init_var_nodes_parse_mapping_node_missing_key_cover_branches() -> None:
+    with pytest.raises(ScalimInitVarNodeValueError) as exc_info:
+        _ = parse_init_var_mapping_node({}, path="p")
+    assert exc_info.value.path == "p"
+    assert "missing '$init_var'" in exc_info.value.reason
 
 
 @pytest.mark.parametrize(

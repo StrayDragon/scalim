@@ -1,7 +1,9 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 from ...exceptions import ScalimYamlError
 from ...vendor.compact.typing_extensionsx import override
+from ...vendor.dataclassesx import dataclass
+from ...vendor.dataclassesx import field as dataclass_field
 
 
 class ScalimInitVarNodeValueError(ScalimYamlError):
@@ -35,6 +37,18 @@ class ScalimInitVarNodeTypeError(ScalimYamlError):
 _INIT_VAR_KEY = "$init_var"
 
 
+@dataclass(frozen=True)
+class InitVarRef:
+    """内部路径节点: `{$init_var: <name>}` 的显式表示."""
+
+    name: str
+    path: str = dataclass_field(compare=False)
+
+
+PathNode = Union[str, InitVarRef]
+OptionalPathNode = Optional[PathNode]
+
+
 def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
     """校验并解析 `{$init_var: <name>}` 指令节点,返回归一化后的变量名.
 
@@ -63,8 +77,19 @@ def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
     return init_var_raw.strip()
 
 
+def parse_init_var_ref(raw: Dict[str, Any], *, path: str) -> InitVarRef:
+    """校验并解析 `{$init_var: <name>}` 指令节点,返回显式 `InitVarRef`."""
+
+    name = parse_init_var_mapping_node(raw, path=path)
+    return InitVarRef(name=str(name), path=str(path))
+
+
 __all__ = (
+    "InitVarRef",
+    "OptionalPathNode",
+    "PathNode",
     "ScalimInitVarNodeTypeError",
     "ScalimInitVarNodeValueError",
     "parse_init_var_mapping_node",
+    "parse_init_var_ref",
 )

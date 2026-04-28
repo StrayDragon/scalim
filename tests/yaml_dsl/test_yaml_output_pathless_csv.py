@@ -2,6 +2,7 @@ import pytest
 
 from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, compile
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ScalimYamlValidationError
+from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl.runtime.output_path_resolve import resolve_output_container_path
 
 
@@ -44,7 +45,10 @@ def test_resolve_output_container_path_branches() -> None:
     with pytest.raises(ValueError, match=r"x is required"):
         _ = resolve_output_container_path("   ", init_vars=None, path="x")
 
-    assert resolve_output_container_path({"$init_var": "p"}, init_vars={"p": "./out.csv"}, path="x") == "./out.csv"
+    with pytest.raises(TypeError, match=r"x must be a string path or InitVarRef"):
+        _ = resolve_output_container_path({"$init_var": "p"}, init_vars={"p": "./out.csv"}, path="x")  # type: ignore[arg-type]
+
+    assert resolve_output_container_path(InitVarRef(name="p", path="x"), init_vars={"p": "./out.csv"}, path="x") == "./out.csv"
 
     with pytest.raises(ValueError, match=r"Missing init_var 'p'"):
-        _ = resolve_output_container_path({"$init_var": "p"}, init_vars=None, path="x")
+        _ = resolve_output_container_path(InitVarRef(name="p", path="x"), init_vars=None, path="x")

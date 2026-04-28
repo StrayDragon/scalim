@@ -1,4 +1,5 @@
 # pragma: allow-c901-file plan: c70
+import os
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from ....execution.guardrails import GuardrailsPolicy
@@ -13,13 +14,12 @@ from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
 from ....vendor.dataclassesx import field as dataclass_field
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ..init_var_nodes import OptionalPathNode
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError
 
 if TYPE_CHECKING:
-    import os
-
     import pandas as pd
 
     from ....execution.run_ir import ExecutionRequest
@@ -123,7 +123,10 @@ class RunOverrides:
         include_header: bool = True,
         header_fields_output_by: str = "field_id",
     ) -> "RunOverrides":
-        resources = ResourcesOverride(files={str(file_id): FileResourceOverride(kind="csv_file", path=output_root, encoding=str(encoding))})
+        output_root_str = str(os.fspath(output_root)).strip()
+        resources = ResourcesOverride(
+            files={str(file_id): FileResourceOverride(kind="csv_file", path=str(output_root_str), encoding=str(encoding))}
+        )
         output = OutputOverride(
             name=str(output_name),
             fields=tuple(str(x) for x in fields),
@@ -145,12 +148,13 @@ class RunOverrides:
         include_header: bool = True,
         header_fields_output_by: str = "field_id",
     ) -> "RunOverrides":
+        output_root_str = str(os.fspath(output_root)).strip()
         defaults = OutputsDefaultsOverride(to=OutputDefaultsToOverride(book=str(book_id)))
         resources = ResourcesOverride(
             books={
                 str(book_id): BookResourceOverride(
                     kind="xlsx_file",
-                    path=output_root,
+                    path=str(output_root_str),
                     allow_formulas=bool(allow_formulas),
                     write_defaults=BookWriteDefaultsOverride(mode="sheet"),
                 )
@@ -268,14 +272,14 @@ class BookBudgetOverride:
 
 @dataclass(frozen=True)
 class BookExportXlsxOverride:
-    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    path: OptionalPathNode = None
     allow_formulas: Optional[bool] = None
 
 
 @dataclass(frozen=True)
 class BookResourceOverride:
     kind: Optional[str] = None
-    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    path: OptionalPathNode = None
     budget: Optional[BookBudgetOverride] = None
     export_xlsx: Optional[BookExportXlsxOverride] = None
     allow_formulas: Optional[bool] = None
@@ -285,7 +289,7 @@ class BookResourceOverride:
 @dataclass(frozen=True)
 class FileResourceOverride:
     kind: Optional[str] = None
-    path: Optional[Union[str, "os.PathLike[str]"]] = None
+    path: OptionalPathNode = None
     encoding: Optional[str] = None
 
 

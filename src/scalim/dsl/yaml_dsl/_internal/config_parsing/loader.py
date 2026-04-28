@@ -5,7 +5,7 @@ from typing import IO, Any, Dict, Mapping, Optional, Sequence, Union, cast
 
 from ....._internal.loggingx import get_logger, prefix
 from .....typedefs import FailurePolicy
-from ...init_var_nodes import parse_init_var_mapping_node
+from ...init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ...schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ...schema_dsl.models import (
     BOOK_BUDGET_KEYS,
@@ -587,14 +587,12 @@ class YamlDemandLoader(
         encoding = str(csv_branch.get(FILE_CSV_FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
         return FileConfig(kind="csv_file", path=path, encoding=encoding)
 
-    def _parse_path_or_init_var(self, raw: object, *, path: str) -> Any:
+    def _parse_path_or_init_var(self, raw: object, *, path: str) -> OptionalPathNode:
         if isinstance(raw, dict):
-            return {
-                "$init_var": parse_init_var_mapping_node(
-                    cast("Dict[str, Any]", raw),  # pragma: allow-cast init_var mapping typed narrowing
-                    path=path,
-                )
-            }
+            return parse_init_var_ref(
+                cast("Dict[str, Any]", raw),  # pragma: allow-cast init_var mapping typed narrowing
+                path=path,
+            )
         if raw is None:
             return None
         if isinstance(raw, str):

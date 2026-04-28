@@ -3,6 +3,7 @@ import os
 import pytest
 
 from scalim.dsl.yaml_dsl._internal import resource_override as resource_override_mod
+from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl.runtime import compiler as compiler_mod
 from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
 from scalim.workflow.errors import ScalimWorkflowConfigError
@@ -417,7 +418,10 @@ def test_output_override_normalizes_fields_sequence_to_tuple_cover_branches() ->
 
 
 def test_resource_override_as_opt_path_or_init_var_cover_branches() -> None:
-    assert resource_override_mod._as_opt_path_or_init_var({"$init_var": "p"}, path="p") == {"$init_var": "p"}  # noqa: SLF001
+    out = resource_override_mod._as_opt_path_or_init_var({"$init_var": "p"}, path="p")  # noqa: SLF001
+    assert isinstance(out, InitVarRef)
+    assert out.name == "p"
+    assert out.path == "p"
     assert resource_override_mod._as_opt_path_or_init_var(None, path="p") is None  # noqa: SLF001
     assert resource_override_mod._as_opt_path_or_init_var(_BlankPathLike(" x "), path="p") == "x"  # noqa: SLF001
 

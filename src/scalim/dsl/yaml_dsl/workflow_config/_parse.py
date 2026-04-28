@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
 from ....workflow.errors import ScalimWorkflowConfigError
-from ..init_var_nodes import parse_init_var_mapping_node
+from ..init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
     BookBudgetConfig,
@@ -199,9 +199,9 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
     return runs, seen_ids
 
 
-def _parse_path_or_init_var(raw: object, *, path: str) -> Any:
+def _parse_path_or_init_var(raw: object, *, path: str) -> OptionalPathNode:
     if isinstance(raw, dict):
-        return {"$init_var": parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)}  # pragma: allow-cast yaml dict
+        return parse_init_var_ref(cast("Dict[str, Any]", raw), path=path)  # pragma: allow-cast yaml dict
     if raw is None:
         return None
     if isinstance(raw, os.PathLike):

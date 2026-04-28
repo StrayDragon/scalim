@@ -1,5 +1,6 @@
 import pytest
 
+from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
@@ -161,7 +162,9 @@ def test_loader_parse_path_or_init_var_branches_cover_dict_and_error() -> None:
     loader = YamlDemandLoader()
 
     out = loader._parse_path_or_init_var({"$init_var": "p"}, path="p")  # noqa: SLF001
-    assert out == {"$init_var": "p"}
+    assert isinstance(out, InitVarRef)
+    assert out.name == "p"
+    assert out.path == "p"
 
     with pytest.raises(TypeError, match=r"p must be a non-empty string or"):
         _ = loader._parse_path_or_init_var(1, path="p")  # noqa: SLF001

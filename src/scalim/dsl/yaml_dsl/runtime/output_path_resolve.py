@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, cast
+from typing import Dict, Optional
 
-from ..init_var_nodes import parse_init_var_mapping_node
+from ..init_var_nodes import InitVarRef, OptionalPathNode
 
 
 def resolve_output_container_path(
-    raw: object,
+    raw: OptionalPathNode,
     *,
     init_vars: Optional[Dict[str, object]],
     path: str,
@@ -23,7 +23,11 @@ def resolve_output_container_path(
     """
 
     if isinstance(raw, dict):
-        var_name = parse_init_var_mapping_node(cast("Dict[str, Any]", raw), path=path)  # pragma: allow-cast yaml mapping typed narrowing
+        msg = "{} must be a string path or InitVarRef".format(path)
+        raise TypeError(msg)
+
+    if isinstance(raw, InitVarRef):
+        var_name = str(raw.name)
         if init_vars is None or var_name not in init_vars:
             msg = "Missing init_var '{}' for {}".format(var_name, path)
             raise ValueError(msg)
@@ -57,7 +61,7 @@ def resolve_output_container_path(
 
 
 def resolve_yaml_relative_output_path(
-    raw: object,
+    raw: OptionalPathNode,
     *,
     base_dir: str,
     init_vars: Optional[Dict[str, object]],

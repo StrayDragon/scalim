@@ -5,7 +5,7 @@ import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.call_by import CallByValue
 from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
-from scalim.dsl.yaml_dsl.init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError
+from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl.runtime import output_composition_yaml as oc_yaml
 from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
@@ -226,7 +226,7 @@ def test_compile_output_composition_skip_flag_keeps_explicit_extra_sheet_path() 
 
 
 def test_compile_output_composition_resolves_file_resource_path_init_var() -> None:
-    config = _csv_config({"$init_var": "output_path"})
+    config = _csv_config(InitVarRef(name="output_path", path="resources.files.detail_csv.csv_file.path"))
 
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,
@@ -241,7 +241,7 @@ def test_compile_output_composition_resolves_file_resource_path_init_var() -> No
 
 
 def test_compile_output_composition_requires_file_resource_path_init_var_value() -> None:
-    config = _csv_config({"$init_var": "output_path"})
+    config = _csv_config(InitVarRef(name="output_path", path="resources.files.detail_csv.csv_file.path"))
 
     with pytest.raises(ValueError, match=r"resources\.files\.detail_csv\.csv_file\.path"):
         _ = oc_yaml.compile_output_composition_from_yaml(
@@ -249,42 +249,8 @@ def test_compile_output_composition_requires_file_resource_path_init_var_value()
         )
 
 
-def test_compile_output_composition_rejects_file_resource_path_init_var_shape_errors() -> None:
-    config = _csv_config({"$init_var": "out_path", "other": 1})
-    with pytest.raises(ScalimInitVarNodeValueError) as excinfo:
-        _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
-        )
-    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path"
-    assert excinfo.value.reason == "only supports {$init_var: <name>}; unexpected keys: other"
-
-    config = _csv_config({})
-    with pytest.raises(ScalimInitVarNodeValueError) as excinfo:
-        _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
-        )
-    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path"
-    assert excinfo.value.reason == "only supports {$init_var: <name>}; missing '$init_var'"
-
-    config = _csv_config({"$init_var": None})
-    with pytest.raises(ScalimInitVarNodeTypeError) as excinfo:
-        _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
-        )
-    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path.$init_var"
-    assert excinfo.value.reason == "must be a non-empty string"
-
-    config = _csv_config({"$init_var": " "})
-    with pytest.raises(ScalimInitVarNodeTypeError) as excinfo:
-        _ = oc_yaml.compile_output_composition_from_yaml(
-            config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), init_vars={"out_path": "./out"}, yaml_base_dir="."
-        )
-    assert excinfo.value.path == "resources.files.detail_csv.csv_file.path.$init_var"
-    assert excinfo.value.reason == "must be a non-empty string"
-
-
 def test_compile_output_composition_validates_init_var_value_types_and_normalizes_path() -> None:
-    config = _csv_config({"$init_var": "out_path"})
+    config = _csv_config(InitVarRef(name="out_path", path="resources.files.detail_csv.csv_file.path"))
 
     spec = oc_yaml.compile_output_composition_from_yaml(
         config,

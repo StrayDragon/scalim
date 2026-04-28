@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cas
 
 from ....vendor.dataclassesx import replace
 from ....workflow.errors import ScalimWorkflowConfigError
-from ..init_var_nodes import parse_init_var_mapping_node
+from ..init_var_nodes import InitVarRef, OptionalPathNode, parse_init_var_ref
 from ..runtime.contracts import (
     BookBudgetOverride,
     BookExportXlsxOverride,
@@ -87,21 +87,42 @@ def _as_non_empty_str(value: object, *, path: str) -> str:
     return v
 
 
-def _as_opt_path_or_init_var(value: object, *, path: str) -> Any:
+def _as_opt_non_empty_str_or_pathlike(value: object, *, path: str) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, os.PathLike):
+        v = str(os.fspath(value)).strip()
+        if not v:
+            msg = "{} must not be empty".format(path)
+            raise ScalimWorkflowConfigError(msg, path=str(path))
+        return v
+    if isinstance(value, str):
+        v = str(value).strip()
+        if not v:
+            msg = "{} must not be empty".format(path)
+            raise ScalimWorkflowConfigError(msg, path=str(path))
+        return v
+    msg = "{} must be a string or os.PathLike".format(path)
+    raise ScalimWorkflowConfigError(msg, path=str(path))
+
+
+def _as_opt_path_or_init_var(value: object, *, path: str) -> OptionalPathNode:
     """校验可选的 `{ $init_var: ... }` / 路径类值。
 
     返回规范化后的表示:
     - 缺失时返回 `None`
-    - `init_var` 映射返回 `{"$init_var": "<name>"}`
+    - `init_var` 映射返回 `InitVarRef`
     - 字符串或 `os.PathLike` 返回去除首尾空白后的 `str`
     """
 
     if value is None:
         return None
 
+    if isinstance(value, InitVarRef):
+        return value
+
     if isinstance(value, dict):
-        var_name = parse_init_var_mapping_node(cast("Dict[str, Any]", value), path=str(path))  # pragma: allow-cast mapping narrowing
-        return {"$init_var": str(var_name)}
+        return parse_init_var_ref(cast("Dict[str, Any]", value), path=str(path))  # pragma: allow-cast mapping narrowing
 
     if isinstance(value, os.PathLike):
         v = str(os.fspath(value)).strip()
@@ -117,7 +138,7 @@ def _as_opt_path_or_init_var(value: object, *, path: str) -> Any:
             raise ScalimWorkflowConfigError(msg, path=str(path))
         return v
 
-    msg = "{} must be a string, os.PathLike, or {{$init_var: <name>}}".format(path)
+    msg = "{} must be a string, os.PathLike, InitVarRef, or {{$init_var: <name>}}".format(path)
     raise ScalimWorkflowConfigError(msg, path=str(path))
 
 
@@ -208,10 +229,10 @@ def parse_output_extra_sheet_override(
     sheet = str(raw.sheet).strip() if raw.sheet is not None else None
 
     raw_path = raw.path
-    if raw_path is not None and not isinstance(raw_path, (str, os.PathLike, dict)):
-        msg = "{}.path must be a string, os.PathLike, or {{$init_var: <name>}}".format(path)
+    if raw_path is not None and not isinstance(raw_path, (str, os.PathLike)):
+        msg = "{}.path must be a string or os.PathLike".format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-    resolved_path = _as_opt_path_or_init_var(raw_path, path="{}.path".format(path)) if raw_path is not None else None
+    resolved_path = _as_opt_non_empty_str_or_pathlike(raw_path, path="{}.path".format(path)) if raw_path is not None else None
 
     allow_formulas = raw.allow_formulas
     if allow_formulas is not None and not isinstance(allow_formulas, bool):

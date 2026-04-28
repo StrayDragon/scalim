@@ -2,6 +2,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple
 
 from .....vendor.dataclassesx import dataclass
 from .....vendor.dataclassesx import field as dataclass_field
+from ...init_var_nodes import OptionalPathNode
 from ..constants import DEFAULT_OUTPUT_ENCODING, schema_meta, schema_omit, schema_ref
 from ..output_enums import (
     BOOK_WRITE_ALIGN_BY_ENUM,
@@ -78,7 +79,7 @@ class BookExportXlsxConfig:
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
-    path: Any = dataclass_field(
+    path: OptionalPathNode = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
@@ -168,7 +169,7 @@ class BookXlsxFileConfig:
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
-    path: Any = dataclass_field(
+    path: OptionalPathNode = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
@@ -230,7 +231,7 @@ class BookConfig:
         metadata=schema_omit(),
     )
 
-    path: Any = dataclass_field(
+    path: OptionalPathNode = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
@@ -285,7 +286,7 @@ class FileConfig:
         metadata=schema_omit(),
     )
 
-    path: Any = dataclass_field(
+    path: OptionalPathNode = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
@@ -311,7 +312,7 @@ class FileCsvFileConfig:
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
-    path: Any = dataclass_field(
+    path: OptionalPathNode = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,

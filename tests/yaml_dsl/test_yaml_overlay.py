@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 
+from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
     BookWriteDefaultsOverride,
@@ -263,7 +264,14 @@ sources: {}
             init_vars={"out_path": output_root},
             overrides=RunOverrides(
                 outputs=(OutputOverride(name="detail", fields=("order_id",), to=OutputToOverride(file="detail_csv")),),
-                resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path={"$init_var": "out_path"})}),
+                resources=ResourcesOverride(
+                    files={
+                        "detail_csv": FileResourceOverride(
+                            kind="csv_file",
+                            path=InitVarRef(name="out_path", path="overrides.resources.files.detail_csv.path"),
+                        )
+                    }
+                ),
             ),
         ),
     )
@@ -301,6 +309,45 @@ sources: {}
                 resources=ResourcesOverride(files={"detail_csv": FileResourceOverride(kind="csv_file", path=output_root)}),
             )
         ),
+    )
+
+    assert compilation.request.output_composition is not None
+    out_path = Path(str(compilation.request.output_composition.targets[0].output.path))
+    from scalim.execution.versioned_outputs import parse_versioned_output_path  # noqa: PLC0415
+
+    parsed = parse_versioned_output_path(out_path)
+    assert parsed.root == output_root.resolve(strict=False)
+    assert parsed.kind == "files"
+    assert parsed.artifact_id == "detail_csv"
+
+
+def test_compile_yaml_resources_file_path_supports_init_var_node(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        """
+name: overlay_resource_path_init_var
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id: {extract: order_id}
+sources: {}
+resources:
+  files:
+    detail_csv:
+      csv_file:
+        path: {$init_var: out_path}
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    fields: [order_id]
+""",
+    )
+
+    output_root = tmp_path / "out"
+    compilation = compile(
+        str(yaml_path),
+        options=_options(init_vars={"out_path": str(output_root)}),
     )
 
     assert compilation.request.output_composition is not None
