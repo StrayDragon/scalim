@@ -5,12 +5,12 @@ import pytest
 def example_report_ir_module():
     from scalim_misc import example_report_ir
 
-    original = example_report_ir.data_loader.random_delay
-    example_report_ir.data_loader.random_delay = 0.0
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(example_report_ir, "data_loader", example_report_ir.PandasDataLoader(random_delay=0.0))
     try:
         yield example_report_ir
     finally:
-        example_report_ir.data_loader.random_delay = original
+        monkeypatch.undo()
 
 
 @pytest.fixture(scope="module")
@@ -43,15 +43,11 @@ def engine_factory(example_model, example_runtime_bindings):
 @pytest.fixture(scope="module")
 def ecommerce_config_small():
     from scalim_misc.demo_big_data_report.cases import build_test_config_small
-    from scalim_misc.demo_big_data_report.loaders import get_config, set_config
+    from tests.support.demo_big_data_report_config import patched_ecommerce_config
 
-    prev = get_config()
     cfg = build_test_config_small()
-    set_config(cfg)
-    try:
+    with patched_ecommerce_config(cfg):
         yield cfg
-    finally:
-        set_config(prev)
 
 
 @pytest.fixture(scope="module")

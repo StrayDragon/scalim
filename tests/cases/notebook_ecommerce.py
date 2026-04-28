@@ -19,9 +19,9 @@ def verify_ecommerce_results(results: Sequence[RowData], *, fields_to_check: Seq
 
 @contextmanager
 def ecommerce_small_config_guard() -> Iterator[None]:
-    from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
+    from scalim_misc.demo_big_data_report.loaders import ECommerceConfig
+    from tests.support.demo_big_data_report_config import patched_ecommerce_config
 
-    prev = get_config()
     cfg = ECommerceConfig(
         order_count=30,
         customer_count=10,
@@ -33,11 +33,8 @@ def ecommerce_small_config_guard() -> Iterator[None]:
         payment_method_count=3,
         logistics_count=3,
     )
-    set_config(cfg)
-    try:
+    with patched_ecommerce_config(cfg):
         yield
-    finally:
-        set_config(prev)
 
 
 def build_ecommerce_model_small() -> "object":

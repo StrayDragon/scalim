@@ -14,14 +14,13 @@ from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverSh
 from scalim.execution import versioned_outputs
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
-    get_config,
     get_workflow_preload_counter_calls,
     reset_workflow_preload_counter_calls,
-    set_config,
 )
 from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL
 from scalim_misc.demo_big_data_report.verification import verify_scalim_output_csv
 from scalim_misc.notebook_support.pathing import demo_big_data_report_workflow_demo_yaml_path
+from tests.support.demo_big_data_report_config import patched_ecommerce_config
 from tests.support.pathing import repo_root as _repo_root
 
 
@@ -30,9 +29,7 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: p
     workflow_yaml_path = demo_big_data_report_workflow_demo_yaml_path(__file__)
 
     cfg = build_test_config_small()
-    prev = get_config()
-    set_config(cfg)
-    try:
+    with patched_ecommerce_config(cfg):
         reset_workflow_preload_counter_calls()
         wf_copy = tmp_path / "workflow.yaml"
         wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
@@ -86,5 +83,3 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: p
         verification = verify_scalim_output_csv(detail_csv, fields_to_check=TARGET_FIELDS_FULL)
         assert verification.passed, verification.summary
         assert verification.checked_rows == verification.total_rows
-    finally:
-        set_config(prev)
