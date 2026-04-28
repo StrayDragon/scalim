@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 import warnings
@@ -84,6 +85,35 @@ def test_unsafe_run_injects_sink_when_provided(tmp_path: Path, monkeypatch: pyte
     )
 
     assert result.total_rows == 0
+
+
+def test_unsafe_run_pre_use_batch_size_policy_signal_logs_debug_when_no_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    yaml_path = _write_minimal_demand_yaml(tmp_path)
+    from scalim.dsl.yaml_dsl.runtime import unsafe_entrypoints as unsafe_mod
+
+    def _fake_run_ir(demand_ir, request, **kwargs):  # type: ignore[no-untyped-def]
+        _ = request, kwargs
+        return _make_execution_result(demand_ir=demand_ir, in_memory_rows=None)
+
+    monkeypatch.setattr(unsafe_mod, "run_ir", _fake_run_ir)
+    caplog.set_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.unsafe.policy")
+
+    _ = unsafe_mod.unsafe_run(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests.fixtures.mock_loaders"]),
+        components=[],
+    )
+
+    assert any(
+        record.name == "scalim.dsl.yaml_dsl.unsafe.policy"
+        and record.levelno == logging.DEBUG
+        and "pre_use_batch_size" in record.getMessage()
+        for record in caplog.records
+    )
 
 
 def test_validate_patches_by_run_id_rejects_security_boundary_dict_patch() -> None:

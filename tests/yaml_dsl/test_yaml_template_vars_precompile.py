@@ -292,8 +292,7 @@ def test_template_sandbox_safe_rejects_method_calls() -> None:
         )
 
 
-@pytest.mark.parametrize("template_sandbox", ["safe", "legacy"], ids=["safe", "legacy"])
-def test_template_sandbox_rejects_underscore_attributes_in_both_modes(template_sandbox: str) -> None:
+def test_template_sandbox_rejects_underscore_attributes() -> None:
     yaml_text = "x: {{ obj.__class__ }}\n"
     with pytest.raises(ValueError, match=r"禁止访问以下划线开头属性"):
         _ = maybe_precompile_yaml_text(
@@ -301,13 +300,12 @@ def test_template_sandbox_rejects_underscore_attributes_in_both_modes(template_s
             template_vars={"obj": "x"},
             context_label="repro",
             context_kind="demand",
-            template_sandbox=template_sandbox,
         )
 
 
 def test_template_sandbox_rejects_unknown_value() -> None:
     yaml_text = "x: {{ a }}\n"
-    with pytest.raises(ValueError, match=r"`template_sandbox` 必须是以下值之一"):
+    with pytest.raises(ValueError, match=r"`template_sandbox` 必须是 `safe`"):
         _ = maybe_precompile_yaml_text(
             yaml_text,
             template_vars={"a": 1},
@@ -337,19 +335,16 @@ def test_template_sandbox_common_substitutions_still_work() -> None:
     assert "c: x" in rendered
 
 
-def test_template_sandbox_legacy_allows_method_calls_and_warns(caplog) -> None:
-    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
+def test_template_sandbox_legacy_is_rejected() -> None:
     yaml_text = "x: {{ s.strip() }}\n"
-
-    rendered = maybe_precompile_yaml_text(
-        yaml_text,
-        template_vars={"s": "  hi  "},
-        context_label="repro",
-        context_kind="demand",
-        template_sandbox="legacy",
-    )
-    assert "x: hi" in rendered
-    assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
+    with pytest.raises(ValueError, match=r"legacy.*已移除|已移除.*legacy"):
+        _ = maybe_precompile_yaml_text(
+            yaml_text,
+            template_vars={"s": "  hi  "},
+            context_label="repro",
+            context_kind="demand",
+            template_sandbox="legacy",
+        )
 
 
 def test_template_sandbox_safe_whitespace_is_normalized_by_public_compile_api(tmp_path) -> None:
@@ -414,15 +409,13 @@ outputs:
             ),
         )
     msg = str(exc_info.value)
-    assert "仅允许" in msg and "safe" in msg
+    assert "仅支持" in msg and "safe" in msg
     assert "迁移" in msg
-    assert "unsafe" in msg
 
 
-def test_template_sandbox_legacy_is_available_via_unsafe_compile_entrypoint(tmp_path, caplog) -> None:
+def test_template_sandbox_legacy_is_rejected_by_unsafe_compile_entrypoint(tmp_path) -> None:
     from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_compile
 
-    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(
         """
@@ -448,21 +441,19 @@ outputs:
         encoding="utf-8",
     )
 
-    compilation = unsafe_compile(
-        str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures"]),
-        template_vars={"output_path": "  ./out  "},
-        template_sandbox="legacy",
-    )
-    assert compilation.config.resources.files["detail_csv"].path == "./out"
-    assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
+    with pytest.raises(ValueError, match=r"legacy.*已移除|已移除.*legacy"):
+        _ = unsafe_compile(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_vars={"output_path": "  ./out  "},
+            template_sandbox="legacy",
+        )
 
 
-def test_template_sandbox_safe_does_not_warn_legacy_deprecation_in_unsafe_entrypoints(tmp_path) -> None:
-    import warnings
-
+def test_unsafe_entrypoints_emit_audit_warning(tmp_path, caplog) -> None:
     from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_compile
 
+    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.unsafe")
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(
         """
@@ -488,14 +479,12 @@ outputs:
         encoding="utf-8",
     )
 
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always")
-        _ = unsafe_compile(
-            str(yaml_path),
-            allowed_modules=frozenset(["tests.fixtures"]),
-            template_sandbox="safe",
-        )
-    assert not any("template_sandbox='legacy'" in str(w.message) for w in recorded)
+    _ = unsafe_compile(
+        str(yaml_path),
+        allowed_modules=frozenset(["tests.fixtures"]),
+        template_sandbox="safe",
+    )
+    assert any("`unsafe` 入口被调用" in record.getMessage() for record in caplog.records)
 
 
 def test_template_sandbox_invalid_value_is_rejected_by_unsafe_entrypoints(tmp_path) -> None:
@@ -517,7 +506,7 @@ outputs: []
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="template_sandbox"):
+    with pytest.raises(ValueError, match=r"`template_sandbox` 必须是 `safe`"):
         _ = unsafe_compile(
             str(yaml_path),
             allowed_modules=frozenset(["tests.fixtures"]),
@@ -525,10 +514,9 @@ outputs: []
         )
 
 
-def test_template_sandbox_legacy_is_available_via_unsafe_run_entrypoint(tmp_path, caplog) -> None:
+def test_template_sandbox_legacy_is_rejected_by_unsafe_run_entrypoint(tmp_path) -> None:
     from scalim.dsl.yaml_dsl.runtime.unsafe_entrypoints import unsafe_run
 
-    caplog.set_level("WARNING", logger="scalim.dsl.yaml_dsl.template_vars")
     yaml_path = tmp_path / "demand.yaml"
     out_root = tmp_path / "out"
     yaml_path.write_text(
@@ -555,18 +543,13 @@ outputs:
         encoding="utf-8",
     )
 
-    result = unsafe_run(
-        str(yaml_path),
-        allowed_modules=frozenset(["tests.fixtures"]),
-        template_vars={"output_path": "  {}  ".format(str(out_root))},
-        template_sandbox="legacy",
-    )
-    assert result is not None
-    assert result.output_path is not None
-    from pathlib import Path
-
-    assert Path(str(result.output_path)).exists()
-    assert any("template_sandbox=legacy" in record.getMessage() for record in caplog.records)
+    with pytest.raises(ValueError, match=r"legacy.*已移除|已移除.*legacy"):
+        _ = unsafe_run(
+            str(yaml_path),
+            allowed_modules=frozenset(["tests.fixtures"]),
+            template_vars={"output_path": "  {}  ".format(str(out_root))},
+            template_sandbox="legacy",
+        )
 
 
 def test_template_vars_rejects_non_json_like_types_and_does_not_leak_value() -> None:

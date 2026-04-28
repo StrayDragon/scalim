@@ -45,7 +45,7 @@ def test_litejinja2_set_and_expression_eval() -> None:
     assert tpl.render({"prefix": "p_", "name": "n"}) == "p_n_suf"
 
 
-def test_litejinja2_variable_access_dict_list_attr_and_method() -> None:
+def test_litejinja2_variable_access_dict_list_attr_and_indexing() -> None:
     class User:
         def __init__(self, name: str) -> None:
             self.name = name
@@ -53,9 +53,22 @@ def test_litejinja2_variable_access_dict_list_attr_and_method() -> None:
         def get_name(self) -> str:
             return self.name
 
-    tpl = from_string('{{ user.name }}|{{ user.get_name() }}|{{ config["k"] }}|{{ config[key] }}|{{ items[idx] }}|{{ items[idx_missing] }}')
+    tpl = from_string('{{ user.name }}|{{ config["k"] }}|{{ config[key] }}|{{ items[idx] }}|{{ items[idx_missing] }}')
     out = tpl.render({"user": User("Ada"), "config": {"k": "v"}, "key": "k", "items": [10, 20], "idx": 1, "idx_missing": 99})
-    assert out == "Ada|Ada|v|v|20|"
+    assert out == "Ada|v|v|20|"
+
+
+def test_litejinja2_method_calls_are_rejected() -> None:
+    class User:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def get_name(self) -> str:
+            return self.name
+
+    tpl = from_string("{{ user.get_name() }}")
+    with pytest.raises(TemplateError, match=r"禁止无参方法调用"):
+        _ = tpl.render({"user": User("Ada")})
 
 
 def test_litejinja2_errors_raise_template_error() -> None:

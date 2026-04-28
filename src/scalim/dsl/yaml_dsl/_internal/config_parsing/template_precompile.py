@@ -1,7 +1,7 @@
 import re
 from typing import Dict, List, Mapping, Optional, Tuple
 
-from ....._internal.loggingx import format_kv, get_logger, prefix
+from ....._internal.loggingx import get_logger
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.litejinja2 import TemplateError, from_string
 
@@ -10,7 +10,6 @@ __all__ = ()
 _logger = get_logger("dsl.yaml_dsl.template_vars")
 
 _TEMPLATE_SANDBOX_SAFE = "safe"
-_TEMPLATE_SANDBOX_LEGACY = "legacy"
 _TEMPLATE_VARS_JSON_LIKE_SCALARS: Tuple[type, ...] = (bool, int, float, str)
 DEFAULT_RENDERED_YAML_MAX_LEN = 1048576
 
@@ -29,8 +28,14 @@ def _is_json_like_dict(value: object) -> TypeGuard[Dict[object, object]]:
 
 def _validate_template_sandbox(template_sandbox: str) -> str:
     value = str(template_sandbox or "").strip() or _TEMPLATE_SANDBOX_SAFE
-    if value not in {_TEMPLATE_SANDBOX_SAFE, _TEMPLATE_SANDBOX_LEGACY}:
-        msg = "`template_sandbox` 必须是以下值之一: `safe`, `legacy`"
+    if value != _TEMPLATE_SANDBOX_SAFE:
+        if value == "legacy":
+            msg = (
+                "`template_sandbox='legacy'` 已移除; 当前仅支持 `safe`. "
+                "迁移: 删除 `template_sandbox` 参数或显式设置 `template_sandbox='safe'`."
+            )
+            raise ValueError(msg)
+        msg = "`template_sandbox` 必须是 `safe`; 收到={!r}".format(value)
         raise ValueError(msg)
     return value
 
@@ -39,14 +44,14 @@ _VAR_EXPR_METHOD_CALL_RE = re.compile(r"\.[A-Za-z_][A-Za-z0-9_]*\(\)")
 _VAR_EXPR_UNDERSCORE_PART_RE = re.compile(r"(^|\.)_")
 
 
-def _scan_template_expr_sandbox_violation(var_expr: str, *, template_sandbox: str) -> None:
+def _scan_template_expr_sandbox_violation(var_expr: str) -> None:
     raw = str(var_expr or "").strip()
     base_expr = raw.split("|", 1)[0].strip()
 
     if _VAR_EXPR_UNDERSCORE_PART_RE.search(base_expr):
         msg = "`template_sandbox` 禁止访问以下划线开头属性"
         raise TemplateError(msg)
-    if template_sandbox == _TEMPLATE_SANDBOX_SAFE and _VAR_EXPR_METHOD_CALL_RE.search(base_expr):
+    if _VAR_EXPR_METHOD_CALL_RE.search(base_expr):
         msg = "`template_sandbox=safe` 禁止无参方法调用"
         raise TemplateError(msg)
 
@@ -152,17 +157,6 @@ def maybe_precompile_yaml_text(
     sandbox = _validate_template_sandbox(template_sandbox)
     max_len = _validate_rendered_yaml_max_len(rendered_yaml_max_len)
 
-    if sandbox == _TEMPLATE_SANDBOX_LEGACY:
-        _logger.warning(
-            "%s启用 `template_sandbox=legacy`(不安全): %s",
-            prefix("template_vars"),
-            format_kv(
-                template_sandbox=sandbox,
-                context_label=str(context_label or ""),
-                template_vars_keys=len(template_vars),
-            ),
-        )
-
     # 轻量优化: 无模板标记时跳过渲染(不影响语义).
     raw = str(text or "")
     if "{{" not in raw and "{%" not in raw:
@@ -175,7 +169,7 @@ def maybe_precompile_yaml_text(
         for node in template.nodes:
             if node.get("type") != "var":
                 continue
-            _scan_template_expr_sandbox_violation(str(node.get("content") or ""), template_sandbox=sandbox)
+            _scan_template_expr_sandbox_violation(str(node.get("content") or ""))
 
         _validate_template_vars_json_like_or_raise(template_vars, context_label=context_label)
 

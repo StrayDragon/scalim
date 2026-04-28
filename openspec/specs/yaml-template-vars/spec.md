@@ -97,47 +97,43 @@
 - **AND** 错误信息 MUST 可诊断地指出"method call 在 sandbox 下被禁止"（或等价表述）
 
 ### Requirement: legacy behavior MUST require explicit non-public opt-in
-系统 MUST NOT 在默认公共 API 上继续暴露 legacy/信任模式模板沙箱开关。
+系统 MUST NOT 在任何入口继续支持 legacy/信任模式模板沙箱。
 
-当且仅当调用方进入显式的非公共、不安全语义入口时，系统才允许 legacy 行为放宽；默认公共入口 MUST 只允许 safe sandbox。
+系统 MUST 将 `template_sandbox` 的允许值集合收敛为 `safe`:
+- 公共入口收到 `template_sandbox="legacy"`(或等价 legacy opt-in)时 MUST fail-fast,并给出迁移提示
+- 非公共/unsafe 入口同样 MUST fail-fast(legacy 已彻底移除,不再提供"逃逸口")。
 
-并且：
-
-- `_`/`__dunder__` 属性访问 MUST 仍然被禁止（不提供放宽开关）
-- 公共入口收到 `template_sandbox="legacy"`（或等价 legacy opt-in）时 MUST fail-fast，并给出迁移提示
-- 若后续保留 legacy 能力，系统 MUST 通过显式 `unsafe` 语义的专用入口承载，而不是继续挂在默认 facade 上
+并且:
+- `_`/`__dunder__` 属性访问 MUST 仍然被禁止(不提供放宽开关)
+- method call 语法(例如 `x.y()`) MUST 始终被禁止
 
 #### Scenario: public run API rejects legacy sandbox
 - **WHEN** 调用方通过官方公开入口启用 `template_sandbox="legacy"`
 - **THEN** 系统 MUST fail-fast
 - **AND** 错误信息 MUST 同时满足:
-  - 指出默认公共入口仅允许 safe sandbox（legacy 已不再支持）
-  - 给出明确迁移动作（例如"移除 `template_sandbox` 参数或显式改为 safe 模式"）
-  - 若仍需 legacy 能力,提示其必须转入显式 `unsafe` 语义的非公共入口（而非继续使用默认 facade）
+  - 指出系统仅支持 safe sandbox(legacy 已移除)
+  - 给出明确迁移动作(例如"移除 `template_sandbox` 参数或显式改为 safe 模式")
 
 #### Scenario: safe sandbox remains the only public template mode
 - **WHEN** 调用方通过官方公开入口提供 `template_vars`
 - **THEN** 系统 MUST 继续在 YAML parse 前执行 safe sandbox 预编译
-- **AND** 不得再通过公共入口放宽为 legacy 模式
+- **AND** 不得再通过任何公共入口放宽为 legacy 模式
 
-#### Scenario: legacy mode allows method calls with warnings (unsafe entrypoint)
-- **WHEN** 调用方通过显式 `unsafe` 语义的非公共入口启用 legacy 模式
-- **AND** YAML 文本包含 `x: {{ p.open().read() }}`
-- **THEN** 模板渲染 MUST 成功并产生渲染后的 YAML 文本
-- **AND** 系统 MUST 发出明确的风险告警（warning）
+#### Scenario: unsafe entrypoint rejects legacy sandbox
+- **WHEN** 调用方通过 `unsafe` 语义入口传入 `template_sandbox="legacy"`
+- **THEN** 系统 MUST fail-fast
+- **AND** 错误信息 MUST 指出 legacy 已移除并提示迁移到 safe
 
-### Requirement: unsafe entrypoints MUST be auditable and MUST warn about legacy sandbox deprecation
-当调用方通过显式 `unsafe` 语义入口启用不安全能力时,系统 MUST 产生可观测的 warning 级审计输出.
+### Requirement: unsafe entrypoints MUST be auditable
+当调用方通过显式 `unsafe` 语义入口调用不安全能力时,系统 MUST 产生可观测的 warning 级审计输出。
 
-当 `template_sandbox="legacy"` 被使用时,系统 SHOULD 额外输出弃用警告,提示迁移到 `safe`.
+说明:
+- 该审计输出的目标是让"unsafe 能力的使用"在日志/可观测链路中可追踪。
+- legacy sandbox 不再存在,unsafe 入口不再承担 legacy 兼容与弃用提示。
 
 #### Scenario: unsafe entrypoint emits audit warning
-- **WHEN** 调用方调用 `unsafe_run/unsafe_compile`
+- **WHEN** 调用方调用 `unsafe_run/unsafe_compile`(或等价 unsafe 入口)
 - **THEN** 系统 MUST 产生 warning 级告警/审计输出
-
-#### Scenario: legacy sandbox emits deprecation warning
-- **WHEN** 调用方通过 `unsafe` 入口启用 `template_sandbox="legacy"`
-- **THEN** 系统 SHOULD 产生弃用警告(deprecation)
 
 ### Requirement: template_vars MUST be JSON/YAML-like by default
 系统 MUST 对 `template_vars` 提供输入护栏（默认策略），以降低误把"带副作用能力对象"注入模板的风险。

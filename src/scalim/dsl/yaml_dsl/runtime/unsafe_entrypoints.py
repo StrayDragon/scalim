@@ -2,13 +2,12 @@
 
 注意:
 - 该模块属于内部/不稳定路径,不应在 `docs`/`examples`/`skills` 中作为官方导入路径推广.
-- 该模块允许显式启用不安全能力(例如 `legacy` 模板沙箱),仅用于可信输入/内部测试.
-- `legacy` 模板沙箱计划逐步废弃,请迁移到 `safe` 模式.
+- 该模块允许显式启用不安全能力(例如更宽松的 `allowlist`/`trusted-mode` 组合),仅用于可信输入/内部测试.
+- `legacy` 模板沙箱已移除;系统仅支持 `safe`.
 """
 
 import logging
 import traceback
-import warnings
 from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 from ....execution.guardrails import GuardrailsPolicy
@@ -41,28 +40,22 @@ from .contracts import (
 _unsafe_logger = logging.getLogger("scalim.dsl.yaml_dsl.unsafe")
 _policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.unsafe.policy")
 
-warnings.warn(
-    "`unsafe_entrypoints` 为内部/不安全 `API`;请优先使用 `scalim.dsl.yaml_dsl.run/compile`; `legacy` 沙箱已弃用,请用 `safe`.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
 
 def _validate_unsafe_template_sandbox(template_sandbox: str) -> str:
     value = str(template_sandbox or "").strip() or "safe"
-    if value not in {"safe", "legacy"}:
-        msg = "`template_sandbox` 必须是以下值之一: `safe`, `legacy`"
+    if value != "safe":
+        if value == "legacy":
+            msg = (
+                "`template_sandbox='legacy'` 已移除; 当前仅支持 `safe`. "
+                "迁移: 删除 `template_sandbox` 参数或显式设置 `template_sandbox='safe'`."
+            )
+            raise ValueError(msg)
+        msg = "`template_sandbox` 必须是 `safe`; 收到={!r}".format(value)
         raise ValueError(msg)
     return value
 
 
 def _audit_unsafe_call(fn_name: str, *, template_sandbox: str) -> None:
-    if template_sandbox == "legacy":
-        warnings.warn(
-            "`template_sandbox='legacy'` 已弃用;请迁移到 `template_sandbox='safe'`.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
     caller = "".join(traceback.format_stack(limit=4)[:-1]).strip()
     _unsafe_logger.warning(
         "`unsafe` 入口被调用: `fn`=%s `template_sandbox`=%s\n`caller`:\n%s",
@@ -94,7 +87,7 @@ def unsafe_run(  # noqa: PLR0913
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> DemandRunResult:
-    """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
+    """不安全入口: 允许显式启用不安全能力.
 
     仅用于可信输入/内部测试;普通用户请使用 `scalim.dsl.yaml_dsl.run`.
     """
@@ -174,7 +167,7 @@ def unsafe_compile(  # noqa: PLR0913
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
 ) -> Compilation:
-    """不安全入口: 允许显式启用 `legacy` 模板沙箱等能力.
+    """不安全入口: 允许显式启用不安全能力.
 
     仅用于可信输入/内部测试;普通用户请使用 `scalim.dsl.yaml_dsl.compile`.
     """

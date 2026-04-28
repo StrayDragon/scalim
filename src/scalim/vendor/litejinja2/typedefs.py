@@ -54,7 +54,7 @@ class LoopContext(TypedDict):
     last: bool  # 是否为最后一个元素
 
 
-RenderContext = Dict[str, Any]  # 模板渲染时的上下文变量字典
+RenderContext = Dict[str, object]  # 模板渲染时的上下文变量字典
 """ 渲染上下文类型 """
 
 

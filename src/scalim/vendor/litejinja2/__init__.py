@@ -30,7 +30,7 @@
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
-from ..compact.typing_extensionsx import override
+from ..compact.typing_extensionsx import TypeGuard, override
 from .typedefs import (
     ExpressionResult,
     FilterFunc,
@@ -201,6 +201,13 @@ DEFAULT_FILTERS: Dict[str, Callable[..., Any]] = {
 }
 
 
+def _is_str_key_dict(value: object) -> TypeGuard[Dict[str, object]]:
+    if not isinstance(value, dict):
+        return False
+    value_dict = cast("Dict[object, object]", value)
+    return all(isinstance(key, str) for key in value_dict)
+
+
 class Template:
     """模板类 - 解析和渲染模板字符串"""
 
@@ -226,7 +233,7 @@ class Template:
         if not isinstance(undefined, type) or not issubclass(undefined, Undefined):
             raise TypeError("`undefined` 必须是 `Undefined` 的子类")
         self.undefined = undefined
-        self._template_sandbox = "legacy"
+        self._template_sandbox = "safe"
         self.macros = {}
         self.nodes = self._parse()
 
@@ -282,7 +289,7 @@ class Template:
         self,
         context: Optional[RenderContext] = None,
         *,
-        template_sandbox: str = "legacy",
+        template_sandbox: str = "safe",
         strict_undefined: bool = False,
         undefined_behavior: str = "error",
         empty_string_behavior: str = "keep",
@@ -296,8 +303,15 @@ class Template:
         返回:
             渲染后的字符串.
         """
-        if template_sandbox not in {"safe", "legacy"}:
-            raise ValueError("`template_sandbox` 必须是以下值之一: `safe`, `legacy`")
+        sandbox = str(template_sandbox or "").strip() or "safe"
+        if sandbox != "safe":
+            if sandbox == "legacy":
+                msg = (
+                    "`template_sandbox='legacy'` 已移除; 当前仅支持 `safe`. "
+                    "迁移: 删除 `template_sandbox` 参数或显式设置 `template_sandbox='safe'`."
+                )
+                raise ValueError(msg)
+            raise ValueError("`template_sandbox` 必须是 `safe`; 收到={!r}".format(sandbox))
         if undefined_behavior not in {"error", "empty"}:
             raise ValueError("`undefined_behavior` 必须是以下值之一: `error`, `empty`")
         if empty_string_behavior not in {"keep", "error"}:
@@ -310,7 +324,7 @@ class Template:
             merged_context.update(kwargs)
 
         previous_sandbox = self._template_sandbox
-        self._template_sandbox = str(template_sandbox)
+        self._template_sandbox = "safe"
         try:
             return self._render_nodes(
                 self.nodes,
@@ -830,22 +844,22 @@ class Template:
 
             # 访问字典或列表
             try:
-                if isinstance(base_value, dict):
+                if _is_str_key_dict(base_value):
                     # 确保 `key` 是字符串类型
                     str_key = str(key) if not isinstance(key, str) else key
                     if str_key in base_value:
-                        return base_value[str_key]
+                        return cast("VariableValue", base_value[str_key])
                     return self.undefined(var_expr)
                 if isinstance(base_value, (list, tuple)):
                     # 确保 `key` 可以转换为整数
                     if isinstance(key, int):
                         try:
-                            return base_value[key]
+                            return cast("VariableValue", base_value[key])
                         except IndexError:
                             return self.undefined(var_expr)
                     if isinstance(key, str) and key.isdigit():
                         try:
-                            return base_value[int(key)]
+                            return cast("VariableValue", base_value[int(key)])
                         except IndexError:
                             return self.undefined(var_expr)
             except (KeyError, IndexError, ValueError):
@@ -856,56 +870,35 @@ class Template:
         # 处理简单的变量名
         if "." not in var_expr and " " not in var_expr:
             if var_expr in context:
-                return context[var_expr]
+                return cast("VariableValue", context[var_expr])
             return self.undefined(var_expr)
 
         # 处理带点号的属性访问和方法调用
         parts = var_expr.split(".")
-        value = context
-        template_sandbox = str(getattr(self, "_template_sandbox", "legacy"))
-
+        value: object = context
         for part in parts:
             # 检查是否是方法调用 (以 () 结尾)
             if part.endswith("()"):
                 method_name = part[:-2]
                 if method_name.startswith("_"):
                     raise TemplateError("`template_sandbox` 禁止访问以下划线开头属性: `{}`".format(method_name))
-                if template_sandbox == "safe":
-                    raise TemplateError("`template_sandbox=safe` 禁止无参方法调用: `{}()`".format(method_name))
-                if isinstance(value, dict):
-                    if method_name in value:
-                        value = value[method_name]
-                    elif hasattr(value, method_name):
-                        method = getattr(value, method_name)
-                        if callable(method):
-                            value = method()
-                        else:
-                            value = method
-                    else:
-                        return self.undefined(var_expr)
-                elif hasattr(value, method_name):
-                    method = getattr(value, method_name)
-                    if callable(method):
-                        value = method()
-                    else:
-                        value = method
-                else:
-                    return self.undefined(var_expr)
+                raise TemplateError("`template_sandbox=safe` 禁止无参方法调用: `{}()`".format(method_name))
             # 普通属性访问
-            elif part.startswith("_"):
+            if part.startswith("_"):
                 raise TemplateError("`template_sandbox` 禁止访问以下划线开头属性: `{}`".format(part))
-            elif isinstance(value, dict):
+            if _is_str_key_dict(value):
                 if part in value:
                     value = value[part]
                 else:
                     return self.undefined(var_expr)
             elif hasattr(value, part):
-                value = getattr(value, part)
+                obj = cast("object", value)
+                value = getattr(obj, part)
             else:
                 return self.undefined(var_expr)
 
         # 确保返回正确的类型
-        result = value if value is not None else ""
+        result: object = value if value is not None else ""
         # 使用 `cast` 确保返回 `VariableValue` 类型
         return cast("VariableValue", result)
 
