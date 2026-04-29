@@ -230,6 +230,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/runtime-guardrails/spec.md)
 - Summary: 定义运行期 guardrails 配置与执行契约,用于对 loader/relations/compute 等环节的契约违规、数据质量问题与异常处理提供可配置的 quiet/fast_fail 行为,并通过现有错误事件通道进行可观测记录.
 
+### `runtime-policy-normalization`
+- Title: runtime-policy-normalization Specification
+- Source: [spec.md](#code=openspec/specs/runtime-policy-normalization/spec.md)
+- Summary: TBD - created by archiving change c6-policy-normalization-breaking-cleanup. Update Purpose after archive.
+
 ### `runtime-pruning`
 - Title: runtime-pruning Specification
 - Source: [spec.md](#code=openspec/specs/runtime-pruning/spec.md)
