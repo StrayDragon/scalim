@@ -40,7 +40,7 @@ class OutputSpec:
     streaming: bool = True
     include_header: bool = True
     sheet_name: Optional[str] = None
-    excel_allow_formulas: bool = False
+    excel_allow_formulas: bool = True
 
 
 __all__ = (

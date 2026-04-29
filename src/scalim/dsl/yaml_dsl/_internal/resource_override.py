@@ -507,7 +507,7 @@ def _apply_optional_book_export_xlsx_patch(
         msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(path))
 
-    allow_formulas = bool(base.allow_formulas) if base is not None else False
+    allow_formulas = bool(base.allow_formulas) if base is not None else True
     if "allow_formulas" in patch:
         allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path="{}.export_xlsx.allow_formulas".format(path))
 
@@ -676,6 +676,9 @@ def _apply_book_patch(
             value=patch.get("write_defaults"),
             path=path,
         )
+
+    if base is None and "allow_formulas" not in patch and str(kind) == "xlsx_file":
+        allow_formulas = True
 
     _validate_book_kind_semantic_contracts(
         kind=str(kind),

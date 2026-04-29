@@ -162,7 +162,7 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
     if book.export_xlsx is not None:
         export_override = BookExportXlsxOverride(
             path=book.export_xlsx.path,
-            allow_formulas=True if bool(book.export_xlsx.allow_formulas) else None,
+            allow_formulas=bool(book.export_xlsx.allow_formulas),
         )
 
     write_defaults_override = None
@@ -175,7 +175,7 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
             on_conflict=str(book.write_defaults.on_conflict or ""),
         )
 
-    allow_formulas = True if bool(book.allow_formulas) else None
+    allow_formulas = bool(book.allow_formulas)
 
     return BookResourceOverride(
         kind=kind,

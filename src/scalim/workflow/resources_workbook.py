@@ -130,7 +130,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             return _WorkbookPlan(
                 resource_id=key,
                 path=str(raw_path),
-                allow_formulas=bool(self._workbook_allow_formulas.get(key, False)),
+                allow_formulas=bool(self._workbook_allow_formulas.get(key, True)),
                 sheet_decl_order={},
                 sheet_order=[],
                 sheets={},

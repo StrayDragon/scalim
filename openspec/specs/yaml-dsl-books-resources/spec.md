@@ -66,7 +66,7 @@ legacy `kind` discriminator MUST 被移除；若用户仍声明 `resources.books
 
 可选字段:
 
-- `resources.books.<id>.xlsx_file.allow_formulas` MUST 为 bool(默认 `false`)
+- `resources.books.<id>.xlsx_file.allow_formulas` MUST 为 bool(默认 `true`)
 
 legacy `write_lock` 配置面 MUST 被移除；若用户仍提供 `resources.books.<id>.write_lock`，系统 MUST fail-fast 并给出迁移提示。
 
@@ -103,7 +103,7 @@ legacy `write_lock` 配置面 MUST 被移除；若用户仍提供 `resources.boo
 - `resources.books.<id>.xlsx_memory.export_xlsx` MAY 存在且 MUST 为 mapping
 - `resources.books.<id>.xlsx_memory.export_xlsx.path` MUST 为非空字符串或 `{$init_var: <name>}` 指令节点
 - `resources.books.<id>.xlsx_memory.export_xlsx.path` 语义 MUST 为 **输出 root 目录**（版本化输出 D-2）
-- `resources.books.<id>.xlsx_memory.export_xlsx.allow_formulas` MUST 为 bool(默认 `false`)
+- `resources.books.<id>.xlsx_memory.export_xlsx.allow_formulas` MUST 为 bool(默认 `true`)
 - 系统 MUST 基于 `book_id` 与 `version_id` 推导最终输出路径：
   - final path MUST 等价于 `<root>/versions/<version_id>/books/<book_id>.xlsx`
 
@@ -270,7 +270,11 @@ outputs 级覆盖:
 
 ### Requirement: Excel exports MUST escape formula-like strings by default (opt-out via allow_formulas)
 
-当系统导出 `.xlsx`(包括 `xlsx_file` book 与 `xlsx_memory.export_xlsx`)时,系统 MUST 默认对所有字符串 cell 值执行公式前缀转义,以避免 `Excel` 将其解析为公式。
+当系统导出 `.xlsx`(包括 `xlsx_file` book 与 `xlsx_memory.export_xlsx`)时,系统 MUST 默认保留所有字符串 cell 值原样写出,不得执行公式前缀转义。
+
+防护模式（不可信输入显式收紧）：
+
+- 若 effective book 配置 `allow_formulas=false`,系统 MUST 对所有字符串 cell 值执行公式前缀转义,以避免 `Excel` 将其解析为公式。
 
 转义规则 MUST 满足：
 
@@ -280,13 +284,15 @@ outputs 级覆盖:
 - 其它字符串 MUST 保持不变。
 - 该规则 MUST 同时作用于表头行与数据行。
 
-允许公式（可信输入显式放宽）：
-
-- 若 effective book 配置 `allow_formulas=true`,系统 MUST 禁用上述转义并保留原始字符串。
+#### Scenario: allow_formulas is true by default and preserves raw strings
+- **GIVEN** `resources.books.report.xlsx_file.path=./out`
+- **AND** `resources.books.report.xlsx_file.allow_formulas` 缺省(等价 `true`)
+- **WHEN** 写入字符串 `\"=1+1\"` 到任一 sheet cell
+- **THEN** 导出的 `.xlsx` 中对应单元格值 MUST 为 `\"=1+1\"`
 
 #### Scenario: allow_formulas false escapes formula-like strings
 - **GIVEN** `resources.books.report.xlsx_file.path=./out`
-- **AND** `resources.books.report.xlsx_file.allow_formulas` 缺省(等价 `false`)
+- **AND** `resources.books.report.xlsx_file.allow_formulas=false`
 - **WHEN** 写入字符串 `\"=1+1\"` 到任一 sheet cell
 - **THEN** 导出的 `.xlsx` 中对应单元格值 MUST 为 `\"'=1+1\"`
 
@@ -342,3 +348,4 @@ loader MUST 接收 `params.ref` 映射对象,并满足以下结构:
 - **WHEN** demand YAML 仍声明 `outputs[*].container`
 - **THEN** schema-only 与 runtime 校验 MUST fail-fast
 - **AND** 错误信息 MUST 提示迁移到 `resources.files/resources.books` + `outputs[*].to` + `outputs[*].write`
+

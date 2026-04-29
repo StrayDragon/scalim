@@ -187,7 +187,7 @@ class CSVSink(BaseRowSink):
         flush_policy: str = "every_n_rows",
         flush_every_rows: int = 1000,
         open_fn: Optional[Callable[..., io.TextIOWrapper]] = None,
-        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        allow_formulas: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.delimiter = delimiter
@@ -354,7 +354,7 @@ class ColumnCSVSink(IColumnSink):
         delimiter: str = ",",
         encoding: str = "utf-8",
         include_header: bool = True,  # noqa: FBT001, FBT002
-        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        allow_formulas: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names
@@ -512,7 +512,7 @@ class BlockColumnCSVSink(IColumnSink):
         delimiter: str = ",",
         encoding: str = "utf-8",
         write_delay: float = 0.5,
-        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        allow_formulas: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names

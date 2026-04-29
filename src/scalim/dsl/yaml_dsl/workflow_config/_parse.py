@@ -280,7 +280,7 @@ def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
         ).format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
 
-    allow_formulas_raw = data.get("allow_formulas", False)
+    allow_formulas_raw = data.get("allow_formulas", True)
     if not isinstance(allow_formulas_raw, bool):
         msg = "{}.allow_formulas must be a bool".format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
@@ -408,7 +408,7 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
             ).format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.path".format(path))
 
-        allow_formulas_raw = xlsx_file.get("allow_formulas", False)
+        allow_formulas_raw = xlsx_file.get("allow_formulas", True)
         if not isinstance(allow_formulas_raw, bool):
             msg = "{}.xlsx_file.allow_formulas must be a bool".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.allow_formulas".format(path))

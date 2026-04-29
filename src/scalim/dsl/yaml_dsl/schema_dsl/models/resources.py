@@ -88,12 +88,12 @@ class BookExportXlsxConfig:
     )
 
     allow_formulas: bool = dataclass_field(
-        default=False,
+        default=True,
         metadata=schema_meta(
-            desc="允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-            md="允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-            default=False,
-            examples=[False],
+            desc="允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护)",
+            md="允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+            default=True,
+            examples=[True],
         ),
     )
 
@@ -178,12 +178,12 @@ class BookXlsxFileConfig:
     )
 
     allow_formulas: bool = dataclass_field(
-        default=False,
+        default=True,
         metadata=schema_meta(
-            desc="允许 Excel 公式(可信输入显式 opt-out;默认 false)",
-            md="允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-            default=False,
-            examples=[False],
+            desc="允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护)",
+            md="允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+            default=True,
+            examples=[True],
         ),
     )
 

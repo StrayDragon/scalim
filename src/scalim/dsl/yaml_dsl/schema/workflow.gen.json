@@ -186,11 +186,11 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "default": false,
+          "description": "允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.allow_formulas\n\n允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+          "default": true,
           "examples": [
-            false
+            true
           ]
         }
       },
@@ -311,11 +311,11 @@
         },
         "allow_formulas": {
           "type": "boolean",
-          "description": "允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_file.allow_formulas\n\n允许 Excel 公式(可信输入显式 opt-out;默认 false).",
-          "default": false,
+          "description": "允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_file.allow_formulas\n\n允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+          "default": true,
           "examples": [
-            false
+            true
           ]
         }
       },

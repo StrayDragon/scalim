@@ -165,7 +165,7 @@ class ExcelSink(BaseRowSink):
         header_names: Optional[List[str]] = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
-        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        allow_formulas: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.sheet_name = sheet_name
@@ -263,7 +263,7 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
         field_names: List[str],
         header_names: Optional[List[str]] = None,
         include_header: bool = True,
-        allow_formulas: bool = False,
+        allow_formulas: bool = True,
     ) -> None:
         self._worksheet = worksheet
         self.sheet_name = str(sheet_name)
@@ -334,7 +334,7 @@ class ExcelWorkbookSink:
         field_names: List[str],
         header_names: Optional[List[str]] = None,
         include_header: bool = True,
-        allow_formulas: bool = False,
+        allow_formulas: bool = True,
     ) -> ExcelWorkbookSheetRowSink:
         if self._closed:
             msg = "ExcelWorkbookSink is closed: {}".format(self.output_path)
@@ -447,7 +447,7 @@ class ColumnExcelSink(IColumnSink):
         header_names: Optional[List[str]] = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
-        allow_formulas: bool = False,  # noqa: FBT001, FBT002
+        allow_formulas: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
         self.field_names = field_names

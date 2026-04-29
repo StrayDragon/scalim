@@ -144,7 +144,7 @@ class RunOverrides:
         sheet: str,
         output_name: str = "detail",
         book_id: str = "report",
-        allow_formulas: bool = False,
+        allow_formulas: bool = True,
         include_header: bool = True,
         header_fields_output_by: str = "field_id",
     ) -> "RunOverrides":

@@ -783,7 +783,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     direct_targets: List[OutputTargetSpec] = []
     derived_targets: List[DerivedOutputTargetSpec] = []
     workbook_default_path: Optional[str] = None
-    workbook_default_allow_formulas = False
+    workbook_default_allow_formulas = True
 
     version_id = validate_version_id(str(version_id))
 

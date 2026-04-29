@@ -493,7 +493,7 @@ class YamlDemandLoader(
                 msg = "{}.path is required".format(branch_path)
                 raise ValueError(msg)
 
-            allow_formulas = bool(file_branch.get(BOOK_XLSX_FILE_KEYS["allow_formulas"], False))
+            allow_formulas = bool(file_branch.get(BOOK_XLSX_FILE_KEYS["allow_formulas"], True))
             return BookConfig(
                 kind="xlsx_file",
                 path=path,
@@ -632,7 +632,7 @@ class YamlDemandLoader(
         if not export_path or (isinstance(export_path, str) and not export_path.strip()):
             msg = "{}.path is required".format(base_path)
             raise ValueError(msg)
-        allow_formulas = bool(raw.get(BOOK_EXPORT_XLSX_KEYS["allow_formulas"], False))
+        allow_formulas = bool(raw.get(BOOK_EXPORT_XLSX_KEYS["allow_formulas"], True))
         return BookExportXlsxConfig(path=export_path, allow_formulas=allow_formulas)
 
     def _parse_book_write_defaults(self, raw: Dict[str, Any], *, base_path: str) -> BookWriteDefaultsConfig:

@@ -11,7 +11,6 @@
 - resource lifecycle observability
 - single-writer concurrency safety
 - versioned output roots
-
 ## Requirements
 ### Requirement: workflow YAML exposes a stable authoring surface for shared resources and write intents
 系统 MUST 为共享输出容器提供可实现、可校验的 workflow YAML authoring surface,并将“写入意图”从 workflow `writes` 收敛为 demand outputs 的 IO 绑定(由 workflow 编译期推导写入节点):
@@ -186,14 +185,19 @@
 - **THEN** `commit_all()` MUST 等待 inflight 创建完成后再 commit 所有资源
 
 ### Requirement: workflow workbook exports MUST escape Excel formulas by default
-当 workflow 通过共享 `books.kind=xlsx_file` 或 `books.kind=xlsx_memory.export_xlsx` 导出 `.xlsx` 时,系统 MUST 默认对所有字符串 cell 值执行公式前缀转义,以避免 `Excel` 将其解析为公式。
+当 workflow 通过共享 `books.kind=xlsx_file` 或 `books.kind=xlsx_memory.export_xlsx` 导出 `.xlsx` 时,系统 MUST 默认保留所有字符串 cell 值原样写出,不得执行公式前缀转义。
 
-允许公式（可信输入显式放宽）：
+防护模式（不可信输入显式收紧）：
 
-- 若 effective book 配置 `allow_formulas=true`,系统 MUST 禁用上述转义并保留原始字符串。
+- 若 effective book 配置 `allow_formulas=false`,系统 MUST 对所有字符串 cell 值执行公式前缀转义,以避免 `Excel` 将其解析为公式。
 
-#### Scenario: formula-like values are escaped by default
+#### Scenario: allow_formulas is true by default and preserves raw strings
 - **GIVEN** workflow 声明 book 资源 `report` 且未显式设置 `allow_formulas`
+- **WHEN** 某个写入节点将字符串 `\"=1+1\"` 写入该 book
+- **THEN** 导出的 `.xlsx` 中对应单元格值 MUST 为 `\"=1+1\"`
+
+#### Scenario: allow_formulas false escapes formula-like strings
+- **GIVEN** workflow 声明 book 资源 `report` 且设置 `allow_formulas=false`
 - **WHEN** 某个写入节点将字符串 `\"=1+1\"` 写入该 book
 - **THEN** 导出的 `.xlsx` 中对应单元格值 MUST 为 `\"'=1+1\"`
 
@@ -201,7 +205,7 @@
 系统 MUST 支持 workflow YAML 的 book 资源声明包含可选字段 `workflow.resources.books.<book_id>.allow_formulas`：
 
 - 该字段 MUST 为 bool
-- 缺省时 MUST 等价于 `false`
+- 缺省时 MUST 等价于 `true`
 
 #### Scenario: book allow_formulas passes schema validation
 - **WHEN** workflow YAML 声明 `workflow.resources.books.report.allow_formulas=false`
@@ -318,3 +322,4 @@ staging 路径布局约束:
 - **THEN** `./out/versions/<wf_exec_id_1>/` 与 `./out/versions/<wf_exec_id_2>/` MUST 同时存在
 - **AND** `./out/manifest/latest.json` MUST 始终为可解析 JSON
 - **AND** `./out/**/*.scalim.lock` MUST 不存在
+

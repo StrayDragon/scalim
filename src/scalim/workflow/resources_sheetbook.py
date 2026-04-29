@@ -134,7 +134,7 @@ class SheetBookDef:
     budget_max_sheets: int
     budget_max_total_cells: int
     export_path: Optional[str]
-    export_allow_formulas: bool = False
+    export_allow_formulas: bool = True
 
 
 @dataclass

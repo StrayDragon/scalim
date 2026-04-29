@@ -76,7 +76,7 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 layout = _layout_for_root(output_root, path="workflow.resources.books.{}.path".format(str(res.resource_id)))
                 final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
                 workbook_defs[str(res.resource_id)] = str(final_path)
-                workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", False))
+                workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", True))
                 continue
             if kind == "xlsx_memory":
                 budget_obj = opts.get("budget")
@@ -86,7 +86,7 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
 
                 export_cfg_obj = opts.get("export_xlsx")
                 export_cfg_dict: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-                export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", False))
+                export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", True))
                 export_path = str(res.path or "").strip() or None
                 if export_path is not None:
                     layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
@@ -110,7 +110,7 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
             final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
             workbook_defs[str(res.resource_id)] = str(final_path)
             opts = res.options or {}
-            workbook_allow_formulas_by_id[str(res.resource_id)] = options_bool(opts, "allow_formulas", default=False)
+            workbook_allow_formulas_by_id[str(res.resource_id)] = options_bool(opts, "allow_formulas", default=True)
             continue
 
         if res_type == "csv":
@@ -129,7 +129,7 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
 
             export_cfg_obj = opts.get("export_xlsx")
             sheetbook_export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
-            export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", False))
+            export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", True))
             export_path = str(res.path or "").strip() or None
             if export_path is not None:
                 layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))

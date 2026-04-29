@@ -243,7 +243,7 @@ def test_csv_sink_escapes_special_chars(tmp_path, sink_cls):
     [CSVSink, ColumnCSVSink],
     ids=["row-sink", "column-sink"],
 )
-def test_csv_sinks_escape_formula_like_values_by_default(tmp_path, sink_cls) -> None:
+def test_csv_sinks_preserve_raw_formula_like_values_by_default(tmp_path, sink_cls) -> None:
     output_path = tmp_path / "formula.csv"
     rows = [
         {"id": 1, "name": "=1+1"},
@@ -261,14 +261,14 @@ def test_csv_sinks_escape_formula_like_values_by_default(tmp_path, sink_cls) -> 
         out_rows = list(csv.reader(f))
 
     assert out_rows == [
-        ["'=id", "name"],
-        ["1", "'=1+1"],
-        ["2", "'  -2+2"],
+        ["=id", "name"],
+        ["1", "=1+1"],
+        ["2", "  -2+2"],
         ["3", "'=already"],
     ]
 
 
-def test_csv_sinks_allow_formulas_preserves_raw_values(tmp_path) -> None:
+def test_csv_sinks_allow_formulas_false_escapes_formula_like_values(tmp_path) -> None:
     rows = [
         {"id": 1, "name": "=1+1"},
         {"id": 2, "name": "  -2+2"},
@@ -280,16 +280,16 @@ def test_csv_sinks_allow_formulas_preserves_raw_values(tmp_path) -> None:
         str(output_path),
         field_names=["id", "name"],
         header_names=["=id", "name"],
-        allow_formulas=True,
+        allow_formulas=False,
     ) as sink:
         sink.write_batch(rows)
 
     with output_path.open(encoding="utf-8", newline="") as f:
         out_rows = list(csv.reader(f))
     assert out_rows == [
-        ["=id", "name"],
-        ["1", "=1+1"],
-        ["2", "  -2+2"],
+        ["'=id", "name"],
+        ["1", "'=1+1"],
+        ["2", "'  -2+2"],
         ["3", "'=already"],
     ]
 
@@ -298,7 +298,7 @@ def test_csv_sinks_allow_formulas_preserves_raw_values(tmp_path) -> None:
         str(output_path2),
         field_names=["id", "name"],
         header_names=["=id", "name"],
-        allow_formulas=True,
+        allow_formulas=False,
     )
     row_ids = [row["id"] for row in rows]
     sink2.set_row_ids(row_ids)
