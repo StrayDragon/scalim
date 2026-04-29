@@ -208,7 +208,7 @@ runtime core MUST NOT 导入 dev tooling packages (例如 scalim-misc),dev tooli
 
 ### Requirement: output_composition hotspot MUST be decomposed into spec/router/builder submodules
 
-系统 MUST 将 `execution/output_composition.py` 这类混合 spec+runtime+builder 的热点模块拆分为职责单一的子模块,至少分离:
+系统 MUST 将 output composition 热点实现拆分为职责单一的子模块(例如 `execution/output_composition/{specs,router,build}.py`),至少分离:
 - spec/数据类层
 - router/runtime 实现层
 - builder/工厂层
@@ -221,4 +221,3 @@ runtime core MUST NOT 导入 dev tooling packages (例如 scalim-misc),dev tooli
 - **WHEN** 维护者将 output composition 代码迁移到子模块/子包
 - **THEN** 调用方仍可通过 `scalim.execution.output_composition` 导入公共类型与 `build_output_composition`
 - **AND** `just qa` MUST 通过
-

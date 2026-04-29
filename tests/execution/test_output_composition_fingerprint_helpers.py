@@ -18,14 +18,14 @@ def test_fingerprint_part_helpers_are_stable_and_structured() -> None:
     assert oc._post_field_fingerprint_part(p) == "score|kind=test|deps=rank|fingerprint=score=rank*10"
 
 
-def test_output_composition_py_placeholder_is_executable_for_coverage() -> None:
-    import importlib.util
+def test_output_composition_is_package_and_no_legacy_py_module() -> None:
+    import importlib
     from pathlib import Path
 
-    path = Path(__file__).resolve().parents[2] / "src/scalim/execution/output_composition.py"
-    spec = importlib.util.spec_from_file_location("scalim.execution._output_composition_placeholder", path)
+    spec = importlib.util.find_spec("scalim.execution.output_composition")
     assert spec is not None
-    assert spec.loader is not None
+    assert spec.origin is not None
+    assert spec.origin.endswith("src/scalim/execution/output_composition/__init__.py")
 
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    legacy = Path(__file__).resolve().parents[2] / "src/scalim/execution/output_composition.py"
+    assert not legacy.exists()

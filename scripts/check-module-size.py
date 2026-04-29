@@ -16,13 +16,22 @@ class ModuleSize:
 _HOTSPOT_LIMITS: Dict[str, int] = {
     # 热点模块: 防止继续膨胀; 拆分在后续变更推进.
     "src/scalim/workflow/execute.py": 1920,
-    "src/scalim/execution/output_composition.py": 1377,
+    # output_composition 已拆分为子包; 按目录聚合统计以保持护栏意义.
+    "src/scalim/execution/output_composition": 1700,
     # 试点拆分模块: 保持低于通用阈值.
     "src/scalim/dsl/yaml_dsl/workflow_config/_parse.py": 1000,
 }
 
 
 def _count_lines(path: Path) -> int:
+    if path.is_dir():
+        total = 0
+        for child in sorted(path.rglob("*.py")):
+            if "__pycache__" in child.parts:
+                continue
+            total += _count_lines(child)
+        return total
+
     text = path.read_text(encoding="utf-8")
     return len(text.splitlines())
 
