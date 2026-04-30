@@ -354,6 +354,36 @@ def test_conversion_source_helpers_raise_on_invalid_runtime_values() -> None:
     with pytest.raises(TypeError, match="unsupported value type"):
         _ensure_field_value(object(), field_id="status_name", producer="call_by")
 
+    ctx = ComputeCallContextIr(row_id="row", batch_num=1, field_id="status_name", deps=(), values={})
+
+    assert (
+        _eval_call_by_value(
+            CallByValueIr(kind="literal", value=1),
+            field_id="status_name",
+            dep_values={},
+            ctx=ctx,
+        )
+        == 1
+    )
+    assert (
+        _eval_call_by_value(
+            CallByValueIr(kind="field", value="a"),
+            field_id="status_name",
+            dep_values={"a": 2},
+            ctx=ctx,
+        )
+        == 2
+    )
+    assert (
+        _eval_call_by_value(
+            CallByValueIr(kind="ctx", value=""),
+            field_id="status_name",
+            dep_values={},
+            ctx=ctx,
+        )
+        is ctx
+    )
+
     with pytest.raises(AttributeError, match="has no attribute 'missing'"):
         _eval_call_by_value(
             CallByValueIr(kind="ctx_attr", value="missing"),

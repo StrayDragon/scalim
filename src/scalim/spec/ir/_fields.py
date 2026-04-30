@@ -35,6 +35,18 @@ class CallBySpecIr:
     field_names: Tuple[str, ...] = ()
 
 
+def call_by_requires_ctx(call_by: "CallBySpecIr") -> bool:
+    for item in tuple(call_by.args or ()):
+        kind = str(getattr(item, "kind", "") or "").strip()  # pragma: allow-dynattr dsl: CallByValueIr contract
+        if kind in ("ctx", "ctx_attr"):
+            return True
+    for _key, item in tuple(call_by.kwargs or ()):
+        kind = str(getattr(item, "kind", "") or "").strip()  # pragma: allow-dynattr dsl: CallByValueIr contract
+        if kind in ("ctx", "ctx_attr"):
+            return True
+    return False
+
+
 @dataclass(frozen=True)
 class ValueOpIr:
     """值处理操作规范(纯数据,不包含可调用对象).

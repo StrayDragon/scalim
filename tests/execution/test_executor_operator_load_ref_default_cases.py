@@ -15,7 +15,7 @@ from scalim.execution.executor.operators.load_ref.flow import (
 from scalim.execution.executor.operators.load_ref.context import LoadRefExecutionContext
 from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
-from scalim.spec.ir import CallBySpecIr, FieldIr, KeyIr, LookupStepIr, SourceIr, ValueOpIr
+from scalim.spec.ir import CallBySpecIr, CallByValueIr, FieldIr, KeyIr, LookupStepIr, SourceIr, ValueOpIr
 from scalim.spec.ir._fields import FieldDefaultCaseIr
 from scalim.spec.ir.binding import BindingIr, LoaderIr
 from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
@@ -285,9 +285,7 @@ def test_load_ref_relation_miss_call_by_default_passes_dependencies() -> None:
 
     def _default_calc(*dep_args: object, **kwargs: object) -> str:
         captured["dep_args"] = tuple(dep_args)
-        ctx = kwargs.get("ctx")
-        assert ctx is not None
-        captured["ctx_values"] = dict(getattr(ctx, "values", {}))
+        captured["ctx"] = kwargs.get("ctx")
         return "6"
 
     main_source = _make_main_source()
@@ -330,6 +328,73 @@ def test_load_ref_relation_miss_call_by_default_passes_dependencies() -> None:
     LoadRefOperatorExecutor().execute(operator, context, [1], runtime)
     assert context.get_field_value("amount", 1) == 6
     assert captured["dep_args"] == (1,)
+    assert captured["ctx"] is None
+
+
+def test_load_ref_relation_miss_call_by_default_passes_ctx_values_when_requested() -> None:
+    runtime_bindings = RuntimeBindings()
+
+    def _params_builder(ctx):  # type: ignore[no-untyped-def]
+        return (), {"target_ids": list(ctx.lookup_keys or [])}
+
+    def _loader(target_ids):  # type: ignore[no-untyped-def]
+        _ = target_ids
+        return {}
+
+    captured = {}
+
+    def _default_calc(*dep_args: object, **kwargs: object) -> str:
+        captured["dep_args"] = tuple(dep_args)
+        ctx = kwargs.get("ctx")
+        assert ctx is not None
+        captured["ctx_values_type"] = type(getattr(ctx, "values", None)).__name__
+        captured["ctx_values"] = dict(getattr(ctx, "values", {}))
+        with pytest.raises(TypeError):
+            getattr(ctx, "values", {})["fk_id"] = 2
+        return "6"
+
+    main_source = _make_main_source()
+    target_source = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:targets")),
+    )
+    _bind_source_loader(runtime_bindings, "targets", _loader)
+    binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
+    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+
+    field_spec = FieldIr(
+        field_id="amount",
+        name="Amount",
+        source=target_source,
+        data_key="amount",
+        value_ops=(ValueOpIr(kind="cast", to="int"),),
+        default_cases=(
+            FieldDefaultCaseIr(
+                when="relation_miss",
+                kind="call_by",
+                call_by=CallBySpecIr(
+                    reference=RuntimeHandleIdIr(handle_id="default:amount"),
+                    args=(CallByValueIr(kind="ctx", value=""),),
+                    field_names=("fk_id",),
+                ),
+            ),
+        ),
+    )
+    runtime_bindings.ref_default_calculators[("amount", 0)] = _default_calc
+    runtime_bindings.value_transforms["amount"] = lambda v: int(v) if v is not None else None  # type: ignore[no-any-return]
+
+    operator = _make_single_step_operator(field_key="amount", source=target_source, step=step)
+    plan = _make_single_step_plan(field_key="amount", field_spec=field_spec, operator=operator)
+    runtime = _make_runtime(plan, main_source, sources={str(target_source.source_id): target_source}, runtime_bindings=runtime_bindings)
+
+    context = BatchContext()
+    context.set_field_value("fk_id", 1, 1)
+
+    LoadRefOperatorExecutor().execute(operator, context, [1], runtime)
+    assert context.get_field_value("amount", 1) == 6
+    assert captured["dep_args"] == (1,)
+    assert captured["ctx_values_type"] == "mappingproxy"
     assert captured["ctx_values"] == {"fk_id": 1}
 
 

@@ -60,6 +60,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/execution-error-taxonomy/spec.md)
 - Summary: **状态: ✅ 已实现** 为 scalim 建立统一的异常体系规范:以 ScalimError 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径.
 
+### `execution-hotpath-fastpaths`
+- Title: execution-hotpath-fastpaths Specification
+- Source: [spec.md](#code=openspec/specs/execution-hotpath-fastpaths/spec.md)
+- Summary: 在不要求业务改动的前提下，降低 execution 热路径（`compute` / `call_by` / `load_ref`）的 per-row 固定开销，并保持既有语义、可观测性与低内存特性。
+
 ### `execution-loader-retry`
 - Title: loader-retry-policy Specification
 - Source: [spec.md](#code=openspec/specs/execution-loader-retry/spec.md)

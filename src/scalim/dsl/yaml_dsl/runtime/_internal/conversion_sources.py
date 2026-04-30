@@ -13,7 +13,7 @@ from .....spec.ir import (
     SourceNormalizeStepIr,
     SourceRefIr,
 )
-from .....spec.ir._fields import CallBySpecIr, CallByValueIr, FieldDefaultCaseIr, ValueOpIr
+from .....spec.ir._fields import CallBySpecIr, CallByValueIr, FieldDefaultCaseIr, ValueOpIr, call_by_requires_ctx
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr
@@ -634,7 +634,8 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
                 raise ScalimConversionError(msg) from exc
 
             call_by_spec = _convert_parsed_call_by_spec(parsed, field_id=derived_config.field_id)
-            call_ctx_key = CALL_BY_CTX_KEY
+            if call_by_requires_ctx(call_by_spec):
+                call_ctx_key = CALL_BY_CTX_KEY
         else:
             msg = "Derived field '{}' must declare 'compute' or 'call_by'".format(derived_config.field_id)
             raise ScalimConversionError(msg)

@@ -5,6 +5,7 @@ from typing import Any, Optional
 import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
+from scalim.events import EventType
 from scalim.execution.context import BatchContext
 from scalim.execution.guardrails import ScalimGuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
@@ -118,9 +119,75 @@ def test_compute_operator_secure_compute_wants_gated_dependencies_payload(monkey
     context.set_field_value("b", 2, 4)
 
     ComputeOperatorExecutor().execute(operator, context, [1, 2], runtime)
-
     assert context.get_field_value("sum", 1) == 3
     assert context.get_field_value("sum", 2) == 7
+
+
+def test_compute_operator_builds_dependencies_payload_on_expected_error_when_wants_gated(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _div(a, b):  # type: ignore[no-untyped-def]
+        return a / b
+
+    field_spec = DerivedFieldIr(
+        field_id="div",
+        name="Div",
+        dependencies=("a", "b"),
+        compute_expr="a / b",
+    )
+    operator = ComputeOperatorIr(
+        operator_id="compute_div",
+        operator_type=OperatorType.COMPUTE.value,
+        field_key="div",
+        input_fields=("a", "b"),
+    )
+    runtime_bindings = RuntimeBindings(derived_calculators={"div": _div})
+    runtime, hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"div": field_spec}), runtime_bindings=runtime_bindings)
+
+    def _wants(event_type: str) -> bool:
+        return str(event_type) == str(EventType.ERROR)
+
+    monkeypatch.setattr(runtime.instrumentation, "wants", _wants)
+
+    context = BatchContext()
+    context.set_field_value("a", 1, 1)
+    context.set_field_value("b", 1, 0)
+
+    ComputeOperatorExecutor().execute(operator, context, [1], runtime)
+    assert len(hook.errors) == 1
+    assert hook.errors[0].context["dependencies"] == {"a": 1, "b": 0}
+
+
+def test_compute_operator_builds_dependencies_payload_on_unexpected_error_when_wants_gated(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _boom(a, b):  # type: ignore[no-untyped-def]
+        _ = (a, b)
+        raise RuntimeError("boom")
+
+    field_spec = DerivedFieldIr(
+        field_id="boom",
+        name="Boom",
+        dependencies=("a", "b"),
+        compute_expr="a",
+    )
+    operator = ComputeOperatorIr(
+        operator_id="compute_boom",
+        operator_type=OperatorType.COMPUTE.value,
+        field_key="boom",
+        input_fields=("a", "b"),
+    )
+    runtime_bindings = RuntimeBindings(derived_calculators={"boom": _boom})
+    runtime, hook = _make_runtime_with_hook(ExecutionPlan(field_specs={"boom": field_spec}), runtime_bindings=runtime_bindings)
+
+    def _wants(event_type: str) -> bool:
+        return str(event_type) == str(EventType.ERROR)
+
+    monkeypatch.setattr(runtime.instrumentation, "wants", _wants)
+
+    context = BatchContext()
+    context.set_field_value("a", 1, 1)
+    context.set_field_value("b", 1, 2)
+
+    ComputeOperatorExecutor().execute(operator, context, [1], runtime)
+    assert len(hook.errors) == 1
+    assert hook.errors[0].context["dependencies"] == {"a": 1, "b": 2}
 
 
 def test_compute_operator_secure_compute_emits_field_compute_and_formats_value() -> None:
@@ -306,9 +373,15 @@ def test_compute_operator_secure_compute_unexpected_error_variants(
 
 
 def test_compute_operator_injects_ctx_when_configured_and_emits_deps_without_ctx() -> None:
+    seen = {}
+
     def _calc(amount, **kwargs):  # type: ignore[no-untyped-def]
         _ = amount
         ctx = kwargs["ctx"]
+        seen["ctx_values_type"] = type(getattr(ctx, "values", None)).__name__
+        seen["ctx_values"] = dict(getattr(ctx, "values", {}))
+        with pytest.raises(TypeError):
+            getattr(ctx, "values", {})["amount"] = 999
         return "{}:{}".format(ctx.row_id, ctx.batch_num)
 
     field_spec = DerivedFieldIr(
@@ -349,6 +422,8 @@ def test_compute_operator_injects_ctx_when_configured_and_emits_deps_without_ctx
 
     assert context.get_field_value("score", 1) == "1:7"
     assert context.get_field_value("score", 2) == "2:7"
+    assert seen["ctx_values_type"] == "mappingproxy"
+    assert seen["ctx_values"] in ({"amount": 100}, {"amount": 200})
     assert len(hook.field_computed) == 2
     assert hook.field_computed[0].dependencies == {"amount": 100}
     assert hook.field_computed[1].dependencies == {"amount": 200}

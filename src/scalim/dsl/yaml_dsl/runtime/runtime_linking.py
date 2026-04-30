@@ -16,6 +16,7 @@ from ....spec.ir import (
     DerivedFieldIr,
     FieldIr,
 )
+from ....spec.ir._fields import call_by_requires_ctx
 from ....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr, RuntimeHandleIdIr, describe_callable_ref
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import FieldValue, LoaderResultMapping, LookupKey
@@ -59,7 +60,7 @@ def _resolve_callable_ref(ref: CallableRefIr, *, resolver: SecurePythonReference
     return resolver.resolve(reference)
 
 
-def _eval_call_by_value(
+def _eval_call_by_value(  # pyright: ignore[reportUnusedFunction]  # used by internal tests
     value: CallByValueIr,
     *,
     field_id: str,
@@ -180,7 +181,7 @@ def _preflight_loader_params_signature(
     )
 
 
-def _build_call_by_calculator(
+def _build_call_by_calculator(  # noqa: C901  # pragma: allow-c901 plan: c0
     *,
     field_spec: DerivedFieldIr,
     call_by: CallBySpecIr,
@@ -188,32 +189,80 @@ def _build_call_by_calculator(
 ) -> DerivedCalculatorFn:
     field_id = str(field_spec.field_id)
     deps = tuple(str(x) for x in (field_spec.dependencies or ()))
-    args_spec = tuple(call_by.args or ())
-    kwargs_spec = tuple(call_by.kwargs or ())
+    dep_index = {str(dep): int(idx) for idx, dep in enumerate(deps)}
+    needs_ctx = call_by_requires_ctx(call_by)
+
+    def _compile_value(value: CallByValueIr) -> Tuple[str, object]:
+        kind = str(value.kind or "").strip()
+        raw = value.value
+        if kind == "literal":
+            return "literal", raw
+        if kind == "field":
+            return "field", dep_index.get(str(raw))
+        if kind == "ctx":
+            return "ctx", ""
+        if kind == "ctx_attr":
+            return "ctx_attr", str(raw)
+        msg = "Derived field '{}' has unknown call_by value kind: {!r}".format(field_id, kind)
+        raise ValueError(msg)
+
+    args_spec = tuple(_compile_value(item) for item in (call_by.args or ()))
+    kwargs_spec = tuple((str(key), _compile_value(item)) for key, item in (call_by.kwargs or ()))
+
+    def _resolve_value_no_ctx(spec: Tuple[str, object], dep_args: Tuple[object, ...]) -> object:
+        kind, raw = spec
+        if kind == "field":
+            return dep_args[raw] if isinstance(raw, int) else None
+        return raw
+
+    def _resolve_value_with_ctx(spec: Tuple[str, object], dep_args: Tuple[object, ...], ctx_obj: ComputeCallContextIr) -> object:
+        kind, raw = spec
+        if kind == "field":
+            return dep_args[raw] if isinstance(raw, int) else None
+        if kind == "ctx":
+            return ctx_obj
+        if kind == "ctx_attr":
+            return getattr(ctx_obj, str(raw))  # pragma: allow-dynattr dsl: ctx_attr access
+        return raw
 
     def _calculator(*dep_args: object, **_kwargs: object) -> FieldValue:
-        ctx_obj = _kwargs.get("ctx")
-        if not isinstance(ctx_obj, ComputeCallContextIr):
-            msg = "Derived field '{}' call_by requires ctx=ComputeCallContextIr".format(field_id)
-            raise TypeError(msg)
+        if needs_ctx:
+            candidate = _kwargs.get("ctx")
+            if not isinstance(candidate, ComputeCallContextIr):
+                msg = "Derived field '{}' call_by requires ctx=ComputeCallContextIr".format(field_id)
+                raise TypeError(msg)
+            ctx_obj = candidate
 
-        dep_values = build_dep_values_payload(deps, dep_args)
+            args: List[object] = []
+            for item in args_spec:
+                args.append(_resolve_value_with_ctx(item, dep_args, ctx_obj))
 
-        args: List[object] = []
+            if kwargs_spec:
+                kwargs: Dict[str, object] = {}
+                for key, item in kwargs_spec:
+                    kwargs[str(key)] = _resolve_value_with_ctx(item, dep_args, ctx_obj)
+                returned = fn(*args, **kwargs)
+            else:
+                returned = fn(*args)
+            return _ensure_field_value(returned, field_id=field_id, producer="call_by")
+
+        args = []
         for item in args_spec:
-            args.append(_eval_call_by_value(item, field_id=field_id, dep_values=dep_values, ctx=ctx_obj))
+            args.append(_resolve_value_no_ctx(item, dep_args))
 
-        kwargs: Dict[str, object] = {}
-        for key, item in kwargs_spec:
-            kwargs[str(key)] = _eval_call_by_value(item, field_id=field_id, dep_values=dep_values, ctx=ctx_obj)
-
-        returned = fn(*args, **kwargs)
+        if kwargs_spec:
+            kwargs = {}
+            for key, item in kwargs_spec:
+                kwargs[str(key)] = _resolve_value_no_ctx(item, dep_args)
+            returned = fn(*args, **kwargs)
+        else:
+            returned = fn(*args)
         return _ensure_field_value(returned, field_id=field_id, producer="call_by")
 
     return _calculator
 
 
-def _build_ref_default_call_by_calculator(
+def _build_ref_default_call_by_calculator(  # noqa: C901  # pragma: allow-c901 plan: c0
     *,
     field_id: str,
     idx: int,
@@ -222,38 +271,77 @@ def _build_ref_default_call_by_calculator(
     fn: Callable[..., Any],
 ) -> RefDefaultCalculatorFn:
     deps = tuple(str(x) for x in (dep_keys or ()))
-    args_spec = tuple(call_by.args or ())
-    kwargs_spec = tuple(call_by.kwargs or ())
+    dep_index = {str(dep): int(i) for i, dep in enumerate(deps)}
+    needs_ctx = call_by_requires_ctx(call_by)
+
+    def _compile_value(value: CallByValueIr) -> Tuple[str, object]:
+        kind = str(value.kind or "").strip()
+        raw = value.value
+        if kind == "literal":
+            return "literal", raw
+        if kind == "field":
+            return "field", dep_index.get(str(raw))
+        if kind == "ctx":
+            return "ctx", ""
+        if kind == "ctx_attr":
+            return "ctx_attr", str(raw)
+        msg = "Field '{}' default[{}].call_by has unknown call_by value kind: {!r}".format(field_id, int(idx), kind)
+        raise ValueError(msg)
+
+    args_spec = tuple(_compile_value(item) for item in (call_by.args or ()))
+    kwargs_spec = tuple((str(key), _compile_value(item)) for key, item in (call_by.kwargs or ()))
+
+    def _resolve_value_no_ctx(spec: Tuple[str, object], dep_args: Tuple[object, ...]) -> object:
+        kind, raw = spec
+        if kind == "field":
+            return dep_args[raw] if isinstance(raw, int) else None
+        return raw
+
+    def _resolve_value_with_ctx(spec: Tuple[str, object], dep_args: Tuple[object, ...], ctx_obj: ComputeCallContextIr) -> object:
+        kind, raw = spec
+        if kind == "field":
+            return dep_args[raw] if isinstance(raw, int) else None
+        if kind == "ctx":
+            return ctx_obj
+        if kind == "ctx_attr":
+            return getattr(ctx_obj, str(raw))  # pragma: allow-dynattr dsl: ctx_attr access
+        return raw
 
     def _calculator(*dep_args: object, **_kwargs: object) -> FieldValue:
-        ctx_obj = _kwargs.get("ctx")
-        if not isinstance(ctx_obj, ComputeCallContextIr):
-            msg = "Field '{}' default[{}].call_by requires ctx=ComputeCallContextIr".format(field_id, int(idx))
-            raise TypeError(msg)
+        if needs_ctx:
+            candidate = _kwargs.get("ctx")
+            if not isinstance(candidate, ComputeCallContextIr):
+                msg = "Field '{}' default[{}].call_by requires ctx=ComputeCallContextIr".format(field_id, int(idx))
+                raise TypeError(msg)
+            ctx_obj = candidate
 
-        dep_values = build_dep_values_payload(deps, dep_args)
+            args: List[object] = []
+            for item in args_spec:
+                args.append(_resolve_value_with_ctx(item, dep_args, ctx_obj))
 
-        args: List[object] = []
+            if kwargs_spec:
+                kwargs: Dict[str, object] = {}
+                for key, item in kwargs_spec:
+                    kwargs[str(key)] = _resolve_value_with_ctx(item, dep_args, ctx_obj)
+                returned = fn(*args, **kwargs)
+            else:
+                returned = fn(*args)
+            return _ensure_field_value(returned, field_id=field_id, producer="default.call_by")
+
+        args = []
         for item in args_spec:
-            args.append(_eval_call_by_value(item, field_id=field_id, dep_values=dep_values, ctx=ctx_obj))
+            args.append(_resolve_value_no_ctx(item, dep_args))
 
-        kwargs: Dict[str, object] = {}
-        for key, item in kwargs_spec:
-            kwargs[str(key)] = _eval_call_by_value(item, field_id=field_id, dep_values=dep_values, ctx=ctx_obj)
-
-        returned = fn(*args, **kwargs)
+        if kwargs_spec:
+            kwargs = {}
+            for key, item in kwargs_spec:
+                kwargs[str(key)] = _resolve_value_no_ctx(item, dep_args)
+            returned = fn(*args, **kwargs)
+        else:
+            returned = fn(*args)
         return _ensure_field_value(returned, field_id=field_id, producer="default.call_by")
 
     return _calculator
-
-
-def build_dep_values_payload(dep_keys: Sequence[str], dep_values: Sequence[object]) -> Dict[str, object]:
-    payload: Dict[str, object] = {}
-    i = 0
-    while i < len(dep_keys):
-        payload[str(dep_keys[i])] = dep_values[i]
-        i += 1
-    return payload
 
 
 def _resolve_value_op_callable(

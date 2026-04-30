@@ -43,6 +43,18 @@ def test_compiled_calculator_supports_positional_and_kwargs() -> None:
         _ = calc(1)
 
 
+def test_field_name_can_shadow_safe_function_name() -> None:
+    engine = SecureComputeEngine()
+
+    calc = engine.compile("len + 1", ("len",))
+    assert calc(len=5) == 6
+    assert calc(5) == 6
+
+    calc_call = engine.compile("len('abc')", ("len",))
+    with pytest.raises(ScalimComputeExpressionError, match="TypeError"):
+        _ = calc_call(len=1)
+
+
 def test_max_compiled_cache_size_must_be_positive() -> None:
     with pytest.raises(ValueError, match="max_compiled_cache_size"):
         _ = SecureComputeEngine(max_compiled_cache_size=0)
@@ -349,6 +361,13 @@ def test_audit_mode_full_logs_raw_values_when_unlocked(caplog, monkeypatch: pyte
 
     with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
         _ = calc(a=secret)
+
+    messages = [record.getMessage() for record in caplog.records if record.name == "scalim.dsl.yaml_dsl.security"]
+    assert any(secret in message for message in messages)
+
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger="scalim.dsl.yaml_dsl.security"):
+        _ = calc(secret)
 
     messages = [record.getMessage() for record in caplog.records if record.name == "scalim.dsl.yaml_dsl.security"]
     assert any(secret in message for message in messages)

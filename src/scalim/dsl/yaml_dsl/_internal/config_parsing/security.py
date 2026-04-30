@@ -8,9 +8,27 @@ import sys
 import threading
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from collections.abc import Mapping as AbcMapping
 from decimal import Decimal
 from types import CodeType
-from typing import Any, Callable, ClassVar, Container, Dict, FrozenSet, List, Optional, Set, Tuple, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Container,
+    Dict,
+    FrozenSet,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 from .....exceptions import ScalimYamlError
 from .....vendor.compact.typing_extensionsx import override
@@ -117,7 +135,7 @@ class ScalimComputeExpressionError(ScalimYamlError):
     pass
 
 
-AuditCallback = Callable[[str, Dict[str, Any], Any], None]
+AuditCallback = Callable[[str, Mapping[str, Any], Any], None]
 
 
 @dataclass(frozen=True)
@@ -137,6 +155,7 @@ class SecureComputeCalculator(SecureComputeCalculatorContract):
     expression: str
     dependencies: Tuple[str, ...]
     code: CodeType
+    dep_index: Dict[str, int]
 
     @override
     def __call__(self, *args: Any, **field_values: Any) -> Any:
@@ -144,12 +163,13 @@ class SecureComputeCalculator(SecureComputeCalculatorContract):
             expression=self.expression,
             code=self.code,
             dependencies=self.dependencies,
+            dep_index=self.dep_index,
             args=args,
             field_values=field_values,
         )
 
 
-def unsafe_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
+def unsafe_audit_callback(expression: str, field_values: Mapping[str, Any], result: Any) -> None:
     """不安全的 `raw` 审计回调: 记录字段值与结果原文(可能包含敏感信息).
 
     注意:
@@ -159,12 +179,12 @@ def unsafe_audit_callback(expression: str, field_values: Dict[str, Any], result:
     security_logger.debug(EVAL_AUDIT_LOG, expression, field_values, result)
 
 
-def default_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
+def default_audit_callback(expression: str, field_values: Mapping[str, Any], result: Any) -> None:
     """安全默认审计回调: 等价于 `redacted_audit_callback`."""
     redacted_audit_callback(expression, field_values, result)
 
 
-def redacted_audit_callback(expression: str, field_values: Dict[str, Any], result: Any) -> None:
+def redacted_audit_callback(expression: str, field_values: Mapping[str, Any], result: Any) -> None:
     """脱敏审计回调: 仅记录表达式和字段名,不记录字段值与结果."""
     expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
     field_names = sorted(field_values.keys()) if field_values else []
@@ -175,6 +195,41 @@ def redacted_audit_callback(expression: str, field_values: Dict[str, Any], resul
         field_names,
         type(result).__name__,
     )
+
+
+if TYPE_CHECKING:
+    _PositionalLocalsViewBase = AbcMapping[str, Any]
+else:
+    _PositionalLocalsViewBase = AbcMapping
+
+
+class _PositionalLocalsView(_PositionalLocalsViewBase):  # pragma: allow-no-docstring hotpath view
+    __slots__: Tuple[str, ...] = ("_dep_index", "_dep_keys", "_dep_values")
+    _dep_keys: Tuple[str, ...]
+    _dep_values: Tuple[Any, ...]
+    _dep_index: Dict[str, int]
+
+    def __init__(self, dep_keys: Tuple[str, ...], dep_values: Tuple[Any, ...], dep_index: Dict[str, int]) -> None:
+        self._dep_keys = dep_keys
+        self._dep_values = dep_values
+        self._dep_index = dep_index
+
+    @override
+    def __getitem__(self, key: str) -> Any:
+        idx = self._dep_index[key]
+        return self._dep_values[idx]
+
+    @override
+    def __iter__(self) -> "Iterator[str]":
+        return iter(self._dep_keys)
+
+    @override
+    def __len__(self) -> int:
+        return len(self._dep_keys)
+
+    @override
+    def __repr__(self) -> str:
+        return repr({key: self[key] for key in self._dep_keys})
 
 
 def _is_full_audit_unlocked() -> bool:
@@ -479,6 +534,7 @@ class SecureComputeEngine:
     _compiled_cache_max_size: int
     _compiled_cache_lock: threading.Lock
     _limits: ComputeLimits
+    _base_globals: Dict[str, Any]
 
     def __init__(
         self,
@@ -503,6 +559,8 @@ class SecureComputeEngine:
         self._compiled_cache = OrderedDict()
         self._compiled_cache_lock = threading.Lock()
 
+        self._base_globals = self._build_base_globals()
+
         normalized_audit_mode = str(audit_mode or "none").strip().lower()
         if normalized_audit_mode not in ("none", "redacted", "full"):
             msg = "audit_mode must be one of: none/redacted/full"
@@ -519,6 +577,25 @@ class SecureComputeEngine:
             audit_callback = unsafe_audit_callback
 
         self._audit_callback = audit_callback
+
+    def _build_base_globals(self) -> Dict[str, Any]:
+        base_globals: Dict[str, Any] = {
+            "__builtins__": {},
+            # 常量
+            "True": True,
+            "False": False,
+            "None": None,
+        }
+        base_globals.update(
+            {
+                name: (self._safe_range if name == "range" else func)
+                for name, func in self.SAFE_FUNCTIONS.items()
+                if name in self._allowed_functions
+            }
+        )
+        if self._custom_functions:
+            base_globals.update(self._custom_functions)
+        return base_globals
 
     def _validate_limits(self) -> None:
         limits = self._limits
@@ -546,11 +623,13 @@ class SecureComputeEngine:
 
         tree = self._validate_expression(expression, dependencies)
         code = compile(tree, "<scalim-compute>", "eval")
+        dep_index = {str(key): int(idx) for idx, key in enumerate(dependencies)}
         calculator = SecureComputeCalculator(
             engine=self,
             expression=expression,
             dependencies=dependencies,
             code=code,
+            dep_index=dep_index,
         )
 
         with self._compiled_cache_lock:
@@ -597,6 +676,7 @@ class SecureComputeEngine:
         expression: str,
         code: CodeType,
         dependencies: Tuple[str, ...],
+        dep_index: Dict[str, int],
         args: Tuple[Any, ...],
         field_values: Dict[str, Any],
     ) -> Any:
@@ -607,7 +687,7 @@ class SecureComputeEngine:
             if len(args) != len(dependencies):
                 msg = "Secure compute calculator expected {} positional args, got {}".format(len(dependencies), len(args))
                 raise TypeError(msg)
-            return self._evaluate_positional(expression, code, dependencies, args)
+            return self._evaluate_positional(expression, code, dependencies, dep_index, args)
         return self._evaluate(expression, code, field_values)
 
     @staticmethod
@@ -738,26 +818,8 @@ class SecureComputeEngine:
         return rng
 
     def _evaluate(self, expression: str, code: Any, field_values: Dict[str, Any]) -> Any:
-        safe_globals: Dict[str, Any] = {
-            "__builtins__": {},
-            # 常量
-            "True": True,
-            "False": False,
-            "None": None,
-        }
-        safe_globals.update(
-            {
-                name: (self._safe_range if name == "range" else func)
-                for name, func in self.SAFE_FUNCTIONS.items()
-                if name in self._allowed_functions
-            }
-        )
-        if self._custom_functions:
-            safe_globals.update(self._custom_functions)
-        safe_globals.update(field_values)
-
         try:
-            result = eval(code, safe_globals, {})  # noqa: S307
+            result = eval(code, self._base_globals, field_values)  # noqa: S307
             if self._audit_callback is not None:
                 self._audit_callback(expression, field_values, result)
         except ScalimComputeExpressionError:
@@ -770,38 +832,20 @@ class SecureComputeEngine:
         else:
             return result
 
-    def _evaluate_positional(self, expression: str, code: Any, dep_keys: Tuple[str, ...], dep_values: Tuple[Any, ...]) -> Any:
-        safe_globals: Dict[str, Any] = {
-            "__builtins__": {},
-            # 常量
-            "True": True,
-            "False": False,
-            "None": None,
-        }
-        safe_globals.update(
-            {
-                name: (self._safe_range if name == "range" else func)
-                for name, func in self.SAFE_FUNCTIONS.items()
-                if name in self._allowed_functions
-            }
-        )
-        if self._custom_functions:
-            safe_globals.update(self._custom_functions)
-
-        i = 0
-        while i < len(dep_keys):
-            safe_globals[dep_keys[i]] = dep_values[i]
-            i += 1
-
+    def _evaluate_positional(
+        self,
+        expression: str,
+        code: Any,
+        dep_keys: Tuple[str, ...],
+        dep_index: Dict[str, int],
+        dep_values: Tuple[Any, ...],
+    ) -> Any:
+        locals_view = _PositionalLocalsView(dep_keys, dep_values, dep_index)
         audit_callback = self._audit_callback
-        audit_field_values: Dict[str, Any] = {}
-        if audit_callback is not None:
-            audit_field_values = {dep_keys[i]: dep_values[i] for i in range(len(dep_keys))}
-
         try:
-            result = eval(code, safe_globals, {})  # noqa: S307
+            result = eval(code, self._base_globals, locals_view)  # noqa: S307
             if audit_callback is not None:
-                audit_callback(expression, audit_field_values, result)
+                audit_callback(expression, locals_view, result)
         except ScalimComputeExpressionError:
             raise
         except Exception as e:

@@ -413,21 +413,14 @@ def test_converter_requires_allowlist_for_call_by() -> None:
     derived = demand_ir.fields["text"]
     assert isinstance(derived, DerivedFieldIr)
     assert derived.call_by is not None
-    assert derived.call_ctx_key == "$ctx"
+    assert derived.call_ctx_key is None
 
     bindings = resolve_runtime_bindings(
         demand_ir,
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
     )
     calculator = bindings.require_derived_calculator("text")
-    ctx = ComputeCallContextIr(
-        row_id=1,
-        batch_num=2,
-        field_id="text",
-        deps=("status",),
-        values={"status": "x"},
-    )
-    assert calculator("x", ctx=ctx) == "x"
+    assert calculator("x") == "x"
 
 
 def test_converter_rejects_unknown_call_by_reference() -> None:
@@ -517,14 +510,7 @@ def test_converter_accepts_call_by_keyword_arg_for_keyword_only_param() -> None:
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
     )
     calculator = bindings.require_derived_calculator("ok")
-    ctx = ComputeCallContextIr(
-        row_id=1,
-        batch_num=0,
-        field_id="ok",
-        deps=("group_name",),
-        values={"group_name": "vip"},
-    )
-    assert calculator("vip", ctx=ctx) is True
+    assert calculator("vip") is True
 
 
 def test_converter_call_by_accepts_decimal_result() -> None:
@@ -538,14 +524,7 @@ def test_converter_call_by_accepts_decimal_result() -> None:
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
     )
     calculator = bindings.require_derived_calculator("text")
-    ctx = ComputeCallContextIr(
-        row_id=1,
-        batch_num=0,
-        field_id="text",
-        deps=("status",),
-        values={"status": "0.3"},
-    )
-    assert calculator("0.3", ctx=ctx) == Decimal("0.3")
+    assert calculator("0.3") == Decimal("0.3")
 
 
 def test_converter_rejects_missing_compute_and_call_by() -> None:
@@ -606,14 +585,7 @@ def test_converter_call_by_parse_error_and_literal_and_ctx_attr_and_missing_ctx(
         resolver=SecurePythonReferenceResolver(allowed_modules=frozenset(["tests.fixtures.call_by_fns"])),
     )
     calculator = bindings.require_derived_calculator("text")
-    ctx = ComputeCallContextIr(
-        row_id=1,
-        batch_num=0,
-        field_id="text",
-        deps=("status",),
-        values={"status": True},
-    )
-    assert calculator(True, ctx=ctx) == 1
+    assert calculator(True) == 1
 
     ctx_attr_cfg = DemandConfig(
         name=base.name,

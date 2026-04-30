@@ -2,6 +2,7 @@ import pytest
 
 from scalim.dsl.yaml_dsl.runtime.errors import ScalimResolverError
 from scalim.dsl.yaml_dsl.runtime.runtime_linking import (
+    _build_call_by_calculator,
     _build_ref_default_call_by_calculator,
     _bind_field_runtime_bindings,
     _bind_source_runtime_bindings,
@@ -551,7 +552,7 @@ def test_bind_field_runtime_bindings_wraps_ref_default_call_by_preflight_errors(
         )
 
 
-def test_build_ref_default_call_by_calculator_requires_ctx_and_evaluates_args_kwargs() -> None:
+def test_build_ref_default_call_by_calculator_supports_no_ctx_when_unused() -> None:
     calls = []
 
     def _fn(a, **kwargs):  # noqa: ANN001
@@ -566,12 +567,149 @@ def test_build_ref_default_call_by_calculator_requires_ctx_and_evaluates_args_kw
     )
     calc = _build_ref_default_call_by_calculator(field_id="f", idx=0, dep_keys=("cs_id",), call_by=call_by, fn=_fn)
 
+    assert calc(123) == 0
+    assert calls == [(123, {"x": 1})]
+
+
+def test_build_ref_default_call_by_calculator_requires_ctx_when_referenced() -> None:
+    calls = []
+
+    def _fn(a, **kwargs):  # noqa: ANN001
+        calls.append((a, dict(kwargs)))
+        return 0
+
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(CallByValueIr(kind="ctx", value=""),),
+        kwargs=(("x", CallByValueIr(kind="field", value="cs_id")), ("y", CallByValueIr(kind="literal", value=1))),
+        field_names=("cs_id",),
+    )
+    calc = _build_ref_default_call_by_calculator(field_id="f", idx=0, dep_keys=("cs_id",), call_by=call_by, fn=_fn)
+
     with pytest.raises(TypeError, match=r"requires ctx=ComputeCallContextIr"):
         _ = calc(123)
 
     ctx = ComputeCallContextIr(row_id=1, batch_num=0, field_id="f", deps=("cs_id",), values={"cs_id": 123})
     assert calc(123, ctx=ctx) == 0
-    assert calls == [(123, {"x": 1})]
+    assert len(calls) == 1
+    assert isinstance(calls[0][0], ComputeCallContextIr)
+    assert calls[0][1] == {"x": 123, "y": 1}
+
+
+def test_build_call_by_calculator_rejects_unknown_kind() -> None:
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(CallByValueIr(kind="bad", value="x"),),
+    )
+    field = DerivedFieldIr(
+        field_id="f",
+        name="F",
+        dependencies=("a",),
+        call_by=call_by,
+    )
+
+    with pytest.raises(ValueError, match="unknown call_by value kind"):
+        _ = _build_call_by_calculator(field_spec=field, call_by=call_by, fn=lambda *_args, **_kwargs: 0)
+
+
+def test_build_call_by_calculator_resolves_missing_field_to_none() -> None:
+    calls = []
+
+    def _fn(a):  # noqa: ANN001
+        calls.append(a)
+        return 0
+
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(CallByValueIr(kind="field", value="missing"),),
+        field_names=("missing",),
+    )
+    field = DerivedFieldIr(
+        field_id="f",
+        name="F",
+        dependencies=("a",),
+        call_by=call_by,
+    )
+    calc = _build_call_by_calculator(field_spec=field, call_by=call_by, fn=_fn)
+    assert calc(123) == 0
+    assert calls == [None]
+
+
+def test_build_call_by_calculator_supports_ctx_and_literal_values() -> None:
+    calls = []
+
+    def _fn(ctx, a, b):  # noqa: ANN001
+        calls.append((ctx, a, b))
+        return int(a) + int(b)
+
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(
+            CallByValueIr(kind="ctx", value=""),
+            CallByValueIr(kind="literal", value=1),
+            CallByValueIr(kind="field", value="a"),
+        ),
+        field_names=("a",),
+    )
+    field = DerivedFieldIr(
+        field_id="f",
+        name="F",
+        dependencies=("a",),
+        call_by=call_by,
+    )
+
+    calc = _build_call_by_calculator(field_spec=field, call_by=call_by, fn=_fn)
+    ctx = ComputeCallContextIr(row_id=1, batch_num=0, field_id="f", deps=("a",), values={"a": 123})
+    assert calc(123, ctx=ctx) == 124
+    assert len(calls) == 1
+    assert isinstance(calls[0][0], ComputeCallContextIr)
+    assert calls[0][1:] == (1, 123)
+
+
+def test_build_ref_default_call_by_calculator_supports_ctx_attr() -> None:
+    calls = []
+
+    def _fn(a):  # noqa: ANN001
+        calls.append(a)
+        return 0
+
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(CallByValueIr(kind="ctx_attr", value="row_id"),),
+        field_names=("cs_id",),
+    )
+    calc = _build_ref_default_call_by_calculator(field_id="f", idx=0, dep_keys=("cs_id",), call_by=call_by, fn=_fn)
+
+    ctx = ComputeCallContextIr(row_id=9, batch_num=0, field_id="f", deps=("cs_id",), values={"cs_id": 123})
+    assert calc(123, ctx=ctx) == 0
+    assert calls == [9]
+
+
+def test_build_ref_default_call_by_calculator_resolves_missing_field_to_none() -> None:
+    calls = []
+
+    def _fn(a):  # noqa: ANN001
+        calls.append(a)
+        return 0
+
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(CallByValueIr(kind="field", value="missing"),),
+        field_names=("missing",),
+    )
+    calc = _build_ref_default_call_by_calculator(field_id="f", idx=0, dep_keys=("cs_id",), call_by=call_by, fn=_fn)
+    assert calc(123) == 0
+    assert calls == [None]
+
+
+def test_build_ref_default_call_by_calculator_rejects_unknown_kind() -> None:
+    call_by = CallBySpecIr(
+        reference=PythonReferenceIr(reference="tests:fn", module_path="tests", attr_path=("fn",), style="dotted"),
+        args=(CallByValueIr(kind="bad", value="x"),),
+        field_names=("cs_id",),
+    )
+    with pytest.raises(ValueError, match="unknown call_by value kind"):
+        _ = _build_ref_default_call_by_calculator(field_id="f", idx=0, dep_keys=("cs_id",), call_by=call_by, fn=lambda *_a, **_k: 0)
 
 
 def test_field_default_case_ir_invariants() -> None:

@@ -1,4 +1,5 @@
 import logging
+from types import MappingProxyType
 from typing import Any, Dict, Hashable, List, Tuple, cast
 
 from .....events import EventType
@@ -78,7 +79,7 @@ def _execute_constant_compute(
             runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_payload, result)
 
 
-def _execute_row_compute(
+def _execute_row_compute(  # noqa: C901  # pragma: allow-c901 plan: c0
     *,
     field_spec: DerivedFieldIr,
     context: BatchContext,
@@ -95,15 +96,17 @@ def _execute_row_compute(
 
     for row_id in batch_row_nth:
         dep_args: Tuple[Any, ...] = tuple(context.get_field_value(dep_key, row_id) for dep_key in deps)
+        dep_values_payload: Dict[str, Any] = {}
+        if use_ctx or wants_field_compute:
+            dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
         try:
             if use_ctx:
-                dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
                 ctx = ComputeCallContextIr(
                     row_id=row_id,
                     batch_num=runtime.batch_num,
                     field_id=field_spec.field_id,
                     deps=deps,
-                    values=dep_values_payload,
+                    values=MappingProxyType(dep_values_payload),
                 )
                 result = calculator(*dep_args, ctx=ctx)
             else:
@@ -113,12 +116,13 @@ def _execute_row_compute(
             context.set_field_value(field_spec.field_id, row_id, result)
 
             if wants_field_compute:
-                dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
                 runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_values_payload, result)
         except _EXPECTED_COMPUTE_ERRORS as exc:  # type: ignore[misc]
-            deps_payload: Dict[str, Any] = {}
+            deps_payload = {}
             if not guardrails_enabled:
-                deps_payload = build_field_compute_dependencies_payload(deps, dep_args)
+                if not dep_values_payload:
+                    dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
+                deps_payload = dep_values_payload
             handle_compute_error(
                 runtime,
                 context,
@@ -138,7 +142,9 @@ def _execute_row_compute(
             )
             deps_payload = {}
             if not guardrails_enabled:
-                deps_payload = build_field_compute_dependencies_payload(deps, dep_args)
+                if not dep_values_payload:
+                    dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
+                deps_payload = dep_values_payload
             handle_compute_error(
                 runtime,
                 context,
