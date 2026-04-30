@@ -1,6 +1,6 @@
 [project]
 name = "scalim-cli"
-version = "0.9.9"
+version = "0.9.10"
 description = "Command-line tools for scalim"
 readme = "README.md"
 requires-python = ">=3.10"
