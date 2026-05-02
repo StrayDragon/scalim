@@ -677,10 +677,12 @@ class SeqPipeline(Pipeline):
             allow_release=allow_release,
         )
 
+        on_field_set_fields = set(self.plan.target_fields) - set(global_ready_target_fields)
         context = create_batch_context_for_rows(
             row_ids,
             required_fields=self._required_fields,
             on_field_set=coordinator.on_field_set,
+            on_field_set_fields=on_field_set_fields,
         )
         coordinator.attach_context(context)
 

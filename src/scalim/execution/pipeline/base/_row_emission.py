@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Hashable, List, Sequence, Set, cast
+from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Sequence, Set, cast
 
 from ....sinks import IRowSink
 from ...context import BatchContext
@@ -22,6 +22,7 @@ class RowEmissionCoordinator:
     _write_row_ids: List[Hashable]
     _next_write_idx: int
     _next_release_idx: int
+    _next_write_row_id: Optional[Hashable]
     _allow_release: bool
     _rows_to_remove: Set[Hashable]
     _retained_fields: Set[str]
@@ -47,6 +48,7 @@ class RowEmissionCoordinator:
         self._write_row_ids = []
         self._next_write_idx = 0
         self._next_release_idx = 0
+        self._next_write_row_id = None
         self._allow_release = bool(allow_release)
         self._rows_to_remove = set()
         self._retained_fields = set(retained_fields)
@@ -56,15 +58,27 @@ class RowEmissionCoordinator:
 
     def set_write_order(self, write_row_ids: List[Hashable]) -> None:
         self._write_row_ids = list(write_row_ids)
+        if self._write_row_ids:
+            self._next_write_row_id = self._write_row_ids[self._next_write_idx]
 
     def on_field_set(self, field_key: str, row_id: Hashable) -> None:
         if field_key not in self._target_fields_set:
             return
         if field_key in self._global_ready_fields:
             return
+        required = int(self._required_non_global_targets)
+        if required <= 0:
+            return
 
-        self._ready_counts[row_id] = int(self._ready_counts.get(row_id, 0)) + 1
-        self.flush_ready_rows()
+        prev = int(self._ready_counts.get(row_id, 0))
+        now = prev + 1
+        self._ready_counts[row_id] = now
+        # 快路径: 仅当“写出头部行”变为就绪时才尝试连续写出。
+        # 一旦头部行被写出, `_drain_write_rows()` 会顺带写出后续已就绪的连续前缀。
+        if now < required:
+            return
+        if self._next_write_row_id is not None and row_id == self._next_write_row_id:
+            self.flush_ready_rows()
 
     def enable_release(self) -> None:
         if self._allow_release:
@@ -96,6 +110,10 @@ class RowEmissionCoordinator:
                 break
             self._write_row(row_id=row_id, row_index=self._next_write_idx)
             self._next_write_idx += 1
+            if self._next_write_idx < len(self._write_row_ids):
+                self._next_write_row_id = self._write_row_ids[self._next_write_idx]
+            else:
+                self._next_write_row_id = None
             self._maybe_release_written_prefix()
 
     def _is_row_ready(self, row_id: Hashable) -> bool:

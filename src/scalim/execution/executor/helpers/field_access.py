@@ -1,10 +1,17 @@
 from collections.abc import Mapping
-from typing import Any, Iterable, Tuple, Union, cast
+from typing import Any, Dict, Iterable, Tuple, Union, cast
 
 from ....typedefs import FieldValue
 
 
 def extract_field(data: Any, field_key: str) -> FieldValue:
+    # 热路径优化:
+    # - `isinstance(x, dict)` 是 C 层快速路径
+    # - `isinstance(x, Mapping)` 需要走 `ABCMeta.__instancecheck__`,在紧密循环里更慢
+    if isinstance(data, dict):
+        mapping = cast("Dict[str, Any]", data)  # pragma: allow-cast dict keys typed narrowing
+        return cast("FieldValue", mapping.get(field_key))  # pragma: allow-cast dict field value typed narrowing
+
     if isinstance(data, Mapping):
         # 注意:在 `basedpyright` 中,`isinstance(data, Mapping)` 会把类型收窄为 `Mapping[Unknown, Unknown]`,
         # 从而使 `get()` 的返回值变成“部分未知”.这里我们有意将映射的键按字符串处理.
@@ -43,6 +50,11 @@ def extract_field_segments(data: Any, segments: Tuple[Union[str, int], ...]) -> 
 
 
 def _extract_field_segment(data: Any, segment: Union[str, int]) -> Any:
+    # 热路径优化: `dict` 是最常见的承载类型,优先走快速路径.
+    if isinstance(data, dict):
+        mapping = cast("Dict[Any, Any]", data)  # pragma: allow-cast dict typed narrowing
+        return mapping.get(segment)
+
     if isinstance(data, Mapping):
         mapping = cast("Mapping[Any, Any]", data)  # pragma: allow-cast mapping typed narrowing
         return mapping.get(segment)

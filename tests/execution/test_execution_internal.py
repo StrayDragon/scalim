@@ -816,6 +816,7 @@ def test_row_emission_coordinator_flush_noops_when_write_order_missing() -> None
     coordinator.attach_context(BatchContext())
 
     coordinator.on_field_set("a", 0)
+    coordinator.flush_ready_rows()
 
     assert sink.get_data() == []
 
@@ -841,6 +842,103 @@ def test_row_emission_coordinator_defers_release_when_disabled() -> None:
 
     assert sink.get_data()
     assert coordinator.drain_rows_to_remove() == set()
+
+
+def test_row_emission_coordinator_ignores_unknown_field_key() -> None:
+    plan = _make_plan({}, ["a"])
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
+    sink = InMemoryRowDataSink()
+    coordinator = RowEmissionCoordinator(
+        runtime=runtime,
+        sink=sink,
+        target_fields=["a"],
+        retained_fields=set(),
+        global_ready_fields=set(),
+        allow_release=True,
+    )
+    coordinator.attach_context(BatchContext())
+    coordinator.set_write_order([0])
+
+    coordinator.on_field_set("b", 0)
+
+    assert sink.get_data() == []
+
+
+def test_row_emission_coordinator_ignores_global_ready_targets() -> None:
+    plan = _make_plan({}, ["a"])
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
+    sink = InMemoryRowDataSink()
+    coordinator = RowEmissionCoordinator(
+        runtime=runtime,
+        sink=sink,
+        target_fields=["a"],
+        retained_fields=set(),
+        global_ready_fields={"a"},
+        allow_release=True,
+    )
+    ctx = BatchContext()
+    ctx.set_field_value("a", 0, 1)
+    coordinator.attach_context(ctx)
+    coordinator.set_write_order([0])
+
+    coordinator.on_field_set("a", 0)
+
+    assert sink.get_data() == []
+
+
+def test_row_emission_coordinator_returns_when_required_zero() -> None:
+    plan = _make_plan({}, ["a"])
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
+    sink = InMemoryRowDataSink()
+    coordinator = RowEmissionCoordinator(
+        runtime=runtime,
+        sink=sink,
+        target_fields=["a"],
+        retained_fields=set(),
+        global_ready_fields={"x"},  # same size as targets -> required_non_global_targets == 0
+        allow_release=True,
+    )
+    ctx = BatchContext()
+    ctx.set_field_value("a", 0, 1)
+    coordinator.attach_context(ctx)
+    coordinator.set_write_order([0])
+
+    coordinator.on_field_set("a", 0)
+
+    assert sink.get_data() == []
+
+
+def test_row_emission_coordinator_set_write_order_empty_noops() -> None:
+    plan = _make_plan({}, ["a"])
+    runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
+    sink = InMemoryRowDataSink()
+    coordinator = RowEmissionCoordinator(
+        runtime=runtime,
+        sink=sink,
+        target_fields=["a"],
+        retained_fields=set(),
+        global_ready_fields=set(),
+        allow_release=True,
+    )
+    coordinator.attach_context(BatchContext())
+
+    coordinator.set_write_order([])
+    coordinator.flush_ready_rows()
+
+    assert sink.get_data() == []
+
+
+def test_batch_context_on_field_set_filter_skips_non_selected_fields() -> None:
+    calls = []
+
+    def on_field_set(field_key: str, row_id: int) -> None:
+        calls.append((field_key, row_id))
+
+    ctx = BatchContext(on_field_set=on_field_set, on_field_set_fields={"a"})
+    ctx.set_field_value("b", 0, 1)
+    ctx.set_field_value("a", 0, 2)
+
+    assert calls == [("a", 0)]
 
 
 def test_row_emission_coordinator_finalize_writes_rows_even_when_not_ready() -> None:

@@ -30,6 +30,7 @@ class BatchContext:
     _data: Dict[str, Dict[Hashable, FieldValue]]
     _required_fields: Optional[Set[str]]
     _on_field_set: Optional[Callable[[str, Hashable], None]]
+    _on_field_set_fields: Optional[Set[str]]
     _disabled_rows: Optional[Set[Hashable]]
 
     def __init__(
@@ -37,10 +38,12 @@ class BatchContext:
         required_fields: Optional[Set[str]] = None,
         *,
         on_field_set: Optional[Callable[[str, Hashable], None]] = None,
+        on_field_set_fields: Optional[Set[str]] = None,
     ) -> None:
         self._data = {}
         self._required_fields = required_fields
         self._on_field_set = on_field_set
+        self._on_field_set_fields = on_field_set_fields
         self._disabled_rows = None
 
     def set_field_value(self, field_key: str, row_id: Hashable, value: FieldValue) -> None:
@@ -54,8 +57,13 @@ class BatchContext:
         if field_key not in self._data:
             self._data[field_key] = {}
         self._data[field_key][row_id] = value
-        if self._on_field_set is not None:
-            self._on_field_set(field_key, row_id)
+        on_field_set = self._on_field_set
+        if on_field_set is None:
+            return
+        on_field_set_fields = self._on_field_set_fields
+        if on_field_set_fields is not None and field_key not in on_field_set_fields:
+            return
+        on_field_set(field_key, row_id)
 
     def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
         field_data = self._data.get(field_key)
@@ -147,8 +155,13 @@ class DenseBatchContext(BatchContext):
         row_count: int,
         required_fields: Optional[Set[str]] = None,
         on_field_set: Optional[Callable[[str, Hashable], None]] = None,
+        on_field_set_fields: Optional[Set[str]] = None,
     ) -> None:
-        super(DenseBatchContext, self).__init__(required_fields=required_fields, on_field_set=on_field_set)
+        super(DenseBatchContext, self).__init__(
+            required_fields=required_fields,
+            on_field_set=on_field_set,
+            on_field_set_fields=on_field_set_fields,
+        )
         self._base_row_id = int(base_row_id)
         self._row_count = int(max(0, row_count))
         self._dense_data = {}
@@ -192,7 +205,9 @@ class DenseBatchContext(BatchContext):
 
         on_field_set = self._on_field_set
         if on_field_set is not None:
-            on_field_set(field_key, row_id)
+            on_field_set_fields = self._on_field_set_fields
+            if on_field_set_fields is None or field_key in on_field_set_fields:
+                on_field_set(field_key, row_id)
 
     @override
     def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
@@ -305,12 +320,19 @@ def create_batch_context_for_rows(
     *,
     required_fields: Optional[Set[str]] = None,
     on_field_set: Optional[Callable[[str, Hashable], None]] = None,
+    on_field_set_fields: Optional[Set[str]] = None,
 ) -> BatchContext:
     resolved = _try_resolve_dense_range(row_ids)
     if resolved is None:
-        return BatchContext(required_fields=required_fields, on_field_set=on_field_set)
+        return BatchContext(required_fields=required_fields, on_field_set=on_field_set, on_field_set_fields=on_field_set_fields)
     base, row_count = resolved
-    return DenseBatchContext(base_row_id=base, row_count=row_count, required_fields=required_fields, on_field_set=on_field_set)
+    return DenseBatchContext(
+        base_row_id=base,
+        row_count=row_count,
+        required_fields=required_fields,
+        on_field_set=on_field_set,
+        on_field_set_fields=on_field_set_fields,
+    )
 
 
 __all__ = ()
