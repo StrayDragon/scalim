@@ -183,6 +183,55 @@ class DenseBatchContext(BatchContext):
             self._dense_data[field_key] = storage
         return storage
 
+    def dense_base_row_id(self) -> int:
+        return int(self._base_row_id)
+
+    def dense_row_count(self) -> int:
+        return int(self._row_count)
+
+    def dense_prefill_prepare_storage(
+        self,
+        field_key: str,
+        *,
+        row_count: int,
+        present_mask: bytes,
+    ) -> Optional[List[FieldValue]]:
+        """为主数据源预填充准备稠密存储,并返回可写的 `values` 列表.
+
+        说明:
+        - 该方法是内部热路径优化支撑,目的是让调用方在不触碰受保护成员的情况下,
+          直接写入 `values[idx]` 并一次性设置 `present` 掩码/计数.
+        - 若存在 `disabled_rows` 则返回 `None`,让调用方回退到通用 `set_field_value` 逻辑,
+          以保证语义一致(按行跳过被禁用行).
+        """
+        if self._disabled_rows:
+            return None
+
+        if self._required_fields is not None and field_key not in self._required_fields:
+            return None
+
+        resolved_row_count = int(max(0, min(int(row_count), int(self._row_count))))
+        if resolved_row_count <= 0:
+            return None
+
+        if len(present_mask) != resolved_row_count:
+            msg = "present_mask length mismatch: expected {}, got {}".format(resolved_row_count, len(present_mask))
+            raise ValueError(msg)
+
+        storage = self._ensure_storage(field_key)
+        storage.present[:resolved_row_count] = present_mask
+        storage.present_count = resolved_row_count
+        return storage.values
+
+    def dense_on_field_set_callback_for_field(self, field_key: str) -> Optional[Callable[[str, Hashable], None]]:
+        on_field_set = self._on_field_set
+        if on_field_set is None:
+            return None
+        on_field_set_fields = self._on_field_set_fields
+        if on_field_set_fields is not None and field_key not in on_field_set_fields:
+            return None
+        return on_field_set
+
     @override
     def set_field_value(self, field_key: str, row_id: Hashable, value: FieldValue) -> None:
         if self._disabled_rows is not None and row_id in self._disabled_rows:

@@ -2,7 +2,7 @@ from typing import Any, Dict, Hashable, List, Optional, Set, Tuple
 
 import pytest
 
-from scalim.execution.context import BatchContext
+from scalim.execution.context import BatchContext, DenseBatchContext, create_batch_context_for_rows
 from scalim.execution.executor.batch.executor import BatchExecutor
 from scalim.execution.executor.operators.load import LoadOperatorExecutor
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
@@ -681,9 +681,10 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
     quiet = GuardrailsPolicy(enabled=True, mode="quiet", loader=GuardrailsLoaderPolicy(required_fields=("amount",)))
     runtime = _make_runtime(plan, main_source=main_source, runtime_bindings=runtime_bindings, guardrails=quiet)
     context = BatchContext()
-    main_rows = {1: {"amount": 1}, 2: {"amount": 2}}
+    batch_row_nth = [1, 2]
+    main_rows = [{"amount": 1}, {"amount": 2}]
 
-    BatchExecutor(plan, runtime).prefill_main_source_fields(context, main_rows, required_fields={"amount"})
+    BatchExecutor(plan, runtime).prefill_main_source_fields(context, batch_row_nth, main_rows, required_fields={"amount"})
 
     assert context.get_field_value("amount", 1) is None
     assert context.get_field_value("amount", 2) is None
@@ -692,16 +693,17 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
     fast_fail = GuardrailsPolicy(enabled=True, mode="fast_fail", loader=GuardrailsLoaderPolicy(on_transform_error="fast_fail"))
     runtime = _make_runtime(plan, main_source=main_source, runtime_bindings=runtime_bindings, guardrails=fast_fail)
     context = BatchContext()
-    main_rows = {1: {"amount": 1}}
+    batch_row_nth = [1]
+    main_rows = [{"amount": 1}]
 
     with pytest.raises(GuardrailViolation) as exc_info:
-        BatchExecutor(plan, runtime).prefill_main_source_fields(context, main_rows, required_fields={"amount"})
+        BatchExecutor(plan, runtime).prefill_main_source_fields(context, batch_row_nth, main_rows, required_fields={"amount"})
     assert exc_info.value.code == "loader_transform_error"
 
     runtime = _make_runtime(plan, main_source=main_source, runtime_bindings=runtime_bindings)
     context = BatchContext()
     with pytest.raises(ValueError, match="bad"):
-        BatchExecutor(plan, runtime).prefill_main_source_fields(context, main_rows, required_fields={"amount"})
+        BatchExecutor(plan, runtime).prefill_main_source_fields(context, batch_row_nth, main_rows, required_fields={"amount"})
 
     field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
@@ -709,14 +711,14 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
     runtime = _make_runtime(plan, main_source=main_source, guardrails=missing_required)
     context = BatchContext()
     with pytest.raises(GuardrailViolation) as exc_info:
-        BatchExecutor(plan, runtime).prefill_main_source_fields(context, {1: {}}, required_fields={"amount"})
+        BatchExecutor(plan, runtime).prefill_main_source_fields(context, [1], [{}], required_fields={"amount"})
     assert exc_info.value.code == "loader_required_field_missing"
 
     passthrough_plan = ExecutionPlan(field_specs={}, target_fields=["extra"])
     quiet_passthrough = GuardrailsPolicy(enabled=True, mode="quiet", loader=GuardrailsLoaderPolicy(required_fields=("extra",)))
     runtime = _make_runtime(passthrough_plan, main_source=main_source, guardrails=quiet_passthrough)
     context = BatchContext()
-    BatchExecutor(passthrough_plan, runtime).prefill_main_source_fields(context, {1: {}, 2: {}}, required_fields={"extra"})
+    BatchExecutor(passthrough_plan, runtime).prefill_main_source_fields(context, [1, 2], [{}, {}], required_fields={"extra"})
     assert context.get_field_value("extra", 1) is None
     assert context.get_field_value("extra", 2) is None
     assert runtime.guardrail_logged == _guardrail_logged_required_field_missing("orders", "extra")
@@ -725,5 +727,92 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
     runtime = _make_runtime(passthrough_plan, main_source=main_source, guardrails=fast_fail_passthrough)
     context = BatchContext()
     with pytest.raises(GuardrailViolation) as exc_info:
-        BatchExecutor(passthrough_plan, runtime).prefill_main_source_fields(context, {1: {}}, required_fields={"extra"})
+        BatchExecutor(passthrough_plan, runtime).prefill_main_source_fields(context, [1], [{}], required_fields={"extra"})
     assert exc_info.value.code == "loader_required_field_missing"
+
+
+def test_prefill_dense_context_falls_back_to_generic_when_rows_disabled() -> None:
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
+    runtime = _make_runtime(plan, main_source=main_source)
+    executor = BatchExecutor(plan, runtime)
+
+    batch_row_nth = [0, 1]
+    context = create_batch_context_for_rows(batch_row_nth, required_fields={"amount"})
+    assert isinstance(context, DenseBatchContext)
+    context.disable_row(0)
+
+    executor.prefill_main_source_fields(context, batch_row_nth, [{"amount": 1}, {"amount": 2}], required_fields={"amount"})
+
+    assert context.get_field_value("amount", 0) is None
+    assert context.get_field_value("amount", 1) == 2
+
+
+def test_prefill_dense_context_row_count_zero_short_circuits() -> None:
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
+    runtime = _make_runtime(plan, main_source=main_source)
+    executor = BatchExecutor(plan, runtime)
+
+    context = DenseBatchContext(base_row_id=0, row_count=0, required_fields={"amount"})
+    executor.prefill_main_source_fields(context, [], [], required_fields={"amount"})
+
+    assert context.get_field_count() == 0
+
+
+def test_prefill_dense_context_falls_back_when_passthrough_prepare_rejected() -> None:
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount", "extra"])
+    runtime = _make_runtime(plan, main_source=main_source)
+    executor = BatchExecutor(plan, runtime)
+
+    batch_row_nth = [0]
+    context = create_batch_context_for_rows(batch_row_nth, required_fields={"amount"})
+    assert isinstance(context, DenseBatchContext)
+
+    executor.prefill_main_source_fields(
+        context,
+        batch_row_nth,
+        [{"amount": 1, "extra": "x"}],
+        required_fields={"amount", "extra"},
+    )
+
+    assert context.get_field_value("amount", 0) == 1
+    assert context.get_field_value("extra", 0) is None
+
+
+def test_prefill_dense_context_emits_on_field_set_and_enforces_passthrough_required() -> None:
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount", "extra"])
+
+    guardrails = GuardrailsPolicy(enabled=True, mode="quiet", loader=GuardrailsLoaderPolicy(required_fields=("extra",)))
+    runtime = _make_runtime(plan, main_source=main_source, guardrails=guardrails)
+    executor = BatchExecutor(plan, runtime)
+
+    calls = []
+
+    def _on_set(field_key, row_id):  # type: ignore[no-untyped-def]
+        calls.append((field_key, row_id))
+
+    batch_row_nth = [0]
+    context = create_batch_context_for_rows(
+        batch_row_nth,
+        required_fields={"amount", "extra"},
+        on_field_set=_on_set,
+        on_field_set_fields={"amount", "extra"},
+    )
+    assert isinstance(context, DenseBatchContext)
+
+    executor.prefill_main_source_fields(
+        context,
+        batch_row_nth,
+        [{"amount": 1}],
+        required_fields={"amount", "extra"},
+    )
+
+    assert calls == [("amount", 0), ("extra", 0)]
+    assert runtime.guardrail_logged == _guardrail_logged_required_field_missing("orders", "extra")

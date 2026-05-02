@@ -320,8 +320,8 @@ class Pipeline(ABC):
     def _iter_row_batches(
         self,
         main_rows: Iterable[RowData],
-    ) -> Iterator[Tuple[List[Hashable], Dict[Hashable, RowData], Optional[float]]]:
-        """按行顺序产出批次(`row_ids`, `row_map`, `stream_duration_s`)."""
+    ) -> Iterator[Tuple[List[Hashable], List[RowData], Optional[float]]]:
+        """按行顺序产出批次(`row_ids`, `row_rows`, `stream_duration_s`)."""
         row_iter = iter(main_rows)
         next_row_id = 0
         wants_stage_spans = self.runtime.instrumentation.wants(EventType.STAGE_SPAN)
@@ -342,8 +342,7 @@ class Pipeline(ABC):
                 batch_rows = list(row_iter)
             if batch_rows:
                 row_ids = _make_row_ids(next_row_id, len(batch_rows))
-                single_batch_map: Dict[Hashable, RowData] = dict(zip(row_ids, batch_rows))
-                yield row_ids, single_batch_map, stream_duration_s
+                yield row_ids, batch_rows, stream_duration_s
             return
 
         chunk_size = self.batch_size
@@ -367,8 +366,7 @@ class Pipeline(ABC):
                 break
             row_ids = _make_row_ids(next_row_id, len(batch_rows))
             next_row_id += len(batch_rows)
-            batch_map: Dict[Hashable, RowData] = dict(zip(row_ids, batch_rows))
-            yield row_ids, batch_map, stream_duration_s
+            yield row_ids, batch_rows, stream_duration_s
 
 
 class SeqPipeline(Pipeline):
@@ -508,7 +506,7 @@ class SeqPipeline(Pipeline):
     def _execute_batch_column_mode(
         self,
         row_ids: List[Hashable],
-        batch_rows: Dict[Hashable, RowData],
+        batch_rows: List[RowData],
         column_sink: IColumnSink,
         batch_num: int,
         *,
@@ -524,7 +522,7 @@ class SeqPipeline(Pipeline):
         self.runtime.sink = column_sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
-        self.executor.prefill_main_source_fields(context, batch_rows, required_fields=self._required_fields)
+        self.executor.prefill_main_source_fields(context, row_ids, batch_rows, required_fields=self._required_fields)
 
         write_row_ids = self._sort_row_ids_for_write(row_ids, context)
         column_sink.set_row_ids(cast("SinkRowKeySeq", list(write_row_ids)))  # pragma: allow-cast sink row ids typed narrowing
@@ -654,7 +652,7 @@ class SeqPipeline(Pipeline):
     def _execute_batch_streaming_mode(
         self,
         row_ids: List[Hashable],
-        batch_rows: Dict[Hashable, RowData],
+        batch_rows: List[RowData],
         streaming_sink: IRowSink,
         batch_num: int,
         *,
@@ -686,7 +684,7 @@ class SeqPipeline(Pipeline):
         )
         coordinator.attach_context(context)
 
-        self.executor.prefill_main_source_fields(context, batch_rows, required_fields=self._required_fields)
+        self.executor.prefill_main_source_fields(context, row_ids, batch_rows, required_fields=self._required_fields)
         write_row_ids = self._sort_row_ids_for_write(row_ids, context)
         coordinator.set_write_order(write_row_ids)
         coordinator.flush_ready_rows()

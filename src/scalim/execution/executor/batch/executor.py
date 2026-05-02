@@ -67,13 +67,15 @@ class BatchExecutor:
     def prefill_main_source_fields(
         self,
         context: BatchContext,
-        main_rows: Optional[Dict[Hashable, RowData]],
+        batch_row_nth: List[Hashable],
+        main_rows: Optional[Sequence[RowData]],
         required_fields: Optional[Set[str]] = None,
     ) -> None:
         prefill_main_source_fields(
             context=context,
             plan_field_specs=self.plan.field_specs,
             runtime=self.runtime,
+            batch_row_nth=batch_row_nth,
             main_rows=main_rows,
             required_fields=required_fields,
         )
@@ -84,7 +86,7 @@ class BatchExecutor:
         batch_num: int,
         sink: Optional[ISink] = None,
         required_fields: Optional[Set[str]] = None,
-        main_rows: Optional[Dict[Hashable, RowData]] = None,
+        main_rows: Optional[Sequence[RowData]] = None,
         *,
         adaptive_pool: Optional[Executor] = None,
     ) -> List[RowData]:
@@ -93,7 +95,7 @@ class BatchExecutor:
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
 
-        self.prefill_main_source_fields(context, main_rows, required_fields=required_fields)
+        self.prefill_main_source_fields(context, batch_row_nth, main_rows, required_fields=required_fields)
 
         stage_durations = self.execute_operators(
             context,

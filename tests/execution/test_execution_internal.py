@@ -114,7 +114,7 @@ class _CaptureHook(BaseHook):
     "has_other_field,main_rows,required_fields",
     [
         (False, None, None),
-        (True, {0: {"id": 1}}, {"other"}),
+        (True, [{"id": 1}], {"other"}),
     ],
     ids=["no-main-rows", "no-main-fields"],
 )
@@ -140,7 +140,8 @@ def test_batch_executor_prefill_noop(has_other_field: bool, main_rows, required_
     executor = BatchExecutor(plan, runtime)
     context = BatchContext()
 
-    executor.prefill_main_source_fields(context, main_rows=main_rows, required_fields=required_fields)
+    batch_row_nth = list(range(len(main_rows or [])))
+    executor.prefill_main_source_fields(context, batch_row_nth, main_rows=main_rows, required_fields=required_fields)
 
     assert context.get_field_count() == 0
 

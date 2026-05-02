@@ -178,3 +178,45 @@ def test_dense_batch_context_set_field_value_twice_hits_already_present_branch()
 
     assert ctx.get_field_value("a", 0) == 2
     assert ctx.get_all_rows_for_field("a") == {0}
+
+
+def test_dense_batch_context_dense_prefill_prepare_storage_branches() -> None:
+    ctx = DenseBatchContext(base_row_id=10, row_count=2, required_fields={"keep"})
+
+    assert ctx.dense_base_row_id() == 10
+    assert ctx.dense_row_count() == 2
+
+    assert ctx.dense_prefill_prepare_storage("drop", row_count=2, present_mask=b"\x01\x01") is None
+    assert ctx.dense_prefill_prepare_storage("keep", row_count=0, present_mask=b"") is None
+
+    with pytest.raises(ValueError, match="present_mask length mismatch"):
+        _ = ctx.dense_prefill_prepare_storage("keep", row_count=1, present_mask=b"")
+
+    values = ctx.dense_prefill_prepare_storage("keep", row_count=2, present_mask=b"\x01\x01")
+    assert values is not None
+    values[0] = 1
+    values[1] = None
+
+    assert ctx.get_field_value("keep", 10) == 1
+    assert ctx.get_field_value("keep", 11) is None
+
+    ctx.disable_row(10)
+    assert ctx.dense_prefill_prepare_storage("keep", row_count=1, present_mask=b"\x01") is None
+
+
+def test_dense_batch_context_dense_on_field_set_callback_for_field_variants() -> None:
+    ctx = DenseBatchContext(base_row_id=0, row_count=1)
+    assert ctx.dense_on_field_set_callback_for_field("a") is None
+
+    calls = []
+
+    def _on_set(field_key, row_id):  # type: ignore[no-untyped-def]
+        calls.append((field_key, row_id))
+
+    ctx2 = DenseBatchContext(base_row_id=0, row_count=1, on_field_set=_on_set, on_field_set_fields={"keep"})
+    assert ctx2.dense_on_field_set_callback_for_field("drop") is None
+
+    cb = ctx2.dense_on_field_set_callback_for_field("keep")
+    assert cb is not None
+    cb("keep", 0)
+    assert calls == [("keep", 0)]
