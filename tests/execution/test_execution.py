@@ -369,6 +369,25 @@ class TestBatchContext:
         assert ctx.get_field_value("cost", 1) is None
         assert ctx.get_field_value("order_id", 1) == 1
 
+    def test_delete_row_from_all_fields_keeps_field_when_not_empty(self) -> None:
+        """测试删除行后字段仍非空时不删除字段容器"""
+        ctx: BatchContext = BatchContext()
+
+        ctx.set_field_value("amount", 1, 100)
+        ctx.set_field_value("amount", 2, 200)
+        ctx.set_field_value("cost", 1, 60)
+        ctx.set_field_value("cost", 2, 120)
+
+        released = ctx.delete_row_from_all_fields(1)
+
+        assert set(released) == {"amount", "cost"}
+        assert ctx.has_field("amount") is True
+        assert ctx.has_field("cost") is True
+        assert ctx.get_field_value("amount", 1) is None
+        assert ctx.get_field_value("amount", 2) == 200
+        assert ctx.get_field_value("cost", 1) is None
+        assert ctx.get_field_value("cost", 2) == 120
+
     def test_clear(self) -> None:
         """测试清空所有数据"""
         ctx: BatchContext = BatchContext()

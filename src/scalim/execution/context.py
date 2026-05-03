@@ -99,14 +99,25 @@ class BatchContext:
         """
         exclude = exclude_fields or set()
         released_fields: List[str] = []
-        for field_key in list(self._data.keys()):
-            if field_key not in exclude:
-                field_data = self._data.get(field_key)
-                if field_data and row_id in field_data:
-                    del field_data[row_id]
-                    released_fields.append(field_key)
-                    if not field_data:
-                        del self._data[field_key]
+        empty_fields: Optional[List[str]] = None
+
+        # 热路径: 避免每次调用都复制 `keys` 列表;通过延迟删除空字段来保持迭代安全.
+        data = self._data
+        for field_key, field_data in data.items():
+            if field_key in exclude:
+                continue
+            if not field_data or row_id not in field_data:
+                continue
+            del field_data[row_id]
+            released_fields.append(field_key)
+            if not field_data:
+                if empty_fields is None:
+                    empty_fields = []
+                empty_fields.append(field_key)
+
+        if empty_fields is not None:
+            for field_key in empty_fields:
+                _ = data.pop(field_key, None)
         return released_fields
 
     def disable_row(self, row_id: Hashable) -> None:
@@ -376,18 +387,30 @@ class DenseBatchContext(BatchContext):
             return []
 
         released_fields: List[str] = []
-        for field_key in list(self._dense_data.keys()):
+        empty_fields: Optional[List[str]] = None
+
+        # 热路径: 避免每次调用都复制 `keys` 列表;通过延迟 `pop` 空字段来保持迭代安全.
+        dense_data = self._dense_data
+        pinned_check = self._dense_is_field_storage_pinned
+        for field_key, storage in dense_data.items():
             if field_key in exclude:
                 continue
-            storage = self._dense_data[field_key]
-            if storage.present[idx] == 0:
+            present = storage.present
+            if present[idx] == 0:
                 continue
-            storage.present[idx] = 0
+            present[idx] = 0
             storage.values[idx] = None
             storage.present_count -= 1
             released_fields.append(field_key)
-            if storage.present_count <= 0 and not self._dense_is_field_storage_pinned(field_key):
-                _ = self._dense_data.pop(field_key, None)
+            if storage.present_count <= 0 and not pinned_check(field_key):
+                if empty_fields is None:
+                    empty_fields = []
+                empty_fields.append(field_key)
+
+        if empty_fields is not None:
+            for field_key in empty_fields:
+                _ = dense_data.pop(field_key, None)
+
         return released_fields
 
     @override
