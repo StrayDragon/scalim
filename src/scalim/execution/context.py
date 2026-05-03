@@ -147,6 +147,7 @@ class DenseBatchContext(BatchContext):
     _base_row_id: int
     _row_count: int
     _dense_data: Dict[str, _DenseFieldStorage]
+    _dense_pinned_refcounts: Optional[Dict[str, int]]
 
     def __init__(
         self,
@@ -165,6 +166,7 @@ class DenseBatchContext(BatchContext):
         self._base_row_id = int(base_row_id)
         self._row_count = int(max(0, row_count))
         self._dense_data = {}
+        self._dense_pinned_refcounts = None
 
     def _idx_of(self, row_id: Hashable) -> Optional[int]:
         if not isinstance(row_id, int):
@@ -188,6 +190,37 @@ class DenseBatchContext(BatchContext):
 
     def dense_row_count(self) -> int:
         return int(self._row_count)
+
+    def dense_idx_of(self, row_id: Hashable) -> Optional[int]:
+        """返回 `row_id` 在稠密批次内的索引,用于热路径复用.
+
+        说明:
+        - 返回 `None` 表示 `row_id` 不是本批次范围内的 `int`。
+        - 该方法是内部优化支撑,避免调用方重复实现边界判断.
+        """
+
+        return self._idx_of(row_id)
+
+    def dense_get_storage_for_read(self, field_key: str) -> Optional["_DenseFieldStorage"]:
+        """返回字段的稠密存储(只读场景),缺失则返回 `None`."""
+
+        return self._dense_data.get(field_key)
+
+    def dense_prepare_write_storage(self, field_key: str) -> Optional["_DenseFieldStorage"]:
+        """为写入准备稠密存储,并返回存储对象.
+
+        若 `required_fields` 剪枝使该字段无需保留,返回 `None` 以保持语义一致:
+        - 仍允许上层计算发生(可能有副作用),但不应写入上下文.
+        """
+
+        if self._required_fields is not None and field_key not in self._required_fields:
+            return None
+        return self._ensure_storage(field_key)
+
+    def dense_disabled_rows_or_none(self) -> Optional[Set[Hashable]]:
+        """返回被禁用行集合(若未启用行级禁用则为 `None`)."""
+
+        return self._disabled_rows
 
     def dense_prefill_prepare_storage(
         self,
@@ -231,6 +264,45 @@ class DenseBatchContext(BatchContext):
         if on_field_set_fields is not None and field_key not in on_field_set_fields:
             return None
         return on_field_set
+
+    def dense_pin_field_storage(self, field_key: str) -> None:
+        """固定(`pin`)稠密字段存储,避免在流式释放时被从上下文中移除.
+
+        说明:
+        - 这是内部热路径契约: 某些优化会直接持有 `_DenseFieldStorage` 引用。
+        - `RowEmissionCoordinator` 可能在同一算子执行过程中触发 `flush` + `release`,导致字段存储在变空时被 `pop` 掉。
+        """
+
+        refs = self._dense_pinned_refcounts
+        if refs is None:
+            refs = {}
+            self._dense_pinned_refcounts = refs
+        refs[field_key] = int(refs.get(field_key, 0)) + 1
+
+    def dense_unpin_field_storage(self, field_key: str) -> None:
+        refs = self._dense_pinned_refcounts
+        if refs is None:
+            return
+        count = refs.get(field_key)
+        if count is None:
+            return
+        if int(count) <= 1:
+            _ = refs.pop(field_key, None)
+            if not refs:
+                self._dense_pinned_refcounts = None
+
+            # 解除 `pin` 后,若该字段存储已为空,则补做一次 `pop` 以恢复行级释放的内存效果.
+            storage = self._dense_data.get(field_key)
+            if storage is not None and storage.present_count <= 0:
+                _ = self._dense_data.pop(field_key, None)
+            return
+
+        refs[field_key] = int(count) - 1
+        return
+
+    def _dense_is_field_storage_pinned(self, field_key: str) -> bool:
+        refs = self._dense_pinned_refcounts
+        return refs is not None and field_key in refs
 
     @override
     def set_field_value(self, field_key: str, row_id: Hashable, value: FieldValue) -> None:
@@ -293,7 +365,7 @@ class DenseBatchContext(BatchContext):
         storage.present[idx] = 0
         storage.values[idx] = None
         storage.present_count -= 1
-        if storage.present_count <= 0:
+        if storage.present_count <= 0 and not self._dense_is_field_storage_pinned(field_key):
             _ = self._dense_data.pop(field_key, None)
 
     @override
@@ -314,7 +386,7 @@ class DenseBatchContext(BatchContext):
             storage.values[idx] = None
             storage.present_count -= 1
             released_fields.append(field_key)
-            if storage.present_count <= 0:
+            if storage.present_count <= 0 and not self._dense_is_field_storage_pinned(field_key):
                 _ = self._dense_data.pop(field_key, None)
         return released_fields
 

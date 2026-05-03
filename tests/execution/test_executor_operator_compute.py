@@ -6,7 +6,7 @@ import pytest
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.security import SecureComputeEngine
 from scalim.events import EventType
-from scalim.execution.context import BatchContext
+from scalim.execution.context import BatchContext, DenseBatchContext
 from scalim.execution.guardrails import ScalimGuardrailViolationError as GuardrailViolation, GuardrailsComputePolicy, GuardrailsPolicy
 from scalim.execution.executor.operators.compute.executor import ComputeOperatorExecutor
 from scalim.execution.runtime_bindings import RuntimeBindings
@@ -765,3 +765,42 @@ def test_compute_operator_non_constant_compute_is_not_cached() -> None:
     assert context.get_field_value("score", 1) == 11
     assert context.get_field_value("score", 2) == 21
     assert context.get_field_value("score", 3) == 31
+
+
+def test_compute_operator_dense_context_fastpath_sets_values_and_calls_on_field_set() -> None:
+    calls = []
+
+    def _on_set(field_key, row_id):  # type: ignore[no-untyped-def]
+        calls.append((field_key, row_id))
+
+    def _compute(a, b):  # type: ignore[no-untyped-def]
+        return int(a or 0) + int(b or 0)
+
+    field_spec = DerivedFieldIr(
+        field_id="out",
+        name="Out",
+        dependencies=("a", "b"),
+        compute_expr="a + b",
+    )
+    operator = ComputeOperatorIr(
+        operator_id="compute_out",
+        operator_type=OperatorType.COMPUTE.value,
+        field_key="out",
+        input_fields=("a", "b"),
+    )
+
+    runtime_bindings = RuntimeBindings(derived_calculators={"out": _compute})
+    runtime = _make_runtime(ExecutionPlan(field_specs={"out": field_spec}), None, runtime_bindings=runtime_bindings)
+
+    context = DenseBatchContext(base_row_id=0, row_count=3, on_field_set=_on_set, on_field_set_fields={"out"})
+    context.set_field_value("a", 0, 1)
+    context.set_field_value("a", 1, 2)
+    context.set_field_value("b", 0, 10)
+    context.set_field_value("b", 1, 20)
+
+    ComputeOperatorExecutor().execute(operator, context, [0, 1, 2], runtime)
+
+    assert context.get_field_value("out", 0) == 11
+    assert context.get_field_value("out", 1) == 22
+    assert context.get_field_value("out", 2) == 0
+    assert calls == [("out", 0), ("out", 1), ("out", 2)]

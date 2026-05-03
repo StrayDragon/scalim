@@ -220,3 +220,50 @@ def test_dense_batch_context_dense_on_field_set_callback_for_field_variants() ->
     assert cb is not None
     cb("keep", 0)
     assert calls == [("keep", 0)]
+
+
+def test_dense_batch_context_dense_storage_helpers() -> None:
+    ctx = DenseBatchContext(base_row_id=10, row_count=2, required_fields={"keep"})
+
+    assert ctx.dense_idx_of(10) == 0
+    assert ctx.dense_idx_of(11) == 1
+    assert ctx.dense_idx_of(9) is None
+    assert ctx.dense_idx_of("x") is None
+
+    assert ctx.dense_get_storage_for_read("keep") is None
+    assert ctx.dense_prepare_write_storage("drop") is None
+
+    st = ctx.dense_prepare_write_storage("keep")
+    assert st is not None
+    ctx.set_field_value("keep", 10, 1)
+    assert ctx.dense_get_storage_for_read("keep") is not None
+
+
+def test_dense_batch_context_dense_pin_unpin_refcount_and_cleanup_variants() -> None:
+    ctx = DenseBatchContext(base_row_id=0, row_count=1, required_fields={"a"})
+
+    # refs is None: early return
+    ctx.dense_unpin_field_storage("a")
+
+    # pin + unpin unknown key: count is None early return
+    ctx.dense_pin_field_storage("a")
+    ctx.dense_unpin_field_storage("missing")
+
+    # refcount > 1 branch
+    ctx.dense_pin_field_storage("a")
+    ctx.dense_unpin_field_storage("a")
+
+    # create empty storage and ensure the last unpin triggers cleanup pop
+    st = ctx.dense_prepare_write_storage("a")
+    assert st is not None
+    assert ctx.dense_get_storage_for_read("a") is not None
+
+    # 让 `refs` 在 unpin 时不为空,覆盖 `if not refs` 的 false 分支
+    ctx.dense_pin_field_storage("b")
+    ctx.dense_unpin_field_storage("a")
+    assert ctx.dense_get_storage_for_read("a") is None
+    ctx.dense_unpin_field_storage("b")
+
+    assert ctx.dense_disabled_rows_or_none() is None
+    ctx.disable_row(10)
+    assert ctx.dense_disabled_rows_or_none() == {10}

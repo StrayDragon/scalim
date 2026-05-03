@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Sequence, Set, cast
 
 from ....sinks import IRowSink
-from ...context import BatchContext
+from ...context import BatchContext, DenseBatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
 
 if TYPE_CHECKING:
@@ -19,6 +19,9 @@ class RowEmissionCoordinator:
     _global_ready_fields: Set[str]
     _required_non_global_targets: int
     _ready_counts: Dict[Hashable, int]
+    _dense_base_row_id: Optional[int]
+    _dense_row_count: int
+    _dense_ready_counts: Optional[List[int]]
     _write_row_ids: List[Hashable]
     _next_write_idx: int
     _next_release_idx: int
@@ -45,6 +48,9 @@ class RowEmissionCoordinator:
         self._global_ready_fields = set(global_ready_fields)
         self._required_non_global_targets = max(0, len(self._target_fields) - len(self._global_ready_fields))
         self._ready_counts = {}
+        self._dense_base_row_id = None
+        self._dense_row_count = 0
+        self._dense_ready_counts = None
         self._write_row_ids = []
         self._next_write_idx = 0
         self._next_release_idx = 0
@@ -55,6 +61,14 @@ class RowEmissionCoordinator:
 
     def attach_context(self, context: BatchContext) -> None:
         self._context = context
+        if isinstance(context, DenseBatchContext):
+            self._dense_base_row_id = int(context.dense_base_row_id())
+            self._dense_row_count = int(context.dense_row_count())
+            self._dense_ready_counts = [0] * int(self._dense_row_count)
+        else:
+            self._dense_base_row_id = None
+            self._dense_row_count = 0
+            self._dense_ready_counts = None
 
     def set_write_order(self, write_row_ids: List[Hashable]) -> None:
         self._write_row_ids = list(write_row_ids)
@@ -66,13 +80,25 @@ class RowEmissionCoordinator:
             return
         if field_key in self._global_ready_fields:
             return
-        required = int(self._required_non_global_targets)
+        required = self._required_non_global_targets
         if required <= 0:
             return
 
-        prev = int(self._ready_counts.get(row_id, 0))
-        now = prev + 1
-        self._ready_counts[row_id] = now
+        dense_counts = self._dense_ready_counts
+        base_row_id = self._dense_base_row_id
+        if dense_counts is not None and base_row_id is not None and isinstance(row_id, int):
+            idx = row_id - base_row_id
+            if 0 <= idx < self._dense_row_count:
+                now = dense_counts[idx] + 1
+                dense_counts[idx] = now
+            else:
+                prev = self._ready_counts.get(row_id, 0)
+                now = prev + 1
+                self._ready_counts[row_id] = now
+        else:
+            prev = self._ready_counts.get(row_id, 0)
+            now = prev + 1
+            self._ready_counts[row_id] = now
         # 快路径: 仅当“写出头部行”变为就绪时才尝试连续写出。
         # 一旦头部行被写出, `_drain_write_rows()` 会顺带写出后续已就绪的连续前缀。
         if now < required:
@@ -119,7 +145,13 @@ class RowEmissionCoordinator:
     def _is_row_ready(self, row_id: Hashable) -> bool:
         if self._required_non_global_targets <= 0:
             return True
-        return int(self._ready_counts.get(row_id, 0)) >= int(self._required_non_global_targets)
+        dense_counts = self._dense_ready_counts
+        base_row_id = self._dense_base_row_id
+        if dense_counts is not None and base_row_id is not None and isinstance(row_id, int):
+            idx = row_id - base_row_id
+            if 0 <= idx < self._dense_row_count:
+                return dense_counts[idx] >= self._required_non_global_targets
+        return self._ready_counts.get(row_id, 0) >= self._required_non_global_targets
 
     def _write_row(self, *, row_id: Hashable, row_index: int) -> None:
         write_row_aligned = getattr(self._sink, "write_row_aligned", None)  # pragma: allow-dynattr optional-interface: sink
