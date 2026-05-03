@@ -90,6 +90,75 @@ def test_pipeline_runs_gc_when_interval_hits(plan_builder, engine_factory) -> No
     assert calls
 
 
+def test_pipeline_consume_clears_internal_main_rows_list() -> None:
+    captured = {"rows": None}
+
+    def _main_loader() -> List[Dict[str, Any]]:
+        rows = [{"order_id": i} for i in range(5)]
+        captured["rows"] = rows
+        return rows
+
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
+    demand = DemandIr(
+        sources={},
+        fields={"order_id": FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True)},
+        main_source=main_source,
+    )
+    plan = PlanBuilder(demand).build(targets=["order_id"])
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": _main_loader})
+
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=2)
+    results = engine.run()
+
+    assert [row["order_id"] for row in results] == [0, 1, 2, 3, 4]
+
+    loaded = captured["rows"]
+    assert isinstance(loaded, list)
+    assert loaded == [{}, {}, {}, {}, {}]
+
+
+def test_pipeline_consume_clear_helper_guard_clauses() -> None:
+    main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
+    demand = DemandIr(
+        sources={},
+        fields={"order_id": FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True)},
+        main_source=main_source,
+    )
+    plan = PlanBuilder(demand).build(targets=["order_id"])
+    runtime_bindings = RuntimeBindings(main_source_loaders={"main": (lambda: [])})
+
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=2)
+    pipeline = engine._pipeline
+    assert isinstance(pipeline, SeqPipeline)
+
+    rows: List[Dict[str, Any]] = [{"order_id": 0}, {"order_id": 1}]
+    batch_rows: List[Dict[str, Any]] = [rows[0]]
+
+    pipeline._maybe_consume_clear_main_rows_list(enabled=False, main_rows=rows, row_ids=[0], batch_rows=batch_rows)
+    pipeline._maybe_consume_clear_main_rows_list(enabled=True, main_rows=rows, row_ids=[], batch_rows=batch_rows)
+    pipeline._maybe_consume_clear_main_rows_list(  # type: ignore[list-item]
+        enabled=True,
+        main_rows=rows,
+        row_ids=["x"],
+        batch_rows=batch_rows,
+    )
+    pipeline._maybe_consume_clear_main_rows_list(enabled=True, main_rows=iter(rows), row_ids=[0], batch_rows=batch_rows)
+    pipeline._maybe_consume_clear_main_rows_list(enabled=True, main_rows=rows, row_ids=[0], batch_rows=[])
+    pipeline._maybe_consume_clear_main_rows_list(enabled=True, main_rows=rows, row_ids=[-1], batch_rows=batch_rows)
+    pipeline._maybe_consume_clear_main_rows_list(
+        enabled=True,
+        main_rows=rows,
+        row_ids=[1],
+        batch_rows=[rows[0], rows[1], {"order_id": 2}],
+    )
+
+    assert rows[0].get("order_id") == 0
+    assert rows[1].get("order_id") == 1
+
+    pipeline._maybe_consume_clear_main_rows_list(enabled=True, main_rows=rows, row_ids=[0], batch_rows=rows)
+    assert rows == [{}, {}]
+
+
 def test_streaming_pipeline_uses_context_when_not_cached(plan_builder, engine_factory) -> None:
     plan = plan_builder.build(targets=["order_id", "amount"])
     engine = engine_factory(plan, batch_size=2)

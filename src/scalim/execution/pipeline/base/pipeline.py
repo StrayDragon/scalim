@@ -372,6 +372,35 @@ class Pipeline(ABC):
 class SeqPipeline(Pipeline):
     """顺序执行 `Pipeline`."""
 
+    def _maybe_consume_clear_main_rows_list(
+        self,
+        *,
+        enabled: bool,
+        main_rows: Iterable[RowData],
+        row_ids: List[Hashable],
+        batch_rows: List[RowData],
+    ) -> None:
+        if not enabled:
+            return
+        if not row_ids:
+            return
+        start_idx = row_ids[0]
+        if not isinstance(start_idx, int):
+            return
+
+        if not isinstance(main_rows, list):
+            return
+        rows_list = main_rows
+        count = len(batch_rows)
+        if count <= 0:
+            return
+        end_idx = int(start_idx) + int(count)
+        if int(start_idx) < 0 or end_idx < int(start_idx) or end_idx > len(rows_list):
+            return
+        # 使用同类型哨兵替换已消费元素(保持 `list` 长度不变),同时释放原行对象引用.
+        cleared_row: RowData = {}
+        rows_list[int(start_idx) : end_idx] = [cleared_row] * int(count)
+
     @override
     def run(
         self,
@@ -384,8 +413,17 @@ class SeqPipeline(Pipeline):
 
         self._preload_cached_sources()
 
+        loaded_main_rows = False
         if main_rows is None:
             main_rows = self._load_main_rows()
+            loaded_main_rows = True
+
+        # 内存优化: 对“主 `loader` 返回 `list`”的常见形态,在批次消费后清空已消费元素引用,以便更早释放行对象占用的内存。
+        #
+        # 约束:
+        # - 仅在 `main_rows` 由框架内部 `loader` 加载时启用(避免意外修改用户显式传入的 `list`)。
+        # - 仅做“定长 `slice` 置哨兵”,不改变 `list` 长度,避免影响 `list iterator` 语义。
+        consume_clear_main_rows_list = bool(loaded_main_rows and isinstance(main_rows, list))
 
         column_sink, streaming_sink = self._classify_sink(sink)
 
@@ -440,6 +478,13 @@ class SeqPipeline(Pipeline):
                     self.runtime.instrumentation.emit_batch_end(batch_count, batch_duration)
 
                     self._process_batch_results(batch_results, results, sink, column_sink, streaming_sink)
+
+                    self._maybe_consume_clear_main_rows_list(
+                        enabled=consume_clear_main_rows_list,
+                        main_rows=main_rows,
+                        row_ids=row_ids,
+                        batch_rows=batch_rows,
+                    )
 
                     if batch_count % self.gc_interval == 0:
                         collect_fn = self._overrides.gc_collect_fn or gc.collect
