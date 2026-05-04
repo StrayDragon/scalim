@@ -40,6 +40,11 @@ Sources:
 - Source: [spec.md](#code=openspec/specs/execution-adaptive-guardrails/spec.md)
 - Summary: TBD - created by archiving change c0-deps-and-adaptive-guardrails. Update Purpose after archive.
 
+### `execution-call-by-memoization`
+- Title: execution-call-by-memoization Specification
+- Source: [spec.md](#code=openspec/specs/execution-call-by-memoization/spec.md)
+- Summary: TBD - created by archiving change c20-exp-call-by-memoize-field-policy. Update Purpose after archive.
+
 ### `execution-concurrency-safety`
 - Title: no-external-callback-under-lock Specification
 - Source: [spec.md](#code=openspec/specs/execution-concurrency-safety/spec.md)
