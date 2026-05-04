@@ -40,6 +40,7 @@ def _load_identity(pyproject: Dict[str, Any]) -> Dict[str, str]:
     bench_env = env.get("bench") or {}
     sync_env = env.get("sync") or {}
     probes_env = env.get("probes") or {}
+    experiments_env = env.get("experiments") or {}
     bench_scale = _require_str(bench_env.get("scale"), "tool.scalim.env.bench.scale")
     bench_scope = _require_str(bench_env.get("scope"), "tool.scalim.env.bench.scope")
     bench_max_workers = _require_str(bench_env.get("max_workers"), "tool.scalim.env.bench.max_workers")
@@ -57,6 +58,23 @@ def _load_identity(pyproject: Dict[str, Any]) -> Dict[str, str]:
     probe_call_by_dep_cardinality = _require_str(
         probes_env.get("call_by_dep_cardinality"),
         "tool.scalim.env.probes.call_by_dep_cardinality",
+    )
+
+    exp_call_by_memoize_max_entries = _require_str(
+        experiments_env.get("call_by_memoize_max_entries"),
+        "tool.scalim.env.experiments.call_by_memoize_max_entries",
+    )
+    exp_call_by_memoize_allow = _require_str(
+        experiments_env.get("call_by_memoize_allow"),
+        "tool.scalim.env.experiments.call_by_memoize_allow",
+    )
+    exp_call_by_memoize_deny = _require_str(
+        experiments_env.get("call_by_memoize_deny"),
+        "tool.scalim.env.experiments.call_by_memoize_deny",
+    )
+    exp_call_by_memoize_log_stats = _require_str(
+        experiments_env.get("call_by_memoize_log_stats"),
+        "tool.scalim.env.experiments.call_by_memoize_log_stats",
     )
 
     return {
@@ -80,6 +98,10 @@ def _load_identity(pyproject: Dict[str, Any]) -> Dict[str, str]:
         "ENV_SYNC_ANALYZE_ARGS": sync_analyze_args,
         "ENV_SYNC_ANALYZE_ARGS_PREFIX": sync_analyze_args_prefix,
         "ENV_PROBE_CALL_BY_DEP_CARDINALITY": probe_call_by_dep_cardinality,
+        "ENV_EXP_CALL_BY_MEMOIZE_MAX_ENTRIES": exp_call_by_memoize_max_entries,
+        "ENV_EXP_CALL_BY_MEMOIZE_ALLOW": exp_call_by_memoize_allow,
+        "ENV_EXP_CALL_BY_MEMOIZE_DENY": exp_call_by_memoize_deny,
+        "ENV_EXP_CALL_BY_MEMOIZE_LOG_STATS": exp_call_by_memoize_log_stats,
     }
 
 

@@ -42,6 +42,10 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
     dep_cardinality = runtime.call_by_dep_cardinality
     if dep_cardinality is not None and (field_spec.call_by is None or use_ctx):
         dep_cardinality = None
+    memoization = runtime.call_by_memoization
+    memo_cache = None
+    if memoization is not None and field_spec.call_by is not None and not use_ctx and memoization.is_field_allowed(field_spec.field_id):
+        memo_cache = memoization.get_or_create_field_cache(field_spec.field_id)
 
     base_row_id = int(context.dense_base_row_id())
     row_count = int(context.dense_row_count())
@@ -100,7 +104,18 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         )
                         result = calculator(d0, ctx=ctx)
                     else:
-                        result = calculator(d0)
+                        raw = None
+                        if memo_cache is not None:
+                            hit, cached, hashable = memo_cache.try_get(d0)
+                            if hit:
+                                raw = cached
+                            else:
+                                raw = calculator(d0)
+                                if hashable:
+                                    memo_cache.store_miss(key=d0, value=raw)
+                        else:
+                            raw = calculator(d0)
+                        result = raw
                 elif deps_len == _DEPS_LEN_TWO:
                     st0 = dep_storages[0]
                     st1 = dep_storages[1]
@@ -126,7 +141,19 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         )
                         result = calculator(d0, d1, ctx=ctx)
                     else:
-                        result = calculator(d0, d1)
+                        key = (d0, d1)
+                        raw = None
+                        if memo_cache is not None:
+                            hit, cached, hashable = memo_cache.try_get(key)
+                            if hit:
+                                raw = cached
+                            else:
+                                raw = calculator(d0, d1)
+                                if hashable:
+                                    memo_cache.store_miss(key=key, value=raw)
+                        else:
+                            raw = calculator(d0, d1)
+                        result = raw
                 elif deps_len == _DEPS_LEN_THREE:
                     st0 = dep_storages[0]
                     st1 = dep_storages[1]
@@ -157,7 +184,19 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         )
                         result = calculator(d0, d1, d2, ctx=ctx)
                     else:
-                        result = calculator(d0, d1, d2)
+                        key = (d0, d1, d2)
+                        raw = None
+                        if memo_cache is not None:
+                            hit, cached, hashable = memo_cache.try_get(key)
+                            if hit:
+                                raw = cached
+                            else:
+                                raw = calculator(d0, d1, d2)
+                                if hashable:
+                                    memo_cache.store_miss(key=key, value=raw)
+                        else:
+                            raw = calculator(d0, d1, d2)
+                        result = raw
                 else:
                     dep_args = tuple((None if st is None or st.present[idx] == 0 else st.values[idx]) for st in dep_storages)
                     if dep_cardinality is not None:
@@ -174,7 +213,18 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         )
                         result = calculator(*dep_args, ctx=ctx)
                     else:
-                        result = calculator(*dep_args)
+                        raw = None
+                        if memo_cache is not None:
+                            hit, cached, hashable = memo_cache.try_get(dep_args)
+                            if hit:
+                                raw = cached
+                            else:
+                                raw = calculator(*dep_args)
+                                if hashable:
+                                    memo_cache.store_miss(key=dep_args, value=raw)
+                        else:
+                            raw = calculator(*dep_args)
+                        result = raw
 
                 if value_transform is not None:
                     result = value_transform(result)
@@ -307,7 +357,7 @@ def _execute_constant_compute(
             runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_payload, result)
 
 
-def _execute_row_compute(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
+def _execute_row_compute(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c0
     *,
     field_spec: DerivedFieldIr,
     context: BatchContext,
@@ -324,6 +374,10 @@ def _execute_row_compute(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
     dep_cardinality = runtime.call_by_dep_cardinality
     if dep_cardinality is not None and (field_spec.call_by is None or use_ctx):
         dep_cardinality = None
+    memoization = runtime.call_by_memoization
+    memo_cache = None
+    if memoization is not None and field_spec.call_by is not None and not use_ctx and memoization.is_field_allowed(field_spec.field_id):
+        memo_cache = memoization.get_or_create_field_cache(field_spec.field_id)
 
     if isinstance(context, DenseBatchContext) and _execute_row_compute_dense(
         field_spec=field_spec,
@@ -353,7 +407,18 @@ def _execute_row_compute(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
                 )
                 result = calculator(*dep_args, ctx=ctx)
             else:
-                result = calculator(*dep_args)
+                raw = None
+                if memo_cache is not None:
+                    hit, cached, hashable = memo_cache.try_get(dep_args)
+                    if hit:
+                        raw = cached
+                    else:
+                        raw = calculator(*dep_args)
+                        if hashable:
+                            memo_cache.store_miss(key=dep_args, value=raw)
+                else:
+                    raw = calculator(*dep_args)
+                result = raw
             if value_transform is not None:
                 result = value_transform(result)
             context.set_field_value(field_spec.field_id, row_id, result)

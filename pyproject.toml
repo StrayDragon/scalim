@@ -119,6 +119,12 @@ analyze_args_prefix = "SCALIM_ANALYZE_ARGS_"
 [tool.scalim.env.probes]
 call_by_dep_cardinality = "SCALIM_PROBE_CALL_BY_DEP_CARDINALITY"
 
+[tool.scalim.env.experiments]
+call_by_memoize_max_entries = "SCALIM_EXP_CALL_BY_MEMOIZE_MAX_ENTRIES"
+call_by_memoize_allow = "SCALIM_EXP_CALL_BY_MEMOIZE_ALLOW"
+call_by_memoize_deny = "SCALIM_EXP_CALL_BY_MEMOIZE_DENY"
+call_by_memoize_log_stats = "SCALIM_EXP_CALL_BY_MEMOIZE_LOG_STATS"
+
 [tool.ruff]
 exclude = [
     ".bzr",
