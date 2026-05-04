@@ -39,6 +39,7 @@ def _load_identity(pyproject: Dict[str, Any]) -> Dict[str, str]:
 
     bench_env = env.get("bench") or {}
     sync_env = env.get("sync") or {}
+    probes_env = env.get("probes") or {}
     bench_scale = _require_str(bench_env.get("scale"), "tool.scalim.env.bench.scale")
     bench_scope = _require_str(bench_env.get("scope"), "tool.scalim.env.bench.scope")
     bench_max_workers = _require_str(bench_env.get("max_workers"), "tool.scalim.env.bench.max_workers")
@@ -52,6 +53,11 @@ def _load_identity(pyproject: Dict[str, Any]) -> Dict[str, str]:
     sync_analysis_script = _require_str(sync_env.get("analysis_script"), "tool.scalim.env.sync.analysis_script")
     sync_analyze_args = _require_str(sync_env.get("analyze_args"), "tool.scalim.env.sync.analyze_args")
     sync_analyze_args_prefix = _require_str(sync_env.get("analyze_args_prefix"), "tool.scalim.env.sync.analyze_args_prefix")
+
+    probe_call_by_dep_cardinality = _require_str(
+        probes_env.get("call_by_dep_cardinality"),
+        "tool.scalim.env.probes.call_by_dep_cardinality",
+    )
 
     return {
         "DIST_NAME": dist_name,
@@ -73,6 +79,7 @@ def _load_identity(pyproject: Dict[str, Any]) -> Dict[str, str]:
         "ENV_SYNC_ANALYSIS_SCRIPT": sync_analysis_script,
         "ENV_SYNC_ANALYZE_ARGS": sync_analyze_args,
         "ENV_SYNC_ANALYZE_ARGS_PREFIX": sync_analyze_args_prefix,
+        "ENV_PROBE_CALL_BY_DEP_CARDINALITY": probe_call_by_dep_cardinality,
     }
 
 

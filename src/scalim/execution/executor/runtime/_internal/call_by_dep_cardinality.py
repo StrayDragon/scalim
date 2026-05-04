@@ -1,7 +1,9 @@
 import os
 from typing import Any, Dict, Optional, Set, Tuple
 
-_ENV_ENABLE = "SCALIM_PROBE_CALL_BY_DEP_CARDINALITY"
+from ....._project_constants import ENV_PROBE_CALL_BY_DEP_CARDINALITY
+
+_ENV_ENABLE = ENV_PROBE_CALL_BY_DEP_CARDINALITY
 
 
 class CallByDepCardinalityStats:

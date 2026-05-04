@@ -116,6 +116,9 @@ analysis_script = "SCALIM_ANALYSIS_SCRIPT"
 analyze_args = "SCALIM_ANALYZE_ARGS"
 analyze_args_prefix = "SCALIM_ANALYZE_ARGS_"
 
+[tool.scalim.env.probes]
+call_by_dep_cardinality = "SCALIM_PROBE_CALL_BY_DEP_CARDINALITY"
+
 [tool.ruff]
 exclude = [
     ".bzr",
