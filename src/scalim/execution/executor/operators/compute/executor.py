@@ -39,6 +39,9 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
     value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
     guardrails_enabled = runtime.guardrails.enabled
     use_ctx = field_spec.call_ctx_key is not None
+    dep_cardinality = runtime.call_by_dep_cardinality
+    if dep_cardinality is not None and (field_spec.call_by is None or use_ctx):
+        dep_cardinality = None
 
     base_row_id = int(context.dense_base_row_id())
     row_count = int(context.dense_row_count())
@@ -83,6 +86,8 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         d0 = None
                     else:
                         d0 = st0.values[idx]
+                    if dep_cardinality is not None:
+                        dep_cardinality.record(field_key=field_spec.field_id, dep_args=(d0,))
                     if use_ctx or wants_field_compute:
                         dep_values_payload = {deps[0]: d0}
                     if use_ctx:
@@ -107,6 +112,8 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         d1 = None
                     else:
                         d1 = st1.values[idx]
+                    if dep_cardinality is not None:
+                        dep_cardinality.record(field_key=field_spec.field_id, dep_args=(d0, d1))
                     if use_ctx or wants_field_compute:
                         dep_values_payload = {deps[0]: d0, deps[1]: d1}
                     if use_ctx:
@@ -136,6 +143,8 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         d2 = None
                     else:
                         d2 = st2.values[idx]
+                    if dep_cardinality is not None:
+                        dep_cardinality.record(field_key=field_spec.field_id, dep_args=(d0, d1, d2))
                     if use_ctx or wants_field_compute:
                         dep_values_payload = {deps[0]: d0, deps[1]: d1, deps[2]: d2}
                     if use_ctx:
@@ -151,6 +160,8 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                         result = calculator(d0, d1, d2)
                 else:
                     dep_args = tuple((None if st is None or st.present[idx] == 0 else st.values[idx]) for st in dep_storages)
+                    if dep_cardinality is not None:
+                        dep_cardinality.record(field_key=field_spec.field_id, dep_args=dep_args)
                     if use_ctx or wants_field_compute:
                         dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
                     if use_ctx:
@@ -310,6 +321,9 @@ def _execute_row_compute(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
     value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
     guardrails_enabled = runtime.guardrails.enabled
     use_ctx = field_spec.call_ctx_key is not None
+    dep_cardinality = runtime.call_by_dep_cardinality
+    if dep_cardinality is not None and (field_spec.call_by is None or use_ctx):
+        dep_cardinality = None
 
     if isinstance(context, DenseBatchContext) and _execute_row_compute_dense(
         field_spec=field_spec,
@@ -323,6 +337,8 @@ def _execute_row_compute(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c0
 
     for row_id in batch_row_nth:
         dep_args: Tuple[Any, ...] = tuple(context.get_field_value(dep_key, row_id) for dep_key in deps)
+        if dep_cardinality is not None:
+            dep_cardinality.record(field_key=field_spec.field_id, dep_args=dep_args)
         dep_values_payload: Dict[str, Any] = {}
         if use_ctx or wants_field_compute:
             dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)

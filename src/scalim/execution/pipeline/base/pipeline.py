@@ -545,6 +545,7 @@ class SeqPipeline(Pipeline):
 
         total_duration = time.perf_counter() - start_time
         self.runtime.instrumentation.emit_pipeline_end(batch_count, total_duration)
+        self.runtime.maybe_log_call_by_dep_cardinality_summary()
 
         return return_value
 

@@ -1,8 +1,10 @@
 # region imports
 
+import json
 import logging
 from typing import Any, Dict, FrozenSet, Hashable, List, Mapping, MutableMapping, Optional, Set, Tuple
 
+from ...._internal.loggingx import prefix
 from ...._internal.utils.converters import auto_str_normalize_key
 from ....hooks import HookManager
 from ....ob.hub import InstrumentationHub
@@ -20,6 +22,7 @@ from ...key_normalization import normalize_key_normalization, should_apply_str_k
 from ...loader_retry import LoaderRetryPolicies
 from ...runtime_bindings import RuntimeBindings
 from ...workflow_cache_pool import WorkflowCachePool
+from ._internal.call_by_dep_cardinality import CallByDepCardinalityCollector, build_call_by_dep_cardinality_collector
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
 
 # endregion
@@ -74,6 +77,7 @@ class ExecutionRuntime:
     adaptive_backend: Optional[str]
     adaptive_process_failure_mode: Optional[str]
     runtime_bindings: RuntimeBindings
+    call_by_dep_cardinality: Optional[CallByDepCardinalityCollector]
 
     def __init__(
         self,
@@ -128,6 +132,20 @@ class ExecutionRuntime:
         self.guardrail_logged = set()
         self.key_space_mismatch_logged = set()
         self.relation_guardrail_stats = {}
+        self.call_by_dep_cardinality = build_call_by_dep_cardinality_collector()
+
+    def maybe_log_call_by_dep_cardinality_summary(self) -> None:
+        collector = self.call_by_dep_cardinality
+        if collector is None:
+            return
+        summary = collector.build_summary(top_n=20)
+        if not summary.get("fields"):
+            return
+        logging.getLogger("scalim.performance").info(
+            "%s探针: 派生字段依赖元组去重摘要: %s",
+            prefix("performance"),
+            json.dumps(summary, ensure_ascii=False, sort_keys=True),
+        )
 
     def get_cached_source_mapping(self, step: LookupStepIr) -> LoaderResultMapping:
         source_id = str(step.to_source.source_id)
