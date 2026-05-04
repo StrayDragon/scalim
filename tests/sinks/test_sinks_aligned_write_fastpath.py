@@ -160,6 +160,17 @@ def _read_first_column_xlsx(path) -> list:  # type: ignore[no-untyped-def]
         wb.close()
 
 
+def _read_rows_xlsx(path) -> list:  # type: ignore[no-untyped-def]
+    import openpyxl
+
+    wb = openpyxl.load_workbook(path)
+    try:
+        ws = wb.active
+        return [list(row) for row in ws.iter_rows(values_only=True)]
+    finally:
+        wb.close()
+
+
 def test_excel_sinks_aligned_write_and_mismatch(tmp_path) -> None:
     row_path = tmp_path / "rows.xlsx"
     row_sink = ExcelSink(str(row_path), field_names=["id"], include_header=False)
@@ -173,6 +184,15 @@ def test_excel_sinks_aligned_write_and_mismatch(tmp_path) -> None:
             row_sink2.write_row_aligned(["id"], [1, 2])
     finally:
         row_sink2.close()
+
+    # `write_row_aligned` should handle missing fields and keep the declared output field order.
+    row_path3 = tmp_path / "rows3.xlsx"
+    row_sink3 = ExcelSink(str(row_path3), field_names=["id", "name"], include_header=False)
+    row_sink3.write_row_aligned(["id"], [1])
+    row_sink3.write_row_aligned(["id", "name"], [2, "b"])
+    row_sink3.write_row_aligned(["id", "name"], [3, "c"])
+    row_sink3.close()
+    assert _read_rows_xlsx(row_path3) == [[1, None], [2, "b"], [3, "c"]]
 
     col_path = tmp_path / "cols.xlsx"
     col_sink = ColumnExcelSink(str(col_path), field_names=["id"], include_header=False)

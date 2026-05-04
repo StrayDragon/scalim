@@ -5,7 +5,7 @@ import logging
 import zipfile
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Type
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
@@ -157,6 +157,8 @@ class ExcelSink(BaseRowSink):
     _workbook: Any
     _worksheet: Any
     _allow_formulas: bool
+    _aligned_cache_field_keys: Optional[Tuple[str, ...]]
+    _aligned_cache_indexes: Optional[List[Optional[int]]]
 
     def __init__(
         self,
@@ -176,6 +178,8 @@ class ExcelSink(BaseRowSink):
         self._allow_formulas = bool(allow_formulas)
         self._workbook = Workbook(write_only=True)
         self._worksheet = self._workbook.create_sheet(self.sheet_name)
+        self._aligned_cache_field_keys = None
+        self._aligned_cache_indexes = None
         if self.include_header:
             _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
@@ -193,7 +197,23 @@ class ExcelSink(BaseRowSink):
         if len(field_keys) != len(values):
             msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
             raise ValueError(msg)
-        self.write_row(dict(zip(field_keys, values)))
+
+        cache_keys = self._aligned_cache_field_keys
+        field_keys_tuple = tuple(field_keys)
+        if cache_keys != field_keys_tuple:
+            index_by_key: Dict[str, int] = {key: i for i, key in enumerate(field_keys_tuple)}
+            self._aligned_cache_field_keys = field_keys_tuple
+            self._aligned_cache_indexes = [index_by_key.get(name) for name in self.field_names]
+
+        indexes = self._aligned_cache_indexes or []
+        row_values: List[Any] = []
+        for idx in indexes:
+            if idx is None:
+                v = None
+            else:
+                v = values[idx]
+            row_values.append(escape_excel_formula(v, allow_formulas=self._allow_formulas))
+        _ = self._worksheet.append(row_values)
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
