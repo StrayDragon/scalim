@@ -2,6 +2,7 @@ import pytest
 
 from scalim.events import Event, EventType
 from scalim.events._events import PipelineStartEvent
+from scalim.ob._internal.common import ObserverManagerMode
 from scalim.ob.manager import ObserverManager
 from scalim.ob.observer import EventDispatchObserver, Observer
 
@@ -230,7 +231,7 @@ def test_observer_manager_setstate_backfills_capture_unknown_event_types() -> No
 
 
 def test_observer_manager_wants_unknown_event_type_in_capture_mode_respects_flag() -> None:
-    manager = ObserverManager(mode="capture")
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE)
     assert manager.wants("unknown") is False
 
     manager._capture_unknown_event_types = True  # noqa: SLF001

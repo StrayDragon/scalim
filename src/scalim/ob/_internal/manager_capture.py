@@ -2,10 +2,17 @@ import threading
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
 
-from ..._internal.utils.loader_result import LoaderResultPolicyValue
+from ..._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue, parse_loader_result_policy
 from ...events import Event
 from ..observer import Observer
-from .common import CaptureOverflowPolicyValue, ScalimObserverCaptureOverflowError
+from .common import (
+    CaptureOverflowPolicy,
+    CaptureOverflowPolicyValue,
+    ObserverManagerMode,
+    ScalimObserverCaptureOverflowError,
+    parse_capture_overflow_policy,
+    parse_observer_manager_mode,
+)
 
 
 class ObserverManagerCaptureMixin:
@@ -77,17 +84,20 @@ class ObserverManagerCaptureMixin:
 
     def create_capture_manager(self) -> Any:
         manager_cls = cast("Any", type(self))  # pragma: allow-cast manager class boundary typed narrowing
+        loader_result_policy_value = parse_loader_result_policy(self.loader_result_policy)
+        capture_overflow_policy_value = parse_capture_overflow_policy(self.capture_overflow_policy)
+        mode_value = parse_observer_manager_mode("capture")
         capture = manager_cls(
             observers=None,
             enable_debugging=self.debug_mode,
             fallback_logger_enabled=self.fallback_logger_enabled,
-            loader_result_policy=self.loader_result_policy,
+            loader_result_policy=LoaderResultPolicy(loader_result_policy_value),
             loader_result_sample_size=self.loader_result_sample_size,
             run_id=self.run_id,
             event_meta_defaults=self._event_meta_defaults,
-            mode="capture",
+            mode=ObserverManagerMode(mode_value),
             max_recorded_events=self.max_recorded_events,
-            capture_overflow_policy=self.capture_overflow_policy,
+            capture_overflow_policy=CaptureOverflowPolicy(capture_overflow_policy_value),
         )
         capture._capture_event_types = set(self._supported_event_types or ())  # noqa: SLF001
         capture._capture_unknown_event_types = bool(self._observers_for_unknown_event_type)  # noqa: SLF001

@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from scalim._internal.utils.loader_result import LoaderResultPolicy
 from scalim.events import Event, EventType
 from scalim.events._events import PipelineStartEvent, StageSpanEvent
 from scalim.execution.executor.batch.executor import BatchExecutor
@@ -242,21 +243,21 @@ def test_hub_emit_loader_call_on_event_honors_loader_result_policy_variants() ->
     hook = _CaptureOnEventHook()
     hook.event_types = {EventType.LOADER_CALL}  # type: ignore[assignment]
 
-    manager_none = ObserverManager(loader_result_policy="none")
+    manager_none = ObserverManager(loader_result_policy=LoaderResultPolicy.NONE)
     hub_none = InstrumentationHub(hook_manager=HookManager(), observer_manager=manager_none)
     hub_none.register(hook)
     hub_none.emit_loader_call(loader_name="l", params={}, result={"a": 1}, duration=0.01)
     assert hook.events[-1].payload.result is None
 
     hook.events = []
-    manager_summary = ObserverManager(loader_result_policy="summary")
+    manager_summary = ObserverManager(loader_result_policy=LoaderResultPolicy.SUMMARY)
     hub_summary = InstrumentationHub(hook_manager=HookManager(), observer_manager=manager_summary)
     hub_summary.register(hook)
     hub_summary.emit_loader_call(loader_name="l", params={}, result={"a": 1}, duration=0.01)
     assert hook.events[-1].payload.result["type"] == "dict"
 
     hook.events = []
-    manager_sample = ObserverManager(loader_result_policy="sample", loader_result_sample_size=1)
+    manager_sample = ObserverManager(loader_result_policy=LoaderResultPolicy.SAMPLE, loader_result_sample_size=1)
     hub_sample = InstrumentationHub(hook_manager=HookManager(), observer_manager=manager_sample)
     hub_sample.register(hook)
     hub_sample.emit_loader_call(loader_name="l", params={}, result={"a": 1, "b": 2}, duration=0.01)

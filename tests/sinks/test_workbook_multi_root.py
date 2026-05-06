@@ -5,6 +5,7 @@ import pytest
 from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec
 from scalim.execution import workbook_multi_root as wm_mod
 from scalim.execution.workbook_multi_root import run_multi_root_workbook
+from scalim.typedefs import FailurePolicy
 from tests.cases.minimal_ir import build_minimal_ir_case
 
 
@@ -57,8 +58,8 @@ def test_run_multi_root_workbook_rejects_unknown_failure_policy(tmp_path: Path) 
         sink=None,
         runtime_bindings=case.runtime_bindings,
     )
-    with pytest.raises(ValueError, match="failure_policy must be one of"):
-        _ = run_multi_root_workbook(output_path=str(tmp_path / "x.xlsx"), runs=(("S", case.demand, req),), failure_policy="bad")
+    with pytest.raises(TypeError, match="failure_policy must be a FailurePolicy"):
+        _ = run_multi_root_workbook(output_path=str(tmp_path / "x.xlsx"), runs=(("S", case.demand, req),), failure_policy="bad")  # type: ignore[arg-type]
 
 
 def test_run_multi_root_workbook_all_fail_wraps_sheet_error_and_saves_workbook(tmp_path: Path) -> None:
@@ -72,7 +73,7 @@ def test_run_multi_root_workbook_all_fail_wraps_sheet_error_and_saves_workbook(t
     )
 
     with pytest.raises(wm_mod.ScalimMultiRootWorkbookRunError, match="Workbook sheet run failed"):
-        _ = run_multi_root_workbook(output_path=str(out), runs=(("SheetA", case.demand, req),), failure_policy="all_fail")
+        _ = run_multi_root_workbook(output_path=str(out), runs=(("SheetA", case.demand, req),), failure_policy=FailurePolicy.ALL_FAIL)
 
     assert out.exists()
     assert _read_workbook_sheet_names(out) == ["SheetA"]
@@ -98,7 +99,7 @@ def test_run_multi_root_workbook_primary_only_continues_and_returns_results(tmp_
     results = run_multi_root_workbook(
         output_path=str(out),
         runs=(("SheetA", case_a.demand, req_fail), ("SheetB", case_b.demand, req_ok)),
-        failure_policy="primary_only",
+        failure_policy=FailurePolicy.PRIMARY_ONLY,
     )
     assert len(results) == 1
     assert out.exists()
@@ -119,7 +120,7 @@ def test_run_multi_root_workbook_primary_only_continues_after_multiple_failures(
     results = run_multi_root_workbook(
         output_path=str(out),
         runs=(("SheetA", case_a.demand, req_fail), ("SheetB", case_b.demand, req_fail)),
-        failure_policy="primary_only",
+        failure_policy=FailurePolicy.PRIMARY_ONLY,
     )
     assert len(results) == 0
     assert out.exists()

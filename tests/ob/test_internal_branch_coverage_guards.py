@@ -8,6 +8,7 @@ import threading
 
 from scalim.events import Event
 from scalim.events import EventType
+from scalim.ob._internal.common import ObserverManagerMode
 from scalim.ob.manager import ObserverManager
 from scalim.ob._internal.manager_capture import ObserverManagerCaptureMixin
 from scalim.ob._internal.manager_emit import ObserverManagerEmitMixin
@@ -123,7 +124,7 @@ def test_internal_observer_manager_lazy_branches_and_viz_node_cache() -> None:
     emit_only.loader_result_policy = "SUMMARY"
     emit_only.emit_loader_call(loader_name="x", params={}, result={"a": 1}, duration=0.0)  # noqa: SLF001
 
-    manager = ObserverManager(mode="capture")
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE)
     manager._recorded_events = None  # noqa: SLF001
     assert manager.drain_events() == []
 

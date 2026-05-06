@@ -2,6 +2,7 @@ import json
 import logging
 
 import pytest
+from scalim._internal.utils.loader_result import LoaderResultPolicy
 from scalim.events import Event, EventType
 from scalim.events._events import (
     ColumnWriteEvent,
@@ -240,23 +241,23 @@ def test_base_hook_pre_use_batch_size_noops() -> None:
 
 
 def test_hook_manager_loader_result_policy_invalid() -> None:
-    with pytest.raises(ValueError):
-        HookManager(loader_result_policy="bad")
+    with pytest.raises(TypeError, match=r"loader_result_policy must be a LoaderResultPolicy"):
+        HookManager(loader_result_policy="bad")  # type: ignore[arg-type]
 
 
 def test_hook_manager_loader_result_policy_rejects_non_str() -> None:
-    with pytest.raises(TypeError, match=r"loader_result_policy must be a str"):
+    with pytest.raises(TypeError, match=r"loader_result_policy must be a LoaderResultPolicy"):
         HookManager(loader_result_policy=123)  # type: ignore[arg-type]
 
 
 def test_hook_manager_loader_result_policy_whitespace_is_invalid() -> None:
-    with pytest.raises(ValueError, match=r"loader_result_policy must not be empty"):
-        HookManager(loader_result_policy="   ")
+    with pytest.raises(TypeError, match=r"loader_result_policy must be a LoaderResultPolicy"):
+        HookManager(loader_result_policy="   ")  # type: ignore[arg-type]
 
 
 def test_hook_manager_loader_result_policy_summary_and_none() -> None:
     summary_hook = _CaptureHook()
-    summary_manager = HookManager(loader_result_policy="summary")
+    summary_manager = HookManager(loader_result_policy=LoaderResultPolicy.SUMMARY)
     summary_manager.register(summary_hook)
     summary_manager.trigger_loader_call("loader", {}, [1, 2, 3], 0.1)
     summary = summary_hook.loader_calls[-1].result
@@ -264,7 +265,7 @@ def test_hook_manager_loader_result_policy_summary_and_none() -> None:
     assert summary["size"] == 3
 
     none_hook = _CaptureHook()
-    none_manager = HookManager(loader_result_policy="none")
+    none_manager = HookManager(loader_result_policy=LoaderResultPolicy.NONE)
     none_manager.register(none_hook)
     none_manager.trigger_loader_call("loader", {}, {"a": 1}, 0.1)
     assert none_hook.loader_calls[-1].result is None
@@ -272,7 +273,7 @@ def test_hook_manager_loader_result_policy_summary_and_none() -> None:
 
 def test_hook_manager_loader_result_policy_sample_variants() -> None:
     hook = _CaptureHook()
-    manager = HookManager(loader_result_policy="sample", loader_result_sample_size=2)
+    manager = HookManager(loader_result_policy=LoaderResultPolicy.SAMPLE, loader_result_sample_size=2)
     manager.register(hook)
 
     manager.trigger_loader_call("loader", {}, {"a": 1, "b": 2, "c": 3}, 0.1)

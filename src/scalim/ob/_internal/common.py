@@ -2,9 +2,15 @@ from collections.abc import Set as AbstractSet
 from typing import Any, Optional, Set, Tuple
 
 from ..._internal.loggingx import prefix
+from ..._internal.utils.policy import (
+    ensure_policy_enum,
+    normalize_token_lower_strip,
+    normalize_token_lower_strip_replace,
+    parse_policy_value,
+)
 from ...events import EventType
 from ...exceptions import ScalimObserverError
-from ...vendor.compact.typing_extensionsx import Literal
+from ...vendor.compact import StrEnum
 
 OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
 OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s 关闭时抛出异常"
@@ -45,94 +51,69 @@ CATALOG_EVENT_TYPES_SET: Set[str] = set(CATALOG_EVENT_TYPES)
 DEFAULT_MAX_RECORDED_EVENTS = 10_000
 
 
-ObserverManagerModeValue = Literal["process", "capture"]
-"""观察者管理器模式的字符串字面量类型(对外配置/状态边界)."""
+class ObserverManagerMode(StrEnum):
+    PROCESS = "process"
+    CAPTURE = "capture"
 
+
+ObserverManagerModeValue = str
 ObserverManagerModeLike = Optional[ObserverManagerModeValue]
 
-_OBSERVER_MANAGER_MODE_PROCESS: ObserverManagerModeValue = "process"
-_OBSERVER_MANAGER_MODE_CAPTURE: ObserverManagerModeValue = "capture"
-_OBSERVER_MANAGER_MODES = (_OBSERVER_MANAGER_MODE_PROCESS, _OBSERVER_MANAGER_MODE_CAPTURE)
-_OBSERVER_MANAGER_MODES_LABEL = "process/capture"
+_DEFAULT_OBSERVER_MANAGER_MODE = ObserverManagerMode.PROCESS
 
-CaptureOverflowPolicyValue = Literal["raise", "drop-oldest", "drop-newest"]
-"""捕获溢出策略的字符串字面量类型(对外配置/状态边界)."""
 
+class CaptureOverflowPolicy(StrEnum):
+    RAISE = "raise"
+    DROP_OLDEST = "drop-oldest"
+    DROP_NEWEST = "drop-newest"
+
+
+CaptureOverflowPolicyValue = str
 CaptureOverflowPolicyLike = Optional[CaptureOverflowPolicyValue]
 
-_CAPTURE_OVERFLOW_POLICY_RAISE: CaptureOverflowPolicyValue = "raise"
-_CAPTURE_OVERFLOW_POLICY_DROP_OLDEST: CaptureOverflowPolicyValue = "drop-oldest"
-_CAPTURE_OVERFLOW_POLICY_DROP_NEWEST: CaptureOverflowPolicyValue = "drop-newest"
-CAPTURE_OVERFLOW_POLICIES = (
-    _CAPTURE_OVERFLOW_POLICY_RAISE,
-    _CAPTURE_OVERFLOW_POLICY_DROP_OLDEST,
-    _CAPTURE_OVERFLOW_POLICY_DROP_NEWEST,
-)
-_CAPTURE_OVERFLOW_POLICIES_LABEL = "raise/drop-oldest/drop-newest"
+_DEFAULT_CAPTURE_OVERFLOW_POLICY = CaptureOverflowPolicy.RAISE
 
 
 class ScalimObserverCaptureOverflowError(ScalimObserverError):
     pass
 
 
-def normalize_observer_manager_mode(value: object) -> ObserverManagerModeValue:
-    if value is None:
-        return _OBSERVER_MANAGER_MODE_PROCESS
+def format_observer_manager_mode(value: ObserverManagerMode) -> ObserverManagerModeValue:
+    return str(value.value)
 
-    if not isinstance(value, str):
-        msg = "observer_manager.mode must be a str, got '{}'".format(type(value).__name__)
-        raise TypeError(msg)
-    if type(value) is not str:
-        msg = "observer_manager.mode must be a builtin str, got '{}'; expected one of: {}".format(
-            type(value).__name__,
-            _OBSERVER_MANAGER_MODES_LABEL,
-        )
-        raise TypeError(msg)
 
-    normalized = value.strip().lower()
-    if not normalized:
-        msg = "observer_manager.mode must not be empty; expected one of: {}".format(_OBSERVER_MANAGER_MODES_LABEL)
-        raise ValueError(msg)
+def parse_observer_manager_mode(value: object) -> ObserverManagerModeValue:
+    return parse_policy_value(
+        ObserverManagerMode,
+        value,
+        label="observer_manager.mode",
+        default=_DEFAULT_OBSERVER_MANAGER_MODE,
+        normalize=normalize_token_lower_strip,
+        allow_empty=False,
+    )
 
-    if normalized == _OBSERVER_MANAGER_MODE_PROCESS:
-        return _OBSERVER_MANAGER_MODE_PROCESS
-    if normalized == _OBSERVER_MANAGER_MODE_CAPTURE:
-        return _OBSERVER_MANAGER_MODE_CAPTURE
 
-    msg = "Unknown observer_manager.mode: {!r}; expected one of: {}".format(value, _OBSERVER_MANAGER_MODES_LABEL)
-    raise ValueError(msg)
+def normalize_observer_manager_mode(value: ObserverManagerMode) -> ObserverManagerModeValue:
+    enum_value = ensure_policy_enum(ObserverManagerMode, value, label="observer_manager.mode")
+    return format_observer_manager_mode(enum_value)
 
 
 def normalize_capture_overflow_policy(
-    value: object,
+    value: CaptureOverflowPolicy,
 ) -> CaptureOverflowPolicyValue:
-    if value is None:
-        return _CAPTURE_OVERFLOW_POLICY_RAISE
+    enum_value = ensure_policy_enum(CaptureOverflowPolicy, value, label="capture_overflow_policy")
+    return str(enum_value.value)
 
-    if not isinstance(value, str):
-        msg = "capture_overflow_policy must be a str, got '{}'".format(type(value).__name__)
-        raise TypeError(msg)
-    if type(value) is not str:
-        msg = "capture_overflow_policy must be a builtin str, got '{}'; expected one of: {}".format(
-            type(value).__name__,
-            _CAPTURE_OVERFLOW_POLICIES_LABEL,
-        )
-        raise TypeError(msg)
 
-    normalized = value.strip().lower().replace("_", "-")
-    if not normalized:
-        msg = "capture_overflow_policy must not be empty; expected one of: {}".format(_CAPTURE_OVERFLOW_POLICIES_LABEL)
-        raise ValueError(msg)
-
-    if normalized == _CAPTURE_OVERFLOW_POLICY_RAISE:
-        return _CAPTURE_OVERFLOW_POLICY_RAISE
-    if normalized == _CAPTURE_OVERFLOW_POLICY_DROP_OLDEST:
-        return _CAPTURE_OVERFLOW_POLICY_DROP_OLDEST
-    if normalized == _CAPTURE_OVERFLOW_POLICY_DROP_NEWEST:
-        return _CAPTURE_OVERFLOW_POLICY_DROP_NEWEST
-
-    msg = "Unknown capture_overflow_policy: {!r}; expected one of: {}".format(value, _CAPTURE_OVERFLOW_POLICIES_LABEL)
-    raise ValueError(msg)
+def parse_capture_overflow_policy(value: object) -> CaptureOverflowPolicyValue:
+    return parse_policy_value(
+        CaptureOverflowPolicy,
+        value,
+        label="capture_overflow_policy",
+        default=_DEFAULT_CAPTURE_OVERFLOW_POLICY,
+        normalize=lambda v: normalize_token_lower_strip_replace(v, old="_", new="-"),
+        allow_empty=False,
+    )
 
 
 def validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:

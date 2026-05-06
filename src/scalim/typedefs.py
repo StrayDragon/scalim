@@ -3,6 +3,7 @@
 from decimal import Decimal
 from typing import Dict, Hashable, List, Mapping, Sequence, Set, Tuple, Union
 
+from ._internal.utils.policy import ensure_policy_enum, parse_policy_value
 from .vendor.compact import StrEnum
 from .vendor.compact.typing_extensionsx import Literal
 
@@ -140,46 +141,28 @@ class FailurePolicy(StrEnum):
     PRIMARY_ONLY = "primary_only"
 
 
-FailurePolicyValue = Literal["all_fail", "primary_only"]
-"""失败策略的字符串字面量类型(对外配置/序列化边界)."""
+FailurePolicyValue = str
+"""失败策略的规范化内置 `str` 值(用于运行时存储与 `state`/`wire` 边界)."""
 
-FailurePolicyLike = Union[FailurePolicy, FailurePolicyValue]
-"""失败策略入参类型: 支持 `FailurePolicy` 与字符串字面量."""
-
-_FAILURE_POLICY_ALL_FAIL: FailurePolicyValue = "all_fail"
-_FAILURE_POLICY_PRIMARY_ONLY: FailurePolicyValue = "primary_only"
-_FAILURE_POLICY_VALUES = (_FAILURE_POLICY_ALL_FAIL, _FAILURE_POLICY_PRIMARY_ONLY)
-_FAILURE_POLICY_VALUES_LABEL = "all_fail/primary_only"
+_DEFAULT_FAILURE_POLICY = FailurePolicy.ALL_FAIL
 
 
-def normalize_failure_policy(value: object, *, label: str = "failure_policy") -> FailurePolicyValue:
-    """归一化并校验 `failure_policy`(封闭集合; `fail-fast`).
+def parse_failure_policy(value: object, *, label: str = "failure_policy") -> FailurePolicyValue:
+    """从配置/状态边界解析并校验 `failure_policy`(封闭集合;快速失败)."""
+    return parse_policy_value(
+        FailurePolicy,
+        value,
+        label=label,
+        default=_DEFAULT_FAILURE_POLICY,
+        normalize=lambda v: v.strip().lower().replace("-", "_"),
+        allow_empty=True,
+    )
 
-    约定:
-    - 支持大小写不敏感与 `-`/`_` 对齐(例如 `primary-only` -> `primary_only`)
-    - 返回值为稳定字符串,用于状态/序列化边界
-    """
-    if value is None:
-        return _FAILURE_POLICY_ALL_FAIL
 
-    if isinstance(value, FailurePolicy):
-        if value == FailurePolicy.ALL_FAIL:
-            return _FAILURE_POLICY_ALL_FAIL
-        return _FAILURE_POLICY_PRIMARY_ONLY
-
-    if not isinstance(value, str):
-        msg = "{} must be a str".format(label)
-        raise TypeError(msg)
-
-    normalized = value.strip().lower().replace("-", "_")
-    if not normalized:
-        return _FAILURE_POLICY_ALL_FAIL
-    if normalized == _FAILURE_POLICY_ALL_FAIL:
-        return _FAILURE_POLICY_ALL_FAIL
-    if normalized == _FAILURE_POLICY_PRIMARY_ONLY:
-        return _FAILURE_POLICY_PRIMARY_ONLY
-    msg = "{} must be one of: {} (got {!r})".format(label, _FAILURE_POLICY_VALUES_LABEL, value)
-    raise ValueError(msg)
+def normalize_failure_policy(value: FailurePolicy, *, label: str = "failure_policy") -> FailurePolicyValue:
+    """公开 `API`: 严格只接受 `Enum`,并返回规范化后的内置 `str` 值."""
+    policy = ensure_policy_enum(FailurePolicy, value, label=label)
+    return str(policy.value)
 
 
 class SourceSpecIrCacheMode(StrEnum):

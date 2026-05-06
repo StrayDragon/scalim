@@ -21,7 +21,7 @@ from ....spec.ir._workflow import (
     WorkflowResourcesWaitDiagnosticsIr,
     WorkflowResourcesWaitOptionsIr,
 )
-from ....typedefs import FailurePolicy, normalize_failure_policy
+from ....typedefs import FailurePolicy, parse_failure_policy
 from ..workflow_config._models import (
     WorkflowOutputStagingOptions,
     WorkflowResourcesWaitDiagnosticsOptions,
@@ -56,7 +56,7 @@ def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowE
     if not isinstance(failure_policy_raw, str):
         msg = "workflow_runtime_options.execution.failure_policy must be a string"
         raise TypeError(msg)
-    failure_policy = normalize_failure_policy(
+    failure_policy = parse_failure_policy(
         failure_policy_raw,
         label="workflow_runtime_options.execution.failure_policy",
     )

@@ -5,6 +5,7 @@ import pytest
 
 from scalim.events import EventType
 from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.ob._internal.common import CaptureOverflowPolicy, ObserverManagerMode
 from scalim.ob.manager import ScalimObserverCaptureOverflowError, ObserverManager
 from scalim.ob.observer import Observer
 from scalim.planning import PlanBuilder
@@ -24,7 +25,7 @@ class _LoaderCallObserver(Observer):
 
 
 def test_observer_manager_capture_overflow_default_policy_raises() -> None:
-    manager = ObserverManager(mode="capture", max_recorded_events=1)
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE, max_recorded_events=1)
     manager.emit_event("x", 1)
     with pytest.raises(ScalimObserverCaptureOverflowError, match="capture recorded events overflow"):
         manager.emit_event("x", 2)
@@ -35,7 +36,11 @@ def test_observer_manager_capture_overflow_default_policy_raises() -> None:
 
 
 def test_observer_manager_capture_overflow_drop_oldest_keeps_last_n() -> None:
-    manager = ObserverManager(mode="capture", max_recorded_events=2, capture_overflow_policy="drop-oldest")
+    manager = ObserverManager(
+        mode=ObserverManagerMode.CAPTURE,
+        max_recorded_events=2,
+        capture_overflow_policy=CaptureOverflowPolicy.DROP_OLDEST,
+    )
     manager.emit_event("x", 0)
     manager.emit_event("x", 1)
     manager.emit_event("x", 2)
@@ -45,7 +50,11 @@ def test_observer_manager_capture_overflow_drop_oldest_keeps_last_n() -> None:
 
 
 def test_observer_manager_capture_overflow_drop_newest_keeps_first_n() -> None:
-    manager = ObserverManager(mode="capture", max_recorded_events=2, capture_overflow_policy="drop-newest")
+    manager = ObserverManager(
+        mode=ObserverManagerMode.CAPTURE,
+        max_recorded_events=2,
+        capture_overflow_policy=CaptureOverflowPolicy.DROP_NEWEST,
+    )
     manager.emit_event("x", 0)
     manager.emit_event("x", 1)
     manager.emit_event("x", 2)
@@ -55,7 +64,7 @@ def test_observer_manager_capture_overflow_drop_newest_keeps_first_n() -> None:
 
 
 def test_observer_manager_capture_limit_can_be_disabled_with_none() -> None:
-    manager = ObserverManager(mode="capture", max_recorded_events=None)
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE, max_recorded_events=None)
     manager.emit_event("x", 0)
     manager.emit_event("x", 1)
     manager.emit_event("x", 2)
@@ -63,7 +72,11 @@ def test_observer_manager_capture_limit_can_be_disabled_with_none() -> None:
 
 
 def test_observer_manager_capture_limit_zero_drops_when_configured() -> None:
-    manager = ObserverManager(mode="capture", max_recorded_events=0, capture_overflow_policy="drop-oldest")
+    manager = ObserverManager(
+        mode=ObserverManagerMode.CAPTURE,
+        max_recorded_events=0,
+        capture_overflow_policy=CaptureOverflowPolicy.DROP_OLDEST,
+    )
     manager.emit_event("x", 1)
     assert manager.drain_events() == []
 
@@ -74,12 +87,12 @@ def test_observer_manager_rejects_negative_max_recorded_events() -> None:
 
 
 def test_observer_manager_rejects_unknown_capture_overflow_policy() -> None:
-    with pytest.raises(ValueError, match="Unknown capture_overflow_policy"):
-        _ = ObserverManager(capture_overflow_policy="unknown")
+    with pytest.raises(TypeError, match=r"capture_overflow_policy must be a CaptureOverflowPolicy"):
+        _ = ObserverManager(capture_overflow_policy="unknown")  # type: ignore[arg-type]
 
 
 def test_observer_manager_rejects_non_str_capture_overflow_policy() -> None:
-    with pytest.raises(TypeError, match="capture_overflow_policy must be a str"):
+    with pytest.raises(TypeError, match=r"capture_overflow_policy must be a CaptureOverflowPolicy"):
         _ = ObserverManager(capture_overflow_policy=1)  # type: ignore[arg-type]
 
 
@@ -260,7 +273,11 @@ def test_adaptive_capture_overflow_is_diagnosable() -> None:
     plan = PlanBuilder(demand).build(targets=["order_id", "customer_name", "product_name"])
 
     observer = _LoaderCallObserver()
-    manager = ObserverManager(observers=[observer], max_recorded_events=0, capture_overflow_policy="raise")
+    manager = ObserverManager(
+        observers=[observer],
+        max_recorded_events=0,
+        capture_overflow_policy=CaptureOverflowPolicy.RAISE,
+    )
     engine = ScalimEngine(
         demand=demand,
         plan=plan,

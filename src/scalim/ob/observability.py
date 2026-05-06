@@ -2,9 +2,10 @@
 
 from typing import Any, Dict, List, Optional
 
-from .._internal.utils.loader_result import LoaderResultPolicyLike, normalize_loader_result_policy
+from .._internal.utils.loader_result import LoaderResultPolicy
+from .._internal.utils.policy import ensure_policy_enum
 from ..vendor.dataclassesx import dataclass
-from ._internal.common import ObserverManagerModeLike
+from ._internal.common import ObserverManagerMode
 from .manager import ObserverManager
 from .observer import Observer
 
@@ -17,15 +18,15 @@ class ObservabilityOptions:
 
     enable_debugging: bool = False
     fallback_logger_enabled: bool = False
-    loader_result_policy: LoaderResultPolicyLike = "full"
+    loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL
     loader_result_sample_size: int = 5
 
     def __post_init__(self) -> None:
         try:
-            policy = normalize_loader_result_policy(self.loader_result_policy)
-        except (TypeError, ValueError) as exc:
+            policy = ensure_policy_enum(LoaderResultPolicy, self.loader_result_policy, label="ObservabilityOptions.loader_result_policy")
+        except TypeError as exc:
             msg = "ObservabilityOptions.loader_result_policy: {}".format(str(exc))
-            raise ValueError(msg) from exc
+            raise TypeError(msg) from exc
         object.__setattr__(self, "loader_result_policy", policy)
 
         sample_size = int(self.loader_result_sample_size)
@@ -58,7 +59,7 @@ class Observability:
         *,
         run_id: Optional[str] = None,
         event_meta_defaults: Optional[Dict[str, Any]] = None,
-        mode: ObserverManagerModeLike = "process",
+        mode: ObserverManagerMode = ObserverManagerMode.PROCESS,
     ) -> ObserverManager:
         return ObserverManager(
             observers=list(self.observers),

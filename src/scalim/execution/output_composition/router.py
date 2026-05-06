@@ -10,10 +10,11 @@ from ...events._events import OutputTargetEndEvent
 from ...exceptions import ScalimExecutionError
 from ...ob.hub import InstrumentationHub
 from ...sinks import BaseRowSink, ExcelWorkbookSink, IRowSink
-from ...typedefs import FailurePolicy, RowData, normalize_failure_policy
+from ...typedefs import FailurePolicy, RowData
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import AggregatingRowSink, fingerprint_for_meta
+from .policy import parse_output_failure_policy
 from .sinks import RowCounter
 from .specs import OutputRowPredicate, OutputTargetStats
 
@@ -123,7 +124,7 @@ class RouterRowSink(BaseRowSink):
         include_full_error_message: bool = False,
     ) -> None:
         self._routes = list(routes)
-        self._failure_policy = normalize_failure_policy(failure_policy, label="output_composition.failure_policy")
+        self._failure_policy = parse_output_failure_policy(failure_policy)
         self._workbook_resources = list(workbook_resources)
         self._meta_target = meta_target
         self._audit_target = audit_target

@@ -6,19 +6,24 @@ from typing import Any, Deque, Dict, Optional, cast
 from typing import Iterable as TypingIterable
 
 from ..._internal.utils.loader_result import (
-    LoaderResultPolicyLike,
+    LoaderResultPolicy,
     LoaderResultPolicyValue,
     normalize_loader_result_policy,
+    parse_loader_result_policy,
     sample_loader_result,
     summarize_loader_result,
 )
 from ...events import Event
 from .common import (
     DEFAULT_MAX_RECORDED_EVENTS,
+    CaptureOverflowPolicy,
     CaptureOverflowPolicyValue,
+    ObserverManagerMode,
     ObserverManagerModeValue,
     normalize_capture_overflow_policy,
     normalize_observer_manager_mode,
+    parse_capture_overflow_policy,
+    parse_observer_manager_mode,
 )
 
 
@@ -57,14 +62,14 @@ class ObserverManagerStateMixin(ABC):
         _ = state_map.setdefault("max_recorded_events", DEFAULT_MAX_RECORDED_EVENTS)
         _ = state_map.setdefault("capture_overflow_policy", "raise")
 
-        self.mode = self._normalize_mode(state_map.get("mode"))
+        self.mode = parse_observer_manager_mode(state_map.get("mode"))
         max_recorded_events = state_map.get("max_recorded_events")
         self.max_recorded_events = self._normalize_max_recorded_events(max_recorded_events)
-        self.capture_overflow_policy = self._normalize_capture_overflow_policy(state_map.get("capture_overflow_policy") or "raise")
+        self.capture_overflow_policy = parse_capture_overflow_policy(state_map.get("capture_overflow_policy") or "raise")
         # 确保状态/序列化边界仅存储内置 `str` 字面量值.
         state_map["mode"] = self.mode
         state_map["capture_overflow_policy"] = self.capture_overflow_policy
-        normalized_policy = normalize_loader_result_policy(state_map.get("loader_result_policy"))
+        normalized_policy = parse_loader_result_policy(state_map.get("loader_result_policy"))
         state_map["loader_result_policy"] = normalized_policy
         self.loader_result_policy = normalized_policy
 
@@ -88,13 +93,13 @@ class ObserverManagerStateMixin(ABC):
             raise ValueError(msg)
         return resolved
 
-    def _normalize_capture_overflow_policy(self, policy: object) -> CaptureOverflowPolicyValue:
+    def _normalize_capture_overflow_policy(self, policy: CaptureOverflowPolicy) -> CaptureOverflowPolicyValue:
         return normalize_capture_overflow_policy(policy)
 
-    def _normalize_mode(self, value: object) -> ObserverManagerModeValue:
+    def _normalize_mode(self, value: ObserverManagerMode) -> ObserverManagerModeValue:
         return normalize_observer_manager_mode(value)
 
-    def _normalize_loader_result_policy(self, policy: LoaderResultPolicyLike) -> LoaderResultPolicyValue:
+    def _normalize_loader_result_policy(self, policy: LoaderResultPolicy) -> LoaderResultPolicyValue:
         return normalize_loader_result_policy(policy)
 
     def _summarize_result(self, result: Any) -> Dict[str, Any]:

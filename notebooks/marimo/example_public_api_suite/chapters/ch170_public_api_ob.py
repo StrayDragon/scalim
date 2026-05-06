@@ -14,7 +14,7 @@ _EXAMPLE_ID = "example_public_api_suite/ch170_public_api_ob"
 def run_public_api_ob() -> ExampleResult:
     symbols = {name: getattr(api, name) for name in api.__all__}
     ob = api.Observability()
-    manager = ob.build_manager(mode="capture")
+    manager = ob.build_manager(mode=api.ObserverManagerMode.CAPTURE)
     manager.emit_pipeline_start(targets=["item_id"], batch_size=2)
     manager.emit_pipeline_end(total_batches=1, total_duration=0.01)
 

@@ -6,11 +6,12 @@ from ..._internal.loggingx import format_kv, get_logger, prefix
 from ..._internal.utils.iterables import ordered_unique_str
 from ...ob.hub import InstrumentationHub
 from ...sinks import ExcelWorkbookSink, IRowSink
-from ...typedefs import KeyNormalizationMode, normalize_failure_policy
+from ...typedefs import KeyNormalizationMode
 from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import AggregatingRowSink
 from ..managed_artifacts import MANAGED_ARTIFACT_KIND_CSV, ManagedArtifactPlan
 from ..output_contracts import ExportLayout, OutputSpec
+from .policy import parse_output_failure_policy
 from .router import FinalTargetState, RouterRowSink, RouteState
 from .sinks import RowCounter, create_row_sink_for_composed_output
 from .specs import (
@@ -53,7 +54,7 @@ class OutputCompositionPlan:
 
 
 def normalize_output_failure_policy(failure_policy: object) -> str:
-    return normalize_failure_policy(failure_policy, label="output_composition.failure_policy")
+    return parse_output_failure_policy(failure_policy)
 
 
 def validate_excel_workbook_sheet_names(spec: OutputCompositionSpec) -> None:

@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 
+from ..._internal.utils.loader_result import LoaderResultPolicy, parse_loader_result_policy
 from ...events import EventType
 from ...events._events import LoaderCallEvent
 from ...hooks import HookManager
@@ -27,10 +28,11 @@ class HookCaptureManager(HookManager):
     _recorded_events: List[HookRecordedEvent]
 
     def __init__(self, source: HookManager) -> None:
+        normalized_loader_result_policy = parse_loader_result_policy(str(source.loader_result_policy))
         super().__init__(
             enable_debugging=source.debug_mode,
             fallback_logger_enabled=source.fallback_logger_enabled,
-            loader_result_policy=source.loader_result_policy,
+            loader_result_policy=LoaderResultPolicy(normalized_loader_result_policy),
             loader_result_sample_size=source.loader_result_sample_size,
         )
         # 仅复用原始 `hook` 实例用于订阅发现;捕获模式下不进行分发调用.

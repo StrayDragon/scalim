@@ -7,7 +7,7 @@ from scalim.events import (
     get_event_catalog,
     get_event_catalog_map,
 )
-from scalim.ob import ObservabilityOptions
+from scalim.ob import LoaderResultPolicy, ObservabilityOptions
 
 
 def test_event_type_values_are_stable() -> None:
@@ -44,16 +44,16 @@ def test_event_catalog_works_with_event_type_enum_members() -> None:
 
 
 def test_observability_options_validation_is_fail_fast() -> None:
-    with pytest.raises(ValueError, match=r"ObservabilityOptions\.loader_result_policy"):
-        ObservabilityOptions(loader_result_policy="bogus")
+    with pytest.raises(TypeError, match=r"ObservabilityOptions\.loader_result_policy"):
+        ObservabilityOptions(loader_result_policy="bogus")  # type: ignore[arg-type]
 
     with pytest.raises(ValueError, match=r"ObservabilityOptions\.loader_result_sample_size"):
         ObservabilityOptions(loader_result_sample_size=0)
 
 
 def test_observability_options_normalizes_fields() -> None:
-    opts = ObservabilityOptions(loader_result_policy="FULL", loader_result_sample_size=2.0)
-    assert opts.loader_result_policy == "full"
+    opts = ObservabilityOptions(loader_result_policy=LoaderResultPolicy.FULL, loader_result_sample_size=2.0)
+    assert opts.loader_result_policy == LoaderResultPolicy.FULL
     assert opts.loader_result_sample_size == 2
 
 

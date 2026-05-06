@@ -4,7 +4,7 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from .._internal.utils.loader_result import LoaderResultPolicyLike, LoaderResultPolicyValue
+from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
 from ..events import Event
 from ..events._events import (
     BatchEndEvent,
@@ -187,7 +187,7 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
         self,
         enable_debugging: bool = False,  # noqa: FBT001, FBT002
         fallback_logger_enabled: bool = False,  # noqa: FBT001, FBT002
-        loader_result_policy: LoaderResultPolicyLike = "full",
+        loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL,
         loader_result_sample_size: int = 5,
         dispatch_strategy: Optional[HookDispatchStrategy] = None,
     ) -> None:

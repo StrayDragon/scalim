@@ -15,7 +15,7 @@ from ....execution.guardrails import GuardrailsPolicy
 from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesSpec, LoaderRetryPolicy, LoaderRetryPolicySpec
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir import DemandIr
-from ....typedefs import FailurePolicy
+from ....typedefs import parse_failure_policy
 from ....vendor.dataclassesx import replace
 from .._internal import resource_override as _resource_override_ssot
 from .._internal.config_parsing.loader import YamlDemandLoader
@@ -66,9 +66,6 @@ def validate_allowlist(
     _ensure_allowlist(allowed_modules, allowed_functions)
 
 
-_DEMAND_FAILURE_POLICIES: Tuple[str, ...] = (FailurePolicy.ALL_FAIL, FailurePolicy.PRIMARY_ONLY)
-
-
 def _parse_overrides_outputs_defaults_book_id(defaults: Optional[object], *, path: str) -> Optional[str]:
     return _resource_override_ssot.parse_outputs_defaults_book_id(defaults, path=str(path))
 
@@ -98,11 +95,8 @@ def _apply_demand_runtime_policy_overrides(config: DemandConfig, *, options: Dem
             next_config = replace(next_config, batch_size=int(raw))
 
     if options.runtime.demand_failure_policy is not None:
-        normalized = str(options.runtime.demand_failure_policy or "").strip()
-        if normalized not in _DEMAND_FAILURE_POLICIES:
-            msg = "demand_failure_policy={!r} is invalid; expected one of: {}".format(normalized, ", ".join(_DEMAND_FAILURE_POLICIES))
-            raise ValueError(msg)
-        next_config = replace(next_config, failure_policy=str(normalized))
+        failure_policy = parse_failure_policy(options.runtime.demand_failure_policy, label="demand_failure_policy")
+        next_config = replace(next_config, failure_policy=failure_policy)
 
     demand_diagnostics = options.runtime.demand_diagnostics
     if demand_diagnostics is not None:

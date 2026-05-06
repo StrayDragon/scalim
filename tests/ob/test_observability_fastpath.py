@@ -1,5 +1,7 @@
+from scalim._internal.utils.loader_result import LoaderResultPolicy
 from scalim.events import EventType
 from scalim.hooks import BaseHook, HookManager
+from scalim.ob._internal.common import ObserverManagerMode
 from scalim.ob.observer import Observer
 from scalim.ob.manager import ObserverManager
 
@@ -31,12 +33,12 @@ class _CaptureObserver(Observer):
 
 
 def test_hook_manager_fastpath_skips_loader_sampling_when_no_hooks() -> None:
-    manager = _ExplodingSampleHookManager(loader_result_policy="sample", loader_result_sample_size=1)
+    manager = _ExplodingSampleHookManager(loader_result_policy=LoaderResultPolicy.SAMPLE, loader_result_sample_size=1)
     manager.trigger_loader_call("loader", {}, [1, 2, 3], 0.1)
 
 
 def test_observer_manager_fastpath_skips_loader_sampling_when_no_observers() -> None:
-    manager = _ExplodingSampleObserverManager(loader_result_policy="sample", loader_result_sample_size=1)
+    manager = _ExplodingSampleObserverManager(loader_result_policy=LoaderResultPolicy.SAMPLE, loader_result_sample_size=1)
     manager.emit_loader_call("loader", {}, [1, 2, 3], 0.1)
 
 
@@ -57,7 +59,7 @@ def test_observer_manager_subscription_cache_gates_typed_emits() -> None:
 
 
 def test_observer_manager_capture_mode_still_records_typed_events() -> None:
-    manager = ObserverManager(mode="capture")
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE)
     manager.emit_pipeline_start(targets=["x"], batch_size=1)
     events = manager.drain_events()
     assert len(events) == 1

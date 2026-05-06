@@ -5,6 +5,7 @@ from scalim.events import EventType
 from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook, HookManager
+from scalim.ob._internal.common import ObserverManagerMode
 from scalim.ob.manager import ObserverManager
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir import DemandIr
@@ -69,7 +70,7 @@ def test_scalim_engine_run_is_serialized_per_instance() -> None:
 
 
 def test_observer_manager_capture_drain_and_emit_are_thread_safe() -> None:
-    manager = ObserverManager(mode="capture", max_recorded_events=None)
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE, max_recorded_events=None)
 
     start = threading.Barrier(2)
     done = threading.Event()

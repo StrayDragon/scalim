@@ -5,6 +5,7 @@ import pytest
 
 from scalim_benchlib import BenchmarkRunner
 from scalim._project_constants import ENV_BENCH_SCALE, ENV_BENCH_SCOPE
+from scalim._internal.utils.loader_result import LoaderResultPolicy
 from scalim.events import EventType
 from scalim.hooks import HookManager
 from scalim.ob.hub import InstrumentationHub
@@ -56,12 +57,12 @@ def _make_runner(scenario: str, iters: int) -> Callable[[], int]:
         result = list(range(1000))
         hook_manager = HookManager(
             fallback_logger_enabled=False,
-            loader_result_policy="sample",
+            loader_result_policy=LoaderResultPolicy.SAMPLE,
             loader_result_sample_size=5,
         )
         observer_manager = ObserverManager(
             fallback_logger_enabled=False,
-            loader_result_policy="sample",
+            loader_result_policy=LoaderResultPolicy.SAMPLE,
             loader_result_sample_size=5,
         )
 

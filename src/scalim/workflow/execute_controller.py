@@ -33,7 +33,7 @@ from ..spec.ir._workflow import (
     WorkflowNodeType,
     WriteSheetNodeIr,
 )
-from ..typedefs import FailurePolicy, normalize_failure_policy
+from ..typedefs import FailurePolicy, parse_failure_policy
 from ..vendor.compact.typing_extensionsx import Protocol
 from ..vendor.dataclassesx import dataclass, field
 from ._internal.replay_event_classification import (
@@ -313,7 +313,7 @@ class WorkflowRunController:
             remaining_prereqs=remaining_prereqs,
             prereq_failed=prereq_failed,
             max_concurrency=int(max_concurrency),
-            failure_policy=normalize_failure_policy(
+            failure_policy=parse_failure_policy(
                 failure_policy,
                 label="workflow_runtime_options.execution.failure_policy",
             ),

@@ -39,7 +39,7 @@ Sources:
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
 | `scalim.execution` | 7 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
-| `scalim.ob` | 2 | 可观测性入口 | 构建 observer manager / 采集事件 |
+| `scalim.ob` | 5 | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 12 | 事件envelope+事件类型入口+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
 | `scalim.events.type_groups` | 15 | 事件类型分组视图 | 按主题探索 `EventType`(不引入新值) |
 | `scalim.sinks` | 15 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
@@ -310,12 +310,15 @@ from scalim.execution import (
 
 #### `scalim.ob`
 
-- Export count: `2`
+- Export count: `5`
 
 ```python
 from scalim.ob import (
+    CaptureOverflowPolicy,
+    LoaderResultPolicy,
     Observability,
     ObservabilityOptions,
+    ObserverManagerMode,
 )
 ```
 

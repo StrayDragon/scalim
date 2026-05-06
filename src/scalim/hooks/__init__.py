@@ -4,6 +4,7 @@
 - `from scalim.hooks import HookManager, BaseHook`
 """
 
+from .._internal.utils.loader_result import LoaderResultPolicy
 from .api import (
     HOOK_RAISED_EXCEPTION_WARNING,
     BaseHook,
@@ -23,5 +24,6 @@ __all__ = (
     "HookDispatchStrategy",
     "HookManager",
     "IExecutionHook",
+    "LoaderResultPolicy",
     "PreUseBatchSizeDecision",
 )

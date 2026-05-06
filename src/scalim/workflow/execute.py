@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
 
 from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
-from .._internal.utils.loader_result import normalize_loader_result_policy
+from .._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
 from ..events import (
     Event,
     generate_run_id,
@@ -36,7 +36,7 @@ from ..spec.ir._workflow import (
     WorkflowNodeIr,
     WriteSheetNodeIr,
 )
-from ..typedefs import FailurePolicy, normalize_failure_policy
+from ..typedefs import FailurePolicy, parse_failure_policy
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
 from . import input_artifacts as _input_artifacts_module
@@ -409,7 +409,7 @@ def _prepare_workflow_run_ir(
     _validate_workflow_ctx_refs(workflow_ir, ctx_store=ctx_store)
 
     max_concurrency = int(workflow_ir.options.max_concurrency)
-    failure_policy = normalize_failure_policy(workflow_ir.options.failure_policy, label="workflow.options.failure_policy")
+    failure_policy = parse_failure_policy(workflow_ir.options.failure_policy, label="workflow.options.failure_policy")
     workflow_wall_start_ts = time.time()
 
     workflow_observer_manager: Optional[ObserverManager] = None
@@ -430,8 +430,8 @@ def _prepare_workflow_run_ir(
             workflow_replay_instrumentation = workflow_instrumentation
             capture_hook_manager = HookCaptureManager(workflow_instrumentation.hook_manager)
             capture_observer_manager = workflow_observer_manager.create_capture_manager()
-            capture_hook_manager.loader_result_policy = normalize_loader_result_policy("summary")
-            capture_observer_manager.loader_result_policy = normalize_loader_result_policy("summary")
+            capture_hook_manager.loader_result_policy = normalize_loader_result_policy(LoaderResultPolicy.SUMMARY)
+            capture_observer_manager.loader_result_policy = normalize_loader_result_policy(LoaderResultPolicy.SUMMARY)
             capture_observer_manager.max_recorded_events = None
             workflow_instrumentation = InstrumentationHub(
                 hook_manager=capture_hook_manager,
@@ -583,7 +583,7 @@ def _execute_workflow_run(
     run_ir_fn: Callable[..., ExecutionResult],
 ) -> Tuple[List[WorkflowRunOutcome], Optional[WorkflowRunOutcome], Optional[BaseException]]:
     max_concurrency = int(prepared.max_concurrency)
-    failure_policy = normalize_failure_policy(prepared.failure_policy, label="workflow.options.failure_policy")
+    failure_policy = prepared.failure_policy
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrency) as executor:
         controller = WorkflowRunController.build_for_prepared_run(
             executor=executor,

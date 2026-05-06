@@ -1,10 +1,11 @@
 import pytest
 
+from scalim.ob._internal.common import ObserverManagerMode
 from scalim.ob.manager import ObserverManager
 
 
 def test_observer_manager_mode_normalizes_and_rejects_invalid_values_cover_branches() -> None:
-    manager = ObserverManager(mode=" CAPTURE ")
+    manager = ObserverManager(mode=ObserverManagerMode.CAPTURE)
     assert manager.mode == "capture"
 
     state = ObserverManager().__getstate__()
@@ -13,11 +14,11 @@ def test_observer_manager_mode_normalizes_and_rejects_invalid_values_cover_branc
     restored.__setstate__(state)
     assert restored.mode == "process"
 
-    with pytest.raises(TypeError, match="observer_manager.mode must be a str"):
+    with pytest.raises(TypeError, match=r"observer_manager\.mode must be a ObserverManagerMode"):
         _ = ObserverManager(mode=1)  # type: ignore[arg-type]
 
-    with pytest.raises(ValueError, match="observer_manager.mode must not be empty"):
-        _ = ObserverManager(mode="   ")
+    with pytest.raises(TypeError, match=r"observer_manager\.mode must be a ObserverManagerMode"):
+        _ = ObserverManager(mode="   ")  # type: ignore[arg-type]
 
-    with pytest.raises(ValueError, match="Unknown observer_manager.mode"):
-        _ = ObserverManager(mode="nope")
+    with pytest.raises(TypeError, match=r"observer_manager\.mode must be a ObserverManagerMode"):
+        _ = ObserverManager(mode="nope")  # type: ignore[arg-type]

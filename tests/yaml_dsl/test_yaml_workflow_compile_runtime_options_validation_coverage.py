@@ -51,7 +51,7 @@ def test_workflow_compile_normalize_and_validate_execution_options_rejects_inval
             WorkflowExecutionOptions(max_concurrency=1, failure_policy=1)  # type: ignore[arg-type]
         )
 
-    with pytest.raises(ValueError, match="workflow_runtime_options.execution.failure_policy must be one of"):
+    with pytest.raises(ValueError, match=r"Unknown workflow_runtime_options\.execution\.failure_policy"):
         workflow_compile_mod._normalize_and_validate_workflow_execution_options(  # noqa: SLF001
             WorkflowExecutionOptions(max_concurrency=1, failure_policy="nope")
         )

@@ -19,6 +19,7 @@ from scalim.events._events import (
     StageSpanEvent,
 )
 from scalim.events import Event, EventType, get_event_catalog, get_event_catalog_map
+from scalim.ob._internal.common import ObserverManagerMode
 from scalim.ob.observability import Observability
 from scalim.ob.observer import EventDispatchObserver, Observer
 from scalim.ob.manager import (
@@ -647,7 +648,7 @@ def test_observer_manager_debug_mode_raises() -> None:
 
 def test_observer_manager_unregister_clear_and_drain() -> None:
     observer = _CaptureObserver()
-    manager = ObserverManager(observers=[observer], mode="capture")
+    manager = ObserverManager(observers=[observer], mode=ObserverManagerMode.CAPTURE)
 
     manager.emit_event(EventType.PIPELINE_START, PipelineStartEvent(targets=["x"], batch_size=1))
     assert manager.drain_events()

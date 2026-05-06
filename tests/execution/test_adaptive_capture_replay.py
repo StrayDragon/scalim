@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Set
 
 import pytest
 
+from scalim._internal.utils.loader_result import LoaderResultPolicy
 from scalim.events import EventType
 from scalim.events._events import BatchStartEvent
 from scalim.execution.adaptive.capture import HookCaptureManager
@@ -52,14 +53,16 @@ def test_hook_capture_manager_emit_typed_gates_and_records() -> None:
 @pytest.mark.parametrize(
     "policy,sample_size,result,expected",
     [
-        ("full", 2, list(range(10)), list(range(10))),
-        ("none", 2, list(range(10)), None),
-        ("summary", 2, list(range(10)), {"type": "list", "size": 10}),
-        ("sample", 2, list(range(10)), [0, 1]),
+        (LoaderResultPolicy.FULL, 2, list(range(10)), list(range(10))),
+        (LoaderResultPolicy.NONE, 2, list(range(10)), None),
+        (LoaderResultPolicy.SUMMARY, 2, list(range(10)), {"type": "list", "size": 10}),
+        (LoaderResultPolicy.SAMPLE, 2, list(range(10)), [0, 1]),
     ],
     ids=["full", "none", "summary", "sample"],
 )
-def test_hook_capture_manager_trigger_loader_call_policies(policy: str, sample_size: int, result: Any, expected: Any) -> None:
+def test_hook_capture_manager_trigger_loader_call_policies(
+    policy: LoaderResultPolicy, sample_size: int, result: Any, expected: Any
+) -> None:
     source = HookManager(loader_result_policy=policy, loader_result_sample_size=sample_size)
     source.register(_LoaderCallHook())
     capture = HookCaptureManager(source)

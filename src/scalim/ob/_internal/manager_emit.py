@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
 
 from ..._internal.loggingx import format_kv, prefix
-from ..._internal.utils.loader_result import LoaderResultPolicyValue, normalize_loader_result_policy
+from ..._internal.utils.loader_result import LOADER_RESULT_POLICY_VALUES, LoaderResultPolicyValue, parse_loader_result_policy
 from ...events import (
     WORKFLOW_ATTRIBUTION_META_KEYS,
     Event,
@@ -217,8 +217,8 @@ class ObserverManagerEmitMixin(ABC):
             return
         payload = result
         policy = self.loader_result_policy
-        if policy not in ("full", "none", "summary", "sample"):
-            policy = normalize_loader_result_policy(policy)
+        if policy not in LOADER_RESULT_POLICY_VALUES:
+            policy = parse_loader_result_policy(policy)
             self.loader_result_policy = policy
         if policy == "none":
             payload = None

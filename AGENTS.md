@@ -27,6 +27,12 @@
   - `# pragma: allow-cast-file ...` (cast-usage gate exceptions; see `scripts/check-cast-usage.py`)
 - **Skills extraction markers**: do not remove `# region SCALIM-SKILL:<tag>` / `# endregion` markers (used for automated skill example extraction).
 - **Privacy**: do not quote, enumerate, or summarize the contents of `.tmp/known-outer-paths-using-this-package.txt`; only reference the file path.
+- **Policy SSOT (closed sets)**:
+  - For policy-like values that are a closed set and cross boundaries (state/pickle/JSON/YAML/config), the **single source of truth MUST be an Enum (`StrEnum`)**.
+  - Do **NOT** maintain duplicated allowed-value definitions (e.g. `StrEnum` **and** `Literal[...]` lists) for the same policy.
+  - **Public API (strict in)**: constructors/options exposed to users MUST accept the Enum only (fail-fast on string literals).
+  - **Config/state inputs (wide in)**: YAML/JSON/state/pickle MAY provide builtin `str`; code MUST validate/normalize via the Enum SSOT and then store the canonical builtin `str` value.
+  - **Outputs (stable out)**: any state/wire representation MUST emit builtin `str` (from `.value`); never serialize Enum instances or `str` subclasses.
 
 ## Pointers (keep this file small)
 - Project/code reading map: `docs/doc/getting-started/reading-guide.md`

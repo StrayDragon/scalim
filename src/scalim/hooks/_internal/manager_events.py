@@ -3,6 +3,7 @@ from abc import ABC
 from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple, TypeVar
 
 from ..._internal.loggingx import format_kv, prefix
+from ..._internal.utils.loader_result import LOADER_RESULT_POLICY_VALUES, parse_loader_result_policy
 from ...events import (
     Event,
     EventType,
@@ -152,8 +153,8 @@ class HookManagerEventMixin(HookManagerBase, ABC):
 
         payload: Any = result
         policy = manager.loader_result_policy
-        if policy not in ("full", "none", "summary", "sample"):
-            policy = self._normalize_loader_result_policy(policy)
+        if policy not in LOADER_RESULT_POLICY_VALUES:
+            policy = parse_loader_result_policy(policy)
             manager.loader_result_policy = policy
         if policy == "none":
             payload = None

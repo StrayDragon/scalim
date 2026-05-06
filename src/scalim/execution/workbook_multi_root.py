@@ -22,7 +22,7 @@ def run_multi_root_workbook(
     *,
     output_path: str,
     runs: Sequence[Tuple[str, DemandIr, ExecutionRequest]],
-    failure_policy: str = "all_fail",
+    failure_policy: FailurePolicy = FailurePolicy.ALL_FAIL,
 ) -> List[ExecutionResult]:
     """将多个独立 `demand` 依次写入同一 `workbook`(多根数据源 `sheet` 集合).
 

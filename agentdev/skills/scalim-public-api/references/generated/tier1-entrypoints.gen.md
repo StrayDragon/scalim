@@ -202,10 +202,13 @@
 - desc: 可观测性入口
 - scenario: 构建 observer manager / 采集事件
 - marker: `src/scalim/ob/__init__.py:3`
-- source: `src/scalim/ob/__init__.py:7`
-- exports (`__all__`, tuple, count=2):
+- source: `src/scalim/ob/__init__.py:9`
+- exports (`__all__`, tuple, count=5):
+  - `CaptureOverflowPolicy`
+  - `LoaderResultPolicy`
   - `Observability`
   - `ObservabilityOptions`
+  - `ObserverManagerMode`
 
 ### `scalim.events` (order=110)
 - desc: 事件envelope+事件类型入口+事件目录查询入口
