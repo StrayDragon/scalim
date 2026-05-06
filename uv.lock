@@ -12,7 +12,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-04-27T12:17:46.327576388Z"
+exclude-newer = "2026-04-29T06:54:30.819285166Z"
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
@@ -3197,7 +3197,7 @@ wheels = [
 
 [[package]]
 name = "scalim"
-version = "0.9.14"
+version = "0.9.15"
 source = { editable = "." }
 dependencies = [
     { name = "typing-extensions" },
@@ -3297,12 +3297,12 @@ dev = [
 
 [[package]]
 name = "scalim-benchlib"
-version = "0.9.14"
+version = "0.9.15"
 source = { editable = "packages/scalim-benchlib" }
 
 [[package]]
 name = "scalim-cli"
-version = "0.9.14"
+version = "0.9.15"
 source = { editable = "packages/scalim-cli" }
 dependencies = [
     { name = "jsonschema" },
@@ -3317,7 +3317,7 @@ requires-dist = [
 
 [[package]]
 name = "scalim-misc"
-version = "0.9.14"
+version = "0.9.15"
 source = { editable = "packages/scalim-misc" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -3336,7 +3336,7 @@ requires-dist = [
 
 [[package]]
 name = "scalim-yaml-dsl-lsp"
-version = "0.9.14"
+version = "0.9.15"
 source = { editable = "packages/scalim-yaml-dsl-lsp" }
 dependencies = [
     { name = "pygls" },
