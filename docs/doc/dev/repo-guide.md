@@ -6,4 +6,4 @@
 
 相关新提案(需求)迭代唯一准则
 
-- [openspec/config.yaml](#code=openspec/config.yaml)
+- [llmanspec/config.yaml](#code=llmanspec/config.yaml)

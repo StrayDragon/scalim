@@ -107,7 +107,7 @@ def _parse_args() -> argparse.Namespace:
     mode.add_argument("--apply", action="store_true", help="Apply sanitization in-place.")
     parser.add_argument(
         "--root",
-        help="Target directory to sanitize (default: repo's openspec/ when present).",
+        help="Target directory to sanitize (default: repo's llmanspec/ when present).",
     )
     parser.add_argument(
         "--rules",
@@ -189,7 +189,7 @@ def _resolve_rule_paths(args: argparse.Namespace, root: Path, repo_root: Path) -
         elif not args.local_rules and not _env_var_is_truthy("CI"):
             print(
                 "[warn] 未找到可选本地规则文件 `sanitize_rules.local.yaml`; 当前仅应用公共规则. "
-                "若存在组织/私有字面量,请在 `openspec/sanitize_rules.local.yaml` 中补充规则后重试.",
+                "若存在组织/私有字面量,请在 `llmanspec/sanitize_rules.local.yaml` 中补充规则后重试.",
                 file=sys.stderr,
             )  # force-en
 
@@ -206,7 +206,7 @@ def _resolve_rule_paths(args: argparse.Namespace, root: Path, repo_root: Path) -
 def main() -> int:
     args = _parse_args()
     repo_root = Path(__file__).resolve().parents[1]
-    default_root = repo_root / "openspec"
+    default_root = repo_root / "llmanspec"
     root = Path(args.root).resolve() if args.root else (default_root if default_root.exists() else repo_root)
 
     if not root.exists() or not root.is_dir():

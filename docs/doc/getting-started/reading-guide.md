@@ -19,13 +19,13 @@
 - 测试: `tests/` (pytest) + `tests/bench/` (benchmark-only)
 - 示例与数据: `notebooks/` (marimo) + `packages/scalim-misc/src/scalim_misc/`
 - 文档站点: `docs/doc/` (manual + `*.gen.*`) + `docs/zensical.toml`
-- 规范与变更: `openspec/specs/` + `openspec/changes/`
+- 规范与变更: `llmanspec/specs/` + `llmanspec/changes/`
 
 ## 1. 先读哪些文档(避免迷路)
 
 - [`AGENTS.md`](#code=AGENTS.md): 仓库协作约定与硬边界(唯一准则)
-- [架构详解](../architecture/arch.md): 架构分层与主要流程图;实现细节与行为约束会指向 `openspec/`
-- [OpenSpec 规范](../specs/index.md): 更接近“规范/约束”的描述,适合在改行为前先对齐预期
+- [架构详解](../architecture/arch.md): 架构分层与主要流程图;实现细节与行为约束会指向 `llmanspec/`
+- [llmanspec 规范](../specs/index.md): 更接近“规范/约束”的描述,适合在改行为前先对齐预期
 - [SSOT / 生成物 / 门禁地图](../dev/ssot-map.md): 统一查表“改哪里/跑哪个生成入口/哪个门禁会拦”
 - [主线教程: demo_big_data_report](demo-big-data-report.md): 从一个稳定 demo 入口跑起来/对拍/排错(面向 CI 与日常开发)
 

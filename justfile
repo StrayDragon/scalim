@@ -178,61 +178,45 @@ gen-public-api-jump-imports:
 gen-public-api-exports-catalog:
     uv {{ UV_OPTIONS }} run python scripts/gen-public-api-exports-catalog.py
 
-# 工具: `openspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认强制 apply)
-openspec-sanitize:
-    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
+# 工具: `llmanspec/` 脱敏 (自动叠加本地 `sanitize_rules.local.yaml`; 默认强制 apply)
+llmanspec-sanitize:
+    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root llmanspec
 
-# 检查: `openspec/` 脱敏 (dry-run; 若存在命中则失败)
-openspec-sanitize-check:
+# 检查: `llmanspec/` 脱敏 (dry-run; 若存在命中则失败)
+llmanspec-sanitize-check:
     #!/usr/bin/env bash
     set -euo pipefail
     set +e
-    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root openspec
+    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root llmanspec
     rc=$?
     set -e
     if [ "$rc" -ne 0 ]; then
         echo ""
-        echo "[error] openspec sanitize check failed; run: just openspec-sanitize" >&2
+        echo "[error] llmanspec sanitize check failed; run: just llmanspec-sanitize" >&2
         exit "$rc"
     fi
 
-# 检查: OpenSpec 提案/规范的脱敏与结构校验 (自动叠加本地 `sanitize_rules.local.yaml`; 缺失时脚本仅在非 CI 告警)
+# 检查: llmanspec 提案/规范的脱敏与结构校验 (自动叠加本地 `sanitize_rules.local.yaml`; 缺失时脚本仅在非 CI 告警)
 #
 # 注意:
 # - 本 gate 默认严格检查：若发现命中，将自动 apply 脱敏并失败退出（避免敏感字面量继续停留在工作区/产物中）。
-openspec-check:
+llmanspec-check:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    set +e
-    uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root openspec
-    rc=$?
-    set -e
-    if [ "$rc" -eq 1 ]; then
-        echo "" >&2
-        echo "[error] openspec sanitize check failed; applying sanitize in-place..." >&2
-        uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root openspec
-        echo "" >&2
-        echo "[error] sanitization applied; please review & commit changes, then rerun: just openspec-check" >&2
-        exit 1
-    fi
-    if [ "$rc" -ne 0 ]; then
-        exit "$rc"
-    fi
-
-    if command -v openspec >/dev/null 2>&1; then
-        uv {{ UV_OPTIONS }} run openspec validate --all --strict --no-interactive
+    if command -v llman >/dev/null 2>&1; then
+        llman sdd validate --all --strict --no-interactive
         exit 0
     fi
 
     ci_value="$(printf '%s' "${CI:-}" | tr '[:upper:]' '[:lower:]')"
     case "$ci_value" in
         ""|0|false|no|off)
-            echo "[error] openspec CLI not found; install it before running openspec-check." >&2
+            echo "[error] llman CLI not found; install it before running llmanspec-check." >&2
             exit 2
             ;;
         *)
-            echo "[warn] openspec CLI not found in CI; skipping openspec validate --all --strict --no-interactive." >&2
+            echo "[warn] llman CLI not found in CI; skipping llman sdd validate --all --strict --no-interactive." >&2
             exit 0
             ;;
     esac
@@ -796,7 +780,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
-quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check openspec-check
+quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check
 
 # QA: 仅py轻量的检查
 quick-check-only-py: quick-check-only-py-no-test-gate test-gate

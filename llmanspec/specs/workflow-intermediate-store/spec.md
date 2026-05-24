@@ -1,0 +1,40 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate workflow-intermediate-store --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "workflow-intermediate-store"
+purpose: "TBD - created by archiving change c15-workflow-intermediate-store-optimizations. Update Purpose after archive."
+requirements[8]{req_id,title,statement}:
+  r1,workflow intermediate store MUST support a typed row artifact (`InMemoryRows`),"当 workflow 需要在节点之间传递“纯 Python 数据”（而不是强制落盘/字符串化）时，系统 MUST 支持一个稳定的 typed 中间态结构 `InMemoryRows`： - `InMemoryRows` MUST 是一个明确的表结构（而不是任意 `object` 图），避免把 workflow 变成“随便塞对象”的隐式耦合点。 - `InMemoryRows` 的值域 MUST 限制在框架既有的 `FieldValue` 口径（例如 `int/float/Decimal/str/bool/None`），以保证： - 与现有 sinks 的类型语义可对齐（尤其是 workbook 写入） - 失败诊断与序列化/日志输出的可控性 - `InMemoryRows` MUST 采用稳定结构（与 `InMemoryCsv` 类似但值域为 typed）： - `header: list[str]`（字段顺序 SSOT） - `rows: list[list[FieldValue]]`（每行 MUST 与 `header` 等长，列序一致）"
+  r2,`InMemoryRows` and `InMemoryCsv` MUST be independent artifacts (no contract coup,"`InMemoryRows` 与 `InMemoryCsv` 面向不同消费场景，它们的约束 MUST 互不干扰： - 系统 MUST NOT 因引入 `InMemoryRows` 而改变 `InMemoryCsv` 的既定语义（`list[str]` + `list[list[str]]` + `CSVSink` 等价字符串化）。 - 系统 MAY 在需要时提供显式转换（见下），但 MUST NOT 将“自动生成另一份 artifact”设为硬依赖（避免双份数据常驻导致峰值翻倍）。"
+  r3,workflow runtime MUST support pure Python dataflow (source) by wiring `InMemoryR,"workflow runtime MUST 支持将上游节点产生的 `InMemoryRows` 作为下游 demand 节点的 `main_rows` 输入（形成 workflow 内部的数据流/源传递）： - 该 wiring MUST 是显式声明/显式授权（allowlist），避免隐式推断导致数据边界失控。 - 该能力 MUST NOT 放宽 standalone demand 的既有校验/失败语义,仅用于 workflow 托管场景。"
+  r4,"workflow YAML MUST expose `main_rows_from` and compile-time validate explicit de","系统 MUST 在 workflow YAML authoring surface 中暴露一个显式 wiring 字段,用于声明“本节点的 `main_rows` 来自上游节点的 `InMemoryRows`”： - 字段: `workflow.runs[*].main_rows_from` - 结构: mapping,至少包含 `run: <producer_run_id>` 当该字段存在时，workflow 编译期 MUST fail-fast 校验： - producer `run_id` MUST 存在 - consumer MUST 显式 `depends_on` producer（避免隐式可见性/执行顺序推断）"
+  r5,execution orchestration MUST pass `main_rows` through `run_ir`,"系统 MUST 支持把 workflow wiring 得到的行流注入到 demand 执行边界： - by `run_ir` 组装的 `engine.run(...)` 调用 MUST 透传 `main_rows`（当其被显式提供时） - 当 `main_rows` 被提供时，系统 MUST NOT 触发 main source loader（避免“注入了但仍加载主源”的双重输入）"
+  r6,workflow MUST capture and release `InMemoryRows` only for referenced producers,"为避免无意间常驻大对象，系统 MUST 以“显式引用”为基准启用 typed rows 捕获与生命周期管理： - 当且仅当某个 producer run_id 被至少一个 consumer 通过 `main_rows_from` 引用时，producer 才 MUST 启用 `InMemoryRows` 捕获与发布 - workflow artifacts 中该 typed artifact 的 `artifact_id` MUST 为稳定值 `in_memory_rows` - workflow MUST 在“最后一个 consumer 节点结束（done/failed/cancelled 皆视为不再消费）”后释放该 artifact（discard）"
+  r7,conversion from `InMemoryRows` to `InMemoryCsv` MUST be explicit and stable,"当某些 consumer 需要“CSV 等价语义”（例如复用现有 `csv_append`/基于 CSV 的对齐逻辑）时，系统 MAY 提供从 `InMemoryRows` 转换到 `InMemoryCsv` 的显式转换工具/适配层，但该转换 MUST 稳定且可审计： - 转换 MUST 保留 `header` 字段顺序 - 转换 MUST 对每个 value 采用与 `CSVSink` 等价的规范化： - `None` -> `\"\"` - 其余 -> `str(value)`"
+  r8,workflow typed rows artifact MUST have a stable public import path,"系统 MUST 为 workflow typed rows artifact `InMemoryRows` 提供稳定的公开导入路径,并避免跨层绑定内部实现模块路径。 约束: - `InMemoryRows` MUST 可从稳定 facade 子模块导入(固定为 `scalim.sinks.rows`)。 - 该稳定 facade SHOULD 同时导出 `InMemoryRows` 的必要配套类型/工具(例如 `InMemoryRowsSink`/`in_memory_rows_to_in_memory_csv`/`iter_in_memory_rows_as_main_rows`),作为一组成熟可用入口。 - workflow runtime 与 execution orchestration MUST NOT 直接依赖 `IMPL_ROOT.sinks._internal.*` 路径获取该类型(内部路径可变,非契约)。"
+scenarios[16]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"workflow-publishes-typed-rows-as-a-stable-table-artifact",workflow 节点 A 需要把 typed 表数据作为中间态传递给下游节点,A 发布一个 `InMemoryRows` artifact,`InMemoryRows` MUST 以 `header` + `rows` 的稳定表结构呈现
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"inmemoryrows-does-not-change-inmemorycsv-semantics-and-does-",workflow 托管场景下存在一个内存 CSV 等价 artifact `InMemoryCsv`（实现细节；不再通过 pathless CSV authoring surface 触发）,workflow 同时启用/使用 `InMemoryRows`,`InMemoryCsv` 的既定语义 MUST 保持不变（字符串化表结构，与 `CSVSink` 规范化等价）
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"downstream-demand-consumes-upstream-typed-rows-as-main-rows",workflow 节点 A 产出 `InMemoryRows`（typed）,B 执行,B MUST 在不落盘/不字符串化的前提下消费该数据（仍遵守既有执行/并发/可观测性边界）
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"missing-depends-on-fails-fast","workflow 节点 B 配置 `main_rows_from.run = \"A\"`","B 未在 `depends_on` 中声明 `\"A\"`","workflow 编译 MUST fail-fast"
+  r5,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r5,"providing-main-rows-bypasses-main-source-loader",本次运行显式提供 `main_rows`,执行 `run_ir`,main source loader MUST NOT 被调用
+  r6,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r6,"release-typed-rows-after-final-consumer-ends",producer 节点 A 的 `in_memory_rows` 被多个 consumer 引用,最后一个 consumer 节点结束,workflow MUST discard A 的 `in_memory_rows` artifact
+  r7,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r7,"explicit-conversion-preserves-header-order-and-normalizes-va",一个 `InMemoryRows` typed 表（包含 `None` 与非字符串类型值）,调用方显式请求将其转换为 `InMemoryCsv`,`header` 字段顺序 MUST 保持不变
+  r8,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r8,"inmemoryrows-is-importable-from-a-stable-facade-module","",调用方从 `scalim.sinks.rows` 导入 `InMemoryRows`,导入 MUST 成功且类型与 runtime 实际使用的 typed rows artifact 一致
+```

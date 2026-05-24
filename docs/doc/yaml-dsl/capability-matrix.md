@@ -116,5 +116,5 @@
 
 1) **先把“缺口”分类**: 哪些是“执行环境参数”(更适合 CLI/Python options),哪些是“需求本体”(更适合 YAML/IR)。
 2) **优先补最小可迁移面**: 例如把 `FieldPresentationIr` 先收敛成一小组 YAML 可表达的 `presentation` 子集(Excel number_format/width/align),其余仍 Python-only。
-3) **复杂装配保持 Python-only,但做稳定扩展点**: 例如为 outputs 引入受控 `extensions` 或把更多 derived targets 以 OpenSpec changes 逐步落地到 YAML,避免一次性暴露完整 IR。
+3) **复杂装配保持 Python-only,但做稳定扩展点**: 例如为 outputs 引入受控 `extensions` 或把更多 derived targets 以 llmanspec changes 逐步落地到 YAML,避免一次性暴露完整 IR。
 4) **把 “Not in YAML” 的运行期参数在 CLI/教程里显式化**: 例如 `parallel_mode/max_workers/init_vars` 的推荐默认值与可复现策略。

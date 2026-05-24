@@ -836,7 +836,7 @@ class OutputTargetConfig:
     SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
         {
             # 当声明了 `aggregate`,明细输出的 `fields/from` 约束不再适用.
-            # 注意: 输出编排区不支持 `$import` (见 `OpenSpec`: `yaml-dsl-demand-imports-scope`)。
+            # 注意: 输出编排区不支持 `$import` (见 `llmanspec`: `yaml-dsl-demand-imports-scope`)。
             "if": {"required": ["aggregate"]},
             "then": {},
             "else": {

@@ -1,0 +1,28 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate governance-mainline-principles --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "governance-mainline-principles"
+purpose: "定义 YAML DSL 的上位主线原则与设计护栏，用于约束后续变更的方向与评审口径：单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式（拒绝 imports expansion）。"
+requirements[4]{req_id,title,statement}:
+  r1,"YAML DSL mainline MUST evolve as a single in-place line","YAML DSL 主线演进 MUST 采用单主线原地升级模型: - 系统 MUST NOT 引入 `dsl_version` - 系统 MUST NOT 通过 CLI、schema 路径或 modeline 选择并行 DSL 版本 - 系统 MUST NOT 维护并行 parser、validator 或 schema 产物来长期承载旧写法"
+  r2,Mainline YAML MUST keep authoring separate from runtime policy,"主线 YAML MUST 聚焦 authoring surface,而运行环境、性能预算、集成策略类能力 MUST 收口到 Python / CLI runtime entrypoints: - authoring surface MUST 以 `sources`、`fields`、`relations`、`outputs` 与少量资源声明为中心 - environment-sensitive knobs MUST NOT 作为主线 YAML 的优先承载面"
+  r3,"Mainline YAML structures MUST be KV-first unless order is semantic",凡是需要稳定标识、引用或复用的 YAML 结构 MUST 优先采用 mapping / KV 形式;只有顺序本身具有业务语义时才使用 list。
+  r4,Workflow MUST remain a small declarative orchestration surface,"workflow MUST 保持“小而声明式”的 orchestration DSL: - workflow MUST 聚焦 runs、依赖关系、上下文传递与少量稳定的 orchestration knobs - workflow MUST NOT 扩张为 imports fragment composition surface"
+scenarios[8]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"future-cleanup-does-not-add-a-parallel-parser","",某个后续变更需要清理旧 YAML 写法,方案 MUST 选择原地迁移、lint 或升级提示
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"environment-sensitive-control-is-routed-to-runtime-entrypoin","",某个字段的启停明显取决于环境、性能预算或运行入口集成,该能力 MUST 优先设计到 Python / CLI runtime entrypoints
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"reusable-keyed-nodes-use-mappings","",系统新增一个需要稳定 ID 与跨节点引用的 YAML 结构,该结构 MUST 优先采用 mapping / KV 形式
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"workflow-rejects-imports-expansion-as-a-design-direction","",有提案希望在 workflow 中新增 imports expansion,该方向 MUST 被视为偏离 workflow 主线职责
+```

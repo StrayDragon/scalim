@@ -7,7 +7,7 @@
 生成内容分层如下:
 - 语法目录: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json` 与 `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json` 为语法真相
 - CLI/LSP 参考: `packages/scalim-cli/src/scalim_cli/yaml_dsl.py` 为唯一命令真相
-- 规范摘要: `openspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
+- 规范摘要: `llmanspec/specs/` 中相关 spec 作为维护来源,自动摘录 requirement 索引
 - canonical example: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
 
 手工维护的 `SKILL.md` 与非 generated references 一般不由这里写入或重排.
@@ -96,24 +96,24 @@ UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->"
 UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
 
 SYNTAX_SPEC_RELS = (
-    Path("openspec") / "specs" / "yaml-dsl-schema" / "spec.md",
-    Path("openspec") / "specs" / "demand-dsl" / "spec.md",
-    Path("openspec") / "specs" / "yaml-dsl-workflow" / "spec.md",
-    Path("openspec") / "specs" / "yaml-dsl-books-resources" / "spec.md",
-    Path("openspec") / "specs" / "yaml-dsl-output-overrides" / "spec.md",
-    Path("openspec") / "specs" / "ir-source-relations" / "spec.md",
-    Path("openspec") / "specs" / "ir-field-compute" / "spec.md",
-    Path("openspec") / "specs" / "execution-source-cache" / "spec.md",
-    Path("openspec") / "specs" / "workflow-cache-pool" / "spec.md",
-    Path("openspec") / "specs" / "workflow-observability-bridge" / "spec.md",
-    Path("openspec") / "specs" / "runtime-pruning" / "spec.md",
-    Path("openspec") / "specs" / "execution-loader-retry" / "spec.md",
-    Path("openspec") / "specs" / "runtime-guardrails" / "spec.md",
-    Path("openspec") / "specs" / "performance-observability" / "spec.md",
-    Path("openspec") / "specs" / "output-mode-api" / "spec.md",
+    Path("llmanspec") / "specs" / "yaml-dsl-schema" / "spec.md",
+    Path("llmanspec") / "specs" / "demand-dsl" / "spec.md",
+    Path("llmanspec") / "specs" / "yaml-dsl-workflow" / "spec.md",
+    Path("llmanspec") / "specs" / "yaml-dsl-books-resources" / "spec.md",
+    Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "spec.md",
+    Path("llmanspec") / "specs" / "ir-source-relations" / "spec.md",
+    Path("llmanspec") / "specs" / "ir-field-compute" / "spec.md",
+    Path("llmanspec") / "specs" / "execution-source-cache" / "spec.md",
+    Path("llmanspec") / "specs" / "workflow-cache-pool" / "spec.md",
+    Path("llmanspec") / "specs" / "workflow-observability-bridge" / "spec.md",
+    Path("llmanspec") / "specs" / "runtime-pruning" / "spec.md",
+    Path("llmanspec") / "specs" / "execution-loader-retry" / "spec.md",
+    Path("llmanspec") / "specs" / "runtime-guardrails" / "spec.md",
+    Path("llmanspec") / "specs" / "performance-observability" / "spec.md",
+    Path("llmanspec") / "specs" / "output-mode-api" / "spec.md",
 )
 
-CLI_SPEC_RELS = (Path("openspec") / "specs" / "yaml-dsl-cli-validation" / "spec.md",)
+CLI_SPEC_RELS = (Path("llmanspec") / "specs" / "yaml-dsl-cli-validation" / "spec.md",)
 
 
 class GenerationError(RuntimeError):
@@ -701,10 +701,10 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
         title = extract_markdown_h1(read_text(path)) or path.name
         doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
         content = read_text(path)
-        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/") or extract_backtick_path(
-            content, prefix="openspec/changes/"
+        openspec_archive = extract_backtick_path(content, prefix="llmanspec/changes/archive/") or extract_backtick_path(
+            content, prefix="llmanspec/changes/"
         )
-        spec_path = extract_backtick_path(content, prefix="openspec/specs/")
+        spec_path = extract_backtick_path(content, prefix="llmanspec/specs/")
         docs.append(
             {
                 "title": title,
@@ -722,7 +722,7 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
         lines.append("- {}".format(item["title"]))
         lines.append("  - SSOT: `{}`".format(item["doc_rel"]))
         if item["openspec_archive"]:
-            lines.append("  - OpenSpec: `{}`".format(item["openspec_archive"]))
+            lines.append("  - llmanspec: `{}`".format(item["openspec_archive"]))
         if item["spec_path"]:
             lines.append("  - Spec: `{}`".format(item["spec_path"]))
     return "\n".join(lines).rstrip() + "\n"
@@ -761,10 +761,10 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
         title = extract_markdown_h1(content) or path.name
         doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
         date, slug = _split_upgrade_id(path.stem)
-        openspec_archive = extract_backtick_path(content, prefix="openspec/changes/archive/") or extract_backtick_path(
-            content, prefix="openspec/changes/"
+        openspec_archive = extract_backtick_path(content, prefix="llmanspec/changes/archive/") or extract_backtick_path(
+            content, prefix="llmanspec/changes/"
         )
-        spec_path = extract_backtick_path(content, prefix="openspec/specs/")
+        spec_path = extract_backtick_path(content, prefix="llmanspec/specs/")
 
         summary_lines = extract_markdown_section_lines(content, heading_prefix="## 变更摘要", max_lines=16)
         migration_lines = extract_markdown_section_lines(content, heading_prefix="## Migration Checklist", max_lines=24)
@@ -1008,24 +1008,86 @@ def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dic
     for rel_path in spec_paths:
         abs_path = repo_root / rel_path
         if not abs_path.exists():
-            raise GenerationError("未找到 OpenSpec 文件: {}".format(abs_path))
+            raise GenerationError("未找到 llmanspec 文件: {}".format(abs_path))  # force-en
         text = read_text(abs_path)
-        purpose = sanitize_spec_summary_text(extract_markdown_section(text, "## Purpose"))
-        requirements = []
-        for line in text.splitlines():
-            if line.startswith("### Requirement:"):
-                requirements.append(sanitize_spec_summary_text(line.split(":", 1)[1].strip()))
+        purpose, requirements = _parse_spec_content(text)
         if not requirements:
-            raise GenerationError("OpenSpec 文件未包含需求条目: {}".format(abs_path))
+            raise GenerationError("llmanspec 文件未包含需求条目: {}".format(abs_path))  # force-en
         summaries.append(
             {
                 "slug": rel_path.parent.name,
                 "path": path_to_posix(rel_path),
-                "purpose": purpose,
-                "requirements": requirements,
+                "purpose": sanitize_spec_summary_text(purpose),
+                "requirements": [sanitize_spec_summary_text(r) for r in requirements],
             }
         )
     return summaries
+
+
+def _parse_spec_content(text: str) -> Tuple[str, List[str]]:
+    """Parse spec from toon format or legacy markdown format."""
+    import re as _re
+
+    toon_match = _re.search(r"```toon\s*\n(.*?)```", text, _re.DOTALL)
+    if toon_match:
+        toon_body = toon_match.group(1)
+        purpose = ""
+        purpose_m = _re.search(r'^purpose:\s*"(.*?)"\s*$', toon_body, _re.MULTILINE)
+        if purpose_m:
+            purpose = purpose_m.group(1).replace('\\"', '"')
+
+        requirements = []  # type: List[str]
+        in_reqs = False
+        for line in toon_body.splitlines():
+            if _re.match(r"^requirements\[", line):
+                in_reqs = True
+                continue
+            if in_reqs:
+                if not line.startswith("  "):
+                    in_reqs = False
+                    continue
+                parts = _parse_toon_row(line.strip())
+                if len(parts) >= 2:
+                    requirements.append(parts[1])
+        return purpose, requirements
+
+    purpose = extract_markdown_section(text, "## Purpose")
+    requirements = []  # type: List[str]
+    for line in text.splitlines():
+        if line.startswith("### Requirement:"):
+            requirements.append(line.split(":", 1)[1].strip())
+    return purpose, requirements
+
+
+def _parse_toon_row(row: str) -> List[str]:
+    """Parse a toon tabular row respecting quoted values."""
+    parts = []  # type: List[str]
+    current = []  # type: List[str]
+    in_quote = False
+    i = 0
+    while i < len(row):
+        ch = row[i]
+        if ch == '"' and not in_quote:
+            in_quote = True
+            i += 1
+            continue
+        if ch == '"' and in_quote:
+            if i + 1 < len(row) and row[i + 1] == '"':
+                current.append('"')
+                i += 2
+                continue
+            in_quote = False
+            i += 1
+            continue
+        if ch == "," and not in_quote:
+            parts.append("".join(current))
+            current = []
+            i += 1
+            continue
+        current.append(ch)
+        i += 1
+    parts.append("".join(current))
+    return parts
 
 
 def sanitize_spec_summary_text(text: str) -> str:

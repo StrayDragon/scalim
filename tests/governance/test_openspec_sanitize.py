@@ -25,20 +25,23 @@ def _subprocess_env(**overrides: str) -> dict:
 def _prepare_repo_fixture(tmp_path: Path) -> Path:
     repo_root = tmp_path / "repo"
     scripts_root = repo_root / "scripts"
-    openspec_root = repo_root / "openspec"
+    llmanspec_root = repo_root / "llmanspec"
     source_repo_root = _repo_root()
 
     scripts_root.mkdir(parents=True, exist_ok=True)
-    openspec_root.mkdir(parents=True, exist_ok=True)
+    llmanspec_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_repo_root / "scripts" / "sanitize.py", scripts_root / "sanitize.py")
-    shutil.copy2(source_repo_root / "openspec" / "sanitize_rules.yaml", openspec_root / "sanitize_rules.yaml")
+    sanitize_rules_src = source_repo_root / "llmanspec" / "sanitize_rules.yaml"
+    if not sanitize_rules_src.exists():
+        sanitize_rules_src = source_repo_root / "openspec" / "sanitize_rules.yaml"
+    shutil.copy2(sanitize_rules_src, llmanspec_root / "sanitize_rules.yaml")
     return repo_root
 
 
 def test_sanitize_apply_rewrites_only_example_secret_tokens(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
-    openspec_root = repo_root / "openspec"
-    sample = openspec_root / "sample.md"
+    llmanspec_root = repo_root / "llmanspec"
+    sample = llmanspec_root / "sample.md"
     _write(
         sample,
         "\n".join(
@@ -61,7 +64,7 @@ def test_sanitize_apply_rewrites_only_example_secret_tokens(tmp_path: Path) -> N
     )
 
     proc = subprocess.run(
-        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--apply", "--root", str(openspec_root), "--no-local-rules"],
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--apply", "--root", str(llmanspec_root), "--no-local-rules"],
         cwd=str(repo_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -89,8 +92,8 @@ def test_sanitize_apply_rewrites_only_example_secret_tokens(tmp_path: Path) -> N
 
 def test_sanitize_prefers_target_root_rules_over_parent_rules(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
-    openspec_root = repo_root / "openspec"
-    nested_root = openspec_root / "nested"
+    llmanspec_root = repo_root / "llmanspec"
+    nested_root = llmanspec_root / "nested"
     nested_root.mkdir(parents=True, exist_ok=True)
     _write(
         nested_root / "sanitize_rules.yaml",
@@ -123,13 +126,13 @@ def test_sanitize_prefers_target_root_rules_over_parent_rules(tmp_path: Path) ->
     assert "NESTED_CLI" in text
     assert "scalim-cli" in text
     assert str(nested_root / "sanitize_rules.yaml") in proc.stdout
-    assert str(openspec_root / "sanitize_rules.yaml") not in proc.stdout
+    assert str(llmanspec_root / "sanitize_rules.yaml") not in proc.stdout
 
 
 def test_sanitize_auto_loads_local_rules_and_skips_rewriting_them(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
-    openspec_root = repo_root / "openspec"
-    local_rules = openspec_root / "sanitize_rules.local.yaml"
+    llmanspec_root = repo_root / "llmanspec"
+    local_rules = llmanspec_root / "sanitize_rules.local.yaml"
     _write(
         local_rules,
         "\n".join(
@@ -146,11 +149,11 @@ def test_sanitize_auto_loads_local_rules_and_skips_rewriting_them(tmp_path: Path
             ]
         ),
     )
-    sample = openspec_root / "notes.md"
+    sample = llmanspec_root / "notes.md"
     _write(sample, "Vendor: SecretVendor\nPath: /home/alice/work/private/note.md\n")
 
     proc = subprocess.run(
-        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--apply", "--root", str(openspec_root)],
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--apply", "--root", str(llmanspec_root)],
         cwd=str(repo_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -171,12 +174,12 @@ def test_sanitize_auto_loads_local_rules_and_skips_rewriting_them(tmp_path: Path
 
 def test_sanitize_warns_when_local_rules_missing(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
-    openspec_root = repo_root / "openspec"
-    sample = openspec_root / "notes.md"
+    llmanspec_root = repo_root / "llmanspec"
+    sample = llmanspec_root / "notes.md"
     _write(sample, "CLI: scalim-cli\n")
 
     proc = subprocess.run(
-        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(llmanspec_root)],
         cwd=str(repo_root),
         env=_subprocess_env(CI=None),
         stdout=subprocess.PIPE,
@@ -192,12 +195,12 @@ def test_sanitize_warns_when_local_rules_missing(tmp_path: Path) -> None:
 
 def test_sanitize_skips_missing_local_rules_warning_when_ci_enabled(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
-    openspec_root = repo_root / "openspec"
-    sample = openspec_root / "notes.md"
+    llmanspec_root = repo_root / "llmanspec"
+    sample = llmanspec_root / "notes.md"
     _write(sample, "CLI: scalim-cli\n")
 
     proc = subprocess.run(
-        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(llmanspec_root)],
         cwd=str(repo_root),
         env=_subprocess_env(CI="true"),
         stdout=subprocess.PIPE,
@@ -213,12 +216,12 @@ def test_sanitize_skips_missing_local_rules_warning_when_ci_enabled(tmp_path: Pa
 
 def test_sanitize_still_warns_when_ci_value_is_falsey(tmp_path: Path) -> None:
     repo_root = _prepare_repo_fixture(tmp_path)
-    openspec_root = repo_root / "openspec"
-    sample = openspec_root / "notes.md"
+    llmanspec_root = repo_root / "llmanspec"
+    sample = llmanspec_root / "notes.md"
     _write(sample, "CLI: scalim-cli\n")
 
     proc = subprocess.run(
-        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(openspec_root)],
+        [sys.executable, str(repo_root / "scripts" / "sanitize.py"), "--check", "--root", str(llmanspec_root)],
         cwd=str(repo_root),
         env=_subprocess_env(CI="false"),
         stdout=subprocess.PIPE,

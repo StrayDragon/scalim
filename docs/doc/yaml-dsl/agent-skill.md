@@ -33,7 +33,7 @@
   - `agentdev/skills/scalim-yaml-dsl/references/upgrades/*.md` (升级指南 SSOT; docs-site 对应页面由此生成)
 
 一般把整个目录 `agentdev/skills/scalim-yaml-dsl/` 交给你的 Agent 就行: `SKILL.md` 负责分流,细节再按需从 `references/` 读取。
-`references/generated/` 由 `scripts/gen-agent-skill.py` 根据 schema、CLI 与相关 `openspec/specs/` 自动摘录生成; `references/` 里的 task 文档则保留人工维护的任务预设与迁移经验.
+`references/generated/` 由 `scripts/gen-agent-skill.py` 根据 schema、CLI 与相关 `llmanspec/specs/` 自动摘录生成; `references/` 里的 task 文档则保留人工维护的任务预设与迁移经验.
 
 ## 2. 怎么让智能助手用它写/改 YAML
 
@@ -93,7 +93,7 @@ workflow YAML 同理,只是 `--type` 与 schema 文件名不同:
 
 ## 4. 贡献者:如何更新/校验技能包
 
-当你修改了 YAML DSL schema、CLI 命令语义、相关 OpenSpec spec 或 canonical example 来源,建议同步更新 generated 产物:
+当你修改了 YAML DSL schema、CLI 命令语义、相关 llmanspec spec 或 canonical example 来源,建议同步更新 generated 产物:
 
 - 生成:`just gen-agent-skill`
 - 漂移校验:`just validate-agent-skill`

@@ -1,0 +1,23 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate yaml-dsl-render-effective-yaml --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "yaml-dsl-render-effective-yaml"
+purpose: "提供用于 review/debug/对拍的库侧 API，将”作者写的 demand YAML”渲染为 effective YAML（展开后的单文件等价配置），避免 imports/template 复用在 review 时变成黑盒。"
+requirements[2]{req_id,title,statement}:
+  r1,Library MUST render effective demand YAML by expanding template_vars and imports,"系统 MUST 提供一个用于 review/debug/对拍的**库侧 API**,将“作者写的 demand YAML”渲染为 effective YAML(展开后的单文件等价配置)。 该 API MUST 支持 `loads/dumps` 形态(或等价接口): - `load_effective_demand_yaml(<demand.yaml>, template_vars=...) -> mapping` - `dump_effective_demand_yaml(<mapping>) -> yaml_text` 渲染行为 MUST 至少包含: - 对 demand YAML 文本执行 template precompile(仅当调用方显式提供 template vars) - 对 demand YAML mapping 执行 imports/$import expansion 输出约束 MUST 满足: - 输出 MUST 不包含 `imports` 与 `$import`(已被展开) - 输出 MUST 保留 `{$init_var: ...}` / `$keys` / `$rows` 等指令节点(它们属于运行期模板 AST)"
+  r2,editor effective expansion MUST support outputs.fields flatten and YAML aliases,"为支撑 editor 侧导航与补全,系统 MUST 提供静态的 effective expansion 视图,至少覆盖: - YAML anchors/aliases 与 merge key 的展开（对当前打开文档以内存态文本为准） - `outputs[*].fields` 的 nested list flatten 规则（与运行时/validator 口径一致）"
+scenarios[5]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"api-renders-effective-yaml-text",调用方提供 `demand.yaml`,调用方执行 `dump_effective_demand_yaml(load_effective_demand_yaml(demand.yaml))`,MUST 返回有效的 YAML 文本
+  r1,"api-fails-fast-on-import-expansion-errors",demand YAML 的 imports 存在 cycle 或类型冲突,调用方执行 `load_effective_demand_yaml(demand.yaml)`,MUST 失败(抛出异常)
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"outputs-fields-alias-is-expanded-for-navigation","YAML 使用 anchor 定义字段列表 `detail_fields: &detail_fields [a, b]`",editor 侧请求 outputs.fields 的 completion/definition,effective expansion MUST 将该 outputs.fields 视为展开后的有效列表（至少包含 `a`、`b`）
+```

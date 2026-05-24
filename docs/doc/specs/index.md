@@ -1,22 +1,22 @@
-# OpenSpec 规范
+# 规范 (llmanspec)
 
 ??? note "适用读者"
     - 项目贡献者(改行为/改边界前对齐约束)
-    - 需要理解“框架承诺了什么/不承诺什么”的使用方开发者
+    - 需要理解"框架承诺了什么/不承诺什么"的使用方开发者
 
 ??? note "维护提示"
     本页内容通常会在以下变更后需要同步检查:
 
-    - `openspec/specs/` 的目录结构调整
+    - `llmanspec/specs/` 的目录结构调整
     - 规范命名/README 入口调整
     - 站内文档与规范之间的边界调整(哪些写在规范,哪些写在站点)
 
-OpenSpec 是本仓库对核心行为/边界的“约束性描述”,更接近规范而不是教程.
+llmanspec 是本仓库对核心行为/边界的"约束性描述",更接近规范而不是教程.
 
-- 规范目录: `openspec/specs/`
-- 索引页(生成): [OpenSpec 索引(生成)](openspec-index.gen.md)
+- 规范目录: `llmanspec/specs/`
+- 校验命令: `llman sdd validate --all --strict --no-interactive`
 
 常见用法:
 
-- 在改动执行语义、并行边界、安全策略前,先在 `openspec/specs/` 找到对应主题的 spec 对齐预期
-- 站内文档偏“怎么用/怎么跑/怎么排查”;遇到边界争议,以 spec 为准
+- 在改动执行语义、并行边界、安全策略前,先在 `llmanspec/specs/` 找到对应主题的 spec 对齐预期
+- 站内文档偏"怎么用/怎么跑/怎么排查";遇到边界争议,以 spec 为准

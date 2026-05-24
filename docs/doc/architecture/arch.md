@@ -19,7 +19,7 @@
     - 并行模式与 `LoadRef` 调度语义调整
     - hooks/ob/events 的分发与回放策略调整
 
-更严格的语义/约束以 `openspec/specs/` 为准.
+更严格的语义/约束以 `llmanspec/specs/` 为准.
 
 ## 1. 分层总览
 
@@ -138,7 +138,7 @@ flowchart TD
 
 除单次 demand YAML 的运行入口外,Scalim 还支持 workflow YAML 用于编排多个 demand run 与 workflow shared resources 写出.
 
-分层约束(以 `openspec/specs/` 为准):
+分层约束(以 `llmanspec/specs/` 为准):
 
 - `scalim.dsl.yaml_dsl.run_workflow` / `scalim.dsl.yaml_dsl.workflow*` 是 workflow 的稳定入口:负责 workflow YAML 的加载/校验/编译,并通过 per-call callbacks 注入执行依赖.
 - `scalim.workflow.*` 是 workflow runtime 的 framework/SSOT:负责调度执行、ctx/artifacts/resources 管理与 workflow-level events.
@@ -237,8 +237,8 @@ flowchart LR
 
 规范说明:
 
-- `openspec/specs/runtime-pruning/spec.md`
-- `openspec/specs/streaming-output/spec.md`
+- `llmanspec/specs/runtime-pruning/spec.md`
+- `llmanspec/specs/streaming-output/spec.md`
 
 ## 7. 输出层(sinks): 行式/列式/内存
 

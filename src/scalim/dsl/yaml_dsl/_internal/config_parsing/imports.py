@@ -16,7 +16,7 @@ IMPORT_KEY = "$import"
 
 MAX_IMPORT_EXPANSION_DEPTH = 20
 
-# `demand` 的 `$import` 作用域边界 (唯一事实来源: `OpenSpec` 变更 `c15-yaml-dsl-demand-imports-scope`)
+# `demand` 的 `$import` 作用域边界 (唯一事实来源: `llmanspec` 变更 `c15-yaml-dsl-demand-imports-scope`)
 _ALLOWED_DEMAND_IMPORT_ROOT_KEYS: Tuple[str, ...] = (
     "main_source",
     "sources",

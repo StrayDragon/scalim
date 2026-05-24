@@ -1893,7 +1893,7 @@ fields:
 
 **compute limits(可选覆盖)**:
 
-compute limits 等更细粒度安全配置属于内部实现细节;如确需自定义,请以 OpenSpec 与源码为准:
+compute limits 等更细粒度安全配置属于内部实现细节;如确需自定义,请以 llmanspec 与源码为准:
 
 - `src/scalim/dsl/yaml_dsl/_internal/config_parsing/security.py`
 

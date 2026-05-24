@@ -279,8 +279,8 @@ docs/doc/notebooks/**/*.html
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 
-# Local openspec sanitization rules
-openspec/sanitize_rules.local.yaml
+# Local llmanspec sanitization rules
+llmanspec/sanitize_rules.local.yaml
 
 # vendors clib
 !src/scalim/vendor/yamlx/**/*.so

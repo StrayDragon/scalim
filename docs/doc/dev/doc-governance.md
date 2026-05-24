@@ -2,7 +2,7 @@
 
 本仓库将文档分为四类,并要求边界清晰(可机械校验,可在 CI 门禁):
 
-1. **SSOT(事实来源)**: 代码/配置/规范本体(例如 `src/scalim/**`, `pyproject.toml`, `openspec/specs/**/spec.md`)
+1. **SSOT(事实来源)**: 代码/配置/规范本体(例如 `src/scalim/**`, `pyproject.toml`, `llmanspec/specs/**/spec.md`)
 2. **Generated(全文件生成物)**: 文件名包含 `.gen.` 的产物(例如 `*.gen.md/*.gen.json`),禁止手改
 3. **Manual(手工页)**: 叙事/教程/排错路径,允许链接到 SSOT/Generated,但不重复大段 reference
 4. **Manual + Injected Blocks**: 手工页中的受控注入区块,由生成器按 marker 替换:

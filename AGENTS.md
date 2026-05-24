@@ -1,10 +1,20 @@
+<!-- LLMANSPEC:START -->
+# LLMAN 规范驱动开发
+
+本项目使用 llman SDD。阅读 `llmanspec/config.yaml` 了解项目上下文与规则。
+
+使用 `/llman-sdd-onboard` 开始，然后使用 `/llman-sdd-*` 技能进行工作流。
+
+保留此托管块，便于 `llman sdd update` 刷新。
+<!-- LLMANSPEC:END -->
+
 # Repository Guidelines
 
 ## Quick Commands (SSOT Entry Points)
 - `just --list`: discover tasks.
-- `just qa`: repo quality gates (lint/tests + drift checks + OpenSpec checks, etc.).
+- `just qa`: repo quality gates (lint/tests + drift checks + llmanspec checks, etc.).
 - `just gen-docs`: refresh docs-site generated pages and injected blocks.
-- `just openspec-check`: sanitize + validate OpenSpec artifacts.
+- `just llmanspec-check`: sanitize + validate llmanspec artifacts.
 
 ## Hard Rules (SSOT)
 - **Python runtime boundary**: code under `src/scalim/` MUST remain compatible with Python 3.6 (dev tooling is typically Python 3.10+; see `pyproject.toml`).
@@ -38,5 +48,5 @@
 - Project/code reading map: `docs/doc/getting-started/reading-guide.md`
 - Docs governance workflow: `docs/doc/dev/doc-governance.md`
 - Docs site config + content root: `docs/zensical.toml`, `docs/doc/`
-- OpenSpec specs: `openspec/specs/` and `docs/doc/specs/index.md`
+- Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
 - Architecture overview: `ARCH.md` and `docs/doc/architecture/arch.md`

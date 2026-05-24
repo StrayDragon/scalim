@@ -44,8 +44,8 @@ nav = [
   { "进阶阅读" = [
     "architecture/index.md",
     { "架构详解" = "architecture/arch.md" },
-    { "OpenSpec 规范" = "specs/index.md" },
-    { "OpenSpec 索引" = "specs/openspec-index.gen.md" },
+    { "llmanspec 规范" = "specs/index.md" },
+    { "llmanspec 索引" = "specs/openspec-index.gen.md" },
   ] },
   { "参与开发" = [
     "dev/index.md",

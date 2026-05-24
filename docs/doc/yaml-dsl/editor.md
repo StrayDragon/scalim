@@ -110,8 +110,8 @@ scalim-cli yaml-dsl validate /path/to/config.yaml
 
 相关规范(SSOT):
 
-- `openspec/specs/yaml-dsl-editor-project-discovery/spec.md`
-- `openspec/specs/yaml-dsl-lsp-serve/spec.md`
-- `openspec/specs/yaml-dsl-lsp-server/spec.md`
-- `openspec/specs/yaml-dsl-lsp-code-actions/spec.md`
-- `openspec/specs/yaml-dsl-vscode-extension/spec.md`
+- `llmanspec/specs/yaml-dsl-editor-project-discovery/spec.md`
+- `llmanspec/specs/yaml-dsl-lsp-serve/spec.md`
+- `llmanspec/specs/yaml-dsl-lsp-server/spec.md`
+- `llmanspec/specs/yaml-dsl-lsp-code-actions/spec.md`
+- `llmanspec/specs/yaml-dsl-vscode-extension/spec.md`

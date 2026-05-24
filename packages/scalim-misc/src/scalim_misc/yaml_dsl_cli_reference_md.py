@@ -177,7 +177,7 @@ def render_yaml_dsl_cli_reference_markdown(
         ]
     )
 
-    lines.extend(_render_spec_requirement_map("## OpenSpec Requirement Map", spec_summaries))
+    lines.extend(_render_spec_requirement_map("## llmanspec Requirement Map", spec_summaries))
 
     lines.extend(["", "## Command Details"])
     for command_doc in command_docs:

@@ -12,7 +12,7 @@
 
 这里整理 Scalim 的使用与开发文档,优先解决“怎么写配置/怎么跑/怎么排查”的问题.
 
-如果你在改动框架行为/边界,建议先看: [OpenSpec 规范](specs/index.md)
+如果你在改动框架行为/边界,建议先看: [llmanspec 规范](specs/index.md)
 
 ## 第一次来先看这些
 
@@ -25,5 +25,5 @@
 
 想弄清楚原理,再看下面这组:
 
-- 原理与架构: [架构入口](architecture/index.md) → [架构详解](architecture/arch.md) → [OpenSpec 规范](specs/index.md)
+- 原理与架构: [架构入口](architecture/index.md) → [架构详解](architecture/arch.md) → [llmanspec 规范](specs/index.md)
 - 参与开发: [仓库开发约定](dev/repo-guide.md) → [如何阅读本项目](getting-started/reading-guide.md)

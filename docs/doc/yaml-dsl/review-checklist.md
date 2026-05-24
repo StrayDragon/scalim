@@ -1,8 +1,8 @@
 # YAML DSL 提案审核清单
 
-本页用于评审/编写 YAML DSL 相关 OpenSpec 变更时的统一 checklist,避免反复在各个专题提案中重复解释主线原则与边界。
+本页用于评审/编写 YAML DSL 相关 llmanspec 变更时的统一 checklist,避免反复在各个专题提案中重复解释主线原则与边界。
 
-上位原则 SSOT: `openspec/specs/yaml-dsl-mainline-principles/spec.md`。
+上位原则 SSOT: `llmanspec/specs/yaml-dsl-mainline-principles/spec.md`。
 
 ## 0) 必须遵守的主线原则(硬约束)
 
@@ -28,7 +28,7 @@
   - 代码实现 + 测试
   - schema 生成(如涉及)与 drift gate
   - docs/skill/notebooks(如涉及)与生成/验收口径
-  - `just openspec-check` 与 `just qa`
+  - `just llmanspec-check` 与 `just qa`
 
 ## 1.5) 专题拆分与依赖顺序(参考)
 
@@ -69,5 +69,5 @@
 ## 5) 验收口径(提交前必须过)
 
 - 相关单测/回归测覆盖核心场景
-- `just openspec-check`
+- `just llmanspec-check`
 - `just qa`

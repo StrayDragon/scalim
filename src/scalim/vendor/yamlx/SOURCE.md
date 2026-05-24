@@ -1,6 +1,6 @@
 # yamlx provenance
 
-本目录 vendors 化 `YAML` 解析实现,以支持下游老项目(`Python 3.6`、不可随意安装第三方依赖)仅同步 `src/scalim/` 源码即可运行(见 `scripts/vendor-sync.py` 与 `openspec/specs/legacy-vendors-sync/spec.md`)。
+本目录 vendors 化 `YAML` 解析实现,以支持下游老项目(`Python 3.6`、不可随意安装第三方依赖)仅同步 `src/scalim/` 源码即可运行(见 `scripts/vendor-sync.py` 与 `llmanspec/specs/legacy-vendors-sync/spec.md`)。
 
 ## Upstream
 

@@ -1,0 +1,31 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate vendor-legacy-sync --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "vendor-legacy-sync"
+purpose: "为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。"
+requirements[4]{req_id,title,statement}:
+  r1,提供 vendors 同步的 `just` 快捷入口,"系统 MUST 在仓库根 `justfile` 中提供一个快捷 recipe,用于触发 vendors 同步脚本;目标路径 MUST 由调用方显式传入,不得写入仓库版本控制。"
+  r2,同步脚本镜像 `src/scalim` 到 `<dest>/scalim`,"系统 MUST 提供一个同步脚本,用于将仓库的 `src/scalim/` 镜像同步到下游旧工程的 `vendors/libs/scalim/` 导入链路。 同步脚本 MUST 满足: - 接收目标目录参数 `--dest <vendors/libs>` 并将同步落点固定为 `<dest>/scalim/`。 - 默认 MUST 以 dry-run 方式执行镜像式同步预览（等价于 `rsync -a --delete --dry-run`）。 - 当调用方显式确认执行实际同步时,脚本 MUST 执行镜像式同步（等价于 `rsync -a --delete`）。 - MUST 提供 `--apply` 用于显式触发实际写入。 - MUST 排除非源码产物(至少包含 `__pycache__` 与 `*.pyc`)。 - MUST 提供 `--dry-run` 以预览变更。 - MUST 对明显危险的目标路径做硬拒绝(例如 `--dest /`),避免误删。"
+  r3,vendors 同步包含 `README.md`,同步脚本 MUST 将仓库根的 `README.md` 同步到目标目录下的 `scalim/` 子目录。
+  r4,vendors synced scalim MUST be able to parse YAML without external installs,"当 `src/scalim/` 通过 `scripts/vendor-sync.py` 被镜像到下游 `vendors/libs/scalim/` 导入链路后,系统 MUST 在 Python 3.6 环境中具备可用的 YAML 解析能力,且 MUST 不依赖下游额外安装 `PyYAML`/`ruamel.yaml`。"
+scenarios[11]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"默认-dry-run-预览","","开发者执行 `just sync-project-vendors <vendors/libs>`","recipe MUST 触发同步脚本并将目标路径传入脚本（默认 `dry-run` 预览）"
+  r1,"实际同步需要显式确认-token","","开发者执行 `just sync-project-vendors <vendors/libs> YES`","recipe MUST 执行实际同步（非 dry-run）"
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,镜像同步会移除残留文件,目标 `<dest>/scalim/` 中存在历史残留文件,"使用 `--apply` 执行同步脚本",同步结果 MUST 与源 `src/scalim/` 保持一致且残留文件 MUST 被移除
+  r2,"dry-run-不产生写入","","使用 `--dry-run` 执行同步脚本",脚本 MUST 不写入目标目录且输出计划变更
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"目标包含-readme","",执行同步脚本,目标目录中的 `scalim/README.md` MUST 存在
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"downstream-vendors-runtime-imports-yaml-dsl-successfully","下游工程仅 vendors 化同步了 `src/scalim/` 源码,且运行环境为 Python 3.6",下游导入并执行 YAML DSL 的解析入口(例如 `scalim.dsl.yaml_dsl.validation_service` 或 `scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load`),导入与 YAML 解析 MUST 成功
+  r4,"scalim-yaml-parsing-uses-vendored-ruamel-yaml-without-extern",`src/scalim/vendor/yamlx/` 内包含 vendors 化的 YAML 实现,`scalim` 在运行时解析 YAML 文本,系统 MUST 使用 vendored `ruamel.yaml` 作为默认 YAML 解析实现
+```

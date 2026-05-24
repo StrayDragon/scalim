@@ -568,8 +568,8 @@ def _extract_markdown_section(text: str, heading: str) -> str:
     return " ".join(buffer)
 
 
-def _render_openspec_index(repo_root: Path) -> str:
-    specs_root = repo_root / "openspec" / "specs"
+def _render_llmanspec_index(repo_root: Path) -> str:
+    specs_root = repo_root / "llmanspec" / "specs"
     spec_paths = sorted(p for p in specs_root.glob("*/spec.md") if p.is_file())
     entries = []
     for path in spec_paths:
@@ -586,15 +586,15 @@ def _render_openspec_index(repo_root: Path) -> str:
         entries.append((slug, title, status_line, purpose, rel))
 
     lines = [
-        _autogen_md_header(sources=["`openspec/specs/*/spec.md`"]).rstrip("\n"),
+        _autogen_md_header(sources=["`llmanspec/specs/*/spec.md`"]).rstrip("\n"),
         "",
         '??? warning "自动生成文件"',
         "    本文件由 `scripts/gen-docs.py` 自动生成，请勿手动编辑。如需修改，请编辑源文件或生成脚本。",
         "",
-        "# OpenSpec 索引(生成)",
+        "# llmanspec 索引(生成)",
         "",
         "说明:",
-        "- 本页仅做“索引与链接”,不把 `openspec/specs/**` 作为站点页面.",
+        "- 本页仅做“索引与链接”,不把 `llmanspec/specs/**` 作为站点页面.",
         "- 规范本体以仓库文件为准,请通过代码链接打开.",
         "",
         "## Specs",
@@ -673,7 +673,7 @@ def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, 
     expected: Dict[Path, str] = {
         cli_reference: cli_reference_content,
         docs_dir / "getting-started" / "public-api.gen.md": _render_public_api_import_guide(repo_root),
-        docs_dir / "specs" / "openspec-index.gen.md": _render_openspec_index(repo_root),
+        docs_dir / "specs" / "openspec-index.gen.md": _render_llmanspec_index(repo_root),
     }
     return expected
 

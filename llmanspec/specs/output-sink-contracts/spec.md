@@ -1,0 +1,41 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate output-sink-contracts --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "output-sink-contracts"
+purpose: "定义 sink 接口稳定性与可选依赖提示规范，确保内建与外部 sink 的长期兼容、可诊断性与一致行为。"
+requirements[8]{req_id,title,statement}:
+  r1,Sink 契约稳定,"系统 MUST 保持 `ISink`/`IRowSink`/`IColumnSink`/`BaseRowSink` 等接口契约稳定,并确保内建 sinks 满足契约."
+  r2,可选依赖错误提示清晰,系统 MUST 对可选依赖(如 Excel 的 `openpyxl`)提供一致且可诊断的错误路径.
+  r3,file sinks 写入前创建输出目录,"系统 MUST 在 file sinks(如 CSV/Excel)写入输出文件前确保 `output.path` 的父目录存在;当父目录不存在时系统 MUST 以 best-effort 方式创建目录(`mkdir(parents=True, exist_ok=True)`)."
+  r4,file sinks 原子替换失败路径可清理且可诊断,"系统 MUST 在 file sinks(如 CSV/Excel)采用“临时文件 + close 时原子替换”的写出策略时,确保 replace 失败路径具备 best-effort 清理与可诊断性: - replace 失败时系统 MUST 以 best-effort 方式清理临时文件(避免残留 `.tmp` 垃圾文件). - 若清理失败,系统 MUST 通过日志或错误信息暴露临时路径与目标路径,便于用户手动处理."
+  r5,File sinks MUST support formula injection protection,"当使用内建 file sinks (CSV/Excel) 输出数据时，系统 MUST 提供”公式注入防护”能力，避免不可信字符串在电子表格工具中被当作公式执行。 系统 MUST 支持两种模式： - **allow** (默认): 允许将字符串原样写入，使其可被工具当作公式解析（用于可信场景主动写公式） - **escape**: 将疑似公式的字符串以文本形式写出（例如前缀转义），确保工具不会将其作为公式执行（用于不可信输入） 系统 MUST 明确规定”疑似公式字符串”的识别规则（至少覆盖 `=`, `+`, `-`, `@` 前缀，允许忽略前导空白）。 转义规则 MUST 满足： - 仅对 `str` 生效（其它类型保持原样） - 若原始字符串以 `'` 开头，MUST 保持不变（避免重复转义） - 对 `value.lstrip()` 的首字符，若属于 `{ '=', '+', '-', '@' }`，MUST 在**原始值**前追加 `'` - 该规则 MUST 同时作用于表头与数据行"
+  r6,"Sinks MAY implement aligned-write fastpath without breaking existing contracts","系统 MUST 在保持现有 `ISink`/`IRowSink`/`IColumnSink` 契约可用的前提下，允许 sinks 通过“可选方法”提供 aligned-write fastpath（见 `sink-fastpath` capability）。 内建 sinks MUST 覆盖该 fastpath（当实现类型适用时），并通过测试保证： - fastpath 与现有接口写出结果一致 - fastpath 不改变 close/flush 等资源语义"
+  r7,"built-in file sinks MUST NOT create adjacent `.scalim.lock` files","系统内建 file sinks（例如 CSV/Excel）在写出边界 MUST NOT 通过在目标输出路径旁创建 `<output_path>.scalim.lock` 的方式实现并发保护。 说明： - 并发隔离应优先通过“版本化输出（D-2）+ 唯一路径”在更高层解决。 - 若调用方仍需要对固定路径做互斥，系统 SHALL 建议调用方在框架外部进行协调（例如业务层唯一输出路径、外部锁或排队）。"
+  r8,"sinks public facade MUST separate optional-dependency sinks into explicit submod","系统 MUST 将带可选依赖的 sinks 从默认推荐的 public facade 中隔离出来，以避免用户误认为其属于默认 runtime 基线能力。 系统 MUST 提供显式稳定导入路径（例如 `scalim.sinks.pandas`）承载该类 sinks，并满足： - 默认入口 `scalim.sinks` 的 `__all__` MUST NOT 直接导出 pandas sinks 等可选依赖 sinks。 - 显式子模块（例如 `scalim.sinks.pandas`）MUST 存在并可导入，用于承载相关 sinks 类型。"
+scenarios[17]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"旧-sink-实现可继续工作","",现有 sink 继承 `BaseRowSink` 或实现 `IRowSink`,不需修改即可运行
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,缺少可选依赖,"",在未安装依赖时导入或使用相关 sink,抛出明确且可读的错误信息
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,输出目录不存在仍可写出,"","用户直接构造并使用 file sink,且 `output.path` 的父目录不存在(例如 `CSVSink(\"a/b.csv\")` 的 `a/` 不存在)",sink close 写出结果时系统应自动创建父目录并成功生成输出文件
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"replace-失败时临时文件被清理",file sink 已写入临时文件,close 阶段的原子替换操作失败,close MUST 抛出异常
+  r5,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r5,"default-mode-preserves-raw-values",用户使用内建 file sink 且未显式启用 escape 模式,file sink 写出该值,输出的字段值 MUST 保持为 `=1+1`
+  r5,"escape-mode-writes-formula-like-values-as-text","某个输出字段来自不可信输入且值为字符串 `=HYPERLINK(“http://evil”, “x”)`",file sink 以 escape 模式写出该值,输出的字段值 MUST 以 `'` 前缀写出，以避免被解析为公式
+  r6,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r6,"built-in-sinks-produce-identical-output-via-fastpath","","内建 sink 同时支持现有接口与 aligned-write fastpath",在相同输入下两条路径写出的结果 MUST 一致
+  r7,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r7,"sink-close-does-not-leave-a-lock-file-next-to-output",某次 CSV/Excel sink 写出目标路径为 `./out/report.csv` 或 `./out/report.xlsx`,sink 成功 close 并发布最终文件,`./out/report.csv.scalim.lock` 与 `./out/report.xlsx.scalim.lock` MUST NOT 存在
+  r8,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r8,"optional-sinks-are-not-exported-from-default-facade","",调用方执行 `from scalim.sinks import PandasRowSink`,该导入 MUST 失败（符号不在 `scalim.sinks` 默认导出面中）
+```

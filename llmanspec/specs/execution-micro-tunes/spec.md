@@ -1,0 +1,32 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate execution-micro-tunes --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "execution-micro-tunes"
+purpose: "定义 YAML DSL 语法增强，简化常见场景的表达复杂度，包括 relation 引用语法糖、output.fields 简写、runtime vars 指令节点形式，以及改进的验证器诊断信息。"
+requirements[4]{req_id,title,statement}:
+  r1,Relation references support string ref to relations.<id>,"系统 MUST 支持在字段定义中用字符串引用 relation: - `relation: <relation_id>` 作为 `relations.<relation_id>` 的显式引用 系统 MUST 在 full validate 时校验: - `relations.<relation_id>` 存在 - relation steps 的起止字段与 chain 校验规则保持不变"
+  r2,output.fields supports string list sugar,"系统 MUST 支持 `output.fields` 的 string sugar: - string 作为 `field_id`(例如 `order_id`) - `source.field_id` 作为显式消歧形式(例如 `orders.order_id`),且仅支持单个 `.` 分隔的二段式 系统 MUST 允许在同一 `output.fields` 列表中混用 string 与对象条目。 系统 MUST 保留对象条目用于覆写字段输出行为(例如覆写 `name` 或指定 selector)。"
+  r3,Runtime vars use directive node form (breaking),"系统 MUST 支持并统一 runtime vars 的指令节点形态: - `{$runtime: <name>}` 系统 MUST NOT 依赖字符串占位符 `$runtime.<name>` 作为 runtime vars 表达。"
+  r4,Validator provides actionable diagnostics for field_id vs data_key mistakes,"当 relation steps 写了 data_key(不在声明字段与 key 中)时,系统 MUST 在错误信息中提供: - 最可能的 `field_id` 建议(至少 1 个) - 可直接复制的修复片段(最小 YAML 片段)"
+scenarios[12]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"relation-can-be-referenced-by-id","","用户在字段中写 `relation: orders_to_customers`","系统 MUST 将其解析为对 `relations.orders_to_customers` 的引用,并执行与 steps 对象相同的语义校验"
+  r1,"unknown-relation-id-is-rejected","","用户写 `relation: missing_relation`","full validate MUST 失败,并指出缺失的 `relations.missing_relation`"
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"output-fields-accepts-field-id-strings","","用户写 `output.fields: [order_id, order_date]`","schema-only 校验与 full validate MUST 通过,并按声明顺序输出字段"
+  r2,"output-fields-accepts-source-field-id-strings","","用户写 `output.fields: [orders.order_id, customers.customer_name]`","schema-only 校验与 full validate MUST 通过;full validate MUST 将其解析为显式选择器,避免同名字段歧义"
+  r2,"output-fields-rejects-multi-dot-source-field-id-strings","","用户写 `output.fields: [orders.customer.id]`","schema-only 校验与 full validate MUST 失败,并提示 `source.field_id` 仅支持二段式(单个 `.`);需要更复杂表达时应使用对象条目"
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"runtime-var-directive-is-accepted","","用户在 params 中写 `ids: {$runtime: order_ids}`","schema-only 校验与 full validate MUST 通过,并在运行期注入对应 runtime 值"
+  r3,"legacy-runtime-xxx-placeholder-is-rejected","","用户在 params 中写 `ids: \"$runtime.order_ids\"`","full validate MUST 失败,并提示改用 `{$runtime: order_ids}`"
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"validator-suggests-likely-field-id-and-fix-snippet","",用户在 relation steps 中误写 data_key,"full validate MUST 失败,并在错误信息中包含建议的 `field_id` 与可复制的修复片段"
+```

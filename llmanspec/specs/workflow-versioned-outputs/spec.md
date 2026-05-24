@@ -1,0 +1,35 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate workflow-versioned-outputs --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "workflow-versioned-outputs"
+purpose: "定义版本化输出协议（D-2）：将 `path` 解释为输出 root 目录,并在 root 下以 `versions/<version_id>/...` 写入产物,同时通过 `manifest/latest.json` 提供稳定入口与并发下的原子更新语义（last-writer-wins,但不丢历史版本）。"
+requirements[6]{req_id,title,statement}:
+  r1,output path MUST be treated as an output root directory,"系统 MUST 将“输出配置的 path”解释为 **目录 root**（而不是最终文件路径），并在该 root 下创建框架自管目录： - `<root>/versions/`：所有版本化输出目录 - `<root>/manifest/`：元数据目录（latest 指示等） 约束： - 系统 MUST 在首次写入前创建 root 目录及其父目录（`mkdir(parents=True, exist_ok=True)`）。 - 系统 MUST NOT 在 `<root>` 的其它位置创建框架元数据文件（尤其是 `<final_path>.scalim.lock`）。 - root 目录的相对路径解析规则由各 DSL capability 定义（例如相对 YAML 目录解析）。"
+  r2,each run MUST publish into a unique version directory under the root,"系统 MUST 为每次运行选择一个 `version_id`，并将所有该 root 的产物写入： - `<root>/versions/<version_id>/...` 约束： - `version_id` MUST 等于： - workflow: `workflow_exec_id` - standalone demand: `run_id` - `version_id` MUST 是安全的路径段： - `version_id` MUST match regex `^[A-Za-z0-9][A-Za-z0-9_-]*$` - `version_id` MUST NOT contain path separators - 系统 MUST NOT 修改或覆盖其它 `version_id` 的产物（版本目录是 append-only）。 - 若 `<root>/versions/<version_id>/` 已存在，系统 MUST fail-fast（避免并发/复用导致的版本污染）。"
+  r3,latest pointer MUST be updated atomically and remain valid JSON under concurrenc,"系统 MUST 在每次成功 publish 后写入/更新 `latest` 指示文件： - path: `<root>/manifest/latest.json` - content MUST 至少包含： - `version_id`：当前版本 id - `version_manifest_relpath`：指向版本 manifest 的相对路径（例如 `versions/<version_id>/manifest.json`） 原子性与并发语义： - 系统 MUST 通过“临时文件 + atomic replace”更新 `latest.json`，避免并发写导致文件内容损坏。 - 当多个运行并发写同一 root 时，`latest.json` 的语义 MUST 为 **last-writer-wins**。"
+  r4,output root MUST be the namespace boundary for latest,"系统 MUST 将 output root 视为 `latest` 的唯一隔离域（namespace boundary）： - v1 仅支持单一 `latest` 指示文件：`<root>/manifest/latest.json` - v1 MUST NOT 引入或写入任何 namespaced latest（例如 `latest.<tenant>.json`） - 多租户场景 MUST 通过目录分层为每个租户/业务提供独立 root"
+  r5,each version MUST write a version manifest for diagnostics and discovery,"系统 MUST 在版本目录内写入版本 manifest： - path: `<root>/versions/<version_id>/manifest.json` - manifest MUST 至少包含： - `version_id` - `created_at_unix_s` - 该版本产物的相对路径信息（例如 books/files 的映射）"
+  r6,v1 MUST NOT prune or delete versions automatically,"系统 v1 MUST NOT 自动删除任何历史版本目录： - 系统 MUST NOT 删除 `<root>/versions/<version_id>/...` - 系统 MUST NOT 因更新 `latest.json` 而删除旧版本"
+scenarios[13]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"output-root-layout-is-created-lazily-and-is-stable","",系统首次向某个输出 root 写入版本化产物,系统 MUST 创建 `<root>`（含父目录）并创建 `<root>/versions/` 与 `<root>/manifest/`
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"two-runs-preserve-both-versions",同一输出 root 被连续执行两次且产生两个不同的 `version_id`,两次运行均成功完成,`<root>/versions/<version_id_1>/` 与 `<root>/versions/<version_id_2>/` MUST 同时存在
+  r2,"invalid-version-id-is-rejected",某次运行的 `workflow_exec_id/run_id` 包含不安全字符（例如路径分隔符）,系统尝试创建 `<root>/versions/<version_id>/`,"系统 MUST fail-fast"
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"concurrent-writers-do-not-corrupt-latest-json",两个独立运行并发写入同一输出 root（各自使用不同的 `version_id`）,两个运行都尝试更新 `<root>/manifest/latest.json`,任意时刻读取 `latest.json` MUST 始终得到可解析的 JSON
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"multiple-tenants-use-separate-roots-to-avoid-latest-conflict",服务端存在 tenant A/B 两个并发报表请求,A 使用 root `./out/tenant_a`，B 使用 root `./out/tenant_b`,A/B MUST 各自拥有独立的 `<root>/manifest/latest.json`
+  r5,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r5,"version-manifest-is-present-for-successful-runs","",某次运行成功完成并发布版本化产物,系统 MUST 生成 `<root>/versions/<version_id>/manifest.json`
+  r6,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r6,"newer-runs-do-not-delete-older-versions",同一输出 root 下已存在旧版本目录 `versions/v1`,系统写入新版本目录 `versions/v2` 并更新 `manifest/latest.json`,`versions/v1` MUST 仍然存在
+```

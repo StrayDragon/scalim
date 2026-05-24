@@ -1,0 +1,25 @@
+---
+llman_spec_valid_scope:
+  - src/scalim/
+llman_spec_valid_commands:
+  - llman sdd validate workflow-runtime-module-organization --type spec --strict --no-interactive
+llman_spec_evidence:
+  - migrated from openspec
+---
+
+```toon
+kind: llman.sdd.spec
+name: "workflow-runtime-module-organization"
+purpose: "定义 workflow runtime 的包位置、子模块职责划分与稳定入口策略,确保其作为 framework 层能力与 DSL 层保持清晰边界."
+requirements[3]{req_id,title,statement}:
+  r1,workflow runtime MUST be modularized while preserving stable entrypoints,"系统 MUST 将 workflow runtime 作为 framework 层能力放置在独立包中(SSOT: `IMPL_ROOT.workflow`),并按职责拆分为更小的内部模块（例如 execute/scheduler、ctx、resources、loaders、report）。 系统 MUST 同时保持 YAML workflow 的稳定入口可用(SSOT: `IMPL_ROOT.dsl.yaml_dsl.workflow_entrypoints`),调用方不需要因内部拆分而修改导入路径。"
+  r2,workflow execution MUST be structured as explicit Controller + State with inject,"workflow 执行层本质为状态驱动的调度与生命周期管理,系统 MUST 将其实现建模为显式的 Controller/State 结构以降低回归风险并提升可测试性： - 系统 MUST 提供一个显式的 `WorkflowRunState`（或等价 dataclass）集中承载执行状态（ready/submitted/outcomes/node_state/capture 等）,避免通过散落的 dict/闭包隐式共享状态 - 系统 MUST 提供一个 `WorkflowRunController`（或等价对象）作为执行协调器： - 依赖（executor/resource_manager/instrumentation/cache_pool 等）MUST 通过构造参数显式注入 - 关键状态转换 SHOULD 由明确方法表达（例如 submit/process_done/finalize） - 逻辑拆分 SHOULD 优先抽离可单测的纯规则模块（failure_policy 决策、outcome 构造、事件分类）,避免仅把复杂度从单个长函数扩散到多个仍共享隐式状态的函数"
+  r3,workflow visibility closure MUST have a single SSOT and be reused,"workflow runtime 中所有依赖“节点可见性闭包”(transitive depends_on)的能力(至少包括 ctx refs 校验与 artifacts 可见性校验) MUST 复用单一 SSOT 的可见性索引/计算逻辑,避免重复实现导致的行为漂移."
+scenarios[6]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"stable-workflow-entrypoints-remain-importable-after-refactor","",调用方导入并调用 workflow 的稳定入口（例如 `run_workflow`）,导入 MUST 成功且行为与重构前一致
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"controller-methods-can-be-unit-tested-around-state-transitio",一个 controller 持有显式 state 与注入依赖,模拟 future 完成/失败/取消等事件输入,测试 SHOULD 能仅通过断言 state 的变化与注入依赖的调用来验证语义
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"ctx-and-artifacts-share-the-same-visibility-rules","workflow 节点 B depends_on A,且 C depends_on B(因此 C 传递可见 A)",C 通过 ctx 或 artifacts 引用 A 的产物,可见性判定 MUST 一致地视为可见
+```

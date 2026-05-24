@@ -43,7 +43,7 @@ def _is_allowed_markdown(rel_posix: str) -> bool:
         return True
     if rel_posix == "agentdev/skills/scalim-yaml-dsl/references/generated/yaml-dsl-upgrades.gen.md":
         return True
-    if rel_posix.startswith("openspec/changes/archive/"):
+    if rel_posix.startswith("llmanspec/changes/archive/"):
         return True
     return False
 
@@ -137,7 +137,7 @@ def main() -> int:
     if errors:
         sys.stderr.write("`Markdown` SSOT 检查失败: 检测到遗留写法.\n")
         sys.stderr.write(
-            "允许的例外: `agentdev/skills/.../references/upgrades/`, `yaml-dsl-upgrades.gen.md`, `openspec/changes/archive/`\n"
+            "允许的例外: `agentdev/skills/.../references/upgrades/`, `yaml-dsl-upgrades.gen.md`, `llmanspec/changes/archive/`\n"
         )
         sys.stderr.write("违规项:\n")
         for item in errors[:200]:
