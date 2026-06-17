@@ -1,0 +1,21 @@
+kind: llman.sdd.spec
+name: "tools-console-reports"
+purpose: "TBD - created by archiving change c2-remove-literich. Update Purpose after archive."
+valid_scope[1]: src/scalim/
+requirements[5]{req_id,title,statement}:
+  r1,"console reports MUST be dependency-free and line-oriented","系统 MUST 将 `console` 报告（或等价的 “打印/展示到日志” 输出）实现为仅依赖 Python 标准库 `logging` 的逐行（line-oriented）文本输出。 系统 MUST NOT 依赖 `scalim.vendor.literich`（或任何表格/面板渲染器）来完成 console 报告展示。"
+  r2,console report lines MUST use stable prefix + kind token + k=v fields,"系统 MUST 使用稳定前缀 `[scalim] <subsystem>:` 输出 console 报告行，并在每行前缀后使用稳定 kind token 表示该行语义（例如 `summary`、`per_source`、`loader` 等）。 系统 MUST 以稳定 `k=v` 形式表达诊断字段，且 key 顺序 MUST 稳定（字典序），值为 `None` 的字段 MUST 被省略。"
+  r3,console report MUST NOT rely on alignment or box drawing,系统 MUST 将 console 报告视为可被 grep/日志采集处理的文本流，不得将“列对齐/固定宽度”作为信息载体。 实现 MUST NOT 以 “表格边框/对齐空格/等宽假设” 表达语义（例如不得要求用户通过 `│`/`┌─┐` 等 box drawing 或 padding 才能理解字段归属）。
+  r4,"per-entity breakdown MUST be emitted as repeated lines",当报告包含 “按实体拆分”的明细（例如 `per_source` / `per_loader` / `per_stage`），系统 MUST 以重复的逐行输出表达该明细，而不是把其嵌入为对齐表格。
+  r5,"multi-line details MUST be bounded and individually line-oriented","当报告需要输出样本/详情（例如 type mismatch samples），系统 MUST： - 输出一行 “summary line” 指明 `showing=N`（或等价字段） - 随后将每条样本作为独立的一行输出（每行仍遵循 prefix/kind/`k=v` 的约定，或以固定缩进并保持 `k=v`） - 样本数量 MUST 有界（例如仅输出前 N 条）"
+scenarios[10]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"console-report-does-not-require-rendering-dependencies",环境未安装 `rich` 等可选依赖,用户启用 observability 并选择 `report_format=console`,console 输出 MUST 正常产生
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"stable-prefix-and-stable-k-v-ordering","","系统输出一行 console 报告并包含字段 `{b: 2, a: 1, skip: None}`","该行 MUST 以 `[scalim] <subsystem>:` 开头"
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"report-remains-readable-without-monospace-rendering","",读者在比例字体/日志系统 UI 中查看 console 输出,输出中的关键语义 MUST 仍可通过 kind token 与 `k=v` 直接读出
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"per-source-is-emitted-as-multiple-lines",关联命中统计包含多个 `source_id`,系统输出 console 报告,系统 MUST 为每个 `source_id` 输出一行 kind=`per_source` 的记录
+  r5,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r5,"samples-output-is-bounded-and-line-oriented",系统收集到 100 条 type mismatch 样本,系统输出 console 报告,系统 MUST 明确输出 `showing=<N>`（N 为有界数，例如 5）

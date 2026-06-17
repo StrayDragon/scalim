@@ -1,0 +1,72 @@
+kind: llman.sdd.spec
+name: "workflow-shared-output-containers"
+purpose: 定义 workflow 共享输出容器的资源声明、写入节点、确定性顺序、追加/合并语义、原子提交、可观测性及并发安全契约。
+valid_scope[1]: src/scalim/
+requirements[21]{req_id,title,statement}:
+  r1,workflow YAML exposes a stable authoring surface for shared resources and write,"系统 MUST 为共享输出容器提供可实现、可校验的 workflow YAML authoring surface,并将“写入意图”从 workflow `writes` 收敛为 demand outputs 的 IO 绑定(由 workflow 编译期推导写入节点): - 资源声明: - `workflow.resources.books.<book_id>` MUST 为 mapping 且 MUST 满足 `yaml-dsl-books-resources` 对 book 的约束 - 写入意图: - workflow YAML MUST NOT 再暴露已移除的 workflow-level 写入 intents authoring surface - 系统 MUST 从每个 run 引用的 demand YAML 中读取 `outputs[*].to` / `outputs[*].write` 推导等价的写入节点集合 迁移约束(破坏性变更): - legacy workflow resource groups(workbooks/csvs/sheetbooks) MUST 被拒绝并给出迁移提示(迁移到 `workflow.resources.books`) - 已移除的 workflow-level 写入 intents MUST 被拒绝并给出迁移提示(迁移到 demand outputs 的 `to/write` 绑定)"
+  r2,workflow declares shared output resources at workflow scope,"系统 MUST 扩展 workflow YAML 语义,允许在 workflow 层声明共享输出资源(books),并由 workflow runtime 统一管理其生命周期: - 资源声明 MUST 位于 workflow scope: `workflow.resources.books` - 每个资源 MUST 具备稳定 id(资源名)与 kind 对应的必要配置(例如 path/budget/export) - 系统 MUST 静态校验资源声明(例如 id 唯一、必填字段齐全、预算为正整数等)"
+  r3,shared output is written via explicit workflow write nodes,"系统 MUST 将“写入共享 book 资源”的动作建模为 workflow 的显式节点类型,而不是 demand 的隐式后处理: - 系统 MUST 支持至少两类写入节点语义: - `write_sheet`(写入/覆盖某个 sheet; 对应 `mode=sheet`) - `append_sheet`(追加写入某个 sheet; 对应 `mode=append`,具备字段对齐与 header 策略) - workflow YAML authoring surface 不再手写 write intents,但编译后语义 MUST 等价于显式 write nodes - 写入节点 MUST 消费上游 demand 节点的 output artifacts；该 artifact 可以是文件路径 output,也可以是 workflow-managed 的内存表格 artifact(例如 `InMemoryRows` 或等价结构) - 当写入节点消费的是 workflow-managed 内存 artifact 时,消费完成后系统 MUST 参与该 artifact 的最终消费者释放流程"
+  r4,writes to shared resources are deterministic and serialized,"系统 MUST 定义确定性写入顺序,且 MUST NOT 依赖并发完成顺序: - 对同一共享 book 资源的写入 MUST 互斥/串行化 - 写入顺序 MUST 由声明顺序决定: - 以 workflow YAML `runs` 列表顺序为一级 SSOT - 以每个 demand YAML 的 `outputs` 列表顺序为二级 SSOT"
+  r5,append/merge semantics are explicit and verifiable,"当多个节点写入同一个 sheet 或以 append 方式合并时,系统 MUST 定义明确且可测试的合并语义: - 字段对齐策略 MUST 明确(例如按 field_id 对齐/按 header 对齐) - header 输出策略 MUST 明确(例如仅一次/每段/禁用) - 当字段不匹配或冲突时,系统 MUST 提供明确策略并可配置(`error|warn|skip`) 该策略的 authoring surface MUST 以 `resources.books.*.write_defaults` 与 `outputs[*].write` 表达(SSOT),不得再通过 workflow `writes` 表达。"
+  r6,shared resources commit atomically at workflow end,"系统 MUST 定义共享资源的落盘/提交语义,避免“部分写入但语义不清”的灰区: - 共享资源 MUST 在 workflow 成功结束后统一 commit,并以原子方式落盘(只保存一次/原子替换) - 当 workflow 失败时,系统 MUST discard 未提交的共享资源（v0 不支持 partial commit）"
+  r7,shared resource lifecycle MUST be observable,"系统 MUST 为共享资源生命周期提供可观测事件/钩子点,以便排障与可视化: - 系统 MUST 发出以下事件类型: - `workflow_resource_create` - `workflow_resource_write` - `workflow_resource_commit` - `workflow_resource_discard` - 事件 MUST 复用 workflow 归因字段(例如 `workflow_exec_id` / `workflow_node_id`)"
+  r8,shared resource plan creation MUST be atomic and joinable within a workflow exec,"当 workflow 并发执行多个 nodes 且多个写入节点引用同一个共享 book 资源时,系统 MUST 确保该资源在一次 workflow 执行内仅创建一个 plan,并允许并发写入方 join 到同一 plan： - 对同一 `resource_id` 的 “get-or-create” MUST 原子（并发首次命中不得产生多个 plan）。 - 该资源的写锁获取 MUST 与该 plan 绑定且在一次 workflow 执行内只发生一次；同一 workflow 内的其它并发写入 MUST join 而不是被误判为并发写者。 - 最终 commit MUST 包含所有写入方产生的写入意图（不得丢写）。"
+  r9,"joinable get-or-create 的等待诊断","系统 SHALL 为共享资源的 joinable get-or-create 提供可选的 wait diagnostics,使 waiter 等待过程可观测且可定位. 该诊断配置 MUST 作为 workflow-level SSOT 暴露(例如 `workflow.options.resources_wait`),并贯穿 YAML→IR→runtime. 约束: - 诊断配置 MUST 包含 `diagnostics.enabled`(默认 false) - 当 `diagnostics.enabled=true` 时,诊断配置 MUST 包含 `warn_after_s`(首次告警阈值)和可选的 `repeat_every_s`(重复告警间隔) - 告警 MUST 包含: `resource_id`、owner 线程标识、waiter 线程标识、已等待时长 - 当启用 `capture_owner_callsite=true` 时,告警 SHOULD 额外包含 owner callsite(用于定位卡住的创建点) - 告警 MUST 走 instrumentation event 或 warning logger,不得污染正常输出 - 默认行为 MUST 为禁用(仅在 `diagnostics.enabled=true` 时输出告警)"
+  r10,"joinable get-or-create 的可选超时","系统 MUST 为共享资源的 joinable get-or-create 提供 max wait / fail-fast 能力,以避免并发场景无限等待导致 workflow hang. 约束: - 超时后 MUST 以 `WorkflowWriteError` 失败,错误消息包含 resource_id、owner 线程标识、已等待时长与 max_wait_s - 默认策略 MUST 为启用超时且 `max_wait_s=600`(BREAKING: 不再允许无限等待作为默认) - 超时值 MUST 可配置(优先通过 workflow-level 配置 `workflow.options.resources_wait.max_wait_s`) - 若显式将 `max_wait_s` 配置为 `0` 或负数,MUST 被拒绝并给出配置错误"
+  r11,commit_all/discard_all 与 inflight 并发交错语义,"系统 MUST 在 `commit_all()`/`discard_all()` 执行时显式处理与 inflight 创建的并发交错,并采用 **drain** 策略: - commit/discard 在开始前 MUST 等待所有 inflight 创建完成,保证不会\"漏 commit / 漏 discard\" 约束: - drain 等待 MUST 复用 wait diagnostics(含 warn-after/timeout)"
+  r12,workflow workbook exports MUST escape Excel formulas by default,"当 workflow 通过共享 `books.kind=xlsx_file` 或 `books.kind=xlsx_memory.export_xlsx` 导出 `.xlsx` 时,系统 MUST 默认保留所有字符串 cell 值原样写出,不得执行公式前缀转义。 防护模式（不可信输入显式收紧）： - 若 effective book 配置 `allow_formulas=false`,系统 MUST 对所有字符串 cell 值执行公式前缀转义,以避免 `Excel` 将其解析为公式。"
+  r13,workflow workbook resource authoring surface MUST support allow_formulas,"系统 MUST 支持 workflow YAML 的 book 资源声明包含可选字段 `workflow.resources.books.<book_id>.allow_formulas`： - 该字段 MUST 为 bool - 缺省时 MUST 等价于 `true`"
+  r14,"workflow MUST precheck Excel output-path collisions across books deterministical","当 workflow 声明多个 `xlsx` 导出路径时,系统 MUST 在“写入发生前”检测潜在的路径冲突,并采用确定性规则 fail-fast: - 若两个 book 的 effective 导出路径相同(同一路径),系统 MUST 拒绝执行并报告冲突的 book ids 与 path - 路径判定 MUST 基于 `expanduser + resolve(strict=False)` 的归一化绝对路径 动态路径约束: - 若 book path 由 `{$init_var: ...}` 注入,系统 MUST 使用渲染后的最终路径参与冲突判断 - 对依赖 `$ctx` 的注入(compile-on-ready) MUST 在该节点物化编译后,仍在实际写入前做最终冲突预检查"
+  r15,commit order MUST NOT depend on thread scheduling,"当 workflow 在并发模式执行时,系统 MUST 禁止将共享资源（csv/workbook/sheetbook）的最终写入顺序绑定到线程调度或节点完成时序. 系统 MUST 为每条写入意图记录稳定的 `decl_order`（声明顺序序号）,并在 commit 阶段按 `decl_order` 稳定排序后写出."
+  r16,workbook/sheetbook sheet order MUST be stable,"系统 MUST 定义 workbook/sheetbook 的 sheet 顺序策略,且不得依赖“并发首次创建时 append”导致的漂移."
+  r17,shared outputs MUST commit into staging and publish on success,"系统 MUST 将 workflow 共享输出容器（csv/workbook/sheetbook）的落盘语义收敛为 staging → publish: - commit 阶段 MUST 写入 staging 唯一路径（不得直接写入最终导出路径） - workflow 成功结束后 MUST 覆盖发布到最终导出路径（原子 replace） - 默认清理策略 MUST 为: - success: 清理 staging exec dir - failure: 保留 staging（便于排障） staging 路径布局约束: - 对最终路径 `final_path`,staging MUST 为 `<final_dir>/<dir_name>/<workflow_exec_id>/<filename>` - `dir_name` 由 `workflow.options.output_staging.dir_name` 提供或缺省为 `.scalim-staging`"
+  r18,"workflow controller MUST be the sole writer of workflow-managed shared state","当 workflow 以并发模式执行（`max_concurrency > 1`）时，系统 MUST 将所有 workflow-managed 的共享可变状态更新收敛到单一 controller（单写者/actor）执行上下文中： - `WorkflowArtifactsDirectory` 的 publish/get/discard - `WorkflowCtxStore` 的 publish/resolve - `WorkflowResourceManager` 的 create/write/commit/discard 并发线程（worker）MUST 仅负责纯计算（例如执行 `run_ir`）并将结果回传给 controller；worker MUST NOT 直接写入上述共享状态。"
+  r19,"WorkflowArtifactsDirectory MUST fail-fast on any non-controller thread write pat","`WorkflowArtifactsDirectory` 是 workflow-managed 的共享可变状态. 所有会写内部状态的 API MUST 被视为 controller-only writer,包括: - `publish` / `discard` - in-memory artifact cleanup helpers(例如 `discard_in_memory_*`、`discard_all_in_memory_*`、`discard_all_in_memory_rows`) 任一非 controller 线程(worker)调用上述 writer API MUST 被视为实现错误,并 MUST fail-fast(例如抛出 `RuntimeError`),而不是静默写入共享状态."
+  r20,"The single-writer contract MUST be consistently enforced across all artifacts cl","单写者契约 MUST NOT 仅在“主入口 API”上部分生效,而留下 helper 方法的未加固写路径. 任何会写内部 dict 的 artifacts helper MUST 具备与 `publish/discard` 等价的 owner-thread enforcement."
+  r21,workflow shared resources MUST publish into versioned output roots and update ma,"当 workflow 最终 commit 共享输出资源（books/files）时，系统 MUST 按版本化输出（D-2）协议发布： - 产物 MUST 写入 `<root>/versions/<workflow_exec_id>/...` - 系统 MUST 写入 `<root>/versions/<workflow_exec_id>/manifest.json` - 系统 MUST 原子更新 `<root>/manifest/latest.json` - 系统 MUST NOT 在产物路径旁生成 `<final_path>.scalim.lock`"
+scenarios[45]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"shared-output-authoring-surface-passes-schema-validation","","workflow YAML 包含 `workflow.resources.books` 且不包含已移除的 workflow-level 写入 intents","schema-only 校验 MUST 通过"
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"shared-resource-declaration-is-validated",workflow 声明两个同名 book 资源,workflow 被编译/校验,"系统 MUST fail-fast 并报告资源 id 冲突"
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"write-nodes-depend-on-demand-outputs",write_sheet 节点消费 run A 的 output `detail`,workflow 执行,系统 MUST 在 run A 成功完成并产生该 output 后才允许 write_sheet 执行
+  r3,"write-nodes-can-consume-workflow-managed-in-memory-artifacts",write_sheet 节点消费 run A 的 output `detail`,workflow 执行,write_sheet MUST 无需依赖临时 CSV 文件路径即可完成写入
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,"writes-to-a-shared-book-are-deterministic",两个 runs 都绑定到同一个共享 book 的不同 sheets,workflow 在并发模式下执行多次,"对共享资源的写入顺序 MUST 可复现,且结果 MUST 等价"
+  r5,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r5,"field-alignment-policy-is-enforced",append_sheet 声明按 field_id 对齐且策略为严格相等,两段输出字段集合不一致,"系统 MUST fail-fast 并报告差异摘要"
+  r6,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r6,"failed-workflow-does-not-leave-partial-committed-output",workflow 包含共享 book 且其中部分写入节点已执行,workflow 结束,系统 MUST 不产生“已提交但不完整”的最终 xlsx 文件(默认 discard)
+  r7,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r7,"resource-lifecycle-events-are-joinable",workflow 声明共享 book 资源并执行写入,workflow 成功 commit 或失败 discard 该资源,observer MUST 能观测到对应的 commit/discard 事件
+  r8,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r8,"concurrent-writes-to-a-shared-book-join-a-single-plan",workflow 并发执行两个 nodes A/B,多次执行该 workflow,"系统 MUST 不得因“重复获取写锁”而 fail-fast"
+  r9,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r9,"waiter-等待超过阈值时产生诊断告警",wait diagnostics 启用且 `warn_after_s=5.0`,waiter 等待 owner 创建资源超过 5 秒,系统 MUST 发出包含 resource_id/owner_thread/waiter_thread/wait_s 的告警
+  r10,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r10,"owner-卡死导致-waiter-超时",max_wait_s 配置为 60 秒,owner 线程创建资源超过 60 秒未完成,waiter MUST 以包含诊断信息的 `WorkflowWriteError` 失败
+  r10,"default-timeout-is-enforced",未显式配置 max_wait_s,owner 线程创建资源超过默认超时,"waiter MUST fail-fast,而不是无限等待"
+  r11,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r11,"commit-all-与-inflight-创建并发时-drain",采用 drain 策略,"某线程正在 inflight 创建资源,另一线程调用 `commit_all()`",`commit_all()` MUST 等待 inflight 创建完成后再 commit 所有资源
+  r12,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r12,"allow-formulas-is-true-by-default-and-preserves-raw-strings",workflow 声明 book 资源 `report` 且未显式设置 `allow_formulas`,"某个写入节点将字符串 `\\\"=1+1\\\"` 写入该 book","导出的 `.xlsx` 中对应单元格值 MUST 为 `\\\"=1+1\\\"`"
+  r12,"allow-formulas-false-escapes-formula-like-strings",workflow 声明 book 资源 `report` 且设置 `allow_formulas=false`,"某个写入节点将字符串 `\\\"=1+1\\\"` 写入该 book","导出的 `.xlsx` 中对应单元格值 MUST 为 `\\\"'=1+1\\\"`"
+  r13,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r13,"book-allow-formulas-passes-schema-validation","",workflow YAML 声明 `workflow.resources.books.report.allow_formulas=false`,"schema-only 校验 MUST 通过"
+  r14,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r14,"duplicate-xlsx-export-paths-are-rejected-deterministically","workflow 声明两个 book: `a` 与 `b`",workflow 被编译/校验,"系统 MUST fail-fast 并报告冲突路径与 book ids"
+  r15,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r15,"concurrent-appends-preserve-declaration-order",两个并发 runs 对同一共享 csv 资源 append 写入,workflow 在并发模式下重复执行多次,最终落盘 csv 的段顺序 MUST 始终与 YAML 声明顺序一致
+  r16,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r16,"sheet-order-is-stable-across-concurrent-runs","",并发执行多个写入不同 sheets 的 write intents,导出的 workbook/sheetbook 内 sheet 顺序 MUST 可复现
+  r17,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r17,"publish-overwrites-final-path-on-success",workflow 成功结束且存在 staged output,执行 publish,最终导出路径 MUST 被原子覆盖为 staged output 的内容
+  r18,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r18,"worker-threads-do-not-mutate-workflow-managed-state",workflow 启用并发执行（`max_concurrency=2`）,两个 demand nodes 并发运行并产生 outputs,系统 MUST 仅在 controller 上下文中发布 artifacts/ctx/resource 写入
+  r19,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r19,"worker-misuse-of-in-memory-discard-helpers-fails-fast",workflow 启用并发执行（`max_concurrency > 1`）,"worker 线程调用 `WorkflowArtifactsDirectory` 的 in-memory discard/cleanup helper","调用 MUST fail-fast(例如抛出 `RuntimeError`),而不是静默写入共享状态"
+  r20,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r20,"refactor-does-not-introduce-unguarded-helper-writes","",新增 artifacts helper API 或重构既有 helper,"任一会写 workflow-managed artifacts 的 helper MUST 包含相同的 owner-thread enforcement"
+  r21,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r21,"concurrent-workflows-publish-to-the-same-root-without-mutual",两个独立 workflow 进程并发写入同一输出 root（`./out`）,两个 workflow 都成功完成 publish,`./out/versions/<wf_exec_id_1>/` 与 `./out/versions/<wf_exec_id_2>/` MUST 同时存在

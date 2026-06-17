@@ -1,0 +1,16 @@
+kind: llman.sdd.spec
+name: "workflow-execute-organization"
+purpose: "TBD - created by archiving change c45-refactor-execute-controller-phase1. Update Purpose after archive."
+valid_scope[1]: src/scalim/
+requirements[3]{req_id,title,statement}:
+  r1,Workflow execution observable behavior MUST remain unchanged after Phase 1 refac,"Phase 1 MUST reorganize `execute.py` / `execute_controller.py` implementation into focused modules (`outcome_builder`, `scheduler_rules`, `WorkflowResourceLifecycle`, `WorkflowVizReporter`) without changing external semantics: outcomes, scheduling decisions, resource commit/discard, viz snapshots, and replay link behavior MUST remain byte-for-byte or logically equivalent to pre-change behavior for the same inputs and options."
+  r2,"Phase 1 MUST avoid new hot-path allocation or abstraction overhead","Extraction MUST use module-level pure functions and small holder classes that only keep references (no deep copies). The implementation MUST NOT introduce abstract base classes, strategy/plugin indirection, or extra serialization. Per-run extra memory from new objects MUST remain negligible (on the order of a few references per run as stated in design)."
+  r3,Extracted modules MUST remain Python 3.6 compatible,"New modules under `src/scalim/workflow/` MUST use the same Python 3.6 compatibility constraints as the rest of `scalim` (typing, dataclasses shims, no 3.7-only stdlib helpers unless shimmed)."
+scenarios[7]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"regression-parity-after-extraction","",the same workflow run configuration is executed before and after Phase 1 module extraction,"observable results (outcomes, node states, events, artifacts lifecycle, viz outputs) MUST match prior behavior within the project’s existing equivalence tests or snapshot contracts"
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"performance-characteristics-preserved","","a representative workflow run executes on GIL-backed CPython",the refactor MUST NOT add material CPU or memory regressions attributable to new object churn or indirect dispatch on the primary execute path
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,"ci-runs-on-minimum-supported-python","",tests run on the repository’s Python 3.6 job or equivalent gate,the new modules MUST import and execute without syntax or stdlib availability errors
+  r3,"organization-improves-testability","",reviewers add or extend unit tests for `outcome_builder` and `scheduler_rules`,pure functions MUST be callable without constructing a full workflow runtime except where integration tests require it

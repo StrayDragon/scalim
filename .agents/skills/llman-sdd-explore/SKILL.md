@@ -25,7 +25,7 @@ description: "进入 llman SDD 探索模式（仅思考；不做实现）。"
 4. 探索 2–3 个选项与权衡。
 5. 当结论逐渐清晰时，建议用户把它记录下来（不要自动写入）：
    - 范围变化 → `proposal.md`
-   - 需求变化 → `llmanspec/changes/<id>/specs/<capability>/spec.md`
+   - 需求变化 → `llmanspec/changes/<id>/specs/<capability>/spec.toon`
    - 设计决策 → `design.md`
    - 新工作项 → `tasks.md`
 
@@ -45,7 +45,7 @@ description: "进入 llman SDD 探索模式（仅思考；不做实现）。"
 - `llman sdd show <id>`（查看 change/spec）
 - `llman sdd validate <id>`（校验变更或 spec）
 - `llman sdd validate --all`（批量校验）
-- `llman sdd convert --to <style> --project`（显式风格迁移；toon/yaml 为 experimental）
+- `llman sdd migrate`（将旧版 `.md`+fence spec 一次性迁移为独立 `.toon`；幂等）
 - `llman sdd archive run <id>`（归档变更）
 - `llman sdd archive <id>`（`archive run` 的兼容别名）
 - `llman sdd archive freeze [--before YYYY-MM-DD] [--keep-recent N] [--dry-run]`（将已归档目录冻结到单一冷备文件）

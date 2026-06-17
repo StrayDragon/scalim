@@ -1,0 +1,17 @@
+kind: llman.sdd.spec
+name: "runtime-pruning"
+purpose: "PlanBuilder 基于目标字段构建依赖图并裁剪 required_fields,生成仅包含必需字段的 ExecutionPlan;运行时在 BatchContext 中仅保留 required_fields,并在列式/流式写入与显式释放时触发 FieldSlimEvent 以降低内存占用."
+valid_scope[1]: src/scalim/
+requirements[3]{req_id,title,statement}:
+  r1,依赖剪枝与计划元数据,"系统 SHALL 基于目标字段收集依赖并构建仅包含必需字段的执行计划,并使用依赖图进行拓扑排序以保证计算顺序正确. 系统 SHALL 在未显式指定 targets 时默认包含所有字段;可通过 output.fields 配置指定输出字段顺序. 系统 SHALL 在执行计划元数据中记录 pruned_fields(总字段数减去 required_fields 数量)."
+  r2,YAML 转换阶段按 output.fields 剪枝字段定义,"系统 SHALL 在 YAML DSL `DemandConfig → DemandIr` 转换阶段基于 `output.fields` 计算 required-fields 闭包(包含派生字段依赖与 `main_source.order_by` 引用字段),并跳过未被 required-fields 覆盖的字段定义转换,以降低无效字段带来的 IR/计划噪声. 当 `output.fields` 缺省时,转换阶段 MUST 保留全部字段定义."
+  r3,运行时字段保留与释放策略,系统 SHALL 在 BatchContext 中仅存储 required_fields 内的字段值. 系统 SHALL 在列式写入/行式流式缓存/显式释放算子触发时释放无后续依赖且非 key_fields 的字段并触发 FieldSlimEvent(基于 reverse_deps 结果判定).
+scenarios[8]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,未配置输出字段,"",YAML 未设置 output.fields,计划应包含全部字段
+  r1,剪枝非目标字段,"",目标字段仅包含订单 ID 与名称,未被依赖的字段不应被加载或计算
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,"未引用字段不进入-ir","",字段未在 `output.fields` 中出现且不被派生依赖引用,该字段不应被转换到 IR
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,非必需字段被忽略,"",计算过程中写入一个非 required_fields 字段,BatchContext 不应保存该字段
+  r3,列写入后释放,"",目标字段列写入完成且无后续依赖,该字段应从 BatchContext 删除并触发 FieldSlimEvent

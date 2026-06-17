@@ -1,0 +1,66 @@
+kind: llman.sdd.spec
+name: "execution-derived-outputs"
+purpose: "支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界."
+valid_scope[1]: src/scalim/
+requirements[17]{req_id,title,statement}:
+  r1,派生输出定义(同步聚合),"系统 SHALL 支持在同一次运行中定义派生输出,派生输出可基于详情数据进行聚合/计算,并在运行结束时输出结果."
+  r2,增量聚合与批次累计,"系统 SHALL 支持派生输出以增量方式累计(按批次或流式),以避免加载全部详情数据."
+  r3,派生输出的数据来源选择,"系统 SHALL 允许派生输出明确选择其数据来源(例如直接消费运行期事件/批次结果,或基于已落盘的详情输出),以平衡内存与 I/O 成本."
+  r4,非增量指标的处理方式,"系统 SHALL 支持对不可增量的统计指标提供可行路径,包括可合并近似算法或二阶段后置聚合."
+  r5,聚合状态资源控制,"系统 SHALL 支持派生输出聚合状态的资源控制(如阈值、落盘、降采样),以避免内存过载."
+  r6,IR/Python 配置入口,"系统 SHALL 仅提供 IR/Python 方式配置派生输出,并保持 YAML DSL 不变."
+  r7,`adaptive` 一致性边界,"系统 SHALL 明确 `adaptive` 并发下派生聚合的一致性边界,并在不满足条件时 fail-fast."
+  r8,`max_groups=0`(不设上限)时必须输出明确 warn,"当派生聚合输出的 `max_groups=0` 表示\"不设上限\"时,系统 MUST 输出明确的 warn,提示高基数 group-by 可能导致聚合状态无限增长并拖垮内存. 该 warn MUST 仅作为告警,不得改变结果语义(仍信任用户配置)."
+  r9,内置 set 口径聚合原语,"系统 SHALL 在派生输出的内置聚合能力中新增 streaming-friendly 的 set 口径原语,用于减少业务侧 Python state 并提升复用性. 系统 MUST 至少支持: - `count_distinct` (支持复合 key) - `dedup_by` - `two_stage_group_by`"
+  r10,`count_distinct` 复合 key 与缺失值语义,"系统 MUST 支持 `count_distinct` 同时接受单字段与复合 key. 系统 MUST 明确缺失值语义: - 当 distinct key 的任一组成字段为 `None` 时,该行 MUST 被忽略 - 空字符串 MUST 作为普通值参与 distinct."
+  r11,`dedup_by` 冲突策略,"系统 MUST 对 `dedup_by` 在同一 key 命中多行时的冲突策略提供显式配置,并保证在相同输入下结果确定性."
+  r12,`adaptive` 下的确定性边界,"系统 MUST 明确 `parallel_mode=\"adaptive\"` 下的确定性边界: 任一阶段包含顺序依赖语义时,系统 MUST fail-fast."
+  r13,两阶段聚合确定性,"系统 MUST 为 `two_stage_group_by` 定义确定性的 tie-break 与输出顺序规则,以避免对拍误报."
+  r14,distinct/去重状态的资源护栏,"系统 SHALL 为 set 口径状态提供可配置护栏,用于限制聚合状态规模并提供可对拍诊断信息. 系统 MUST 支持: - `max_distinct`: distinct key 数上限(0 表示不设上限) - `on_overflow`: 溢出策略(至少支持 `error|truncate`)"
+  r15,最小条件计数原语,"系统 MUST 提供至少一种\"可对拍且可指纹化\"的条件计数能力,用于覆盖常见口径. 系统 MUST 至少支持: - `count_true_gte(field_id, threshold)`"
+  r16,meta/audit 的稳定指纹与结构化审计,"系统 MUST 为每个 derived target 生成稳定聚合指纹,并写入 meta sheet. 系统 MUST 满足: - meta 中 MUST 写入聚合指纹 - 当触发护栏失败/截断/冲突等情况时,系统 MUST 写入结构化 audit 行(仅脱敏信息) - 指纹 MUST 使用 `sha256` 计算,不得用于签名/认证等安全目的"
+  r17,aggregate producer key enums MUST be centralized,"系统 MUST 为 aggregate 输出相关的 producer keys 提供一个 SSOT 模块,并要求 YAML 解析、运行时装配、工具自省、JSON Schema、前端 editor 共享同一份枚举集合. 该 SSOT MUST 包含并可被引用: - metric producer keys - rank producer keys - post producer keys"
+scenarios[43]{req_id,id,given,when,then}:
+  r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r1,"订单明细-供应商利润率","",详情输出包含订单ID/订单金额/订单利润/供应商ID,系统应生成包含供应商ID与利润率的汇总输出
+  r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r2,分批累计,"",详情数据按批次处理,派生聚合应跨批次累计并在结束时输出完整结果
+  r2,"可合并统计-均值-比率","",派生输出需要计算均值或比率,系统应仅累计必要的分子/分母状态并在结束时输出结果
+  r2,"top-k-近似聚合","","派生输出需要 Top-K 排名且数据量巨大",系统应允许使用可合并的近似算法并以有限内存完成累计
+  r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r3,列式输出的后置聚合,"",详情输出采用列式或落盘模式,派生输出可选择在详情落盘后进行聚合
+  r3,事件流增量聚合,"",派生输出选择消费运行期事件或批次结果,系统应允许在详情写入后立即更新聚合状态而不保留明细
+  r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r4,需要全量数据的指标,"",指标无法在单批次内增量计算,系统应允许使用近似算法或选择后置聚合模式完成输出
+  r4,精确分位数后置聚合,"",需要精确分位数且不允许近似,系统应允许将该指标标记为后置聚合并在详情落盘后计算
+  r5,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r5,聚合键数量过大,"",聚合键数量超过预设上限,系统应触发既定的资源控制策略并继续主流程
+  r6,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r6,仅使用编程方式配置,"",用户通过编程方式定义派生输出,系统应无需修改 YAML DSL 即可运行
+  r7,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r7,"内置可交换聚合在-adaptive-下可用","",派生输出仅使用内置可交换/可结合的增量指标,系统应允许派生聚合并确保结果确定性
+  r7,"自定义聚合器在-adaptive-下默认拒绝","",派生输出使用自定义聚合器且未声明支持 `adaptive`,"系统应 fail-fast 并提示切换到 `parallel_mode=\"seq\"`"
+  r8,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r8,"无上限聚合触发-warn",某个派生输出配置 `max_groups=0`,运行开始执行派生聚合,系统 MUST 输出一次 warn 提示资源耗尽风险并建议设置 `max_groups`
+  r9,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r9,"count-distinct-统计-distinct-用户数",详情流包含 `cs_id` 与 `user_id`,派生输出按 `cs_id` 分组并对 `user_id` 执行 `count_distinct`,系统 MUST 输出每个 `cs_id` 的 distinct 用户数且结果确定性
+  r10,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r10,"复合-key-的缺失值忽略",distinct key 由多个字段组成,某行的任一字段为 `None`,系统 MUST 忽略该行且不计入 distinct 计数
+  r11,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r11,"dedup-by-on-conflict-first",两行数据具有相同的 dedup key,"配置 `dedup_by(..., on_conflict=first)`","系统 MUST 选择稳定的\"第一条\"并用于后续指标计算"
+  r12,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r12,"adaptive-下拒绝顺序依赖去重策略","","`parallel_mode=\"adaptive\"` 且使用顺序依赖的去重策略","系统 MUST fail-fast 并提示切换到 `parallel_mode=\"seq\"`"
+  r13,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r13,两阶段聚合产生相同输出,"",执行两阶段聚合,系统 MUST 在相同输入下产生相同输出(含顺序)
+  r14,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r14,"distinct-护栏不设上限触发-warn",用户将 distinct 护栏配置为不设上限,运行开始执行 set 口径聚合,"系统 MUST 输出一次 warn 提示高基数风险,但不得改变结果语义"
+  r15,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r15,"count-true-gte-阈值计数",某行满足阈值条件,指标配置为 `count_true_gte`,系统 MUST 对该行计数 +1
+  r16,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r16,"写入派生聚合指纹到-meta","",运行包含 derived target,系统 MUST 在 meta 中写入聚合指纹
+  r16,"meta-指纹为-sha-256-形式","",为派生输出 meta 计算元信息指纹,"返回的 digest MUST 为 64 字符的小写十六进制字符串(SHA-256)"
+  r16,测试与基线随迁移更新,"",测试或快照断言指纹的返回值或长度,"期望 MUST 与 SHA-256 输出一致"
+  r17,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
+  r17,"parser-runtime-introspection-共享枚举","",系统提供 SSOT 模块,"各层 MUST 共享同一份枚举集合,不得维护本地副本"
+  r17,默认配置一致性,YAML primary output 包含 compute 字段且未显式指定输出字段,调用 introspection 加载输出配置,返回的默认输出字段 MUST 与 runtime 默认一致
+  r17,"json-schema-editor-bundles-同步","",系统生成 canonical JSON schema,schema 中 producer keys 的可选集合 MUST 与 SSOT 一致
