@@ -268,6 +268,40 @@ def test_resolve_workflow_output_export_header_visibility_error_path_is_wrapped(
     assert excinfo.value.path == "workflow.runs.0.input_node_id"
 
 
+def test_resolve_workflow_output_export_header_output_id_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    """headers_map 存在但 input_output_id 不在其中 → 返回 None."""
+
+    from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
+    from scalim.workflow import execute as workflow_execute_mod
+
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    artifacts_dir = workflow_execute_mod.WorkflowArtifactsDirectory(workflow_ir)
+
+    def _fake_get_optional(consumer_node_id: str, producer_node_id: str, artifact_id: str) -> object:
+        _ = consumer_node_id, producer_node_id
+        if artifact_id == "in_memory_csv_export_headers":
+            # headers_map 中不含 "detail" → 触发 `header is None` 分支。
+            return {"other": ("col1", "col2")}
+        raise AssertionError("unexpected artifact_id={!r}".format(artifact_id))
+
+    monkeypatch.setattr(artifacts_dir, "get_optional", _fake_get_optional)
+
+    result = workflow_execute_mod._resolve_workflow_output_export_header(
+        artifacts_dir=artifacts_dir,
+        consumer_node_id="a",
+        consumer_decl_order=0,
+        input_node_id="a",
+        input_output_id="detail",
+    )
+    assert result is None
+
+
 def test_resolve_workflow_input_csv_missing_outputs_mapping_and_unknown_and_non_csv() -> None:
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr
     from scalim.workflow import execute as workflow_execute_mod
