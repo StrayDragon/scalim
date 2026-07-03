@@ -8,7 +8,7 @@
 from abc import ABC
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Type, cast
 
 from .._internal.utils.excel import escape_excel_formula
 from ..events import EventType
@@ -16,7 +16,7 @@ from ..events._events import DiagnosticWarningEvent
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass
+from ..vendor.dataclassesx import dataclass, field
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
 
@@ -61,9 +61,10 @@ def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool)
 
     header_written = False
     segments = sorted(sheet_plan.segments, key=lambda seg: int(seg.decl_order))
+    export_fields = list(sheet_plan.export_header if sheet_plan.export_header is not None else sheet_plan.baseline_header)
     for seg in segments:
         if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
-            header = [escape_excel_formula(x, allow_formulas=bool(allow_formulas)) for x in list(sheet_plan.baseline_header)]
+            header = [escape_excel_formula(x, allow_formulas=bool(allow_formulas)) for x in list(export_fields)]
             yield header
             header_written = True
         # `never`: 不输出 `header`
@@ -104,7 +105,8 @@ def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> Non
 class _SheetPlan:
     sheet: str
     baseline_header: List[str]
-    segments: List[_AppendSegment]
+    export_header: Optional[List[str]] = None
+    segments: List[_AppendSegment] = field(default_factory=list)
 
 
 @dataclass
@@ -165,6 +167,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         input_output_id: str,
         input_csv: WorkflowCsvInput,
         on_conflict: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
@@ -210,7 +213,12 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             align_by="header",
             input_header=input_header,
         )
-        plan.sheets[sheet_name] = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[segment])
+        plan.sheets[sheet_name] = _SheetPlan(
+            sheet=sheet_name,
+            baseline_header=list(input_header),
+            export_header=list(export_header) if export_header is not None else None,
+            segments=[segment],
+        )
         plan.last_workflow_node_id = str(workflow_node_id)
 
         self._emit_resource_write(
@@ -238,6 +246,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         align_by: str,
         header_policy: str,
         on_mismatch: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
@@ -251,7 +260,12 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         if sheet_plan is None:
             plan.sheet_decl_order[sheet_name] = int(decl_order)
             plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
-            sheet_plan = _SheetPlan(sheet=sheet_name, baseline_header=list(input_header), segments=[])
+            sheet_plan = _SheetPlan(
+                sheet=sheet_name,
+                baseline_header=list(input_header),
+                export_header=list(export_header) if export_header is not None else None,
+                segments=[],
+            )
             plan.sheets[sheet_name] = sheet_plan
         else:
             existing_decl_order = plan.sheet_decl_order.get(sheet_name)

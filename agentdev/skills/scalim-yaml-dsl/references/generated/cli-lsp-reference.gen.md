@@ -60,7 +60,7 @@
 
 ## llmanspec Requirement Map
 ### `yaml-dsl-cli-validation`
-- Source: `llmanspec/specs/yaml-dsl-cli-validation/spec.md`
+- Source: `llmanspec/specs/yaml-dsl-cli-validation/spec.toon`
 - Purpose: 定义 CLI 校验工具的行为契约，包括校验分层、诊断输出格式与错误定位，确保 CLI 结果可用于 IDE 跳转、CI 报告与脚本化消费。
 - Requirements:
   - CLI 与 runtime core 职责分离

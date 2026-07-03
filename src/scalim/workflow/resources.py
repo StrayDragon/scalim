@@ -64,6 +64,7 @@ class WorkflowResourceManager(
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
                 input_csv=csv_input,
+                export_header=export_header,
                 on_conflict=str(on_conflict or "error"),
             )
         if kind == "xlsx_memory":
@@ -107,6 +108,7 @@ class WorkflowResourceManager(
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
                 input_csv=csv_input,
+                export_header=export_header,
                 align_by=str(align_by or "field_id"),
                 header_policy=str(header_policy or "once"),
                 on_mismatch=str(on_mismatch or "error"),

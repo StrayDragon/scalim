@@ -84,6 +84,13 @@ def run_workflow_write_sheet_node(
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
             input_csv=input_csv,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             on_conflict=str(node.on_conflict or "error"),
         )
         return
@@ -196,6 +203,13 @@ def run_workflow_append_sheet_node(
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
             input_csv=input_csv,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             align_by=str(node.align_by or "field_id"),
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
@@ -218,6 +232,13 @@ def run_workflow_append_sheet_node(
             input_node_id=str(node.input_node_id),
             input_output_id=str(node.input_output_id),
             input_csv=input_csv,
+            export_header=_resolve_workflow_output_export_header(
+                artifacts_dir=artifacts_dir,
+                consumer_node_id=str(node.node_id),
+                consumer_decl_order=int(node.decl_order),
+                input_node_id=str(node.input_node_id),
+                input_output_id=str(node.input_output_id),
+            ),
             header_policy=str(node.header_policy or "once"),
             on_mismatch=str(node.on_mismatch or "error"),
         )

@@ -96,24 +96,24 @@ UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->"
 UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
 
 SYNTAX_SPEC_RELS = (
-    Path("llmanspec") / "specs" / "yaml-dsl-schema" / "spec.md",
-    Path("llmanspec") / "specs" / "demand-dsl" / "spec.md",
-    Path("llmanspec") / "specs" / "yaml-dsl-workflow" / "spec.md",
-    Path("llmanspec") / "specs" / "yaml-dsl-books-resources" / "spec.md",
-    Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "spec.md",
-    Path("llmanspec") / "specs" / "ir-source-relations" / "spec.md",
-    Path("llmanspec") / "specs" / "ir-field-compute" / "spec.md",
-    Path("llmanspec") / "specs" / "execution-source-cache" / "spec.md",
-    Path("llmanspec") / "specs" / "workflow-cache-pool" / "spec.md",
-    Path("llmanspec") / "specs" / "workflow-observability-bridge" / "spec.md",
-    Path("llmanspec") / "specs" / "runtime-pruning" / "spec.md",
-    Path("llmanspec") / "specs" / "execution-loader-retry" / "spec.md",
-    Path("llmanspec") / "specs" / "runtime-guardrails" / "spec.md",
-    Path("llmanspec") / "specs" / "performance-observability" / "spec.md",
-    Path("llmanspec") / "specs" / "output-mode-api" / "spec.md",
+    Path("llmanspec") / "specs" / "yaml-dsl-schema" / "spec.toon",
+    Path("llmanspec") / "specs" / "demand-dsl" / "spec.toon",
+    Path("llmanspec") / "specs" / "yaml-dsl-workflow" / "spec.toon",
+    Path("llmanspec") / "specs" / "yaml-dsl-books-resources" / "spec.toon",
+    Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "spec.toon",
+    Path("llmanspec") / "specs" / "ir-source-relations" / "spec.toon",
+    Path("llmanspec") / "specs" / "ir-field-compute" / "spec.toon",
+    Path("llmanspec") / "specs" / "execution-source-cache" / "spec.toon",
+    Path("llmanspec") / "specs" / "workflow-cache-pool" / "spec.toon",
+    Path("llmanspec") / "specs" / "workflow-observability-bridge" / "spec.toon",
+    Path("llmanspec") / "specs" / "runtime-pruning" / "spec.toon",
+    Path("llmanspec") / "specs" / "execution-loader-retry" / "spec.toon",
+    Path("llmanspec") / "specs" / "runtime-guardrails" / "spec.toon",
+    Path("llmanspec") / "specs" / "performance-observability" / "spec.toon",
+    Path("llmanspec") / "specs" / "output-mode-api" / "spec.toon",
 )
 
-CLI_SPEC_RELS = (Path("llmanspec") / "specs" / "yaml-dsl-cli-validation" / "spec.md",)
+CLI_SPEC_RELS = (Path("llmanspec") / "specs" / "yaml-dsl-cli-validation" / "spec.toon",)
 
 
 class GenerationError(RuntimeError):
@@ -1028,13 +1028,23 @@ def _parse_spec_content(text: str) -> Tuple[str, List[str]]:
     """Parse spec from toon format or legacy markdown format."""
     import re as _re
 
-    toon_match = _re.search(r"```toon\s*\n(.*?)```", text, _re.DOTALL)
-    if toon_match:
-        toon_body = toon_match.group(1)
+    toon_body = ""  # type: str
+    fenced_match = _re.search(r"```toon\s*\n(.*?)```", text, _re.DOTALL)
+    if fenced_match:
+        toon_body = fenced_match.group(1)
+    elif _re.search(r"^kind:\s*llman\.sdd\.spec\s*$", text, _re.MULTILINE) or _re.search(r"^requirements\[", text, _re.MULTILINE):
+        # 独立 `.toon` 文件(无 markdown fence): 整个文本即为 toon 体。
+        toon_body = text
+
+    if toon_body:
         purpose = ""
-        purpose_m = _re.search(r'^purpose:\s*"(.*?)"\s*$', toon_body, _re.MULTILINE)
+        purpose_m = _re.search(r"^purpose:\s*(.+?)\s*$", toon_body, _re.MULTILINE)
         if purpose_m:
-            purpose = purpose_m.group(1).replace('\\"', '"')
+            raw_purpose = purpose_m.group(1)
+            if len(raw_purpose) >= 2 and raw_purpose.startswith('"') and raw_purpose.endswith('"'):
+                purpose = raw_purpose[1:-1].replace('\\"', '"')
+            else:
+                purpose = raw_purpose
 
         requirements = []  # type: List[str]
         in_reqs = False

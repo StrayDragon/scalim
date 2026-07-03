@@ -9,7 +9,7 @@ import csv
 import io
 from abc import ABC
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, Union, cast
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
 
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
@@ -104,6 +104,7 @@ class _CsvPlan:
     resource_id: str
     path: str
     baseline_header: Optional[List[str]] = None
+    export_header: Optional[List[str]] = None
     segments: Optional[List[_AppendSegment]] = None
     last_workflow_node_id: Optional[str] = None
 
@@ -148,6 +149,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         input_csv: WorkflowCsvInput,
         header_policy: str,
         on_mismatch: str,
+        export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
         plan = self._get_or_create_csv(csv_id, workflow_node_id=str(workflow_node_id))
         input_header = _read_csv_header(input_csv)
@@ -158,6 +160,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
 
         if plan.baseline_header is None:
             plan.baseline_header = list(input_header)
+            plan.export_header = list(export_header) if export_header is not None else None
             plan.segments = []
 
         expected = list(plan.baseline_header or [])
@@ -241,7 +244,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                 segments = sorted(p.segments, key=lambda seg: int(seg.decl_order))
                 for seg in segments:
                     if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
-                        writer.writerow(list(p.baseline_header))
+                        writer.writerow(list(p.export_header if p.export_header is not None else p.baseline_header))
                         header_written = True
 
                     for row in _iter_csv_rows(seg.input_csv):

@@ -929,7 +929,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         if out_cfg.aggregate is None:
             fields = out_cfg.fields or ()
             layout_header_by = str(header_by)
-            if in_memory and book is not None and str(book.kind or "").strip() == "xlsx_memory":
+            if in_memory:
                 export_layout = export_layout_from_demand_ir(
                     demand_ir,
                     list(fields),
@@ -961,7 +961,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         derived = _derived_group_by_spec_from_yaml(agg, resolver=resolver, compute_engine=engine)
         out_layout_fields = tuple(str(x) for x in out_cfg.fields) if out_cfg.fields is not None else _derived_output_layout_fields(agg)
         out_layout_header_by = str(header_by)
-        if in_memory and book is not None and str(book.kind or "").strip() == "xlsx_memory":
+        if in_memory:
             export_layout = _export_layout_for_derived(
                 demand_ir=demand_ir,
                 agg=agg,

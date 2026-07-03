@@ -9,7 +9,7 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _JUSTFILE = _REPO_ROOT / "justfile"
-_SPEC = _REPO_ROOT / "llmanspec" / "specs" / "testing-quality" / "spec.md"
+_SPEC = _REPO_ROOT / "llmanspec" / "specs" / "testing-quality" / "spec.toon"
 
 
 def _extract_justfile_cov_threshold() -> int:
