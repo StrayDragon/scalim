@@ -10,11 +10,11 @@
 - 明确 **不做** `"1" ↔ 1` 隐式 cast，避免歧义
 - 明确 **不支持** list/tuple 下标（`[1]` 永远表示 key=1，而不是 list index）
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-03-10-yaml-field-extract/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-03-10-yaml-field-extract/`
 
 对应主规范:
-- `openspec/specs/yaml-field-extract/spec.md`
+- `llmanspec/specs/yaml-field-extract/spec.md`
 
 ## 破坏性变更(Breaking)
 

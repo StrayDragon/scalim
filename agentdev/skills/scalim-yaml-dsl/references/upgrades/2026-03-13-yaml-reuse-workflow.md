@@ -8,16 +8,16 @@
 - 新增 workflow YAML + Python 入口 `scalim.dsl.yaml_dsl.run_workflow(...)` 编排多个 demand
 - workflow 可选启用 `cache_pool`: 跨 nodes 共享 `cache_mode: preload_forever` 的预加载结果,并通过 signature + 冲突策略治理复用边界（`share_preload_cache` 已移除）
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-03-13-yaml-dsl-imports/`
-- `openspec/changes/archive/2026-03-13-yaml-dsl-workflow/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-03-13-yaml-dsl-imports/`
+- `llmanspec/changes/archive/2026-03-13-yaml-dsl-workflow/`
 
 对应主规范(节选):
-- `openspec/specs/yaml-dsl-imports/spec.md`
-- `openspec/specs/yaml-dsl-workflow/spec.md`
-- `openspec/specs/yaml-dsl-schema/spec.md`
-- `openspec/specs/yaml-dsl-cli-validation/spec.md`
-- `openspec/specs/execution-source-cache/spec.md`
+- `llmanspec/specs/yaml-dsl-imports/spec.md`
+- `llmanspec/specs/yaml-dsl-workflow/spec.md`
+- `llmanspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/yaml-dsl-cli-validation/spec.md`
+- `llmanspec/specs/execution-source-cache/spec.md`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

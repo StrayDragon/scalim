@@ -9,14 +9,14 @@
 - `on_conflict` 默认 `error`,也可用 `first/last` 显式声明冲突策略
 - 归一化发生在 `extract` 之前;`extract` 仍然只负责从“单条 row value”里取字段
 
-OpenSpec 归档变更(含 proposal/design/spec/tasks):
-- `openspec/changes/archive/2026-03-10-yaml-source-normalize/`
+llmanspec 归档变更(含 proposal/design/spec/tasks):
+- `llmanspec/changes/archive/2026-03-10-yaml-source-normalize/`
 
 对应主规范:
-- `openspec/specs/demand-dsl/spec.md`
-- `openspec/specs/execution-source-cache/spec.md`
-- `openspec/specs/yaml-dsl-schema/spec.md`
-- `openspec/specs/yaml-dsl-agent-guidance/spec.md`
+- `llmanspec/specs/demand-dsl/spec.md`
+- `llmanspec/specs/execution-source-cache/spec.md`
+- `llmanspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/yaml-dsl-agent-guidance/spec.md`
 
 ## 适用场景
 

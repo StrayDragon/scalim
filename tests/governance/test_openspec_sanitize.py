@@ -31,10 +31,7 @@ def _prepare_repo_fixture(tmp_path: Path) -> Path:
     scripts_root.mkdir(parents=True, exist_ok=True)
     llmanspec_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_repo_root / "scripts" / "sanitize.py", scripts_root / "sanitize.py")
-    sanitize_rules_src = source_repo_root / "llmanspec" / "sanitize_rules.yaml"
-    if not sanitize_rules_src.exists():
-        sanitize_rules_src = source_repo_root / "openspec" / "sanitize_rules.yaml"
-    shutil.copy2(sanitize_rules_src, llmanspec_root / "sanitize_rules.yaml")
+    shutil.copy2(source_repo_root / "llmanspec" / "sanitize_rules.yaml", llmanspec_root / "sanitize_rules.yaml")
     return repo_root
 
 

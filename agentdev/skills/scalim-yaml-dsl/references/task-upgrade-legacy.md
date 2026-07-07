@@ -23,30 +23,54 @@
 <!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->
 - 2026-03-10: yaml-field-extract
   - SSOT: `references/upgrades/2026-03-10-yaml-field-extract.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-10-yaml-field-extract/`
+  - Spec: `llmanspec/specs/yaml-field-extract/spec.md`
 - 2026-03-10: yaml-source-normalize
   - SSOT: `references/upgrades/2026-03-10-yaml-source-normalize.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-10-yaml-source-normalize/`
+  - Spec: `llmanspec/specs/demand-dsl/spec.md`
 - 2026-03-11: yaml-params-template
   - SSOT: `references/upgrades/2026-03-11-yaml-params-template.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
+  - Spec: `llmanspec/specs/demand-dsl/spec.md`
 - 2026-03-13: demand-dsl-breaking
   - SSOT: `references/upgrades/2026-03-13-demand-dsl-breaking.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
+  - Spec: `llmanspec/specs/demand-dsl/spec.md`
 - 2026-03-13: derived-outputs-set-aggregations
   - SSOT: `references/upgrades/2026-03-13-derived-outputs-set-aggregations.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-13-derived-outputs-set-aggregations/`
+  - Spec: `llmanspec/specs/execution-derived-outputs/spec.md`
 - 2026-03-13: yaml-dsl-outputs
   - SSOT: `references/upgrades/2026-03-13-yaml-dsl-outputs.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-13-yaml-dsl-outputs/`
+  - Spec: `llmanspec/specs/yaml-dsl-schema/spec.md`
 - 2026-03-13: yaml-reuse-workflow
   - SSOT: `references/upgrades/2026-03-13-yaml-reuse-workflow.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-13-yaml-dsl-imports/`
+  - Spec: `llmanspec/specs/yaml-dsl-imports/spec.md`
 - 2026-03-13: yaml-source-normalize-shapes
   - SSOT: `references/upgrades/2026-03-13-yaml-source-normalize-shapes.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
+  - Spec: `llmanspec/specs/yaml-source-normalize/spec.md`
 - 2026-03-14: yaml-dsl-output-fields-alias
   - SSOT: `references/upgrades/2026-03-14-yaml-dsl-output-fields-alias.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
+  - Spec: `llmanspec/specs/yaml-dsl-schema/spec.md`
 - 2026-03-16: yaml-dsl-outputs-aggregate-fields
   - SSOT: `references/upgrades/2026-03-16-yaml-dsl-outputs-aggregate-fields.md`
+  - llmanspec: `llmanspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
 - 2026-03-18: yaml-workflow-dag-ctx-resources
   - SSOT: `references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md`
+  - llmanspec: `llmanspec/changes/archive/2026-03-18-c20-workflow-dag-context-passing/`
+  - Spec: `llmanspec/specs/yaml-dsl-workflow/spec.md`
 - 2026-04-07: yaml-dsl-import-roots-registry
   - SSOT: `references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md`
+  - llmanspec: `llmanspec/changes/archive/2026-04-07-c41-yaml-dsl-import-roots-registry/`
+  - Spec: `llmanspec/specs/yaml-dsl-project-config-schema/spec.md`
 - 2026-04-08: yaml-dsl-api-naming-alignment
   - SSOT: `references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md`
+  - llmanspec: `llmanspec/changes/archive/2026-04-07-c1-yaml-dsl-api-naming-alignment/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

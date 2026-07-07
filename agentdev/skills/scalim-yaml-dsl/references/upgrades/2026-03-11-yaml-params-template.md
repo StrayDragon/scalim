@@ -12,14 +12,14 @@
 - **BREAKING**: `bind` / `to_bind` 已从稳定 YAML authoring surface 移除(出现即 fail-fast)
 - **BREAKING**: `cache_mode: preload_forever` 的预加载语义收敛: 预加载阶段会复用 `sources.<id>.params` 并透传渲染后的 kwargs(禁用 `$keys/$rows`)
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
-- `openspec/changes/archive/2026-03-11-yaml-loader-params-template/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-03-11-yaml-inline-dynamic-params/`
+- `llmanspec/changes/archive/2026-03-11-yaml-loader-params-template/`
 
 对应主规范(节选):
-- `openspec/specs/demand-dsl/spec.md`
-- `openspec/specs/ir-source-relations/spec.md`
-- `openspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/demand-dsl/spec.md`
+- `llmanspec/specs/ir-source-relations/spec.md`
+- `llmanspec/specs/yaml-dsl-schema/spec.md`
 
 ## 破坏性变更(Breaking)
 

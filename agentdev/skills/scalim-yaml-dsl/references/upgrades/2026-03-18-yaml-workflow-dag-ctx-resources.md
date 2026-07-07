@@ -13,18 +13,18 @@
 - **NEW**: `workflow.runs[*].writes` 声明写入 intents(list): workbook/csv/sheetbook 的 sheet/append 写入（旧 `write_to` 已移除）
 - **NEW**: 内置 loader `scalim.workflow.loaders:sheetbook_sheet_rows` 支持下游 demand 读取上游 sheetbook sheet rows(受 deps 可见性约束)
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
 
-- `openspec/changes/archive/2026-03-18-c20-workflow-dag-context-passing/`
-- `openspec/changes/archive/2026-03-17-c30-workflow-shared-output-containers/`
-- `openspec/changes/archive/2026-03-18-c40-workflow-sheetbook-resources/`
+- `llmanspec/changes/archive/2026-03-18-c20-workflow-dag-context-passing/`
+- `llmanspec/changes/archive/2026-03-17-c30-workflow-shared-output-containers/`
+- `llmanspec/changes/archive/2026-03-18-c40-workflow-sheetbook-resources/`
 
 对应主规范(节选):
 
-- `openspec/specs/yaml-dsl-workflow/spec.md`
-- `openspec/specs/workflow-shared-output-containers/spec.md`
-- `openspec/specs/workflow-sheetbook-resources/spec.md`
-- `openspec/specs/workflow-observability-bridge/spec.md`
+- `llmanspec/specs/yaml-dsl-workflow/spec.md`
+- `llmanspec/specs/workflow-shared-output-containers/spec.md`
+- `llmanspec/specs/workflow-sheetbook-resources/spec.md`
+- `llmanspec/specs/workflow-observability-bridge/spec.md`
 
 ## Migration Checklist
 

@@ -16,13 +16,13 @@
 - **默认 allow-roots 扩展输入**: 当调用侧未显式提供 `allowed_yaml_roots` 时,`import_roots[*].path` 会扩展 imports 的默认 allow-roots
 - **别名解析基准**: 当条目配置了 `alias` 时,可在 `imports.*` 中使用 `@/x.yaml` 或 `<alias>:/x.yaml`
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-04-07-c41-yaml-dsl-import-roots-registry/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-04-07-c41-yaml-dsl-import-roots-registry/`
 
 对应主规范(节选):
-- `openspec/specs/yaml-dsl-project-config-schema/spec.md`
-- `openspec/specs/yaml-dsl-import-aliases-and-presets/spec.md`
-- `openspec/specs/yaml-dsl-editor-project-discovery/spec.md`
+- `llmanspec/specs/yaml-dsl-project-config-schema/spec.md`
+- `llmanspec/specs/yaml-dsl-import-aliases-and-presets/spec.md`
+- `llmanspec/specs/yaml-dsl-editor-project-discovery/spec.md`
 
 ## 新语法要点
 

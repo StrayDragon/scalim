@@ -11,8 +11,8 @@
   - 排名字段: `row_number` / `rank` / `dense_rank`(支持 `partition_by` / `order_by` / `top_k_mode`)
   - 聚合后派生字段: `score_by_rank`(内置) 与 `call_by`(hotfix 口子,受 allowlist 约束)
 
-OpenSpec 工件:
-- `openspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
+llmanspec 工件:
+- `llmanspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
 
 ## BREAKING: `aggregate.metrics` → `aggregate.fields`
 

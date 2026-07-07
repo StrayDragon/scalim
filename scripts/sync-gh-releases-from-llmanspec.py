@@ -62,7 +62,7 @@ def _list_semver_tags(root: Path) -> List[str]:
     return [t for _v, t in tags]
 
 
-_ARCHIVE_PREFIXES = ("llmanspec/changes/archive/", "openspec/changes/archive/")
+_ARCHIVE_PREFIXES = ("llmanspec/changes/archive/",)
 
 
 def _dirs_in_archive(tag: str, *, root: Path) -> Set[str]:
@@ -169,7 +169,7 @@ def _is_capability_token(tok: str) -> bool:
     if not _CAPABILITY_TOKEN_RE.fullmatch(lower):
         return False
     # `llmanspec` 的 `capability` 多为 `kebab-case`；避免把它们当成 `YAML` 编写面 `token`。
-    if lower.startswith(("yaml-dsl-", "yaml-source-", "llmanspec-", "openspec-", "docs-", "output-", "lsp-", "frontend-", "cli-", "qa-")):
+    if lower.startswith(("yaml-dsl-", "yaml-source-", "llmanspec-", "docs-", "output-", "lsp-", "frontend-", "cli-", "qa-")):
         return True
     return False
 

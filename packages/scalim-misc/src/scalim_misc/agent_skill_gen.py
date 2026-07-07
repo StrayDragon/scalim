@@ -562,7 +562,7 @@ def render_syntax_catalog(
         "builtin_callables": builtin_ids_rendered,
         "demand_top_fields": demand_top_fields,
         "demand_definitions": definition_names,
-        "openspec_requirement_map": spec_rows,
+        "llmanspec_requirement_map": spec_rows,
         "entries": entry_rows,
         "properties": prop_rows,
         "workflow_key_paths": [
@@ -701,7 +701,7 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
         title = extract_markdown_h1(read_text(path)) or path.name
         doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
         content = read_text(path)
-        openspec_archive = extract_backtick_path(content, prefix="llmanspec/changes/archive/") or extract_backtick_path(
+        llmanspec_archive = extract_backtick_path(content, prefix="llmanspec/changes/archive/") or extract_backtick_path(
             content, prefix="llmanspec/changes/"
         )
         spec_path = extract_backtick_path(content, prefix="llmanspec/specs/")
@@ -709,7 +709,7 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
             {
                 "title": title,
                 "doc_rel": doc_rel,
-                "openspec_archive": openspec_archive,
+                "llmanspec_archive": llmanspec_archive,
                 "spec_path": spec_path,
             }
         )
@@ -721,8 +721,8 @@ def render_yaml_dsl_upgrades_index(repo_root: Path, upgrades_root: Path) -> str:
     for item in docs:
         lines.append("- {}".format(item["title"]))
         lines.append("  - SSOT: `{}`".format(item["doc_rel"]))
-        if item["openspec_archive"]:
-            lines.append("  - llmanspec: `{}`".format(item["openspec_archive"]))
+        if item["llmanspec_archive"]:
+            lines.append("  - llmanspec: `{}`".format(item["llmanspec_archive"]))
         if item["spec_path"]:
             lines.append("  - Spec: `{}`".format(item["spec_path"]))
     return "\n".join(lines).rstrip() + "\n"
@@ -761,7 +761,7 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
         title = extract_markdown_h1(content) or path.name
         doc_rel = path_to_posix(REFERENCES_ROOT_REL / "upgrades" / path.name)
         date, slug = _split_upgrade_id(path.stem)
-        openspec_archive = extract_backtick_path(content, prefix="llmanspec/changes/archive/") or extract_backtick_path(
+        llmanspec_archive = extract_backtick_path(content, prefix="llmanspec/changes/archive/") or extract_backtick_path(
             content, prefix="llmanspec/changes/"
         )
         spec_path = extract_backtick_path(content, prefix="llmanspec/specs/")
@@ -777,7 +777,7 @@ def render_yaml_dsl_upgrades_notes(repo_root: Path, upgrades_root: Path) -> str:
                 "slug": slug,
                 "title": title,
                 "ssot": doc_rel,
-                "openspec": openspec_archive,
+                "llmanspec": llmanspec_archive,
                 "spec": spec_path,
                 "summary": _clean_lines(summary_lines or []),
                 "migration": _clean_lines(migration_lines or []),

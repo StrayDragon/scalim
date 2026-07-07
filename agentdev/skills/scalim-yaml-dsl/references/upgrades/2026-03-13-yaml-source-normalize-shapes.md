@@ -9,12 +9,12 @@
 - 新增 `normalize.map_values`(values pipeline)
 - 新增受控扩展点 `normalize.call_by`(whole-result `Mapping -> Mapping`,受 allowlist 约束)
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-03-12-yaml-source-normalize-shapes/`
 
 对应主规范(节选):
-- `openspec/specs/yaml-source-normalize/spec.md`
-- `openspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/yaml-source-normalize/spec.md`
+- `llmanspec/specs/yaml-dsl-schema/spec.md`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

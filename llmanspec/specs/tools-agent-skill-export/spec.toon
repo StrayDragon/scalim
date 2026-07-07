@@ -22,7 +22,7 @@ scenarios[32]{req_id,id,given,when,then}:
   r3,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
   r3,"generated-syntax-catalog-覆盖完整","",生成器运行,syntax catalog 必须覆盖 schema 顶层字段与 definitions
   r3,"generated-cli-reference-可用于-skill-引用","",生成器运行,"CLI/LSP reference 必须包含 `yaml-dsl validate`、`yaml-dsl schema validate`、`yaml-dsl schema show` 与 `yaml-dsl schema path`"
-  r3,"受控参考产物复用-openspec","",生成器导出 syntax catalog 或 CLI/LSP reference,它必须从相关 `openspec/specs/*/spec.md` 摘录 requirement 索引
+  r3,"受控参考产物复用-llmanspec","",生成器导出 syntax catalog 或 CLI/LSP reference,它必须从相关 `llmanspec/specs/*/spec.toon` 摘录 requirement 索引
   r4,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
   r4,"canonical-source-缺失","",`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml` 不存在,生成器退出非零并提示 canonical example 来源缺失
   r4,"不执行-notebooks","",生成器导出 canonical example,"它只能静态读取 YAML 源文件,不得执行 notebook 代码"

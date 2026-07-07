@@ -12,8 +12,8 @@
 
 本批次 **不提供兼容层/弃用期**：旧路径与旧名字会直接失效.
 
-对应 OpenSpec change:
-- `openspec/changes/archive/2026-04-07-c1-yaml-dsl-api-naming-alignment/` (归档后路径)
+对应 llmanspec change:
+- `llmanspec/changes/archive/2026-04-07-c1-yaml-dsl-api-naming-alignment/` (归档后路径)
 
 ## Migration Checklist
 
@@ -88,7 +88,7 @@ uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/sche
 ```bash
 just gen-docs
 just gen-agent-skill
-just openspec-check
+just llmanspec-check
 just qa
 ```
 

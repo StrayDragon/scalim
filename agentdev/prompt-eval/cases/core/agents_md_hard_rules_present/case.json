@@ -7,7 +7,7 @@
     "must_contain": [
       "`just qa`",
       "`just gen-docs`",
-      "`just openspec-check`",
+      "`just llmanspec-check`",
       "Any file containing `.gen.` is generated",
       "BEGIN AUTOGEN"
     ]

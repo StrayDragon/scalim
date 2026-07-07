@@ -10,15 +10,15 @@
   - `source.field_id` (例: `customers.customer_name`;用于消歧;仅支持二段式)
 - **BREAKING**: init vars 统一为指令节点 `{$init_var: <name>}`;旧写法 `$runtime.<name>`/`{$runtime: <name>}` 不再允许
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
 
 对应主规范(节选):
-- `openspec/specs/demand-dsl/spec.md`
-- `openspec/specs/yaml-dsl-schema/spec.md`
-- `openspec/specs/yaml-runtime-vars/spec.md`
-- `openspec/specs/ir-source-relations/spec.md`
-- `openspec/specs/yaml-dsl-micro-tunes/spec.md`
+- `llmanspec/specs/demand-dsl/spec.md`
+- `llmanspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/yaml-runtime-vars/spec.md`
+- `llmanspec/specs/ir-source-relations/spec.md`
+- `llmanspec/specs/yaml-dsl-micro-tunes/spec.md`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

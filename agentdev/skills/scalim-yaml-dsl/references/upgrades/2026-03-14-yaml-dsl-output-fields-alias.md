@@ -8,12 +8,12 @@
 - `outputs.*.fields` 的条目允许为 YAML alias(object): 直接引用“已定义字段对象”(展开后为 dict),解析器会将其推导为对应的 `field_id`
 - `outputs.*.fields` 支持 YAML alias(list) 与嵌套列表: 会递归展开/flatten,最终归一化为 `field_id` 字符串列表
 
-OpenSpec 归档变更（含 proposal/design/spec/tasks）:
-- `openspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
+llmanspec 归档变更（含 proposal/design/spec/tasks）:
+- `llmanspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
 
 对应主规范(节选):
-- `openspec/specs/yaml-dsl-schema/spec.md`
-- `openspec/specs/yaml-dsl-cli-validation/spec.md`
+- `llmanspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/yaml-dsl-cli-validation/spec.md`
 
 ## 新语法要点
 

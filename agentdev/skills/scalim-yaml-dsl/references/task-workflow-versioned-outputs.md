@@ -6,7 +6,7 @@
 - 你希望彻底避免在“用户目标目录/最终文件旁边”落 `.scalim.lock` 或其他锁文件
 - 你在写测试,希望用一个稳定入口定位本次运行产物,而不是依赖“固定最终文件路径”
 
-本指引对应变更提案: `openspec/changes/c0-lockless-workflow-versioned-outputs/`（D-2；版本化输出；latest 指向当前版本）。
+本指引对应变更提案: `llmanspec/changes/c0-lockless-workflow-versioned-outputs/`（D-2；版本化输出；latest 指向当前版本）。
 
 ## 核心语义(v1)
 

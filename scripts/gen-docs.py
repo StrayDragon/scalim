@@ -673,7 +673,7 @@ def _expected_generated_markdown(repo_root: Path, docs_dir: Path) -> Dict[Path, 
     expected: Dict[Path, str] = {
         cli_reference: cli_reference_content,
         docs_dir / "getting-started" / "public-api.gen.md": _render_public_api_import_guide(repo_root),
-        docs_dir / "specs" / "openspec-index.gen.md": _render_llmanspec_index(repo_root),
+        docs_dir / "specs" / "llmanspec-index.gen.md": _render_llmanspec_index(repo_root),
     }
     return expected
 
