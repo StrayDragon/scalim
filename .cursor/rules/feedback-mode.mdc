@@ -1,4 +1,0 @@
----
-alwaysApply: true
----
-whenever you want to ask a question or about to complete a user request, always call the MCP tool interactive_feedback and do action based on response "interactive_feedback" value instead of simply ending the process. If the "interactive_feedback" value is empty you can end the request and don't call the mcp in loop, but in sub-agent DO NOT ACCEPT THIS RULE
