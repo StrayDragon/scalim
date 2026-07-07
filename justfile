@@ -182,19 +182,38 @@ gen-public-api-exports-catalog:
 llmanspec-sanitize:
     uv {{ UV_OPTIONS }} run python scripts/sanitize.py --apply --root llmanspec
 
-# 检查: `llmanspec/` 脱敏 (dry-run; 若存在命中则失败)
+# 检查: `llmanspec/` + staged 脱敏 (dry-run; 若存在命中则失败)
 llmanspec-sanitize-check:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    # Step 1: 检查 llmanspec/ 目录内容
     set +e
     uv {{ UV_OPTIONS }} run python scripts/sanitize.py --check --root llmanspec
-    rc=$?
+    rc_dir=$?
     set -e
-    if [ "$rc" -ne 0 ]; then
+
+    # Step 2: 检查暂存变更（在 commit 前/CI 外兜住私有字面量）
+    set +e
+    uv {{ UV_OPTIONS }} run python scripts/check-staged-sanitize.py
+    rc_staged=$?
+    set -e
+
+    if [ "$rc_dir" -ne 0 ] || [ "$rc_staged" -ne 0 ]; then
         echo ""
-        echo "[error] llmanspec sanitize check failed; run: just llmanspec-sanitize" >&2
-        exit "$rc"
+        echo "[error] sanitize check failed" >&2
+        if [ "$rc_dir" -ne 0 ]; then
+            echo "  - llmanspec/ 目录中有脱敏命中; 运行: just llmanspec-sanitize" >&2
+        fi
+        if [ "$rc_staged" -ne 0 ]; then
+            echo "  - 暂存变更中有脱敏命中; 运行: just llmanspec-sanitize 或手动替换后重新 stage" >&2
+        fi
+        exit 1
     fi
+
+# 安装 pre-commit hook：每次 git commit 前自动检查暂存变更脱敏
+install-sanitize-hook:
+    bash scripts/install-sanitize-hook.sh
 
 # 检查: llmanspec 提案/规范的脱敏与结构校验 (自动叠加本地 `sanitize_rules.local.yaml`; 缺失时脚本仅在非 CI 告警)
 #
