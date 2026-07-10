@@ -875,20 +875,23 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
                     header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
                 )
-                if str(book.kind or "").strip() == "xlsx_memory":
-                    managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
-                    output_spec = OutputSpec(
-                        format="excel",
-                        path=str(export_path) if export_path else None,
-                        streaming=True,
-                        include_header=bool(include_header),
-                        sheet_name=str(sheet_name),
-                    )
-                else:
-                    managed_artifact_kind = MANAGED_ARTIFACT_KIND_CSV
-                    output_spec = OutputSpec(
-                        format="csv", path=str(export_path) if export_path else None, streaming=True, include_header=bool(include_header)
-                    )
+                # `MANAGED_ARTIFACT_KIND_ROWS` = 类型化行工件(`InMemoryRows`/`FieldValue`);
+                # 与 `MANAGED_ARTIFACT_KIND_CSV`(字符串化)相对。不是 `pipeline` 的列写(`IColumnSink`)
+                # 或块列写(`BlockColumnCSVSink`)模式——那些是 `sink` 布局,不在 `managed-artifact kind` 闭集内。
+                book_kind = str(book.kind or "").strip()
+                if book_kind not in ("xlsx_file", "xlsx_memory"):
+                    msg = (
+                        "Unsupported book kind for workflow-managed spreadsheet output: {!r}; expected xlsx_file or xlsx_memory (path={})"
+                    ).format(book_kind, book_ref_path)
+                    raise ValueError(msg)
+                managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
+                output_spec = OutputSpec(
+                    format="excel",
+                    path=str(export_path) if export_path else None,
+                    streaming=True,
+                    include_header=bool(include_header),
+                    sheet_name=str(sheet_name),
+                )
             else:
                 if yaml_base_dir is None:
                     msg = "yaml_base_dir is required to resolve resources.books output paths"

@@ -213,24 +213,145 @@ def test_resource_manager_book_unknown_resource_ids_raise(tmp_path: Path) -> Non
         )
 
 
-def test_resource_manager_iter_book_sheet_rows_requires_xlsx_memory(tmp_path: Path) -> None:
+def test_resource_manager_iter_book_sheet_rows_rejects_unknown_book(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(
         workflow_exec_id="wf",
         instrumentation=instrumentation,
-        workbook_defs={"report": str(tmp_path / "report.xlsx")},
+        workbook_defs={},
         csv_defs={},
         sheetbook_defs={},
     )
 
-    with pytest.raises(ValueError, match="only supports xlsx_memory"):
+    with pytest.raises(ValueError, match="only supports xlsx_file/xlsx_memory"):
         _ = manager.iter_book_sheet_rows(
+            consumer_node_id="consumer",
+            visible_producer_node_ids=frozenset(["producer"]),
+            producer_node_id="producer",
+            book_id="missing",
+            sheet="S",
+        )
+
+
+def test_resource_manager_iter_book_sheet_rows_supports_xlsx_file(tmp_path: Path) -> None:
+    from scalim.execution import versioned_outputs
+    from scalim.sinks.rows import InMemoryRows
+
+    instrumentation = _Instrumentation()
+    layout = versioned_outputs.ensure_output_root_layout(tmp_path / "out")
+    workbook_path = versioned_outputs.book_output_path(layout, version_id="wf", book_id="report")
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(workbook_path)},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+    manager.apply_workbook_sheet(
+        workflow_node_id="n1",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="producer",
+        input_output_id="detail",
+        input_csv=InMemoryRows(header=["id", "amount"], rows=[[1, 2.5], [2, None]]),
+        on_conflict="error",
+    )
+
+    rows = list(
+        manager.iter_book_sheet_rows(
             consumer_node_id="consumer",
             visible_producer_node_ids=frozenset(["producer"]),
             producer_node_id="producer",
             book_id="report",
             sheet="S",
         )
+    )
+    assert rows == [{"id": 1, "amount": 2.5}, {"id": 2, "amount": None}]
+
+
+def test_resource_manager_iter_workbook_sheet_rows_error_and_visibility_paths(tmp_path: Path) -> None:
+    from scalim.execution import versioned_outputs
+    from scalim.sinks.rows import InMemoryRows
+
+    instrumentation = _Instrumentation()
+    layout = versioned_outputs.ensure_output_root_layout(tmp_path / "out")
+    workbook_path = versioned_outputs.book_output_path(layout, version_id="wf", book_id="report")
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={"report": str(workbook_path)},
+        csv_defs={},
+        sheetbook_defs={},
+    )
+
+    with pytest.raises(ValueError, match="Unknown workbook resource id"):
+        _ = list(
+            manager.iter_workbook_sheet_rows(
+                consumer_node_id="c",
+                visible_producer_node_ids=frozenset(),
+                producer_node_id="p",
+                workbook_id="missing",
+                sheet="S",
+            )
+        )
+
+    manager.apply_workbook_sheet(
+        workflow_node_id="n1",
+        decl_order=0,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="p1",
+        input_output_id="detail",
+        input_csv=InMemoryRows(header=["id"], rows=[[1]]),
+        on_conflict="error",
+    )
+    manager.apply_workbook_append(
+        workflow_node_id="n2",
+        decl_order=1,
+        workbook_id="report",
+        sheet="S",
+        input_node_id="p2",
+        input_output_id="detail",
+        input_csv=InMemoryRows(header=["id"], rows=[[2]]),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+    )
+
+    with pytest.raises(ValueError, match="Unknown workbook sheet"):
+        _ = list(
+            manager.iter_workbook_sheet_rows(
+                consumer_node_id="c",
+                visible_producer_node_ids=frozenset(["p1"]),
+                producer_node_id="p1",
+                workbook_id="report",
+                sheet="Missing",
+            )
+        )
+
+    with pytest.raises(ValueError, match="Unknown workbook ref node"):
+        _ = list(
+            manager.iter_workbook_sheet_rows(
+                consumer_node_id="c",
+                visible_producer_node_ids=frozenset(["p1"]),
+                producer_node_id="ghost",
+                workbook_id="report",
+                sheet="S",
+            )
+        )
+
+    # cutoff at p2 but p1 not visible → only p2 rows
+    rows = list(
+        manager.iter_workbook_sheet_rows(
+            consumer_node_id="c",
+            visible_producer_node_ids=frozenset(),
+            producer_node_id="p2",
+            workbook_id="report",
+            sheet="S",
+        )
+    )
+    assert rows == [{"id": 2}]
 
 
 def test_resource_manager_workbook_append_mismatch_error_warn_skip(tmp_path: Path) -> None:
@@ -1911,8 +2032,6 @@ def test_csv_commit_replace_failure_raises_workflow_write_error(tmp_path: Path, 
 
 
 def test_workbook_commit_save_failure_raises_workflow_write_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from scalim.sinks.memory import InMemoryCsv
-
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(
         workflow_exec_id="wf",
@@ -1929,14 +2048,11 @@ def test_workbook_commit_save_failure_raises_workflow_write_error(tmp_path: Path
 
     monkeypatch.setattr(workbook_cls, "save", _boom_save)
 
-    seg = resources_csv_mod.AppendSegment(
+    seg = resources_workbook_mod._WorkbookSegment(  # noqa: SLF001
+        producer_node_id="n1",
         decl_order=0,
-        input_csv=InMemoryCsv(header=["id"], rows=[["a1"]]),
+        rows=[["a1"]],
         header_policy="once",
-        mapping=[0],
-        on_mismatch="error",
-        align_by="header",
-        input_header=["id"],
     )
     sheet_plan = resources_workbook_mod.SheetPlan(sheet="S", baseline_header=["id"], segments=[seg])
     plan = resources_workbook_mod.WorkbookPlan(

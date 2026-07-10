@@ -3,13 +3,11 @@
 背景:
 - 底层输出字段 `field_id` 全局唯一(明确约束), 但用户希望导出给数据同事的“展示列名”
   可以重复(例如多个“人数”/“金额”指标块).
-- `workflow` 模式下, `xlsx_file`(`workbook`) 与 `csv` 资源经由中间工件 `InMemoryCsv` 传递,
-  该工件的 `header` 携带的是展示名(`header_names`, 可重复), 而非 `field_id`.
-- 写入节点用 `_build_alignment_mapping(expected, actual)` 按“列名 -> 首次出现索引”建表,
-  重复列名被坍缩到首次出现位置, 于是后续同名列被首列的值填充 -> 数据错位.
-
-对照: `xlsx_memory`(`sheetbook`) 路径不受影响 —— 其中间工件 `InMemoryRows` 的 `header`
-固定为 `field_id`(唯一), 展示名通过独立的 `export_header` 仅用于表头行(见下方对照用例).
+- 历史 bug: 若中间工件 `header` 用展示名(可重复)做列对齐, `_build_alignment_mapping`
+  按“列名 -> 首次出现索引”建表, 重复列名坍缩到首次位置 -> 数据错位.
+- 现行契约: `xlsx_file` / `xlsx_memory` 的 workflow-managed 中间态均为 `InMemoryRows`
+  (`header`=`field_id`); `csv`/file 仍可为 `InMemoryCsv`。展示名经独立 `export_header`
+  仅用于表头行。本文件部分用例仍用 `InMemoryCsv` 作为 tabular 适配输入,验证对齐契约。
 
 说明: 本文件为可推送的脱敏 `MVP`, 所有字段名/取值均为占位符, 不含任何真实业务数据.
 """
@@ -107,12 +105,11 @@ def test_sheetbook_xlsx_memory_duplicate_display_headers_remains_correct(tmp_pat
 
 
 def test_workbook_sheet_writes_export_header_and_aligns_by_field_id(tmp_path: Path) -> None:
-    """源头修复验证(`xlsx_file`/workbook): 中间工件 header=field_id + 独立 export_header.
+    """源头修复验证(`xlsx_file`/workbook): header=field_id + 独立 export_header.
 
-    修复后 workflow 的 managed 工件 `InMemoryCsv.header` = field_id(唯一),
-    展示名经独立 `export_header` 仅用于表头行. `apply_workbook_sheet` 接收并存储
-    `export_header`; `_iter_workbook_sheet_rows` 表头写 export_header(可重复),
-    对齐用 baseline_header=field_id(identity, 不坍缩).
+    生产 managed 路径为 `InMemoryRows`;本用例用 `InMemoryCsv`(header=field_id) 作为
+    tabular 适配输入。`apply_workbook_sheet` 存储 `export_header`;写出时表头用
+    export_header(可重复),对齐用 baseline_header=field_id(identity, 不坍缩).
     """
 
     from openpyxl import load_workbook

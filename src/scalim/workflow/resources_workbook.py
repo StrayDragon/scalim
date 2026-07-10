@@ -8,24 +8,22 @@
 from abc import ABC
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, Type, cast
 
 from .._internal.utils.excel import escape_excel_formula
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
+from ..typedefs import FieldValue
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, field
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
-from .resources_csv import AppendSegment, WorkflowCsvInput, build_alignment_mapping, describe_header_diff, iter_csv_rows, read_csv_header
+from .resources_csv import build_alignment_mapping, describe_header_diff
+from .tabular_artifacts import WorkflowTabularInput, materialize_aligned_tabular_rows, read_tabular_header
 
-# 内部实现仍沿用原有局部命名,减少重构噪音.
-_AppendSegment = AppendSegment
 _build_alignment_mapping = build_alignment_mapping
 _describe_header_diff = describe_header_diff
-_iter_csv_rows = iter_csv_rows
-_read_csv_header = read_csv_header
 
 if TYPE_CHECKING:
     from openpyxl import Workbook
@@ -56,11 +54,53 @@ def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
             ws.close()
 
 
+def _sorted_workbook_segments(segments: List["_WorkbookSegment"]) -> List["_WorkbookSegment"]:
+    return sorted(segments, key=lambda seg: (int(seg.decl_order), str(seg.producer_node_id)))
+
+
+def _workbook_find_cutoff_index(segments: List["_WorkbookSegment"], *, producer_node_id: str) -> Optional[int]:
+    needle = str(producer_node_id)
+    for idx, seg in enumerate(segments):
+        if str(seg.producer_node_id) == needle:
+            return int(idx)
+    return None
+
+
+def _workbook_collect_visible_segments(
+    segments: List["_WorkbookSegment"],
+    *,
+    cutoff_idx: int,
+    producer_node_id: str,
+    visible_producer_node_ids: FrozenSet[str],
+) -> List[Tuple[str, List[List[FieldValue]]]]:
+    producer = str(producer_node_id)
+    visible = frozenset(str(x) for x in visible_producer_node_ids)
+    out: List[Tuple[str, List[List[FieldValue]]]] = []
+    for seg in segments[: int(cutoff_idx) + 1]:
+        seg_producer = str(seg.producer_node_id)
+        if seg_producer != producer and seg_producer not in visible:
+            continue
+        out.append((seg_producer, list(seg.rows)))
+    return out
+
+
+def _iter_workbook_row_dicts(
+    baseline_header: List[str],
+    segments: List[Tuple[str, List[List[FieldValue]]]],
+) -> Iterator[Dict[str, FieldValue]]:
+    for _seg_producer, seg_rows in segments:
+        for row_values in seg_rows:
+            row: Dict[str, FieldValue] = {}
+            for idx, key in enumerate(baseline_header):
+                row[str(key)] = row_values[idx] if idx >= 0 and idx < len(row_values) else ""
+            yield row
+
+
 def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool) -> Iterator[List[object]]:
-    """将 `sheet_plan` 的 `segments` 物化为一组待写入的行数据(不依赖 `openpyxl`)."""
+    """将 `sheet_plan` 的自有类型化 `segments` 物化为待写入行(不依赖 `openpyxl`)."""
 
     header_written = False
-    segments = sorted(sheet_plan.segments, key=lambda seg: int(seg.decl_order))
+    segments = _sorted_workbook_segments(sheet_plan.segments)
     export_fields = list(sheet_plan.export_header if sheet_plan.export_header is not None else sheet_plan.baseline_header)
     for seg in segments:
         if seg.header_policy == "always" or (seg.header_policy == "once" and not header_written):
@@ -69,11 +109,8 @@ def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool)
             header_written = True
         # `never`: 不输出 `header`
 
-        for row in _iter_csv_rows(seg.input_csv):
-            out_row: List[object] = []
-            for idx in seg.mapping:
-                value = row[idx] if idx >= 0 and idx < len(row) else ""
-                out_row.append(escape_excel_formula(value, allow_formulas=bool(allow_formulas)))
+        for row in seg.rows:
+            out_row = [escape_excel_formula(v, allow_formulas=bool(allow_formulas)) for v in row]
             yield out_row
 
 
@@ -102,11 +139,19 @@ def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> Non
 
 
 @dataclass
+class _WorkbookSegment:
+    producer_node_id: str
+    decl_order: int
+    rows: List[List[FieldValue]]
+    header_policy: str
+
+
+@dataclass
 class _SheetPlan:
     sheet: str
     baseline_header: List[str]
     export_header: Optional[List[str]] = None
-    segments: List[_AppendSegment] = field(default_factory=list)
+    segments: List[_WorkbookSegment] = field(default_factory=list)
 
 
 @dataclass
@@ -165,7 +210,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv: WorkflowCsvInput,
+        input_csv: WorkflowTabularInput,
         on_conflict: str,
         export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
@@ -173,7 +218,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet_name = str(sheet)
         action = "write"
 
-        input_header = _read_csv_header(input_csv)
+        input_header = read_tabular_header(input_csv)
 
         existing = plan.sheets.get(sheet_name)
         if existing is not None:
@@ -204,14 +249,12 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
 
         mapping = _build_alignment_mapping(input_header, input_header)
-        segment = _AppendSegment(
+        rows = materialize_aligned_tabular_rows(input_header, mapping, input_tabular=input_csv)
+        segment = _WorkbookSegment(
+            producer_node_id=str(input_node_id),
             decl_order=int(decl_order),
-            input_csv=input_csv,
+            rows=rows,
             header_policy="once",
-            mapping=mapping,
-            on_mismatch="error",
-            align_by="header",
-            input_header=input_header,
         )
         plan.sheets[sheet_name] = _SheetPlan(
             sheet=sheet_name,
@@ -242,7 +285,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet: str,
         input_node_id: str,
         input_output_id: str,
-        input_csv: WorkflowCsvInput,
+        input_csv: WorkflowTabularInput,
         align_by: str,
         header_policy: str,
         on_mismatch: str,
@@ -250,7 +293,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
-        input_header = _read_csv_header(input_csv)
+        input_header = read_tabular_header(input_csv)
 
         pending_warning: Optional[DiagnosticWarningEvent] = None
         pending_warning_meta: Optional[Dict[str, object]] = None
@@ -299,15 +342,14 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 pending_skip = True
 
         if not pending_skip:
+            _ = str(align_by)
+            rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
             sheet_plan.segments.append(
-                _AppendSegment(
+                _WorkbookSegment(
+                    producer_node_id=str(input_node_id),
                     decl_order=int(decl_order),
-                    input_csv=input_csv,
+                    rows=rows,
                     header_policy=str(header_policy),
-                    mapping=mapping,
-                    on_mismatch=str(on_mismatch),
-                    align_by=str(align_by),
-                    input_header=list(input_header),
                 )
             )
             plan.last_workflow_node_id = str(workflow_node_id)
@@ -340,6 +382,47 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             input_output_id=str(input_output_id),
             sheet=sheet_name,
         )
+
+    def iter_workbook_sheet_rows(
+        self,
+        *,
+        consumer_node_id: str,
+        visible_producer_node_ids: FrozenSet[str],
+        producer_node_id: str,
+        workbook_id: str,
+        sheet: str,
+    ) -> Iterator[Dict[str, FieldValue]]:
+        """读取 `workbook` 的行快照(按 `ref.node` 截断;按依赖可见性过滤)."""
+
+        _ = str(consumer_node_id)
+        producer = str(producer_node_id)
+        wb_id = str(workbook_id)
+        sheet_name = str(sheet)
+        visible = frozenset(str(x) for x in visible_producer_node_ids)
+
+        plan = cast("Optional[_WorkbookPlan]", self._workbooks.get(wb_id))  # pragma: allow-cast workbook plan typed narrowing
+        if plan is None:
+            msg = "Unknown workbook resource id: {!r}".format(wb_id)
+            raise ValueError(msg)
+        sheet_plan = plan.sheets.get(sheet_name)
+        if sheet_plan is None:
+            msg = "Unknown workbook sheet: workbook={!r}, sheet={!r}".format(wb_id, sheet_name)
+            raise ValueError(msg)
+
+        ordered_segments = _sorted_workbook_segments(list(sheet_plan.segments))
+        cutoff_idx = _workbook_find_cutoff_index(ordered_segments, producer_node_id=producer)
+        if cutoff_idx is None:
+            msg = "Unknown workbook ref node for sheet: node={!r}, workbook={!r}, sheet={!r}".format(producer, wb_id, sheet_name)
+            raise ValueError(msg)
+
+        baseline_header = list(sheet_plan.baseline_header)
+        segments = _workbook_collect_visible_segments(
+            ordered_segments,
+            cutoff_idx=int(cutoff_idx),
+            producer_node_id=producer,
+            visible_producer_node_ids=visible,
+        )
+        return _iter_workbook_row_dicts(baseline_header, segments)
 
     @override
     def _commit_workbook(self, plan: object) -> None:

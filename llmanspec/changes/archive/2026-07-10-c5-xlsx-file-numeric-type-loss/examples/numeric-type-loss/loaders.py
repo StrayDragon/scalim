@@ -187,9 +187,7 @@ def load_channel_summary(
                 "total_amount": round(v["total_amount"], 2),
                 "avg_amount": round(v["total_amount"] / oc, 2) if oc else 0.0,
                 "active_rate": round(v["active_count"] / oc * 100, 1) if oc else 0.0,
-                "share_pct": round(v["total_amount"] / total_amount * 100, 2)
-                if total_amount
-                else 0.0,
+                "share_pct": round(v["total_amount"] / total_amount * 100, 2) if total_amount else 0.0,
                 "total_qty": v["total_qty"],
             }
         )
@@ -210,9 +208,7 @@ def load_overall_kpi(
     total_orders = sum(c["order_count"] for c in channels)
     total_amount = sum(c["total_amount"] for c in channels)
     total_qty = sum(c["total_qty"] for c in channels)
-    active_orders = sum(
-        c["active_rate"] * c["order_count"] / 100 for c in channels
-    )
+    active_orders = sum(c["active_rate"] * c["order_count"] / 100 for c in channels)
 
     return [
         {
@@ -238,9 +234,7 @@ def load_overall_kpi(
         },
         {
             "metric": "活跃率",
-            "value": round(active_orders / total_orders * 100, 1)
-            if total_orders
-            else 0.0,
+            "value": round(active_orders / total_orders * 100, 1) if total_orders else 0.0,
             "unit": "%",
             "target": 80.0,
             "attained": False,

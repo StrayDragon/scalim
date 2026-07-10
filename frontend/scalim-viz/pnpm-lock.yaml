@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  devalue@5.6.2: 5.6.4
+  devalue: '>=5.8.1'
   picomatch@2.3.1: 2.3.2
   picomatch@4.0.3: 4.0.4
   rollup: ^4.59.0
@@ -32,7 +32,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.4
-        version: 6.2.4(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7))
+        version: 6.2.4(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7))
       autoprefixer:
         specifier: ^10.4.17
         version: 10.4.24(postcss@8.5.6)
@@ -55,8 +55,8 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
       vite:
-        specifier: ^6.4.2
-        version: 6.4.2(jiti@1.21.7)
+        specifier: ^6.4.3
+        version: 6.4.3(jiti@1.21.7)
 
 packages:
 
@@ -577,8 +577,8 @@ packages:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
     engines: {node: '>=6'}
 
-  devalue@5.6.4:
-    resolution: {integrity: sha512-Gp6rDldRsFh/7XuouDbxMH3Mx8GMCcgzIb1pDTvNyn8pZGQ22u+Wa+lGV9dQCltFQ7uVw0MhRyb8XDskNFOReA==}
+  devalue@5.8.1:
+    resolution: {integrity: sha512-4CXDYRBGqN+57wVJkuXBYmpAVUSg3L6JAQa/DFqm238G73E1wuyc/JhGQJzN7vUf/CMphYau2zXbfWzDR5aTEw==}
 
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
@@ -930,8 +930,8 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
-  vite@6.4.2:
-    resolution: {integrity: sha512-2N/55r4JDJ4gdrCvGgINMy+HH3iRpNIz8K6SFwVsA+JbQScLiC+clmAxBgwiSPgcG9U15QmvqCGWzMbqda5zGQ==}
+  vite@6.4.3:
+    resolution: {integrity: sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
     peerDependencies:
@@ -1192,22 +1192,22 @@ snapshots:
     dependencies:
       acorn: 8.15.0
 
-  '@sveltejs/vite-plugin-svelte-inspector@5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7)))(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7))':
+  '@sveltejs/vite-plugin-svelte-inspector@5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7)))(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7))':
     dependencies:
-      '@sveltejs/vite-plugin-svelte': 6.2.4(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7))
+      '@sveltejs/vite-plugin-svelte': 6.2.4(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7))
       obug: 2.1.1
       svelte: 5.55.1
-      vite: 6.4.2(jiti@1.21.7)
+      vite: 6.4.3(jiti@1.21.7)
 
-  '@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7))':
+  '@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7))':
     dependencies:
-      '@sveltejs/vite-plugin-svelte-inspector': 5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7)))(svelte@5.55.1)(vite@6.4.2(jiti@1.21.7))
+      '@sveltejs/vite-plugin-svelte-inspector': 5.0.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7)))(svelte@5.55.1)(vite@6.4.3(jiti@1.21.7))
       deepmerge: 4.3.1
       magic-string: 0.30.21
       obug: 2.1.1
       svelte: 5.55.1
-      vite: 6.4.2(jiti@1.21.7)
-      vitefu: 1.1.1(vite@6.4.2(jiti@1.21.7))
+      vite: 6.4.3(jiti@1.21.7)
+      vitefu: 1.1.1(vite@6.4.3(jiti@1.21.7))
 
   '@swc/helpers@0.5.18':
     dependencies:
@@ -1377,7 +1377,7 @@ snapshots:
 
   dequal@2.0.3: {}
 
-  devalue@5.6.4: {}
+  devalue@5.8.1: {}
 
   didyoumean@1.2.2: {}
 
@@ -1690,7 +1690,7 @@ snapshots:
       aria-query: 5.3.1
       axobject-query: 4.1.0
       clsx: 2.1.1
-      devalue: 5.6.4
+      devalue: 5.8.1
       esm-env: 1.2.2
       esrap: 2.2.4
       is-reference: 3.0.3
@@ -1765,7 +1765,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  vite@6.4.2(jiti@1.21.7):
+  vite@6.4.3(jiti@1.21.7):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.4)
@@ -1777,8 +1777,8 @@ snapshots:
       fsevents: 2.3.3
       jiti: 1.21.7
 
-  vitefu@1.1.1(vite@6.4.2(jiti@1.21.7)):
+  vitefu@1.1.1(vite@6.4.3(jiti@1.21.7)):
     optionalDependencies:
-      vite: 6.4.2(jiti@1.21.7)
+      vite: 6.4.3(jiti@1.21.7)
 
   zimmerframe@1.1.4: {}

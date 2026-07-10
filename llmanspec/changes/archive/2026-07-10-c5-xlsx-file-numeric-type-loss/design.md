@@ -43,15 +43,12 @@ book_sheet_rows(ref={node, book, sheet})  # book 可为 xlsx_file 或 xlsx_memor
 ### 1. Artifact 决策（`output_composition_yaml`）
 
 ```text
-if book.kind in {"xlsx_memory", "xlsx_file"}:
-    managed_artifact_kind = ROWS
-    OutputSpec.format = "excel"
-else:
-    # 非 book 或未来非 spreadsheet：保持既有 CSV 路径
-    ...
+# workflow-managed book output（当前仅 xlsx_file / xlsx_memory）
+managed_artifact_kind = ROWS
+OutputSpec.format = "excel"
 ```
 
-规则语义：**目标介质是 spreadsheet → ROWS**，不是「是不是 memory」。
+规则语义：**目标介质是 spreadsheet book → ROWS**，不是「是不是 memory」。
 
 ### 2. Collect（`run_ir._collect_managed_artifact_outputs`）
 

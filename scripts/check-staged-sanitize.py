@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Pre-commit gate: check git staged changes against sanitize rules.
+`pre-commit` 门禁: 对照 `sanitize` 规则检查 `git staged` 变更.
 
-Reads `llmanspec/sanitize_rules.yaml` and `llmanspec/sanitize_rules.local.yaml`,
-then checks all added/modified lines in staged changes against the patterns.
+读取 `llmanspec/sanitize_rules.yaml` 与 `llmanspec/sanitize_rules.local.yaml`,
+再对 `staged` 变更中所有新增/修改行做模式匹配.
 
-Usage:
-  python scripts/check-staged-sanitize.py         # check staged changes
-  python scripts/check-staged-sanitize.py --diff   # read diff from stdin
+用法:
+  `python scripts/check-staged-sanitize.py`         # 检查 `staged` 变更
+  `python scripts/check-staged-sanitize.py --diff`   # 从 `stdin` 读取 `diff`
 
-Exit codes:
-  0  → no leaks detected
-  1  → leaks detected
-  2  → error (missing rules, etc.)
+退出码:
+  `0`  → 未检测到泄漏
+  `1`  → 检测到泄漏
+  `2`  → 错误(缺少规则等)
 """
 
 from __future__ import annotations
@@ -26,9 +26,9 @@ from typing import Dict, List, Tuple
 
 
 def _load_rules(repo_root: Path) -> List[Tuple[str, re.Pattern, str]]:
-    """Load rules from sanitize_rules.yaml and the local overlay."""
+    """从 `sanitize_rules.yaml` 与本地 `overlay` 加载规则."""
 
-    # Try scalim's vendored yaml first, fallback to stdlib
+    # 优先用 `scalim` 内置 `yaml`,失败再回退 `stdlib`
     try:
         from scalim.vendor.yamlx import yaml as _yaml
     except ImportError:
@@ -51,65 +51,97 @@ def _load_rules(repo_root: Path) -> List[Tuple[str, re.Pattern, str]]:
                 regex = re.compile(pattern)
             except re.error as exc:
                 print(
-                    f"[warn] skipping rule {name!r}: bad regex {pattern!r}: {exc}",
+                    f"[warn] skipping rule {name!r}: bad regex {pattern!r}: {exc}",  # force-en
                     file=sys.stderr,
                 )
                 continue
-            # Local overlay replaces the public rule with same name
+            # 本地 `overlay` 同名规则覆盖公共规则
             all_rules[name] = (name, regex, replace)
 
     return list(all_rules.values())
 
 
 def _get_staged_diff() -> str:
-    """Return unified diff of staged changes (added/modified/renamed files)."""
+    """返回 `staged` 变更的 `unified diff`(新增/修改/重命名文件)."""
     result = subprocess.run(
         ["git", "diff", "--staged", "--diff-filter=ACMR", "--"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
         cwd=Path.cwd(),
     )
     if result.returncode != 0:
-        print(f"[error] git diff --staged failed:\n{result.stderr}", file=sys.stderr)
+        print(f"[error] git diff --staged failed:\n{result.stderr}", file=sys.stderr)  # force-en
         sys.exit(2)
     return result.stdout
 
 
 def _is_textual(path: str) -> bool:
-    """Heuristic: skip known-binary paths."""
-    skip_exts = frozenset({
-        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico",
-        ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-        ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
-        ".so", ".dll", ".dylib", ".exe",
-        ".woff", ".woff2", ".ttf", ".eot",
-        ".mp3", ".mp4", ".avi", ".mov",
-        ".o", ".a", ".lib", ".pyc", ".pyo",
-        ".svgz",
-    })
+    """启发式: 跳过已知二进制路径."""
+    skip_exts = frozenset(
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".bmp",
+            ".ico",
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".bz2",
+            ".7z",
+            ".rar",
+            ".so",
+            ".dll",
+            ".dylib",
+            ".exe",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".eot",
+            ".mp3",
+            ".mp4",
+            ".avi",
+            ".mov",
+            ".o",
+            ".a",
+            ".lib",
+            ".pyc",
+            ".pyo",
+            ".svgz",
+        }
+    )
     return Path(path).suffix.lower() not in skip_exts
 
 
-_SELF_SKIP = frozenset({
-    "scripts/sanitize.py",
-    "scripts/check-staged-sanitize.py",
-    "llmanspec/sanitize_rules.yaml",
-    "llmanspec/sanitize_rules.local.yaml",
-    "llmanspec/sanitize_rules.local.example.yaml",
-})
+_SELF_SKIP = frozenset(
+    {
+        "scripts/sanitize.py",
+        "scripts/check-staged-sanitize.py",
+        "llmanspec/sanitize_rules.yaml",
+        "llmanspec/sanitize_rules.local.yaml",
+        "llmanspec/sanitize_rules.local.example.yaml",
+    }
+)
 
 
 def check_diff(diff_text: str, rules: List[Tuple[str, re.Pattern, str]]) -> int:
     """
-    Scan diff lines against rules. Prints leaks to stderr.
+    对照规则扫描 `diff` 行,泄漏信息打印到 `stderr`.
 
-    Returns leak count.
+    返回泄漏条数.
     """
     leaks: Dict[str, List[Tuple[str, str, int]]] = defaultdict(list)
-    # ^ file_path -> [(rule_name, matched_text, approx_line)]
+    # ^ `file_path` -> [(`rule_name`, `matched_text`, `approx_line`)]
 
     current_file = ""
     for line in diff_text.splitlines():
-        # Track file header
+        # 跟踪文件头
         if line.startswith("+++ b/"):
             current_file = line[6:]
             if not _is_textual(current_file) or current_file in _SELF_SKIP:
@@ -118,24 +150,24 @@ def check_diff(diff_text: str, rules: List[Tuple[str, re.Pattern, str]]) -> int:
         if not current_file:
             continue
 
-        # Only added lines
+        # 只看新增行
         if not line.startswith("+"):
             continue
-        # Skip diff metadata
+        # 跳过 `diff` 元数据
         if line.startswith("+++") or line.startswith("---") or line.startswith("@@"):
             continue
 
-        content = line[1:]  # strip the leading +
+        content = line[1:]  # 去掉行首 `+`
         for rule_name, regex, _replace in rules:
             for match in regex.finditer(content):
                 leaks[current_file].append((rule_name, match.group(), 0))
 
-    # Report
+    # 报告
     if not leaks:
         return 0
 
     print(f"\n{'=' * 60}", file=sys.stderr)
-    print("❌  SANITIZE LEAK(S) DETECTED IN STAGED CHANGES", file=sys.stderr)
+    print("❌  SANITIZE LEAK(S) DETECTED IN STAGED CHANGES", file=sys.stderr)  # force-en
     print(f"{'=' * 60}", file=sys.stderr)
 
     total = 0
@@ -146,7 +178,7 @@ def check_diff(diff_text: str, rules: List[Tuple[str, re.Pattern, str]]) -> int:
             total += 1
 
     print(f"\n{'=' * 60}", file=sys.stderr)
-    print(f"Total: {total} leak(s) in {len(leaks)} file(s)", file=sys.stderr)
+    print(f"Total: {total} leak(s) in {len(leaks)} file(s)", file=sys.stderr)  # force-en
     print(f"{'=' * 60}\n", file=sys.stderr)
     return total
 
@@ -156,26 +188,26 @@ def main() -> int:
 
     rules = _load_rules(repo_root)
     if not rules:
-        print("[error] no sanitize rules loaded", file=sys.stderr)
+        print("[error] no sanitize rules loaded", file=sys.stderr)  # force-en
         return 2
 
     print(
-        f"🔍 Checking staged changes against {len(rules)} sanitize rule(s)...",
+        f"🔍 Checking staged changes against {len(rules)} sanitize rule(s)...",  # force-en
         file=sys.stderr,
     )
 
     diff_text = _get_staged_diff()
     if not diff_text.strip():
-        print("   No staged changes to check.", file=sys.stderr)
+        print("   No staged changes to check.", file=sys.stderr)  # force-en
         return 0
 
     leak_count = check_diff(diff_text, rules)
     if leak_count == 0:
-        print("✅  No leaks detected in staged changes.", file=sys.stderr)
+        print("✅  No leaks detected in staged changes.", file=sys.stderr)  # force-en
         return 0
 
     print(
-        "💡  Tip: run `just llmanspec-sanitize` to auto-apply replacements.",
+        "💡  Tip: run `just llmanspec-sanitize` to auto-apply replacements.",  # force-en
         file=sys.stderr,
     )
     return 1

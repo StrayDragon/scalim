@@ -192,6 +192,56 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
     assert target.managed_artifact_kind == "rows"
 
 
+def test_compile_output_composition_xlsx_file_managed_uses_rows_and_excel_format(tmp_path: Path) -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path=str(tmp_path / "out"))}),
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="S"),
+                fields=("order_id", "amount"),
+            ),
+        ),
+    )
+
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(field_name_by_id={"order_id": "Order ID", "amount": "Amount"}),
+        version_id="run_0",
+        resolver=_resolver(),
+        yaml_base_dir=str(tmp_path),
+        workflow_managed_output_ids=frozenset(["detail"]),
+    )
+
+    assert spec is not None
+    target = spec.targets[0]
+    assert target.managed_artifact_kind == "rows"
+    assert target.output.format == "excel"
+
+
+def test_compile_output_composition_rejects_unsupported_book_kind_for_managed_rows(tmp_path: Path) -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(books={"report": BookConfig(kind="future_book", path=str(tmp_path / "out"))}),
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="S"),
+                fields=("order_id",),
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Unsupported book kind.*future_book"):
+        oc_yaml.compile_output_composition_from_yaml(
+            config,
+            _make_demand_ir(field_name_by_id={"order_id": "Order ID"}),
+            version_id="run_0",
+            resolver=_resolver(),
+            yaml_base_dir=str(tmp_path),
+            workflow_managed_output_ids=frozenset(["detail"]),
+        )
+
+
 def test_compile_output_composition_can_skip_extra_sheet_without_workbook() -> None:
     config = _csv_config("./out")
     config = DemandConfig(resources=config.resources, outputs=config.outputs, meta=OutputExtraSheetConfig())

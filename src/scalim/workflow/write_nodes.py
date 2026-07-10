@@ -22,6 +22,12 @@ from .input_artifacts import (
 from .resources import ScalimWorkflowWriteError, WorkflowResourceManager
 
 
+def is_xlsx_spreadsheet_book_kind(book_kind: str) -> bool:
+    """判断 `book_kind` 是否为 `xlsx_file` / `xlsx_memory`。"""
+
+    return str(book_kind or "").strip() in ("xlsx_file", "xlsx_memory")
+
+
 def run_workflow_write_sheet_node(
     node: WriteSheetNodeIr,
     *,
@@ -30,7 +36,7 @@ def run_workflow_write_sheet_node(
 ) -> None:
     if str(node.resource_type) == "book":
         book_kind = resource_manager.get_book_kind(str(node.resource_id))
-        if book_kind == "xlsx_memory":
+        if is_xlsx_spreadsheet_book_kind(book_kind):
             input_csv = _resolve_workflow_input_tabular(
                 artifacts_dir=artifacts_dir,
                 consumer_node_id=str(node.node_id),
@@ -68,7 +74,7 @@ def run_workflow_write_sheet_node(
         return
 
     if str(node.resource_type) == "workbook":
-        input_csv = _resolve_workflow_input_csv(
+        input_csv = _resolve_workflow_input_tabular(
             artifacts_dir=artifacts_dir,
             consumer_node_id=str(node.node_id),
             consumer_decl_order=int(node.decl_order),
@@ -137,7 +143,7 @@ def run_workflow_append_sheet_node(
 ) -> None:
     if str(node.resource_type) == "book":
         book_kind = resource_manager.get_book_kind(str(node.resource_id))
-        if book_kind == "xlsx_memory":
+        if is_xlsx_spreadsheet_book_kind(book_kind):
             input_csv = _resolve_workflow_input_tabular(
                 artifacts_dir=artifacts_dir,
                 consumer_node_id=str(node.node_id),
@@ -182,7 +188,7 @@ def run_workflow_append_sheet_node(
         return
 
     if str(node.resource_type) == "workbook":
-        input_csv = _resolve_workflow_input_csv(
+        input_csv = _resolve_workflow_input_tabular(
             artifacts_dir=artifacts_dir,
             consumer_node_id=str(node.node_id),
             consumer_decl_order=int(node.decl_order),
@@ -313,4 +319,4 @@ def run_workflow_write_node(
     raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
-__all__ = ()
+__all__ = ("is_xlsx_spreadsheet_book_kind",)

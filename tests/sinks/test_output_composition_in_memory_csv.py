@@ -46,6 +46,5 @@ outputs:
     assert result.in_memory_rows_outputs is not None
     assert result.in_memory_rows_outputs["detail"].header == ["id", "value"]
     assert result.in_memory_rows_outputs["detail"].rows[-1] == ["a2", "A2"]
-    assert result.in_memory_csv_outputs is not None
-    assert result.in_memory_csv_outputs["detail"].header == ["id", "value"]
-    assert result.in_memory_csv_outputs["detail"].rows[-1] == ["a2", "A2"]
+    # ROWS managed plans must not eagerly duplicate CSV artifacts.
+    assert result.in_memory_csv_outputs is None or "detail" not in (result.in_memory_csv_outputs or {})

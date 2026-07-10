@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MVP: 全面复现 xlsx_file 路径的数字类型丢失。
+MVP: 验证 xlsx_file 与 xlsx_memory 在 typed-ROWS 路径下数字类型一致保留。
 
 场景覆盖:
   场景 A (主场景 - 多层): workflow.yaml
@@ -15,7 +15,7 @@ MVP: 全面复现 xlsx_file 路径的数字类型丢失。
     - 经 to_numeric() 处理后的字段
     - 聚合计算后的派生数值
 
-  对比基线: xlsx_memory book 全程保留类型
+  对比基线: xlsx_memory book 全程保留类型；修复后 xlsx_file 应对齐
 
 运行:
   cd scalim/
@@ -103,9 +103,7 @@ def _inspect_xlsx(path: Path, label: str) -> List[Dict[str, Any]]:
                     # 如果是字符串且在数字列 -> 类型丢失
                     if isinstance(val, str):
                         if col_name not in [x[0] for x in sheet_info["col_errors"]]:
-                            sheet_info["col_errors"].append(
-                                (col_name, data_row_idx, "int/float/Decimal/bool", "str", val)
-                            )
+                            sheet_info["col_errors"].append((col_name, data_row_idx, "int/float/Decimal/bool", "str", val))
 
                     # 打印前 3 行
                     if data_row_idx <= 3:
@@ -194,9 +192,7 @@ def _run_workflow_and_check(
                 ),
                 runtime=DemandRunRuntimeOptions(
                     batch_size=100,
-                    demand_diagnostics=DemandDiagnosticsOverride(
-                        validate_unique_field_names=False
-                    ),
+                    demand_diagnostics=DemandDiagnosticsOverride(validate_unique_field_names=False),
                 ),
             ),
         ),
@@ -253,16 +249,12 @@ def _run_workflow_and_check(
                 all_cols.append(col)
             if col not in col_book_map:
                 col_book_map[col] = {}
-            col_book_map[col]["xlsx_file"] = ", ".join(
-                sorted(s["col_types"].get(col, {"N/A"}))
-            )
+            col_book_map[col]["xlsx_file"] = ", ".join(sorted(s["col_types"].get(col, {"N/A"})))
     for s in mem_sheets:
         for col in s["header"]:
             if col not in col_book_map:
                 col_book_map[col] = {}
-            col_book_map[col]["xlsx_memory"] = ", ".join(
-                sorted(s["col_types"].get(col, {"N/A"}))
-            )
+            col_book_map[col]["xlsx_memory"] = ", ".join(sorted(s["col_types"].get(col, {"N/A"})))
 
     for col in all_cols:
         ft = col_book_map.get(col, {}).get("xlsx_file", "N/A")
@@ -280,21 +272,16 @@ def _run_workflow_and_check(
             status = "⚠️"
         print(f"    {status} {col:20s}  file={ft:20s}  mem={mt:20s}")
 
-    # 结论
+    # 结论（修复后期望: lost == 0 且 file/mem 类型对齐）
     print()
-    if lost > 0 and ok > 0:
-        print(f"  ✅ 确认: xlsx_file 存在数字类型丢失 ({lost}/{total} 列变字符串)")
-        print(f"  ✅ 确认: xlsx_memory 保留类型")
+    if lost == 0 and total > 0:
+        print("  ✅ 确认: xlsx_file 与 xlsx_memory 均保留数字类型 (0 丢失)")
         return 0
-    elif lost == 0 and total > 0:
-        print("  ⚠️ 未发现类型丢失 (可能问题已修复或场景未命中)")
-        return 0
-    elif lost == total:
-        print("  ❌ 全部数字列丢失")
+    if lost > 0:
+        print(f"  ❌ 回归: xlsx_file 仍有数字类型丢失 ({lost}/{total} 列变字符串)")
         return 1
-    else:
-        print("  ⚠️ 结果异常, 需人工排查")
-        return 1
+    print("  ⚠️ 结果异常, 需人工排查")
+    return 1
 
 
 def main() -> int:
@@ -335,10 +322,13 @@ def main() -> int:
         print("最终结论")
         print("=" * 60)
         if rc_a == 0:
-            print("\n✅ 场景A (多 sheet 多 demand): xlsx_file 数字类型丢失已确认复现")
-            print("   xlsx_memory 路径保留类型,对照成立")
+            print("\n✅ 场景A (多 sheet 多 demand): xlsx_file / xlsx_memory 类型对齐,无 丢失")
+        else:
+            print("\n❌ 场景A 回归: 仍存在数字类型丢失或不一致")
         if rc_b == 0:
-            print("\n✅ 场景B (单 sheet 最小复现): 最简路径同样存在类型丢失")
+            print("\n✅ 场景B (单 sheet 最小复现): xlsx_file / xlsx_memory 类型对齐,0 丢失")
+        else:
+            print("\n❌ 场景B 回归: 仍存在数字类型丢失或不一致")
 
         detail_workflow_a = temp_path / "场景A-多sheet" / "out"
         detail_workflow_b = temp_path / "场景B-单sheet(最小复现)" / "out"
@@ -351,4 +341,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     from decimal import Decimal  # noqa: F401 用于 _is_numeric
+
     sys.exit(main())

@@ -38,6 +38,7 @@ from .adaptive.capture import HookCaptureManager, HookRecordedEvent
 from .contracts import ExecutionRequest, ExecutionResult, ObservabilitySpec
 from .engine import ScalimEngine
 from .key_normalization import normalize_key_normalization
+from .managed_artifacts import MANAGED_ARTIFACT_KIND_ROWS
 from .output_composition import build_output_composition, required_demand_fields
 from .output_contracts import ExportLayout, OutputSpec
 
@@ -532,6 +533,9 @@ def _collect_managed_artifact_outputs(
         rows_artifact = plan_obj.to_rows_artifact()
         if rows_artifact is not None:
             rows_map[str(target_id)] = rows_artifact
+        # `ROWS` 计划不得急切复制 `CSV`(`xlsx_*` 消费方使用类型化行)
+        if str(plan_obj.kind) == MANAGED_ARTIFACT_KIND_ROWS:
+            continue
         csv_artifact = plan_obj.to_csv_artifact()
         if csv_artifact is not None:
             csv_map[str(target_id)] = csv_artifact

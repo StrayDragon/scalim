@@ -7,9 +7,8 @@
 
 from typing import FrozenSet, Iterator, Mapping, Optional, Tuple
 
-from ..sinks.rows import InMemoryRows
 from .resources_base import ScalimWorkflowWriteError
-from .resources_csv import WorkflowCsvInput, WorkflowCsvResourceMixin
+from .resources_csv import WorkflowCsvResourceMixin
 from .resources_sheetbook import SheetBookDef, WorkflowSheetBookResourceMixin
 from .resources_workbook import WorkflowWorkbookResourceMixin
 from .tabular_artifacts import WorkflowTabularInput
@@ -33,13 +32,6 @@ class WorkflowResourceManager(
     def get_book_kind(self, book_id: str) -> str:
         return self._book_kind(book_id)
 
-    @staticmethod
-    def _require_csv_input(input_tabular: WorkflowTabularInput) -> WorkflowCsvInput:
-        if isinstance(input_tabular, InMemoryRows):
-            msg = "xlsx_file books only accept CSV-equivalent artifacts"
-            raise ScalimWorkflowWriteError(msg)
-        return input_tabular
-
     def apply_book_sheet(
         self,
         *,
@@ -55,7 +47,6 @@ class WorkflowResourceManager(
     ) -> None:
         kind = self._book_kind(book_id)
         if kind == "xlsx_file":
-            csv_input = self._require_csv_input(input_csv)
             return self.apply_workbook_sheet(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
@@ -63,7 +54,7 @@ class WorkflowResourceManager(
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
-                input_csv=csv_input,
+                input_csv=input_csv,
                 export_header=export_header,
                 on_conflict=str(on_conflict or "error"),
             )
@@ -99,7 +90,6 @@ class WorkflowResourceManager(
     ) -> None:
         kind = self._book_kind(book_id)
         if kind == "xlsx_file":
-            csv_input = self._require_csv_input(input_csv)
             return self.apply_workbook_append(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
@@ -107,7 +97,7 @@ class WorkflowResourceManager(
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
-                input_csv=csv_input,
+                input_csv=input_csv,
                 export_header=export_header,
                 align_by=str(align_by or "field_id"),
                 header_policy=str(header_policy or "once"),
@@ -140,16 +130,26 @@ class WorkflowResourceManager(
         sheet: str,
     ) -> "Iterator[Mapping[str, object]]":
         kind = self._book_kind(book_id)
-        if kind != "xlsx_memory":
-            msg = "book_sheet_rows only supports xlsx_memory books (book_id={!r}, kind={!r})".format(str(book_id), kind or "<unknown>")
-            raise ValueError(msg)
-        return self.iter_sheetbook_sheet_rows(
-            consumer_node_id=str(consumer_node_id),
-            visible_producer_node_ids=visible_producer_node_ids,
-            producer_node_id=str(producer_node_id),
-            sheetbook_id=str(book_id),
-            sheet=str(sheet),
+        if kind == "xlsx_memory":
+            return self.iter_sheetbook_sheet_rows(
+                consumer_node_id=str(consumer_node_id),
+                visible_producer_node_ids=visible_producer_node_ids,
+                producer_node_id=str(producer_node_id),
+                sheetbook_id=str(book_id),
+                sheet=str(sheet),
+            )
+        if kind == "xlsx_file":
+            return self.iter_workbook_sheet_rows(
+                consumer_node_id=str(consumer_node_id),
+                visible_producer_node_ids=visible_producer_node_ids,
+                producer_node_id=str(producer_node_id),
+                workbook_id=str(book_id),
+                sheet=str(sheet),
+            )
+        msg = "book_sheet_rows only supports xlsx_file/xlsx_memory books (book_id={!r}, kind={!r})".format(
+            str(book_id), kind or "<unknown>"
         )
+        raise ValueError(msg)
 
 
 __all__ = (
