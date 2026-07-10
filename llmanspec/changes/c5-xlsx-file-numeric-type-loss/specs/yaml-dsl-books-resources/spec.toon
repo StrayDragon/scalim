@@ -1,0 +1,7 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  modify_requirement,r10,"downstream demands MUST be able to load xlsx book sheet rows via a built-in loader","系统 MUST 提供一个 workflow scope 的内置 loader,允许下游 demand 将上游 `xlsx_file` 或 `xlsx_memory` book 的某个 sheet 作为 rows 输入使用: - loader 稳定导入路径: `scalim.workflow.loaders:book_sheet_rows` - YAML builtin callable id: `^workflow/book_sheet_rows`(由 `yaml-dsl-builtin-callables` 约束) - `book_sheet_rows` MUST 以 canonical field key 作为返回 row 的键 SSOT - `book_sheet_rows` MUST 返回保留 `FieldValue` 值域的 row values,而不是 `CSV` 等价字符串 values loader MUST 接收 `params.ref` 映射对象,并满足以下结构: - `ref.node`（上游 node id） - `ref.book`（book 资源 id） - `ref.sheet`（sheet 名） 约束: - `xlsx_file` 与 `xlsx_memory` MUST 均被支持 - 下游 node 仅允许读取其依赖闭包内上游 nodes 的 book(闭包可见性) - 当引用越界或目标 sheet 不存在时,系统 MUST fail-fast 并提供可诊断摘要 - display header MUST NOT 泄漏到 loader 返回键空间 - loader MUST NOT 依赖猜测性字符串恢复来满足 typed row 语义",null,null,null
+op_scenarios[3]{req_id,id,given,when,then}:
+  r10,"book-sheet-rows-supports-xlsx-file","上游 node 向 xlsx_file book 的某 sheet 写入 typed rows","下游 node 通过 book_sheet_rows 读取 ref.node/book/sheet","返回 row 的值 MUST 保留 FieldValue 类型且键为 canonical field id"
+  r10,"book-sheet-rows-xlsx-file-respects-visibility","下游 node 的依赖闭包不包含某 producer","下游调用 book_sheet_rows 引用该 producer 写入的 xlsx_file sheet","系统 MUST fail-fast 或按既有可见性契约拒绝越界读取"
+  r10,"book-sheet-rows-xlsx-memory-unchanged","上游 node 向 xlsx_memory book 写入 typed rows","下游通过 book_sheet_rows 读取","既有 xlsx_memory 行为 MUST 保持（typed FieldValue rows）"

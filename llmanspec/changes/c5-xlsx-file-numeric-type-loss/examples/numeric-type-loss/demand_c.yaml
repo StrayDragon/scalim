@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=../../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
+
+name: overall_kpi
+description: |
+  整体指标 sheet — 对应 Pay Order 的汇总指标 sheet。
+  产出包含 float、bool（attained 字段），验证 bool 在 xlsx_file 中丢失类型。
+
+main_source:
+  source_id: kpi
+  loader: "loaders:load_overall_kpi"
+  fields:
+    metric:   {name: "指标"}
+    value:    {name: "数值"}
+    unit:     {name: "单位"}
+    target:   {name: "目标值"}
+    attained: {name: "是否达标"}
+
+outputs:
+  - name: kpi_sheet
+    to:
+      book: report_workbook
+      sheet: 整体指标
+    fields:
+      - metric
+      - value
+      - unit
+      - target
+      - attained
+
+  - name: kpi_sheet_sb
+    to:
+      book: report_sheetbook
+      sheet: 整体指标
+    fields:
+      - metric
+      - value
+      - unit
+      - target
+      - attained
