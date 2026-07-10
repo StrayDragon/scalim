@@ -81,11 +81,9 @@ class InMemoryRowsSink(BaseRowSink):
         for field_id in self.field_ids:
             value = row.get(field_id)
             if not _is_field_value(value):
-                msg = "InMemoryRowsSink received non-FieldValue: field_id={!r}, type={!r}".format(
-                    str(field_id),
-                    type(value).__name__,
-                )
-                raise TypeError(msg)
+                # 兼容边界: `loader` 常见 `datetime`/`date` 等暂不在 `FieldValue` 闭集内.
+                # 行为对齐旧 `CSV` 中间层 `str(value)`;正式扩展值域见 `notplan` `c0-add-field-value-datetime`.
+                value = str(value)
             values.append(value)
         return values
 

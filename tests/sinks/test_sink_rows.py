@@ -46,10 +46,24 @@ def test_in_memory_rows_sink_requires_field_ids() -> None:
         _ = InMemoryRowsSink(field_ids=None)  # type: ignore[arg-type]
 
 
-def test_in_memory_rows_sink_rejects_non_field_value() -> None:
-    sink = InMemoryRowsSink(field_ids=["a"])
-    with pytest.raises(TypeError, match=r"non-FieldValue"):
-        sink.write_row({"a": {"bad": "x"}})  # type: ignore[dict-item]
+def test_in_memory_rows_sink_stringifies_non_field_value() -> None:
+    from datetime import date, datetime
+
+    sink = InMemoryRowsSink(field_ids=["dt", "d", "obj"])
+    sink.write_row(
+        {  # pyright: ignore[reportArgumentType]
+            "dt": datetime(2024, 1, 2, 3, 4, 5),
+            "d": date(2024, 1, 2),
+            "obj": {"bad": "x"},
+        }
+    )  # type: ignore[dict-item]
+    artifact = sink.to_artifact()
+    assert artifact.rows == [["2024-01-02 03:04:05", "2024-01-02", "{'bad': 'x'}"]]
+
+
+def test_in_memory_rows_still_rejects_non_field_value_on_construct() -> None:
+    with pytest.raises(TypeError, match=r"FieldValue"):
+        _ = InMemoryRows(header=["a"], rows=[[object()]])  # type: ignore[list-item]  # pyright: ignore[reportArgumentType]
 
 
 def test_in_memory_rows_to_in_memory_csv_preserves_order_and_normalizes_values() -> None:

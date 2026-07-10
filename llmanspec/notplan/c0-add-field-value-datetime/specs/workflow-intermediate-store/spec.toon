@@ -1,0 +1,8 @@
+kind: llman.sdd.delta
+ops[2]{op,req_id,title,statement,from,to,name}:
+  modify_requirement,r1,"workflow intermediate store MUST support a typed row artifact (`InMemoryRows`)","当 workflow 需要在节点之间传递“纯 Python 数据”（而不是强制落盘/字符串化）时，系统 MUST 支持一个稳定的 typed 中间态结构 `InMemoryRows`： - `InMemoryRows` MUST 是一个明确的表结构（而不是任意 `object` 图），避免把 workflow 变成“随便塞对象”的隐式耦合点。 - `InMemoryRows` 的值域 MUST 限制在框架 `FieldValue` 口径：`int`/`float`/`Decimal`/`str`/`bool`/`None`/`datetime`/`date`（`datetime` 不区分 naive/aware），以保证与 sinks（尤其 workbook/Excel）类型语义可对齐。 - `InMemoryRows` MUST 采用稳定结构（与 `InMemoryCsv` 类似但值域为 typed）： - `header: list[str]`（字段顺序 SSOT） - `rows: list[list[FieldValue]]`（每行 MUST 与 `header` 等长，列序一致）",null,null,null
+  add_requirement,r9,"InMemoryRows MUST accept datetime and date FieldValues","系统 MUST 允许 `InMemoryRows` / `InMemoryRowsSink` 接受 `datetime` 与 `date` 作为合法 `FieldValue`（不因 `tzinfo` 拒绝）。显式转换到 `InMemoryCsv` 时，时间值 MUST 继续使用与 `CSVSink` 等价的 `str(value)` 规范化。",null,null,null
+op_scenarios[3]{req_id,id,given,when,then}:
+  r1,"field-value-domain-includes-datetime-and-date","","InMemoryRows 被用作 workflow typed 中间态","值域 MUST 文档化为包含 datetime 与 date"
+  r9,"rows-sink-accepts-naive-datetime","某 output 字段值为 naive datetime(2024,1,2,3,4,5)",写入 InMemoryRowsSink,"MUST 成功追加且保留 datetime 类型"
+  r9,"rows-sink-accepts-aware-datetime","某 output 字段值为 timezone-aware datetime",写入 InMemoryRowsSink,"MUST 成功追加（不得因 tzinfo 拒绝）"

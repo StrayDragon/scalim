@@ -42,6 +42,15 @@
 - **备注**: 源 change 明确否决从 bugfix 夹带 bypass。
 - **第一条动作**: 先 `llman-sdd-explore` 澄清原子性与可见性，再 propose。
 
+### later — `FieldValue` 纳入 `datetime`/`date`（Excel 原生日期）
+
+- **来源**: pay-order 回归：loader 的 `datetime` 撞上 ROWS sink；草案在 `llmanspec/notplan/c0-add-field-value-datetime/`。
+- **当前临时策略**: `InMemoryRowsSink` 对非 `FieldValue` `str()`（对齐旧 CSV）；Excel 单元格为文本日期。
+- **阻塞**: openpyxl 拒绝 aware `datetime`；去 `tzinfo` 可能扭曲绝对时刻语义，需产品决策后再转正。
+- **触发信号**: 需要 Excel 原生日期单元格 / 时区策略已收敛。
+- **落地路径**: 将 notplan `c0-add-field-value-datetime` 转回 active change 后 apply。
+- **第一条动作**: `llman-sdd-explore` 收敛 aware 策略（拒绝 / 去 tz / UTC 再去 tz）。
+
 ### drop — commit 边界启发式数字恢复
 
 - **原因**: 与 typed SSOT 及 sheetbook r6 冲突；源 change 已从根去掉 stringify。
