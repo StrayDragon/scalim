@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-docs-skills-autogen-sync"
-purpose: "确保 CLI/LSP 文档和 skill 文档从单一真相源自动生成，避免手工维护重复文案，并通过 QA gate 拦截文档漂移。 [scope-review-2026-07-12-c20]"
+purpose: "确保 CLI/LSP 文档和 skill 文档从单一真相源自动生成，避免手工维护重复文案，并通过 QA gate 拦截文档漂移。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,YAML DSL CLI reference MUST be generated from CLI parser and shared by docs and,"系统 MUST 以 argparse parser 为命令真相，并将其输出作为 docs-site 与 skill 的共享 reference 来源，禁止手工维护重复文案。 系统 MUST 至少覆盖并可从生成物中发现以下子命令与其 usage/help： - `yaml-dsl validate` - `yaml-dsl schema validate/show/path` - `yaml-dsl upsert-lsp-comment`"

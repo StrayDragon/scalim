@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-template-vars"
-purpose: "定义 YAML 模板变量预编译能力：在 YAML parse 前通过 LiteJinja2 渲染 `{{ x }}`/`{% ... %}` 占位符，并提供安全的 sandbox 策略与输入护栏。 [scope-review-2026-07-12-c20]"
+purpose: "定义 YAML 模板变量预编译能力：在 YAML parse 前通过 LiteJinja2 渲染 `{{ x }}`/`{% ... %}` 占位符，并提供安全的 sandbox 策略与输入护栏。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[9]{req_id,title,statement}:
   r1,template_vars enables LiteJinja2 precompile before YAML parse,"系统 MUST 支持在读取 demand/workflow YAML 文本后、YAML parse 前执行 LiteJinja2 预编译,以便调用方通过 `template_vars` 注入 `{{ x }}`/`{% ... %}` 模板值. 当且仅当调用方显式提供 `template_vars`(非 `None`)时,系统 MUST 启用该预编译步骤;未提供时 MUST 不进行模板渲染(保持原有语义与安全边界)."

@@ -1,8 +1,8 @@
 kind: llman.sdd.spec
 name: "governance-module-organization"
-purpose: "定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性. [scope-review-2026-07-12-c20]"
+purpose: "定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
-requirements[21]{req_id,title,statement}:
+requirements[23]{req_id,title,statement}:
   r1,"internal implementation paths MUST remain non-contract","系统 MUST 将\"可导入\"与\"可承诺\"分为两个层级：稳定公开入口由显式白名单定义,其余实现路径即使可导入也 MUST 视为内部实现细节."
   r2,facade modules MUST use explicit export whitelists,"稳定公开入口的 facade 模块 MUST 使用显式 `__all__` 或等价白名单控制导出面,避免内部符号随重构被无意带出."
   r3,yaml_dsl MUST maintain subpackage structure,"yaml_dsl 的解析与 runtime MUST 保持显式子包结构：`_internal.config_parsing` 采用 package 形式,保留 `loader.py`/`validator.py` 作为稳定入口；`runtime` 采用子模块组织并通过稳定入口提供访问."
@@ -24,7 +24,9 @@ requirements[21]{req_id,title,statement}:
   r19,yaml_dsl runtime MUST NOT contain workflow runtime modules,"系统 MUST 保持 yaml_dsl runtime 子包不包含 workflow runtime 语义模块 (例如 `workflow_*.py`),以避免把 workflow 层实现符号误放入 DSL runtime.该约束 MUST 由可独立运行的静态门禁守护."
   r20,"workflow_compile hotspot MUST be decomposed into responsibility-focused submodul","系统 MUST 将 `workflow_compile.py` 这类多职责热点模块拆分为职责单一的子模块,以降低复杂度并提升可测试性。 拆分后系统 MUST 满足: - 对外稳定入口(例如 `compile_workflow_ir`)保持可用且行为不变 - 纯规则/校验逻辑 MUST 位于可单测的子模块中(无 IO、输入输出明确) - IO 相关逻辑(例如 demand YAML 预加载) MUST 与纯规则逻辑分离"
   r21,output_composition hotspot MUST be decomposed into spec/router/builder submodule,"系统 MUST 将 output composition 热点实现拆分为职责单一的子模块(例如 `execution/output_composition/{specs,router,build}.py`),至少分离: - spec/数据类层 - router/runtime 实现层 - builder/工厂层 拆分后系统 MUST 保持: - `scalim.execution.output_composition` 的稳定导入路径继续可用 - 对外行为不变(纯重构)"
-scenarios[45]{req_id,id,given,when,then}:
+  r22,openpyxl write helpers MUST use shared SSOT util,"系统 MUST 将 openpyxl write_only 关闭与原子保存辅助逻辑集中到单一内部 util(`src/scalim/_internal/utils/openpyxl_helpers.py`): - `best_effort_close_write_only_worksheet` / `best_effort_close_write_only_workbook_worksheets` / `save_openpyxl_workbook_atomic` MUST 为 SSOT - `workflow` 的 workbook/sheetbook 资源与 `sinks` Excel 实现 MUST 复用该 SSOT,不得再维护平行副本 - util MUST NOT 反向依赖 `sinks`/`workflow` 领域模块 - `resources_workbook` 对外 re-export 的兼容符号 MUST 保持可导入"
+  r23,atomic temp path helpers MUST live under _internal.utils,"系统 MUST 将原子临时路径辅助(`create_temp_path`/`atomic_replace_temp_path`/`best_effort_remove_temp_path`/`best_effort_cleanup_temp_path_dir`)的 SSOT 放在 `src/scalim/_internal/utils/atomic_paths.py`; `sinks._internal.base` MAY re-export 以保持既有导入路径可用,但 MUST NOT 再持有平行实现副本"
+scenarios[49]{req_id,id,given,when,then}:
   r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
   r1,"implementation-paths-are-not-promoted-to-public-contract","",某个内部实现模块可以被 import,系统 MUST NOT 因此自动将其视为稳定公开入口
   r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
@@ -70,3 +72,7 @@ scenarios[45]{req_id,id,given,when,then}:
   r20,"workflow-compile-remains-stable-after-internal-split","",维护者按职责拆分 `workflow_compile.py` 为多个 `_internal` 子模块,对外入口 `compile_workflow_ir` 的导入与运行 MUST 保持不变
   r21,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
   r21,"stable-import-path-remains-after-refactor","",维护者将 output composition 代码迁移到子模块/子包,调用方仍可通过 `scalim.execution.output_composition` 导入公共类型与 `build_output_composition`
+  r22,"openpyxl-helpers-ssot-imported",workflow workbook/sheetbook 与 Excel sinks 需要 write_only close 或原子保存,维护者审查实现,仓库 MUST 仅有一份 openpyxl_helpers SSOT 且调用方从该模块导入
+  r22,"workbook-reexport-remains",既有调用方从 resources_workbook 导入 best_effort_close_write_only_workbook_worksheets,执行导入,导入 MUST 成功且行为与共享实现一致
+  r23,"atomic-paths-ssot",多模块需要原子临时路径写出,维护者审查实现,"路径辅助 MUST 以 atomic_paths 为 SSOT,base 仅允许 re-export"
+  r23,"no-utils-to-sinks-inversion",openpyxl_helpers 需要临时路径辅助,模块导入图检查,`_internal.utils` MUST NOT 导入 `sinks` 或 `workflow`

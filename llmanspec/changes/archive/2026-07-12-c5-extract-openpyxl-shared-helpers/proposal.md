@@ -23,13 +23,15 @@ Bug fix 必须在多处同步修改，存在行为漂移风险。
 
 ## What Changes
 
-1. **创建共享模块**: `src/scalim/_internal/utils/openpyxl_helpers.py`
+1. **创建共享模块**:
+   - `src/scalim/_internal/utils/openpyxl_helpers.py`（openpyxl close/save）
+   - `src/scalim/_internal/utils/atomic_paths.py`（原子临时路径 SSOT，避免 utils→sinks 层级反转）
 2. **提取函数**:
    - `best_effort_close_write_only_workbook_worksheets(workbook)`
    - `best_effort_close_write_only_worksheet(worksheet)`
-   - `save_openpyxl_workbook_atomic(workbook, *, output_path, error_label="Workbook")`
+   - `save_openpyxl_workbook_atomic(workbook, *, output_path)`（原始异常上抛；领域错误由调用方包装）
 3. **替换所有调用点**: `resources_workbook.py`、`resources_sheetbook.py`、`sinks/_internal/excel.py` 改为导入共享模块
-4. **保持公共 re-export**: `resources_workbook.py` 中维持对外导出（兼容已有导入方）
+4. **保持公共 re-export**: `resources_workbook.py` 中维持对外导出；`sinks._internal.base` re-export atomic path 符号
 
 ## Capabilities
 

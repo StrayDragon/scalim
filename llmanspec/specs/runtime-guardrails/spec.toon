@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "runtime-guardrails"
-purpose: "定义运行期 guardrails 配置与执行契约,用于对 loader/relations/compute 等环节的契约违规、数据质量问题与异常处理提供可配置的 quiet/fast_fail 行为,并通过现有错误事件通道进行可观测记录. [scope-review-2026-07-12-c20]"
+purpose: "定义运行期 guardrails 配置与执行契约,用于对 loader/relations/compute 等环节的契约违规、数据质量问题与异常处理提供可配置的 quiet/fast_fail 行为,并通过现有错误事件通道进行可观测记录. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[7]{req_id,title,statement}:
   r1,Guardrails 配置与默认行为,"系统 SHALL 提供可选的 guardrails 配置用于运行期护栏控制;默认 `enabled=false` 时不得改变现有执行行为. 系统 SHALL 支持 `mode: quiet|fast_fail`(默认 fast_fail) 并在 `fast_fail` 时对护栏违规抛出终止异常. guardrails 配置 SHALL 按职责分层,包含 `loader`/`relations`/`compute` 子配置;关键字段缺失检查配置位于 `guardrails.loader.required_fields`."

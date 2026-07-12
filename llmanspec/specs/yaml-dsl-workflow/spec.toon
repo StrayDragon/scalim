@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-workflow"
-purpose: "提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目). [scope-review-2026-07-12-c20]"
+purpose: "提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目). [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[22]{req_id,title,statement}:
   r1,workflow public guidance MUST use curated stable entrypoints,"在 workflow 分层稳定后，系统 MUST 将 workflow 的用户侧导入与示例统一收敛到 curated stable entrypoints。 系统 MUST 允许面向用户的 workflow 官方用法通过以下路径表达： - `scalim.dsl.yaml_dsl.run_workflow` - `scalim.dsl.yaml_dsl.workflow` - `scalim.dsl.yaml_dsl.workflow_types` - `scalim.dsl.yaml_dsl.workflow_paths` 系统 MUST NOT 再把 workflow 的内部实现路径写成官方用户导入路径。"

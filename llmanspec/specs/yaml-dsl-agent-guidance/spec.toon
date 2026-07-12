@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-agent-guidance"
-purpose: "定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计. [scope-review-2026-07-12-c20]"
+purpose: "定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[13]{req_id,title,statement}:
   r1,"Task-Driven Manual Skill Entry","系统 MUST 提供手工维护的 YAML DSL skill 本体,用于把 agent 引导到正确的任务路径,而不是把 skill 退化为单个 schema 摘要页. 手工维护的 `SKILL.md` MUST 明确覆盖至少以下任务类型: - 新建或修改 YAML DSL 配置(demand YAML) - 编排多条 demand 的 workflow YAML 配置(workflow YAML) - 将旧写法直接升级到当前结构 - 对现有 YAML 做 schema/full validate 与订正(demand YAML) - 对 workflow YAML 做 schema validate 与排错(workflow YAML) - 为某类 legacy 批量报表脚本设计渐进迁移方案 `SKILL.md` MUST 指示 agent 先识别任务类型,再按需读取最少的 references,而不是默认加载全部参考资料. `SKILL.md` MUST 保持 routing-first: 只保留任务分流、最小命令入口与对一层直达 references 的链接; 详细场景预设、迁移 heuristics 与完整语法目录 MUST 放在被直接链接的 references 中."

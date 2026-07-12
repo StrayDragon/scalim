@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "ir-key-normalization"
-purpose: "`key_normalization` 提供一个运行期可控的”稳定字符串口径”键匹配策略,用于解决 relations/derived outputs 中跨来源类型不一致导致的 miss/分组拆分问题(例如 `1` 与 `”1”`). 该能力为 `EXPERIMENTAL`,默认关闭(`raw`). [scope-review-2026-07-12-c20]"
+purpose: "`key_normalization` 提供一个运行期可控的”稳定字符串口径”键匹配策略,用于解决 relations/derived outputs 中跨来源类型不一致导致的 miss/分组拆分问题(例如 `1` 与 `”1”`). 该能力为 `EXPERIMENTAL`,默认关闭(`raw`). [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[10]{req_id,title,statement}:
   r1,"`key_normalization` MUST be a validated opt-in runtime option (default `raw`)","系统 MUST 提供一个运行期开关 `key_normalization`,取值域为: - `raw`: 保持现有 key 口径(默认) - `auto_str`: 使用稳定字符串口径做 key 匹配(仅在未显式配置 cast 时作为缺省策略生效) - `force_str`: 强制使用稳定字符串口径做 key 匹配(即使显式配置 cast 也会在最终匹配边界做字符串规范化) 系统 MUST 在对外入口对该字段进行校验;未知取值 MUST fail-fast(编译期/启动期均可). 该开关 MUST 可在所有公开入口启用并最终落到执行核心的运行期上下文."

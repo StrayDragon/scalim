@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-books-resources"
-purpose: "定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义."
+purpose: "定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[11]{req_id,title,statement}:
   r1,demand/workflow YAML MUST support resources.books as unified Excel IO identity declaration,"系统 MUST 在 demand 与 workflow YAML 中提供一致的 resources.books 入口作为 Excel book 的 identity/variant/path 声明面: - demand: resources.books.<book_id> - workflow: workflow.resources.books.<book_id> - <book_id> MUST 非空且在 mapping 内唯一 - 每个 book MUST 选择且仅选择一个实现分支 xlsx_file 或 xlsx_memory - YAML books MUST NOT 再把 write_defaults 或 xlsx_memory.budget 作为稳定 authoring 字段（出现 MUST fail-fast 并迁移到 Python policy） - legacy kind discriminator 仍 MUST fail-fast - demand 侧 imports/ 规则保持既有 scope；workflow MUST NOT 支持 imports/"

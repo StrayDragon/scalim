@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "structured-logging"
-purpose: "定义结构化日志的 JSONL 输出格式、字段元信息、归因上下文自动注入及 CLI 渲染能力，确保日志可被机器解析与人类友好展示。 [scope-review-2026-07-12-c20]"
+purpose: "定义结构化日志的 JSONL 输出格式、字段元信息、归因上下文自动注入及 CLI 渲染能力，确保日志可被机器解析与人类友好展示。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[8]{req_id,title,statement}:
   r1,"when enabled, `scalim.*` logs MUST be emitted as JSONL (one JSON object per line","当启用结构化日志时，系统 MUST 将所有 `scalim.*` logger 的可见输出统一为 JSONL： - 每条日志 MUST 是 **单行** JSON object（JSON Lines） - MUST 可写入 `stdout/stderr`（由配置决定） - MUST 保持 line-oriented（便于 `tail -f`/流式处理/管道） 说明：该 requirement 约束的是“启用 structured-logging 时”的输出形态；未启用时系统仍可保持库默认行为（不主动配置 root logging）。"

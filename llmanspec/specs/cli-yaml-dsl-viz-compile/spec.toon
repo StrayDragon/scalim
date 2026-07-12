@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "cli-yaml-dsl-viz-compile"
-purpose: "TBD - created by archiving change c0-yaml-dsl-viz-compile-cli. Update Purpose after archive. [scope-review-2026-07-12-c20]"
+purpose: "TBD - created by archiving change c0-yaml-dsl-viz-compile-cli. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,Demand YAML 静态导出 viz 产物,"`scalim-cli` MUST 提供命令： `scalim-cli yaml-dsl viz compile --type demand <demand.yaml> --output-dir <dir>` 该命令 MUST 在不执行任何 loader 的前提下，基于静态编译得到的 `ExecutionPlan` 写出： - `<dir>/viz_snapshot.json` - `<dir>/viz_schedule_plan.json`"

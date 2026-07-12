@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "tools-prompt-eval-cli"
-purpose: "定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略，确保其不覆盖仓库真实 `scalim-cli`，同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现，并避免对 PyPI build 依赖/网络造成的 dry-run 波动。 [scope-review-2026-07-12-c20]"
+purpose: "定义 prompt-eval coding-agent workspace 的 fixture CLI 隔离策略，确保其不覆盖仓库真实 `scalim-cli`，同时保持 workspace 内 `uv run scalim-cli ...` 命令模板可复现，并避免对 PyPI build 依赖/网络造成的 dry-run 波动。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,Fixture CLI 命令名与仓库 CLI 解耦,"prompt-eval 的 workspace fixture MUST 提供一个内部专用的 CLI 命令名(例如 `scalim-fixture-cli`)用于执行 stub 行为。 该 fixture MUST NOT 注册与仓库真实 CLI 同名的 console script(例如 `scalim-cli`)。"

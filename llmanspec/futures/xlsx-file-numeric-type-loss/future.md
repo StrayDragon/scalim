@@ -55,8 +55,9 @@
 
 - **产品直觉**: cell/sheet 超限 fail-fast 更像硬截断；框架默认更宜把内存交给进程/OS，若要控资源应更接近「限速/背压」而非直接杀任务。
 - **当前策略**: **先保留**可选 `BookBudgetPolicy`（omit = unlimited；显式则 fail-fast）。c30 只验收既有接线，不扩语义。
-- **下一步**: 调研下游是否实际配置 budget；评估移除 breaking 面与替代（cgroup / 外层限流 / 未来背压 API）。
-- **触发信号**: 调研显示无人使用，或明确需要「限速式」护栏而非 fail-fast。
+- **用量盘点（2026-07-12）**: 见 `.tmp/evidence/book-budget-usage-explore/NOTES.md`。仓库内非测试用法≈0；`.tmp/known-outer-paths-using-this-package.txt` 当时不存在。结论：**暂不升格移除/限流**。
+- **下一步**: 外部路径清单可用后再盘点；评估移除 breaking 面与替代（cgroup / 外层限流 / 未来背压 API）。
+- **触发信号**: 调研显示有真实配置者且痛点明确，或明确需要「限速式」护栏而非 fail-fast。
 - **落地路径**: 独立 change（建议 id：`book-budget-rate-limit-or-remove`）；MUST NOT 塞进 c30。
 - **第一条动作**: 用量盘点（含 `.tmp/known-outer-paths-using-this-package.txt` 仅作路径盘点，勿公开复述内容）→ explore。
 

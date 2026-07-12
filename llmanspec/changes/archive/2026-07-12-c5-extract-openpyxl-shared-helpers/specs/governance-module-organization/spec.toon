@@ -1,0 +1,9 @@
+kind: llman.sdd.delta
+ops[2]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r22,openpyxl write helpers MUST use shared SSOT util,"系统 MUST 将 openpyxl write_only 关闭与原子保存辅助逻辑集中到单一内部 util(`src/scalim/_internal/utils/openpyxl_helpers.py`): - `best_effort_close_write_only_worksheet` / `best_effort_close_write_only_workbook_worksheets` / `save_openpyxl_workbook_atomic` MUST 为 SSOT - `workflow` 的 workbook/sheetbook 资源与 `sinks` Excel 实现 MUST 复用该 SSOT,不得再维护平行副本 - util MUST NOT 反向依赖 `sinks`/`workflow` 领域模块 - `resources_workbook` 对外 re-export 的兼容符号 MUST 保持可导入",null,null,null
+  add_requirement,r23,atomic temp path helpers MUST live under _internal.utils,"系统 MUST 将原子临时路径辅助(`create_temp_path`/`atomic_replace_temp_path`/`best_effort_remove_temp_path`/`best_effort_cleanup_temp_path_dir`)的 SSOT 放在 `src/scalim/_internal/utils/atomic_paths.py`; `sinks._internal.base` MAY re-export 以保持既有导入路径可用,但 MUST NOT 再持有平行实现副本",null,null,null
+op_scenarios[4]{req_id,id,given,when,then}:
+  r22,openpyxl-helpers-ssot-imported,"workflow workbook/sheetbook 与 Excel sinks 需要 write_only close 或原子保存",维护者审查实现,"仓库 MUST 仅有一份 openpyxl_helpers SSOT 且调用方从该模块导入"
+  r22,workbook-reexport-remains,"既有调用方从 resources_workbook 导入 best_effort_close_write_only_workbook_worksheets",执行导入,"导入 MUST 成功且行为与共享实现一致"
+  r23,atomic-paths-ssot,"多模块需要原子临时路径写出",维护者审查实现,"路径辅助 MUST 以 atomic_paths 为 SSOT,base 仅允许 re-export"
+  r23,no-utils-to-sinks-inversion,openpyxl_helpers 需要临时路径辅助,模块导入图检查,"`_internal.utils` MUST NOT 导入 `sinks` 或 `workflow`"

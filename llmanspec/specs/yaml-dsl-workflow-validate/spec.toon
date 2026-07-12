@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-workflow-validate"
-purpose: "提供面向 CI/预发布的 workflow-level validate CLI 入口，在不执行 workflow 的前提下对 workflow YAML 及其引用的 demands 做静态/编译期校验。 [scope-review-2026-07-12-c20]"
+purpose: "提供面向 CI/预发布的 workflow-level validate CLI 入口，在不执行 workflow 的前提下对 workflow YAML 及其引用的 demands 做静态/编译期校验。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[2]{req_id,title,statement}:
   r1,"CLI MUST provide workflow-level validate that recursively validates referenced d","系统 MUST 提供一个面向 CI/预发布的 workflow-level validate CLI 入口，用于在不执行 workflow 的前提下，对 workflow YAML 及其引用的 demands 做静态/编译期校验。 该入口 MUST 支持形如： - `yaml-dsl validate --type workflow <workflow.yaml>` 校验范围 MUST 至少包含： - workflow YAML 自身结构与语义校验（解析、引用合法性、cycle detection 等） - 递归校验每个 `runs[*].demand` 引用的 demand YAML（允许 imports/$import，并在错误中提供可诊断的引用链路） - workflow ↔ demand 的交叉一致性校验（例如 demand outputs 绑定到的资源 id 必须能解析到某个有效的资源 mapping）: - `to.book` ↔ `resources.books` - `to.file` ↔ `resources.files` - 对旧 `outputs[*].container` 给出迁移诊断"

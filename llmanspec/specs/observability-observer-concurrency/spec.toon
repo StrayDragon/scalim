@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "observability-observer-concurrency"
-purpose: "定义 workflow 并发执行时 observers/hooks/components 的默认并发语义,确保在不要求 observer 实现方线程安全的前提下仍具备可解释、可复现的事件回放顺序,并保持 `no-external-callback-under-lock` 护栏不被破坏. [scope-review-2026-07-12-c20]"
+purpose: "定义 workflow 并发执行时 observers/hooks/components 的默认并发语义,确保在不要求 observer 实现方线程安全的前提下仍具备可解释、可复现的事件回放顺序,并保持 `no-external-callback-under-lock` 护栏不被破坏. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,observer callbacks MUST be safe under workflow concurrency by default,"当 workflow 以并发模式执行（例如 `max_concurrency>1`）且注册了 observers/hooks/components 时,系统 MUST 默认保证回调调用在并发下安全: - 系统 MUST NOT 要求 observer 实现方必须是线程安全的才能正确工作 - 系统 MUST 通过序列化回调或 capture+replay（单线程回放）提供默认保障 - 系统 MUST 仍满足 `no-external-callback-under-lock`（不得把回调放回锁内）"

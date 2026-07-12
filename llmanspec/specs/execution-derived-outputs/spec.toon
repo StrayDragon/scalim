@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-derived-outputs"
-purpose: "支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界. [scope-review-2026-07-12-c20]"
+purpose: "支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[17]{req_id,title,statement}:
   r1,派生输出定义(同步聚合),"系统 SHALL 支持在同一次运行中定义派生输出,派生输出可基于详情数据进行聚合/计算,并在运行结束时输出结果."

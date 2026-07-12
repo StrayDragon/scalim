@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "ir-structure"
-purpose: "定义 IR 层的纯数据边界与依赖约束,确保 spec/ir 不依赖执行与规划层,便于稳定复用、演进与测试. [scope-review-2026-07-12-c20]"
+purpose: "定义 IR 层的纯数据边界与依赖约束,确保 spec/ir 不依赖执行与规划层,便于稳定复用、演进与测试. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,IR 纯数据层,"系统 MUST 保证 `spec/ir` 中的 IR 类型为纯数据/类型层,不依赖 `execution`/`planning`/`sinks` 等执行侧模块."

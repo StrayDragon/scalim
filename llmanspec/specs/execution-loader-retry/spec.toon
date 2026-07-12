@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-loader-retry"
-purpose: "提供可配置的 loader retry policy 机制，在 loader 调用因瞬态错误失败时执行有限的自动重试，支持全局默认策略与 per-source 覆盖，并通过可配置的退避策略、次数上限和耗时上限防止无限重试。 [scope-review-2026-07-12-c20]"
+purpose: "提供可配置的 loader retry policy 机制，在 loader 调用因瞬态错误失败时执行有限的自动重试，支持全局默认策略与 per-source 覆盖，并通过可配置的退避策略、次数上限和耗时上限防止无限重试。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[6]{req_id,title,statement}:
   r1,Loader retry policy 配置模型与默认值,"系统 SHALL 提供可配置的 loader retry policy,用于在 loader 调用因**瞬态错误**失败时执行有限的自动重试. 该 policy MUST 支持如下字段(字段名可按实现调整,但语义必须等价): - `enabled`: bool,默认 `false` - `should_retry`: 用户提供的可调用对象(或可解析为可调用对象的安全引用),当 `enabled=true` 时 MUST 提供 - `max_attempts`: int,默认 `3`,MUST >= 1,且 MUST <= 5(硬上限) - `max_elapsed_seconds`: float,默认 `10`,MUST > 0,且 MUST <= 20(硬上限) - `backoff`: `\"fixed\" | \"exponential\"`,默认 `\"exponential\"` - `base_delay_seconds`: float,默认 `0.2`,MUST >= 0 - `max_delay_seconds`: float,默认 `2`,MUST >= 0,且 MUST <= 5(硬上限) - `jitter`: bool,默认 `true` 系统 MUST 在配置解析/编译阶段校验上述字段类型与范围;任何超过硬上限或为负值/非法枚举的配置 MUST 被拒绝并报告清晰的字段路径."

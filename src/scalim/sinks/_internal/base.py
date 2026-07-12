@@ -1,12 +1,9 @@
 # region imports
 
-import os
-import tempfile
 from abc import ABC, abstractmethod
-from contextlib import suppress
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, List, Mapping, Optional, Sequence, Type
 
+from ..._internal.utils import atomic_paths as _atomic_paths
 from ...typedefs import FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
 
@@ -20,48 +17,11 @@ ColumnValues = Mapping[Hashable, FieldValue]
 ColumnBatch = Mapping[str, ColumnValues]
 ColumnData = Dict[str, Dict[Hashable, FieldValue]]
 
-_PRIVATE_TEMP_DIR_PREFIX = ".scalim-tmp-"
-
-
-def _is_private_temp_dir(path: Path) -> bool:
-    return bool(path.name) and path.name.startswith(_PRIVATE_TEMP_DIR_PREFIX)
-
-
-def _best_effort_cleanup_private_temp_dir(private_dir: Path) -> None:
-    if not _is_private_temp_dir(private_dir):
-        return
-    with suppress(OSError):
-        private_dir.rmdir()
-
-
-def best_effort_cleanup_temp_path_dir(temp_path: str) -> None:
-    temp_obj = Path(temp_path)
-    _best_effort_cleanup_private_temp_dir(temp_obj.parent)
-
-
-def best_effort_remove_temp_path(temp_path: str) -> None:
-    temp_obj = Path(temp_path)
-    with suppress(OSError):
-        temp_obj.unlink()
-    _best_effort_cleanup_private_temp_dir(temp_obj.parent)
-
-
-def atomic_replace_temp_path(temp_path: str, output_path: str) -> None:
-    temp_obj = Path(temp_path)
-    _ = temp_obj.replace(output_path)
-    _best_effort_cleanup_private_temp_dir(temp_obj.parent)
-
-
-def create_temp_path(output_path: str, suffix: str) -> str:
-    output_dir = Path(output_path).parent
-    output_dir.mkdir(parents=True, exist_ok=True)
-    private_dir = Path(tempfile.mkdtemp(dir=str(output_dir), prefix=_PRIVATE_TEMP_DIR_PREFIX))
-    with suppress(OSError):
-        private_dir.chmod(0o700)
-
-    fd, temp_path = tempfile.mkstemp(suffix=suffix, dir=str(private_dir))
-    os.close(fd)
-    return str(temp_path)
+# 从 `_internal.utils.atomic_paths` 再导出,兼容既有导入路径.
+atomic_replace_temp_path = _atomic_paths.atomic_replace_temp_path
+best_effort_cleanup_temp_path_dir = _atomic_paths.best_effort_cleanup_temp_path_dir
+best_effort_remove_temp_path = _atomic_paths.best_effort_remove_temp_path
+create_temp_path = _atomic_paths.create_temp_path
 
 
 def update_column(columns: ColumnData, field_key: str, values: ColumnValues) -> None:

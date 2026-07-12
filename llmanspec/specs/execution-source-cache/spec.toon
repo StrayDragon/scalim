@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-source-cache"
-purpose: "支持 `cache_mode=preload_forever` 的数据源在 pipeline 启动前预加载,结果写入 `ExecutionRuntime.preloaded_cache` 并在关联加载时复用;计划元数据记录已缓存的数据源。对于高频且内存占用小的映射表(如国家地区表、枚举常量映射表),作为全局一次性导入使用以加速获值速度。 [scope-review-2026-07-12-c20]"
+purpose: "支持 `cache_mode=preload_forever` 的数据源在 pipeline 启动前预加载,结果写入 `ExecutionRuntime.preloaded_cache` 并在关联加载时复用;计划元数据记录已缓存的数据源。对于高频且内存占用小的映射表(如国家地区表、枚举常量映射表),作为全局一次性导入使用以加速获值速度。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[7]{req_id,title,statement}:
   r1,预加载缓存模式,"系统 SHALL 支持 source `cache_mode=preload_forever`,并在执行前预加载该数据源结果。系统 MUST 将 `source.cache_mode` 约束为显式枚举(当前仅允许 `none|preload_forever`),并在语义校验阶段拒绝未知值。 预加载调用 MUST 与常规 loader 调用保持一致的参数语义: - 若 `sources.<id>.params` 非空,预加载时 MUST 以 `loader(**sources.<id>.params)` 形式调用,且 `sources.<id>.params` 中的 `{$runtime: <name>}` 必须先完成解析 - 若 `sources.<id>.params` 为空,预加载时 MAY 使用零参调用以减少影响面 - preload 与 ref loader MUST 共用同一份编译后的 params template representation,避免双轨 params 逻辑"

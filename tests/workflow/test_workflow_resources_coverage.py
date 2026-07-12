@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
+from scalim._internal.utils import openpyxl_helpers as openpyxl_helpers_mod
 from scalim.workflow import resources as resources_mod
 from scalim.workflow import resources_csv as resources_csv_mod
 from scalim.workflow import resources_sheetbook as resources_sheetbook_mod
@@ -1464,7 +1465,7 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
         "require_optional_dependency",
         lambda *_args, **_kwargs: type("_M", (), {"Workbook": _FakeWB})(),
     )
-    monkeypatch.setattr(resources_sheetbook_mod, "create_temp_path", lambda _path, _suffix: str(temp_path))
+    monkeypatch.setattr(openpyxl_helpers_mod, "create_temp_path", lambda _path, _suffix: str(temp_path))
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="Sheetbook export failed"):
         manager.commit_all()
     assert not temp_path.exists()

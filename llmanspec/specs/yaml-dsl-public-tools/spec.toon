@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-public-tools"
-purpose: "为 YAML DSL 的下游集成提供稳定”工具/自省”公开入口，避免下游依赖 runtime 的内部实现模块路径。 [scope-review-2026-07-12-c20]"
+purpose: "为 YAML DSL 的下游集成提供稳定”工具/自省”公开入口，避免下游依赖 runtime 的内部实现模块路径。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,tools MUST expose `load_output_config` with a stable dict contract,"系统 MUST 通过 tools 模块暴露输出配置自省能力。 `load_output_config()` MUST 返回 `dict`（运行期）且其结构契约 MUST 稳定。该 `dict` 至少包含以下 keys： - `params` - `field_name_mapping` - `output_fields` - `outputs` 系统 MUST 提供 `OutputConfigDict`（TypedDict）作为类型层契约，用于描述上述结构。"

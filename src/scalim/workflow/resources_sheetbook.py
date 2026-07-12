@@ -7,13 +7,12 @@
 
 from abc import ABC
 from contextlib import suppress
-from pathlib import Path
 from typing import Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 
 from .._internal.utils.excel import escape_excel_formula
+from .._internal.utils.openpyxl_helpers import save_openpyxl_workbook_atomic as _save_openpyxl_workbook_atomic_impl
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
-from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..typedefs import FieldValue
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass
@@ -27,6 +26,14 @@ _build_alignment_mapping = build_alignment_mapping
 _describe_header_diff = describe_header_diff
 _best_effort_close_write_only_workbook_worksheets = best_effort_close_write_only_workbook_worksheets
 _get_openpyxl_workbook_class = get_openpyxl_workbook_class
+
+
+def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
+    try:
+        _save_openpyxl_workbook_atomic_impl(workbook, output_path=output_path)
+    except Exception as exc:
+        msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
+        raise ScalimWorkflowWriteError(msg) from exc
 
 
 def _sheetbook_has_alignment_mismatch(expected: List[str], input_header: List[str], *, align_by: str) -> bool:
@@ -113,19 +120,6 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBo
             for row in seg.rows:
                 out_row = [escape_excel_formula(v, allow_formulas=bool(plan.export_allow_formulas)) for v in row]
                 _ = ws.append(out_row)
-
-
-def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
-    wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
-    temp_path = create_temp_path(output_path, ".xlsx.tmp")
-    temp_obj = Path(temp_path)
-    try:
-        wb.save(temp_obj)
-        atomic_replace_temp_path(temp_path, output_path)
-    except Exception as exc:
-        best_effort_remove_temp_path(temp_path)
-        msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
-        raise ScalimWorkflowWriteError(msg) from exc
 
 
 @dataclass(frozen=True)

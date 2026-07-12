@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "examples-marimo"
-purpose: "定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。 [scope-review-2026-07-12-c20]"
+purpose: "定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[21]{req_id,title,statement}:
   r1,Marimo notebooks 作为唯一交互载体,系统 MUST 将 Marimo notebooks 作为示例/教程的交互载体。用于教学展示的示例 notebooks MUST 包含 `marimo.App`。 系统 MAY 保留非 Marimo 的 headless runner 实现，但该实现 MUST 明确定位为 runner/工具实现，不得承担交互教学入口职责。

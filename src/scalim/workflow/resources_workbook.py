@@ -7,13 +7,15 @@
 
 from abc import ABC
 from contextlib import suppress
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, Type, cast
 
 from .._internal.utils.excel import escape_excel_formula
+from .._internal.utils.openpyxl_helpers import (
+    best_effort_close_write_only_workbook_worksheets as _best_effort_close_write_only_workbook_worksheets,
+)
+from .._internal.utils.openpyxl_helpers import save_openpyxl_workbook_atomic as _save_openpyxl_workbook_atomic_impl
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
-from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..typedefs import FieldValue
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
@@ -34,24 +36,12 @@ def _get_openpyxl_workbook_class() -> "Type[Workbook]":
     return cast("Any", openpyxl_mod).Workbook  # pragma: allow-cast openpyxl module runtime boundary
 
 
-def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
+def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
     try:
-        worksheets_obj = workbook.worksheets
-    except AttributeError:
-        return
-    try:
-        worksheets = list(worksheets_obj)
-    except TypeError:
-        return
-    for ws in worksheets:
-        try:
-            is_closed = bool(ws.closed)
-        except AttributeError:
-            continue
-        if is_closed:
-            continue
-        with suppress(Exception):
-            ws.close()
+        _save_openpyxl_workbook_atomic_impl(workbook, output_path=output_path)
+    except Exception as exc:
+        msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
+        raise ScalimWorkflowWriteError(msg) from exc
 
 
 def _sorted_workbook_segments(segments: List["_WorkbookSegment"]) -> List["_WorkbookSegment"]:
@@ -123,19 +113,6 @@ def _write_workbook_plan_to_openpyxl_workbook(workbook: object, plan: "_Workbook
         ws = wb.create_sheet(str(sheet_name))
         for row in _iter_workbook_sheet_rows(sheet_plan, allow_formulas=bool(plan.allow_formulas)):
             _ = ws.append(row)
-
-
-def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
-    wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
-    temp_path = create_temp_path(output_path, ".xlsx.tmp")
-    temp_obj = Path(temp_path)
-    try:
-        wb.save(temp_obj)
-        atomic_replace_temp_path(temp_path, output_path)
-    except Exception as exc:
-        best_effort_remove_temp_path(temp_path)
-        msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
-        raise ScalimWorkflowWriteError(msg) from exc
 
 
 @dataclass

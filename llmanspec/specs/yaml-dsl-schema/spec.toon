@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-schema"
-purpose: "通过 dataclass 元数据生成 YAML DSL JSON Schema，作为校验与编辑器提示的唯一来源。 [scope-review-2026-07-12-c20]"
+purpose: "通过 dataclass 元数据生成 YAML DSL JSON Schema，作为校验与编辑器提示的唯一来源。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[28]{req_id,title,statement}:
   r1,YAML DSL JSON Schema generator MUST live in dev tooling and consume core SSOT,"系统 MUST 将 YAML DSL JSON Schema 的**结构/描述 SSOT** 与**生成器实现**分层： - 结构/描述 SSOT MUST 位于 schema 元数据模块（dataclass + metadata、枚举/默认值、字段描述文本等）。 - JSON Schema 的生成器实现（builder/writer/docs standardization pipeline）MUST 位于 dev tooling packages。 - 生成器 MUST 以 core SSOT 为唯一来源构建 schema，不得在 dev 包中复制字段枚举/默认值/描述文案的另一份真相。 - runtime core MUST NOT 导入 dev tooling packages，包括 optional hook / 动态导入方式。"

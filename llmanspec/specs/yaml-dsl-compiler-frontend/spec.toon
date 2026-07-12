@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-compiler-frontend"
-purpose: "TBD - created by archiving change c30-yaml-dsl-compiler-frontend. Update Purpose after archive. [scope-review-2026-07-12-c20]"
+purpose: "TBD - created by archiving change c30-yaml-dsl-compiler-frontend. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[2]{req_id,title,statement}:
   r1,"Front-end compilation MUST build ExecutionPlan without importing user code","系统 MUST 提供一个编译前端入口（front-end compilation），将单个 demand YAML 编译到： - diagnostics（errors/warnings，含稳定 path + range） - 静态 IR（不包含任何 Python callable） - ExecutionPlan 与依赖索引（可用于“字段上游依赖展开”等 dev features） 编译前端 MUST 满足： - MUST NOT 导入/执行任何用户模块（仅允许文件系统读取 + YAML/AST 静态解析）。 - MUST NOT 依赖 allowlist（allowlist 仅属于运行时解析与执行边界）。 - MUST 在失败时降级为可诊断结果（不 crash、不退出）。"

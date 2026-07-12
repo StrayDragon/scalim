@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-write-policy-and-output-extras"
-purpose: 明确输出资源的四层边界：resources 声明、write_defaults 策略、outputs 内容编排、runtime output extras（meta/audit），并将 write policy 和 extras 迁出 YAML 主线。
+purpose: "明确输出资源的四层边界：resources 声明、write_defaults 策略、outputs 内容编排、runtime output extras（meta/audit），并将 write policy 和 extras 迁出 YAML 主线。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,`resources` MUST distinguish authoring declarations from runtime overlays,"输出资源面 MUST 明确区分“authoring 声明”与“runtime overlay”: - YAML `resources.books/files` MUST 表达基础资源声明 - workflow 资源覆盖与 `RunOverrides.resources` MUST 作为 overlay / deep-merge 生效 - overlay MUST 不改变 `resources` 作为资源 identity 与目标声明面的职责"

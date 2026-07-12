@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "testing-quality"
-purpose: "定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现. [scope-review-2026-07-12-c20]"
+purpose: "定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,测试分类与默认执行,测试套件 MUST 使用 bench marker 标识基准用例。默认测试入口 MUST 运行所有非 bench 测试。质量门禁入口 MUST 显式启用 xdist 并行 + coverage 统计 + coverage gate。

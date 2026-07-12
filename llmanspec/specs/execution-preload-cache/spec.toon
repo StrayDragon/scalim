@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-preload-cache"
-purpose: "定义 `PreloadCache` 的完整行为契约：并发安全性、in-flight 去重、signature 冲突防护、诊断能力，以及并发场景下的幂等性期望。 [scope-review-2026-07-12-c20]"
+purpose: "定义 `PreloadCache` 的完整行为契约：并发安全性、in-flight 去重、signature 冲突防护、诊断能力，以及并发场景下的幂等性期望。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[11]{req_id,title,statement}:
   r1,"PreloadCache waiter path MUST read inflight and fallback state under the per-sou","After an in-flight waiter's `Event` becomes done, the implementation MUST NOT read `inflight.error`, `inflight.value`, or decide fallback from `_data` outside the per-source lock. All such reads MUST occur in the same critical section pattern as existing `_data` access so that free-threaded runtimes cannot observe torn or inconsistent inflight fields."

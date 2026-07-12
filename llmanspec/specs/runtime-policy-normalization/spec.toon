@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "runtime-policy-normalization"
-purpose: "TBD - created by archiving change c6-policy-normalization-breaking-cleanup. Update Purpose after archive. [scope-review-2026-07-12-c20]"
+purpose: "TBD - created by archiving change c6-policy-normalization-breaking-cleanup. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,policy values MUST normalize to builtin str literals at state/serialization boun,"对外可配置的 policy-like 值(封闭集合) MUST 在进入任何 state/serialization 边界时被编码为稳定的内置 `str` 字面量值,并满足: - 允许值集合 MUST 为封闭集合,且其 SSOT MUST 为单一 Enum 定义(禁止手工维护 Enum + Literal 双份允许值列表) - 编码后的值 MUST 为 builtin `str`(而不是 Enum 实例或 `str` 子类) - 解码 MUST 从 builtin `str` fail-fast 解析/验证为对应 Enum 成员(用于归一化与校验),并最终产出 canonical builtin `str` value 用于运行时存储；错误信息中 MUST 列出允许值 - 公开 API MUST 只接受 Enum 作为输入(严进);配置/反序列化边界 MAY 接受 builtin `str` 并通过 parse 恢复(宽进) - 运行期对象图 MAY 持有 Enum 实例,但任何参与序列化/pickling 的 state 表示（例如 `__getstate__` 输出）MUST 不包含 enum 实例"

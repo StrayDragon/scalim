@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "vendor-legacy-sync"
-purpose: "为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。 [scope-review-2026-07-12-c20]"
+purpose: "为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,提供 vendors 同步的 `just` 快捷入口,"系统 MUST 在仓库根 `justfile` 中提供一个快捷 recipe,用于触发 vendors 同步脚本;目标路径 MUST 由调用方显式传入,不得写入仓库版本控制。"

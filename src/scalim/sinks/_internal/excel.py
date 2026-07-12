@@ -9,6 +9,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Ty
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
+from ..._internal.utils.openpyxl_helpers import (
+    best_effort_close_write_only_workbook_worksheets as _best_effort_close_write_only_workbook_worksheets,
+)
+from ..._internal.utils.openpyxl_helpers import (
+    best_effort_close_write_only_worksheet as _best_effort_close_write_only_worksheet,
+)
 from ...typedefs import FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact.importlibx import require_optional_dependency
 from ...vendor.compact.typing_extensionsx import Self, override
@@ -88,39 +94,6 @@ COLUMN_EXCEL_SINK_SAVE_FAILED_LOG = COLUMN_EXCEL_SINK_SAVE_FAILED + ": %s"
 
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED = _SINKS_PREFIX + "ColumnExcelSink 删除临时文件失败"
 COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG = COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED + ": %s"
-
-
-def _best_effort_close_write_only_worksheet(worksheet: Any) -> None:
-    """尽力关闭 `openpyxl` `write_only` 的 `worksheet`,避免生成器在 `GC` 时抛出 `PytestUnraisableExceptionWarning`.
-
-    背景: `openpyxl` 的 `WriteOnlyWorksheet.append()` 会创建并持有 `_write_rows()` 生成器,该生成器依赖底层 `xmlfile` 仍处于打开状态.
-    若在保存/关闭前抛错(例如写锁冲突 `fail-fast`),对象在 `GC` 时可能先关闭底层文件再关闭生成器,
-    从而产生 `ValueError: I/O operation on closed file`.
-    """
-
-    try:
-        is_closed = bool(worksheet.closed)
-    except AttributeError:
-        return
-    if is_closed:
-        return
-    with suppress(Exception):
-        worksheet.close()
-
-
-def _best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
-    """尽力关闭 `write_only workbook` 下所有 `worksheet`(仅在异常路径使用)."""
-
-    try:
-        worksheets_obj = workbook.worksheets
-    except AttributeError:
-        return
-    try:
-        worksheets = list(worksheets_obj)
-    except TypeError:
-        return
-    for ws in worksheets:
-        _best_effort_close_write_only_worksheet(ws)
 
 
 class ExcelSink(BaseRowSink):

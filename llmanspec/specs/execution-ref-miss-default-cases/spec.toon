@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-ref-miss-default-cases"
-purpose: "定义 YAML DSL 中 source ref 字段的 relation miss 默认值机制。允许用户在关联查询未命中时使用有序的默认值替代 None，提高配置表达能力和错误容错性。 [scope-review-2026-07-12-c20]"
+purpose: "定义 YAML DSL 中 source ref 字段的 relation miss 默认值机制。允许用户在关联查询未命中时使用有序的默认值替代 None，提高配置表达能力和错误容错性。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,YAML ref fields MAY declare ordered default cases for relation miss,"系统 MUST 支持在 source ref 字段上声明 `default` ordered cases： - `default` MUST 为数组（按声明顺序 first-match） - 每个 case MUST 包含 `when`（v1 中 MUST 仅允许 `relation_miss`） - 每个 case MUST 在 `literal` 与 `call_by` 之间二选一（oneOf） - `literal` MUST 为 YAML 标量 - `call_by` MUST 为字符串且显式包含 `()` 以表示可调用表达式 `default` MUST 仅允许出现在带 `relation:` 的 source field 上；若字段未声明 `relation`，系统 MUST 在校验阶段 fail-fast。"

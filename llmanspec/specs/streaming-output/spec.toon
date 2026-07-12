@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "streaming-output"
-purpose: "支持 IRowSink 与 IColumnSink 的流式写入路径,定义 main source 行流、分批与 `row_id` 规则,并约束行式路径\"行就绪即写出 + rows 绑定 release 屏障\"语义. [scope-review-2026-07-12-c20]"
+purpose: "支持 IRowSink 与 IColumnSink 的流式写入路径,定义 main source 行流、分批与 `row_id` 规则,并约束行式路径\"行就绪即写出 + rows 绑定 release 屏障\"语义. [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,行流输入与分批规则,"系统 SHALL 支持 main source loader 返回 `Iterable[RowData]`,并将其中每个元素视为一行进行处理;支持在 main_source 中声明 `params` 并透传给 loader. main_source 不支持 bindings 机制. 系统 SHALL 按 `batch_size` 对行流分批处理,并按 loader 原始行顺序为每行分配 `row_id`(全局递增). `batch_size` MUST 允许 `null` 或整数且 `>=1`: - `batch_size=null` 表示禁用分批,本次运行对 main source 行流执行单批处理. - `batch_size=<int>=1` 表示按固定批大小分批处理. `0`、负数、布尔值、浮点数、字符串等非法取值 MUST 被拒绝(避免出现\"静默处理 0 行\"或隐式截断). 当未配置 `main_source.order_by` 时,系统 SHALL 保持原始行顺序作为批次内写入顺序. 当配置 `main_source.order_by` 时,系统 SHALL 在每个批次写入前按主数据源字段进行稳定排序(`null` 始终在最后),排序仅影响写入顺序与事件 `row_index`,不改变计算顺序与 `row_id` 分配;列式 sink 的 `set_row_ids` 顺序也应遵循该排序. 排序字段可不在输出字段中,系统仍应使用其值进行排序."

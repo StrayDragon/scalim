@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "vendor-dataclassesx"
-purpose: "为 `scalim/` 提供一个可 vendors 化、可审计的 dataclasses 能力入口,在保持 Python 3.6 运行时兼容的同时避免依赖外部 `dataclasses` backport,并避免包内绝对导入在多份包共存时混入错误实现。 [scope-review-2026-07-12-c20]"
+purpose: "为 `scalim/` 提供一个可 vendors 化、可审计的 dataclasses 能力入口,在保持 Python 3.6 运行时兼容的同时避免依赖外部 `dataclasses` backport,并避免包内绝对导入在多份包共存时混入错误实现。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,提供 `scalim.vendor.dataclassesx` 入口,"系统 MUST 提供 `scalim.vendor.dataclassesx` 作为 dataclasses 能力的唯一入口,并覆盖 `scalim` 运行时使用到的核心符号(至少包括 `dataclass`、`field`、`replace`、`asdict`)。"

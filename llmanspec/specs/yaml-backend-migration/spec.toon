@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-backend-migration"
-purpose: "定义 `scalim` 默认 YAML backend 迁移到 vendored `ruamel.yaml`(YAML 1.2) 的运行时契约, 并为 CLI 的 YAML round-trip 编辑能力建立稳定性门禁(no-op 字节级幂等 + minimal edit)。 [scope-review-2026-07-12-c20]"
+purpose: "定义 `scalim` 默认 YAML backend 迁移到 vendored `ruamel.yaml`(YAML 1.2) 的运行时契约, 并为 CLI 的 YAML round-trip 编辑能力建立稳定性门禁(no-op 字节级幂等 + minimal edit)。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,scalim YAML parsing MUST use vendored `ruamel.yaml` (YAML 1.2) as the only runti,"系统 MUST 使用 vendored `ruamel.yaml` 作为 `src/scalim/` 运行时 YAML 解析的唯一后端,并显式采用 YAML 1.2 语义。 该要求至少覆盖: - demand/workflow/CLI validate/imports/project-config 等所有 YAML 入口 - safe load / compose(location index) / parse error envelope - vendors-sync 下的可导入性(不得依赖外部安装包)"

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-concurrency-safety"
-purpose: "为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。 [scope-review-2026-07-12-c20]"
+purpose: "为执行层的并发安全定义护栏：任何可能触发用户回调（hooks/observers）或外部回调的操作不得在内部互斥锁临界区内执行，避免重入/锁顺序反转导致的死锁。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
 valid_scope[1]: src/scalim/
 requirements[2]{req_id,title,statement}:
   r1,instrumentation emit MUST NOT run under internal locks,"当组件在内部使用互斥锁保护状态时（例如 cache pools、workflow resources 等），系统 MUST 禁止在持锁期间执行： - `instrumentation.emit(...)` - 任何会触发 hooks/observers 的回调路径 系统 MUST 将这类外部回调移动到锁外执行（锁内仅采集必要字段与完成状态更新）。"
