@@ -33,6 +33,7 @@ nav = [
   ] },
   { "运行与调参" = [
     { "并行模式(seq/adaptive)" = "architecture/parallel-modes.md" },
+    { "Excel 列式写出策略(HOLD/WINDOW)" = "getting-started/excel-column-residency.md" },
   ] },
   { "工具与排查" = [
     "tools/index.md",

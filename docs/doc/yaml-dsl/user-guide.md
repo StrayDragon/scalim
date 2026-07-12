@@ -1934,6 +1934,12 @@ compute limits 等更细粒度安全配置属于内部实现细节;如确需自�
 
 ## 7. 常见问题 (FAQ)
 
+### Q0: YAML Excel 宽表内存很高，要不要开 WINDOW？
+
+**A**: YAML `resources.books` 路径已经是**行式** Excel 写出，**没有** `ExcelColumnResidency` / YAML streaming knobs。  
+`WINDOW` 只适用于 Python IR **列式**文件 sink（`format=excel` 且 `streaming=False`）。  
+选型说明见 [Excel 列式写出策略(HOLD/WINDOW)](../getting-started/excel-column-residency.md)。
+
 ### Q1: 如何调试关联关系？
 
 **A**: 通过 runtime entrypoints 装配 `RelationObserver`:

@@ -10,6 +10,7 @@
 - [如何阅读本项目](../getting-started/reading-guide.md)
 - [YAML DSL](../yaml-dsl/index.md)
 - [并行模式(seq/adaptive)](parallel-modes.md)
+- [Excel 列式写出策略(HOLD/WINDOW)](../getting-started/excel-column-residency.md)
 
 ??? note "维护提示"
     本页内容通常会在以下变更后需要同步检查:

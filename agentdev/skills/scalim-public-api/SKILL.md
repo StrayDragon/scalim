@@ -34,4 +34,5 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 
 与 YAML DSL 的交叉入口:
 - 若任务是写/改 YAML DSL,优先用 `agentdev/skills/scalim-yaml-dsl/SKILL.md`（`scalim-yaml-dsl`）。
+- 若任务涉及宽表 Excel 峰值 / `StreamingColumnExcelSink` 选型:读 `references/streaming-column-excel.md`（并交叉 `scalim-yaml-dsl` 的 `references/streaming-column-excel-guidance.md`）。
 

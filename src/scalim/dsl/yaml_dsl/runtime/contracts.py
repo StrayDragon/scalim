@@ -2,6 +2,7 @@
 import os
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
+from ....execution.excel_column_residency import ExcelColumnResidency
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
@@ -543,11 +544,18 @@ class DemandRunRuntimeOptions:
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""
 
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
+    """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `HOLD`)."""
+
     def __post_init__(self) -> None:
         parallel_mode = self.parallel_mode
         if parallel_mode not in ("seq", "adaptive"):
             msg = "DemandRunRuntimeOptions.parallel_mode must be 'seq' or 'adaptive'"
             raise ValueError(msg)
+
+        if not isinstance(self.excel_column_residency, ExcelColumnResidency):
+            msg = "DemandRunRuntimeOptions.excel_column_residency must be an ExcelColumnResidency"
+            raise TypeError(msg)
 
         max_workers = self.max_workers
         if isinstance(max_workers, bool) or not isinstance(max_workers, int):

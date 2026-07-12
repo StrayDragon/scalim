@@ -15,6 +15,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 - 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
 - 服务端并发输出/版本化输出(D-2)/outputs facade 定位写法: 读 [references/task-workflow-versioned-outputs.md](references/task-workflow-versioned-outputs.md)
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
+- 宽表 Excel 峰值 / `StreamingColumnExcelSink` / `ExcelColumnResidency` 选型: 读 [references/streaming-column-excel-guidance.md](references/streaming-column-excel-guidance.md)（人类文档: `docs/doc/getting-started/excel-column-residency.md`）
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
 - 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`(book write/budget: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)
@@ -83,6 +84,7 @@ run_workflow(
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
 - YAML `resources.books` 只声明 identity(`xlsx_file`/`xlsx_memory` + path/export);`write_defaults` 与 `xlsx_memory.budget` 已迁出,出现即 fail-fast → 用 `WorkflowRunOptions`/`DemandRunOptions.resources_policy`(`BookWritePolicy`/`BookBudgetPolicy`,StrEnum 严格 in);详见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- **MUST NOT** 为降低 Excel 峰值在 YAML 发明 `write.streaming` / books streaming knobs;YAML Excel 组合层已是行 sink。列式 HOLD→WINDOW 用 Python `ExcelColumnResidency`(见 `references/streaming-column-excel-guidance.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`)
 - `path` / `export_xlsx.path` 是输出 root 目录:相对路径相对 **声明该路径的 YAML 文件目录**(不是进程 cwd);环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride`(IO-only overlay,不再含 write/budget)
 - workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 outputs→book 绑定等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证

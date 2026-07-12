@@ -11,6 +11,7 @@
 
 from typing import TYPE_CHECKING
 
+from ...execution.excel_column_residency import ExcelColumnResidency
 from ...vendor.compact.importlibx import import_module
 from .book_resource_policy import (
     BookBudgetPolicy,
@@ -104,6 +105,7 @@ __all__ = (
     "DemandRunRuntimeOptions",
     "DemandRunSecurityOptions",
     "DemandRunTemplateOptions",
+    "ExcelColumnResidency",
     "FileResourceOverride",
     "OutputDefaultsToOverride",
     "OutputExtraSheetOverride",

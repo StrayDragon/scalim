@@ -549,6 +549,7 @@ def build_request(
         key_normalization=options.runtime.key_normalization,
         runtime_bindings=runtime_bindings,
         capture_in_memory_rows=isinstance(options.outputs.capture, CaptureRows),
+        excel_column_residency=options.runtime.excel_column_residency,
     )
 
 

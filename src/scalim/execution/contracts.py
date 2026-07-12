@@ -12,6 +12,7 @@ from ..sinks import ISink
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
+from .excel_column_residency import ExcelColumnResidency
 from .output_contracts import ExportLayout, OutputSpec
 
 if TYPE_CHECKING:
@@ -111,6 +112,12 @@ def _validate_execution_request_key_normalization(key_normalization: object) -> 
         raise TypeError(msg)
 
 
+def _validate_execution_request_excel_column_residency(excel_column_residency: object) -> None:
+    if not isinstance(excel_column_residency, ExcelColumnResidency):
+        msg = "ExecutionRequest.excel_column_residency must be an ExcelColumnResidency"
+        raise TypeError(msg)
+
+
 @dataclass(frozen=True)
 class ExecutionRequest:
     export_layout: ExportLayout
@@ -173,6 +180,9 @@ class ExecutionRequest:
     capture_in_memory_rows: bool = False
     """可选:捕获本次运行输出的 `InMemoryRows`(保留 `FieldValue` 类型域;默认关闭)."""
 
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
+    """列式 `Excel` 文件 `sink` 驻留策略(仅 `format=excel` 且 `streaming=False` 时生效)."""
+
     def __post_init__(self) -> None:
         _validate_execution_request_export_layout(self.export_layout)
         _validate_execution_request_output(self.output)
@@ -182,6 +192,7 @@ class ExecutionRequest:
         _validate_execution_request_parallel_mode(self.parallel_mode)
         _validate_execution_request_capture_in_memory_rows(self.capture_in_memory_rows)
         _validate_execution_request_key_normalization(self.key_normalization)
+        _validate_execution_request_excel_column_residency(self.excel_column_residency)
 
 
 @dataclass(frozen=True)

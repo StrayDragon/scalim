@@ -27,6 +27,7 @@ from ..sinks import (
     IColumnSink,
     IRowSink,
     ISink,
+    StreamingColumnExcelSink,
 )
 from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows, InMemoryRowsSink
@@ -37,6 +38,7 @@ from ..vendor.dataclassesx import dataclass, replace
 from .adaptive.capture import HookCaptureManager, HookRecordedEvent
 from .contracts import ExecutionRequest, ExecutionResult, ObservabilitySpec
 from .engine import ScalimEngine
+from .excel_column_residency import ExcelColumnResidency
 from .key_normalization import normalize_key_normalization
 from .managed_artifacts import MANAGED_ARTIFACT_KIND_ROWS
 from .output_composition import build_output_composition, required_demand_fields
@@ -302,7 +304,12 @@ def export_layout_from_demand_ir(
     return ExportLayout(field_ids=normalized_ids, header_names=header_names)
 
 
-def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISink]:
+def _create_file_sink(
+    output: OutputSpec,
+    layout: ExportLayout,
+    *,
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+) -> Optional[ISink]:
     if not output.path:
         return None
 
@@ -333,8 +340,24 @@ def _create_file_sink(output: OutputSpec, layout: ExportLayout) -> Optional[ISin
         )
 
     if fmt == "excel":
+        if excel_column_residency is ExcelColumnResidency.WINDOW and output.streaming:
+            msg = (
+                "`ExcelColumnResidency.WINDOW` 仅适用于列式 Excel 文件 sink"
+                "(`OutputSpec.format=excel` 且 `streaming=False`)."
+                " 当前为行式写出(`streaming=True`);请改用 `HOLD`,或关闭 streaming 后再设 `WINDOW`."
+            )
+            raise ValueError(msg)
         if output.streaming:
             return ExcelSink(
+                output_path=str(output.path),
+                field_names=field_names,
+                header_names=header_names,
+                sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
+                include_header=output.include_header,
+                allow_formulas=bool(output.excel_allow_formulas),
+            )
+        if excel_column_residency is ExcelColumnResidency.WINDOW:
+            return StreamingColumnExcelSink(
                 output_path=str(output.path),
                 field_names=field_names,
                 header_names=header_names,
@@ -372,8 +395,14 @@ def _describe_sink_kind(sink: ISink) -> str:
     return "ISink"
 
 
-def _create_output_plan(output: OutputSpec, layout: ExportLayout, sink: Optional[ISink]) -> _OutputPlan:
-    file_sink = _create_file_sink(output, layout)
+def _create_output_plan(
+    output: OutputSpec,
+    layout: ExportLayout,
+    sink: Optional[ISink],
+    *,
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+) -> _OutputPlan:
+    file_sink = _create_file_sink(output, layout, excel_column_residency=excel_column_residency)
     output_path: Optional[str] = output.path or None
 
     if sink is None:
@@ -609,8 +638,21 @@ def _assemble_outputs(
     stats: InternalStatsCollector,
 ) -> _OutputAssembly:
     composition_spec = request.output_composition
+    if composition_spec is not None and request.excel_column_residency is ExcelColumnResidency.WINDOW:
+        msg = (
+            "`ExcelColumnResidency.WINDOW` 与 `output_composition`(YAML books/多输出行组合)互斥."
+            " 组合层仅为行流式写出;WINDOW 只适用于列式 IR 文件 sink"
+            "(`format=excel` 且 `streaming=False`)."
+            " 请改用 `HOLD`,或改用手写 `StreamingColumnExcelSink` / 非 composition 列式路径."
+        )
+        raise ValueError(msg)
     if composition_spec is None:
-        output_plan = _create_output_plan(request.output, request.export_layout, request.sink)
+        output_plan = _create_output_plan(
+            request.output,
+            request.export_layout,
+            request.sink,
+            excel_column_residency=request.excel_column_residency,
+        )
         counting_sink = _wrap_sink_for_row_count(output_plan.sink, stats)
         return _OutputAssembly(
             counting_sink=counting_sink,

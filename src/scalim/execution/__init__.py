@@ -2,6 +2,7 @@
 
 # pragma: scalim-public-api tier1:90:scalim.execution|execution facade(run_ir + contracts)|DSL-agnostic 执行入口 + request/result 契约
 
+from .excel_column_residency import ExcelColumnResidency
 from .run_ir import (
     ExecutionRequest,
     ExecutionResult,
@@ -13,6 +14,7 @@ from .run_ir import (
 )
 
 __all__ = (
+    "ExcelColumnResidency",
     "ExecutionRequest",
     "ExecutionResult",
     "ExportLayout",
