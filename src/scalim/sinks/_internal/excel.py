@@ -423,11 +423,12 @@ class ColumnExcelSink(IColumnSink):
 
     工作原理:
     1. 在内存中按列缓存数据
-    2. 在 `close()` 时一次性将所有数据写入 `Excel` 文件
+    2. 在 `close()` 时用 `openpyxl` 的 `write_only` `Workbook` 按行写出并保存
 
     优点:
     - 调用方可在 `write_column()` 后立即释放该列的源数据
     - 适合宽表场景(200+ 列)
+    - `close()` 使用 `write_only=True`,避免常规 `Workbook` 单元格树与列缓存双峰叠加
 
     参数:
         `output_path`: 输出文件路径
@@ -520,18 +521,15 @@ class ColumnExcelSink(IColumnSink):
         wb = None
 
         try:
-            wb = Workbook()
-            ws = wb.active
-            if ws is None:
-                ws = wb.create_sheet(self.sheet_name)
-            else:
-                ws.title = self.sheet_name
+            # 与行式写出器对齐: 使用只写工作簿降低关闭阶段单元格树峰值(见本变更 `evidence-mvp`)
+            wb = Workbook(write_only=True)
+            ws = wb.create_sheet(self.sheet_name)
 
             if self.include_header:
                 _ = ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
             for row_values in iter_row_values(self._row_ids, self.field_names, self._columns):
-                _ = ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(row_values)])
+                _ = ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in row_values])
 
             wb.save(temp_path_obj)
             # 原子重命名临时文件到目标路径
@@ -546,6 +544,8 @@ class ColumnExcelSink(IColumnSink):
             except OSError:
                 _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
             best_effort_cleanup_temp_path_dir(temp_path)
+            if wb is not None:
+                _best_effort_close_write_only_workbook_worksheets(wb)
             raise
         finally:
             if wb is not None:  # pragma: no branch  # pragma: allow-no-branch best-effort cleanup under multiple error paths

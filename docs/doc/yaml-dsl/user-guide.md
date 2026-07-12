@@ -1265,6 +1265,31 @@ sources:
 - `preload_forever` 场景允许声明 `params`.当 `params` 非空时,预加载调用会透传 kwargs;为空则保持零参 preload.
 - `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`.
 
+### 4.4.3 lookup_chunk_size: keys 分片(可选)
+
+`lookup_chunk_size` 只影响 **keys 模式** LoadRef:把一次 lookup 的 keys 拆成多次 loader 调用再合并.
+
+```yaml
+sources:
+  customers:
+    key: customer_id
+    lookup_chunk_size: 800   # 仅当下游有 IN/payload 上限时才设
+    params:
+      ids: {$keys: {as: list}}
+```
+
+选用规则:
+
+- **省略 / `0` / `null` = 不分片**(单次 loader 调用).这是运行时默认,也是延迟上通常最优的选择.
+- **不要**把 chunk 当成“越小越省内存”的旋钮.顺序分片下:
+  - `loader_calls ≈ ceil(unique_keys / chunk_size)`
+  - wall time ≈ `loader_calls × RTT`(外加固定开销)
+- 仅在下游有硬限制时设置(例如 SQL `IN (...)` 长度、HTTP payload、供应商 API 批次上限).
+- 需要分片时:**取下游限制允许的最大安全值**(例如上限的 50–80%),避免习惯性写 `50`/`100`.
+- 与 `parallel_mode=adaptive` 正交:adaptive 并行的是不同 LoadRef 任务;同一 source 的 chunk 调用当前仍顺序执行.
+
+本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
+
 ### 4.5 多输出编排与派生汇总 (outputs / output_composition)
 
 `YAML DSL` 支持在顶层通过 `outputs` 声明多输出编排(同 Excel 多 sheet / where 分发 / aggregate 派生汇总),

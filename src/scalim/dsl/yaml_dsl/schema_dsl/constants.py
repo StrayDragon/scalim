@@ -112,7 +112,17 @@ DESC_BIND_AS = "绑定容器: set/list (仅 keys 模式生效)"
 DESC_BIND_CACHE_MODE = "rows 模式缓存: batch=批次内复用, none=不复用(仅 rows 模式生效;未配置时默认 batch)"
 DESC_BIND_USE_ROWS = "rows 绑定: rows=批次行上下文(主源+已 join)"
 DESC_BIND_USE_KEYS = "keys 绑定: keys=lookup keys"
-DESC_LOOKUP_CHUNK_SIZE = "keys 模式 LoadRef 的 lookup_keys 分片大小(0/空表示不分片)"
+DESC_LOOKUP_CHUNK_SIZE = (
+    "keys 模式 LoadRef 的 lookup_keys 分片大小(0/空/省略表示不分片;仅在下游有 payload/IN 上限时设置,并尽量取最大安全值)"
+)
+DESC_LOOKUP_CHUNK_SIZE_MD = (
+    "keys 模式 lookup_keys 分片大小.\n\n"
+    "- 省略 / `0` / `null`: **不分片**(单次 loader 调用;通常延迟最优)\n"
+    "- 仅在下游有 **payload / SQL IN 长度上限** 时设置\n"
+    "- 代价: `loader_calls ≈ ceil(unique_keys / chunk_size)`, wall ≈ calls x RTT(顺序分片)\n"
+    "- 推荐策略: 需要分片时取下游限制的最大安全值(例如 IN 上限的 50-80%);避免习惯性设很小的 chunk\n"
+    "- 运行时默认保持不分片;本字段不是“越小越省内存”的旋钮"
+)
 DESC_PARAMS = "调用 loader 时透传的 kwargs 模板(支持 `{$init_var: <name>}`; sources 支持 `$keys/$rows`)"
 DESC_PARAMS_MD = (
     "调用 loader 时透传的 kwargs 模板.\n\n"
@@ -583,7 +593,7 @@ LOOKUP_CHUNK_SIZE_SCHEMA = {
         {"type": "null"},
     ],
     "description": DESC_LOOKUP_CHUNK_SIZE,
-    "markdownDescription": "keys 模式 lookup_keys 分片大小.\n\n- `0` / `null` 表示不分片",
+    "markdownDescription": DESC_LOOKUP_CHUNK_SIZE_MD,
 }
 
 BIND_ROWS_SCHEMA = {

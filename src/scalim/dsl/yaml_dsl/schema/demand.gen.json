@@ -512,7 +512,7 @@
             }
           ],
           "description": "keys 模式 lookup_keys 分片大小.",
-          "markdownDescription": "#### sources.*.lookup_chunk_size\n\nkeys 模式 lookup_keys 分片大小.\n- `0` / `null` 表示不分片"
+          "markdownDescription": "#### sources.*.lookup_chunk_size\n\nkeys 模式 lookup_keys 分片大小.\n- 省略 / `0` / `null`: **不分片**(单次 loader 调用;通常延迟最优)\n- 仅在下游有 **payload / SQL IN 长度上限** 时设置"
         },
         "normalize": {
           "type": "object",

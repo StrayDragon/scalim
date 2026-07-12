@@ -159,7 +159,7 @@ def test_column_excel_sink_write_columns_and_batch(tmp_path: Path) -> None:
     assert output_path.exists()
 
 
-def test_column_excel_sink_handles_missing_active(monkeypatch, tmp_path: Path) -> None:
+def test_column_excel_sink_handles_write_only_create_sheet(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(excel_mod, "Workbook", _FakeWorkbook)
 
     output_path = tmp_path / "cols_fake.xlsx"
@@ -202,18 +202,6 @@ class _FailingSaveWorkbook:
         return None
 
 
-class _FailingSaveWorkbookNonWriteOnly:
-    def __init__(self) -> None:
-        self._sheet = _FakeWorksheet()
-        self.active = self._sheet
-
-    def save(self, _path) -> None:  # type: ignore[no-untyped-def]
-        raise OSError("simulated save failure")
-
-    def close(self) -> None:
-        return None
-
-
 def _init_sink_for_failure(tmp_path: Path, sink_cls, filename: str):
     output_path = tmp_path / filename
     sink = sink_cls(str(output_path), ["id"])
@@ -229,7 +217,7 @@ def _init_sink_for_failure(tmp_path: Path, sink_cls, filename: str):
     "sink_cls,workbook_cls,log_match,filename,set_worksheet",
     [
         (excel_mod.ExcelSink, _FailingSaveWorkbook, excel_mod.EXCEL_SINK_SAVE_FAILED, "exc_rows.xlsx", True),
-        (excel_mod.ColumnExcelSink, _FailingSaveWorkbookNonWriteOnly, excel_mod.COLUMN_EXCEL_SINK_SAVE_FAILED, "exc_cols.xlsx", False),
+        (excel_mod.ColumnExcelSink, _FailingSaveWorkbook, excel_mod.COLUMN_EXCEL_SINK_SAVE_FAILED, "exc_cols.xlsx", False),
     ],
     ids=["row-sink", "column-sink"],
 )
@@ -340,7 +328,7 @@ def test_excel_workbook_sink_close_exception_logs_unlink_failure(tmp_path: Path,
     "sink_cls,workbook_cls,filename",
     [
         (excel_mod.ExcelSink, _FailingSaveWorkbook, "exc_unlink.xlsx"),
-        (excel_mod.ColumnExcelSink, _FailingSaveWorkbookNonWriteOnly, "exc_cols_unlink.xlsx"),
+        (excel_mod.ColumnExcelSink, _FailingSaveWorkbook, "exc_cols_unlink.xlsx"),
     ],
     ids=["row-sink", "column-sink"],
 )
