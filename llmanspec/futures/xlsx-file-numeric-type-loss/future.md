@@ -113,7 +113,7 @@
 | ID | 风险 | 可能性 | 影响 | 本 change 缓解 | 残留 / 升级条件 |
 |---|---|---|---|---|---|
 | R1 | 外部依赖「xlsx_file 全是 str cell」的后处理失效或双重转换 | 中 | 中 | proposal Impact 标明 bugfix；MVP 对照 | 发布说明提醒去掉 `_post_process_workbook` 数字修复 |
-| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | **第一刀**：active `c30-workflow-shared-book-memory`（尽早释放双驻留 + xlsx_memory Python budget 验收）。更大 spill/流式见下方 Deferred |
+| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | **第一刀已归档**：`archive/2026-07-12-c30-workflow-shared-book-memory`。更大 spill/流式见 Deferred later；宽表 Excel close 峰值另见已归档 `archive/2026-07-12-c0-column-excel-sink-write-memory`（`write_only`） |
 | R3 | `book_sheet_rows(xlsx_file)` 可见性/截断与 sheetbook 漂移 | 中 | 高 | design 要求同契约；tasks 含可见性单测 | 用户报告不一致 → 立即 reopen 源 change 或 hotfix |
 | R4 | 同一 output 双消费（xlsx + csv）缺 CSV artifact | 低（当前少见） | 高 | 本 change **有意不实现**自动派生；见上条 later | 触发「按 consumer 显式派生」升格为 change |
 | R5 | `resolve_workflow_input_csv` 误用于 ROWS-only output | 中 | 高 | write 路由改 tabular；legacy workbook 一并改 | 回归测：无 csv map 时 xlsx write 成功、csv resolve fail-fast 清晰 |
