@@ -1,5 +1,5 @@
 kind: llman.sdd.delta
 ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r10,"shared-book memory release and budget knobs MUST stay on Python runtime policy boundary","与共享 book 峰值内存相关的释放积极程度、budget、以及未来 profile 档位 MUST 保持在 Python/CLI runtime policy boundary: - MUST NOT 将 streaming/flush/budget/release knobs 重新引入 YAML authoring（包括 outputs.write） - 任何后续 streaming-xlsx 类优化若转正，MUST 先 reframe 为 Python/profile 入口",null,null,null
+  add_requirement,r10,"shared-book memory release and budget knobs MUST stay on Python runtime policy boundary","与共享 book 峰值内存相关的释放与 xlsx_memory budget MUST 保持在 Python runtime policy boundary: - MUST NOT 将 streaming/flush/budget/release knobs 重新引入 YAML authoring（包括 outputs.write） - 本需求不引入 release 积极程度或 spill/seal 的 YAML/Python 新旋钮；该类能力若转正 MUST 另开 change 并保持非 YAML authoring - 任何后续 streaming-xlsx 类优化若转正，MUST 先 reframe 为 Python/profile 入口（见 notplan/futures）",null,null,null
 op_scenarios[1]{req_id,id,given,when,then}:
   r10,"reject-yaml-streaming-knobs",提案或配置试图在 outputs.write 下增加 streaming/flush 字段,按主线原则评审或 validate,该方向 MUST 被视为偏离 runtime policy boundary（YAML 不得承载）

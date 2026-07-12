@@ -51,6 +51,37 @@
 - **落地路径**: 将 notplan `c0-add-field-value-datetime` 转回 active change 后 apply。
 - **第一条动作**: `llman-sdd-explore` 收敛 aware 策略（拒绝 / 去 tz / UTC 再去 tz）。
 
+### later — shared-book 分段 spill / 分段 commit（c30 迁出）
+
+- **来源**: 曾列于 `c30-workflow-shared-book-memory` P2+；c30 收紧后迁出。
+- **缺口**: plan 全量 segment 仍决定峰值；尽早释放 demand 副本不够时需 spill 到 staging 再拼装，同时保留成功后一次 publish / 失败 discard。
+- **触发信号**: c30 落地后真实工作负载峰值仍不可接受；或有可复现 bench 证明 ROI。
+- **落地路径**: 独立 change（建议 id：`shared-book-spill-commit`）；MUST NOT 默认边写 openpyxl。
+- **受影响 capability**: `workflow-shared-output-containers`
+- **第一条动作**: c30 归档后用 bench 证据 `llman-sdd-explore`，再 propose。
+
+### later — shared-book sheet seal（c30 迁出）
+
+- **缺口**: 「sheet 写满后禁止再 append」等更强产品约束；与内存释放正交。
+- **触发信号**: 明确产品需要 seal 语义（审计/不可变 sheet）。
+- **落地路径**: 独立 change（建议 id：`shared-book-sheet-seal`）；策略 MUST 走 Python policy，禁止 YAML。
+- **第一条动作**: 产品确认 seal 规则后再 propose。
+
+### later — `xlsx_file` 可选 cell/sheet budget（c30 迁出）
+
+- **来源**: c30 design 曾开放「xlsx_file 是否同套 budget」；收紧后明确 **本阶段不套用**。
+- **缺口**: 若 `xlsx_file` plan 峰值与 sheetbook 同级，可能需要同一 `BookBudgetPolicy` 护栏。
+- **触发信号**: 生产出现 `xlsx_file` plan OOM / 需与 `xlsx_memory` 对称护栏。
+- **落地路径**: 独立 change；默认仍应 opt-in（避免打破 historical unlimited）。
+- **第一条动作**: 收集证据后 propose；挂 `BookBudgetPolicy` 既有 API。
+
+### later — 边写 openpyxl + runtime profile（c30 明确不做默认）
+
+- **约束**: 默认边写会破坏原子 discard；若未来要做 MUST 独立 change + **显式** Python/profile，禁止 YAML。
+- **载体**: `llmanspec/notplan/c1-runtime-performance-profiles/`（reframe 后转正）。
+- **触发信号**: profile 方案落地且有「可牺牲原子 discard」的明确产品档位。
+- **第一条动作**: 先完成 profiles notplan → change，再挂边写策略。
+
 ### drop — commit 边界启发式数字恢复
 
 - **原因**: 与 typed SSOT 及 sheetbook r6 冲突；源 change 已从根去掉 stringify。
@@ -73,7 +104,7 @@
 | ID | 风险 | 可能性 | 影响 | 本 change 缓解 | 残留 / 升级条件 |
 |---|---|---|---|---|---|
 | R1 | 外部依赖「xlsx_file 全是 str cell」的后处理失效或双重转换 | 中 | 中 | proposal Impact 标明 bugfix；MVP 对照 | 发布说明提醒去掉 `_post_process_workbook` 数字修复 |
-| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | 若峰值不可接受 → 另案流式/分段 commit（非本 future 默认） |
+| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | **第一刀**：active `c30-workflow-shared-book-memory`（尽早释放双驻留 + xlsx_memory Python budget 验收）。更大 spill/流式见下方 Deferred |
 | R3 | `book_sheet_rows(xlsx_file)` 可见性/截断与 sheetbook 漂移 | 中 | 高 | design 要求同契约；tasks 含可见性单测 | 用户报告不一致 → 立即 reopen 源 change 或 hotfix |
 | R4 | 同一 output 双消费（xlsx + csv）缺 CSV artifact | 低（当前少见） | 高 | 本 change **有意不实现**自动派生；见上条 later | 触发「按 consumer 显式派生」升格为 change |
 | R5 | `resolve_workflow_input_csv` 误用于 ROWS-only output | 中 | 高 | write 路由改 tabular；legacy workbook 一并改 | 回归测：无 csv map 时 xlsx write 成功、csv resolve fail-fast 清晰 |

@@ -22,14 +22,14 @@ flowchart TD
 | Change | 角色 | 状态 | 校验 |
 | --- | --- | --- | --- |
 | `c20-book-write-policy-python-ssot` | 边界：write_defaults + budget → Python SSOT；YAML reject | **archived** → `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/` | specs 已合并；`llman sdd validate --all` OK |
-| `c30-workflow-shared-book-memory` | 性能：P0 释放 + P1 Python budget 接线 | **proposed；depends on c20（已满足）** | `llman sdd validate c30-workflow-shared-book-memory --strict --no-interactive --stage spec` |
+| `c30-workflow-shared-book-memory` | 性能：P0 尽早释放双驻留 + P1 `xlsx_memory` Python budget 验收 | **proposed（MUST 已收紧；待 apply）**；depends on c20（已满足） | `llman sdd validate … --strict --no-interactive --stage spec` OK；`--stage full` 待 apply 勾选后 |
 
 推进命令：
 
 ```bash
 llman sdd show c30-workflow-shared-book-memory
 llman sdd graph c30-workflow-shared-book-memory --depth 2
-# 下一步：propose 已完成时用 llman-sdd-apply 做 c30
+# 下一步：llman-sdd-apply 实现 c30（P0+P1）
 ```
 
 ## 已拍板决策
@@ -42,6 +42,9 @@ llman sdd graph c30-workflow-shared-book-memory --depth 2
 | 4 | **`allow_formulas` / `encoding` 暂保持 YAML 可写**（一般不动态改） |
 | 5 | 开箱：不传 policy = 今日缺省（`mode=sheet`, `on_conflict=error`, …；budget unlimited） |
 | 6 | 两线都落 formal change；c30 depends_on c20（c20 已归档） |
+| 7 | **c30 P0**：消费者闭包 = 待执行 write nodes + 待执行 `book_sheet_rows` 可见性消费者；写成功无剩余消费者 → discard demand artifact；`commit_all`/`discard_all` 后清 plan segments；diagnostics 走既有通道（原因 `no_remaining_consumers\|commit\|discard`） |
+| 8 | **c30 P1**：仅对 `xlsx_memory` 强制 `BookBudgetPolicy`；`xlsx_file` **不**套 cell/sheet budget |
+| 9 | **c30 不做**：spill / seal / 默认边写 openpyxl / YAML release knobs / `xlsx_file` budget → 已迁 `futures/.../future.md` Deferred |
 
 ## 目标态例子
 
@@ -102,14 +105,15 @@ result = run_workflow(
 | `notplan/c0-roadmap-yaml-dsl-oneof-checklist` | REMOVE/stale（oneOf 已落地） |
 | `notplan/c1-streaming-xlsx-output` | REFRAME：禁止 YAML streaming knobs；另案 Python/profile（**非**被 c30 直接实现） |
 | `notplan/c1-runtime-performance-profiles` | KEEP 为后续载体 |
-| `futures/.../R2` 峰值内存 | c30 部分消化 |
+| `futures/.../R2` 峰值内存 | c30 第一刀（释放 + xlsx_memory budget）；spill/seal/`xlsx_file` budget/边写 → Deferred later |
 
 ## 建议推进顺序
 
 1. ~~Apply + archive `c20`~~（已完成）
-2. **Apply `c30` P0/P1**（释放 + budget 接线）
-3. （可选）reframe streaming notplan / 引入 performance profiles
-4. `c30` 归档后刷新本 HANDOFF 或删除
+2. ~~收紧 `c30` proposal（MUST-only A+B；P2+ → futures）~~（已完成）
+3. **Apply `c30` P0/P1**（释放 + `xlsx_memory` budget 验收）
+4. （可选）reframe streaming notplan / 引入 performance profiles
+5. `c30` 归档后刷新本 HANDOFF 或删除
 
 ## 不要做的事
 
