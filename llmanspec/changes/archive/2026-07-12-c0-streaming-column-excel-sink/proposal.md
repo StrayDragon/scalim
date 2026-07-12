@@ -46,14 +46,14 @@
 
 - `peak_reduction_ratio` ≈ **25.8%**；`gate_peak_reduced=true`
 
-### 50k×300 / window=2000（复测）
+### 100k×300 / window=2000（复测）
 
 | arm | peak RSS | pre_close | duration_s |
 |---|---:|---:|---:|
-| hold | **1.80GB** | 1.21GB | 79.5 |
-| streaming_window | **0.60GB** | 0.56GB | 83.1 |
+| hold | **3.58GB** | 2.39GB | 159 |
+| streaming_window | **1.11GB** | 1.06GB | 167 |
 
 - 正确性：`ok=true`
-- `peak_reduction_ratio` ≈ **67.0%**（Δpeak ≈ 1.21GB）；`gate_peak_reduced=true`
-- 产物：`.tmp/evidence/streaming-column-excel-ab/20260712T103747Z/result.json`
-- 结论：行窗 MVP **随 shape 放大收益更明显**；值得 apply 迁入生产 opt-in sink
+- `peak_reduction_ratio` ≈ **69.0%**（Δpeak ≈ 2.47GB）；`gate_peak_reduced=true`
+- 产物：`.tmp/evidence/streaming-column-excel-ab/20260712T104647Z/result.json`
+- 结论：行窗 MVP **随 shape 放大收益更明显**；已 apply 迁入生产 `StreamingColumnExcelSink`

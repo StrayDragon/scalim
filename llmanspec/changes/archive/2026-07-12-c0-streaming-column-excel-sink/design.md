@@ -40,11 +40,12 @@
 - 正确性：`ok=true`
 - 效果：同 shape 下 streaming 的 `peak_rss_gb_observed` **明显低于** hold（经验阈值：≥20% 或绝对值差 ≥0.2GB，以 result.json 为准记录）
 
-## 生产落地（后续 apply，非本轮）
+## 生产落地（已 apply）
 
-1. 将证据 MVP 迁入 `StreamingColumnExcelSink`（opt-in）
-2. API 对齐 `ColumnExcelSink` + 显式行窗/flush 文档
-3. **MUST NOT**: YAML；改默认 `ColumnExcelSink`
+1. `src/scalim/sinks/_internal/streaming_column_excel.py` → `StreamingColumnExcelSink`
+2. 导出：`scalim.sinks` / `scalim.sinks.api`
+3. 证据脚本流式臂改用生产实现
+4. **MUST NOT**: YAML；改默认 `ColumnExcelSink`
 
 ## Follow-up
 

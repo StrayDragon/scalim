@@ -22,6 +22,7 @@ from ._internal.sink_csv import (
     ColumnCSVSink,
     CSVSink,
 )
+from ._internal.streaming_column_excel import StreamingColumnExcelSink
 
 __all__ = (
     "BaseColumnSink",
@@ -39,4 +40,5 @@ __all__ = (
     "IColumnSink",
     "IRowSink",
     "ISink",
+    "StreamingColumnExcelSink",
 )

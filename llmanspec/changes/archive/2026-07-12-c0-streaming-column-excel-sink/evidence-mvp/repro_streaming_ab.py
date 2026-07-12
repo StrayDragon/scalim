@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pinned A/B: ColumnExcelSink hold vs evidence-MVP streaming (row-window).
 
-生产代码不改动. 流式臂实现见本文件 `MvpStreamingColumnExcel`.
+流式臂使用生产 `StreamingColumnExcelSink`(行窗写出).
 
 - hold: 全量列写入 ColumnExcelSink 后 close
 - streaming_window: 按行窗写入全部列; 行字段齐备即 append 到 write_only 并释放行缓冲
@@ -23,7 +23,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Hashable, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, List, Sequence
 
 
 def _rss_kb() -> int:
@@ -61,115 +61,6 @@ def _read_xlsx_matrix(path: Path):
         return [list(row) for row in ws.iter_rows(values_only=True)]
     finally:
         wb.close()
-
-
-class MvpStreamingColumnExcel:
-    """证据用 MVP: 行字段齐备即 write_only append 并释放行缓冲."""
-
-    def __init__(
-        self,
-        output_path: str,
-        field_names: List[str],
-        *,
-        header_names: Optional[List[str]] = None,
-        sheet_name: str = "Sheet1",
-        include_header: bool = True,
-        allow_formulas: bool = True,
-    ) -> None:
-        self.output_path = str(output_path)
-        self.field_names = list(field_names)
-        self.header_names = list(header_names) if header_names is not None else list(field_names)
-        self.sheet_name = str(sheet_name)
-        self.include_header = bool(include_header)
-        self._allow_formulas = bool(allow_formulas)
-        self._row_ids: List[Hashable] = []
-        self._row_index: Dict[Hashable, int] = {}
-        self._pending: List[Optional[Set[str]]] = []
-        self._values: List[Optional[List[Any]]] = []
-        self._field_index = {name: idx for idx, name in enumerate(self.field_names)}
-        self._wb = None
-        self._ws = None
-        self._closed = False
-        self._flushed_rows = 0
-
-    def set_row_ids(self, row_ids: Sequence[Hashable]) -> None:
-        if self._row_ids:
-            raise RuntimeError("row_ids already set")
-        from scalim._internal.utils.excel import escape_excel_formula
-        from scalim.sinks._internal.excel import Workbook
-
-        self._row_ids = list(row_ids)
-        self._row_index = {pk: i for i, pk in enumerate(self._row_ids)}
-        n = len(self._row_ids)
-        self._pending = [set(self.field_names) for _ in range(n)]
-        self._values = [[None] * len(self.field_names) for _ in range(n)]
-
-        self._wb = Workbook(write_only=True)
-        self._ws = self._wb.create_sheet(self.sheet_name)
-        if self.include_header:
-            _ = self._ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
-
-    def write_column(self, field_key: str, values: Mapping[Hashable, Any]) -> None:
-        if self._closed:
-            raise RuntimeError("sink closed")
-        if not self._row_ids:
-            raise RuntimeError("set_row_ids required")
-        field = str(field_key)
-        if field not in self._field_index:
-            raise KeyError(field)
-        from scalim._internal.utils.excel import escape_excel_formula
-
-        fidx = self._field_index[field]
-        completed: List[int] = []
-        for pk, value in values.items():
-            ridx = self._row_index.get(pk)
-            if ridx is None:
-                continue
-            pending = self._pending[ridx]
-            row_vals = self._values[ridx]
-            if pending is None or row_vals is None:
-                continue
-            row_vals[fidx] = value
-            pending.discard(field)
-            if not pending:
-                completed.append(ridx)
-
-        for ridx in completed:
-            row_vals = self._values[ridx]
-            assert row_vals is not None
-            assert self._ws is not None
-            _ = self._ws.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in row_vals])
-            self._values[ridx] = None
-            self._pending[ridx] = None
-            self._flushed_rows += 1
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        from contextlib import suppress
-        from pathlib import Path as PathCls
-
-        from scalim._internal.utils.openpyxl_helpers import (
-            best_effort_close_write_only_workbook_worksheets,
-            save_openpyxl_workbook_atomic,
-        )
-
-        leftover = sum(1 for p in self._pending if p is not None)
-        if leftover:
-            raise RuntimeError("incomplete rows at close: {}".format(leftover))
-
-        output_dir = PathCls(self.output_path).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-        assert self._wb is not None
-        try:
-            save_openpyxl_workbook_atomic(self._wb, output_path=self.output_path)
-        except Exception:
-            best_effort_close_write_only_workbook_worksheets(self._wb)
-            raise
-        finally:
-            with suppress(Exception):
-                self._wb.close()
-        self._closed = True
 
 
 def run_hold(*, out_path: Path, n_rows: int, n_cols: int) -> Dict[str, Any]:
@@ -230,6 +121,8 @@ def run_streaming_window(
     n_cols: int,
     window_rows: int,
 ) -> Dict[str, Any]:
+    from scalim.sinks import StreamingColumnExcelSink
+
     field_names = ["f{}".format(i) for i in range(n_cols)]
     row_ids = list(range(n_rows))
     window = max(1, int(window_rows))
@@ -248,8 +141,9 @@ def run_streaming_window(
     thr.start()
     t0 = time.perf_counter()
     rss_pre = rss0
+    flushed = 0
     try:
-        sink = MvpStreamingColumnExcel(str(out_path), field_names=field_names, include_header=True)
+        sink = StreamingColumnExcelSink(str(out_path), field_names=field_names, include_header=True)
         sink.set_row_ids(row_ids)
         for start in range(0, n_rows, window):
             end = min(n_rows, start + window)
@@ -282,6 +176,7 @@ def run_streaming_window(
         "duration_s": elapsed,
         "bytes_on_disk": out_path.stat().st_size if out_path.exists() else 0,
         "flushed_rows": flushed,
+        "impl": "StreamingColumnExcelSink",
     }
 
 
@@ -352,7 +247,7 @@ def main() -> None:
 
     result: Dict[str, Any] = {
         "ts": ts,
-        "mvp": "MvpStreamingColumnExcel+row_window",
+        "mvp": "StreamingColumnExcelSink+row_window",
         "shape": {"rows": args.rows, "cols": args.cols, "window_rows": args.window_rows},
         "correctness": correctness,
         "hold": hold,

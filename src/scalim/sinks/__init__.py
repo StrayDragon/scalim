@@ -25,6 +25,7 @@ from .api import (
     IColumnSink,
     IRowSink,
     ISink,
+    StreamingColumnExcelSink,
 )
 
 __all__ = (
@@ -43,4 +44,5 @@ __all__ = (
     "IColumnSink",
     "IRowSink",
     "ISink",
+    "StreamingColumnExcelSink",
 )
