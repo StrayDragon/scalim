@@ -1,5 +1,11 @@
 # Proposal: allow-formulas-safe-default
 
+## 与 c20/c30 关系
+
+- **不被取代**。`c20` 明确 **暂留 `allow_formulas` 在 YAML**（通常不动态改）；本 change 只翻转默认值 true→false，不把该字段迁出 YAML。
+- 同碰 `yaml-dsl-books-resources` schema：apply 顺序建议先保证字段仍在 authoring 面，再改默认值，避免与 c20 削 `write_defaults`/`budget` 的 schema 改动搅在一起。
+- 进度总览：仓库根 `_HANDOFF.md`。
+
 ## Why
 
 所有 CSV/Excel sink（`CSVSink`、`ColumnCSVSink`、`BlockColumnCSVSink`、`ExcelSink` 等）的 `allow_formulas` **默认为 True**。当数据来自不受信任的 loader（如外部数据库）时，以 `=`、`+`、`-`、`@` 开头的值会原样写入 CSV/Excel，在用户打开文件时可能触发公式注入攻击。

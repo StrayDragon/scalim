@@ -1,5 +1,10 @@
 # Proposal: workflow-temp-file-permissions
 
+## 与 c20/c30 关系
+
+- **不被取代**。本 change 加固 publish 临时文件权限（`resources_base` staging），与 c20 policy 边界正交；与 c30 内存释放可并行，注意同一文件合并冲突即可。
+- 进度总览：仓库根 `_HANDOFF.md`。
+
 ## Why
 
 `src/scalim/workflow/resources_base.py:172-177` 中 workflow publish 路径的临时文件使用 `tempfile.mkstemp` 创建，默认权限为系统默认（通常 `0o644`），在共享输出目录场景下存在 symlink/race 风险。

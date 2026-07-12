@@ -79,6 +79,20 @@ result = run_workflow(
 )
 ```
 
+## 与其它 active changes 的协调
+
+**结论：没有任何 active change 被 c20/c30 整份取代。** 多数正交；下表仅列交叉项。
+
+| Change | 关系 | 建议 |
+| --- | --- | --- |
+| `c0-output-write-path-allowlist` | 同碰 `books-resources` / shared-output；主题是 path 白名单（Python 入口） | **互补**；合 delta 时注意别互相覆盖。方向与「调参进 Python」一致 |
+| `c1-allow-formulas-safe-default` | 同碰 books 的 `allow_formulas` | **不取代**；c20 **暂留该字段在 YAML**。c1 只改默认 true→false。apply 时先保证字段仍在 YAML，再改默认值 |
+| `c5-extract-openpyxl-shared-helpers` | 同改 `resources_workbook/sheetbook` | **有利前置（soft）**；先做可减 c30 重复，非硬 `depends_on` |
+| `c5-workflow-temp-file-permissions` | staging/publish 邻近 | **正交加固**；可与 c30 并行，注意同一文件合并 |
+| 其余 c0/c1/c10（timestamp、sleep fixtures、trusted-mode、compute-dos、preloaded-cache、adaptive-locks） | 无交叉 | 照旧推进 |
+
+各交叉 proposal 内已加「与 c20/c30 关系」小节。
+
 ## 相关工件（合并 / 移除意向）
 
 | 工件 | 意向 |
@@ -88,7 +102,7 @@ result = run_workflow(
 | `yaml-dsl-books-resources` | KEEP 骨架；削 write_defaults/budget（c20） |
 | `workflow-shared-output-containers` | KEEP 生命周期；策略来源改 Python（c20）；释放/budget（c30） |
 | `notplan/c0-roadmap-yaml-dsl-oneof-checklist` | REMOVE/stale（oneOf 已落地） |
-| `notplan/c1-streaming-xlsx-output` | REFRAME：禁止 YAML streaming knobs；另案 Python/profile |
+| `notplan/c1-streaming-xlsx-output` | REFRAME：禁止 YAML streaming knobs；另案 Python/profile（**非**被 c30 直接实现） |
 | `notplan/c1-runtime-performance-profiles` | KEEP 为后续载体 |
 | `futures/.../R2` 峰值内存 | c30 部分消化 |
 

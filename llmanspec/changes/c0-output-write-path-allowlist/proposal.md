@@ -1,5 +1,11 @@
 # Proposal: output-write-path-allowlist
 
+## 与 c20/c30 关系
+
+- **不被取代**。本 change 管输出 path 白名单（`allowed_output_roots`），与 `c20`（write_defaults/budget → Python）主题不同。
+- 同碰 `yaml-dsl-books-resources` / `workflow-shared-output-containers`：合 delta / 实现时避免互相覆盖；本能力本身是 Python/runtime 入口，与「YAML 编排瘦身」方向一致。
+- 进度总览：仓库根 `_HANDOFF.md`。
+
 ## Why
 
 YAML **读取路径** 有完善的约束（`allowed_yaml_roots`、`validate_resolved_yaml_path_within_roots`、import 路径归一化），但**输出写入路径**无任何限制。`resolve_yaml_relative_output_path()` 中相对路径如 `../../sensitive/file.csv` 可解析到 YAML 目录之外，在多租户或不受信任的 YAML 作者场景下构成路径穿越风险。
