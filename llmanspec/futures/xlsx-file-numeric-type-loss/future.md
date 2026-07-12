@@ -35,18 +35,12 @@
 - **备注**: `c5-xlsx-file-numeric-type-loss` 已对齐 **数据模型**（物化 typed rows）；`archive/2026-07-12-c5-extract-openpyxl-shared-helpers` 已抽出 close/atomic save SSOT。文件级合并另案，避免与类型修复绑大 PR。
 - **第一条动作**: helpers 已归档；评估剩余 workbook/sheetbook 业务逻辑 diff 面后再 propose。
 
-### now — opt-in `StreamingColumnExcelSink`（砍 `pre_close` 列驻留）
+### done — opt-in `StreamingColumnExcelSink`（砍 `pre_close` 列驻留）
 
 - **来源**: notplan `c1-streaming-xlsx-output`；经 `c0-column-excel-sink-column-residency` 取证后升格收窄。
-- **证据（2026-07-12）**: mid-close 列切片释放 **不降 peak**（`peak≈pre_close`）。要砍峰必须在写出更早阶段释放列/行缓冲，且 **默认 `ColumnExcelSink` 不变**。
-- **范围约束**:
-  1. 新类型 opt-in；禁止改默认 `ColumnExcelSink` 行为
-  2. **MUST NOT** YAML `write.streaming` / books knobs（Python/API only）
-  3. 原子临时文件 + best-effort cleanup 保持
-  4. evidence-mvp 固定 `pre_close`/`peak` A/B 后再 apply
-- **落地路径**: active change `c0-streaming-column-excel-sink`
-- **受影响 capability**: `output-sink-contracts`
-- **第一条动作**: 见该 change proposal/design；先 MVP 手动 flush 完整行再评估 framework 接线。
+- **证据（2026-07-12）**: mid-close 列切片释放 **不降 peak**；行窗 streaming 100k×300 peak **3.58GB → 1.11GB**（~69%）。
+- **状态**: **已归档落地** `archive/2026-07-12-c0-streaming-column-excel-sink`；生产类型 `scalim.sinks.StreamingColumnExcelSink`（默认 `ColumnExcelSink` 不变；无 YAML knobs）。
+- **残留 follow-up**: execution 自动按 source 完成触发 flush；更细 pending 窗口优化（仍 later，非阻塞）。
 
 ### later — output bypass / 非托管 book 写出
 
@@ -127,7 +121,7 @@
 | ID | 风险 | 可能性 | 影响 | 本 change 缓解 | 残留 / 升级条件 |
 |---|---|---|---|---|---|
 | R1 | 外部依赖「xlsx_file 全是 str cell」的后处理失效或双重转换 | 中 | 中 | proposal Impact 标明 bugfix；MVP 对照 | 发布说明提醒去掉 `_post_process_workbook` 数字修复 |
-| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | **第一刀已归档**：`archive/2026-07-12-c30-workflow-shared-book-memory`。宽表 Excel close 峰：`archive/2026-07-12-c0-column-excel-sink-write-memory`（`write_only`）。列驻留 mid-close 释放：**定案 A（文档-only）**见 `archive/2026-07-12-c0-column-excel-sink-column-residency`（30k×300：`peak≈pre_close`，分块释放不降 peak）。砍 `pre_close` 需 opt-in 流式 sibling：active `c0-streaming-column-excel-sink`（自 notplan `c1-streaming-xlsx-output` 收窄） |
+| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | **第一刀已归档**：`archive/2026-07-12-c30-workflow-shared-book-memory`。宽表 Excel close 峰：`archive/2026-07-12-c0-column-excel-sink-write-memory`（`write_only`）。列驻留 mid-close：**定案 A** `archive/2026-07-12-c0-column-excel-sink-column-residency`。砍 `pre_close`：**已归档落地** `archive/2026-07-12-c0-streaming-column-excel-sink`（`StreamingColumnExcelSink` 行窗；100k×300 peak ~3.58→1.11GB）。更大 shared-book spill 仍见 Deferred later |
 | R3 | `book_sheet_rows(xlsx_file)` 可见性/截断与 sheetbook 漂移 | 中 | 高 | design 要求同契约；tasks 含可见性单测 | 用户报告不一致 → 立即 reopen 源 change 或 hotfix |
 | R4 | 同一 output 双消费（xlsx + csv）缺 CSV artifact | 低（当前少见） | 高 | 本 change **有意不实现**自动派生；见上条 later | 触发「按 consumer 显式派生」升格为 change |
 | R5 | `resolve_workflow_input_csv` 误用于 ROWS-only output | 中 | 高 | write 路由改 tabular；legacy workbook 一并改 | 回归测：无 csv map 时 xlsx write 成功、csv resolve fail-fast 清晰 |

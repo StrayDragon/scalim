@@ -262,8 +262,8 @@
 - desc: sink 契约与常用 sinks
 - scenario: 使用内置 sinks / 实现自定义 sink
 - marker: `src/scalim/sinks/__init__.py:8`
-- source: `src/scalim/sinks/__init__.py:30`
-- exports (`__all__`, tuple, count=15):
+- source: `src/scalim/sinks/__init__.py:31`
+- exports (`__all__`, tuple, count=16):
   - `BaseColumnSink`
   - `BaseRowSink`
   - `BaseSink`
@@ -279,6 +279,7 @@
   - `IColumnSink`
   - `IRowSink`
   - `ISink`
+  - `StreamingColumnExcelSink`
 
 ### `scalim.sinks.memory` (order=121)
 - desc: memory sinks(调试/测试/捕获)

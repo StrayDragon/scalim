@@ -112,9 +112,7 @@ class StreamingColumnExcelSink(IColumnSink):
         self._workbook = Workbook(write_only=True)
         self._worksheet = self._workbook.create_sheet(self.sheet_name)
         if self.include_header:
-            _ = self._worksheet.append(
-                [escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names]
-            )
+            _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
     def _flush_ready_prefix(self) -> None:
         """按行序刷入已齐备的连续前缀(满足 `write_only` 顺序约束)."""
@@ -126,9 +124,7 @@ class StreamingColumnExcelSink(IColumnSink):
             row_vals = self._values[self._next_flush_index]
             if row_vals is None:
                 break
-            _ = self._worksheet.append(
-                [escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in row_vals]
-            )
+            _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in row_vals])
             self._values[self._next_flush_index] = None
             self._pending[self._next_flush_index] = None
             self._next_flush_index += 1
@@ -174,7 +170,7 @@ class StreamingColumnExcelSink(IColumnSink):
     def _abandon_open_workbook(self) -> None:
         if self._workbook is None:
             return
-        # 只关 worksheet,避免 write_only 生成器在 `Workbook.close` 后对已关文件做 I/O.
+        # 只关 `worksheet`,避免 `write_only` 生成器在 `Workbook.close` 后对已关文件做 I/O.
         best_effort_close_write_only_workbook_worksheets(self._workbook)
         self._workbook = None
         self._worksheet = None
