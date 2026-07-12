@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-run-patches"
-purpose: "允许 run_workflow 接受按 workflow run id 注入的 per-run runtime patches，支持覆盖 batch_size、parallel_mode、max_workers、demand_diagnostics、components 等参数，并确保安全边界参数不可覆盖。"
+purpose: "允许 run_workflow 接受按 workflow run id 注入的 per-run runtime patches，支持覆盖 batch_size、parallel_mode、max_workers、demand_diagnostics、components 等参数，并确保安全边界参数不可覆盖。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[9]{req_id,title,statement}:
   r1,"run_workflow MUST accept per-run patches keyed by workflow run id","`run_workflow(...)` MUST 接受一个可选参数 `run_options_patches_by_run_id`,用于按 `workflow.runs[*].id` 注入 per-run runtime patches（其语义为对 base `RunOptions` 的字段级 patch）。 语义: - `run_options_patches_by_run_id` 的 key MUST 等于 `workflow.runs[*].id` - patch 仅作用于对应的 demand run,不作用于 workflow 内部派生节点(例如 write/append 等) - per-run patch 的优先级 MUST 高于 `run_workflow(..., options=RunOptions(...))` 的全局 runtime knobs"

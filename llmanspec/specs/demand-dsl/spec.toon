@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "demand-dsl"
-purpose: "实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用."
+purpose: "实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用. [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[16]{req_id,title,statement}:
   r1,顶层结构与 IR 转换规则,"系统 SHALL 在加载 YAML 时解析 `name`、`main_source`、`sources`、`fields`,并可选解析 `relations`、`output` 与 `guardrails`. - `dsl_version` 字段不再支持;配置中出现 `dsl_version` MUST 被视为未知字段并在校验中失败. - legacy 字段(`relations_sql_like`、`relations_graph`、`foreign_key`、`target`、`from`、`via`、`column`、`pk`、`pk_transform`、`derived`)一律拒绝. - `name`、`main_source` 为必填项;`sources` 可缺省(缺省视为 `{}`)且允许为空对象;顶层 `fields` 可缺省. - `main_source` 为对象结构(至少包含 `source_id` 与 `loader`);`sources` 仅包含非主源数据源. - 源字段在 `main_source.fields` 与 `sources.*.fields` 内声明;顶层 `fields` 仅用于派生字段. - `guardrails` 为可选对象结构,用于启用运行时护栏配置;未提供时默认关闭. 系统 SHALL 将 `guardrails.enabled`、`guardrails.mode`、`guardrails.loader.validate_result`、`guardrails.loader.required_fields`、`guardrails.relations.*_max_rate`、`guardrails.loader.on_transform_error`、`guardrails.compute.on_error` 等配置映射到运行时策略模型. 系统 SHALL 支持使用 `_templates` 中的 YAML anchor/alias 复用 `guardrails.*` 下的字段列表配置(例如 `guardrails.loader.required_fields`). 系统 SHALL 将 YAML 配置转换为 DemandIr,验证 `main_source.source_id` 不与 sources 冲突且字段引用的数据源存在."

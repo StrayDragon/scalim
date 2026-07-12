@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "parallel-execution"
-purpose: "定义执行层对外并发语义 `seq|adaptive`,以及 `adaptive` 下的调度边界、后端选择、结果提交与事件回放契约."
+purpose: "定义执行层对外并发语义 `seq|adaptive`,以及 `adaptive` 下的调度边界、后端选择、结果提交与事件回放契约. [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[10]{req_id,title,statement}:
   r1,对外并发模式与参数,"系统 MUST 支持 `parallel_mode=seq|adaptive`;其它值 MUST 失败并提示合法值. 历史 `parallel_mode=\"thread\"|\"process\"` MUST 视为已移除并给出迁移提示(使用 `adaptive` 或 `seq`). `max_workers` 作为 `adaptive` 并发上限提示,`0=自动`,在 `seq` 下忽略."

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-lsp-editor-integration"
-purpose: 提供一套可复制、可审计、可排障的多编辑器接入指南与回归套件，降低 YAML DSL LSP server 在各编辑器生态中的接入成本，并持续验证 editor semantics core 的行为稳定性。
+purpose: "提供一套可复制、可审计、可排障的多编辑器接入指南与回归套件，降低 YAML DSL LSP server 在各编辑器生态中的接入成本，并持续验证 editor semantics core 的行为稳定性。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[13]{req_id,title,statement}:
   r1,Docs site MUST provide editor integration guides for YAML DSL LSP server,"系统 MUST 在 docs-site 中提供多编辑器接入指南，至少覆盖： - Neovim - Zed editor - JetBrains（LSP Support 插件） 每个指南 MUST 以\"可复制、无需预安装二进制\"为默认目标，并至少提供两种等价启动模式（按推荐优先级排序）： 1) **Ephemeral（默认推荐）**：通过 `uvx` 启动 `scalim-yaml-dsl-lsp` 2) **Installed（可选）**：通过已安装的 `scalim-yaml-dsl-lsp` 二进制启动 每个指南 MUST 包含： - server 启动命令（stdio） - MUST 给出 `uvx scalim-yaml-dsl-lsp serve ...` 的最小启动示例（默认推荐） - MUST 给出 `scalim-yaml-dsl-lsp serve ...` 的等价替代示例（installed） - YAML 文件匹配规则/启用方式 - workspace root 与 project discovery 的说明"

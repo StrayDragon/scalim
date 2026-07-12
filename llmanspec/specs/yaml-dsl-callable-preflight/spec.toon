@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-callable-preflight"
-purpose: "定义 YAML DSL 在 demand compile / workflow preflight 阶段的 callable preflight: 在 resolver 安全边界就绪后,对用户可配置的 Python callable 执行“可推理的签名/形态/固定 contract”校验,并在失败时 fail-fast。"
+purpose: "定义 YAML DSL 在 demand compile / workflow preflight 阶段的 callable preflight: 在 resolver 安全边界就绪后,对用户可配置的 Python callable 执行“可推理的签名/形态/固定 contract”校验,并在失败时 fail-fast。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,"callable preflight MUST run at the resolver boundary and fail-fast","系统 MUST 在 demand runtime compile（以及 workflow preflight 中对每个 run 的 demand compile）阶段,在“resolver 已就绪”边界执行 callable preflight,并在发现第一个可推理错误时立即 fail-fast 抛出配置/编译错误: - callable preflight MUST 在 allowlist/builtin vocabulary 已生效的 resolver 可用后执行（不得在缺失安全边界的情况下尝试导入/解析用户引用）。 - callable preflight MUST 覆盖所有“用户可配置为 Python callable”的入口点（至少包含 `loader`、派生字段 `call_by`、聚合后派生字段 `call_by`、`normalize.call_by`、`should_retry` 以及 `compute` 的安全内置函数调用形态检查）。 - callable preflight MUST NOT 执行用户 callable（不得调用函数体）,仅允许解析引用与做签名/形态/固定 contract 校验。 - callable preflight 失败 MUST 被归类为 compile/config error,不得进入运行期 guardrails 的 quiet/吞错语义。"

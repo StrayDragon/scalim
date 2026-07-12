@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-execute-organization"
-purpose: "TBD - created by archiving change c45-refactor-execute-controller-phase1. Update Purpose after archive."
+purpose: "TBD - created by archiving change c45-refactor-execute-controller-phase1. Update Purpose after archive. [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,Workflow execution observable behavior MUST remain unchanged after Phase 1 refac,"Phase 1 MUST reorganize `execute.py` / `execute_controller.py` implementation into focused modules (`outcome_builder`, `scheduler_rules`, `WorkflowResourceLifecycle`, `WorkflowVizReporter`) without changing external semantics: outcomes, scheduling decisions, resource commit/discard, viz snapshots, and replay link behavior MUST remain byte-for-byte or logically equivalent to pre-change behavior for the same inputs and options."

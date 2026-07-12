@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-package-identity"
-purpose: 定义项目包身份与分发边界的治理规范，确保 PyPI 发行名、导入根包名、CLI 命令名之间的清晰分离，以及运行时主包与 CLI 发行物的版本约束解耦。
+purpose: "定义项目包身份与分发边界的治理规范，确保 PyPI 发行名、导入根包名、CLI 命令名之间的清晰分离，以及运行时主包与 CLI 发行物的版本约束解耦。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,PyPI 发行名为 PROJECT_DIST_NAME,系统 MUST 使用 `PROJECT_DIST_NAME` 作为唯一对外 PyPI 发行名(distribution name). 系统 MUST NOT 以 `PROJECT_DIST_NAME` 作为对外发布名.

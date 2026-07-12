@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-cli-validation"
-purpose: 定义 CLI 校验工具的行为契约，包括校验分层、诊断输出格式与错误定位，确保 CLI 结果可用于 IDE 跳转、CI 报告与脚本化消费。
+purpose: "定义 CLI 校验工具的行为契约，包括校验分层、诊断输出格式与错误定位，确保 CLI 结果可用于 IDE 跳转、CI 报告与脚本化消费。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[13]{req_id,title,statement}:
   r1,CLI 与 runtime core 职责分离,"系统 MUST 允许 CLI 实现独立于 runtime core 发行，但 MUST 保持对外行为契约一致： - 校验逻辑 MUST 委托 runtime core 的可复用服务层，不得在 CLI 中复制语义实现 - runtime core MUST 可在不安装 CLI 的环境中被 import 使用 - CLI 的退出码、JSON payload 结构、诊断输出格式 MUST 保持规范一致"

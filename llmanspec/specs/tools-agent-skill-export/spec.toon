@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "tools-agent-skill-export"
-purpose: "定义 `scalim-yaml-dsl` skill 自动生成器的职责边界，确保自动化只负责受控参考产物，同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体。"
+purpose: "定义 `scalim-yaml-dsl` skill 自动生成器的职责边界，确保自动化只负责受控参考产物，同时保证输出可校验、可重建、不会覆盖手工维护的 skill 本体。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[9]{req_id,title,statement}:
   r1,Safe Output Destination,"系统 MUST 默认输出到 `agentdev/skills/`,允许通过参数指定输出根目录,但必须拒绝写入用户 skill 目录(如 `~/.codex/skills`、`~/.claude/skills`、`/etc/codex/skills`)."

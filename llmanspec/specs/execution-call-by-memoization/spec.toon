@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-call-by-memoization"
-purpose: "TBD - created by archiving change c20-exp-call-by-memoize-field-policy. Update Purpose after archive."
+purpose: "TBD - created by archiving change c20-exp-call-by-memoize-field-policy. Update Purpose after archive. [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,"Opt-in ctx-free call_by memoization","当且仅当启用实验性开关时，系统 MUST 对满足条件的 `ctx-free call_by` 派生字段启用“按字段 LRU”记忆化；默认 MUST 关闭。"

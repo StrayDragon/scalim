@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-dense-batch"
-purpose: 优化批次执行场景的内存占用与访问速度，通过 Dense 存储表示支持连续整数 row_id 的紧凑编码。
+purpose: "优化批次执行场景的内存占用与访问速度，通过 Dense 存储表示支持连续整数 row_id 的紧凑编码。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,Dense storage for contiguous integer row_id batches,"系统 MUST 支持在 row_id 连续整数场景下使用 Dense 存储表示以优化内存与性能；实现 MAY 在满足条件时启用该路径。 启用条件 MUST 可判定且可回退： - row_id MUST 为 int 且构成连续区间（存在可计算的 base_row_id 与 row_count） - 条件不满足时 MUST 回退到通用实现，语义不变"

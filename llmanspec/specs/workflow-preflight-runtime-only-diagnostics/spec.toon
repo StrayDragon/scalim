@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-preflight-runtime-only-diagnostics"
-purpose: "为 `run_workflow(...)` 增加一个 engine 执行前的 preflight 阶段,用于运行一组“runtime-only 但可推理”的诊断（v1 仅覆盖 `validate_unique_field_names`）,并以 fail-fast 的方式把错误提前暴露为 workflow compile/config error。"
+purpose: "为 `run_workflow(...)` 增加一个 engine 执行前的 preflight 阶段,用于运行一组“runtime-only 但可推理”的诊断（v1 仅覆盖 `validate_unique_field_names`）,并以 fail-fast 的方式把错误提前暴露为 workflow compile/config error。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,workflow preflight MUST run after effective policy merge but before workflow eng,"系统 MUST 在进入 workflow engine 调度前运行 workflow preflight: - **MUST** 在 workflow compile/preload（结构预加载）完成之后运行 - **MUST** 在 per-run patches 与 overrides 合并完成、具备 effective policy/outputs/resources 口径之后运行 - **MUST** 在 workflow engine（调度/执行）启动之前运行"

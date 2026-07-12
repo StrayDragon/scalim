@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-lsp-server"
-purpose: "定义 YAML DSL LSP server 的语义 contract：诊断（diagnostics）与 Python 引用的 definition/hover/completion，并要求 server 侧复用 shared core， 以保证跨编辑器一致、静态无副作用且可诊断降级（不 crash、不退出、不依赖 shell-out CLI）。"
+purpose: "定义 YAML DSL LSP server 的语义 contract：诊断（diagnostics）与 Python 引用的 definition/hover/completion，并要求 server 侧复用 shared core， 以保证跨编辑器一致、静态无副作用且可诊断降级（不 crash、不退出、不依赖 shell-out CLI）。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[22]{req_id,title,statement}:
   r1,YAML DSL LSP server MUST NOT shell out to CLI and MUST reuse scalim library sema,"系统 MUST 定义并支持一个 YAML DSL 语义 LSP server,其实现约束如下: - LSP server MUST 以 `scalim` 作为 library 依赖复用 validator/schema/解析逻辑 - LSP server MUST NOT 通过 shell-out 调用 `PROJECT_CLI_NAME` 或读取 CLI 文本输出再解析 - LSP server MUST 在缺失可选依赖时降级为可诊断的 warning(而不是崩溃/无响应)"

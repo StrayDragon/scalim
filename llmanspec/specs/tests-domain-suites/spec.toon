@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "tests-domain-suites"
-purpose: "将测试按领域组织为显式套件目录，约束 YAML string-reference fixtures 放在 tests/fixtures/，禁止 additional 模式，并确保 governance 聚焦于契约测试和脚本单元测试。"
+purpose: "将测试按领域组织为显式套件目录，约束 YAML string-reference fixtures 放在 tests/fixtures/，禁止 additional 模式，并确保 governance 聚焦于契约测试和脚本单元测试。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,tests MUST be organized as domain suites,"仓库 MUST 将 `tests/` 下的测试用例按领域（domain）组织为显式套件目录,而不是长期依赖“平铺文件 + 文件名前缀”来表达归类. 该结构 MUST 至少包含以下领域目录（名称可固定,内容可随实现重构调整）: - `tests/public_api/` - `tests/yaml_dsl/` - `tests/workflow/` - `tests/execution/` - `tests/governance/` - `tests/integration/` - `tests/bench/`（基准套件,保持 marker 隔离） 该约束 MUST 由可独立运行的静态门禁守护，并在 QA gate 的 fail-fast 阶段执行。"

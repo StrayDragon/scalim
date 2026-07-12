@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-output-composition"
-purpose: "支持单次运行的多输出目标组合(多文件或同一容器多逻辑输出),并定义容器命名冲突策略与输出失败策略(`failure_policy`)."
+purpose: "支持单次运行的多输出目标组合(多文件或同一容器多逻辑输出),并定义容器命名冲突策略与输出失败策略(`failure_policy`). [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[7]{req_id,title,statement}:
   r1,多输出组合,"系统 SHALL 允许单次运行定义多个输出目标,每个输出目标拥有独立的字段集合、输出绑定与生命周期,并可同时产出."

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "tools-resources-discovery"
-purpose: "定义面向用户的稳定公开入口,用于从 output root 定位“最新一次成功发布”的产物集合(books/files),并隐藏底层 D-2 版本化输出协议的内部落盘细节."
+purpose: "定义面向用户的稳定公开入口,用于从 output root 定位“最新一次成功发布”的产物集合(books/files),并隐藏底层 D-2 版本化输出协议的内部落盘细节. [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,system MUST provide a stable facade to discover the latest published output reso,"系统 MUST 提供一个面向用户的稳定公开入口(建议入口 package `scalim.shortcuts.resources`,v1 子域模块为 `scalim.shortcuts.resources.outputs`),用于从某个 output root 定位“最新一次成功发布”的产物集合。 该 facade 的目标是隐藏底层落盘协议细节(D-2 版本化输出的 `versions/` 目录与 `manifest/*.json`),避免下游手写 JSON 读取与路径拼接逻辑。 备注(非约束): `scalim.shortcuts.resources` 被视为资源类 shortcut 的长期统一入口；本轮 v1 仅新增 `scalim.shortcuts.resources.outputs`（从 output root 发现最新 outputs(books/files)）这一最小切片,其它 input artifacts / ctx resources 等能力后续再增补。 最小能力: - 输入 MUST 为 output root（目录路径,`str` 或 `pathlib.Path` 均可）。 - 输出 MUST 为一个可直接使用的产物快照对象(例如 `LatestOutputs`),其中包含: - `run_id: str`（稳定标识符;用于诊断与追踪,但不以 “version” 术语对外表达） - `books: Mapping[str, Path]`（book_id → 产物路径） - `files: Mapping[str, Path]`（file_id → 产物路径） - 用户侧 MUST NOT 需要自行读取 `manifest/latest.json` 或拼接 `versions/<id>` 路径。"

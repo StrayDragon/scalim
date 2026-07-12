@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-error-taxonomy"
-purpose: "为 scalim 建立统一的异常体系规范:以 ScalimError 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径."
+purpose: "为 scalim 建立统一的异常体系规范:以 ScalimError 作为唯一根,并在其下按域拆分子类;对用户可感知错误以异常类型/显式字段作为稳定契约;同时约束错误事件的最小输出与敏感信息治理,并提供可执行的测试断言口径. [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[9]{req_id,title,statement}:
   r1,scalim MUST 暴露单根异常类型,系统 MUST 定义 `ScalimError(Exception)` 作为 scalim 内所有自定义异常的根。 仓库内新增的 scalim 自定义异常 MUST 直接或间接继承 `ScalimError`，并 SHOULD 使用单继承以保持严格树形结构。

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-observability-bridge"
-purpose: "定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约，使 demand 事件可稳定归因到 workflow 节点，并提供最小的 workflow-level 编排事件。"
+purpose: "定义 workflow 运行上下文与既有 hooks/observers 事件流的桥接契约，使 demand 事件可稳定归因到 workflow 节点，并提供最小的 workflow-level 编排事件。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,workflow attributes demand events for stable DAG correlation,"系统 MUST 在 workflow 执行中为每个 demand 节点的事件流提供稳定的归因信息,以便 hooks/observers/scalim-viz 能将事件关联回 workflow DAG: - 事件 envelope (`Event`) 的 `meta` MUST 支持携带 workflow 归因字段 - 对 demand 节点发出的事件,`Event.meta` MUST 至少包含: - `workflow_exec_id`: 标识一次 workflow 执行(同一次调用内稳定;跨调用可不同) - `workflow_node_id`: 标识该事件来自哪个 workflow 节点(对 demand 节点等于 workflow YAML 的 `runs[*].id`) - 系统 MUST 保持 `Event.run_id` 的既有语义不变(仍表示一次 demand 执行的运行标识),不得用 workflow node_id 覆盖它"
