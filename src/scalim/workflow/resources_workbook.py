@@ -428,6 +428,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
     def _commit_workbook(self, plan: object) -> None:
         p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
         if not p.sheets:
+            node_id = p.last_workflow_node_id or "__wf__commit"
+            self._release_workbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
             return
 
         final_path = str(p.path)
@@ -457,6 +459,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             staged_path=str(staging_path),
             final_path=str(final_path),
         )
+        self._release_workbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
 
     @override
     def _discard_workbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
@@ -469,6 +472,21 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
             path=str(p.path),
             reason=str(reason),
         )
+        self._release_workbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="discard")
+
+    def _release_workbook_plan_segments(self, plan: "_WorkbookPlan", *, workflow_node_id: str, release_reason: str) -> None:
+        for sheet_plan in plan.sheets.values():
+            for seg in sheet_plan.segments:
+                seg.rows = []
+            sheet_plan.segments = []
+        self._log_plan_segment_release(
+            workflow_node_id=str(workflow_node_id),
+            resource_type="workbook",
+            resource_id=plan.resource_id,
+            path=str(plan.path),
+            release_reason=str(release_reason),
+        )
+        _ = self._workbooks.pop(str(plan.resource_id), None)
 
 
 __all__ = (

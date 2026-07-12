@@ -685,8 +685,10 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         p = cast("_SheetBookPlan", plan)  # pragma: allow-cast sheetbook plan typed narrowing
         export_path = p.export_path
         display_path = export_path if export_path is not None else "<memory>"
+        node_id = p.last_workflow_node_id or "__wf__commit"
         if export_path is None:
             self._emit_sheetbook_commit(p, display_path=str(display_path))
+            self._release_sheetbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
             return
 
         final_path = str(export_path)
@@ -708,7 +710,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             with suppress(Exception):
                 wb.close()
 
-        node_id = p.last_workflow_node_id or "__wf__commit"
         self._register_staged_output(
             resource_type="sheetbook",
             resource_id=p.resource_id,
@@ -716,6 +717,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             staged_path=str(staging_path),
             final_path=str(final_path),
         )
+        self._release_sheetbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
 
     @override
     def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
@@ -729,6 +731,24 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             path=str(display_path),
             reason=str(reason),
         )
+        self._release_sheetbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="discard")
+
+    def _release_sheetbook_plan_segments(self, plan: "_SheetBookPlan", *, workflow_node_id: str, release_reason: str) -> None:
+        for sheet_plan in plan.sheets.values():
+            for seg in sheet_plan.segments:
+                seg.rows = []
+            sheet_plan.segments = []
+            sheet_plan.cell_count = 0
+        plan.total_cells = 0
+        display_path = plan.export_path if plan.export_path is not None else "<memory>"
+        self._log_plan_segment_release(
+            workflow_node_id=str(workflow_node_id),
+            resource_type="sheetbook",
+            resource_id=plan.resource_id,
+            path=str(display_path),
+            release_reason=str(release_reason),
+        )
+        _ = self._sheetbooks.pop(str(plan.resource_id), None)
 
 
 __all__ = (

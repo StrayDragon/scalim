@@ -3,6 +3,8 @@ import concurrent.futures
 import contextlib
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
 
+from .._internal.loggingx import format_kv, get_logger
+from .._internal.loggingx import prefix as log_prefix
 from ..events import (
     Event,
     EventType,
@@ -930,6 +932,17 @@ class WorkflowRunController:
             _ = self._state.write_consumers_remaining_by_output_key.pop(key, None)
             self._artifacts_dir.discard_in_memory_csv_output(producer_node_id, output_id)
             self._artifacts_dir.discard_in_memory_rows_output(producer_node_id, output_id)
+            logger = get_logger("workflow.execute")
+            logger.info(
+                "%sreleased_managed_in_memory_output %s",
+                log_prefix("workflow.execute"),
+                format_kv(
+                    workflow_exec_id=self._workflow_exec_id,
+                    producer_node_id=str(producer_node_id),
+                    output_id=str(output_id),
+                    release_reason="no_remaining_consumers",
+                ),
+            )
         else:
             self._state.write_consumers_remaining_by_output_key[key] = int(next_remaining)
 

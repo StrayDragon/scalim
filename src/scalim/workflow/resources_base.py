@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from .._internal import loggingx
+from .._internal.loggingx import format_kv, get_logger
+from .._internal.loggingx import prefix as log_prefix
 from ..events import EventType
 from ..events._events import (
     WorkflowResourceCommitEvent,
@@ -392,6 +394,30 @@ class _WorkflowResourceManagerBase(ABC):
                 "workflow_exec_id": self._workflow_exec_id,
                 "workflow_node_id": str(workflow_node_id),
             },
+        )
+
+    def _log_plan_segment_release(
+        self,
+        *,
+        workflow_node_id: str,
+        resource_type: str,
+        resource_id: str,
+        path: str,
+        release_reason: str,
+    ) -> None:
+        # 释放共享 `workbook`/`sheetbook` 计划中的行数据;仅写结构化日志,不新增公开事件类型.
+        logger = get_logger("workflow.resources")
+        logger.info(
+            "%sreleased_book_plan_segments %s",
+            log_prefix("workflow.resources"),
+            format_kv(
+                workflow_exec_id=self._workflow_exec_id,
+                workflow_node_id=str(workflow_node_id),
+                resource_type=str(resource_type),
+                resource_id=str(resource_id),
+                path=str(path),
+                release_reason=str(release_reason),
+            ),
         )
 
     def commit_all(self) -> None:

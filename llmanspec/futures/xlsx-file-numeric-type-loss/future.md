@@ -51,6 +51,15 @@
 - **落地路径**: 将 notplan `c0-add-field-value-datetime` 转回 active change 后 apply。
 - **第一条动作**: `llman-sdd-explore` 收敛 aware 策略（拒绝 / 去 tz / UTC 再去 tz）。
 
+### later — `BookBudgetPolicy`：用量调研 / fail-fast → 限流 / 是否移除
+
+- **产品直觉**: cell/sheet 超限 fail-fast 更像硬截断；框架默认更宜把内存交给进程/OS，若要控资源应更接近「限速/背压」而非直接杀任务。
+- **当前策略**: **先保留**可选 `BookBudgetPolicy`（omit = unlimited；显式则 fail-fast）。c30 只验收既有接线，不扩语义。
+- **下一步**: 调研下游是否实际配置 budget；评估移除 breaking 面与替代（cgroup / 外层限流 / 未来背压 API）。
+- **触发信号**: 调研显示无人使用，或明确需要「限速式」护栏而非 fail-fast。
+- **落地路径**: 独立 change（建议 id：`book-budget-rate-limit-or-remove`）；MUST NOT 塞进 c30。
+- **第一条动作**: 用量盘点（含 `.tmp/known-outer-paths-using-this-package.txt` 仅作路径盘点，勿公开复述内容）→ explore。
+
 ### later — shared-book 分段 spill / 分段 commit（c30 迁出）
 
 - **来源**: 曾列于 `c30-workflow-shared-book-memory` P2+；c30 收紧后迁出。

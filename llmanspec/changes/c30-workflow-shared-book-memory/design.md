@@ -21,18 +21,21 @@ demand run → managed ROWS artifact
 
 对 managed artifact `A`（producer run / output 绑定）：
 
-| 计入消费者 | 不计入 |
+| 计入消费者（artifact `A`） | 不计入 |
 | --- | --- |
 | 尚未完成的 write node，其输入解析到 `A` | workflow 结束后用户代码持有的引用 |
-| 尚未完成的 node，其 `book_sheet_rows`（或等价）依赖该 producer 的 book plan 可见性，且该可见性以 `A` 的写入为前置 | `CaptureRows` / 非 workflow-managed 捕获 |
+| | `CaptureRows` / 非 workflow-managed 捕获 |
+| | `book_sheet_rows`（读的是 **plan**，不是 demand artifact `A`） |
 
-「无剩余消费者」= 上表左列集合为空。
+「无剩余消费者」= 上表左列集合为空 → 可 discard demand 侧 `A`。
+
+`book_sheet_rows` 的可见性依赖 **plan segments**；plan 仅在 `commit_all` / `discard_all` 后释放（见下），因此不得在 workflow 中途清空 plan。
 
 ### Actions
 
-1. Write node 成功 apply `A` → plan 后，若 `A` 无剩余消费者 → discard demand 侧 `A`。
-2. `commit_all` 成功或 `discard_all` 完成后 → 清空/丢弃各 book plan 的 segment 行数据。
-3. Diagnostics：在释放点写结构化诊断（原因枚举：`no_remaining_consumers` | `commit` | `discard`），走既有 diagnostics/log，不新增 YAML/公开 Event 类型。
+1. Write node 成功 apply `A` → plan 后，若 `A` 无剩余 write consumers → discard demand 侧 `A`（既有 refcount；补 diagnostics）。
+2. `commit_all` 成功或 `discard_all` 完成后 → 清空各 book plan 的 segment 行数据并丢弃 plan 槽位。
+3. Diagnostics：释放点写结构化日志（原因：`no_remaining_consumers` | `commit` | `discard`），走既有 logging；不新增 YAML/公开 Event 类型。
 
 ### Evidence
 

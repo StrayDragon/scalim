@@ -42,9 +42,10 @@ llman sdd graph c30-workflow-shared-book-memory --depth 2
 | 4 | **`allow_formulas` / `encoding` 暂保持 YAML 可写**（一般不动态改） |
 | 5 | 开箱：不传 policy = 今日缺省（`mode=sheet`, `on_conflict=error`, …；budget unlimited） |
 | 6 | 两线都落 formal change；c30 depends_on c20（c20 已归档） |
-| 7 | **c30 P0**：消费者闭包 = 待执行 write nodes + 待执行 `book_sheet_rows` 可见性消费者；写成功无剩余消费者 → discard demand artifact；`commit_all`/`discard_all` 后清 plan segments；diagnostics 走既有通道（原因 `no_remaining_consumers\|commit\|discard`） |
+| 7 | **c30 P0**：artifact 消费者 = 待执行 write nodes；写成功无剩余 write consumers → discard demand artifact；`book_sheet_rows` 读 plan（仅 `commit_all`/`discard_all` 后清 segments）；diagnostics 走既有日志（`no_remaining_consumers\|commit\|discard`） |
 | 8 | **c30 P1**：仅对 `xlsx_memory` 强制 `BookBudgetPolicy`；`xlsx_file` **不**套 cell/sheet budget |
-| 9 | **c30 不做**：spill / seal / 默认边写 openpyxl / YAML release knobs / `xlsx_file` budget → 已迁 `futures/.../future.md` Deferred |
+| 9 | **c30 不做**：spill / seal / 默认边写 openpyxl / YAML release knobs / `xlsx_file` budget → 已迁 futures |
+| 10 | **budget 产品态度**：先保留可选 fail-fast；后续调研用量；若要控资源倾向限速/背压而非硬杀（见 futures `BookBudgetPolicy` 条目） |
 
 ## 目标态例子
 

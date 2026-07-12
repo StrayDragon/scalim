@@ -11,6 +11,7 @@
 - Python：`WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`（`BookWritePolicy` + `BookBudgetPolicy`）；省略 = builtin defaults / budget unlimited
 - YAML 再写 `write_defaults` / `xlsx_memory.budget` → fail-fast + 迁移提示
 - Skill upgrade：`agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。可选 `BookBudgetPolicy` 仅护栏 `xlsx_memory`（omit=unlimited；fail-fast 语义后续可调研改为限流/移除，见 `llmanspec/futures/xlsx-file-numeric-type-loss/future.md`）
 ## 0) 必须遵守的主线原则(硬约束)
 
 - **禁止并行版本**: 不引入 `dsl_version`;不通过 CLI/schema/modeline 选择并行 DSL 版本。

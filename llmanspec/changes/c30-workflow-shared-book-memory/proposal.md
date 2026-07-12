@@ -27,17 +27,16 @@ blocks: []
 
 ### 1) Demand artifact 尽早释放
 
-- **消费者定义（封闭）**：对某个 workflow-managed tabular artifact，仅统计：
-  - 仍待执行的 **workflow write nodes**（将该 artifact 作为输入写入 book），以及
-  - 仍待执行的、通过 `book_sheet_rows`（或等价）读取 **同一 book plan** 且依赖该 producer 可见性的 demand nodes
-- **不计入**：调用方在 workflow 结束后自行持有的 Python 引用；`CaptureRows` 等非 workflow-managed 路径
-- **时机**：当某 write node **成功**将 artifact 物化进 book plan，且按上表该 artifact **已无剩余消费者**时，系统 MUST 释放 demand 侧内存副本（例如 `artifacts.discard` / 等价）
-- **语义**：MUST NOT 破坏 `book_sheet_rows` 基于 plan 的可见性
+- **消费者定义（封闭）**：对某个 workflow-managed tabular artifact，仅统计仍待执行的 **workflow write nodes**（将该 artifact 作为输入写入 book）
+- **不计入**：调用方在 workflow 结束后自行持有的 Python 引用；`CaptureRows` 等非 workflow-managed 路径；`book_sheet_rows`（读 plan，不读 demand artifact）
+- **时机**：当某 write node **成功**将 artifact 物化进 book plan，且按上表该 artifact **已无剩余 write consumers**时，系统 MUST 释放 demand 侧内存副本（例如 `artifacts.discard` / 等价）
+- **语义**：`book_sheet_rows` 可见性由 **plan** 生命周期保证（见 §2），MUST NOT 因释放 demand artifact 而破坏
 
 ### 2) Plan segments 尾释放
 
 - 在 `commit_all` **成功**或 `discard_all` **完成**之后，系统 MUST 释放 book plan 持有的 segment 行数据（清空 segments 和/或丢弃 plan），以降低尾峰
 - 释放 MUST 发生在资源生命周期收尾路径上（与现有 `resource_lifecycle` 对齐），不得依赖 YAML 开关
+- 在此之前 MUST NOT 清空 plan（保证仍待执行的 `book_sheet_rows` 可读）
 
 ### 3) 可观测性（单一口径）
 

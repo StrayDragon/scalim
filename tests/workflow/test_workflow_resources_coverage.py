@@ -970,15 +970,6 @@ def test_resource_manager_sheetbook_export_header_metadata_controls_xlsx_header(
         export_header=("Order ID", "Display Value"),
     )
 
-    manager.commit_all()
-
-    wb = openpyxl.load_workbook(str(export_path))
-    ws = wb["S"]
-    rows = list(ws.iter_rows(values_only=True))
-    assert list(rows[0]) == ["Order ID", "Display Value"]
-    assert list(rows[1]) == ["a1", "A1"]
-    assert list(rows[2]) == ["b1", "B1"]
-
     with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="export header baseline mismatch"):
         manager.apply_sheetbook_append(
             workflow_node_id="n2",
@@ -993,6 +984,16 @@ def test_resource_manager_sheetbook_export_header_metadata_controls_xlsx_header(
             on_mismatch="error",
             export_header=("Order ID", "Other Display"),
         )
+
+    manager.commit_all()
+
+    wb = openpyxl.load_workbook(str(export_path))
+    ws = wb["S"]
+    rows = list(ws.iter_rows(values_only=True))
+    assert list(rows[0]) == ["Order ID", "Display Value"]
+    assert list(rows[1]) == ["a1", "A1"]
+    assert list(rows[2]) == ["b1", "B1"]
+    assert "sb" not in manager._sheetbooks  # noqa: SLF001
 
 
 def test_resource_manager_sheetbook_rejects_header_alignment(tmp_path: Path) -> None:
