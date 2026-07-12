@@ -7,45 +7,23 @@ workflow:
         xlsx_file:
           path: ./out/shared_report_sheet
           allow_formulas: false
-        write_defaults:
-          mode: sheet
-          on_conflict: overwrite
 
       shared_report_append:
         xlsx_file:
           path: ./out/shared_report_append
           allow_formulas: false
-        write_defaults:
-          mode: append
-          align_by: header
-          header_policy: once
-          on_mismatch: error
 
       sheetbook_report_sheet:
         xlsx_memory:
-          budget:
-            max_sheets: 6
-            max_total_cells: 200000
           export_xlsx:
             path: ./out/sheetbook_report_sheet
             allow_formulas: false
-        write_defaults:
-          mode: sheet
-          on_conflict: overwrite
 
       sheetbook_report_append:
         xlsx_memory:
-          budget:
-            max_sheets: 6
-            max_total_cells: 200000
           export_xlsx:
             path: ./out/sheetbook_report_append
             allow_formulas: false
-        write_defaults:
-          mode: append
-          align_by: field_id
-          header_policy: once
-          on_mismatch: error
 
   runs:
     - id: detail_a

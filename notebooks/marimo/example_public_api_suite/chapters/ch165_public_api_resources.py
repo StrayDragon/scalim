@@ -78,7 +78,6 @@ sources: {}
                         kind="xlsx_file",
                         path=output_root,
                         allow_formulas=False,
-                        write_defaults=api.BookWriteDefaultsOverride(mode="sheet"),
                     )
                 },
                 files={"detail_csv": api.FileResourceOverride(kind="csv_file", path=output_root, encoding="utf-8")},

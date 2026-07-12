@@ -52,7 +52,6 @@ resources:
     report:
       xlsx_file:
         path: ./out
-      write_defaults: {mode: sheet}
 
 outputs:
   - name: detail
@@ -93,7 +92,6 @@ resources:
     report:
       xlsx_file:
         path: ./out
-      write_defaults: {mode: sheet}
 
 outputs:
   - name: detail

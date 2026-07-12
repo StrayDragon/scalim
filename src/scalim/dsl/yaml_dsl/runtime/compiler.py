@@ -20,6 +20,7 @@ from ....vendor.dataclassesx import replace
 from .._internal import resource_override as _resource_override_ssot
 from .._internal.config_parsing.loader import YamlDemandLoader
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ..book_resource_policy import ResourcesPolicy, materialize_resources_policy_onto_books
 from ..diagnostics import format_duplicate_effective_field_display_names_message
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ..schema_dsl.models import (
@@ -438,16 +439,15 @@ def _apply_resources_override(config: DemandConfig, override: ResourcesOverride)
 
 def _apply_io_overrides(config: DemandConfig, *, options: DemandRunOptions) -> DemandConfig:
     overrides = options.outputs.overrides
-    if overrides is None:
-        return config
-
     next_config = config
 
-    resources_override = overrides.resources
-    if resources_override is not None:
-        next_config = _apply_resources_override(next_config, resources_override)
+    if overrides is not None:
+        resources_override = overrides.resources
+        if resources_override is not None:
+            next_config = _apply_resources_override(next_config, resources_override)
 
-    return next_config
+    policy = options.resources_policy if isinstance(options.resources_policy, ResourcesPolicy) else None
+    return materialize_resources_policy_onto_books(next_config, policy)
 
 
 def _compile_output_composition_for_outputs(

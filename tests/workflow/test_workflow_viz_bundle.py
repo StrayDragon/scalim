@@ -4,9 +4,12 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl import (
+    BookBudgetPolicy,
+    BookResourcePolicy,
     DemandRunOptions,
     DemandRunOutputOptions,
     DemandRunSecurityOptions,
+    ResourcesPolicy,
     RunOverrides,
     WorkflowRunOptions,
     run_workflow,
@@ -214,10 +217,7 @@ workflow:
   resources:
     books:
       report:
-        xlsx_memory:
-          budget:
-            max_sheets: 10
-            max_total_cells: 1000
+        xlsx_memory: {{}}
   runs:
     - id: ok
       demand: ok.yaml
@@ -233,6 +233,9 @@ workflow:
                 outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(use_default_output_dir=True))),
             ),
             runtime=_workflow_runtime_options(failure_policy="primary_only"),
+            resources_policy=ResourcesPolicy(
+                books={"report": BookResourcePolicy(budget=BookBudgetPolicy(max_sheets=10, max_total_cells=1000))},
+            ),
         ),
     )
     assert not result.errors()

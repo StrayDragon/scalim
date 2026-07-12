@@ -74,6 +74,7 @@ resources:
   - `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)))`
   - `scalim.dsl.yaml_dsl.run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))))`
 - workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `WorkflowRunOptions(patches_by_run_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowNodePatch`(不支持 dict patch)。
+- book 写入策略 / `xlsx_memory` 内存预算也已迁出 YAML: 用 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy`(`ResourcesPolicy`/`BookWritePolicy`/`BookBudgetPolicy`);YAML 不得再写 `write_defaults` / `xlsx_memory.budget`(见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)。
 
 ## 关键规则
 
@@ -94,9 +95,13 @@ resources:
 - `field_id` 必须全局唯一(不再依赖输出层做消歧)
 - 分发过滤用 `outputs.*.where`(安全表达式); where 依赖字段会被注入到 required fields
 
-输出路径注入提示:
+输出路径(output root)提示:
 
-- `resources.files.*.csv_file.path: {$init_var: ...}` / `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path` 会将“输出 root 决定权”交给调用方;请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录).
+- `resources.files.*.csv_file.path` / `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path` 配置的是 **输出 root 目录**(版本化写入其下 `versions/<id>/...`),不是最终文件路径。
+- 相对路径(例如 `./out`)相对 **该 demand YAML 所在目录** 解析, **不是** 进程 cwd。
+- 把“输出 root 决定权”交给调用方时,优先 `path: {$init_var: out_root}` + `DemandRunTemplateOptions(init_vars={"out_root": ...})`;或用 `RunOverrides(resources=ResourcesOverride(... BookResourceOverride(path=...)))` 覆盖(IO-only)。
+- 请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录)。
+- 版本化输出 / 服务端并发写法见 `references/task-workflow-versioned-outputs.md`。
 
 ## YAML 模板预编译(可选): `template_vars`
 

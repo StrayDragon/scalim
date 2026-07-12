@@ -12,13 +12,19 @@
 - desc: YAML DSL 官方运行入口 + 运行期契约
 - scenario: 运行 demand/workflow YAML
 - marker: `src/scalim/dsl/yaml_dsl/__init__.py:6`
-- source: `src/scalim/dsl/yaml_dsl/__init__.py:74`
-- exports (`__all__`, tuple, count=32):
+- source: `src/scalim/dsl/yaml_dsl/__init__.py:83`
+- exports (`__all__`, tuple, count=39):
   - `UNSET`
-  - `BookBudgetOverride`
+  - `BookBudgetPolicy`
   - `BookExportXlsxOverride`
   - `BookResourceOverride`
-  - `BookWriteDefaultsOverride`
+  - `BookResourcePolicy`
+  - `BookWriteAlignBy`
+  - `BookWriteHeaderPolicy`
+  - `BookWriteMode`
+  - `BookWriteOnConflict`
+  - `BookWriteOnMismatch`
+  - `BookWritePolicy`
   - `CaptureNone`
   - `CapturePolicy`
   - `CaptureRows`
@@ -41,6 +47,7 @@
   - `OutputsDefaultsOverride`
   - `ResolverTrustedMode`
   - `ResourcesOverride`
+  - `ResourcesPolicy`
   - `RunOverrides`
   - `WorkflowRunOptions`
   - `compile`
@@ -78,7 +85,7 @@
 - desc: workflow 类型(拆分给 typing/依赖方用)
 - scenario: 仅用类型,或避免重导入
 - marker: `src/scalim/dsl/yaml_dsl/__init__.py:9`
-- source: `src/scalim/dsl/yaml_dsl/workflow_types.py:219`
+- source: `src/scalim/dsl/yaml_dsl/workflow_types.py:227`
 - exports (`__all__`, tuple, count=22):
   - `UNSET`
   - `ComponentsExtend`

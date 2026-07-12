@@ -63,7 +63,7 @@ def _rules() -> Tuple[_Rule, ...]:
         _Rule(
             name="legacy-writes-output",
             pattern=re.compile(r"writes\[\*\]\.output\b"),
-            message="已移除旧写法 `writes[*].output`: 使用 `demand` 输出的 `to/write` 绑定(并配合 `resources.books.*.write_defaults`).",
+            message="已移除旧写法 `writes[*].output`: 使用 `demand` 输出的 `to/write` 绑定(并配合 Python `ResourcesPolicy`/`BookWritePolicy`).",
         ),
         _Rule(
             name="legacy-write-to",

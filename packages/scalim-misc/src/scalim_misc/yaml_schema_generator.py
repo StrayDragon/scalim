@@ -190,9 +190,7 @@ class SchemaBuilder:
             "source_field_inline": self._build_definition(types_mod.SourceFieldConfig),
             "field": self._build_field_definition(),
             "relation": self._build_definition(types_mod.RelationConfig),
-            "book_budget": self._build_definition(types_mod.BookBudgetConfig),
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
-            "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig),
             "book_xlsx_file": self._build_definition(types_mod.BookXlsxFileConfig),
             "book_xlsx_memory": self._build_definition(types_mod.BookXlsxMemoryConfig),
             "book": self._build_definition(types_mod.BookConfig),
@@ -238,9 +236,7 @@ class SchemaBuilder:
         types_mod = self._types
 
         definitions: Dict[str, Any] = {
-            "book_budget": self._build_definition(types_mod.BookBudgetConfig, allow_import=False),
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig, allow_import=False),
-            "book_write_defaults": self._build_definition(types_mod.BookWriteDefaultsConfig, allow_import=False),
             "book_xlsx_file": self._build_definition(types_mod.BookXlsxFileConfig, allow_import=False),
             "book_xlsx_memory": self._build_definition(types_mod.BookXlsxMemoryConfig, allow_import=False),
             "book": self._build_definition(types_mod.BookConfig, allow_import=False),

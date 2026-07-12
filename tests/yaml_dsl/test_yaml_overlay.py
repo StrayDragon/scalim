@@ -6,7 +6,9 @@ import pytest
 from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
-    BookWriteDefaultsOverride,
+    BookResourcePolicy,
+    BookWriteMode,
+    BookWritePolicy,
     DemandRunOptions,
     DemandRunOutputOptions,
     DemandRunRuntimeOptions,
@@ -19,6 +21,7 @@ from scalim.dsl.yaml_dsl import (
     OutputToOverride,
     OutputWriteOverride,
     ResourcesOverride,
+    ResourcesPolicy,
     UNSET,
     RunOverrides,
     compile,
@@ -30,12 +33,15 @@ from scalim.workflow.errors import ScalimWorkflowConfigError
 _ALLOWED_MODULES = frozenset(["tests.fixtures.mock_loaders"])
 
 
-def _options(*, allowed_modules=_ALLOWED_MODULES, init_vars=None, batch_size=UNSET, overrides=None, demand_diagnostics=None):  # type: ignore[no-untyped-def] test helper
+def _options(
+    *, allowed_modules=_ALLOWED_MODULES, init_vars=None, batch_size=UNSET, overrides=None, demand_diagnostics=None, resources_policy=None
+):  # type: ignore[no-untyped-def] test helper
     return DemandRunOptions(
         security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
         template=DemandRunTemplateOptions(init_vars=init_vars),
         runtime=DemandRunRuntimeOptions(batch_size=batch_size, demand_diagnostics=demand_diagnostics),
         outputs=DemandRunOutputOptions(overrides=overrides),
+        resources_policy=resources_policy,
     )
 
 
@@ -197,7 +203,6 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                         "report": BookResourceOverride(
                             kind="xlsx_file",
                             path="./out",
-                            write_defaults=BookWriteDefaultsOverride(mode="append"),
                         )
                     }
                 ),
@@ -221,7 +226,9 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
         "append-book-output-include-header-not-allowed",
     ],
 )
-def test_compile_overrides_outputs_rejects_invalid_payloads(tmp_path: Path, make_overrides, exc_type, match: str) -> None:
+def test_compile_overrides_outputs_rejects_invalid_payloads(
+    tmp_path: Path, make_overrides, exc_type, match: str, request: pytest.FixtureRequest
+) -> None:
     yaml_path = _write_yaml(
         tmp_path,
         """
@@ -237,9 +244,14 @@ sources: {}
 
     with pytest.raises(exc_type, match=match):
         overrides = make_overrides()
+        resources_policy = None
+        if "append-book-output-include-header-not-allowed" in str(request.node.callspec.id):  # type: ignore[attr-defined]
+            resources_policy = ResourcesPolicy(
+                books={"report": BookResourcePolicy(write=BookWritePolicy(mode=BookWriteMode.APPEND))},
+            )
         _ = compile(
             str(yaml_path),
-            options=_options(overrides=overrides),
+            options=_options(overrides=overrides, resources_policy=resources_policy),
         )
 
 

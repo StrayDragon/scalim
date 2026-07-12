@@ -209,6 +209,9 @@ def test_workflow_run_options_contract_validation_and_normalization_cover_branch
     with pytest.raises(TypeError, match=r"WorkflowRunOptions\.path_aliases must be a mapping"):
         _ = WorkflowRunOptions(demand=demand, path_aliases="nope")  # type: ignore[arg-type] contract validation boundary
 
+    with pytest.raises(TypeError, match=r"WorkflowRunOptions\.resources_policy must be a ResourcesPolicy or None"):
+        _ = WorkflowRunOptions(demand=demand, resources_policy="nope")  # type: ignore[arg-type] contract validation boundary
+
     normalized = WorkflowRunOptions(demand=demand, workflow_components=[object()])  # type: ignore[arg-type] contract normalization boundary
     assert isinstance(normalized.workflow_components, tuple)
     assert len(normalized.workflow_components) == 1

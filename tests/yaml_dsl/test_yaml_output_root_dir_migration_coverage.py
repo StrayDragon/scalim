@@ -172,6 +172,38 @@ def test_workflow_config_parse_rejects_export_xlsx_path_with_xlsx_suffix() -> No
         )
 
 
+def test_workflow_config_parse_book_export_xlsx_and_memory_error_branches() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"must be a mapping") as exc_info:
+        _ = parse_mod._parse_book_export_xlsx("nope", path="p.export_xlsx")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"has unknown keys: nope") as exc_info:
+        _ = parse_mod._parse_book_export_xlsx({"path": "out", "nope": 1}, path="p.export_xlsx")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"path is required") as exc_info:
+        _ = parse_mod._parse_book_export_xlsx({"path": "   "}, path="p.export_xlsx")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx.path"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas must be a bool") as exc_info:
+        _ = parse_mod._parse_book_export_xlsx({"path": "out", "allow_formulas": "nope"}, path="p.export_xlsx")  # noqa: SLF001
+    assert exc_info.value.path == "p.export_xlsx.allow_formulas"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory\.write_lock was removed") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx_memory": {"write_lock": True}},
+            path="p",
+        )
+    assert exc_info.value.path == "p.xlsx_memory.write_lock"
+
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory has unknown keys: nope") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx_memory": {"nope": 1}},
+            path="p",
+        )
+    assert exc_info.value.path == "p.xlsx_memory"
+
+
 def test_workflow_config_parse_rejects_legacy_write_lock_and_csv_file_path() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"write_lock was removed"):
         _ = parse_mod._parse_file_config(  # noqa: SLF001

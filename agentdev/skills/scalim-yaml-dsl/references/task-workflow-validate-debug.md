@@ -50,12 +50,25 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 3. validate 过了但 workflow 仍失败时,用 Python 入口跑一次,定位运行期的 fail-fast 校验(例如 cycle、ctx 越界、输出路径冲突等)
 
 ```python
-from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl import (
+    BookBudgetPolicy,
+    BookResourcePolicy,
+    BookWritePolicy,
+    DemandRunOptions,
+    DemandRunSecurityOptions,
+    ResourcesPolicy,
+    WorkflowRunOptions,
+    run_workflow,
+)
 
 run_workflow(
     "path/to/workflow.yaml",
     options=WorkflowRunOptions(
         demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
+        # 若 YAML 仍残留 write_defaults/budget,或需要非默认写入策略/预算护栏,在此配置
+        resources_policy=ResourcesPolicy(
+            books={"report": BookResourcePolicy(write=BookWritePolicy(), budget=BookBudgetPolicy(max_sheets=16, max_total_cells=2_000_000))}
+        ),
     ),
 )
 ```
@@ -108,28 +121,34 @@ run_workflow(
 - 下游 run 必须显式 `depends_on: [A]`(或依赖闭包中包含 A)
 - 避免把大对象塞进 ctx；只放小体量 summary/path 等
 
-### 5) `workflow.resources.books.*.kind=xlsx_memory` budget 配置问题(可选)
+### 5) YAML 仍写 `write_defaults` / `xlsx_memory.budget`(已迁出)
 
 症状:
 
-- schema validate / full validate 报错: `budget.max_sheets/max_total_cells` 类型不匹配或取值非法
-- 运行期报错: `Sheetbook budget exceeded ...`(命中预算护栏)
+- validate / parse / compile fail-fast: `write_defaults was removed from YAML authoring` 或 `xlsx_memory.budget was removed`
+- 或运行期命中 Python `BookBudgetPolicy` 护栏(超限 fail-fast)
 
 修复:
 
-- `budget` 为可选:
-  - 若需要预算护栏,显式声明 `budget.max_sheets` 与 `budget.max_total_cells`(整数且 `>=1`)
-  - 若不需要护栏(视为 unlimited),省略 `budget`
+- 从 YAML `resources.books.*` 删除 `write_defaults` 与 `xlsx_memory.budget`(只留 identity: `xlsx_file`/`xlsx_memory` + path/export)
+- 在 Python 配置 `WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`:
+  - write → `BookWritePolicy`(构造只用 StrEnum)
+  - budget → `BookBudgetPolicy(max_sheets=..., max_total_cells=...)`(启用时两者都要给;省略 = unlimited)
+- 完整迁移: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- `RunOverrides.resources` / `BookResourceOverride` 仍可覆盖 path/export/`allow_formulas`,但 **不能**再 overlay write/budget
 
-### 6) 把“写入意图”写进了 workflow YAML
+### 6) 把“写入意图”或 runtime knobs 写进了 workflow YAML
 
 症状:
 
 - schema validate 报错 unknown-fields,或 full validate 报错“字段已移除/不支持”
+- 例如出现 `workflow.options`、`resources.books.*.write_defaults`、旧 `writes` 字段
 
 修复:
 
-- workflow YAML 只声明 `workflow.resources.books`(共享 book 资源)与 runs DAG；写到哪个 book/sheet 由 demand outputs 的 `to/write` 绑定表达,并由 workflow 编译期推导写入节点
+- workflow YAML 只声明 `workflow.resources.books`(共享 book identity)与 runs DAG
+- 写到哪个 book/sheet 由 demand outputs 的 `to/write` 绑定表达,并由 workflow 编译期推导写入节点
+- concurrency / cache_pool / failure_policy 等走 Python runtime entrypoints,不要写回 `workflow.options`
 
 ### 7) 输出路径冲突或共享资源路径被直接写入
 
@@ -142,6 +161,7 @@ run_workflow(
 
 - 要么每个 demand 输出到唯一路径
 - 要么把共享输出收敛到 `workflow.resources.books` + demand outputs 的 `to/write` 绑定,避免多方直接写同一路径
+- 相对 `path: ./out` 相对 **声明该路径的 YAML 文件目录**(workflow 托管 book → workflow YAML 目录),不是进程 cwd;环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride(path=...)`
 
 ### 8) 输出未绑定到 book/sheet 或 book_id 不存在
 

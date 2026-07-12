@@ -10,6 +10,13 @@ from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy
 from scalim.dsl.yaml_dsl import OutputOverride, OutputToOverride, OutputWriteOverride
 from scalim.dsl.yaml_dsl import RunOverrides
 from scalim.dsl.yaml_dsl import (
+    BookBudgetPolicy,
+    BookResourcePolicy,
+    BookWriteHeaderPolicy,
+    BookWriteMode,
+    BookWriteOnConflict,
+    BookWriteOnMismatch,
+    BookWritePolicy,
     DemandRunOptions,
     DemandRunOutputOptions,
     DemandRunResult,
@@ -20,6 +27,7 @@ from scalim.dsl.yaml_dsl import (
 from scalim.dsl.yaml_dsl import FileResourceOverride
 from scalim.dsl.yaml_dsl import OutputExtrasOverride
 from scalim.dsl.yaml_dsl import ResourcesOverride
+from scalim.dsl.yaml_dsl import ResourcesPolicy
 from scalim.dsl.yaml_dsl import run_workflow as run_workflow_public
 from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_workflow_injected
 from scalim.dsl.yaml_dsl.runtime import compiler as by_yaml_compiler_mod
@@ -57,6 +65,43 @@ from tests.fixtures import workflow_loaders
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
 _ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", "scalim.workflow.loaders"])
+
+
+def _workflow_resources_policy(  # type: ignore[no-untyped-def] test helper
+    book_id: str = "report",
+    *,
+    write_mode: Optional[str] = None,
+    header_policy: Optional[str] = None,
+    on_mismatch: Optional[str] = None,
+    on_conflict: Optional[str] = None,
+    max_sheets: Optional[int] = None,
+    max_total_cells: Optional[int] = None,
+) -> ResourcesPolicy:
+    write_kwargs: Dict[str, Any] = {}
+    if write_mode is not None:
+        write_kwargs["mode"] = BookWriteMode(str(write_mode))
+    if header_policy is not None:
+        write_kwargs["header_policy"] = BookWriteHeaderPolicy(str(header_policy))
+    if on_mismatch is not None:
+        write_kwargs["on_mismatch"] = BookWriteOnMismatch(str(on_mismatch))
+    if on_conflict is not None:
+        write_kwargs["on_conflict"] = BookWriteOnConflict(str(on_conflict))
+
+    budget = None
+    if max_sheets is not None or max_total_cells is not None:
+        budget = BookBudgetPolicy(
+            max_sheets=max_sheets,
+            max_total_cells=max_total_cells,
+        )
+
+    return ResourcesPolicy(
+        books={
+            str(book_id): BookResourcePolicy(
+                write=BookWritePolicy(**write_kwargs),
+                budget=budget if budget is not None else BookBudgetPolicy(),
+            )
+        }
+    )
 
 
 def _run_options(*, allowed_modules=_ALLOWED_MODULES, **kwargs):  # type: ignore[no-untyped-def] test helper
@@ -131,6 +176,7 @@ def run_workflow(  # type: ignore[no-untyped-def] test helper
     workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
     path_aliases: Optional[Dict[str, str]] = None,
     run_options_patches_by_run_id: Optional[Dict[str, WorkflowNodePatch]] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
     run_ir_fn=None,
     compile_demand_yaml_fn=None,
 ):
@@ -144,6 +190,7 @@ def run_workflow(  # type: ignore[no-untyped-def] test helper
         runtime=workflow_runtime_options,
         path_aliases=path_aliases,
         workflow_components=workflow_components,
+        resources_policy=resources_policy,
     )
     if run_ir_fn is None and compile_demand_yaml_fn is None:
         return run_workflow_public(workflow_yaml_path, options=wf_options)
@@ -3518,7 +3565,6 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root)},
                     },
                 }
@@ -3631,10 +3677,8 @@ outputs:
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root)},
                     },
-                    "write_defaults": {"mode": "sheet"},
                 }
             }
         },
@@ -3697,7 +3741,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"xlsx_memory": {"budget": {"max_sheets": 8, "max_total_cells": 1000}}}}},
+        resources={"books": {"report": {"xlsx_memory": {}}}},
         runs=[
             {
                 "id": "a",
@@ -3715,10 +3759,12 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     )
 
     runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+    sheetbook_policy = _workflow_resources_policy(max_sheets=8, max_total_cells=1000)
     result = run_workflow(
         str(wf),
         options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK),
         workflow_runtime_options=runtime,
+        resources_policy=sheetbook_policy,
     )
     assert not result.errors()
     outcomes = {str(o.run_id): o for o in result.outcomes}
@@ -3736,7 +3782,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     # Outside depends_on closure: MUST fail-fast.
     wf_bad = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"xlsx_memory": {"budget": {"max_sheets": 8, "max_total_cells": 1000}}}}},
+        resources={"books": {"report": {"xlsx_memory": {}}}},
         runs=[
             {
                 "id": "a",
@@ -3755,6 +3801,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
         str(wf_bad),
         options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK),
         workflow_runtime_options=runtime,
+        resources_policy=sheetbook_policy,
     )
     errs = {e.run_id: e for e in bad.errors()}
     assert "c" in errs
@@ -3809,7 +3856,6 @@ outputs:
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root)},
                     },
                 }
@@ -3928,7 +3974,6 @@ outputs:
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root)},
                     },
                 }
@@ -4000,7 +4045,6 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 1, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root)},
                     },
                 }
@@ -4014,7 +4058,12 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         failure_policy="primary_only",
     )
     runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
-    result_sheets = run_workflow(str(wf_max_sheets), options=_run_options(), workflow_runtime_options=runtime)
+    result_sheets = run_workflow(
+        str(wf_max_sheets),
+        options=_run_options(),
+        workflow_runtime_options=runtime,
+        resources_policy=_workflow_resources_policy(max_sheets=1, max_total_cells=1000),
+    )
     assert result_sheets.errors()
     assert not (out_root / "manifest" / "latest.json").exists()
     assert list(out_root.rglob("*.xlsx")) == []
@@ -4027,7 +4076,6 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 3},
                         "export_xlsx": {"path": str(out_root2)},
                     },
                 }
@@ -4037,7 +4085,12 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    result_cells = run_workflow(str(wf_max_cells), options=_run_options(), workflow_runtime_options=runtime)
+    result_cells = run_workflow(
+        str(wf_max_cells),
+        options=_run_options(),
+        workflow_runtime_options=runtime,
+        resources_policy=_workflow_resources_policy(max_sheets=8, max_total_cells=3),
+    )
     assert result_cells.errors()
     assert not (out_root2 / "manifest" / "latest.json").exists()
     assert list(out_root2.rglob("*.xlsx")) == []
@@ -4057,7 +4110,6 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
             "books": {
                 "report": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root3)},
                     },
                 }
@@ -4162,7 +4214,6 @@ def test_workflow_excel_output_collision_precheck_and_reserved_paths(tmp_path: P
                 "file_book": {"xlsx_file": {"path": str(out_root2)}},
                 "mem_book": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": str(out_root2)},
                     },
                 },
@@ -4300,7 +4351,6 @@ def test_workflow_resources_rejects_export_xlsx_write_lock(tmp_path: Path) -> No
                 "file_book": {"xlsx_file": {"path": {"$init_var": "reserved_path"}}},
                 "mem_book": {
                     "xlsx_memory": {
-                        "budget": {"max_sheets": 8, "max_total_cells": 1000},
                         "export_xlsx": {"path": {"$init_var": "reserved_path"}, "write_lock": True},
                     },
                 },
@@ -4341,7 +4391,7 @@ outputs:
 
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}, "write_defaults": {"mode": "sheet"}}}},
+        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}}}},
         runs=[{"id": "a", "demand": "demand.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -5170,10 +5220,8 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
                 "books": {
                     "report": {
                         "xlsx_memory": {
-                            "budget": {"max_sheets": 8, "max_total_cells": 1000},
                             "export_xlsx": {"path": str(out_root)},
                         },
-                        "write_defaults": {"mode": "append"},
                     }
                 }
             },
@@ -5185,7 +5233,11 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
             failure_policy="primary_only",
         )
 
-        result = run_workflow(str(wf), options=_run_options())
+        result = run_workflow(
+            str(wf),
+            options=_run_options(),
+            resources_policy=_workflow_resources_policy(write_mode="append", max_sheets=8, max_total_cells=1000),
+        )
         assert not result.errors()
         export_path = _latest_book_path(out_root, book_id="report")
         assert export_path.exists()
@@ -5275,7 +5327,6 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
                 "books": {
                     "report": {
                         "xlsx_file": {"path": str(out_root)},
-                        "write_defaults": {"mode": "append"},
                     }
                 }
             },
@@ -5288,7 +5339,11 @@ def test_workflow_shared_workbook_append_is_deterministic_by_runs_order(tmp_path
         )
 
         recorder = _WorkflowEventRecorder()
-        result = run_workflow(str(wf), options=_run_options(components=[recorder]))
+        result = run_workflow(
+            str(wf),
+            options=_run_options(components=[recorder]),
+            resources_policy=_workflow_resources_policy(write_mode="append"),
+        )
         assert not result.errors()
         workbook_path = _latest_book_path(out_root, book_id="report")
         assert workbook_path.exists()
@@ -5389,7 +5444,6 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
                 "books": {
                     "report": {
                         "xlsx_file": {"path": str(out_root)},
-                        "write_defaults": {"mode": "append", "header_policy": str(header_policy)},
                     }
                 }
             },
@@ -5402,7 +5456,11 @@ def test_workflow_shared_append_header_policy_variants(tmp_path: Path) -> None:
             failure_policy="primary_only",
         )
 
-        result = run_workflow(str(wf), options=_run_options())
+        result = run_workflow(
+            str(wf),
+            options=_run_options(),
+            resources_policy=_workflow_resources_policy(write_mode="append", header_policy=str(header_policy)),
+        )
         assert not result.errors()
         workbook_path = _latest_book_path(out_root, book_id="report")
         assert workbook_path.exists()
@@ -5475,7 +5533,6 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
                 "books": {
                     "report": {
                         "xlsx_file": {"path": str(out_root)},
-                        "write_defaults": {"mode": "append", "header_policy": "once", "on_mismatch": str(on_mismatch)},
                     }
                 }
             },
@@ -5489,7 +5546,11 @@ def test_workflow_shared_book_append_warn_skip_and_header_policies(tmp_path: Pat
         )
 
         recorder = _WorkflowEventRecorder()
-        result = run_workflow(str(wf), options=_run_options(components=[recorder]))
+        result = run_workflow(
+            str(wf),
+            options=_run_options(components=[recorder]),
+            resources_policy=_workflow_resources_policy(write_mode="append", on_mismatch=str(on_mismatch)),
+        )
         assert not result.errors()
         workbook_path = _latest_book_path(out_root, book_id="report")
         assert workbook_path.exists()
@@ -5577,7 +5638,6 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
             "books": {
                 "report": {
                     "xlsx_file": {"path": str(out_root_err)},
-                    "write_defaults": {"mode": "sheet", "on_conflict": "error"},
                 }
             }
         },
@@ -5588,7 +5648,12 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_err = run_workflow(str(wf_err), options=_run_options(), workflow_runtime_options=runtime)
+    result_err = run_workflow(
+        str(wf_err),
+        options=_run_options(),
+        workflow_runtime_options=runtime,
+        resources_policy=_workflow_resources_policy(write_mode="sheet", on_conflict="error"),
+    )
     assert result_err.errors()
     assert not (out_root_err / "manifest" / "latest.json").exists()
     assert list(out_root_err.rglob("*.xlsx")) == []
@@ -5601,7 +5666,6 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
             "books": {
                 "report": {
                     "xlsx_file": {"path": str(out_root_over)},
-                    "write_defaults": {"mode": "sheet", "on_conflict": "overwrite"},
                 }
             }
         },
@@ -5612,7 +5676,12 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_over = run_workflow(str(wf_over), options=_run_options(), workflow_runtime_options=runtime)
+    result_over = run_workflow(
+        str(wf_over),
+        options=_run_options(),
+        workflow_runtime_options=runtime,
+        resources_policy=_workflow_resources_policy(write_mode="sheet", on_conflict="overwrite"),
+    )
     assert not result_over.errors()
     workbook_over = _latest_book_path(out_root_over, book_id="report")
     assert workbook_over.exists()
@@ -5626,7 +5695,6 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
             "books": {
                 "report": {
                     "xlsx_file": {"path": str(out_root_skip)},
-                    "write_defaults": {"mode": "sheet", "on_conflict": "skip"},
                 }
             }
         },
@@ -5637,7 +5705,12 @@ def test_workflow_shared_sheet_conflict_policies(tmp_path: Path) -> None:
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    result_skip = run_workflow(str(wf_skip), options=_run_options(), workflow_runtime_options=runtime)
+    result_skip = run_workflow(
+        str(wf_skip),
+        options=_run_options(),
+        workflow_runtime_options=runtime,
+        resources_policy=_workflow_resources_policy(write_mode="sheet", on_conflict="skip"),
+    )
     assert not result_skip.errors()
     workbook_skip = _latest_book_path(out_root_skip, book_id="report")
     assert workbook_skip.exists()
@@ -5664,7 +5737,6 @@ def test_workflow_resources_rejects_write_lock_for_xlsx_file(tmp_path: Path) -> 
                 "report": {
                     "xlsx_file": {"path": str(out_root)},
                     "write_lock": True,
-                    "write_defaults": {"mode": "sheet"},
                 }
             }
         },
@@ -5728,7 +5800,7 @@ def test_workflow_managed_temp_outputs_does_not_require_pathless_csv_authoring_a
     out_root = tmp_path / "out"
     wf = _write_workflow_yaml(
         tmp_path,
-        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}, "write_defaults": {"mode": "sheet"}}}},
+        resources={"books": {"report": {"xlsx_file": {"path": str(out_root)}}}},
         runs=[{"id": "a", "demand": "a.yaml"}],
         max_concurrency=1,
         failure_policy="primary_only",
@@ -6203,7 +6275,6 @@ def test_workflow_shared_book_commit_failure_raises_workflow_config_error(tmp_pa
                 "report": {
                     "xlsx_file": {"path": str(workbook_dir)},
                     "write_lock": True,
-                    "write_defaults": {"mode": "sheet"},
                 }
             }
         },

@@ -5,9 +5,9 @@ description: |
   demo_big_data_report workflow demo: shared workbooks via `resources.books` + output bindings.
 
   Notes:
-  - workflow manages the book resources (paths/budgets/export)
+  - workflow manages the book resource identity (paths/export)
   - demand defines stable output contracts: `outputs[*].to` (+ optional output-local header behavior via `outputs[*].write`)
-  - workbook write policy is controlled by `resources.books.*.write_defaults` (in this demo, declared in workflow YAML)
+  - workbook write policy / memory budget are Python SSOT via `WorkflowRunOptions.resources_policy` (`ResourcesPolicy`/`BookWritePolicy`/`BookBudgetPolicy`)
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
 # Pass via workflow runtime entrypoints, e.g. `WorkflowRunOptions(demand=DemandRunOptions(runtime=DemandRunRuntimeOptions(batch_size=30), ...))`.

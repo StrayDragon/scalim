@@ -8,35 +8,19 @@ from .....typedefs import FailurePolicy
 from ...init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ...schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ...schema_dsl.models import (
-    BOOK_BUDGET_KEYS,
     BOOK_EXPORT_XLSX_KEYS,
     BOOK_KEYS,
-    BOOK_WRITE_DEFAULTS_KEYS,
     BOOK_XLSX_FILE_KEYS,
     BOOK_XLSX_MEMORY_KEYS,
     DEMAND_KEYS,
     FILE_CSV_FILE_KEYS,
     FILE_KEYS,
     RESOURCES_KEYS,
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
-    BookWriteDefaultsConfig,
     DemandConfig,
     FileConfig,
     ResourcesConfig,
-)
-from ...schema_dsl.output_enums import (
-    BOOK_WRITE_ALIGN_BY_ENUM,
-    BOOK_WRITE_HEADER_POLICY_ENUM,
-    BOOK_WRITE_MODE_ENUM,
-    BOOK_WRITE_ON_CONFLICT_ENUM,
-    BOOK_WRITE_ON_MISMATCH_ENUM,
-    DEFAULT_BOOK_WRITE_ALIGN_BY,
-    DEFAULT_BOOK_WRITE_HEADER_POLICY,
-    DEFAULT_BOOK_WRITE_MODE,
-    DEFAULT_BOOK_WRITE_ON_CONFLICT,
-    DEFAULT_BOOK_WRITE_ON_MISMATCH,
 )
 from .error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
@@ -422,34 +406,31 @@ class YamlDemandLoader(
             if kind == "xlsx_file":
                 msg = (
                     "{}.kind was removed. "
-                    "Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}} "
-                    "(and keep {}.write_defaults as a sibling key)."
-                ).format(base_path, base_path, base_path)
+                    "Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}}."
+                ).format(base_path, base_path)
             elif kind == "xlsx_memory":
-                msg = (
-                    "{}.kind was removed. "
-                    "Migration: use oneOf branch object: {}.xlsx_memory: {{budget?: ..., export_xlsx?: ...}} "
-                    "(and keep {}.write_defaults as a sibling key)."
-                ).format(base_path, base_path, base_path)
+                msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_memory: {{export_xlsx?: ...}}.").format(
+                    base_path, base_path
+                )
             else:
                 msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{...}} or {}.xlsx_memory: {{...}}.").format(
                     base_path, base_path, base_path
                 )
             raise ValueError(msg)
 
-        allowed_keys = {BOOK_KEYS["xlsx_file"], BOOK_KEYS["xlsx_memory"], BOOK_KEYS["write_defaults"]}
+        if "write_defaults" in raw:
+            msg = (
+                "{}.write_defaults was removed from YAML authoring. "
+                "Migration: configure BookWritePolicy via DemandRunOptions.resources_policy "
+                "or WorkflowRunOptions.resources_policy (Python SSOT; omit for builtin defaults)."
+            ).format(base_path)
+            raise ValueError(msg)
+
+        allowed_keys = {BOOK_KEYS["xlsx_file"], BOOK_KEYS["xlsx_memory"]}
         unknown = sorted({str(k) for k in raw} - allowed_keys)
         if unknown:
             msg = "{} has unknown keys: {}".format(base_path, ", ".join(unknown))
             raise ValueError(msg)
-
-        write_defaults_cfg = None
-        if BOOK_KEYS["write_defaults"] in raw:
-            write_defaults_raw = mapping_or_none(raw.get(BOOK_KEYS["write_defaults"]))
-            if write_defaults_raw is None:
-                msg = "{}.write_defaults must be an object".format(base_path)
-                raise TypeError(msg)
-            write_defaults_cfg = self._parse_book_write_defaults(write_defaults_raw, base_path="{}.write_defaults".format(base_path))
 
         file_branch = None
         if BOOK_KEYS["xlsx_file"] in raw:
@@ -500,12 +481,19 @@ class YamlDemandLoader(
                 budget=None,
                 export_xlsx=None,
                 allow_formulas=allow_formulas,
-                write_defaults=write_defaults_cfg,
+                write_defaults=None,
             )
 
         assert mem_branch is not None  # noqa: S101  # pragma: allow-no-cover invariant: has_mem checked above
         branch_path = "{}.xlsx_memory".format(base_path)
-        allowed_branch_keys = {BOOK_XLSX_MEMORY_KEYS["budget"], BOOK_XLSX_MEMORY_KEYS["export_xlsx"]}
+        if "budget" in mem_branch:
+            msg = (
+                "{}.budget was removed from YAML authoring. "
+                "Migration: configure BookBudgetPolicy via DemandRunOptions.resources_policy "
+                "or WorkflowRunOptions.resources_policy (Python SSOT; omit for unlimited)."
+            ).format(branch_path)
+            raise ValueError(msg)
+        allowed_branch_keys = {BOOK_XLSX_MEMORY_KEYS["export_xlsx"]}
         unknown_branch = sorted({str(k) for k in mem_branch} - allowed_branch_keys)
         if unknown_branch:
             if "write_lock" in unknown_branch:
@@ -513,11 +501,6 @@ class YamlDemandLoader(
                 raise ValueError(msg)
             msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
             raise ValueError(msg)
-
-        budget_cfg = None
-        budget_raw = mapping_or_none(mem_branch.get(BOOK_XLSX_MEMORY_KEYS["budget"]))
-        if budget_raw is not None:
-            budget_cfg = self._parse_book_budget(budget_raw, base_path="{}.budget".format(branch_path))
 
         export_cfg = None
         export_raw = mapping_or_none(mem_branch.get(BOOK_XLSX_MEMORY_KEYS["export_xlsx"]))
@@ -527,10 +510,10 @@ class YamlDemandLoader(
         return BookConfig(
             kind="xlsx_memory",
             path=None,
-            budget=budget_cfg,
+            budget=None,
             export_xlsx=export_cfg,
             allow_formulas=False,
-            write_defaults=write_defaults_cfg,
+            write_defaults=None,
         )
 
     def _parse_file_config(self, raw: Dict[str, Any], *, base_path: str) -> FileConfig:
@@ -600,33 +583,6 @@ class YamlDemandLoader(
         msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
         raise TypeError(msg)
 
-    def _parse_book_budget(self, raw: Dict[str, Any], *, base_path: str) -> BookBudgetConfig:
-        max_sheets_raw = raw.get(BOOK_BUDGET_KEYS["max_sheets"])
-        max_total_cells_raw = raw.get(BOOK_BUDGET_KEYS["max_total_cells"])
-        if max_sheets_raw is None:
-            msg = "{}.max_sheets must be an integer".format(base_path)
-            raise TypeError(msg)
-        if max_total_cells_raw is None:
-            msg = "{}.max_total_cells must be an integer".format(base_path)
-            raise TypeError(msg)
-        try:
-            max_sheets = int(max_sheets_raw)
-        except (TypeError, ValueError) as exc:
-            msg = "{}.max_sheets must be an integer".format(base_path)
-            raise TypeError(msg) from exc
-        try:
-            max_total_cells = int(max_total_cells_raw)
-        except (TypeError, ValueError) as exc:
-            msg = "{}.max_total_cells must be an integer".format(base_path)
-            raise TypeError(msg) from exc
-        if max_sheets < 1:
-            msg = "{}.max_sheets must be >= 1".format(base_path)
-            raise ValueError(msg)
-        if max_total_cells < 1:
-            msg = "{}.max_total_cells must be >= 1".format(base_path)
-            raise ValueError(msg)
-        return BookBudgetConfig(max_sheets=max_sheets, max_total_cells=max_total_cells)
-
     def _parse_book_export_xlsx(self, raw: Dict[str, Any], *, base_path: str) -> BookExportXlsxConfig:
         export_path = self._parse_path_or_init_var(raw.get(BOOK_EXPORT_XLSX_KEYS["path"]), path="{}.path".format(base_path))
         if not export_path or (isinstance(export_path, str) and not export_path.strip()):
@@ -634,52 +590,3 @@ class YamlDemandLoader(
             raise ValueError(msg)
         allow_formulas = bool(raw.get(BOOK_EXPORT_XLSX_KEYS["allow_formulas"], True))
         return BookExportXlsxConfig(path=export_path, allow_formulas=allow_formulas)
-
-    def _parse_book_write_defaults(self, raw: Dict[str, Any], *, base_path: str) -> BookWriteDefaultsConfig:
-        mode = str(raw.get(BOOK_WRITE_DEFAULTS_KEYS["mode"]) or DEFAULT_BOOK_WRITE_MODE).strip() or DEFAULT_BOOK_WRITE_MODE
-        if mode not in BOOK_WRITE_MODE_ENUM:
-            msg = "{}.mode={!r} is invalid; expected one of: {}".format(base_path, mode, ", ".join(BOOK_WRITE_MODE_ENUM))
-            raise ValueError(msg)
-
-        align_by = str(raw.get(BOOK_WRITE_DEFAULTS_KEYS["align_by"]) or DEFAULT_BOOK_WRITE_ALIGN_BY).strip() or DEFAULT_BOOK_WRITE_ALIGN_BY
-        if align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
-            msg = "{}.align_by={!r} is invalid; expected one of: {}".format(base_path, align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
-            raise ValueError(msg)
-
-        header_policy = (
-            str(raw.get(BOOK_WRITE_DEFAULTS_KEYS["header_policy"]) or DEFAULT_BOOK_WRITE_HEADER_POLICY).strip()
-            or DEFAULT_BOOK_WRITE_HEADER_POLICY
-        )
-        if header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
-            msg = "{}.header_policy={!r} is invalid; expected one of: {}".format(
-                base_path, header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM)
-            )
-            raise ValueError(msg)
-
-        on_mismatch = (
-            str(raw.get(BOOK_WRITE_DEFAULTS_KEYS["on_mismatch"]) or DEFAULT_BOOK_WRITE_ON_MISMATCH).strip()
-            or DEFAULT_BOOK_WRITE_ON_MISMATCH
-        )
-        if on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
-            msg = "{}.on_mismatch={!r} is invalid; expected one of: {}".format(
-                base_path, on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM)
-            )
-            raise ValueError(msg)
-
-        on_conflict = (
-            str(raw.get(BOOK_WRITE_DEFAULTS_KEYS["on_conflict"]) or DEFAULT_BOOK_WRITE_ON_CONFLICT).strip()
-            or DEFAULT_BOOK_WRITE_ON_CONFLICT
-        )
-        if on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
-            msg = "{}.on_conflict={!r} is invalid; expected one of: {}".format(
-                base_path, on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM)
-            )
-            raise ValueError(msg)
-
-        return BookWriteDefaultsConfig(
-            mode=mode,
-            align_by=align_by,
-            header_policy=header_policy,
-            on_mismatch=on_mismatch,
-            on_conflict=on_conflict,
-        )

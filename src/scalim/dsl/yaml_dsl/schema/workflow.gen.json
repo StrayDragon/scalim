@@ -120,34 +120,6 @@
     }
   },
   "definitions": {
-    "book_budget": {
-      "type": "object",
-      "properties": {
-        "max_sheets": {
-          "type": "integer",
-          "description": "sheet 数量预算(>=1).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.budget.max_sheets\n\nsheet 数量预算(>=1).",
-          "minimum": 1,
-          "examples": [
-            64
-          ]
-        },
-        "max_total_cells": {
-          "type": "integer",
-          "description": "总 cell 数预算(>=1).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.budget.max_total_cells\n\n总 cell 数预算(>=1).",
-          "minimum": 1,
-          "examples": [
-            1000000
-          ]
-        }
-      },
-      "required": [
-        "max_sheets",
-        "max_total_cells"
-      ],
-      "additionalProperties": false
-    },
     "book_export_xlsx": {
       "type": "object",
       "properties": {
@@ -197,80 +169,6 @@
       "required": [
         "path"
       ],
-      "additionalProperties": false
-    },
-    "book_write_defaults": {
-      "type": "object",
-      "properties": {
-        "mode": {
-          "type": "string",
-          "description": "写入语义.",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults.mode\n\n写入语义.\n\n- `sheet`: 写入/覆盖某个 sheet\n- `append`: 追加写入某个 sheet\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `sheet`, `append`\n- 默认值: `sheet`\n\n##### 例子\n```yaml\nsheet\n```",
-          "enum": [
-            "sheet",
-            "append"
-          ],
-          "default": "sheet",
-          "examples": [
-            "sheet"
-          ]
-        },
-        "align_by": {
-          "type": "string",
-          "description": "字段对齐策略(仅 `mode=append` 生效).",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults.align_by\n\n字段对齐策略(仅 `mode=append` 生效).\n\n- `field_id`: 按 field_id 对齐(忽略 header 名)\n- `header`: 按 header 名对齐(严格匹配)\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `field_id`, `header`\n- 默认值: `field_id`\n\n##### 例子\n```yaml\nfield_id\n```",
-          "enum": [
-            "field_id",
-            "header"
-          ],
-          "default": "field_id",
-          "examples": [
-            "field_id"
-          ]
-        },
-        "header_policy": {
-          "type": "string",
-          "description": "表头策略(仅 `mode=append` 生效).",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults.header_policy\n\n表头策略(仅 `mode=append` 生效).\n\n- `once`: 只在第一段输出表头\n- `always`: 每段都输出表头\n- `never`: 不输出表头\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `once`, `always`, `never`\n- 默认值: `once`\n\n##### 例子\n```yaml\nonce\n```",
-          "enum": [
-            "once",
-            "always",
-            "never"
-          ],
-          "default": "once",
-          "examples": [
-            "once"
-          ]
-        },
-        "on_mismatch": {
-          "type": "string",
-          "description": "字段不匹配策略(仅 `mode=append` 生效).",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults.on_mismatch\n\n字段不匹配策略(仅 `mode=append` 生效).\n\n- `error`: 失败\n- `warn`: 告警并继续\n- `skip`: 跳过该段写入\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `warn`, `skip`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
-          "enum": [
-            "error",
-            "warn",
-            "skip"
-          ],
-          "default": "error",
-          "examples": [
-            "error"
-          ]
-        },
-        "on_conflict": {
-          "type": "string",
-          "description": "sheet 冲突策略(仅 `mode=sheet` 生效).",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults.on_conflict\n\nsheet 冲突策略(仅 `mode=sheet` 生效).\n\n- `error`: 失败\n- `overwrite`: 覆盖\n- `skip`: 跳过\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `overwrite`, `skip`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
-          "enum": [
-            "error",
-            "overwrite",
-            "skip"
-          ],
-          "default": "error",
-          "examples": [
-            "error"
-          ]
-        }
-      },
       "additionalProperties": false
     },
     "book_xlsx_file": {
@@ -327,15 +225,6 @@
     "book_xlsx_memory": {
       "type": "object",
       "properties": {
-        "budget": {
-          "description": "可选: 预算配置(缺省为 unlimited)",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.budget\n\n可选: 预算配置(缺省为 unlimited)",
-          "allOf": [
-            {
-              "$ref": "#/definitions/book_budget"
-            }
-          ]
-        },
         "export_xlsx": {
           "description": "可选: 导出配置",
           "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx\n\n可选: 导出配置",
@@ -351,15 +240,6 @@
     "book": {
       "type": "object",
       "properties": {
-        "write_defaults": {
-          "description": "可选:默认写入语义与冲突策略",
-          "markdownDescription": "#### workflow.resources.books.*.write_defaults\n\n可选:默认写入语义与冲突策略",
-          "allOf": [
-            {
-              "$ref": "#/definitions/book_write_defaults"
-            }
-          ]
-        },
         "xlsx_file": {
           "description": "xlsx_file: 文件导出 book 配置.",
           "markdownDescription": "#### workflow.resources.books.*.xlsx_file\n\nxlsx_file: 文件导出 book 配置.\n- 必填: `path`\n- 可选: `allow_formulas`",
@@ -371,7 +251,7 @@
         },
         "xlsx_memory": {
           "description": "xlsx_memory: 内存 book 配置.",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory\n\nxlsx_memory: 内存 book 配置.\n- 可选: `budget`\n- 可选: `export_xlsx`",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory\n\nxlsx_memory: 内存 book 配置.\n- 可选: `export_xlsx`\n- `budget`/`write_defaults` 已迁出 YAML(Python ResourcesPolicy)",
           "allOf": [
             {
               "$ref": "#/definitions/book_xlsx_memory"

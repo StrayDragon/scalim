@@ -27,4 +27,5 @@
 - [2026-03-18: yaml-workflow-dag-ctx-resources](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-03-18-yaml-workflow-dag-ctx-resources.md)
 - [2026-04-07: yaml-dsl-import-roots-registry](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md)
 - [2026-04-08: yaml-dsl-api-naming-alignment](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md)
+- [2026-07-12: book-write-policy-python-ssot](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

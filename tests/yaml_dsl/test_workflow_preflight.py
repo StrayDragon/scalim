@@ -6,7 +6,10 @@ import pytest
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl import (
     BookResourceOverride,
-    BookWriteDefaultsOverride,
+    BookResourcePolicy,
+    BookWriteHeaderPolicy,
+    BookWriteMode,
+    BookWritePolicy,
     DemandDiagnosticsPolicy,
     DemandRunOutputOptions,
     DemandRunOptions,
@@ -18,6 +21,7 @@ from scalim.dsl.yaml_dsl import (
     OutputWriteOverride,
     OutputsDefaultsOverride,
     ResourcesOverride,
+    ResourcesPolicy,
     RunOverrides,
 )
 from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
@@ -139,25 +143,16 @@ def test_workflow_preflight_apply_default_book_binding_to_outputs_branches() -> 
 
 
 def test_workflow_preflight_effective_book_write_defaults_come_from_config() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_book_defaults
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-        header_policy: never
-"""
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode="sheet", header_policy="never"),
+                ),
+            }
+        )
     )
 
     assert effective_outputs_mod.effective_book_write_mode(config, resources_override=None, book_id="report") == "sheet"
@@ -186,62 +181,55 @@ def test_workflow_preflight_effective_book_defaults_blank_values_fall_back_to_de
 
 
 def test_workflow_preflight_effective_book_write_defaults_can_be_overridden() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_book_defaults_override
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-        header_policy: once
-"""
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                ),
+            }
+        )
     )
 
-    resources_override = ResourcesOverride(
+    resources_policy = ResourcesPolicy(
         books={
-            "report": BookResourceOverride(write_defaults=BookWriteDefaultsOverride(mode="append", header_policy="never")),
+            "report": BookResourcePolicy(
+                write=BookWritePolicy(mode=BookWriteMode.APPEND, header_policy=BookWriteHeaderPolicy.NEVER),
+            ),
         }
     )
 
-    assert effective_outputs_mod.effective_book_write_mode(config, resources_override=resources_override, book_id="report") == "append"
-    assert effective_outputs_mod.effective_book_header_policy(config, resources_override=resources_override, book_id="report") == "never"
+    assert (
+        effective_outputs_mod.effective_book_write_mode(
+            config, resources_override=None, book_id="report", resources_policy=resources_policy
+        )
+        == "append"
+    )
+    assert (
+        effective_outputs_mod.effective_book_header_policy(
+            config, resources_override=None, book_id="report", resources_policy=resources_policy
+        )
+        == "never"
+    )
 
 
-def test_workflow_preflight_effective_book_write_defaults_blank_override_does_not_override_config() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_book_defaults_blank_override
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-        header_policy: never
-"""
+def test_workflow_preflight_effective_book_write_defaults_ignore_resources_override() -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode="sheet", header_policy="never"),
+                ),
+            }
+        )
     )
 
     resources_override = ResourcesOverride(
         books={
-            "report": BookResourceOverride(write_defaults=BookWriteDefaultsOverride(mode=" ", header_policy=" ")),
+            "report": BookResourceOverride(path="./other"),
         }
     )
 
@@ -249,9 +237,9 @@ resources:
     assert effective_outputs_mod.effective_book_header_policy(config, resources_override=resources_override, book_id="report") == "never"
 
 
-def test_workflow_preflight_output_target_requires_unique_branches() -> None:
+def _preflight_base_config() -> DemandConfig:
     loader = YamlDemandLoader()
-    config = loader.load_string(
+    return loader.load_string(
         """
 name: preflight_output_target
 main_source:
@@ -265,11 +253,12 @@ resources:
     report:
       xlsx_file:
         path: ./out
-      write_defaults:
-        mode: sheet
-        header_policy: once
 """
     )
+
+
+def test_workflow_preflight_output_target_requires_unique_branches() -> None:
+    config = _preflight_base_config()
 
     assert (
         effective_outputs_mod.output_target_requires_unique_effective_field_display_names(
@@ -319,25 +308,9 @@ resources:
 
 
 def test_workflow_preflight_output_target_requires_unique_header_by_not_name_and_append() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_output_target_extra
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: append
-        header_policy: once
-"""
+    config = _preflight_base_config()
+    append_policy = ResourcesPolicy(
+        books={"report": BookResourcePolicy(write=BookWritePolicy(mode=BookWriteMode.APPEND))},
     )
 
     assert (
@@ -359,32 +332,14 @@ resources:
             config,
             OutputTargetConfig(name="append_book", to=OutputToConfig(book="report", sheet="S"), fields=("id",)),
             resources_override=None,
+            resources_policy=append_policy,
         )
         is True
     )
 
 
 def test_workflow_preflight_output_override_requires_unique_branches() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_output_override
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-        header_policy: once
-"""
-    )
+    config = _preflight_base_config()
 
     assert (
         effective_outputs_mod.output_override_requires_unique_effective_field_display_names(
@@ -448,25 +403,9 @@ resources:
 
 
 def test_workflow_preflight_output_override_requires_unique_header_by_not_name_and_append() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_output_override_extra
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: append
-        header_policy: once
-"""
+    config = _preflight_base_config()
+    append_policy = ResourcesPolicy(
+        books={"report": BookResourcePolicy(write=BookWritePolicy(mode=BookWriteMode.APPEND))},
     )
 
     assert (
@@ -495,6 +434,7 @@ resources:
             ),
             default_book_id=None,
             resources_override=None,
+            resources_policy=append_policy,
         )
         is True
     )

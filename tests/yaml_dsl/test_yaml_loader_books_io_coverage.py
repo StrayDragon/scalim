@@ -3,11 +3,11 @@ import pytest
 from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
+from scalim.dsl.yaml_dsl.book_resource_policy import BookBudgetPolicy, BookWriteMode, BookWritePolicy
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BOOK_BUDGET_KEYS,
     BOOK_EXPORT_XLSX_KEYS,
     BOOK_KEYS,
-    BOOK_WRITE_DEFAULTS_KEYS,
     DEMAND_KEYS,
     RESOURCES_KEYS,
     OutputTargetConfig,
@@ -90,14 +90,20 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    parsed = loader._parse_book_config(
-        {
-            BOOK_KEYS["xlsx_file"]: {"path": "./out"},
-            BOOK_KEYS["write_defaults"]: {},
-        },
-        base_path="resources.books.report",
-    )  # noqa: SLF001
-    assert parsed.write_defaults is not None
+    with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
+        _ = loader._parse_book_config(
+            {
+                BOOK_KEYS["xlsx_file"]: {"path": "./out"},
+                "write_defaults": {},
+            },
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
+    with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, "write_defaults": []},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
 
 
 def test_loader_parse_book_config_additional_error_branches_cover_removed_write_lock_and_types() -> None:
@@ -120,13 +126,6 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
             {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, "unknown": 1},
             base_path="resources.books.report",
         )  # noqa: SLF001
-
-    with pytest.raises(TypeError, match=r"resources\.books\.report\.write_defaults must be an object"):
-        _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, BOOK_KEYS["write_defaults"]: []},
-            base_path="resources.books.report",
-        )  # noqa: SLF001
-
     with pytest.raises(TypeError, match=r"resources\.books\.report\.xlsx_file must be an object"):
         _ = loader._parse_book_config(
             {BOOK_KEYS["xlsx_file"]: []},
@@ -170,26 +169,30 @@ def test_loader_parse_path_or_init_var_branches_cover_dict_and_error() -> None:
         _ = loader._parse_path_or_init_var(1, path="p")  # noqa: SLF001
 
 
-def test_loader_parse_book_budget_error_branches_cover_paths() -> None:
+def test_loader_rejects_yaml_book_budget_authoring() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(TypeError, match=r"b\.max_sheets must be an integer"):
-        _ = loader._parse_book_budget({}, base_path="b")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {
+                BOOK_KEYS["xlsx_memory"]: {
+                    "budget": {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
+                },
+            },
+            base_path="resources.books.report",
+        )
 
-    with pytest.raises(TypeError, match=r"b\.max_total_cells must be an integer"):
-        _ = loader._parse_book_budget({BOOK_BUDGET_KEYS["max_sheets"]: 1}, base_path="b")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {BOOK_KEYS["xlsx_memory"]: {"budget": {}}},
+            base_path="resources.books.report",
+        )
 
-    with pytest.raises(TypeError, match=r"b\.max_sheets must be an integer"):
-        _ = loader._parse_book_budget({BOOK_BUDGET_KEYS["max_sheets"]: "nope", BOOK_BUDGET_KEYS["max_total_cells"]: 1}, base_path="b")  # noqa: SLF001
-
-    with pytest.raises(TypeError, match=r"b\.max_total_cells must be an integer"):
-        _ = loader._parse_book_budget({BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: "nope"}, base_path="b")  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"b\.max_sheets must be >= 1"):
-        _ = loader._parse_book_budget({BOOK_BUDGET_KEYS["max_sheets"]: 0, BOOK_BUDGET_KEYS["max_total_cells"]: 1}, base_path="b")  # noqa: SLF001
-
-    with pytest.raises(ValueError, match=r"b\.max_total_cells must be >= 1"):
-        _ = loader._parse_book_budget({BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 0}, base_path="b")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {BOOK_KEYS["xlsx_memory"]: {"budget": "nope"}},
+            base_path="resources.books.report",
+        )
 
 
 def test_loader_parse_book_export_xlsx_branches_cover_success_and_error() -> None:
@@ -202,26 +205,52 @@ def test_loader_parse_book_export_xlsx_branches_cover_success_and_error() -> Non
     assert cfg.path == "x.xlsx"
 
 
-def test_loader_parse_book_write_defaults_branches_cover_invalid_enums_and_success() -> None:
+def test_loader_rejects_yaml_book_write_defaults_authoring() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"w\.mode=.*expected one of"):
-        _ = loader._parse_book_write_defaults({BOOK_WRITE_DEFAULTS_KEYS["mode"]: "nope"}, base_path="w")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {
+                BOOK_KEYS["xlsx_file"]: {"path": "./out"},
+                "write_defaults": {"mode": "nope"},
+            },
+            base_path="resources.books.report",
+        )
 
-    with pytest.raises(ValueError, match=r"w\.align_by=.*expected one of"):
-        _ = loader._parse_book_write_defaults({BOOK_WRITE_DEFAULTS_KEYS["align_by"]: "nope"}, base_path="w")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {
+                BOOK_KEYS["xlsx_memory"]: {},
+                "write_defaults": {"align_by": "nope"},
+            },
+            base_path="resources.books.report",
+        )
 
-    with pytest.raises(ValueError, match=r"w\.header_policy=.*expected one of"):
-        _ = loader._parse_book_write_defaults({BOOK_WRITE_DEFAULTS_KEYS["header_policy"]: "nope"}, base_path="w")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"w\.on_mismatch=.*expected one of"):
-        _ = loader._parse_book_write_defaults({BOOK_WRITE_DEFAULTS_KEYS["on_mismatch"]: "nope"}, base_path="w")  # noqa: SLF001
+def test_book_write_and_budget_policy_validation_cover_python_ssot() -> None:
+    with pytest.raises(TypeError, match=r"BookWritePolicy\.mode must be a BookWriteMode"):
+        _ = BookWritePolicy(mode="sheet")  # type: ignore[arg-type]
 
-    with pytest.raises(ValueError, match=r"w\.on_conflict=.*expected one of"):
-        _ = loader._parse_book_write_defaults({BOOK_WRITE_DEFAULTS_KEYS["on_conflict"]: "nope"}, base_path="w")  # noqa: SLF001
+    with pytest.raises(TypeError, match=r"BookWritePolicy\.align_by must be a BookWriteAlignBy"):
+        _ = BookWritePolicy(mode=BookWriteMode.SHEET, align_by="field_id")  # type: ignore[arg-type]
 
-    cfg = loader._parse_book_write_defaults({}, base_path="w")  # noqa: SLF001
-    assert str(cfg.mode)
+    policy = BookWritePolicy()
+    assert policy.to_write_defaults_config().mode == "sheet"
+
+    with pytest.raises(TypeError, match=r"BookBudgetPolicy\.max_sheets must be an int or None"):
+        _ = BookBudgetPolicy(max_sheets=True, max_total_cells=1)  # type: ignore[arg-type]
+
+    with pytest.raises(TypeError, match=r"BookBudgetPolicy\.max_total_cells must be an int or None"):
+        _ = BookBudgetPolicy(max_sheets=1, max_total_cells=True)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match=r"BookBudgetPolicy\.max_sheets must be >= 1"):
+        _ = BookBudgetPolicy(max_sheets=0, max_total_cells=1)
+
+    with pytest.raises(ValueError, match=r"BookBudgetPolicy\.max_total_cells must be >= 1"):
+        _ = BookBudgetPolicy(max_sheets=1, max_total_cells=0)
+
+    with pytest.raises(ValueError, match=r"requires both max_sheets and max_total_cells"):
+        _ = BookBudgetPolicy(max_sheets=1).as_options_mapping()
 
 
 def test_outputs_parser_write_enum_errors_cover_branches() -> None:

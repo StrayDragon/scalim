@@ -4,9 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from scalim.dsl.yaml_dsl import (
-    BookBudgetOverride,
     BookExportXlsxOverride,
-    BookWriteDefaultsOverride,
     BookResourceOverride,
     DemandRunOptions,
     DemandRunSecurityOptions,
@@ -29,15 +27,6 @@ from scalim.dsl.yaml_dsl.workflow_types import WorkflowNodePatch, WorkflowRun, W
 
 
 def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> None:
-    left_budget = BookBudgetOverride(max_sheets=1, max_total_cells=2)
-    right_budget = BookBudgetOverride(max_sheets=None, max_total_cells=3)
-    assert entrypoints_mod._merge_book_budget_overrides(left_budget, None) == left_budget  # noqa: SLF001
-    assert entrypoints_mod._merge_book_budget_overrides(None, right_budget) == right_budget  # noqa: SLF001
-    merged_budget = entrypoints_mod._merge_book_budget_overrides(left_budget, right_budget)  # noqa: SLF001
-    assert merged_budget is not None
-    assert merged_budget.max_sheets == 1
-    assert merged_budget.max_total_cells == 3
-
     left_export = BookExportXlsxOverride(path="a")
     right_export = BookExportXlsxOverride(path=None, allow_formulas=True)
     assert entrypoints_mod._merge_book_export_xlsx_overrides(left_export, None) == left_export  # noqa: SLF001
@@ -46,15 +35,6 @@ def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> No
     assert merged_export is not None
     assert merged_export.path == "a"
     assert merged_export.allow_formulas is True
-
-    left_write = BookWriteDefaultsOverride(mode="append")
-    right_write = BookWriteDefaultsOverride(mode=None, align_by="name")
-    assert entrypoints_mod._merge_book_write_defaults_overrides(left_write, None) == left_write  # noqa: SLF001
-    assert entrypoints_mod._merge_book_write_defaults_overrides(None, right_write) == right_write  # noqa: SLF001
-    merged_write = entrypoints_mod._merge_book_write_defaults_overrides(left_write, right_write)  # noqa: SLF001
-    assert merged_write is not None
-    assert merged_write.mode == "append"
-    assert merged_write.align_by == "name"
 
     left_book = BookResourceOverride(kind="xlsx_file", path="a", allow_formulas=True)
     right_book = BookResourceOverride(path="b", allow_formulas=None)
@@ -111,9 +91,8 @@ def test_workflow_entrypoints_workflow_resources_override_handles_missing_and_co
     assert out is not None
     assert out.books is not None
     assert out.books["report"].allow_formulas is True
-    assert out.books["report"].write_defaults is not None
-    assert out.books["report"].write_defaults.mode == "append"
-    assert out.books["mem"].budget is not None
+    assert out.books["report"].kind == "xlsx_file"
+    assert out.books["report"].path == "a"
     assert out.books["mem"].export_xlsx is not None
     assert out.books["mem"].export_xlsx.allow_formulas is True
     assert out.files is not None

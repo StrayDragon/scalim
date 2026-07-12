@@ -308,6 +308,9 @@ class TestDemandRunOptionsContractsCoverage:
         with pytest.raises(TypeError, match=r"DemandRunOptions.outputs must be a DemandRunOutputOptions"):
             _ = DemandRunOptions(security=security, outputs="nope")  # type: ignore[arg-type] contract validation boundary
 
+        with pytest.raises(TypeError, match=r"DemandRunOptions.resources_policy must be a ResourcesPolicy or None"):
+            _ = DemandRunOptions(security=security, resources_policy="nope")  # type: ignore[arg-type] contract validation boundary
+
     def test_normalize_public_demand_run_options_replaces_when_template_sandbox_needs_trimming(self) -> None:
         from scalim.dsl.yaml_dsl.runtime.normalize import normalize_public_demand_run_options
 

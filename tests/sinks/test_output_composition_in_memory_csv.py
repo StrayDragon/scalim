@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from scalim.dsl.yaml_dsl.book_resource_policy import BookBudgetPolicy, BookResourcePolicy, ResourcesPolicy
 from scalim.dsl.yaml_dsl.runtime.compiler import compile as compile_demand
 from scalim.dsl.yaml_dsl.runtime.contracts import DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions
 from scalim.execution import run_ir
@@ -23,8 +24,7 @@ main_source:
 resources:
   books:
     report:
-      xlsx_memory:
-        budget: {max_sheets: 10, max_total_cells: 1000}
+      xlsx_memory: {}
 outputs:
   - name: detail
     to:
@@ -38,6 +38,13 @@ outputs:
     opts = DemandRunOptions(
         security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
         outputs=DemandRunOutputOptions(workflow_managed_output_ids=frozenset(["detail"])),
+        resources_policy=ResourcesPolicy(
+            books={
+                "report": BookResourcePolicy(
+                    budget=BookBudgetPolicy(max_sheets=10, max_total_cells=1000),
+                )
+            }
+        ),
     )
     compilation = compile_demand(str(yaml_path), options=opts)
     result = run_ir(compilation.demand_ir, compilation.request)

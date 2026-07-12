@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple, Union, cas
 
 from ...vendor.dataclassesx import dataclass
 from ...vendor.dataclassesx import field as dataclass_field
+from .book_resource_policy import ResourcesPolicy
 from .runtime.contracts import UNSET, DemandDiagnosticsOverride, DemandRunOptions, RunOverrides, UnsetType
 from .workflow_config import (
     ScalimWorkflowConfigError,
@@ -193,6 +194,9 @@ class WorkflowRunOptions:
     workflow_components: Optional[Tuple[WorkflowComponent, ...]] = None
     """可选:`workflow` 编排层观测组件(不作用于单个 `demand` 执行)."""
 
+    resources_policy: Optional["ResourcesPolicy"] = None
+    """可选:`book` 写入策略与预算(`Python` `SSOT`;缺省 `builtin` `defaults`)."""
+
     def __post_init__(self) -> None:
         if not isinstance(self.demand, DemandRunOptions):
             msg = "WorkflowRunOptions.demand must be a DemandRunOptions"
@@ -214,6 +218,10 @@ class WorkflowRunOptions:
                 "workflow_components",
                 tuple(cast("Iterable[WorkflowComponent]", comps)),  # pragma: allow-cast components normalization boundary
             )
+
+        if self.resources_policy is not None and not isinstance(self.resources_policy, ResourcesPolicy):
+            msg = "WorkflowRunOptions.resources_policy must be a ResourcesPolicy or None"
+            raise TypeError(msg)
 
 
 __all__ = (

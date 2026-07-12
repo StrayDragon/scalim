@@ -23,10 +23,8 @@ from ...workflow.execute import ScalimWorkflowRunFailedError, run_workflow_ir
 from ...workflow.report import WorkflowResult
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import (
-    BookBudgetOverride,
     BookExportXlsxOverride,
     BookResourceOverride,
-    BookWriteDefaultsOverride,
     DemandDiagnosticsOverride,
     DemandDiagnosticsPolicy,
     DemandRunOptions,
@@ -60,20 +58,6 @@ _policy_logger = logging.getLogger("scalim.dsl.yaml_dsl.workflow.policy")
 _ADAPTIVE_MAX_WORKERS_HARD_CAP = 256
 
 
-def _merge_book_budget_overrides(
-    left: Optional[BookBudgetOverride],
-    right: Optional[BookBudgetOverride],
-) -> Optional[BookBudgetOverride]:
-    if right is None:
-        return left
-    if left is None:
-        return right
-    return BookBudgetOverride(
-        max_sheets=left.max_sheets if right.max_sheets is None else right.max_sheets,
-        max_total_cells=left.max_total_cells if right.max_total_cells is None else right.max_total_cells,
-    )
-
-
 def _merge_book_export_xlsx_overrides(
     left: Optional[BookExportXlsxOverride],
     right: Optional[BookExportXlsxOverride],
@@ -88,33 +72,14 @@ def _merge_book_export_xlsx_overrides(
     )
 
 
-def _merge_book_write_defaults_overrides(
-    left: Optional[BookWriteDefaultsOverride],
-    right: Optional[BookWriteDefaultsOverride],
-) -> Optional[BookWriteDefaultsOverride]:
-    if right is None:
-        return left
-    if left is None:
-        return right
-    return BookWriteDefaultsOverride(
-        mode=left.mode if right.mode is None else right.mode,
-        align_by=left.align_by if right.align_by is None else right.align_by,
-        header_policy=left.header_policy if right.header_policy is None else right.header_policy,
-        on_mismatch=left.on_mismatch if right.on_mismatch is None else right.on_mismatch,
-        on_conflict=left.on_conflict if right.on_conflict is None else right.on_conflict,
-    )
-
-
 def _merge_book_resource_overrides(left: Optional[BookResourceOverride], right: BookResourceOverride) -> BookResourceOverride:
     if left is None:
         return right
     return BookResourceOverride(
         kind=left.kind if right.kind is None else right.kind,
         path=left.path if right.path is None else right.path,
-        budget=_merge_book_budget_overrides(left.budget, right.budget),
         export_xlsx=_merge_book_export_xlsx_overrides(left.export_xlsx, right.export_xlsx),
         allow_formulas=left.allow_formulas if right.allow_formulas is None else right.allow_formulas,
-        write_defaults=_merge_book_write_defaults_overrides(left.write_defaults, right.write_defaults),
     )
 
 
@@ -151,13 +116,6 @@ def _merge_resources_overrides(
 def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
     kind = str(book.kind or "").strip() or None
 
-    budget_override = None
-    if book.budget is not None:
-        budget_override = BookBudgetOverride(
-            max_sheets=int(book.budget.max_sheets),
-            max_total_cells=int(book.budget.max_total_cells),
-        )
-
     export_override = None
     if book.export_xlsx is not None:
         export_override = BookExportXlsxOverride(
@@ -165,25 +123,13 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
             allow_formulas=bool(book.export_xlsx.allow_formulas),
         )
 
-    write_defaults_override = None
-    if book.write_defaults is not None:
-        write_defaults_override = BookWriteDefaultsOverride(
-            mode=str(book.write_defaults.mode or ""),
-            align_by=str(book.write_defaults.align_by or ""),
-            header_policy=str(book.write_defaults.header_policy or ""),
-            on_mismatch=str(book.write_defaults.on_mismatch or ""),
-            on_conflict=str(book.write_defaults.on_conflict or ""),
-        )
-
     allow_formulas = bool(book.allow_formulas)
 
     return BookResourceOverride(
         kind=kind,
         path=book.path if book.path is not None else None,
-        budget=budget_override,
         export_xlsx=export_override,
         allow_formulas=allow_formulas,
-        write_defaults=write_defaults_override,
     )
 
 
@@ -590,6 +536,7 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
         init_vars=base_demand_options.template.init_vars,
         overrides=compile_overrides,
         workflow_runtime_options=workflow_runtime_options,
+        resources_policy=options.resources_policy,
     )
     workflow_ir = compilation.workflow_ir
     demand_configs_by_run_id = compilation.demand_configs_by_run_id

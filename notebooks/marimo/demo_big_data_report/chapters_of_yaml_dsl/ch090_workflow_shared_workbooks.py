@@ -6,10 +6,19 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from scalim.dsl.yaml_dsl import (
+    BookBudgetPolicy,
+    BookResourcePolicy,
+    BookWriteAlignBy,
+    BookWriteHeaderPolicy,
+    BookWriteMode,
+    BookWriteOnConflict,
+    BookWriteOnMismatch,
+    BookWritePolicy,
     DemandRunOptions,
     DemandRunRuntimeOptions,
     DemandRunSecurityOptions,
     DemandRunTemplateOptions,
+    ResourcesPolicy,
     WorkflowRunOptions,
     run_workflow,
 )
@@ -91,11 +100,47 @@ def run_workflow_shared_workbooks(
                     template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
                     runtime=DemandRunRuntimeOptions(batch_size=30),
                 )
+                memory_budget = BookBudgetPolicy(max_sheets=6, max_total_cells=200000)
+                resources_policy = ResourcesPolicy(
+                    books={
+                        "shared_report_sheet": BookResourcePolicy(
+                            write=BookWritePolicy(
+                                mode=BookWriteMode.SHEET,
+                                on_conflict=BookWriteOnConflict.OVERWRITE,
+                            )
+                        ),
+                        "shared_report_append": BookResourcePolicy(
+                            write=BookWritePolicy(
+                                mode=BookWriteMode.APPEND,
+                                align_by=BookWriteAlignBy.HEADER,
+                                header_policy=BookWriteHeaderPolicy.ONCE,
+                                on_mismatch=BookWriteOnMismatch.ERROR,
+                            )
+                        ),
+                        "sheetbook_report_sheet": BookResourcePolicy(
+                            write=BookWritePolicy(
+                                mode=BookWriteMode.SHEET,
+                                on_conflict=BookWriteOnConflict.OVERWRITE,
+                            ),
+                            budget=memory_budget,
+                        ),
+                        "sheetbook_report_append": BookResourcePolicy(
+                            write=BookWritePolicy(
+                                mode=BookWriteMode.APPEND,
+                                align_by=BookWriteAlignBy.FIELD_ID,
+                                header_policy=BookWriteHeaderPolicy.ONCE,
+                                on_mismatch=BookWriteOnMismatch.ERROR,
+                            ),
+                            budget=memory_budget,
+                        ),
+                    }
+                )
                 wf_result = run_workflow(
                     str(wf_copy),
                     options=WorkflowRunOptions(
                         demand=demand_options,
                         path_aliases={"@": str(repo_root)},
+                        resources_policy=resources_policy,
                     ),
                 )
             except Exception as exc:  # noqa: BLE001
@@ -263,15 +308,15 @@ def _(mo):
         - 多个节点把输出写入同一个 `xlsx`(不同 sheet)
         - 需要明确 append/overwrite 语义,并且可回归验证
 
-        这就是 workflow YAML 的 `workflow.resources.books` + book-level 写策略(`write_defaults`) + demand outputs 绑定:
+        这就是 workflow YAML 的 `workflow.resources.books` + Python `ResourcesPolicy` 写策略 + demand outputs 绑定:
 
-        - `workflow.resources.books`: 声明 workflow-scope 的共享 book 资源(`xlsx_file|xlsx_memory`)
-        - `resources.books.*.write_defaults`: 声明该 book 的写入语义(sheet/append + 冲突策略等)
+        - `workflow.resources.books`: 声明 workflow-scope 的共享 book 资源(`xlsx_file|xlsx_memory`)身份(path/export)
+        - `WorkflowRunOptions.resources_policy`: 声明该 book 的写入语义(sheet/append + 冲突策略等; Python SSOT)
         - demand YAML 通过 `outputs[*].to.book/to.sheet` 绑定到共享 book; workflow 编译期推导 write nodes 并保证写入顺序确定性
 
         ## 需求方提问（自然语言）
 
-        平台同学：我想把两个节点的明细输出追加到同一个报表里,能不能用 YAML 显式声明 append 语义并在 CI 里对拍？
+        平台同学：我想把两个节点的明细输出追加到同一个报表里,能不能用 YAML 声明共享 book,并用 Python `ResourcesPolicy` 显式声明 append 语义并在 CI 里对拍？
 
         ## 对拍点（deterministic）
 

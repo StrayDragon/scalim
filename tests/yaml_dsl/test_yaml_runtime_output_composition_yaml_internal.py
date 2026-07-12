@@ -379,6 +379,31 @@ def test_compile_output_composition_append_mode_rejects_include_header() -> None
         )
 
 
+def test_compile_output_composition_append_mode_uses_header_policy_when_include_header_omitted() -> None:
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode="append", header_policy="once"),
+                )
+            }
+        ),
+        outputs=(
+            OutputTargetConfig(
+                name="detail",
+                to=OutputToConfig(book="report", sheet="Detail"),
+                fields=("a",),
+            ),
+        ),
+    )
+    composition = oc_yaml.compile_output_composition_from_yaml(
+        config, _make_demand_ir(), version_id="run_0", resolver=_resolver(), yaml_base_dir="."
+    )
+    assert composition is not None
+
+
 def test_compile_output_composition_rejects_empty_or_missing_file_resource_path_values() -> None:
     config = _csv_config(None)
     with pytest.raises(ValueError, match=r"is required"):

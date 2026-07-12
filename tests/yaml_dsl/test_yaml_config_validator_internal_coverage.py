@@ -1,7 +1,15 @@
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
-from scalim.dsl.yaml_dsl.schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig, OutputWriteConfig
+from scalim.dsl.yaml_dsl.schema_dsl.models import (
+    BookConfig,
+    BookWriteDefaultsConfig,
+    DemandConfig,
+    OutputTargetConfig,
+    OutputToConfig,
+    OutputWriteConfig,
+    ResourcesConfig,
+)
 from scalim.dsl.yaml_dsl.schema_dsl.output_enums import DEFAULT_BOOK_WRITE_MODE
 
 
@@ -14,47 +22,31 @@ def test_effective_book_write_mode_returns_default_when_book_missing() -> None:
 
 
 def test_effective_book_write_mode_reads_write_defaults_value() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_book_mode
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-""",
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode="sheet"),
+                ),
+            }
+        )
     )
     assert effective_outputs_mod.effective_book_write_mode(config, resources_override=None, book_id="report") == "sheet"
 
 
 def test_output_item_requires_unique_effective_display_names_file_and_book_branches() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: preflight_output_unique_cov
-main_source:
-  source_id: main
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    id: {extract: id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-""",
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode="sheet"),
+                ),
+            }
+        )
     )
 
     assert (
@@ -141,6 +133,51 @@ def test_output_target_requires_unique_effective_display_names_rejects_missing_d
         )
         is False
     )
+
+
+def test_validator_error_and_strip_removed_resources_write_budget_fields_reports_and_strips() -> None:
+    v = ConfigValidator()
+    issues = []
+
+    next_config = v._error_and_strip_removed_resources_write_budget_fields(  # noqa: SLF001
+        {
+            "resources": {
+                "books": {
+                    "bad": None,  # continue branch (non-dict)
+                    "report": {
+                        "kind": "xlsx_file",
+                        "path": "./out",
+                        "write_defaults": {"mode": "sheet"},
+                    },
+                    "mem": {
+                        "kind": "xlsx_memory",
+                        "write_defaults": {"mode": "sheet"},
+                        "xlsx_memory": {
+                            "budget": {"max_sheets": 1, "max_total_cells": 10},
+                            "export_xlsx": {"path": "./out"},
+                        },
+                    },
+                    "mem_budget_only": {
+                        "kind": "xlsx_memory",
+                        "xlsx_memory": {
+                            "budget": {"max_sheets": 2, "max_total_cells": 20},
+                        },
+                    },
+                }
+            }
+        },
+        issues,
+    )
+
+    assert any(i.path == "resources.books.report.write_defaults" for i in issues)
+    assert any(i.path == "resources.books.mem.write_defaults" for i in issues)
+    assert any(i.path == "resources.books.mem.xlsx_memory.budget" for i in issues)
+    assert any(i.path == "resources.books.mem_budget_only.xlsx_memory.budget" for i in issues)
+    assert "write_defaults" not in next_config["resources"]["books"]["report"]
+    assert "write_defaults" not in next_config["resources"]["books"]["mem"]
+    assert "budget" not in next_config["resources"]["books"]["mem"]["xlsx_memory"]
+    assert "budget" not in next_config["resources"]["books"]["mem_budget_only"]["xlsx_memory"]
+    assert next_config["resources"]["books"]["mem"]["xlsx_memory"]["export_xlsx"]["path"] == "./out"
 
 
 def test_validator_error_and_strip_removed_resources_write_lock_fields_reports_and_strips() -> None:

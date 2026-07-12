@@ -14,6 +14,7 @@ from ....vendor.compact.typing_extensionsx import override
 from ....vendor.dataclassesx import dataclass
 from ....vendor.dataclassesx import field as dataclass_field
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from ..book_resource_policy import ResourcesPolicy
 from ..init_var_nodes import OptionalPathNode
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
@@ -156,7 +157,6 @@ class RunOverrides:
                     kind="xlsx_file",
                     path=str(output_root_str),
                     allow_formulas=bool(allow_formulas),
-                    write_defaults=BookWriteDefaultsOverride(mode="sheet"),
                 )
             }
         )
@@ -256,21 +256,6 @@ class OutputOverride:
 
 
 @dataclass(frozen=True)
-class BookWriteDefaultsOverride:
-    mode: Optional[str] = None
-    align_by: Optional[str] = None
-    header_policy: Optional[str] = None
-    on_mismatch: Optional[str] = None
-    on_conflict: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class BookBudgetOverride:
-    max_sheets: Optional[int] = None
-    max_total_cells: Optional[int] = None
-
-
-@dataclass(frozen=True)
 class BookExportXlsxOverride:
     path: OptionalPathNode = None
     allow_formulas: Optional[bool] = None
@@ -280,10 +265,13 @@ class BookExportXlsxOverride:
 class BookResourceOverride:
     kind: Optional[str] = None
     path: OptionalPathNode = None
-    budget: Optional[BookBudgetOverride] = None
     export_xlsx: Optional[BookExportXlsxOverride] = None
     allow_formulas: Optional[bool] = None
-    write_defaults: Optional[BookWriteDefaultsOverride] = None
+
+    def __post_init__(self) -> None:
+        # `write_defaults` / `budget` 已迁出 `RunOverrides.resources`(`Python` `ResourcesPolicy` `SSOT`).
+        # 保留旧字段名时的 `fail-fast` 由 `resource_override` 补丁层负责.
+        pass
 
 
 @dataclass(frozen=True)
@@ -626,6 +614,7 @@ class DemandRunOptions:
     template: DemandRunTemplateOptions = dataclass_field(default_factory=DemandRunTemplateOptions)
     runtime: DemandRunRuntimeOptions = dataclass_field(default_factory=DemandRunRuntimeOptions)
     outputs: DemandRunOutputOptions = dataclass_field(default_factory=DemandRunOutputOptions)
+    resources_policy: Optional["ResourcesPolicy"] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.security, DemandRunSecurityOptions):
@@ -639,6 +628,9 @@ class DemandRunOptions:
             raise TypeError(msg)
         if not isinstance(self.outputs, DemandRunOutputOptions):
             msg = "DemandRunOptions.outputs must be a DemandRunOutputOptions"
+            raise TypeError(msg)
+        if self.resources_policy is not None and not isinstance(self.resources_policy, ResourcesPolicy):
+            msg = "DemandRunOptions.resources_policy must be a ResourcesPolicy or None"
             raise TypeError(msg)
 
 

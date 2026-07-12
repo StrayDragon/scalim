@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Set, Tuple
 
 from ....spec.ir._workflow import WorkflowResourceIr
+from ..book_resource_policy import ResourcesPolicy
 from ..runtime.contracts import BookResourceOverride, FileResourceOverride, ResourcesOverride
 from ..runtime.output_path_resolve import resolve_yaml_relative_output_path
 from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
@@ -64,6 +65,7 @@ def _book_export_path_and_options(
     base_dir: str,
     init_vars: Optional[Dict[str, object]],
     path_prefix: str,
+    resources_policy: Optional[object] = None,
 ) -> Tuple[str, Dict[str, object]]:
     is_override = str(path_prefix).startswith("overrides.")
     kind = str(book.kind or "").strip()
@@ -89,7 +91,9 @@ def _book_export_path_and_options(
         return str(output_root), book_options
 
     if kind == "xlsx_memory":
-        budget = book.budget
+        budget_mapping = None
+        if isinstance(resources_policy, ResourcesPolicy):
+            budget_mapping = resources_policy.budget_policy_for(str(book_id)).as_options_mapping()
 
         export_cfg = book.export_xlsx
         output_root = ""
@@ -115,8 +119,8 @@ def _book_export_path_and_options(
             }
 
         book_options = {"kind": "xlsx_memory"}
-        if budget is not None:
-            book_options["budget"] = {"max_sheets": int(budget.max_sheets), "max_total_cells": int(budget.max_total_cells)}
+        if budget_mapping is not None:
+            book_options["budget"] = dict(budget_mapping)
         if export_options is not None:
             book_options["export_xlsx"] = export_options
         return str(output_root), book_options
@@ -170,6 +174,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     demand_yaml_paths_by_run_id: Mapping[str, str],
     init_vars: Optional[Dict[str, object]],
     overrides_resources: Optional[ResourcesOverride],
+    resources_policy: Optional[object] = None,
 ) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, FileConfig]]:
     """编译工作流的有效 `books` 资源并返回:
 
@@ -400,6 +405,7 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
                 base_dir=str(base_dir),
                 init_vars=init_vars,
                 path_prefix=prefix,
+                resources_policy=resources_policy,
             )
         except (TypeError, ValueError) as exc:
             raise ScalimWorkflowConfigError(str(exc), path=prefix) from exc
@@ -508,6 +514,7 @@ def compile_workflow_resources(
     demand_yaml_paths_by_run_id: Mapping[str, str],
     init_vars: Optional[Dict[str, object]],
     overrides_resources: Optional[ResourcesOverride],
+    resources_policy: Optional[object] = None,
 ) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, FileConfig]]:
     return _compile_workflow_resources(
         wf_obj,
@@ -516,4 +523,5 @@ def compile_workflow_resources(
         demand_yaml_paths_by_run_id=demand_yaml_paths_by_run_id,
         init_vars=init_vars,
         overrides_resources=overrides_resources,
+        resources_policy=resources_policy,
     )

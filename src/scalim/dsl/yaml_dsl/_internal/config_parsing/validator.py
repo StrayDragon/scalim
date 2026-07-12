@@ -107,6 +107,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         config = self._error_and_strip_removed_output_extras_fields(config, errors)
         config = self._error_and_strip_removed_output_write_workbook_fields(config, errors)
         config = self._error_and_strip_removed_resources_write_lock_fields(config, errors)
+        config = self._error_and_strip_removed_resources_write_budget_fields(config, errors)
         raw = RawDemand.from_raw(config)
 
         self._validate_required_fields(raw.data, errors)

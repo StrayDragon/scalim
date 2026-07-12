@@ -21,6 +21,7 @@ from ....spec.ir._workflow import (
     WriteSheetNodeIr,
 )
 from ....vendor.dataclassesx import replace
+from ..book_resource_policy import ResourcesPolicy, resolve_write_defaults_config
 from ..runtime.contracts import OutputOverride, RunOverrides
 from ..schema_dsl.models import BookConfig, BookWriteDefaultsConfig, DemandConfig, FileConfig, OutputTargetConfig
 from ..schema_dsl.output_enums import (
@@ -85,37 +86,33 @@ def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, o
     return str(out_cfg.name or ""), _outputs_path_ref(outputs_path, int(idx), "name")
 
 
-def _effective_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
-    base = book.write_defaults
-    if base is not None:
-        return base
-    return BookWriteDefaultsConfig(
-        mode=str(DEFAULT_BOOK_WRITE_MODE),
-        align_by=str(DEFAULT_BOOK_WRITE_ALIGN_BY),
-        header_policy=str(DEFAULT_BOOK_WRITE_HEADER_POLICY),
-        on_mismatch=str(DEFAULT_BOOK_WRITE_ON_MISMATCH),
-        on_conflict=str(DEFAULT_BOOK_WRITE_ON_CONFLICT),
-    )
+def _effective_write_defaults(
+    book_id: str,
+    *,
+    resources_policy: Optional[object] = None,
+) -> BookWriteDefaultsConfig:
+    policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
+    return resolve_write_defaults_config(book_id=str(book_id), resources_policy=policy)
 
 
 def _validate_xlsx_memory_align_by(
     *,
     book: BookConfig,
     book_id: str,
+    effective_defaults: BookWriteDefaultsConfig,
 ) -> None:
     if str(book.kind or "").strip() != "xlsx_memory":
         return
 
-    effective_defaults = _effective_write_defaults(book)
     if str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE) != "append":
         return
     if str(effective_defaults.align_by or "") != "header":
         return
 
-    align_by_path = "resources.books.{}.write_defaults.align_by".format(str(book_id))
+    align_by_path = "resources_policy.books.{}.write.align_by".format(str(book_id))
     msg = (
-        "books.kind=xlsx_memory does not support write_defaults.align_by=header; "
-        "internal rows only use canonical field keys. Migrate to resources.books.<book_id>.write_defaults.align_by=field_id "
+        "books.kind=xlsx_memory does not support BookWritePolicy.align_by=header; "
+        "internal rows only use canonical field keys. Migrate to BookWriteAlignBy.FIELD_ID "
         "and keep write.header_fields_output_by for export display (book_id={!r})"
     ).format(str(book_id))
     raise ScalimWorkflowConfigError(msg, path=str(align_by_path))
@@ -255,6 +252,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     effective_files: Mapping[str, FileConfig],
     overrides_outputs: Optional[Sequence[OutputOverride]],
     default_book_id: Optional[str],
+    resources_policy: Optional[object] = None,
 ) -> Dict[str, List[str]]:
     last_write_node_id_by_book_id: Dict[str, str] = {}
     last_write_node_id_by_file_id: Dict[str, str] = {}
@@ -338,6 +336,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             _validate_xlsx_memory_align_by(
                 book=book,
                 book_id=str(book_id),
+                effective_defaults=_effective_write_defaults(str(book_id), resources_policy=resources_policy),
             )
 
             sheet_name, sheet_ref_path = _effective_sheet_name_for_output(out_cfg, idx=int(out_idx), outputs_path=outputs_path)
@@ -346,7 +345,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             except ValueError as exc:
                 raise ScalimWorkflowConfigError(str(exc), path=str(sheet_ref_path)) from exc
 
-            base_defaults = _effective_write_defaults(book)
+            base_defaults = _effective_write_defaults(str(book_id), resources_policy=resources_policy)
             effective_defaults = base_defaults
             mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
 
@@ -370,7 +369,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 input_output_id=str(out_cfg.name),
                 mode=str(mode),
                 write_defaults=effective_defaults,
-                write_defaults_mode_path="workflow.resources.books.{}.write_defaults.mode".format(str(book_id)),
+                write_defaults_mode_path="resources_policy.books.{}.write.mode".format(str(book_id)),
             )
 
             nodes.append(node)
@@ -427,12 +426,13 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 )
                 raise ScalimWorkflowConfigError(msg, path=str(default_book_ref))
 
-            base_defaults = _effective_write_defaults(book)
+            base_defaults = _effective_write_defaults(str(default_book_id), resources_policy=resources_policy)
             effective_defaults = base_defaults
             mode = str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE)
             _validate_xlsx_memory_align_by(
                 book=book,
                 book_id=str(default_book_id),
+                effective_defaults=effective_defaults,
             )
 
             for extra_id, extra_cfg_obj, default_sheet in extras:
@@ -464,7 +464,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                     input_output_id=str(extra_id),
                     mode=str(mode),
                     write_defaults=effective_defaults,
-                    write_defaults_mode_path="workflow.resources.books.{}.write_defaults.mode".format(str(default_book_id)),
+                    write_defaults_mode_path="resources_policy.books.{}.write.mode".format(str(default_book_id)),
                 )
 
                 nodes.append(node)
@@ -532,16 +532,25 @@ def effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, ou
     return _effective_sheet_name_for_output(out_cfg, idx=idx, outputs_path=outputs_path)
 
 
-def effective_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
-    return _effective_write_defaults(book)
+def effective_write_defaults(
+    book_id: str,
+    *,
+    resources_policy: Optional[object] = None,
+) -> BookWriteDefaultsConfig:
+    return _effective_write_defaults(str(book_id), resources_policy=resources_policy)
 
 
 def validate_xlsx_memory_align_by(
     *,
     book: BookConfig,
     book_id: str,
+    effective_defaults: Optional[BookWriteDefaultsConfig] = None,
+    resources_policy: Optional[object] = None,
 ) -> None:
-    _validate_xlsx_memory_align_by(book=book, book_id=book_id)
+    defaults = effective_defaults
+    if defaults is None:
+        defaults = _effective_write_defaults(str(book_id), resources_policy=resources_policy)
+    _validate_xlsx_memory_align_by(book=book, book_id=book_id, effective_defaults=defaults)
 
 
 def load_demands(
@@ -629,6 +638,7 @@ def append_write_nodes_from_runs(
     effective_files: Mapping[str, FileConfig],
     overrides_outputs: Optional[Sequence[OutputOverride]],
     default_book_id: Optional[str],
+    resources_policy: Optional[object] = None,
 ) -> Dict[str, List[str]]:
     return _append_write_nodes_from_runs(
         wf_obj,
@@ -639,6 +649,7 @@ def append_write_nodes_from_runs(
         effective_files=effective_files,
         overrides_outputs=overrides_outputs,
         default_book_id=default_book_id,
+        resources_policy=resources_policy,
     )
 
 

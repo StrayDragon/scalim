@@ -290,7 +290,7 @@ workflow YAML 只负责两件事:
   - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
   - oneOf 分支写法: `xlsx_file` / `xlsx_memory`
 - 输出到 book 的绑定: `outputs[*].to.book` / `outputs[*].to.sheet`
-- 写入策略: `resources.books.*.write_defaults`(workbook SSOT) + `outputs[*].write`(仅 output-local header 行为: `include_header` / `header_fields_output_by`)
+- 写入策略: Python `ResourcesPolicy` / `BookWritePolicy`（`WorkflowRunOptions.resources_policy` 或 `DemandRunOptions.resources_policy`；省略则用 builtin defaults）+ `outputs[*].write`（仅 output-local header 行为: `include_header` / `header_fields_output_by`）
 
 约定:
 
@@ -305,7 +305,7 @@ workflow YAML 只负责两件事:
 示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
 
 说明:
-- 对 `xlsx_memory` 分支,`budget` 为可选项；缺省时视为 unlimited(不启用预算护栏)。若需要护栏,请显式声明 `budget.max_sheets/max_total_cells`。
+- 对 `xlsx_memory` 分支,内存 `budget` 已迁出 YAML；缺省 unlimited。若需要护栏,在 Python 侧配置 `BookBudgetPolicy`（经 `WorkflowRunOptions.resources_policy`）。
 
 workflow YAML:
 
@@ -317,8 +317,6 @@ workflow:
         xlsx_memory:
           export_xlsx:
             path: ./out
-          # 可选预算护栏:
-          # budget: {max_sheets: 16, max_total_cells: 2000000}
 
   runs:
     - id: main
@@ -342,13 +340,32 @@ outputs:
 当前暂不扩展 workflow runner CLI; 先用 Python 入口:
 
 ```python
-from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+from scalim.dsl.yaml_dsl import (
+    BookBudgetPolicy,
+    BookResourcePolicy,
+    BookWriteMode,
+    BookWritePolicy,
+    DemandRunOptions,
+    DemandRunSecurityOptions,
+    ResourcesPolicy,
+    WorkflowRunOptions,
+    run_workflow,
+)
 
 result = run_workflow(
     "path/to/workflow.yaml",
     options=WorkflowRunOptions(
         demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
         path_aliases={"@": "/abs/project_root"},
+        # 可选: book 写入策略 / 内存预算（省略则用 builtin defaults / unlimited）
+        resources_policy=ResourcesPolicy(
+            books={
+                "report": BookResourcePolicy(
+                    write=BookWritePolicy(mode=BookWriteMode.SHEET),
+                    budget=BookBudgetPolicy(max_sheets=16, max_total_cells=2_000_000),
+                )
+            }
+        ),
     ),
 )
 

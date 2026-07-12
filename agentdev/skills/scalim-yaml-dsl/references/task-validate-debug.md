@@ -73,6 +73,13 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 
 - 按 [task-upgrade-legacy.md](task-upgrade-legacy.md) 直接改到新结构
 
+### `write_defaults was removed` / `xlsx_memory.budget was removed`
+
+- book 写入策略与内存预算已迁出 YAML
+- 删除 YAML 字段后,在 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy` 配置
+- SSOT: [upgrades/2026-07-12-book-write-policy-python-ssot.md](upgrades/2026-07-12-book-write-policy-python-ssot.md)
+- workflow 场景更多排错见 [task-workflow-validate-debug.md](task-workflow-validate-debug.md)
+
 ### `Legacy YAML syntax is not supported: top-level 'output'. ...`
 
 - 顶层 `output:` 已移除;必须升级为 `outputs:`(list)

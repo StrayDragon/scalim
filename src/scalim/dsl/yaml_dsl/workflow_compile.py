@@ -91,11 +91,13 @@ def compile_workflow_ir(
     init_vars: Optional[Dict[str, object]] = None,
     overrides: Optional[object] = None,
     workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
+    resources_policy: Optional[object] = None,
 ) -> WorkflowCompileResult:
     """将工作流配置编译为工作流 `IR`.
 
     说明:
     - `overrides` 为 `RunOverrides` 强类型覆盖项,用于 `resources` 覆盖、`outputs_defaults` 与 `outputs` 替换.
+    - `resources_policy` 为 `book` 写入策略/预算 `Python` `SSOT`(可选;缺省 `builtin` `defaults`).
     """
     if overrides is not None and not isinstance(overrides, RunOverrides):
         msg = (
@@ -143,6 +145,7 @@ def compile_workflow_ir(
         demand_yaml_paths_by_run_id=demand_yaml_paths_by_run_id,
         init_vars=init_vars,
         overrides_resources=overrides_resources,
+        resources_policy=resources_policy,
     )
 
     xlsx_memory_write_node_ids_by_run_id = _append_write_nodes_from_runs(
@@ -154,6 +157,7 @@ def compile_workflow_ir(
         effective_files=effective_files,
         overrides_outputs=overrides_outputs,
         default_book_id=default_book_id,
+        resources_policy=resources_policy,
     )
 
     _inject_xlsx_memory_write_dependencies(

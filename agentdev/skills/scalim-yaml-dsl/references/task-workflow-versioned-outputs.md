@@ -17,6 +17,17 @@
 
 > 注意：v1 不提供 tenant/namespace 维度；root 自身就是 namespace 边界。服务端多租户/多请求并发场景优先用“每请求一个 root”。
 
+### 相对路径解析基准(易踩坑)
+
+- demand YAML 里的相对 `path` / `export_xlsx.path`(例如 `./out`)相对 **该 demand YAML 所在目录**,不是进程 cwd。
+- workflow 托管 `workflow.resources.books` 的相对 path 相对 **workflow YAML 所在目录**。
+- `WorkflowRunOptions.path_aliases` 只解析 `run.demand` 路径(`@/...`),不改变 book/file output root 的相对基准。
+- 环境相关 root 推荐:
+  1. YAML: `path: {$init_var: out_root}` + Python `init_vars={"out_root": str(abs_root)}`
+  2. 或 `RunOverrides(resources=ResourcesOverride(books={...: BookResourceOverride(path=str(abs_root))}))`
+  3. 或直接写绝对路径
+- book 写入策略 / 内存 budget 不在 path 层: 用 `resources_policy`,不要写回 YAML `write_defaults`/`budget`。
+
 ## 目录布局(约定)
 
 ```

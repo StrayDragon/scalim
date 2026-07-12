@@ -8,24 +8,10 @@ from ....workflow.errors import ScalimWorkflowConfigError
 from ..init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
-    BookWriteDefaultsConfig,
     FileConfig,
     ResourcesConfig,
-)
-from ..schema_dsl.output_enums import (
-    BOOK_WRITE_ALIGN_BY_ENUM,
-    BOOK_WRITE_HEADER_POLICY_ENUM,
-    BOOK_WRITE_MODE_ENUM,
-    BOOK_WRITE_ON_CONFLICT_ENUM,
-    BOOK_WRITE_ON_MISMATCH_ENUM,
-    DEFAULT_BOOK_WRITE_ALIGN_BY,
-    DEFAULT_BOOK_WRITE_HEADER_POLICY,
-    DEFAULT_BOOK_WRITE_MODE,
-    DEFAULT_BOOK_WRITE_ON_CONFLICT,
-    DEFAULT_BOOK_WRITE_ON_MISMATCH,
 )
 from ._models import (
     WorkflowConfig,
@@ -212,47 +198,6 @@ def _parse_path_or_init_var(raw: object, *, path: str) -> OptionalPathNode:
     raise ScalimWorkflowConfigError(msg, path=path)
 
 
-def _parse_book_budget(raw: object, *, path: str) -> BookBudgetConfig:
-    msg: str
-    if not isinstance(raw, dict):
-        msg = "{} must be a mapping".format(path)
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
-    _raise_if_import_present(data, path=path)
-    unknown = sorted({str(k) for k in data} - {"max_sheets", "max_total_cells"})
-    if unknown:
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    max_sheets_raw = data.get("max_sheets")
-    max_total_cells_raw = data.get("max_total_cells")
-    if max_sheets_raw is None:
-        msg = "{}.max_sheets must be an integer >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_sheets".format(path))
-    if max_total_cells_raw is None:
-        msg = "{}.max_total_cells must be an integer >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_total_cells".format(path))
-    try:
-        max_sheets = int(max_sheets_raw)
-    except (TypeError, ValueError) as exc:
-        msg = "{}.max_sheets must be an integer >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_sheets".format(path)) from exc
-    try:
-        max_total_cells = int(max_total_cells_raw)
-    except (TypeError, ValueError) as exc:
-        msg = "{}.max_total_cells must be an integer >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_total_cells".format(path)) from exc
-    if max_sheets < 1:
-        msg = "{}.max_sheets must be >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_sheets".format(path))
-    if max_total_cells < 1:
-        msg = "{}.max_total_cells must be >= 1".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.max_total_cells".format(path))
-
-    return BookBudgetConfig(max_sheets=max_sheets, max_total_cells=max_total_cells)
-
-
 def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
     msg: str
     if not isinstance(raw, dict):
@@ -288,53 +233,6 @@ def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
     return BookExportXlsxConfig(path=export_path, allow_formulas=bool(allow_formulas_raw))
 
 
-def _parse_book_write_defaults(raw: object, *, path: str) -> BookWriteDefaultsConfig:
-    msg: str
-    if not isinstance(raw, dict):
-        msg = "{} must be a mapping".format(path)
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
-    _raise_if_import_present(data, path=path)
-    unknown = sorted({str(k) for k in data} - {"mode", "align_by", "header_policy", "on_mismatch", "on_conflict"})
-    if unknown:
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    mode = str(data.get("mode") or DEFAULT_BOOK_WRITE_MODE).strip() or DEFAULT_BOOK_WRITE_MODE
-    if mode not in BOOK_WRITE_MODE_ENUM:
-        msg = "{}.mode={!r} is invalid; expected one of: {}".format(path, mode, ", ".join(BOOK_WRITE_MODE_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.mode".format(path))
-
-    align_by = str(data.get("align_by") or DEFAULT_BOOK_WRITE_ALIGN_BY).strip() or DEFAULT_BOOK_WRITE_ALIGN_BY
-    if align_by not in BOOK_WRITE_ALIGN_BY_ENUM:
-        msg = "{}.align_by={!r} is invalid; expected one of: {}".format(path, align_by, ", ".join(BOOK_WRITE_ALIGN_BY_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.align_by".format(path))
-
-    header_policy = str(data.get("header_policy") or DEFAULT_BOOK_WRITE_HEADER_POLICY).strip() or DEFAULT_BOOK_WRITE_HEADER_POLICY
-    if header_policy not in BOOK_WRITE_HEADER_POLICY_ENUM:
-        msg = "{}.header_policy={!r} is invalid; expected one of: {}".format(path, header_policy, ", ".join(BOOK_WRITE_HEADER_POLICY_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.header_policy".format(path))
-
-    on_mismatch = str(data.get("on_mismatch") or DEFAULT_BOOK_WRITE_ON_MISMATCH).strip() or DEFAULT_BOOK_WRITE_ON_MISMATCH
-    if on_mismatch not in BOOK_WRITE_ON_MISMATCH_ENUM:
-        msg = "{}.on_mismatch={!r} is invalid; expected one of: {}".format(path, on_mismatch, ", ".join(BOOK_WRITE_ON_MISMATCH_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.on_mismatch".format(path))
-
-    on_conflict = str(data.get("on_conflict") or DEFAULT_BOOK_WRITE_ON_CONFLICT).strip() or DEFAULT_BOOK_WRITE_ON_CONFLICT
-    if on_conflict not in BOOK_WRITE_ON_CONFLICT_ENUM:
-        msg = "{}.on_conflict={!r} is invalid; expected one of: {}".format(path, on_conflict, ", ".join(BOOK_WRITE_ON_CONFLICT_ENUM))
-        raise ScalimWorkflowConfigError(msg, path="{}.on_conflict".format(path))
-
-    return BookWriteDefaultsConfig(
-        mode=mode,
-        align_by=align_by,
-        header_policy=header_policy,
-        on_mismatch=on_mismatch,
-        on_conflict=on_conflict,
-    )
-
-
 def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
     msg: str
     if not isinstance(raw, dict):
@@ -355,24 +253,26 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
                 "{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}}."
             ).format(path, path)
         elif kind == "xlsx_memory":
-            msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_memory: {{budget?: ..., export_xlsx?: ...}}.").format(
-                path, path
-            )
+            msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_memory: {{export_xlsx?: ...}}.").format(path, path)
         else:
             msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{...}} or {}.xlsx_memory: {{...}}.").format(
                 path, path, path
             )
         raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
 
-    allowed_keys = {"xlsx_file", "xlsx_memory", "write_defaults"}
+    if "write_defaults" in cfg:
+        msg = (
+            "{}.write_defaults was removed from YAML authoring. "
+            "Migration: configure BookWritePolicy via WorkflowRunOptions.resources_policy "
+            "(Python SSOT; omit for builtin defaults)."
+        ).format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.write_defaults".format(path))
+
+    allowed_keys = {"xlsx_file", "xlsx_memory"}
     unknown = sorted({str(k) for k in cfg} - allowed_keys)
     if unknown:
         msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
         raise ScalimWorkflowConfigError(msg, path=path)
-
-    write_defaults_cfg = (
-        _parse_book_write_defaults(cfg.get("write_defaults"), path="{}.write_defaults".format(path)) if "write_defaults" in cfg else None
-    )
 
     has_xlsx_file = "xlsx_file" in cfg
     has_xlsx_memory = "xlsx_memory" in cfg
@@ -419,7 +319,7 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
             budget=None,
             export_xlsx=None,
             allow_formulas=bool(allow_formulas_raw),
-            write_defaults=write_defaults_cfg,
+            write_defaults=None,
         )
 
     xlsx_memory_raw = cfg.get("xlsx_memory")
@@ -428,7 +328,14 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
         raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory".format(path))
     xlsx_memory = cast("Dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
     _raise_if_import_present(xlsx_memory, path="{}.xlsx_memory".format(path))
-    unknown_branch = sorted({str(k) for k in xlsx_memory} - {"budget", "export_xlsx"})
+    if "budget" in xlsx_memory:
+        msg = (
+            "{}.xlsx_memory.budget was removed from YAML authoring. "
+            "Migration: configure BookBudgetPolicy via WorkflowRunOptions.resources_policy "
+            "(Python SSOT; omit for unlimited)."
+        ).format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory.budget".format(path))
+    unknown_branch = sorted({str(k) for k in xlsx_memory} - {"export_xlsx"})
     if unknown_branch:
         if "write_lock" in unknown_branch:
             msg = (
@@ -438,9 +345,6 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
         msg = "{}.xlsx_memory has unknown keys: {}".format(path, ", ".join(unknown_branch))
         raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory".format(path))
 
-    budget_cfg = (
-        _parse_book_budget(xlsx_memory.get("budget"), path="{}.xlsx_memory.budget".format(path)) if "budget" in xlsx_memory else None
-    )
     export_cfg = (
         _parse_book_export_xlsx(xlsx_memory.get("export_xlsx"), path="{}.xlsx_memory.export_xlsx".format(path))
         if "export_xlsx" in xlsx_memory
@@ -452,10 +356,10 @@ def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, 
     return BookConfig(
         kind="xlsx_memory",
         path=None,
-        budget=budget_cfg,
+        budget=None,
         export_xlsx=export_cfg,
         allow_formulas=False,
-        write_defaults=write_defaults_cfg,
+        write_defaults=None,
     )
 
 

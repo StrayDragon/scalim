@@ -1,6 +1,6 @@
 ---
 name: scalim-yaml-dsl
-description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,并为旧报表脚本规划渐进迁移到 YAML DSL 的方案。适用于 `scalim-cli yaml-dsl`、YAML LSP/schema 配置、修复 `scalim-cli yaml-dsl validate` / `scalim-cli yaml-dsl schema validate` 报错、以及判断哪些逻辑应留在 Python 与哪些应下沉到 YAML 的场景。"
+description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/workflow)配置,并为旧报表脚本规划渐进迁移。覆盖 resources.books identity、outputs→book 绑定、Python ResourcesPolicy/BookWritePolicy/BookBudgetPolicy(write_defaults 与 xlsx_memory.budget 已迁出)、RunOverrides IO overlay、path/init_var 输出 root、以及 scalim-cli yaml-dsl validate/schema。适用于修复 validate 报错、迁移 write_defaults/budget、判断逻辑应留在 Python 还是下沉 YAML 的场景。"
 ---
 
 # Scalim YAML DSL
@@ -8,7 +8,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 先识别任务类型,只读取最少的 reference:
 
 - 新写或改写 YAML: 读 [references/task-authoring.md](references/task-authoring.md)
-- 新写或改写 workflow YAML(编排多 demand / `workflow.resources.books` / outputs→book 绑定): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
+- 新写或改写 workflow YAML(编排多 demand / `workflow.resources.books` / outputs→book 绑定 / `resources_policy`): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
 - 运行时故障处理(服务端/工作目录/PYTHONPATH 导致的相对引用问题): 读 [references/task-runtime-troubleshooting.md](references/task-runtime-troubleshooting.md)
@@ -17,7 +17,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL 配置,
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
-- 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`
+- 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`(book write/budget: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)
 - 需要全量语法/API: 读 [references/syntax-catalog.gen.md](references/syntax-catalog.gen.md) 和 [references/generated/cli-lsp-reference.gen.md](references/generated/cli-lsp-reference.gen.md)
 - 需要完整 canonical example: 读 [references/generated/example-full/ecommerce_report.gen.yaml](references/generated/example-full/ecommerce_report.gen.yaml)
 
@@ -82,6 +82,8 @@ run_workflow(
 - 不要硬记/猜语法: 以 schema / 生成文档为准(需要时看 `references/syntax-catalog.gen.md`、`references/generated/cli-lsp-reference.gen.md`、`references/generated/example-full/ecommerce_report.gen.yaml`)
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
+- YAML `resources.books` 只声明 identity(`xlsx_file`/`xlsx_memory` + path/export);`write_defaults` 与 `xlsx_memory.budget` 已迁出,出现即 fail-fast → 用 `WorkflowRunOptions`/`DemandRunOptions.resources_policy`(`BookWritePolicy`/`BookBudgetPolicy`,StrEnum 严格 in);详见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- `path` / `export_xlsx.path` 是输出 root 目录:相对路径相对 **声明该路径的 YAML 文件目录**(不是进程 cwd);环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride`(IO-only overlay,不再含 write/budget)
 - workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 outputs→book 绑定等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
 - 若 Python 侧使用 `overrides.outputs` 把 workbook outputs 整体替换为非 workbook 输出,未显式 `path` 的 `meta/audit`

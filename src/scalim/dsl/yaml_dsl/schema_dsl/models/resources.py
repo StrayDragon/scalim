@@ -195,7 +195,7 @@ class BookXlsxMemoryConfig:
 
     budget: Optional[BookBudgetConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc="可选: 预算配置(缺省为 unlimited)", ref="book_budget"),
+        metadata=schema_omit(),
     )
 
     export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
@@ -253,7 +253,7 @@ class BookConfig:
 
     write_defaults: Optional[BookWriteDefaultsConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc="可选:默认写入语义与冲突策略", ref="book_write_defaults"),
+        metadata=schema_omit(),
     )
 
     xlsx_file: Optional[BookXlsxFileConfig] = dataclass_field(
@@ -268,8 +268,8 @@ class BookConfig:
     xlsx_memory: Optional[BookXlsxMemoryConfig] = dataclass_field(
         default=None,
         metadata=schema_meta(
-            desc="xlsx_memory: 内存 book 配置(可选预算与导出)",
-            md="xlsx_memory: 内存 book 配置.\n\n- 可选: `budget`\n- 可选: `export_xlsx`",
+            desc="xlsx_memory: 内存 book 配置(可选导出)",
+            md="xlsx_memory: 内存 book 配置.\n\n- 可选: `export_xlsx`\n- `budget`/`write_defaults` 已迁出 YAML(Python ResourcesPolicy)",
             ref="book_xlsx_memory",
         ),
     )

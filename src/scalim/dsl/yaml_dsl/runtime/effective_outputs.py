@@ -10,6 +10,7 @@
 from typing import List, Optional, Tuple
 
 from ....vendor.dataclassesx import replace
+from ..book_resource_policy import ResourcesPolicy, resolve_write_defaults_config
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig
 from ..schema_dsl.output_enums import DEFAULT_BOOK_WRITE_HEADER_POLICY, DEFAULT_BOOK_WRITE_MODE
@@ -49,25 +50,18 @@ def effective_book_write_mode(
     *,
     resources_override: Optional[ResourcesOverride],
     book_id: str,
+    resources_policy: Optional[object] = None,
 ) -> str:
-    mode = str(DEFAULT_BOOK_WRITE_MODE)
-
+    _ = resources_override  # `IO` `overlay` 不再承载 `write` `policy`
+    policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
     book_cfg = None
     if config.resources is not None:
         book_cfg = config.resources.books.get(str(book_id))
     if book_cfg is not None and book_cfg.write_defaults is not None:
         raw_text = str(book_cfg.write_defaults.mode or "").strip()
         if raw_text:
-            mode = raw_text
-
-    if resources_override is not None and resources_override.books is not None:
-        book_override = resources_override.books.get(str(book_id))
-        if book_override is not None and book_override.write_defaults is not None:
-            raw_text = str(book_override.write_defaults.mode or "").strip()
-            if raw_text:
-                mode = raw_text
-
-    return mode
+            return raw_text
+    return str(resolve_write_defaults_config(book_id=str(book_id), resources_policy=policy).mode or DEFAULT_BOOK_WRITE_MODE)
 
 
 def effective_book_header_policy(
@@ -75,25 +69,20 @@ def effective_book_header_policy(
     *,
     resources_override: Optional[ResourcesOverride],
     book_id: str,
+    resources_policy: Optional[object] = None,
 ) -> str:
-    header_policy = str(DEFAULT_BOOK_WRITE_HEADER_POLICY)
-
+    _ = resources_override  # `IO` `overlay` 不再承载 `write` `policy`
+    policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
     book_cfg = None
     if config.resources is not None:
         book_cfg = config.resources.books.get(str(book_id))
     if book_cfg is not None and book_cfg.write_defaults is not None:
         raw_text = str(book_cfg.write_defaults.header_policy or "").strip()
         if raw_text:
-            header_policy = raw_text
-
-    if resources_override is not None and resources_override.books is not None:
-        book_override = resources_override.books.get(str(book_id))
-        if book_override is not None and book_override.write_defaults is not None:
-            raw_text = str(book_override.write_defaults.header_policy or "").strip()
-            if raw_text:
-                header_policy = raw_text
-
-    return header_policy
+            return raw_text
+    return str(
+        resolve_write_defaults_config(book_id=str(book_id), resources_policy=policy).header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY
+    )
 
 
 def output_target_requires_unique_effective_field_display_names(
@@ -101,6 +90,7 @@ def output_target_requires_unique_effective_field_display_names(
     output: OutputTargetConfig,
     *,
     resources_override: Optional[ResourcesOverride],
+    resources_policy: Optional[object] = None,
 ) -> bool:
     to_cfg = output.to
     if to_cfg is None:
@@ -124,8 +114,10 @@ def output_target_requires_unique_effective_field_display_names(
     if not book_id:
         return False
 
-    mode = effective_book_write_mode(config, resources_override=resources_override, book_id=str(book_id))
-    header_policy = effective_book_header_policy(config, resources_override=resources_override, book_id=str(book_id))
+    mode = effective_book_write_mode(config, resources_override=resources_override, book_id=str(book_id), resources_policy=resources_policy)
+    header_policy = effective_book_header_policy(
+        config, resources_override=resources_override, book_id=str(book_id), resources_policy=resources_policy
+    )
 
     if str(mode).strip() == "append":
         return header_policy != "never"
@@ -142,6 +134,7 @@ def output_override_requires_unique_effective_field_display_names(
     *,
     default_book_id: Optional[str],
     resources_override: Optional[ResourcesOverride],
+    resources_policy: Optional[object] = None,
 ) -> bool:
     to_cfg = output.to
     write_cfg = output.write
@@ -165,8 +158,10 @@ def output_override_requires_unique_effective_field_display_names(
     if not book_id:
         return False
 
-    mode = effective_book_write_mode(config, resources_override=resources_override, book_id=str(book_id))
-    header_policy = effective_book_header_policy(config, resources_override=resources_override, book_id=str(book_id))
+    mode = effective_book_write_mode(config, resources_override=resources_override, book_id=str(book_id), resources_policy=resources_policy)
+    header_policy = effective_book_header_policy(
+        config, resources_override=resources_override, book_id=str(book_id), resources_policy=resources_policy
+    )
 
     if str(mode).strip() == "append":
         return header_policy != "never"
@@ -182,9 +177,12 @@ def outputs_require_unique_effective_field_display_names(
     *,
     outputs: Tuple[OutputTargetConfig, ...],
     resources_override: Optional[ResourcesOverride],
+    resources_policy: Optional[object] = None,
 ) -> bool:
     return any(
-        output_target_requires_unique_effective_field_display_names(config, out_cfg, resources_override=resources_override)
+        output_target_requires_unique_effective_field_display_names(
+            config, out_cfg, resources_override=resources_override, resources_policy=resources_policy
+        )
         for out_cfg in outputs
     )
 
@@ -195,6 +193,7 @@ def output_overrides_require_unique_effective_field_display_names(
     outputs: Tuple[OutputOverride, ...],
     default_book_id: Optional[str],
     resources_override: Optional[ResourcesOverride],
+    resources_policy: Optional[object] = None,
 ) -> bool:
     return any(
         output_override_requires_unique_effective_field_display_names(
@@ -202,6 +201,7 @@ def output_overrides_require_unique_effective_field_display_names(
             out_override,
             default_book_id=default_book_id,
             resources_override=resources_override,
+            resources_policy=resources_policy,
         )
         for out_override in outputs
     )
@@ -216,6 +216,7 @@ def options_require_unique_effective_field_display_names(
     outputs_override = None if overrides is None else overrides.outputs
     defaults = None if overrides is None else overrides.outputs_defaults
     resources_override = None if overrides is None else overrides.resources
+    resources_policy = options.resources_policy
 
     default_book_id = None
     if defaults is not None and isinstance(defaults, OutputsDefaultsOverride):
@@ -227,6 +228,7 @@ def options_require_unique_effective_field_display_names(
             outputs=tuple(outputs_override),
             default_book_id=default_book_id,
             resources_override=resources_override,
+            resources_policy=resources_policy,
         )
 
     outputs = tuple(config.outputs)
@@ -236,4 +238,5 @@ def options_require_unique_effective_field_display_names(
         config,
         outputs=outputs,
         resources_override=resources_override,
+        resources_policy=resources_policy,
     )

@@ -1,5 +1,9 @@
 # 2026-03-13: yaml-reuse-workflow
 
+> **Superseded (部分)**: 文中若仍出现 `workflow.options.cache_pool` / `share_preload_cache` 的 YAML 写法,已迁出 runtime policy boundary。
+> 当前请用 Python `WorkflowRunOptions` 的 runtime/cache_pool preset；YAML 再写 `workflow.options.*` 会 fail-fast。
+> book 写入/budget 边界见 `2026-07-12-book-write-policy-python-ssot.md`。imports/`run_workflow` 主体仍有效。
+
 ## 变更摘要
 
 本批次聚焦 YAML DSL 的“复用与编排”能力:

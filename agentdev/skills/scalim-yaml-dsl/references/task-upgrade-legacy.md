@@ -18,6 +18,18 @@
 2) 优先读生成的 upgrades 摘要: `references/generated/yaml-dsl-upgrades.gen.md`
 3) 再按摘要里的路径打开对应批次的完整升级文档(`references/upgrades/*.md`)
 
+### 错误症状 → 优先打开的批次(快速路径)
+
+| 症状 / 关键词 | 打开 |
+|---|---|
+| `write_defaults was removed` / YAML `resources.books.*.write_defaults` | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md` |
+| `xlsx_memory.budget was removed` / YAML book `budget` | 同上 |
+| `BookWriteDefaultsOverride` / `BookBudgetOverride` / write·budget overlay | 同上 |
+| `workflow.options` / `cache_pool` in YAML / `share_preload_cache` | 查 upgrades 摘要里 runtime-policy / workflow 相关批次；**不要**照抄 `2026-03-18` 里已过时的 `workflow.options.ctx` / `sheetbooks` 写法 |
+| `sheetbooks` / `workbooks` / `writes:` (旧 workflow 字段) | 先读 `2026-03-18` 理解历史，再以当前 `resources.books` + `2026-07-12` policy 为准 |
+
+说明: AUTOGEN 索引按时间列出全部批次；**当前权威**以 SKILL 硬规则 + 最新相关 upgrade 为准，旧批次仅作迁移上下文。
+
 ## YAML DSL 升级批次索引 (自动生成)
 
 <!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->
@@ -71,6 +83,10 @@
 - 2026-04-08: yaml-dsl-api-naming-alignment
   - SSOT: `references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md`
   - llmanspec: `llmanspec/changes/archive/2026-04-07-c1-yaml-dsl-api-naming-alignment/`
+- 2026-07-12: book-write-policy-python-ssot
+  - SSOT: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+  - llmanspec: `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`
+  - Spec: `llmanspec/specs/yaml-dsl-books-resources/spec.toon`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`
@@ -99,6 +115,9 @@
 - `derived`
 - `key_transform`
 - `primary`
+- `resources.books.*.write_defaults`(迁到 Python `BookWritePolicy` / `resources_policy`;见 `2026-07-12-book-write-policy-python-ssot.md`)
+- `resources.books.*.xlsx_memory.budget`(迁到 Python `BookBudgetPolicy`;同上)
+- `workflow.options.*`(runtime policy boundary;不要写回 YAML)
 
 ### 2. 顶层 `fields`
 

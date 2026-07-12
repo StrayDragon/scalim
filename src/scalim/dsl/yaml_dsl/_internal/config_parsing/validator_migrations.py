@@ -145,7 +145,8 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                     path="outputs.{}.write.{}".format(int(idx), str(key)),
                     msg=(
                         "YAML key 'outputs[*].write.{}' was moved out of output-local write config. "
-                        "Hint: configure workbook write policy via resources.books.*.write_defaults.{}."
+                        "Hint: configure workbook write policy via DemandRunOptions.resources_policy "
+                        "/ WorkflowRunOptions.resources_policy (BookWritePolicy.{})."
                     ).format(str(key), str(key)),
                 )
                 next_write.pop(key, None)
@@ -325,6 +326,81 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                     next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
                     next_books[str(raw_book_id)] = next_book_cfg
                     next_resources[RESOURCES_KEYS["books"]] = next_books
+
+        return config if next_config is None else next_config
+
+    def _error_and_strip_removed_resources_write_budget_fields(  # noqa: C901
+        self,
+        config: Dict[str, Any],
+        issues: List["ValidationIssue"],
+    ) -> Dict[str, Any]:
+        resources_raw: object = config.get(DEMAND_KEYS["resources"])
+        if not _is_dict(resources_raw):
+            return config
+
+        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        books_raw = resources.get(RESOURCES_KEYS["books"])
+        if not _is_dict(books_raw):
+            return config
+        books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+        write_hint = (
+            "write_defaults was removed from YAML authoring (Python ResourcesPolicy SSOT). "
+            "Migration: configure BookWritePolicy via DemandRunOptions.resources_policy "
+            "or WorkflowRunOptions.resources_policy; omit for builtin defaults."
+        )
+        budget_hint = (
+            "xlsx_memory.budget was removed from YAML authoring (Python ResourcesPolicy SSOT). "
+            "Migration: configure BookBudgetPolicy via DemandRunOptions.resources_policy "
+            "or WorkflowRunOptions.resources_policy; omit for unlimited."
+        )
+
+        next_config: Optional[Dict[str, Any]] = None
+
+        def _ensure_next_resources() -> Dict[str, Any]:
+            nonlocal next_config
+            if next_config is None:
+                next_config = dict(config)
+                next_config[DEMAND_KEYS["resources"]] = dict(resources)
+            return cast("Dict[str, Any]", next_config[DEMAND_KEYS["resources"]])  # pragma: allow-cast
+
+        for raw_book_id, book_raw in books.items():
+            book_cfg = as_mapping(book_raw, path="resources.books.{}".format(raw_book_id))
+            if book_cfg is None:
+                continue
+            next_book_cfg: Optional[Dict[str, Any]] = None
+
+            if "write_defaults" in book_cfg:
+                ValidatorMigrationsMixin._append_removed_runtime_policy_error(
+                    issues,
+                    msg="resources.books.{}.write_defaults was removed; {}".format(raw_book_id, write_hint),
+                    path="resources.books.{}.write_defaults".format(raw_book_id),
+                )
+                next_book_cfg = dict(book_cfg)
+                next_book_cfg.pop("write_defaults", None)
+
+            xlsx_memory_raw = book_cfg.get(BOOK_KEYS["xlsx_memory"])
+            xlsx_memory_cfg = as_mapping(
+                xlsx_memory_raw,
+                path="resources.books.{}.xlsx_memory".format(raw_book_id),
+            )
+            if xlsx_memory_cfg is not None and "budget" in xlsx_memory_cfg:
+                ValidatorMigrationsMixin._append_removed_runtime_policy_error(
+                    issues,
+                    msg="resources.books.{}.xlsx_memory.budget was removed; {}".format(raw_book_id, budget_hint),
+                    path="resources.books.{}.xlsx_memory.budget".format(raw_book_id),
+                )
+                if next_book_cfg is None:
+                    next_book_cfg = dict(book_cfg)
+                next_xlsx_memory = dict(xlsx_memory_cfg)
+                next_xlsx_memory.pop("budget", None)
+                next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
+
+            if next_book_cfg is not None:
+                next_resources = _ensure_next_resources()
+                next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
+                next_books[str(raw_book_id)] = next_book_cfg
+                next_resources[RESOURCES_KEYS["books"]] = next_books
 
         return config if next_config is None else next_config
 

@@ -22,13 +22,13 @@ demand_top_fields[10	]{name	required}:
   relations	false
   resources	false
   outputs	false
-demand_definitions[24	]: book	book_budget	book_export_xlsx	book_write_defaults	book_xlsx_file	book_xlsx_memory	field	file	file_csv_file	guardrails	guardrails_compute	guardrails_loader	guardrails_relations	loader_retry	main_source	output_aggregate	output_extra_sheet	output_target	output_to	output_write	relation	resources	source	source_field_inline
+demand_definitions[22	]: book	book_export_xlsx	book_xlsx_file	book_xlsx_memory	field	file	file_csv_file	guardrails	guardrails_compute	guardrails_loader	guardrails_relations	loader_retry	main_source	output_aggregate	output_extra_sheet	output_target	output_to	output_write	relation	resources	source	source_field_inline
 llmanspec_requirement_map[15	]{slug	path	purpose	requirements}:
   yaml-dsl-schema	llmanspec/specs/yaml-dsl-schema/spec.toon	通过 dataclass 元数据生成 YAML DSL JSON Schema，作为校验与编辑器提示的唯一来源。	"YAML DSL JSON Schema generator MUST live in dev tooling and consume core SSOT\nschema generation entrypoint MUST remain single and output location MUST remain\nenums and defaults MUST be sourced from schema_dsl SSOT\nschema 生成器 MUST 支持文档标准化与 hover 指引\ndemand JSON Schema MUST validate source identifiers and reject empty loader/key\nYAML DSL JSON Schemas MUST allow YAML merge key (`<<`) where propertyNames is us\noutputs 字段 hover 指引明确可选与 overrides 推荐写法\nschema MUST expose the unified output target surface and reject legacy surfaces\ndemand JSON Schema MUST encode composed outputs invariants\n`header_fields_output_by` default is `name`\n顶层 schema 字段(guardrails)\n字段声明位置与 compute 约束\nschema documents `extract` as current-row-relative field extraction\nschema removes legacy `field` and provides migration guidance\nrelation steps-only 约束\noutput.fields 解析与 schema 指引\n字段 ID 唯一性与解析规则\n派生字段支持 call_by Schema\nschema meta key 参考文档与推荐写法\nschema meta 中 schema dict 不得吞掉 desc/md\nschema 明确 batch_size 的 null-or-int 语义\nretry 字段纳入 JSON Schema 与 hover 指引\ndemand JSON Schema MUST encode `lookup_cast` as a one-of cast-branch object\nschema 说明源代码级 `normalize` 及其执行顺序\n`outputs.*.fields` 支持 YAML alias 与 object 条目\nschema MUST support `{$init_var: <name>}` for resource paths\nkind-based `if/then` constraints MUST NOT trigger when `kind` is missing\nschema MUST NOT expose runtime policy fields"
   demand-dsl	llmanspec/specs/demand-dsl/spec.toon	实现 YAML DSL 的加载、结构校验与 IR 转换流程,覆盖 main_source/sources/fields/relations 等配置,并在解析阶段使用安全 resolver 解析 loader 引用与 allowlist 限制,生成 DemandIr 供计划构建使用.	"顶层结构与 IR 转换规则\nsource_id and sources keys MUST be valid identifiers and validated fail-fast\nunknown fields 诊断提供 suggestions(CLI/库一致)\nLoader 引用解析与 allowlist\ncallable preflight MUST run before building execution request\nSource/Bind 结构与 keys 分片参数\n使用语义清晰的配置 key 常量\nloader params templates support `{$runtime: <name>}` directives\n字段/关系表达式默认行为\nmain_source 批次排序配置\nbatch_size 语义、校验与一致性\nYAML DSL loader retry 配置\n`should_retry` 引用解析与 allowlist\n`normalize` 配置规则\naggregate 派生字段支持依赖驱动求值 (DAG)\naggregate fields 支持 safe compute 派生字段 (`compute`)"
   yaml-dsl-workflow	llmanspec/specs/yaml-dsl-workflow/spec.toon	提供独立于 demand 的 workflow YAML,用于编排多个 demand 的批量执行,支持并发上限、失败策略与可选的 workflow-scope cache pool(用于共享 `preload_forever` 等缓存条目).	"workflow public guidance MUST use curated stable entrypoints\nWorkflow YAML declares runs and options\nworkflow demand preloading MUST stay structural\nRuns execute demand YAML via existing compilation pipeline\nWorkflow enforces failure_policy\nworkflow preflight errors MUST be treated as workflow config/compile errors (ind\nmax_concurrency limits parallel runs deterministically\nworkflow nodes declare explicit DAG deps via `depends_on`\nworkflow provides a workflow-level ctx store (namespaced by `workflow_node_id`)\ndemand nodes MUST publish a minimal default ctx summary\n`$ctx` directives are resolved during compile-on-ready materialization\nfailure propagation cancels downstream nodes deterministically\nworkflow options expose a stable `cache_pool` configuration (replacing `share_pr\nworkflow entrypoints MUST be importable under Python 3.6\nworkflow emits workflow-level events and injects attribution for demand events\nmax_concurrency>1 requires thread-safe or stateless components\nworkflow YAML MUST use `workflow.resources.books` and MUST reject `writes` autho\nworkflow.options.resources_wait MUST configure join/wait diagnostics and timeout\nworkflow.options.output_staging MUST configure staging directory and cleanup pol\nworkflow scheduler preset MUST be configured through runtime entrypoints\nyaml_dsl public facade MUST export scheduler preset types under a stable import\n`run_workflow(...)` MUST orchestrate parse/preload/effective-merge/preflight via"
-  yaml-dsl-books-resources	llmanspec/specs/yaml-dsl-books-resources/spec.toon	定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.	"demand/workflow YAML MUST support `resources.books` as the unified Excel IO reso\n`books.kind=xlsx_file` MUST define file export semantics and path resolution bas\n`books.kind=xlsx_memory` MUST define in-memory budget guards and optional export\ndemand MUST bind outputs to books via `outputs[*].to.book` and `outputs[*].to.sh\nstandalone demand MUST fail-fast when a referenced book resource is missing\nworkflow MUST merge books from demand/workflow with deterministic precedence and\nworkflow book patches MUST be applied with strict contracts and consistent diagn\nbooks MUST support default write behavior and per-output overrides for append vs\nExcel exports MUST escape formula-like strings by default (opt-out via allow_for\ndownstream demands MUST be able to load xlsx book sheet rows via a built-in loader\n`.xlsx` outputs MUST use books binding; legacy workbook container surface MUST b"
-  yaml-dsl-output-overrides	llmanspec/specs/yaml-dsl-output-overrides/spec.toon	为下游”UI 动态选字段/动态输出”场景提供单一标准做法：demand YAML 保持可复用（通常不声明 `outputs`），调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。	"`RunOverrides` MUST provide factory methods for the common “single-sheet dynamic\nlegacy YAML-shaped overrides inputs MUST be rejected with actionable migration h\n`RunOverrides.outputs` MUST take precedence over YAML `outputs`\n`RunOverrides.outputs` MUST compile through the same outputs pipeline\nYAML DSL runtime MUST accept typed `RunOverrides.outputs` (dataclasses)\nYAML DSL runtime MUST accept IO-only overrides for `resources` and `outputs_defa\ndemand compile and workflow compile MUST share the same overrides compilation pi\ninvalid overrides MUST raise ScalimWorkflowConfigError with stable path"
+  yaml-dsl-books-resources	llmanspec/specs/yaml-dsl-books-resources/spec.toon	定义 demand/workflow 统一的 `resources.books` Excel IO 资源入口,并约束 `outputs[*].to` / `outputs[*].write` 的 book 绑定与导出语义.	"demand/workflow YAML MUST support resources.books as unified Excel IO identity declaration\n`books.kind=xlsx_file` MUST define file export semantics and path resolution bas\nxlsx_memory MUST define typed internal semantics and optional export; budget is Python policy\ndemand MUST bind outputs to books via `outputs[*].to.book` and `outputs[*].to.sh\nstandalone demand MUST fail-fast when a referenced book resource is missing\nworkflow MUST merge books from demand/workflow with deterministic precedence and\nworkflow book patches MUST be applied with strict contracts and consistent diagn\nbook write behavior MUST come from Python policy; outputs.write stays header-local\nExcel exports MUST escape formula-like strings by default (opt-out via allow_for\ndownstream demands MUST be able to load xlsx book sheet rows via a built-in loader\n`.xlsx` outputs MUST use books binding; legacy workbook container surface MUST b"
+  yaml-dsl-output-overrides	llmanspec/specs/yaml-dsl-output-overrides/spec.toon	为下游”UI 动态选字段/动态输出”场景提供单一标准做法：demand YAML 保持可复用（通常不声明 `outputs`），调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。	"`RunOverrides` MUST provide factory methods for the common “single-sheet dynamic\nlegacy YAML-shaped overrides inputs MUST be rejected with actionable migration h\n`RunOverrides.outputs` MUST take precedence over YAML `outputs`\n`RunOverrides.outputs` MUST compile through the same outputs pipeline\nYAML DSL runtime MUST accept typed `RunOverrides.outputs` (dataclasses)\nRunOverrides.resources MUST remain IO-only for path identity; write/budget use policy API\ndemand compile and workflow compile MUST share the same overrides compilation pi\ninvalid overrides MUST raise ScalimWorkflowConfigError with stable path"
   ir-source-relations	llmanspec/specs/ir-source-relations/spec.toon	使用 `relations.*.steps` 描述主数据源到目标数据源的有序等值关联链,支持单步/多步/多字段关联,并在关联查找前应用 `lookup_cast` 归一化,执行时保持 left join 语义.	"steps 结构与 relation 解析/推断规则\nlookup_key 与 lookup_cast/诊断\nref loader params are expressed by target-source params templates\n`$rows` preserves rows barrier semantics for relations\npreload_forever sources reject `$keys/$rows` directives\nlegacy `to_bind` is rejected with a copy-pastable migration hint\n批次内 LoadRef 复用与分片语义\nref loader 依赖信号驱动稳定排序\n关联诊断基于样本值并支持复合键对比\n关联路径与比较输出可读且稳定\nrelation `from` MAY reference pre-relation derived fields on main_source side"
   ir-field-compute	llmanspec/specs/ir-field-compute/spec.toon	定义源字段 `value_cast` 转换与派生字段 `compute/call_by` 的解析、校验与执行行为,并规范派生字段依赖推导(拒绝显式 `depends_on`)与表达式安全策略.	"字段值 value_cast\ncompute 识别/校验/安全约束\ncompute expression builtin calls MUST validate arity when signature is inspectab\ncompute 安全引擎 MUST provide a safe `dec(x)` decimal helper\ncompute 表达式允许使用 `Decimal(...)` 构造器\n依赖推导规则与无依赖拒绝\n派生字段执行与错误处理\ncompute 表达式预编译并复用执行\ncompute 编译缓存有上限(有界 LRU)\ncompute failures MUST NOT log raw expressions by default\ncompute audit callback MUST support redaction\ncompile cache operations MUST be safe under concurrent access\ncall_by 派生字段函数调用\nderived field call_by MUST validate argument binding at compile time when possib\ncall_by 上下文引用\ncompute sandbox rejection MUST include an actionable `call_by` migration hint"
   execution-source-cache	llmanspec/specs/execution-source-cache/spec.toon	支持 `cache_mode=preload_forever` 的数据源在 pipeline 启动前预加载,结果写入 `ExecutionRuntime.preloaded_cache` 并在关联加载时复用;计划元数据记录已缓存的数据源。对于高频且内存占用小的映射表(如国家地区表、枚举常量映射表),作为全局一次性导入使用以加速获值速度。	"预加载缓存模式\n关联加载优先命中缓存\n计划元数据记录缓存源\npreload cache 存储 normalized 结果\npreloaded_cache 并发边界与 key 空间明确\nPreloadCache signature guardrail 可选启用\nloader 幂等性期望"
@@ -39,7 +39,7 @@ llmanspec_requirement_map[15	]{slug	path	purpose	requirements}:
   runtime-guardrails	llmanspec/specs/runtime-guardrails/spec.toon	定义运行期 guardrails 配置与执行契约,用于对 loader/relations/compute 等环节的契约违规、数据质量问题与异常处理提供可配置的 quiet/fast_fail 行为,并通过现有错误事件通道进行可观测记录.	"Guardrails 配置与默认行为\nruntime guardrails MUST NOT swallow callable preflight failures\nquiet 模式违规记录\nLoader 结果结构护栏\nRowLike 字段提取语义(无歧义优先级)\n关键字段缺失护栏\n字段 extractor/value_cast/transform 异常护栏"
   performance-observability	llmanspec/specs/performance-observability/spec.toon	PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断.	"性能指标采集与结构化输出\nduration 统计使用单调时钟\n资源采样与报告输出\nruntime entrypoints 装配与独立开关\nRelationObserver 统计与报告\nadaptive 调度决策可观测性"
   output-mode-api	llmanspec/specs/output-mode-api/spec.toon	"定义运行时输出语义为\"显式 sink 驱动\": 是否保留内存数据、是否写文件、以及是否同时写入(tee)都通过 sink 选择表达,而不是通过 `return_data` 等布尔参数驱动 runtime 隐式装配. 同时要求稳定的执行元数据(例如 `ExecutionResult.total_rows`)以及异常路径的 best-effort 资源清理."	"输出是否保留内存数据由 sink 表达\n无输出时避免构造返回列表\n允许 tee 同时写文件与显式 sink\ntotal_rows 为稳定元数据\n成功路径 sink.close 失败必须使 run 失败\n异常路径 close 不得覆盖原异常\n异常路径 best-effort 关闭 sink"
-entries[37	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	examples	constraints}:
+entries[35	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	examples	constraints}:
   1	demand.field	name	properties.name	true	null	string	"#### name 需求配置名称. - 必填, 用于标识当前配置 ##### 字段约束 - 必填: 是 - 类型: string ##### 例子 ```yaml order_report ```"	null	null	null	"[\"order_report\"]"	null
   2	demand.field	imports	properties.imports	false	null	object	"#### imports 片段文件导入别名映射. - key: alias - value: 片段文件路径(字符串) - V2 支持相对路径 fragments(解析基准: 当前 YAML 文件所在目录): - `./x.yaml` / `x.yaml` - `x/y.yaml`(子目录) - `../x.yaml`(父目录) - 支持(编辑器侧放宽,运行时校验为准): - alias 路径: `@/x.yaml`, `COMMON:/x.yaml`(需 `scalim.yaml` 显式配置) - 内置 preset: `scalim://yaml-dsl/presets/common.yaml`(仅本地白名单) - 禁止(以运行时为准): 绝对路径/非 `scalim://` 的 `URI scheme`/Windows 盘符/反斜杠分隔符等 ##### 字段约束 - 必填: 否 - 类型: object - additionalProperties: string - propertyNames: configured ##### 例子 (兜底最小示例; 仅保证 schema-only 合法) ```yaml {} ```"	null	null	null	null	additionalProperties=string
   3	demand.field	_templates	properties._templates	false	null	object	#### _templates YAML anchor 模板集合. - 仅用于 YAML 复用(anchors) - 常用于 `fields` / `relations`	null	null	null	null	additionalProperties=true
@@ -51,150 +51,137 @@ entries[37	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	
   9	demand.field	resources	properties.resources	false	null	null	"#### resources 可选:IO 资源声明. - 稳定入口: `resources.books` / `resources.files`"	null	null	null	null	allOf=1
   10	demand.field	outputs	properties.outputs	false	null	array	#### outputs 输出目标列表(有序; 可选). - 顶层 `outputs` 可省略,用于保持 demand YAML 可复用(通常仅承载需求本体) - 需要运行时动态指定输出(字段/路径/sheet/header 策略)时,推荐在 Python 调用侧使用与 YAML 同形的 `overrides.outputs`	null	null	null	"[[{\"fields\":[\"order_id\",\"user_id\"],\"name\":\"detail\",\"to\":{\"sheet\":\"明细\"}}]]"	minItems=0; items=ref #/definitions/output_target
   11	demand.definition	book	definitions.book	false	null	object	null	null	null	null	null	additionalProperties=false; allOf=1
-  12	demand.definition	book_budget	definitions.book_budget	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  13	demand.definition	book_export_xlsx	definitions.book_export_xlsx	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  14	demand.definition	book_write_defaults	definitions.book_write_defaults	false	null	object	null	null	null	null	null	additionalProperties=false
-  15	demand.definition	book_xlsx_file	definitions.book_xlsx_file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  16	demand.definition	book_xlsx_memory	definitions.book_xlsx_memory	false	null	object	null	null	null	null	null	additionalProperties=false
-  17	demand.definition	field	definitions.field	false	null	object	null	null	null	null	null	additionalProperties=true; allOf=1
-  18	demand.definition	file	definitions.file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  19	demand.definition	file_csv_file	definitions.file_csv_file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  20	demand.definition	guardrails	definitions.guardrails	false	null	object	null	null	null	null	null	additionalProperties=false
-  21	demand.definition	guardrails_compute	definitions.guardrails_compute	false	null	object	null	null	null	null	null	additionalProperties=false
-  22	demand.definition	guardrails_loader	definitions.guardrails_loader	false	null	object	null	null	null	null	null	additionalProperties=false
-  23	demand.definition	guardrails_relations	definitions.guardrails_relations	false	null	object	null	null	null	null	null	additionalProperties=false
-  24	demand.definition	loader_retry	definitions.loader_retry	false	null	object	null	null	null	null	null	additionalProperties=false
-  25	demand.definition	main_source	definitions.main_source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  26	demand.definition	output_aggregate	definitions.output_aggregate	false	null	object	null	null	null	null	null	additionalProperties=false
-  27	demand.definition	output_extra_sheet	definitions.output_extra_sheet	false	null	object	null	null	null	null	null	additionalProperties=false
-  28	demand.definition	output_target	definitions.output_target	false	null	object	null	null	null	null	null	additionalProperties=false; allOf=1
-  29	demand.definition	output_to	definitions.output_to	false	null	object	null	null	null	null	null	additionalProperties=false
-  30	demand.definition	output_write	definitions.output_write	false	null	object	null	null	null	null	null	additionalProperties=false
-  31	demand.definition	relation	definitions.relation	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  32	demand.definition	resources	definitions.resources	false	null	object	null	null	null	null	null	additionalProperties=false
-  33	demand.definition	source	definitions.source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
-  34	demand.definition	source_field_inline	definitions.source_field_inline	false	null	object	null	null	null	null	null	allOf=3
-  35	workflow	workflow	properties.workflow	true	null	object	#### workflow workflow	null	null	null	null	additionalProperties=false
-  36	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
-  37	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"#### workflow.resources workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
-properties[117	]{entry_id	name	required	summary}:
+  12	demand.definition	book_export_xlsx	definitions.book_export_xlsx	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  13	demand.definition	book_xlsx_file	definitions.book_xlsx_file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  14	demand.definition	book_xlsx_memory	definitions.book_xlsx_memory	false	null	object	null	null	null	null	null	additionalProperties=false
+  15	demand.definition	field	definitions.field	false	null	object	null	null	null	null	null	additionalProperties=true; allOf=1
+  16	demand.definition	file	definitions.file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  17	demand.definition	file_csv_file	definitions.file_csv_file	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  18	demand.definition	guardrails	definitions.guardrails	false	null	object	null	null	null	null	null	additionalProperties=false
+  19	demand.definition	guardrails_compute	definitions.guardrails_compute	false	null	object	null	null	null	null	null	additionalProperties=false
+  20	demand.definition	guardrails_loader	definitions.guardrails_loader	false	null	object	null	null	null	null	null	additionalProperties=false
+  21	demand.definition	guardrails_relations	definitions.guardrails_relations	false	null	object	null	null	null	null	null	additionalProperties=false
+  22	demand.definition	loader_retry	definitions.loader_retry	false	null	object	null	null	null	null	null	additionalProperties=false
+  23	demand.definition	main_source	definitions.main_source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  24	demand.definition	output_aggregate	definitions.output_aggregate	false	null	object	null	null	null	null	null	additionalProperties=false
+  25	demand.definition	output_extra_sheet	definitions.output_extra_sheet	false	null	object	null	null	null	null	null	additionalProperties=false
+  26	demand.definition	output_target	definitions.output_target	false	null	object	null	null	null	null	null	additionalProperties=false; allOf=1
+  27	demand.definition	output_to	definitions.output_to	false	null	object	null	null	null	null	null	additionalProperties=false
+  28	demand.definition	output_write	definitions.output_write	false	null	object	null	null	null	null	null	additionalProperties=false
+  29	demand.definition	relation	definitions.relation	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  30	demand.definition	resources	definitions.resources	false	null	object	null	null	null	null	null	additionalProperties=false
+  31	demand.definition	source	definitions.source	false	null	object	null	null	null	null	null	additionalProperties=false; anyOf=2
+  32	demand.definition	source_field_inline	definitions.source_field_inline	false	null	object	null	null	null	null	null	allOf=3
+  33	workflow	workflow	properties.workflow	true	null	object	#### workflow workflow	null	null	null	null	additionalProperties=false
+  34	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
+  35	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"#### workflow.resources workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
+properties[106	]{entry_id	name	required	summary}:
   6	$import	false	string | array, oneOf(2)
   7	$import	false	string | array, oneOf(2)
   8	$import	false	string | array, oneOf(2)
   11	$import	false	string | array, oneOf(2)
-  11	write_defaults	false	allOf(1)
   11	xlsx_file	false	allOf(1)
   11	xlsx_memory	false	allOf(1)
   12	$import	false	string | array, oneOf(2)
-  12	max_sheets	false	integer
-  12	max_total_cells	false	integer
+  12	allow_formulas	false	boolean
+  12	path	false	string | object, oneOf(2)
   13	$import	false	string | array, oneOf(2)
   13	allow_formulas	false	boolean
   13	path	false	string | object, oneOf(2)
   14	$import	false	string | array, oneOf(2)
-  14	align_by	false	string, enum field_id, header
-  14	header_policy	false	string, enum once, always, never
-  14	mode	false	string, enum sheet, append
-  14	on_conflict	false	string, enum error, overwrite, skip
-  14	on_mismatch	false	string, enum error, warn, skip
+  14	export_xlsx	false	allOf(1)
+  15	name	false	string
   15	$import	false	string | array, oneOf(2)
-  15	allow_formulas	false	boolean
-  15	path	false	string | object, oneOf(2)
+  15	call_by	false	string
+  15	compute	false	string
+  15	default	false	array, items object, properties call_by, literal, when, oneOf(2)
+  15	extract	false	string
+  15	relation	false	string | object, oneOf(2)
+  15	source	false	string
+  15	value_cast	false	string, enum auto, int, str, decimal
   16	$import	false	string | array, oneOf(2)
-  16	budget	false	allOf(1)
-  16	export_xlsx	false	allOf(1)
-  17	name	false	string
+  16	csv_file	false	allOf(1)
   17	$import	false	string | array, oneOf(2)
-  17	call_by	false	string
-  17	compute	false	string
-  17	default	false	array, items object, properties call_by, literal, when, oneOf(2)
-  17	extract	false	string
-  17	relation	false	string | object, oneOf(2)
-  17	source	false	string
-  17	value_cast	false	string, enum auto, int, str, decimal
+  17	encoding	false	string
+  17	path	false	string | object, oneOf(2)
+  18	relations	false	ref #/definitions/guardrails_relations
   18	$import	false	string | array, oneOf(2)
-  18	csv_file	false	allOf(1)
+  18	compute	false	ref #/definitions/guardrails_compute
+  18	enabled	false	boolean
+  18	loader	false	ref #/definitions/guardrails_loader
+  18	mode	false	string, enum quiet, fast_fail
   19	$import	false	string | array, oneOf(2)
-  19	encoding	false	string
-  19	path	false	string | object, oneOf(2)
-  20	relations	false	ref #/definitions/guardrails_relations
+  19	on_error	false	string, enum quiet, fast_fail
   20	$import	false	string | array, oneOf(2)
-  20	compute	false	ref #/definitions/guardrails_compute
-  20	enabled	false	boolean
-  20	loader	false	ref #/definitions/guardrails_loader
-  20	mode	false	string, enum quiet, fast_fail
+  20	on_transform_error	false	string, enum quiet, fast_fail
+  20	required_fields	false	array, items string | object, anyOf(2)
+  20	validate_result	false	boolean
   21	$import	false	string | array, oneOf(2)
-  21	on_error	false	string, enum quiet, fast_fail
+  21	null_key_max_rate	false	number
+  21	type_error_max_rate	false	number
   22	$import	false	string | array, oneOf(2)
-  22	on_transform_error	false	string, enum quiet, fast_fail
-  22	required_fields	false	array, items string | object, anyOf(2)
-  22	validate_result	false	boolean
+  22	backoff	false	string, enum fixed, exponential
+  22	base_delay_seconds	false	number
+  22	enabled	false	boolean
+  22	jitter	false	boolean
+  22	max_attempts	false	integer
+  22	max_delay_seconds	false	number
+  22	max_elapsed_seconds	false	number
+  22	should_retry	false	string
+  23	fields	false	object, properties $import
   23	$import	false	string | array, oneOf(2)
-  23	null_key_max_rate	false	number
-  23	type_error_max_rate	false	number
-  24	$import	false	string | array, oneOf(2)
-  24	backoff	false	string, enum fixed, exponential
-  24	base_delay_seconds	false	number
-  24	enabled	false	boolean
-  24	jitter	false	boolean
-  24	max_attempts	false	integer
-  24	max_delay_seconds	false	number
-  24	max_elapsed_seconds	false	number
-  24	should_retry	false	string
-  25	fields	false	object, properties $import
-  25	$import	false	string | array, oneOf(2)
-  25	loader	false	string
-  25	order_by	false	array, items string
-  25	params	false	object, properties $import
-  25	source_id	false	string
-  26	fields	true	object
-  26	distinct_on_overflow	false	string, enum error, truncate
-  26	group_by	true	array, items string | object | array, anyOf(3)
-  26	max_distinct	false	integer
-  26	max_groups	false	integer
-  27	allow_formulas	false	boolean
-  27	path	false	string
+  23	loader	false	string
+  23	order_by	false	array, items string
+  23	params	false	object, properties $import
+  23	source_id	false	string
+  24	fields	true	object
+  24	distinct_on_overflow	false	string, enum error, truncate
+  24	group_by	true	array, items string | object | array, anyOf(3)
+  24	max_distinct	false	integer
+  24	max_groups	false	integer
+  25	allow_formulas	false	boolean
+  25	path	false	string
+  25	sheet	false	string
+  26	name	true	string
+  26	fields	false	array, items string | object | array, anyOf(3)
+  26	aggregate	false	allOf(1)
+  26	from	false	string
+  26	to	false	allOf(1)
+  26	where	false	string
+  26	write	false	allOf(1)
+  27	book	false	string
+  27	file	false	string
   27	sheet	false	string
-  28	name	true	string
-  28	fields	false	array, items string | object | array, anyOf(3)
-  28	aggregate	false	allOf(1)
-  28	from	false	string
-  28	to	false	allOf(1)
-  28	where	false	string
-  28	write	false	allOf(1)
-  29	book	false	string
-  29	file	false	string
-  29	sheet	false	string
-  30	header_fields_output_by	false	string, enum field_id, name
-  30	include_header	false	boolean
+  28	header_fields_output_by	false	string, enum field_id, name
+  28	include_header	false	boolean
+  29	$import	false	string | array, oneOf(2)
+  29	steps	false	array, items object, properties from, lookup_cast, to
+  30	$import	false	string | array, oneOf(2)
+  30	books	false	object, properties $import
+  30	files	false	object, properties $import
+  31	fields	false	object, properties $import
   31	$import	false	string | array, oneOf(2)
-  31	steps	false	array, items object, properties from, lookup_cast, to
+  31	cache_mode	false	string, enum none, preload_forever
+  31	key	false	string | array, oneOf(2)
+  31	loader	false	string
+  31	lookup_cast	false	object, oneOf(4)
+  31	lookup_chunk_size	false	integer | null, oneOf(2)
+  31	normalize	false	object, properties call_by, index_by_key, map_values, project_fields, take_first, allOf(1)
+  31	params	false	object, properties $import
+  32	name	false	string
   32	$import	false	string | array, oneOf(2)
-  32	books	false	object, properties $import
-  32	files	false	object, properties $import
-  33	fields	false	object, properties $import
-  33	$import	false	string | array, oneOf(2)
-  33	cache_mode	false	string, enum none, preload_forever
-  33	key	false	string | array, oneOf(2)
-  33	loader	false	string
-  33	lookup_cast	false	object, oneOf(4)
-  33	lookup_chunk_size	false	integer | null, oneOf(2)
-  33	normalize	false	object, properties call_by, index_by_key, map_values, project_fields, take_first, allOf(1)
-  33	params	false	object, properties $import
-  34	name	false	string
-  34	$import	false	string | array, oneOf(2)
-  34	default	false	array, items object, properties call_by, literal, when, oneOf(2)
-  34	extract	false	string
-  34	relation	false	string | object, oneOf(2)
-  34	source	false	string
-  34	value_cast	false	string, enum auto, int, str, decimal
-  35	resources	false	allOf(1)
-  35	runs	true	array, items object, properties demand, depends_on, id, init_vars, main_rows_from
-  36	demand	true	string
-  36	depends_on	false	array, items string
-  36	id	true	string
-  36	init_vars	false	object | null, oneOf(2)
-  36	main_rows_from	false	object | null, oneOf(2)
+  32	default	false	array, items object, properties call_by, literal, when, oneOf(2)
+  32	extract	false	string
+  32	relation	false	string | object, oneOf(2)
+  32	source	false	string
+  32	value_cast	false	string, enum auto, int, str, decimal
+  33	resources	false	allOf(1)
+  33	runs	true	array, items object, properties demand, depends_on, id, init_vars, main_rows_from
+  34	demand	true	string
+  34	depends_on	false	array, items string
+  34	id	true	string
+  34	init_vars	false	object | null, oneOf(2)
+  34	main_rows_from	false	object | null, oneOf(2)
 workflow_key_paths[10	]: workflow.runs	workflow.runs[*].id	workflow.runs[*].demand	workflow.runs[*].depends_on	workflow.runs[*].init_vars	workflow.options	workflow.options.ctx	workflow.options.cache_pool	workflow.resources	workflow.resources.books
 workflow_validation[2	]: "Repo schema-only: uv run scalim-cli yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>"	"LSP header: # yaml-language-server: $schema=.../workflow.gen.json OR # $schema: .../workflow.gen.json (use yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>)"
 ```

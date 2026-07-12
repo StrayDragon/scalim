@@ -143,7 +143,8 @@ def test_project_config_paths_do_not_leak_definition_names() -> None:
 
 
 def test_enum_nodes_are_full_and_have_per_choice_semantics() -> None:
-    schema = _load_schema(_schema_path("workflow.gen.json"))
+    # workflow schema 可能无 enum(写入策略已迁出 YAML);以 demand schema 为权威校验面.
+    schema = _load_schema(_schema_path("demand.gen.json"))
     checked = 0
     for node in _iter_doc_property_nodes(schema):
         enum_vals = _schema_enum_values(node)

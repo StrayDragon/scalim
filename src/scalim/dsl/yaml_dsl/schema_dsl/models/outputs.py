@@ -115,9 +115,9 @@ class OutputWriteConfig:
             md=(
                 "可选:是否输出表头.\n\n"
                 "- file 输出: 缺省等价 `true`\n"
-                "- book + `resources.books.*.write_defaults.mode=sheet`: 缺省等价 `true`\n"
-                "- book + `resources.books.*.write_defaults.mode=append`: 不允许显式声明;请改用 "
-                "`resources.books.*.write_defaults.header_policy`"
+                "- book + `BookWritePolicy.mode=sheet`: 缺省等价 `true`\n"
+                "- book + `BookWritePolicy.mode=append`: 不允许显式声明;请改用 "
+                "`BookWritePolicy.header_policy`(via ResourcesPolicy)"
             ),
             default=DEFAULT_OUTPUT_INCLUDE_HEADER,
             examples=[True, False],
@@ -885,7 +885,7 @@ class OutputTargetConfig:
             md=(
                 "可选:写入策略覆盖.\n\n"
                 "- 通用字段: `include_header`, `header_fields_output_by`\n"
-                "- book 专属字段覆盖 `resources.books.*.write_defaults`"
+                "- book 级写入策略见 Python `ResourcesPolicy`/`BookWritePolicy`(不再经 YAML write_defaults)"
             ),
         ),
     )

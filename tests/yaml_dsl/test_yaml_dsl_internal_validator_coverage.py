@@ -4,12 +4,16 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidat
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl.runtime import effective_outputs as effective_outputs_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
+    BookConfig,
+    BookWriteDefaultsConfig,
+    DemandConfig,
     OUTPUT_TARGET_KEYS,
     OUTPUT_TO_KEYS,
     OUTPUT_WRITE_KEYS,
     OutputTargetConfig,
     OutputToConfig,
     OutputWriteConfig,
+    ResourcesConfig,
 )
 
 
@@ -77,24 +81,16 @@ def test_validator_sources_skip_import_and_cover_key_edge_cases() -> None:
 
 
 def test_output_item_requires_unique_effective_display_names_sheet_mode_reads_include_header() -> None:
-    loader = YamlDemandLoader()
-    config = loader.load_string(
-        """
-name: validator_unique_sheet_mode
-main_source:
-  source_id: orders
-  loader: tests.fixtures.mock_loaders.mock_loader
-  fields:
-    order_id: {extract: order_id}
-sources: {}
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-      write_defaults:
-        mode: sheet
-""",
+    config = DemandConfig(
+        resources=ResourcesConfig(
+            books={
+                "report": BookConfig(
+                    kind="xlsx_file",
+                    path="./out",
+                    write_defaults=BookWriteDefaultsConfig(mode="sheet"),
+                ),
+            }
+        )
     )
     out_cfg = OutputTargetConfig(
         name="detail",
