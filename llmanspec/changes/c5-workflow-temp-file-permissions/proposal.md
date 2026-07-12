@@ -3,7 +3,7 @@
 ## 与 c20/c30 关系
 
 - **不被取代**。本 change 加固 publish 临时文件权限（`resources_base` staging），与 c20 policy 边界正交；与 c30 内存释放可并行，注意同一文件合并冲突即可。
-- 进度总览：仓库根 `_HANDOFF.md`。
+- 相关归档：`llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`。
 
 ## Why
 

@@ -23,7 +23,7 @@
   - YAML `resources.books.*.write_defaults` and `xlsx_memory.budget` MUST NOT be reintroduced; runtime fail-fast + migration hints.
   - Agent-facing migration: `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md`.
   - `allow_formulas` / `encoding` may remain YAML for now (usually static).
-  - Active track + status: `_HANDOFF.md` (temporary); `c20-book-write-policy-python-ssot` archived → next `c30-workflow-shared-book-memory`.
+  - Archived track: `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`；后续 shared-book 优化见 `llmanspec/futures/xlsx-file-numeric-type-loss/future.md`。
 - **Python runtime boundary**: code under `src/scalim/` MUST remain compatible with Python 3.6 (dev tooling is typically Python 3.10+; see `pyproject.toml`).
 - **Formatting**: Python-only; 4-space indent; line length 140; double quotes (ruff formatter). Use ruff as the source of truth for formatting and linting.
 - **Imports**: inside `src/scalim/` prefer relative imports; avoid `import scalim` / `from scalim...` (tests/scripts/notebooks may import `scalim` directly).
@@ -57,4 +57,4 @@
 - Docs site config + content root: `docs/zensical.toml`, `docs/doc/`
 - Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
 - Architecture overview: `ARCH.md` and `docs/doc/architecture/arch.md`
-- Temporary workflow iteration handoff: `_HANDOFF.md`
+- YAML DSL review checklist: `docs/doc/yaml-dsl/review-checklist.md`

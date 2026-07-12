@@ -4,7 +4,7 @@
 
 - **不被取代**；对 `c30-workflow-shared-book-memory` 是 **soft 有利前置**（去重 `resources_workbook` / `resources_sheetbook` / excel sink 的 openpyxl helpers），非硬 `depends_on`。
 - 与 `c20`（policy/authoring 边界）基本正交。
-- 进度总览：仓库根 `_HANDOFF.md`。
+- 相关归档：`llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`。
 
 ## Why
 

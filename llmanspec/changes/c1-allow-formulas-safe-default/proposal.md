@@ -4,7 +4,7 @@
 
 - **不被取代**。`c20` 明确 **暂留 `allow_formulas` 在 YAML**（通常不动态改）；本 change 只翻转默认值 true→false，不把该字段迁出 YAML。
 - 同碰 `yaml-dsl-books-resources` schema：apply 顺序建议先保证字段仍在 authoring 面，再改默认值，避免与 c20 削 `write_defaults`/`budget` 的 schema 改动搅在一起。
-- 进度总览：仓库根 `_HANDOFF.md`。
+- 相关归档：`llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`。
 
 ## Why
 

@@ -4,7 +4,7 @@
 
 - **不被取代**。本 change 管输出 path 白名单（`allowed_output_roots`），与 `c20`（write_defaults/budget → Python）主题不同。
 - 同碰 `yaml-dsl-books-resources` / `workflow-shared-output-containers`：合 delta / 实现时避免互相覆盖；本能力本身是 Python/runtime 入口，与「YAML 编排瘦身」方向一致。
-- 进度总览：仓库根 `_HANDOFF.md`。
+- 相关归档：`llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`。
 
 ## Why
 

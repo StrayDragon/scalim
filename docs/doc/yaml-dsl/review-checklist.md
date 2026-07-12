@@ -4,9 +4,7 @@
 
 上位原则 SSOT: `llmanspec/specs/governance-mainline-principles/spec.toon`。
 
-当前迭代方向（YAML 编排瘦身 / write_defaults+budget → Python `ResourcesPolicy` SSOT）见仓库根 `_HANDOFF.md`；`c20` 已归档，后续为 `c30-workflow-shared-book-memory`。
-
-**Authoring 边界速记**:
+**Authoring 边界速记**（`c20`/`c30` 已归档）:
 - YAML `resources.books`：仅 identity（oneOf variant / path / `export_xlsx.path`；暂留 `allow_formulas`）
 - Python：`WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`（`BookWritePolicy` + `BookBudgetPolicy`）；省略 = builtin defaults / budget unlimited
 - YAML 再写 `write_defaults` / `xlsx_memory.budget` → fail-fast + 迁移提示
