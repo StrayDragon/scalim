@@ -1,0 +1,7 @@
+kind: llman.sdd.delta
+ops[2]{op,req_id,title,statement,from,to,name}:
+  modify_requirement,r2,workflow declares shared output resource identity at workflow scope,"系统 MUST 允许在 workflow 层声明共享输出资源 identity（books）并由 runtime 管理生命周期: - 资源声明 MUST 位于 workflow.resources.books - 每个资源 MUST 具备稳定 id 与 variant 对应的必要 path/export 声明 - write 策略与 budget MUST 来自 Python runtime policy（不是 YAML write_defaults/budget） - 系统 MUST 静态校验资源 identity 声明（id 唯一、必填 path 等）",null,null,null
+  modify_requirement,r5,append/merge semantics are explicit via Python write policy,"当多个节点写入同一个 sheet 或以 append 方式合并时,系统 MUST 定义明确且可测试的合并语义: - 字段对齐、header 策略、mismatch/conflict 策略 MUST 明确可配置 - 上述策略的 SSOT MUST 为 Python BookWritePolicy（缺省 builtin defaults） - 策略 MUST NOT 再通过 YAML resources.books.*.write_defaults 或已移除的 workflow writes 表达",null,null,null
+op_scenarios[2]{req_id,id,given,when,then}:
+  r2,"identity-without-write-defaults",workflow YAML 仅声明 books id/variant/path,配合 builtin 或 Python BookWritePolicy 运行,共享资源生命周期 MUST 正常 create/write/commit
+  r5,"append-policy-from-python","Python BookWritePolicy(mode=append,header_policy=once)",两 runs 写入同一 book 同一 sheet,最终 sheet MUST 按 append 语义合并且 YAML 无需 write_defaults

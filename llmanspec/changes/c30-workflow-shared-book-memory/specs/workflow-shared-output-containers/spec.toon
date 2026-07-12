@@ -1,0 +1,8 @@
+kind: llman.sdd.delta
+ops[2]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r26,shared book pipeline MUST release demand artifacts and plan segments aggressively enough to avoid needless dual residency,"在保持成功后统一 commit/失败 discard 的前提下,系统 MUST 降低共享 book 路径的不必要内存双驻留: - 当 write node 已成功将 managed ROWS（或等价 tabular artifact）物化进 book plan，且该 artifact 已无剩余消费者时，系统 MUST 释放 demand 侧内存副本 - commit_all 成功或 discard_all 之后，系统 MUST 释放 plan 持有的 segment 行数据（或丢弃 plan）以降低尾峰 - 释放策略 MUST NOT 破坏 book_sheet_rows 基于 plan 的可见性语义 - 释放相关调参（若有）MUST 仅通过 Python runtime policy/profile 表达，MUST NOT 引入 YAML authoring 开关",null,null,null
+  add_requirement,r27,book memory budget MUST be enforced from Python BookBudgetPolicy,"系统 MUST 通过 Python BookBudgetPolicy（由上游 book-write-policy-python-ssot 提供）对共享 book 内存护栏生效: - YAML MUST NOT 再作为 budget authoring SSOT - 未提供 budget policy 时 MUST 视为 unlimited - 超出 max_sheets/max_total_cells 时 MUST fail-fast - xlsx_memory MUST 强制执行该护栏；xlsx_file 是否启用同一 cell budget MUST 在实现/文档中明确且默认不改变历史 unlimited 行为除非显式 policy",null,null,null
+op_scenarios[3]{req_id,id,given,when,then}:
+  r26,"release-after-final-write-consumer",某 managed ROWS artifact 仅被一个 write node 消费且无下游 book_sheet_rows 依赖,该 write node 成功 apply 到 book plan,系统 MUST 释放该 demand 侧内存 artifact（不再与 plan segments 无必要双驻留）
+  r26,"release-after-commit-or-discard",workflow 结束并完成 commit_all 或 discard_all,资源生命周期收尾完成,系统 MUST 释放 plan segment 行数据占用（或丢弃 plan）
+  r27,"python-budget-enforced",Python BookBudgetPolicy(max_sheets=1) 且 workflow 试图写入第二张 sheet,write/apply 阶段,"系统 MUST fail-fast"

@@ -1,0 +1,5 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  modify_requirement,r6,"RunOverrides.resources MUST remain IO-only for path identity; write/budget use policy API","系统 MUST 在 RunOverrides 中提供 IO-only 覆盖能力用于 resources/outputs_defaults path 等 identity/IO 声明: - overlay MUST 允许覆盖 books.*.path/export_xlsx/allow_formulas 与 files.*.path/encoding 等 IO 字段 - overlay MUST NOT 再把 write_defaults/budget 作为主 SSOT 补丁路径（这些 MUST 走 Python ResourcesPolicy/BookWritePolicy） - 若仍传入 write_defaults/budget overlay，系统 MUST fail-fast 或按设计的短暂兼容期发出迁移诊断后拒绝作为长期口径 - overlay MUST NOT 覆盖输出定义层字段",null,null,null
+op_scenarios[1]{req_id,id,given,when,then}:
+  r6,"write-defaults-overlay-rejected",调用方在 RunOverrides.resources.books 中提供 write_defaults 补丁,compile/run,"系统 MUST fail-fast（或兼容期内等价拒绝长期口径）并提示改用 BookWritePolicy"

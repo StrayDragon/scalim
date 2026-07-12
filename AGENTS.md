@@ -17,6 +17,11 @@
 - `just llmanspec-check`: sanitize + validate llmanspec artifacts.
 
 ## Hard Rules (SSOT)
+- **YAML authoring vs Python policy** (workflow/books 迭代方向):
+  - YAML DSL SHOULD stay orchestration + resource identity (`runs` / deps / `resources.*.id+variant+path` / `outputs.to` / content fields).
+  - Book **write strategy** (`write_defaults`) and **memory budget** are **Python SSOT** (builtin defaults when omitted); do not reintroduce them as YAML mainline authoring.
+  - `allow_formulas` / `encoding` may remain YAML for now (usually static).
+  - Active track + status: `_HANDOFF.md` (temporary); changes `c20-book-write-policy-python-ssot` → `c30-workflow-shared-book-memory`.
 - **Python runtime boundary**: code under `src/scalim/` MUST remain compatible with Python 3.6 (dev tooling is typically Python 3.10+; see `pyproject.toml`).
 - **Formatting**: Python-only; 4-space indent; line length 140; double quotes (ruff formatter). Use ruff as the source of truth for formatting and linting.
 - **Imports**: inside `src/scalim/` prefer relative imports; avoid `import scalim` / `from scalim...` (tests/scripts/notebooks may import `scalim` directly).
@@ -50,3 +55,4 @@
 - Docs site config + content root: `docs/zensical.toml`, `docs/doc/`
 - Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
 - Architecture overview: `ARCH.md` and `docs/doc/architecture/arch.md`
+- Temporary workflow iteration handoff: `_HANDOFF.md`

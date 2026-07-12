@@ -2,7 +2,9 @@
 
 本页用于评审/编写 YAML DSL 相关 llmanspec 变更时的统一 checklist,避免反复在各个专题提案中重复解释主线原则与边界。
 
-上位原则 SSOT: `llmanspec/specs/yaml-dsl-mainline-principles/spec.md`。
+上位原则 SSOT: `llmanspec/specs/governance-mainline-principles/spec.toon`。
+
+当前迭代方向（YAML 编排瘦身 / write_defaults+budget → Python SSOT）见仓库根 `_HANDOFF.md` 与 active changes `c20-book-write-policy-python-ssot`、`c30-workflow-shared-book-memory`。
 
 ## 0) 必须遵守的主线原则(硬约束)
 

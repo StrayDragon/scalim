@@ -1,0 +1,6 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r9,book write_defaults and budget MUST move to Python runtime policy,"系统 MUST 将 book 级写入策略与内存预算从 YAML authoring 迁出到 Python runtime policy SSOT: - resources.books.*.write_defaults（mode/align_by/header_policy/on_mismatch/on_conflict）MUST NOT 再作为 YAML 主线 authoring 字段 - resources.books.*.xlsx_memory.budget（及等价 budget 字段）MUST NOT 再作为 YAML 主线 authoring 字段 - 上述能力 MUST 由 typed Python runtime policy（例如 BookWritePolicy/BookBudgetPolicy/ResourcesPolicy）表达 - 当调用方未提供显式 policy 时系统 MUST 使用与历史缺省等价的 builtin defaults - YAML 中出现已迁出字段时 MUST fail-fast 并给出迁移到 Python policy 的提示",null,null,null
+op_scenarios[2]{req_id,id,given,when,then}:
+  r9,"yaml-rejects-write-defaults",某个 workflow 或 demand YAML 在 resources.books.<id> 下声明 write_defaults,用户执行 validate 或运行入口解析,"系统 MUST fail-fast 并提示改用 Python BookWritePolicy（或等价 typed policy）"
+  r9,"builtin-defaults-without-policy",YAML 仅声明 books id/variant/path 且调用方未传 book write/budget policy,用户执行 run_workflow 或等价入口,系统 MUST 使用 builtin defaults（等价 mode=sheet 与历史 on_conflict/align_by/header_policy/on_mismatch 缺省以及 unlimited budget）
