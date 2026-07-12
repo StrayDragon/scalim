@@ -1,3 +1,12 @@
+# notplan: streaming-xlsx-output（已收窄升格）
+
+> **状态（2026-07-12）**: 本 notplan **不再整包激活**。  
+> 宽表 close 峰已由 `write_only` 归档消化；列驻留 mid-close 释放经证据定为文档-only（A）。  
+> **升格收窄**: active change [`c0-streaming-column-excel-sink`](../../changes/c0-streaming-column-excel-sink/proposal.md) —— 仅 Python opt-in sibling sink，禁止 YAML streaming knobs。  
+> 下文保留为历史草案 / 风险清单；实现以 active change 的 proposal/design 为准。
+
+---
+
 ## Why
 
 本框架的核心设计目标是**极致的内存优化（FR023）**，但在宽表 Excel 输出场景下，当前实现未充分发挥列式写入的内存节省潜力。
