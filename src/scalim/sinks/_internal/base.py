@@ -161,6 +161,11 @@ class IColumnSink(ISink, ABC):
 
     注意:内存优化(FR023)- 真正的按列追加写入
     每处理完一个数据源,立即写入该数据源提供的目标字段列,然后释放内存.
+
+    驻留边界(内建列式写出器):
+    - 调用方在 `write_column`/`write_columns` 成功后可以丢弃其本地源列引用
+    - 内建 `ColumnExcelSink` 在 `close()` 完成前仍持有写入副本以完成原子写出
+    - 默认路径不提供隐式的 `close` 中途列释放;更早流式写出需另案提出显式可选类型
     """
 
     @abstractmethod

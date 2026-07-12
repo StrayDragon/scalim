@@ -399,9 +399,13 @@ class ColumnExcelSink(IColumnSink):
     2. 在 `close()` 时用 `openpyxl` 的 `write_only` `Workbook` 按行写出并保存
 
     优点:
-    - 调用方可在 `write_column()` 后立即释放该列的源数据
+    - 调用方可在 `write_column()` 后立即释放该列的**源**数据(`sink` 仍持有副本直至 `close()`)
     - 适合宽表场景(200+ 列)
     - `close()` 使用 `write_only=True`,避免常规 `Workbook` 单元格树与列缓存双峰叠加
+
+    驻留边界:
+    - 默认路径不提供 `close` 中途列释放/`flush`;证据显示对 `peak` `RSS` 收益≈0
+    - 更早流式写出若需要,必须以显式可选类型另案提出,不得改变本类默认行为
 
     参数:
         `output_path`: 输出文件路径
