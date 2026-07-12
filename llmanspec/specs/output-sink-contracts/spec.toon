@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "output-sink-contracts"
 purpose: "定义 sink 接口稳定性与可选依赖提示规范，确保内建与外部 sink 的长期兼容、可诊断性与一致行为。 [scope-review-2026-07-12-c20]"
 valid_scope[1]: src/scalim/
-requirements[11]{req_id,title,statement}:
+requirements[12]{req_id,title,statement}:
   r1,Sink 契约稳定,"系统 MUST 保持 `ISink`/`IRowSink`/`IColumnSink`/`BaseRowSink` 等接口契约稳定,并确保内建 sinks 满足契约."
   r2,可选依赖错误提示清晰,系统 MUST 对可选依赖(如 Excel 的 `openpyxl`)提供一致且可诊断的错误路径.
   r3,file sinks 写入前创建输出目录,"系统 MUST 在 file sinks(如 CSV/Excel)写入输出文件前确保 `output.path` 的父目录存在;当父目录不存在时系统 MUST 以 best-effort 方式创建目录(`mkdir(parents=True, exist_ok=True)`)."
@@ -14,7 +14,8 @@ requirements[11]{req_id,title,statement}:
   r9,ColumnExcelSink close MUST use write_only workbook,"系统 MUST 使内建 `ColumnExcelSink` 在 `close()` 写出 xlsx 时使用 openpyxl `Workbook(write_only=True)`(与 `ExcelSink` 一致的写出策略): - MUST 通过 `create_sheet` 创建目标 sheet(不得依赖常规 workbook 的 `active` 语义) - 保存失败路径 MUST 尽力清理临时文件,并对 write_only worksheet 做 best-effort close - MUST NOT 改变 `IColumnSink` 公共写入契约与输出单元格语义 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线"
   r10,ColumnExcelSink column residency MUST be documented without default flush,"系统 MUST 明确内建 `ColumnExcelSink` 的列驻留契约: - 调用方在 `write_column`/`write_columns` 成功后 MAY 丢弃其持有的源列数据 - sink 在 `close()` 完成前 MUST 继续持有写入副本以完成原子写出 - 默认路径 MUST NOT 提供隐式 mid-close 列释放/flush 语义(证据显示对 peak RSS ROI≈0) - MUST NOT 将 streaming/flush knobs 引入 YAML 主线 - 可选流式 sibling sink(若未来提出) MUST 显式 opt-in 且不得改变默认 `ColumnExcelSink` 行为"
   r11,"StreamingColumnExcelSink MUST be opt-in and may release residency before close","系统 MUST 提供可选的 `StreamingColumnExcelSink`(或等价命名)作为 `IColumnSink` 实现以降低宽表 `pre_close` 驻留: - MUST NOT 改变默认 `ColumnExcelSink` 行为 - 调用方可在行字段齐备后触发刷盘并释放对应缓冲(显式 `flush` 或等价语义) - `close()` MUST 刷剩余数据并以原子临时文件落盘,失败路径 MUST best-effort 清理临时文件并对 write_only worksheet 尽力关闭 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线 - 行为变更 MUST 有 evidence-mvp 证明相对 `ColumnExcelSink` 在目标 shape 上降低 `pre_close`/`peak` RSS 且输出正确"
-scenarios[24]{req_id,id,given,when,then}:
+  r12,"StreamingColumnExcelSink MUST accept append set_row_ids for multi-batch windows","系统 MUST 使可选的 `StreamingColumnExcelSink` 的 `set_row_ids` 支持多次调用以追加行窗: - 首次调用 MUST 打开 `write_only` workbook(并按需写表头) - 后续调用 MUST 追加新 `row_id` 与对应行缓冲,且 MUST NOT 重建已打开的 workbook - 重复 `row_id` MUST fail-fast - MUST NOT 改变默认 `ColumnExcelSink` 行为 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线"
+scenarios[27]{req_id,id,given,when,then}:
   r1,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
   r1,"旧-sink-实现可继续工作","",现有 sink 继承 `BaseRowSink` 或实现 `IRowSink`,不需修改即可运行
   r2,baseline,"","TODO: describe the trigger","TODO: describe the expected result"
@@ -39,3 +40,6 @@ scenarios[24]{req_id,id,given,when,then}:
   r11,"default-column-excel-unchanged",既有调用方仅使用 ColumnExcelSink,执行既有写出路径,"行为与归档前契约一致,不受 StreamingColumnExcelSink 引入影响"
   r11,"streaming-opt-in-reduces-pre-close",调用方显式构造 StreamingColumnExcelSink 并写入宽表列,在齐备行上 flush 后继续写入,"系统 MUST 允许释放已刷行缓冲,且 evidence 显示 pre_close/peak 低于同 shape 的 ColumnExcelSink hold"
   r11,"no-yaml-streaming-knobs",维护者审阅 YAML DSL 主线与 schema,检查 streaming/flush 配置面,MUST NOT 出现 write.streaming 或等价 YAML knobs
+  r12,"multi-batch-append-matches-hold",调用方对 StreamingColumnExcelSink 按 batch 多次 set_row_ids 并写满各批全部列,close 后读取 xlsx,"输出 MUST 与同数据的 ColumnExcelSink 一致,且已刷行缓冲可在过程中释放"
+  r12,"duplicate-row-id-fail-fast",StreamingColumnExcelSink 已登记某 row_id,再次 set_row_ids 含同一 row_id,系统 MUST 抛出错误且不得静默覆盖
+  r12,"default-column-excel-unchanged",既有调用方仅使用 ColumnExcelSink,执行既有写出路径,行为不受本变更影响

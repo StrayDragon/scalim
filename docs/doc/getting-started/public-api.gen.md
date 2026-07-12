@@ -42,7 +42,7 @@ Sources:
 | `scalim.ob` | 5 | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 12 | 事件envelope+事件类型入口+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
 | `scalim.events.type_groups` | 15 | 事件类型分组视图 | 按主题探索 `EventType`(不引入新值) |
-| `scalim.sinks` | 15 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
+| `scalim.sinks` | 16 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 | `scalim.sinks.memory` | 4 | memory sinks(调试/测试/捕获) | `InMemoryRowDataSink`/`InMemoryCsv` 等 |
 | `scalim.sinks.pandas` | 2 | pandas sinks(可选依赖) | 需要 `pandas` 时显式使用该子模块 |
 | `scalim.shortcuts.resources` | 1 | 资源类 shortcut 稳定入口 | 从 output root 定位产物/资源 |
@@ -376,7 +376,7 @@ from scalim.events.type_groups import (
 
 #### `scalim.sinks`
 
-- Export count: `15`
+- Export count: `16`
 
 ```python
 from scalim.sinks import (
@@ -395,6 +395,7 @@ from scalim.sinks import (
     IColumnSink,
     IRowSink,
     ISink,
+    StreamingColumnExcelSink,
 )
 ```
 

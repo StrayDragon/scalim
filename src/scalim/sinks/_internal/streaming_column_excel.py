@@ -43,7 +43,7 @@ class StreamingColumnExcelSink(IColumnSink):
     """流式列式 `Excel` 写入器(可选接入):行字段齐备即 `append` 并释放行缓冲.
 
     与 `ColumnExcelSink` 的差异:
-    - `set_row_ids` 后立即打开 `write_only` `Workbook`
+    - 首次 `set_row_ids` 打开 `write_only` `Workbook`;后续调用追加行窗(对齐 `pipeline` 多 `batch`)
     - 某行 `field_names` 全集齐备后,按行序刷入 `sheet` 并释放该行缓冲
     - 适合行窗写出(每窗写满全部列);对先写完整列再写下一批列的全量模式峰值收益有限
 
@@ -95,19 +95,32 @@ class StreamingColumnExcelSink(IColumnSink):
 
     @override
     def set_row_ids(self, row_ids: "SinkRowKeySeq") -> None:
-        if self._row_ids:
-            msg = "`set_row_ids` 已调用"
-            raise RuntimeError(msg)
         if self._closed:
             msg = "Sink 已关闭"
             raise RuntimeError(msg)
 
-        self._row_ids = list(row_ids)
-        self._row_index = {pk: i for i, pk in enumerate(self._row_ids)}
-        n = len(self._row_ids)
-        self._pending = [set(self.field_names) for _ in range(n)]
+        new_ids = list(row_ids)
+        if not new_ids:
+            return
+
+        for pk in new_ids:
+            if pk in self._row_index:
+                msg = "重复 `row_id`: {!r}".format(pk)
+                raise RuntimeError(msg)
+
+        start = len(self._row_ids)
+        first_batch = start == 0
+        self._row_ids.extend(new_ids)
+        for offset, pk in enumerate(new_ids):
+            self._row_index[pk] = start + offset
+
+        n = len(new_ids)
+        self._pending.extend(set(self.field_names) for _ in range(n))
         empty_row: List[FieldValue] = [None] * len(self.field_names)  # type: ignore[list-item]
-        self._values = [list(empty_row) for _ in range(n)]
+        self._values.extend(list(empty_row) for _ in range(n))
+
+        if not first_batch:
+            return
 
         self._workbook = Workbook(write_only=True)
         self._worksheet = self._workbook.create_sheet(self.sheet_name)

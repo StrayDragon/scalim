@@ -40,7 +40,7 @@
 - **来源**: notplan `c1-streaming-xlsx-output`；经 `c0-column-excel-sink-column-residency` 取证后升格收窄。
 - **证据（2026-07-12）**: mid-close 列切片释放 **不降 peak**；行窗 streaming 100k×300 peak **3.58GB → 1.11GB**（~69%）。
 - **状态**: **已归档落地** `archive/2026-07-12-c0-streaming-column-excel-sink`；生产类型 `scalim.sinks.StreamingColumnExcelSink`（默认 `ColumnExcelSink` 不变；无 YAML knobs）。
-- **残留 follow-up**: execution 自动按 source 完成触发 flush；更细 pending 窗口优化（仍 later，非阻塞）。
+- **残留 follow-up**: `set_row_ids` 多 batch 追加 **已归档** `archive/2026-07-12-c0-streaming-column-excel-multi-batch`（证据：50k×300 peak hold 1.92→**0.11GB**，且优于单次全量 `set_row_ids` 行窗 0.60GB）；pipeline opt-in 选用 Streaming（仍 later，非阻塞）。
 
 ### later — output bypass / 非托管 book 写出
 
