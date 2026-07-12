@@ -13,9 +13,7 @@ from typing import List, Set
 
 TESTS_ROOT = Path(__file__).resolve().parents[1] / "tests"
 
-ALLOWLIST: Set[str] = {
-    "tests/fixtures/workflow_loaders.py",
-}
+ALLOWLIST: Set[str] = set()
 
 
 @dataclass(frozen=True)

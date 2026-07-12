@@ -1,17 +1,40 @@
 import threading
-import time
 from decimal import Decimal
-from typing import Dict, Iterable, Mapping
+from typing import Dict, Iterable, Mapping, Optional
+
+from tests.support.testing_utils import CI_TIMEOUT_S, barrier_wait, event_wait
 
 
 _LOCK = threading.Lock()
 _PRELOAD_CALLS = 0
+
+_MAIN_SLOW_RELEASE = threading.Event()
+_MAIN_VERY_SLOW_RELEASE = threading.Event()
+_PRELOAD_RELEASE = threading.Event()
+_TABLE_C_RELEASE = threading.Event()
+_FIRST_PRELOAD_ENTERED = threading.Event()
+_MAIN_SLOW_ENTERED = threading.Event()
+
+_MAIN_SLOW_BARRIER = None  # type: Optional[threading.Barrier]
+
+
+def reset_timing() -> None:
+    """Open all loader timing gates (non-blocking default) and clear barriers."""
+    global _MAIN_SLOW_BARRIER
+    _MAIN_SLOW_RELEASE.set()
+    _MAIN_VERY_SLOW_RELEASE.set()
+    _PRELOAD_RELEASE.set()
+    _TABLE_C_RELEASE.set()
+    _FIRST_PRELOAD_ENTERED.clear()
+    _MAIN_SLOW_ENTERED.clear()
+    _MAIN_SLOW_BARRIER = None
 
 
 def reset_counters() -> None:
     global _PRELOAD_CALLS
     with _LOCK:
         _PRELOAD_CALLS = 0
+    reset_timing()
 
 
 def preload_calls() -> int:
@@ -19,17 +42,73 @@ def preload_calls() -> int:
         return int(_PRELOAD_CALLS)
 
 
+def wait_first_preload_entered(*, timeout_s: float = CI_TIMEOUT_S) -> None:
+    event_wait(_FIRST_PRELOAD_ENTERED, timeout_s=timeout_s, label="workflow_loaders.first_preload_entered")
+
+
+def wait_main_slow_entered(*, timeout_s: float = CI_TIMEOUT_S) -> None:
+    event_wait(_MAIN_SLOW_ENTERED, timeout_s=timeout_s, label="workflow_loaders.main_slow_entered")
+
+
+def hold_main_slow() -> None:
+    _MAIN_SLOW_RELEASE.clear()
+
+
+def release_main_slow() -> None:
+    _MAIN_SLOW_RELEASE.set()
+
+
+def hold_main_very_slow() -> None:
+    _MAIN_VERY_SLOW_RELEASE.clear()
+
+
+def release_main_very_slow() -> None:
+    _MAIN_VERY_SLOW_RELEASE.set()
+
+
+def hold_preload() -> None:
+    _PRELOAD_RELEASE.clear()
+
+
+def release_preload() -> None:
+    _PRELOAD_RELEASE.set()
+
+
+def hold_table_c() -> None:
+    _TABLE_C_RELEASE.clear()
+
+
+def release_table_c() -> None:
+    _TABLE_C_RELEASE.set()
+
+
+def set_main_slow_barrier(*, parties: int) -> None:
+    """Optional barrier rendezvous inside ``load_main_slow`` (after the release gate)."""
+    global _MAIN_SLOW_BARRIER
+    _MAIN_SLOW_BARRIER = threading.Barrier(int(parties))
+
+
 def load_main_fast() -> Iterable[Mapping[str, object]]:
     return [{"ref_id": 1}]
 
 
+def load_main_fast_releasing_very_slow() -> Iterable[Mapping[str, object]]:
+    """Fast main loader that releases ``load_main_very_slow`` (for pipeline overlap tests)."""
+    release_main_very_slow()
+    return [{"ref_id": 1}]
+
+
 def load_main_slow() -> Iterable[Mapping[str, object]]:
-    time.sleep(0.05)
+    _MAIN_SLOW_ENTERED.set()
+    event_wait(_MAIN_SLOW_RELEASE, timeout_s=CI_TIMEOUT_S, label="workflow_loaders.main_slow")
+    barrier = _MAIN_SLOW_BARRIER
+    if barrier is not None:
+        barrier_wait(barrier, timeout_s=CI_TIMEOUT_S, label="workflow_loaders.main_slow_barrier")
     return [{"ref_id": 1}]
 
 
 def load_main_very_slow() -> Iterable[Mapping[str, object]]:
-    time.sleep(0.2)
+    event_wait(_MAIN_VERY_SLOW_RELEASE, timeout_s=CI_TIMEOUT_S, label="workflow_loaders.main_very_slow")
     return [{"ref_id": 1}]
 
 
@@ -42,7 +121,10 @@ def load_preload_table(**kwargs: object) -> Dict[int, Mapping[str, object]]:
     global _PRELOAD_CALLS
     with _LOCK:
         _PRELOAD_CALLS += 1
-    time.sleep(0.05)
+        calls = int(_PRELOAD_CALLS)
+    if calls == 1:
+        _FIRST_PRELOAD_ENTERED.set()
+    event_wait(_PRELOAD_RELEASE, timeout_s=CI_TIMEOUT_S, label="workflow_loaders.preload_table")
     return {1: {"id": 1, "value": "ok"}}
 
 
@@ -69,7 +151,7 @@ def load_table_b_fast() -> Iterable[Mapping[str, object]]:
 
 
 def load_table_c_slow() -> Iterable[Mapping[str, object]]:
-    time.sleep(0.05)
+    event_wait(_TABLE_C_RELEASE, timeout_s=CI_TIMEOUT_S, label="workflow_loaders.table_c")
     return [
         {"id": "c1", "value": "C1"},
     ]
@@ -95,3 +177,6 @@ def load_table_typed_values() -> Iterable[Mapping[str, object]]:
             "raw_text": "",
         }
     ]
+
+
+reset_timing()

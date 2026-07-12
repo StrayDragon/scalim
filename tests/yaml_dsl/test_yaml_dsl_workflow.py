@@ -61,10 +61,18 @@ from scalim.dsl.yaml_dsl.workflow import (
     validate_workflow_yaml_text_json,
 )
 from tests.fixtures import workflow_loaders
+from tests.support.testing_utils import CI_TIMEOUT_S, event_wait
 
 
 _ALLOWED_MODULES = frozenset(["tests.fixtures.workflow_loaders"])
 _ALLOWED_MODULES_WITH_SHEETBOOK = frozenset(["tests.fixtures.workflow_loaders", "scalim.workflow.loaders"])
+
+
+@pytest.fixture(autouse=True)
+def _reset_workflow_loader_fixture_state() -> None:
+    workflow_loaders.reset_counters()
+    yield
+    workflow_loaders.reset_counters()
 
 
 def _workflow_resources_policy(  # type: ignore[no-untyped-def] test helper
@@ -1698,7 +1706,7 @@ def test_workflow_pipeline_allows_cross_stage_overlap_under_concurrency(tmp_path
         tmp_path,
         file_name="b.yaml",
         name="b",
-        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast",
+        main_loader_ref="tests.fixtures.workflow_loaders:load_main_fast_releasing_very_slow",
         preload_loader_ref="tests.fixtures.workflow_loaders:load_preload_table_alt",
         cache_mode="none",
     )
@@ -1714,6 +1722,7 @@ def test_workflow_pipeline_allows_cross_stage_overlap_under_concurrency(tmp_path
         failure_policy="primary_only",
     )
 
+    workflow_loaders.hold_main_very_slow()
     recorder = _WorkflowEventRecorder()
     runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="primary_only", schedule_mode="pipeline")
     result = run_workflow(str(wf), options=_run_options(components=[recorder]), workflow_runtime_options=runtime)
@@ -1725,8 +1734,8 @@ def test_workflow_pipeline_allows_cross_stage_overlap_under_concurrency(tmp_path
     by_start = {e.payload.workflow_node_id: e for e in start}
     by_end = {e.payload.workflow_node_id: e for e in end}
 
-    assert by_start["b"].timestamp >= by_end["a"].timestamp
-    assert by_start["b"].timestamp < by_end["x"].timestamp
+    # Causal: b starts after a ends. Overlap with x is proven by b's loader releasing x's gate.
+    assert by_start["b"].seq > by_end["a"].seq
     assert by_start["b"].payload.schedule_mode == "pipeline"
     assert by_start["b"].payload.stage == 1
 
@@ -1779,8 +1788,8 @@ def test_workflow_stage_barrier_blocks_next_stage_until_all_nodes_in_stage_termi
     by_start = {e.payload.workflow_node_id: e for e in start}
     by_end = {e.payload.workflow_node_id: e for e in end}
 
-    assert by_start["b"].timestamp >= by_end["a"].timestamp
-    assert by_start["b"].timestamp >= by_end["x"].timestamp
+    assert by_start["b"].seq > by_end["a"].seq
+    assert by_start["b"].seq > by_end["x"].seq
     assert by_start["b"].payload.schedule_mode == "stage_barrier"
     assert by_start["b"].payload.stage == 1
 
@@ -2464,7 +2473,7 @@ relations:
     assert "lookup_cast" in str(excinfo.value)
 
 
-def test_cache_pool_budget_fail_fast_raises(tmp_path: Path) -> None:
+def test_cache_pool_budget_fail_fast_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _ = _write_demand_yaml(
         tmp_path,
         file_name="a.yaml",
@@ -2483,18 +2492,56 @@ def test_cache_pool_budget_fail_fast_raises(tmp_path: Path) -> None:
     )
 
     workflow_loaders.reset_counters()
+    # Keep the first node in-flight after preload so the second node hits budget fail-fast.
+    workflow_loaders.hold_main_slow()
+
+    from scalim.execution.workflow_cache_pool import ScalimWorkflowCachePoolError, WorkflowCachePool
+
+    budget_failed = threading.Event()
+    original_get_or_load = WorkflowCachePool.get_or_load
+
+    def _get_or_load(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        try:
+            return original_get_or_load(self, *args, **kwargs)
+        except ScalimWorkflowCachePoolError:
+            budget_failed.set()
+            raise
+
+    monkeypatch.setattr(WorkflowCachePool, "get_or_load", _get_or_load)
+
     wf = _write_workflow_yaml(
         tmp_path,
         runs=[{"id": "a", "demand": "a.yaml"}, {"id": "b", "demand": "b.yaml"}],
         max_concurrency=2,
         failure_policy="primary_only",
     )
+    runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="primary_only", cache_pool_max_entries=1)
 
-    with pytest.raises(ScalimWorkflowConfigError) as excinfo:
-        runtime = _workflow_runtime_options(max_concurrency=2, failure_policy="primary_only", cache_pool_max_entries=1)
-        _ = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
-    assert "over budget" in str(excinfo.value).lower()
-    assert workflow_loaders.preload_calls() == 1
+    errors: List[Optional[BaseException]] = []
+    done = threading.Event()
+
+    def _run() -> None:
+        try:
+            _ = run_workflow(str(wf), options=_run_options(), workflow_runtime_options=runtime)
+            errors.append(None)
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            done.set()
+
+    worker = threading.Thread(target=_run, name="cache-budget-runner")
+    worker.start()
+    try:
+        workflow_loaders.wait_main_slow_entered()
+        event_wait(budget_failed, timeout_s=CI_TIMEOUT_S, label="cache_pool_budget_failed")
+        workflow_loaders.release_main_slow()
+        assert done.wait(timeout=CI_TIMEOUT_S)
+        assert errors and isinstance(errors[0], ScalimWorkflowConfigError)
+        assert "over budget" in str(errors[0]).lower()
+        assert workflow_loaders.preload_calls() == 1
+    finally:
+        workflow_loaders.release_main_slow()
+        worker.join(timeout=CI_TIMEOUT_S)
 
 
 def test_cache_pool_calls_node_done_on_compile_error_and_cancelled_dependents(tmp_path: Path) -> None:
