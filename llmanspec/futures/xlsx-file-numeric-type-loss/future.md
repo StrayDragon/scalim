@@ -6,7 +6,7 @@
 **已承接（勿再当作 open work）**
 
 - typed `xlsx_file` / ROWS SSOT、openpyxl helpers、streaming column sink、c30 释放 → 已归档
-- 内存总线**语义** → `c15-decide-xlsx-memory-book-role`
+- 内存总线**语义** → **`archive/2026-07-13-c15-decide-xlsx-memory-book-role`**
 - 统一 authoring `xlsx` + 旧 kind deprecated → **`archive/2026-07-13-c20-add-unified-xlsx-book-kind`**
 - IR 身份改为 path 有无（不再以假 kind 字符串为 SSOT）→ **`archive/2026-07-13-c25-normalize-xlsx-book-ir-path-presence`**
 - BREAKING 硬删 YAML `xlsx_file`/`xlsx_memory` 别名 → **`c999-remove-deprecated-xlsx-file-memory-kinds`（draft；勿再写回 futures）**
