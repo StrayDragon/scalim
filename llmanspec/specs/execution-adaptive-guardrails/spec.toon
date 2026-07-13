@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-adaptive-guardrails"
-purpose: "TBD - created by archiving change c0-deps-and-adaptive-guardrails. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "TBD - created by archiving change c0-deps-and-adaptive-guardrails. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[2]{req_id,title,statement}:
   r1,explicit max_workers MUST be guarded by a hard cap,"当调用方显式传入 `max_workers > 0` 时，系统 MUST 对其施加 hard cap，避免因外部输入不受控而导致线程池膨胀、CPU/内存资源耗尽。 系统 MUST 同时满足： - cap 策略是稳定且可解释的（例如与 `os.cpu_count()` 相关，并有上限） - 当发生裁剪（`resolved_workers < requested_workers`）时，系统 MUST 发出可诊断的 warning/事件/日志（不得静默）"

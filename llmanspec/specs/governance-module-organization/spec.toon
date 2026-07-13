@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-module-organization"
-purpose: "定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[23]{req_id,title,statement}:
   r1,"internal implementation paths MUST remain non-contract","系统 MUST 将\"可导入\"与\"可承诺\"分为两个层级：稳定公开入口由显式白名单定义,其余实现路径即使可导入也 MUST 视为内部实现细节."

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-output-overrides"
-purpose: "为下游”UI 动态选字段/动态输出”场景提供单一标准做法：demand YAML 保持可复用（通常不声明 `outputs`），调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "为下游”UI 动态选字段/动态输出”场景提供单一标准做法：demand YAML 保持可复用（通常不声明 `outputs`），调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[8]{req_id,title,statement}:
   r1,"`RunOverrides` MUST provide factory methods for the common “single-sheet dynamic","系统 MUST 在 `RunOverrides` 上提供标准 `@classmethod` 工厂方法,以覆盖最常见的下游集成场景: - 单表 - 单 sheet - 字段动态(由调用方指定 field_id 列表) - 输出 root 动态(由调用方指定输出 root 目录;版本化输出 D-2) 该工厂方法 MUST: - 只构造 detail output 的最小子集 - 同时覆盖 `resources.*` 与 `outputs_defaults` 的必要拼装,避免调用方重复拼结构"

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-micro-tunes"
-purpose: "定义 YAML DSL 语法增强，简化常见场景的表达复杂度，包括 relation 引用语法糖、output.fields 简写、runtime vars 指令节点形式，以及改进的验证器诊断信息。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 YAML DSL 语法增强，简化常见场景的表达复杂度，包括 relation 引用语法糖、output.fields 简写、runtime vars 指令节点形式，以及改进的验证器诊断信息。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,Relation references support string ref to relations.<id>,"系统 MUST 支持在字段定义中用字符串引用 relation: - `relation: <relation_id>` 作为 `relations.<relation_id>` 的显式引用 系统 MUST 在 full validate 时校验: - `relations.<relation_id>` 存在 - relation steps 的起止字段与 chain 校验规则保持不变"

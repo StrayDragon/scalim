@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-schema-workflow-alignment"
-purpose: "对齐 workflow `workflow.resources` 的 schema/runtime 契约（禁止 `$import` 暴露并提供迁移提示），并为 schema numeric constraints 引入生成期 fail-fast 与仓库级 drift gate。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "对齐 workflow `workflow.resources` 的 schema/runtime 契约（禁止 `$import` 暴露并提供迁移提示），并为 schema numeric constraints 引入生成期 fail-fast 与仓库级 drift gate。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,"workflow `resources` schema MUST expose only runtime-supported keys","workflow `resources` 的 schema 与静态校验面 MUST 以 runtime parser / compiler 实际支持的结构为准: - `workflow.resources` MUST NOT 暴露 runtime 不支持的 keys - `workflow.resources` MUST NOT 支持 imports expansion 或 `$import` - 当用户写入被移除的旧 key 时,系统 MUST 提供可执行的 migration hint"

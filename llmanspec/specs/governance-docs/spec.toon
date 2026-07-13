@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-docs"
-purpose: "定义仓库内文档的分层、生成边界(`*.gen.*` + `AUTOGEN` 注入区块)、统一生成入口与漂移门禁,以降低维护成本并防止”手工修改生成物/区块”导致的不一致. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义仓库内文档的分层、生成边界(`*.gen.*` + `AUTOGEN` 注入区块)、统一生成入口与漂移门禁,以降低维护成本并防止”手工修改生成物/区块”导致的不一致. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[6]{req_id,title,statement}:
   r1,"Generated doc artifacts are identifiable and non-editable","仓库 MUST 使用可机械识别的规则区分 “手工文档” 与 “生成文档/产物”,以避免漂移与误改: - 任何**全文件生成物** MUST 在文件名中包含 `.gen.`(例如 `*.gen.md`/`*.gen.json`/`*.gen.yaml`) - 全文件生成物 MUST 在文件头部包含”自动生成 + 生成入口(脚本或 just 目标)”提示 - 手工页中的受控注入区块 MUST 使用 `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` markers - 生成器 MUST 只写入其受控输出集合,不得覆盖手工维护文件"

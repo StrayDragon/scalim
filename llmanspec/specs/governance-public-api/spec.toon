@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-public-api"
-purpose: "定义 public API 边界治理规则：稳定入口编目、`__all__` 治理、用户材料导入边界、agent skill 生成器，确保在不引入\"符号级硬 manifest SSOT\"的前提下维护清晰的公共契约。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 public API 边界治理规则：稳定入口编目、`__all__` 治理、用户材料导入边界、agent skill 生成器，确保在不引入\"符号级硬 manifest SSOT\"的前提下维护清晰的公共契约。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[15]{req_id,title,statement}:
   r1,stable public entrypoints MUST be explicitly cataloged,"系统 MUST 为用户侧可依赖的公共入口维护一份显式、可审计的稳定目录，而不是让\"当前能 import 的路径\"自然演化成公共契约。 该目录 MUST 覆盖核心公共模块（如 YAML DSL 入口、IR 类型、事件系统、sink 契约、资源 shortcuts 等），并将未列入目录的路径（如 internal 模块、运行期细节、旧路径、底层协议工具）视为非公共契约。"

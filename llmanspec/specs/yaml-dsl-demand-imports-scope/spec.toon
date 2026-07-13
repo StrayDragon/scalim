@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-demand-imports-scope"
-purpose: "定义 demand imports (`imports` / `$import`) 的作用域边界，确保其仅服务于稳定的 authoring 复用场景，而非 runtime overlay 或 output extras 的替代机制。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 demand imports (`imports` / `$import`) 的作用域边界，确保其仅服务于稳定的 authoring 复用场景，而非 runtime overlay 或 output extras 的替代机制。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,demand imports MUST remain available for reusable authoring fragments,"demand `imports` / `$import` MUST 继续服务于跨文件 authoring 复用: - imports MUST 继续支持 demand 侧片段共享 - 允许范围 MUST 绑定到稳定 authoring surface,而不是 runtime overlay / control-plane"

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "observability-logging"
-purpose: "为框架内部日志建立统一的 Python 标准库 `logging` 使用约定,以保证默认静默、命名空间稳定、输出前缀一致,并提供可扩展的诊断字段与 context 绑定机制。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "为框架内部日志建立统一的 Python 标准库 `logging` 使用约定,以保证默认静默、命名空间稳定、输出前缀一致,并提供可扩展的诊断字段与 context 绑定机制。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[6]{req_id,title,statement}:
   r1,框架内部日志使用标准库 `logging` 且默认静默,"系统 MUST 使用 Python 标准库 `logging` 输出框架内部日志,并遵循库代码“默认静默”约束。 - 系统 MUST NOT 在运行时调用 `logging.basicConfig(...)` 或修改 `root logger`。 - 系统 MUST 在导入内部日志工具后,为 `logging.getLogger(\"scalim\")` 安装 `logging.NullHandler`,以避免无 handler 时的库侧噪音。"

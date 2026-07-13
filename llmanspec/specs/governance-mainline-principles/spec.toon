@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-mainline-principles"
-purpose: "定义 YAML DSL 的上位主线原则与设计护栏，用于约束后续变更的方向与评审口径：单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式（拒绝 imports expansion）。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 YAML DSL 的上位主线原则与设计护栏，用于约束后续变更的方向与评审口径：单主线原地演进、authoring/runtime policy 分离、KV-first、以及 workflow 小而声明式（拒绝 imports expansion）。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,"YAML DSL mainline MUST evolve as a single in-place line","YAML DSL 主线演进 MUST 采用单主线原地升级模型: - 系统 MUST NOT 引入 `dsl_version` - 系统 MUST NOT 通过 CLI、schema 路径或 modeline 选择并行 DSL 版本 - 系统 MUST NOT 维护并行 parser、validator 或 schema 产物来长期承载旧写法"

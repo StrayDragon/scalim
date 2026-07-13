@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-replay-bundle"
-purpose: "TBD - created by archiving change c10-workflow-viz-linked-replay. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "TBD - created by archiving change c10-workflow-viz-linked-replay. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[7]{req_id,title,statement}:
   r1,workflow execution MUST be exportable as a single linked replay bundle,"系统 MUST 提供 workflow 级 replay bundle 导出能力，使用户能够通过一次 workflow 级导出得到一个可携带、可直接打开的目录，而不需要手工收集多个 child run replay 目录。 bundle MUST 作为一个单目录存在，并至少包含： - `scalim-viz/workflow/` 下的 workflow scope run - `scalim-viz/<demand_run_id>/` 下的 demand runs（由 workflow 节点引用）"

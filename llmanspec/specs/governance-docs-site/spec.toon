@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-docs-site"
-purpose: "定义仓库内文档站点的范围与组织规则：使用 Zensical（兼容 MkDocs 的配置格式）构建站点，以 `docs/doc/` 作为唯一文档真源，避免将规范、审计报告等纳入站点。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义仓库内文档站点的范围与组织规则：使用 Zensical（兼容 MkDocs 的配置格式）构建站点，以 `docs/doc/` 作为唯一文档真源，避免将规范、审计报告等纳入站点。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,Documentation site is properly configured,The system MUST provide a Zensical configuration and treat `docs/doc/` as the canonical documentation root.

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-lsp-cli"
-purpose: "提供一个跨编辑器可复用的 YAML DSL LSP server 启动入口（默认 stdio），并约束其日志/降级行为， 以保证编辑器集成稳定且可排障。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "提供一个跨编辑器可复用的 YAML DSL LSP server 启动入口（默认 stdio），并约束其日志/降级行为， 以保证编辑器集成稳定且可排障。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,"CLI MUST provide a stable `scalim-yaml-dsl-lsp serve` entrypoint (stdio by defau","系统 MUST 提供一个稳定的 server 启动入口，供任意 LSP client 通过一个命令拉起： - MUST 提供命令：`scalim-yaml-dsl-lsp serve` - MUST 默认以 stdio 模式运行（stdout/stderr 分离；stdout 仅用于 JSON-RPC） - MAY 提供 `--tcp` 模式（仅用于 debug；不作为 v1 必选） - MUST 支持配置日志输出到 stderr 或文件（不得写入 stdout）"

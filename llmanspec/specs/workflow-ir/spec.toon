@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-ir"
-purpose: "定义 Workflow IR 作为 workflow 的统一底座,并将 workflow 的 authoring surface(例如 YAML)视为\"编译到 IR 的语法前端\",而不是直接驱动执行器分支逻辑. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 Workflow IR 作为 workflow 的统一底座,并将 workflow 的 authoring surface(例如 YAML)视为\"编译到 IR 的语法前端\",而不是直接驱动执行器分支逻辑. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[7]{req_id,title,statement}:
   r1,workflow compiles to a Workflow IR graph,"系统 MUST 引入 Workflow IR 作为 workflow 的统一底座,并将 workflow 的 authoring surface(例如 YAML)视为\"编译到 IR 的语法前端\",而不是直接驱动执行器分支逻辑. Workflow IR MUST 至少包含: - 节点集合(`nodes`),每个节点具备稳定 id 与 type - 显式依赖(`deps`),以表达 DAG 与就绪条件（IR MUST 以 `node_id -> [prereq_node_id, ...]` 的形式保留 deps 列表） - workflow-scope 选项(`options`),用于并发/失败策略/资源与缓存策略等 - workflow-scope 工件/产物(`artifacts`),用于节点间显式传递与生命周期管理"

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "quality-perf-regression"
-purpose: "定义性能回归护栏、基准测试套件与内存剖析入口，确保执行热路径的确定性行为不被退化，并提供可测量的趋势指标。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义性能回归护栏、基准测试套件与内存剖析入口，确保执行热路径的确定性行为不被退化，并提供可测量的趋势指标。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,Deterministic hotpath regression guardrails,"系统 MUST 为执行热路径提供确定性的回归护栏（单元测试级别），用于防止“wants-gated 退化”与无订阅时的额外循环/分配被重新引入。 该护栏 MUST 满足： - 不依赖机器性能阈值（避免 CI 抖动）。 - 以“调用次数/分支路径/是否构造中间结构”为断言信号。"

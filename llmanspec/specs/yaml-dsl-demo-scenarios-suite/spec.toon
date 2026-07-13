@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-demo-scenarios-suite"
-purpose: "维护一组 YAML DSL 场景库（fixtures），覆盖电商/广告/客服三类域，并纳入自动化回归测试范围，确保 DSL 能力与实现持续对齐。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "维护一组 YAML DSL 场景库（fixtures），覆盖电商/广告/客服三类域，并纳入自动化回归测试范围，确保 DSL 能力与实现持续对齐。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,YAML DSL 场景库必须覆盖电商/广告/客服三类域,"系统 MUST 在场景库目录下维护一组 YAML DSL 场景库（fixtures），第一版至少包含三类域： - 电商（ecommerce）：以 canonical demand YAML 为核心（路径由其它规范约束保持稳定） - 广告（ads）：至少 1 份 demand YAML（可选 workflow） - 客服（support）：至少 1 份 demand YAML（可选 workflow） 场景库的 YAML MUST 以最新 schema 为基准编写，并在文件头部包含 YAML LSP schema modeline。"

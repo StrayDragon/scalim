@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-versioned-outputs"
-purpose: "定义版本化输出协议（D-2）：将 `path` 解释为输出 root 目录,并在 root 下以 `versions/<version_id>/...` 写入产物,同时通过 `manifest/latest.json` 提供稳定入口与并发下的原子更新语义（last-writer-wins,但不丢历史版本）。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义版本化输出协议（D-2）：将 `path` 解释为输出 root 目录,并在 root 下以 `versions/<version_id>/...` 写入产物,同时通过 `manifest/latest.json` 提供稳定入口与并发下的原子更新语义（last-writer-wins,但不丢历史版本）。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[6]{req_id,title,statement}:
   r1,output path MUST be treated as an output root directory,"系统 MUST 将“输出配置的 path”解释为 **目录 root**（而不是最终文件路径），并在该 root 下创建框架自管目录： - `<root>/versions/`：所有版本化输出目录 - `<root>/manifest/`：元数据目录（latest 指示等） 约束： - 系统 MUST 在首次写入前创建 root 目录及其父目录（`mkdir(parents=True, exist_ok=True)`）。 - 系统 MUST NOT 在 `<root>` 的其它位置创建框架元数据文件（尤其是 `<final_path>.scalim.lock`）。 - root 目录的相对路径解析规则由各 DSL capability 定义（例如相对 YAML 目录解析）。"

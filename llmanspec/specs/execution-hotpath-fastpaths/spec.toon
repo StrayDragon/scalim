@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-hotpath-fastpaths"
-purpose: "在不要求业务改动的前提下，降低 execution 热路径（`compute` / `call_by` / `load_ref`）的 per-row 固定开销，并保持既有语义、可观测性与低内存特性。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "在不要求业务改动的前提下，降低 execution 热路径（`compute` / `call_by` / `load_ref`）的 per-row 固定开销，并保持既有语义、可观测性与低内存特性。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,"Fastpaths are default-on and behavior-preserving",系统 MUST 默认启用面向执行热路径的 fastpaths，并保持对外语义不变（值、异常、事件顺序/边界）。

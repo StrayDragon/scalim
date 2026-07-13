@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-import-aliases-and-presets"
-purpose: "支持项目级配置文件治理 YAML DSL imports 路径解析，提供 alias 映射、allowed roots 约束和内置 presets 引用能力。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "支持项目级配置文件治理 YAML DSL imports 路径解析，提供 alias 映射、allowed roots 约束和内置 presets 引用能力。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,Imports MUST support scalim.yaml configured aliases and allowed roots,"系统 MUST 支持可选的项目级配置文件 `scalim.yaml`，用于治理 YAML DSL 的 imports 路径解析。 当配置存在时： - 系统 MUST 支持 `yaml_dsl.import_roots` 列表： - 每个条目 MUST 为 mapping - 条目 MUST 包含 `path`（目录路径；建议相对 `scalim.yaml` 所在目录） - 条目 MAY 包含 `alias`（例如 `@` / `fragments`） - 系统 MUST 在解析 `imports.<alias>` 路径时先应用 alias（例如 `@/x.yaml` 或 `fragments:/x.yaml`），再执行后续的相对路径归一化与安全校验 - 当调用方未显式提供 `allowed_yaml_roots` 时，系统 MUST 将 `import_roots[*].path` 作为默认 allow-roots 的扩展输入；越界 MUST fail-fast"

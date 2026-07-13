@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-stage-scheduling-residual-risks"
-purpose: "将 `workflow stage scheduling`（`pipeline` / `stage_barrier`）相关的“残留风险”收敛为稳定、可检索、可复核的 risk register，并明确在后续迭代/验收中必须检查的边界与可观测性约束。 本 spec 不引入新的 runtime 行为；其目标是把“真实项目里可能遇到的解释偏差、下游消费破坏或性能印象落差”显式化，作为后续变更的 chec [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "将 `workflow stage scheduling`（`pipeline` / `stage_barrier`）相关的“残留风险”收敛为稳定、可检索、可复核的 risk register，并明确在后续迭代/验收中必须检查的边界与可观测性约束。 本 spec 不引入新的 runtime 行为；其目标是把“真实项目里可能遇到的解释偏差、下游消费破坏或性能印象落差”显式化，作为后续变更的 chec [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,workflow stage scheduling residual risks MUST be tracked as a stable risk regist,"系统 MUST 提供一份稳定可发现的 risk register，用于记录 `workflow stage scheduling` 的残留风险、触发条件与缓解建议，并避免风险仅存在于： - 临时讨论记录 - commit message - 单次 change proposal（归档后难以被后续变更发现） risk register MUST 至少覆盖以下风险条目（ID 稳定，便于引用）： - **R1**：`stage_barrier` 可能导致吞吐下降或 wall time 放大 - **R2**：内部 write nodes 的 `stage` 折叠可能隐藏执行细节（诊断视角的“少一层”感受） - **R3**：可观测字段扩展的兼容性风险（`viz snapshot` vs workflow node event payload） - **R4**：术语漂移导致概念分叉（`wave` vs `stage`） - **R5**：性能“印象”评估容易被误当作严谨 benchmark risk register 的每个条目 MUST 至少包含： - **Risk**：风险描述（面向维护者/使用方） - **Signals**：触发信号/观测证据（从哪里看、怎么看） - **Mitigations**：建议缓解措施（含默认策略/边界） - **Touchpoints**：相关的 spec / 代码位置（用于快速定位）"

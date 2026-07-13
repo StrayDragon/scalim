@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-safety-single-writer"
-purpose: "Establish and enforce a single-writer threading model for workflow execution state, ensuring that write operations to shared runtime structures are either owned by a controller thread or protected by [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "Establish and enforce a single-writer threading model for workflow execution state, ensuring that write operations to shared runtime structures are either owned by a controller thread or protected by [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,WorkflowCtxStore and WorkflowArtifactsDirectory write operations MUST assert con,"All mutating entry points on `WorkflowCtxStore` and `WorkflowArtifactsDirectory` (e.g. publish and equivalent writes) MUST assert that `threading.current_thread().ident` equals the thread id recorded at construction (`_owner_thread_id`). Assertions MUST be disabled under Python `-O` so normal production runs incur no overhead."

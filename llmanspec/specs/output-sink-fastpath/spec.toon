@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "output-sink-fastpath"
-purpose: "TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "TBD - created by archiving change c60-performance-optimization-abc. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[3]{req_id,title,statement}:
   r1,"Optional aligned-write fastpath interfaces","系统 MUST 为 sinks 提供可选的 aligned-write fastpath，以减少执行层在写出前构造中间 `dict` 的分配开销。 系统 MUST 定义以下可选接口（方法名为稳定契约）： - 对 `IColumnSink`：`write_column_aligned(field_key, row_ids, values)` - `row_ids` 与 `values` MUST 为等长序列 - `values[i]` 对应 `row_ids[i]` 的值 - 对 `IRowSink`：`write_row_aligned(field_keys, values)` - `field_keys` 与 `values` MUST 为等长序列 - `values[i]` 对应 `field_keys[i]` 的值"

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "governance-extension-points"
-purpose: "定义 PROJECT_NAME 内部扩展点的显式注入与编译式分发模型，减少模块级”魔法注入”与事件热路径反射，提升类型友好性、可维护性与性能稳定性。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 PROJECT_NAME 内部扩展点的显式注入与编译式分发模型，减少模块级”魔法注入”与事件热路径反射，提升类型友好性、可维护性与性能稳定性。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,执行层扩展点必须显式注入,"系统 MUST 提供显式的 overrides/config 对象用于覆盖 execution pipeline 的可变实现细节(例如批次切分策略与 `adaptive` 调度策略/并发池配置/执行器类型),并禁止通过 `sys.modules` 探测或模块级 `getattr` “魔法注入”实现覆盖. 默认情况下,未提供 overrides 时系统行为 MUST 与现有默认实现一致."

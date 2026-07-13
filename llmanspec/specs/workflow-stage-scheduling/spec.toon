@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-stage-scheduling"
-purpose: "为 workflow DAG 提供可配置的调度 preset，使调用方可以在保持默认 pipeline 行为不变的前提下，选择严格的 stage barrier（阶段屏障）调度，以提升可预期性、资源规划与可解释性。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "为 workflow DAG 提供可配置的调度 preset，使调用方可以在保持默认 pipeline 行为不变的前提下，选择严格的 stage barrier（阶段屏障）调度，以提升可预期性、资源规划与可解释性。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[4]{req_id,title,statement}:
   r1,workflow runtime MUST 支持 scheduler preset（pipeline / stage_barrier）,"系统 MUST 通过运行期策略边界（runtime policy boundary）提供 workflow scheduler preset 的选择入口： - 调用方 MUST 能通过 `workflow_runtime_options.scheduler` 选择调度 preset（以 typed dataclass 作为策略对象）。 - 当调用方未显式配置 scheduler 时，系统 MUST 使用 `pipeline` 作为默认 preset。"

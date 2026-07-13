@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "tools-prompt-eval-workflow"
-purpose: "定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。 [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义仓库级 prompt 评测/回归工作流的最低要求,用于守护关键 skill/指令文本的质量与文档治理边界规则,并提供稳定的本地运行入口与 CI 产物。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[2]{req_id,title,statement}:
   r1,Prompt evaluation workflow exists,"系统 MUST 提供一套仓库级 prompt 评测/回归工作流,用于守护关键 skill/指令文本的质量与边界规则,并提供稳定的本地运行入口."

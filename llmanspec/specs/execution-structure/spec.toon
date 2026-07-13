@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "execution-structure"
-purpose: "定义 execution 层的模块拆分与入口契约,并明确统一 IR 编排入口(如 `run_ir`)的边界,确保执行编排对 DSL 配置解耦且行为在重构后保持兼容. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "定义 execution 层的模块拆分与入口契约,并明确统一 IR 编排入口(如 `run_ir`)的边界,确保执行编排对 DSL 配置解耦且行为在重构后保持兼容. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[21]{req_id,title,statement}:
   r1,execution 提供统一 IR 编排入口并返回通用结果,"系统 MUST 在 execution 层提供统一 IR 执行编排入口(概念名: `run_ir`,具体模块/符号名可调整),负责: - 基于 `DemandIr` + `ExecutionRequest` 构建 plan - 装配 sinks/observers/hooks 并完成收尾 - 调用 engine 执行并产出 **DSL-agnostic** 的 `ExecutionResult` 该入口 MUST 不依赖任何 DSL 专有配置类型(例如 YAML 的 `DemandConfig`/`ObservabilityConfig`)."

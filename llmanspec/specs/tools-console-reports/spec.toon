@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "tools-console-reports"
-purpose: "TBD - created by archiving change c2-remove-literich. Update Purpose after archive. [scope-review-2026-07-12-c5-openpyxl-helpers]"
+purpose: "TBD - created by archiving change c2-remove-literich. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
   r1,"console reports MUST be dependency-free and line-oriented","系统 MUST 将 `console` 报告（或等价的 “打印/展示到日志” 输出）实现为仅依赖 Python 标准库 `logging` 的逐行（line-oriented）文本输出。 系统 MUST NOT 依赖 `scalim.vendor.literich`（或任何表格/面板渲染器）来完成 console 报告展示。"
