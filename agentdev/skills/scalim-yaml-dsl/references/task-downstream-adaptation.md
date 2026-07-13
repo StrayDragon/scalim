@@ -48,6 +48,7 @@ python3 scripts/scan-downstream-yaml-dsl.py
   - 入口: `agentdev/skills/scalim-yaml-dsl/references/upgrades/`
   - 或从 skill 的升级索引进入: `references/task-upgrade-legacy.md` (含症状→批次快速路径 + 自动注入索引)
   - book `write_defaults` / `xlsx_memory.budget` / 旧 Override 类型: 优先 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+  - 旧 `xlsx_file` / `xlsx_memory` → 统一 `xlsx`(可选 `path`): 优先 `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`（IR pathful/pathless: `2026-07-13-normalize-xlsx-book-ir-path-presence.md`）
   - 需要快速全文检索时: `rg -n "<keyword>" agentdev/skills/scalim-yaml-dsl/references/upgrades/*.md`
 
 ### B. 上游稳定后: 一步到位升级下游(不保留兼容)

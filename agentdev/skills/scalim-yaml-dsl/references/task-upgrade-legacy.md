@@ -89,7 +89,7 @@
   - Spec: `llmanspec/specs/yaml-dsl-books-resources/spec.toon`
 - 2026-07-13: normalize-xlsx-book-ir-path-presence
   - SSOT: `references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md`
-  - llmanspec: `llmanspec/changes/c25-normalize-xlsx-book-ir-path-presence/`
+  - llmanspec: `llmanspec/changes/archive/2026-07-13-c25-normalize-xlsx-book-ir-path-presence/`
 - 2026-07-13: unified-xlsx-book-kind
   - SSOT: `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`
   - llmanspec: `llmanspec/changes/archive/2026-07-13-c20-add-unified-xlsx-book-kind/`

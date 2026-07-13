@@ -4,12 +4,13 @@
 
 上位原则 SSOT: `llmanspec/specs/governance-mainline-principles/spec.toon`。
 
-**Authoring 边界速记**（`c20`/`c30` 已归档）:
-- YAML `resources.books`：仅 identity（oneOf variant / path / `export_xlsx.path`；暂留 `allow_formulas`）
+**Authoring 边界速记**（`c20`/`c30`/`c15`/`c20-unified`/`c25` 已归档；`c999` 硬删别名仍为 draft）:
+- YAML `resources.books`：仅 identity；推荐统一分支 `xlsx`（有 `path`=落盘，无 `path`=内存总线）；旧 `xlsx_file` / `xlsx_memory`（及 `export_xlsx.path`）为 deprecated 别名；暂留 `allow_formulas`
+- 运行时身份：parse 后以 **pathful / pathless** 为准（勿把 deprecated kind 字符串当长期 IR SSOT）
 - Python：`WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`（`BookWritePolicy` + `BookBudgetPolicy`）；省略 = builtin defaults / budget unlimited
-- YAML 再写 `write_defaults` / `xlsx_memory.budget` → fail-fast + 迁移提示
-- Skill upgrade：`agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
-- 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。可选 `BookBudgetPolicy` 仅护栏 `xlsx_memory`（omit=unlimited；fail-fast 语义后续可调研改为限流/移除，见 `llmanspec/futures/xlsx-file-numeric-type-loss/future.md`）
+- YAML 再写 `write_defaults` / `budget`（含旧 `xlsx_memory.budget`）→ fail-fast + 迁移提示
+- Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`
+- 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。可选 `BookBudgetPolicy` 仅护栏 **pathless**（内存总线）book（omit=unlimited；fail-fast 语义后续可调研改为限流/移除，见 `llmanspec/futures/xlsx-file-numeric-type-loss/future.md`）
 ## 0) 必须遵守的主线原则(硬约束)
 
 - **禁止并行版本**: 不引入 `dsl_version`;不通过 CLI/schema/modeline 选择并行 DSL 版本。

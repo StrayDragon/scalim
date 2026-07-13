@@ -78,7 +78,7 @@ result = run(
 resources:
   books:
     minimal_order_report:
-      xlsx_file:
+      xlsx:
         path: ./output
 
 outputs:
@@ -229,13 +229,13 @@ outputs:
     fields: [order_id]
 ```
 
-Excel 输出路径注入在 `resources.books.*.xlsx_file.path` / `resources.books.*.xlsx_memory.export_xlsx.path`:
+Excel 输出路径注入在 `resources.books.*.xlsx.path`(推荐;过渡期亦接受旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`):
 
 ```yaml
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: {$init_var: out_root}
 ```
 
@@ -264,7 +264,7 @@ result = run(
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
 | `resources.files.<id>.csv_file.path` | ✅ | ❌ | ❌ |
-| `resources.books.<id>.xlsx_file.path` / `resources.books.<id>.xlsx_memory.export_xlsx.path` | ✅ | ❌ | ❌ |
+| `resources.books.<id>.xlsx.path`(推荐;过渡期亦含旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`) | ✅ | ❌ | ❌ |
 
 ---
 
@@ -345,7 +345,7 @@ relations:
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./output
 
 _templates:
@@ -1310,7 +1310,7 @@ sources:
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./output
 
 _templates:
@@ -2153,7 +2153,7 @@ _ = compile(
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./output
 
 outputs:

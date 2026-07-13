@@ -288,7 +288,7 @@ workflow YAML 只负责两件事:
 
 - book 资源声明: `resources.books.<book_id>`
   - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
-  - oneOf 分支写法: `xlsx_file` / `xlsx_memory`
+  - 推荐分支: 统一 `xlsx`（有 `path`=落盘；无 `path`=内存总线）；旧 `xlsx_file` / `xlsx_memory` 为 deprecated 别名（见 upgrade `2026-07-13-unified-xlsx-book-kind`）
 - 输出到 book 的绑定: `outputs[*].to.book` / `outputs[*].to.sheet`
 - 写入策略: Python `ResourcesPolicy` / `BookWritePolicy`（`WorkflowRunOptions.resources_policy` 或 `DemandRunOptions.resources_policy`；省略则用 builtin defaults）+ `outputs[*].write`（仅 output-local header 行为: `include_header` / `header_fields_output_by`）
 
@@ -302,10 +302,10 @@ workflow YAML 只负责两件事:
 - workflow YAML **不支持** `imports` / `$import` 片段导入(不做 imports expansion)。
 - 若需要复用资源声明,优先使用 YAML anchors(`_templates`)或在 demand YAML 中使用 `$import` 生成最终 `resources.*`,workflow 侧仅做声明/覆盖。
 
-示例: workflow 统一声明一个共享 book(`xlsx_memory`),各 run 的 demand 只负责声明 outputs 绑定:
+示例: workflow 统一声明一个共享落盘 book(`xlsx.path`),各 run 的 demand 只负责声明 outputs 绑定:
 
 说明:
-- 对 `xlsx_memory` 分支,内存 `budget` 已迁出 YAML；缺省 unlimited。若需要护栏,在 Python 侧配置 `BookBudgetPolicy`（经 `WorkflowRunOptions.resources_policy`）。
+- 对 **pathless**（无 `path`）的内存总线 book,内存 `budget` 已迁出 YAML；缺省 unlimited。若需要护栏,在 Python 侧配置 `BookBudgetPolicy`（经 `WorkflowRunOptions.resources_policy`）。
 
 workflow YAML:
 
@@ -314,9 +314,8 @@ workflow:
   resources:
     books:
       report:
-        xlsx_memory:
-          export_xlsx:
-            path: ./out
+        xlsx:
+          path: ./out
 
   runs:
     - id: main
