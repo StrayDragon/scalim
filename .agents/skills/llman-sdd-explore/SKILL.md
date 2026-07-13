@@ -2,7 +2,7 @@
 name: "llman-sdd-explore"
 description: "进入 llman SDD 探索模式：理清思路、调查需求、分析问题。仅思考，禁止写代码。用于意图不明确或需要分析后再行动的场景。"
 metadata:
-  version: "0.0.57"
+  version: "0.0.58"
 ---
 
 # LLMAN SDD Explore
@@ -110,16 +110,3 @@ flowchart LR
 - `ethics.required_evidence`：列出高影响输出前必须具备的证据。
 - `ethics.refusal_contract`：定义何时拒答以及安全替代响应方式。
 - `ethics.escalation_policy`：定义何时必须升级为用户确认/人工复核。
-
-## Future 到执行的规划
-- 将 `llmanspec/changes/<id>/future.md` 视为候选待办池，而不是静态备注。
-- 审查 `Deferred Items`、`Branch Options`、`Triggers to Reopen`，并把每项归类为：
-  - `now`（需要立即转化为可执行工作）
-  - `later`（保留在 future.md，补充明确触发信号）
-  - `drop`（移除或标记拒绝并说明原因）
-- 对每个 `now` 项，产出明确落地路径：
-  - 后续 change id（`add-...`、`update-...`、`refactor-...`）
-  - 受影响 capability/spec 路径
-  - 第一条可执行动作（`llman-sdd-propose`、`llman-sdd-new-change`、`llman-sdd-continue`、`llman-sdd-ff` 或 `llman-sdd-apply`）
-- 保持可追溯性：在新 proposal/design/tasks 中引用来源 future 条目。
-- 若存在高不确定性，先暂停并提问，再创建新变更工件。

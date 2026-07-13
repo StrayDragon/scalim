@@ -2,7 +2,7 @@
 name: "llman-sdd-apply"
 description: "在一个闭环内实施 llman SDD 变更的 tasks：写代码 → 跑测试 → 失败自修复 → 直到门禁全绿。自动更新 tasks.md 勾选状态并运行校验。用于提案完成后的实现阶段。"
 metadata:
-  version: "0.0.57"
+  version: "0.0.58"
 ---
 
 # LLMAN SDD Apply
@@ -43,6 +43,7 @@ flowchart LR
   - 若工作区不干净且改动不属于当前 change：先 `git stash push -u -m "llman-sdd-apply autopilot backup"` 做备份。
 - 运行 `llman sdd validate --all --strict --no-interactive`：
   - 若失败且与当前 change 无关，先停下报告（工件不一致会导致实现无法以 SSOT 驱动）。
+- **检查 spec valid_scope 完整性**：使用 `llman sdd list --specs --json` 列出所有 spec，然后对每个 spec 验证其 `valid_scope` 中的每个路径是否存在于磁盘上。若存在缺失的文件/目录，停下并建议更新 spec（从 `valid_scope` 中移除已删除的路径）。
 
 ### 1) 选择变更 id 并检查前置条件
 - 若已提供 change id，直接使用。

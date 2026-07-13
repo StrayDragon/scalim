@@ -2,7 +2,7 @@
 name: "llman-sdd-quick"
 description: "快速路径：处理不改行为合约的小改动——重构、修错字、性能优化。不涉及 MUST/SHALL 变更。如发现需要改合约，立即切换到 propose 完整路径。"
 metadata:
-  version: "0.0.57"
+  version: "0.0.58"
 ---
 
 # LLMAN SDD Quick Path

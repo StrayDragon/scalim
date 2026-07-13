@@ -2,7 +2,7 @@
 name: "llman-sdd-archive"
 description: "归档已完成的 llman SDD 变更：合并 delta specs 到主 specs，校验全量，引导 commit。在 verify 报告全绿后运行。支持单个或批量归档。"
 metadata:
-  version: "0.0.57"
+  version: "0.0.58"
 ---
 
 # LLMAN SDD 归档

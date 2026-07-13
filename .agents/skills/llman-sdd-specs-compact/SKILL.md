@@ -2,7 +2,7 @@
 name: "llman-sdd-specs-compact"
 description: "人类主动触发的维护工具。压缩去重 llman SDD specs——在归档积累较多后合并冗余 requirement/scenario，保留所有规范行为不变。不属于日常 pipeline：仅在用户明确要求压缩 specs 时才运行。"
 metadata:
-  version: "0.0.57"
+  version: "0.0.58"
 ---
 
 # LLMAN SDD Specs Compact

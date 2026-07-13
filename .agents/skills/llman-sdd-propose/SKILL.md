@@ -2,7 +2,7 @@
 name: "llman-sdd-propose"
 description: "创建 llman SDD 变更提案，一次性生成 proposal + delta specs + tasks 等规划工件。用于正式定义变更——尤其是涉及 MUST/SHALL 行为合约的变更。"
 metadata:
-  version: "0.0.57"
+  version: "0.0.58"
 ---
 
 # LLMAN SDD 提案（Propose）
@@ -38,6 +38,7 @@ flowchart LR
 - 读取 `llmanspec/config.yaml` 了解项目上下文、规则、locale。
 - `llman sdd validate --all --strict --no-interactive`：确保当前工件状态干净。
   - 若预存错误，先停下报告（在脏工件上叠加新变更会导致级联错误）。
+- **检查 spec valid_scope 完整性**：使用 `llman sdd list --specs --json` 列出所有 spec，然后对每个 spec 验证其 `valid_scope` 中的每个路径是否存在于磁盘上。若存在缺失的文件/目录，停下并建议更新 spec（从 `valid_scope` 中移除已删除的路径）。
 
 ### 1) 判断变更规模（triage）
    - **行为合约变更**（改 MUST/SHALL、改外部行为）→ 走完整 SDD 流程
@@ -173,16 +174,3 @@ r1,happy,"","a trigger happens","the outcome is observed"
 - `ethics.required_evidence`：列出高影响输出前必须具备的证据。
 - `ethics.refusal_contract`：定义何时拒答以及安全替代响应方式。
 - `ethics.escalation_policy`：定义何时必须升级为用户确认/人工复核。
-
-## Future 到执行的规划
-- 将 `llmanspec/changes/<id>/future.md` 视为候选待办池，而不是静态备注。
-- 审查 `Deferred Items`、`Branch Options`、`Triggers to Reopen`，并把每项归类为：
-  - `now`（需要立即转化为可执行工作）
-  - `later`（保留在 future.md，补充明确触发信号）
-  - `drop`（移除或标记拒绝并说明原因）
-- 对每个 `now` 项，产出明确落地路径：
-  - 后续 change id（`add-...`、`update-...`、`refactor-...`）
-  - 受影响 capability/spec 路径
-  - 第一条可执行动作（`llman-sdd-propose`、`llman-sdd-new-change`、`llman-sdd-continue`、`llman-sdd-ff` 或 `llman-sdd-apply`）
-- 保持可追溯性：在新 proposal/design/tasks 中引用来源 future 条目。
-- 若存在高不确定性，先暂停并提问，再创建新变更工件。
