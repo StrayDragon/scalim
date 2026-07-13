@@ -7,3 +7,7 @@
 相关新提案(需求)迭代唯一准则
 
 - [llmanspec/config.yaml](#code=llmanspec/config.yaml)
+
+准备打版本 tag 时，按发布前校准清单走一遍（范围 / breaking / 文档与公开面 / bump）:
+
+- [发布前校准清单](pre-release-checklist.md)

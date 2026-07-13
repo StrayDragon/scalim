@@ -15,6 +15,7 @@
 - `just qa`: repo quality gates (lint/tests + drift checks + llmanspec checks, etc.).
 - `just gen-docs`: refresh docs-site generated pages and injected blocks.
 - `just llmanspec-check`: sanitize + validate llmanspec artifacts.
+- `just bump-versions <X.Y.Z>` / `just bump-versions <X.Y.Z> YES`: dry-run / apply unified package versions (see pre-release checklist).
 
 ## Hard Rules (SSOT)
 - **YAML authoring vs Python policy** (workflow/books 迭代方向):
@@ -44,6 +45,7 @@
   - `# pragma: allow-cast-file ...` (cast-usage gate exceptions; see `scripts/check-cast-usage.py`)
 - **Skills extraction markers**: do not remove `# region SCALIM-SKILL:<tag>` / `# endregion` markers (used for automated skill example extraction).
 - **Privacy**: do not quote, enumerate, or summarize the contents of `.tmp/known-outer-paths-using-this-package.txt`; only reference the file path.
+- **Pre-release**: before bumping versions / tagging, follow `docs/doc/dev/pre-release-checklist.md` (scope last-tag→HEAD, breaking/docs/public-api drift, then `just bump-versions`). `just qa` is a gate, not a substitute for that checklist.
 - **Policy SSOT (closed sets)**:
   - For policy-like values that are a closed set and cross boundaries (state/pickle/JSON/YAML/config), the **single source of truth MUST be an Enum (`StrEnum`)**.
   - Do **NOT** maintain duplicated allowed-value definitions (e.g. `StrEnum` **and** `Literal[...]` lists) for the same policy.
@@ -54,6 +56,7 @@
 ## Pointers (keep this file small)
 - Project/code reading map: `docs/doc/getting-started/reading-guide.md`
 - Docs governance workflow: `docs/doc/dev/doc-governance.md`
+- Pre-release calibration (last tag → HEAD, docs/API/breaking): `docs/doc/dev/pre-release-checklist.md`
 - Docs site config + content root: `docs/zensical.toml`, `docs/doc/`
 - Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
 - Architecture overview: `ARCH.md` and `docs/doc/architecture/arch.md`

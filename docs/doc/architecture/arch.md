@@ -19,6 +19,7 @@
     - ExecutionPlan 的算子序列或批次执行边界调整
     - 并行模式与 `LoadRef` 调度语义调整
     - hooks/ob/events 的分发与回放策略调整
+    - 稳定 sinks / 写出策略新增（例如列式 Excel HOLD vs WINDOW）
 
 更严格的语义/约束以 `llmanspec/specs/` 为准.
 
@@ -249,6 +250,8 @@ flowchart LR
 - `IRowSink`: 行式流式写出
 - `IColumnSink`: 列式写出(更适合宽表,可配合运行时瘦身)
 
+列式 Excel 默认 `ColumnExcelSink`（HOLD）；宽表峰值可 opt-in `StreamingColumnExcelSink` / `ExcelColumnResidency.WINDOW`，见 [Excel 列式写出策略](../getting-started/excel-column-residency.md)。YAML `resources.books` 组合层仍是行式写出，不提供 streaming knobs。
+
 ```mermaid
 flowchart TD
   IS[ISink] --> RS[IRowSink]
@@ -260,6 +263,7 @@ flowchart TD
 
   CS --> ColCSV[ColumnCSVSink]
   CS --> ColExcel[ColumnExcelSink]
+  CS --> StreamColExcel[StreamingColumnExcelSink]
   CS --> MemC[InMemoryColumnSink]
 ```
 

@@ -12,6 +12,7 @@
 
 - [仓库开发约定](repo-guide.md)
 - [文档治理与生成工作流](doc-governance.md)
+- [发布前校准清单](pre-release-checklist.md)
 
 常用命令:
 
