@@ -1,0 +1,6 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r12,"xlsx_memory without export MUST remain a supported in-memory shared-book pattern",系统 MUST 将 resources.books.<id>.xlsx_memory 在无 export_xlsx 时仍视为合法 book identity：该 book 可作为 workflow 内多 demand 写入、并由下游通过 book_sheet_rows（或等价内置 loader）读取的内存共享容器，且 MUST NOT 强制要求落盘路径。xlsx_file MUST 继续表示以版本化导出 root 为终点的文件书。系统 MUST NOT 仅因 xlsx_file 也可承载多 sheet 而移除或静默折叠 xlsx_memory。重命名或合并 kind 若发生，MUST 作为显式 BREAKING change 并提供迁移，不得在本需求范围内默默改变 authoring。,null,null,null
+op_scenarios[2]{req_id,id,given,when,then}:
+  r12,"no-export-memory-bus-is-valid",workflow 声明 books.scratch.xlsx_memory 且不提供 export_xlsx，另有 books.report.xlsx_file.path,若干 runs 将 outputs 写入 scratch 的不同 sheet，下游 run 用 book_sheet_rows 读取 scratch，最终 run 写入 report,"校验与执行 MUST 接受无 export 的 xlsx_memory；scratch MUST 不因缺少 path/export 而 fail-fast；下游 MUST 能读到 typed rows"
+  r12,"xlsx-file-remains-export-root",workflow 仅声明 books.report.xlsx_file.path,runs 将 outputs 绑定到 report 的 sheet,系统 MUST 按版本化输出 root 语义导出，不得要求改用 xlsx_memory

@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 
 from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
@@ -126,13 +128,13 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
             {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, "unknown": 1},
             base_path="resources.books.report",
         )  # noqa: SLF001
-    with pytest.raises(TypeError, match=r"resources\.books\.report\.xlsx_file must be an object"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file must be a mapping"):
         _ = loader._parse_book_config(
             {BOOK_KEYS["xlsx_file"]: []},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(TypeError, match=r"resources\.books\.report\.xlsx_memory must be an object"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_memory must be a mapping"):
         _ = loader._parse_book_config(
             {BOOK_KEYS["xlsx_memory"]: []},
             base_path="resources.books.report",
@@ -150,11 +152,15 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    parsed = loader._parse_book_config(
-        {BOOK_KEYS["xlsx_memory"]: {"export_xlsx": {"path": "./out"}}},
-        base_path="resources.books.report",
-    )  # noqa: SLF001
-    assert parsed.export_xlsx is not None
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        parsed = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_memory"]: {"export_xlsx": {"path": "./out"}}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+    assert parsed.kind == "xlsx_file"
+    assert parsed.path == "./out"
+    assert parsed.export_xlsx is None
 
 
 def test_loader_parse_path_or_init_var_branches_cover_dict_and_error() -> None:

@@ -1,156 +1,92 @@
 # Future — xlsx-file-numeric-type-loss
 
-> 潜在 purpose 池（非 active change）。  
-> 来源 change: `c5-xlsx-file-numeric-type-loss`  
-> 路径约定: `llmanspec/futures/<kebab-id>/future.md`（仅本文件；无 proposal/tasks/specs）
+> 未完成候选池（非 active change）。来源归档：`c5-xlsx-file-numeric-type-loss`。  
+> 已完成项已移出；升格须新建 `llmanspec/changes/cN-...` 并引用本文件。
 
-审查条目时归类为 `now` / `later` / `drop`。升格为可执行工作须新建 `llmanspec/changes/cN-...` 并引用本文件条目。
+**已承接（勿再当作 open work）**
+
+- typed `xlsx_file` / ROWS SSOT、openpyxl helpers、streaming column sink、c30 释放 → 已归档
+- 内存总线**语义** → `c15-decide-xlsx-memory-book-role`
+- 统一 authoring `xlsx` + 旧 kind deprecated → **`archive/2026-07-13-c20-add-unified-xlsx-book-kind`**
+- IR 身份改为 path 有无（不再以假 kind 字符串为 SSOT）→ **`c25-normalize-xlsx-book-ir-path-presence`**
+- BREAKING 硬删 YAML `xlsx_file`/`xlsx_memory` 别名 → **`c999-remove-deprecated-xlsx-file-memory-kinds`（draft；勿再写回 futures）**
+- 默认 deprecate/删除总线、无条件急切 CSV 双份、启发式数字恢复 → **已拒绝**
 
 ---
 
 ## Deferred Items
 
-### later — 按 consumer 显式派生 CSV（ROWS → CSV，禁止急切双份）
+### later — 按 consumer 显式派生 CSV
 
-- **来源**: change `design.md` Collect 契约 — 本 change 只做「ROWS 不调用 `to_csv_artifact()`」；`in_memory_rows_to_in_memory_csv` 保留为显式工具，**不**实现「有 CSV consumer 时自动派生」。
-- **缺口**: 若同一 demand output 同时被 `xlsx_*` write 与 `csv_file` / CSV write 消费，停急切副本后 CSV 侧会缺 `in_memory_csv_outputs`。
-- **触发信号**:
-  - 真实 workflow 出现「单 output → xlsx book + csv/file」双消费；或
-  - 集成测/用户报告 `Missing workflow-managed in-memory CSV artifact`。
-- **落地路径**（建议 change id）: `add-managed-artifact-consumer-driven-csv`
-- **受影响 capability**: `workflow-managed-temp-outputs`, `workflow-intermediate-store` (r2/r7), `workflow-shared-output-containers`
-- **设计约束（预案，非本 future 实现）**:
-  1. Typed `InMemoryRows` 仍为 SSOT；CSV 仅为派生视图。
-  2. 仅当编译期/运行期能证明存在 CSV-equivalent consumer 时才调用 `in_memory_rows_to_in_memory_csv`（或等价）。
-  3. **禁止**恢复无条件 `ManagedArtifactPlan.to_csv_artifact()` 急切双份。
-  4. 生命周期：派生 CSV 与 ROWS 一同参与最终 consumer 释放；失败 discard 两者。
-  5. 诊断：缺 CSV consumer 却走 `resolve_workflow_input_csv` 时 fail-fast，提示改用 tabular 或声明 CSV consumer。
-- **第一条动作**: `llman-sdd-propose` / `llman-sdd-ff` 建上述 change，把本条链进 proposal Why。
+- **必要？** **有条件必要**。合约缺口仍在（ROWS-only + CSV consumer → 缺 artifact）；匿名侧尚无双消费证据。
+- **触发**: 真实「单 output → xlsx + csv」或报告 `Missing workflow-managed in-memory CSV artifact`。
+- **落地**: `add-managed-artifact-consumer-driven-csv`
+- **约束**: 禁止恢复无条件 `to_csv_artifact()`；派生须显式、与 ROWS 同释放。
 
-### later — 合并 workbook / sheetbook 实现模块
+### later — 合并 workbook / sheetbook **实现**模块
 
-- **触发信号**: segment / 对齐 / openpyxl 写出持续双份漂移；或 `extract-openpyxl-shared-helpers` 落地后仍难共享。
-- **落地路径**: `refactor-workflow-xlsx-backends-unify`
-- **受影响 capability**: `workflow-shared-output-containers`, `workflow-runtime-module-organization`
-- **备注**: `c5-xlsx-file-numeric-type-loss` 已对齐 **数据模型**（物化 typed rows）；`archive/2026-07-12-c5-extract-openpyxl-shared-helpers` 已抽出 close/atomic save SSOT。文件级合并另案，避免与类型修复绑大 PR。
-- **第一条动作**: helpers 已归档；评估剩余 workbook/sheetbook 业务逻辑 diff 面后再 propose。
+- **必要？** **值得保留，但排在 c20/c25 之后**。产品名已由 `xlsx` 统一；双后端仍是漂移/spill 成本。
+- **触发**: 同算法双改漏改；或 spill/seal/budget 必须两套都做。
+- **落地**: `refactor-workflow-xlsx-backends-unify`
+- **注意**: ≠ 删总线语义；≠ 替代 c20/c25/c999。
 
-### done — opt-in `StreamingColumnExcelSink`（砍 `pre_close` 列驻留）
+### later — shared-book 分段 spill / 分段 commit
 
-- **来源**: notplan `c1-streaming-xlsx-output`；经 `c0-column-excel-sink-column-residency` 取证后升格收窄。
-- **证据（2026-07-12）**: mid-close 列切片释放 **不降 peak**；行窗 streaming 100k×300 peak **3.58GB → 1.11GB**（~69%）。
-- **状态**: **已归档落地** `archive/2026-07-12-c0-streaming-column-excel-sink`；生产类型 `scalim.sinks.StreamingColumnExcelSink`（默认 `ColumnExcelSink` 不变；无 YAML knobs）。
-- **残留 follow-up**: `set_row_ids` 多 batch 与 **`ExcelColumnResidency` opt-in** 已归档 `archive/2026-07-12-c0-excel-column-residency-opt-in`；YAML books 仍为行 sink。人类文档: `docs/doc/getting-started/excel-column-residency.md`。skills: `agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`。
+- **必要？** **有 bench 才必要**。c30 后峰值仍可能卡在 plan∑segments。
+- **触发**: 可复现 shared-book peak ROI（证据进 `.tmp/`）。
+- **落地**: `shared-book-spill-commit`；禁止默认边写 openpyxl。
+- **前置**: c20/c25 正规化后更易做；完整模块合并为软前置。
 
-### later — output bypass / 非托管 book 写出
+### later — `FieldValue` 纳入 `datetime`/`date`
 
-- **触发信号**: 产品明确要求「某 output 不走 workflow 资源管理器、立即落盘且可被下游按文件读取」。
-- **落地路径**: 独立 change；必须重做原子 commit / discard 契约。
-- **备注**: 源 change 明确否决从 bugfix 夹带 bypass。
-- **第一条动作**: 先 `llman-sdd-explore` 澄清原子性与可见性，再 propose。
+- **必要？** **产品决策后必要**。临时 `str()`；aware tz 未收敛。
+- **触发**: 要 Excel 原生日期 + tz 策略定案。
+- **落地**: notplan `c0-add-field-value-datetime` 转正。
 
-### later — `FieldValue` 纳入 `datetime`/`date`（Excel 原生日期）
+### later — output bypass / 非托管写出
 
-- **来源**: pay-order 回归：loader 的 `datetime` 撞上 ROWS sink；草案在 `llmanspec/notplan/c0-add-field-value-datetime/`。
-- **当前临时策略**: `InMemoryRowsSink` 对非 `FieldValue` `str()`（对齐旧 CSV）；Excel 单元格为文本日期。
-- **阻塞**: openpyxl 拒绝 aware `datetime`；去 `tzinfo` 可能扭曲绝对时刻语义，需产品决策后再转正。
-- **触发信号**: 需要 Excel 原生日期单元格 / 时区策略已收敛。
-- **落地路径**: 将 notplan `c0-add-field-value-datetime` 转回 active change 后 apply。
-- **第一条动作**: `llman-sdd-explore` 收敛 aware 策略（拒绝 / 去 tz / UTC 再去 tz）。
+- **必要？** **仅强产品需求时**。动原子 commit/discard，成本高。
+- **触发**: 明确要求立即落盘且下游按文件读。
+- **落地**: 独立 explore → propose。
 
-### later — `BookBudgetPolicy`：用量调研 / fail-fast → 限流 / 是否移除
+### later — sheet seal（Python policy）
 
-- **产品直觉**: cell/sheet 超限 fail-fast 更像硬截断；框架默认更宜把内存交给进程/OS，若要控资源应更接近「限速/背压」而非直接杀任务。
-- **当前策略**: **先保留**可选 `BookBudgetPolicy`（omit = unlimited；显式则 fail-fast）。c30 只验收既有接线，不扩语义。
-- **用量盘点（2026-07-12）**: 见 `.tmp/evidence/book-budget-usage-explore/NOTES.md`。仓库内非测试用法≈0；`.tmp/known-outer-paths-using-this-package.txt` 当时不存在。结论：**暂不升格移除/限流**。
-- **下一步**: 外部路径清单可用后再盘点；评估移除 breaking 面与替代（cgroup / 外层限流 / 未来背压 API）。
-- **触发信号**: 调研显示有真实配置者且痛点明确，或明确需要「限速式」护栏而非 fail-fast。
-- **落地路径**: 独立 change（建议 id：`book-budget-rate-limit-or-remove`）；MUST NOT 塞进 c30。
-- **第一条动作**: 用量盘点（含 `.tmp/known-outer-paths-using-this-package.txt` 仅作路径盘点，勿公开复述内容）→ explore。
+- **必要？** **低优先**。与内存无关；无产品信号可不动。
+- **触发**: 审计/不可变 sheet。
+- **落地**: `shared-book-sheet-seal`；**禁止 YAML knobs**。
 
-### later — shared-book 分段 spill / 分段 commit（c30 迁出）
+### later — 有 path 的 book 可选 cell/sheet budget
 
-- **来源**: 曾列于 `c30-workflow-shared-book-memory` P2+；c30 收紧后迁出。
-- **缺口**: plan 全量 segment 仍决定峰值；尽早释放 demand 副本不够时需 spill 到 staging 再拼装，同时保留成功后一次 publish / 失败 discard。
-- **触发信号**: c30 落地后真实工作负载峰值仍不可接受；或有可复现 bench 证明 ROI。
-- **落地路径**: 独立 change（建议 id：`shared-book-spill-commit`）；MUST NOT 默认边写 openpyxl。
-- **受影响 capability**: `workflow-shared-output-containers`
-- **第一条动作**: c30 归档后用 bench 证据 `llman-sdd-explore`，再 propose。
+- **必要？** **低优先**。原 `xlsx_file` unlimited；统一 `xlsx` 后仍是「有 path 是否套 `BookBudgetPolicy`」。
+- **触发**: 有 path 的 plan OOM / 要与无 path 总线对称护栏。
+- **落地**: 独立 change；opt-in；挂既有 Python `BookBudgetPolicy`。
 
-### later — shared-book sheet seal（c30 迁出）
+### later — `BookBudgetPolicy` 限流或移除
 
-- **缺口**: 「sheet 写满后禁止再 append」等更强产品约束；与内存释放正交。
-- **触发信号**: 明确产品需要 seal 语义（审计/不可变 sheet）。
-- **落地路径**: 独立 change（建议 id：`shared-book-sheet-seal`）；策略 MUST 走 Python policy，禁止 YAML。
-- **第一条动作**: 产品确认 seal 规则后再 propose。
+- **必要？** **暂不必要**。用量≈0；fail-fast 是否改限流未证实。
+- **触发**: 真实配置者痛点或明确要背压 API。
+- **落地**: `book-budget-rate-limit-or-remove`。
 
-### later — `xlsx_file` 可选 cell/sheet budget（c30 迁出）
+### later — 边写 openpyxl + runtime profile
 
-- **来源**: c30 design 曾开放「xlsx_file 是否同套 budget」；收紧后明确 **本阶段不套用**。
-- **缺口**: 若 `xlsx_file` plan 峰值与 sheetbook 同级，可能需要同一 `BookBudgetPolicy` 护栏。
-- **触发信号**: 生产出现 `xlsx_file` plan OOM / 需与 `xlsx_memory` 对称护栏。
-- **落地路径**: 独立 change；默认仍应 opt-in（避免打破 historical unlimited）。
-- **第一条动作**: 收集证据后 propose；挂 `BookBudgetPolicy` 既有 API。
-
-### later — 边写 openpyxl + runtime profile（c30 明确不做默认）
-
-- **约束**: 默认边写会破坏原子 discard；若未来要做 MUST 独立 change + **显式** Python/profile，禁止 YAML。
-- **载体**: `llmanspec/notplan/c1-runtime-performance-profiles/`（reframe 后转正）。
-- **触发信号**: profile 方案落地且有「可牺牲原子 discard」的明确产品档位。
-- **第一条动作**: 先完成 profiles notplan → change，再挂边写策略。
-
-### drop — commit 边界启发式数字恢复
-
-- **原因**: 与 typed SSOT 及 sheetbook r6 冲突；源 change 已从根去掉 stringify。
-- **状态**: 拒绝；勿 reopen，除非推翻 typed 主线（需治理级讨论）。
+- **必要？** **暂不必要**。破坏默认原子 discard。
+- **触发**: profile 档位明确可牺牲 discard。
+- **落地**: notplan profiles → change；**禁止 YAML**。
 
 ---
 
-## Branch Options（已关闭）
+## Triggers to Reopen
 
-| 选项 | 状态 | 说明 |
-|---|---|---|
-| 双字段 CSV+tabular 旁路 | 否决 | 终态为物化 typed segment |
-| 文档迁移到 `xlsx_memory`+`export_xlsx` 代替修 `xlsx_file` | 否决为框架答案 | 可作用户临时 workaround |
-| 无条件恢复 `to_csv_artifact()` 急切副本 | 否决 | 与 intermediate-store r2 冲突；用「按 consumer 显式派生」代替 |
-
----
-
-## Risk Analysis（相对源 change 终态）
-
-| ID | 风险 | 可能性 | 影响 | 本 change 缓解 | 残留 / 升级条件 |
-|---|---|---|---|---|---|
-| R1 | 外部依赖「xlsx_file 全是 str cell」的后处理失效或双重转换 | 中 | 中 | proposal Impact 标明 bugfix；MVP 对照 | 发布说明提醒去掉 `_post_process_workbook` 数字修复 |
-| R2 | write 时物化使 workbook plan 常驻全量 rows，大报表峰值上升 | 中 | 中 | 与 sheetbook 同模型；去掉急切 CSV 副本部分对冲 | **第一刀已归档**：`archive/2026-07-12-c30-workflow-shared-book-memory`。宽表 Excel close 峰：`archive/2026-07-12-c0-column-excel-sink-write-memory`（`write_only`）。列驻留 mid-close：**定案 A** `archive/2026-07-12-c0-column-excel-sink-column-residency`。砍 `pre_close`：**已归档落地** `archive/2026-07-12-c0-streaming-column-excel-sink`（`StreamingColumnExcelSink` 行窗；100k×300 peak ~3.58→1.11GB）。更大 shared-book spill 仍见 Deferred later |
-| R3 | `book_sheet_rows(xlsx_file)` 可见性/截断与 sheetbook 漂移 | 中 | 高 | design 要求同契约；tasks 含可见性单测 | 用户报告不一致 → 立即 reopen 源 change 或 hotfix |
-| R4 | 同一 output 双消费（xlsx + csv）缺 CSV artifact | 低（当前少见） | 高 | 本 change **有意不实现**自动派生；见上条 later | 触发「按 consumer 显式派生」升格为 change |
-| R5 | `resolve_workflow_input_csv` 误用于 ROWS-only output | 中 | 高 | write 路由改 tabular；legacy workbook 一并改 | 回归测：无 csv map 时 xlsx write 成功、csv resolve fail-fast 清晰 |
-| R6 | Decimal / bool / None 在 openpyxl 边界表现与预期不符 | 低 | 中 | 管道保 `FieldValue`；文件 round-trip 不承诺（对齐 sheetbook r7） | 文档写清；MVP 覆盖 Decimal/None/bool |
-| R7 | 仅改 kind 未改 `OutputSpec.format` 导致 sink 路径歧义 | 低 | 高 | design/tasks 强制整段进入 `format=excel` | code review 检查点 |
-| R8 | workbook/sheetbook 模块双份实现后续漂移 | 中 | 中 | 数据模型先对齐 | 升格「合并模块」later |
-| R9 | 公开工具 `in_memory_rows_to_in_memory_csv` 被误当作「应自动调用」 | 低 | 低 | design 写明显式工具；collect 不急切调用 | 文档/注释强调；派生逻辑进独立 change |
-
-### 风险结论
-
-- **阻断实现**: 无（R4 为已知范围外缺口，用 future 预案承接）。
-- **实现期必测**: R3、R5、R6、R7。
-- **发布期必宣**: R1。
-- **升格 future→change**: 优先看 R4 是否出现真实双消费。
-
----
-
-## Triggers to Reopen（源 change 或本 future）
-
-1. `book_sheet_rows(xlsx_file)` 可见性/截断与 sheetbook 不一致（→ 源 change hotfix 或 follow-up fix change）。
-2. 出现「单 output → xlsx + csv」双消费缺 CSV（→ 升格「按 consumer 显式派生」）。
-3. 有人提议恢复无条件 `to_csv_artifact()`（→ **拒绝**，引导至显式派生方案）。
-
----
+1. `book_sheet_rows` 在「有 path / 无 path」书上可见性不一致 → hotfix。
+2. 单 output 双消费缺 CSV → 升格 consumer-driven CSV。
+3. 提议恢复无条件 `to_csv_artifact()` → **拒绝**，改显式派生。
 
 ## Traceability
 
 | 字段 | 值 |
 |---|---|
-| Source change | `llmanspec/changes/c5-xlsx-file-numeric-type-loss/` |
-| Design anchor | Collect § `in_memory_rows_to_in_memory_csv` 显式工具 / 不急切 |
-| Spec anchors | shared-output r24；managed-temp-outputs r1（typed SSOT）；intermediate-store r2/r7 |
+| Source | archive `c5-xlsx-file-numeric-type-loss` |
+| Active authoring (archived) | `archive/2026-07-13-c20-add-unified-xlsx-book-kind` |
+| IR path-presence | `c25-normalize-xlsx-book-ir-path-presence` |
+| BREAKING remove aliases (draft) | `c999-remove-deprecated-xlsx-file-memory-kinds` |
+| Spec anchors | shared-output r24；managed-temp r1；intermediate-store r2/r7 |

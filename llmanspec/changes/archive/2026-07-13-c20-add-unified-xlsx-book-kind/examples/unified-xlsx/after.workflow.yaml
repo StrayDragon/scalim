@@ -1,0 +1,21 @@
+# After：统一 xlsx（新 SSOT）
+# 虚构示例 — 无 path=内存总线；有 path=落盘
+
+workflow:
+  resources:
+    books:
+      scratch:
+        xlsx: {}
+      report:
+        xlsx:
+          path: ./out
+
+  runs:
+    - id: stage_a
+      demand: ./stage_a.demand.yaml
+    - id: stage_b
+      demand: ./stage_b.demand.yaml
+      depends_on: [stage_a]
+    - id: summary
+      demand: ./summary.demand.yaml
+      depends_on: [stage_b]

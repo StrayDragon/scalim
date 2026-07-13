@@ -16,6 +16,7 @@ from ...schema_dsl.models import (
     FILE_KEYS,
     RESOURCES_KEYS,
 )
+from .book_branch_parse import deprecated_book_branch_validation_message
 
 if TYPE_CHECKING:
     from .....vendor.compact.typing_extensionsx import TypeGuard
@@ -53,6 +54,41 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         cleaned = dict(config)
         cleaned.pop("observability", None)
         return cleaned
+
+    def _warn_deprecated_book_branches(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
+        resources_raw: object = config.get(DEMAND_KEYS["resources"])
+        if not _is_dict(resources_raw):
+            return config
+        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        books_raw = resources.get(RESOURCES_KEYS["books"])
+        if not _is_dict(books_raw):
+            return config
+        books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
+
+        for raw_book_id, book_raw in books.items():
+            book_cfg = as_mapping(book_raw, path="resources.books.{}".format(raw_book_id))
+            if book_cfg is None:
+                continue
+            book_path = "resources.books.{}".format(raw_book_id)
+            if "xlsx_file" in book_cfg:
+                issues.append(
+                    ValidationIssue(
+                        severity=VALIDATION_SEVERITY_WARNING,
+                        message=deprecated_book_branch_validation_message(book_path=book_path, branch="xlsx_file"),
+                        path="{}.xlsx_file".format(book_path),
+                    )
+                )
+            if "xlsx_memory" in book_cfg:
+                mem = as_mapping(book_cfg.get("xlsx_memory"), path="{}.xlsx_memory".format(book_path))
+                branch = "xlsx_memory_export" if mem is not None and "export_xlsx" in mem else "xlsx_memory"
+                issues.append(
+                    ValidationIssue(
+                        severity=VALIDATION_SEVERITY_WARNING,
+                        message=deprecated_book_branch_validation_message(book_path=book_path, branch=branch),
+                        path="{}.xlsx_memory".format(book_path),
+                    )
+                )
+        return config
 
     @staticmethod
     def _append_removed_runtime_policy_error(issues: List["ValidationIssue"], *, path: str, msg: str) -> None:
@@ -329,7 +365,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
         return config if next_config is None else next_config
 
-    def _error_and_strip_removed_resources_write_budget_fields(  # noqa: C901
+    def _error_and_strip_removed_resources_write_budget_fields(  # noqa: C901, PLR0915
         self,
         config: Dict[str, Any],
         issues: List["ValidationIssue"],
@@ -395,6 +431,31 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                 next_xlsx_memory = dict(xlsx_memory_cfg)
                 next_xlsx_memory.pop("budget", None)
                 next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
+
+            xlsx_raw = book_cfg.get(BOOK_KEYS["xlsx"])
+            xlsx_cfg = as_mapping(xlsx_raw, path="resources.books.{}.xlsx".format(raw_book_id))
+            if xlsx_cfg is not None and "budget" in xlsx_cfg:
+                ValidatorMigrationsMixin._append_removed_runtime_policy_error(
+                    issues,
+                    msg="resources.books.{}.xlsx.budget was removed; {}".format(raw_book_id, budget_hint),
+                    path="resources.books.{}.xlsx.budget".format(raw_book_id),
+                )
+                if next_book_cfg is None:
+                    next_book_cfg = dict(book_cfg)
+                next_xlsx = dict(xlsx_cfg)
+                next_xlsx.pop("budget", None)
+                next_book_cfg[BOOK_KEYS["xlsx"]] = next_xlsx
+            if xlsx_cfg is not None and "write_defaults" in xlsx_cfg:
+                ValidatorMigrationsMixin._append_removed_runtime_policy_error(
+                    issues,
+                    msg="resources.books.{}.xlsx.write_defaults was removed; {}".format(raw_book_id, write_hint),
+                    path="resources.books.{}.xlsx.write_defaults".format(raw_book_id),
+                )
+                if next_book_cfg is None:
+                    next_book_cfg = dict(book_cfg)
+                next_xlsx = dict(cast("Dict[str, Any]", next_book_cfg.get(BOOK_KEYS["xlsx"]) or xlsx_cfg))
+                next_xlsx.pop("write_defaults", None)
+                next_book_cfg[BOOK_KEYS["xlsx"]] = next_xlsx
 
             if next_book_cfg is not None:
                 next_resources = _ensure_next_resources()

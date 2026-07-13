@@ -4,26 +4,25 @@ workflow:
   resources:
     books:
       shared_report_sheet:
-        xlsx_file:
+        xlsx:
           path: ./out/shared_report_sheet
           allow_formulas: false
 
       shared_report_append:
-        xlsx_file:
+        xlsx:
           path: ./out/shared_report_append
           allow_formulas: false
 
+      # 历史 sheetbook+export 形状；统一后与有 path 的 xlsx 同为落盘书（仍保留 book id 便于对拍）
       sheetbook_report_sheet:
-        xlsx_memory:
-          export_xlsx:
-            path: ./out/sheetbook_report_sheet
-            allow_formulas: false
+        xlsx:
+          path: ./out/sheetbook_report_sheet
+          allow_formulas: false
 
       sheetbook_report_append:
-        xlsx_memory:
-          export_xlsx:
-            path: ./out/sheetbook_report_append
-            allow_formulas: false
+        xlsx:
+          path: ./out/sheetbook_report_append
+          allow_formulas: false
 
   runs:
     - id: detail_a

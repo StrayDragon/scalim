@@ -1,0 +1,7 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r15,book runtime identity MUST be pathful vs pathless after normalize,"在 parse/normalize 之后，book 的运行时身份 MUST 由是否存在版本化导出 path（pathful vs pathless）定义。实现 MUST NOT 把 deprecated YAML 分支名 xlsx_file / xlsx_memory 字符串作为长期 IR 身份 SSOT。统一分支 xlsx 与过渡期仍接受的旧别名 MUST 归一到同一 path 有无形状；materialize MUST 按 path 有无绑定既有 workbook（有 path）与 sheetbook（无 path）后端。本需求 MUST NOT 要求合并 workbook/sheetbook 源文件；MUST NOT 从 YAML 硬删旧别名（硬删属后续 BREAKING change）。",null,null,null
+op_scenarios[3]{req_id,id,given,when,then}:
+  r15,"pathful-xlsx-normalizes-to-pathful-ir",books.report.xlsx 声明非空 path,parse 与 normalize,"IR/runtime 身份 MUST 为 pathful（版本化文件导出后端）；行为 MUST 对齐既有 workbook 语义"
+  r15,"pathless-xlsx-normalizes-to-pathless-ir",books.scratch.xlsx 不提供 path,parse 与 normalize,"IR/runtime 身份 MUST 为 pathless（内存总线后端）；行为 MUST 对齐既有无 path 总线语义"
+  r15,"deprecated-kinds-normalize-to-same-ir-shape",authoring 仍使用 deprecated xlsx_file 或 xlsx_memory（在 YAML 别名仍接受期间）,parse 与 normalize,"IR MUST 分别等价于有 path / 无 path 的 xlsx；下游 materialize MUST NOT 依赖长期保留 xlsx_file/xlsx_memory 业务身份字符串"

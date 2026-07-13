@@ -191,6 +191,7 @@ class SchemaBuilder:
             "field": self._build_field_definition(),
             "relation": self._build_definition(types_mod.RelationConfig),
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig),
+            "book_xlsx": self._build_definition(types_mod.BookXlsxConfig),
             "book_xlsx_file": self._build_definition(types_mod.BookXlsxFileConfig),
             "book_xlsx_memory": self._build_definition(types_mod.BookXlsxMemoryConfig),
             "book": self._build_definition(types_mod.BookConfig),
@@ -237,6 +238,7 @@ class SchemaBuilder:
 
         definitions: Dict[str, Any] = {
             "book_export_xlsx": self._build_definition(types_mod.BookExportXlsxConfig, allow_import=False),
+            "book_xlsx": self._build_definition(types_mod.BookXlsxConfig, allow_import=False),
             "book_xlsx_file": self._build_definition(types_mod.BookXlsxFileConfig, allow_import=False),
             "book_xlsx_memory": self._build_definition(types_mod.BookXlsxMemoryConfig, allow_import=False),
             "book": self._build_definition(types_mod.BookConfig, allow_import=False),

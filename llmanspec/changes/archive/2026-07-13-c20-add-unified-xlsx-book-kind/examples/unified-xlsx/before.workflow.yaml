@@ -1,0 +1,21 @@
+# Before：双 kind（仍合法，但将 deprecated）
+# 虚构示例
+
+workflow:
+  resources:
+    books:
+      scratch:
+        xlsx_memory: {}
+      report:
+        xlsx_file:
+          path: ./out
+
+  runs:
+    - id: stage_a
+      demand: ./stage_a.demand.yaml
+    - id: stage_b
+      demand: ./stage_b.demand.yaml
+      depends_on: [stage_a]
+    - id: summary
+      demand: ./summary.demand.yaml
+      depends_on: [stage_b]

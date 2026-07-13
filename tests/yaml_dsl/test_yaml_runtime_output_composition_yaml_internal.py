@@ -808,3 +808,16 @@ def test_try_resolve_workflow_managed_book_export_path_returns_none_for_unknown_
         )
         is None
     )
+
+
+def test_try_resolve_workflow_managed_book_export_path_xlsx_memory_with_export(tmp_path: Path) -> None:
+    book = BookConfig(kind="xlsx_memory", export_xlsx=BookExportXlsxConfig(path=str(tmp_path / "out")))
+    path = oc_yaml._try_resolve_workflow_managed_book_export_path(  # noqa: SLF001
+        book,
+        book_id="mem",
+        yaml_base_dir=str(tmp_path),
+        init_vars={},
+        version_id="run_0",
+    )
+    assert path is not None
+    assert str(path).endswith(".xlsx")

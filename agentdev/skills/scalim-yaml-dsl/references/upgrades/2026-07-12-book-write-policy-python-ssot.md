@@ -15,7 +15,8 @@
   - `WorkflowRunOptions.resources_policy`
   - `DemandRunOptions.resources_policy`
 - 省略 policy 时行为与旧 YAML 缺省一致（`mode=sheet`、`header_policy=once`、…；budget unlimited）
-- YAML 仍保留 book identity：`xlsx_file` / `xlsx_memory` + `path` / `export_xlsx.path`（`allow_formulas` 暂留 YAML）
+- YAML 仍保留 book identity：当时为 `xlsx_file` / `xlsx_memory` + `path` / `export_xlsx.path`（`allow_formulas` 暂留 YAML）
+- **后续 authoring 收敛**：统一 `xlsx`（可选 `path`）见 `2026-07-13-unified-xlsx-book-kind.md`
 
 本批次 **不提供兼容层/弃用期**：旧 YAML 字段与旧 override 类型会直接失效。
 

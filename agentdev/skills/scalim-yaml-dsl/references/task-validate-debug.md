@@ -73,7 +73,11 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 
 - 按 [task-upgrade-legacy.md](task-upgrade-legacy.md) 直接改到新结构
 
-### `write_defaults was removed` / `xlsx_memory.budget was removed`
+### `write_defaults was removed` / `budget was removed`
+
+症状: YAML books 仍写 `write_defaults` 或 `budget`(含旧 `xlsx_memory.budget` / 新 `xlsx.budget`)。
+
+修复: 删除 YAML 字段；改用 Python `ResourcesPolicy`。book identity 推荐 `xlsx` — 见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md` 与 `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`。
 
 - book 写入策略与内存预算已迁出 YAML
 - 删除 YAML 字段后,在 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy` 配置

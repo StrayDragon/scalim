@@ -6,7 +6,7 @@
 - 用户要加 DAG 依赖(`depends_on`)或跨节点注入 init vars(`init_vars`)
 - 用户要用 workflow-level ctx(`$ctx`)减少 Python glue
 - 用户要声明 workflow-scope 共享输出资源(`workflow.resources.books`)
-- 用户要配置 book 写入策略 / `xlsx_memory` 内存预算(`ResourcesPolicy` / `BookWritePolicy` / `BookBudgetPolicy`)
+- 用户要配置 book 写入策略 / 内存预算(`ResourcesPolicy` / `BookWritePolicy` / `BookBudgetPolicy`)
 
 ## 工作顺序
 
@@ -19,7 +19,9 @@
 
 ## 推荐骨架(YAML identity + Python policy)
 
-YAML 只声明 DAG / books identity / `$ctx` 注入; concurrency、cache_pool、write_defaults、budget 等 runtime knobs **不要**写进 `workflow.options` 或 `resources.books.*.write_defaults` / `xlsx_memory.budget`(出现即 fail-fast)。
+YAML 只声明 DAG / books identity / `$ctx` 注入; concurrency、cache_pool、write_defaults、budget 等 runtime knobs **不要**写进 `workflow.options` 或 `resources.books.*.write_defaults` / `budget`(出现即 fail-fast)。
+
+推荐 book identity：统一 `xlsx`（有 `path`=落盘；无 `path`=内存总线）。旧 `xlsx_file` / `xlsx_memory` 仍可解析，但会 deprecated warning — 见 `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`。
 
 ```yaml
 # yaml-language-server: $schema=.../workflow.gen.json
@@ -28,9 +30,11 @@ YAML 只声明 DAG / books identity / `$ctx` 注入; concurrency、cache_pool、
 workflow:
   resources:
     books:
+      scratch:
+        xlsx: {}
       report:
-        xlsx_memory:
-          export_xlsx: {path: ./out}
+        xlsx:
+          path: ./out
 
   runs:
     - id: extract
@@ -75,7 +79,9 @@ run_workflow(
 )
 ```
 
-迁移细节: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`。
+迁移细节:
+- write/budget Python SSOT: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- 统一 `xlsx` identity: `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`
 
 ## 关键规则
 
@@ -93,8 +99,9 @@ run_workflow(
   - workflow-level ctx size guardrails 已迁出 YAML(不要写 `workflow.options.ctx`)
 - `workflow.resources.books`:
   - workflow-scope 的共享 book **identity**(Excel 输出目标/中间态)
-  - oneOf 分支写法: `xlsx_file` / `xlsx_memory`；YAML **不得**再写 `write_defaults` 或 `xlsx_memory.budget`
-  - `path` / `export_xlsx.path` 是输出 **root 目录**(相对路径相对 **workflow YAML 所在目录**,不是进程 cwd)
+  - 推荐分支: `xlsx`（可选 `path`）；deprecated 别名: `xlsx_file` / `xlsx_memory`
+  - YAML **不得**写 `write_defaults` / `budget`；`xlsx` 下也 **不得**写 `export_xlsx`
+  - `xlsx.path`（及旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`）是输出 **root 目录**(相对路径相对 **workflow YAML 所在目录**,不是进程 cwd)
   - Excel 输出通过 demand 的 `outputs[*].to` 绑定到 book+sheet
   - workbook 写入策略 / 内存预算以 Python `ResourcesPolicy` 为 SSOT（`WorkflowRunOptions.resources_policy`）；`outputs[*].write` 仅用于 output-local header 行为
   - IO 路径仍可用 `RunOverrides.resources` / `BookResourceOverride` 覆盖；write/budget overlay 已移除
@@ -112,7 +119,7 @@ outputs:
 
 ### 读取上游 book sheet rows 作为下游 demand 的输入
 
-workflow 的 `books.xlsx_memory` 是 workflow scope 的共享资源. 若下游 demand 需要读取上游写入的某个 sheet,可以用内置 loader:
+workflow 的无 path `books.xlsx`（内存总线；旧写法 `xlsx_memory`）是 workflow scope 的共享资源. 若下游 demand 需要读取上游写入的某个 sheet,可以用内置 loader:
 
 ```yaml
 main_source:

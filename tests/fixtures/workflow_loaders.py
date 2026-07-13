@@ -143,6 +143,16 @@ def load_table_a_fast() -> Iterable[Mapping[str, object]]:
     ]
 
 
+def load_formula_like_rows() -> Iterable[Mapping[str, object]]:
+    """供 `allow_formulas=false` 导出转义对拍: 含公式前缀字符串."""
+
+    return [
+        {"label": "ok", "payload": "=1+1"},
+        {"label": "sum", "payload": "  +SUM(A1:A2)"},
+        {"label": "at", "payload": "@X"},
+    ]
+
+
 def load_table_b_fast() -> Iterable[Mapping[str, object]]:
     return [
         {"id": "b1", "value": "B1"},

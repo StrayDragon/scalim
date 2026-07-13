@@ -4,9 +4,8 @@ workflow:
   resources:
     books:
       report:
-        xlsx_memory:
-          export_xlsx:
-            path: ./out
+        xlsx:
+          path: ./out
 
   runs:
     - id: detail

@@ -1,0 +1,26 @@
+# After（对照）：显式区分「内存总线」与「落盘文件书」
+# 虚构示例 — id/路径均不来自外部报告
+
+workflow:
+  resources:
+    books:
+      # 内存总线：无 export_xlsx → 不落盘；供下游 book_sheet_rows 读取
+      scratch:
+        xlsx_memory: {}
+      # 文件书：版本化输出 root；最终报表
+      report:
+        xlsx_file:
+          path: ./out
+
+  runs:
+    - id: stage_a
+      demand: ./stage_a.demand.yaml
+
+    - id: stage_b
+      demand: ./stage_b.demand.yaml
+      depends_on: [stage_a]
+
+    # 交叉读 scratch 各 sheet，再写入 report
+    - id: summary
+      demand: ./summary.demand.yaml
+      depends_on: [stage_b]

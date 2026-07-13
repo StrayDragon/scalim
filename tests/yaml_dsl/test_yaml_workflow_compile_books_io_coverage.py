@@ -979,8 +979,13 @@ def test_workflow_compile_accepts_xlsx_memory_align_by_field_id() -> None:
         book=BookConfig(
             kind="xlsx_memory",
             budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
-            write_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
         ),
+        book_id="report",
+        effective_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
+    )
+    # 覆盖 `effective_defaults is None` → builtin defaults 分支
+    workflow_compile_mod._validate_xlsx_memory_align_by(  # noqa: SLF001
+        book=BookConfig(kind="xlsx_memory"),
         book_id="report",
     )
 

@@ -19,6 +19,6 @@ base_resources:
           path: {$init_var: out_path_detail}
     books:
       secondary_debug:
-        xlsx_file:
+        xlsx:
           path: {$init_var: out_path_secondary_workbook}
           allow_formulas: false

@@ -121,21 +121,22 @@ run_workflow(
 - 下游 run 必须显式 `depends_on: [A]`(或依赖闭包中包含 A)
 - 避免把大对象塞进 ctx；只放小体量 summary/path 等
 
-### 5) YAML 仍写 `write_defaults` / `xlsx_memory.budget`(已迁出)
+### 5) YAML 仍写 `write_defaults` / `budget`(已迁出)
 
 症状:
 
-- validate / parse / compile fail-fast: `write_defaults was removed from YAML authoring` 或 `xlsx_memory.budget was removed`
+- validate / parse / compile fail-fast: `write_defaults was removed from YAML authoring` 或 `budget was removed`
 - 或运行期命中 Python `BookBudgetPolicy` 护栏(超限 fail-fast)
 
 修复:
 
-- 从 YAML `resources.books.*` 删除 `write_defaults` 与 `xlsx_memory.budget`(只留 identity: `xlsx_file`/`xlsx_memory` + path/export)
+- 从 YAML `resources.books.*` 删除 `write_defaults` 与 `budget`(只留 identity: 推荐 `xlsx` + 可选 `path`)
 - 在 Python 配置 `WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`:
   - write → `BookWritePolicy`(构造只用 StrEnum)
   - budget → `BookBudgetPolicy(max_sheets=..., max_total_cells=...)`(启用时两者都要给;省略 = unlimited)
 - 完整迁移: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
-- `RunOverrides.resources` / `BookResourceOverride` 仍可覆盖 path/export/`allow_formulas`,但 **不能**再 overlay write/budget
+- book identity 统一: `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`
+- `RunOverrides.resources` / `BookResourceOverride` 仍可覆盖 path/`allow_formulas`,但 **不能**再 overlay write/budget
 
 ### 6) 把“写入意图”或 runtime knobs 写进了 workflow YAML
 

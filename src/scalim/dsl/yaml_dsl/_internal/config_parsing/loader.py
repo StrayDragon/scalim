@@ -9,9 +9,6 @@ from ...init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ...schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ...schema_dsl.models import (
     BOOK_EXPORT_XLSX_KEYS,
-    BOOK_KEYS,
-    BOOK_XLSX_FILE_KEYS,
-    BOOK_XLSX_MEMORY_KEYS,
     DEMAND_KEYS,
     FILE_CSV_FILE_KEYS,
     FILE_KEYS,
@@ -22,6 +19,7 @@ from ...schema_dsl.models import (
     FileConfig,
     ResourcesConfig,
 )
+from .book_branch_parse import parse_book_config_mapping
 from .error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from .imports import ScalimYamlImportExpansionError, contains_import_syntax, expand_imports_inplace
 from .models import RawDemand
@@ -392,128 +390,31 @@ class YamlDemandLoader(
 
         return ResourcesConfig(books=books, files=files)
 
-    def _parse_book_config(self, raw: Dict[str, Any], *, base_path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
-        if "write_lock" in raw:
-            msg = (
-                "{}.write_lock was removed. "
-                "Migration: set xlsx_file/xlsx_memory.export_xlsx path to an output root directory "
-                "(e.g. './out'), and locate outputs via <root>/manifest/latest.json."
-            ).format(base_path)
-            raise ValueError(msg)
+    def _parse_book_config(self, raw: Dict[str, Any], *, base_path: str) -> BookConfig:
+        def _error(message: str, path: Optional[str] = None) -> ValueError:
+            _ = path
+            return ValueError(message)
 
-        if "kind" in raw:
-            kind = str(raw.get("kind") or "").strip()
-            if kind == "xlsx_file":
-                msg = (
-                    "{}.kind was removed. "
-                    "Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}}."
-                ).format(base_path, base_path)
-            elif kind == "xlsx_memory":
-                msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_memory: {{export_xlsx?: ...}}.").format(
-                    base_path, base_path
-                )
-            else:
-                msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{...}} or {}.xlsx_memory: {{...}}.").format(
-                    base_path, base_path, base_path
-                )
-            raise ValueError(msg)
+        def _ignore_import(_data: Mapping[str, Any], path: Optional[str] = None) -> None:
+            _ = path
 
-        if "write_defaults" in raw:
-            msg = (
-                "{}.write_defaults was removed from YAML authoring. "
-                "Migration: configure BookWritePolicy via DemandRunOptions.resources_policy "
-                "or WorkflowRunOptions.resources_policy (Python SSOT; omit for builtin defaults)."
-            ).format(base_path)
-            raise ValueError(msg)
-
-        allowed_keys = {BOOK_KEYS["xlsx_file"], BOOK_KEYS["xlsx_memory"]}
-        unknown = sorted({str(k) for k in raw} - allowed_keys)
-        if unknown:
-            msg = "{} has unknown keys: {}".format(base_path, ", ".join(unknown))
-            raise ValueError(msg)
-
-        file_branch = None
-        if BOOK_KEYS["xlsx_file"] in raw:
-            file_branch = mapping_or_none(raw.get(BOOK_KEYS["xlsx_file"]))
-            if file_branch is None:
-                msg = "{}.xlsx_file must be an object".format(base_path)
+        def _parse_export(raw_export: object, path: Optional[str] = None) -> BookExportXlsxConfig:
+            export_path = str(path or base_path)
+            if not isinstance(raw_export, dict):
+                msg = "{} must be a mapping".format(export_path)
                 raise TypeError(msg)
-
-        mem_branch = None
-        if BOOK_KEYS["xlsx_memory"] in raw:
-            mem_branch = mapping_or_none(raw.get(BOOK_KEYS["xlsx_memory"]))
-            if mem_branch is None:
-                msg = "{}.xlsx_memory must be an object".format(base_path)
-                raise TypeError(msg)
-
-        has_file = file_branch is not None
-        has_mem = mem_branch is not None
-        if has_file == has_mem:
-            msg = "{} must choose exactly one variant key: xlsx_file or xlsx_memory".format(base_path)
-            raise ValueError(msg)
-
-        if file_branch is not None:
-            branch_path = "{}.xlsx_file".format(base_path)
-            allowed_branch_keys = {BOOK_XLSX_FILE_KEYS["path"], BOOK_XLSX_FILE_KEYS["allow_formulas"]}
-            unknown_branch = sorted({str(k) for k in file_branch} - allowed_branch_keys)
-            if unknown_branch:
-                if "write_lock" in unknown_branch:
-                    msg = (
-                        "{}.write_lock was removed. "
-                        "Migration: set path to an output root directory and locate outputs via <root>/manifest/latest.json."
-                    ).format(branch_path)
-                    raise ValueError(msg)
-                msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
-                raise ValueError(msg)
-
-            path = self._parse_path_or_init_var(
-                file_branch.get(BOOK_XLSX_FILE_KEYS["path"]),
-                path="{}.path".format(branch_path),
-            )
-            if not path or (isinstance(path, str) and not path.strip()):
-                msg = "{}.path is required".format(branch_path)
-                raise ValueError(msg)
-
-            allow_formulas = bool(file_branch.get(BOOK_XLSX_FILE_KEYS["allow_formulas"], True))
-            return BookConfig(
-                kind="xlsx_file",
-                path=path,
-                budget=None,
-                export_xlsx=None,
-                allow_formulas=allow_formulas,
-                write_defaults=None,
+            return self._parse_book_export_xlsx(
+                cast("Dict[str, Any]", raw_export),  # pragma: allow-cast yaml mapping typed narrowing
+                base_path=export_path,
             )
 
-        assert mem_branch is not None  # noqa: S101  # pragma: allow-no-cover invariant: has_mem checked above
-        branch_path = "{}.xlsx_memory".format(base_path)
-        if "budget" in mem_branch:
-            msg = (
-                "{}.budget was removed from YAML authoring. "
-                "Migration: configure BookBudgetPolicy via DemandRunOptions.resources_policy "
-                "or WorkflowRunOptions.resources_policy (Python SSOT; omit for unlimited)."
-            ).format(branch_path)
-            raise ValueError(msg)
-        allowed_branch_keys = {BOOK_XLSX_MEMORY_KEYS["export_xlsx"]}
-        unknown_branch = sorted({str(k) for k in mem_branch} - allowed_branch_keys)
-        if unknown_branch:
-            if "write_lock" in unknown_branch:
-                msg = ("{}.write_lock was removed. Migration: locate outputs via <root>/manifest/latest.json.").format(branch_path)
-                raise ValueError(msg)
-            msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
-            raise ValueError(msg)
-
-        export_cfg = None
-        export_raw = mapping_or_none(mem_branch.get(BOOK_XLSX_MEMORY_KEYS["export_xlsx"]))
-        if export_raw is not None:
-            export_cfg = self._parse_book_export_xlsx(export_raw, base_path="{}.export_xlsx".format(branch_path))
-
-        return BookConfig(
-            kind="xlsx_memory",
-            path=None,
-            budget=None,
-            export_xlsx=export_cfg,
-            allow_formulas=False,
-            write_defaults=None,
+        return parse_book_config_mapping(
+            raw,
+            path=base_path,
+            parse_path_or_init_var=self._parse_path_or_init_var,
+            parse_export_xlsx=_parse_export,
+            raise_if_import_present=_ignore_import,
+            error_factory=_error,
         )
 
     def _parse_file_config(self, raw: Dict[str, Any], *, base_path: str) -> FileConfig:

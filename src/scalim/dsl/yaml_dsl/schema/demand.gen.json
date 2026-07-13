@@ -2066,6 +2066,77 @@
       ],
       "additionalProperties": false
     },
+    "book_xlsx": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$init_var": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
+                  "markdownDescription": "#### resources.books.*.xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                }
+              },
+              "required": [
+                "$init_var"
+              ],
+              "additionalProperties": false,
+              "description": "运行时动态路径: {$init_var: <name>}"
+            }
+          ],
+          "description": "可选输出 root 目录.",
+          "examples": [
+            "./output",
+            {
+              "$init_var": "output_root"
+            }
+          ],
+          "markdownDescription": "#### resources.books.*.xlsx.path\n\n可选输出 root 目录.\n\n- 有 `path`: 版本化落盘(原 `xlsx_file` 语义)\n- 无 `path`: 内存总线(原无 export 的 `xlsx_memory` 语义)\n- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+        },
+        "allow_formulas": {
+          "type": "boolean",
+          "description": "允许 Excel 公式(仅有 path 导出时有意义;默认 true;不可信输入显式设为 false).",
+          "markdownDescription": "#### resources.books.*.xlsx.allow_formulas\n\n允许 Excel 公式(仅有 path 导出时有意义;默认 true;不可信输入显式设为 false).",
+          "default": true,
+          "examples": [
+            true
+          ]
+        },
+        "$import": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ],
+          "description": "$import 引用.",
+          "markdownDescription": "#### resources.books.*.xlsx.$import\n\n$import 引用.\n\n- string: `<alias>(.<segment>)*`\n- list: 按顺序合并,后者覆盖前者,最终再被本地覆盖\n- 仅支持 mapping 片段\n- 导入源由顶层 `imports` 决定;支持相对路径 fragments、目录 alias 与 `scalim://` preset\n- 路径解析与 allow-roots/import aliases 约束以顶层 `imports` 文档与运行时校验为准\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\ncommon.sources\n```\n```yaml\n- common.sources\n- other.sources\n```",
+          "examples": [
+            "common.sources",
+            [
+              "common.sources",
+              "other.sources"
+            ]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "book_xlsx_file": {
       "type": "object",
       "properties": {
@@ -2093,14 +2164,14 @@
               "description": "运行时动态路径: {$init_var: <name>}"
             }
           ],
-          "description": "输出 root 目录(字符串或 {$init_var: <name>})",
+          "description": "**deprecated**: 请迁移到 `xlsx: {path: ...}`.",
           "examples": [
             "./output",
             {
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### resources.books.*.xlsx_file.path\n\n输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### resources.books.*.xlsx_file.path\n\n**deprecated**: 请迁移到 `xlsx: {path: ...}`.\n\n输出 root 目录(字符串或 {$init_var: <name>}).\n\n##### 字段约束\n- 必填: 是(除非仅提供 `$import`)\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
@@ -2153,8 +2224,8 @@
       "type": "object",
       "properties": {
         "export_xlsx": {
-          "description": "可选: 导出配置",
-          "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx\n\n可选: 导出配置\n- 或仅 `$import`(展开后再校验必填字段)",
+          "description": "**deprecated**: 无 export 请用 `xlsx: {}`; 有导出请用 `xlsx: {path: ...}`.",
+          "markdownDescription": "#### resources.books.*.xlsx_memory.export_xlsx\n\n**deprecated**: 无 export 请用 `xlsx: {}`; 有导出请用 `xlsx: {path: ...}`.\n可选导出配置.\n- 或仅 `$import`(展开后再校验必填字段)",
           "allOf": [
             {
               "$ref": "#/definitions/book_export_xlsx"
@@ -2190,9 +2261,18 @@
     "book": {
       "type": "object",
       "properties": {
+        "xlsx": {
+          "description": "xlsx: 统一 book identity(新 SSOT).",
+          "markdownDescription": "#### resources.books.*.xlsx\n\nxlsx: 统一 book identity(新 SSOT).\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线(`book_sheet_rows`)",
+          "allOf": [
+            {
+              "$ref": "#/definitions/book_xlsx"
+            }
+          ]
+        },
         "xlsx_file": {
-          "description": "xlsx_file: 文件导出 book 配置.",
-          "markdownDescription": "#### resources.books.*.xlsx_file\n\nxlsx_file: 文件导出 book 配置.\n- 必填: `path`\n- 或仅 `$import`(展开后再校验必填字段)",
+          "description": "**deprecated**: 请迁移到 `xlsx: {path: ...}`.",
+          "markdownDescription": "#### resources.books.*.xlsx_file\n\n**deprecated**: 请迁移到 `xlsx: {path: ...}`.\nxlsx_file: 文件导出 book 配置.\n- 或仅 `$import`(展开后再校验必填字段)",
           "allOf": [
             {
               "$ref": "#/definitions/book_xlsx_file"
@@ -2200,8 +2280,8 @@
           ]
         },
         "xlsx_memory": {
-          "description": "xlsx_memory: 内存 book 配置.",
-          "markdownDescription": "#### resources.books.*.xlsx_memory\n\nxlsx_memory: 内存 book 配置.\n- 可选: `export_xlsx`\n- `budget`/`write_defaults` 已迁出 YAML(Python ResourcesPolicy)",
+          "description": "**deprecated**: 无导出用 `xlsx: {}`; 有导出用 `xlsx: {path: ...}`.",
+          "markdownDescription": "#### resources.books.*.xlsx_memory\n\n**deprecated**: 无导出用 `xlsx: {}`; 有导出用 `xlsx: {path: ...}`.\nxlsx_memory: 内存 book 配置.\n- 可选: `export_xlsx`(亦 deprecated)",
           "allOf": [
             {
               "$ref": "#/definitions/book_xlsx_memory"
@@ -2241,9 +2321,25 @@
                 "$import"
               ],
               "not": {
-                "required": [
-                  "xlsx_file",
-                  "xlsx_memory"
+                "anyOf": [
+                  {
+                    "required": [
+                      "xlsx",
+                      "xlsx_file"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "xlsx",
+                      "xlsx_memory"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "xlsx_file",
+                      "xlsx_memory"
+                    ]
+                  }
                 ]
               }
             },
@@ -2251,9 +2347,25 @@
               "oneOf": [
                 {
                   "required": [
+                    "xlsx"
+                  ],
+                  "properties": {
+                    "xlsx_file": {
+                      "not": {}
+                    },
+                    "xlsx_memory": {
+                      "not": {}
+                    }
+                  }
+                },
+                {
+                  "required": [
                     "xlsx_file"
                   ],
                   "properties": {
+                    "xlsx": {
+                      "not": {}
+                    },
                     "xlsx_memory": {
                       "not": {}
                     }
@@ -2264,6 +2376,9 @@
                     "xlsx_memory"
                   ],
                   "properties": {
+                    "xlsx": {
+                      "not": {}
+                    },
                     "xlsx_file": {
                       "not": {}
                     }
@@ -2439,7 +2554,7 @@
             }
           },
           "description": "books 资源映射(Excel book; key 为 `book_id`).",
-          "markdownDescription": "#### resources.books\n\nbooks 资源映射(Excel book; key 为 `book_id`).\n- 对外稳定术语: `book`\n- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)",
+          "markdownDescription": "#### resources.books\n\nbooks 资源映射(Excel book; key 为 `book_id`).\n- 对外稳定术语: `book`\n- 新 SSOT 分支: `xlsx`(可选 `path`); `xlsx_file`/`xlsx_memory` 为 deprecated 别名",
           "additionalProperties": {
             "$ref": "#/definitions/book"
           },

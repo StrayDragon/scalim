@@ -693,6 +693,38 @@ def test_resource_manager_sheetbook_sheet_budget_max_sheets_is_enforced(tmp_path
         )
 
 
+def test_resource_manager_apply_book_append_routes_xlsx_memory_to_sheetbook(tmp_path: Path) -> None:
+    instrumentation = _Instrumentation()
+    manager = resources_mod.WorkflowResourceManager(
+        workflow_exec_id="wf",
+        instrumentation=instrumentation,
+        workbook_defs={},
+        csv_defs={},
+        sheetbook_defs={
+            "sb": resources_mod.SheetBookDef(
+                resource_id="sb",
+                budget_max_sheets=4,
+                budget_max_total_cells=1000,
+                export_path=None,
+            )
+        },
+    )
+    first = _write_csv(tmp_path / "a.csv", [["id", "value"], ["a1", "A1"]])
+    manager.apply_book_append(
+        workflow_node_id="n0",
+        decl_order=0,
+        book_id="sb",
+        sheet="S",
+        input_node_id="a",
+        input_output_id="detail",
+        input_csv=str(first),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+    )
+    assert manager.get_book_kind("sb") == "xlsx_memory"
+
+
 def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(

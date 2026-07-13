@@ -491,7 +491,7 @@ resources:
   books:
     report:
       $import: fragments.report_book
-      xlsx_file:
+      xlsx:
         path: ./.tmp/output/ecommerce_report
 
 # NOTE: meta/audit extra sheets were moved out of YAML mainline (output extras boundary).

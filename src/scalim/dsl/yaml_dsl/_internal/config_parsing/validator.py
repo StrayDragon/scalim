@@ -13,6 +13,7 @@ from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValue
 from ...schema_dsl.models import (
     BOOK_KEYS,
     BOOK_XLSX_FILE_KEYS,
+    BOOK_XLSX_KEYS,
     BOOK_XLSX_MEMORY_KEYS,
     DEMAND_KEYS,
     FILE_CSV_FILE_KEYS,
@@ -103,6 +104,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
     ) -> ValidationReport:
         errors: List[ValidationIssue] = []
         config = self._warn_and_strip_legacy_observability(config, errors)
+        config = self._warn_deprecated_book_branches(config, errors)
         config = self._error_and_strip_removed_demand_runtime_policy_fields(config, errors)
         config = self._error_and_strip_removed_output_extras_fields(config, errors)
         config = self._error_and_strip_removed_output_write_workbook_fields(config, errors)
@@ -387,25 +389,79 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
                 if kind == "xlsx_file":
                     msg = (
                         "resources.books.{}.kind was removed. "
-                        "Migration: use resources.books.{}.xlsx_file: {{path: <output_root>, allow_formulas?: false}}."
-                    ).format(book_id, book_id)
+                        "Migration: use resources.books.{}.xlsx: {{path: <output_root>}} "
+                        "(or deprecated resources.books.{}.xlsx_file: {{...}})."
+                    ).format(book_id, book_id, book_id)
                 elif kind == "xlsx_memory":
                     msg = (
                         "resources.books.{}.kind was removed. "
-                        "Migration: use resources.books.{}.xlsx_memory: {{budget?: ..., export_xlsx?: ...}}."
-                    ).format(book_id, book_id)
+                        "Migration: use resources.books.{}.xlsx: {{}} "
+                        "(or deprecated resources.books.{}.xlsx_memory: {{...}})."
+                    ).format(book_id, book_id, book_id)
                 else:
                     msg = (
                         "resources.books.{}.kind was removed. "
-                        "Migration: use resources.books.{}.xlsx_file: {{...}} or resources.books.{}.xlsx_memory: {{...}}."
-                    ).format(book_id, book_id, book_id)
+                        "Migration: use resources.books.{}.xlsx: {{path?: ...}} "
+                        "(deprecated aliases: xlsx_file / xlsx_memory)."
+                    ).format(book_id, book_id)
                 self._add_error(errors, msg, path="resources.books.{}.kind".format(book_id))
 
+            has_xlsx = BOOK_KEYS["xlsx"] in book_cfg
             has_xlsx_file = BOOK_KEYS["xlsx_file"] in book_cfg
             has_xlsx_memory = BOOK_KEYS["xlsx_memory"] in book_cfg
-            if has_xlsx_file == has_xlsx_memory:
-                msg = "resources.books.{} must choose exactly one variant key: xlsx_file or xlsx_memory".format(book_id)
+            present_count = int(has_xlsx) + int(has_xlsx_file) + int(has_xlsx_memory)
+            if present_count != 1:
+                msg = (
+                    "resources.books.{} must choose exactly one variant key: xlsx (preferred) or deprecated xlsx_file / xlsx_memory"
+                ).format(book_id)
                 self._add_error(errors, msg, path="resources.books.{}".format(book_id))
+
+            xlsx_raw = book_cfg.get(BOOK_KEYS["xlsx"])
+            if xlsx_raw is not None:
+                if not isinstance(xlsx_raw, dict):
+                    msg = "resources.books.{}.xlsx must be an object".format(book_id)
+                    self._add_error(errors, msg, path="resources.books.{}.xlsx".format(book_id))
+                else:
+                    xlsx_cfg = cast("Dict[str, Any]", xlsx_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    if "export_xlsx" in xlsx_cfg:
+                        msg = (
+                            "resources.books.{}.xlsx.export_xlsx is not allowed; set resources.books.{}.xlsx.path "
+                            "for export (or use empty resources.books.{}.xlsx: {{}} for an in-memory bus)."
+                        ).format(book_id, book_id, book_id)
+                        self._add_error(errors, msg, path="resources.books.{}.xlsx.export_xlsx".format(book_id))
+                    if "write_defaults" in xlsx_cfg:
+                        msg = (
+                            "resources.books.{}.xlsx.write_defaults was removed from YAML authoring. "
+                            "Migration: configure BookWritePolicy via Python ResourcesPolicy."
+                        ).format(book_id)
+                        self._add_error(errors, msg, path="resources.books.{}.xlsx.write_defaults".format(book_id))
+                    if "budget" in xlsx_cfg:
+                        msg = (
+                            "resources.books.{}.xlsx.budget was removed from YAML authoring. "
+                            "Migration: configure BookBudgetPolicy via Python ResourcesPolicy."
+                        ).format(book_id)
+                        self._add_error(errors, msg, path="resources.books.{}.xlsx.budget".format(book_id))
+
+                    path_value = xlsx_cfg.get(BOOK_XLSX_KEYS["path"]) if "path" in xlsx_cfg else None
+                    if "path" in xlsx_cfg and (path_value is None or (isinstance(path_value, str) and not path_value.strip())):
+                        msg = "resources.books.{}.xlsx.path must be a non-empty output root when provided".format(book_id)
+                        self._add_error(errors, msg, path="resources.books.{}.xlsx.path".format(book_id))
+                    if isinstance(path_value, str) and Path(path_value).suffix.lower() == ".xlsx":
+                        msg = (
+                            "resources.books.{}.xlsx.path expects an output root directory, not a file path. "
+                            "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+                        ).format(book_id)
+                        self._add_error(errors, msg, path="resources.books.{}.xlsx.path".format(book_id))
+
+                    path_raw = xlsx_cfg.get(BOOK_XLSX_KEYS["path"]) if "path" in xlsx_cfg else None
+                    if isinstance(path_raw, dict):
+                        try:
+                            _ = parse_init_var_mapping_node(
+                                cast("Dict[str, Any]", path_raw),
+                                path="resources.books.{}.xlsx.path".format(book_id),
+                            )
+                        except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
+                            self._add_error(errors, exc.reason, path=exc.path)
 
             xlsx_file_raw = book_cfg.get(BOOK_KEYS["xlsx_file"])
             if xlsx_file_raw is not None:

@@ -164,6 +164,38 @@ class BookWriteDefaultsConfig:
 
 
 @dataclass(frozen=True)
+class BookXlsxConfig:
+    """统一 `book` `identity`: 有 `path`=落盘; 无 `path`=内存总线."""
+
+    SCHEMA_NAME: ClassVar[str] = "book_xlsx"
+    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
+
+    path: OptionalPathNode = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            schema=_PATH_OR_INIT_VAR_SCHEMA,
+            desc="可选输出 root 目录(有 path=落盘;无 path=内存总线;字符串或 {$init_var: <name>})",
+            md=(
+                "可选输出 root 目录.\n\n"
+                "- 有 `path`: 版本化落盘(原 `xlsx_file` 语义)\n"
+                "- 无 `path`: 内存总线(原无 export 的 `xlsx_memory` 语义)\n"
+                "- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`"
+            ),
+        ),
+    )
+
+    allow_formulas: bool = dataclass_field(
+        default=True,
+        metadata=schema_meta(
+            desc="允许 Excel 公式(仅导出时有意义;默认 true;不可信输入显式设为 false)",
+            md="允许 Excel 公式(仅有 path 导出时有意义;默认 true;不可信输入显式设为 false).",
+            default=True,
+            examples=[True],
+        ),
+    )
+
+
+@dataclass(frozen=True)
 class BookXlsxFileConfig:
     SCHEMA_NAME: ClassVar[str] = "book_xlsx_file"
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
@@ -173,7 +205,8 @@ class BookXlsxFileConfig:
         default=None,
         metadata=schema_meta(
             schema=_PATH_OR_INIT_VAR_SCHEMA,
-            desc="输出 root 目录(字符串或 {$init_var: <name>})",
+            desc="输出 root 目录(字符串或 {$init_var: <name>}) [deprecated: 迁移到 xlsx.path]",
+            md="**deprecated**: 请迁移到 `xlsx: {path: ...}`.\n\n输出 root 目录(字符串或 {$init_var: <name>}).",
         ),
     )
 
@@ -200,7 +233,11 @@ class BookXlsxMemoryConfig:
 
     export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
         default=None,
-        metadata=schema_meta(desc="可选: 导出配置", ref="book_export_xlsx"),
+        metadata=schema_meta(
+            desc="可选: 导出配置 [deprecated: 迁移到 xlsx.path]",
+            md="**deprecated**: 无 export 请用 `xlsx: {}`; 有导出请用 `xlsx: {path: ...}`.\n\n可选导出配置.",
+            ref="book_export_xlsx",
+        ),
     )
 
 
@@ -213,13 +250,29 @@ class BookConfig:
             "anyOf": [
                 {
                     "required": ["$import"],
-                    # 允许 `$import + override` 形态,但仍拒绝显式声明两个分支.
-                    "not": {"required": ["xlsx_file", "xlsx_memory"]},
+                    # 允许 `$import + override` 形态,但仍拒绝显式声明多个分支.
+                    "not": {
+                        "anyOf": [
+                            {"required": ["xlsx", "xlsx_file"]},
+                            {"required": ["xlsx", "xlsx_memory"]},
+                            {"required": ["xlsx_file", "xlsx_memory"]},
+                        ]
+                    },
                 },
                 {
                     "oneOf": [
-                        {"required": ["xlsx_file"], "properties": {"xlsx_memory": {"not": {}}}},
-                        {"required": ["xlsx_memory"], "properties": {"xlsx_file": {"not": {}}}},
+                        {
+                            "required": ["xlsx"],
+                            "properties": {"xlsx_file": {"not": {}}, "xlsx_memory": {"not": {}}},
+                        },
+                        {
+                            "required": ["xlsx_file"],
+                            "properties": {"xlsx": {"not": {}}, "xlsx_memory": {"not": {}}},
+                        },
+                        {
+                            "required": ["xlsx_memory"],
+                            "properties": {"xlsx": {"not": {}}, "xlsx_file": {"not": {}}},
+                        },
                     ]
                 },
             ]
@@ -256,11 +309,29 @@ class BookConfig:
         metadata=schema_omit(),
     )
 
+    xlsx: Optional[BookXlsxConfig] = dataclass_field(
+        default=None,
+        metadata=schema_meta(
+            desc="xlsx: 统一 book identity(有 path=落盘;无 path=内存总线)",
+            md=(
+                "xlsx: 统一 book identity(新 SSOT).\n\n"
+                "- 有 `path`: 版本化落盘\n"
+                "- 无 `path`: 内存总线(`book_sheet_rows`)\n"
+                "- 可选: `allow_formulas`(导出相关)\n"
+                "- `write_defaults`/`budget` 在 Python ResourcesPolicy"
+            ),
+            ref="book_xlsx",
+        ),
+    )
+
     xlsx_file: Optional[BookXlsxFileConfig] = dataclass_field(
         default=None,
         metadata=schema_meta(
-            desc="xlsx_file: 文件导出 book 配置",
-            md="xlsx_file: 文件导出 book 配置.\n\n- 必填: `path`\n- 可选: `allow_formulas`",
+            desc="xlsx_file: deprecated 别名 → 迁移到 xlsx.path",
+            md=(
+                "**deprecated**: 请迁移到 `xlsx: {path: ...}`.\n\n"
+                "xlsx_file: 文件导出 book 配置.\n\n- 必填: `path`\n- 可选: `allow_formulas`"
+            ),
             ref="book_xlsx_file",
         ),
     )
@@ -268,8 +339,13 @@ class BookConfig:
     xlsx_memory: Optional[BookXlsxMemoryConfig] = dataclass_field(
         default=None,
         metadata=schema_meta(
-            desc="xlsx_memory: 内存 book 配置(可选导出)",
-            md="xlsx_memory: 内存 book 配置.\n\n- 可选: `export_xlsx`\n- `budget`/`write_defaults` 已迁出 YAML(Python ResourcesPolicy)",
+            desc="xlsx_memory: deprecated 别名 → 迁移到 xlsx{}",
+            md=(
+                "**deprecated**: 无导出用 `xlsx: {}`; 有导出用 `xlsx: {path: ...}`.\n\n"
+                "xlsx_memory: 内存 book 配置.\n\n"
+                "- 可选: `export_xlsx`(亦 deprecated)\n"
+                "- `budget`/`write_defaults` 已迁出 YAML(Python ResourcesPolicy)"
+            ),
             ref="book_xlsx_memory",
         ),
     )
@@ -343,7 +419,7 @@ class ResourcesConfig:
             md=(
                 "books 资源映射(Excel book; key 为 `book_id`).\n\n"
                 "- 对外稳定术语: `book`\n"
-                "- `kind` 选择实现策略(`xlsx_file`/`xlsx_memory`)\n"
+                "- 新 SSOT 分支: `xlsx`(可选 `path`); `xlsx_file`/`xlsx_memory` 为 deprecated 别名\n"
                 "- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n"
                 "- `outputs[*].to.book` 引用该 mapping 的 key"
             ),

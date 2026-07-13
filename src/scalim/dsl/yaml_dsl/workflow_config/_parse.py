@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
 
 from ....workflow.errors import ScalimWorkflowConfigError
+from .._internal.config_parsing.book_branch_parse import parse_book_config_mapping
 from ..init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
@@ -233,133 +234,24 @@ def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
     return BookExportXlsxConfig(path=export_path, allow_formulas=bool(allow_formulas_raw))
 
 
-def _parse_book_config(raw: object, *, path: str) -> BookConfig:  # noqa: C901, PLR0912, PLR0915
+def _parse_book_config(raw: object, *, path: str) -> BookConfig:
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)
         raise ScalimWorkflowConfigError(msg, path=path)
 
     cfg = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
-    _raise_if_import_present(cfg, path=path)
 
-    if "write_lock" in cfg:
-        msg = "{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
+    def _error(message: str, path: Optional[str] = None) -> ScalimWorkflowConfigError:
+        return ScalimWorkflowConfigError(message, path=str(path or ""))
 
-    if "kind" in cfg:
-        kind = str(cfg.get("kind") or "").strip()
-        if kind == "xlsx_file":
-            msg = (
-                "{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{path: <output_root>, allow_formulas?: false}}."
-            ).format(path, path)
-        elif kind == "xlsx_memory":
-            msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_memory: {{export_xlsx?: ...}}.").format(path, path)
-        else:
-            msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.xlsx_file: {{...}} or {}.xlsx_memory: {{...}}.").format(
-                path, path, path
-            )
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
-
-    if "write_defaults" in cfg:
-        msg = (
-            "{}.write_defaults was removed from YAML authoring. "
-            "Migration: configure BookWritePolicy via WorkflowRunOptions.resources_policy "
-            "(Python SSOT; omit for builtin defaults)."
-        ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.write_defaults".format(path))
-
-    allowed_keys = {"xlsx_file", "xlsx_memory"}
-    unknown = sorted({str(k) for k in cfg} - allowed_keys)
-    if unknown:
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    has_xlsx_file = "xlsx_file" in cfg
-    has_xlsx_memory = "xlsx_memory" in cfg
-    if has_xlsx_file == has_xlsx_memory:
-        msg = "{} must choose exactly one variant key: xlsx_file or xlsx_memory".format(path)
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    if has_xlsx_file:
-        xlsx_file_raw = cfg.get("xlsx_file")
-        if not isinstance(xlsx_file_raw, dict):
-            msg = "{}.xlsx_file must be a mapping".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file".format(path))
-        xlsx_file = cast("Dict[str, Any]", xlsx_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
-        _raise_if_import_present(xlsx_file, path="{}.xlsx_file".format(path))
-        unknown_branch = sorted({str(k) for k in xlsx_file} - {"path", "allow_formulas"})
-        if unknown_branch:
-            if "write_lock" in unknown_branch:
-                msg = (
-                    "{}.xlsx_file.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
-                ).format(path)
-                raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.write_lock".format(path))
-            msg = "{}.xlsx_file has unknown keys: {}".format(path, ", ".join(unknown_branch))
-            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file".format(path))
-
-        book_path = _parse_path_or_init_var(xlsx_file.get("path"), path="{}.xlsx_file.path".format(path))
-        if not book_path or (isinstance(book_path, str) and not book_path.strip()):
-            msg = "{}.xlsx_file.path is required".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.path".format(path))
-        if isinstance(book_path, str) and Path(book_path).suffix.lower() == ".xlsx":
-            msg = (
-                "{}.xlsx_file.path now expects an output root directory, not a file path. "
-                "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-            ).format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.path".format(path))
-
-        allow_formulas_raw = xlsx_file.get("allow_formulas", True)
-        if not isinstance(allow_formulas_raw, bool):
-            msg = "{}.xlsx_file.allow_formulas must be a bool".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_file.allow_formulas".format(path))
-
-        return BookConfig(
-            kind="xlsx_file",
-            path=book_path,
-            budget=None,
-            export_xlsx=None,
-            allow_formulas=bool(allow_formulas_raw),
-            write_defaults=None,
-        )
-
-    xlsx_memory_raw = cfg.get("xlsx_memory")
-    if not isinstance(xlsx_memory_raw, dict):
-        msg = "{}.xlsx_memory must be a mapping".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory".format(path))
-    xlsx_memory = cast("Dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
-    _raise_if_import_present(xlsx_memory, path="{}.xlsx_memory".format(path))
-    if "budget" in xlsx_memory:
-        msg = (
-            "{}.xlsx_memory.budget was removed from YAML authoring. "
-            "Migration: configure BookBudgetPolicy via WorkflowRunOptions.resources_policy "
-            "(Python SSOT; omit for unlimited)."
-        ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory.budget".format(path))
-    unknown_branch = sorted({str(k) for k in xlsx_memory} - {"export_xlsx"})
-    if unknown_branch:
-        if "write_lock" in unknown_branch:
-            msg = (
-                "{}.xlsx_memory.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
-            ).format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory.write_lock".format(path))
-        msg = "{}.xlsx_memory has unknown keys: {}".format(path, ", ".join(unknown_branch))
-        raise ScalimWorkflowConfigError(msg, path="{}.xlsx_memory".format(path))
-
-    export_cfg = (
-        _parse_book_export_xlsx(xlsx_memory.get("export_xlsx"), path="{}.xlsx_memory.export_xlsx".format(path))
-        if "export_xlsx" in xlsx_memory
-        else None
-    )
-
-    # 路径语义: `export_xlsx.path` 也必须是输出根目录(版本化输出 `D-2`)。
-
-    return BookConfig(
-        kind="xlsx_memory",
-        path=None,
-        budget=None,
-        export_xlsx=export_cfg,
-        allow_formulas=False,
-        write_defaults=None,
+    return parse_book_config_mapping(
+        cfg,
+        path=path,
+        parse_path_or_init_var=_parse_path_or_init_var,
+        parse_export_xlsx=_parse_book_export_xlsx,
+        raise_if_import_present=_raise_if_import_present,
+        error_factory=_error,
     )
 
 

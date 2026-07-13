@@ -310,7 +310,7 @@ def _(mo):
 
         这就是 workflow YAML 的 `workflow.resources.books` + Python `ResourcesPolicy` 写策略 + demand outputs 绑定:
 
-        - `workflow.resources.books`: 声明 workflow-scope 的共享 book 资源(`xlsx_file|xlsx_memory`)身份(path/export)
+        - `workflow.resources.books`: 声明 workflow-scope 的共享 book 资源（推荐统一 `xlsx`：有 `path`=落盘，无 `path`=内存总线；旧 `xlsx_file`/`xlsx_memory` 为 deprecated 别名）
         - `WorkflowRunOptions.resources_policy`: 声明该 book 的写入语义(sheet/append + 冲突策略等; Python SSOT)
         - demand YAML 通过 `outputs[*].to.book/to.sheet` 绑定到共享 book; workflow 编译期推导 write nodes 并保证写入顺序确定性
 

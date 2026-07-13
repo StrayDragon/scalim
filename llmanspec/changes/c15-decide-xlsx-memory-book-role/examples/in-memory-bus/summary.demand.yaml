@@ -1,0 +1,23 @@
+# 虚构 demand：从 scratch 读 typed rows，再落到 report 文件书
+
+resources:
+  books:
+    scratch:
+      xlsx_memory: {}
+    report:
+      xlsx_file:
+        path: ./out
+
+main_source:
+  loader: "scalim.workflow.loaders:book_sheet_rows"
+  params:
+    ref:
+      node: stage_a
+      book: scratch
+      sheet: metrics_a
+
+outputs:
+  - name: final_sheet
+    to:
+      book: report
+      sheet: final_sheet

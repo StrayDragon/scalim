@@ -3648,11 +3648,12 @@ def test_workflow_sheetbook_resources_export_xlsx_and_emit_events(tmp_path: Path
     writes = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE]
     commits = [e for e in recorder.events if e.event_type == EventType.WORKFLOW_RESOURCE_COMMIT]
     assert len(creates) == 1
-    assert creates[0].payload.resource_type == "sheetbook"
+    # c20: xlsx_memory.export_xlsx 正规化为有 path → workbook 后端
+    assert creates[0].payload.resource_type == "workbook"
     assert creates[0].payload.resource_id == "report"
     assert creates[0].payload.workflow_node_id == "__wf__write.a.0"
-    assert len([e for e in writes if e.payload.resource_type == "sheetbook" and e.payload.resource_id == "report"]) == 2
-    assert len([e for e in commits if e.payload.resource_type == "sheetbook" and e.payload.resource_id == "report"]) == 1
+    assert len([e for e in writes if e.payload.resource_type == "workbook" and e.payload.resource_id == "report"]) == 2
+    assert len([e for e in commits if e.payload.resource_type == "workbook" and e.payload.resource_id == "report"]) == 1
     assert commits[0].payload.workflow_node_id == "__wf__write.b.0"
 
 
@@ -3756,9 +3757,7 @@ outputs:
     write_events = [
         e
         for e in recorder.events
-        if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE
-        and e.payload.resource_type == "sheetbook"
-        and e.payload.resource_id == "report"
+        if e.event_type == EventType.WORKFLOW_RESOURCE_WRITE and e.payload.resource_type == "workbook" and e.payload.resource_id == "report"
     ]
     assert [e.payload.workflow_node_id for e in write_events] == ["__wf__write.report.0", "__wf__write.report.1"]
 
@@ -4091,9 +4090,8 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         resources={
             "books": {
                 "report": {
-                    "xlsx_memory": {
-                        "export_xlsx": {"path": str(out_root)},
-                    },
+                    # budget 仅 sheetbook(无 path 总线)生效; export 别名已正规化为 workbook
+                    "xlsx_memory": {},
                 }
             }
         },
@@ -4122,9 +4120,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         resources={
             "books": {
                 "report": {
-                    "xlsx_memory": {
-                        "export_xlsx": {"path": str(out_root2)},
-                    },
+                    "xlsx_memory": {},
                 }
             }
         },
@@ -4156,9 +4152,7 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         resources={
             "books": {
                 "report": {
-                    "xlsx_memory": {
-                        "export_xlsx": {"path": str(out_root3)},
-                    },
+                    "xlsx": {"path": str(out_root3)},
                 }
             }
         },
