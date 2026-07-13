@@ -1,25 +1,64 @@
 ---
 name: "llman-sdd-archive"
-description: "归档单个或多个变更，并将增量合并到 specs。"
+description: "归档已完成的 llman SDD 变更：合并 delta specs 到主 specs，校验全量，引导 commit。在 verify 报告全绿后运行。支持单个或批量归档。"
+metadata:
+  version: "0.0.57"
 ---
 
 # LLMAN SDD 归档
 
-使用此 skill 归档已完成的变更。
+使用此 skill 归档已完成的变更，合并 delta specs 到主 specs，并引导 commit。
+
+## Pipeline 位置
+
+```mermaid
+flowchart LR
+    verify["llman-sdd-verify<br/>验证"] --> archive
+    archive["★ llman-sdd-archive ★<br/>归档（你现在在这里）"]
+    archive --> commit["git commit<br/>完成闭环"]
+
+    style archive fill:#fff3cd,stroke:#ffc107,stroke-width:3px
+```
+
+> 📍 你现在在归档阶段：pipeline 最后一站。
+> 📎 若 specs 逐渐膨胀，可运行 `llman-sdd-specs-compact` 压缩。
+
+## 硬约束
+
+- **必须先通过 verify 阶段全绿**：未通过验证的 change 禁止归档。
+- **SSOT 校验**：每个 change 归档前必须通过 `llman sdd validate <id> --strict --no-interactive`。
+- **不要问「要不要继续」**：批量归档时间线上一路执行到底，除非遇到无法自动解决的错误。
 
 ## 步骤
-1. 确认每个目标 change 都已接受或已部署。
-2. 确定目标 ID：
-   - 单个模式：一个 `<change-id>`。
-   - 批量模式：多个 ID（来自用户输入或 `llman sdd list --json`）。
-   - 始终说明："归档 IDs：<id1>, <id2>, ..."。
-3. 先逐个校验：`llman sdd validate <id> --strict --no-interactive`。
-4. 可选逐个预览归档：`llman sdd archive <id> --dry-run`。
-5. 按顺序执行归档：
-   - 默认：`llman sdd archive run <id>`（或 `llman sdd archive <id>`）
-   - 仅工具类变更：`llman sdd archive run <id> --skip-specs`
-   - 任一失败立即停止，并报告剩余未处理 ID。
-6. 全部结束后执行一次全量校验：`llman sdd validate --strict --no-interactive`。
+
+### 0) Preflight
+- `git status --porcelain`：确认工作区改动属于已完成的 change。
+- 若有未预期改动，先处理（stash 或报告）。
+
+### 1) 确认目标变更
+- 确定目标 ID：单个或批量（来自用户输入或 `llman sdd list --json`）。
+- 始终说明："归档 IDs：<id1>, <id2>, ..."。
+- 确认每个 change 都已通过 verify 阶段的全绿验证。
+
+### 2) 逐个归档
+- 先逐个校验：`llman sdd validate <id> --strict --no-interactive`。
+- 校验失败 → STOP 并报告；不要跳过校验强行归档。
+- 可选预览：`llman sdd archive <id> --dry-run`。
+- 执行归档：
+  - 默认：`llman sdd archive run <id>`
+  - 仅工具类变更：`llman sdd archive run <id> --skip-specs`
+  - **任一失败立即停止**，报告剩余未处理 ID。
+
+### 3) 全量校验
+- 全部归档完成后执行：`llman sdd validate --all --strict --no-interactive`。
+- 确认归档后的 specs 工件一致。
+
+### 4) Commit 引导
+- 输出建议的 commit message（格式：`feat(sdd): archive <id1>, <id2> - <简短总结>`）。
+- 提示用户：`git add -A && git commit -m "..."`。
+- 若用户要求自动 commit，执行后输出 commit hash。
+
+> 💡 上一阶段 `llman-sdd-verify`（验证通过）→ 本阶段归档后闭环结束。若 specs 逐渐膨胀，可运行 `llman-sdd-specs-compact` 压缩。
 
 ## Archive 冷备引导
 - 当 archive 目录增长过大时，使用冷备维护：
@@ -32,17 +71,18 @@ description: "归档单个或多个变更，并将增量合并到 specs。"
 在执行之前，请先阅读 `llmanspec/config.yaml`，若其中包含 `context` 与 `rules` 请遵循。
 
 常用命令：
+- `llman sdd context --task "<description>" --paths "<files>"`（获取相关 specs）。使用 pageindex agentic 树检索后端（需配置 `LLMAN_SDD_INDEX_CHAT_MODEL`）。可用 `LLMAN_SDD_INDEX_BACKEND` 预设。
 - `llman sdd list`（列出变更）
-- `llman sdd list --specs`（列出 specs）
+- `llman sdd list --specs`（列出 specs，含 purpose/scope 元数据）
 - `llman sdd show <id>`（查看 change/spec）
 - `llman sdd validate <id>`（校验变更或 spec）
 - `llman sdd validate --all`（批量校验）
-- `llman sdd migrate`（将旧版 `.md`+fence spec 一次性迁移为独立 `.toon`；幂等）
+- `llman sdd index rebuild`（重建 pageindex 树索引——无需模型）
+- `llman sdd index check`（检查索引新鲜度）
 - `llman sdd archive run <id>`（归档变更）
-- `llman sdd archive <id>`（`archive run` 的兼容别名）
-- `llman sdd archive freeze [--before YYYY-MM-DD] [--keep-recent N] [--dry-run]`（将已归档目录冻结到单一冷备文件）
-- `llman sdd archive thaw [--change <id> ...] [--dest <path>]`（从冷备文件恢复目录）
-- `llman sdd graph [CHANGE] [--format mermaid] [--scope active|archived|all] [--depth N]`（生成变更依赖图并输出到标准输出）
+- `llman sdd archive freeze [--before YYYY-MM-DD] [--keep-recent N] [--dry-run]`（冻结归档目录）
+- `llman sdd archive thaw [--change <id> ...] [--dest <path>]`（解冻归档）
+- `llman sdd graph [CHANGE] [--format mermaid] [--scope active|archived|all] [--depth N]`（生成变更依赖图）
 
 
 常见校验修复（TOON 独立文件 spec）：
@@ -91,6 +131,7 @@ r1,happy,"","a trigger happens","the outcome is observed"
 
 ## Context
 - 执行前先确认当前 change/spec 状态。
+- 优先使用 `llman sdd context --task --paths` 获取相关 specs，而非全量读取或猜测。
 
 ## Goal
 - 明确本次命令/skill 要达成的可验证结果。
@@ -98,10 +139,14 @@ r1,happy,"","a trigger happens","the outcome is observed"
 ## Constraints
 - 变更保持最小化且范围明确。
 - 标识符或意图不明确时禁止猜测。
+- 在读取 spec 全文前，先使用 `llman sdd context --task --paths` 获取相关 specs。
+- 判断变更规模后选择路径：行为合约变更走完整 SDD 流程，实现变更走快速路径。
 
 ## Workflow
 - 以 `llman sdd` 命令结果为事实来源。
 - 涉及文件/规范变更时执行校验。
+- 首选 `llman sdd context` 获取相关 specs，而非全量读取或猜测。
+- 当 context 不可用时，按错误提示处理（重建 index 或降级到 `list --specs --json`）。
 
 ## Decision Policy
 - 高影响歧义必须先澄清。
