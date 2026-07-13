@@ -224,7 +224,7 @@ def test_resource_manager_iter_book_sheet_rows_rejects_unknown_book(tmp_path: Pa
         sheetbook_defs={},
     )
 
-    with pytest.raises(ValueError, match="only supports xlsx_file/xlsx_memory"):
+    with pytest.raises(ValueError, match="only supports pathful/pathless books"):
         _ = manager.iter_book_sheet_rows(
             consumer_node_id="consumer",
             visible_producer_node_ids=frozenset(["producer"]),
