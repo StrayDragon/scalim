@@ -3,6 +3,8 @@
 说明:
 - 本文件对外保持稳定导入路径;具体实现拆分到同目录的 `resources_*` 子模块
 - 运行时需兼容 `Python 3.6`
+- `book` 身份以 `defs` 成员关系表达(`pathful`→`workbook_defs`; `pathless`→`sheetbook_defs`);
+  `get_book_kind` 仅返回 `deprecated` `wire` `shim`
 """
 
 from typing import FrozenSet, Iterator, Mapping, Optional, Tuple
@@ -22,6 +24,8 @@ class WorkflowResourceManager(
     """工作流级共享输出资源管理器(延迟提交 + 原子落盘)."""
 
     def _book_kind(self, book_id: str) -> str:
+        """`Deprecated` `shim`: `pathful`→`xlsx_file`, `pathless`→`xlsx_memory`."""
+
         bid = str(book_id)
         if bid in self._workbook_defs:
             return "xlsx_file"
@@ -45,12 +49,12 @@ class WorkflowResourceManager(
         on_conflict: str,
         export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
-        kind = self._book_kind(book_id)
-        if kind == "xlsx_file":
+        bid = str(book_id)
+        if bid in self._workbook_defs:
             return self.apply_workbook_sheet(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
-                workbook_id=str(book_id),
+                workbook_id=bid,
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
@@ -58,11 +62,11 @@ class WorkflowResourceManager(
                 export_header=export_header,
                 on_conflict=str(on_conflict or "error"),
             )
-        if kind == "xlsx_memory":
+        if bid in self._sheetbook_defs:
             return self.apply_sheetbook_sheet(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
-                sheetbook_id=str(book_id),
+                sheetbook_id=bid,
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
@@ -88,12 +92,12 @@ class WorkflowResourceManager(
         on_mismatch: str,
         export_header: Optional[Tuple[str, ...]] = None,
     ) -> None:
-        kind = self._book_kind(book_id)
-        if kind == "xlsx_file":
+        bid = str(book_id)
+        if bid in self._workbook_defs:
             return self.apply_workbook_append(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
-                workbook_id=str(book_id),
+                workbook_id=bid,
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
@@ -103,11 +107,11 @@ class WorkflowResourceManager(
                 header_policy=str(header_policy or "once"),
                 on_mismatch=str(on_mismatch or "error"),
             )
-        if kind == "xlsx_memory":
+        if bid in self._sheetbook_defs:
             return self.apply_sheetbook_append(
                 workflow_node_id=str(workflow_node_id),
                 decl_order=int(decl_order),
-                sheetbook_id=str(book_id),
+                sheetbook_id=bid,
                 sheet=str(sheet),
                 input_node_id=str(input_node_id),
                 input_output_id=str(input_output_id),
@@ -129,26 +133,24 @@ class WorkflowResourceManager(
         book_id: str,
         sheet: str,
     ) -> "Iterator[Mapping[str, object]]":
-        kind = self._book_kind(book_id)
-        if kind == "xlsx_memory":
+        bid = str(book_id)
+        if bid in self._sheetbook_defs:
             return self.iter_sheetbook_sheet_rows(
                 consumer_node_id=str(consumer_node_id),
                 visible_producer_node_ids=visible_producer_node_ids,
                 producer_node_id=str(producer_node_id),
-                sheetbook_id=str(book_id),
+                sheetbook_id=bid,
                 sheet=str(sheet),
             )
-        if kind == "xlsx_file":
+        if bid in self._workbook_defs:
             return self.iter_workbook_sheet_rows(
                 consumer_node_id=str(consumer_node_id),
                 visible_producer_node_ids=visible_producer_node_ids,
                 producer_node_id=str(producer_node_id),
-                workbook_id=str(book_id),
+                workbook_id=bid,
                 sheet=str(sheet),
             )
-        msg = "book_sheet_rows only supports xlsx_file/xlsx_memory books (book_id={!r}, kind={!r})".format(
-            str(book_id), kind or "<unknown>"
-        )
+        msg = "book_sheet_rows only supports pathful/pathless books (book_id={!r})".format(str(book_id))
         raise ValueError(msg)
 
 

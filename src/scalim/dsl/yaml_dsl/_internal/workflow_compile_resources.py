@@ -22,6 +22,7 @@ from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import BookConfig, DemandConfig, FileConfig
 from ..workflow import ScalimWorkflowConfigError, WorkflowConfig
 from . import resource_override as _resource_override_ssot
+from .book_identity import is_pathful_book, legacy_kind_shim
 
 __all__ = ()
 
@@ -68,10 +69,9 @@ def _book_export_path_and_options(
     resources_policy: Optional[object] = None,
 ) -> Tuple[str, Dict[str, object]]:
     is_override = str(path_prefix).startswith("overrides.")
-    kind = str(book.kind or "").strip()
     book_options: Dict[str, object]
-    if kind == "xlsx_file":
-        path_ref = "{}.path".format(path_prefix) if is_override else "{}.xlsx_file.path".format(path_prefix)
+    if is_pathful_book(book):
+        path_ref = "{}.path".format(path_prefix) if is_override else "{}.xlsx.path".format(path_prefix)
         output_root = resolve_yaml_relative_output_path(
             book.path,
             base_dir=str(base_dir),
@@ -85,50 +85,47 @@ def _book_export_path_and_options(
             ).format(path_ref)
             raise ValueError(msg)
         book_options = {
-            "kind": "xlsx_file",
+            "pathful": True,
+            "kind": legacy_kind_shim(pathful=True),  # `deprecated` `wire` `shim`
             "allow_formulas": bool(book.allow_formulas),
         }
         return str(output_root), book_options
 
-    if kind == "xlsx_memory":
-        budget_mapping = None
-        if isinstance(resources_policy, ResourcesPolicy):
-            budget_mapping = resources_policy.budget_policy_for(str(book_id)).as_options_mapping()
+    # `pathless`: 内存总线;过渡期仍可能带 `export_xlsx`(`override` 路径)
+    budget_mapping = None
+    if isinstance(resources_policy, ResourcesPolicy):
+        budget_mapping = resources_policy.budget_policy_for(str(book_id)).as_options_mapping()
 
-        export_cfg = book.export_xlsx
-        output_root = ""
-        export_options = None
-        if export_cfg is not None:
-            export_path_ref = (
-                "{}.export_xlsx.path".format(path_prefix) if is_override else "{}.xlsx_memory.export_xlsx.path".format(path_prefix)
-            )
-            output_root = resolve_yaml_relative_output_path(
-                export_cfg.path,
-                base_dir=str(base_dir),
-                init_vars=init_vars,
-                path=str(export_path_ref),
-            )
-            if Path(str(output_root)).suffix.lower() == ".xlsx":
-                msg = (
-                    "{} now expects an output root directory, not a file path. "
-                    "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-                ).format(export_path_ref)
-                raise ValueError(msg)
-            export_options = {
-                "allow_formulas": bool(export_cfg.allow_formulas),
-            }
+    export_cfg = book.export_xlsx
+    output_root = ""
+    export_options = None
+    if export_cfg is not None:
+        export_path_ref = "{}.export_xlsx.path".format(path_prefix)
+        output_root = resolve_yaml_relative_output_path(
+            export_cfg.path,
+            base_dir=str(base_dir),
+            init_vars=init_vars,
+            path=str(export_path_ref),
+        )
+        if Path(str(output_root)).suffix.lower() == ".xlsx":
+            msg = (
+                "{} now expects an output root directory, not a file path. "
+                "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
+            ).format(export_path_ref)
+            raise ValueError(msg)
+        export_options = {
+            "allow_formulas": bool(export_cfg.allow_formulas),
+        }
 
-        book_options = {"kind": "xlsx_memory"}
-        if budget_mapping is not None:
-            book_options["budget"] = dict(budget_mapping)
-        if export_options is not None:
-            book_options["export_xlsx"] = export_options
-        return str(output_root), book_options
-
-    msg = "Unknown book kind {!r} for book_id={!r}".format(kind, str(book_id))
-    path_ref = "{}.kind".format(path_prefix) if is_override else str(path_prefix)
-    err = "{} (path={})".format(msg, path_ref)
-    raise ValueError(err)
+    book_options = {
+        "pathful": False,
+        "kind": legacy_kind_shim(pathful=False),  # `deprecated` `wire` `shim`
+    }
+    if budget_mapping is not None:
+        book_options["budget"] = dict(budget_mapping)
+    if export_options is not None:
+        book_options["export_xlsx"] = export_options
+    return str(output_root), book_options
 
 
 def _file_export_path_and_options(
@@ -208,13 +205,13 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
         for book_id, book in books.items():
             bid = str(book_id)
             if bid in workflow_books:
-                # 工作流声明同名 `book_id` 时,要求与需求侧的 `kind` 兼容.
-                wf_kind = str(workflow_books[bid].kind or "").strip()
-                demand_kind = str(book.kind or "").strip()
-                if wf_kind and demand_kind and wf_kind != demand_kind:
-                    msg = "Book kind mismatch between workflow and demand (book_id={!r}, workflow_kind={!r}, demand_kind={!r})".format(
-                        bid, wf_kind, demand_kind
-                    )
+                # 工作流声明同名 `book_id` 时,要求与需求侧的 `pathful`/`pathless` 身份兼容.
+                wf_pathful = is_pathful_book(workflow_books[bid])
+                demand_pathful = is_pathful_book(book)
+                if wf_pathful != demand_pathful:
+                    msg = (
+                        "Book path-presence mismatch between workflow and demand (book_id={!r}, workflow_pathful={!r}, demand_pathful={!r})"
+                    ).format(bid, wf_pathful, demand_pathful)
                     raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(bid))
                 continue
 

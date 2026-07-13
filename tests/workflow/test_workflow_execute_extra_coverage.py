@@ -502,7 +502,7 @@ def test_build_workflow_resource_defs_covers_workbook_sheetbook_and_book_errors(
         resources=(WorkflowResourceIr(resource_id="b1", resource_type="book", path="", options={"kind": "nope"}),),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
-    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="Unknown book kind"):
+    with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match="Unknown book identity"):
         _ = workflow_execute_mod._build_workflow_resource_defs(bad_kind_ir, workflow_exec_id=workflow_exec_id)
 
 

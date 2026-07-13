@@ -28,5 +28,6 @@
 - [2026-04-07: yaml-dsl-import-roots-registry](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-04-07-yaml-dsl-import-roots-registry.md)
 - [2026-04-08: yaml-dsl-api-naming-alignment](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-04-08-yaml-dsl-api-naming-alignment.md)
 - [2026-07-12: book-write-policy-python-ssot](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md)
+- [2026-07-13: normalize-xlsx-book-ir-path-presence](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md)
 - [2026-07-13: unified-xlsx-book-kind](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-13-unified-xlsx-book-kind.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

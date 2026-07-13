@@ -219,7 +219,9 @@ def test_compile_output_composition_xlsx_file_managed_uses_rows_and_excel_format
     assert target.output.format == "excel"
 
 
-def test_compile_output_composition_rejects_unsupported_book_kind_for_managed_rows(tmp_path: Path) -> None:
+def test_compile_output_composition_accepts_pathful_book_regardless_of_legacy_kind_shim(tmp_path: Path) -> None:
+    """c25: 身份由 path 决定;legacy kind 字面量不再拦截 managed rows."""
+
     config = DemandConfig(
         resources=ResourcesConfig(books={"report": BookConfig(kind="future_book", path=str(tmp_path / "out"))}),
         outputs=(
@@ -231,15 +233,16 @@ def test_compile_output_composition_rejects_unsupported_book_kind_for_managed_ro
         ),
     )
 
-    with pytest.raises(ValueError, match="Unsupported book kind.*future_book"):
-        oc_yaml.compile_output_composition_from_yaml(
-            config,
-            _make_demand_ir(field_name_by_id={"order_id": "Order ID"}),
-            version_id="run_0",
-            resolver=_resolver(),
-            yaml_base_dir=str(tmp_path),
-            workflow_managed_output_ids=frozenset(["detail"]),
-        )
+    spec = oc_yaml.compile_output_composition_from_yaml(
+        config,
+        _make_demand_ir(field_name_by_id={"order_id": "Order ID"}),
+        version_id="run_0",
+        resolver=_resolver(),
+        yaml_base_dir=str(tmp_path),
+        workflow_managed_output_ids=frozenset(["detail"]),
+    )
+    assert spec is not None
+    assert spec.targets[0].managed_artifact_kind == "rows"
 
 
 def test_compile_output_composition_can_skip_extra_sheet_without_workbook() -> None:
@@ -512,7 +515,7 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
     assert allow_formulas is True
 
     config = DemandConfig(resources=ResourcesConfig(books={"bad": BookConfig(kind="nope")}))
-    with pytest.raises(ValueError, match=r"Unknown book kind"):
+    with pytest.raises(ValueError, match=r"pathless book requires export_xlsx"):
         _ = oc_yaml._resolve_book_export_path(  # noqa: SLF001
             config,
             book_id="bad",

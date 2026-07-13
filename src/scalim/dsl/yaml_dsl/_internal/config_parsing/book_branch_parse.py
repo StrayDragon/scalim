@@ -2,7 +2,8 @@
 
 说明:
 - 新 `SSOT`: `xlsx`(有 `path`=落盘; 无 `path`=内存总线)
-- 过渡期别名: `xlsx_file` / `xlsx_memory` → 内部仍产出 `kind=xlsx_file|xlsx_memory` 以复用 `compile`
+- 过渡期别名: `xlsx_file` / `xlsx_memory` → 正规化为同一 `BookConfig`(身份由 `path` 有无决定)
+- `kind=xlsx_file|xlsx_memory` 仅作 `deprecated` `wire` `shim`(见 `book_identity.legacy_kind_shim`)
 - 旧别名 `MUST` 触发 `DeprecationWarning`(稳定文案 `SSOT` 在本模块)
 """
 

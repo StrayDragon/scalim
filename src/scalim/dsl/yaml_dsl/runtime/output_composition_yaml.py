@@ -22,6 +22,7 @@ from ....execution.versioned_outputs import book_output_relpath, file_output_rel
 from ....spec.ir import DemandIr
 from ....typedefs import FailurePolicy, FieldValue, RowData
 from ....vendor.dataclassesx import dataclass
+from .._internal.book_identity import is_pathful_book
 from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
 from .._internal.config_parsing.security import (
     ScalimComputeExpressionError,
@@ -613,42 +614,36 @@ def _resolve_book_export_path(
 ) -> Tuple[str, bool]:
     book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
 
-    kind = str(book.kind or "").strip()
-    if kind == "xlsx_file":
+    if is_pathful_book(book):
         output_root = resolve_yaml_relative_output_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.xlsx_file.path".format(str(book_id)),
+            path="resources.books.{}.xlsx.path".format(str(book_id)),
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_file.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx.path".format(str(book_id)))
         export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
         return export_path, bool(book.allow_formulas)
 
-    if kind == "xlsx_memory":
-        export = book.export_xlsx
-        if export is None:
-            msg = (
-                "resources.books.<book_id>.xlsx_memory requires export_xlsx for standalone xlsx export (book_id={!r}); "
-                "set resources.books.{}.xlsx_memory.export_xlsx.path or run in a workflow"
-            ).format(str(book_id), str(book_id))
-            path_ref = "resources.books.{}.xlsx_memory.export_xlsx".format(str(book_id))
-            err = "{} (path={})".format(msg, path_ref)
-            raise ValueError(err)
-        output_root = resolve_yaml_relative_output_path(
-            export.path,
-            base_dir=str(yaml_base_dir),
-            init_vars=init_vars,
-            path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)),
-        )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)))
-        export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
-        return export_path, bool(export.allow_formulas)
-
-    msg = "Unknown book kind: {!r}".format(kind)
-    path_ref = "resources.books.{}".format(str(book_id))
-    err = "{} (path={})".format(msg, path_ref)
-    raise ValueError(err)
+    # `pathless`: `standalone` `export` 仅当仍带 `export_xlsx`(过渡期 `override` / 旧形状)
+    export = book.export_xlsx
+    if export is None:
+        msg = (
+            "pathless book requires export_xlsx for standalone xlsx export (book_id={!r}); "
+            "prefer resources.books.{}.xlsx.path or run in a workflow"
+        ).format(str(book_id), str(book_id))
+        path_ref = "resources.books.{}.export_xlsx".format(str(book_id))
+        err = "{} (path={})".format(msg, path_ref)
+        raise ValueError(err)
+    output_root = resolve_yaml_relative_output_path(
+        export.path,
+        base_dir=str(yaml_base_dir),
+        init_vars=init_vars,
+        path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+    )
+    _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+    export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
+    return export_path, bool(export.allow_formulas)
 
 
 def _try_resolve_workflow_managed_book_export_path(
@@ -661,34 +656,30 @@ def _try_resolve_workflow_managed_book_export_path(
 ) -> Optional[str]:
     """为 `workflow-managed` 的 `book` 输出解析“可能存在”的最终导出路径.
 
-    - `xlsx_file`: 始终可导出,返回版本化 `.xlsx` 文件路径
-    - `xlsx_memory`: 仅当声明 `export_xlsx` 时返回导出路径;否则返回 `None`(仅内存态)
+    - `pathful`: 始终可导出,返回版本化 `.xlsx` 文件路径
+    - `pathless`: 仅当声明 `export_xlsx` 时返回导出路径;否则返回 `None`(仅内存态)
     """
-    kind = str(book.kind or "").strip()
-    if kind == "xlsx_file":
+    if is_pathful_book(book):
         output_root = resolve_yaml_relative_output_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.xlsx_file.path".format(str(book_id)),
+            path="resources.books.{}.xlsx.path".format(str(book_id)),
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_file.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx.path".format(str(book_id)))
         return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
 
-    if kind == "xlsx_memory":
-        export = book.export_xlsx
-        if export is None:
-            return None
-        output_root = resolve_yaml_relative_output_path(
-            export.path,
-            base_dir=str(yaml_base_dir),
-            init_vars=init_vars,
-            path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)),
-        )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx_memory.export_xlsx.path".format(str(book_id)))
-        return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
-
-    return None
+    export = book.export_xlsx
+    if export is None:
+        return None
+    output_root = resolve_yaml_relative_output_path(
+        export.path,
+        base_dir=str(yaml_base_dir),
+        init_vars=init_vars,
+        path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+    )
+    _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+    return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
 
 
 def _effective_book_write_defaults(book: BookConfig) -> BookWriteDefaultsConfig:
@@ -878,12 +869,6 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 # `MANAGED_ARTIFACT_KIND_ROWS` = 类型化行工件(`InMemoryRows`/`FieldValue`);
                 # 与 `MANAGED_ARTIFACT_KIND_CSV`(字符串化)相对。不是 `pipeline` 的列写(`IColumnSink`)
                 # 或块列写(`BlockColumnCSVSink`)模式——那些是 `sink` 布局,不在 `managed-artifact kind` 闭集内。
-                book_kind = str(book.kind or "").strip()
-                if book_kind not in ("xlsx_file", "xlsx_memory"):
-                    msg = (
-                        "Unsupported book kind for workflow-managed spreadsheet output: {!r}; expected xlsx_file or xlsx_memory (path={})"
-                    ).format(book_kind, book_ref_path)
-                    raise ValueError(msg)
                 managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
                 output_spec = OutputSpec(
                     format="excel",

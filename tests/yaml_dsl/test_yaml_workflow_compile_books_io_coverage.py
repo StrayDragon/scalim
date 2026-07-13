@@ -436,16 +436,20 @@ def test_workflow_compile_book_export_path_and_options_error_branches_cover_budg
         path_prefix="resources.books.b",
     )
     assert root == ""
-    assert opts == {"kind": "xlsx_memory"}
+    assert opts["pathful"] is False
+    assert opts["kind"] == "xlsx_memory"
 
-    with pytest.raises(ValueError, match=r"Unknown book kind"):
-        _ = workflow_compile_mod._book_export_path_and_options(  # noqa: SLF001
-            BookConfig(kind="nope"),
-            book_id="b",
-            base_dir=".",
-            init_vars=None,
-            path_prefix="resources.books.b",
-        )
+    # kind 字符串不再是身份 SSOT: path=None → pathless(即使 kind 字面量异常)
+    root2, opts2 = workflow_compile_mod._book_export_path_and_options(  # noqa: SLF001
+        BookConfig(kind="nope"),
+        book_id="b",
+        base_dir=".",
+        init_vars=None,
+        path_prefix="resources.books.b",
+    )
+    assert root2 == ""
+    assert opts2["pathful"] is False
+    assert opts2["kind"] == "xlsx_memory"
 
 
 def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branches(tmp_path: Path) -> None:
@@ -465,13 +469,13 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         overrides_resources=None,
     )
 
-    # kind mismatch between workflow and demand
+    # path-presence mismatch between workflow and demand
     wf_obj = WorkflowConfig(
         runs=(run_a,),
         resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_file", path="a")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(1, 1))}))
-    with pytest.raises(ScalimWorkflowConfigError, match=r"Book kind mismatch"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"Book path-presence mismatch"):
         _ = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
             wf_obj,
             workflow_base_dir=workflow_base_dir,

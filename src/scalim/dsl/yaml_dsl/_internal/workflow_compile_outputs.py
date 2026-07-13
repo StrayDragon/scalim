@@ -33,6 +33,7 @@ from ..schema_dsl.output_enums import (
 )
 from ..workflow import ScalimWorkflowConfigError, WorkflowConfig
 from . import resource_override as _resource_override_ssot
+from .book_identity import is_pathful_book
 from .config_parsing.loader import YamlDemandLoader
 from .validation_contracts import validate_excel_sheet_name as _validate_excel_sheet_name_ssot
 
@@ -101,7 +102,7 @@ def _validate_xlsx_memory_align_by(
     book_id: str,
     effective_defaults: BookWriteDefaultsConfig,
 ) -> None:
-    if str(book.kind or "").strip() != "xlsx_memory":
+    if is_pathful_book(book):
         return
 
     if str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE) != "append":
@@ -111,7 +112,7 @@ def _validate_xlsx_memory_align_by(
 
     align_by_path = "resources_policy.books.{}.write.align_by".format(str(book_id))
     msg = (
-        "books.kind=xlsx_memory does not support BookWritePolicy.align_by=header; "
+        "pathless books (in-memory bus) do not support BookWritePolicy.align_by=header; "
         "internal rows only use canonical field keys. Migrate to BookWriteAlignBy.FIELD_ID "
         "and keep write.header_fields_output_by for export display (book_id={!r})"
     ).format(str(book_id))
@@ -376,8 +377,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             for dep_id in write_deps:
                 edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
 
-            kind = str(book.kind or "").strip()
-            if kind == "xlsx_memory":
+            if not is_pathful_book(book):
                 xlsx_memory_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
 
         # `meta`/`audit` 额外工作表: 在工作流模式下通过推导的写入节点写出.
@@ -471,8 +471,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 for dep_id in write_deps:
                     edges.append(WorkflowEdgeIr(from_node_id=str(dep_id), to_node_id=str(node_id)))
 
-                kind = str(book.kind or "").strip()
-                if kind == "xlsx_memory":
+                if not is_pathful_book(book):
                     xlsx_memory_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
 
     return xlsx_memory_write_node_ids_by_run_id

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional
 from ...vendor.compact import StrEnum
 from ...vendor.dataclassesx import dataclass, replace
 from ...vendor.dataclassesx import field as dataclass_field
+from ._internal.book_identity import is_pathful_book
 from .schema_dsl.models import BookBudgetConfig, BookWriteDefaultsConfig
 from .schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_ALIGN_BY,
@@ -217,7 +218,7 @@ def materialize_resources_policy_onto_books(
     for book_id, book in config.resources.books.items():
         write_cfg = resolve_write_defaults_config(book_id=str(book_id), resources_policy=resources_policy)
         budget_cfg = None
-        if str(book.kind or "").strip() == "xlsx_memory":
+        if not is_pathful_book(book):
             budget_policy = BookBudgetPolicy() if resources_policy is None else resources_policy.budget_policy_for(str(book_id))
             budget_mapping = budget_policy.as_options_mapping()
             if budget_mapping is not None:

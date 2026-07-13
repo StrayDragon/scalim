@@ -5,7 +5,7 @@
 """
 
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from ..execution import versioned_outputs
 from ..spec.ir._workflow import WorkflowIr
@@ -16,6 +16,19 @@ from .resources import SheetBookDef
 
 def _is_dict_str_any(value: object) -> TypeGuard[Dict[str, Any]]:
     return isinstance(value, dict)
+
+
+def _is_pathful_resource_options(opts: Dict[str, Any]) -> Optional[bool]:
+    """从 `WorkflowResourceIr.options` 读取 `pathful`;缺省时回退 `legacy` `kind`."""
+
+    if "pathful" in opts:
+        return bool(opts.get("pathful"))
+    kind = str(opts.get("kind") or "").strip()
+    if kind == "xlsx_file":
+        return True
+    if kind == "xlsx_memory":
+        return False
+    return None
 
 
 def options_bool(opts: object, key: str, *, default: bool = False) -> bool:
@@ -70,15 +83,15 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
             if not _is_dict_str_any(opts):
                 msg = "Invalid workflow resource options for book: resource_id={!r}".format(str(res.resource_id))
                 raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
-            kind = str(opts.get("kind") or "").strip()
-            if kind == "xlsx_file":
+            pathful = _is_pathful_resource_options(opts)
+            if pathful is True:
                 output_root = str(res.path or "")
                 layout = _layout_for_root(output_root, path="workflow.resources.books.{}.path".format(str(res.resource_id)))
                 final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
                 workbook_defs[str(res.resource_id)] = str(final_path)
                 workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", True))
                 continue
-            if kind == "xlsx_memory":
+            if pathful is False:
                 budget_obj = opts.get("budget")
                 budget_dict: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
                 max_sheets = int(budget_dict.get("max_sheets") or 0)
@@ -101,7 +114,7 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 )
                 continue
 
-            msg = "Unknown book kind: {!r} (book_id={!r})".format(kind, str(res.resource_id))
+            msg = "Unknown book identity for book_id={!r}; expected options.pathful or legacy options.kind".format(str(res.resource_id))
             raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
 
         if res_type == "workbook":
