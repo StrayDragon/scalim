@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from scalim.dsl.yaml_dsl._internal.book_identity import is_pathful_book, legacy_kind_shim
 from scalim.dsl.yaml_dsl._internal.workflow_compile_resources import _book_export_path_and_options
 from scalim.dsl.yaml_dsl.schema_dsl.models import BookConfig
@@ -99,3 +101,78 @@ def test_unified_xlsx_yaml_normalizes_to_path_presence_ir(tmp_path: Path) -> Non
     # deprecated wire shim 仍可派生,但不是身份 SSOT
     assert cfg.resources.books["report"].kind == "xlsx_file"
     assert cfg.resources.books["scratch"].kind == "xlsx_memory"
+
+
+def test_try_resolve_book_export_abs_path_swallows_resolve_errors(tmp_path: Path) -> None:
+    from scalim.dsl.yaml_dsl._internal import workflow_compile_resources as wcr
+
+    assert (
+        wcr._try_resolve_book_export_abs_path(  # noqa: SLF001
+            BookConfig(kind="xlsx_memory"),
+            book_id="scratch",
+            base_dir=".",
+            init_vars=None,
+            path_prefix="resources.books.scratch",
+        )
+        is None
+    )
+    # pathful 但 path 误写成 `.xlsx` 文件 → ValueError 被吞掉
+    assert (
+        wcr._try_resolve_book_export_abs_path(  # noqa: SLF001
+            BookConfig(kind="xlsx_file", path=str(tmp_path / "report.xlsx")),
+            book_id="report",
+            base_dir=str(tmp_path),
+            init_vars=None,
+            path_prefix="resources.books.report",
+        )
+        is None
+    )
+
+
+def test_get_book_kind_empty_for_unknown_book_id() -> None:
+    from scalim.workflow.resources import WorkflowResourceManager
+
+    mgr = WorkflowResourceManager.__new__(WorkflowResourceManager)
+    mgr._workbook_defs = {}  # noqa: SLF001
+    mgr._sheetbook_defs = {}  # noqa: SLF001
+    assert mgr.get_book_kind("missing") == ""
+
+
+def test_resource_defs_fallback_legacy_kind_and_reject_unknown(tmp_path: Path) -> None:
+    from scalim.workflow.errors import ScalimWorkflowConfigError
+
+    out = tmp_path / "out"
+    out.mkdir()
+    workflow_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(
+            WorkflowResourceIr(
+                resource_id="report",
+                resource_type="book",
+                path=str(out),
+                options={"kind": "xlsx_file", "allow_formulas": True},
+            ),
+            WorkflowResourceIr(
+                resource_id="scratch",
+                resource_type="book",
+                path="",
+                options={"kind": "xlsx_memory"},
+            ),
+        ),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    workbooks, _allow, _csv, sheetbooks = build_workflow_resource_defs(workflow_ir, workflow_exec_id="wf_c25_legacy")
+    assert "report" in workbooks
+    assert "scratch" in sheetbooks
+
+    bad_ir = WorkflowIr(
+        nodes=(),
+        edges=(),
+        options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
+        resources=(WorkflowResourceIr(resource_id="x", resource_type="book", path="", options={"kind": "nope"}),),
+        artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
+    )
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown book identity"):
+        _ = build_workflow_resource_defs(bad_ir, workflow_exec_id="wf_c25_bad")

@@ -87,6 +87,6 @@
 |---|---|
 | Source | archive `c5-xlsx-file-numeric-type-loss` |
 | Active authoring (archived) | `archive/2026-07-13-c20-add-unified-xlsx-book-kind` |
-| IR path-presence | `c25-normalize-xlsx-book-ir-path-presence` |
+| IR path-presence (archived) | `archive/2026-07-13-c25-normalize-xlsx-book-ir-path-presence` |
 | BREAKING remove aliases (draft) | `c999-remove-deprecated-xlsx-file-memory-kinds` |
 | Spec anchors | shared-output r24；managed-temp r1；intermediate-store r2/r7 |
