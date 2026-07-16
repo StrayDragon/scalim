@@ -2,7 +2,7 @@
 name: "llman-sdd-apply"
 description: "在一个闭环内实施 llman SDD 变更的 tasks：写代码 → 跑测试 → 失败自修复 → 直到门禁全绿。自动更新 tasks.md 勾选状态并运行校验。用于提案完成后的实现阶段。"
 metadata:
-  version: "0.0.58"
+  version: "0.0.61"
 ---
 
 # LLMAN SDD Apply

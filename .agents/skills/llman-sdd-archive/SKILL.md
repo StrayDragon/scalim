@@ -2,7 +2,7 @@
 name: "llman-sdd-archive"
 description: "归档已完成的 llman SDD 变更：合并 delta specs 到主 specs，校验全量，引导 commit。在 verify 报告全绿后运行。支持单个或批量归档。"
 metadata:
-  version: "0.0.58"
+  version: "0.0.61"
 ---
 
 # LLMAN SDD 归档
@@ -48,6 +48,7 @@ flowchart LR
   - 默认：`llman sdd archive run <id>`
   - 仅工具类变更：`llman sdd archive run <id> --skip-specs`
   - **任一失败立即停止**，报告剩余未处理 ID。
+- **BDD-on**：`archive run` 仅将 delta `spec.toon` 合并到主 `spec.toon`。`.feature` 文件由 `llman sdd solidify` 管理——archive 不复制 `.feature` 文件。归档前运行 `solidify <id>`。
 
 ### 3) 全量校验
 - 全部归档完成后执行：`llman sdd validate --all --strict --no-interactive`。
@@ -120,8 +121,8 @@ r1,happy,"",a trigger happens,the outcome is observed
 r1,happy,"","a trigger happens","the outcome is observed"
 ```
 
-4) BDD 空 spec 护栏（`BDD is enabled but this spec declares no requirements and no feature_refs`）：
-当 `config.yaml` 含 `bdd` 块时，spec 必须要么声明 `requirements`，要么通过 `feature_refs` 指向 `.feature`（point-only 模式）。
+4) BDD spec 护栏（`BDD is enabled but this spec declares no requirements and has no .feature files`）：
+当 `config.yaml` 含 `bdd` 块时，行为规格在 `spec.toon` 的 `scenarios` 中（TOON 是唯一真源）。`.feature` 文件由 `llman sdd solidify` 衍生生成。`requirements` 和 `scenarios` 均为空的 spec 是 ERROR。
 
 备注：
 - 每个 spec 是一个独立的 `.toon` 文件；没有 Markdown 外壳，也没有 ```toon fence。
