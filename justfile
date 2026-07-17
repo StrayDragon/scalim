@@ -1,4 +1,12 @@
-set dotenv-load := true
+set dotenv-load
+
+# QA 输出详细程度。空值=静默(适合 agent); 设任意真值(1/true/yes)显示完整输出。
+# 用法: just qa                          # 静默模式(默认,仅显示错误/汇总)
+#       just QA_VERBOSE=1 qa             # 完整输出(适合人类)
+QA_VERBOSE := ""
+
+# pytest 静默模式共用参数。三个 test 配方共享,改一处即生效。
+_qa_pytest_quiet := "--no-header -W once::DeprecationWarning -rN --tb=short -o console_output_style=classic"
 
 UV_OPTIONS := "--preview-features extra-build-dependencies"
 
@@ -35,7 +43,13 @@ _frontend-check DIR LABEL:
         echo "pnpm not found; skipping ${label}" >&2
         exit 0
     fi
-    pnpm -C "$dir" install --frozen-lockfile
+    if [ -n "{{ QA_VERBOSE }}" ]; then
+        pnpm -C "$dir" install --frozen-lockfile
+    else
+        pnpm -C "$dir" install --frozen-lockfile --silent
+    fi
+    # audit: --audit-level high 使 exit code 仅对 HIGH/CRITICAL 敏感;
+    # --ignore-registry-errors 避免 registry 网络抖动导致假阳性。
     pnpm -C "$dir" audit --audit-level high --ignore-registry-errors
     pnpm -C "$dir" lint
     pnpm -C "$dir" build
@@ -91,7 +105,6 @@ uv-sync-dev:
         -u PIP_EXTRA_INDEX_URL \
         UV_DEFAULT_INDEX="https://pypi.org/simple" \
         uv {{ UV_OPTIONS }} sync --locked
-
 
 # 检查: `uv.lock` 是否与当前项目元数据一致(强制按默认 PyPI 校验,避免本地镜像环境掩盖 CI 漂移)
 uv-lock-check:
@@ -379,16 +392,33 @@ py-output-language-check:
 
 # 检查: 运行单元测试
 test:
-    # Fast/local functional checks (bench excluded). Use for daily dev loops.
-    uv {{ UV_OPTIONS }} run pytest tests/ -q
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="{{ _qa_pytest_quiet }}"
+    fi
+    uv {{ UV_OPTIONS }} run pytest tests/ -q $quiet_flag
 
 # 检查: 运行单元测试 (gate: xdist + coverage)
 test-gate:
-    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="{{ _qa_pytest_quiet }}"
+    fi
+    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 $quiet_flag 2>&1 | sed '/^\.\{30,\}$/d'
 
 # 检查: 生成 branch coverage 报告(不做阈值门禁;用于定位 missing branches)
 test-gate-branch-report:
-    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-report=json:.tmp/coverage.json
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="{{ _qa_pytest_quiet }}"
+    fi
+    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-report=json:.tmp/coverage.json $quiet_flag 2>&1 | sed '/^\.\{30,\}$/d'
 
 # 检查: core 覆盖率 gate (statements + branches; core 由 allow-non-core-file 治理标记决定)
 core-coverage-report:
@@ -399,11 +429,11 @@ core-coverage-check:
     uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check
 
 # 检查: 测试门禁覆盖率 (statements + branches; core 由 allow-non-core-file 治理标记决定)
-test-gate-core-coverage:
-    # 先执行 statements/line coverage gate(SSOT: --cov-fail-under=100),再执行 core branch gate.
-    just test-gate
-    just test-gate-branch-report
-    just core-coverage-check
+#
+# 先执行 statements/line coverage gate(SSOT: --cov-fail-under=100),再执行 core branch gate.
+# 静默模式: just test-gate-core-coverage
+# 完整输出: just QA_VERBOSE=1 test-gate-core-coverage
+test-gate-core-coverage: test-gate test-gate-branch-report core-coverage-check
 
 # 压力测试: 运行
 bench *ARGS:
@@ -463,6 +493,8 @@ examples:
 
     cd "{{ justfile_directory() }}"
 
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+
     PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python - <<'PY'
     import importlib
     import logging
@@ -475,6 +507,13 @@ examples:
 
     from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
     from scalim_misc.examples.harness import exit_code, format_results, summarize_failures
+
+
+    def _is_verbose() -> bool:
+        raw = str(os.environ.get("QA_VERBOSE") or "").strip().lower()
+        if not raw:
+            return False
+        return raw not in {"", "0", "false", "no", "off"}
 
 
     def _is_ci() -> bool:
@@ -649,14 +688,24 @@ examples:
         for suite_id in suites:
             all_results.extend(suite_results.get(suite_id, []))
 
-        for line in format_results(all_results):
-            print(line)
-
+        verbose = _is_verbose()
+        if verbose:
+            for line in format_results(all_results):
+                print(line)
         failures = summarize_failures(all_results)
         if failures:
             print("\n--- 失败详情 ---\n{}".format(failures), file=sys.stderr)
-        if not failures:
-            print("\n所有示例执行完成!")
+        total = len(all_results)
+        passed = sum(1 for r in all_results if r.passed)
+        if verbose:
+            if not failures:
+                print("\n所有示例执行完成!")
+        else:
+            # 静默模式: 仅输出汇总行,不输出每项详情
+            if not failures:
+                print("所有示例执行完成! total={} passed={}".format(total, passed))
+            else:
+                print("示例执行完成! total={} passed={} failed={}".format(total, passed, total - passed))
         return exit_code(all_results)
 
 
