@@ -2,7 +2,7 @@
 name: "llman-sdd-apply-cycle"
 description: "单个闭环完成一个变更：实现→测试→校验→归档→提交。仅手动触发。Agent 禁止自动启用。"
 metadata:
-  version: "0.0.61"
+  version: "0.0.64"
 disable-model-invocation: true
 ---
 
@@ -35,7 +35,7 @@ llman sdd validate <change-id> --strict --no-interactive
 
 ### 3) 归档
 ```bash
-llman sdd archive run <change-id>
+llman sdd change archive <change-id>
 ```
 
 ### 4) 提交
@@ -53,6 +53,6 @@ git add -A && git commit -m "<前缀>: <描述>"
 ## Ethics Governance
 - `ethics.risk_level`: medium
 - `ethics.prohibited_actions`: 在完成前切换到其他变更、直接修改 proposal.md/spec 文件、未经验证就提交
-- `ethics.required_evidence`: llman sdd validate --strict 通过、llman sdd archive run 成功、所有 tasks.md 中的 checkbox 已勾选
+- `ethics.required_evidence`: llman sdd validate --strict 通过、llman sdd change archive 成功、所有 tasks.md 中的 checkbox 已勾选
 - `ethics.refusal_contract`: 若校验连续失败 3 次，报告 blocker 而非强制归档
 - `ethics.escalation_policy`: 若变更涉及 SDD 工作流规范或模板，在归档前暂停并请用户确认

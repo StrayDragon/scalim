@@ -3,17 +3,17 @@ name: "testing-quality"
 purpose: "定义测试分类、覆盖率门槛与 demo 对拍验证的最低要求,明确默认测试范围与质量门禁,确保持续集成结果稳定可复现. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[5]{req_id,title,statement}:
-  r1,测试分类与默认执行,测试套件 MUST 使用 bench marker 标识基准用例。默认测试入口 MUST 运行所有非 bench 测试。质量门禁入口 MUST 显式启用 xdist 并行 + coverage 统计 + coverage gate。
-  r2,"non-bench tests MUST be xdist-parallel-safe","系统 MUST 确保所有非 bench 测试在 pytest-xdist 并行执行下稳定通过,且不依赖执行顺序或隐式全局状态耦合。若确需修改模块全局状态,MUST 通过集中化的隔离工具实现。对 tests.fixtures.workflow_loaders 的全局计数与 timing gate,使用该 fixture 的测试模块 MUST 通过 autouse fixture 在每个用例前后重置。"
-  r3,覆盖率保持 100%,"使用覆盖率统计时，核心模块的覆盖率 MUST 保持 100%。核心模块定义为源代码根目录排除 CLI 与 misc 包。覆盖率低于 100% 时 MUST 视为失败（例如通过 --cov-fail-under=100 强制）。"
-  r4,"runtime-only policy changes MUST define a boundary coverage matrix","当某个能力被定义为 runtime-only policy 时，系统的测试与评审材料 MUST 明确定义其边界覆盖矩阵，至少包括 schema/parse 层、compile/preload 层、runtime policy merge 层等。"
-  r5,"compile/preload layers MUST be reviewed against premature runtime-policy consumption","对于 runtime-only policy，系统 MUST 在设计与测试评审中显式检查 compile/preload 阶段是否可能提前消费该策略。"
-scenarios[8]{req_id,id,given,when,then}:
-  r1,"default-non-bench","",使用默认测试命令执行 pytest,运行所有非 bench 测试且不包含 bench
-  r1,"qa-gate-coverage","",使用质量门禁入口执行测试,MUST 显式启用 coverage 统计与覆盖率阈值门禁
-  r2,"workflow-loader-counters-autouse-reset",测试模块引用 tests.fixtures.workflow_loaders,任一用例开始执行,autouse fixture MUST 重置 _PRELOAD_CALLS 与 timing gates
-  r3,"coverage-fail","",执行带覆盖率统计的非 bench 测试套件,若核心模块覆盖率低于 100% 则执行失败
-  r3,"edge-excluded","",生成覆盖率报告,CLI 与 misc 包不参与覆盖率统计
-  r4,"boundary-review","","维护者新增或修改某个已迁出 YAML 主线的 runtime-only policy",review 文档 MUST 指出该 policy 在各层的最早生效边界
-  r5,"compile-phase-risk","","某个 runtime-only policy 会影响 demand/workflow 的运行期诊断或行为",review 文档 MUST 说明 compile/preload 阶段是否允许读取该 policy
-  r5,"no-compile-premature-test","","runtime-only policy 被禁止在 compile 阶段消费",后续测试计划 MUST 包含 compile phase 不抢跑的覆盖
+  r77,测试分类与默认执行,测试套件 MUST 使用 bench marker 标识基准用例。默认测试入口 MUST 运行所有非 bench 测试。质量门禁入口 MUST 显式启用 xdist 并行 + coverage 统计 + coverage gate。
+  r321,"non-bench tests MUST be xdist-parallel-safe","系统 MUST 确保所有非 bench 测试在 pytest-xdist 并行执行下稳定通过,且不依赖执行顺序或隐式全局状态耦合。若确需修改模块全局状态,MUST 通过集中化的隔离工具实现。对 tests.fixtures.workflow_loaders 的全局计数与 timing gate,使用该 fixture 的测试模块 MUST 通过 autouse fixture 在每个用例前后重置。"
+  r444,覆盖率保持 100%,"使用覆盖率统计时，核心模块的覆盖率 MUST 保持 100%。核心模块定义为源代码根目录排除 CLI 与 misc 包。覆盖率低于 100% 时 MUST 视为失败（例如通过 --cov-fail-under=100 强制）。"
+  r533,"runtime-only policy changes MUST define a boundary coverage matrix","当某个能力被定义为 runtime-only policy 时，系统的测试与评审材料 MUST 明确定义其边界覆盖矩阵，至少包括 schema/parse 层、compile/preload 层、runtime policy merge 层等。"
+  r607,"compile/preload layers MUST be reviewed against premature runtime-policy consumption","对于 runtime-only policy，系统 MUST 在设计与测试评审中显式检查 compile/preload 阶段是否可能提前消费该策略。"
+scenarios[8]{req_id,id,given,when,then,feature}:
+  r77,"default-non-bench","",使用默认测试命令执行 pytest,运行所有非 bench 测试且不包含 bench,true
+  r77,"qa-gate-coverage","",使用质量门禁入口执行测试,MUST 显式启用 coverage 统计与覆盖率阈值门禁,true
+  r321,"workflow-loader-counters-autouse-reset",测试模块引用 tests.fixtures.workflow_loaders,任一用例开始执行,autouse fixture MUST 重置 _PRELOAD_CALLS 与 timing gates,true
+  r444,"coverage-fail","",执行带覆盖率统计的非 bench 测试套件,若核心模块覆盖率低于 100% 则执行失败,true
+  r444,"edge-excluded","",生成覆盖率报告,CLI 与 misc 包不参与覆盖率统计,true
+  r533,"boundary-review","","维护者新增或修改某个已迁出 YAML 主线的 runtime-only policy",review 文档 MUST 指出该 policy 在各层的最早生效边界,true
+  r607,"compile-phase-risk","","某个 runtime-only policy 会影响 demand/workflow 的运行期诊断或行为",review 文档 MUST 说明 compile/preload 阶段是否允许读取该 policy,true
+  r607,"no-compile-premature-test","","runtime-only policy 被禁止在 compile 阶段消费",后续测试计划 MUST 包含 compile phase 不抢跑的覆盖,true
