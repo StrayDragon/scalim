@@ -30,4 +30,5 @@
 - [2026-07-12: book-write-policy-python-ssot](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md)
 - [2026-07-13: normalize-xlsx-book-ir-path-presence](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md)
 - [2026-07-13: unified-xlsx-book-kind](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-13-unified-xlsx-book-kind.md)
+- [2026-07-18 — tabular bus object + sink accept / opt-in precheck](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-18-tabular-bus-object-sink-accept-precheck.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->
