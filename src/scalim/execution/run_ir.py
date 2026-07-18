@@ -74,6 +74,7 @@ class _TeeRowSink(BaseRowSink):
         self._primary.close()
         self._secondary.close()
 
+    @override
     def discard(self) -> None:
         _best_effort_discard_sink(self._primary)
         _best_effort_discard_sink(self._secondary)
@@ -118,6 +119,7 @@ class _TeeColumnSink(IColumnSink):
         self._primary.close()
         self._secondary.close()
 
+    @override
     def discard(self) -> None:
         _best_effort_discard_sink(self._primary)
         _best_effort_discard_sink(self._secondary)
@@ -165,6 +167,7 @@ class _CountingRowSink(BaseRowSink):
     def close(self) -> None:
         self._sink.close()
 
+    @override
     def discard(self) -> None:
         _best_effort_discard_sink(self._sink)
 
@@ -199,6 +202,7 @@ class _CountingColumnSink(IColumnSink):
     def close(self) -> None:
         self._sink.close()
 
+    @override
     def discard(self) -> None:
         _best_effort_discard_sink(self._sink)
 
@@ -220,6 +224,7 @@ class _CountingBatchSink(ISink):
     def close(self) -> None:
         self._sink.close()
 
+    @override
     def discard(self) -> None:
         _best_effort_discard_sink(self._sink)
 
@@ -242,6 +247,7 @@ class _TeeBatchSink(BaseSink):
         self._primary.close()
         self._secondary.close()
 
+    @override
     def discard(self) -> None:
         _best_effort_discard_sink(self._primary)
         _best_effort_discard_sink(self._secondary)

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
-from .base import ColumnValues, IColumnSink, IRowSink
+from .base import ColumnValues, IColumnSink, IRowSink, exit_sink
 
 if TYPE_CHECKING:
     import types
@@ -54,6 +54,13 @@ class PandasRowSink(IRowSink):
     def close(self) -> None:
         self._closed = True
 
+    @override
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._rows = []
+        self._closed = True
+
     def to_dataframe(self) -> "pd.DataFrame":
         pd_module = _get_pandas_module()
         if self.field_names:
@@ -72,7 +79,7 @@ class PandasRowSink(IRowSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 class PandasColumnSink(IColumnSink):
@@ -133,6 +140,14 @@ class PandasColumnSink(IColumnSink):
     def close(self) -> None:
         self._closed = True
 
+    @override
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._columns = {}
+        self._row_ids = []
+        self._closed = True
+
     def to_dataframe(self) -> "pd.DataFrame":
         pd_module = _get_pandas_module()
         if not self._row_ids:
@@ -162,7 +177,7 @@ class PandasColumnSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 __all__ = ()

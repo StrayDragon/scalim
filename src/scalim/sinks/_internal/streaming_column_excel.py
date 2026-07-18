@@ -205,6 +205,7 @@ class StreamingColumnExcelSink(IColumnSink):
         self._workbook = None
         self._worksheet = None
 
+    @override
     def discard(self) -> None:
         if self._closed:
             return

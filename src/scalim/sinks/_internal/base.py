@@ -78,7 +78,14 @@ class ISink(ABC):
 
     @abstractmethod
     def close(self) -> None:
-        """关闭 `Sink`,完成输出."""
+        """关闭 `Sink`,完成输出(成功路径提交/落盘)."""
+
+    @abstractmethod
+    def discard(self) -> None:
+        """失败路径清理:放弃半成品,`MUST NOT` `promote` 最终用户可见输出路径.
+
+        无文件副作用的实现可为可调用的 `no-op`,但必须幂等.
+        """
 
 
 class IRowSink(ISink, ABC):
@@ -229,14 +236,17 @@ class IColumnSink(ISink, ABC):
 
 
 def discard_sink(sink: object) -> None:
-    """失败路径:有 `discard` 则调用;否则 `MUST NOT` `close()`(避免半成品 `promote`)."""
+    """失败路径:调用 `discard()`;`MUST NOT` 回退为成功语义的 `close()` `promote`.
+
+    主路径为正式合约方法;对非 `ISink` 对象仍以可调用探测做 `best-effort` 兼容.
+    """
     discard = getattr(sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
     if callable(discard):
         _ = discard()
 
 
 def exit_sink(sink: object, exc_type: Optional[Type[BaseException]]) -> None:
-    """`CM` 退出:成功则 `close()`;异常则 `discard()`(若有)且 `MUST NOT` 成功 `promote`."""
+    """`CM` 退出:成功则 `close()`;异常则 `discard()` 且 `MUST NOT` 成功 `promote`."""
     if exc_type is not None:
         with suppress(Exception):
             discard_sink(sink)
@@ -259,6 +269,10 @@ class BaseSink(ISink):
     @override
     def close(self) -> None:
         pass
+
+    @override
+    def discard(self) -> None:
+        """默认无副作用;有状态/文件副作用的子类 `MUST` 覆盖."""
 
     def __enter__(self) -> Self:
         return self
@@ -291,6 +305,10 @@ class BaseRowSink(IRowSink):
     def close(self) -> None:
         pass
 
+    @override
+    def discard(self) -> None:
+        """默认无副作用;有状态/文件副作用的子类 `MUST` 覆盖."""
+
     def __enter__(self) -> Self:
         return self
 
@@ -321,6 +339,10 @@ class BaseColumnSink(IColumnSink):
     @override
     def close(self) -> None:
         pass
+
+    @override
+    def discard(self) -> None:
+        """默认无副作用;有状态/文件副作用的子类 `MUST` 覆盖."""
 
     def __enter__(self) -> Self:
         return self

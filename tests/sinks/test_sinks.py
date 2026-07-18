@@ -181,6 +181,10 @@ class _DefaultColumnSink(IColumnSink):
     def close(self) -> None:  # type: ignore[override]
         return None
 
+    def discard(self) -> None:
+        self.row_ids = []
+        self.columns = {}
+
 
 def test_default_column_sink_write_batch_converts_rows():
     sink = _DefaultColumnSink()

@@ -31,6 +31,10 @@ class _RowSink(IRowSink):
     def close(self) -> None:  # type: ignore[override]
         self.closed = True
 
+    def discard(self) -> None:
+        self.rows = []
+        self.closed = False
+
 
 class _ColumnSink(IColumnSink):
     def __init__(self) -> None:
@@ -48,6 +52,10 @@ class _ColumnSink(IColumnSink):
 
     def close(self) -> None:  # type: ignore[override]
         self.closed = True
+
+    def discard(self) -> None:
+        self.columns_called = False
+        self.closed = False
 
 
 class _ContextSink(BaseSink):

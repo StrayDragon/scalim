@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "execution-structure"
 purpose: "定义 execution 层的模块拆分与入口契约,并明确统一 IR 编排入口(如 `run_ir`)的边界,确保执行编排对 DSL 配置解耦且行为在重构后保持兼容. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
-requirements[21]{req_id,title,statement}:
+requirements[22]{req_id,title,statement}:
   r46,execution 提供统一 IR 编排入口并返回通用结果,"系统 MUST 在 execution 层提供统一 IR 执行编排入口(概念名: `run_ir`,具体模块/符号名可调整),负责: - 基于 `DemandIr` + `ExecutionRequest` 构建 plan - 装配 sinks/observers/hooks 并完成收尾 - 调用 engine 执行并产出 **DSL-agnostic** 的 `ExecutionResult` 该入口 MUST 不依赖任何 DSL 专有配置类型(例如 YAML 的 `DemandConfig`/`ObservabilityConfig`)."
   r290,"execution Tier1 facade MUST expose an options-only `run_ir` entrypoint","系统 MUST 将 execution 层的统一编排入口（`run_ir`）与其 DSL-agnostic contracts（`ExecutionRequest`/`ExecutionResult` 等）作为官方推荐 public facade 的一部分,确保用户材料无需引用内部模块路径即可完成执行编排. 该 facade MUST 满足： - execution facade MUST 提供 `run_ir` 与 `ExecutionRequest` 的稳定导入路径（通过 re-export 或等价方式）。 - 调用入口 MUST 以单一 request/options 对象驱动（`ExecutionRequest` 为唯一运行期契约承载）。"
   r414,`ExecutionRequest`/`ExecutionResult` 不得包含 DSL config types,"系统 MUST 保持 execution 侧的请求/结果对象为 DSL-agnostic: - 请求中不得直接携带 `DemandConfig`/`ObservabilityConfig` 等 DSL config - 结果中不得强制暴露 DSL config(DSL wrapper 可自行附加)"
@@ -24,7 +24,8 @@ requirements[21]{req_id,title,statement}:
   r266,adaptive scheduler 热点必须进一步拆分为可替换协作单元,"系统 MUST 将 `loadref_scheduler.py` 视为确认热点,并允许其继续拆分为更清晰的协作单元,至少包括策略/worker 数解析、layer planning、任务提交、结果聚合与提交顺序维护."
   r377,scheduler 热点拆分后输出与事件顺序保持稳定,系统 MUST 在 `loadref_scheduler.py` 拆分后继续保持相同输入下的输出顺序、事件回放顺序与错误语义不变.
   r383,execution contracts MUST be splittable from orchestration while preserving stabl,"系统 MUST 允许将 execution 的 DSL-agnostic contracts(例如 `ExecutionRequest`/`ExecutionResult`)从 orchestration 逻辑中拆分到独立模块,以降低热点文件聚合度并改善可测试性。 同时系统 MUST 保持稳定入口不变: - 既有 `run_ir` 稳定导入路径 MUST 继续可用 - contracts 在稳定入口处的导入路径 MUST 继续可用(可通过 re-export 兼容)"
-scenarios[49]{req_id,id,given,when,then,feature}:
+  r925,run_ir failure cleanup MUST discard sinks not close,当 `run_ir`（或等价统一 IR 编排入口）在 engine 初始化/运行失败，或装配失败需要中止时，系统 MUST 对已创建的输出 sink 调用失败清理（`discard()` / `discard_sink`），MUST NOT 调用成功语义的 `close()` 以免 promote 半成品；原始错误 MUST 向上抛出且 MUST NOT 被清理错误覆盖。成功路径仍 MUST 以 `close()` 作为落盘/提交标准。
+scenarios[50]{req_id,id,given,when,then,feature}:
   r46,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r46,"yaml-通过-execution-入口执行","",YAML adapter 运行 YAML DSL,"它应调用 execution 统一 IR 编排入口完成执行,而非在 DSL 层自行编排",true
   r46,"多-dsl-复用-execution-入口","",另一个 DSL 适配层已产出 `DemandIr`,可直接复用 execution 统一 IR 编排入口并获得同一个 `ExecutionResult` 结构,true
@@ -74,3 +75,4 @@ scenarios[49]{req_id,id,given,when,then,feature}:
   r377,"scheduler-结构重构后行为等价","",完成 adaptive scheduler 的内部职责拆分,相同输入下的输出顺序、事件顺序与错误语义 MUST 与重构前保持一致,true
   r383,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r383,"existing-run-ir-imports-remain-stable-after-refactor","",调用方通过既有稳定入口导入并调用 `run_ir`,导入 MUST 成功且行为与重构前一致,true
+  r925,"run-ir-engine-fail-discards-excel",run_ir 目标为 Excel 文件且 loader/engine 中途抛错,异常向上抛出,最终 Excel 路径 MUST NOT 存在；sink MUST 被 discard 而非 close promote,true

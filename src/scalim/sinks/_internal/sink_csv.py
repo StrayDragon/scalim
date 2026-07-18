@@ -129,6 +129,14 @@ class InMemoryCsvSink(BaseRowSink):
     def close(self) -> None:
         self._closed = True
 
+    @override
+    def discard(self) -> None:
+        """失败路径:丢弃已捕获行,不作为成功产物."""
+        if self._closed:
+            return
+        self._artifact = InMemoryCsv(header=list(self.header_names), rows=[])
+        self._closed = True
+
 
 class CSVSink(BaseRowSink):
     """`CSV` 行写入器:支持流式写入.
@@ -302,6 +310,7 @@ class CSVSink(BaseRowSink):
 
         self._closed = True
 
+    @override
     def discard(self) -> None:
         """异常路径:关闭句柄并删除 `temp`,不 `promote` 最终文件."""
         if self._closed:
@@ -451,6 +460,7 @@ class ColumnCSVSink(IColumnSink):
 
         self._closed = True
 
+    @override
     def discard(self) -> None:
         if self._closed:
             return
@@ -697,6 +707,18 @@ class BlockColumnCSVSink(IColumnSink):
             return
         if self._file is not None:
             self._file.close()
+        self._closed = True
+
+    @override
+    def discard(self) -> None:
+        if self._closed:
+            return
+        if self._file is not None:
+            with suppress(Exception):
+                self._file.close()
+            self._file = None
+        self._row_ids = []
+        self._pk_to_index = {}
         self._closed = True
 
     def __enter__(self) -> Self:

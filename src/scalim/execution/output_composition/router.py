@@ -299,6 +299,7 @@ class RouterRowSink(BaseRowSink):
         # 4) 输出级观测结束事件
         self._emit_target_end_events()
 
+    @override
     def discard(self) -> None:
         """失败路径:丢弃路由/`workbook` 半成品,`MUST NOT` `promote` 最终文件."""
         if self._closed:

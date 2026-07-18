@@ -83,6 +83,7 @@ class InMemoryRowsSink(BaseRowSink):
     def close(self) -> None:
         self._closed = True
 
+    @override
     def discard(self) -> None:
         """失败路径:丢弃已捕获行,`MUST NOT` 当作成功产物."""
         if self._closed:

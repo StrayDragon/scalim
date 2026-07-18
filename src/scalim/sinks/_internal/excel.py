@@ -255,6 +255,7 @@ class ExcelSink(BaseRowSink):
 
         self._closed = True
 
+    @override
     def discard(self) -> None:
         """异常路径:关闭 `workbook` 且不 `promote` 最终文件."""
         if self._closed:
@@ -339,6 +340,13 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
     @override
     def close(self) -> None:
         # `sheet` `sink` 仅标记关闭,不保存文件.
+        self._closed = True
+
+    @override
+    def discard(self) -> None:
+        """失败路径:标记关闭;文件提交由 `ExcelWorkbookSink.discard` 负责."""
+        if self._closed:
+            return
         self._closed = True
 
 
@@ -624,6 +632,7 @@ class ColumnExcelSink(IColumnSink):
 
         self._closed = True
 
+    @override
     def discard(self) -> None:
         if self._closed:
             return

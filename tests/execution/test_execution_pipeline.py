@@ -50,6 +50,10 @@ class _CollectingSink(ISink):
     def close(self) -> None:
         self.closed = True
 
+    def discard(self) -> None:
+        self.rows = []
+        self.closed = False
+
 
 def test_pipeline_loads_main_rows_when_missing(
     example_report_ir_module,

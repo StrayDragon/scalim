@@ -93,6 +93,8 @@
 - 2026-07-13: unified-xlsx-book-kind
   - SSOT: `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`
   - llmanspec: `llmanspec/changes/archive/2026-07-13-c20-add-unified-xlsx-book-kind/`
+- 2026-07-18 — `ISink.discard` 显式失败清理合约
+  - SSOT: `references/upgrades/2026-07-18-sink-discard-explicit-contract.md`
 - 2026-07-18 — tabular bus object + sink accept / opt-in precheck
   - SSOT: `references/upgrades/2026-07-18-tabular-bus-object-sink-accept-precheck.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->

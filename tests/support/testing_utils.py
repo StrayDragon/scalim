@@ -130,6 +130,10 @@ class ListSink(ISink):
     def close(self) -> None:
         self.closed = True
 
+    def discard(self) -> None:
+        self.rows = []
+        self.closed = False
+
 
 class StreamingListSink(IRowSink):
     """Collect results into an in-memory list (streaming row mode)."""
@@ -143,6 +147,10 @@ class StreamingListSink(IRowSink):
 
     def close(self) -> None:
         self.closed = True
+
+    def discard(self) -> None:
+        self.rows = []
+        self.closed = False
 
 
 class ColumnListSink(IColumnSink):
@@ -167,6 +175,11 @@ class ColumnListSink(IColumnSink):
 
     def close(self) -> None:
         self.closed = True
+
+    def discard(self) -> None:
+        self.row_ids = []
+        self.columns = {}
+        self.closed = False
 
     def to_rows(self) -> "List[RowData]":
         rows = []

@@ -37,6 +37,11 @@ class _ColumnCollectSink(IColumnSink):
     def close(self) -> None:
         self.closed = True
 
+    def discard(self) -> None:
+        self.row_ids = []
+        self.columns = {}
+        self.closed = False
+
 
 def test_base_row_sink_write_batch() -> None:
     sink = _RowCollectSink()

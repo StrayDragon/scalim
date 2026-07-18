@@ -1160,6 +1160,10 @@ def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
         def close(self) -> None:
             return
 
+        def discard(self) -> None:
+            self.row_ids = []
+            self.columns = {}
+
     main_source = _make_main_source()
     field_spec = FieldIr(field_id="id", name="ID", source=main_source)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
@@ -1195,6 +1199,9 @@ def test_pipeline_column_write_prefers_aligned_when_supported() -> None:
 
         def close(self) -> None:
             return
+
+        def discard(self) -> None:
+            self.calls = []
 
     main_source = _make_main_source()
     field_spec = FieldIr(field_id="id", name="ID", source=main_source)

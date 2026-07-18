@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "output-sink-contracts"
 purpose: "定义 sink 接口稳定性与可选依赖提示规范，确保内建与外部 sink 的长期兼容、可诊断性与一致行为。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
-requirements[17]{req_id,title,statement}:
+requirements[19]{req_id,title,statement}:
   r65,Sink 契约稳定,"系统 MUST 保持 `ISink`/`IRowSink`/`IColumnSink`/`BaseRowSink` 等接口契约稳定,并确保内建 sinks 满足契约."
   r309,可选依赖错误提示清晰,系统 MUST 对可选依赖(如 Excel 的 `openpyxl`)提供一致且可诊断的错误路径.
   r432,file sinks 写入前创建输出目录,"系统 MUST 在 file sinks(如 CSV/Excel)写入输出文件前确保 `output.path` 的父目录存在;当父目录不存在时系统 MUST 以 best-effort 方式创建目录(`mkdir(parents=True, exist_ok=True)`)."
@@ -19,8 +19,10 @@ requirements[17]{req_id,title,statement}:
   r918,Excel sinks MUST pass through temporal values without rewriting timezone,"当内建 Excel / workbook / sheetbook 写出路径接收时间相关细胞值时，系统 MUST 允许 `datetime`/`date`/`time`/`timedelta`（及 Excel accept set 内的兼容值）原样交给 openpyxl（不得仅因类型而先 `str()`）。系统 MUST NOT 为兼容 openpyxl 而清除 `tzinfo`、转换为 UTC、或以其它方式改写用户时间值；timezone-aware 值若被 openpyxl 拒绝，该错误 MUST 向上暴露。`escape_excel_formula` MUST 仍仅对 `str` 做公式转义。"
   r920,"built-in sinks MUST declare an accepted cell-type set",系统 MUST 为内建 tabular/file sinks（至少 Excel 与 CSV 语义路径）提供可查询的细胞类型接受约束（accept set 或等价谓词），其口径 MUST 对齐底层连接库的实际能力（例如 openpyxl 可绑定类型；CSV 为写出时 `str` 规范化）。accept set MUST NOT 声称会自动 coerce 未支持的库类型。`FieldValue` 推荐闭集 MAY 作为 Excel accept set 的默认文档/参考子集，但 MUST NOT 再作为 `InMemoryRows` 写入硬门禁。
   r921,"Python MAY enable opt-in sink type precheck before write","系统 MUST 提供 Python-only opt-in 开关（闭集 Enum 或 bool SSOT；默认关闭），用于在目标 sink 写出之前按该 sink 的 accept set 对细胞值做 TypeError fail-fast。启用时错误信息 MUST 包含 field 标识、实际类型与目标 sink。默认关闭时，系统 MUST 将类型不兼容错误延迟到 sink write/close（或底层库）边界。系统 MUST NOT 将该开关暴露为 YAML DSL knobs。"
-  r922,"file sink write failures MUST NOT promote half-written final artifacts","当内建 file sinks（CSV/Excel）或 workflow book 导出在写出/save/replace 失败时，系统 MUST NOT 将半成品 promote 为最终用户可见输出路径；系统 MUST 以 best-effort 清理 Scalim 管理的临时文件，并将原始错误向上抛出。成功路径仍 MUST 使用临时文件 + 原子替换（或 staging 再 publish）。本要求不强制改变 workflow staging 的 `keep_on_failure` 默认调试保留策略，但最终 publish 失败时最终路径 MUST NOT 留下半残文件。"
-scenarios[36]{req_id,id,given,when,then,feature}:
+  r922,"file sink write failures MUST NOT promote half-written final artifacts","当内建 file sinks（CSV/Excel）或 workflow book 导出在写出/save/replace 失败时，系统 MUST NOT 将半成品 promote 为最终用户可见输出路径；失败清理 MUST 通过 `discard()`（或等价显式失败收尾）完成，MUST NOT 用成功语义的 `close()` 代替。系统 MUST 以 best-effort 清理 Scalim 管理的临时文件，并将原始错误向上抛出。成功路径仍 MUST 使用临时文件 + 原子替换（或 staging 再 publish）。本要求不强制改变 workflow staging 的 `keep_on_failure` 默认调试保留策略，但最终 publish 失败时最终路径 MUST NOT 留下半残文件。"
+  r923,ISink MUST expose discard as explicit failure cleanup,"系统 MUST 在 `ISink`（及 `IRowSink`/`IColumnSink`）上显式声明 `discard()` 作为失败路径清理合约：调用后 MUST NOT 将半成品 promote 为最终用户可见输出路径；无文件副作用的实现 MAY 为可调用的 no-op，但 MUST 幂等且可被框架稳定调用。成功提交语义仍 MUST 仅通过 `close()`。系统 MUST NOT 将失败清理默认依赖对可选方法的 duck-typed 探测作为唯一合约。"
+  r924,"built-in and wrapper sinks MUST implement discard forwarding","系统 MUST 使内建 file/memory sinks 与 composition wrappers（tee/counting/router 等）实现 `discard()`：file sinks MUST 放弃 temp/句柄且最终路径 MUST NOT 因 discard 被创建或替换；wrappers MUST 向内部 sink 转发。`discard()` 失败时框架 MAY best-effort suppress，但 MUST NOT 回退为成功语义的 `close()` promote。"
+scenarios[39]{req_id,id,given,when,then,feature}:
   r65,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r65,"旧-sink-实现可继续工作","",现有 sink 继承 `BaseRowSink` 或实现 `IRowSink`,不需修改即可运行,true
   r309,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
@@ -56,4 +58,7 @@ scenarios[36]{req_id,id,given,when,then,feature}:
   r920,"excel-accept-set-documents-openpyxl-capable-types","",查询内建 Excel sink 的 accept set,MUST 覆盖 openpyxl 可写的推荐标量/时间类型且 MUST NOT 声称接受经探测不可写的 np.datetime64,true
   r921,"precheck-off-defers-type-error-to-sink","opt-in 预检关闭且细胞含 openpyxl 拒绝的类型",执行写出,MUST 在 sink write/close 边界失败而非 ROWS 捕获时失败,true
   r921,"precheck-on-fails-before-sink-write","opt-in 预检启用且目标为 Excel accept set",准备写入不被 accept 的类型,MUST 在首次写出前 TypeError，且最终输出路径 MUST NOT 被创建/替换,true
-  r922,"excel-save-failure-leaves-no-final-half-file",ExcelSink close 阶段 save 抛错,异常向上抛出,"最终 output_path MUST NOT 存在半残 xlsx；Scalim temp MUST best-effort 清理",true
+  r922,"failure-path-uses-discard-not-close",file sink 写出过程中失败且框架进入失败收尾,清理半成品,MUST 走 discard（或等价显式失败收尾），MUST NOT 用 close 完成原子 promote,true
+  r923,"isink-declares-discard",自定义类型声称实现 ISink,未实现 discard 方法,MUST 无法作为合法 ISink 实现通过静态/运行时合约检查（ABC 或等价）,true
+  r923,"memory-sink-discard-is-callable-noop",InMemoryRowsSink 已写入若干行,调用 discard,MUST 成功返回且后续不得被当作已成功 close 的产物使用（可清空或标记关闭）,true
+  r924,"excel-discard-leaves-no-final-file",ExcelSink 已 write 若干行但尚未成功 close,调用 discard,"最终 output_path MUST NOT 存在；Scalim temp MUST best-effort 清理",true

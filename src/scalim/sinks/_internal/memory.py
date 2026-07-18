@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, List, Mapping, Optional, Seque
 
 from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
-from .base import BaseRowSink, ColumnValues, IColumnSink
+from .base import BaseRowSink, ColumnValues, IColumnSink, exit_sink
 
 if TYPE_CHECKING:
     import types
@@ -47,6 +47,13 @@ class InMemoryRowDataSink(BaseRowSink):
 
     @override
     def close(self) -> None:
+        self._closed = True
+
+    @override
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._data = []
         self._closed = True
 
     def get_data(self) -> List[RowData]:
@@ -136,6 +143,14 @@ class InMemoryColumnSink(IColumnSink):
     def close(self) -> None:
         self._closed = True
 
+    @override
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._columns = {}
+        self._row_ids = []
+        self._closed = True
+
     # ============================================================
     # 数据访问方法
     # ============================================================
@@ -191,7 +206,7 @@ class InMemoryColumnSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 __all__ = ()

@@ -38,6 +38,7 @@ class _CountingOutputRowSink(BaseRowSink):
     def close(self) -> None:
         self._sink.close()
 
+    @override
     def discard(self) -> None:
         discard = getattr(self._sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
         if callable(discard):
