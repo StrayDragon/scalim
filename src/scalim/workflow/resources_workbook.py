@@ -16,7 +16,7 @@ from .._internal.utils.openpyxl_helpers import (
 from .._internal.utils.openpyxl_helpers import save_openpyxl_workbook_atomic as _save_openpyxl_workbook_atomic_impl
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
-from ..typedefs import FieldValue
+from ..typedefs import CellValue
 from ..vendor.compact.importlibx import require_optional_dependency
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, field
@@ -62,10 +62,10 @@ def _workbook_collect_visible_segments(
     cutoff_idx: int,
     producer_node_id: str,
     visible_producer_node_ids: FrozenSet[str],
-) -> List[Tuple[str, List[List[FieldValue]]]]:
+) -> List[Tuple[str, List[List[CellValue]]]]:
     producer = str(producer_node_id)
     visible = frozenset(str(x) for x in visible_producer_node_ids)
-    out: List[Tuple[str, List[List[FieldValue]]]] = []
+    out: List[Tuple[str, List[List[CellValue]]]] = []
     for seg in segments[: int(cutoff_idx) + 1]:
         seg_producer = str(seg.producer_node_id)
         if seg_producer != producer and seg_producer not in visible:
@@ -76,11 +76,11 @@ def _workbook_collect_visible_segments(
 
 def _iter_workbook_row_dicts(
     baseline_header: List[str],
-    segments: List[Tuple[str, List[List[FieldValue]]]],
-) -> Iterator[Dict[str, FieldValue]]:
+    segments: List[Tuple[str, List[List[CellValue]]]],
+) -> Iterator[Dict[str, CellValue]]:
     for _seg_producer, seg_rows in segments:
         for row_values in seg_rows:
-            row: Dict[str, FieldValue] = {}
+            row: Dict[str, CellValue] = {}
             for idx, key in enumerate(baseline_header):
                 row[str(key)] = row_values[idx] if idx >= 0 and idx < len(row_values) else ""
             yield row
@@ -119,7 +119,7 @@ def _write_workbook_plan_to_openpyxl_workbook(workbook: object, plan: "_Workbook
 class _WorkbookSegment:
     producer_node_id: str
     decl_order: int
-    rows: List[List[FieldValue]]
+    rows: List[List[CellValue]]
     header_policy: str
 
 
@@ -368,7 +368,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         producer_node_id: str,
         workbook_id: str,
         sheet: str,
-    ) -> Iterator[Dict[str, FieldValue]]:
+    ) -> Iterator[Dict[str, CellValue]]:
         """读取 `workbook` 的行快照(按 `ref.node` 截断;按依赖可见性过滤)."""
 
         _ = str(consumer_node_id)

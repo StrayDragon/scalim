@@ -18,6 +18,12 @@ from ..._internal.utils.openpyxl_helpers import (
 from ...typedefs import FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact.importlibx import require_optional_dependency
 from ...vendor.compact.typing_extensionsx import Self, override
+from .accept_types import (
+    SinkTypePrecheck,
+    ensure_sink_accepted_cell,
+    is_excel_accepted_cell,
+    require_sink_type_precheck,
+)
 from .base import (
     BaseRowSink,
     ColumnBatch,
@@ -27,6 +33,7 @@ from .base import (
     atomic_replace_temp_path,
     best_effort_cleanup_temp_path_dir,
     create_temp_path,
+    exit_sink,
     iter_row_values,
     store_rows_as_columns,
     update_column,
@@ -130,6 +137,7 @@ class ExcelSink(BaseRowSink):
     _workbook: Any
     _worksheet: Any
     _allow_formulas: bool
+    _type_precheck: SinkTypePrecheck
     _aligned_cache_field_keys: Optional[Tuple[str, ...]]
     _aligned_cache_indexes: Optional[List[Optional[int]]]
 
@@ -141,7 +149,9 @@ class ExcelSink(BaseRowSink):
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
+        type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
     ) -> None:
+        self._type_precheck = require_sink_type_precheck(type_precheck, where="ExcelSink.type_precheck")
         self.output_path = output_path
         self.sheet_name = sheet_name
         self.include_header = include_header
@@ -156,10 +166,21 @@ class ExcelSink(BaseRowSink):
         if self.include_header:
             _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
+    def _maybe_precheck(self, field_name: str, value: object) -> object:
+        if self._type_precheck is SinkTypePrecheck.OFF:
+            return value
+        return ensure_sink_accepted_cell(
+            value,
+            field_id=str(field_name),
+            sink_name="ExcelSink",
+            accepted=is_excel_accepted_cell,
+        )
+
     def _format_row(self, row: RowData) -> List[Any]:
         values: List[Any] = []
         for field_name in self.field_names:
-            values.append(escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
+            raw = self._maybe_precheck(field_name, row.get(field_name))
+            values.append(escape_excel_formula(raw, allow_formulas=self._allow_formulas))
         return values
 
     @override
@@ -180,11 +201,13 @@ class ExcelSink(BaseRowSink):
 
         indexes = self._aligned_cache_indexes or []
         row_values: List[Any] = []
-        for idx in indexes:
+        for i, idx in enumerate(indexes):
             if idx is None:
                 v = None
             else:
                 v = values[idx]
+            field_name = self.field_names[i]
+            v = self._maybe_precheck(field_name, v)
             row_values.append(escape_excel_formula(v, allow_formulas=self._allow_formulas))
         _ = self._worksheet.append(row_values)
 
@@ -232,6 +255,15 @@ class ExcelSink(BaseRowSink):
 
         self._closed = True
 
+    def discard(self) -> None:
+        """异常路径:关闭 `workbook` 且不 `promote` 最终文件."""
+        if self._closed:
+            return
+        _best_effort_close_write_only_worksheet(self._worksheet)
+        with suppress(Exception):
+            self._workbook.close()
+        self._closed = True
+
 
 class ExcelWorkbookSheetRowSink(BaseRowSink):
     """`Excel` `workbook` 中单个 `sheet` 的行写入器(共享同一 `workbook`).
@@ -247,6 +279,7 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
     _worksheet: Any
     _closed: bool
     _allow_formulas: bool
+    _type_precheck: SinkTypePrecheck
 
     def __init__(
         self,
@@ -257,7 +290,9 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
         header_names: Optional[List[str]] = None,
         include_header: bool = True,
         allow_formulas: bool = True,
+        type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
     ) -> None:
+        self._type_precheck = require_sink_type_precheck(type_precheck, where="ExcelWorkbookSheetRowSink.type_precheck")
         self._worksheet = worksheet
         self.sheet_name = str(sheet_name)
         self.include_header = bool(include_header)
@@ -269,10 +304,21 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
             # 关键护栏: `header` 与 `rows` 分离,避免 `header` `list` 被复用污染.
             _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(self.header_names)])
 
+    def _maybe_precheck(self, field_name: str, value: object) -> object:
+        if self._type_precheck is SinkTypePrecheck.OFF:
+            return value
+        return ensure_sink_accepted_cell(
+            value,
+            field_id=str(field_name),
+            sink_name="ExcelWorkbookSheetRowSink",
+            accepted=is_excel_accepted_cell,
+        )
+
     def _format_row(self, row: RowData) -> List[Any]:
         values: List[Any] = []
         for field_name in self.field_names:
-            values.append(escape_excel_formula(row.get(field_name), allow_formulas=self._allow_formulas))
+            raw = self._maybe_precheck(field_name, row.get(field_name))
+            values.append(escape_excel_formula(raw, allow_formulas=self._allow_formulas))
         return values
 
     @override
@@ -328,6 +374,7 @@ class ExcelWorkbookSink:
         header_names: Optional[List[str]] = None,
         include_header: bool = True,
         allow_formulas: bool = True,
+        type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
     ) -> ExcelWorkbookSheetRowSink:
         if self._closed:
             msg = "ExcelWorkbookSink is closed: {}".format(self.output_path)
@@ -347,6 +394,7 @@ class ExcelWorkbookSink:
             header_names=header_names,
             include_header=include_header,
             allow_formulas=allow_formulas,
+            type_precheck=type_precheck,
         )
 
     def close(self) -> None:
@@ -384,11 +432,24 @@ class ExcelWorkbookSink:
 
         self._closed = True
 
+    def discard(self) -> None:
+        if self._closed:
+            return
+        _best_effort_close_write_only_workbook_worksheets(self._workbook)
+        with suppress(Exception):
+            self._workbook.close()
+        self._closed = True
+
     def __enter__(self) -> "Self":
         return self
 
-    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
-        self.close()
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
+    ) -> None:
+        exit_sink(self, exc_type)
 
 
 class ColumnExcelSink(IColumnSink):
@@ -437,6 +498,7 @@ class ColumnExcelSink(IColumnSink):
     _columns: ColumnData
     _closed: bool
     _allow_formulas: bool
+    _type_precheck: SinkTypePrecheck
 
     def __init__(
         self,
@@ -446,7 +508,9 @@ class ColumnExcelSink(IColumnSink):
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
+        type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
     ) -> None:
+        self._type_precheck = require_sink_type_precheck(type_precheck, where="ColumnExcelSink.type_precheck")
         self.output_path = output_path
         self.field_names = field_names
         self.header_names = header_names if header_names is not None else field_names
@@ -457,13 +521,26 @@ class ColumnExcelSink(IColumnSink):
         self._closed = False
         self._allow_formulas = bool(allow_formulas)
 
+    def _maybe_precheck_column(self, field_key: str, values: ColumnValues) -> ColumnValues:
+        if self._type_precheck is SinkTypePrecheck.OFF:
+            return values
+        checked: Dict[Any, Any] = {}
+        for pk, value in values.items():
+            checked[pk] = ensure_sink_accepted_cell(
+                value,
+                field_id=str(field_key),
+                sink_name="ColumnExcelSink",
+                accepted=is_excel_accepted_cell,
+            )
+        return checked
+
     @override
     def set_row_ids(self, row_ids: "SinkRowKeySeq") -> None:
         self._row_ids.extend(row_ids)
 
     @override
     def write_column(self, field_key: str, values: ColumnValues) -> None:
-        update_column(self._columns, field_key, values)
+        update_column(self._columns, field_key, self._maybe_precheck_column(field_key, values))
 
     def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
         if len(row_ids) != len(values):
@@ -531,6 +608,13 @@ class ColumnExcelSink(IColumnSink):
 
         self._closed = True
 
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._columns = {}
+        self._row_ids = []
+        self._closed = True
+
     def __enter__(self) -> Self:
         return self
 
@@ -540,7 +624,7 @@ class ColumnExcelSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 __all__ = ()

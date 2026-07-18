@@ -12,7 +12,7 @@ from typing import Iterator, List, Sequence, Union
 
 from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows
-from ..typedefs import FieldValue
+from ..typedefs import CellValue
 from .resources_base import ScalimWorkflowWriteError
 
 WorkflowTabularInput = Union[str, InMemoryCsv, InMemoryRows]
@@ -52,7 +52,7 @@ def read_tabular_header(input_tabular: WorkflowTabularInput) -> List[str]:
     return header
 
 
-def iter_tabular_rows(input_tabular: WorkflowTabularInput) -> Iterator[List[FieldValue]]:
+def iter_tabular_rows(input_tabular: WorkflowTabularInput) -> Iterator[List[CellValue]]:
     if isinstance(input_tabular, InMemoryRows):
         for row in input_tabular.rows:
             yield list(row)
@@ -76,11 +76,11 @@ def materialize_aligned_tabular_rows(
     mapping: Sequence[int],
     *,
     input_tabular: WorkflowTabularInput,
-) -> List[List[FieldValue]]:
+) -> List[List[CellValue]]:
     _ = list(expected)
-    rows: List[List[FieldValue]] = []
+    rows: List[List[CellValue]] = []
     for row in iter_tabular_rows(input_tabular):
-        out_row: List[FieldValue] = []
+        out_row: List[CellValue] = []
         for src_idx in mapping:
             out_row.append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
         rows.append(out_row)

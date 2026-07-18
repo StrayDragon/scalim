@@ -550,6 +550,7 @@ def build_request(
         runtime_bindings=runtime_bindings,
         capture_in_memory_rows=isinstance(options.outputs.capture, CaptureRows),
         excel_column_residency=options.runtime.excel_column_residency,
+        sink_type_precheck=options.runtime.sink_type_precheck,
     )
 
 

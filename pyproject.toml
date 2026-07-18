@@ -189,6 +189,7 @@ max-args = 16
 "*.ipynb" = ["S101", "DTZ005"]
 "**/notebooks/marimo/*.py" = ["ALL"]
 "llmanspec/changes/**/acceptance/**/*.py" = ["ALL"]
+"llmanspec/changes/**/evidence/**/*.py" = ["ALL"]
 "llmanspec/changes/**/*mvp*/**/*.py" = ["ALL"]
 "llmanspec/changes/**/examples/**/*.py" = ["ALL"]
 "agentdev/prompt-eval/promptfoo/assertions/*.py" = ["ALL"]

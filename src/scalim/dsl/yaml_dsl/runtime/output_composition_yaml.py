@@ -20,7 +20,7 @@ from ....execution.output_contracts import ExportLayout, OutputSpec
 from ....execution.run_ir import export_layout_from_demand_ir
 from ....execution.versioned_outputs import book_output_relpath, file_output_relpath, validate_version_id
 from ....spec.ir import DemandIr
-from ....typedefs import FIELD_VALUE_TYPES, FailurePolicy, FieldValue, RowData, format_field_value_expected_types
+from ....typedefs import FIELD_VALUE_TYPES, CellValue, FailurePolicy, FieldValue, RowData, format_field_value_expected_types
 from ....vendor.dataclassesx import dataclass
 from .._internal.book_identity import is_pathful_book
 from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
@@ -110,7 +110,7 @@ class _AggregateCallByContext:
     batch_num: int
     field_id: str
     deps: Tuple[str, ...]
-    values: Dict[str, FieldValue]
+    values: Dict[str, CellValue]
 
 
 def _eval_call_by_value(*, field_id: str, value: CallByValue, row: RowData, ctx: _AggregateCallByContext) -> object:
@@ -160,7 +160,7 @@ def _compile_call_by_post_field(
     deps = tuple(str(x) for x in (parsed.field_names or ()))
 
     def calculator(row: RowData, p: ParsedCallBy = parsed, f: Callable[..., Any] = fn) -> FieldValue:
-        dep_values: Dict[str, FieldValue] = {name: row.get(name) for name in deps}
+        dep_values: Dict[str, CellValue] = {name: row.get(name) for name in deps}
         ctx = _AggregateCallByContext(
             row_id=None,
             batch_num=0,

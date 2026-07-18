@@ -3,7 +3,6 @@ from __future__ import absolute_import
 
 import hashlib
 from abc import ABC, abstractmethod
-from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
@@ -12,7 +11,7 @@ from .._internal.utils.converters import auto_str_normalize
 from .._internal.utils.iterables import ordered_unique_str
 from ..exceptions import ScalimExecutionError
 from ..sinks import BaseRowSink, IRowSink
-from ..typedefs import FieldValue, KeyNormalizationMode, RowData
+from ..typedefs import CellValue, FieldValue, KeyNormalizationMode, RowData
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, field
 from .key_normalization import normalize_key_normalization
@@ -90,8 +89,8 @@ class AggregatorDiagnostics:
     - `meta`/`audit_events` 不得包含明细行内容与聚合 `key` 的具体值(避免泄露敏感数据).
     """
 
-    meta: Dict[str, FieldValue] = field(default_factory=dict)
-    audit_events: List[Dict[str, FieldValue]] = field(default_factory=list)
+    meta: Dict[str, CellValue] = field(default_factory=dict)
+    audit_events: List[Dict[str, CellValue]] = field(default_factory=list)
 
 
 class IRowAggregator(ABC):
@@ -139,7 +138,7 @@ class RankFieldSpec:
     top_k_mode: str = "rank"
 
 
-PostFieldCalculator = Callable[[RowData], FieldValue]
+PostFieldCalculator = Callable[[RowData], CellValue]
 
 
 @dataclass(frozen=True)
@@ -309,7 +308,7 @@ def _stable_group_key_tuple(key: Tuple[object, ...]) -> str:
 
 
 class _BoundedDistinctKeySet:
-    _keys: Set[Tuple[FieldValue, ...]]
+    _keys: Set[Tuple[CellValue, ...]]
     _max_distinct: int
     _on_overflow: str
     _key_fields: Tuple[str, ...]
@@ -338,7 +337,7 @@ class _BoundedDistinctKeySet:
     def key_count(self) -> int:
         return len(self._keys)
 
-    def add(self, key: Tuple[FieldValue, ...]) -> Tuple[bool, Optional[Tuple[FieldValue, ...]]]:
+    def add(self, key: Tuple[CellValue, ...]) -> Tuple[bool, Optional[Tuple[CellValue, ...]]]:
         """添加去重 `key`.
 
         返回:
@@ -391,7 +390,7 @@ class _MetricState(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         raise NotImplementedError
 
 
@@ -412,7 +411,7 @@ class _CountMetric(_MetricState):
             self._count += 1
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         return int(self._count)
 
 
@@ -430,7 +429,7 @@ class _CountTrueMetric(_MetricState):
             self._count += 1
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         return int(self._count)
 
 
@@ -453,12 +452,12 @@ class _SumMetric(_MetricState):
         self._sum += dec
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         return self._sum
 
 
 class _MinMetric(_MetricState):
-    _value: FieldValue
+    _value: CellValue
     _field_id: str
     _has_value: bool
     _best_key: Optional[Tuple[int, Decimal, str]]
@@ -474,34 +473,33 @@ class _MinMetric(_MetricState):
         raw = row.get(self._field_id)
         if raw is None:
             return
-        raw_nn: NonNullFieldValue = raw
 
-        def _cmp_key(v: NonNullFieldValue) -> Tuple[int, Decimal, str]:
+        def _cmp_key(v: object) -> Tuple[int, Decimal, str]:
             dec = _to_decimal(v)
             if dec is not None:
                 return (0, dec, "")
             return (1, _DECIMAL_ZERO, _stable_sort_key(v))
 
-        key = _cmp_key(raw_nn)
+        key = _cmp_key(raw)
         if not self._has_value or self._best_key is None:
-            self._value = raw_nn
+            self._value = raw
             self._best_key = key
             self._has_value = True
             return
 
         if key < self._best_key:
-            self._value = raw_nn
+            self._value = raw
             self._best_key = key
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         if not self._has_value:
             return None
         return self._value
 
 
 class _MaxMetric(_MetricState):
-    _value: FieldValue
+    _value: CellValue
     _field_id: str
     _has_value: bool
     _best_key: Optional[Tuple[int, Decimal, str]]
@@ -517,27 +515,26 @@ class _MaxMetric(_MetricState):
         raw = row.get(self._field_id)
         if raw is None:
             return
-        raw_nn: NonNullFieldValue = raw
 
-        def _cmp_key(v: NonNullFieldValue) -> Tuple[int, Decimal, str]:
+        def _cmp_key(v: object) -> Tuple[int, Decimal, str]:
             dec = _to_decimal(v)
             if dec is not None:
                 return (0, dec, "")
             return (1, _DECIMAL_ZERO, _stable_sort_key(v))
 
-        key = _cmp_key(raw_nn)
+        key = _cmp_key(raw)
         if not self._has_value or self._best_key is None:
-            self._value = raw_nn
+            self._value = raw
             self._best_key = key
             self._has_value = True
             return
 
         if key > self._best_key:
-            self._value = raw_nn
+            self._value = raw
             self._best_key = key
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         if not self._has_value:
             return None
         return self._value
@@ -576,7 +573,7 @@ class _CountDistinctMetric(_MetricState):
         _ = self._distinct.add(key)
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         return int(self._distinct.key_count)
 
 
@@ -606,7 +603,7 @@ class _CountTrueGteMetric(_MetricState):
             self._count += 1
 
     @override
-    def finalize(self) -> FieldValue:
+    def finalize(self) -> CellValue:
         return int(self._count)
 
 
@@ -693,7 +690,7 @@ def _metric_state_from_spec(spec: AggMetricSpec, *, max_distinct: int = 0, on_ov
 class GroupByAggregator(IRowAggregator):
     _group_by: Tuple[str, ...]
     _metrics: Tuple[AggMetricSpec, ...]
-    _states: Dict[Tuple[FieldValue, ...], Tuple[_MetricState, ...]]
+    _states: Dict[Tuple[CellValue, ...], Tuple[_MetricState, ...]]
     _max_groups: int
     _max_distinct: int
     _distinct_on_overflow: str
@@ -766,7 +763,7 @@ class GroupByAggregator(IRowAggregator):
         sorted_keys = sorted(self._states.keys(), key=_stable_group_key_tuple)
         for key in sorted_keys:
             state = self._states[key]
-            out: Dict[str, FieldValue] = {}
+            out: Dict[str, CellValue] = {}
             for idx, fid in enumerate(self._group_by):
                 out[fid] = key[idx] if idx < len(key) else None
             for metric_spec, metric_state in zip(self._metrics, state):
@@ -776,8 +773,8 @@ class GroupByAggregator(IRowAggregator):
 
     @override
     def diagnostics(self) -> AggregatorDiagnostics:
-        meta: Dict[str, FieldValue] = {"group_count": len(self._states)}
-        audit_events: List[Dict[str, FieldValue]] = []
+        meta: Dict[str, CellValue] = {"group_count": len(self._states)}
+        audit_events: List[Dict[str, CellValue]] = []
 
         distinct_indices = [i for i, m in enumerate(self._metrics) if str(m.op).lower() == "count_distinct"]
         for idx in distinct_indices:
@@ -863,7 +860,7 @@ class RankedGroupByAggregator(IRowAggregator):
 
     @override
     def finalize_rows(self) -> List[RowData]:  # noqa: C901
-        rows: List[Dict[str, FieldValue]] = [dict(r) for r in self._base.finalize_rows()]
+        rows: List[Dict[str, CellValue]] = [dict(r) for r in self._base.finalize_rows()]
         if not rows:
             return []
 
@@ -917,13 +914,13 @@ class RankedGroupByAggregator(IRowAggregator):
         # 按 `out_field_id` 稳定选择一个,用于稳定输出顺序.
         return sorted(self._rank_fields, key=lambda r: str(r.out_field_id))[0]
 
-    def _apply_top_k_and_sort(self, rows: List[Dict[str, FieldValue]], spec: RankFieldSpec) -> List[Dict[str, FieldValue]]:
-        partitions: Dict[Tuple[FieldValue, ...], List[Dict[str, FieldValue]]] = {}
+    def _apply_top_k_and_sort(self, rows: List[Dict[str, CellValue]], spec: RankFieldSpec) -> List[Dict[str, CellValue]]:
+        partitions: Dict[Tuple[CellValue, ...], List[Dict[str, CellValue]]] = {}
         for row in rows:
             key = self._partition_key(row, spec)
             partitions.setdefault(key, []).append(row)
 
-        ordered: List[Dict[str, FieldValue]] = []
+        ordered: List[Dict[str, CellValue]] = []
         for p_key in sorted(partitions.keys(), key=_stable_group_key_tuple):
             bucket = partitions[p_key]
             bucket.sort(key=lambda r: self._row_sort_key(r, spec))
@@ -938,12 +935,12 @@ class RankedGroupByAggregator(IRowAggregator):
 
         return ordered
 
-    def _partition_key(self, row: Dict[str, FieldValue], spec: RankFieldSpec) -> Tuple[FieldValue, ...]:
+    def _partition_key(self, row: Dict[str, CellValue], spec: RankFieldSpec) -> Tuple[CellValue, ...]:
         if not spec.partition_by:
             return ()
         return tuple(row.get(str(fid)) for fid in spec.partition_by)
 
-    def _row_sort_key(self, row: Dict[str, FieldValue], spec: RankFieldSpec) -> Tuple[object, ...]:
+    def _row_sort_key(self, row: Dict[str, CellValue], spec: RankFieldSpec) -> Tuple[object, ...]:
         desc = str(spec.order or "desc").lower() != "asc"
         order_fields = tuple(str(x) for x in (spec.order_by or ())) or (str(spec.by),)
         key_parts: List[object] = []
@@ -962,8 +959,8 @@ class RankedGroupByAggregator(IRowAggregator):
             return (0, 0, _ReversibleValue(dec, desc=desc))
         return (0, 1, _ReversibleValue(_stable_sort_key(value), desc=desc))
 
-    def _apply_rank_field(self, rows: List[Dict[str, FieldValue]], spec: RankFieldSpec) -> None:
-        partitions: Dict[Tuple[FieldValue, ...], List[Dict[str, FieldValue]]] = {}
+    def _apply_rank_field(self, rows: List[Dict[str, CellValue]], spec: RankFieldSpec) -> None:
+        partitions: Dict[Tuple[CellValue, ...], List[Dict[str, CellValue]]] = {}
         for row in rows:
             key = self._partition_key(row, spec)
             partitions.setdefault(key, []).append(row)
@@ -1044,7 +1041,7 @@ class DedupByThenAggregator(IRowAggregator):
     _distinct: _BoundedDistinctKeySet
     _downstream: IRowAggregator
     _store_fields: Tuple[str, ...]
-    _rows: Dict[Tuple[FieldValue, ...], Dict[str, FieldValue]]
+    _rows: Dict[Tuple[CellValue, ...], Dict[str, CellValue]]
     _conflict_count: int
     _key_normalization: KeyNormalizationMode
 
@@ -1099,8 +1096,8 @@ class DedupByThenAggregator(IRowAggregator):
             key = tuple(row.get(fid) for fid in self._key_fields)
             stored_row = {fid: row.get(fid) for fid in self._store_fields}
         else:
-            normalized_by_fid: Dict[str, FieldValue] = {}
-            parts: List[FieldValue] = []
+            normalized_by_fid: Dict[str, CellValue] = {}
+            parts: List[CellValue] = []
             for fid in self._key_fields:
                 normalized_part = _auto_str_normalize_derived_key_part(value=row.get(fid), field_id=fid, context="dedup_by")
                 normalized_by_fid[fid] = normalized_part
@@ -1185,7 +1182,7 @@ class TwoStageGroupByAggregator(IRowAggregator):
         diag1 = self._stage1.diagnostics()
         diag2 = self._stage2.diagnostics()
 
-        meta: Dict[str, FieldValue] = {}
+        meta: Dict[str, CellValue] = {}
         for k, v in diag1.meta.items():
             meta["stage1." + str(k)] = v
         for k, v in diag2.meta.items():
@@ -1263,7 +1260,5 @@ def fingerprint_for_meta(
     h.update(payload)
     return h.hexdigest()
 
-
-NonNullFieldValue = Union[int, float, Decimal, str, bool, datetime, date, time, timedelta]
 
 __all__ = ()

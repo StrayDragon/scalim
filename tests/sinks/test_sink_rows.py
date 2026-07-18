@@ -21,9 +21,10 @@ def test_in_memory_rows_rejects_row_length_mismatch() -> None:
         _ = InMemoryRows(header=["a", "b"], rows=[[1]])
 
 
-def test_in_memory_rows_rejects_non_field_value() -> None:
-    with pytest.raises(TypeError, match=r"FieldValue"):
-        _ = InMemoryRows(header=["a"], rows=[[object()]])  # type: ignore[list-item]
+def test_in_memory_rows_accepts_arbitrary_objects() -> None:
+    sentinel = object()
+    artifact = InMemoryRows(header=["a"], rows=[[sentinel]])
+    assert artifact.rows[0][0] is sentinel
 
 
 def test_in_memory_rows_iter_row_data_zips_header_and_values() -> None:
@@ -69,10 +70,13 @@ def test_in_memory_rows_sink_preserves_temporal_field_values() -> None:
     assert artifact.rows[0][4].tzinfo is timezone.utc  # type: ignore[union-attr]
 
 
-def test_in_memory_rows_sink_rejects_non_field_value() -> None:
-    sink = InMemoryRowsSink(field_ids=["obj"])
-    with pytest.raises(TypeError, match=r"non-FieldValue"):
-        sink.write_row({"obj": {"bad": "x"}})  # type: ignore[dict-item]
+def test_in_memory_rows_sink_preserves_dict_and_custom_object() -> None:
+    sink = InMemoryRowsSink(field_ids=["obj", "mapping"])
+    sentinel = object()
+    sink.write_row({"obj": sentinel, "mapping": {"bad": "x"}})
+    artifact = sink.to_artifact()
+    assert artifact.rows[0][0] is sentinel
+    assert artifact.rows[0][1] == {"bad": "x"}
 
 
 def test_in_memory_rows_accepts_temporal_on_construct() -> None:
@@ -100,3 +104,11 @@ def test_iter_in_memory_rows_as_main_rows_is_reiterable() -> None:
     rows = iter_in_memory_rows_as_main_rows(artifact)
     assert list(rows) == [{"a": 1}, {"a": 2}]
     assert list(rows) == [{"a": 1}, {"a": 2}]
+
+
+def test_in_memory_rows_sink_preserves_numpy_datetime64() -> None:
+    np = pytest.importorskip("numpy")
+    value = np.datetime64("2024-01-02T03:04:05")
+    sink = InMemoryRowsSink(field_ids=["v"])
+    sink.write_row({"v": value})
+    assert sink.to_artifact().rows[0][0] is value

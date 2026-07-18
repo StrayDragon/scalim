@@ -4,6 +4,7 @@ import csv
 import io
 import logging
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
@@ -22,6 +23,7 @@ from .base import (
     atomic_replace_temp_path,
     best_effort_cleanup_temp_path_dir,
     create_temp_path,
+    exit_sink,
     iter_row_values,
     store_rows_as_columns,
     update_column,
@@ -300,6 +302,21 @@ class CSVSink(BaseRowSink):
 
         self._closed = True
 
+    def discard(self) -> None:
+        """异常路径:关闭句柄并删除 `temp`,不 `promote` 最终文件."""
+        if self._closed:
+            return
+        with suppress(Exception):
+            self._file.close()
+        temp_path_obj = Path(self._temp_path)
+        if temp_path_obj.exists():
+            try:
+                temp_path_obj.unlink()
+            except OSError:
+                _LOGGER.warning(CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
+        best_effort_cleanup_temp_path_dir(self._temp_path)
+        self._closed = True
+
 
 class ColumnCSVSink(IColumnSink):
     """列式 `CSV` 写入器:用于生产环境的高性能列式写入(FR023).
@@ -434,6 +451,13 @@ class ColumnCSVSink(IColumnSink):
 
         self._closed = True
 
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._columns = {}
+        self._row_ids = []
+        self._closed = True
+
     def __enter__(self) -> Self:
         return self
 
@@ -443,7 +467,7 @@ class ColumnCSVSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 class BlockColumnCSVSink(IColumnSink):
@@ -584,7 +608,7 @@ class BlockColumnCSVSink(IColumnSink):
         col_offset = col_index * (self.col_width + 1)
         return row_offset + col_offset
 
-    def _write_cell(self, row_index: int, col_index: int, value: FieldValue) -> None:
+    def _write_cell(self, row_index: int, col_index: int, value: object) -> None:
         if self._file is None:
             return
         if value is None:
@@ -684,7 +708,7 @@ class BlockColumnCSVSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 __all__ = ()

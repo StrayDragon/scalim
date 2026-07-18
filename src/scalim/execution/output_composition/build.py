@@ -6,6 +6,7 @@ from ..._internal.loggingx import format_kv, get_logger, prefix
 from ..._internal.utils.iterables import ordered_unique_str
 from ...ob.hub import InstrumentationHub
 from ...sinks import ExcelWorkbookSink, IRowSink
+from ...sinks.accept_types import SinkTypePrecheck
 from ...typedefs import KeyNormalizationMode
 from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import AggregatingRowSink
@@ -120,6 +121,7 @@ def _append_direct_target_routes(
     managed_artifact_plans: Dict[str, ManagedArtifactPlan],
     targets: Sequence[OutputTargetSpec],
     workbook_by_path: Dict[str, ExcelWorkbookSink],
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> None:
     for t in targets:
         sink, counter, managed_plan = create_row_sink_for_composed_output(
@@ -129,6 +131,7 @@ def _append_direct_target_routes(
             workbook_by_path=workbook_by_path,
             in_memory=bool(t.in_memory),
             managed_artifact_kind=t.managed_artifact_kind,
+            sink_type_precheck=sink_type_precheck,
         )
         if managed_plan is not None:
             managed_artifact_plans[str(t.target_id)] = managed_plan
@@ -199,6 +202,7 @@ def _append_derived_target_routes(
     workbook_by_path: Dict[str, ExcelWorkbookSink],
     run_parallel_mode: str,
     run_key_normalization: KeyNormalizationMode,
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> None:
     for t in targets:
         # `adaptive` 下的确定性边界 `fail-fast` 校验
@@ -214,6 +218,7 @@ def _append_derived_target_routes(
             workbook_by_path=workbook_by_path,
             in_memory=bool(t.in_memory),
             managed_artifact_kind=t.managed_artifact_kind,
+            sink_type_precheck=sink_type_precheck,
         )
         if managed_plan is not None:
             managed_artifact_plans[str(t.target_id)] = managed_plan
@@ -244,6 +249,7 @@ def _maybe_create_meta_target(
     output_paths: Dict[str, str],
     workbook_by_path: Dict[str, ExcelWorkbookSink],
     managed_artifact_plans: Dict[str, ManagedArtifactPlan],
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> Optional[FinalTargetState]:
     if meta_sheet is None:
         return None
@@ -265,6 +271,7 @@ def _maybe_create_meta_target(
         workbook_by_path=workbook_by_path,
         in_memory=bool(meta_sheet.in_memory),
         managed_artifact_kind=MANAGED_ARTIFACT_KIND_CSV,
+        sink_type_precheck=sink_type_precheck,
     )
     if managed_plan is not None:
         managed_artifact_plans[str(meta_sheet.target_id)] = managed_plan
@@ -284,6 +291,7 @@ def _maybe_create_audit_target(
     output_paths: Dict[str, str],
     workbook_by_path: Dict[str, ExcelWorkbookSink],
     managed_artifact_plans: Dict[str, ManagedArtifactPlan],
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> Optional[FinalTargetState]:
     if audit_sheet is None:
         return None
@@ -326,6 +334,7 @@ def _maybe_create_audit_target(
         workbook_by_path=workbook_by_path,
         in_memory=bool(audit_sheet.in_memory),
         managed_artifact_kind=MANAGED_ARTIFACT_KIND_CSV,
+        sink_type_precheck=sink_type_precheck,
     )
     if managed_plan is not None:
         managed_artifact_plans[str(audit_sheet.target_id)] = managed_plan
@@ -351,6 +360,7 @@ def build_output_composition(
     run_batch_size: Optional[int] = None,
     run_key_normalization: KeyNormalizationMode = "raw",
     instrumentation: Optional[InstrumentationHub] = None,
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> OutputCompositionPlan:
     """物化多输出组合为一个 `IRowSink`(`RouterRowSink`).
 
@@ -372,6 +382,7 @@ def build_output_composition(
         managed_artifact_plans=managed_artifact_plans,
         targets=spec.targets,
         workbook_by_path=workbook_by_path,
+        sink_type_precheck=sink_type_precheck,
     )
     _append_derived_target_routes(
         routes=routes,
@@ -381,6 +392,7 @@ def build_output_composition(
         workbook_by_path=workbook_by_path,
         run_parallel_mode=str(run_parallel_mode or ""),
         run_key_normalization=run_key_normalization,
+        sink_type_precheck=sink_type_precheck,
     )
     ensure_primary_route(routes)
 
@@ -389,12 +401,14 @@ def build_output_composition(
         output_paths=output_paths,
         workbook_by_path=workbook_by_path,
         managed_artifact_plans=managed_artifact_plans,
+        sink_type_precheck=sink_type_precheck,
     )
     audit_target = _maybe_create_audit_target(
         audit_sheet=spec.audit_sheet,
         output_paths=output_paths,
         workbook_by_path=workbook_by_path,
         managed_artifact_plans=managed_artifact_plans,
+        sink_type_precheck=sink_type_precheck,
     )
 
     # 构建路由器

@@ -9,6 +9,7 @@ from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.run_ir import ExecutionResult
 from ....hooks import IExecutionHook
 from ....ob.observer import Observer
+from ....sinks.accept_types import SinkTypePrecheck
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
 from ....vendor.compact.typing_extensionsx import override
@@ -547,6 +548,9 @@ class DemandRunRuntimeOptions:
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `HOLD`)."""
 
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
+    """写出前按 `sink` `accept set` 预检(默认 `OFF`;`Python` `SSOT`,禁止 `YAML`)."""
+
     def __post_init__(self) -> None:
         parallel_mode = self.parallel_mode
         if parallel_mode not in ("seq", "adaptive"):
@@ -555,6 +559,10 @@ class DemandRunRuntimeOptions:
 
         if not isinstance(self.excel_column_residency, ExcelColumnResidency):
             msg = "DemandRunRuntimeOptions.excel_column_residency must be an ExcelColumnResidency"
+            raise TypeError(msg)
+
+        if not isinstance(self.sink_type_precheck, SinkTypePrecheck):
+            msg = "DemandRunRuntimeOptions.sink_type_precheck must be a SinkTypePrecheck"
             raise TypeError(msg)
 
         max_workers = self.max_workers

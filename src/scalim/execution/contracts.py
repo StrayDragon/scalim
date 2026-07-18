@@ -9,6 +9,7 @@ import warnings
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..sinks import ISink
+from ..sinks.accept_types import SinkTypePrecheck
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
@@ -118,6 +119,12 @@ def _validate_execution_request_excel_column_residency(excel_column_residency: o
         raise TypeError(msg)
 
 
+def _validate_execution_request_sink_type_precheck(sink_type_precheck: object) -> None:
+    if not isinstance(sink_type_precheck, SinkTypePrecheck):
+        msg = "ExecutionRequest.sink_type_precheck must be a SinkTypePrecheck"
+        raise TypeError(msg)
+
+
 @dataclass(frozen=True)
 class ExecutionRequest:
     export_layout: ExportLayout
@@ -178,10 +185,13 @@ class ExecutionRequest:
     """可选:显式注入 `main_rows`(当提供时绕过主数据源 `loader`)."""
 
     capture_in_memory_rows: bool = False
-    """可选:捕获本次运行输出的 `InMemoryRows`(保留 `FieldValue` 类型域;默认关闭)."""
+    """可选:捕获本次运行输出的 `InMemoryRows`(表格总线细胞为 `object`;默认关闭)."""
 
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `format=excel` 且 `streaming=False` 时生效)."""
+
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
+    """写出前按 `sink` `accept set` 预检(默认 `OFF`)."""
 
     def __post_init__(self) -> None:
         _validate_execution_request_export_layout(self.export_layout)
@@ -193,6 +203,7 @@ class ExecutionRequest:
         _validate_execution_request_capture_in_memory_rows(self.capture_in_memory_rows)
         _validate_execution_request_key_normalization(self.key_normalization)
         _validate_execution_request_excel_column_residency(self.excel_column_residency)
+        _validate_execution_request_sink_type_precheck(self.sink_type_precheck)
 
 
 @dataclass(frozen=True)

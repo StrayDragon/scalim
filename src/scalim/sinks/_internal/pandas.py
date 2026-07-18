@@ -7,9 +7,9 @@ from ...vendor.compact.importlibx import require_optional_dependency
 if TYPE_CHECKING:
     import pandas as pd
 
-from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
-from .base import IColumnSink, IRowSink
+from .base import ColumnValues, IColumnSink, IRowSink
 
 if TYPE_CHECKING:
     import types
@@ -39,7 +39,7 @@ class PandasRowSink(IRowSink):
                 if key not in self.field_names:
                     self.field_names.append(key)
 
-    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
+    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[CellValue]) -> None:
         if len(field_keys) != len(values):
             msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
             raise ValueError(msg)
@@ -78,7 +78,7 @@ class PandasRowSink(IRowSink):
 class PandasColumnSink(IColumnSink):
     field_names: List[str]
     _row_ids: List[Hashable]
-    _columns: Dict[str, Dict[Hashable, FieldValue]]
+    _columns: Dict[str, Dict[Hashable, CellValue]]
     _closed: bool
     _auto_field_names: bool
 
@@ -94,14 +94,14 @@ class PandasColumnSink(IColumnSink):
         self._row_ids.extend(row_ids)
 
     @override
-    def write_column(self, field_key: str, values: Mapping[Hashable, FieldValue]) -> None:
+    def write_column(self, field_key: str, values: ColumnValues) -> None:
         if field_key not in self._columns:
             self._columns[field_key] = {}
         self._columns[field_key].update(values)
         if self._auto_field_names and field_key not in self.field_names:
             self.field_names.append(field_key)
 
-    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[CellValue]) -> None:
         if len(row_ids) != len(values):
             msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
             raise ValueError(msg)
@@ -114,7 +114,7 @@ class PandasColumnSink(IColumnSink):
             self.field_names.append(field_key)
 
     @override
-    def write_columns(self, columns: Mapping[str, Mapping[Hashable, FieldValue]]) -> None:
+    def write_columns(self, columns: Mapping[str, ColumnValues]) -> None:
         for field_key, values in columns.items():
             self.write_column(field_key, values)
 
@@ -139,7 +139,7 @@ class PandasColumnSink(IColumnSink):
             return pd_module.DataFrame(columns=self.field_names or [])
 
         fields = self.field_names or list(self._columns.keys())
-        data: Dict[str, List[Union[FieldValue, None]]] = {}
+        data: Dict[str, List[Union[CellValue, None]]] = {}
 
         for field_key in fields:
             col_data = self._columns.get(field_key, {})
@@ -147,7 +147,7 @@ class PandasColumnSink(IColumnSink):
 
         return pd_module.DataFrame(data, columns=fields)
 
-    def get_columns(self) -> Dict[str, Dict[Hashable, FieldValue]]:
+    def get_columns(self) -> Dict[str, Dict[Hashable, CellValue]]:
         return self._columns
 
     def get_row_ids(self) -> List[Hashable]:

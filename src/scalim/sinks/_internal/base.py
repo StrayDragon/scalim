@@ -1,10 +1,11 @@
 # region imports
 
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, List, Mapping, Optional, Sequence, Type
 
 from ..._internal.utils import atomic_paths as _atomic_paths
-from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
 
 if TYPE_CHECKING:
@@ -13,9 +14,9 @@ if TYPE_CHECKING:
 # endregion
 
 
-ColumnValues = Mapping[Hashable, FieldValue]
+ColumnValues = Mapping[Hashable, CellValue]
 ColumnBatch = Mapping[str, ColumnValues]
-ColumnData = Dict[str, Dict[Hashable, FieldValue]]
+ColumnData = Dict[str, Dict[Hashable, CellValue]]
 
 # 从 `_internal.utils.atomic_paths` 再导出,兼容既有导入路径.
 atomic_replace_temp_path = _atomic_paths.atomic_replace_temp_path
@@ -52,9 +53,9 @@ def store_rows_as_columns(
             columns[field_key][pk] = value
 
 
-def iter_row_values(row_ids: "SinkRowKeySeq", field_names: Sequence[str], columns: ColumnData) -> Iterator[List[FieldValue]]:
+def iter_row_values(row_ids: "SinkRowKeySeq", field_names: Sequence[str], columns: ColumnData) -> Iterator[List[CellValue]]:
     for pk in row_ids:
-        row_values: List[FieldValue] = []
+        row_values: List[CellValue] = []
         for field_name in field_names:
             column_data = columns.get(field_name, {})
             row_values.append(column_data.get(pk))
@@ -227,6 +228,19 @@ class IColumnSink(ISink, ABC):
         self.write_columns(columns)
 
 
+def exit_sink(sink: object, exc_type: Optional[Type[BaseException]]) -> None:
+    """`CM` 退出:成功则 `close()`;异常则 `discard()`(若有)且 `MUST NOT` 成功 `promote`."""
+    if exc_type is not None:
+        discard = getattr(sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
+        if callable(discard):
+            with suppress(Exception):
+                _ = discard()
+        return
+    close = getattr(sink, "close", None)  # pragma: allow-dynattr optional-interface: sink close
+    if callable(close):
+        _ = close()
+
+
 class BaseSink(ISink):
     """`Sink` 基类.
 
@@ -250,7 +264,7 @@ class BaseSink(ISink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 class BaseRowSink(IRowSink):
@@ -281,7 +295,7 @@ class BaseRowSink(IRowSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 class BaseColumnSink(IColumnSink):
@@ -312,7 +326,7 @@ class BaseColumnSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 __all__ = ()

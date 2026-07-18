@@ -2,9 +2,9 @@
 
 from typing import TYPE_CHECKING, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
 
-from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Self, override
-from .base import BaseRowSink, IColumnSink
+from .base import BaseRowSink, ColumnValues, IColumnSink
 
 if TYPE_CHECKING:
     import types
@@ -34,7 +34,7 @@ class InMemoryRowDataSink(BaseRowSink):
     def write_row(self, row: RowData) -> None:
         self._data.append(dict(row))
 
-    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
+    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[CellValue]) -> None:
         if len(field_keys) != len(values):
             msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
             raise ValueError(msg)
@@ -79,7 +79,7 @@ class InMemoryColumnSink(IColumnSink):
 
     field_names: List[str]
     _row_ids: List[Hashable]
-    _columns: Dict[str, Dict[Hashable, FieldValue]]
+    _columns: Dict[str, Dict[Hashable, CellValue]]
     _closed: bool
     _auto_field_names: bool
 
@@ -95,14 +95,14 @@ class InMemoryColumnSink(IColumnSink):
         self._row_ids.extend(row_ids)
 
     @override
-    def write_column(self, field_key: str, values: Mapping[Hashable, FieldValue]) -> None:
+    def write_column(self, field_key: str, values: ColumnValues) -> None:
         if field_key not in self._columns:
             self._columns[field_key] = {}
         self._columns[field_key].update(values)
         if self._auto_field_names and field_key not in self.field_names:
             self.field_names.append(field_key)
 
-    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[CellValue]) -> None:
         if len(row_ids) != len(values):
             msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
             raise ValueError(msg)
@@ -117,7 +117,7 @@ class InMemoryColumnSink(IColumnSink):
             self.field_names.append(field_key)
 
     @override
-    def write_columns(self, columns: Mapping[str, Mapping[Hashable, FieldValue]]) -> None:
+    def write_columns(self, columns: Mapping[str, ColumnValues]) -> None:
         for field_key, values in columns.items():
             self.write_column(field_key, values)
 
@@ -140,16 +140,16 @@ class InMemoryColumnSink(IColumnSink):
     # 数据访问方法
     # ============================================================
 
-    def get_columns(self) -> Dict[str, Dict[Hashable, FieldValue]]:
+    def get_columns(self) -> Dict[str, Dict[Hashable, CellValue]]:
         return self._columns
 
-    def get_column(self, field_key: str) -> Dict[Hashable, FieldValue]:
+    def get_column(self, field_key: str) -> Dict[Hashable, CellValue]:
         return self._columns.get(field_key, {})
 
     def get_rows(self) -> List[RowData]:
         rows: List[RowData] = []
         for pk in self._row_ids:
-            row: Dict[str, FieldValue] = {}
+            row: Dict[str, CellValue] = {}
             for field_key in self._columns:
                 if pk in self._columns[field_key]:
                     row[field_key] = self._columns[field_key][pk]
@@ -160,15 +160,15 @@ class InMemoryColumnSink(IColumnSink):
         self,
         *,
         include_header: bool = False,
-    ) -> List[List[Union[str, FieldValue]]]:
-        result: List[List[Union[str, FieldValue]]] = []
+    ) -> List[List[Union[str, CellValue]]]:
+        result: List[List[Union[str, CellValue]]] = []
         fields = self.field_names or list(self._columns.keys())
 
         if include_header:
             result.append(list(fields))
 
         for pk in self._row_ids:
-            row_values: List[Union[str, FieldValue]] = []
+            row_values: List[Union[str, CellValue]] = []
             for field_key in fields:
                 column_data = self._columns.get(field_key, {})
                 row_values.append(column_data.get(pk))

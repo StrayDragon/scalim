@@ -15,10 +15,16 @@ from ..._internal.utils.openpyxl_helpers import (
     best_effort_close_write_only_workbook_worksheets,
     save_openpyxl_workbook_atomic,
 )
-from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.importlibx import require_optional_dependency
 from ...vendor.compact.typing_extensionsx import Self, override
-from .base import ColumnBatch, ColumnValues, IColumnSink
+from .accept_types import (
+    SinkTypePrecheck,
+    ensure_sink_accepted_cell,
+    is_excel_accepted_cell,
+    require_sink_type_precheck,
+)
+from .base import ColumnBatch, ColumnValues, IColumnSink, exit_sink
 
 if TYPE_CHECKING:
     import types
@@ -58,7 +64,7 @@ class StreamingColumnExcelSink(IColumnSink):
     _row_ids: List[Hashable]
     _row_index: Dict[Hashable, int]
     _pending: List[Optional[Set[str]]]
-    _values: List[Optional[List[FieldValue]]]
+    _values: List[Optional[List[CellValue]]]
     _field_index: Dict[str, int]
     _workbook: Any
     _worksheet: Any
@@ -66,6 +72,7 @@ class StreamingColumnExcelSink(IColumnSink):
     _flushed_rows: int
     _closed: bool
     _allow_formulas: bool
+    _type_precheck: SinkTypePrecheck
 
     def __init__(
         self,
@@ -75,7 +82,9 @@ class StreamingColumnExcelSink(IColumnSink):
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
+        type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
     ) -> None:
+        self._type_precheck = require_sink_type_precheck(type_precheck, where="StreamingColumnExcelSink.type_precheck")
         self.output_path = output_path
         self.field_names = list(field_names)
         self.header_names = list(header_names) if header_names is not None else list(field_names)
@@ -116,7 +125,7 @@ class StreamingColumnExcelSink(IColumnSink):
 
         n = len(new_ids)
         self._pending.extend(set(self.field_names) for _ in range(n))
-        empty_row: List[FieldValue] = [None] * len(self.field_names)  # type: ignore[list-item]
+        empty_row: List[CellValue] = [None] * len(self.field_names)  # type: ignore[list-item]
         self._values.extend(list(empty_row) for _ in range(n))
 
         if not first_batch:
@@ -156,7 +165,7 @@ class StreamingColumnExcelSink(IColumnSink):
             raise KeyError(field)
 
         fidx = self._field_index[field]
-        for pk, value in values.items():
+        for pk, raw_value in values.items():
             ridx = self._row_index.get(pk)
             if ridx is None:
                 continue
@@ -164,6 +173,14 @@ class StreamingColumnExcelSink(IColumnSink):
             row_vals = self._values[ridx]
             if pending is None or row_vals is None:
                 continue
+            value = raw_value
+            if self._type_precheck is SinkTypePrecheck.ON:
+                value = ensure_sink_accepted_cell(
+                    value,
+                    field_id=field,
+                    sink_name="StreamingColumnExcelSink",
+                    accepted=is_excel_accepted_cell,
+                )
             row_vals[fidx] = value
             pending.discard(field)
 
@@ -187,6 +204,13 @@ class StreamingColumnExcelSink(IColumnSink):
         best_effort_close_write_only_workbook_worksheets(self._workbook)
         self._workbook = None
         self._worksheet = None
+
+    def discard(self) -> None:
+        if self._closed:
+            return
+        self._abandon_open_workbook()
+        self._pending = []
+        self._closed = True
 
     @override
     def close(self) -> None:
@@ -228,7 +252,7 @@ class StreamingColumnExcelSink(IColumnSink):
         exc_val: Optional[BaseException],
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
-        self.close()
+        exit_sink(self, exc_type)
 
 
 __all__ = ()

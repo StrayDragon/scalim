@@ -29,6 +29,7 @@ from ..sinks import (
     ISink,
     StreamingColumnExcelSink,
 )
+from ..sinks.accept_types import SinkTypePrecheck
 from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows, InMemoryRowsSink
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SupportedFieldIr
@@ -309,6 +310,7 @@ def _create_file_sink(
     layout: ExportLayout,
     *,
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> Optional[ISink]:
     if not output.path:
         return None
@@ -355,6 +357,7 @@ def _create_file_sink(
                 sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
                 include_header=output.include_header,
                 allow_formulas=bool(output.excel_allow_formulas),
+                type_precheck=sink_type_precheck,
             )
         if excel_column_residency is ExcelColumnResidency.WINDOW:
             return StreamingColumnExcelSink(
@@ -364,6 +367,7 @@ def _create_file_sink(
                 sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
                 include_header=output.include_header,
                 allow_formulas=bool(output.excel_allow_formulas),
+                type_precheck=sink_type_precheck,
             )
         return ColumnExcelSink(
             output_path=str(output.path),
@@ -372,6 +376,7 @@ def _create_file_sink(
             sheet_name=str(output.sheet_name) if output.sheet_name else "Sheet1",
             include_header=output.include_header,
             allow_formulas=bool(output.excel_allow_formulas),
+            type_precheck=sink_type_precheck,
         )
 
     msg = "Unsupported output format: '{}'. Supported formats: excel, csv.".format(output.format)
@@ -401,8 +406,14 @@ def _create_output_plan(
     sink: Optional[ISink],
     *,
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> _OutputPlan:
-    file_sink = _create_file_sink(output, layout, excel_column_residency=excel_column_residency)
+    file_sink = _create_file_sink(
+        output,
+        layout,
+        excel_column_residency=excel_column_residency,
+        sink_type_precheck=sink_type_precheck,
+    )
     output_path: Optional[str] = output.path or None
 
     if sink is None:
@@ -652,6 +663,7 @@ def _assemble_outputs(
             request.export_layout,
             request.sink,
             excel_column_residency=request.excel_column_residency,
+            sink_type_precheck=request.sink_type_precheck,
         )
         counting_sink = _wrap_sink_for_row_count(output_plan.sink, stats)
         return _OutputAssembly(
@@ -676,6 +688,7 @@ def _assemble_outputs(
         run_batch_size=batch_size,
         run_key_normalization=request.key_normalization,
         instrumentation=instrumentation,
+        sink_type_precheck=request.sink_type_precheck,
     )
 
     router_sink = composition_plan.sink

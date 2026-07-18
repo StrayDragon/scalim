@@ -1,36 +1,31 @@
-"""`typed rows` 的内存中间态(用于 `workflow-intermediate-store`).
+"""`InMemoryRows` 的内存中间态(用于 `workflow-intermediate-store`).
 
 说明:
-- `InMemoryRows` 与 `InMemoryCsv` 独立: 前者保留 `FieldValue` 类型域,后者为 `CSV` 等价的字符串化语义.
+- `InMemoryRows` 与 `InMemoryCsv` 独立:前者保留任意 `Python` 细胞对象,后者为 `CSV` 等价的字符串化语义.
 - `InMemoryRowsSink` 用于从 `RowData` 行流捕获 `InMemoryRows`(按 `field_id` 顺序).
+- 细胞类型门禁不在 `ROWS`;写出兼容由 `sink` `accept set` / `opt-in` 预检 / 库边界负责.
 - 运行时需兼容 `Python 3.6`.
 """
 
 from typing import Iterable, Iterator, List, Optional, Sequence
 
-from ...typedefs import FIELD_VALUE_TYPES, FieldValue, RowData
+from ...typedefs import CellValue, RowData
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 from .base import BaseRowSink
 from .sink_csv import InMemoryCsv
 
 
-def _is_field_value(value: object) -> bool:
-    if value is None:
-        return True
-    return isinstance(value, FIELD_VALUE_TYPES)
-
-
 @dataclass(frozen=True)
 class InMemoryRows:
-    """`typed rows` 的稳定表结构.
+    """表格中间态的稳定表结构.
 
     - `header`: 字段 `field_id` 序列(顺序 `SSOT`)
-    - `rows`: 行数据(值域为 `FieldValue`;每行长度必须与 `header` 等长,列序一致)
+    - `rows`: 行数据(细胞为任意 `object`;每行长度必须与 `header` 等长,列序一致)
     """
 
     header: List[str]
-    rows: List[List[FieldValue]]
+    rows: List[List[CellValue]]
 
     def __post_init__(self) -> None:
         msg: str
@@ -44,10 +39,6 @@ class InMemoryRows:
             if len(row) != width:
                 msg = "InMemoryRows.rows[{}] length mismatch: {} != {}".format(row_idx, len(row), width)
                 raise ValueError(msg)
-            for col_idx, value in enumerate(row):
-                if not _is_field_value(value):
-                    msg = "InMemoryRows.rows[{}][{}] must be a FieldValue".format(row_idx, col_idx)
-                    raise TypeError(msg)
 
     def iter_row_data(self) -> Iterator[RowData]:
         header = list(self.header)
@@ -73,17 +64,10 @@ class InMemoryRowsSink(BaseRowSink):
     def to_artifact(self) -> InMemoryRows:
         return self._artifact
 
-    def _format_row(self, row: RowData) -> List[FieldValue]:
-        values: List[FieldValue] = []
+    def _format_row(self, row: RowData) -> List[CellValue]:
+        values: List[CellValue] = []
         for field_id in self.field_ids:
-            value = row.get(field_id)
-            if not _is_field_value(value):
-                msg = "InMemoryRowsSink received non-FieldValue: field_id={!r}, type={!r}".format(
-                    str(field_id),
-                    type(value).__name__,
-                )
-                raise TypeError(msg)
-            values.append(value)
+            values.append(row.get(field_id))
         return values
 
     @override
@@ -103,7 +87,7 @@ class InMemoryRowsSink(BaseRowSink):
 def in_memory_rows_to_in_memory_csv(artifact: InMemoryRows) -> InMemoryCsv:
     """显式转换 `InMemoryRows` -> `InMemoryCsv`(保序 + 值规范化)."""
 
-    def _normalize(value: FieldValue) -> str:
+    def _normalize(value: CellValue) -> str:
         return "" if value is None else str(value)
 
     header = list(artifact.header)
@@ -118,9 +102,9 @@ def iter_in_memory_rows_as_main_rows(artifact: InMemoryRows) -> Iterable[RowData
 
     class _Iterable:
         _header: List[str]
-        _rows: List[List[FieldValue]]
+        _rows: List[List[CellValue]]
 
-        def __init__(self, header: List[str], rows: List[List[FieldValue]]) -> None:
+        def __init__(self, header: List[str], rows: List[List[CellValue]]) -> None:
             self._header = header
             self._rows = rows
 

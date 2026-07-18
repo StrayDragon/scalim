@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from typing import Dict, Optional, Sequence, Tuple
 
 from ...sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink
+from ...sinks.accept_types import SinkTypePrecheck
 from ...typedefs import RowData
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
@@ -37,6 +38,13 @@ class _CountingOutputRowSink(BaseRowSink):
     def close(self) -> None:
         self._sink.close()
 
+    def discard(self) -> None:
+        discard = getattr(self._sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
+        if callable(discard):
+            _ = discard()
+            return
+        # 无 `discard` 时不 `promote`:跳过 `close`
+
 
 def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
     field_names = list(layout.field_ids)
@@ -51,7 +59,12 @@ def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:
     )
 
 
-def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink:
+def _create_excel_row_sink(
+    output: OutputSpec,
+    layout: ExportLayout,
+    *,
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
+) -> IRowSink:
     field_names = list(layout.field_ids)
     header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
     sheet_name = str(output.sheet_name) if output.sheet_name else "Sheet1"
@@ -62,6 +75,7 @@ def _create_excel_row_sink(output: OutputSpec, layout: ExportLayout) -> IRowSink
         sheet_name=sheet_name,
         include_header=bool(output.include_header),
         allow_formulas=bool(output.excel_allow_formulas),
+        type_precheck=sink_type_precheck,
     )
 
 
@@ -86,6 +100,7 @@ def create_row_sink_for_composed_output(
     workbook_by_path: Dict[str, "ExcelWorkbookSink"],
     in_memory: bool = False,
     managed_artifact_kind: Optional[str] = None,
+    sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> Tuple[IRowSink, RowCounter, Optional[ManagedArtifactPlan]]:
     fmt = (output.format or "csv").lower()
     if not output.path and not in_memory:
@@ -128,12 +143,16 @@ def create_row_sink_for_composed_output(
                 header_names=header_names,
                 include_header=bool(output.include_header),
                 allow_formulas=bool(output.excel_allow_formulas),
+                type_precheck=sink_type_precheck,
             )
             sink = _CountingOutputRowSink(sheet_sink, counter)
             return sink, counter, None
 
         # 单工作表 `Excel` 输出(独立文件)
-        sink = _CountingOutputRowSink(_create_excel_row_sink(output, layout), counter)
+        sink = _CountingOutputRowSink(
+            _create_excel_row_sink(output, layout, sink_type_precheck=sink_type_precheck),
+            counter,
+        )
         return sink, counter, None
 
     msg = "Unsupported output format for composed outputs: {!r}".format(output.format)
