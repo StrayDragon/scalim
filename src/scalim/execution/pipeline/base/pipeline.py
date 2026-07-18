@@ -21,6 +21,7 @@ from ....ob.manager import ObserverManager
 from ....planning.operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks import IColumnSink, IRowSink, ISink
+from ....sinks._internal.base import discard_sink
 from ....spec.ir import DemandIr, FieldIr, SourceIr
 from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.aliases import LoaderResultMapCallable
@@ -494,7 +495,7 @@ class SeqPipeline(Pipeline):
         except Exception:
             if sink:
                 with contextlib.suppress(Exception):
-                    sink.close()
+                    discard_sink(sink)
             raise
         finally:
             with contextlib.suppress(Exception):

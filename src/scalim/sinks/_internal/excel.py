@@ -550,11 +550,27 @@ class ColumnExcelSink(IColumnSink):
 
     @override
     def write_columns(self, columns: ColumnBatch) -> None:
-        update_columns(self._columns, columns)
+        checked: Dict[str, ColumnValues] = {}
+        for field_key, values in columns.items():
+            checked[str(field_key)] = self._maybe_precheck_column(str(field_key), values)
+        update_columns(self._columns, checked)
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
         start_index = len(self._row_ids)
+        if self._type_precheck is SinkTypePrecheck.ON:
+            checked_rows: List[RowData] = []
+            for row in rows:
+                checked: Dict[str, object] = {}
+                for field_key, value in row.items():
+                    checked[str(field_key)] = ensure_sink_accepted_cell(
+                        value,
+                        field_id=str(field_key),
+                        sink_name="ColumnExcelSink",
+                        accepted=is_excel_accepted_cell,
+                    )
+                checked_rows.append(checked)
+            rows = checked_rows
 
         def _pk_factory(row_idx: int) -> int:
             return start_index + row_idx

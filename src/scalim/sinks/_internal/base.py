@@ -228,13 +228,18 @@ class IColumnSink(ISink, ABC):
         self.write_columns(columns)
 
 
+def discard_sink(sink: object) -> None:
+    """失败路径:有 `discard` 则调用;否则 `MUST NOT` `close()`(避免半成品 `promote`)."""
+    discard = getattr(sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
+    if callable(discard):
+        _ = discard()
+
+
 def exit_sink(sink: object, exc_type: Optional[Type[BaseException]]) -> None:
     """`CM` 退出:成功则 `close()`;异常则 `discard()`(若有)且 `MUST NOT` 成功 `promote`."""
     if exc_type is not None:
-        discard = getattr(sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
-        if callable(discard):
-            with suppress(Exception):
-                _ = discard()
+        with suppress(Exception):
+            discard_sink(sink)
         return
     close = getattr(sink, "close", None)  # pragma: allow-dynattr optional-interface: sink close
     if callable(close):

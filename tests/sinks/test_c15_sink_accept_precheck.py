@@ -255,3 +255,253 @@ def test_counting_output_row_sink_discard_delegates(tmp_path: Path) -> None:
 
     wrapped2 = _CountingOutputRowSink(_NoDiscard(), RowCounter())  # type: ignore[arg-type]
     wrapped2.discard()
+
+
+def test_column_excel_write_columns_and_batch_honor_precheck(tmp_path: Path) -> None:
+    np = pytest.importorskip("numpy")
+    bad = np.datetime64("2024-01-02T03:04:05")
+    path = tmp_path / "col_batch.xlsx"
+    with pytest.raises(TypeError, match=r"sink type precheck failed"):
+        with ColumnExcelSink(str(path), field_names=["v"], include_header=True, type_precheck=SinkTypePrecheck.ON) as sink:
+            sink.set_row_ids([1])
+            sink.write_columns({"v": {1: bad}})
+    assert not path.exists()
+
+    path2 = tmp_path / "col_rows.xlsx"
+    with pytest.raises(TypeError, match=r"sink type precheck failed"):
+        with ColumnExcelSink(str(path2), field_names=["v"], include_header=True, type_precheck=SinkTypePrecheck.ON) as sink:
+            sink.write_batch([{"v": bad}])
+    assert not path2.exists()
+
+    path3 = tmp_path / "col_rows_ok.xlsx"
+    with ColumnExcelSink(str(path3), field_names=["v"], include_header=True, type_precheck=SinkTypePrecheck.ON) as sink:
+        sink.write_batch([{"v": 9}])
+    assert path3.exists()
+
+
+def test_run_ir_engine_failure_discards_excel_without_final_file(tmp_path: Path) -> None:
+    from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, run_ir
+    from scalim.execution.runtime_bindings import RuntimeBindings
+    from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
+
+    out = tmp_path / "fail.xlsx"
+
+    def _rows():
+        yield {"order_id": 1}
+        raise RuntimeError("boom-mid-run")
+
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    demand_ir = DemandIr.from_irs(
+        sources=[],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        main_source=main_source,
+    )
+    request = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True),
+        runtime_bindings=RuntimeBindings(main_source_loaders={"orders": _rows}),
+    )
+    with pytest.raises(RuntimeError, match=r"boom-mid-run"):
+        _ = run_ir(demand_ir, request)
+    assert not out.exists()
+
+
+def test_tee_and_counting_discard_forwards() -> None:
+    import importlib
+
+    from scalim.sinks import BaseRowSink, BaseSink, IColumnSink
+    from scalim.typedefs import RowData
+
+    run_ir_mod = importlib.import_module("scalim.execution.run_ir")
+
+    class _TrackRow(BaseRowSink):
+        def __init__(self) -> None:
+            self.discarded = False
+
+        def write_row(self, row: object) -> None:
+            _ = row
+
+        def write_batch(self, rows: object) -> None:
+            _ = rows
+
+        def close(self) -> None:
+            return None
+
+        def discard(self) -> None:
+            self.discarded = True
+
+    class _TrackCol(IColumnSink):
+        def __init__(self) -> None:
+            self.discarded = False
+
+        def set_row_ids(self, row_ids: object) -> None:
+            _ = row_ids
+
+        def write_column(self, field_key: str, values: object) -> None:
+            _ = (field_key, values)
+
+        def write_columns(self, columns: object) -> None:
+            _ = columns
+
+        def write_batch(self, rows: object) -> None:
+            _ = rows
+
+        def close(self) -> None:
+            return None
+
+        def discard(self) -> None:
+            self.discarded = True
+
+    class _TrackBatch(BaseSink):
+        def __init__(self) -> None:
+            self.discarded = False
+
+        def write_batch(self, rows: object) -> None:
+            _ = rows
+
+        def close(self) -> None:
+            return None
+
+        def discard(self) -> None:
+            self.discarded = True
+
+    a = _TrackRow()
+    b = _TrackRow()
+    run_ir_mod._TeeRowSink(a, b).discard()
+    assert a.discarded and b.discarded
+
+    c1 = _TrackCol()
+    c2 = _TrackCol()
+    run_ir_mod._TeeColumnSink(c1, c2).discard()
+    assert c1.discarded and c2.discarded
+
+    b1 = _TrackBatch()
+    b2 = _TrackBatch()
+    run_ir_mod._TeeBatchSink(b1, b2).discard()
+    assert b1.discarded and b2.discarded
+
+    tracker = run_ir_mod.InternalStatsCollector()
+    inner = _TrackCol()
+    run_ir_mod._CountingColumnSink(inner, tracker).discard()
+    assert inner.discarded is True
+    inner2 = _TrackBatch()
+    run_ir_mod._CountingBatchSink(inner2, tracker).discard()
+    assert inner2.discarded is True
+
+
+def test_column_excel_write_columns_precheck_on_accepts_ok(tmp_path: Path) -> None:
+    path = tmp_path / "cols_ok.xlsx"
+    with ColumnExcelSink(str(path), field_names=["v"], include_header=True, type_precheck=SinkTypePrecheck.ON) as sink:
+        sink.set_row_ids([1])
+        sink.write_columns({"v": {1: 7}})
+    assert path.exists()
+
+
+def test_in_memory_rows_sink_discard_clears_rows() -> None:
+    from scalim.sinks.rows import InMemoryRowsSink
+
+    sink = InMemoryRowsSink(field_ids=["v"])
+    sink.write_row({"v": 1})
+    sink.discard()
+    assert sink.to_artifact().rows == []
+    sink.discard()
+
+
+def test_router_row_sink_discard_is_idempotent() -> None:
+    from scalim.execution.output_composition.router import FinalTargetState, RouteState, RouterRowSink
+    from scalim.execution.output_composition.sinks import RowCounter
+    from scalim.sinks import BaseRowSink
+
+    class _Track(BaseRowSink):
+        def __init__(self) -> None:
+            self.discarded = 0
+
+        def write_row(self, row: object) -> None:
+            _ = row
+
+        def write_batch(self, rows: object) -> None:
+            _ = rows
+
+        def close(self) -> None:
+            return None
+
+        def discard(self) -> None:
+            self.discarded += 1
+
+    class _NoDiscard(BaseRowSink):
+        def write_row(self, row: object) -> None:
+            _ = row
+
+        def write_batch(self, rows: object) -> None:
+            _ = rows
+
+        def close(self) -> None:
+            return None
+
+    inner = _Track()
+    meta = _Track()
+    audit = _Track()
+    router = RouterRowSink(
+        routes=[
+            RouteState(
+                target_id="t",
+                sink=inner,
+                predicate=None,
+                is_primary=True,
+                output_path=None,
+                sheet_name=None,
+            )
+        ],
+        failure_policy="all_fail",
+        workbook_resources=[],
+        meta_target=FinalTargetState(
+            target_id="meta",
+            sink=meta,
+            output_counter=RowCounter(),
+            output_path=None,
+            sheet_name=None,
+        ),
+        audit_target=FinalTargetState(
+            target_id="audit",
+            sink=audit,
+            output_counter=RowCounter(),
+            output_path=None,
+            sheet_name=None,
+        ),
+    )
+    router.discard()
+    router.discard()
+    assert inner.discarded == 1
+    assert meta.discarded == 1
+    assert audit.discarded == 1
+
+    # 无 `discard` 的路由/元信息 sink:跳过即可,不得回退到 `close()` promote.
+    bare = RouterRowSink(
+        routes=[
+            RouteState(
+                target_id="t2",
+                sink=_NoDiscard(),
+                predicate=None,
+                is_primary=True,
+                output_path=None,
+                sheet_name=None,
+            )
+        ],
+        failure_policy="all_fail",
+        workbook_resources=[],
+        meta_target=FinalTargetState(
+            target_id="meta2",
+            sink=_NoDiscard(),
+            output_counter=RowCounter(),
+            output_path=None,
+            sheet_name=None,
+        ),
+        audit_target=FinalTargetState(
+            target_id="audit2",
+            sink=_NoDiscard(),
+            output_counter=RowCounter(),
+            output_path=None,
+            sheet_name=None,
+        ),
+    )
+    bare.discard()

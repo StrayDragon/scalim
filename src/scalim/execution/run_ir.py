@@ -29,6 +29,7 @@ from ..sinks import (
     ISink,
     StreamingColumnExcelSink,
 )
+from ..sinks._internal.base import discard_sink as _best_effort_discard_sink
 from ..sinks.accept_types import SinkTypePrecheck
 from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows, InMemoryRowsSink
@@ -73,6 +74,10 @@ class _TeeRowSink(BaseRowSink):
         self._primary.close()
         self._secondary.close()
 
+    def discard(self) -> None:
+        _best_effort_discard_sink(self._primary)
+        _best_effort_discard_sink(self._secondary)
+
 
 @dataclass(frozen=True)
 class _OutputPlan:
@@ -112,6 +117,10 @@ class _TeeColumnSink(IColumnSink):
     def close(self) -> None:
         self._primary.close()
         self._secondary.close()
+
+    def discard(self) -> None:
+        _best_effort_discard_sink(self._primary)
+        _best_effort_discard_sink(self._secondary)
 
 
 class _NullSink(BaseSink):
@@ -156,6 +165,9 @@ class _CountingRowSink(BaseRowSink):
     def close(self) -> None:
         self._sink.close()
 
+    def discard(self) -> None:
+        _best_effort_discard_sink(self._sink)
+
 
 class _CountingColumnSink(IColumnSink):
     _sink: IColumnSink
@@ -187,6 +199,9 @@ class _CountingColumnSink(IColumnSink):
     def close(self) -> None:
         self._sink.close()
 
+    def discard(self) -> None:
+        _best_effort_discard_sink(self._sink)
+
 
 class _CountingBatchSink(ISink):
     _sink: ISink
@@ -204,6 +219,9 @@ class _CountingBatchSink(ISink):
     @override
     def close(self) -> None:
         self._sink.close()
+
+    def discard(self) -> None:
+        _best_effort_discard_sink(self._sink)
 
 
 class _TeeBatchSink(BaseSink):
@@ -223,6 +241,10 @@ class _TeeBatchSink(BaseSink):
     def close(self) -> None:
         self._primary.close()
         self._secondary.close()
+
+    def discard(self) -> None:
+        _best_effort_discard_sink(self._primary)
+        _best_effort_discard_sink(self._secondary)
 
 
 def _create_engine_sink_for_in_memory_rows_capture(
@@ -255,7 +277,7 @@ def _prepare_engine_sink(
         )
     except Exception:
         with contextlib.suppress(Exception):
-            sink.close()
+            _best_effort_discard_sink(sink)
         with contextlib.suppress(Exception):
             close = getattr(observer_manager, "close", None)  # pragma: allow-dynattr optional-interface: observer_manager
             if callable(close):
@@ -440,7 +462,7 @@ def _create_output_plan(
             _describe_sink_kind(sink),
         )
         with contextlib.suppress(Exception):
-            file_sink.close()
+            _best_effort_discard_sink(file_sink)
         raise ValueError(msg) from e
 
     return _OutputPlan(sink=tee_sink, output_path=output_path)
@@ -708,7 +730,7 @@ def _assemble_outputs(
                 _describe_sink_kind(request.sink),
             )
             with contextlib.suppress(Exception):
-                router_sink.close()
+                _best_effort_discard_sink(router_sink)
             raise ValueError(msg) from e
 
     counting_sink = _wrap_sink_for_row_count(composed_sink, stats)
@@ -755,7 +777,7 @@ def _create_engine_with_cleanup(
         )
     except Exception:
         with contextlib.suppress(Exception):
-            sink.close()
+            _best_effort_discard_sink(sink)
         with contextlib.suppress(Exception):
             observer_manager.close()
         raise
@@ -819,7 +841,7 @@ def _run_ir_with_plan_and_managers(
         #
         # 语义:
         # - `engine.run(...)` 成功: `sink.close()` 失败必须传播(输出落盘/提交的真实成功标准).
-        # - `engine.run(...)` 失败: `sink.close()` 尽力而为,不得覆盖原异常.
+        # - `engine.run(...)` 失败: `MUST` `discard`(若有)且 `MUST NOT` `close()` `promote` 半成品;不得覆盖原异常.
         if run_ok:
             try:
                 engine_sink.close()
@@ -828,7 +850,7 @@ def _run_ir_with_plan_and_managers(
                     observer_manager.close()
         else:
             with contextlib.suppress(Exception):
-                engine_sink.close()
+                _best_effort_discard_sink(engine_sink)
             with contextlib.suppress(Exception):
                 observer_manager.close()
 

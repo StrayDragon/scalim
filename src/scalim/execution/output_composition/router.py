@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import hashlib
 import time
+from contextlib import suppress
 from typing import List, Optional, Sequence, Tuple
 
 from ..._project_constants import VERSION as SCALIM_VERSION
@@ -297,6 +298,27 @@ class RouterRowSink(BaseRowSink):
 
         # 4) 输出级观测结束事件
         self._emit_target_end_events()
+
+    def discard(self) -> None:
+        """失败路径:丢弃路由/`workbook` 半成品,`MUST NOT` `promote` 最终文件."""
+        if self._closed:
+            return
+        self._closed = True
+        for route in self._routes:
+            discard = getattr(route.sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
+            if callable(discard):
+                with suppress(Exception):
+                    _ = discard()
+        for target in (self._meta_target, self._audit_target):
+            if target is None:
+                continue
+            discard = getattr(target.sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
+            if callable(discard):
+                with suppress(Exception):
+                    _ = discard()
+        for wb in self._workbook_resources:
+            with suppress(Exception):
+                wb.discard()
 
     def _write_meta_and_audit(self) -> None:
         self._write_meta()

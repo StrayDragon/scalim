@@ -83,6 +83,13 @@ class InMemoryRowsSink(BaseRowSink):
     def close(self) -> None:
         self._closed = True
 
+    def discard(self) -> None:
+        """失败路径:丢弃已捕获行,`MUST NOT` 当作成功产物."""
+        if self._closed:
+            return
+        self._artifact = InMemoryRows(header=list(self.field_ids), rows=[])
+        self._closed = True
+
 
 def in_memory_rows_to_in_memory_csv(artifact: InMemoryRows) -> InMemoryCsv:
     """显式转换 `InMemoryRows` -> `InMemoryCsv`(保序 + 值规范化)."""

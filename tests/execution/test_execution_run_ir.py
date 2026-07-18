@@ -329,11 +329,15 @@ def test_prepare_engine_sink_closes_sink_and_observer_manager_on_capture_error()
         def __init__(self) -> None:
             super(_ClosingColumnSink, self).__init__(["order_id"])
             self.closed = False
+            self.discarded = False
 
         @override
         def close(self) -> None:
             self.closed = True
             super(_ClosingColumnSink, self).close()
+
+        def discard(self) -> None:
+            self.discarded = True
 
     sink = _ClosingColumnSink()
     observer_manager = _ObserverManager()
@@ -346,7 +350,8 @@ def test_prepare_engine_sink_closes_sink_and_observer_manager_on_capture_error()
             observer_manager=observer_manager,
         )
 
-    assert sink.closed is True
+    assert sink.discarded is True
+    assert sink.closed is False
     assert observer_manager.closed is True
 
 
@@ -358,11 +363,15 @@ def test_prepare_engine_sink_handles_observer_manager_close_not_callable() -> No
         def __init__(self) -> None:
             super(_ClosingColumnSink, self).__init__(["order_id"])
             self.closed = False
+            self.discarded = False
 
         @override
         def close(self) -> None:
             self.closed = True
             super(_ClosingColumnSink, self).close()
+
+        def discard(self) -> None:
+            self.discarded = True
 
     sink = _ClosingColumnSink()
     observer_manager = _ObserverManager()
@@ -375,7 +384,8 @@ def test_prepare_engine_sink_handles_observer_manager_close_not_callable() -> No
             observer_manager=observer_manager,
         )
 
-    assert sink.closed is True
+    assert sink.discarded is True
+    assert sink.closed is False
 
 
 def test_run_ir_rejects_unknown_key_normalization() -> None:
@@ -458,6 +468,7 @@ def test_run_ir_closes_sink_on_exception() -> None:
     class _ExplodingSink(BaseRowSink):
         def __init__(self) -> None:
             self.closed = False
+            self.discarded = False
 
         @override
         def write_row(self, row) -> None:  # type: ignore[override]
@@ -467,6 +478,9 @@ def test_run_ir_closes_sink_on_exception() -> None:
         @override
         def close(self) -> None:
             self.closed = True
+
+        def discard(self) -> None:
+            self.discarded = True
 
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
@@ -483,7 +497,8 @@ def test_run_ir_closes_sink_on_exception() -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         _ = run_ir(demand_ir, request)
-    assert sink.closed is True
+    assert sink.discarded is True
+    assert sink.closed is False
 
 
 def test_run_ir_raises_when_sink_close_fails_after_successful_run() -> None:
@@ -524,6 +539,7 @@ def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
     class _ExplodingSink(BaseRowSink):
         def __init__(self) -> None:
             self.closed = False
+            self.discarded = False
 
         @override
         def write_row(self, row) -> None:  # type: ignore[override]
@@ -534,6 +550,10 @@ def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
         def close(self) -> None:
             self.closed = True
             raise RuntimeError("close boom")
+
+        def discard(self) -> None:
+            self.discarded = True
+            raise RuntimeError("discard boom")
 
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
@@ -550,7 +570,8 @@ def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
 
     with pytest.raises(RuntimeError, match="run boom"):
         _ = run_ir(demand_ir, request)
-    assert sink.closed is True
+    assert sink.discarded is True
+    assert sink.closed is False
 
 
 def test_create_tee_sink_column_mode_delegates_to_both_sinks() -> None:
@@ -575,7 +596,7 @@ def test_create_tee_sink_rejects_incompatible_sinks() -> None:
         _ = run_ir_mod._create_tee_sink(primary, secondary)  # noqa: SLF001
 
 
-def test_create_output_plan_closes_file_sink_on_incompatible_tee(tmp_path: Path) -> None:
+def test_create_output_plan_discards_file_sink_on_incompatible_tee(tmp_path: Path) -> None:
     output_path = tmp_path / "out.csv"
     layout = ExportLayout(field_ids=("id",), header_names=None)
     memory_column_sink = InMemoryColumnSink(field_names=["id"])
@@ -587,8 +608,8 @@ def test_create_output_plan_closes_file_sink_on_incompatible_tee(tmp_path: Path)
             memory_column_sink,
         )
 
-    # If file sink wasn't closed, the temp file would remain un-finalized and `output_path` would not exist.
-    assert output_path.exists()
+    # Failure path MUST discard (not close/promote); final path must not exist.
+    assert not output_path.exists()
 
 
 def test_create_output_plan_error_message_classifies_non_row_or_column_sink_as_isink(tmp_path: Path) -> None:
@@ -615,11 +636,11 @@ def test_create_output_plan_error_message_classifies_non_row_or_column_sink_as_i
             batch_sink,
         )
 
-    assert output_path.exists()
+    assert not output_path.exists()
     assert batch_sink.closed is False
 
 
-def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
+def test_run_ir_discards_sink_and_closes_observers_when_engine_init_fails() -> None:
     class _ExplodingEngine:
         def __init__(self, **_kwargs) -> None:  # type: ignore[no-untyped-def]
             raise RuntimeError("init boom")
@@ -627,6 +648,7 @@ def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
     class _CloseTrackingSink(BaseRowSink):
         def __init__(self) -> None:
             self.closed = False
+            self.discarded = False
 
         @override
         def write_row(self, row) -> None:  # type: ignore[override]
@@ -635,6 +657,9 @@ def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
         @override
         def close(self) -> None:
             self.closed = True
+
+        def discard(self) -> None:
+            self.discarded = True
 
     class _CloseTrackingObserver(Observer):
         def __init__(self) -> None:
@@ -665,7 +690,8 @@ def test_run_ir_closes_sink_and_observers_when_engine_init_fails() -> None:
     with pytest.raises(RuntimeError, match="init boom"):
         _ = run_ir(demand_ir, request, engine_factory=_ExplodingEngine)
 
-    assert sink.closed is True
+    assert sink.discarded is True
+    assert sink.closed is False
     assert observer.closed is True
 
 
