@@ -218,10 +218,13 @@
 - `workflow.resources.books`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_big_data_report.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_shared_workbooks.yaml`
+  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_temporal_field_values.yaml`
 - 通过 demand outputs 绑定共享 book（`outputs[*].to.book` + `outputs[*].write`）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_shared_workbooks_demand.yaml`
+  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_demo_temporal_field_values_demand.yaml`
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch090_workflow_shared_workbooks.py`
+    - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch150_workflow_temporal_field_values.py`（`FieldValue` 时间类型保留为 Excel 日期单元格）
 
 ### options
 

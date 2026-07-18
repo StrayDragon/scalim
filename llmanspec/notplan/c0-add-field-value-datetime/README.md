@@ -1,30 +1,29 @@
-# notplan: c0-add-field-value-datetime（暂缓观察）
+# notplan stub: c0-add-field-value-datetime
 
-> **状态**: 已从 `llmanspec/changes/` 移入 `notplan/`，**不**作为当前可 apply 变更。  
-> **原因**: 扩展 `FieldValue` 含 `datetime`/`date` 后，Excel/`openpyxl` 对 aware `datetime` 必须去 `tzinfo`；静默丢时区可能扭曲绝对时刻语义，需单独探索。  
-> **当前运行时策略（临时）**: `InMemoryRowsSink` 对非 `FieldValue` 做 `str(value)`（方案 B），对齐旧 CSV 中间层，先解锁 pay-order 等业务。
+> **已转正** → [`llmanspec/changes/c0-add-field-value-datetime/`](../../changes/c0-add-field-value-datetime/)  
+> 本目录仅保留指针，**禁止**再按下方旧策略开第二份 change。
 
-## Why（仍成立）
+## 被本转正提案承接 / 替代的内容
 
-`xlsx_file` → `InMemoryRows` 后，loader 的 `datetime`/`date` 会撞上 `FieldValue` 闭集。  
-正式扩展值域是正确方向，但 Excel 边界与 tz 语义未收敛前不宜落地。
+| 旧 notplan 内容 | 状态 |
+|---|---|
+| 扩展 `FieldValue` 含时间类型 | **承接**（且扩到 `time`/`timedelta`） |
+| 撤 `InMemoryRowsSink` 的 `str()` 补丁 | **承接** |
+| Excel 边界 `prepare_excel_cell_value` **去 tz** | **替代 / 否决** — 改为原样透传，与 openpyxl 同源报错 |
+| 中间态拒绝或改写 aware | **否决** — aware 可进 ROWS；错误出在写出边界 |
+| YAML `value_cast: datetime` | **仍非本 change**（另案；勿在本 stub 重开） |
 
-## openpyxl 实验结论（仓库 venv 3.1.5）
+## 为何曾停在 notplan
 
-- naive `datetime` / `date`：可写可读
-- aware `datetime`/`time`：`TypeError: Excel does not support timezones...`
-- 因此若 A 落地，Excel 边界几乎必然要去 tz 或拒绝 aware——需产品决策后再转正
+`0ebee6d6` 用 `str()` 救活业务；正式扩类型卡在「是否去 tz」。  
+2026-07-18 产品定案：**不去 tz、不改用户数据**，故转正并改写 design。
 
-## 转正前必须回答
+## 证据 / MVP
 
-1. aware `datetime`：拒绝 / 去 tz 写出 / 转 UTC 再去 tz？
-2. Excel 单元格要原生日期，还是文本日期可接受（B 已是文本）？
-3. `time` 是否纳入 `FieldValue`？
+`.tmp/repro/openpyxl-write-type-support/probe_write_types.py`  
+`.tmp/evidence/openpyxl-write-type-support/`
 
-## 转正路径
+## 后续勿重复做
 
-1. `llman-sdd-propose` 新建 active change（可复用本目录草案）
-2. 收敛 design 中 tz 策略后 `llman-sdd-apply`
-3. 落地后可移除 `InMemoryRowsSink` 的 `str()` 兼容分支（若值域已覆盖业务类型）
-
-原 proposal/design/tasks/specs 仍保留在本目录供后续探索。
+- 不要再新建 `add-field-value-datetime` / `strip-tz-at-excel-boundary` 类 change。
+- pandas / parquet 等其它 sink 类型矩阵：见 active change `design.md` Future，另立 change。

@@ -189,4 +189,29 @@ def load_table_typed_values() -> Iterable[Mapping[str, object]]:
     ]
 
 
+def load_table_temporal_values() -> Iterable[Mapping[str, object]]:
+    from datetime import date, datetime, time, timedelta
+
+    return [
+        {
+            "order_id": 1001,
+            "created": datetime(2024, 1, 2, 3, 4, 5),
+            "day": date(2024, 1, 2),
+            "clock": time(3, 4, 5),
+            "span": timedelta(days=1, seconds=30),
+            "label": "ok",
+        }
+    ]
+
+
+def load_table_aware_datetime() -> Iterable[Mapping[str, object]]:
+    from datetime import datetime, timezone
+
+    return [
+        {
+            "created": datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
+        }
+    ]
+
+
 reset_timing()

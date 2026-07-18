@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "output-sink-contracts"
 purpose: "定义 sink 接口稳定性与可选依赖提示规范，确保内建与外部 sink 的长期兼容、可诊断性与一致行为。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
-requirements[13]{req_id,title,statement}:
+requirements[14]{req_id,title,statement}:
   r65,Sink 契约稳定,"系统 MUST 保持 `ISink`/`IRowSink`/`IColumnSink`/`BaseRowSink` 等接口契约稳定,并确保内建 sinks 满足契约."
   r309,可选依赖错误提示清晰,系统 MUST 对可选依赖(如 Excel 的 `openpyxl`)提供一致且可诊断的错误路径.
   r432,file sinks 写入前创建输出目录,"系统 MUST 在 file sinks(如 CSV/Excel)写入输出文件前确保 `output.path` 的父目录存在;当父目录不存在时系统 MUST 以 best-effort 方式创建目录(`mkdir(parents=True, exist_ok=True)`)."
@@ -16,7 +16,8 @@ requirements[13]{req_id,title,statement}:
   r169,"StreamingColumnExcelSink MUST be opt-in and may release residency before close","系统 MUST 提供可选的 `StreamingColumnExcelSink`(或等价命名)作为 `IColumnSink` 实现以降低宽表 `pre_close` 驻留: - MUST NOT 改变默认 `ColumnExcelSink` 行为 - 调用方可在行字段齐备后触发刷盘并释放对应缓冲(显式 `flush` 或等价语义) - `close()` MUST 刷剩余数据并以原子临时文件落盘,失败路径 MUST best-effort 清理临时文件并对 write_only worksheet 尽力关闭 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线 - 行为变更 MUST 有 evidence-mvp 证明相对 `ColumnExcelSink` 在目标 shape 上降低 `pre_close`/`peak` RSS 且输出正确"
   r188,"StreamingColumnExcelSink MUST accept append set_row_ids for multi-batch windows","系统 MUST 使可选的 `StreamingColumnExcelSink` 的 `set_row_ids` 支持多次调用以追加行窗: - 首次调用 MUST 打开 `write_only` workbook(并按需写表头) - 后续调用 MUST 追加新 `row_id` 与对应行缓冲,且 MUST NOT 重建已打开的 workbook - 重复 `row_id` MUST fail-fast - MUST NOT 改变默认 `ColumnExcelSink` 行为 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线"
   r206,"Excel column residency MUST be Python opt-in for IR file sinks","系统 MUST 提供闭集 `ExcelColumnResidency`(`HOLD`|`WINDOW`)作为 Python runtime SSOT,用于在列式 Excel 文件写出时选择驻留策略: - 默认 MUST 为 `HOLD`(继续使用 `ColumnExcelSink`) - 当 `OutputSpec.format=excel` 且 `streaming=False` 且 residency=`WINDOW` 时,工厂 MUST 构造 `StreamingColumnExcelSink` - MUST NOT 改变默认 `ColumnExcelSink` 行为 - MUST NOT 将 residency/streaming knobs 引入 YAML 主线 - 调用方显式传入 `ExecutionRequest.sink` 时 MUST 优先于工厂选择"
-scenarios[30]{req_id,id,given,when,then,feature}:
+  r918,Excel sinks MUST pass through temporal FieldValues without rewriting timezone,"当内建 Excel / workbook / sheetbook 写出路径接收 `FieldValue` 时，系统 MUST 允许 `datetime`/`date`/`time`/`timedelta` 原样交给 openpyxl（不得仅因类型而先 `str()`）。系统 MUST NOT 为兼容 openpyxl 而清除 `tzinfo`、转换为 UTC、或以其它方式改写用户时间值；timezone-aware 值若被 openpyxl 拒绝，该错误 MUST 向上暴露。`escape_excel_formula` MUST 仍仅对 `str` 做公式转义。"
+scenarios[33]{req_id,id,given,when,then,feature}:
   r65,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r65,"旧-sink-实现可继续工作","",现有 sink 继承 `BaseRowSink` 或实现 `IRowSink`,不需修改即可运行,true
   r309,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
@@ -47,3 +48,6 @@ scenarios[30]{req_id,id,given,when,then,feature}:
   r206,"default-hold-uses-column-excel",调用方未设置 residency 或显式 HOLD 且 excel streaming=False,框架经 `_create_file_sink` 创建文件 sink,系统 MUST 使用 ColumnExcelSink,true
   r206,"window-selects-streaming-column-excel",调用方设置 ExcelColumnResidency.WINDOW 且 excel streaming=False 且无 output_composition,框架经 `_create_file_sink` 创建文件 sink,系统 MUST 使用 StreamingColumnExcelSink,true
   r206,"no-yaml-residency-knobs",维护者审阅 YAML DSL 主线与 schema,检查 residency/streaming 配置面,MUST NOT 出现 write.streaming 或 excel_column_residency YAML 字段,true
+  r918,"excel-write-preserves-naive-datetime",segment/row contains naive datetime,commit/export via openpyxl,"cell value MUST be datetime-like with Excel date data_type (not forced text)",true
+  r918,"excel-write-preserves-date-time-timedelta",segment/row contains date or time or timedelta,commit/export via openpyxl,cell MUST write successfully as openpyxl temporal/date type,true
+  r918,"excel-write-does-not-strip-tzinfo",segment/row contains aware datetime,commit/export via openpyxl path,system MUST NOT clear tzinfo; openpyxl timezone TypeError MAY propagate,true

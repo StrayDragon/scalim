@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import hashlib
 from abc import ABC, abstractmethod
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
@@ -1263,6 +1264,6 @@ def fingerprint_for_meta(
     return h.hexdigest()
 
 
-NonNullFieldValue = Union[int, float, Decimal, str, bool]
+NonNullFieldValue = Union[int, float, Decimal, str, bool, datetime, date, time, timedelta]
 
 __all__ = ()

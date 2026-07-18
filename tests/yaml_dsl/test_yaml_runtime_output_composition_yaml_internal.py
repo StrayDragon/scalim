@@ -750,11 +750,19 @@ def test_compile_call_by_post_field_rejects_non_callable_reference() -> None:
 
 
 def test_score_by_rank_post_field_handles_missing_rank_and_invalid_rank_types() -> None:
+    from datetime import datetime
+
     spec = oc_yaml._compile_score_by_rank_post_field(out_field_id="score", cfg={})  # noqa: SLF001
     assert spec.calculator({}) is None
 
     with pytest.raises(TypeError, match=r"requires integer rank"):
         _ = spec.calculator({"rank": "oops"})
+
+    with pytest.raises(TypeError, match=r"requires integer rank"):
+        _ = spec.calculator({"rank": True})
+
+    with pytest.raises(TypeError, match=r"requires integer rank"):
+        _ = spec.calculator({"rank": datetime(2024, 1, 2, 3, 4, 5)})
 
 
 def test_compile_compute_post_field_executes_expression_and_validates_result_type() -> None:

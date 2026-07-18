@@ -37,11 +37,11 @@
 - **落地**: `shared-book-spill-commit`；禁止默认边写 openpyxl。
 - **前置**: c20/c25 正规化后更易做；完整模块合并为软前置。
 
-### later — `FieldValue` 纳入 `datetime`/`date`
+### done / active — `FieldValue` 纳入 openpyxl 时间类型
 
-- **必要？** **产品决策后必要**。临时 `str()`；aware tz 未收敛。
-- **触发**: 要 Excel 原生日期 + tz 策略定案。
-- **落地**: notplan `c0-add-field-value-datetime` 转正。
+- **状态**: **已转正** → active change `c0-add-field-value-datetime`（`llmanspec/changes/c0-add-field-value-datetime/`）。
+- **定案**: 含 `datetime`/`date`/`time`/`timedelta`；撤中间态 `str()`；**不去 tz**（与 openpyxl 同源报错）。
+- **勿重复**: notplan 同名目录仅为指针 stub；勿再开平行 change。
 
 ### later — output bypass / 非托管写出
 

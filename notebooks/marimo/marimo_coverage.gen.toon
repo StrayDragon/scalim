@@ -1,9 +1,9 @@
 generated_by: scripts/gen-marimo-coverage.py
 summary:
-  ok: 44
-  total: 44
+  ok: 45
+  total: 45
 warnings[0	]:
-rows[44	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
+rows[45	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   hub	demo_big_data_report/demo_main.py	notebooks/marimo/demo_big_data_report/demo_main.py	null	just examples	null	true	null
   hub	example_public_api_suite/demo_main.py	notebooks/marimo/example_public_api_suite/demo_main.py	null	just examples	null	true	null
   fixture	canonical_yaml/demand	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml	null	just examples	null	true	"schema_ok: ../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json"
@@ -29,6 +29,7 @@ rows[44	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   chapter	demo_big_data_report/yaml_dsl_lookup_cast_sep_first_type_error_guardrail	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup_cast_sep_first_type_error_guardrail.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/yaml_dsl_viz_custom_paths	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/workflow_cache_pool_pin	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch140_workflow_cache_pool_pin.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch140_workflow_cache_pool_pin.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
+  chapter	demo_big_data_report/workflow_temporal_field_values	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch150_workflow_temporal_field_values.py	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch150_workflow_temporal_field_values.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/ch010_basics	notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py	notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/ch040_sinks	notebooks/marimo/demo_big_data_report/chapters_of_ir/ch040_sinks.py	notebooks/marimo/demo_big_data_report/chapters_of_ir/ch040_sinks.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null
   chapter	demo_big_data_report/ch050_memory_opt	notebooks/marimo/demo_big_data_report/chapters_of_ir/ch050_memory_opt.py	notebooks/marimo/demo_big_data_report/chapters_of_ir/ch050_memory_opt.py	just examples	tests/integration/test_demo_big_data_report_chapters.py	true	null

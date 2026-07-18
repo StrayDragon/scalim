@@ -1,4 +1,3 @@
-from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
 
 from ....execution.runtime_bindings import (
@@ -19,7 +18,7 @@ from ....spec.ir import (
 from ....spec.ir._fields import call_by_requires_ctx
 from ....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr, RuntimeHandleIdIr, describe_callable_ref
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
-from ....typedefs import FieldValue, LoaderResultMapping, LookupKey
+from ....typedefs import FIELD_VALUE_TYPES, FieldValue, LoaderResultMapping, LookupKey, format_field_value_expected_types
 from .._internal.config_parsing.security import SecureComputeEngine, build_compute_engine
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX
 from ._internal.callable_preflight import (
@@ -31,16 +30,15 @@ from ._internal.conversion_lookup import VALUE_CASTS, LookupCastRegistry
 from .errors import ScalimResolverError
 from .references import SecurePythonReferenceResolver
 
-_SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
-
 
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
-    if value is None or isinstance(value, _SUPPORTED_FIELD_VALUE_TYPES):
+    if value is None or isinstance(value, FIELD_VALUE_TYPES):
         return value
-    msg = "Derived field '{}' {} has unsupported value type '{}'; expected int/float/Decimal/str/bool/None".format(
+    msg = "Derived field '{}' {} has unsupported value type '{}'; expected {}".format(
         field_id,
         producer,
         type(value).__name__,
+        format_field_value_expected_types(),
     )
     raise TypeError(msg)
 

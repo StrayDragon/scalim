@@ -11,6 +11,7 @@ def test_demo_big_data_report_selected_chapters_pass() -> None:
             "yaml_dsl_support",
             "workflow_yaml",
             "workflow_demo_big_data_report",
+            "workflow_temporal_field_values",
             "yaml_dsl_debugging",
             "yaml_dsl_call_by_keyword_only",
             "yaml_dsl_compute_builtin_arity_mismatch",

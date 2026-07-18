@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
+
+name: temporal_field_values
+
+main_source:
+  source_id: main
+  loader: "scalim_misc.demo_big_data_report.temporal_field_values_demo:load_table_temporal_values"
+  fields:
+    order_id: {extract: order_id}
+    created: {extract: created}
+    day: {extract: day}
+    clock: {extract: clock}
+    span: {extract: span}
+    label: {extract: label}
+
+outputs:
+  - name: detail
+    to:
+      book: report
+      sheet: Types
+    fields: [order_id, created, day, clock, span, label]

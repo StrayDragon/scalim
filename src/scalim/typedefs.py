@@ -1,5 +1,6 @@
 # region imports
 
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Dict, Hashable, List, Mapping, Sequence, Set, Tuple, Union
 
@@ -9,8 +10,21 @@ from .vendor.compact.typing_extensionsx import Literal
 
 # endregion
 
-FieldValue = Union[int, float, Decimal, str, bool, None]
-"""字段值的常见具体类型"""
+FieldValue = Union[int, float, Decimal, str, bool, None, datetime, date, time, timedelta]
+"""字段值闭集.
+
+含 `openpyxl` 的 `TIME_TYPES`(`datetime` / `date` / `time` / `timedelta`).
+中间态原样保存(含带 `tzinfo` 的实例);表格写出不改写 `tzinfo`(与直接使用 `openpyxl` 同源).
+"""
+
+FIELD_VALUE_TYPES = (bool, int, float, Decimal, str, datetime, date, time, timedelta)
+"""`FieldValue` 的运行时 `isinstance` 闭集(`None` 单独处理)."""
+
+
+def format_field_value_expected_types() -> str:
+    """错误文案用的期望类型标签(与 `FIELD_VALUE_TYPES` + `None` 同步)."""
+    return "/".join(t.__name__ for t in FIELD_VALUE_TYPES) + "/None"
+
 
 RowData = Mapping[str, FieldValue]
 """行数据类型 - 从字段键到字段值的映射"""

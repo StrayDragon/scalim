@@ -1,6 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r9,"Excel sinks MUST accept datetime/date FieldValues and normalize aware datetime","当内建 Excel / workbook / sheetbook 写出路径接收 `FieldValue` 时，系统 MUST 允许 `datetime` 与 `date` 交给 `openpyxl`（不得仅因类型而先 `str()`）。对 timezone-aware `datetime`，系统 MUST 在写出前清除 `tzinfo`（对齐 openpyxl 限制）。`escape_excel_formula` / `prepare_excel_cell_value` MUST 仍仅对 `str` 做公式转义。",null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r9,"excel-write-preserves-datetime","segment row contains naive datetime",commit/export via openpyxl,"cell value MUST round-trip as datetime-like (not forced text)"
-  r9,"excel-write-normalizes-aware-datetime","segment row contains aware datetime",commit/export via openpyxl path,"MUST clear tzinfo and successfully write without openpyxl timezone TypeError"

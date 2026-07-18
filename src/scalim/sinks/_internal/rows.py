@@ -6,22 +6,19 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from decimal import Decimal
 from typing import Iterable, Iterator, List, Optional, Sequence
 
-from ...typedefs import FieldValue, RowData
+from ...typedefs import FIELD_VALUE_TYPES, FieldValue, RowData
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 from .base import BaseRowSink
 from .sink_csv import InMemoryCsv
 
-_FIELD_VALUE_TYPES = (int, float, Decimal, str, bool)
-
 
 def _is_field_value(value: object) -> bool:
     if value is None:
         return True
-    return isinstance(value, _FIELD_VALUE_TYPES)
+    return isinstance(value, FIELD_VALUE_TYPES)
 
 
 @dataclass(frozen=True)
@@ -81,9 +78,11 @@ class InMemoryRowsSink(BaseRowSink):
         for field_id in self.field_ids:
             value = row.get(field_id)
             if not _is_field_value(value):
-                # 兼容边界: `loader` 常见 `datetime`/`date` 等暂不在 `FieldValue` 闭集内.
-                # 行为对齐旧 `CSV` 中间层 `str(value)`;正式扩展值域见 `notplan` `c0-add-field-value-datetime`.
-                value = str(value)
+                msg = "InMemoryRowsSink received non-FieldValue: field_id={!r}, type={!r}".format(
+                    str(field_id),
+                    type(value).__name__,
+                )
+                raise TypeError(msg)
             values.append(value)
         return values
 

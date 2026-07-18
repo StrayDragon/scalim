@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/workflow.gen.json
+
+workflow:
+  resources:
+    books:
+      report:
+        xlsx:
+          path: ./out
+  runs:
+    - id: a
+      demand: ./workflow_demo_temporal_field_values_demand.yaml

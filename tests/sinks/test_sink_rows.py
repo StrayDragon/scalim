@@ -1,3 +1,4 @@
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -46,24 +47,45 @@ def test_in_memory_rows_sink_requires_field_ids() -> None:
         _ = InMemoryRowsSink(field_ids=None)  # type: ignore[arg-type]
 
 
-def test_in_memory_rows_sink_stringifies_non_field_value() -> None:
-    from datetime import date, datetime
+def test_in_memory_rows_sink_preserves_temporal_field_values() -> None:
+    dt = datetime(2024, 1, 2, 3, 4, 5)
+    d = date(2024, 1, 2)
+    t = time(3, 4, 5)
+    td = timedelta(days=1, seconds=30)
+    aware = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
-    sink = InMemoryRowsSink(field_ids=["dt", "d", "obj"])
+    sink = InMemoryRowsSink(field_ids=["dt", "d", "t", "td", "aware"])
     sink.write_row(
         {  # pyright: ignore[reportArgumentType]
-            "dt": datetime(2024, 1, 2, 3, 4, 5),
-            "d": date(2024, 1, 2),
-            "obj": {"bad": "x"},
+            "dt": dt,
+            "d": d,
+            "t": t,
+            "td": td,
+            "aware": aware,
         }
-    )  # type: ignore[dict-item]
+    )
     artifact = sink.to_artifact()
-    assert artifact.rows == [["2024-01-02 03:04:05", "2024-01-02", "{'bad': 'x'}"]]
+    assert artifact.rows == [[dt, d, t, td, aware]]
+    assert artifact.rows[0][4].tzinfo is timezone.utc  # type: ignore[union-attr]
 
 
-def test_in_memory_rows_still_rejects_non_field_value_on_construct() -> None:
-    with pytest.raises(TypeError, match=r"FieldValue"):
-        _ = InMemoryRows(header=["a"], rows=[[object()]])  # type: ignore[list-item]  # pyright: ignore[reportArgumentType]
+def test_in_memory_rows_sink_rejects_non_field_value() -> None:
+    sink = InMemoryRowsSink(field_ids=["obj"])
+    with pytest.raises(TypeError, match=r"non-FieldValue"):
+        sink.write_row({"obj": {"bad": "x"}})  # type: ignore[dict-item]
+
+
+def test_in_memory_rows_accepts_temporal_on_construct() -> None:
+    dt = datetime(2024, 1, 2, 3, 4, 5)
+    artifact = InMemoryRows(header=["dt", "d"], rows=[[dt, date(2024, 1, 2)]])
+    assert artifact.rows[0][0] is dt
+
+
+def test_in_memory_rows_to_in_memory_csv_stringifies_temporal() -> None:
+    dt = datetime(2024, 1, 2, 3, 4, 5)
+    artifact = InMemoryRows(header=["dt", "n"], rows=[[dt, None]])
+    csv_artifact = in_memory_rows_to_in_memory_csv(artifact)
+    assert csv_artifact.rows == [["2024-01-02 03:04:05", ""]]
 
 
 def test_in_memory_rows_to_in_memory_csv_preserves_order_and_normalizes_values() -> None:

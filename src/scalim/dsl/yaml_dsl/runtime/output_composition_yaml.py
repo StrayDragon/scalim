@@ -20,7 +20,7 @@ from ....execution.output_contracts import ExportLayout, OutputSpec
 from ....execution.run_ir import export_layout_from_demand_ir
 from ....execution.versioned_outputs import book_output_relpath, file_output_relpath, validate_version_id
 from ....spec.ir import DemandIr
-from ....typedefs import FailurePolicy, FieldValue, RowData
+from ....typedefs import FIELD_VALUE_TYPES, FailurePolicy, FieldValue, RowData, format_field_value_expected_types
 from ....vendor.dataclassesx import dataclass
 from .._internal.book_identity import is_pathful_book
 from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
@@ -58,9 +58,14 @@ def _validate_excel_sheet_name(sheet: str, *, path: str) -> None:
 def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
     if value is None:
         return None
-    if isinstance(value, (int, float, Decimal, str, bool)):
+    if isinstance(value, FIELD_VALUE_TYPES):
         return cast("FieldValue", value)  # pragma: allow-cast literal typed narrowing
-    msg = "aggregate field {!r} produced unsupported value type {} from {}".format(field_id, type(value).__name__, producer)
+    msg = "aggregate field {!r} produced unsupported value type {}; expected {} from {}".format(
+        field_id,
+        type(value).__name__,
+        format_field_value_expected_types(),
+        producer,
+    )
     raise TypeError(msg)
 
 
@@ -199,6 +204,9 @@ def _compile_score_by_rank_post_field(
         raw_rank = row.get(rf)
         if raw_rank is None:
             return None
+        if isinstance(raw_rank, bool) or not isinstance(raw_rank, (int, float, Decimal, str)):
+            msg = "score_by_rank requires integer rank, got {} for rank_field={!r}".format(type(raw_rank).__name__, rf)
+            raise TypeError(msg)
         try:
             rank_val = int(raw_rank)
         except Exception as exc:

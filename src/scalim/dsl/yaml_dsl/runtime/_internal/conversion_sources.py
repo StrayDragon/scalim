@@ -1,4 +1,3 @@
-from decimal import Decimal
 from typing import TYPE_CHECKING, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple
 
 from .....spec.ir import (
@@ -17,7 +16,7 @@ from .....spec.ir._fields import CallBySpecIr, CallByValueIr, FieldDefaultCaseIr
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr
-from .....typedefs import FieldValue, SourceSpecIrCacheMode
+from .....typedefs import FIELD_VALUE_TYPES, FieldValue, SourceSpecIrCacheMode, format_field_value_expected_types
 from ..._internal.config_parsing.call_by import ParsedCallBy, ScalimCallByParseError, parse_call_by
 from ..._internal.config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
 from ..._internal.config_parsing.security import SecureComputeEngine, is_constant_compute_expression
@@ -49,7 +48,16 @@ if TYPE_CHECKING:
     from .....vendor.compact.typing_extensionsx import TypeGuard
 
 
-_SUPPORTED_FIELD_VALUE_TYPES = (bool, int, float, Decimal, str)
+def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
+    if value is None or isinstance(value, FIELD_VALUE_TYPES):
+        return value
+    msg = "Field '{}' {} has unsupported value type '{}'; expected {}".format(
+        field_id,
+        producer,
+        type(value).__name__,
+        format_field_value_expected_types(),
+    )
+    raise TypeError(msg)
 
 
 def _is_normalize_on_conflict(value: str) -> "TypeGuard[NormalizeOnConflict]":
@@ -66,17 +74,6 @@ def _is_normalize_on_empty(value: str) -> "TypeGuard[NormalizeOnEmpty]":
 
 def _is_normalize_on_missing(value: str) -> "TypeGuard[NormalizeOnMissing]":
     return value in {"error", "null"}
-
-
-def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
-    if value is None or isinstance(value, _SUPPORTED_FIELD_VALUE_TYPES):
-        return value
-    msg = "Field '{}' {} has unsupported value type '{}'; expected int/float/Decimal/str/bool/None".format(
-        field_id,
-        producer,
-        type(value).__name__,
-    )
-    raise TypeError(msg)
 
 
 def _parse_callable_ref(reference: object, *, context_label: str) -> CallableRefIr:
