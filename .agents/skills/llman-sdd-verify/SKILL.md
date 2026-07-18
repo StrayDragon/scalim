@@ -41,6 +41,7 @@ flowchart LR
      - 其他非 full 阶段（`specified`/`designed`）："变更 <id> 处于 <stage> 阶段，尚未准备好被验证。请先用 llman-sdd-apply 实现。"
 3. 先跑一个快速校验门禁：
    - `llman sdd validate <id> --strict --no-interactive`
+   - **诊断结构问题（Gherkin 解析 / `@req` 链接 / 双写 / 全局 req_id 唯一性）时优先加 `--no-check`**（BDD-on 下跳过可能耗时的 `bdd.run_command`），结构门禁全绿后再跑完整 `--check`（full mode）。`FAIL <item_type>/<id>` 行会逐条列出失败项（在 Totals 行上方）。
 4. 阅读：
    - `llmanspec/changes/<id>/specs/` 下的 delta specs
    - `proposal.md` 与 `design.md`（如存在）

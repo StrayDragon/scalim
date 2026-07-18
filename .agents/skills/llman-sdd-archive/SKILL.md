@@ -53,6 +53,14 @@ flowchart LR
   - `change archive` **只移动 change 文档**到 `changes/archive/`——**不会**把 TOON delta 当 SSOT 合并，也永不 apply `feature_delta`。
   - change 下遗留活跃 `*.feature.delta.toon` 是迁移阻断项——归档前须移除/迁移。
   - 归档后，通过正常 Git/PR 将 feature 分支合并进默认分支，以提升 live `llmanspec/specs/**`。
+  - **完整的 commit/checkpoint 时序**（checkpoint 会改写 proposal.md 的 frontmatter，故 archive 需要两次 commit）：
+    ```text
+    1. git commit   # 提交 live specs + 代码（让工作区干净，checkpoint 才能跑）
+    2. llman sdd change checkpoint <id>   # 写入 checkpointed / checkpoint_sha
+    3. git commit   # 提交 proposal.md 的 checkpoint 元数据
+    4. llman sdd change archive <id>      # 仅移动 change 文档到 archive/
+    5. git commit   # 提交 archive 改名
+    ```
 - **BDD-off**：
   - `change archive` 按今日流程将 change 内 TOON delta 合并进主 `spec.toon`。
   - 不要求 attach / checkpoint / feature 分支 / harness。
@@ -65,6 +73,7 @@ flowchart LR
 - BDD-off：输出建议 commit message（格式：`feat(sdd): archive <id1>, <id2> - <简短总结>`），然后 `git add -A && git commit -m "..."`。
 - BDD-on：文档归档后，打开/合并 feature 分支 PR，使 live specs/features 进入默认分支。
 - 若用户要求自动 commit 归档文档提交，执行后输出 commit hash。
+- **archived `depends_on`**：archive 会把 change 目录改名为 `archive/YYYY-MM-DD-<id>`，但 validate 会把指向 archived/frozen id 的 `depends_on` 识别为 INFO（非 ERROR），所以**归档后无需**手动更新其它 change 的 `depends_on` frontmatter。
 
 > 💡 上一阶段 `llman-sdd-verify`（验证通过）→ 本阶段归档后闭环结束。若 specs 逐渐膨胀，可运行 `llman-sdd-specs-compact` 压缩。
 
