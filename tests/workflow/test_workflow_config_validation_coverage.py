@@ -142,13 +142,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
             "xlsx.export_xlsx is not allowed",
         ),
         (
-            {
-                "books": {
-                    "mem": {
-                        "xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "nope": 1}}
-                    }
-                }
-            },
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "nope": 1}}}}},
             "xlsx.export_xlsx is not allowed",
         ),
         (
@@ -189,35 +183,19 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
             "write_defaults was removed from YAML authoring",
         ),
         (
-            {
-                "books": {
-                    "mem": {"xlsx": {}, "write_defaults": {"align_by": "nope"}}
-                }
-            },
+            {"books": {"mem": {"xlsx": {}, "write_defaults": {"align_by": "nope"}}}},
             "write_defaults was removed from YAML authoring",
         ),
         (
-            {
-                "books": {
-                    "mem": {"xlsx": {}, "write_defaults": {"header_policy": "nope"}}
-                }
-            },
+            {"books": {"mem": {"xlsx": {}, "write_defaults": {"header_policy": "nope"}}}},
             "write_defaults was removed from YAML authoring",
         ),
         (
-            {
-                "books": {
-                    "mem": {"xlsx": {}, "write_defaults": {"on_mismatch": "nope"}}
-                }
-            },
+            {"books": {"mem": {"xlsx": {}, "write_defaults": {"on_mismatch": "nope"}}}},
             "write_defaults was removed from YAML authoring",
         ),
         (
-            {
-                "books": {
-                    "mem": {"xlsx": {}, "write_defaults": {"on_conflict": "nope"}}
-                }
-            },
+            {"books": {"mem": {"xlsx": {}, "write_defaults": {"on_conflict": "nope"}}}},
             "write_defaults was removed from YAML authoring",
         ),
     ],
