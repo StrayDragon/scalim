@@ -1,7 +1,7 @@
 # pragma: allow-c901-file plan: c90
 import concurrent.futures
 import contextlib
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple, Union, cast
 
 from .._internal.loggingx import format_kv, get_logger
 from .._internal.loggingx import prefix as log_prefix
@@ -26,6 +26,7 @@ from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.observability import Observability, ObservabilityOptions
 from ..ob.observer import Observer
+from ..ob.presets.viz import VizObserverConfig
 from ..spec.ir import DemandIr
 from ..spec.ir._workflow import (
     AppendSheetNodeIr,
@@ -82,7 +83,7 @@ class WorkflowRunState:
     ready_queue: List[str]
     submitted: Dict[
         "concurrent.futures.Future[Any]",
-        Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[object], Optional[ExecutionRequest]],
+        Tuple[str, WorkflowAnyNodeIr, Optional[str], Optional[Any], Optional[ExecutionRequest]],
     ]
     remaining_prereqs: Dict[str, int]
     prereq_failed: Dict[str, bool]
@@ -98,22 +99,22 @@ class WorkflowRunState:
     captured_demand_events_by_node_id: Dict[str, List[Event]] = field(default_factory=dict)
     captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]] = field(default_factory=dict)
     captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]] = field(default_factory=dict)
-    captured_demand_request_by_node_id: Dict[str, object] = field(default_factory=dict)
+    captured_demand_request_by_node_id: Dict[str, ExecutionRequest] = field(default_factory=dict)
 
 
 def _build_demand_replay_instrumentation(  # noqa: C901
-    request: Optional[object],
+    request: Optional[ExecutionRequest],
     viz_observer: Optional[Observer],
     *,
-    workflow_components: Tuple[object, ...],
+    workflow_components: Tuple[Any, ...],
 ) -> Optional[InstrumentationHub]:
     if request is None and viz_observer is None:
         return None
 
     fallback_logger_enabled = False
-    components: List[object] = []
+    components: List[Any] = []
     if request is not None:
-        req = cast("ExecutionRequest", request)  # pragma: allow-cast request runtime boundary
+        req = request
         obs_spec = req.observability
         if obs_spec is not None:
             fallback_logger_enabled = bool(obs_spec.fallback_logger_enabled)
@@ -158,22 +159,22 @@ class WorkflowRunController:
     _artifacts_dir: WorkflowArtifactsDirectory
     _ctx_store: _WorkflowCtxStoreLike
 
-    _bundle_viz_base_config: Optional[object]
+    _bundle_viz_base_config: Optional[VizObserverConfig]
     _workflow_instrumentation: InstrumentationHub
     _workflow_cache_pool: Optional[WorkflowCachePool]
     _resource_manager: WorkflowResourceManager
     _resource_lifecycle: WorkflowResourceLifecycle
     _write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
 
-    _compile_demand_node: Callable[..., Tuple[object, ExecutionRequest]]
-    _compile_demand_fn: Callable[..., object]
-    _build_demand_run_result_fn: Optional[Callable[..., object]]
+    _compile_demand_node: Callable[..., Tuple[Any, ExecutionRequest]]
+    _compile_demand_fn: Callable[..., Any]
+    _build_demand_run_result_fn: Optional[Callable[..., Any]]
     _run_ir_fn: Callable[..., ExecutionResult]
     _run_workflow_write_node: Callable[..., None]
 
     _capture_observability: bool
     _workflow_replay_instrumentation: Optional[InstrumentationHub]
-    _workflow_components: Tuple[object, ...]
+    _workflow_components: Tuple[Any, ...]
 
     _node_by_id: Dict[str, WorkflowAnyNodeIr]
     _index_by_node_id: Dict[str, int]
@@ -194,20 +195,20 @@ class WorkflowRunController:
         workflow_ir: WorkflowIr,
         artifacts_dir: WorkflowArtifactsDirectory,
         ctx_store: _WorkflowCtxStoreLike,
-        bundle_viz_base_config: Optional[object],
+        bundle_viz_base_config: Optional[VizObserverConfig],
         workflow_instrumentation: InstrumentationHub,
         workflow_cache_pool: Optional[WorkflowCachePool],
         resource_manager: WorkflowResourceManager,
         resource_lifecycle: WorkflowResourceLifecycle,
         write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
-        compile_demand_node_fn: Callable[..., Tuple[object, ExecutionRequest]],
-        compile_demand_fn: Callable[..., object],
-        build_demand_run_result_fn: Optional[Callable[..., object]],
+        compile_demand_node_fn: Callable[..., Tuple[Any, ExecutionRequest]],
+        compile_demand_fn: Callable[..., Any],
+        build_demand_run_result_fn: Optional[Callable[..., Any]],
         run_ir_fn: Callable[..., ExecutionResult],
         run_workflow_write_node_fn: Callable[..., None],
         capture_observability: bool,
         workflow_replay_instrumentation: Optional[InstrumentationHub],
-        workflow_components: Tuple[object, ...],
+        workflow_components: Tuple[Any, ...],
     ) -> None:
         self._executor = executor
         self._state = state
@@ -272,7 +273,7 @@ class WorkflowRunController:
         ctx_store: _WorkflowCtxStoreLike,
         max_concurrency: int,
         failure_policy: str,
-        bundle_viz_base_config: Optional[object],
+        bundle_viz_base_config: Optional[VizObserverConfig],
         workflow_instrumentation: InstrumentationHub,
         workflow_cache_pool: Optional[WorkflowCachePool],
         resource_manager: WorkflowResourceManager,
@@ -283,15 +284,15 @@ class WorkflowRunController:
         captured_demand_events_by_node_id: Dict[str, List[Event]],
         captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]],
         captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]],
-        captured_demand_request_by_node_id: Dict[str, object],
-        compile_demand_node_fn: Callable[..., Tuple[object, ExecutionRequest]],
-        compile_demand_fn: Callable[..., object],
-        build_demand_run_result_fn: Optional[Callable[..., object]],
+        captured_demand_request_by_node_id: Dict[str, ExecutionRequest],
+        compile_demand_node_fn: Callable[..., Tuple[Any, ExecutionRequest]],
+        compile_demand_fn: Callable[..., Any],
+        build_demand_run_result_fn: Optional[Callable[..., Any]],
         run_ir_fn: Callable[..., ExecutionResult],
         run_workflow_write_node_fn: Callable[..., None],
         capture_observability: bool,
         workflow_replay_instrumentation: Optional[InstrumentationHub],
-        workflow_components: Tuple[object, ...],
+        workflow_components: Tuple[Any, ...],
     ) -> "WorkflowRunController":
         outcomes: List[Optional[WorkflowRunOutcome]] = [None for _ in range(len(workflow_ir.nodes))]
 
@@ -501,8 +502,7 @@ class WorkflowRunController:
             )
             return
 
-        comp = cast("Any", compilation)  # pragma: allow-cast compilation runtime boundary
-        demand_ir = cast("DemandIr", comp.demand_ir)  # pragma: allow-cast compilation.demand_ir narrow
+        demand_ir = cast("DemandIr", compilation.demand_ir)  # pragma: allow-cast compilation.demand_ir narrow
         visible = self._ctx_store.visible_producer_node_ids(str(node_id))
         fut = self._executor.submit(self._run_one, demand_ir, request_for_run, str(node_id), visible, str(demand_path))
         self._state.submitted[fut] = (str(node_id), node, str(demand_path), compilation, request_for_run)
@@ -540,7 +540,7 @@ class WorkflowRunController:
                 if core.in_memory_rows is not None:
                     self._artifacts_dir.publish(str(node_id), "in_memory_rows", core.in_memory_rows)
                 self._ctx_store.publish_default_summary(str(node_id), core)
-                node_result: object
+                node_result: Any
                 if self._build_demand_run_result_fn is None:
                     node_result = core
                 else:
@@ -626,11 +626,11 @@ class WorkflowRunController:
         workflow_instrumentation: InstrumentationHub,
         workflow_ir: WorkflowIr,
         workflow_exec_id: str,
-        workflow_components: Tuple[object, ...],
+        workflow_components: Tuple[Any, ...],
         captured_demand_events_by_node_id: Dict[str, List[Event]],
         captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]],
         captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]],
-        captured_demand_request_by_node_id: Dict[str, object],
+        captured_demand_request_by_node_id: Dict[str, ExecutionRequest],
     ) -> None:
         if not capture_observability:
             return
@@ -735,8 +735,8 @@ class WorkflowRunController:
         workflow_node_id: str,
         visible_producer_node_ids: FrozenSet[str],
         demand_path: str,
-    ) -> object:
-        def _engine_factory(**kwargs: object) -> ScalimEngine:
+    ) -> Union[ExecutionResult, _CapturedNodeRun]:
+        def _engine_factory(**kwargs: Any) -> ScalimEngine:
             engine_kwargs = cast("Any", kwargs)  # pragma: allow-cast engine kwargs typed narrowing
             return ScalimEngine(
                 **engine_kwargs,

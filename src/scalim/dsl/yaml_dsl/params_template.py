@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 from ...exceptions import ScalimYamlError
 from ...spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
@@ -48,7 +48,7 @@ class ScalimParamsTemplateRenderError(ScalimParamsTemplateError):
         return "{} (path={})".format(self.message, self.path)
 
 
-def _path_child(path: str, key: object) -> str:
+def _path_child(path: str, key: Any) -> str:
     if not path:
         return str(key)
     return "{}.{}".format(path, str(key))
@@ -58,19 +58,19 @@ def _path_index(path: str, idx: int) -> str:
     return "{}[{}]".format(path, idx)
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[Any, Any]]:
     return isinstance(value, dict)
 
 
-def _is_list(value: object) -> TypeGuard[List[object]]:
+def _is_list(value: RuntimeValue) -> TypeGuard[List[Any]]:
     return isinstance(value, list)
 
 
-def _is_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
+def _is_tuple(value: RuntimeValue) -> TypeGuard[Tuple[Any, ...]]:
     return isinstance(value, tuple)
 
 
-def _is_set(value: object) -> TypeGuard[Set[object]]:
+def _is_set(value: RuntimeValue) -> TypeGuard[Set[Any]]:
     return isinstance(value, set)
 
 
@@ -78,7 +78,7 @@ def _deepcopy_literal(value: RuntimeValue) -> RuntimeValue:
     # 这里刻意只对常见容器做深拷贝,避免对任意对象进行 `deepcopy`.
     # `init_vars` 可能注入任意对象(例如 `datetime`/`Decimal` 等),应按“不透明字面值”透传.
     if _is_dict(value):
-        copied: Dict[object, RuntimeValue] = {}
+        copied: Dict[Any, RuntimeValue] = {}
         for k, v in value.items():
             copied[k] = _deepcopy_literal(v)
         return copied
@@ -116,11 +116,11 @@ class LiteralNode(_NodeBase):
 
 @dataclass(frozen=True)
 class MappingNode(_NodeBase):
-    items: Tuple[Tuple[object, _NodeBase], ...]
+    items: Tuple[Tuple[Any, _NodeBase], ...]
 
     @override
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
-        out: Dict[object, RuntimeValue] = {}
+        out: Dict[Any, RuntimeValue] = {}
         for k, node in self.items:
             out[k] = node.render(ctx, path=_path_child(path, k))
         return out
@@ -269,7 +269,7 @@ class _CompileState:
 
 
 def _maybe_compile_runtime_literal(
-    node_value: object,
+    node_value: Any,
     *,
     node_path: str,
 ) -> None:
@@ -293,7 +293,7 @@ def _maybe_compile_runtime_literal(
 
 
 def _compile_legacy_runtime_directive_node(
-    mapping_dict: Dict[object, object],
+    mapping_dict: Dict[Any, Any],
     *,
     node_path: str,
 ) -> Node:
@@ -307,7 +307,7 @@ def _compile_legacy_runtime_directive_node(
 
 
 def _compile_runtime_directive_node(
-    mapping_dict: Dict[object, object],
+    mapping_dict: Dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -331,7 +331,7 @@ def _compile_runtime_directive_node(
 
 
 def _compile_keys_directive_node(
-    mapping_dict: Dict[object, object],
+    mapping_dict: Dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -347,7 +347,7 @@ def _compile_keys_directive_node(
 
 
 def _compile_rows_directive_node(
-    mapping_dict: Dict[object, object],
+    mapping_dict: Dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -363,7 +363,7 @@ def _compile_rows_directive_node(
 
 
 def _maybe_compile_directive_node(
-    mapping_dict: Dict[object, object],
+    mapping_dict: Dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -398,14 +398,14 @@ def _maybe_compile_directive_node(
 
 
 def _compile_mapping_node(
-    mapping_dict: Dict[object, object],
+    mapping_dict: Dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
     state: _CompileState,
     resolve_runtime: bool,
 ) -> MappingNode:
-    mapping_items: List[Tuple[object, Node]] = []
+    mapping_items: List[Tuple[Any, Node]] = []
     for k, v in mapping_dict.items():
         mapping_items.append(
             (
@@ -423,7 +423,7 @@ def _compile_mapping_node(
 
 
 def _compile_list_node(
-    list_value: Sequence[object],
+    list_value: Sequence[Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -445,7 +445,7 @@ def _compile_list_node(
 
 
 def _compile_params_template_node(
-    node_value: object,
+    node_value: Any,
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -486,7 +486,7 @@ def _compile_params_template_node(
 
 
 def compile_params_template(
-    value: object,
+    value: Any,
     *,
     path: str,
     init_vars: Optional[Mapping[str, RuntimeValue]] = None,
@@ -514,7 +514,7 @@ def compile_params_template(
 
 
 def _parse_single_option_str(
-    options_raw: object,
+    options_raw: Any,
     *,
     path: str,
     directive: str,
@@ -544,7 +544,7 @@ def _parse_single_option_str(
     return raw_value
 
 
-def _parse_keys_options(options_raw: object, *, path: str) -> str:
+def _parse_keys_options(options_raw: Any, *, path: str) -> str:
     return _parse_single_option_str(
         options_raw,
         path=path,
@@ -555,7 +555,7 @@ def _parse_keys_options(options_raw: object, *, path: str) -> str:
     )
 
 
-def _parse_rows_options(options_raw: object, *, path: str) -> str:
+def _parse_rows_options(options_raw: Any, *, path: str) -> str:
     return _parse_single_option_str(
         options_raw,
         path=path,

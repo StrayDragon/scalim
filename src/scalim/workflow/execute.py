@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
 
-from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from .._internal.utils.json_like import JsonLike, ensure_json_like as _ensure_json_like_ssot
 from .._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
 from ..events import (
     Event,
@@ -38,7 +38,7 @@ from ..spec.ir._workflow import (
     WorkflowNodeIr,
     WriteSheetNodeIr,
 )
-from ..typedefs import FailurePolicy, parse_failure_policy
+from ..typedefs import FailurePolicy, RuntimeValue, parse_failure_policy
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, replace
 from . import input_artifacts as _input_artifacts_module
@@ -71,11 +71,11 @@ _commit_workflow_resources = _resource_lifecycle_module.commit_workflow_resource
 class _CompilationLike(ABC):
     @property
     @abstractmethod
-    def request(self) -> object:
+    def request(self) -> ExecutionRequest:
         raise NotImplementedError  # pragma: no cover  # pragma: allow-no-cover abstract property
 
 
-def ensure_json_like(value: object, *, path: str) -> object:
+def ensure_json_like(value: RuntimeValue, *, path: str) -> JsonLike:
     return _ensure_json_like_ssot(
         value,
         path=path,
@@ -89,7 +89,7 @@ def ensure_json_like(value: object, *, path: str) -> object:
 
 class WorkflowCtxStore:
     _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
-    _values_by_producer_node_id: Dict[str, Dict[str, object]]
+    _values_by_producer_node_id: Dict[str, Dict[str, JsonLike]]
     _owner_thread_id: Optional[int]
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
@@ -113,7 +113,7 @@ class WorkflowCtxStore:
         self.publish(node_id, "total_rows", int(result.total_rows), path="$ctx")
         self.publish(node_id, "duration_secs", float(result.duration), path="$ctx")
 
-    def publish(self, producer_node_id: str, key: str, value: object, *, path: str) -> None:
+    def publish(self, producer_node_id: str, key: str, value: RuntimeValue, *, path: str) -> None:
         self._assert_owner_thread()
         node_id = str(producer_node_id)
         ctx_key = str(key)
@@ -122,7 +122,7 @@ class WorkflowCtxStore:
         by_key = self._values_by_producer_node_id.setdefault(node_id, {})
         by_key[ctx_key] = ctx_value
 
-    def resolve(self, consumer_node_id: str, *, node: str, key: str, path: str) -> object:
+    def resolve(self, consumer_node_id: str, *, node: str, key: str, path: str) -> JsonLike:
         consumer = str(consumer_node_id)
         producer = str(node)
         ctx_key = str(key)
@@ -143,15 +143,15 @@ class WorkflowCtxStore:
         return by_key[ctx_key]
 
 
-def _is_list(value: object) -> TypeGuard[List[object]]:
+def _is_list(value: RuntimeValue) -> TypeGuard[List[RuntimeValue]]:
     return isinstance(value, list)
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[str, RuntimeValue]]:
     return isinstance(value, dict)
 
 
-def iter_ctx_directives(value: object, *, path: str) -> List[Tuple[str, str]]:
+def iter_ctx_directives(value: RuntimeValue, *, path: str) -> List[Tuple[str, str]]:
     out: List[Tuple[str, str]] = []
     if _is_dict(value):
         mapping = value
@@ -184,7 +184,7 @@ def iter_ctx_directives(value: object, *, path: str) -> List[Tuple[str, str]]:
     return out
 
 
-def render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: WorkflowCtxStore, path: str) -> object:
+def render_ctx_directives(value: RuntimeValue, *, consumer_node_id: str, ctx_store: WorkflowCtxStore, path: str) -> RuntimeValue:
     if _is_dict(value):
         mapping = value
         if len(mapping) == 1 and "$ctx" in mapping:
@@ -205,7 +205,7 @@ def render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: Wo
             value = ctx_store.resolve(str(consumer_node_id), node=node_id, key=ctx_key, path=path)
             return ensure_json_like(value, path=path)
 
-        out: Dict[object, object] = {}
+        out: Dict[str, RuntimeValue] = {}
         for raw_key, raw_value in mapping.items():
             child_path = "{}.{}".format(path, str(raw_key))
             out[raw_key] = render_ctx_directives(raw_value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=child_path)
@@ -221,15 +221,15 @@ def render_ctx_directives(value: object, *, consumer_node_id: str, ctx_store: Wo
 
 
 def _render_workflow_init_vars(
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, RuntimeValue]],
     *,
     consumer_node_id: str,
     ctx_store: WorkflowCtxStore,
     path_prefix: str,
-) -> Dict[str, object]:
+) -> Dict[str, JsonLike]:
     if init_vars is None:
         return {}
-    out: Dict[str, object] = {}
+    out: Dict[str, JsonLike] = {}
     for key, value in init_vars.items():
         item_path = "{}.{}".format(path_prefix, key)
         rendered = render_ctx_directives(value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=item_path)
@@ -276,7 +276,7 @@ class ScalimWorkflowRunFailedError(ScalimWorkflowError):
 class _PreparedWorkflowRun:
     workflow_path: str
     workflow_exec_id: str
-    workflow_components: Tuple[object, ...]
+    workflow_components: Tuple[Any, ...]
     workflow_ir: WorkflowIr
     artifacts_dir: WorkflowArtifactsDirectory
     ctx_store: WorkflowCtxStore
@@ -298,7 +298,7 @@ class _PreparedWorkflowRun:
     captured_demand_events_by_node_id: Dict[str, List[Event]]
     captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]]
     captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]]
-    captured_demand_request_by_node_id: Dict[str, object]
+    captured_demand_request_by_node_id: Dict[str, ExecutionRequest]
 
 
 def _build_workflow_instrumentation(
@@ -306,7 +306,7 @@ def _build_workflow_instrumentation(
     workflow_exec_id: str,
     workflow_path: str,
     workflow_ir: WorkflowIr,
-    components: Optional[Sequence[object]],
+    components: Optional[Sequence[Any]],
     bundle_viz_base_config: Optional[VizObserverConfig],
 ) -> Tuple[ObserverManager, Optional[WorkflowVizObserver], InstrumentationHub]:
     # 工作流层事件:复用 `hooks`/`observers` 分发通道,并以 `workflow_exec_id` 作为 `run_id` 分区.
@@ -400,7 +400,7 @@ def _prepare_workflow_run_ir(
     workflow_path: str,
     workflow_ir: WorkflowIr,
     *,
-    components: Optional[Sequence[object]],
+    components: Optional[Sequence[Any]],
     bundle_viz_base_config: Optional[VizObserverConfig],
     cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]],
     cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]],
@@ -524,12 +524,12 @@ def _compile_demand_node(
     *,
     workflow_exec_id: str,
     ctx_store: WorkflowCtxStore,
-    compile_demand_fn: Callable[..., object],
+    compile_demand_fn: Callable[..., Any],
     bundle_viz_base_config: Optional[VizObserverConfig],
     write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
     main_rows_consumers_remaining_by_run_id: Dict[str, int],
     artifacts_dir: WorkflowArtifactsDirectory,
-) -> Tuple[object, ExecutionRequest]:
+) -> Tuple[Any, ExecutionRequest]:
     node_id = str(node.node_id)
     demand_path = str(node.demand_path or "")
 
@@ -556,7 +556,7 @@ def _compile_demand_node(
         viz_config=node_viz_config,
     )
     comp = cast("_CompilationLike", compilation)  # pragma: allow-cast compile_demand typed narrowing
-    base_request = cast("ExecutionRequest", comp.request)  # pragma: allow-cast compilation.request narrow
+    base_request = comp.request
     overrides = WorkflowNodeRequestOverrides()
     if node_id in main_rows_consumers_remaining_by_run_id:
         overrides = replace(overrides, capture_in_memory_rows=True)
@@ -580,8 +580,8 @@ def _compile_demand_node(
 def _execute_workflow_run(
     prepared: _PreparedWorkflowRun,
     *,
-    compile_demand_fn: Callable[..., object],
-    build_demand_run_result_fn: Optional[Callable[..., object]],
+    compile_demand_fn: Callable[..., Any],
+    build_demand_run_result_fn: Optional[Callable[..., Any]],
     run_ir_fn: Callable[..., ExecutionResult],
 ) -> Tuple[List[WorkflowRunOutcome], Optional[WorkflowRunOutcome], Optional[BaseException]]:
     max_concurrency = int(prepared.max_concurrency)
@@ -680,10 +680,10 @@ def run_workflow_ir(
     workflow_path: str,
     workflow_ir: WorkflowIr,
     *,
-    compile_demand_fn: Callable[..., object],
-    build_demand_run_result_fn: Optional[Callable[..., object]] = None,
+    compile_demand_fn: Callable[..., Any],
+    build_demand_run_result_fn: Optional[Callable[..., Any]] = None,
     run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    components: Optional[Sequence[object]] = None,
+    components: Optional[Sequence[Any]] = None,
     bundle_viz_base_config: Optional[VizObserverConfig] = None,
     cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]] = None,
     cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]] = None,
