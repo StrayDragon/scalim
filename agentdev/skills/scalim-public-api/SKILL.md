@@ -1,11 +1,13 @@
 ---
 name: scalim-public-api
-description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-public-api tier1:...) → examples suite → pytest public_api suite → 受控生成 references + drift gates。"
+description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-public-api tier1:...) → examples suite → pytest public_api suite → 受控生成 references + drift gates。含 EventType/Observer/Hook 破坏性适配指引。"
 ---
 
 # Scalim Public API (Tier1)
 
 本 skill 面向“public API 漂移治理”场景：当维护者调整 `scalim.*` 的 Tier1 curated entrypoints / `__all__` 导出面时，用它把 **入口清单 → 可运行示例 → pytest 回归 → gates** 串成确定性闭环。
+
+也用于 **Event / Observer / Hook 二开适配**:进程内事件身份已收敛为 `EventType`(breaking)。
 
 ## SSOT / Rules
 
@@ -18,6 +20,14 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
   - `references/**/*.gen.*`
   - `references/generated/**`
 
+### Event / Hook 身份(硬规则)
+
+- 进程内身份与订阅: `EventType` only(`Event.event_type`、`event_types`、`wants`/`emit`)
+- 公开 payload: `from scalim.events import PipelineStartEvent, ...`(禁止用户契约依赖私有实现模块)
+- 边界: `to_dict`/`JSONL` 可出 builtin `str`;读回用 `parse_event_type`
+- 适配入口: `references/task-event-type-adaptation.md`
+- 完整升级批次: `references/upgrades/2026-07-19-event-type-enum-identity.md`
+
 ## Commands (Repo)
 
 - Coverage drift gate (fail-fast before pytest): `just check-public-api-suite-coverage`
@@ -27,12 +37,21 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - Validate skill references drift: `just validate-public-api-skill`
 - Full quality gate: `just qa`
 
-## References (Generated)
+## References
+
+### Generated
 
 - Tier1 catalog: `references/generated/tier1-entrypoints.gen.md`
 - Tier1 ↔ examples/pytest coverage map: `references/generated/tier1-suite-coverage.gen.md`
 
+### Hand-authored (适配 / 升级)
+
+- EventType 下游适配任务卡: `references/task-event-type-adaptation.md`
+- EventType Enum 身份升级批次: `references/upgrades/2026-07-19-event-type-enum-identity.md`
+- 宽表 Excel: `references/streaming-column-excel.md`
+
 与 YAML DSL 的交叉入口:
 - 若任务是写/改 YAML DSL,优先用 `agentdev/skills/scalim-yaml-dsl/SKILL.md`（`scalim-yaml-dsl`）。
+- 若下游同时升级 YAML DSL 与 EventType: YAML 走 `scalim-yaml-dsl`;Observer/Hook 走本 skill 的 `task-event-type-adaptation.md`。
 - 若任务涉及宽表 Excel 峰值 / `StreamingColumnExcelSink` 选型:读 `references/streaming-column-excel.md`（并交叉 `scalim-yaml-dsl` 的 `references/streaming-column-excel-guidance.md`）。
-
+- YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType 批次属于 Python public API**,不进 YAML upgrades 索引。

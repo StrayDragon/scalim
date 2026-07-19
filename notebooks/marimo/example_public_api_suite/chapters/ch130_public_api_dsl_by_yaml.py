@@ -103,7 +103,7 @@ def run_public_api_dsl_by_yaml() -> ExampleResult:
 
     class _WorkflowBatchSizeObserver(Observer):
         def __init__(self) -> None:
-            self.event_types: Optional[Set[str]] = {EventType.PIPELINE_START}
+            self.event_types: Optional[Set[EventType]] = {EventType.PIPELINE_START}
             self.batch_size_by_workflow_node_id: Dict[str, Optional[int]] = {}
 
         def on_event(self, event: Any) -> None:

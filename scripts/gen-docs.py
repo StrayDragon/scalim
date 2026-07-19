@@ -339,7 +339,7 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
             "需要事件类型/目录查询入口时:",
             "",
             "```python",
-            "from scalim.events import Event, EventType, get_event_catalog",
+            "from scalim.events import Event, EventType, PipelineStartEvent, get_event_catalog, parse_event_type",
             "```",
             "",
             "需要常用 sinks 时:",

@@ -5,6 +5,7 @@
 - 你在本仓库升级了 YAML DSL(包含 breaking),需要盘点并同步下游项目的配置/用法
 - 你希望“先做调研与风险评估”,等上游/依赖版本稳定后再批量升级下游
 - 你需要在不泄露路径明细的前提下,输出可行动的下游改造清单
+- 若 breaking 是 **EventType / Observer / Hook**(非 YAML):改读 `agentdev/skills/scalim-public-api/references/task-event-type-adaptation.md`
 
 ## 隐私与输出约束
 

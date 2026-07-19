@@ -3,7 +3,7 @@ import marimo
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from scalim.events import EventType
+from scalim.events import EventType, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
 from scalim.execution import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
@@ -25,18 +25,22 @@ class _HookStats:
 
 class _CounterHook(BaseHook):
     def __init__(self) -> None:
-        self.event_types: Optional[Set[str]] = {EventType.PIPELINE_START, EventType.PIPELINE_END, EventType.LOADER_CALL}
+        self.event_types: Optional[Set[EventType]] = {
+            EventType.PIPELINE_START,
+            EventType.PIPELINE_END,
+            EventType.LOADER_CALL,
+        }
         self.stats = _HookStats()
 
-    def on_pipeline_start(self, event: Any) -> None:
+    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
         _ = event
         self.stats.pipeline_start += 1
 
-    def on_pipeline_end(self, event: Any) -> None:
+    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
         _ = event
         self.stats.pipeline_end += 1
 
-    def on_loader_call(self, event: Any) -> None:
+    def on_loader_call(self, event: LoaderCallEvent) -> None:
         loader_name = getattr(event, "loader_name", None)
         if loader_name:
             self.stats.loader_calls.append(str(loader_name))
@@ -44,11 +48,17 @@ class _CounterHook(BaseHook):
 
 class _TraceObserver(Observer):
     def __init__(self) -> None:
-        self.event_types: Optional[Set[str]] = {EventType.PIPELINE_START, EventType.PIPELINE_END, EventType.LOADER_CALL}
-        self.seen_event_types: List[str] = []
+        self.event_types: Optional[Set[EventType]] = {
+            EventType.PIPELINE_START,
+            EventType.PIPELINE_END,
+            EventType.LOADER_CALL,
+        }
+        self.seen_event_types: List[EventType] = []
 
     def on_event(self, event: Any) -> None:
-        self.seen_event_types.append(str(getattr(event, "event_type", "")))
+        event_type = getattr(event, "event_type", None)
+        if isinstance(event_type, EventType):
+            self.seen_event_types.append(event_type)
 
 
 def run_public_api_hooks_events() -> ExampleResult:
@@ -87,9 +97,9 @@ def run_public_api_hooks_events() -> ExampleResult:
         and hook.stats.pipeline_start == 1
         and hook.stats.pipeline_end == 1
         and hook.stats.loader_calls == ["items"]
-        and observer.seen_event_types.count(str(EventType.PIPELINE_START)) == 1
-        and observer.seen_event_types.count(str(EventType.PIPELINE_END)) == 1
-        and observer.seen_event_types.count(str(EventType.LOADER_CALL)) == 1
+        and observer.seen_event_types.count(EventType.PIPELINE_START) == 1
+        and observer.seen_event_types.count(EventType.PIPELINE_END) == 1
+        and observer.seen_event_types.count(EventType.LOADER_CALL) == 1
     )
     summary = "rows={} hook(pipeline_start={}, pipeline_end={}, loader_calls={}) observer_events={}".format(
         len(rows),
@@ -99,7 +109,7 @@ def run_public_api_hooks_events() -> ExampleResult:
         len(observer.seen_event_types),
     )
     details: Dict[str, Any] = {
-        "event_types": list(observer.seen_event_types),
+        "event_types": [str(x) for x in observer.seen_event_types],
         "hook": {
             "pipeline_start": hook.stats.pipeline_start,
             "pipeline_end": hook.stats.pipeline_end,
@@ -128,6 +138,7 @@ def _(mo):
 
         本章目标:
         - 演示扩展点: hook / observer / events / components 注入
+        - 订阅使用 `Set[EventType]`;typed payload 从 `scalim.events` 公开导入
 
         SSOT:
         - `notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py::run_public_api_hooks_events`
