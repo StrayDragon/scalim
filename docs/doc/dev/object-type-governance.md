@@ -2,14 +2,16 @@
 
 ## 目的
 
-`scripts/check-object-type.py` 扫描 `src/scalim/`、`tests/`、`scripts/` 中类型标注里的 `object`,把动态边界变成可审阅基线,推动用更精确的类型(Protocol / TypedDict / 具体类型 / 窄化后的别名)替代裸 `object`/`Any`.
+`scripts/check-object-type.py` 扫描 `src/scalim/`、`tests/`、`scripts/` 中类型标注里的 `object`,把动态边界变成可审阅基线,推动用更精确的类型(`Protocol` / `TypedDict` / 具体类型 / 窄化后的别名)替代裸 `object`/`Any`.
 
 ## 当前姿态(基线)
 
-- **不进入** `just qa` / `quick-check` 阻断门禁,直到 `block` 可收敛到可维护规模(当前量级约数百处 `block`).
+- **不进入** `just qa` / `quick-check` 阻断门禁,直到 `block` 可收敛到可维护规模.
+- 扫描器覆盖: 模块级函数、**类方法 / 嵌套类 / 嵌套函数** 的参数与返回标注、类字段 `AnnAssign`、以及 `X = object` 别名.
+- 当前量级(完整扫描后,约数): **`block≈1016` / `total≈1022`**(此前顶层-only 约 504,漏扫约一半 class 方法命中).
 - 扫描器可按需运行;报告写入 `.tmp/artifacts/`(勿提交).
 - `scripts/` 与 `vendor/` 命中记为 `whitelist`,不参与 `--check` 阻断.
-- 嵌套 class 方法等边界的扫描覆盖仍可能偏松;完整清债与扫描修正应走独立 SDD 变更,不要借一次 PR 硬接门禁.
+- 分批清债走 **quick 路径**(直接改类型 / 加有理由的 pragma);**仅当**需要改 `llmanspec` MUST/SHALL 时再开 `SDD` propose. **不要**在 `block` 仍高时接入 `quick-check`.
 
 ## 例外 pragma
 
@@ -35,6 +37,6 @@ uv run python scripts/check-object-type.py --check --quiet
 
 ## 清债方向(后续)
 
-1. 先修扫描覆盖缺口(嵌套方法等),再按域(workflow / yaml_dsl / tests)分批收窄.
-2. 公共 API / 跨边界入参优先 Protocol 或 Enum SSOT,而不是 `object`.
-3. `block→0` 且扫描可信后,再评估是否把 `check-object-type` 接入 `quick-check`.
+1. 扫描覆盖已按类方法/嵌套补齐;按热点文件(见 `just report-object-type`)分批收窄.
+2. 公共 API / 跨边界入参优先 `Protocol` 或 `Enum` SSOT,而不是 `object`.
+3. `block` 降到可维护规模且扫描可信后,再评估是否把 `check-object-type` 接入 `quick-check`.

@@ -239,6 +239,44 @@ def test_object_type_quiet_pass_and_tmp_block(tmp_path, capsys) -> None:
     assert "bad.py" in captured.out
 
 
+def test_object_type_scans_class_methods_and_nested(tmp_path, capsys) -> None:
+    module = _load_script("check-object-type.py")
+
+    fake_root = tmp_path / "repo"
+    _write(
+        fake_root / "src/scalim/nested.py",
+        "\n".join(
+            [
+                "class Outer:",
+                "    field: object",
+                "",
+                "    def method(self, value: object) -> object:",
+                "        def inner(x: object) -> object:",
+                "            return x",
+                "        return inner(value)",
+                "",
+                "    class Inner:",
+                "        nested_field: object",
+                "",
+                "        def nested_method(self, item: object) -> None:",
+                "            return None",
+                "",
+            ]
+        )
+        + "\n",
+    )
+
+    assert module.main(["src/scalim", "--root", str(fake_root), "--check", "--quiet", "--no-artifacts"]) == 1
+    captured = capsys.readouterr()
+    assert "block=" in captured.out
+    assert "cls=Outer fn=method" in captured.out
+    assert "cls=Outer.Inner fn=nested_method" in captured.out
+    assert "cls=Outer target=field" in captured.out
+    assert "cls=Outer.Inner target=nested_field" in captured.out
+    # nested function inside method keeps outer class context in summary
+    assert "cls=Outer fn=inner" in captured.out
+
+
 def test_monkeypatch_policy_quiet_pass_and_tmp_failure(tmp_path, capsys) -> None:
     module = _load_script("check-monkeypatch-policy.py")
 

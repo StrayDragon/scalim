@@ -228,52 +228,75 @@ def _scan_file(*, repo_root: Path, path: Path) -> list[_Hit]:
             )
         )
 
-    for stmt in tree.body:
-        if isinstance(stmt, ast.AnnAssign) and stmt.annotation is not None:
-            if _annotation_contains_object(stmt.annotation):
-                target = ast.get_source_segment(source, stmt.target) or "<unknown>"
-                add_hit(node=stmt.annotation, kind="annassign", summary="target={}".format(" ".join(target.split())))
+    def fn_summary(*, class_stack: tuple[str, ...], fn_name: str, arg: str = "") -> str:
+        if class_stack:
+            if arg:
+                return "cls={} fn={} arg={}".format(".".join(class_stack), fn_name, arg)
+            return "cls={} fn={}".format(".".join(class_stack), fn_name)
+        if arg:
+            return "fn={} arg={}".format(fn_name, arg)
+        return "fn={}".format(fn_name)
 
-        if isinstance(stmt, ast.Assign):
-            if _is_object_ref(stmt.value):
-                for target in stmt.targets:
-                    name = ast.get_source_segment(source, target) or "<unknown>"
-                    add_hit(node=stmt.value, kind="alias", summary="target={}".format(" ".join(str(name).split())))
+    def scan_function(stmt: ast.AST, *, class_stack: tuple[str, ...]) -> None:
+        assert isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef))
+        fn_name = str(getattr(stmt, "name", "") or "")
+        returns = stmt.returns
+        if returns is not None and _annotation_contains_object(returns):
+            add_hit(node=returns, kind="return", summary=fn_summary(class_stack=class_stack, fn_name=fn_name))
+        for arg in list(stmt.args.posonlyargs) + list(stmt.args.args) + list(stmt.args.kwonlyargs):
+            if arg.annotation is not None and _annotation_contains_object(arg.annotation):
+                add_hit(
+                    node=arg.annotation,
+                    kind="param",
+                    summary=fn_summary(class_stack=class_stack, fn_name=fn_name, arg=arg.arg),
+                )
+        if stmt.args.vararg is not None and stmt.args.vararg.annotation is not None:
+            if _annotation_contains_object(stmt.args.vararg.annotation):
+                add_hit(
+                    node=stmt.args.vararg.annotation,
+                    kind="param",
+                    summary=fn_summary(class_stack=class_stack, fn_name=fn_name, arg="*" + stmt.args.vararg.arg),
+                )
+        if stmt.args.kwarg is not None and stmt.args.kwarg.annotation is not None:
+            if _annotation_contains_object(stmt.args.kwarg.annotation):
+                add_hit(
+                    node=stmt.args.kwarg.annotation,
+                    kind="param",
+                    summary=fn_summary(class_stack=class_stack, fn_name=fn_name, arg="**" + stmt.args.kwarg.arg),
+                )
+        # 嵌套函数/类与方法体内部的标注也要扫到(函数体内不再按 `class-annassign` 计).
+        scan_body(stmt.body, class_stack=class_stack, in_class_body=False)
 
-        if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            fn_name = str(getattr(stmt, "name", "") or "")
-            returns = stmt.returns
-            if returns is not None and _annotation_contains_object(returns):
-                add_hit(node=returns, kind="return", summary="fn={}".format(fn_name))
-            for arg in list(stmt.args.posonlyargs) + list(stmt.args.args) + list(stmt.args.kwonlyargs):
-                if arg.annotation is not None and _annotation_contains_object(arg.annotation):
-                    add_hit(node=arg.annotation, kind="param", summary="fn={} arg={}".format(fn_name, arg.arg))
-            if stmt.args.vararg is not None and stmt.args.vararg.annotation is not None:
-                if _annotation_contains_object(stmt.args.vararg.annotation):
-                    add_hit(
-                        node=stmt.args.vararg.annotation,
-                        kind="param",
-                        summary="fn={} arg=*{}".format(fn_name, stmt.args.vararg.arg),
-                    )
-            if stmt.args.kwarg is not None and stmt.args.kwarg.annotation is not None:
-                if _annotation_contains_object(stmt.args.kwarg.annotation):
-                    add_hit(
-                        node=stmt.args.kwarg.annotation,
-                        kind="param",
-                        summary="fn={} arg=**{}".format(fn_name, stmt.args.kwarg.arg),
-                    )
+    def scan_body(nodes: list[ast.stmt], *, class_stack: tuple[str, ...], in_class_body: bool = False) -> None:
+        for stmt in nodes:
+            if isinstance(stmt, ast.AnnAssign) and stmt.annotation is not None:
+                if _annotation_contains_object(stmt.annotation):
+                    target = ast.get_source_segment(source, stmt.target) or "<unknown>"
+                    if in_class_body and class_stack:
+                        kind = "class-annassign"
+                        summary = "cls={} target={}".format(".".join(class_stack), " ".join(target.split()))
+                    else:
+                        kind = "annassign"
+                        summary = "target={}".format(" ".join(target.split()))
+                    add_hit(node=stmt.annotation, kind=kind, summary=summary)
 
-        if isinstance(stmt, ast.ClassDef):
-            cls_name = str(getattr(stmt, "name", "") or "")
-            for item in stmt.body:
-                if isinstance(item, ast.AnnAssign) and item.annotation is not None and _annotation_contains_object(item.annotation):
-                    target = ast.get_source_segment(source, item.target) or "<unknown>"
-                    add_hit(
-                        node=item.annotation,
-                        kind="class-annassign",
-                        summary="cls={} target={}".format(cls_name, " ".join(str(target).split())),
-                    )
+            elif isinstance(stmt, ast.Assign):
+                if _is_object_ref(stmt.value):
+                    for target in stmt.targets:
+                        name = ast.get_source_segment(source, target) or "<unknown>"
+                        if in_class_body and class_stack:
+                            summary = "cls={} target={}".format(".".join(class_stack), " ".join(str(name).split()))
+                        else:
+                            summary = "target={}".format(" ".join(str(name).split()))
+                        add_hit(node=stmt.value, kind="alias", summary=summary)
 
+            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                scan_function(stmt, class_stack=class_stack)
+
+            elif isinstance(stmt, ast.ClassDef):
+                scan_body(stmt.body, class_stack=class_stack + (str(stmt.name),), in_class_body=True)
+
+    scan_body(tree.body, class_stack=(), in_class_body=False)
     return sorted(hits, key=lambda item: (item.line, item.col, item.kind, item.summary))
 
 
