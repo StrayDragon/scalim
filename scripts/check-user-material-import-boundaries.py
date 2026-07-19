@@ -6,6 +6,9 @@
 - `notebooks/marimo/**`
 - `agentdev/skills/**`
 
+跳过:
+- `**/references/upgrades/**`(迁移指南需要展示 Before 反例/旧内部路径)
+
 约束(约定优先):
 - 用户材料中不得出现内部/不安全导入路径(例如 `._internal`、`._foo`、`runtime.*` 等)
 
@@ -46,6 +49,9 @@ _TEXT_SUFFIXES: Tuple[str, ...] = (
 
 _SCALIM_IMPORT_RE = re.compile(r"(?:\bfrom\s+(scalim(?:\.[A-Za-z0-9_]+)*)\s+import\b)|(?:\bimport\s+(scalim(?:\.[A-Za-z0-9_]+)*)\b)")
 
+# `scalim.events._foo` 命中; 不误伤 `scalim.events.__all__`
+_EVENTS_INTERNAL_TOKEN_RE = re.compile(r"scalim\.events\._(?!_)")
+
 _INTERNAL_TOKEN_SUGGESTIONS: Mapping[str, str] = {
     # “硬禁止”标记(不要求是 `import` 语句;出现在任何用户材料文本中都应立即报错)
     "TRUSTED_ALLOW_ALL_MODULES": "请移除该内部/不安全标记;用户材料不得放宽导入边界.",
@@ -61,6 +67,16 @@ _INTERNAL_TOKEN_SUGGESTIONS: Mapping[str, str] = {
 }
 
 
+def _is_skipped(relpath: str) -> bool:
+    """迁移指南允许展示旧内部路径 Before 反例."""
+    parts = Path(relpath).parts
+    try:
+        idx = parts.index("references")
+    except ValueError:
+        return False
+    return idx + 1 < len(parts) and parts[idx + 1] == "upgrades"
+
+
 def _iter_text_files(root: Path) -> Iterable[Path]:
     if not root.exists():
         return
@@ -72,6 +88,14 @@ def _iter_text_files(root: Path) -> Iterable[Path]:
         yield path
 
 
+def _line_has_internal_token(line: str, token: str) -> bool:
+    if not token:
+        return False
+    if token == "scalim.events._":
+        return _EVENTS_INTERNAL_TOKEN_RE.search(line) is not None
+    return token in line
+
+
 def _scan_file(
     path: Path,
     *,
@@ -79,6 +103,9 @@ def _scan_file(
     internal_token_suggestions: Mapping[str, str],
 ) -> List[Hit]:
     rel = str(path.relative_to(repo_root))
+    if _is_skipped(rel):
+        return []
+
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except Exception as exc:  # noqa: BLE001
@@ -99,7 +126,7 @@ def _scan_file(
 
         # 1) 内部/不安全 标记/前缀 门禁(窄且确定)
         for token, suggestion in internal_token_suggestions.items():
-            if token and token in stripped:
+            if _line_has_internal_token(stripped, token):
                 hits.append(
                     Hit(
                         relpath=rel,
