@@ -11,6 +11,10 @@
   - `src/scalim/**/__init__.py` 标记:
       `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`
   - 模块级 `__all__`（仅允许字符串常量组成的 `tuple`/`list`）
+
+输出合约:
+- `--check` 只控制退出码(发现问题时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
 """
 
 from __future__ import annotations
@@ -83,6 +87,7 @@ def _collect_problems(repo_root: Path) -> Sequence[PublicApiProblem]:
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check Tier 1 curated public API entrypoints consistency.")
     parser.add_argument("--check", action="store_true", help="Fail with non-zero exit code when problems are found.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     return parser.parse_args(list(argv))
 
 
@@ -97,7 +102,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write("\n")
         return 1 if args.check else 0
 
-    sys.stdout.write("[通过] 第 1 层入口检查通过\n")
+    if not args.quiet:
+        sys.stdout.write("[通过] 第 1 层入口检查通过\n")
     return 0
 
 

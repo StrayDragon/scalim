@@ -75,3 +75,32 @@ def test_import_graph_check_passes_on_acyclic_graph(tmp_path, capsys) -> None:
 
     assert return_code == 0
     assert "[通过]" in captured.out
+
+
+def test_import_graph_quiet_silences_pass_stdout(tmp_path, capsys) -> None:
+    module = _load_script_module()
+
+    _write(tmp_path / "src/scalim/__init__.py", "")
+    _write(tmp_path / "src/scalim/a.py", "VALUE = 1\n")
+
+    return_code = module.main(["--root", str(tmp_path), "--check", "--quiet"])
+    captured = capsys.readouterr()
+
+    assert return_code == 0
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_import_graph_quiet_still_reports_failures_on_stderr(tmp_path, capsys) -> None:
+    module = _load_script_module()
+
+    _write(tmp_path / "src/scalim/__init__.py", "")
+    _write(tmp_path / "src/scalim/a.py", "import scalim.b\n")
+    _write(tmp_path / "src/scalim/b.py", "import scalim.a\n")
+
+    return_code = module.main(["--root", str(tmp_path), "--check", "--quiet"])
+    captured = capsys.readouterr()
+
+    assert return_code == 1
+    assert captured.out == ""
+    assert "导入环" in captured.err

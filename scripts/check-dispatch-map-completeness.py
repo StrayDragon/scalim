@@ -1,3 +1,16 @@
+"""检查核心事件分发映射完整性(新增事件需显式加入或忽略).
+
+用法:
+- `uv run python scripts/check-dispatch-map-completeness.py`
+- `uv run python scripts/check-dispatch-map-completeness.py --check`
+- `uv run python scripts/check-dispatch-map-completeness.py --check --quiet`
+
+输出合约:
+- `--check` 只控制退出码(发现缺口时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
+- 非 `--check` 模式下 `--quiet` 跳过信息性报告.
+"""
+
 import argparse
 import sys
 from typing import Iterable, List, Optional, Sequence, Set
@@ -28,6 +41,7 @@ def _missing(*, required: Set[str], provided: Set[str], ignored: Set[str]) -> Li
 def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="检查: 核心事件分发映射完整性校验(新增事件需显式加入或忽略).")
     p.add_argument("--check", action="store_true", help="发现缺口时直接失败.")
+    p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     args = p.parse_args(argv)
 
     # 显式忽略列表(可按需要扩展,用于强制维护者做显式决策).
@@ -45,21 +59,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     missing_workflow = _missing(required=workflow_events, provided=workflow_provided, ignored=ignored_workflow)
 
     if not args.check:
-        print("分发映射完整性报告")
-        print("")
-        print("事件目录汇总: 总计={} 基础事件={} 工作流事件={}".format(len(catalog), len(base_events), len(workflow_events)))
-        print("基础事件分发映射: 总计={}".format(len(base_provided)))
-        print("可视化工作流分发映射: 总计={}".format(len(workflow_provided)))
-        if missing_base:
+        if not args.quiet:
+            print("分发映射完整性报告")
             print("")
-            print("[警告] 缺失基础事件: {}".format(len(missing_base)))
-            for name in missing_base:
-                print("  - {}".format(name))
-        if missing_workflow:
-            print("")
-            print("[警告] 缺失工作流事件: {}".format(len(missing_workflow)))
-            for name in missing_workflow:
-                print("  - {}".format(name))
+            print("事件目录汇总: 总计={} 基础事件={} 工作流事件={}".format(len(catalog), len(base_events), len(workflow_events)))
+            print("基础事件分发映射: 总计={}".format(len(base_provided)))
+            print("可视化工作流分发映射: 总计={}".format(len(workflow_provided)))
+            if missing_base:
+                print("")
+                print("[警告] 缺失基础事件: {}".format(len(missing_base)))
+                for name in missing_base:
+                    print("  - {}".format(name))
+            if missing_workflow:
+                print("")
+                print("[警告] 缺失工作流事件: {}".format(len(missing_workflow)))
+                for name in missing_workflow:
+                    print("  - {}".format(name))
         return 0
 
     if missing_base or missing_workflow:

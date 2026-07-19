@@ -24,6 +24,10 @@
     `uv run scripts/check-export-api-must-tuple.py --check --strict`
     `uv run scripts/check-export-api-must-tuple.py --fix`
     `uv run scripts/check-export-api-must-tuple.py --update-allow-file`
+
+输出合约:
+- `--check` 只控制退出码(发现 `list` 字面量时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
 """
 
 from __future__ import annotations
@@ -146,6 +150,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     g.add_argument("--check", action="store_true", help="检查模式; 发现 `list` 字面量则失败.")
     g.add_argument("--fix", action="store_true", help="修复模式; 自动将 `__all__ = [...]` 改为 tuple.")
     g.add_argument("--update-allow-file", action="store_true", help="更新允许名单文件为当前命中集合(便于增量治理).")
+    p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     return p.parse_args(list(argv))
 
 
@@ -237,10 +242,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             msg = "[通过] 未新增 `__all__` 列表字面量 (历史存量 {} 个文件仍在允许名单).".format(len(hit_paths))
             if stale:
                 msg += " (允许名单可收敛: {} 条已不再命中)".format(len(stale))
-            print(msg)
+            if not args.quiet:
+                print(msg)
             return 0
 
-        print("[通过] 未发现 `__all__` 列表字面量 ({})".format(str(root)))
+        if not args.quiet:
+            print("[通过] 未发现 `__all__` 列表字面量 ({})".format(str(root)))
         return 0
 
     changed: List[Path] = []

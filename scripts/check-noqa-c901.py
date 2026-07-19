@@ -1,3 +1,16 @@
+"""检查: `# noqa: C901` 需携带可追踪的 `allow-c901` `plan` 标记.
+
+用法:
+- `uv run python scripts/check-noqa-c901.py`
+- `uv run python scripts/check-noqa-c901.py --check`
+- `uv run python scripts/check-noqa-c901.py --check --quiet`
+
+输出合约:
+- `--check` 只控制退出码(发现违规时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
+- 非 `--check` 模式下 `--quiet` 跳过信息性报告.
+"""
+
 import argparse
 import io
 import sys
@@ -99,23 +112,25 @@ def scan_noqa_c901(repo_root: Path) -> List[_Hit]:
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="检查: `# noqa: C901` 需携带可追踪的 `allow-c901` `plan` 标记.")
     p.add_argument("--check", action="store_true", help="发现违规时返回非 0 退出码.")
+    p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     args = p.parse_args(argv)
 
     repo_root = Path(__file__).resolve().parents[1]
     hits = scan_noqa_c901(repo_root)
 
     if not args.check:
-        print("`noqa` `C901` 扫描报告")
-        print("")
-        print("摘要: 总计={}".format(len(hits)))
-        for hit in hits[:50]:
-            print("  - {}:{}".format(hit.path, hit.line))
-        if len(hits) > 50:
-            print("  ... (还有 {} 条)".format(len(hits) - 50))
-        print("")
-        print("规则:")
-        print("  - 行级: `# noqa: C901 ...  # pragma: allow-c901 plan: <ref>`")
-        print("  - 文件级(注释区): `# pragma: allow-c901-file plan: <ref>`")
+        if not args.quiet:
+            print("`noqa` `C901` 扫描报告")
+            print("")
+            print("摘要: 总计={}".format(len(hits)))
+            for hit in hits[:50]:
+                print("  - {}:{}".format(hit.path, hit.line))
+            if len(hits) > 50:
+                print("  ... (还有 {} 条)".format(len(hits) - 50))
+            print("")
+            print("规则:")
+            print("  - 行级: `# noqa: C901 ...  # pragma: allow-c901 plan: <ref>`")
+            print("  - 文件级(注释区): `# pragma: allow-c901-file plan: <ref>`")
         return 0
 
     if hits:

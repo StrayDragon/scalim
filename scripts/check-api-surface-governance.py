@@ -7,6 +7,10 @@
   - 任意 `_internal/` 目录下的模块
   - 文件名以单个下划线开头的模块(例如 `_foo.py`)
   必须定义 `__all__`,且必须为空(`[]` 或 `()`).
+
+输出合约:
+- `--check` 只控制退出码(发现问题时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
 """
 
 from __future__ import annotations
@@ -121,6 +125,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="要扫描的根目录(默认: src/scalim).",
     )
     parser.add_argument("--check", action="store_true", help="执行检查; 发现问题时返回非 0 退出码.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     return parser.parse_args(list(argv))
 
 
@@ -141,7 +146,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("- {}".format(line), file=sys.stderr)
         return 1
 
-    print("[通过] 公共接口表面治理检查通过 ({})".format(str(root)))
+    if not args.quiet:
+        print("[通过] 公共接口表面治理检查通过 ({})".format(str(root)))
     return 0
 
 

@@ -83,3 +83,31 @@ def test_workflow_layering_check_passes(tmp_path, capsys) -> None:
 
     assert return_code == 0
     assert "[通过]" in captured.out
+
+
+def test_workflow_layering_quiet_silences_pass_stdout(tmp_path, capsys) -> None:
+    module = _load_script_module()
+
+    _write(tmp_path / "src/scalim/workflow/__init__.py", "")
+    _write(tmp_path / "src/scalim/workflow/execute.py", "import scalim.workflow\n")
+
+    return_code = module.main(["--root", str(tmp_path), "--check", "--quiet"])
+    captured = capsys.readouterr()
+
+    assert return_code == 0
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_workflow_layering_quiet_still_reports_failures_on_stderr(tmp_path, capsys) -> None:
+    module = _load_script_module()
+
+    _write(tmp_path / "src/scalim/workflow/__init__.py", "")
+    _write(tmp_path / "src/scalim/workflow/execute.py", "import scalim.dsl.yaml_dsl\n")
+
+    return_code = module.main(["--root", str(tmp_path), "--check", "--quiet"])
+    captured = capsys.readouterr()
+
+    assert return_code == 1
+    assert captured.out == ""
+    assert "import 'scalim.dsl.yaml_dsl'" in captured.err

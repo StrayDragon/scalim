@@ -1,3 +1,16 @@
+"""检查热点模块体量护栏(避免继续增长; 提示拆分).
+
+用法:
+- `uv run python scripts/check-module-size.py`
+- `uv run python scripts/check-module-size.py --check`
+- `uv run python scripts/check-module-size.py --check --quiet`
+
+输出合约:
+- `--check` 只控制退出码(超过阈值时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
+- 非 `--check` 模式下 `--quiet` 跳过信息性报告.
+"""
+
 import argparse
 import sys
 from dataclasses import dataclass
@@ -54,6 +67,7 @@ def _format_row(row: ModuleSize) -> str:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="检查: 热点模块体量护栏(避免继续增长; 提示拆分).")
     p.add_argument("--check", action="store_true", help="超过阈值时直接失败.")
+    p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     args = p.parse_args(argv)
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -66,15 +80,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     too_large: List[ModuleSize] = [row for row in rows if row.lines > row.limit]
 
     if not args.check:
-        print("模块体量报告")
-        print("")
-        for row in rows:
-            print("  - {}".format(_format_row(row)))
-        if too_large:
+        if not args.quiet:
+            print("模块体量报告")
             print("")
-            print("[警告] 超过阈值: {}".format(len(too_large)))
-            for row in too_large:
+            for row in rows:
                 print("  - {}".format(_format_row(row)))
+            if too_large:
+                print("")
+                print("[警告] 超过阈值: {}".format(len(too_large)))
+                for row in too_large:
+                    print("  - {}".format(_format_row(row)))
         return 0
 
     if too_large:

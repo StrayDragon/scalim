@@ -12,7 +12,12 @@
 
 用法:
 - `uv run python scripts/check-monkeypatch-policy.py --check`
+- `uv run python scripts/check-monkeypatch-policy.py --check --quiet`
 - `uv run python scripts/check-monkeypatch-policy.py --root /path/to/repo --check`
+
+输出合约:
+- `--check` 只控制退出码(有违规则非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 有违规时仍写 `stderr`.
 
 退出码:
 - 0: 通过
@@ -31,6 +36,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="检查 monkeypatch policy gate.")
     parser.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     parser.add_argument("--check", action="store_true", help="发现违规时返回非 0 退出码.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     return parser.parse_args(argv)
 
 
@@ -98,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
             print("- {}".format(v), file=sys.stderr)
         return 1 if args.check else 0
 
-    print("[通过] `monkeypatch` 政策检查通过")
+    if not args.quiet:
+        print("[通过] `monkeypatch` 政策检查通过")
     return 0
 
 

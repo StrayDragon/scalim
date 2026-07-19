@@ -1,4 +1,5 @@
 # ruff: noqa: T201
+# force-en
 """
 检查主包(`src/scalim/`)导入结构:
 
@@ -6,10 +7,16 @@
 - 主包禁止函数内导入(排除 `vendor`)
 
 该脚本是静态门禁:只依赖文件系统与 AST,不执行运行时模块的 `import`.
+失败属于严重架构违规: quiet 不得吞掉失败报告.
 
 用法:
 - `uv run python scripts/check-import-graph.py --check`
+- `uv run python scripts/check-import-graph.py --check --quiet`
 - `uv run python scripts/check-import-graph.py --root /path/to/repo --check`
+
+输出合约:
+- `--check` 只控制退出码(有违规则非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 有违规时仍写 `stderr`(严重错误不可静默).
 
 退出码:
 - 0: 通过
@@ -289,6 +296,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="检查主包导入图无环 + 禁止函数内导入.")
     parser.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     parser.add_argument("--check", action="store_true", help="发现违规时返回非 0 退出码.")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="静默模式: 通过时不向 stdout 写报告; 违规仍写 stderr.",
+    )
     return parser.parse_args(argv)
 
 
@@ -299,6 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     scalim_root = src_root / "scalim"
 
     if not scalim_root.is_dir():
+        # 配置/路径错误同样视为严重失败信号, quiet 不得吞掉.
         print("[错误] 未找到主包目录: {}".format(scalim_root), file=sys.stderr)
         return 1 if args.check else 0
 
@@ -317,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
     local_imports = _collect_function_local_imports(py_files, scalim_root=scalim_root)
 
     if cycles or local_imports:
+        # 严重错误: 始终写 stderr(不受 --quiet 影响).
         print("[错误] 主包导入结构检查失败:", file=sys.stderr)
         if cycles:
             print("- 导入图存在 {} 个循环依赖:".format(len(cycles)), file=sys.stderr)
@@ -337,7 +351,8 @@ def main(argv: list[str] | None = None) -> int:
 
         return 1 if args.check else 0
 
-    print("[通过] 主包导入结构检查通过 (模块数={})".format(len(graph)))
+    if not args.quiet:
+        print("[通过] 主包导入结构检查通过 (模块数={})".format(len(graph)))
     return 0
 
 

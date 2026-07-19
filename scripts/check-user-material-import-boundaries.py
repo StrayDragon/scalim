@@ -8,6 +8,10 @@
 
 约束(约定优先):
 - 用户材料中不得出现内部/不安全导入路径(例如 `._internal`、`._foo`、`runtime.*` 等)
+
+输出合约:
+- `--check` 只控制退出码(发现问题时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
 """
 
 from __future__ import annotations
@@ -143,6 +147,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--notebooks-root", default="notebooks/marimo", help="notebooks 根目录(默认: notebooks/marimo).")
     parser.add_argument("--skills-root", default="agentdev/skills", help="skills 根目录(默认: agentdev/skills).")
     parser.add_argument("--check", action="store_true", help="执行检查; 发现问题时返回非 0 退出码.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     return parser.parse_args(list(argv))
 
 
@@ -181,7 +186,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("- 优先使用更上层的门面模块导入(例如 `scalim.dsl.yaml_dsl`/`scalim.events`/`scalim.sinks`).", file=sys.stderr)
         return 1
 
-    print("[通过] 用户材料导入边界检查通过")
+    if not args.quiet:
+        print("[通过] 用户材料导入边界检查通过")
     return 0
 
 

@@ -842,7 +842,13 @@ report-module-size:
 
 # 检查: hotspot module 体量护栏(避免继续增长)
 check-module-size:
-    uv {{ UV_OPTIONS }} run python scripts/check-module-size.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-module-size.py --check $quiet_flag
 
 # 报告: core event dispatch map 完整性基线
 report-dispatch-map-completeness:
@@ -850,7 +856,13 @@ report-dispatch-map-completeness:
 
 # 检查: core event dispatch map 完整性(新增事件需显式加入/忽略)
 check-dispatch-map-completeness:
-    uv {{ UV_OPTIONS }} run python scripts/check-dispatch-map-completeness.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-dispatch-map-completeness.py --check $quiet_flag
 
 # 报告: print(...) 使用基线
 report-print-usage:
@@ -858,7 +870,13 @@ report-print-usage:
 
 # 检查: runtime 禁止 print(...)
 check-no-print:
-    uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check $quiet_flag
 
 # 检查: tests/ 禁止 time.sleep 轮询 (allowlist 除外)
 check-no-test-sleep:
@@ -876,43 +894,104 @@ report-noqa-c901:
 
 # 检查: `# noqa: C901` 必须显式 allow 且携带 plan
 check-noqa-c901:
-    uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py --check $quiet_flag
 
 # 检查: public API surface governance (`__all__` 约束 + 内部模块封堵)
 check-api-surface-governance:
-    uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check $quiet_flag
 
 # 检查: Tier 1 curated entrypoints 一致性(marker 语法 + 去重 + 模块存在 + 字面量 `__all__`)
 check-public-api-curated-entrypoints:
-    uv {{ UV_OPTIONS }} run python scripts/check-public-api-curated-entrypoints.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-public-api-curated-entrypoints.py --check $quiet_flag
 
 # 检查: Tier1 curated entrypoints 与 examples/pytest public_api suite 覆盖漂移
 check-public-api-suite-coverage:
-    uv {{ UV_OPTIONS }} run python scripts/check-public-api-suite-coverage.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-public-api-suite-coverage.py --check $quiet_flag
 
 # 检查: export API(`__all__`) 必须使用 tuple 字面量
 check-export-api-must-tuple:
-    uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check $quiet_flag
 
 # 检查: user-facing materials 不得引用内部/不安全导入路径
 check-user-material-import-boundaries:
-    uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check $quiet_flag
 
-# 检查: 主包导入图无环 + 禁止函数内导入
+# 检查: 主包导入图无环 + 禁止函数内导入(失败=严重架构违规; quiet 不吞 stderr)
 check-import-graph:
-    uv {{ UV_OPTIONS }} run python scripts/check-import-graph.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-import-graph.py --check $quiet_flag
 
 # 检查: workflow layering gate (workflow 不得依赖 dsl; yaml_dsl/runtime 不得包含 workflow_*.py)
+# 失败=严重架构违规; quiet 不吞 stderr
 check-workflow-layering:
-    uv {{ UV_OPTIONS }} run python scripts/check-workflow-layering.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-workflow-layering.py --check $quiet_flag
 
 # 检查: tests domain suites gate (目录结构 + tests.* 字符串引用边界)
 check-tests-domain-suites:
-    uv {{ UV_OPTIONS }} run python scripts/check-tests-domain-suites.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-tests-domain-suites.py --check $quiet_flag
 
 # 检查: monkeypatch policy gate (禁止 patch private name / patch global import)
 check-monkeypatch-policy:
-    uv {{ UV_OPTIONS }} run python scripts/check-monkeypatch-policy.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-monkeypatch-policy.py --check $quiet_flag
 
 # 报告: `object` 类型标注基线
 report-object-type:
@@ -920,7 +999,13 @@ report-object-type:
 
 # 检查: `object` 类型标注必须显式 allow (scripts/vendor 白名单除外)
 check-object-type:
-    uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check $quiet_flag
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
 quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check

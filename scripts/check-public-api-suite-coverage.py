@@ -15,6 +15,10 @@
 
 约束:
   - 静态扫描(仅 `AST`/文本),不执行 `notebooks`,不 `import` `scalim` 模块。
+
+输出合约:
+- `--check` 只控制退出码(发现漂移时非 0); 不隐含静默.
+- `--quiet` 且通过时不写 `stdout`; 失败时仍写 `stderr`.
 """
 
 from __future__ import annotations
@@ -56,6 +60,7 @@ def _format_problems(problems: Sequence[PublicApiProblem], *, repo_root: Path) -
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Check Tier1 public API coverage drift for examples/pytest suites.")
     parser.add_argument("--check", action="store_true", help="Fail with non-zero exit code when drift is detected.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     return parser.parse_args(list(argv))
 
 
@@ -127,7 +132,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write("\n")
         return 1 if args.check else 0
 
-    sys.stdout.write("[通过] 第 1 层入口 ↔ 示例 ↔ `pytest` 覆盖一致\n")
+    if not args.quiet:
+        sys.stdout.write("[通过] 第 1 层入口 ↔ 示例 ↔ `pytest` 覆盖一致\n")
     return 0
 
 
