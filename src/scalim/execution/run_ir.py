@@ -29,6 +29,7 @@ from ..sinks import (
     ISink,
     StreamingColumnExcelSink,
 )
+from ..sinks._internal.base import SupportsClose
 from ..sinks._internal.base import discard_sink as _best_effort_discard_sink
 from ..sinks.accept_types import SinkTypePrecheck
 from ..sinks.memory import InMemoryCsv
@@ -285,9 +286,10 @@ def _prepare_engine_sink(
         with contextlib.suppress(Exception):
             _best_effort_discard_sink(sink)
         with contextlib.suppress(Exception):
-            close = getattr(observer_manager, "close", None)  # pragma: allow-dynattr optional-interface: observer_manager
-            if callable(close):
-                _ = close()
+            if isinstance(observer_manager, SupportsClose):
+                close = observer_manager.close
+                if callable(close):
+                    _ = close()
         raise
 
 

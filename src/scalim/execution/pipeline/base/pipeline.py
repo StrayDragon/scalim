@@ -21,7 +21,7 @@ from ....ob.manager import ObserverManager
 from ....planning.operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks import IColumnSink, IRowSink, ISink
-from ....sinks._internal.base import discard_sink
+from ....sinks._internal.base import SupportsPreloadGetOrLoad, SupportsWriteColumnAligned, discard_sink
 from ....spec.ir import DemandIr, FieldIr, SourceIr
 from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.aliases import LoaderResultMapCallable
@@ -184,18 +184,27 @@ class Pipeline(ABC):
         load_fn: Callable[[], LoaderResultMapping],
     ) -> Optional[LoaderResultMapping]:
         """通过 `preloaded_cache.get_or_load` 扩展点加载/复用结果(若不存在则返回 `None`)."""
-        get_or_load = getattr(cache, "get_or_load", None)  # pragma: allow-dynattr optional-interface: preloaded_cache
+        if not isinstance(cache, SupportsPreloadGetOrLoad):
+            return None
+        get_or_load = cache.get_or_load
         if not callable(get_or_load):
             return None
-        if bool(
-            getattr(cache, "signature_guardrail_enabled", False)  # pragma: allow-dynattr optional-interface: preloaded_cache
-        ):
+
+        guardrail_enabled = False
+        for cls in type(cache).mro():
+            if "signature_guardrail_enabled" not in cls.__dict__:
+                continue
+            value = cls.__dict__["signature_guardrail_enabled"]
+            if isinstance(value, property):
+                guardrail_enabled = bool(value.__get__(cache, type(cache)))
+            else:
+                guardrail_enabled = bool(value)
+            break
+
+        if guardrail_enabled:
             digest = build_preload_forever_signature(source, rendered_params=rendered_params).digest()
-            return cast(  # pragma: allow-cast preloaded_cache boundary typed narrowing
-                "LoaderResultMapping",
-                get_or_load(source_id, load_fn, signature_digest=digest),
-            )
-        return cast("LoaderResultMapping", get_or_load(source_id, load_fn))  # pragma: allow-cast preloaded_cache boundary typed narrowing
+            return get_or_load(source_id, load_fn, signature_digest=digest)
+        return get_or_load(source_id, load_fn)
 
     def _preload_cached_sources(self) -> None:
         """预加载缓存数据源"""
@@ -632,14 +641,13 @@ class SeqPipeline(Pipeline):
         if field_key not in self.plan.target_fields:
             return
 
-        write_column_aligned = getattr(column_sink, "write_column_aligned", None)  # pragma: allow-dynattr optional-interface: sink
-        if callable(write_column_aligned):
+        write_column_aligned = None
+        if isinstance(column_sink, SupportsWriteColumnAligned):
+            write_column_aligned = column_sink.write_column_aligned
+        if write_column_aligned is not None:
             values: List[FieldValue] = [context.get_field_value(field_key, row_id) for row_id in row_ids]
             aligned_row_ids = cast("SinkRowKeySeq", row_ids)  # pragma: allow-cast sink row ids typed narrowing
-            _ = cast(  # pragma: allow-cast sink optional interface typed narrowing
-                "Callable[[str, SinkRowKeySeq, Sequence[FieldValue]], None]",
-                write_column_aligned,
-            )(field_key, aligned_row_ids, values)
+            write_column_aligned(field_key, aligned_row_ids, values)
             row_count = len(values)
         else:
             col_data: Dict[Hashable, FieldValue] = {}

@@ -5,8 +5,8 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, List, Mapping, Optional, Sequence, Type
 
 from ..._internal.utils import atomic_paths as _atomic_paths
-from ...typedefs import CellValue, RowData, SinkRowKeySeq
-from ...vendor.compact.typing_extensionsx import Self, override
+from ...typedefs import CellValue, FieldValue, LoaderResultMapping, RowData, SinkRowKeySeq
+from ...vendor.compact.typing_extensionsx import Protocol, Self, override, runtime_checkable
 
 if TYPE_CHECKING:
     import types
@@ -235,14 +235,53 @@ class IColumnSink(ISink, ABC):
         self.write_columns(columns)
 
 
+@runtime_checkable
+class SupportsWriteColumnAligned(Protocol):
+    """可选能力:按对齐 `row_ids` 写列(内建列式 `sink` 提供;非 `ABC` 强制)."""
+
+    def write_column_aligned(self, field_key: str, row_ids: SinkRowKeySeq, values: Sequence[FieldValue]) -> None: ...
+
+
+@runtime_checkable
+class SupportsWriteRowAligned(Protocol):
+    """可选能力:按字段序对齐写行(内建行式 `sink` 提供;非 `ABC` 强制)."""
+
+    def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None: ...
+
+
+@runtime_checkable
+class SupportsDiscard(Protocol):
+    def discard(self) -> None: ...
+
+
+@runtime_checkable
+class SupportsClose(Protocol):
+    def close(self) -> None: ...
+
+
+@runtime_checkable
+class SupportsPreloadGetOrLoad(Protocol):
+    def get_or_load(
+        self,
+        source_id: str,
+        load_fn: "Callable[[], LoaderResultMapping]",
+        *args: object,
+        **kwargs: object,
+    ) -> LoaderResultMapping: ...
+
+
 def discard_sink(sink: object) -> None:
     """失败路径:调用 `discard()`;`MUST NOT` 回退为成功语义的 `close()` `promote`.
 
-    主路径为正式合约方法;对非 `ISink` 对象仍以可调用探测做 `best-effort` 兼容.
+    主路径为 `ISink.discard`;非 `ISink` 容器(如 `ExcelWorkbookSink`)走 `SupportsDiscard`.
     """
-    discard = getattr(sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
-    if callable(discard):
-        _ = discard()
+    if isinstance(sink, ISink):
+        sink.discard()
+        return
+    if isinstance(sink, SupportsDiscard):
+        discard = sink.discard
+        if callable(discard):
+            _ = discard()
 
 
 def exit_sink(sink: object, exc_type: Optional[Type[BaseException]]) -> None:
@@ -251,9 +290,13 @@ def exit_sink(sink: object, exc_type: Optional[Type[BaseException]]) -> None:
         with suppress(Exception):
             discard_sink(sink)
         return
-    close = getattr(sink, "close", None)  # pragma: allow-dynattr optional-interface: sink close
-    if callable(close):
-        _ = close()
+    if isinstance(sink, ISink):
+        sink.close()
+        return
+    if isinstance(sink, SupportsClose):
+        close = sink.close
+        if callable(close):
+            _ = close()
 
 
 class BaseSink(ISink):

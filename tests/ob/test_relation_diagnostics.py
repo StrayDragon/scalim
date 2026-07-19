@@ -32,6 +32,13 @@ class TestTypeMismatchWarning:
         assert warning.field_b == "id"
         assert "Type mismatch" in warning.message
 
+    def test_extract_field_value_from_object_missing_attr(self) -> None:
+        class _Row:
+            pass
+
+        assert RelationDiagnostics._extract_field_value(_Row(), "missing") is None  # noqa: SLF001
+        assert RelationDiagnostics._extract_field_value({"id": 1}, "id") == 1  # noqa: SLF001
+
     def test_repr(self) -> None:
         warning = TypeMismatchWarning(
             source_a="a",

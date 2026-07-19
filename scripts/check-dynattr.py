@@ -3,6 +3,7 @@
 # requires-python = ">=3.10"
 # ///
 # ruff: noqa: T201
+# force-en
 """扫描源码中的 `getattr` / `setattr` / `hasattr` 调用.
 
 设计目标:
@@ -22,8 +23,8 @@
 
 输出合约:
 - `--check` 只控制退出码(有 `block` 则非 0); 不隐含静默.
-- `--quiet` 且无 `block` 时不写 stdout; 有 `block` 时仍写报告.
-- `.tmp/artifacts/` 写入与 quiet 正交(见 `--no-artifacts`).
+- `--quiet` 且无 `block` 时不写 `stdout`; 有 `block` 时仍写报告.
+- `.tmp/artifacts/` 写入与 `--quiet` 正交(见 `--no-artifacts`).
 """
 
 from __future__ import annotations
@@ -427,7 +428,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report_path.write_text(text_report, encoding="utf-8")
 
     has_blocks = any(hit.status == "block" for hit in hits)
-    # `--quiet` 控制通过路径静默; `--check` 只控制退出码. 有 block 时始终写 stdout.
+    # `--quiet` 控制通过路径静默; `--check` 只控制退出码. 有 `block` 时始终写 `stdout`.
     if not (args.quiet and not has_blocks):
         sys.stdout.write(output)
 

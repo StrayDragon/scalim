@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from typing import Dict, Optional, Sequence, Tuple
 
-from ...sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink
+from ...sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink, ISink
 from ...sinks.accept_types import SinkTypePrecheck
 from ...typedefs import RowData
 from ...vendor.compact.typing_extensionsx import override
@@ -40,11 +40,9 @@ class _CountingOutputRowSink(BaseRowSink):
 
     @override
     def discard(self) -> None:
-        discard = getattr(self._sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
-        if callable(discard):
-            _ = discard()
-            return
-        # 无 `discard` 时不 `promote`:跳过 `close`
+        # `_sink` 合约为 `IRowSink`;对测试/边界鸭子对象保持无操作而非 `duck-type` `getattr`.
+        if isinstance(self._sink, ISink):
+            self._sink.discard()
 
 
 def _create_csv_sink(output: OutputSpec, layout: ExportLayout) -> CSVSink:

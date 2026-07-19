@@ -290,7 +290,7 @@ def test_workflow_cache_pool_close_waits_for_loading_entry_lock() -> None:
 
 
 def test_pipeline_preload_uses_preloaded_cache_get_or_load() -> None:
-    class _PreloadedCache(dict):
+    class _PreloadedCache(dict):  # pyright: ignore[reportMissingTypeArgument]
         def __init__(self) -> None:
             super(_PreloadedCache, self).__init__()
             self.calls = []
@@ -337,7 +337,7 @@ def test_pipeline_preload_uses_preloaded_cache_get_or_load() -> None:
 
 
 def test_pipeline_preload_passes_signature_digest_when_guardrail_enabled() -> None:
-    class _PreloadedCache(dict):
+    class _PreloadedCache(dict):  # pyright: ignore[reportMissingTypeArgument]
         signature_guardrail_enabled = True
 
         def __init__(self) -> None:
@@ -384,6 +384,83 @@ def test_pipeline_preload_passes_signature_digest_when_guardrail_enabled() -> No
     pipeline._preload_cached_sources()  # type: ignore[attr-defined]
     assert [item[0] for item in cache.calls] == ["preload"]
     assert cache.calls[0][1]
+    assert "preload" in cache
+
+
+def test_pipeline_preload_skips_non_callable_get_or_load() -> None:
+    class _BrokenCache(dict):  # pyright: ignore[reportMissingTypeArgument]
+        get_or_load = 1
+
+    cache = _BrokenCache()
+    source = SourceIr(
+        source_id="preload",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="preload.loader")),
+        cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
+    )
+    plan = ExecutionPlan(preload_sources=(source,))
+    hook_manager = HookManager()
+    observer_manager = ObserverManager()
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": lambda: []},
+        source_loaders={"preload": lambda: {1: {"id": 1}}},
+    )
+    runtime = _make_runtime(
+        plan,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        cache=cache,
+        sources={"preload": source},
+        runtime_bindings=runtime_bindings,
+    )
+    executor = _make_executor(plan, runtime)
+    pipeline = _TestPipeline(
+        plan,
+        executor,
+        runtime,
+        hook_manager,
+        observer_manager,
+        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))),
+    )
+    pipeline._preload_cached_sources()  # type: ignore[attr-defined]
+    assert "preload" in cache
+
+
+def test_pipeline_preload_reads_signature_guardrail_property() -> None:
+    from scalim.execution.preload_cache import PreloadCache, PreloadCacheSignatureGuardrail
+
+    cache = PreloadCache(signature_guardrail=PreloadCacheSignatureGuardrail(enabled=True, policy="warn"))
+    source = SourceIr(
+        source_id="preload",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="preload.loader")),
+        cache_mode=SourceSpecIrCacheMode.PRELOAD_FOREVER,
+    )
+    plan = ExecutionPlan(preload_sources=(source,))
+    hook_manager = HookManager()
+    observer_manager = ObserverManager()
+    runtime_bindings = RuntimeBindings(
+        main_source_loaders={"main": lambda: []},
+        source_loaders={"preload": lambda: {1: {"id": 1, "value": "ok"}}},
+    )
+    runtime = _make_runtime(
+        plan,
+        hook_manager=hook_manager,
+        observer_manager=observer_manager,
+        cache=cache,
+        sources={"preload": source},
+        runtime_bindings=runtime_bindings,
+    )
+    executor = _make_executor(plan, runtime)
+    pipeline = _TestPipeline(
+        plan,
+        executor,
+        runtime,
+        hook_manager,
+        observer_manager,
+        DemandIr(sources={}, fields={}, main_source=MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))),
+    )
+    pipeline._preload_cached_sources()  # type: ignore[attr-defined]
     assert "preload" in cache
 
 

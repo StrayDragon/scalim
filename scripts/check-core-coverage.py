@@ -27,9 +27,9 @@
      `... --check --quiet`
 
 输出合约:
-- `--check` 只控制退出码; `--quiet` 且未 hard_fail 时不写 stdout.
-- hard_fail 时始终写 stdout(与 quiet 无关).
-- `.tmp/artifacts/` 写入与 quiet 正交(见 `--no-artifacts`).
+- `--check` 只控制退出码; `--quiet` 且未 `hard_fail` 时不写 `stdout`.
+- `hard_fail` 时始终写 `stdout`(与 `--quiet` 无关).
+- `.tmp/artifacts/` 写入与 `--quiet` 正交(见 `--no-artifacts`).
 """
 
 from __future__ import annotations

@@ -167,6 +167,19 @@ def test_exit_sink_tolerates_missing_discard_and_close() -> None:
     exit_sink(_Bare(), None)
 
 
+def test_discard_and_exit_sink_ignore_non_callable_attrs() -> None:
+    from scalim.sinks._internal.base import discard_sink, exit_sink
+
+    class _NonCallableDiscard:
+        discard = 1
+
+    class _NonCallableClose:
+        close = 1
+
+    discard_sink(_NonCallableDiscard())
+    exit_sink(_NonCallableClose(), None)
+
+
 def test_column_excel_and_workbook_discard_on_exception(tmp_path: Path) -> None:
     col_path = tmp_path / "col_discard.xlsx"
     with pytest.raises(RuntimeError, match=r"boom"):

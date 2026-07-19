@@ -1,4 +1,5 @@
 # ruff: noqa: T201
+# force-en
 """
 扫描运行时“文字输出点”中的英文描述(例如: `print`/`logger`/`raise`).
 
@@ -25,8 +26,8 @@
 - 1: 发现命中
 
 输出合约:
-- `--quiet` 且无命中时不写 stdout/stderr; 有命中时仍写(命中走 stderr).
-- `--report` 始终落盘(含“未发现命中.”),与 quiet 正交.
+- `--quiet` 且无命中时不写 `stdout`/`stderr`; 有命中时仍写(命中走 `stderr`).
+- `--report` 始终落盘(含“未发现命中.”),与 `--quiet` 正交.
 """
 
 from __future__ import annotations

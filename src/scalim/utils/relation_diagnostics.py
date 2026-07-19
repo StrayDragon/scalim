@@ -47,7 +47,10 @@ class RelationDiagnostics:
     def _extract_field_value(data: Any, field_name: str) -> Any:
         if _is_mapping(data):
             return data.get(field_name)
-        return getattr(data, field_name, None)  # pragma: allow-dynattr optional-interface: row field access
+        try:
+            return object.__getattribute__(data, field_name)
+        except AttributeError:
+            return None
 
     @staticmethod
     def _collect_field_values(data: Any, fields: Tuple[str, ...]) -> Tuple[Tuple[Any, ...], bool]:
@@ -80,13 +83,15 @@ class RelationDiagnostics:
 
             if source.key.cast:
                 cast_spec = source.key.cast
-                cast_name = str(getattr(cast_spec, "name", "") or "").strip()  # pragma: allow-dynattr introspection: key.cast spec contract
-                sep = getattr(cast_spec, "sep", None)  # pragma: allow-dynattr introspection: key.cast spec contract
-                if not cast_name:
-                    if isinstance(cast_spec, type):
-                        cast_name = cast_spec.__name__
-                    else:
-                        cast_name = type(cast_spec).__name__
+                if isinstance(cast_spec, LookupCastSpecIr):
+                    cast_name = str(cast_spec.name or "").strip()
+                    sep = cast_spec.sep
+                elif isinstance(cast_spec, type):
+                    cast_name = cast_spec.__name__
+                    sep = None
+                else:
+                    cast_name = type(cast_spec).__name__
+                    sep = None
                 cast_name = str(cast_name or "").strip().lower() or "auto"
                 if cast_name == "sep_first":
                     transform_info = " (cast: {} sep={!r})".format(cast_name, sep or ",")

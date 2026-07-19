@@ -2,7 +2,7 @@ from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple, cast
 
 from ....typedefs import LoaderCallKwargs, LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
-from ....vendor.compact.typing_extensionsx import TypeGuard
+from ....vendor.compact.typing_extensionsx import Protocol, TypeGuard, runtime_checkable
 from ....vendor.dataclassesx import dataclass, field
 from ..aliases import NormalizedLookupKeySpec
 from ..callable_refs import CallableRefIr
@@ -35,6 +35,13 @@ def build_stable_lookup_key_list(lookup_keys: LookupKeySet) -> LookupKeyList:
     """
 
     return sorted(lookup_keys, key=_stable_lookup_key_sort_key)
+
+
+@runtime_checkable
+class ParamsTemplateRenderContract(Protocol):
+    """`BindingIr.params_template` 最小渲染合约."""
+
+    def render_kwargs(self, ctx: "LoaderCallContextIr", *, path: str) -> LoaderCallKwargs: ...
 
 
 @dataclass(frozen=True)
@@ -164,14 +171,10 @@ class BindingIr:
         template = self.params_template
         if template is None:
             return (), {}
-        render = getattr(template, "render_kwargs", None)  # pragma: allow-dynattr optional-interface: params_template render contract
-        if not callable(render):
+        if not isinstance(template, ParamsTemplateRenderContract):
             msg = "BindingIr.params_template must provide render_kwargs(ctx, path=...)"
             raise TypeError(msg)
-        kwargs = cast(  # pragma: allow-cast params_template render kwargs contract boundary
-            "LoaderCallKwargs",
-            render(context, path=self.template_path or "(binding)"),  # type: ignore[misc]  # pragma: allow-any template typing boundary
-        )
+        kwargs = template.render_kwargs(context, path=self.template_path or "(binding)")
         return (), kwargs
 
 

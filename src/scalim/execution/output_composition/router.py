@@ -306,17 +306,13 @@ class RouterRowSink(BaseRowSink):
             return
         self._closed = True
         for route in self._routes:
-            discard = getattr(route.sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
-            if callable(discard):
-                with suppress(Exception):
-                    _ = discard()
+            with suppress(Exception):
+                route.sink.discard()
         for target in (self._meta_target, self._audit_target):
             if target is None:
                 continue
-            discard = getattr(target.sink, "discard", None)  # pragma: allow-dynattr optional-interface: sink discard
-            if callable(discard):
-                with suppress(Exception):
-                    _ = discard()
+            with suppress(Exception):
+                target.sink.discard()
         for wb in self._workbook_resources:
             with suppress(Exception):
                 wb.discard()

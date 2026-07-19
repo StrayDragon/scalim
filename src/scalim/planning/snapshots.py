@@ -1,20 +1,26 @@
 from typing import Dict, List, Optional, Tuple, cast
 
+from ..spec.ir._relations import LookupStepIr
 from ..spec.ir.binding import BindingIr
 from ..spec.ir.lookup_casts import LookupCastSpecIr
+from ..vendor.compact.typing_extensionsx import Protocol, runtime_checkable
 from .operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
 from .plan import ExecutionPlan
+
+
+@runtime_checkable
+class _SupportsTopLevelMappingStringKeys(Protocol):
+    def top_level_mapping_string_keys(self) -> Tuple[str, ...]: ...
 
 
 def _lookup_cast_snapshot(spec: Optional[LookupCastSpecIr]) -> Optional[Dict[str, object]]:
     if spec is None:
         return None
     payload: Dict[str, object] = {
-        "name": str(getattr(spec, "name", "") or "auto"),  # pragma: allow-dynattr introspection: LookupCastSpecIr snapshot contract
+        "name": str(spec.name or "auto"),
     }
-    sep = getattr(spec, "sep", None)  # pragma: allow-dynattr introspection: LookupCastSpecIr snapshot contract
-    if sep is not None:
-        payload["sep"] = str(sep)
+    if spec.sep is not None:
+        payload["sep"] = str(spec.sep)
     return payload
 
 
@@ -32,14 +38,10 @@ def _binding_snapshot(binding: Optional[BindingIr]) -> Optional[Dict[str, object
     }
 
     template = binding.params_template
-    if template is not None:
-        keys = getattr(  # pragma: allow-dynattr optional-interface: params_template keys contract
-            template,
-            "top_level_mapping_string_keys",
-            None,
-        )
+    if isinstance(template, _SupportsTopLevelMappingStringKeys):
+        keys = template.top_level_mapping_string_keys
         if callable(keys):
-            payload["template_top_level_keys"] = list(cast("Tuple[str, ...]", keys()))  # pragma: allow-cast template contract boundary
+            payload["template_top_level_keys"] = list(keys())
 
     if binding.params_builder_ref is not None:
         payload["params_builder_ref"] = str(binding.params_builder_ref)
@@ -47,14 +49,14 @@ def _binding_snapshot(binding: Optional[BindingIr]) -> Optional[Dict[str, object
     return payload
 
 
-def _lookup_step_snapshot(step: object) -> Dict[str, object]:
-    from_field = getattr(step, "from_field", None)  # pragma: allow-dynattr introspection: LookupStepIr snapshot contract
-    to_source = getattr(step, "to_source", None)  # pragma: allow-dynattr introspection: LookupStepIr snapshot contract
-    to_field = getattr(step, "to_field", None)  # pragma: allow-dynattr introspection: LookupStepIr snapshot contract
-    lookup_cast = getattr(step, "lookup_cast", None)  # pragma: allow-dynattr introspection: LookupStepIr snapshot contract
-    bind = getattr(step, "bind", None)  # pragma: allow-dynattr introspection: LookupStepIr snapshot contract
+def _lookup_step_snapshot(step: LookupStepIr) -> Dict[str, object]:
+    from_field = step.from_field
+    to_source = step.to_source
+    to_field = step.to_field
+    lookup_cast = step.lookup_cast
+    bind = step.bind
 
-    to_source_id = getattr(to_source, "source_id", None)  # pragma: allow-dynattr introspection: source ref contract
+    to_source_id = to_source.source_id
 
     from_field_snapshot: object = from_field
     if isinstance(from_field, tuple):
@@ -69,10 +71,10 @@ def _lookup_step_snapshot(step: object) -> Dict[str, object]:
         if isinstance(to_field, tuple):
             to_field_snapshot = list(cast("Tuple[object, ...]", to_field))  # pragma: allow-cast runtime typed narrowing
         payload["to_field"] = to_field_snapshot
-    cast_snapshot = _lookup_cast_snapshot(lookup_cast if isinstance(lookup_cast, LookupCastSpecIr) else None)
+    cast_snapshot = _lookup_cast_snapshot(lookup_cast)
     if cast_snapshot is not None:
         payload["lookup_cast"] = cast_snapshot
-    bind_snapshot = _binding_snapshot(bind if isinstance(bind, BindingIr) else None)
+    bind_snapshot = _binding_snapshot(bind)
     if bind_snapshot is not None:
         payload["bind"] = bind_snapshot
     return payload

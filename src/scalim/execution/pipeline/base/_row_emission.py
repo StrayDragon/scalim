@@ -1,12 +1,11 @@
-from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Sequence, Set, cast
+from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Sequence, Set
 
 from ....sinks import IRowSink
+from ....sinks._internal.base import SupportsWriteRowAligned
 from ...context import BatchContext, DenseBatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
 
 if TYPE_CHECKING:
-    from typing import Callable
-
     from ....typedefs import FieldValue, RowData
 
 
@@ -154,13 +153,9 @@ class RowEmissionCoordinator:
         return self._ready_counts.get(row_id, 0) >= self._required_non_global_targets
 
     def _write_row(self, *, row_id: Hashable, row_index: int) -> None:
-        write_row_aligned = getattr(self._sink, "write_row_aligned", None)  # pragma: allow-dynattr optional-interface: sink
-        if callable(write_row_aligned):
+        if isinstance(self._sink, SupportsWriteRowAligned):
             values: List["FieldValue"] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
-            _ = cast(  # pragma: allow-cast sink optional interface typed narrowing
-                "Callable[[Sequence[str], Sequence[FieldValue]], None]",
-                write_row_aligned,
-            )(self._target_fields, values)
+            self._sink.write_row_aligned(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
             row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)
