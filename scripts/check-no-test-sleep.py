@@ -50,6 +50,7 @@ def _find_sleep_calls(path: Path) -> List[SleepHit]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="检查 `tests/` 中的 `time.sleep` 使用情况")
     parser.add_argument("--check", action="store_true", help="发现违规时以非零退出码失败")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不输出")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
@@ -61,7 +62,8 @@ def main() -> None:
         all_hits.extend(_find_sleep_calls(py_file))
 
     if not all_hits:
-        print("`check-no-test-sleep`：通过（0 处违规）")
+        if not args.quiet:
+            print("`check-no-test-sleep`：通过（0 处违规）")
         return
 
     print("`check-no-test-sleep`：发现 {} 处违规：".format(len(all_hits)))

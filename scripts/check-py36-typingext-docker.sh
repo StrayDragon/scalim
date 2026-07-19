@@ -17,11 +17,11 @@ is_ci_enabled() {
 
 install_with_retry() {
     if is_ci_enabled; then
-        python -m pip install -i https://pypi.org/simple "$@"
+        python -m pip install -q -i https://pypi.org/simple "$@"
         return 0
     fi
 
-    python -m pip install -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@" || python -m pip install "$@"
+    python -m pip install -q -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@" || python -m pip install -q "$@"
 }
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

@@ -367,6 +367,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--report", default="", help="覆盖默认文本报告路径.")
     parser.add_argument("--no-artifacts", action="store_true", help="不自动写入 `.tmp/artifacts/core-coverage.report.{txt,json}`.")
     parser.add_argument("--check", action="store_true", help="若 gate 失败则返回非零退出码.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不输出.")
     return parser.parse_args(argv)
 
 
@@ -433,17 +434,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(text_report, encoding="utf-8")
 
-    sys.stdout.write(output)
+    hard_fail = (
+        bool(invalid_non_core)
+        or bool(missing_in_report)
+        or bool(failures)
+        or (float(args.require_branches) > 0 and not branch_coverage_enabled)
+    )
 
-    hard_fail = False
-    if invalid_non_core:
-        hard_fail = True
-    if missing_in_report:
-        hard_fail = True
-    if failures:
-        hard_fail = True
-    if float(args.require_branches) > 0 and not branch_coverage_enabled:
-        hard_fail = True
+    if not (args.quiet and not hard_fail):
+        sys.stdout.write(output)
 
     if args.check and hard_fail:
         return 1

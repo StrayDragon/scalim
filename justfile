@@ -237,7 +237,15 @@ llmanspec-check:
     set -euo pipefail
 
     if command -v llman >/dev/null 2>&1; then
-        llman sdd validate --all --strict --no-interactive
+        if [ -z "{{ QA_VERBOSE }}" ]; then
+            # 静默模式: 过滤状态行,只留下 warning/error 信息
+            llman sdd validate --all --strict --no-interactive 2>&1 \
+                | { grep -v '^OK ' | grep -v '^Staleness: ' | grep -v '^Note: ' \
+                      | grep -v 'Working tree is dirty' || true; }
+            exit "${PIPESTATUS[0]}"
+        else
+            llman sdd validate --all --strict --no-interactive
+        fi
         exit 0
     fi
 
@@ -380,15 +388,33 @@ py-doc-language-check:
 
 # 检查: `src/scalim/` 运行时契约规则(`pyright` 顶层指令 + 严格顶层规则 + 类内 `if TYPE_CHECKING:` 条件方法)
 top-level-pyright-pragmas-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py --strict-top-level
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py --strict-top-level $quiet_flag
 
 # 检查: `src/scalim/` 注释/文档字符串英文需用反引号包裹(更严格)
 comments-cn-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-comments-cn.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-comments-cn.py $quiet_flag
 
 # 检查: 运行时输出文案语言(中文为主). 同时写入 `.tmp/artifacts/` 以便 CI 上传
 py-output-language-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-py-output-language.py --report .tmp/artifacts/output-language.report.txt
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-py-output-language.py --report .tmp/artifacts/output-language.report.txt $quiet_flag
 
 # 检查: 运行单元测试
 test:
@@ -422,11 +448,23 @@ test-gate-branch-report:
 
 # 检查: core 覆盖率 gate (statements + branches; core 由 allow-non-core-file 治理标记决定)
 core-coverage-report:
-    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 $quiet_flag
 
 # 检查: core 覆盖率 (statements + branches; core 由 allow-non-core-file 治理标记决定)
 core-coverage-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check $quiet_flag
 
 # 检查: 测试门禁覆盖率 (statements + branches; core 由 allow-non-core-file 治理标记决定)
 #
@@ -583,13 +621,18 @@ examples:
 
     def _configure_logging() -> None:
         logging.basicConfig(level=logging.WARNING)
-        noisy_loggers = [
+        noisy_loggers: List[str] = [
             "scalim.execution.executor.runtime.runtime",
+            "scalim.derived_outputs",
             "scalim.ob.presets.row_gap",
             "scalim.sinks.sink_csv",
         ]
+        verbose = _is_verbose()
         for name in noisy_loggers:
-            logging.getLogger(name).setLevel(logging.ERROR if name == "scalim.sinks.sink_csv" else logging.WARNING)
+            if verbose:
+                logging.getLogger(name).setLevel(logging.WARNING)
+            else:
+                logging.getLogger(name).setLevel(logging.ERROR)
 
 
     def _run_suite(suite_id: str) -> List[ExampleResult]:
@@ -793,7 +836,13 @@ check-no-print:
 
 # 检查: tests/ 禁止 time.sleep 轮询 (allowlist 除外)
 check-no-test-sleep:
-    uv {{ UV_OPTIONS }} run python scripts/check-no-test-sleep.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-no-test-sleep.py --check $quiet_flag
 
 # 报告: noqa C901 使用基线
 report-noqa-c901:

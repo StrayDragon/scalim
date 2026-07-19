@@ -34,6 +34,11 @@ def _parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="用当前源码扫描结果覆盖清单文件",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="静默模式: 仅错误/警告输出到 stderr, 通过时不输出",
+    )
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
@@ -290,10 +295,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     stale = sorted(allowed - found)
 
     if not unexpected and not stale:
-        if args.strict_top_level:
-            print("检查通过: 顶层 `# pyright:` 指令未新增, 严格顶层规则通过, 未发现类内 `if TYPE_CHECKING:` 条件方法, 清单已同步")
-        else:
-            print("检查通过: 顶层 `# pyright:` 指令未新增, 未发现类内 `if TYPE_CHECKING:` 条件方法, 清单已同步")
+        if not args.quiet:
+            if args.strict_top_level:
+                print("检查通过: 顶层 `# pyright:` 指令未新增, 严格顶层规则通过, 未发现类内 `if TYPE_CHECKING:` 条件方法, 清单已同步")
+            else:
+                print("检查通过: 顶层 `# pyright:` 指令未新增, 未发现类内 `if TYPE_CHECKING:` 条件方法, 清单已同步")
         return 0
 
     if unexpected:

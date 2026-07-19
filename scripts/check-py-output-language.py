@@ -342,6 +342,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default="",
         help="将完整报告写入文件(例如: .tmp/artifacts/output-language.report.txt). 若为空则仅输出到 stderr.",
     )
+    p.add_argument(
+        "--quiet",
+        action="store_true",
+        help="静默模式: 通过时不输出到 stdout/stderr.",
+    )
     return p.parse_args(argv)
 
 
@@ -373,8 +378,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(output, encoding="utf-8")
 
-    stream = sys.stderr if hits else sys.stdout
-    stream.write(output)
+    if not args.quiet or hits:
+        stream = sys.stderr if hits else sys.stdout
+        stream.write(output)
     return 1 if hits else 0
 
 

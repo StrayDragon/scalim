@@ -301,7 +301,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(text_report, encoding="utf-8")
 
-    sys.stdout.write(output)
+    # `--check` 模式无违规时不在 `stdout` 输出(静默通过)
+    if not args.check or any(hit.status == "block" for hit in hits):
+        sys.stdout.write(output)
 
     if args.check and any(hit.status == "block" for hit in hits):
         return 1
