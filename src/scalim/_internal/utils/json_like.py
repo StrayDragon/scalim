@@ -1,22 +1,23 @@
 import math
 from typing import Callable, Dict, List, Sequence, Union
 
+from ...typedefs import RuntimeValue
 from ...vendor.compact.typing_extensionsx import TypeGuard
 
 JsonScalar = Union[None, bool, int, float, str]
 JsonLike = Union[JsonScalar, List["JsonLike"], Dict[str, "JsonLike"]]
 
 
-def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+def _is_sequence(value: RuntimeValue) -> TypeGuard[Sequence[RuntimeValue]]:
     return isinstance(value, (list, tuple))
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[RuntimeValue, RuntimeValue]]:
     return isinstance(value, dict)
 
 
 def ensure_json_like(
-    value: object,
+    value: RuntimeValue,
     *,
     path: str,
     value_name: str,

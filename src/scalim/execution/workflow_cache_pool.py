@@ -2,9 +2,9 @@ import hashlib
 import json
 import threading
 from collections import OrderedDict
-from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, overload
+from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast, overload
 
-from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
+from .._internal.utils.json_like import JsonLike, ensure_json_like as _ensure_json_like_ssot
 from ..events import EventType
 from ..events._events import (
     DiagnosticWarningEvent,
@@ -18,7 +18,7 @@ from ..spec.ir import SourceIr
 from ..spec.ir._workflow import WorkflowCachePoolIr
 from ..spec.ir.callable_refs import describe_callable_ref
 from ..spec.ir.lookup_casts import LookupCastSpecIr
-from ..typedefs import LoaderCallKwargs, LoaderResultMapping
+from ..typedefs import LoaderCallKwargs, LoaderResultMapping, RuntimeValue
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass, field
 
@@ -31,15 +31,15 @@ class ScalimWorkflowCachePoolError(ScalimExecutionError):
         self.path = str(path or "")
 
 
-def _is_list(value: object) -> TypeGuard[List[object]]:
+def _is_list(value: RuntimeValue) -> TypeGuard[List[RuntimeValue]]:
     return isinstance(value, list)
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[str, RuntimeValue]]:
     return isinstance(value, dict)
 
 
-def _ensure_json_like(value: object, *, path: str) -> object:
+def _ensure_json_like(value: RuntimeValue, *, path: str) -> JsonLike:
     return _ensure_json_like_ssot(
         value,
         path=path,
@@ -52,31 +52,35 @@ def _ensure_json_like(value: object, *, path: str) -> object:
 
 
 @overload
-def _normalize_json_like(value: Dict[str, object]) -> Dict[str, object]: ...
+def _normalize_json_like(value: Dict[str, JsonLike]) -> Dict[str, JsonLike]: ...
 
 
 @overload
-def _normalize_json_like(value: List[object]) -> List[object]: ...
+def _normalize_json_like(value: List[JsonLike]) -> List[JsonLike]: ...
 
 
 @overload
-def _normalize_json_like(value: object) -> object: ...
+def _normalize_json_like(value: JsonLike) -> JsonLike: ...
 
 
-def _normalize_json_like(value: object) -> object:
+@overload
+def _normalize_json_like(value: RuntimeValue) -> JsonLike: ...
+
+
+def _normalize_json_like(value: RuntimeValue) -> JsonLike:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     if _is_list(value):
         return [_normalize_json_like(item) for item in value]
     if _is_dict(value):
-        out: Dict[str, object] = {}
+        out: Dict[str, JsonLike] = {}
         for raw_key in sorted(value.keys(), key=str):
             out[str(raw_key)] = _normalize_json_like(value[raw_key])
         return out
-    return value
+    return cast(JsonLike, value)  # pragma: allow-cast normalize passthrough after scalar/list/dict branches
 
 
-def _canonical_json_dumps(value: object) -> str:
+def _canonical_json_dumps(value: JsonLike) -> str:
     return json.dumps(
         value,
         ensure_ascii=False,
@@ -85,11 +89,11 @@ def _canonical_json_dumps(value: object) -> str:
     )
 
 
-def _lookup_cast_signature(cast_spec: Optional[LookupCastSpecIr]) -> Optional[Dict[str, object]]:
+def _lookup_cast_signature(cast_spec: Optional[LookupCastSpecIr]) -> Optional[Dict[str, JsonLike]]:
     if cast_spec is None:
         return None
     name = str(cast_spec.name or "").strip() or "auto"
-    payload: Dict[str, object] = {"name": name}
+    payload: Dict[str, JsonLike] = {"name": name}
     if name == "sep_first":
         payload["sep"] = str(cast_spec.sep or ",")
     _ = _ensure_json_like(payload, path="(lookup_cast)")
@@ -101,15 +105,15 @@ class WorkflowCacheEntrySignature:
     kind: str
     source_id: str
     loader_ref: str
-    rendered_params: object
-    normalize: Optional[Dict[str, object]] = None
-    key: object = None
-    lookup_cast: Optional[Dict[str, object]] = None
+    rendered_params: JsonLike
+    normalize: Optional[Dict[str, JsonLike]] = None
+    key: JsonLike = None
+    lookup_cast: Optional[Dict[str, JsonLike]] = None
 
     def logical_key(self) -> Tuple[str, str]:
         return (str(self.kind), str(self.source_id))
 
-    def as_dict(self) -> Dict[str, object]:
+    def as_dict(self) -> Dict[str, JsonLike]:
         return {
             "kind": str(self.kind),
             "source_id": str(self.source_id),
@@ -133,10 +137,10 @@ def build_preload_forever_signature(source: SourceIr, *, rendered_params: Loader
     params_path = "sources.{}.params".format(source.source_id)
     params = _normalize_json_like(_ensure_json_like(rendered_params, path=params_path))
 
-    normalize_dict: Optional[Dict[str, object]] = None
+    normalize_dict: Optional[Dict[str, JsonLike]] = None
     if source.normalize is not None:
         norm = source.normalize
-        normalize_payload: Dict[str, object] = {
+        normalize_payload: Dict[str, JsonLike] = {
             "kind": norm.kind,
             "key_field": norm.key_field,
             "on_conflict": norm.on_conflict,
@@ -255,7 +259,7 @@ class WorkflowCachePool:
         conflict_diff: Optional[List[str]] = None
         conflict_target_digest: Optional[str] = None
 
-        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
+        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
 
         with self._lock:
             existing_keys = self._signature_keys_by_logical_key.get(logical_key, set())
@@ -355,7 +359,7 @@ class WorkflowCachePool:
     def on_workflow_node_done(self, workflow_node_id: str) -> None:
         node_id = str(workflow_node_id)
 
-        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
+        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
 
         with self._lock:
             if node_id in self._done_node_ids:
@@ -373,8 +377,8 @@ class WorkflowCachePool:
         for event_type, payload, meta in pending_emits:
             _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
 
-    def _collect_release_events(self, *, node_id: str, acquired_signature_keys: Set[str]) -> List[Tuple[str, object, Dict[str, object]]]:
-        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
+    def _collect_release_events(self, *, node_id: str, acquired_signature_keys: Set[str]) -> List[Tuple[str, RuntimeValue, Dict[str, str]]]:
+        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
         for signature_key in acquired_signature_keys:
             entry = self._entries.get(signature_key)
             if entry is None:
@@ -430,7 +434,7 @@ class WorkflowCachePool:
             with entry.lock:
                 pass
 
-        pending_emits: List[Tuple[str, object, Dict[str, object]]] = []
+        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
         with self._lock:
             for signature_key in list(self._entries.keys()):
                 pending = self._evict_entry(signature_key, workflow_node_id="workflow_end", reason="workflow_end")
@@ -440,7 +444,7 @@ class WorkflowCachePool:
         for event_type, payload, meta in pending_emits:
             _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
 
-    def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> None:
+    def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]]) -> None:
         max_entries = self._max_entries
         if max_entries is None:
             return
@@ -463,7 +467,7 @@ class WorkflowCachePool:
             msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(max_entries)
             raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
-    def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, object, Dict[str, object]]]) -> bool:
+    def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]]) -> bool:
         for signature_key, entry in list(self._entries.items()):
             logical_key = entry.signature.logical_key()
             if logical_key in self._pinned_logical_keys:
@@ -485,7 +489,7 @@ class WorkflowCachePool:
         *,
         workflow_node_id: str,
         reason: str,
-    ) -> Optional[Tuple[str, object, Dict[str, object]]]:
+    ) -> Optional[Tuple[str, RuntimeValue, Dict[str, str]]]:
         entry = self._entries.pop(signature_key, None)
         if entry is None:
             return None

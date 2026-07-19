@@ -27,13 +27,13 @@ def format_field_value_expected_types() -> str:
     return "/".join(t.__name__ for t in FIELD_VALUE_TYPES) + "/None"
 
 
-CellValue = object
+CellValue = object  # pragma: allow-object CellValue SSOT: table bus holds arbitrary Python values
 """表格总线 / 行映射细胞值:任意 Python `object`(原样持有)."""
 
 RowData = Mapping[str, CellValue]
 """行数据类型 - 从字段键到细胞值的映射"""
 
-RuntimeValue = object
+RuntimeValue = object  # pragma: allow-object RuntimeValue SSOT: dynamic runtime boundary before narrowing
 """运行时动态值边界: 外部输入先按 `object` 处理,再做显式窄化."""
 
 StaticParams = Dict[str, RuntimeValue]
@@ -165,7 +165,7 @@ FailurePolicyValue = str
 _DEFAULT_FAILURE_POLICY = FailurePolicy.ALL_FAIL
 
 
-def parse_failure_policy(value: object, *, label: str = "failure_policy") -> FailurePolicyValue:
+def parse_failure_policy(value: RuntimeValue, *, label: str = "failure_policy") -> FailurePolicyValue:
     """从配置/状态边界解析并校验 `failure_policy`(封闭集合;快速失败)."""
     return parse_policy_value(
         FailurePolicy,

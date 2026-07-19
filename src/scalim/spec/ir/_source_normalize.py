@@ -11,7 +11,7 @@ from collections.abc import Hashable, Mapping
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 from typing import Mapping as TypingMapping
 
-from ...typedefs import LoaderResultMap, LoaderResultMapping
+from ...typedefs import LoaderResultMap, LoaderResultMapping, RowData, RuntimeValue
 from ...vendor.compact.typing_extensionsx import Literal, TypeGuard
 from ...vendor.dataclassesx import dataclass
 
@@ -50,7 +50,7 @@ class SourceNormalizeStepIr:
     on_missing: NormalizeOnMissing = "error"
     fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...] = ()
 
-    def apply_value(self, value: object, *, lookup_key: Hashable, source_id: str, step_index: int) -> object:
+    def apply_value(self, value: RuntimeValue, *, lookup_key: Hashable, source_id: str, step_index: int) -> RuntimeValue:
         if self.kind == "take_first":
             return normalize_take_first_value(
                 value,
@@ -72,7 +72,7 @@ class SourceNormalizeStepIr:
         raise ValueError(msg)
 
 
-NormalizeCallByFn = Callable[..., object]
+NormalizeCallByFn = Callable[..., RuntimeValue]
 
 NORMALIZE_MISS = object()
 """`normalize` 步骤返回此哨兵表示"跳过该条目"."""
@@ -97,19 +97,19 @@ class NormalizeCallByContext:
 _CALL_BY_CTX_POSITIONAL_ARGC = 2
 
 
-def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+def _is_sequence(value: RuntimeValue) -> TypeGuard[Sequence[RuntimeValue]]:
     return isinstance(value, (list, tuple))
 
 
-def _is_mapping(value: object) -> TypeGuard[TypingMapping[object, object]]:
+def _is_mapping(value: RuntimeValue) -> TypeGuard[TypingMapping[RuntimeValue, RuntimeValue]]:
     return isinstance(value, Mapping)
 
 
-def _is_hashable_mapping(value: object) -> TypeGuard[TypingMapping[Hashable, object]]:
+def _is_hashable_mapping(value: RuntimeValue) -> TypeGuard[TypingMapping[Hashable, RuntimeValue]]:
     return isinstance(value, Mapping)
 
 
-def _is_str_mapping(value: object) -> TypeGuard[TypingMapping[str, object]]:
+def _is_str_mapping(value: RuntimeValue) -> TypeGuard[RowData]:
     return isinstance(value, Mapping)
 
 
@@ -119,7 +119,7 @@ def _is_str_mapping(value: object) -> TypeGuard[TypingMapping[str, object]]:
 
 
 def normalize_call_by(
-    result: object,
+    result: RuntimeValue,
     *,
     source_id: str,
     kind: NormalizeKind,
@@ -144,7 +144,7 @@ def normalize_call_by(
     return cast("LoaderResultMapping", returned)  # pragma: allow-cast normalize.call_by return typed narrowing
 
 
-def _call_normalize_call_by(fn: NormalizeCallByFn, result: object, ctx: NormalizeCallByContext) -> object:
+def _call_normalize_call_by(fn: NormalizeCallByFn, result: RuntimeValue, ctx: NormalizeCallByContext) -> RuntimeValue:
     try:
         sig = inspect.signature(fn)
     except (TypeError, ValueError):
@@ -189,7 +189,7 @@ _CALL_BY_MISMATCH_TOKENS = (
 )
 
 
-def _call_normalize_call_by_fallback(fn: NormalizeCallByFn, result: object, ctx: NormalizeCallByContext) -> object:
+def _call_normalize_call_by_fallback(fn: NormalizeCallByFn, result: RuntimeValue, ctx: NormalizeCallByContext) -> RuntimeValue:
     """
     当 `inspect.signature` 无法获取签名时,按约定尝试调用顺序:
 
@@ -233,7 +233,7 @@ class IndexByKeyNormalizedMapping(dict):  # pyright: ignore[reportMissingTypeArg
 
 
 def normalize_index_by_key(
-    result: object,
+    result: RuntimeValue,
     *,
     source_id: str,
     key_field: str,
@@ -275,7 +275,7 @@ def normalize_index_by_key(
     return indexed
 
 
-def _normalize_index_by_key_require_row(item: object, *, source_id: str, idx: int) -> "Mapping[str, object]":
+def _normalize_index_by_key_require_row(item: RuntimeValue, *, source_id: str, idx: int) -> RowData:
     if not _is_str_mapping(item):
         msg = "Source '{}' normalize.index_by_key expected list[row] where row is a Mapping, got '{}' at index {}".format(
             source_id,
@@ -287,7 +287,7 @@ def _normalize_index_by_key_require_row(item: object, *, source_id: str, idx: in
 
 
 def _normalize_index_by_key_extract_key(
-    row: "Mapping[str, object]",
+    row: RowData,
     *,
     source_id: str,
     key_field: str,
@@ -328,7 +328,7 @@ def _normalize_index_by_key_insert(
     indexed: LoaderResultMap,
     *,
     key: Hashable,
-    row: "Mapping[str, object]",
+    row: RowData,
     source_id: str,
     on_conflict: str,
     idx: int,
@@ -357,7 +357,7 @@ def _normalize_index_by_key_insert(
 
 
 def normalize_take_first(
-    result: object,
+    result: RuntimeValue,
     *,
     source_id: str,
     on_empty: str,
@@ -391,13 +391,13 @@ def normalize_take_first(
 
 
 def normalize_take_first_value(
-    candidates_obj: object,
+    candidates_obj: RuntimeValue,
     *,
     source_id: str,
     lookup_key: Hashable,
     on_empty: str,
     config_label: str,
-) -> object:
+) -> RuntimeValue:
     if not _is_sequence(candidates_obj):
         msg = "Source '{}' {} expected list[row] for key '{}', got '{}'".format(
             source_id, config_label, lookup_key, type(candidates_obj).__name__
@@ -431,7 +431,7 @@ def normalize_take_first_value(
 
 
 def normalize_project_fields(
-    result: object,
+    result: RuntimeValue,
     *,
     source_id: str,
     fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...],
@@ -458,14 +458,14 @@ def normalize_project_fields(
 
 
 def normalize_project_fields_value(
-    row_obj: object,
+    row_obj: RuntimeValue,
     *,
     source_id: str,
     lookup_key: Hashable,
     fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...],
     on_missing: str,
     config_label: str,
-) -> object:
+) -> RuntimeValue:
     if not _is_mapping(row_obj):
         msg = "Source '{}' {} expected row to be a Mapping for key '{}', got '{}'".format(
             source_id, config_label, lookup_key, type(row_obj).__name__
@@ -473,7 +473,7 @@ def normalize_project_fields_value(
         raise TypeError(msg)
 
     row = row_obj
-    projected: Dict[str, object] = {}
+    projected: Dict[str, RuntimeValue] = {}
     for rule in fields:
         if rule.from_key:
             projected[rule.name] = lookup_key
@@ -508,7 +508,7 @@ def normalize_project_fields_value(
 
 
 def normalize_map_values(
-    result: object,
+    result: RuntimeValue,
     *,
     source_id: str,
     steps: Tuple[SourceNormalizeStepIr, ...],
@@ -519,7 +519,7 @@ def normalize_map_values(
 
     out: LoaderResultMap = {}
     for lookup_key, value in result.items():
-        current: object = value
+        current: RuntimeValue = value
         skip = False
         for idx, step in enumerate(steps):
             current = step.apply_value(current, lookup_key=lookup_key, source_id=source_id, step_index=idx)
@@ -538,10 +538,10 @@ def normalize_map_values(
 
 
 def extract_segments_with_presence(
-    data: object,
+    data: RuntimeValue,
     segments: Tuple[Union[str, int], ...],
-) -> Tuple[bool, object]:
-    current: object = data
+) -> Tuple[bool, RuntimeValue]:
+    current: RuntimeValue = data
     for segment in segments:
         if current is None:
             return False, None
@@ -552,9 +552,9 @@ def extract_segments_with_presence(
 
 
 def _extract_segment_with_presence(
-    data: object,
+    data: RuntimeValue,
     segment: Union[str, int],
-) -> Tuple[bool, object]:
+) -> Tuple[bool, RuntimeValue]:
     if _is_mapping(data):
         mapping = data
         if segment in mapping:
