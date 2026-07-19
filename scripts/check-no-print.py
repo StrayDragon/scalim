@@ -71,11 +71,12 @@ def scan_print_calls(repo_root: Path) -> List[PrintCall]:
 
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="检查: 禁止 `runtime` 在 `src/scalim/` 中使用 `print(...)`.")
+    p.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     p.add_argument("--check", action="store_true", help="发现 `print` 调用时直接失败.")
     p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     args = p.parse_args(argv)
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(str(args.root)).resolve()
     hits = scan_print_calls(repo_root)
 
     if not args.check:

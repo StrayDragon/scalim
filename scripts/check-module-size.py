@@ -66,11 +66,12 @@ def _format_row(row: ModuleSize) -> str:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="检查: 热点模块体量护栏(避免继续增长; 提示拆分).")
+    p.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     p.add_argument("--check", action="store_true", help="超过阈值时直接失败.")
     p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不向 stdout 写报告; 失败仍写 stderr.")
     args = p.parse_args(argv)
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(str(args.root)).resolve()
     try:
         rows = _collect(repo_root)
     except FileNotFoundError as exc:

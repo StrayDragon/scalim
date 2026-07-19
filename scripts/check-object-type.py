@@ -392,6 +392,7 @@ def _render_json(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="扫描源码中的类型标注 `object` 使用.")
     parser.add_argument("paths", nargs="*", help="要扫描的路径(默认: `src/scalim` / `tests` / `scripts`).")
+    parser.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     parser.add_argument("--json", action="store_true", help="输出 JSON.")
     parser.add_argument("--report", default="", help="覆盖默认文本报告路径.")
     parser.add_argument("--no-artifacts", action="store_true", help="不自动写入 `.tmp/artifacts/object-type.report.{txt,json}`.")
@@ -403,7 +404,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(str(args.root)).resolve()
     rel_roots = tuple(Path(path) for path in args.paths) if args.paths else _DEFAULT_REL_ROOTS
     hits = scan_repo(repo_root=repo_root, rel_roots=rel_roots)
 
