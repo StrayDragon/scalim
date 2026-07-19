@@ -456,10 +456,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         plan: _SheetBookPlan,
         *,
         new_total_cells: int,
-        allow_over_budget: bool = False,
     ) -> None:
-        if allow_over_budget:  # pragma: no cover  # pragma: allow-no-cover test-only budget bypass
-            return  # pragma: no cover  # pragma: allow-no-cover test-only budget bypass
         limit = int(plan.budget_max_total_cells)
         if limit <= 0:
             return

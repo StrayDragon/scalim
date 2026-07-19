@@ -231,6 +231,12 @@ def test_reversible_value_hash_and_mixed_type_lt_fallback_branch() -> None:
     assert (left < right) in (True, False)
 
 
+def test_reversible_value_rich_comparison_rejects_non_reversible_other() -> None:
+    left = mod._ReversibleValue(Decimal("1"), desc=False)  # noqa: SLF001
+    assert left.__lt__(1) is NotImplemented
+    assert left.__eq__("x") is False
+
+
 def test_aggregating_row_sink_close_and_closed_guards() -> None:
     out = _CollectingRowSink()
     agg = mod.GroupByAggregator(

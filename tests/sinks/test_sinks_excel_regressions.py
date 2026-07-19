@@ -366,6 +366,72 @@ def test_excel_sink_close_exception_logs_unlink_failure(
         os.unlink(temp_file)
 
 
+def test_excel_workbook_sink_close_swallows_unlink_file_not_found(tmp_path: Path, monkeypatch, caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
+    monkeypatch.setattr(excel_mod, "Workbook", _FailingSaveWorkbook)
+
+    output_path = tmp_path / "exc_wb_missing_tmp.xlsx"
+    wb = excel_mod.ExcelWorkbookSink(str(output_path))
+    _ = wb.create_sheet_row_sink("Sheet1", field_names=["id"])
+
+    original_unlink = excel_mod.Path.unlink
+
+    def _missing_unlink(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if str(path).endswith(".xlsx.tmp"):
+            raise FileNotFoundError("simulated missing temp")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(excel_mod.Path, "unlink", _missing_unlink)
+
+    with pytest.raises(OSError, match="simulated save failure"):
+        wb.close()
+
+    assert any(excel_mod.EXCEL_WORKBOOK_SINK_SAVE_FAILED in record.getMessage() for record in caplog.records)
+    assert not any(excel_mod.EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.parametrize(
+    "sink_cls,workbook_cls,filename",
+    [
+        (excel_mod.ExcelSink, _FailingSaveWorkbook, "exc_unlink_missing.xlsx"),
+        (excel_mod.ColumnExcelSink, _FailingSaveWorkbook, "exc_cols_unlink_missing.xlsx"),
+    ],
+    ids=["row-sink", "column-sink"],
+)
+def test_excel_sink_close_swallows_unlink_file_not_found(
+    tmp_path: Path,
+    monkeypatch,
+    caplog,
+    sink_cls,
+    workbook_cls,
+    filename: str,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="scalim.sinks.sink_excel")
+    monkeypatch.setattr(excel_mod, "Workbook", workbook_cls)
+    sink = _init_sink_for_failure(tmp_path, sink_cls, filename)
+
+    original_unlink = excel_mod.Path.unlink
+
+    def _missing_unlink(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if str(path).endswith(".xlsx.tmp"):
+            raise FileNotFoundError("simulated missing temp")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(excel_mod.Path, "unlink", _missing_unlink)
+
+    with pytest.raises(OSError, match="simulated save failure"):
+        sink.close()
+
+    remove_failed = (
+        excel_mod.EXCEL_SINK_REMOVE_TEMP_FILE_FAILED
+        if sink_cls is excel_mod.ExcelSink
+        else excel_mod.COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED
+    )
+    save_failed = excel_mod.EXCEL_SINK_SAVE_FAILED if sink_cls is excel_mod.ExcelSink else excel_mod.COLUMN_EXCEL_SINK_SAVE_FAILED
+    assert any(save_failed in record.getMessage() for record in caplog.records)
+    assert not any(remove_failed in record.getMessage() for record in caplog.records)
+
+
 def test_column_excel_sink_close_skips_workbook_close_when_factory_fails(tmp_path: Path, monkeypatch, caplog) -> None:
     def _raise_workbook(*_args, **_kwargs):  # type: ignore[no-untyped-def]
         raise TypeError("simulated workbook create failure")

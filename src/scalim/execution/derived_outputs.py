@@ -1011,9 +1011,7 @@ class _ReversibleValue:
         return hash((self.desc, self.value))
 
     def __lt__(self, other: object) -> bool:
-        if not isinstance(
-            other, _ReversibleValue
-        ):  # pragma: no cover  # pragma: allow-no-cover defensive: rich comparison protocol fallback
+        if not isinstance(other, _ReversibleValue):
             return NotImplemented  # type: ignore[return-value]
         if isinstance(self.value, Decimal) and isinstance(other.value, Decimal):  # noqa: SIM114
             result = other.value < self.value if self.desc else self.value < other.value
@@ -1028,9 +1026,7 @@ class _ReversibleValue:
 
     @override
     def __eq__(self, other: object) -> bool:
-        if not isinstance(
-            other, _ReversibleValue
-        ):  # pragma: no cover  # pragma: allow-no-cover defensive: rich comparison protocol fallback
+        if not isinstance(other, _ReversibleValue):
             return False
         return bool(self.desc) == bool(other.desc) and self.value == other.value
 

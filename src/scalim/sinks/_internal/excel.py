@@ -239,7 +239,7 @@ class ExcelSink(BaseRowSink):
                     # 清理临时文件
                     try:
                         temp_path_obj.unlink()
-                    except FileNotFoundError:  # pragma: no cover  # pragma: allow-no-cover best-effort temp file cleanup
+                    except FileNotFoundError:
                         pass
                     except OSError:
                         _LOGGER.warning(EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
@@ -424,7 +424,7 @@ class ExcelWorkbookSink:
                     _LOGGER.exception(EXCEL_WORKBOOK_SINK_SAVE_FAILED_LOG, self.output_path)
                     try:
                         temp_path_obj.unlink()
-                    except FileNotFoundError:  # pragma: no cover  # pragma: allow-no-cover best-effort temp file cleanup
+                    except FileNotFoundError:
                         pass
                     except OSError:
                         _LOGGER.warning(EXCEL_WORKBOOK_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
@@ -617,7 +617,7 @@ class ColumnExcelSink(IColumnSink):
             # 清理临时文件
             try:
                 temp_path_obj.unlink()
-            except FileNotFoundError:  # pragma: no cover  # pragma: allow-no-cover best-effort temp file cleanup
+            except FileNotFoundError:
                 pass
             except OSError:
                 _LOGGER.warning(COLUMN_EXCEL_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
