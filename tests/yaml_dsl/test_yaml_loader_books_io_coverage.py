@@ -37,7 +37,7 @@ def test_loader_parse_resources_book_mapping_errors_cover_branches() -> None:
     with pytest.raises(TypeError, match=r"resources\.books must be an object"):
         _ = loader._parse_resources(raw)  # noqa: SLF001
 
-    raw = RawDemand.from_raw({DEMAND_KEYS["resources"]: {RESOURCES_KEYS["books"]: {"": {BOOK_KEYS["xlsx_file"]: {"path": "./out"}}}}})
+    raw = RawDemand.from_raw({DEMAND_KEYS["resources"]: {RESOURCES_KEYS["books"]: {"": {BOOK_KEYS["xlsx"]: {"path": "./out"}}}}})
     with pytest.raises(ValueError, match=r"resources\.books key must be a non-empty string"):
         _ = loader._parse_resources(raw)  # noqa: SLF001
 
@@ -61,18 +61,18 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file\.path is required"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx\.path must be a non-empty output root when provided"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["xlsx_file"]: {},
+                BOOK_KEYS["xlsx"]: {"path": ""},
             },
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"xlsx_file has unknown keys"):
+    with pytest.raises(ValueError, match=r"xlsx\.budget was removed from YAML authoring"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["xlsx_file"]: {
+                BOOK_KEYS["xlsx"]: {
                     "path": "./out",
                     "budget": {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
                 },
@@ -80,14 +80,14 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    parsed = loader._parse_book_config({BOOK_KEYS["xlsx_memory"]: {}}, base_path="resources.books.report")  # noqa: SLF001
+    parsed = loader._parse_book_config({BOOK_KEYS["xlsx"]: {}}, base_path="resources.books.report")  # noqa: SLF001
     assert parsed.kind == "xlsx_memory"
     assert parsed.budget is None
 
-    with pytest.raises(ValueError, match=r"xlsx_memory has unknown keys"):
+    with pytest.raises(ValueError, match=r"xlsx has unknown keys"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["xlsx_memory"]: {"path": "./out"},
+                BOOK_KEYS["xlsx"]: {"nope": 1},
             },
             base_path="resources.books.report",
         )  # noqa: SLF001
@@ -95,7 +95,7 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
     with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["xlsx_file"]: {"path": "./out"},
+                BOOK_KEYS["xlsx"]: {"path": "./out"},
                 "write_defaults": {},
             },
             base_path="resources.books.report",
@@ -103,7 +103,7 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
 
     with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, "write_defaults": []},
+            {BOOK_KEYS["xlsx"]: {"path": "./out"}, "write_defaults": []},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
@@ -113,7 +113,7 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
 
     with pytest.raises(ValueError, match=r"resources\.books\.report\.write_lock was removed"):
         _ = loader._parse_book_config(
-            {"write_lock": True, BOOK_KEYS["xlsx_file"]: {"path": "./out"}},
+            {"write_lock": True, BOOK_KEYS["xlsx"]: {"path": "./out"}},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
@@ -125,12 +125,12 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
 
     with pytest.raises(ValueError, match=r"resources\.books\.report has unknown keys: unknown"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, "unknown": 1},
+            {BOOK_KEYS["xlsx"]: {"path": "./out"}, "unknown": 1},
             base_path="resources.books.report",
         )  # noqa: SLF001
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file must be a mapping"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx must be a mapping"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: []},
+            {BOOK_KEYS["xlsx"]: []},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
@@ -178,25 +178,25 @@ def test_loader_parse_path_or_init_var_branches_cover_dict_and_error() -> None:
 def test_loader_rejects_yaml_book_budget_authoring() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+    with pytest.raises(ValueError, match=r"xlsx\.budget was removed from YAML authoring"):
         _ = loader._parse_book_config(  # noqa: SLF001
             {
-                BOOK_KEYS["xlsx_memory"]: {
+                BOOK_KEYS["xlsx"]: {
                     "budget": {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
                 },
             },
             base_path="resources.books.report",
         )
 
-    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+    with pytest.raises(ValueError, match=r"xlsx\.budget was removed from YAML authoring"):
         _ = loader._parse_book_config(  # noqa: SLF001
-            {BOOK_KEYS["xlsx_memory"]: {"budget": {}}},
+            {BOOK_KEYS["xlsx"]: {"budget": {}}},
             base_path="resources.books.report",
         )
 
-    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+    with pytest.raises(ValueError, match=r"xlsx\.budget was removed from YAML authoring"):
         _ = loader._parse_book_config(  # noqa: SLF001
-            {BOOK_KEYS["xlsx_memory"]: {"budget": "nope"}},
+            {BOOK_KEYS["xlsx"]: {"budget": "nope"}},
             base_path="resources.books.report",
         )
 
@@ -217,7 +217,7 @@ def test_loader_rejects_yaml_book_write_defaults_authoring() -> None:
     with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
         _ = loader._parse_book_config(  # noqa: SLF001
             {
-                BOOK_KEYS["xlsx_file"]: {"path": "./out"},
+                BOOK_KEYS["xlsx"]: {"path": "./out"},
                 "write_defaults": {"mode": "nope"},
             },
             base_path="resources.books.report",
@@ -226,7 +226,7 @@ def test_loader_rejects_yaml_book_write_defaults_authoring() -> None:
     with pytest.raises(ValueError, match=r"write_defaults was removed from YAML authoring"):
         _ = loader._parse_book_config(  # noqa: SLF001
             {
-                BOOK_KEYS["xlsx_memory"]: {},
+                BOOK_KEYS["xlsx"]: {},
                 "write_defaults": {"align_by": "nope"},
             },
             base_path="resources.books.report",

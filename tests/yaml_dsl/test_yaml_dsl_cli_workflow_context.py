@@ -65,7 +65,7 @@ def test_cli_schema_validate_and_validate_accept_workflow_context_for_outputs_bi
           resources:
             books:
               report:
-                xlsx_file:
+                xlsx:
                   path: ./out
             files:
               detail_csv:
@@ -227,7 +227,7 @@ def test_cli_rejects_unknown_ids_even_with_workflow_context(tmp_path: Path, caps
           resources:
             books:
               report:
-                xlsx_file:
+                xlsx:
                   path: ./out
             files:
               detail_csv:

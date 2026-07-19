@@ -32,10 +32,10 @@ workflow:
   resources:
     books:
       report:
-        xlsx_file:
+        xlsx:
           path: ./out_a
       report:
-        xlsx_file:
+        xlsx:
           path: ./out_b
 """
         ).lstrip(),
@@ -83,73 +83,73 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         ({"sheetbooks": {"sb": {"budget": {"max_sheets": 1, "max_total_cells": 1}}}}, "workflow.resources.sheetbooks was removed"),
         ({"oops": {}}, "workflow.resources contains unknown keys"),
         ({"books": "nope"}, "workflow.resources.books must be a mapping"),
-        ({"books": {1: {"xlsx_file": {"path": "out"}}}}, "workflow.resources.books keys must be non-empty strings"),
+        ({"books": {1: {"xlsx": {"path": "out"}}}}, "workflow.resources.books keys must be non-empty strings"),
         ({"books": {"report": "nope"}}, "workflow.resources.books.report must be a mapping"),
         ({"books": {"report": {}}}, "must choose exactly one variant key"),
         ({"books": {"report": {"kind": "nope"}}}, "kind was removed"),
-        ({"books": {"report": {"xlsx_file": {}}}}, "xlsx_file.path is required"),
-        ({"books": {"report": {"xlsx_file": {"path": 1}}}}, "must be a non-empty string"),
-        ({"books": {"report": {"xlsx_file": {"path": "out"}, "nope": 1}}}, "has unknown keys"),
-        ({"books": {"report": {"xlsx_file": {"path": "a.xlsx"}}}}, "output root directory"),
+        ({"books": {"report": {"xlsx": {"path": ""}}}}, "xlsx.path must be a non-empty output root when provided"),
+        ({"books": {"report": {"xlsx": {"path": 1}}}}, "must be a non-empty string"),
+        ({"books": {"report": {"xlsx": {"path": "out"}, "nope": 1}}}, "has unknown keys"),
+        ({"books": {"report": {"xlsx": {"path": "a.xlsx"}}}}, "output root directory"),
         (
-            {"books": {"report": {"xlsx_file": {"path": "out", "budget": {"max_sheets": 1, "max_total_cells": 1}}}}},
-            "xlsx_file has unknown keys",
+            {"books": {"report": {"xlsx": {"path": "out", "budget": {"max_sheets": 1, "max_total_cells": 1}}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
-        ({"books": {"report": {"xlsx_file": {"path": "out", "export_xlsx": {"path": "out2"}}}}}, "xlsx_file has unknown keys"),
-        ({"books": {"report": {"xlsx_file": {"path": "out", "allow_formulas": "nope"}}}}, "allow_formulas must be a bool"),
-        ({"books": {"report": {"xlsx_file": {"path": "out"}, "write_lock": "nope"}}}, "write_lock was removed"),
-        ({"books": {"mem": {"xlsx_memory": {"budget": "nope"}}}}, "budget was removed from YAML authoring"),
+        ({"books": {"report": {"xlsx": {"path": "out", "export_xlsx": {"path": "out2"}}}}}, "xlsx.export_xlsx is not allowed"),
+        ({"books": {"report": {"xlsx": {"path": "out", "allow_formulas": "nope"}}}}, "allow_formulas must be a bool"),
+        ({"books": {"report": {"xlsx": {"path": "out"}, "write_lock": "nope"}}}, "write_lock was removed"),
+        ({"books": {"mem": {"xlsx": {"budget": "nope"}}}}, "xlsx.budget was removed from YAML authoring"),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1, "nope": 1}}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1, "nope": 1}}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
-        ({"books": {"mem": {"xlsx_memory": {"budget": {}}}}}, "budget was removed from YAML authoring"),
-        ({"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1}}}}}, "budget was removed from YAML authoring"),
+        ({"books": {"mem": {"xlsx": {"budget": {}}}}}, "xlsx.budget was removed from YAML authoring"),
+        ({"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1}}}}}, "xlsx.budget was removed from YAML authoring"),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": "nope", "max_total_cells": 1}}}}},
-            "budget was removed from YAML authoring",
-        ),
-        (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": "nope"}}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": "nope", "max_total_cells": 1}}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 0, "max_total_cells": 1}}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": "nope"}}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 0}}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 0, "max_total_cells": 1}}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "path": "a.xlsx"}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 0}}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "allow_formulas": False}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "path": "a.xlsx"}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "write_lock": False}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "allow_formulas": False}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "write_lock": False}}}},
+            "xlsx.budget was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}}},
-            "budget was removed from YAML authoring",
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": "nope"}}}},
+            "xlsx.export_xlsx is not allowed",
+        ),
+        (
+            {"books": {"mem": {"xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {}}}}},
+            "xlsx.export_xlsx is not allowed",
         ),
         (
             {
                 "books": {
                     "mem": {
-                        "xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "nope": 1}}
+                        "xlsx": {"budget": {"max_sheets": 1, "max_total_cells": 1}, "export_xlsx": {"path": "x.xlsx", "nope": 1}}
                     }
                 }
             },
-            "budget was removed from YAML authoring",
+            "xlsx.export_xlsx is not allowed",
         ),
         (
             {
@@ -167,31 +167,31 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
             {
                 "books": {
                     "mem": {
-                        "xlsx_memory": {
+                        "xlsx": {
                             "budget": {"max_sheets": 1, "max_total_cells": 1},
                             "export_xlsx": {"path": "out", "allow_formulas": "nope"},
                         }
                     }
                 }
             },
-            "budget was removed from YAML authoring",
+            "xlsx.export_xlsx is not allowed",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": "nope"}}},
+            {"books": {"mem": {"xlsx": {}, "write_defaults": "nope"}}},
             "write_defaults was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"nope": 1}}}},
+            {"books": {"mem": {"xlsx": {}, "write_defaults": {"nope": 1}}}},
             "write_defaults was removed from YAML authoring",
         ),
         (
-            {"books": {"mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"mode": "nope"}}}},
+            {"books": {"mem": {"xlsx": {}, "write_defaults": {"mode": "nope"}}}},
             "write_defaults was removed from YAML authoring",
         ),
         (
             {
                 "books": {
-                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"align_by": "nope"}}
+                    "mem": {"xlsx": {}, "write_defaults": {"align_by": "nope"}}
                 }
             },
             "write_defaults was removed from YAML authoring",
@@ -199,7 +199,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         (
             {
                 "books": {
-                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"header_policy": "nope"}}
+                    "mem": {"xlsx": {}, "write_defaults": {"header_policy": "nope"}}
                 }
             },
             "write_defaults was removed from YAML authoring",
@@ -207,7 +207,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         (
             {
                 "books": {
-                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"on_mismatch": "nope"}}
+                    "mem": {"xlsx": {}, "write_defaults": {"on_mismatch": "nope"}}
                 }
             },
             "write_defaults was removed from YAML authoring",
@@ -215,7 +215,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         (
             {
                 "books": {
-                    "mem": {"xlsx_memory": {"budget": {"max_sheets": 1, "max_total_cells": 1}}, "write_defaults": {"on_conflict": "nope"}}
+                    "mem": {"xlsx": {}, "write_defaults": {"on_conflict": "nope"}}
                 }
             },
             "write_defaults was removed from YAML authoring",
@@ -231,14 +231,14 @@ def test_load_workflow_config_from_mapping_resources_errors(resources_raw: Any, 
 
 def test_load_workflow_config_from_mapping_books_path_accepts_pathlike(tmp_path: Path) -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"books": {"report": {"xlsx_file": {"path": tmp_path / "out"}}}}
+    root["workflow"]["resources"] = {"books": {"report": {"xlsx": {"path": tmp_path / "out"}}}}
     cfg = load_workflow_config_from_mapping(root)
     assert cfg.resources.books["report"].path.endswith("out")
 
 
 def test_load_workflow_config_from_mapping_xlsx_memory_budget_is_optional() -> None:
     root = _base_root()
-    root["workflow"]["resources"] = {"books": {"mem": {"xlsx_memory": {}}}}
+    root["workflow"]["resources"] = {"books": {"mem": {"xlsx": {}}}}
     cfg = load_workflow_config_from_mapping(root)
     assert cfg.resources.books["mem"].kind == "xlsx_memory"
     assert cfg.resources.books["mem"].budget is None

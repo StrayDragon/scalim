@@ -74,7 +74,7 @@ def test_schema_enums_match_runtime_validation_for_books_header_fields_output_by
                     "sources: {}",
                     "resources:",
                     "  books:",
-                    "    report: {xlsx_file: {path: ./out}}",
+                    "    report: {xlsx: {path: ./out}}",
                     "outputs:",
                     "  - name: detail",
                     "    to: {book: report, sheet: Detail}",

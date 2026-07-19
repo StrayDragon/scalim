@@ -24,7 +24,7 @@ main_source:
 resources:
   books:
     report:
-      xlsx_memory: {}
+      xlsx: {}
 outputs:
   - name: detail
     to:

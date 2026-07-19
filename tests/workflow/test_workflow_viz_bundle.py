@@ -217,7 +217,7 @@ workflow:
   resources:
     books:
       report:
-        xlsx_memory: {{}}
+        xlsx: {{}}
   runs:
     - id: ok
       demand: ok.yaml

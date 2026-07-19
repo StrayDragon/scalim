@@ -251,7 +251,7 @@ sources: {}
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./out
 """
     )

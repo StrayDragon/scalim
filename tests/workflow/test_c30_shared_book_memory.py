@@ -164,7 +164,7 @@ workflow:
   resources:
     books:
       report:
-        xlsx_memory: {}
+        xlsx: {}
   runs:
     - id: a
       demand: ./d.yaml
@@ -241,7 +241,7 @@ workflow:
   resources:
     books:
       report:
-        xlsx_file:
+        xlsx:
           path: ./out
   runs:
     - id: a

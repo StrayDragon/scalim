@@ -50,7 +50,7 @@ main_source:
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./out
 
 outputs:
@@ -90,7 +90,7 @@ main_source:
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./out
 
 outputs:

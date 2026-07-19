@@ -497,7 +497,7 @@ main_source:
 sources: {}
 resources:
   books:
-    report: {xlsx_file: {path: ./out}}
+    report: {xlsx: {path: ./out}}
 """
     )
 
@@ -568,7 +568,7 @@ sources: {}
 resources:
   books:
     report:
-      xlsx_file:
+      xlsx:
         path: ./out
 outputs:
   - name: detail
