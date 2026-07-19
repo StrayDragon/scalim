@@ -11,3 +11,7 @@
 准备打版本 tag 时，按发布前校准清单走一遍（范围 / breaking / 文档与公开面 / bump）:
 
 - [发布前校准清单](pre-release-checklist.md)
+
+专题治理(非默认 `qa` 阻断,见各自文档):
+
+- [`object` 类型标注治理](object-type-governance.md)
