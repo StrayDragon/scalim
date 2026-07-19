@@ -152,6 +152,27 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
             base_path="resources.books.report",
         )  # noqa: SLF001
 
+    # deprecated 别名错误分支(专测覆盖;普通 fixture 已迁到 xlsx)
+    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file\.path is required"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"xlsx_file has unknown keys"):
+        _ = loader._parse_book_config(
+            {BOOK_KEYS["xlsx_file"]: {"path": "./out", "nope": 1}},
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+        _ = loader._parse_book_config(
+            {
+                BOOK_KEYS["xlsx_memory"]: {
+                    "budget": {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
+                },
+            },
+            base_path="resources.books.report",
+        )  # noqa: SLF001
+
     with warnings.catch_warnings(record=True):
         warnings.simplefilter("always")
         parsed = loader._parse_book_config(
