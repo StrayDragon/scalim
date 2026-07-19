@@ -13,11 +13,11 @@ def test_observer_supports_respects_event_types() -> None:
             _ = event
 
     obs = _Obs()
-    assert obs.supports("x") is True
+    assert obs.supports(EventType.PIPELINE_START) is True
 
-    obs.event_types = {"y"}  # type: ignore[assignment]
-    assert obs.supports("x") is False
-    assert obs.supports("y") is True
+    obs.event_types = {EventType.PIPELINE_END}
+    assert obs.supports(EventType.PIPELINE_START) is False
+    assert obs.supports(EventType.PIPELINE_END) is True
 
 
 class _BadDispatchObserver(EventDispatchObserver):
@@ -33,7 +33,7 @@ def test_observer_manager_infers_no_subscriptions_when_dispatch_map_is_not_dict(
 
 
 class _NonCatalogDispatchObserver(EventDispatchObserver):
-    dispatch_map = {"non_catalog": "on_pipeline_start", EventType.PIPELINE_START: "on_pipeline_start"}
+    dispatch_map = {"non_catalog": "on_pipeline_start", EventType.PIPELINE_START: "on_pipeline_start"}  # type: ignore[assignment]
 
     def __init__(self) -> None:
         self.events = []
@@ -50,8 +50,8 @@ def test_observer_manager_inference_skips_non_catalog_event_types_in_dispatch_ma
 
 
 class _CustomSupportsObserver(Observer):
-    def supports(self, event_type: str) -> bool:
-        return event_type == str(EventType.PIPELINE_START)
+    def supports(self, event_type: EventType) -> bool:
+        return event_type == EventType.PIPELINE_START
 
     def __init__(self) -> None:
         self.events = []
@@ -215,7 +215,7 @@ def test_observer_manager_register_rejects_event_types_with_non_str_entries() ->
             _ = event
 
     manager = ObserverManager()
-    with pytest.raises(TypeError, match="contain only str"):
+    with pytest.raises(TypeError, match="contain only EventType"):
         manager.register(_InvalidEventTypesObserver())
 
 

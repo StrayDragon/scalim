@@ -31,20 +31,20 @@ from .._internal.viz_config import VizObserverConfig
 from .._internal.viz_nodes import VizObserverNodeMixin
 from .._internal.viz_output import VizObserverOutputMixin
 
-_WORKFLOW_DISPATCH_MAP: Dict[str, str] = {
-    EventType.WORKFLOW_NODE_START.value: "on_workflow_node_start",
-    EventType.WORKFLOW_NODE_END.value: "on_workflow_node_end",
-    EventType.WORKFLOW_NODE_CANCELLED.value: "on_workflow_node_cancelled",
-    EventType.WORKFLOW_CACHE_ACQUIRE.value: "on_workflow_cache_acquire",
-    EventType.WORKFLOW_CACHE_RELEASE.value: "on_workflow_cache_release",
-    EventType.WORKFLOW_CACHE_EVICT.value: "on_workflow_cache_evict",
-    EventType.WORKFLOW_RESOURCE_CREATE.value: "on_workflow_resource_create",
-    EventType.WORKFLOW_RESOURCE_WRITE.value: "on_workflow_resource_write",
-    EventType.WORKFLOW_RESOURCE_COMMIT.value: "on_workflow_resource_commit",
-    EventType.WORKFLOW_RESOURCE_DISCARD.value: "on_workflow_resource_discard",
+_WORKFLOW_DISPATCH_MAP: Dict[EventType, str] = {
+    EventType.WORKFLOW_NODE_START: "on_workflow_node_start",
+    EventType.WORKFLOW_NODE_END: "on_workflow_node_end",
+    EventType.WORKFLOW_NODE_CANCELLED: "on_workflow_node_cancelled",
+    EventType.WORKFLOW_CACHE_ACQUIRE: "on_workflow_cache_acquire",
+    EventType.WORKFLOW_CACHE_RELEASE: "on_workflow_cache_release",
+    EventType.WORKFLOW_CACHE_EVICT: "on_workflow_cache_evict",
+    EventType.WORKFLOW_RESOURCE_CREATE: "on_workflow_resource_create",
+    EventType.WORKFLOW_RESOURCE_WRITE: "on_workflow_resource_write",
+    EventType.WORKFLOW_RESOURCE_COMMIT: "on_workflow_resource_commit",
+    EventType.WORKFLOW_RESOURCE_DISCARD: "on_workflow_resource_discard",
     # 工作流作用域事件(用于回放体验).
-    EventType.WORKFLOW_STARTED.value: "on_workflow_started",
-    EventType.WORKFLOW_FINISHED.value: "on_workflow_finished",
+    EventType.WORKFLOW_STARTED: "on_workflow_started",
+    EventType.WORKFLOW_FINISHED: "on_workflow_finished",
 }
 
 
@@ -279,7 +279,7 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
 
     supports_unknown_event_types: bool = True
 
-    dispatch_map: Dict[str, str] = _WORKFLOW_DISPATCH_MAP
+    dispatch_map: Dict[EventType, str] = _WORKFLOW_DISPATCH_MAP
 
     config: VizObserverConfig
     snapshot: Optional[Dict[str, Any]]

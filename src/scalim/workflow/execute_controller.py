@@ -10,6 +10,7 @@ from ..events import (
     EventType,
     WorkflowNodeCancelledReason,
     WorkflowNodeEndStatus,
+    parse_event_type,
 )
 from ..events._events import (
     WorkflowNodeCancelledEvent,
@@ -100,6 +101,12 @@ class WorkflowRunState:
     captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]] = field(default_factory=dict)
     captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]] = field(default_factory=dict)
     captured_demand_request_by_node_id: Dict[str, ExecutionRequest] = field(default_factory=dict)
+
+
+def _coerce_event_type(value: Any) -> EventType:
+    if isinstance(value, EventType):
+        return value
+    return parse_event_type(value)
 
 
 def _build_demand_replay_instrumentation(  # noqa: C901
@@ -643,7 +650,7 @@ class WorkflowRunController:
         with contextlib.suppress(Exception):
             workflow_hook_events = cast("Any", capture.hook_manager).drain_events()  # pragma: allow-cast capture hook manager drain
         for event in workflow_hook_events:
-            replay.hook_manager.emit_typed(str(event.event_type), event.payload)
+            replay.hook_manager.emit_typed(_coerce_event_type(event.event_type), event.payload)
 
         workflow_events: List[Event] = []
         with contextlib.suppress(Exception):
@@ -660,7 +667,7 @@ class WorkflowRunController:
             meta = dict(event.meta) if event.meta else {}
             replay.emit_recorded_event(
                 Event(
-                    event_type=str(event.event_type),
+                    event_type=_coerce_event_type(event.event_type),
                     timestamp=float(event.timestamp),
                     run_id=str(workflow_exec_id),
                     payload=event.payload,
@@ -683,9 +690,10 @@ class WorkflowRunController:
                 workflow_components=workflow_components,
             )
             for event in hook_events:
-                replay.hook_manager.emit_typed(str(event.event_type), event.payload)
+                hook_event_type = _coerce_event_type(event.event_type)
+                replay.hook_manager.emit_typed(hook_event_type, event.payload)
                 if node_replay is not None:
-                    node_replay.hook_manager.emit_typed(str(event.event_type), event.payload)
+                    node_replay.hook_manager.emit_typed(hook_event_type, event.payload)
             for event in observer_events:
                 replay.emit_recorded_event(event)
                 if node_replay is not None:

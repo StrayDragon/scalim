@@ -3,7 +3,7 @@ from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
 
 from ..._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue, parse_loader_result_policy
-from ...events import Event
+from ...events import Event, EventType
 from ..observer import Observer
 from .common import (
     CaptureOverflowPolicy,
@@ -24,9 +24,9 @@ class ObserverManagerCaptureMixin:
     max_recorded_events: Optional[int] = None
     capture_overflow_policy: CaptureOverflowPolicyValue = "raise"
     _lock: "threading.RLock" = threading.RLock()
-    _supported_event_types: Optional[Set[str]] = None
+    _supported_event_types: Optional[Set[EventType]] = None
     _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
-    _capture_event_types: Optional[Set[str]] = None
+    _capture_event_types: Optional[Set[EventType]] = None
     _capture_unknown_event_types: bool = False
     _recorded_events: Optional[Deque[Event]] = None
     _event_meta_defaults: Optional[Dict[str, Any]] = None

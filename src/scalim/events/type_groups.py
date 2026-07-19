@@ -2,7 +2,7 @@
 
 说明:
 - 本模块不引入新的事件类型,仅对 `EventType` 做确定性分组.
-- 分组不改变事件分发热路径语义;仍以 `event_type` 字符串进行订阅/过滤.
+- 分组不改变事件分发热路径语义;仍以 `EventType` 进行订阅/过滤.
 """
 
 from types import SimpleNamespace

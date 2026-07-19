@@ -55,6 +55,7 @@
   - **Public API (strict in)**: constructors/options exposed to users MUST accept the Enum only (fail-fast on string literals).
   - **Config/state inputs (wide in)**: YAML/JSON/state/pickle MAY provide builtin `str`; code MUST validate/normalize via the Enum SSOT and then store the canonical builtin `str` value.
   - **Outputs (stable out)**: any state/wire representation MUST emit builtin `str` (from `.value`); never serialize Enum instances or `str` subclasses.
+  - **Event/Hook identity exception** (二开注册面): 进程内事件身份与订阅以 `EventType` 为唯一 SSOT（`Event.event_type`、`Observer`/`Hook.event_types`、`wants`/`emit`/dispatch 键）。**不适用**上条「进程内也落 builtin `str`」偏好。落盘/JSONL/viz 等边界 MAY 编码 `.value` 为 builtin `str`，读回进程内 `Event` 时 MUST 归一为 `EventType`。Typed payload 数据类从 `scalim.events` 公开导出；MUST NOT 以 `scalim.events._events` 作为用户契约。
 
 ## Pointers (keep this file small)
 - Project/code reading map: `docs/doc/getting-started/reading-guide.md`

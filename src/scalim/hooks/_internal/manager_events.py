@@ -59,7 +59,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             return
         self._manager().dispatch_strategy.dispatch(handler_pairs, event, self._safe_call)
 
-    def _get_typed_handler_pairs(self, event_type: str) -> Optional[Tuple[HookTypedHandlerPair, ...]]:
+    def _get_typed_handler_pairs(self, event_type: EventType) -> Optional[Tuple[HookTypedHandlerPair, ...]]:
         manager = self._manager()
         if not manager.has_hooks:
             return None
@@ -69,7 +69,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
                 return None
             return manager.typed_handlers_by_event_type.get(event_type)
 
-    def _get_on_event_handler_pairs(self, event_type: str) -> Optional[Tuple[HookOnEventHandlerPair, ...]]:
+    def _get_on_event_handler_pairs(self, event_type: EventType) -> Optional[Tuple[HookOnEventHandlerPair, ...]]:
         manager = self._manager()
         if not manager.has_hooks:
             return None
@@ -79,10 +79,10 @@ class HookManagerEventMixin(HookManagerBase, ABC):
                 return None
             return manager.on_event_handlers_by_event_type.get(event_type)
 
-    def emit_typed(self, event_type: str, payload: Any) -> None:
+    def emit_typed(self, event_type: EventType, payload: Any) -> None:
         self._dispatch(self._get_typed_handler_pairs(event_type), payload)
 
-    def emit_typed_policy(self, event_type: str, payload: Any) -> None:
+    def emit_typed_policy(self, event_type: EventType, payload: Any) -> None:
         """发射类型化的策略决策 `signal`(默认 `fail-fast` 且保持确定性顺序).
 
         与纯观测事件不同,策略 `signal` 会影响运行时行为;默认必须 `fail-fast`(异常直接向外抛出).

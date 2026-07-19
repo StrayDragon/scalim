@@ -16,7 +16,7 @@ from ...vendor.compact import StrEnum
 OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
 OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s 关闭时抛出异常"
 
-CATALOG_EVENT_TYPES: Tuple[str, ...] = (
+CATALOG_EVENT_TYPES: Tuple[EventType, ...] = (
     EventType.PIPELINE_START,
     EventType.PIPELINE_END,
     EventType.BATCH_START,
@@ -50,7 +50,7 @@ CATALOG_EVENT_TYPES: Tuple[str, ...] = (
     EventType.WORKFLOW_RESOURCE_DISCARD,
 )
 
-CATALOG_EVENT_TYPES_SET: Set[str] = set(CATALOG_EVENT_TYPES)
+CATALOG_EVENT_TYPES_SET: Set[EventType] = set(CATALOG_EVENT_TYPES)
 DEFAULT_MAX_RECORDED_EVENTS = 10_000
 
 
@@ -119,16 +119,16 @@ def parse_capture_overflow_policy(value: RuntimeValue) -> CaptureOverflowPolicyV
     )
 
 
-def validate_event_types(observer: Any, value: Any) -> Optional[Set[str]]:
+def validate_event_types(observer: Any, value: Any) -> Optional[Set[EventType]]:
     if value is None:
         return None
     if not isinstance(value, AbstractSet):
-        msg = "observer.event_types must be None or Set[str]; got {} for {}".format(type(value).__name__, type(observer).__name__)
+        msg = "observer.event_types must be None or Set[EventType]; got {} for {}".format(type(value).__name__, type(observer).__name__)
         raise TypeError(msg)
-    normalized: Set[str] = set()
+    normalized: Set[EventType] = set()
     for item in value:
-        if not isinstance(item, str):
-            msg = "observer.event_types must contain only str; got {} element {!r} for {}".format(
+        if not isinstance(item, EventType):
+            msg = "observer.event_types must contain only EventType; got {} element {!r} for {}".format(
                 type(item).__name__,
                 item,
                 type(observer).__name__,

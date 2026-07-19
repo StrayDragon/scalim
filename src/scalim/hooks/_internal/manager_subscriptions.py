@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import Dict, List, Optional, Set, Tuple, cast
 
+from ...events import EventType
 from ...vendor.compact.typing_extensionsx import override
 from .common import (
     CATALOG_EVENT_TYPES,
@@ -28,10 +29,10 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
             return False
         return on_event_attr is not manager.base_hook_on_event
 
-    def _iter_hook_typed_subscriptions(self, hook: ExecutionHookLike) -> Tuple[str, ...]:
+    def _iter_hook_typed_subscriptions(self, hook: ExecutionHookLike) -> Tuple[EventType, ...]:
         manager = self._manager()
         hook_type = type(hook)
-        subscribed: List[str] = []
+        subscribed: List[EventType] = []
         for event_type, handler_name in HOOK_TYPED_DISPATCH_MAP.items():
             hook_handler = resolve_mro_attr(hook_type, handler_name)
             if hook_handler is None:
@@ -45,8 +46,8 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
     def _append_hook_typed_handlers(
         self,
         hook: ExecutionHookLike,
-        event_types: Optional[Set[str]],
-        typed_handlers_by_type: Dict[str, List[HookTypedHandlerPair]],
+        event_types: Optional[Set[EventType]],
+        typed_handlers_by_type: Dict[EventType, List[HookTypedHandlerPair]],
     ) -> None:
         for event_type in self._iter_hook_typed_subscriptions(hook):
             if event_types is not None and event_type not in event_types:
@@ -62,8 +63,8 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
     def _append_hook_on_event_handlers(
         self,
         hook: ExecutionHookLike,
-        event_types: Optional[Set[str]],
-        on_event_handlers_by_type: Dict[str, List[HookOnEventHandlerPair]],
+        event_types: Optional[Set[EventType]],
+        on_event_handlers_by_type: Dict[EventType, List[HookOnEventHandlerPair]],
     ) -> None:
         if not self._hook_overrides_on_event(hook):
             return
@@ -82,8 +83,8 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
     @override
     def _rebuild_subscription_cache(self) -> None:
         manager = self._manager()
-        typed_handlers_by_type: Dict[str, List[HookTypedHandlerPair]] = {event_type: [] for event_type in HOOK_TYPED_DISPATCH_MAP}
-        on_event_handlers_by_type: Dict[str, List[HookOnEventHandlerPair]] = {event_type: [] for event_type in CATALOG_EVENT_TYPES}
+        typed_handlers_by_type: Dict[EventType, List[HookTypedHandlerPair]] = {event_type: [] for event_type in HOOK_TYPED_DISPATCH_MAP}
+        on_event_handlers_by_type: Dict[EventType, List[HookOnEventHandlerPair]] = {event_type: [] for event_type in CATALOG_EVENT_TYPES}
 
         for hook in manager.hooks:
             event_types = validate_event_types(hook, read_optional_attr(hook, "event_types"))
@@ -94,19 +95,19 @@ class HookManagerSubscriptionMixin(HookManagerBase, ABC):
         manager.typed_handlers_by_event_type = {key: tuple(value) for key, value in typed_handlers_by_type.items() if value}
         manager.on_event_handlers_by_event_type = {key: tuple(value) for key, value in on_event_handlers_by_type.items() if value}
 
-    def wants_typed(self, event_type: str) -> bool:
+    def wants_typed(self, event_type: EventType) -> bool:
         manager = self._manager()
         if not manager.has_hooks:
             return False
         return event_type in manager.typed_handlers_by_event_type
 
-    def wants_on_event(self, event_type: str) -> bool:
+    def wants_on_event(self, event_type: EventType) -> bool:
         manager = self._manager()
         if not manager.has_hooks:
             return False
         return event_type in manager.on_event_handlers_by_event_type
 
-    def wants(self, event_type: str) -> bool:
+    def wants(self, event_type: EventType) -> bool:
         return self.wants_typed(event_type) or self.wants_on_event(event_type)
 
 

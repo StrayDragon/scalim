@@ -50,7 +50,7 @@ class ObserverManagerEmitMixin(ABC):
     mode: ObserverManagerModeValue = "process"
     _lock: "threading.RLock" = threading.RLock()
     _has_observers: bool = False
-    _observers_by_event_type: Optional[Dict[str, Tuple[Observer, ...]]] = None
+    _observers_by_event_type: Optional[Dict[EventType, Tuple[Observer, ...]]] = None
     _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
     _diagnostic_warning_emitted: bool = False
     _seq: int = 0
@@ -76,10 +76,10 @@ class ObserverManagerEmitMixin(ABC):
     def _record_event(self, event: Event) -> None: ...
 
     @abstractmethod
-    def _supports_safely(self, observer: Observer, event_type: str) -> bool: ...
+    def _supports_safely(self, observer: Observer, event_type: EventType) -> bool: ...
 
     @abstractmethod
-    def _should_emit_event_type(self, event_type: str) -> bool: ...
+    def _should_emit_event_type(self, event_type: EventType) -> bool: ...
 
     @abstractmethod
     def _summarize_result(self, result: Any) -> Dict[str, Any]: ...
@@ -154,7 +154,7 @@ class ObserverManagerEmitMixin(ABC):
                 continue
             self._safe_call(observer, observer.on_event, event)
 
-    def emit_event(self, event_type: str, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+    def emit_event(self, event_type: EventType, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
         merged_meta = self._merge_event_meta_defaults(meta)
         event = Event(
             event_type=event_type,

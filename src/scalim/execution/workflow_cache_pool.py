@@ -260,7 +260,7 @@ class WorkflowCachePool:
         conflict_diff: Optional[List[str]] = None
         conflict_target_digest: Optional[str] = None
 
-        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
+        pending_emits: List[Tuple[EventType, RuntimeValue, Dict[str, str]]] = []
 
         with self._lock:
             existing_keys = self._signature_keys_by_logical_key.get(logical_key, set())
@@ -341,7 +341,7 @@ class WorkflowCachePool:
             )
 
         for event_type, payload, meta in pending_emits:
-            _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
+            _ = self._instrumentation.emit(event_type, payload, meta=meta)
 
         # 加载过程由每条目锁(`per-entry lock`)保护.
         with entry.lock:
@@ -360,7 +360,7 @@ class WorkflowCachePool:
     def on_workflow_node_done(self, workflow_node_id: str) -> None:
         node_id = str(workflow_node_id)
 
-        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
+        pending_emits: List[Tuple[EventType, RuntimeValue, Dict[str, str]]] = []
 
         with self._lock:
             if node_id in self._done_node_ids:
@@ -376,10 +376,12 @@ class WorkflowCachePool:
                     pending_emits.append(pending)
 
         for event_type, payload, meta in pending_emits:
-            _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
+            _ = self._instrumentation.emit(event_type, payload, meta=meta)
 
-    def _collect_release_events(self, *, node_id: str, acquired_signature_keys: Set[str]) -> List[Tuple[str, RuntimeValue, Dict[str, str]]]:
-        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
+    def _collect_release_events(
+        self, *, node_id: str, acquired_signature_keys: Set[str]
+    ) -> List[Tuple[EventType, RuntimeValue, Dict[str, str]]]:
+        pending_emits: List[Tuple[EventType, RuntimeValue, Dict[str, str]]] = []
         for signature_key in acquired_signature_keys:
             entry = self._entries.get(signature_key)
             if entry is None:
@@ -435,7 +437,7 @@ class WorkflowCachePool:
             with entry.lock:
                 pass
 
-        pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]] = []
+        pending_emits: List[Tuple[EventType, RuntimeValue, Dict[str, str]]] = []
         with self._lock:
             for signature_key in list(self._entries.keys()):
                 pending = self._evict_entry(signature_key, workflow_node_id="workflow_end", reason="workflow_end")
@@ -443,9 +445,11 @@ class WorkflowCachePool:
                     pending_emits.append(pending)
 
         for event_type, payload, meta in pending_emits:
-            _ = self._instrumentation.emit(str(event_type), payload, meta=meta)
+            _ = self._instrumentation.emit(event_type, payload, meta=meta)
 
-    def _ensure_budget_for_new_entry(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]]) -> None:
+    def _ensure_budget_for_new_entry(
+        self, *, workflow_node_id: str, pending_emits: List[Tuple[EventType, RuntimeValue, Dict[str, str]]]
+    ) -> None:
         max_entries = self._max_entries
         if max_entries is None:
             return
@@ -468,7 +472,7 @@ class WorkflowCachePool:
             msg = "cache_pool over budget: max_entries={} (no evictable refcount=0 entries)".format(max_entries)
             raise ScalimWorkflowCachePoolError(msg, path="workflow_runtime_options.cache_pool")
 
-    def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[str, RuntimeValue, Dict[str, str]]]) -> bool:
+    def _evict_lru_idle(self, *, workflow_node_id: str, pending_emits: List[Tuple[EventType, RuntimeValue, Dict[str, str]]]) -> bool:
         for signature_key, entry in list(self._entries.items()):
             logical_key = entry.signature.logical_key()
             if logical_key in self._pinned_logical_keys:
@@ -490,7 +494,7 @@ class WorkflowCachePool:
         *,
         workflow_node_id: str,
         reason: str,
-    ) -> Optional[Tuple[str, RuntimeValue, Dict[str, str]]]:
+    ) -> Optional[Tuple[EventType, RuntimeValue, Dict[str, str]]]:
         entry = self._entries.pop(signature_key, None)
         if entry is None:
             return None

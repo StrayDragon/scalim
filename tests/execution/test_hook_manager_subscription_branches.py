@@ -36,10 +36,18 @@ class _CaptureLoaderCallHook(BaseHook):
         self.seen_results.append(event.result)
 
 
-def test_hook_manager_rejects_unknown_on_event_types() -> None:
+def test_hook_manager_rejects_bare_str_on_event_types() -> None:
     manager = HookManager()
     hook = _CaptureOnEventHook()
     hook.event_types = _OrderedEventTypes(["unknown", EventType.PIPELINE_START])
+    with pytest.raises(TypeError, match=r"contain only EventType"):
+        manager.register(hook)
+
+
+def test_hook_manager_rejects_policy_signal_event_type_for_on_event_catalog() -> None:
+    manager = HookManager()
+    hook = _CaptureOnEventHook()
+    hook.event_types = {EventType.WORKFLOW_STARTED}
     with pytest.raises(ValueError, match=r"unknown event type"):
         manager.register(hook)
 

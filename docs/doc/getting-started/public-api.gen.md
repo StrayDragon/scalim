@@ -40,8 +40,8 @@ Sources:
 | `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
 | `scalim.execution` | 8 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
 | `scalim.ob` | 5 | 可观测性入口 | 构建 observer manager / 采集事件 |
-| `scalim.events` | 12 | 事件envelope+事件类型入口+事件目录查询入口 | 写 Observer/Hook;按 `event_type` 订阅/过滤 |
-| `scalim.events.type_groups` | 15 | 事件类型分组视图 | 按主题探索 `EventType`(不引入新值) |
+| `scalim.events` | 44 | 事件envelope+EventType+公开payload+事件目录 | 写 Observer/Hook;按 EventType 订阅/过滤 |
+| `scalim.events.type_groups` | 15 | 事件类型分组视图 | 按主题探索 EventType(不引入新值) |
 | `scalim.sinks` | 16 | sink 契约与常用 sinks | 使用内置 sinks / 实现自定义 sink |
 | `scalim.sinks.memory` | 4 | memory sinks(调试/测试/捕获) | `InMemoryRowDataSink`/`InMemoryCsv` 等 |
 | `scalim.sinks.pandas` | 2 | pandas sinks(可选依赖) | 需要 `pandas` 时显式使用该子模块 |
@@ -333,22 +333,54 @@ from scalim.ob import (
 
 #### `scalim.events`
 
-- Export count: `12`
+- Export count: `44`
 
 ```python
 from scalim.events import (
     WORKFLOW_ATTRIBUTION_META_KEYS,
     WORKFLOW_EXEC_ID_META_KEY,
     WORKFLOW_NODE_ID_META_KEY,
+    AdaptiveSchedulerDecisionEvent,
+    BatchEndEvent,
+    BatchStartEvent,
+    ColumnWriteEvent,
+    DiagnosticWarningEvent,
+    ErrorEvent,
     Event,
     EventDescriptor,
     EventType,
+    FieldComputeEvent,
+    FieldSlimEvent,
+    LoaderCallEvent,
+    LoaderRetryEvent,
+    LoaderSlimEvent,
+    OperatorSpanEvent,
+    OutputTargetEndEvent,
+    PipelineEndEvent,
+    PipelineStartEvent,
+    RelationLookupEvent,
+    RowReleaseEvent,
+    RowWriteEvent,
+    StageSpanEvent,
+    WorkflowCacheAcquireEvent,
+    WorkflowCacheEvictEvent,
+    WorkflowCacheReleaseEvent,
+    WorkflowFinishedEvent,
+    WorkflowNodeCancelledEvent,
     WorkflowNodeCancelledReason,
+    WorkflowNodeEndEvent,
     WorkflowNodeEndStatus,
+    WorkflowNodeStartEvent,
+    WorkflowResourceCommitEvent,
+    WorkflowResourceCreateEvent,
+    WorkflowResourceDiscardEvent,
+    WorkflowResourceWriteEvent,
+    WorkflowStartedEvent,
     generate_run_id,
     get_event_catalog,
     get_event_catalog_map,
     now_ts,
+    parse_event_type,
 )
 ```
 

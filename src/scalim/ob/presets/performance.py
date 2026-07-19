@@ -100,7 +100,7 @@ class PerformanceConfig:
 
 class PerformanceObserver(EventDispatchObserver):
     config: PerformanceConfig
-    event_types: Optional[Set[str]]
+    event_types: Optional[Set[EventType]]
     metrics: PerformanceMetrics
     _has_psutil: bool
     _process: Any

@@ -6,7 +6,7 @@ from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
 from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
-from ..events import Event, generate_run_id
+from ..events import Event, EventType, generate_run_id
 from ._internal.common import (
     DEFAULT_MAX_RECORDED_EVENTS,
     CaptureOverflowPolicy,
@@ -49,10 +49,10 @@ class ObserverManager(
     observers: Optional[List[Observer]]
     _has_observers: bool
     _supports_all: bool
-    _supported_event_types: Optional[Set[str]]
-    _observers_by_event_type: Optional[Dict[str, Tuple[Observer, ...]]]
+    _supported_event_types: Optional[Set[EventType]]
+    _observers_by_event_type: Optional[Dict[EventType, Tuple[Observer, ...]]]
     _observers_for_unknown_event_type: Tuple[Observer, ...]
-    _capture_event_types: Optional[Set[str]]
+    _capture_event_types: Optional[Set[EventType]]
     _capture_unknown_event_types: bool
     debug_mode: bool
     fallback_logger_enabled: bool

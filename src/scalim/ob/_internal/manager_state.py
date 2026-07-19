@@ -13,7 +13,7 @@ from ..._internal.utils.loader_result import (
     sample_loader_result,
     summarize_loader_result,
 )
-from ...events import Event
+from ...events import Event, parse_event_type
 from .common import (
     DEFAULT_MAX_RECORDED_EVENTS,
     CaptureOverflowPolicy,
@@ -77,12 +77,33 @@ class ObserverManagerStateMixin(ABC):
         if recorded is None:
             self._recorded_events = deque()
         elif isinstance(recorded, deque):
-            self._recorded_events = recorded
+            self._recorded_events = self._normalize_recorded_events(
+                cast("TypingIterable[Event]", recorded)  # pragma: allow-cast deque elements unknown at boundary
+            )
         elif isinstance(recorded, Iterable):
-            self._recorded_events = deque(cast("TypingIterable[Event]", recorded))  # pragma: allow-cast iterable typed narrowing
+            self._recorded_events = self._normalize_recorded_events(
+                cast("TypingIterable[Event]", recorded)  # pragma: allow-cast iterable typed narrowing
+            )
         else:
             self._recorded_events = deque()
         self._rebuild_subscription_cache()
+
+    def _normalize_recorded_events(self, recorded: TypingIterable[Event]) -> Deque[Event]:
+        normalized: Deque[Event] = deque()
+        for event in recorded:
+            if not isinstance(event, Event):
+                continue
+            normalized.append(
+                Event(
+                    event_type=parse_event_type(event.event_type),
+                    timestamp=event.timestamp,
+                    run_id=event.run_id,
+                    payload=event.payload,
+                    meta=dict(event.meta) if event.meta else {},
+                    seq=event.seq,
+                )
+            )
+        return normalized
 
     def _normalize_max_recorded_events(self, max_recorded_events: Optional[int]) -> Optional[int]:
         if max_recorded_events is None:

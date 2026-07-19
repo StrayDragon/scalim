@@ -6,7 +6,7 @@ from ...events import EventType
 
 HOOK_RAISED_EXCEPTION_WARNING = prefix("hooks") + "钩子 %s.%s 抛出异常"
 
-_HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = {
+_HOOK_TYPED_DISPATCH_MAP: Dict[EventType, str] = {
     EventType.PIPELINE_START: "on_pipeline_start",
     EventType.PIPELINE_END: "on_pipeline_end",
     EventType.BATCH_START: "on_batch_start",
@@ -23,9 +23,9 @@ _HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = {
     EventType.PRE_USE_BATCH_SIZE: "on_pre_use_batch_size",
 }
 
-HOOK_TYPED_DISPATCH_MAP: Dict[str, str] = _HOOK_TYPED_DISPATCH_MAP
+HOOK_TYPED_DISPATCH_MAP: Dict[EventType, str] = _HOOK_TYPED_DISPATCH_MAP
 
-CATALOG_EVENT_TYPES: Tuple[str, ...] = (
+CATALOG_EVENT_TYPES: Tuple[EventType, ...] = (
     EventType.PIPELINE_START,
     EventType.PIPELINE_END,
     EventType.BATCH_START,
@@ -72,19 +72,19 @@ def read_callable_attr(obj: Any, name: str) -> Optional[Callable[..., Any]]:
     return value
 
 
-_CATALOG_EVENT_TYPES_SET: Set[str] = set(CATALOG_EVENT_TYPES) | set(_HOOK_TYPED_DISPATCH_MAP.keys())
+_CATALOG_EVENT_TYPES_SET: Set[EventType] = set(CATALOG_EVENT_TYPES) | set(_HOOK_TYPED_DISPATCH_MAP.keys())
 
 
-def validate_event_types(hook: Any, value: Any) -> Optional[Set[str]]:
+def validate_event_types(hook: Any, value: Any) -> Optional[Set[EventType]]:
     if value is None:
         return None
     if not isinstance(value, AbstractSet):
-        msg = "hook.event_types must be None or Set[str]; got {} for {}".format(type(value).__name__, type(hook).__name__)
+        msg = "hook.event_types must be None or Set[EventType]; got {} for {}".format(type(value).__name__, type(hook).__name__)
         raise TypeError(msg)
-    validated: Set[str] = set()
+    validated: Set[EventType] = set()
     for item in value:
-        if not isinstance(item, str):
-            msg = "hook.event_types must contain only str; got {} element {!r} for {}".format(
+        if not isinstance(item, EventType):
+            msg = "hook.event_types must contain only EventType; got {} element {!r} for {}".format(
                 type(item).__name__, item, type(hook).__name__
             )
             raise TypeError(msg)

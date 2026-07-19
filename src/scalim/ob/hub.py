@@ -82,13 +82,13 @@ class InstrumentationHub:
         self.hook_manager.clear()
         self.observer_manager.clear()
 
-    def wants(self, event_type: str) -> bool:
+    def wants(self, event_type: EventType) -> bool:
         # `wants` 为 O(1) 检查;用于热路径在无人订阅时避免构造载荷/关键字参数.
         return self.hook_manager.wants(event_type) or self.observer_manager.wants(event_type)
 
     def _emit_assume_wanted(
         self,
-        event_type: str,
+        event_type: EventType,
         payload: Any,
         meta: Optional[Dict[str, Any]] = None,
     ) -> Optional[Event]:
@@ -104,7 +104,7 @@ class InstrumentationHub:
 
     def emit_lazy(
         self,
-        event_type: str,
+        event_type: EventType,
         payload_factory: Callable[[], _PayloadT],
         meta: Optional[Dict[str, Any]] = None,
     ) -> Optional[Event]:
@@ -115,7 +115,7 @@ class InstrumentationHub:
 
     def emit(
         self,
-        event_type: str,
+        event_type: EventType,
         payload: Any,
         meta: Optional[Dict[str, Any]] = None,
     ) -> Optional[Event]:

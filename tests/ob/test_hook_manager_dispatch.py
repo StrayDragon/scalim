@@ -125,7 +125,7 @@ def test_hook_manager_register_rejects_event_types_with_non_str_entries() -> Non
         event_types = {EventType.PIPELINE_START, 123}  # type: ignore[assignment]
 
     manager = HookManager()
-    with pytest.raises(TypeError, match="contain only str"):
+    with pytest.raises(TypeError, match="contain only EventType"):
         manager.register(_InvalidEventTypesHook())
 
 

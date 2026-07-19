@@ -11,36 +11,36 @@ from ..vendor.compact.typing_extensionsx import override
 
 # endregion
 
-_DISPATCH_MAP: Dict[str, str] = {
-    EventType.PIPELINE_START.value: "on_pipeline_start",
-    EventType.PIPELINE_END.value: "on_pipeline_end",
-    EventType.BATCH_START.value: "on_batch_start",
-    EventType.BATCH_END.value: "on_batch_end",
-    EventType.LOADER_CALL.value: "on_loader_call",
-    EventType.LOADER_RETRY.value: "on_loader_retry",
-    EventType.FIELD_COMPUTE.value: "on_field_compute",
-    EventType.ERROR.value: "on_error",
-    EventType.DIAGNOSTIC_WARNING.value: "on_diagnostic_warning",
-    EventType.FIELD_SLIM.value: "on_field_slim",
-    EventType.ROW_WRITE.value: "on_row_write",
-    EventType.ROW_RELEASE.value: "on_row_release",
-    EventType.LOADER_SLIM.value: "on_loader_slim",
-    EventType.COLUMN_WRITE.value: "on_column_write",
-    EventType.RELATION_LOOKUP.value: "on_relation_lookup",
-    EventType.STAGE_SPAN.value: "on_stage_span",
-    EventType.OPERATOR_SPAN.value: "on_operator_span",
-    EventType.ADAPTIVE_SCHEDULER_DECISION.value: "on_adaptive_scheduler_decision",
-    EventType.OUTPUT_TARGET_END.value: "on_output_target_end",
+_DISPATCH_MAP: Dict[EventType, str] = {
+    EventType.PIPELINE_START: "on_pipeline_start",
+    EventType.PIPELINE_END: "on_pipeline_end",
+    EventType.BATCH_START: "on_batch_start",
+    EventType.BATCH_END: "on_batch_end",
+    EventType.LOADER_CALL: "on_loader_call",
+    EventType.LOADER_RETRY: "on_loader_retry",
+    EventType.FIELD_COMPUTE: "on_field_compute",
+    EventType.ERROR: "on_error",
+    EventType.DIAGNOSTIC_WARNING: "on_diagnostic_warning",
+    EventType.FIELD_SLIM: "on_field_slim",
+    EventType.ROW_WRITE: "on_row_write",
+    EventType.ROW_RELEASE: "on_row_release",
+    EventType.LOADER_SLIM: "on_loader_slim",
+    EventType.COLUMN_WRITE: "on_column_write",
+    EventType.RELATION_LOOKUP: "on_relation_lookup",
+    EventType.STAGE_SPAN: "on_stage_span",
+    EventType.OPERATOR_SPAN: "on_operator_span",
+    EventType.ADAPTIVE_SCHEDULER_DECISION: "on_adaptive_scheduler_decision",
+    EventType.OUTPUT_TARGET_END: "on_output_target_end",
 }
 
 
 class Observer(ABC):
     """观测器插件基类."""
 
-    event_types: Optional[Set[str]] = None
+    event_types: Optional[Set[EventType]] = None
     supports_unknown_event_types: bool = False
 
-    def supports(self, event_type: str) -> bool:
+    def supports(self, event_type: EventType) -> bool:
         if self.event_types is None:
             return True
         return event_type in self.event_types
@@ -56,8 +56,8 @@ class Observer(ABC):
 class EventDispatchObserver(Observer):
     """将事件分发到已定义的类型化处理函数."""
 
-    dispatch_map: Dict[str, str] = _DISPATCH_MAP
-    _handler_cache: Dict[str, Optional[Callable[[Any], Any]]]
+    dispatch_map: Dict[EventType, str] = _DISPATCH_MAP
+    _handler_cache: Dict[EventType, Optional[Callable[[Any], Any]]]
 
     @override
     def on_event(self, event: Event) -> None:

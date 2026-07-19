@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from ..._internal.utils.loader_result import LoaderResultPolicy, parse_loader_result_policy
-from ...events import EventType
+from ...events import EventType, parse_event_type
 from ...events._events import LoaderCallEvent
 from ...hooks import HookManager
 from ...vendor.compact.typing_extensionsx import override
@@ -10,7 +10,7 @@ from ...vendor.dataclassesx import dataclass
 
 @dataclass(frozen=True)
 class HookRecordedEvent:
-    event_type: str
+    event_type: EventType
     payload: Any
 
 
@@ -45,10 +45,13 @@ class HookCaptureManager(HookManager):
             return []
         events = list(self._recorded_events)
         self._recorded_events.clear()
-        return events
+        return [self._normalize_recorded_event(event) for event in events]
+
+    def _normalize_recorded_event(self, event: HookRecordedEvent) -> HookRecordedEvent:
+        return HookRecordedEvent(event_type=parse_event_type(event.event_type), payload=event.payload)
 
     @override
-    def emit_typed(self, event_type: str, payload: Any) -> None:
+    def emit_typed(self, event_type: EventType, payload: Any) -> None:
         if not self._has_hooks:
             return
         if event_type not in self._typed_handlers_by_event_type:

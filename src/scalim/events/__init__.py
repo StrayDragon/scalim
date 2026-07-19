@@ -1,14 +1,48 @@
-"""事件类型与辅助工具.
+"""事件类型、`envelope` 与类型化 `payload` 公共契约.
 
-对外推荐优先从包根导入稳定事件契约(避免绑定到内部模块文件名),例如:
-- `from scalim.events import Event, EventType, get_event_catalog`
+对外推荐从包根导入,例如:
+- `from scalim.events import Event, EventType, PipelineStartEvent, get_event_catalog`
 
-类型化 `payload` 数据类属于内部实现细节,不作为公共导入契约.
+进程内事件身份以 `EventType` 为唯一来源;类型化 `payload` 数据类为公开契约.
+以下划线开头的实现模块不是用户导入契约.
 """
 
-# pragma: scalim-public-api tier1:110:scalim.events|事件envelope+事件类型入口+事件目录查询入口|写 Observer/Hook;按 `event_type` 订阅/过滤
-# pragma: scalim-public-api tier1:111:scalim.events.type_groups|事件类型分组视图|按主题探索 `EventType`(不引入新值)
+# pragma: scalim-public-api tier1:110:scalim.events|事件envelope+EventType+公开payload+事件目录|写 Observer/Hook;按 EventType 订阅/过滤
+# pragma: scalim-public-api tier1:111:scalim.events.type_groups|事件类型分组视图|按主题探索 EventType(不引入新值)
 
+from ._events import (
+    AdaptiveSchedulerDecisionEvent,
+    BatchEndEvent,
+    BatchStartEvent,
+    ColumnWriteEvent,
+    DiagnosticWarningEvent,
+    ErrorEvent,
+    FieldComputeEvent,
+    FieldSlimEvent,
+    LoaderCallEvent,
+    LoaderRetryEvent,
+    LoaderSlimEvent,
+    OperatorSpanEvent,
+    OutputTargetEndEvent,
+    PipelineEndEvent,
+    PipelineStartEvent,
+    RelationLookupEvent,
+    RowReleaseEvent,
+    RowWriteEvent,
+    StageSpanEvent,
+    WorkflowCacheAcquireEvent,
+    WorkflowCacheEvictEvent,
+    WorkflowCacheReleaseEvent,
+    WorkflowFinishedEvent,
+    WorkflowNodeCancelledEvent,
+    WorkflowNodeEndEvent,
+    WorkflowNodeStartEvent,
+    WorkflowResourceCommitEvent,
+    WorkflowResourceCreateEvent,
+    WorkflowResourceDiscardEvent,
+    WorkflowResourceWriteEvent,
+    WorkflowStartedEvent,
+)
 from .api import (
     WORKFLOW_ATTRIBUTION_META_KEYS,
     WORKFLOW_EXEC_ID_META_KEY,
@@ -22,19 +56,52 @@ from .api import (
     get_event_catalog,
     get_event_catalog_map,
     now_ts,
+    parse_event_type,
 )
 
 __all__ = (
     "WORKFLOW_ATTRIBUTION_META_KEYS",
     "WORKFLOW_EXEC_ID_META_KEY",
     "WORKFLOW_NODE_ID_META_KEY",
+    "AdaptiveSchedulerDecisionEvent",
+    "BatchEndEvent",
+    "BatchStartEvent",
+    "ColumnWriteEvent",
+    "DiagnosticWarningEvent",
+    "ErrorEvent",
     "Event",
     "EventDescriptor",
     "EventType",
+    "FieldComputeEvent",
+    "FieldSlimEvent",
+    "LoaderCallEvent",
+    "LoaderRetryEvent",
+    "LoaderSlimEvent",
+    "OperatorSpanEvent",
+    "OutputTargetEndEvent",
+    "PipelineEndEvent",
+    "PipelineStartEvent",
+    "RelationLookupEvent",
+    "RowReleaseEvent",
+    "RowWriteEvent",
+    "StageSpanEvent",
+    "WorkflowCacheAcquireEvent",
+    "WorkflowCacheEvictEvent",
+    "WorkflowCacheReleaseEvent",
+    "WorkflowFinishedEvent",
+    "WorkflowNodeCancelledEvent",
     "WorkflowNodeCancelledReason",
+    "WorkflowNodeEndEvent",
     "WorkflowNodeEndStatus",
+    "WorkflowNodeStartEvent",
+    "WorkflowResourceCommitEvent",
+    "WorkflowResourceCreateEvent",
+    "WorkflowResourceDiscardEvent",
+    "WorkflowResourceWriteEvent",
+    "WorkflowStartedEvent",
     "generate_run_id",
     "get_event_catalog",
     "get_event_catalog_map",
     "now_ts",
+    "parse_event_type",
 )

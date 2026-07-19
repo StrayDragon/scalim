@@ -283,3 +283,10 @@ flowchart LR
 ```
 
 在 `adaptive` 模式下,部分 hook/observer 会走“捕获 + 提交点回放”以保持确定性,细节见并行模式专页.
+
+事件身份与订阅约定:
+
+- 进程内事件身份以 `EventType` 为 SSOT;`Observer.event_types` / `Hook.event_types` MUST 使用 `Set[EventType]`(裸 `str` 注册会 fail-fast).
+- typed payload 数据类(例如 `PipelineStartEvent`)从 `scalim.events` 公开导出;不要依赖包内私有实现模块作为用户导入契约.
+- 落盘/JSONL/viz 边界 MAY 编码 `event_type` 为 builtin `str`(`.value`);读回进程内 `Event` 时 MUST 经 `parse_event_type` 归一为 `EventType`.
+- `supports_unknown_event_types` 仅作逃生口,不是推荐二开路径;扩展新事件应先登记 `EventType`/事件目录.

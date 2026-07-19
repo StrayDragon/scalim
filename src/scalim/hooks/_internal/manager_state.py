@@ -10,6 +10,7 @@ from ..._internal.utils.loader_result import (
     sample_loader_result,
     summarize_loader_result,
 )
+from ...events import EventType  # noqa: TC001
 from ...vendor.compact.typing_extensionsx import override
 from .._dispatch import HookDispatchStrategy
 from .manager_base import HookManagerBase, HookOnEventHandlerPair, HookTypedHandlerPair
@@ -44,8 +45,8 @@ class HookManagerStateMixin(HookManagerBase, ABC):
         else:
             manager.has_hooks = bool(manager.hooks)
 
-        typed_handlers_by_event_type: Dict[str, Tuple[HookTypedHandlerPair, ...]] = {}
-        on_event_handlers_by_event_type: Dict[str, Tuple[HookOnEventHandlerPair, ...]] = {}
+        typed_handlers_by_event_type: Dict[EventType, Tuple[HookTypedHandlerPair, ...]] = {}
+        on_event_handlers_by_event_type: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]] = {}
         manager.typed_handlers_by_event_type = typed_handlers_by_event_type
         manager.on_event_handlers_by_event_type = on_event_handlers_by_event_type
 

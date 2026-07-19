@@ -1,0 +1,9 @@
+kind: llman.sdd.delta
+ops[2]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r933,Event envelope event_type MUST be EventType,"系统 MUST 使进程内 `Event.event_type` 的类型与运行时值为 `EventType`。构造/emit 路径 MUST 写入 `EventType` 成员。系统 MUST NOT 将进程内 envelope 身份长期表示为作者面 `str`。若存在 `to_dict` 或等价序列化辅助，其输出 MAY 使用 builtin `str`（`.value`），但反序列化回 `Event` 时 MUST 恢复为 `EventType`。",null,null,null
+  add_requirement,r934,New event kinds MUST extend EventType catalog,"系统在新增可订阅事件种类时 MUST 向 `EventType`（及事件目录）登记稳定成员，并保持成员取值字符串稳定除非显式 breaking。Hook 与 Observer 的 typed dispatch 映射 MUST 以 `EventType` 成员为键对齐目录，避免并行维护第二套字符串闭集。",null,null,null
+op_scenarios[4]{req_id,id,given,when,then}:
+  r933,envelope-holds-enum,"","执行层经 hub emit 一条已知目录事件","进程内 `Event.event_type` MUST 为对应 `EventType` 成员"
+  r933,reject-str-as-envelope-identity,"","测试或调用方试图以裸 `str` 作为进程内 `Event.event_type` 的长期作者面","类型检查与/或运行时校验 MUST 将其视为不合规（实现至少在公开构造/校验路径 fail-fast 或静态类型拒绝）"
+  r934,new-event-updates-catalog,"","框架新增一种可订阅事件","MUST 新增 `EventType` 成员与目录条目，且 hooks/ob dispatch 映射引用该成员"
+  r934,no-parallel-str-closed-set,"","审阅 hooks/ob 事件闭集定义","MUST NOT 在 `EventType` 之外再手工维护一份并行的作者面字符串闭集作为 SSOT"

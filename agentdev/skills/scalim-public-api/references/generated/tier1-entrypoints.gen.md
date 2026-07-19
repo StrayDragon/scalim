@@ -220,28 +220,60 @@
   - `ObserverManagerMode`
 
 ### `scalim.events` (order=110)
-- desc: 事件envelope+事件类型入口+事件目录查询入口
-- scenario: 写 Observer/Hook;按 `event_type` 订阅/过滤
-- marker: `src/scalim/events/__init__.py:9`
-- source: `src/scalim/events/__init__.py:27`
-- exports (`__all__`, tuple, count=12):
+- desc: 事件envelope+EventType+公开payload+事件目录
+- scenario: 写 Observer/Hook;按 EventType 订阅/过滤
+- marker: `src/scalim/events/__init__.py:10`
+- source: `src/scalim/events/__init__.py:62`
+- exports (`__all__`, tuple, count=44):
   - `WORKFLOW_ATTRIBUTION_META_KEYS`
   - `WORKFLOW_EXEC_ID_META_KEY`
   - `WORKFLOW_NODE_ID_META_KEY`
+  - `AdaptiveSchedulerDecisionEvent`
+  - `BatchEndEvent`
+  - `BatchStartEvent`
+  - `ColumnWriteEvent`
+  - `DiagnosticWarningEvent`
+  - `ErrorEvent`
   - `Event`
   - `EventDescriptor`
   - `EventType`
+  - `FieldComputeEvent`
+  - `FieldSlimEvent`
+  - `LoaderCallEvent`
+  - `LoaderRetryEvent`
+  - `LoaderSlimEvent`
+  - `OperatorSpanEvent`
+  - `OutputTargetEndEvent`
+  - `PipelineEndEvent`
+  - `PipelineStartEvent`
+  - `RelationLookupEvent`
+  - `RowReleaseEvent`
+  - `RowWriteEvent`
+  - `StageSpanEvent`
+  - `WorkflowCacheAcquireEvent`
+  - `WorkflowCacheEvictEvent`
+  - `WorkflowCacheReleaseEvent`
+  - `WorkflowFinishedEvent`
+  - `WorkflowNodeCancelledEvent`
   - `WorkflowNodeCancelledReason`
+  - `WorkflowNodeEndEvent`
   - `WorkflowNodeEndStatus`
+  - `WorkflowNodeStartEvent`
+  - `WorkflowResourceCommitEvent`
+  - `WorkflowResourceCreateEvent`
+  - `WorkflowResourceDiscardEvent`
+  - `WorkflowResourceWriteEvent`
+  - `WorkflowStartedEvent`
   - `generate_run_id`
   - `get_event_catalog`
   - `get_event_catalog_map`
   - `now_ts`
+  - `parse_event_type`
 
 ### `scalim.events.type_groups` (order=111)
 - desc: 事件类型分组视图
-- scenario: 按主题探索 `EventType`(不引入新值)
-- marker: `src/scalim/events/__init__.py:10`
+- scenario: 按主题探索 EventType(不引入新值)
+- marker: `src/scalim/events/__init__.py:11`
 - source: `src/scalim/events/type_groups.py:69`
 - exports (`__all__`, tuple, count=15):
   - `adaptive`

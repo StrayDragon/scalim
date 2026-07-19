@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
-from ..events import Event
+from ..events import Event, EventType
 from ..events._events import (
     BatchEndEvent,
     BatchStartEvent,
@@ -99,7 +99,7 @@ Hook = IExecutionHook
 class BaseHook(IExecutionHook):
     """带有空操作方法的基础钩子实现."""
 
-    event_types: Optional[Set[str]] = None
+    event_types: Optional[Set[EventType]] = None
 
     def on_event(self, event: Event) -> None:
         """统一事件回调(用于订阅事件目录中的全部事件)."""
@@ -171,8 +171,8 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
 
     hooks: List[ExecutionHookLike]
     _has_hooks: bool
-    _typed_handlers_by_event_type: Dict[str, Tuple[HookTypedHandlerPair, ...]]
-    _on_event_handlers_by_event_type: Dict[str, Tuple[HookOnEventHandlerPair, ...]]
+    _typed_handlers_by_event_type: Dict[EventType, Tuple[HookTypedHandlerPair, ...]]
+    _on_event_handlers_by_event_type: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]
     debug_mode: bool
     fallback_logger_enabled: bool
     loader_result_policy: LoaderResultPolicyValue
@@ -217,22 +217,22 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
 
     @property
     @override
-    def typed_handlers_by_event_type(self) -> Dict[str, Tuple[HookTypedHandlerPair, ...]]:
+    def typed_handlers_by_event_type(self) -> Dict[EventType, Tuple[HookTypedHandlerPair, ...]]:
         return self._typed_handlers_by_event_type
 
     @typed_handlers_by_event_type.setter
     @override
-    def typed_handlers_by_event_type(self, value: Dict[str, Tuple[HookTypedHandlerPair, ...]]) -> None:
+    def typed_handlers_by_event_type(self, value: Dict[EventType, Tuple[HookTypedHandlerPair, ...]]) -> None:
         self._typed_handlers_by_event_type = value
 
     @property
     @override
-    def on_event_handlers_by_event_type(self) -> Dict[str, Tuple[HookOnEventHandlerPair, ...]]:
+    def on_event_handlers_by_event_type(self) -> Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]:
         return self._on_event_handlers_by_event_type
 
     @on_event_handlers_by_event_type.setter
     @override
-    def on_event_handlers_by_event_type(self, value: Dict[str, Tuple[HookOnEventHandlerPair, ...]]) -> None:
+    def on_event_handlers_by_event_type(self, value: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]) -> None:
         self._on_event_handlers_by_event_type = value
 
     @property

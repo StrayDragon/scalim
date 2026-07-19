@@ -153,9 +153,9 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
             meta={"workflow_node_id": node_id},
             seq=4,
         ),
-        Event(event_type="some_global_event", timestamp=ts, run_id=workflow_exec_id, payload={"g": 1}, meta={"x": "y"}, seq=5),
+        Event(event_type=EventType.DIAGNOSTIC_WARNING, timestamp=ts, run_id=workflow_exec_id, payload={"g": 1}, meta={"x": "y"}, seq=5),
         Event(
-            event_type="some_node_event",
+            event_type=EventType.STAGE_SPAN,
             timestamp=ts,
             run_id=workflow_exec_id,
             payload={"n": 1},

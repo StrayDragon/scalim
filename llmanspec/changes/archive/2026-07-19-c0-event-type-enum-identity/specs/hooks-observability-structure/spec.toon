@@ -1,0 +1,16 @@
+kind: llman.sdd.delta
+ops[5]{op,req_id,title,statement,from,to,name}:
+  modify_requirement,r56,观测事件契约以 EventType 与公开 payload 为中心,"系统 MUST 以 `events` 作为事件定义中心。执行层、hooks、observers MUST 通过统一 `Event` envelope 交互。进程内事件身份 MUST 为 `EventType`（不得以作者面 `str` 作为订阅/envelope 身份）。系统 MUST 将稳定的 typed payload 数据类作为公开契约从 `scalim.events`（或其公开 re-export 面）导出：docs/examples/skills 等用户可见材料 MUST 示范公开导入路径，MUST NOT 依赖 `scalim.events._events` 等私有模块作为长期契约。用户侧订阅 MUST 使用 `EventType`；handler MUST 能以公开 payload 类型消费 `Event.payload`。",null,null,null
+  modify_requirement,r268,events public facade MUST expose EventType as identity SSOT,"系统 MUST 为用户提供结构化的事件类型访问方式（可枚举/可检索的事件目录，以及按主题分组的稳定入口）。`EventType` MUST 作为进程内事件身份的唯一 SSOT。系统 MAY 在落盘/JSONL/viz 等边界将 `event_type` 编码为稳定的 builtin `str`（来自 `EventType` 成员值），但读回进程内 `Event` 时 MUST 归一为 `EventType`。系统 MUST NOT 将边界字符串形态宣称为二开注册/订阅的作者面。",null,null,null
+  add_requirement,r930,Observer and Hook registration MUST be EventType-strict,"系统 MUST 将 `Observer.event_types` 与 Hook 的 `event_types` 定义为 `Optional[Set[EventType]]`（或等价 Enum 集合）。注册/校验路径 MUST 只接受 `EventType` 成员；传入裸 builtin `str` 或其他非 `EventType` 元素时 MUST fail-fast。错误信息 SHOULD 指向事件目录或列出允许成员。`supports_unknown_event_types` MAY 作为显式逃生口保留，但 MUST NOT 作为公开二开文档的默认扩展方式；推荐扩展路径 MUST 为向事件目录登记新的 `EventType` 成员。",null,null,null
+  add_requirement,r931,In-process emit and wants MUST use EventType identity,"系统 MUST 使 `InstrumentationHub`/`ObserverManager`/`HookManager` 的 `wants`/`emit`/分发索引在进程内以 `EventType` 为事件身份（不得要求调用方传入作者面 `str` 作为唯一合法类型）。`wants(event_type)=false` 时的短路语义（不构建 payload/envelope）MUST 保持不变。",null,null,null
+  add_requirement,r932,AGENTS Event identity exception MUST be documented as SSOT,"仓库级 `AGENTS.md`（Policy SSOT 段）MUST 明确：Event/Hook 注册与 `Event` envelope 的进程内身份以 `EventType` 为准，不适用「输出/存储必须为 builtin str」对该域进程内表示的约束；边界编码 `.value` 仅用于落盘/流式导出且读回须归一为 `EventType`。",null,null,null
+op_scenarios[8]{req_id,id,given,when,then}:
+  r56,public-payload-import,"","用户编写自定义 Observer handler","MUST 能从 `scalim.events` 公开导入 payload 类型，MUST NOT 需要 `scalim.events._events`"
+  r56,subscribe-with-event-type,"","用户声明订阅集","MUST 使用 `EventType` 成员（例如 `EventType.PIPELINE_START`），不得以作者面字符串字面量作为推荐写法"
+  r268,facade-catalog-enum,"","用户从 `scalim.events` 探索可用事件","MUST 通过 `EventType`/目录获得闭集成员，而非依赖散落字符串常量作为身份 SSOT"
+  r268,boundary-roundtrip,"","viz/capture 将事件写入 JSONL 后再载入为进程内 `Event`","边界可含 `event_type` 字符串，但进程内 `Event.event_type` MUST 为 `EventType`"
+  r930,reject-bare-str-subscription,"","注册 Observer/Hook 且 `event_types` 含裸 `str`","系统 MUST fail-fast 拒绝注册"
+  r930,accept-event-type-subscription,"","注册 Observer/Hook 且 `event_types` 仅为 `EventType` 成员","系统 MUST 接受并按成员分发"
+  r931,wants-short-circuit-preserved,无订阅者,触发某 `EventType` 的 emit,系统 MUST 不构建高成本 payload 与 `Event` envelope
+  r932,agents-documents-exception,"","审阅 `AGENTS.md` Policy 段","MUST 包含 Event/Hook 身份以 `EventType` 为进程内 SSOT 的例外说明"

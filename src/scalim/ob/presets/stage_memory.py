@@ -55,7 +55,7 @@ class StageMemoryObserver(EventDispatchObserver):
 
     config: StageMemoryConfig
     samples: List[StageMemorySample]
-    event_types: Optional[Set[str]]
+    event_types: Optional[Set[EventType]]
 
     _enabled: bool
     _process: Any
