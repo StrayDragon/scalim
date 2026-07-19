@@ -51,7 +51,7 @@ def _raise_if_workflow_options_present(wf: Mapping[str, Any]) -> None:
     raise ScalimWorkflowConfigError(msg, path="workflow.options")
 
 
-def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[str, ...]:
+def _parse_run_depends_on(depends_on_raw: Any, *, item_path: str) -> Tuple[str, ...]:
     msg: str
     depends_on: Tuple[str, ...] = ()
     if depends_on_raw is None:
@@ -82,7 +82,7 @@ def _parse_run_depends_on(depends_on_raw: object, *, item_path: str) -> Tuple[st
     return tuple(ordered)
 
 
-def _parse_run_main_rows_from(main_rows_from_raw: object, *, item_path: str) -> Optional[str]:
+def _parse_run_main_rows_from(main_rows_from_raw: Any, *, item_path: str) -> Optional[str]:
     msg: str
     if main_rows_from_raw is None:
         return None
@@ -102,7 +102,7 @@ def _parse_run_main_rows_from(main_rows_from_raw: object, *, item_path: str) -> 
     return run_id
 
 
-def _parse_run_init_vars(init_vars_raw: object, *, item_path: str) -> Optional[Dict[str, object]]:
+def _parse_run_init_vars(init_vars_raw: Any, *, item_path: str) -> Optional[Dict[str, Any]]:
     msg: str
     if init_vars_raw is None:
         return None
@@ -110,7 +110,7 @@ def _parse_run_init_vars(init_vars_raw: object, *, item_path: str) -> Optional[D
         msg = "run.init_vars must be a mapping"
         raise ScalimWorkflowConfigError(msg, path="{}.init_vars".format(item_path))
     init_vars = cast("Dict[str, Any]", init_vars_raw)  # pragma: allow-cast yaml mapping typed narrowing
-    out: Dict[str, object] = {}
+    out: Dict[str, Any] = {}
     for raw_key, raw_value in init_vars.items():
         key = str(raw_key or "").strip() if isinstance(raw_key, str) else ""
         if not key:
@@ -186,7 +186,7 @@ def _load_workflow_runs(wf: Mapping[str, Any]) -> Tuple[List[WorkflowRun], Dict[
     return runs, seen_ids
 
 
-def _parse_path_or_init_var(raw: object, *, path: str) -> OptionalPathNode:
+def _parse_path_or_init_var(raw: Any, *, path: str) -> OptionalPathNode:
     if isinstance(raw, dict):
         return parse_init_var_ref(cast("Dict[str, Any]", raw), path=path)  # pragma: allow-cast yaml dict
     if raw is None:
@@ -199,7 +199,7 @@ def _parse_path_or_init_var(raw: object, *, path: str) -> OptionalPathNode:
     raise ScalimWorkflowConfigError(msg, path=path)
 
 
-def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
+def _parse_book_export_xlsx(raw: Any, *, path: str) -> BookExportXlsxConfig:
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)
@@ -234,7 +234,7 @@ def _parse_book_export_xlsx(raw: object, *, path: str) -> BookExportXlsxConfig:
     return BookExportXlsxConfig(path=export_path, allow_formulas=bool(allow_formulas_raw))
 
 
-def _parse_book_config(raw: object, *, path: str) -> BookConfig:
+def _parse_book_config(raw: Any, *, path: str) -> BookConfig:
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)
@@ -323,7 +323,7 @@ def _load_workflow_resources(wf: Mapping[str, Any]) -> ResourcesConfig:  # noqa:
     return ResourcesConfig(books=books, files=files)
 
 
-def _parse_file_config(raw: object, *, path: str) -> FileConfig:  # noqa: C901
+def _parse_file_config(raw: Any, *, path: str) -> FileConfig:  # noqa: C901
     msg: str
     if not isinstance(raw, dict):
         msg = "{} must be a mapping".format(path)

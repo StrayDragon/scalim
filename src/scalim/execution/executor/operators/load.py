@@ -9,7 +9,7 @@ from ....planning.operators import LoadOperatorIr, SupportedOperatorIr
 from ....spec.ir import FieldIr, SourceIr
 from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.binding import BindingIr, LoaderCallContextIr
-from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping
+from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, LoaderResultValue, RuntimeValue
 from ....vendor.compact.typing_extensionsx import Protocol, TypeGuard, override
 from ...context import BatchContext
 from ...loader_call_params import build_loader_call_params
@@ -31,7 +31,7 @@ class _LoaderResultWithNormalizeStats(Protocol):
     skipped_none_rows: int
 
 
-def _is_mapping(value: object) -> TypeGuard[TypingMapping[object, object]]:
+def _is_mapping(value: RuntimeValue) -> TypeGuard[TypingMapping[RuntimeValue, RuntimeValue]]:
     return isinstance(value, Mapping)
 
 
@@ -60,7 +60,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         runtime: "ExecutionRuntime",
         *,
         loader_name: str,
-        result: object,
+        result: RuntimeValue,
         field_keys: List[str],
     ) -> None:
         if not runtime.instrumentation.wants(EventType.LOADER_SLIM):
@@ -94,7 +94,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         required_field_keys: Set[str],
         required_mode: str,
         transform_mode: str,
-    ) -> object:
+    ) -> RuntimeValue:
         if row_id not in result:
             for required_field_key in required_field_keys:
                 record_or_fail_required_field_missing(
@@ -134,7 +134,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         source: SourceIr,
         row_id: Hashable,
         field_key: str,
-        data: object,
+        data: LoaderResultValue,
         transform_mode: str,
     ) -> FieldValue:
         field_spec = runtime.field_specs.get(field_key)
@@ -168,7 +168,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         runtime: ExecutionRuntime,
         source: SourceIr,
         row_id: Hashable,
-        data: object,
+        data: LoaderResultValue,
         field_keys: List[str],
         required_field_keys: Set[str],
         required_mode: str,
@@ -265,7 +265,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         binding = source.get_binding(key_field)
         loader_fn = runtime.runtime_bindings.require_source_loader(source.source_id)
 
-        def _call_loader() -> object:
+        def _call_loader() -> RuntimeValue:
             args, kwargs = build_loader_call_params(
                 binding=binding,
                 context=loader_context,
@@ -275,7 +275,7 @@ class LoadOperatorExecutor(OperatorExecutor):
 
         loader_start = time.perf_counter()
         policy = runtime.loader_retry.resolve(source.source_id)
-        result_raw: object = call_with_loader_retry(
+        result_raw: RuntimeValue = call_with_loader_retry(
             call=_call_loader,
             instrumentation=runtime.instrumentation,
             policy=policy,
@@ -285,7 +285,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         )
         loader_duration = time.perf_counter() - loader_start
 
-        result_obj: object = result_raw
+        result_obj: RuntimeValue = result_raw
         if source.normalize is not None:
             normalize_call_by = runtime.runtime_bindings.get_source_normalize_call_by(source.source_id)
             result_obj = source.normalize.apply(result_raw, source_id=source.source_id, call_by=normalize_call_by)

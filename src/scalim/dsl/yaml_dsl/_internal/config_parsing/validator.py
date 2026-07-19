@@ -44,11 +44,11 @@ from .yaml_load import (
 __all__ = ()
 
 
-def _is_list(value: object) -> "TypeGuard[List[object]]":
+def _is_list(value: Any) -> "TypeGuard[List[Any]]":
     return isinstance(value, list)
 
 
-def _is_dict(value: object) -> "TypeGuard[Dict[object, object]]":
+def _is_dict(value: Any) -> "TypeGuard[Dict[Any, Any]]":
     return isinstance(value, dict)
 
 
@@ -146,7 +146,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
             self._add_error(errors, "outputs.{} must be a dictionary".format(int(idx)), path="outputs.{}".format(int(idx)))
 
     def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
-        outputs_raw: object = config.get(DEMAND_KEYS["outputs"])
+        outputs_raw: Any = config.get(DEMAND_KEYS["outputs"])
         if not _is_list(outputs_raw):
             return
         outputs = outputs_raw
@@ -197,7 +197,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
             self._add_error(errors, msg, path="outputs.{}.container".format(int(idx)))
 
     def _build_aggregate_field_index(self, aggregate: Dict[str, Any]) -> Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]:
-        fields_raw: object = aggregate.get("fields")
+        fields_raw: Any = aggregate.get("fields")
         if not _is_dict(fields_raw):
             return {}, []
         fields_dict = fields_raw
@@ -218,7 +218,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
     def _outputs_fields_object_item_error(
         self,
         field_def_index: FieldDefIndex,
-        item: object,
+        item: Any,
         *,
         agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
     ) -> Optional[str]:
@@ -258,9 +258,9 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         field_def_index: FieldDefIndex,
         agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
     ) -> None:
-        def _walk(item: object, *, path: str) -> List[Tuple[str, object]]:
+        def _walk(item: Any, *, path: str) -> List[Tuple[str, Any]]:
             if _is_list(item):
-                out: List[Tuple[str, object]] = []
+                out: List[Tuple[str, Any]] = []
                 for idx, sub in enumerate(item):
                     out.extend(_walk(sub, path="{}.{}".format(path, idx)))
                 return out

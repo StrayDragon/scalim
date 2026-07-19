@@ -6,7 +6,7 @@ from typing import Callable, ClassVar, Dict, List, Optional, Sequence
 from ....._internal.utils.converters import NamedLookupCast, auto_normalize_key, auto_str_normalize, must_to_int, must_to_str
 from .....spec.ir.aliases import LookupKeyCast
 from .....spec.ir.lookup_casts import LookupCastSpecIr
-from .....typedefs import FieldValue, LookupKey
+from .....typedefs import FieldValue, LookupKey, RuntimeValue
 from .....vendor.compact.typing_extensionsx import TypeGuard
 from ..errors import ScalimConversionError
 
@@ -14,11 +14,11 @@ _SOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 CALL_BY_CTX_KEY = "$ctx"
 
 
-def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+def _is_sequence(value: RuntimeValue) -> TypeGuard[Sequence[RuntimeValue]]:
     return isinstance(value, (list, tuple))
 
 
-def cast_int(value: object) -> Optional[int]:
+def cast_int(value: RuntimeValue) -> Optional[int]:
     if value is None:
         return None
     try:
@@ -30,7 +30,7 @@ def cast_int(value: object) -> Optional[int]:
         raise TypeError(msg) from exc
 
 
-def cast_str(value: object) -> Optional[str]:
+def cast_str(value: RuntimeValue) -> Optional[str]:
     if value is None:
         return None
     return str(value)
@@ -58,7 +58,7 @@ def _cast_decimal_from_string(value: str) -> Optional[Decimal]:
         raise ValueError(msg) from exc
 
 
-def cast_decimal(value: object) -> Optional[Decimal]:
+def cast_decimal(value: RuntimeValue) -> Optional[Decimal]:
     if value is None:
         return None
 
@@ -93,7 +93,7 @@ class LookupCastRegistry:
 
     def build(self, lookup_cast: LookupCastSpecIr, *, is_multi: bool) -> LookupKeyCast:
         base = self._get_base_cast(lookup_cast)
-        meta: Dict[str, object] = {}
+        meta: Dict[str, RuntimeValue] = {}
         if lookup_cast.name == "sep_first":
             meta["sep"] = lookup_cast.sep or ","
         if not is_multi:
@@ -112,7 +112,7 @@ class LookupCastRegistry:
     def _build_sep_first(self, sep: Optional[str]) -> LookupKeyCast:
         separator = sep or ","
 
-        def _cast(value: object) -> Optional[LookupKey]:
+        def _cast(value: RuntimeValue) -> Optional[LookupKey]:
             if value is None:
                 return None
             raw = str(value)
@@ -124,7 +124,7 @@ class LookupCastRegistry:
         return _cast
 
     def _wrap_multi(self, base: LookupKeyCast) -> LookupKeyCast:
-        def _cast_multi(value: object) -> Optional[LookupKey]:
+        def _cast_multi(value: RuntimeValue) -> Optional[LookupKey]:
             if not _is_sequence(value):
                 return None
             casted: List[LookupKey] = []

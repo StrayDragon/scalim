@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from ..sinks import ISink
 from ..sinks.accept_types import SinkTypePrecheck
-from ..typedefs import KeyNormalizationMode, ParallelMode, RowData
+from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, RuntimeValue
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
 from .excel_column_residency import ExcelColumnResidency
@@ -44,19 +44,19 @@ class ObservabilitySpec:
     viz_config: Optional["VizObserverConfig"] = None
 
 
-def _validate_execution_request_export_layout(export_layout: object) -> None:
+def _validate_execution_request_export_layout(export_layout: RuntimeValue) -> None:
     if not isinstance(export_layout, ExportLayout):
         msg = "ExecutionRequest.export_layout must be an ExportLayout"
         raise TypeError(msg)
 
 
-def _validate_execution_request_output(output: object) -> None:
+def _validate_execution_request_output(output: RuntimeValue) -> None:
     if not isinstance(output, OutputSpec):
         msg = "ExecutionRequest.output must be an OutputSpec"
         raise TypeError(msg)
 
 
-def _validate_execution_request_sink(sink: object) -> None:
+def _validate_execution_request_sink(sink: RuntimeValue) -> None:
     if sink is None:
         return
 
@@ -95,31 +95,31 @@ def _validate_execution_request_max_workers(max_workers: int) -> None:
         warnings.warn(msg, stacklevel=2)
 
 
-def _validate_execution_request_parallel_mode(parallel_mode: object) -> None:
+def _validate_execution_request_parallel_mode(parallel_mode: RuntimeValue) -> None:
     if parallel_mode not in ("seq", "adaptive"):
         msg = "ExecutionRequest.parallel_mode must be 'seq' or 'adaptive'"
         raise ValueError(msg)
 
 
-def _validate_execution_request_capture_in_memory_rows(capture_in_memory_rows: object) -> None:
+def _validate_execution_request_capture_in_memory_rows(capture_in_memory_rows: RuntimeValue) -> None:
     if not isinstance(capture_in_memory_rows, bool):
         msg = "ExecutionRequest.capture_in_memory_rows must be a boolean"
         raise TypeError(msg)
 
 
-def _validate_execution_request_key_normalization(key_normalization: object) -> None:
+def _validate_execution_request_key_normalization(key_normalization: RuntimeValue) -> None:
     if not isinstance(key_normalization, str):
         msg = "ExecutionRequest.key_normalization must be a string"
         raise TypeError(msg)
 
 
-def _validate_execution_request_excel_column_residency(excel_column_residency: object) -> None:
+def _validate_execution_request_excel_column_residency(excel_column_residency: RuntimeValue) -> None:
     if not isinstance(excel_column_residency, ExcelColumnResidency):
         msg = "ExecutionRequest.excel_column_residency must be an ExcelColumnResidency"
         raise TypeError(msg)
 
 
-def _validate_execution_request_sink_type_precheck(sink_type_precheck: object) -> None:
+def _validate_execution_request_sink_type_precheck(sink_type_precheck: RuntimeValue) -> None:
     if not isinstance(sink_type_precheck, SinkTypePrecheck):
         msg = "ExecutionRequest.sink_type_precheck must be a SinkTypePrecheck"
         raise TypeError(msg)

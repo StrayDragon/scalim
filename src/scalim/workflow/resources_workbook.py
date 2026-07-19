@@ -36,7 +36,7 @@ def _get_openpyxl_workbook_class() -> "Type[Workbook]":
     return cast("Any", openpyxl_mod).Workbook  # pragma: allow-cast openpyxl module runtime boundary
 
 
-def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
+def _save_openpyxl_workbook_atomic(workbook: "Workbook", *, output_path: str) -> None:
     try:
         _save_openpyxl_workbook_atomic_impl(workbook, output_path=output_path)
     except Exception as exc:
@@ -86,7 +86,7 @@ def _iter_workbook_row_dicts(
             yield row
 
 
-def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool) -> Iterator[List[object]]:
+def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool) -> Iterator[List[CellValue]]:
     """将 `sheet_plan` 的自有类型化 `segments` 物化为待写入行(不依赖 `openpyxl`)."""
 
     header_written = False
@@ -104,7 +104,7 @@ def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool)
             yield out_row
 
 
-def _write_workbook_plan_to_openpyxl_workbook(workbook: object, plan: "_WorkbookPlan") -> None:
+def _write_workbook_plan_to_openpyxl_workbook(workbook: "Workbook", plan: "_WorkbookPlan") -> None:
     wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
     for sheet_name in plan.sheet_order:
         sheet_plan = plan.sheets.get(sheet_name)
@@ -146,7 +146,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
     def _get_or_create_workbook(self, workbook_id: str, *, workflow_node_id: str) -> _WorkbookPlan:
         key = str(workbook_id)
 
-        def _create() -> object:
+        def _create() -> _WorkbookPlan:
             raw_path = self._workbook_defs.get(key)
             if raw_path is None:
                 msg = "Unknown workbook resource id: {!r}".format(key)
@@ -160,8 +160,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 sheets={},
             )
 
-        def _on_create(plan: object) -> None:
-            p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
+        def _on_create(plan: _WorkbookPlan) -> None:
+            p = plan
             self._emit_resource_create(
                 workflow_node_id=str(workflow_node_id),
                 resource_type="workbook",
@@ -273,7 +273,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         input_header = read_tabular_header(input_csv)
 
         pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_warning_meta: Optional[Dict[str, Any]] = None
         pending_skip = False
 
         sheet_plan = plan.sheets.get(sheet_name)
@@ -402,8 +402,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         return _iter_workbook_row_dicts(baseline_header, segments)
 
     @override
-    def _commit_workbook(self, plan: object) -> None:
-        p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
+    def _commit_workbook(self, plan: _WorkbookPlan) -> None:
+        p = plan
         if not p.sheets:
             node_id = p.last_workflow_node_id or "__wf__commit"
             self._release_workbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
@@ -439,8 +439,8 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         self._release_workbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
 
     @override
-    def _discard_workbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
-        p = cast("_WorkbookPlan", plan)  # pragma: allow-cast joinable plan typed narrowing
+    def _discard_workbook(self, plan: _WorkbookPlan, *, workflow_node_id: str, reason: str) -> None:
+        p = plan
         node_id = p.last_workflow_node_id or str(workflow_node_id)
         self._emit_resource_discard(
             workflow_node_id=node_id,

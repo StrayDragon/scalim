@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from ....._internal.loggingx import get_logger
 from .....vendor.compact.typing_extensionsx import TypeGuard
@@ -14,15 +14,15 @@ _TEMPLATE_VARS_JSON_LIKE_SCALARS: Tuple[type, ...] = (bool, int, float, str)
 DEFAULT_RENDERED_YAML_MAX_LEN = 1048576
 
 
-def _is_json_like_list(value: object) -> TypeGuard[List[object]]:
+def _is_json_like_list(value: Any) -> TypeGuard[List[Any]]:
     return isinstance(value, list)
 
 
-def _is_json_like_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
+def _is_json_like_tuple(value: Any) -> TypeGuard[Tuple[Any, ...]]:
     return isinstance(value, tuple)
 
 
-def _is_json_like_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_json_like_dict(value: Any) -> TypeGuard[Dict[Any, Any]]:
     return isinstance(value, dict)
 
 
@@ -68,7 +68,7 @@ def _raise_template_vars_not_json_like(
     raise ValueError(msg)
 
 
-def _validate_json_like_value(value: object, *, path: str) -> None:
+def _validate_json_like_value(value: Any, *, path: str) -> None:
     if value is None or isinstance(value, _TEMPLATE_VARS_JSON_LIKE_SCALARS):
         return
     if _is_json_like_list(value) or _is_json_like_tuple(value):
@@ -88,7 +88,7 @@ def _validate_json_like_value(value: object, *, path: str) -> None:
     _raise_template_vars_not_json_like(path, type_name=type(value).__name__)
 
 
-def _validate_template_vars_json_like(template_vars: Mapping[str, object]) -> None:
+def _validate_template_vars_json_like(template_vars: Mapping[str, Any]) -> None:
     for key, value in template_vars.items():
         if not isinstance(key, str):
             _raise_template_vars_not_json_like(
@@ -99,7 +99,7 @@ def _validate_template_vars_json_like(template_vars: Mapping[str, object]) -> No
         _validate_json_like_value(value, path="template_vars['{}']".format(key))
 
 
-def _validate_template_vars_json_like_or_raise(template_vars: Mapping[str, object], *, context_label: str) -> None:
+def _validate_template_vars_json_like_or_raise(template_vars: Mapping[str, Any], *, context_label: str) -> None:
     try:
         _validate_template_vars_json_like(template_vars)
     except ValueError as exc:
@@ -139,7 +139,7 @@ def _ensure_rendered_yaml_within_limit(
 def maybe_precompile_yaml_text(
     text: str,
     *,
-    template_vars: Optional[Mapping[str, object]],
+    template_vars: Optional[Mapping[str, Any]],
     context_label: str,
     context_kind: str,
     template_sandbox: str = _TEMPLATE_SANDBOX_SAFE,
