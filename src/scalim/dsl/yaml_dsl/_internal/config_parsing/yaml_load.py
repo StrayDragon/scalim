@@ -43,16 +43,16 @@ def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
     return line + 1, column + 1
 
 
-def _normalize_yaml_mapping_key(key: object) -> object:
+def _normalize_yaml_mapping_key(key: Any) -> Any:
     if isinstance(key, list):
         return cast("Any", tuple(cast("Any", key)))
     return key
 
 
 def _raise_yaml_duplicate_key(
-    key: object,
+    key: Any,
     *,
-    key_node: object,
+    key_node: Any,
     source_path: str,
 ) -> None:
     mark = getattr(key_node, "start_mark", None)  # pragma: allow-dynattr third-party: ruamel node.start_mark
@@ -78,12 +78,12 @@ def _raise_yaml_duplicate_key(
 
 
 def _validate_no_duplicate_yaml_keys(
-    pairs: object,
+    pairs: Any,
     *,
-    constructor: object,
+    constructor: Any,
     source_path: str,
 ) -> None:
-    explicit_seen: Dict[object, bool] = {}
+    explicit_seen: Dict[Any, bool] = {}
     for key_node, _value_node in cast("Any", pairs):
         tag = getattr(key_node, "tag", None)  # pragma: allow-dynattr third-party: ruamel node.tag
         if str(tag) == "tag:yaml.org,2002:merge":
@@ -99,13 +99,13 @@ def _validate_no_duplicate_yaml_keys(
 
 
 def _construct_ruamel_mapping(
-    constructor: object,
-    node: object,
+    constructor: Any,
+    node: Any,
     *,
     deep: bool,
     detect_duplicate_keys: bool,
     source_path: str,
-) -> Dict[object, object]:
+) -> Dict[Any, Any]:
     node_id = getattr(node, "id", None)  # pragma: allow-dynattr third-party: ruamel node.id
     if str(node_id) != "mapping":
         msg = "expected a mapping node, but found {}".format(str(node_id) if node_id is not None else "(unknown)")
@@ -117,7 +117,7 @@ def _construct_ruamel_mapping(
 
     cast("Any", constructor).flatten_mapping(node)  # pragma: allow-cast ruamel constructor typed narrowing
 
-    mapping: Dict[object, object] = cast("Any", constructor).yaml_base_dict_type()  # pragma: allow-cast ruamel typed narrowing
+    mapping: Dict[Any, Any] = cast("Any", constructor).yaml_base_dict_type()  # pragma: allow-cast ruamel typed narrowing
     for key_node, value_node in cast("Any", node).value:
         key = cast("Any", constructor).construct_object(key_node, deep=True)  # pragma: allow-cast ruamel typed narrowing
         key = _normalize_yaml_mapping_key(key)
@@ -126,7 +126,7 @@ def _construct_ruamel_mapping(
     return mapping
 
 
-def _safe_load_yaml_ruamel(text: str, *, source_path: str, detect_duplicate_keys: bool) -> object:
+def _safe_load_yaml_ruamel(text: str, *, source_path: str, detect_duplicate_keys: bool) -> Any:
     """统一 `YAML` 解析入口(仓库内置 `ruamel.yaml` 的 `safe loader`, `YAML 1.2` 语义).
 
     约束:
@@ -139,7 +139,7 @@ def _safe_load_yaml_ruamel(text: str, *, source_path: str, detect_duplicate_keys
     yaml_rt = YAML(typ="safe")
     cast("Any", yaml_rt).version = (1, 2)
 
-    def _construct_mapping(self: object, node: object, deep: bool = False) -> Dict[object, object]:  # noqa: FBT001, FBT002
+    def _construct_mapping(self: Any, node: Any, deep: bool = False) -> Dict[Any, Any]:  # noqa: FBT001, FBT002
         return _construct_ruamel_mapping(
             self,
             node,
@@ -156,7 +156,7 @@ def _safe_load_yaml_ruamel(text: str, *, source_path: str, detect_duplicate_keys
     return cast("Any", yaml_rt).load(text)  # pragma: allow-cast ruamel YAML.load typed narrowing
 
 
-def _safe_load_yaml(text: str, *, source_path: str, detect_duplicate_keys: bool) -> object:
+def _safe_load_yaml(text: str, *, source_path: str, detect_duplicate_keys: bool) -> Any:
     return _safe_load_yaml_ruamel(text, source_path=source_path, detect_duplicate_keys=bool(detect_duplicate_keys))
 
 
@@ -207,10 +207,10 @@ def _index_yaml_node(
             _index_yaml_node(item_node, idx_path, locations, record_current=False)
 
 
-def _compose_yaml_node(yaml_text: str) -> Optional[object]:
+def _compose_yaml_node(yaml_text: str) -> Optional[Any]:
     yaml_safe = YAML(typ="safe")
     cast("Any", yaml_safe).version = (1, 2)
-    return cast("Optional[object]", yaml_safe.compose(yaml_text))  # pragma: allow-cast ruamel compose typed narrowing
+    return cast("Optional[Any]", yaml_safe.compose(yaml_text))  # pragma: allow-cast ruamel compose typed narrowing
 
 
 def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:

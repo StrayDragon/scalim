@@ -63,7 +63,7 @@ __all__ = ()
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
 
-def _as_non_empty_str(value: object, *, path: str) -> str:
+def _as_non_empty_str(value: Any, *, path: str) -> str:
     if not isinstance(value, str):
         msg = "{} must be a non-empty string".format(path)
         raise ScalimWorkflowConfigError(msg, path=str(path))
@@ -74,7 +74,7 @@ def _as_non_empty_str(value: object, *, path: str) -> str:
     return v
 
 
-def _as_opt_non_empty_str_or_pathlike(value: object, *, path: str) -> Optional[str]:
+def _as_opt_non_empty_str_or_pathlike(value: Any, *, path: str) -> Optional[str]:
     if value is None:
         return None
     if isinstance(value, os.PathLike):
@@ -93,7 +93,7 @@ def _as_opt_non_empty_str_or_pathlike(value: object, *, path: str) -> Optional[s
     raise ScalimWorkflowConfigError(msg, path=str(path))
 
 
-def _as_opt_path_or_init_var(value: object, *, path: str) -> OptionalPathNode:
+def _as_opt_path_or_init_var(value: Any, *, path: str) -> OptionalPathNode:
     """校验可选的 `{ $init_var: ... }` / 路径类值。
 
     返回规范化后的表示:
@@ -129,7 +129,7 @@ def _as_opt_path_or_init_var(value: object, *, path: str) -> OptionalPathNode:
     raise ScalimWorkflowConfigError(msg, path=str(path))
 
 
-def parse_outputs_defaults_book_id(defaults: Optional[object], *, path: str) -> Optional[str]:
+def parse_outputs_defaults_book_id(defaults: Optional[Any], *, path: str) -> Optional[str]:
     if defaults is None:
         return None
     if not isinstance(defaults, OutputsDefaultsOverride):
@@ -199,7 +199,7 @@ def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) 
 
 
 def parse_output_extra_sheet_override(
-    raw: object,
+    raw: Any,
     *,
     path: str,
 ) -> Optional[OutputExtraSheetConfig]:
@@ -234,7 +234,7 @@ def parse_output_extra_sheet_override(
 
 
 def compile_output_extras_override(
-    extras: Optional[object],
+    extras: Optional[Any],
     *,
     path: str,
 ) -> Tuple[Optional[OutputExtraSheetConfig], Optional[OutputExtraSheetConfig]]:
@@ -365,7 +365,7 @@ def parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915  # pragma: 
 
 def _apply_optional_book_export_xlsx_patch(
     base: Optional[BookExportXlsxConfig],
-    value: object,
+    value: Any,
     *,
     path: str,
 ) -> Optional[BookExportXlsxConfig]:
@@ -448,21 +448,21 @@ def apply_book_resource_override(
     return _apply_book_patch(base, patch, path=str(path))
 
 
-def _patch_set_if_not_none(patch: Dict[str, object], key: str, value: object) -> None:
+def _patch_set_if_not_none(patch: Dict[str, Any], key: str, value: Any) -> None:
     if value is None:
         return
     patch[str(key)] = value
 
 
-def _book_export_xlsx_override_to_patch(override: BookExportXlsxOverride) -> Dict[str, object]:
-    patch: Dict[str, object] = {}
+def _book_export_xlsx_override_to_patch(override: BookExportXlsxOverride) -> Dict[str, Any]:
+    patch: Dict[str, Any] = {}
     _patch_set_if_not_none(patch, "path", override.path)
     _patch_set_if_not_none(patch, "allow_formulas", override.allow_formulas)
     return patch
 
 
-def _book_resource_override_to_patch(override: BookResourceOverride) -> Dict[str, object]:
-    patch: Dict[str, object] = {}
+def _book_resource_override_to_patch(override: BookResourceOverride) -> Dict[str, Any]:
+    patch: Dict[str, Any] = {}
 
     _patch_set_if_not_none(patch, "kind", override.kind)
     _patch_set_if_not_none(patch, "path", override.path)
@@ -476,7 +476,7 @@ def _book_resource_override_to_patch(override: BookResourceOverride) -> Dict[str
 
 def _apply_book_patch(
     base: Optional[BookConfig],
-    patch: Mapping[str, object],
+    patch: Mapping[str, Any],
     *,
     path: str,
 ) -> BookConfig:
@@ -542,7 +542,7 @@ def apply_file_resource_override(
     *,
     path: str,
 ) -> FileConfig:
-    patch: Dict[str, object] = {}
+    patch: Dict[str, Any] = {}
     if override.kind is not None:
         patch["kind"] = override.kind
     if override.path is not None:
@@ -552,7 +552,7 @@ def apply_file_resource_override(
     return _apply_file_patch(base, patch, path=str(path))
 
 
-def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, object], *, path: str) -> FileConfig:
+def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, Any], *, path: str) -> FileConfig:
     allowed_keys = {"kind", "path", "encoding"}
     unknown = sorted({str(k) for k in patch} - allowed_keys)
     if unknown:

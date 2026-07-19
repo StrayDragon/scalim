@@ -10,7 +10,7 @@
 """
 
 import math
-from typing import Optional
+from typing import Any, Optional
 
 from ....spec.ir._workflow import (
     WorkflowCachePoolBudgetIr,
@@ -39,7 +39,7 @@ from ..workflow_types import (
 )
 
 
-def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowExecutionOptions:
+def _normalize_and_validate_workflow_execution_options(raw: Any) -> WorkflowExecutionOptions:
     if not isinstance(raw, WorkflowExecutionOptions):
         msg = "workflow_runtime_options.execution must be a WorkflowExecutionOptions"
         raise TypeError(msg)
@@ -67,7 +67,7 @@ def _normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowE
     )
 
 
-def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[WorkflowCachePoolIr]:
+def _build_workflow_cache_pool_ir_from_runtime(raw: Any) -> Optional[WorkflowCachePoolIr]:
     if not isinstance(raw, WorkflowCachePoolPreset):
         msg = "workflow_runtime_options.cache_pool must be a WorkflowCachePoolPreset"
         raise TypeError(msg)
@@ -106,7 +106,7 @@ def _build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[Workflow
     raise TypeError(msg)
 
 
-def _normalize_and_validate_workflow_runtime_options(raw: object) -> WorkflowRuntimeOptions:
+def _normalize_and_validate_workflow_runtime_options(raw: Any) -> WorkflowRuntimeOptions:
     if raw is None:
         return WorkflowRuntimeOptions.preset_default()
     if not isinstance(raw, WorkflowRuntimeOptions):
@@ -135,7 +135,7 @@ def _normalize_and_validate_workflow_runtime_options(raw: object) -> WorkflowRun
     )
 
 
-def _parse_workflow_option_finite_number(raw: object, *, path: str, positive: bool) -> float:
+def _parse_workflow_option_finite_number(raw: Any, *, path: str, positive: bool) -> float:
     if isinstance(raw, bool) or not isinstance(raw, (int, float)):
         msg = "{} must be a finite {}number".format(path, "positive " if positive else "")
         raise TypeError(msg)
@@ -152,7 +152,7 @@ def _parse_workflow_option_finite_number(raw: object, *, path: str, positive: bo
     return float(value)
 
 
-def _validate_workflow_resources_wait_override(raw: object) -> WorkflowResourcesWaitOptions:
+def _validate_workflow_resources_wait_override(raw: Any) -> WorkflowResourcesWaitOptions:
     if not isinstance(raw, WorkflowResourcesWaitOptions):
         msg = "workflow_runtime_options.resources_wait must be a WorkflowResourcesWaitOptions"
         raise TypeError(msg)
@@ -196,7 +196,7 @@ def _build_workflow_resources_wait_ir(raw_resources_wait: WorkflowResourcesWaitO
     )
 
 
-def _normalize_workflow_output_staging_override(raw: object) -> WorkflowOutputStagingOptions:
+def _normalize_workflow_output_staging_override(raw: Any) -> WorkflowOutputStagingOptions:
     if not isinstance(raw, WorkflowOutputStagingOptions):
         msg = "workflow_runtime_options.output_staging must be a WorkflowOutputStagingOptions"
         raise TypeError(msg)
@@ -232,7 +232,7 @@ def _build_workflow_output_staging_ir(raw_output_staging: WorkflowOutputStagingO
 
 def _build_workflow_options_ir(
     *,
-    workflow_runtime_options: object,
+    workflow_runtime_options: Any,
 ) -> WorkflowOptionsIr:
     runtime = _normalize_and_validate_workflow_runtime_options(workflow_runtime_options)
     cache_pool = _build_workflow_cache_pool_ir_from_runtime(runtime.cache_pool)
@@ -256,23 +256,23 @@ def _build_workflow_options_ir(
 __all__ = ()
 
 
-def normalize_and_validate_workflow_execution_options(raw: object) -> WorkflowExecutionOptions:
+def normalize_and_validate_workflow_execution_options(raw: Any) -> WorkflowExecutionOptions:
     return _normalize_and_validate_workflow_execution_options(raw)
 
 
-def build_workflow_cache_pool_ir_from_runtime(raw: object) -> Optional[WorkflowCachePoolIr]:
+def build_workflow_cache_pool_ir_from_runtime(raw: Any) -> Optional[WorkflowCachePoolIr]:
     return _build_workflow_cache_pool_ir_from_runtime(raw)
 
 
-def normalize_and_validate_workflow_runtime_options(raw: object) -> WorkflowRuntimeOptions:
+def normalize_and_validate_workflow_runtime_options(raw: Any) -> WorkflowRuntimeOptions:
     return _normalize_and_validate_workflow_runtime_options(raw)
 
 
-def parse_workflow_option_finite_number(raw: object, *, path: str, positive: bool) -> float:
+def parse_workflow_option_finite_number(raw: Any, *, path: str, positive: bool) -> float:
     return _parse_workflow_option_finite_number(raw, path=path, positive=positive)
 
 
-def validate_workflow_resources_wait_override(raw: object) -> WorkflowResourcesWaitOptions:
+def validate_workflow_resources_wait_override(raw: Any) -> WorkflowResourcesWaitOptions:
     return _validate_workflow_resources_wait_override(raw)
 
 
@@ -280,7 +280,7 @@ def build_workflow_resources_wait_ir(raw_resources_wait: WorkflowResourcesWaitOp
     return _build_workflow_resources_wait_ir(raw_resources_wait)
 
 
-def normalize_workflow_output_staging_override(raw: object) -> WorkflowOutputStagingOptions:
+def normalize_workflow_output_staging_override(raw: Any) -> WorkflowOutputStagingOptions:
     return _normalize_workflow_output_staging_override(raw)
 
 
@@ -290,6 +290,6 @@ def build_workflow_output_staging_ir(raw_output_staging: WorkflowOutputStagingOp
 
 def build_workflow_options_ir(
     *,
-    workflow_runtime_options: object,
+    workflow_runtime_options: Any,
 ) -> WorkflowOptionsIr:
     return _build_workflow_options_ir(workflow_runtime_options=workflow_runtime_options)

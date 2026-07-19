@@ -14,7 +14,7 @@ import time
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar
 
 from .._internal import loggingx
 from .._internal.loggingx import format_kv, get_logger
@@ -29,6 +29,8 @@ from ..events._events import (
 from ..exceptions import ScalimWorkflowError
 from ..execution import versioned_outputs
 from ..vendor.dataclassesx import dataclass
+
+_TPlan = TypeVar("_TPlan")
 
 
 @dataclass
@@ -92,10 +94,10 @@ class _WorkflowResourceManagerBase(ABC):
     _workbook_defs: Dict[str, str]
     _workbook_allow_formulas: Dict[str, bool]
     _csv_defs: Dict[str, str]
-    _sheetbook_defs: Dict[str, object]
-    _workbooks: Dict[str, object]
-    _csvs: Dict[str, object]
-    _sheetbooks: Dict[str, object]
+    _sheetbook_defs: Dict[str, Any]
+    _workbooks: Dict[str, Any]
+    _csvs: Dict[str, Any]
+    _sheetbooks: Dict[str, Any]
     _output_staging_dir_name: str
     _output_staging_keep_on_success: bool
     _output_staging_keep_on_failure: bool
@@ -109,7 +111,7 @@ class _WorkflowResourceManagerBase(ABC):
         workbook_defs: Mapping[str, str],
         workbook_allow_formulas: Optional[Mapping[str, bool]] = None,
         csv_defs: Mapping[str, str],
-        sheetbook_defs: Mapping[str, object],
+        sheetbook_defs: Mapping[str, Any],
         output_staging_dir_name: str = ".scalim-staging",
         output_staging_keep_on_success: bool = False,
         output_staging_keep_on_failure: bool = True,
@@ -299,10 +301,10 @@ class _WorkflowResourceManagerBase(ABC):
         *,
         resource_type: str,
         resource_id: str,
-        plans: Dict[str, object],
-        create_fn: Callable[[], object],
-        on_create: Callable[[object], None],
-    ) -> object:
+        plans: Dict[str, _TPlan],
+        create_fn: Callable[[], _TPlan],
+        on_create: Callable[[_TPlan], None],
+    ) -> _TPlan:
         _ = str(resource_type)
         key = str(resource_id)
         existing = plans.get(key)
@@ -439,32 +441,32 @@ class _WorkflowResourceManagerBase(ABC):
         self._cleanup_staged_outputs_on_failure()
 
     @abstractmethod
-    def _commit_workbook(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
+    def _commit_workbook(self, plan: Any) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _commit_csv(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
+    def _commit_csv(self, plan: Any) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
-    def _commit_sheetbook(self, plan: object) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
+    def _commit_sheetbook(self, plan: Any) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
     def _discard_workbook(
-        self, plan: object, *, workflow_node_id: str, reason: str
+        self, plan: Any, *, workflow_node_id: str, reason: str
     ) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
     def _discard_csv(
-        self, plan: object, *, workflow_node_id: str, reason: str
+        self, plan: Any, *, workflow_node_id: str, reason: str
     ) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
     @abstractmethod
     def _discard_sheetbook(
-        self, plan: object, *, workflow_node_id: str, reason: str
+        self, plan: Any, *, workflow_node_id: str, reason: str
     ) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 

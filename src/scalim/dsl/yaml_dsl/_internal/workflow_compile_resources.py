@@ -12,7 +12,7 @@
 """
 
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Set, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
 
 from ....spec.ir._workflow import WorkflowResourceIr
 from ..book_resource_policy import ResourcesPolicy
@@ -36,7 +36,7 @@ def _try_resolve_book_export_abs_path(
     *,
     book_id: str,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path_prefix: str,
 ) -> Optional[str]:
     try:
@@ -64,12 +64,12 @@ def _book_export_path_and_options(
     *,
     book_id: str,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path_prefix: str,
-    resources_policy: Optional[object] = None,
-) -> Tuple[str, Dict[str, object]]:
+    resources_policy: Optional[ResourcesPolicy] = None,
+) -> Tuple[str, Dict[str, Any]]:
     is_override = str(path_prefix).startswith("overrides.")
-    book_options: Dict[str, object]
+    book_options: Dict[str, Any]
     if is_pathful_book(book):
         path_ref = "{}.path".format(path_prefix) if is_override else "{}.xlsx.path".format(path_prefix)
         output_root = resolve_yaml_relative_output_path(
@@ -133,9 +133,9 @@ def _file_export_path_and_options(
     *,
     file_id: str,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path_prefix: str,
-) -> Tuple[str, Dict[str, object]]:
+) -> Tuple[str, Dict[str, Any]]:
     is_override = str(path_prefix).startswith("overrides.")
     kind = str(file_cfg.kind or "").strip()
     if kind != "csv_file":
@@ -169,9 +169,9 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
     workflow_base_dir: Path,
     demand_cfg_by_run_id: Mapping[str, DemandConfig],
     demand_yaml_paths_by_run_id: Mapping[str, str],
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     overrides_resources: Optional[ResourcesOverride],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, FileConfig]]:
     """编译工作流的有效 `books` 资源并返回:
 
@@ -293,8 +293,8 @@ def _compile_workflow_resources(  # noqa: C901, PLR0912, PLR0915
 
     overrides_books_raw = None if overrides_resources is None else overrides_resources.books
     overrides_files_raw = None if overrides_resources is None else overrides_resources.files
-    overrides_books: Optional[Dict[str, object]] = None
-    overrides_files: Optional[Dict[str, object]] = None
+    overrides_books: Optional[Dict[str, BookResourceOverride]] = None
+    overrides_files: Optional[Dict[str, FileResourceOverride]] = None
     if overrides_books_raw:
         overrides_books = {}
         for raw_book_id, book_override in overrides_books_raw.items():
@@ -453,7 +453,7 @@ def try_resolve_book_export_abs_path(
     *,
     book_id: str,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path_prefix: str,
 ) -> Optional[str]:
     return _try_resolve_book_export_abs_path(
@@ -474,9 +474,9 @@ def book_export_path_and_options(
     *,
     book_id: str,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path_prefix: str,
-) -> Tuple[str, Dict[str, object]]:
+) -> Tuple[str, Dict[str, Any]]:
     return _book_export_path_and_options(
         book,
         book_id=book_id,
@@ -491,9 +491,9 @@ def file_export_path_and_options(
     *,
     file_id: str,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path_prefix: str,
-) -> Tuple[str, Dict[str, object]]:
+) -> Tuple[str, Dict[str, Any]]:
     return _file_export_path_and_options(
         file_cfg,
         file_id=file_id,
@@ -509,9 +509,9 @@ def compile_workflow_resources(
     workflow_base_dir: Path,
     demand_cfg_by_run_id: Mapping[str, DemandConfig],
     demand_yaml_paths_by_run_id: Mapping[str, str],
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     overrides_resources: Optional[ResourcesOverride],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> Tuple[List[WorkflowResourceIr], Dict[str, BookConfig], Dict[str, FileConfig]]:
     return _compile_workflow_resources(
         wf_obj,
