@@ -11,6 +11,7 @@
   - 行级: `# pragma: allow-object <reason>`
   - 文件级: `# pragma: allow-object-file <reason>`
 - `scripts/` 与 `vendor/` 属于白名单边界: 命中会被标记为 `whitelist`,不参与 `--check` 阻断.
+- **`tests/` 默认不扫描**(测试注解噪音忽略;不参与门禁与报告).
 
 用法:
     `uv run scripts/check-object-type.py`
@@ -40,7 +41,7 @@ from typing import Iterable, Iterator, Optional, Sequence
 
 _ALLOW_MARK = "pragma: allow-object"
 _ALLOW_FILE_MARK = "pragma: allow-object-file"
-_DEFAULT_REL_ROOTS = (Path("src") / "scalim", Path("tests"), Path("scripts"))
+_DEFAULT_REL_ROOTS = (Path("src") / "scalim", Path("scripts"))
 _DEFAULT_TEXT_REPORT_REL = Path(".tmp") / "artifacts" / "object-type.report.txt"
 _DEFAULT_JSON_REPORT_REL = Path(".tmp") / "artifacts" / "object-type.report.json"
 _OBJECT_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9_])object(?![A-Za-z0-9_])")
@@ -414,7 +415,7 @@ def _render_json(*, repo_root: Path, hits: Sequence[_Hit]) -> str:
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="扫描源码中的类型标注 `object` 使用.")
-    parser.add_argument("paths", nargs="*", help="要扫描的路径(默认: `src/scalim` / `tests` / `scripts`).")
+    parser.add_argument("paths", nargs="*", help="要扫描的路径(默认: `src/scalim` / `scripts`; `tests/` 故意不扫).")
     parser.add_argument("--root", default=".", help="仓库根目录(默认: .).")
     parser.add_argument("--json", action="store_true", help="输出 JSON.")
     parser.add_argument("--report", default="", help="覆盖默认文本报告路径.")

@@ -45,7 +45,7 @@
   - `# pragma: scalim-public-api tier1:...` (Tier 1 public API catalog for `docs/doc/getting-started/public-api.gen.md`)
   - `# pragma: allow-c901-file ...` (complexity gate exceptions; see `scripts/check-noqa-c901.py`)
   - `# pragma: allow-cast-file ...` (cast-usage gate exceptions; see `scripts/check-cast-usage.py`)
-  - `# pragma: allow-object` / `# pragma: allow-object-file ...` (`object` annotation exceptions; see `scripts/check-object-type.py` and `docs/doc/dev/object-type-governance.md`; not in `quick-check` until `block` is sustainable)
+  - `# pragma: allow-object` / `# pragma: allow-object-file ...` (`object` annotation exceptions; see `scripts/check-object-type.py` and `docs/doc/dev/object-type-governance.md`; default scan skips `tests/`; gated in `quick-check`)
 - **Skills extraction markers**: do not remove `# region SCALIM-SKILL:<tag>` / `# endregion` markers (used for automated skill example extraction).
 - **Privacy**: do not quote, enumerate, or summarize the contents of `.tmp/known-outer-paths-using-this-package.txt`; only reference the file path.
 - **Pre-release**: before bumping versions / tagging, follow `docs/doc/dev/pre-release-checklist.md` (scope last-tag→HEAD, breaking/docs/public-api drift, then `just bump-versions`). `just qa` is a gate, not a substitute for that checklist.
