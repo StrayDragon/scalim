@@ -237,9 +237,7 @@ def _compile_compute_post_field(
         raise ValueError(msg)
 
     try:
-        raw_calculator = cast(
-            "Callable[..., Any]", engine.compile(expr, deps)
-        )  # pragma: allow-cast compute engine compile typed narrowing
+        raw_calculator = cast("Callable[..., Any]", engine.compile(expr, deps))  # pragma: allow-cast compute engine compile typed narrowing
     except (ScalimComputeExpressionError, ScalimSecurityError) as exc:
         msg = "aggregate.fields.{} has invalid compute expression: {}".format(out_field_id, exc)
         raise ValueError(msg) from exc
