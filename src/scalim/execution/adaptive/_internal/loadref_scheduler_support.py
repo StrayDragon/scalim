@@ -5,6 +5,7 @@ from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tupl
 from ....events import Event
 from ....planning.plan import ExecutionPlan
 from ....typedefs import FieldValue
+from ....utils.relation_signature import RelationSignature
 from ....vendor.dataclassesx import dataclass
 from ..capture import HookRecordedEvent
 
@@ -36,7 +37,7 @@ class AdaptiveTaskResult:
     overlay: Dict[str, Dict[Hashable, FieldValue]]
     hook_events: List[HookRecordedEvent]
     observer_events: List[Event]
-    relation_key: Tuple[Tuple[object, ...], ...]
+    relation_key: RelationSignature
     group_enabled: bool
 
 

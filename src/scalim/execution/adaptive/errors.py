@@ -1,6 +1,7 @@
 from typing import Sequence, Tuple
 
 from ...exceptions import ScalimExecutionError
+from .strategy_unit import AdaptiveTaskKey
 
 
 def _format_items(items: Sequence[str], *, limit: int = 10) -> str:
@@ -16,14 +17,14 @@ class ScalimAdaptiveTaskTimeoutError(ScalimExecutionError):
     """`parallel_mode=\"adaptive\"` 任务等待超时(可捕获的稳定异常类型)."""
 
     timeout_seconds: float
-    pending_task_keys: Tuple[Tuple[str, object], ...]
+    pending_task_keys: Tuple[AdaptiveTaskKey, ...]
     pending_field_keys: Tuple[str, ...]
 
     def __init__(
         self,
         *,
         timeout_seconds: float,
-        pending_task_keys: Sequence[Tuple[str, object]],
+        pending_task_keys: Sequence[AdaptiveTaskKey],
         pending_field_keys: Sequence[str],
     ) -> None:
         self.timeout_seconds = float(timeout_seconds)

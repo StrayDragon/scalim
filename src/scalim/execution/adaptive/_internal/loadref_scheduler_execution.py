@@ -9,6 +9,7 @@ from ...executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from ...executor.runtime.runtime import ExecutionRuntime
 from ..capture import HookCaptureManager
 from ..overlay_context import OverlayBatchContext
+from ..strategy_unit import AdaptiveTaskKey
 from ..strategy_unit import TaskSpec as _TaskSpec
 from ..submission_unit import LayerScheduleStats as _LayerScheduleStats
 from ..submission_unit import run_tasks_in_pool as _run_tasks_in_pool_unit
@@ -81,13 +82,13 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
 
     def _run_tasks_in_pool(
         self,
-        task_order: Sequence[Tuple[str, object]],
-        task_specs: Dict[Tuple[str, object], _TaskSpec],
+        task_order: Sequence[AdaptiveTaskKey],
+        task_specs: Dict[AdaptiveTaskKey, _TaskSpec],
         *,
         max_workers: int,
         submit_task: Callable[[_TaskSpec], "Future[_AdaptiveTaskResult]"],
         collect_stats: bool,
-    ) -> Tuple[Dict[Tuple[str, object], _AdaptiveTaskResult], Optional[_LayerScheduleStats]]:
+    ) -> Tuple[Dict[AdaptiveTaskKey, _AdaptiveTaskResult], Optional[_LayerScheduleStats]]:
         results_by_key, layer_stats = _run_tasks_in_pool_unit(
             task_order,
             task_specs,

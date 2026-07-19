@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequ
 from ...events import EventType
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
-from ...utils.relation_signature import build_relation_signature, has_rows_binding
+from ...utils.relation_signature import RelationSignature, build_relation_signature, has_rows_binding
 from ...vendor.compact.typing_extensionsx import override
 from ..context import BatchContext
 from ..executor.runtime.runtime import ExecutionRuntime
@@ -95,7 +95,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
         layers = _build_layers(field_keys, deps=self._deps)
 
         serial_executor = self._build_loadref_executor()
-        committed_relation_keys: Set[Tuple[Tuple[object, ...], ...]] = set()
+        committed_relation_keys: Set[RelationSignature] = set()
 
         for layer_index, layer_field_keys in enumerate(layers):
             layer_ops = [op_by_field_key[key] for key in layer_field_keys]

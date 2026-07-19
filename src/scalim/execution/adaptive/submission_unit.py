@@ -6,12 +6,9 @@ from concurrent.futures import FIRST_COMPLETED, Future, as_completed, wait
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 
-from ...utils.relation_signature import RelationSignature
 from ...vendor.dataclassesx import dataclass
 from .errors import ScalimAdaptiveTaskTimeoutError
-from .strategy_unit import TaskSpec
-
-AdaptiveTaskKey = Tuple[str, RelationSignature]
+from .strategy_unit import AdaptiveTaskKey, TaskSpec
 
 
 @dataclass

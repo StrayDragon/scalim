@@ -4,10 +4,12 @@ from typing import Any, Callable, Dict, Hashable, List, Optional, Sequence, Set,
 from ....events import EventType
 from ....events._events import AdaptiveSchedulerDecisionEvent
 from ....planning.operators import LoadRefOperatorIr
+from ....utils.relation_signature import RelationSignature
 from ...context import BatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
 from ..aggregation_unit import commit_layer_results as _commit_layer_results_unit
 from ..policy import AdaptiveLayerDecision
+from ..strategy_unit import AdaptiveTaskKey
 from ..strategy_unit import TaskSpec as _TaskSpec
 from ..strategy_unit import build_task_specs as _build_task_specs_unit
 from ..strategy_unit import collect_layer_executable_ops as _collect_layer_executable_ops_unit
@@ -99,7 +101,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
     def _build_task_specs(
         self,
         ops: Sequence[LoadRefOperatorIr],
-    ) -> Tuple[List[Tuple[str, object]], Dict[Tuple[str, object], _TaskSpec], Dict[str, Tuple[str, object]]]:
+    ) -> Tuple[List[AdaptiveTaskKey], Dict[AdaptiveTaskKey, _TaskSpec], Dict[str, AdaptiveTaskKey]]:
         return _build_task_specs_unit(ops, resolve_task_pool=self._resolve_task_pool)
 
     def _commit_layer_results(
@@ -107,11 +109,11 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         layer_ops: Sequence[LoadRefOperatorIr],
         *,
         skipped_field_keys: Set[str],
-        op_task_key: Dict[str, Tuple[str, object]],
-        results_by_key: Dict[Tuple[str, object], Any],
+        op_task_key: Dict[str, AdaptiveTaskKey],
+        results_by_key: Dict[AdaptiveTaskKey, Any],
         context: BatchContext,
         runtime: ExecutionRuntime,
-        committed_relation_keys: Set[Tuple[Tuple[object, ...], ...]],
+        committed_relation_keys: Set[RelationSignature],
         after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
     ) -> None:
         _commit_layer_results_unit(

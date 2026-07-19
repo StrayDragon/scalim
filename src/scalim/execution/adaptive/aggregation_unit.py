@@ -1,8 +1,10 @@
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Set
 
 from ...planning.operators import LoadRefOperatorIr
+from ...utils.relation_signature import RelationSignature
 from ..context import BatchContext
 from ..executor.runtime.runtime import ExecutionRuntime
+from .strategy_unit import AdaptiveTaskKey
 
 
 def commit_task_result(
@@ -10,7 +12,7 @@ def commit_task_result(
     *,
     context: BatchContext,
     runtime: ExecutionRuntime,
-    committed_relation_keys: Set[Tuple[Tuple[object, ...], ...]],
+    committed_relation_keys: Set[RelationSignature],
 ) -> None:
     for field_key in sorted(result.overlay.keys()):
         values = result.overlay[field_key]
@@ -31,14 +33,14 @@ def commit_layer_results(
     layer_ops: Sequence[LoadRefOperatorIr],
     *,
     skipped_field_keys: Set[str],
-    op_task_key: Dict[str, Tuple[str, object]],
-    results_by_key: Mapping[Tuple[str, object], Any],
+    op_task_key: Dict[str, AdaptiveTaskKey],
+    results_by_key: Mapping[AdaptiveTaskKey, Any],
     context: BatchContext,
     runtime: ExecutionRuntime,
-    committed_relation_keys: Set[Tuple[Tuple[object, ...], ...]],
+    committed_relation_keys: Set[RelationSignature],
     after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
 ) -> None:
-    committed: Set[Tuple[str, object]] = set()
+    committed: Set[AdaptiveTaskKey] = set()
     for op in layer_ops:
         if op.field_key in skipped_field_keys:
             continue
