@@ -47,8 +47,8 @@ def classify_workflow_events_for_replay(workflow_events: List[Event], *, known_n
     node_other_events_by_node_id: Dict[str, List[Event]] = {}
 
     global_buckets: Dict[str, List[Event]] = {
-        "workflow_started": started_events,
-        "workflow_finished": finished_events,
+        str(EventType.WORKFLOW_STARTED): started_events,
+        str(EventType.WORKFLOW_FINISHED): finished_events,
         str(EventType.WORKFLOW_RESOURCE_COMMIT): resource_commit_events,
     }
 

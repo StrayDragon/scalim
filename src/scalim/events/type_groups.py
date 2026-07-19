@@ -10,6 +10,8 @@ from types import SimpleNamespace
 from .api import EventType
 
 workflow = SimpleNamespace(
+    started=EventType.WORKFLOW_STARTED,
+    finished=EventType.WORKFLOW_FINISHED,
     node=SimpleNamespace(
         start=EventType.WORKFLOW_NODE_START,
         end=EventType.WORKFLOW_NODE_END,

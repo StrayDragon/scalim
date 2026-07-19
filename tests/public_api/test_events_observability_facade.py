@@ -17,6 +17,8 @@ def test_event_type_values_are_stable() -> None:
     assert EventType.ERROR.value == "error"
     assert EventType.WORKFLOW_NODE_START.value == "workflow_node_start"
     assert EventType.WORKFLOW_NODE_END.value == "workflow_node_end"
+    assert EventType.WORKFLOW_STARTED.value == "workflow_started"
+    assert EventType.WORKFLOW_FINISHED.value == "workflow_finished"
     assert EventType.PRE_USE_BATCH_SIZE.value == "pre_use_batch_size"
 
     assert str(EventType.PIPELINE_START) == "pipeline_start"
@@ -39,6 +41,8 @@ def test_event_catalog_works_with_event_type_enum_members() -> None:
     catalog_map = get_event_catalog_map()
     assert EventType.PIPELINE_START in catalog_map
     assert EventType.PIPELINE_END in catalog_map
+    assert EventType.WORKFLOW_STARTED in catalog_map
+    assert EventType.WORKFLOW_FINISHED in catalog_map
 
     assert catalog_map[EventType.PIPELINE_START].name == "pipeline_start"
 
@@ -62,4 +66,6 @@ def test_event_type_group_view_is_importable() -> None:
 
     assert type_groups.pipeline.start == EventType.PIPELINE_START
     assert type_groups.loader.call == EventType.LOADER_CALL
+    assert type_groups.workflow.started == EventType.WORKFLOW_STARTED
+    assert type_groups.workflow.finished == EventType.WORKFLOW_FINISHED
     assert type_groups.workflow.node.start == EventType.WORKFLOW_NODE_START

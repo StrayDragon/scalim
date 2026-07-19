@@ -16,14 +16,14 @@ import sys
 from typing import Iterable, List, Optional, Sequence, Set
 
 from scalim.events import get_event_catalog
-from scalim.events._catalog import WORKFLOW_EVENT_PREFIXES
+from scalim.events._catalog import WORKFLOW_EVENT_PREFIXES, WORKFLOW_SCOPE_EVENT_NAMES
 from scalim.ob.observer import _DISPATCH_MAP as _OBSERVER_DISPATCH_MAP
 from scalim.ob.presets.viz.workflow import _WORKFLOW_DISPATCH_MAP as _VIZ_WORKFLOW_DISPATCH_MAP
 
 
 def _is_workflow_event(event_type: str) -> bool:
     raw = str(event_type or "")
-    return any(raw.startswith(prefix) for prefix in WORKFLOW_EVENT_PREFIXES)
+    return raw in WORKFLOW_SCOPE_EVENT_NAMES or any(raw.startswith(prefix) for prefix in WORKFLOW_EVENT_PREFIXES)
 
 
 def _sorted(items: Iterable[str]) -> List[str]:

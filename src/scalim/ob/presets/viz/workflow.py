@@ -41,9 +41,8 @@ _WORKFLOW_DISPATCH_MAP = {
     EventType.WORKFLOW_RESOURCE_WRITE: "on_workflow_resource_write",
     EventType.WORKFLOW_RESOURCE_COMMIT: "on_workflow_resource_commit",
     EventType.WORKFLOW_RESOURCE_DISCARD: "on_workflow_resource_discard",
-    # 工作流运行时额外发出的事件类型(用于回放体验).
-    "workflow_started": "on_workflow_started",
-    "workflow_finished": "on_workflow_finished",
+    EventType.WORKFLOW_STARTED: "on_workflow_started",
+    EventType.WORKFLOW_FINISHED: "on_workflow_finished",
 }
 
 

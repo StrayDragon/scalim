@@ -20,7 +20,7 @@ def test_build_workflow_run_error_and_outcome_preserves_diff_for_write_error() -
 
 def test_classify_workflow_events_for_replay_buckets() -> None:
     events = [
-        Event(event_type="workflow_started", timestamp=0.0, run_id="wf", payload=None, meta={}, seq=1),
+        Event(event_type=EventType.WORKFLOW_STARTED, timestamp=0.0, run_id="wf", payload=None, meta={}, seq=1),
         Event(
             event_type=EventType.WORKFLOW_NODE_START,
             timestamp=0.0,
@@ -68,7 +68,7 @@ def test_classify_workflow_events_for_replay_buckets() -> None:
             meta={},
             seq=7,
         ),
-        Event(event_type="workflow_finished", timestamp=0.0, run_id="wf", payload=None, meta={}, seq=8),
+        Event(event_type=EventType.WORKFLOW_FINISHED, timestamp=0.0, run_id="wf", payload=None, meta={}, seq=8),
     ]
 
     buckets = classify_workflow_events_for_replay(events, known_node_ids={"n1"})

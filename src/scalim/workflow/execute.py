@@ -12,8 +12,10 @@ from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ss
 from .._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
 from ..events import (
     Event,
+    EventType,
     generate_run_id,
 )
+from ..events._events import WorkflowFinishedEvent, WorkflowStartedEvent
 from ..exceptions import ScalimWorkflowError
 from ..execution.adaptive.capture import HookCaptureManager, HookRecordedEvent
 from ..execution.run_ir import ExecutionRequest, ExecutionResult, run_ir
@@ -440,12 +442,12 @@ def _prepare_workflow_run_ir(
 
         if workflow_viz_observer is not None:
             _ = workflow_instrumentation.emit(
-                "workflow_started",
-                {
-                    "workflow_id": str(Path(workflow_path).name),
-                    "workflow_exec_id": str(workflow_exec_id),
-                    "max_concurrency": int(max_concurrency),
-                },
+                EventType.WORKFLOW_STARTED,
+                WorkflowStartedEvent(
+                    workflow_id=str(Path(workflow_path).name),
+                    workflow_exec_id=str(workflow_exec_id),
+                    max_concurrency=int(max_concurrency),
+                ),
             )
         workflow_cache_pool = _maybe_build_workflow_cache_pool(
             workflow_exec_id=workflow_exec_id,
@@ -626,13 +628,13 @@ def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
     status = "error" if sys.exc_info()[1] is not None else "ok"
     with contextlib.suppress(Exception):
         _ = prepared.workflow_instrumentation.emit(
-            "workflow_finished",
-            {
-                "workflow_id": str(Path(prepared.workflow_path).name),
-                "workflow_exec_id": str(prepared.workflow_exec_id),
-                "status": status,
-                "total_duration_ms": total_duration_ms,
-            },
+            EventType.WORKFLOW_FINISHED,
+            WorkflowFinishedEvent(
+                workflow_id=str(Path(prepared.workflow_path).name),
+                workflow_exec_id=str(prepared.workflow_exec_id),
+                status=status,
+                total_duration_ms=total_duration_ms,
+            ),
         )
 
     # 子运行完成后重写工作流快照,避免生成指向缺失子运行的下钻链接.

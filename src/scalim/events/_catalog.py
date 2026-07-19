@@ -26,6 +26,7 @@ from ._events import (
     WorkflowCacheAcquireEvent,
     WorkflowCacheEvictEvent,
     WorkflowCacheReleaseEvent,
+    WorkflowFinishedEvent,
     WorkflowNodeCancelledEvent,
     WorkflowNodeEndEvent,
     WorkflowNodeStartEvent,
@@ -33,6 +34,7 @@ from ._events import (
     WorkflowResourceCreateEvent,
     WorkflowResourceDiscardEvent,
     WorkflowResourceWriteEvent,
+    WorkflowStartedEvent,
 )
 
 # endregion
@@ -62,6 +64,9 @@ EVENT_OUTPUT_TARGET_END = "output_target_end"
 # 该类 `signal` 在运行期边界(例如 `pre-run_ir`)触发,用于允许 `hook` 改写派生的运行期策略值.
 EVENT_PRE_USE_BATCH_SIZE = "pre_use_batch_size"
 
+EVENT_WORKFLOW_STARTED = "workflow_started"
+EVENT_WORKFLOW_FINISHED = "workflow_finished"
+
 EVENT_WORKFLOW_NODE_START = "workflow_node_start"
 EVENT_WORKFLOW_NODE_END = "workflow_node_end"
 EVENT_WORKFLOW_NODE_CANCELLED = "workflow_node_cancelled"
@@ -90,6 +95,8 @@ WORKFLOW_EVENT_PREFIXES = (
     WORKFLOW_EVENT_PREFIX_CACHE,
     WORKFLOW_EVENT_PREFIX_RESOURCE,
 )
+
+WORKFLOW_SCOPE_EVENT_NAMES = frozenset({EVENT_WORKFLOW_STARTED, EVENT_WORKFLOW_FINISHED})
 
 
 @dataclass(frozen=True)
@@ -265,6 +272,22 @@ _EVENT_CATALOG: List[EventDescriptor] = [
         volume="lite",
         payload_policy="full",
         payload_type=OutputTargetEndEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_STARTED,
+        summary="workflow 开始",
+        key_fields=("workflow_id", "workflow_exec_id", "max_concurrency"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowStartedEvent.__name__,
+    ),
+    EventDescriptor(
+        name=EVENT_WORKFLOW_FINISHED,
+        summary="workflow 结束",
+        key_fields=("workflow_id", "workflow_exec_id", "status", "total_duration_ms"),
+        volume="lite",
+        payload_policy="full",
+        payload_type=WorkflowFinishedEvent.__name__,
     ),
     EventDescriptor(
         name=EVENT_WORKFLOW_NODE_START,

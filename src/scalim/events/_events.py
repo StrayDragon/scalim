@@ -433,6 +433,43 @@ class AdaptiveSchedulerDecisionEvent:
 
 
 @dataclass(frozen=True)
+class WorkflowStartedEvent:
+    """工作流开始事件.
+
+    该事件用于表达工作流编排层已开始执行一次工作流调用.
+    """
+
+    workflow_id: str
+    """`workflow_id`: 工作流标识(通常为工作流 `YAML` 文件名)."""
+
+    workflow_exec_id: str
+    """`workflow_exec_id`: 工作流执行标识(一次调用内稳定)."""
+
+    max_concurrency: int
+    """本次工作流调用的最大并发度."""
+
+
+@dataclass(frozen=True)
+class WorkflowFinishedEvent:
+    """工作流结束事件.
+
+    该事件用于表达工作流编排层已完成一次工作流调用(成功或失败).
+    """
+
+    workflow_id: str
+    """`workflow_id`: 工作流标识(通常为工作流 `YAML` 文件名)."""
+
+    workflow_exec_id: str
+    """`workflow_exec_id`: 工作流执行标识(一次调用内稳定)."""
+
+    status: str
+    """结束状态(例如 `ok`/`error`)."""
+
+    total_duration_ms: int
+    """工作流总耗时(毫秒)."""
+
+
+@dataclass(frozen=True)
 class WorkflowNodeStartEvent:
     """工作流节点开始事件.
 

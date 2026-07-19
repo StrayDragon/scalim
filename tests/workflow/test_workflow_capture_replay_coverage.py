@@ -117,7 +117,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
 
     ts = float(time.time())
     workflow_events: List[Event] = [
-        Event(event_type="workflow_started", timestamp=ts, run_id=workflow_exec_id, payload={"x": 1}, meta={}, seq=1),
+        Event(event_type=EventType.WORKFLOW_STARTED, timestamp=ts, run_id=workflow_exec_id, payload={"x": 1}, meta={}, seq=1),
         Event(
             event_type=EventType.WORKFLOW_RESOURCE_COMMIT,
             timestamp=ts,
@@ -162,7 +162,7 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
             meta={"workflow_node_id": "unknown"},
             seq=6,
         ),
-        Event(event_type="workflow_finished", timestamp=ts, run_id=workflow_exec_id, payload={"x": 2}, meta={}, seq=7),
+        Event(event_type=EventType.WORKFLOW_FINISHED, timestamp=ts, run_id=workflow_exec_id, payload={"x": 2}, meta={}, seq=7),
     ]
     workflow_hook_events = [
         HookRecordedEvent(event_type=EventType.PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
@@ -218,8 +218,8 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
     execute_mod._replay_captured_workflow_observability(prepared)  # type: ignore[arg-type]
 
     assert "pipeline_start" in workflow_hook.typed
-    assert "workflow_started" in workflow_observer.events
-    assert "workflow_finished" in workflow_observer.events
+    assert EventType.WORKFLOW_STARTED in workflow_observer.events
+    assert EventType.WORKFLOW_FINISHED in workflow_observer.events
     assert "close" in viz_observer.events
     assert "pipeline_start" in extra_hook.typed
 
