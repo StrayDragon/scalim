@@ -7,7 +7,7 @@
 - `agentdev/skills/**`
 
 跳过:
-- `**/references/upgrades/**`(迁移指南需要展示 Before 反例/旧内部路径)
+- `**/references/upgrades/**`(迁移指南需要展示 `Before` 反例/旧内部路径)
 
 约束(约定优先):
 - 用户材料中不得出现内部/不安全导入路径(例如 `._internal`、`._foo`、`runtime.*` 等)
@@ -68,7 +68,7 @@ _INTERNAL_TOKEN_SUGGESTIONS: Mapping[str, str] = {
 
 
 def _is_skipped(relpath: str) -> bool:
-    """迁移指南允许展示旧内部路径 Before 反例."""
+    """迁移指南允许展示旧内部路径 `Before` 反例."""
     parts = Path(relpath).parts
     try:
         idx = parts.index("references")
