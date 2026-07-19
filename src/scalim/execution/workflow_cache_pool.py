@@ -4,7 +4,8 @@ import threading
 from collections import OrderedDict
 from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple, cast, overload
 
-from .._internal.utils.json_like import JsonLike, ensure_json_like as _ensure_json_like_ssot
+from .._internal.utils.json_like import JsonLike
+from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
 from ..events import EventType
 from ..events._events import (
     DiagnosticWarningEvent,
@@ -77,7 +78,7 @@ def _normalize_json_like(value: RuntimeValue) -> JsonLike:
         for raw_key in sorted(value.keys(), key=str):
             out[str(raw_key)] = _normalize_json_like(value[raw_key])
         return out
-    return cast(JsonLike, value)  # pragma: allow-cast normalize passthrough after scalar/list/dict branches
+    return cast("JsonLike", value)  # pragma: allow-cast normalize passthrough after scalar/list/dict branches
 
 
 def _canonical_json_dumps(value: JsonLike) -> str:

@@ -8,7 +8,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
 
-from .._internal.utils.json_like import JsonLike, ensure_json_like as _ensure_json_like_ssot
+from .._internal.utils.json_like import JsonLike
+from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
 from .._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
 from ..events import (
     Event,
