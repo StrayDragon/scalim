@@ -173,6 +173,11 @@ def test_module_size_quiet_pass_and_tmp_over_limit(tmp_path, capsys) -> None:
     fake_root = tmp_path / "repo"
     for rel in (
         "src/scalim/workflow/execute.py",
+        "src/scalim/execution/derived_outputs.py",
+        "src/scalim/dsl/yaml_dsl/_internal/config_parsing/parsers/outputs.py",
+        "src/scalim/dsl/yaml_dsl/_internal/config_parsing/validators/sources.py",
+        "src/scalim/dsl/yaml_dsl/schema_dsl/models/outputs.py",
+        "src/scalim/dsl/yaml_dsl/runtime/output_composition_yaml.py",
         "src/scalim/dsl/yaml_dsl/workflow_config/_parse.py",
     ):
         _write(fake_root / rel, "x = 1\n")
