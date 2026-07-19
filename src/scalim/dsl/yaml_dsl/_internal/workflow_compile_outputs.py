@@ -10,7 +10,7 @@
 - 本模块不负责 `resources` 编译 (`books/files` 资源 `IR`) 与 `runtime options` 解析.
 """
 
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ....spec.ir._workflow import (
     AppendSheetNodeIr,
@@ -207,7 +207,7 @@ def _build_write_node_for_book(
     write_defaults: Any,
     write_defaults_mode_path: str,
 ) -> WorkflowAnyNodeIr:
-    effective_defaults = cast("Any", write_defaults)  # pragma: allow-cast write defaults typed boundary
+    effective_defaults = write_defaults
 
     if mode == "sheet":
         return WriteSheetNodeIr(
@@ -436,7 +436,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
             )
 
             for extra_id, extra_cfg_obj, default_sheet in extras:
-                extra_cfg = cast("Any", extra_cfg_obj)  # pragma: allow-cast output extra sheet cfg typed narrowing
+                extra_cfg = extra_cfg_obj
                 sheet_name = str(extra_cfg.sheet or default_sheet)
                 sheet_ref_path = "{}.{}".format(extra_id, "sheet")
                 try:
