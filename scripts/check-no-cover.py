@@ -17,6 +17,12 @@
     `uv run scripts/check-no-cover.py`
     `uv run scripts/check-no-cover.py --json`
     `uv run scripts/check-no-cover.py --check`
+    `uv run scripts/check-no-cover.py --check --quiet`
+
+输出合约:
+- `--check` 只控制退出码(有 `block` 则非 0); 不隐含静默.
+- `--quiet` 且无 `block` 时不写 stdout; 有 `block` 时仍写报告.
+- `.tmp/artifacts/` 写入与 quiet 正交(见 `--no-artifacts`).
 """
 
 from __future__ import annotations
@@ -273,6 +279,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--report", default="", help="覆盖默认文本报告路径.")
     parser.add_argument("--no-artifacts", action="store_true", help="不自动写入 `.tmp/artifacts/no-cover.report.{txt,json}`.")
     parser.add_argument("--check", action="store_true", help="若存在未 allow 的命中则返回非零退出码.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 无 block 时不向 stdout 写报告; 不影响 artifact.")
     parser.add_argument("--show-allow-details", action="store_true", help="文本报告中展开 `allow` 明细.")
     return parser.parse_args(argv)
 
@@ -300,11 +307,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(text_report, encoding="utf-8")
 
-    # `--check` 模式无违规时不在 `stdout` 输出(静默通过)
-    if not args.check or any(hit.status == "block" for hit in hits):
+    has_blocks = any(hit.status == "block" for hit in hits)
+    # `--quiet` 控制通过路径静默; `--check` 只控制退出码. 有 block 时始终写 stdout.
+    if not (args.quiet and not has_blocks):
         sys.stdout.write(output)
 
-    if args.check and any(hit.status == "block" for hit in hits):
+    if args.check and has_blocks:
         return 1
     return 0
 

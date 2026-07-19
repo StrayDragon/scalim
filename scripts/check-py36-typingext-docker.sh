@@ -16,12 +16,18 @@ is_ci_enabled() {
 }
 
 install_with_retry() {
+    # 默认 pip -q 降噪; 排障可 export PIP_VERBOSE=1 关闭.
+    local pip_q=(-q)
+    if [ -n "${PIP_VERBOSE:-}" ]; then
+        pip_q=()
+    fi
     if is_ci_enabled; then
-        python -m pip install -q -i https://pypi.org/simple "$@"
+        python -m pip install "${pip_q[@]}" -i https://pypi.org/simple "$@"
         return 0
     fi
 
-    python -m pip install -q -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@" || python -m pip install -q "$@"
+    python -m pip install "${pip_q[@]}" -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com "$@" \
+        || python -m pip install "${pip_q[@]}" "$@"
 }
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

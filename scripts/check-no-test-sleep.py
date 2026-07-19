@@ -2,6 +2,11 @@
 
 用法：
     `uv run python scripts/check-no-test-sleep.py --check`
+    `uv run python scripts/check-no-test-sleep.py --check --quiet`
+
+输出合约:
+- `--check` 只控制退出码; 不隐含静默.
+- `--quiet` 且无违规时不打印通过句; 有违规时始终打印明细.
 """
 
 import argparse
@@ -50,7 +55,7 @@ def _find_sleep_calls(path: Path) -> List[SleepHit]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="检查 `tests/` 中的 `time.sleep` 使用情况")
     parser.add_argument("--check", action="store_true", help="发现违规时以非零退出码失败")
-    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不输出")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 无违规时不打印通过句")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]

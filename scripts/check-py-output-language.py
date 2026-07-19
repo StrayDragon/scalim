@@ -18,10 +18,15 @@
 用法:
     `python scripts/check-py-output-language.py`
     `python scripts/check-py-output-language.py --report .tmp/artifacts/output-language.report.txt`
+    `python scripts/check-py-output-language.py --report .tmp/artifacts/output-language.report.txt --quiet`
 
 退出码:
 - 0: 未发现命中
 - 1: 发现命中
+
+输出合约:
+- `--quiet` 且无命中时不写 stdout/stderr; 有命中时仍写(命中走 stderr).
+- `--report` 始终落盘(含“未发现命中.”),与 quiet 正交.
 """
 
 from __future__ import annotations
@@ -345,7 +350,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument(
         "--quiet",
         action="store_true",
-        help="静默模式: 通过时不输出到 stdout/stderr.",
+        help="静默模式: 无命中时不写 stdout/stderr; 不影响 --report 落盘.",
     )
     return p.parse_args(argv)
 

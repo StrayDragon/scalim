@@ -37,7 +37,7 @@ def _parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--quiet",
         action="store_true",
-        help="静默模式: 仅错误/警告输出到 stderr, 通过时不输出",
+        help="静默模式: 检查通过时不打印通过句; 错误/提示仍走 stderr; `--sync` 成功句不受抑制",
     )
     return parser.parse_args(list(argv) if argv is not None else None)
 

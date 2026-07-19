@@ -238,16 +238,17 @@ llmanspec-check:
 
     if command -v llman >/dev/null 2>&1; then
         if [ -z "{{ QA_VERBOSE }}" ]; then
-            # 静默模式: 过滤状态行,只留下 warning/error 信息
+            # 静默模式: 过滤状态/汇总行,只留下 warning/error 信息
             llman sdd validate --all --strict --no-interactive 2>&1 \
                 | { grep -v '^OK ' | grep -v '^Staleness: ' | grep -v '^Note: ' \
-                      | grep -v 'Working tree is dirty' || true; }
+                      | grep -v 'Working tree is dirty' | grep -v '^Totals:' \
+                      || true; }
             exit "${PIPESTATUS[0]}"
         else
             llman sdd validate --all --strict --no-interactive
         fi
         exit 0
-    fi
+      fi
 
     ci_value="$(printf '%s' "${CI:-}" | tr '[:upper:]' '[:lower:]')"
     case "$ci_value" in
@@ -620,6 +621,7 @@ examples:
 
 
     def _configure_logging() -> None:
+        # examples harness 降噪: 默认 ERROR; QA_VERBOSE 时回退 WARNING(与 check 脚本 quiet 面独立).
         logging.basicConfig(level=logging.WARNING)
         noisy_loggers: List[str] = [
             "scalim.execution.executor.runtime.runtime",
@@ -788,7 +790,13 @@ report-cast-usage:
 
 # 检查: cast 使用必须显式 allow
 check-cast-usage:
-    uv {{ UV_OPTIONS }} run python scripts/check-cast-usage.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-cast-usage.py --check $quiet_flag
 
 # 报告: pragma no cover 基线
 report-no-cover:
@@ -796,11 +804,23 @@ report-no-cover:
 
 # 检查: pragma no cover 必须显式 allow
 check-no-cover:
-    uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check $quiet_flag
 
 # 检查: `# pragma: no branch` 使用必须显式 allow
 check-no-branch:
-    uv {{ UV_OPTIONS }} run python scripts/check-no-branch.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-no-branch.py --check $quiet_flag
 
 # 报告: dynattr 使用基线
 report-dynattr:
@@ -808,7 +828,13 @@ report-dynattr:
 
 # 检查: dynattr 使用必须显式 allow
 check-dynattr:
-    uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check $quiet_flag
 
 # 报告: hotspot module 体量基线
 report-module-size:

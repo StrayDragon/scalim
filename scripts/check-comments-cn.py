@@ -15,6 +15,11 @@
 用法:
     `python scripts/check-comments-cn.py`
     `python scripts/check-comments-cn.py src/scalim scripts notebooks`
+    `python scripts/check-comments-cn.py --quiet`
+
+输出合约:
+- `--quiet` 且无违规时不打印“未发现违规项.”; 有违规时始终打印明细.
+- `--json` 始终打印 JSON payload(不受 quiet 抑制; 机器消费路径).
 """
 
 import argparse
@@ -319,7 +324,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     p.add_argument("paths", nargs="*", help="要扫描的路径(文件或目录). 默认: `src/scalim/`")
     p.add_argument("--json", action="store_true", help="输出 JSON.")
     p.add_argument("--show-tokens", action="store_true", help="在文本输出中显示命中的英文 token 列表.")
-    p.add_argument("--quiet", action="store_true", help="静默模式: 通过时不输出.")
+    p.add_argument("--quiet", action="store_true", help="静默模式: 无违规时不打印通过句; `--json` 仍输出.")
     return p.parse_args(argv)
 
 

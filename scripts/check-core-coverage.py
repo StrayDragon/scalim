@@ -23,6 +23,13 @@
      `uv run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=json:.tmp/coverage.json`
   2) 执行 gate:
      `uv run scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check`
+  3) agent 静默通过:
+     `... --check --quiet`
+
+输出合约:
+- `--check` 只控制退出码; `--quiet` 且未 hard_fail 时不写 stdout.
+- hard_fail 时始终写 stdout(与 quiet 无关).
+- `.tmp/artifacts/` 写入与 quiet 正交(见 `--no-artifacts`).
 """
 
 from __future__ import annotations
@@ -367,7 +374,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--report", default="", help="覆盖默认文本报告路径.")
     parser.add_argument("--no-artifacts", action="store_true", help="不自动写入 `.tmp/artifacts/core-coverage.report.{txt,json}`.")
     parser.add_argument("--check", action="store_true", help="若 gate 失败则返回非零退出码.")
-    parser.add_argument("--quiet", action="store_true", help="静默模式: 通过时不输出.")
+    parser.add_argument("--quiet", action="store_true", help="静默模式: 未 hard_fail 时不向 stdout 写报告; 不影响 artifact.")
     return parser.parse_args(argv)
 
 
