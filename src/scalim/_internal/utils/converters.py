@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from ...spec.ir.aliases import LookupKeyCast
-from ...typedefs import LookupKey
+from ...typedefs import LookupKey, RuntimeValue
 from ...vendor.compact.typing_extensionsx import TypeGuard
 
 # endregion
@@ -25,7 +25,7 @@ SeparatedValues = Union[str, int, float]
 """CSV 字符串或已转换的值"""
 
 
-def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
+def _is_sequence(value: RuntimeValue) -> TypeGuard[Sequence[RuntimeValue]]:
     return isinstance(value, (tuple, list))
 
 
@@ -33,14 +33,14 @@ class NamedLookupCast:
     """用于给 `lookup_cast` 打标签的可调用包装器,提供稳定名称."""
 
     scalim_lookup_cast_name: str
-    scalim_lookup_cast_meta: Dict[str, object]
+    scalim_lookup_cast_meta: Dict[str, RuntimeValue]
 
-    def __init__(self, name: str, fn: LookupKeyCast, *, meta: Optional[Dict[str, object]] = None) -> None:
+    def __init__(self, name: str, fn: LookupKeyCast, *, meta: Optional[Dict[str, RuntimeValue]] = None) -> None:
         self.scalim_lookup_cast_name = name
         self.scalim_lookup_cast_meta = dict(meta or {})
         self._fn: LookupKeyCast = fn
 
-    def __call__(self, value: object) -> Optional[LookupKey]:
+    def __call__(self, value: RuntimeValue) -> Optional[LookupKey]:
         return self._fn(value)
 
 
@@ -62,7 +62,7 @@ def to_int_tuple(value: ConvertibleToIntTuple) -> Tuple[int, ...]:
     return tuple(converted_items)
 
 
-def get_seps_values_first_int(value: object, sep: str = ",") -> int:
+def get_seps_values_first_int(value: RuntimeValue, sep: str = ",") -> int:
     """从分割字符串提取第一个值并转换为 `int`: 会抛异常哦!"""
     if isinstance(value, (int, float)):
         return int(value)
@@ -76,7 +76,7 @@ def get_seps_values_first_int(value: object, sep: str = ",") -> int:
     raise TypeError(msg)
 
 
-def must_to_int(value: object) -> Optional[int]:
+def must_to_int(value: RuntimeValue) -> Optional[int]:
     """强制转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
@@ -86,14 +86,14 @@ def must_to_int(value: object) -> Optional[int]:
         return None
 
 
-def must_to_str(value: object) -> Optional[str]:
+def must_to_str(value: RuntimeValue) -> Optional[str]:
     """强制转换为 `str`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
     return str(value)
 
 
-def must_to_int_tuple(value: object) -> Optional[Tuple[int, ...]]:
+def must_to_int_tuple(value: RuntimeValue) -> Optional[Tuple[int, ...]]:
     """强制将序列的每个元素转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
@@ -108,7 +108,7 @@ def must_to_int_tuple(value: object) -> Optional[Tuple[int, ...]]:
     return tuple(converted_items)
 
 
-def must_get_seps_values_first_int(value: object, sep: str = ",") -> Optional[int]:
+def must_get_seps_values_first_int(value: RuntimeValue, sep: str = ",") -> Optional[int]:
     """强制从分割字符串提取第一个值并转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
@@ -150,7 +150,7 @@ def _format_decimal_no_exponent(d: Decimal) -> str:
     return result or "0"
 
 
-def auto_str_normalize(value: object) -> Optional[str]:  # noqa: C901, PLR0911, PLR0912
+def auto_str_normalize(value: RuntimeValue) -> Optional[str]:  # noqa: C901, PLR0911, PLR0912
     """将值规范化为稳定的字符串形式,用于关联键匹配
 
     规则:
@@ -207,7 +207,7 @@ def auto_str_normalize(value: object) -> Optional[str]:  # noqa: C901, PLR0911, 
     return None
 
 
-def auto_normalize_key(value: object) -> Optional[LookupKey]:  # noqa: PLR0911
+def auto_normalize_key(value: RuntimeValue) -> Optional[LookupKey]:  # noqa: PLR0911
     """自动规范化关联键,尝试类型转换后回退到 `auto_str_normalize`
 
     策略:
@@ -244,7 +244,7 @@ def auto_normalize_key(value: object) -> Optional[LookupKey]:  # noqa: PLR0911
     return auto_str_normalize(value)
 
 
-def auto_str_normalize_key(value: object) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+def auto_str_normalize_key(value: RuntimeValue) -> Tuple[Optional[LookupKey], str, Optional[str]]:
     """将 `key` 规范化为稳定字符串口径(单键或复合键).
 
     语义:

@@ -55,7 +55,7 @@ def _validate_excel_sheet_name(sheet: str, *, path: str) -> None:
     _validate_excel_sheet_name_ssot(str(sheet), path=str(path))
 
 
-def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
+def _ensure_field_value(value: Any, *, field_id: str, producer: str) -> FieldValue:
     if value is None:
         return None
     if isinstance(value, FIELD_VALUE_TYPES):
@@ -78,7 +78,7 @@ def _decimal_from_text(text: str) -> Optional[Decimal]:
         return None
 
 
-def _to_decimal(value: object) -> Optional[Decimal]:
+def _to_decimal(value: Any) -> Optional[Decimal]:
     if value is None:
         return None
     dec: Optional[Decimal] = None
@@ -106,14 +106,14 @@ def _rendered_header_row(layout: ExportLayout) -> Tuple[str, ...]:
 
 @dataclass(frozen=True)
 class _AggregateCallByContext:
-    row_id: Optional[object]
+    row_id: Optional[Any]
     batch_num: int
     field_id: str
     deps: Tuple[str, ...]
     values: Dict[str, CellValue]
 
 
-def _eval_call_by_value(*, field_id: str, value: CallByValue, row: RowData, ctx: _AggregateCallByContext) -> object:
+def _eval_call_by_value(*, field_id: str, value: CallByValue, row: RowData, ctx: _AggregateCallByContext) -> Any:
     kind = str(value.kind)
     if kind == "literal":
         return value.value
@@ -169,11 +169,11 @@ def _compile_call_by_post_field(
             values=dep_values,
         )
 
-        args: List[object] = []
+        args: List[Any] = []
         for arg_value in p.args:
             args.append(_eval_call_by_value(field_id=str(out_field_id), value=arg_value, row=row, ctx=ctx))
 
-        kwargs: Dict[str, object] = {}
+        kwargs: Dict[str, Any] = {}
         for key, kw_value in p.kwargs:
             kwargs[str(key)] = _eval_call_by_value(field_id=str(out_field_id), value=kw_value, row=row, ctx=ctx)
 
@@ -238,7 +238,7 @@ def _compile_compute_post_field(
 
     try:
         raw_calculator = cast(
-            "Callable[..., object]", engine.compile(expr, deps)
+            "Callable[..., Any]", engine.compile(expr, deps)
         )  # pragma: allow-cast compute engine compile typed narrowing
     except (ScalimComputeExpressionError, ScalimSecurityError) as exc:
         msg = "aggregate.fields.{} has invalid compute expression: {}".format(out_field_id, exc)
@@ -246,7 +246,7 @@ def _compile_compute_post_field(
 
     dep_keys = deps
 
-    def calculator(row: RowData, c: Callable[..., object] = raw_calculator) -> FieldValue:
+    def calculator(row: RowData, c: Callable[..., Any] = raw_calculator) -> FieldValue:
         values = [row.get(key) for key in dep_keys]
         result = c(*values)
         return _ensure_field_value(result, field_id=str(out_field_id), producer="compute")
@@ -596,7 +596,7 @@ def _resolve_file_export_path(
     file_id: str,
     file_ref_path: str,
     yaml_base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     version_id: str,
 ) -> Tuple[str, FileConfig]:
     file_cfg = _require_file_resource(config, file_id=str(file_id), file_ref_path=str(file_ref_path))
@@ -617,7 +617,7 @@ def _resolve_book_export_path(
     book_id: str,
     book_ref_path: str,
     yaml_base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     version_id: str,
 ) -> Tuple[str, bool]:
     book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
@@ -659,7 +659,7 @@ def _try_resolve_workflow_managed_book_export_path(
     *,
     book_id: str,
     yaml_base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     version_id: str,
 ) -> Optional[str]:
     """为 `workflow-managed` 的 `book` 输出解析“可能存在”的最终导出路径.
@@ -762,7 +762,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     *,
     version_id: str,
     resolver: SecurePythonReferenceResolver,
-    init_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, Any]] = None,
     yaml_base_dir: Optional[str] = None,
     workflow_managed_output_ids: Optional[FrozenSet[str]] = None,
     outputs_path: str = "outputs",

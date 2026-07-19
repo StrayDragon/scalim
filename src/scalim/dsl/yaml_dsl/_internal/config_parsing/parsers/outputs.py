@@ -47,7 +47,7 @@ from ..security import (
 from .utils import list_or_none, mapping_or_none, str_or_none
 
 
-def _non_empty_str(raw: object) -> str:
+def _non_empty_str(raw: Any) -> str:
     if raw is None:
         return ""
     return str(raw).strip()
@@ -162,7 +162,7 @@ class ParserOutputsMixin:
 
     def _resolve_field_ref(
         self,
-        item: object,
+        item: Any,
         *,
         path: str,
         field_def_index: FieldDefIndex,
@@ -209,7 +209,7 @@ class ParserOutputsMixin:
 
     def _resolve_output_field_ref(
         self,
-        item: object,
+        item: Any,
         *,
         outputs_key: str,
         output_idx: int,
@@ -219,11 +219,11 @@ class ParserOutputsMixin:
         path = "{}.{}.fields.{}".format(outputs_key, output_idx, field_path)
         return self._resolve_field_ref(item, path=path, field_def_index=field_def_index)
 
-    def _walk_output_field_items(self, item: object, *, field_path: str) -> List[Tuple[str, object]]:
+    def _walk_output_field_items(self, item: Any, *, field_path: str) -> List[Tuple[str, Any]]:
         nested = list_or_none(item)
         if nested is None:
             return [(field_path, item)]
-        out: List[Tuple[str, object]] = []
+        out: List[Tuple[str, Any]] = []
         for idx, sub in enumerate(nested):
             sub_path = "{}.{}".format(field_path, idx) if field_path else str(idx)
             out.extend(self._walk_output_field_items(sub, field_path=sub_path))
@@ -339,7 +339,7 @@ class ParserOutputsMixin:
         fields: Optional[Tuple[str, ...]] = None
         if fields_list is not None:
             normalized_fields: List[str] = []
-            flattened: List[Tuple[str, object]] = []
+            flattened: List[Tuple[str, Any]] = []
             for outer_idx, field_item in enumerate(fields_list):
                 flattened.extend(self._walk_output_field_items(field_item, field_path=str(outer_idx)))
             for field_path, field_item in flattened:
@@ -501,7 +501,7 @@ class ParserOutputsMixin:
 
     def _parse_output_aggregate_field(  # noqa: C901, PLR0912
         self,
-        raw: object,
+        raw: Any,
         *,
         base_path: str,
         field_def_index: FieldDefIndex,
@@ -524,7 +524,7 @@ class ParserOutputsMixin:
                 raise TypeError(msg)
             display_name = _non_empty_str(name_raw) if name_raw is not None else ""
 
-        normalized: List[Tuple[str, object]] = []
+        normalized: List[Tuple[str, Any]] = []
         for k, v in typed.items():
             key = str(k or "").strip()
             if not key:
@@ -582,7 +582,7 @@ class ParserOutputsMixin:
     def _parse_output_aggregate_field_agg(  # noqa: C901, PLR0912, PLR0915
         self,
         producer_key: str,
-        raw: object,
+        raw: Any,
         *,
         base_path: str,
         field_def_index: FieldDefIndex,
@@ -676,7 +676,7 @@ class ParserOutputsMixin:
     def _parse_output_aggregate_field_rank(  # noqa: C901, PLR0912, PLR0915
         self,
         producer_key: str,
-        raw: object,
+        raw: Any,
         *,
         base_path: str,
         field_def_index: FieldDefIndex,
@@ -781,7 +781,7 @@ class ParserOutputsMixin:
             "top_k_mode": top_k_mode,
         }
 
-    def _parse_output_aggregate_field_call_by(self, raw: object, *, base_path: str) -> str:
+    def _parse_output_aggregate_field_call_by(self, raw: Any, *, base_path: str) -> str:
         if not isinstance(raw, str):
             msg = "{}.call_by must be a string".format(base_path)
             raise TypeError(msg)
@@ -796,7 +796,7 @@ class ParserOutputsMixin:
             raise ValueError(msg) from exc
         return call_by
 
-    def _parse_output_aggregate_field_compute(self, raw: object, *, base_path: str, engine: SecureComputeEngine) -> Dict[str, Any]:
+    def _parse_output_aggregate_field_compute(self, raw: Any, *, base_path: str, engine: SecureComputeEngine) -> Dict[str, Any]:
         if not isinstance(raw, str):
             msg = "{}.compute must be a string".format(base_path)
             raise TypeError(msg)
@@ -816,7 +816,7 @@ class ParserOutputsMixin:
 
     def _parse_output_aggregate_field_score_by_rank(
         self,
-        raw: object,
+        raw: Any,
         *,
         base_path: str,
         field_def_index: FieldDefIndex,

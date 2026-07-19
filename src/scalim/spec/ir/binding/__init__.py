@@ -1,24 +1,24 @@
 from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple, cast
 
-from ....typedefs import LoaderCallKwargs, LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData
+from ....typedefs import LoaderCallKwargs, LoaderCallParams, LookupKey, LookupKeyList, LookupKeySet, RowData, RuntimeValue
 from ....vendor.compact.typing_extensionsx import Protocol, TypeGuard, runtime_checkable
 from ....vendor.dataclassesx import dataclass, field
 from ..aliases import NormalizedLookupKeySpec
 from ..callable_refs import CallableRefIr
 
 
-def _is_tuple(value: object) -> TypeGuard[Tuple[object, ...]]:
+def _is_tuple(value: RuntimeValue) -> TypeGuard[Tuple[RuntimeValue, ...]]:
     return isinstance(value, tuple)
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[RuntimeValue, RuntimeValue]]:
     return isinstance(value, dict)
 
 
-def _stable_lookup_key_sort_key(value: object) -> Tuple[str, object]:
+def _stable_lookup_key_sort_key(value: RuntimeValue) -> Tuple[str, RuntimeValue]:
     if _is_tuple(value):
-        item_keys: List[Tuple[str, object]] = []
+        item_keys: List[Tuple[str, RuntimeValue]] = []
         for item in value:
             item_keys.append(_stable_lookup_key_sort_key(item))
         return ("tuple", tuple(item_keys))
@@ -118,7 +118,7 @@ class BindingIr:
     绑定的键字段名 (主键或外键)
     """
 
-    params_template: Optional[object] = None
+    params_template: Optional[RuntimeValue] = None
     """可选:编译后的参数模板对象(纯数据,不包含可调用对象).
 
     说明:
@@ -186,7 +186,7 @@ def _clone_bindings(bindings: Mapping[NormalizedLookupKeySpec, BindingIr]) -> Di
     return dict(bindings)
 
 
-def _is_valid_binding_key(value: object) -> bool:
+def _is_valid_binding_key(value: RuntimeValue) -> bool:
     if isinstance(value, str):
         return True
     if _is_tuple(value):
@@ -194,7 +194,7 @@ def _is_valid_binding_key(value: object) -> bool:
     return False
 
 
-def _restore_bindings(bindings: object) -> Optional[Mapping[NormalizedLookupKeySpec, BindingIr]]:
+def _restore_bindings(bindings: RuntimeValue) -> Optional[Mapping[NormalizedLookupKeySpec, BindingIr]]:
     if not _is_dict(bindings):
         return None
 
@@ -232,7 +232,7 @@ class LoaderIr:
         if isinstance(self.bindings, dict):
             object.__setattr__(self, "bindings", MappingProxyType(_clone_bindings(self.bindings)))
 
-    def __getstate__(self) -> Dict[str, object]:
+    def __getstate__(self) -> Dict[str, RuntimeValue]:
         state = dict(self.__dict__)
         bindings = state.get("bindings")
         if isinstance(bindings, MappingProxyType):
@@ -241,7 +241,7 @@ class LoaderIr:
             )
         return state
 
-    def __setstate__(self, state: Dict[str, object]) -> None:
+    def __setstate__(self, state: Dict[str, RuntimeValue]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
         bindings = _restore_bindings(state.get("bindings"))

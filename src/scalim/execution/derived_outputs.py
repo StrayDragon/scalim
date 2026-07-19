@@ -11,13 +11,13 @@ from .._internal.utils.converters import auto_str_normalize
 from .._internal.utils.iterables import ordered_unique_str
 from ..exceptions import ScalimExecutionError
 from ..sinks import BaseRowSink, IRowSink
-from ..typedefs import CellValue, FieldValue, KeyNormalizationMode, RowData
+from ..typedefs import CellValue, FieldValue, KeyNormalizationMode, RowData, RuntimeValue
 from ..vendor.compact.typing_extensionsx import override
 from ..vendor.dataclassesx import dataclass, field
 from .key_normalization import normalize_key_normalization
 
 
-def _auto_str_normalize_derived_key_part(*, value: object, field_id: str, context: str) -> FieldValue:
+def _auto_str_normalize_derived_key_part(*, value: RuntimeValue, field_id: str, context: str) -> FieldValue:
     if value is None:
         return None
     normalized = auto_str_normalize(value)
@@ -121,7 +121,7 @@ class AggMetricSpec:
     op: str
     field_id: Optional[str] = None
     field_ids: Optional[Tuple[str, ...]] = None
-    threshold: Optional[object] = None
+    threshold: Optional[RuntimeValue] = None
 
 
 @dataclass(frozen=True)
@@ -269,7 +269,7 @@ def _decimal_from_text(text: str) -> Optional[Decimal]:
         return None
 
 
-def _to_decimal(value: object) -> Optional[Decimal]:
+def _to_decimal(value: RuntimeValue) -> Optional[Decimal]:
     if value is None:
         return None
     dec: Optional[Decimal] = None
@@ -290,7 +290,7 @@ def _to_decimal(value: object) -> Optional[Decimal]:
     return dec
 
 
-def _stable_sort_key(value: object) -> str:
+def _stable_sort_key(value: RuntimeValue) -> str:
     if value is None:
         return "none"
     if isinstance(value, str):
@@ -303,7 +303,7 @@ def _stable_sort_key(value: object) -> str:
     return "{}:{}".format(type(value).__name__, repr(value))
 
 
-def _stable_group_key_tuple(key: Tuple[object, ...]) -> str:
+def _stable_group_key_tuple(key: Tuple[RuntimeValue, ...]) -> str:
     return "\x1f".join(_stable_sort_key(item) for item in key)
 
 
@@ -474,7 +474,7 @@ class _MinMetric(_MetricState):
         if raw is None:
             return
 
-        def _cmp_key(v: object) -> Tuple[int, Decimal, str]:
+        def _cmp_key(v: RuntimeValue) -> Tuple[int, Decimal, str]:
             dec = _to_decimal(v)
             if dec is not None:
                 return (0, dec, "")
@@ -516,7 +516,7 @@ class _MaxMetric(_MetricState):
         if raw is None:
             return
 
-        def _cmp_key(v: object) -> Tuple[int, Decimal, str]:
+        def _cmp_key(v: RuntimeValue) -> Tuple[int, Decimal, str]:
             dec = _to_decimal(v)
             if dec is not None:
                 return (0, dec, "")
@@ -582,7 +582,7 @@ class _CountTrueGteMetric(_MetricState):
     _field_id: str
     _threshold: Decimal
 
-    def __init__(self, *, field_id: str, threshold: object) -> None:
+    def __init__(self, *, field_id: str, threshold: RuntimeValue) -> None:
         self._count = 0
         self._field_id = str(field_id)
         dec = _to_decimal(threshold)
@@ -940,17 +940,17 @@ class RankedGroupByAggregator(IRowAggregator):
             return ()
         return tuple(row.get(str(fid)) for fid in spec.partition_by)
 
-    def _row_sort_key(self, row: Dict[str, CellValue], spec: RankFieldSpec) -> Tuple[object, ...]:
+    def _row_sort_key(self, row: Dict[str, CellValue], spec: RankFieldSpec) -> Tuple[RuntimeValue, ...]:
         desc = str(spec.order or "desc").lower() != "asc"
         order_fields = tuple(str(x) for x in (spec.order_by or ())) or (str(spec.by),)
-        key_parts: List[object] = []
+        key_parts: List[RuntimeValue] = []
         for fid in order_fields:
             key_parts.extend(self._value_sort_key(row.get(fid), desc=desc))
         group_key = tuple(row.get(fid) for fid in self._group_by)
         key_parts.append(_stable_group_key_tuple(group_key))
         return tuple(key_parts)
 
-    def _value_sort_key(self, value: object, *, desc: bool) -> Tuple[int, int, "_ReversibleValue"]:
+    def _value_sort_key(self, value: RuntimeValue, *, desc: bool) -> Tuple[int, int, "_ReversibleValue"]:
         # `None` 永远排在最后;其余尽量按数值排序(失败时回退为稳定字符串键).
         if value is None:
             return (1, 0, _ReversibleValue(_DECIMAL_ZERO, desc=False))
@@ -1010,7 +1010,7 @@ class _ReversibleValue:
     def __hash__(self) -> int:
         return hash((self.desc, self.value))
 
-    def __lt__(self, other: object) -> bool:
+    def __lt__(self, other: RuntimeValue) -> bool:
         if not isinstance(other, _ReversibleValue):
             return NotImplemented  # type: ignore[return-value]
         if isinstance(self.value, Decimal) and isinstance(other.value, Decimal):  # noqa: SIM114
@@ -1025,7 +1025,7 @@ class _ReversibleValue:
         return bool(result)
 
     @override
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other: RuntimeValue) -> bool:
         if not isinstance(other, _ReversibleValue):
             return False
         return bool(self.desc) == bool(other.desc) and self.value == other.value

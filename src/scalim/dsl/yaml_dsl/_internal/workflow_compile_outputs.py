@@ -122,7 +122,7 @@ def _validate_xlsx_memory_align_by(
 def _load_demands(
     demand_yaml_paths_by_run_id: Mapping[str, str],
     *,
-    template_vars: Optional[Mapping[str, object]],
+    template_vars: Optional[Mapping[str, Any]],
     template_sandbox: str,
     rendered_yaml_max_len: int,
     allowed_yaml_roots: Optional[Tuple[str, ...]],
@@ -162,7 +162,7 @@ def _apply_overrides_output_extras(
     return next_cfg
 
 
-def _parse_overrides_outputs_defaults_book_id(defaults: Optional[object]) -> Optional[str]:
+def _parse_overrides_outputs_defaults_book_id(defaults: Optional[Any]) -> Optional[str]:
     return _resource_override_ssot.parse_outputs_defaults_book_id(defaults, path="overrides.outputs_defaults")
 
 
@@ -204,7 +204,7 @@ def _build_write_node_for_book(
     input_node_id: str,
     input_output_id: str,
     mode: str,
-    write_defaults: object,
+    write_defaults: Any,
     write_defaults_mode_path: str,
 ) -> WorkflowAnyNodeIr:
     effective_defaults = cast("Any", write_defaults)  # pragma: allow-cast write defaults typed boundary
@@ -381,7 +381,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
                 xlsx_memory_write_node_ids_by_run_id.setdefault(str(run.id), []).append(str(node_id))
 
         # `meta`/`audit` 额外工作表: 在工作流模式下通过推导的写入节点写出.
-        extras: List[Tuple[str, object, str]] = []
+        extras: List[Tuple[str, Any, str]] = []
         if cfg.meta is not None:
             extras.append(("meta", cfg.meta, "__meta__"))
         if cfg.audit is not None:
@@ -555,7 +555,7 @@ def validate_xlsx_memory_align_by(
 def load_demands(
     demand_yaml_paths_by_run_id: Mapping[str, str],
     *,
-    template_vars: Optional[Mapping[str, object]],
+    template_vars: Optional[Mapping[str, Any]],
     template_sandbox: str,
     rendered_yaml_max_len: int,
     allowed_yaml_roots: Optional[Tuple[str, ...]],
@@ -575,7 +575,7 @@ def apply_overrides_output_extras(
     return _apply_overrides_output_extras(demand_cfg_by_run_id, overrides=overrides)
 
 
-def parse_overrides_outputs_defaults_book_id(defaults: Optional[object]) -> Optional[str]:
+def parse_overrides_outputs_defaults_book_id(defaults: Optional[Any]) -> Optional[str]:
     return _parse_overrides_outputs_defaults_book_id(defaults)
 
 
@@ -610,7 +610,7 @@ def build_write_node_for_book(
     input_node_id: str,
     input_output_id: str,
     mode: str,
-    write_defaults: object,
+    write_defaults: Any,
     write_defaults_mode_path: str,
 ) -> WorkflowAnyNodeIr:
     return _build_write_node_for_book(
