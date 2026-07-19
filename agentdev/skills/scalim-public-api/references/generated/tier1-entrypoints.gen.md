@@ -242,7 +242,7 @@
 - desc: 事件类型分组视图
 - scenario: 按主题探索 `EventType`(不引入新值)
 - marker: `src/scalim/events/__init__.py:10`
-- source: `src/scalim/events/type_groups.py:67`
+- source: `src/scalim/events/type_groups.py:69`
 - exports (`__all__`, tuple, count=15):
   - `adaptive`
   - `batch`

@@ -31,9 +31,9 @@ _HOTSPOT_LIMITS: Dict[str, int] = {
     "src/scalim/workflow/execute.py": 1920,
     # output_composition 已拆分为子包; 按目录聚合统计以保持护栏意义.
     "src/scalim/execution/output_composition": 1700,
-    # derived_outputs: 当前约 1260 行; 上限留约 15% 余量,拆分走后续 SDD.
+    # `derived_outputs`: 当前约 1260 行; 上限留约 15% 余量,拆分走后续 `SDD`.
     "src/scalim/execution/derived_outputs.py": 1450,
-    # yaml_dsl outputs/sources 集群: 当前均 >1000 行; 上限约 15% 余量,禁止无审阅继续膨胀.
+    # `yaml_dsl` `outputs`/`sources` 集群: 当前均 >1000 行; 上限约 15% 余量,禁止无审阅继续膨胀.
     "src/scalim/dsl/yaml_dsl/_internal/config_parsing/parsers/outputs.py": 1375,
     "src/scalim/dsl/yaml_dsl/_internal/config_parsing/validators/sources.py": 1340,
     "src/scalim/dsl/yaml_dsl/schema_dsl/models/outputs.py": 1230,
