@@ -3,7 +3,7 @@ import threading
 import time
 import traceback
 from collections.abc import MutableMapping as MutableMappingABC
-from typing import TYPE_CHECKING, Callable, Dict, Iterator, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, Optional
 
 from .._internal import loggingx
 from .._internal.utils.exceptions import clone_exception_for_reraise
@@ -156,7 +156,7 @@ class PreloadCache(_PreloadCacheBase):
             return len(self._data)
 
     @override
-    def __contains__(self, key: object) -> bool:
+    def __contains__(self, key: Hashable) -> bool:
         with self._global_lock:
             return key in self._data
 

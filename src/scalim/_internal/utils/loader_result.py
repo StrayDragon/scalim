@@ -13,6 +13,7 @@ from collections.abc import Sized as SizedABC
 from itertools import islice
 from typing import Any, Dict, cast
 
+from ...typedefs import RuntimeValue
 from ...vendor.compact import StrEnum
 from .policy import (
     ensure_policy_enum,
@@ -42,7 +43,7 @@ def format_loader_result_policy(policy: LoaderResultPolicy) -> LoaderResultPolic
     return policy.value
 
 
-def parse_loader_result_policy(policy: object) -> LoaderResultPolicyValue:
+def parse_loader_result_policy(policy: RuntimeValue) -> LoaderResultPolicyValue:
     """从配置/状态边界(例如 `__setstate__`)解析并校验 `loader_result_policy`(封闭集合;快速失败)."""
     return parse_policy_value(
         LoaderResultPolicy,

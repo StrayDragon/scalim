@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from ...execution.run_ir import ExecutionRequest
 from ...vendor.dataclassesx import dataclass, replace
@@ -7,7 +7,7 @@ from ...vendor.dataclassesx import dataclass, replace
 @dataclass(frozen=True)
 class WorkflowNodeRequestOverrides:
     capture_in_memory_rows: bool = False
-    main_rows: Optional[object] = None
+    main_rows: Optional[Any] = None
 
 
 def merge_workflow_node_request(base_request: ExecutionRequest, overrides: WorkflowNodeRequestOverrides) -> ExecutionRequest:

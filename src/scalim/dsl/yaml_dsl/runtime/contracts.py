@@ -222,7 +222,7 @@ class OutputExtrasOverride:
     audit: Optional[Union[bool, OutputExtraSheetOverride]] = None
 
     def __post_init__(self) -> None:
-        def _validate(item: object, *, key: str) -> None:
+        def _validate(item: Any, *, key: str) -> None:
             if item is None:
                 return
             if item is True or item is False:
@@ -416,7 +416,7 @@ class DemandRunSecurityOptions:
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None
     """可选:允许读取 `YAML` 文件的根目录集合."""
 
-    builtin_callables: Optional[Mapping[str, object]] = None
+    builtin_callables: Optional[Mapping[str, Any]] = None
     """可选:内置可调用对象词表(用于 `^<id>` 引用)."""
 
     public_builtin_callable_ids: Optional[Tuple[str, ...]] = None
@@ -478,7 +478,7 @@ class DemandRunSecurityOptions:
 class DemandRunTemplateOptions:
     """`demand` 编译期模板/注入相关选项."""
 
-    template_vars: Optional[Mapping[str, object]] = None
+    template_vars: Optional[Mapping[str, Any]] = None
     """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""
 
     template_sandbox: str = "safe"
@@ -487,7 +487,7 @@ class DemandRunTemplateOptions:
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN
     """当启用 `template_vars` 预编译时,渲染后 `YAML` 文本长度上限(字符数)."""
 
-    init_vars: Optional[Dict[str, object]] = None
+    init_vars: Optional[Dict[str, Any]] = None
     """可选:初始化变量注入(编译期使用,用于解析 `params` 中的 `{$init_var: <name>}` 指令节点)."""
 
     def __post_init__(self) -> None:

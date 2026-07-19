@@ -4,8 +4,8 @@ from ....vendor.compact.typing_extensionsx import Protocol
 
 
 class _OutputSpecLike(Protocol):
-    path: object
-    sheet_name: object
+    path: Any
+    sheet_name: Any
 
 
 class _ExportLayoutLike(Protocol):
@@ -13,7 +13,7 @@ class _ExportLayoutLike(Protocol):
 
 
 class _OutputTargetNodeLike(Protocol):
-    target_id: object
+    target_id: Any
     output: Optional[_OutputSpecLike]
     is_primary: bool
 
@@ -33,9 +33,9 @@ class _OutputTargetDerivedLike(_OutputTargetNodeLike, Protocol):
 
 
 class _OutputSheetLike(Protocol):
-    target_id: object
+    target_id: Any
     output: Optional[_OutputSpecLike]
-    sheet_name: object
+    sheet_name: Any
 
 
 class _OutputCompositionLike(Protocol):

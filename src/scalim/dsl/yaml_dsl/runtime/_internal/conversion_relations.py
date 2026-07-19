@@ -1,5 +1,5 @@
 from collections import deque
-from typing import TYPE_CHECKING, Deque, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set, Tuple, Union
 
 from .....spec.ir import LookupStepIr, MainSourceIr, SourceIr
 from .....spec.ir.binding import BindingIr
@@ -32,8 +32,8 @@ class ConfigToIRConversionRelationMixin:
 
     def _create_binding(
         self,
-        bind_config: object,
-        static_params: object,
+        bind_config: Any,
+        static_params: Any,
         key_field: "NormalizedLookupKeySpec",
     ) -> Optional[BindingIr]:
         _ = (bind_config, static_params, key_field)

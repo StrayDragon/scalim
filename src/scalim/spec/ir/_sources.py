@@ -1,7 +1,7 @@
 from types import MappingProxyType
-from typing import Dict, FrozenSet, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, Union
 
-from ...typedefs import LoaderResultMapping, SourceSpecIrCacheMode, StaticParams
+from ...typedefs import LoaderResultMapping, RuntimeValue, SourceSpecIrCacheMode, StaticParams
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass, field
 from ._relations import FieldRefIr
@@ -96,10 +96,10 @@ class SourceNormalizeIr:
 
     def apply(
         self,
-        result: object,
+        result: RuntimeValue,
         *,
         source_id: str,
-        call_by: Optional[object] = None,
+        call_by: Optional[Any] = None,
     ) -> LoaderResultMapping:
         normalized: LoaderResultMapping
         if self.kind == "index_by_key":
@@ -204,14 +204,14 @@ class SourceIr:
     def __post_init__(self) -> None:
         object.__setattr__(self, "bindings", MappingProxyType(dict(self.bindings)))
 
-    def __getstate__(self) -> Dict[str, object]:
+    def __getstate__(self) -> Dict[str, Any]:
         state = dict(self.__dict__)
         bindings = state.get("bindings")
         if isinstance(bindings, MappingProxyType):
             state["bindings"] = dict(bindings)
         return state
 
-    def __setstate__(self, state: Dict[str, object]) -> None:
+    def __setstate__(self, state: Dict[str, Any]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
         self.__post_init__()

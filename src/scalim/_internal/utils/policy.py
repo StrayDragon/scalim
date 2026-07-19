@@ -8,12 +8,12 @@
 """
 
 from enum import Enum
-from typing import Callable, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, List, Optional, Tuple, Type, TypeVar
 
 _E = TypeVar("_E", bound=Enum)
 
 
-def _ensure_builtin_str(value: object, *, label: str) -> str:
+def _ensure_builtin_str(value: Any, *, label: str) -> str:
     if not isinstance(value, str):
         msg = "{} must be a str, got '{}'".format(label, type(value).__name__)
         raise TypeError(msg)
@@ -40,7 +40,7 @@ def enum_values_label(enum_cls: Type[_E], *, sep: str = "/") -> str:
 
 def parse_policy_value(
     enum_cls: Type[_E],
-    value: object,
+    value: Any,
     *,
     label: str,
     default: Optional[_E] = None,
@@ -75,7 +75,7 @@ def parse_policy_value(
     return member.value
 
 
-def ensure_policy_enum(enum_cls: Type[_E], value: object, *, label: str) -> _E:
+def ensure_policy_enum(enum_cls: Type[_E], value: Any, *, label: str) -> _E:
     """公开 `API`: 严格只接受 `Enum`(快速失败)."""
     if isinstance(value, enum_cls):
         return value

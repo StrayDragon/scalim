@@ -1,7 +1,9 @@
 from typing import List, Sequence, Set, Tuple
 
+from ...typedefs import RuntimeValue
 
-def ordered_unique_str(items: Sequence[object]) -> Tuple[str, ...]:
+
+def ordered_unique_str(items: Sequence[RuntimeValue]) -> Tuple[str, ...]:
     """对输入序列做 `str()` 归一化后,去重并保序.
 
     语义:

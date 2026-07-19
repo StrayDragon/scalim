@@ -14,7 +14,7 @@ from ._parse import load_workflow_config_from_mapping
 def load_workflow_config(
     workflow_yaml_path: str,
     *,
-    template_vars: Optional[Mapping[str, object]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
 ) -> WorkflowConfig:

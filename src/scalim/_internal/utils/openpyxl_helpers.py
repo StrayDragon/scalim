@@ -6,7 +6,10 @@
 
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from openpyxl.workbook import Workbook
 
 from .atomic_paths import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 
@@ -42,7 +45,7 @@ def best_effort_close_write_only_workbook_worksheets(workbook: Any) -> None:
         best_effort_close_write_only_worksheet(ws)
 
 
-def save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
+def save_openpyxl_workbook_atomic(workbook: "Workbook", *, output_path: str) -> None:
     """将 `workbook` 保存到临时文件并原子替换到 `output_path`.
 
     失败时尽力清理临时文件,并重新抛出原始异常(由调用方包装领域错误).

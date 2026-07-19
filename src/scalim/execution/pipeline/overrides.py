@@ -44,10 +44,10 @@ class PipelineOverrides:
     gc_collect_fn: Optional[Callable[[], int]] = None
     """可选:`GC` 回收函数(用于注入/测试)."""
 
-    sys_module: Optional[object] = None
+    sys_module: Optional[Any] = None
     """可选:`sys` 模块注入点(用于测试或兼容性处理)."""
 
-    warnings_module: Optional[object] = None
+    warnings_module: Optional[Any] = None
     """可选:`warnings` 模块注入点(用于测试或兼容性处理)."""
 
 

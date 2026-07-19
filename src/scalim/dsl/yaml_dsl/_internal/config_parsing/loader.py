@@ -52,7 +52,7 @@ class YamlDemandLoader(
         self,
         source: Union[str, Path, IO[str]],
         *,
-        template_vars: Optional[Mapping[str, object]] = None,
+        template_vars: Optional[Mapping[str, Any]] = None,
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
         allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
@@ -181,7 +181,7 @@ class YamlDemandLoader(
         self,
         yaml_string: str,
         *,
-        template_vars: Optional[Mapping[str, object]] = None,
+        template_vars: Optional[Mapping[str, Any]] = None,
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     ) -> DemandConfig:
@@ -398,7 +398,7 @@ class YamlDemandLoader(
         def _ignore_import(_data: Mapping[str, Any], path: Optional[str] = None) -> None:
             _ = path
 
-        def _parse_export(raw_export: object, path: Optional[str] = None) -> BookExportXlsxConfig:
+        def _parse_export(raw_export: Any, path: Optional[str] = None) -> BookExportXlsxConfig:
             export_path = str(path or base_path)
             if not isinstance(raw_export, dict):
                 msg = "{} must be a mapping".format(export_path)
@@ -471,7 +471,7 @@ class YamlDemandLoader(
         encoding = str(csv_branch.get(FILE_CSV_FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
         return FileConfig(kind="csv_file", path=path, encoding=encoding)
 
-    def _parse_path_or_init_var(self, raw: object, *, path: str) -> OptionalPathNode:
+    def _parse_path_or_init_var(self, raw: Any, *, path: str) -> OptionalPathNode:
         if isinstance(raw, dict):
             return parse_init_var_ref(
                 cast("Dict[str, Any]", raw),  # pragma: allow-cast init_var mapping typed narrowing

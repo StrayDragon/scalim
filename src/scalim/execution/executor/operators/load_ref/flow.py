@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, NamedTuple, Op
 from .....spec.ir import CallBySpecIr, ComputeCallContextIr, FieldIr, LookupStepIr
 from .....spec.ir._fields import call_by_requires_ctx
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
-from .....typedefs import FieldValue, LoaderResultMapping, LookupKey
+from .....typedefs import FieldValue, LoaderResultMapping, LookupKey, RuntimeValue
 from ...helpers.field_access import extract_field, extract_field_segments
 from .._internal.loader_guardrails import (
     handle_loader_extractor_error,
@@ -97,7 +97,7 @@ def _write_relation_miss_field_value(
     required_mode: str,
     transform_mode: str,
     reason: str,
-    lookup_key: object,
+    lookup_key: RuntimeValue,
 ) -> None:
     field_spec = exec_ctx.runtime.field_specs.get(field_key)
     source_id = "(unknown)"
@@ -228,7 +228,7 @@ def _collect_multi_field_fk(
 def _resolve_next_step_fk(
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
-    data: object,
+    data: RuntimeValue,
     step: LookupStepIr,
     *,
     from_field: Optional[str],
@@ -284,7 +284,7 @@ def build_next_mapping(
 def _collect_multi_field_fk_from_data(
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
-    data: object,
+    data: RuntimeValue,
     step: LookupStepIr,
     *,
     from_fields: Tuple[str, ...],

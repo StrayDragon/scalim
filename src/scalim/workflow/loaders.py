@@ -3,6 +3,7 @@ import threading
 from typing import Any, FrozenSet, Iterator, Mapping
 
 from ..exceptions import ScalimInternalError
+from ..typedefs import RuntimeValue
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from ..vendor.dataclassesx import dataclass
 from .errors import ScalimWorkflowConfigError
@@ -20,7 +21,7 @@ class _WorkflowLoaderContext:
 _TLS = threading.local()
 
 
-def _is_mapping(value: object) -> TypeGuard[Mapping[str, Any]]:
+def _is_mapping(value: RuntimeValue) -> TypeGuard[Mapping[str, Any]]:
     return isinstance(value, dict)
 
 
@@ -69,7 +70,7 @@ def _require_context() -> _WorkflowLoaderContext:
     return ctx
 
 
-def book_sheet_rows(*, ref: object) -> Iterator[Mapping[str, object]]:
+def book_sheet_rows(*, ref: RuntimeValue) -> Iterator[Mapping[str, Any]]:
     """内置 `loader`: 读取 `workflow` `books.kind=xlsx_memory` 的某个 `sheet` 行数据(`rows`).
 
     参数:

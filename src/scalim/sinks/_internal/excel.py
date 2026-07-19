@@ -15,7 +15,7 @@ from ..._internal.utils.openpyxl_helpers import (
 from ..._internal.utils.openpyxl_helpers import (
     best_effort_close_write_only_worksheet as _best_effort_close_write_only_worksheet,
 )
-from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact.importlibx import require_optional_dependency
 from ...vendor.compact.typing_extensionsx import Self, override
 from .accept_types import (
@@ -166,7 +166,7 @@ class ExcelSink(BaseRowSink):
         if self.include_header:
             _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in self.header_names])
 
-    def _maybe_precheck(self, field_name: str, value: object) -> object:
+    def _maybe_precheck(self, field_name: str, value: CellValue) -> CellValue:
         if self._type_precheck is SinkTypePrecheck.OFF:
             return value
         return ensure_sink_accepted_cell(
@@ -305,7 +305,7 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
             # 关键护栏: `header` 与 `rows` 分离,避免 `header` `list` 被复用污染.
             _ = self._worksheet.append([escape_excel_formula(x, allow_formulas=self._allow_formulas) for x in list(self.header_names)])
 
-    def _maybe_precheck(self, field_name: str, value: object) -> object:
+    def _maybe_precheck(self, field_name: str, value: CellValue) -> CellValue:
         if self._type_precheck is SinkTypePrecheck.OFF:
             return value
         return ensure_sink_accepted_cell(

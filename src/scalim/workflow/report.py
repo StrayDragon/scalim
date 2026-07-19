@@ -8,6 +8,7 @@
 
 from typing import List, Optional, Tuple
 
+from ..typedefs import RuntimeValue
 from ..vendor.dataclassesx import dataclass
 
 
@@ -24,7 +25,7 @@ class WorkflowRunError:
 class WorkflowRunOutcome:
     run_id: str
     demand_path: str
-    result: Optional[object] = None
+    result: Optional[RuntimeValue] = None
     error: Optional[WorkflowRunError] = None
 
 

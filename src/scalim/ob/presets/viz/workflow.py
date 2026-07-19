@@ -23,6 +23,7 @@ from ....spec.ir._workflow import (
     WorkflowResourceIr,
     WriteSheetNodeIr,
 )
+from ....typedefs import RuntimeValue
 from ....vendor.dataclassesx import asdict
 from ....workflow.stage_attribution import derive_workflow_struct_levels, derive_workflow_user_stages
 from ...observer import EventDispatchObserver as _EventDispatchObserver
@@ -47,7 +48,7 @@ _WORKFLOW_DISPATCH_MAP: Dict[str, str] = {
 }
 
 
-def _as_node_id(value: object) -> str:
+def _as_node_id(value: RuntimeValue) -> str:
     return str(value or "").strip()
 
 

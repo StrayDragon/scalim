@@ -5,7 +5,7 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig, load_workflow_config
@@ -14,7 +14,7 @@ from .workflow import ScalimWorkflowConfigError, WorkflowConfig, load_workflow_c
 def load_workflow_config_from_path(
     workflow_yaml_path: str,
     *,
-    template_vars: Optional[Mapping[str, object]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
 ) -> Tuple[str, WorkflowConfig]:

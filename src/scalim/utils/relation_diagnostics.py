@@ -5,14 +5,15 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 from ..dsl.yaml_dsl.runtime._internal.conversion_lookup import LookupCastRegistry
 from ..spec.ir import FieldRefIr, JoinConditionIr, RelationIr, SourceIr
 from ..spec.ir.lookup_casts import LookupCastSpecIr
+from ..typedefs import RuntimeValue
 from ..vendor.compact.typing_extensionsx import TypeGuard, override
 
 
-def _is_mapping(value: object) -> TypeGuard[Mapping[str, Any]]:
+def _is_mapping(value: RuntimeValue) -> TypeGuard[Mapping[str, Any]]:
     return isinstance(value, MappingABC)
 
 
-def _is_tuple(value: object) -> TypeGuard[Tuple[Any, ...]]:
+def _is_tuple(value: RuntimeValue) -> TypeGuard[Tuple[Any, ...]]:
     return isinstance(value, tuple)
 
 

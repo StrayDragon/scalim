@@ -401,7 +401,7 @@ def _build_demand_run_result_impl(
     demand_yaml_path: str,
     workflow_exec_id: str,
     workflow_node_id: str,
-) -> object:
+) -> Any:
     _ = workflow_exec_id, workflow_node_id
     captured_rows = None
     capture_enabled = False
@@ -675,7 +675,7 @@ def run_workflow_injected(  # noqa: C901, PLR0915
         workflow_exec_id: str,
         workflow_node_id: str,
         workflow_node_decl_order: int,
-        node_init_vars: Dict[str, object],
+        node_init_vars: Dict[str, Any],
         managed_output_ids: Optional[FrozenSet[str]],
         viz_config: Optional["VizObserverConfig"],
     ) -> WorkflowCompilationLike:
@@ -770,7 +770,7 @@ def run_workflow_injected(  # noqa: C901, PLR0915
         demand_yaml_path: str,
         workflow_exec_id: str,
         workflow_node_id: str,
-    ) -> object:
+    ) -> Any:
         return _build_demand_run_result_impl(
             core,
             compilation=compilation,

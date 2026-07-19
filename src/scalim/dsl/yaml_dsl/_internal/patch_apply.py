@@ -12,7 +12,7 @@ from ..workflow import ScalimWorkflowConfigError
 __all__ = ()
 
 
-def assert_no_unknown_keys(patch: Mapping[str, object], *, allowed_keys: Set[str], path: str) -> None:
+def assert_no_unknown_keys(patch: Mapping[str, Any], *, allowed_keys: Set[str], path: str) -> None:
     unknown = sorted({str(k) for k in patch} - set(allowed_keys))
     if not unknown:
         return
@@ -20,7 +20,7 @@ def assert_no_unknown_keys(patch: Mapping[str, object], *, allowed_keys: Set[str
     raise ScalimWorkflowConfigError(msg, path=path)
 
 
-def as_opt_mapping(value: object, *, path: str) -> Optional[Dict[str, Any]]:
+def as_opt_mapping(value: Any, *, path: str) -> Optional[Dict[str, Any]]:
     if value is None:
         return None
     if not isinstance(value, dict):
@@ -29,7 +29,7 @@ def as_opt_mapping(value: object, *, path: str) -> Optional[Dict[str, Any]]:
     return cast("Dict[str, Any]", value)  # pragma: allow-cast runtime overrides dict narrowing
 
 
-def as_opt_str(value: object, *, path: str) -> Optional[str]:
+def as_opt_str(value: Any, *, path: str) -> Optional[str]:
     if value is None:
         return None
     if not isinstance(value, str):
@@ -39,7 +39,7 @@ def as_opt_str(value: object, *, path: str) -> Optional[str]:
     return v or None
 
 
-def as_required_non_empty_str(value: object, *, path: str) -> str:
+def as_required_non_empty_str(value: Any, *, path: str) -> str:
     if not isinstance(value, str):
         msg = "{} must be a non-empty string".format(path)
         raise ScalimWorkflowConfigError(msg, path=path)
@@ -50,7 +50,7 @@ def as_required_non_empty_str(value: object, *, path: str) -> str:
     return v
 
 
-def as_bool(value: object, *, path: str) -> bool:
+def as_bool(value: Any, *, path: str) -> bool:
     if not isinstance(value, bool):
         msg = "{} must be a bool".format(path)
         raise ScalimWorkflowConfigError(msg, path=path)

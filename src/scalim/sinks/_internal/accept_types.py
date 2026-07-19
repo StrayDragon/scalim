@@ -7,7 +7,7 @@
 
 from typing import Callable, Optional
 
-from ...typedefs import FIELD_VALUE_TYPES, CellValue, format_field_value_expected_types
+from ...typedefs import FIELD_VALUE_TYPES, CellValue, RuntimeValue, format_field_value_expected_types
 from ...vendor.compact import StrEnum
 
 
@@ -18,7 +18,7 @@ class SinkTypePrecheck(StrEnum):
     ON = "on"
 
 
-def require_sink_type_precheck(type_precheck: object, *, where: str) -> SinkTypePrecheck:
+def require_sink_type_precheck(type_precheck: RuntimeValue, *, where: str) -> SinkTypePrecheck:
     """公开 `API` 运行时门禁:仅接受 `SinkTypePrecheck`(注解之外的字符串字面量 `fail-fast`)."""
     if not isinstance(type_precheck, SinkTypePrecheck):
         msg = "{0} must be a SinkTypePrecheck".format(where)

@@ -1,8 +1,10 @@
 # pragma: allow-cast-file 运行时类型窄化辅助函数
 from typing import Any, Dict, List, Mapping, Optional, cast
 
+from ..typedefs import RuntimeValue
 
-def as_mapping(value: object, *, path: str = "") -> Optional[Dict[str, Any]]:
+
+def as_mapping(value: RuntimeValue, *, path: str = "") -> Optional[Dict[str, Any]]:
     """
     将 `value` 尝试窄化为配置类映射(`dict`).
 
@@ -16,7 +18,7 @@ def as_mapping(value: object, *, path: str = "") -> Optional[Dict[str, Any]]:
     return cast("Dict[str, Any]", value)
 
 
-def as_list(value: object, *, path: str = "") -> Optional[List[Any]]:
+def as_list(value: RuntimeValue, *, path: str = "") -> Optional[List[Any]]:
     """
     将 `value` 尝试窄化为配置类列表(`list`).
 
@@ -30,7 +32,7 @@ def as_list(value: object, *, path: str = "") -> Optional[List[Any]]:
     return cast("List[Any]", value)
 
 
-def require_str(value: object, *, path: str) -> str:
+def require_str(value: RuntimeValue, *, path: str) -> str:
     """要求 `value` 在 `path` 处为 `str`; 否则抛出 `TypeError`(消息口径稳定)."""
 
     if isinstance(value, str):

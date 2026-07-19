@@ -11,7 +11,7 @@ __all__ = ()
 def load_effective_demand_yaml(
     yaml_path: Union[str, Path],
     *,
-    template_vars: Optional[Mapping[str, object]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
     scalim_yaml_override: Optional[Union[str, Path]] = None,
@@ -49,7 +49,7 @@ def dump_effective_demand_yaml(mapping: Mapping[str, Any]) -> str:
     yaml_safe.default_flow_style = False
     yaml_safe.sort_base_mapping_type_on_output = False  # pyright: ignore[reportAttributeAccessIssue]  # pragma: allow-dynattr third-party: ruamel YAML config
 
-    def _ignore_aliases(_data: object) -> bool:
+    def _ignore_aliases(_data: Any) -> bool:
         return True
 
     yaml_safe.representer.ignore_aliases = _ignore_aliases  # type: ignore[assignment]  # pragma: allow-dynattr ruamel config

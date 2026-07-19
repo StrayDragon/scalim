@@ -5,7 +5,7 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
 
 from ..events import EventType
 from ..vendor.dataclassesx import dataclass
@@ -40,19 +40,19 @@ class PreUseBatchSizeDecision:
     value: Optional[int]
     run_id: Optional[str] = None
     demand_path: Optional[str] = None
-    init_vars: Optional[Dict[str, object]] = None
-    main_loader: Optional[object] = None
+    init_vars: Optional[Dict[str, Any]] = None
+    main_loader: Optional[Any] = None
     history: List[DecisionOverrideHistoryEntry] = dataclass_field(default_factory=list)
 
     _active_hook_id: Optional[str] = dataclass_field(default=None, repr=False, compare=False)
 
-    def _enter_hook(self, hook: object) -> None:
+    def _enter_hook(self, hook: "ExecutionHookLike") -> None:
         self._active_hook_id = type(hook).__name__
 
     def _exit_hook(self) -> None:
         self._active_hook_id = None
 
-    def override(self, next_value: object, *, reason: str) -> None:
+    def override(self, next_value: Any, *, reason: str) -> None:
         """改写候选值并记录 `history`."""
         normalized_reason = str(reason or "").strip()
         if not normalized_reason:

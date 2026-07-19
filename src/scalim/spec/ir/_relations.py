@@ -2,6 +2,7 @@ from collections import deque
 from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
 
 from ...exceptions import ScalimError
+from ...typedefs import RuntimeValue
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
 from ._source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
@@ -39,7 +40,7 @@ class FieldRefIr:
     字段名
     """
 
-    def join(self, other: object) -> "JoinConditionIr":
+    def join(self, other: RuntimeValue) -> "JoinConditionIr":
         """构建关联条件 - 推荐方式
 
         示例:
@@ -52,7 +53,7 @@ class FieldRefIr:
             raise TypeError(msg)
         return JoinConditionIr(left=self, right=other)
 
-    def eq(self, other: object) -> "JoinConditionIr":
+    def eq(self, other: RuntimeValue) -> "JoinConditionIr":
         """构建关联条件 - `join()` 的别名,语义更清晰
 
         示例:
@@ -90,7 +91,7 @@ class JoinConditionIr:
     @overload
     def and_(self, other: "RelationIr") -> "RelationIr": ...
 
-    def and_(self, other: object) -> "RelationIr":
+    def and_(self, other: RuntimeValue) -> "RelationIr":
         """组合多个条件, 表达 "且" 的语义"""
         if isinstance(other, JoinConditionIr):
             return RelationIr(conditions=(self, other))
@@ -124,7 +125,7 @@ class RelationIr:
     @overload
     def and_(self, other: "RelationIr") -> "RelationIr": ...
 
-    def and_(self, other: object) -> "RelationIr":
+    def and_(self, other: RuntimeValue) -> "RelationIr":
         """支持继续组合条件, 表达 "且" 的语义"""
         if isinstance(other, JoinConditionIr):
             return RelationIr(conditions=(*self.conditions, other))

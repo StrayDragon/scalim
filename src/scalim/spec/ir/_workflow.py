@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from ...vendor.dataclassesx import dataclass, field
 
@@ -17,7 +17,7 @@ class WorkflowResourceIr:
     resource_id: str
     resource_type: str
     path: str
-    options: Optional[Dict[str, object]] = None
+    options: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,7 @@ class WorkflowNodeIr:
     decl_order: int
     deps: Tuple[str, ...] = ()
     demand_path: Optional[str] = None
-    init_vars: Optional[Dict[str, object]] = None
+    init_vars: Optional[Dict[str, Any]] = None
     main_rows_from_run_id: Optional[str] = None
 
 

@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from ..spec.ir.aliases import NormalizedLookupKeySpec
 from ..spec.ir.binding import LoaderCallContextIr
-from ..typedefs import FieldValue, LoaderCallParams, LoaderResultMapping, LookupKey, RowData
+from ..typedefs import FieldValue, LoaderCallParams, LoaderResultMapping, LookupKey, RowData, RuntimeValue
 from ..vendor.dataclassesx import dataclass, field
 
 MainSourceLoaderFn = Callable[..., Iterable[RowData]]
@@ -40,7 +40,7 @@ class RuntimeBindings:
     ref_default_calculators: Dict[Tuple[str, int], RefDefaultCalculatorFn] = field(default_factory=dict)
     value_transforms: Dict[str, ValueTransformFn] = field(default_factory=dict)
     lookup_key_casts: Dict[str, LookupKeyCastFn] = field(default_factory=dict)
-    loader_extractors: Dict[str, Callable[[LookupKey, LoaderResultMapping], object]] = field(default_factory=dict)
+    loader_extractors: Dict[str, Callable[[LookupKey, LoaderResultMapping], RuntimeValue]] = field(default_factory=dict)
 
     def require_main_source_loader(self, source_id: str) -> MainSourceLoaderFn:
         fn = self.main_source_loaders.get(str(source_id))
@@ -79,7 +79,7 @@ class RuntimeBindings:
     def get_lookup_key_cast(self, cast_id: str) -> Optional[LookupKeyCastFn]:
         return self.lookup_key_casts.get(str(cast_id))
 
-    def get_loader_extractor(self, source_id: str) -> Optional[Callable[[LookupKey, LoaderResultMapping], object]]:
+    def get_loader_extractor(self, source_id: str) -> Optional[Callable[[LookupKey, LoaderResultMapping], RuntimeValue]]:
         return self.loader_extractors.get(str(source_id))
 
     def debug_summary(self) -> Dict[str, Any]:

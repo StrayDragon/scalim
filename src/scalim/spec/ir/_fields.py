@@ -22,7 +22,7 @@ class CallByValueIr:
     """
 
     kind: str
-    value: object
+    value: Any
 
 
 @dataclass(frozen=True)

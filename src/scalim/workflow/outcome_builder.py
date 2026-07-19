@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from ..exceptions import safe_error_message as _safe_error_message
 from ..exceptions import safe_error_type as _safe_error_type
+from ..typedefs import RuntimeValue
 from .report import WorkflowRunError, WorkflowRunOutcome
 from .resources import ScalimWorkflowWriteError
 
@@ -37,7 +38,7 @@ def build_outcome_from_exception(exc: BaseException, *, run_id: str, demand_path
     return WorkflowRunOutcome(run_id=str(run_id), demand_path=str(demand_path), result=None, error=err)
 
 
-def build_outcome_from_result(result: object, *, run_id: str, demand_path: str) -> WorkflowRunOutcome:
+def build_outcome_from_result(result: RuntimeValue, *, run_id: str, demand_path: str) -> WorkflowRunOutcome:
     return WorkflowRunOutcome(
         run_id=str(run_id),
         demand_path=str(demand_path or ""),

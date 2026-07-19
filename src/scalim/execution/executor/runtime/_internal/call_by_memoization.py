@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Hashable, List, Optional, Tuple
 
 from ....._internal.loggingx import prefix
 from ....._project_constants import (
@@ -88,7 +88,7 @@ class CallByMemoizationFieldCache:
     evictions: int
     disabled: int
 
-    _cache: "OrderedDict[object, FieldValue]"
+    _cache: "OrderedDict[Hashable, FieldValue]"
 
     def __init__(self, field_key: str, *, max_entries: int) -> None:
         self.field_key = str(field_key)
@@ -115,7 +115,7 @@ class CallByMemoizationFieldCache:
         self.disabled += 1
         self._cache.clear()
 
-    def try_get(self, key: object) -> Tuple[bool, FieldValue, bool]:
+    def try_get(self, key: Hashable) -> Tuple[bool, FieldValue, bool]:
         """返回 `(hit, value, hashable)`。"""
 
         self.calls += 1
@@ -135,7 +135,7 @@ class CallByMemoizationFieldCache:
         self._cache.move_to_end(key)
         return True, value, True
 
-    def store_miss(self, *, key: object, value: FieldValue) -> None:
+    def store_miss(self, *, key: Hashable, value: FieldValue) -> None:
         if not self.is_enabled():
             return
 

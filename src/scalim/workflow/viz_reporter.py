@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Any, Dict, Iterable
 
 from ..ob.presets._internal import viz_config as viz_config_module
 from ..ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
@@ -39,7 +39,7 @@ class WorkflowVizReporter:
         events_path = self._events_path(str(run_id))
         return snapshot_path.exists() and events_path.exists()
 
-    def write_snapshot(self, state: object, output_path: str) -> None:
+    def write_snapshot(self, state: Any, output_path: str) -> None:
         snapshot_path = Path(str(output_path))
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
 

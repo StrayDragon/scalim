@@ -10,7 +10,7 @@ class ScalimJsonSchemaCollectorError(ScalimYamlError):
 
 
 class _JsonSchemaValidator(Protocol):
-    def iter_errors(self, instance: object) -> Iterable[Any]: ...
+    def iter_errors(self, instance: Any) -> Iterable[Any]: ...
 
 
 class _JsonSchemaDraft7ValidatorFactory(Protocol):

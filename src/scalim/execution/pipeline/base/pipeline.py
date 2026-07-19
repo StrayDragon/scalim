@@ -26,7 +26,7 @@ from ....spec.ir import DemandIr, FieldIr, SourceIr
 from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.aliases import LoaderResultMapCallable
 from ....spec.ir.binding import LoaderCallContextIr
-from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowData, SinkRowKeySeq
+from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowData, RuntimeValue, SinkRowKeySeq
 from ....utils.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext, create_batch_context_for_rows
@@ -52,16 +52,16 @@ class _ReverseSortValue:
         return other.value < self.value
 
 
-def _make_noarg_loader_call(callable_ref: LoaderResultMapCallable, call_kwargs: LoaderCallKwargs) -> Callable[[], object]:
+def _make_noarg_loader_call(callable_ref: LoaderResultMapCallable, call_kwargs: LoaderCallKwargs) -> Callable[[], LoaderResultMapping]:
     if call_kwargs:
 
-        def call() -> object:
-            return callable_ref(**call_kwargs)
+        def call() -> LoaderResultMapping:
+            return cast("LoaderResultMapping", callable_ref(**call_kwargs))  # pragma: allow-cast loader callable return boundary
 
         return call
 
-    def call() -> object:
-        return callable_ref()
+    def call() -> LoaderResultMapping:
+        return cast("LoaderResultMapping", callable_ref())  # pragma: allow-cast loader callable return boundary
 
     return call
 
@@ -177,7 +177,7 @@ class Pipeline(ABC):
     def _preload_cache_get_or_load_or_none(
         self,
         *,
-        cache: object,
+        cache: RuntimeValue,
         source: SourceIr,
         source_id: str,
         rendered_params: LoaderCallKwargs,
@@ -232,9 +232,9 @@ class Pipeline(ABC):
                 def _load_preload_forever_source(
                     *,
                     source_id: str = source_id,
-                    normalize: object = normalize,
-                    normalize_call_by: object = normalize_call_by,
-                    call: Callable[[], object] = call,
+                    normalize: Any = normalize,
+                    normalize_call_by: Any = normalize_call_by,
+                    call: Callable[[], LoaderResultMapping] = call,
                     call_kwargs: LoaderCallKwargs = call_kwargs,
                 ) -> LoaderResultMapping:
                     loader_start = time.perf_counter()
@@ -249,9 +249,9 @@ class Pipeline(ABC):
                     )
                     loader_duration = time.perf_counter() - loader_start
 
-                    result_obj: object = result
+                    result_obj: RuntimeValue = result
                     if normalize is not None:
-                        result_obj = cast("Any", normalize).apply(  # pragma: allow-cast normalize apply typed narrowing
+                        result_obj = normalize.apply(
                             result,
                             source_id=source_id,
                             call_by=normalize_call_by,

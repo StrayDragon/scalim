@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from ....vendor.dataclassesx import dataclass
 from ....vendor.dataclassesx import field as dataclass_field
@@ -11,7 +11,7 @@ class WorkflowRun:
     demand: str
     depends_on: Tuple[str, ...] = ()
     main_rows_from_run_id: Optional[str] = None
-    init_vars: Optional[Dict[str, object]] = None
+    init_vars: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)

@@ -12,7 +12,9 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, cast
 
+from .._internal.utils.json_like import JsonLike
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
+from ..typedefs import RuntimeValue
 from ..vendor.dataclassesx import dataclass
 
 _SAFE_VERSION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
@@ -112,7 +114,7 @@ def book_output_path(layout: OutputRootLayout, *, version_id: str, book_id: str)
     return version_dir(layout, version_id=str(version_id)) / rel
 
 
-def _atomic_write_json(path: Path, payload: object) -> None:
+def _atomic_write_json(path: Path, payload: RuntimeValue) -> None:
     out_path = str(path)
     path_obj = Path(out_path)
     path_obj.parent.mkdir(parents=True, exist_ok=True)
@@ -228,14 +230,14 @@ def parse_versioned_output_path(path: Path) -> ParsedVersionedOutputPath:
     raise ValueError(msg)
 
 
-def read_latest(root: Path) -> Dict[str, object]:
+def read_latest(root: Path) -> Dict[str, JsonLike]:
     p = Path(str(root)) / "manifest" / "latest.json"
-    return cast("Dict[str, object]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
+    return cast("Dict[str, JsonLike]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
 
 
-def read_version_manifest(root: Path, *, version_id: str) -> Dict[str, object]:
+def read_version_manifest(root: Path, *, version_id: str) -> Dict[str, JsonLike]:
     p = Path(str(root)) / "versions" / str(validate_version_id(version_id)) / "manifest.json"
-    return cast("Dict[str, object]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
+    return cast("Dict[str, JsonLike]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
 
 
 __all__ = (

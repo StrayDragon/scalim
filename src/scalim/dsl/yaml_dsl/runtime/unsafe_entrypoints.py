@@ -8,7 +8,7 @@
 
 import logging
 import traceback
-from typing import Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
@@ -81,8 +81,8 @@ def unsafe_run(  # noqa: PLR0913
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
-    init_vars: Optional[Dict[str, object]] = None,
-    template_vars: Optional[Mapping[str, object]] = None,
+    init_vars: Optional[Dict[str, Any]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
@@ -161,8 +161,8 @@ def unsafe_compile(  # noqa: PLR0913
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
-    init_vars: Optional[Dict[str, object]] = None,
-    template_vars: Optional[Mapping[str, object]] = None,
+    init_vars: Optional[Dict[str, Any]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,

@@ -8,7 +8,7 @@
 5)执行请求映射
 """
 
-from typing import FrozenSet, Mapping, Optional
+from typing import Any, FrozenSet, Mapping, Optional
 
 from ....exceptions import ScalimYamlError
 from ....execution.run_ir import ExecutionRequest
@@ -58,7 +58,7 @@ def stage_create_context(*, allowed_modules: FrozenSet[str], allowed_functions: 
     )
 
 
-def stage_load_yaml_config(yaml_path: str, *, template_vars: Optional[Mapping[str, object]] = None) -> DemandConfig:
+def stage_load_yaml_config(yaml_path: str, *, template_vars: Optional[Mapping[str, Any]] = None) -> DemandConfig:
     return load_config(yaml_path, template_vars=template_vars)
 
 

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional,
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
-from ...typedefs import FieldValue, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact import StrEnum
 from ...vendor.compact.typing_extensionsx import Self, override
 from ...vendor.dataclassesx import dataclass
@@ -618,7 +618,7 @@ class BlockColumnCSVSink(IColumnSink):
         col_offset = col_index * (self.col_width + 1)
         return row_offset + col_offset
 
-    def _write_cell(self, row_index: int, col_index: int, value: object) -> None:
+    def _write_cell(self, row_index: int, col_index: int, value: CellValue) -> None:
         if self._file is None:
             return
         if value is None:

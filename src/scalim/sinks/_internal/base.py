@@ -5,7 +5,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, List, Mapping, Optional, Sequence, Type
 
 from ..._internal.utils import atomic_paths as _atomic_paths
-from ...typedefs import CellValue, FieldValue, LoaderResultMapping, RowData, SinkRowKeySeq
+from ...typedefs import CellValue, FieldValue, LoaderResultMapping, RowData, RuntimeValue, SinkRowKeySeq
 from ...vendor.compact.typing_extensionsx import Protocol, Self, override, runtime_checkable
 
 if TYPE_CHECKING:
@@ -265,12 +265,12 @@ class SupportsPreloadGetOrLoad(Protocol):
         self,
         source_id: str,
         load_fn: "Callable[[], LoaderResultMapping]",
-        *args: object,
-        **kwargs: object,
+        *args: RuntimeValue,
+        **kwargs: RuntimeValue,
     ) -> LoaderResultMapping: ...
 
 
-def discard_sink(sink: object) -> None:
+def discard_sink(sink: RuntimeValue) -> None:
     """失败路径:调用 `discard()`;`MUST NOT` 回退为成功语义的 `close()` `promote`.
 
     主路径为 `ISink.discard`;非 `ISink` 容器(如 `ExcelWorkbookSink`)走 `SupportsDiscard`.
@@ -284,7 +284,7 @@ def discard_sink(sink: object) -> None:
             _ = discard()
 
 
-def exit_sink(sink: object, exc_type: Optional[Type[BaseException]]) -> None:
+def exit_sink(sink: RuntimeValue, exc_type: Optional[Type[BaseException]]) -> None:
     """`CM` 退出:成功则 `close()`;异常则 `discard()` 且 `MUST NOT` 成功 `promote`."""
     if exc_type is not None:
         with suppress(Exception):

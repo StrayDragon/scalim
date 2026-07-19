@@ -44,7 +44,7 @@ class SecureComputeCalculatorContract(ABC):
         raise NotImplementedError
 
 
-def is_secure_compute_calculator(value: object) -> bool:
+def is_secure_compute_calculator(value: Any) -> bool:
     return isinstance(value, SecureComputeCalculatorContract)
 
 

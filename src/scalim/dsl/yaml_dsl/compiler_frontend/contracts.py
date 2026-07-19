@@ -28,8 +28,8 @@ class StaticCompilation:
     diagnostics: FrontendDiagnostics = field(default_factory=FrontendDiagnostics)
     effective_yaml: Optional[Dict[str, Any]] = None
     import_fragment_files: Tuple[str, ...] = ()
-    demand_ir: Optional[object] = None
-    plan: Optional[object] = None
+    demand_ir: Optional[Any] = None
+    plan: Optional[Any] = None
     plan_snapshot: Optional[Dict[str, Any]] = None
     deps_snapshot: Optional[Dict[str, Any]] = None
 

@@ -272,7 +272,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         *,
         field_id: str,
         field_data: Dict[str, Any],
-        relation_val: object,
+        relation_val: Any,
         errors: List[ValidationIssue],
         field_path: str,
     ) -> None:

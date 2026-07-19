@@ -10,6 +10,7 @@ from ..._internal.utils.policy import (
 )
 from ...events import EventType
 from ...exceptions import ScalimObserverError
+from ...typedefs import RuntimeValue
 from ...vendor.compact import StrEnum
 
 OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
@@ -84,7 +85,7 @@ def format_observer_manager_mode(value: ObserverManagerMode) -> ObserverManagerM
     return str(value.value)
 
 
-def parse_observer_manager_mode(value: object) -> ObserverManagerModeValue:
+def parse_observer_manager_mode(value: RuntimeValue) -> ObserverManagerModeValue:
     return parse_policy_value(
         ObserverManagerMode,
         value,
@@ -107,7 +108,7 @@ def normalize_capture_overflow_policy(
     return str(enum_value.value)
 
 
-def parse_capture_overflow_policy(value: object) -> CaptureOverflowPolicyValue:
+def parse_capture_overflow_policy(value: RuntimeValue) -> CaptureOverflowPolicyValue:
     return parse_policy_value(
         CaptureOverflowPolicy,
         value,

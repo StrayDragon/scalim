@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple, cast
 
 from ...typedefs import LoaderResultMapping, RuntimeValue
 from ._relations import JoinConditionIr, LookupStepIr, RelationIr, ScalimRelationInferenceError
@@ -8,7 +8,7 @@ from .binding import BindingIr, LoaderCallContextIr
 
 
 def infer_lookup_steps(
-    relation: object,
+    relation: Any,
     from_source: SourceRefIr,
     to_source: SourceIr,
 ) -> Optional[Tuple[LookupStepIr, ...]]:
@@ -92,7 +92,7 @@ def call_loader_with_binding(
     return loader_fn(*args, **kwargs)
 
 
-def coerce_loader_result_mapping(result: object) -> LoaderResultMapping:
+def coerce_loader_result_mapping(result: RuntimeValue) -> LoaderResultMapping:
     return cast("LoaderResultMapping", result)  # pragma: allow-cast loader result boundary typed narrowing
 
 

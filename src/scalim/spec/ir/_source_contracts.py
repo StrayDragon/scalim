@@ -1,8 +1,10 @@
-from typing import Optional
+from typing import Any, Optional
 
+from ...typedefs import LoaderResultMapping, RuntimeValue
 from ...vendor.compact.typing_extensionsx import Protocol, runtime_checkable
 from .aliases import LookupKeySpec, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
+from .callable_refs import CallableRefIr
 from .lookup_casts import LookupCastSpecIr
 
 
@@ -29,7 +31,7 @@ class SourceRefIrBase(Protocol):
 class SourceNormalizeIrBase(Protocol):
     """数据源 `normalize` 契约: 供 `execution` 模块使用的最小接口."""
 
-    def apply(self, result: object, *, source_id: str, call_by: Optional[object] = None) -> object: ...
+    def apply(self, result: RuntimeValue, *, source_id: str, call_by: Optional[Any] = None) -> LoaderResultMapping: ...
 
 
 @runtime_checkable
@@ -56,7 +58,7 @@ class MainSourceRefIrBase(SourceRefIrBase, Protocol):
     """主数据源契约: 可作为关联端点,不可作为关联查找目标."""
 
     @property
-    def loader_ref(self) -> object: ...
+    def loader_ref(self) -> CallableRefIr: ...
 
 
 __all__ = ()

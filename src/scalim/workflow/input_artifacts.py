@@ -7,6 +7,7 @@
 
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, cast
 
+from ..typedefs import RuntimeValue
 from .artifacts import WorkflowArtifactsDirectory
 from .errors import ScalimWorkflowConfigError
 from .resources_base import ScalimWorkflowWriteError
@@ -24,7 +25,7 @@ def _get_optional_workflow_artifact(
     consumer_decl_order: int,
     input_node_id: str,
     artifact_id: str,
-) -> Optional[object]:
+) -> Optional[RuntimeValue]:
     path_prefix = "workflow.runs.{}".format(int(consumer_decl_order))
     try:
         return artifacts_dir.get_optional(str(consumer_node_id), str(input_node_id), str(artifact_id))

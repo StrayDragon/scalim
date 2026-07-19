@@ -9,7 +9,7 @@ import csv
 import io
 from abc import ABC
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
 
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
@@ -113,20 +113,19 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
     def _get_or_create_csv(self, csv_id: str, *, workflow_node_id: str) -> _CsvPlan:
         key = str(csv_id)
 
-        def _create() -> object:
+        def _create() -> _CsvPlan:
             raw_path = self._csv_defs.get(key)
             if raw_path is None:
                 msg = "Unknown csv resource id: {!r}".format(key)
                 raise ScalimWorkflowWriteError(msg)
             return _CsvPlan(resource_id=key, path=str(raw_path))
 
-        def _on_create(plan: object) -> None:
-            p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
+        def _on_create(plan: _CsvPlan) -> None:
             self._emit_resource_create(
                 workflow_node_id=str(workflow_node_id),
                 resource_type="csv",
                 resource_id=key,
-                path=str(p.path),
+                path=str(plan.path),
             )
 
         plan = self._get_or_create_plan(
@@ -155,7 +154,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         input_header = _read_csv_header(input_csv)
 
         pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_warning_meta: Optional[Dict[str, Any]] = None
         pending_skip = False
 
         if plan.baseline_header is None:
@@ -226,8 +225,8 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
     @override
-    def _commit_csv(self, plan: object) -> None:
-        p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
+    def _commit_csv(self, plan: _CsvPlan) -> None:
+        p = plan
         if p.segments is None or p.baseline_header is None:
             return
 
@@ -269,8 +268,8 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         )
 
     @override
-    def _discard_csv(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
-        p = cast("_CsvPlan", plan)  # pragma: allow-cast csv plan typed narrowing
+    def _discard_csv(self, plan: _CsvPlan, *, workflow_node_id: str, reason: str) -> None:
+        p = plan
         node_id = p.last_workflow_node_id or str(workflow_node_id)
         self._emit_resource_discard(
             workflow_node_id=node_id,

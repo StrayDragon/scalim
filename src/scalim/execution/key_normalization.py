@@ -1,9 +1,9 @@
 from typing import Optional
 
-from ..typedefs import KeyNormalizationMode
+from ..typedefs import KeyNormalizationMode, RuntimeValue
 
 
-def normalize_key_normalization(value: object) -> KeyNormalizationMode:
+def normalize_key_normalization(value: RuntimeValue) -> KeyNormalizationMode:
     if value is None:
         return "raw"
     raw = str(value).strip()
@@ -25,7 +25,7 @@ def should_apply_str_key_normalization(
     return True
 
 
-def is_experimental_key_normalization(mode: Optional[object]) -> bool:
+def is_experimental_key_normalization(mode: Optional[RuntimeValue]) -> bool:
     try:
         resolved = normalize_key_normalization(mode)
     except ValueError:

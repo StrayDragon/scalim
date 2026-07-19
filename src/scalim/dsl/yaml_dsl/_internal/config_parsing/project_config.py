@@ -51,7 +51,7 @@ class YamlDslProjectConfig:
     lsp: Optional[YamlDslLspConfig] = None
 
 
-def _is_list(value: object) -> TypeGuard[List[object]]:
+def _is_list(value: Any) -> TypeGuard[List[Any]]:
     return isinstance(value, list)
 
 
@@ -77,7 +77,7 @@ def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
     return loaded
 
 
-def _resolve_dir(value: object, *, base_dir: Path, context_label: str) -> Path:
+def _resolve_dir(value: Any, *, base_dir: Path, context_label: str) -> Path:
     raw = str(value or "")
     if not raw.strip():
         msg = "{} must be a non-empty directory path".format(str(context_label or "path"))

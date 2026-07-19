@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Any, List, Union
 
 from .....vendor.compact.typing_extensionsx import TypedDict
 
@@ -81,7 +81,7 @@ class ObservabilityRaw(TypedDict, total=False):
 
 class GuardrailsLoaderRaw(TypedDict, total=False):
     validate_result: bool
-    required_fields: List[object]
+    required_fields: List[Any]
     on_transform_error: str
 
 

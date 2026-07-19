@@ -7,7 +7,7 @@
   `get_book_kind` 仅返回 `deprecated` `wire` `shim`
 """
 
-from typing import FrozenSet, Iterator, Mapping, Optional, Tuple
+from typing import Any, FrozenSet, Iterator, Mapping, Optional, Tuple
 
 from .resources_base import ScalimWorkflowWriteError
 from .resources_csv import WorkflowCsvResourceMixin
@@ -132,7 +132,7 @@ class WorkflowResourceManager(
         producer_node_id: str,
         book_id: str,
         sheet: str,
-    ) -> "Iterator[Mapping[str, object]]":
+    ) -> "Iterator[Mapping[str, Any]]":
         bid = str(book_id)
         if bid in self._sheetbook_defs:
             return self.iter_sheetbook_sheet_rows(

@@ -9,7 +9,7 @@ from .....spec.ir import LookupStepIr
 from .....spec.ir._helpers import coerce_loader_result_mapping
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
-from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData
+from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData, RuntimeValue
 from .....utils.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
 from .....vendor.compact.typing_extensionsx import Protocol
 from ....loader_call_params import build_loader_call_params
@@ -50,7 +50,7 @@ def _trigger_ref_loader_call(
     source_id: str,
     binding: Optional[BindingIr],
     loader_context: LoaderCallContextIr,
-    result: object,
+    result: RuntimeValue,
     duration: float,
     *,
     cache_enabled: bool,
@@ -67,7 +67,7 @@ def _trigger_ref_loader_call(
             context=loader_context,
             runtime_bindings=runtime.runtime_bindings,
         )
-    result_obj: object = result
+    result_obj: RuntimeValue = result
     skipped_none_rows: Optional[int] = None
     with contextlib.suppress(AttributeError):
         skipped_none_rows = cast(
@@ -100,7 +100,7 @@ def _call_ref_loader(
 ) -> LoaderResultMapping:
     loader_fn = runtime.runtime_bindings.require_source_loader(source.source_id)
 
-    def _call_loader() -> object:
+    def _call_loader() -> RuntimeValue:
         args, kwargs = build_loader_call_params(
             binding=binding,
             context=loader_context,
@@ -110,7 +110,7 @@ def _call_ref_loader(
 
     loader_start = time.perf_counter()
     policy = runtime.loader_retry.resolve(source.source_id)
-    result_raw: object = call_with_loader_retry(
+    result_raw: RuntimeValue = call_with_loader_retry(
         call=_call_loader,
         instrumentation=runtime.instrumentation,
         policy=policy,
@@ -120,7 +120,7 @@ def _call_ref_loader(
     )
     loader_duration = time.perf_counter() - loader_start
 
-    result_obj: object = result_raw
+    result_obj: RuntimeValue = result_raw
     normalize_spec = source.normalize
     if normalize_spec is not None:
         normalize_call_by = runtime.runtime_bindings.get_source_normalize_call_by(source.source_id)

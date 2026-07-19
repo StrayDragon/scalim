@@ -13,7 +13,7 @@
 """
 
 from pathlib import Path
-from typing import Dict, FrozenSet, Mapping, Optional, Set, Tuple, cast
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Set, Tuple, cast
 
 from ...spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr
 from ...vendor.dataclassesx import dataclass
@@ -81,16 +81,16 @@ _build_workflow_options_ir = _workflow_compile_options_mod.build_workflow_option
 
 
 def compile_workflow_ir(
-    wf: object,
+    wf: Any,
     *,
     workflow_yaml_path: str,
     path_aliases: Optional[Mapping[str, str]],
-    template_vars: Optional[Mapping[str, object]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
-    init_vars: Optional[Dict[str, object]] = None,
-    overrides: Optional[object] = None,
+    init_vars: Optional[Dict[str, Any]] = None,
+    overrides: Optional[Any] = None,
     workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
     resources_policy: Optional[ResourcesPolicy] = None,
 ) -> WorkflowCompileResult:

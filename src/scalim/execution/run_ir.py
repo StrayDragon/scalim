@@ -273,7 +273,7 @@ def _prepare_engine_sink(
     sink: ISink,
     field_ids: Sequence[str],
     capture_in_memory_rows: bool,
-    observer_manager: object,
+    observer_manager: "ObserverManager",
 ) -> Tuple[ISink, Optional[InMemoryRowsSink]]:
     if not capture_in_memory_rows:
         return sink, None

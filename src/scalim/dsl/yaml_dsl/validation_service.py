@@ -176,7 +176,7 @@ def find_legacy_field_errors(
 
 
 def issues_to_rows(
-    issues: Iterable[object],
+    issues: Iterable[Any],
     *,
     source_path: str,
     locations: YamlLocationIndex,
@@ -418,7 +418,7 @@ def find_demand_output_destination_binding_errors(
     return errors
 
 
-def _retry_enabled_missing_should_retry(retry_raw: object) -> bool:
+def _retry_enabled_missing_should_retry(retry_raw: Any) -> bool:
     if not isinstance(retry_raw, dict):
         return False
     retry_dict = cast("Dict[str, Any]", retry_raw)  # pragma: allow-cast yaml retry mapping typed narrowing

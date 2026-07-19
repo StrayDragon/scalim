@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Dict, Mapping, Optional, Union, cast
 
+from ..._internal.utils.json_like import JsonLike
+from ...typedefs import RuntimeValue
 from ...vendor.dataclassesx import dataclass
 
 OutputRoot = Union[str, Path]
@@ -34,7 +36,7 @@ def _is_safe_relpath(relpath: str) -> bool:
     return ".." not in p.parts
 
 
-def _read_json_object(path: Path, *, what: str, output_root: Path) -> Mapping[str, object]:
+def _read_json_object(path: Path, *, what: str, output_root: Path) -> Mapping[str, JsonLike]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -53,10 +55,10 @@ def _read_json_object(path: Path, *, what: str, output_root: Path) -> Mapping[st
     if not isinstance(payload, dict):
         msg = "{} must be a JSON object: path={!r}, output_root={!r}".format(str(what), str(path), str(output_root))
         raise TypeError(msg)
-    return cast("Mapping[str, object]", payload)  # pragma: allow-cast json-load runtime boundary
+    return cast("Mapping[str, JsonLike]", payload)  # pragma: allow-cast json-load runtime boundary
 
 
-def _require_non_empty_str(value: object, *, field: str, what: str, output_root: Path, path: Path) -> str:
+def _require_non_empty_str(value: RuntimeValue, *, field: str, what: str, output_root: Path, path: Path) -> str:
     raw = str(value or "").strip()
     if not raw:
         msg = "{} missing required field {!r}: path={!r}, output_root={!r}".format(str(what), str(field), str(path), str(output_root))
@@ -65,7 +67,7 @@ def _require_non_empty_str(value: object, *, field: str, what: str, output_root:
 
 
 def _parse_id_to_paths(
-    value: object,
+    value: RuntimeValue,
     *,
     kind: str,
     base_dir: Path,

@@ -1,7 +1,7 @@
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import ExitStack
 from types import TracebackType
-from typing import Optional, Type
+from typing import Any, Optional, Type
 
 from ....planning.plan import ExecutionPlan
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
@@ -16,8 +16,8 @@ def maybe_create_adaptive_pool(
     runtime: ExecutionRuntime,
     overrides: PipelineOverrides,
     stack: ExitStack,
-    sys_module: object,
-    warnings_module: object,
+    sys_module: Any,
+    warnings_module: Any,
 ) -> Optional[Executor]:
     if runtime.parallel_mode != "adaptive":
         return None

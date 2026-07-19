@@ -2,7 +2,7 @@ from typing import Dict, Hashable, List, Optional, Tuple
 
 from .....spec.ir import LookupStepIr
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
-from .....typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY, LookupKey, RelationLookupResult, RowData
+from .....typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY, LookupKey, RelationLookupResult, RowData, RuntimeValue
 from .....utils.relation_signature import RelationSignature, is_auto_lookup_cast
 from ....context import BatchContext
 from ...helpers.batch_data import build_row
@@ -46,7 +46,7 @@ class LoadRefExecutionContext:
     def record_lookup(
         self,
         row_id: Hashable,
-        fk_raw: object,
+        fk_raw: RuntimeValue,
         fk_normalized: Optional[LookupKey],
         target_source: LookupSourceRefIrBase,
         result: RelationLookupResult,
@@ -64,7 +64,7 @@ class LoadRefExecutionContext:
             error_message=error_message,
         )
 
-    def maybe_warn_float_lookup_key(self, row_id: Hashable, raw_key: object, step: LookupStepIr) -> None:
+    def maybe_warn_float_lookup_key(self, row_id: Hashable, raw_key: RuntimeValue, step: LookupStepIr) -> None:
         effective_cast = step.lookup_cast if step.lookup_cast is not None else step.to_source.key.cast
         if not is_auto_lookup_cast(effective_cast):
             return
@@ -82,7 +82,7 @@ class LoadRefExecutionContext:
     def normalize_key(
         self,
         row_id: Hashable,
-        raw_key: object,
+        raw_key: RuntimeValue,
         step: LookupStepIr,
         *,
         from_fields: Optional[Tuple[str, ...]] = None,

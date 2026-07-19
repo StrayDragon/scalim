@@ -7,7 +7,7 @@ from ..._internal.utils.iterables import ordered_unique_str
 from ...ob.hub import InstrumentationHub
 from ...sinks import ExcelWorkbookSink, IRowSink
 from ...sinks.accept_types import SinkTypePrecheck
-from ...typedefs import KeyNormalizationMode
+from ...typedefs import KeyNormalizationMode, RuntimeValue
 from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import AggregatingRowSink
 from ..managed_artifacts import MANAGED_ARTIFACT_KIND_CSV, ManagedArtifactPlan
@@ -54,7 +54,7 @@ class OutputCompositionPlan:
     managed_artifact_plans: Dict[str, ManagedArtifactPlan]
 
 
-def normalize_output_failure_policy(failure_policy: object) -> str:
+def normalize_output_failure_policy(failure_policy: RuntimeValue) -> str:
     return parse_output_failure_policy(failure_policy)
 
 

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from ..init_var_nodes import InitVarRef, OptionalPathNode
 
@@ -8,7 +8,7 @@ from ..init_var_nodes import InitVarRef, OptionalPathNode
 def resolve_output_container_path(
     raw: OptionalPathNode,
     *,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path: str,
 ) -> str:
     """解析输出资源路径节点为非空字符串路径.
@@ -64,7 +64,7 @@ def resolve_yaml_relative_output_path(
     raw: OptionalPathNode,
     *,
     base_dir: str,
-    init_vars: Optional[Dict[str, object]],
+    init_vars: Optional[Dict[str, Any]],
     path: str,
 ) -> str:
     """解析路径并将相对路径按 `base_dir` 归一化为绝对路径.

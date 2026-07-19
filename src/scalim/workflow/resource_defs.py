@@ -9,12 +9,13 @@ from typing import Any, Dict, Optional, Tuple
 
 from ..execution import versioned_outputs
 from ..spec.ir._workflow import WorkflowIr
+from ..typedefs import RuntimeValue
 from ..vendor.compact.typing_extensionsx import TypeGuard
 from .errors import ScalimWorkflowConfigError
 from .resources import SheetBookDef
 
 
-def _is_dict_str_any(value: object) -> TypeGuard[Dict[str, Any]]:
+def _is_dict_str_any(value: RuntimeValue) -> TypeGuard[Dict[str, Any]]:
     return isinstance(value, dict)
 
 
@@ -31,7 +32,7 @@ def _is_pathful_resource_options(opts: Dict[str, Any]) -> Optional[bool]:
     return None
 
 
-def options_bool(opts: object, key: str, *, default: bool = False) -> bool:
+def options_bool(opts: RuntimeValue, key: str, *, default: bool = False) -> bool:
     if not _is_dict_str_any(opts):
         return bool(default)
     return bool(opts.get(str(key), default))

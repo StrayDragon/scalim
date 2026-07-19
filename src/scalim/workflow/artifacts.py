@@ -4,6 +4,7 @@ import threading
 from typing import TYPE_CHECKING, Dict, FrozenSet, Optional, Tuple, cast
 
 from ..spec.ir._workflow import WorkflowIr
+from ..typedefs import RuntimeValue
 from .visibility_index import WorkflowVisibilityIndex
 
 if TYPE_CHECKING:
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 
 class WorkflowArtifactsDirectory:
     _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
-    _values_by_producer_node_id: Dict[str, Dict[str, object]]
+    _values_by_producer_node_id: Dict[str, Dict[str, RuntimeValue]]
     _owner_thread_id: Optional[int]
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
@@ -30,12 +31,12 @@ class WorkflowArtifactsDirectory:
     def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
         return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
-    def publish(self, producer_node_id: str, artifact_id: str, value: object) -> None:
+    def publish(self, producer_node_id: str, artifact_id: str, value: RuntimeValue) -> None:
         self._assert_owner_thread()
         by_artifact = self._values_by_producer_node_id.setdefault(str(producer_node_id), {})
         by_artifact[str(artifact_id)] = value
 
-    def get(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> object:
+    def get(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> RuntimeValue:
         consumer = str(consumer_node_id)
         producer = str(producer_node_id)
         artifact_key = str(artifact_id)
@@ -50,7 +51,7 @@ class WorkflowArtifactsDirectory:
             raise KeyError(msg)
         return by_artifact[artifact_key]
 
-    def get_optional(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> Optional[object]:
+    def get_optional(self, consumer_node_id: str, producer_node_id: str, artifact_id: str) -> Optional[RuntimeValue]:
         consumer = str(consumer_node_id)
         producer = str(producer_node_id)
         artifact_key = str(artifact_id)

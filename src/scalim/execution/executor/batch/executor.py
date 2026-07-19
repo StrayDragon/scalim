@@ -121,7 +121,7 @@ class BatchExecutor:
         runtime: ExecutionRuntime,
         required_fields: Optional[Set[str]],
         adaptive_pool: Optional[Executor],
-        after_operator: Optional[Callable[[object], None]],
+        after_operator: Optional[Callable[[SupportedOperatorIr], None]],
     ) -> Optional[Dict[str, float]]:
         wants_stage_spans, stage_durations, stage_map = init_stage_span_tracking(runtime)
         wants_operator_spans = runtime.instrumentation.wants(EventType.OPERATOR_SPAN)
@@ -202,7 +202,7 @@ class BatchExecutor:
         required_fields: Optional[Set[str]],
         adaptive_pool: Optional[Executor],
         max_workers: int,
-        after_operator: Optional[Callable[[object], None]],
+        after_operator: Optional[Callable[[SupportedOperatorIr], None]],
     ) -> None:
         executor = self._executors.get(OperatorType.LOAD_REF.value)
         if executor is None:
@@ -256,7 +256,7 @@ class BatchExecutor:
         context: BatchContext,
         batch_row_nth: List[Hashable],
         runtime: ExecutionRuntime,
-        after_operator: Optional[Callable[[object], None]],
+        after_operator: Optional[Callable[[SupportedOperatorIr], None]],
     ) -> None:
         for op in ops:
             executor.execute(op, context, batch_row_nth, runtime)

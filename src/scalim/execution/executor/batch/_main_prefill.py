@@ -1,4 +1,4 @@
-from typing import Callable, Hashable, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, Hashable, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 from ....spec.ir import FieldIr
 from ....typedefs import FieldValue, RowData
@@ -10,7 +10,7 @@ from ..runtime.runtime import ExecutionRuntime
 
 def collect_main_source_fields(
     *,
-    plan_field_specs: Mapping[str, object],
+    plan_field_specs: Mapping[str, Any],
     field_keys: Set[str],
     main_source_id: str,
 ) -> Tuple[List[Tuple[str, FieldIr]], List[str]]:
@@ -395,7 +395,7 @@ def _prefill_main_source_fields_generic(
 def prefill_main_source_fields(
     *,
     context: BatchContext,
-    plan_field_specs: Mapping[str, object],
+    plan_field_specs: Mapping[str, Any],
     runtime: ExecutionRuntime,
     batch_row_nth: Sequence[Hashable],
     main_rows: Optional[Sequence[RowData]],

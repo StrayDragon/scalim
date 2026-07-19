@@ -80,7 +80,7 @@ class DemandIr:
                     msg = f"字段 {field_key!r} 引用的数据源 {source_id!r} 不存在"
                     raise ValueError(msg)
 
-    def __getstate__(self) -> Dict[str, object]:
+    def __getstate__(self) -> Dict[str, Any]:
         state = dict(self.__dict__)
         sources = state.get("sources")
         if isinstance(sources, MappingProxyType):
@@ -90,7 +90,7 @@ class DemandIr:
             state["fields"] = dict(fields)
         return state
 
-    def __setstate__(self, state: Dict[str, object]) -> None:
+    def __setstate__(self, state: Dict[str, Any]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
         self.__post_init__()

@@ -16,6 +16,7 @@ import threading
 from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Mapping, Optional, Set, Tuple, cast
 
+from ..typedefs import RuntimeValue
 from ..vendor.compact.typing_extensionsx import Literal, override
 
 StructuredLogProfile = Literal["compact", "verbose"]
@@ -47,7 +48,7 @@ def _normalize_stream_name(value: str) -> str:
     return "stderr"
 
 
-def _as_json_dict(value: object) -> Optional[Dict[str, Any]]:
+def _as_json_dict(value: RuntimeValue) -> Optional[Dict[str, Any]]:
     if value is None:
         return None
     if isinstance(value, dict):

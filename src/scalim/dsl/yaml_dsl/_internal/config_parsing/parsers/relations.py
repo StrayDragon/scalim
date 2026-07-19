@@ -16,7 +16,7 @@ from .utils import list_or_none, mapping_or_none
 class ParserRelationsMixin(ParserSourcesMixin):
     def _parse_relation_ref(
         self,
-        relation_raw: object,
+        relation_raw: Any,
         *,
         relations: Dict[str, RelationConfig],
     ) -> Optional[InlineRelationConfig]:
@@ -61,7 +61,7 @@ class ParserRelationsMixin(ParserSourcesMixin):
             steps=steps,
         )
 
-    def _parse_steps(self, steps_raw: object) -> Tuple[RelationStepConfig, ...]:
+    def _parse_steps(self, steps_raw: Any) -> Tuple[RelationStepConfig, ...]:
         step_items = list_or_none(steps_raw)
         if step_items is None:
             return ()
@@ -86,7 +86,7 @@ class ParserRelationsMixin(ParserSourcesMixin):
 
         return tuple(steps)
 
-    def _parse_step_field(self, raw_field: object) -> Union[str, Tuple[str, ...]]:
+    def _parse_step_field(self, raw_field: Any) -> Union[str, Tuple[str, ...]]:
         field_items = list_or_none(raw_field)
         if field_items is not None:
             return tuple(str(item) for item in field_items)
