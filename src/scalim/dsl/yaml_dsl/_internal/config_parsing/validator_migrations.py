@@ -30,7 +30,7 @@ from .validators.issues import (
 __all__ = ()
 
 
-def _is_dict(value: object) -> "TypeGuard[Dict[object, object]]":
+def _is_dict(value: Any) -> "TypeGuard[Dict[Any, Any]]":
     return isinstance(value, dict)
 
 
@@ -56,7 +56,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         return cleaned
 
     def _warn_deprecated_book_branches(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
-        resources_raw: object = config.get(DEMAND_KEYS["resources"])
+        resources_raw: Any = config.get(DEMAND_KEYS["resources"])
         if not _is_dict(resources_raw):
             return config
         resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
@@ -210,7 +210,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         config: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:
-        resources_raw: object = config.get(DEMAND_KEYS["resources"])
+        resources_raw: Any = config.get(DEMAND_KEYS["resources"])
         if not _is_dict(resources_raw):
             return config
 
@@ -236,7 +236,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             "and locate outputs via <root>/manifest/latest.json."
         )
 
-        files_raw: object = resources.get(RESOURCES_KEYS["files"])
+        files_raw: Any = resources.get(RESOURCES_KEYS["files"])
         if _is_dict(files_raw):
             files = cast("Dict[str, Any]", files_raw)  # pragma: allow-cast yaml mapping typed narrowing
             for raw_file_id, raw_file_cfg in files.items():
@@ -276,7 +276,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                     next_files[str(raw_file_id)] = next_file_cfg
                     next_resources[RESOURCES_KEYS["files"]] = next_files
 
-        books_raw: object = resources.get(RESOURCES_KEYS["books"])
+        books_raw: Any = resources.get(RESOURCES_KEYS["books"])
         if _is_dict(books_raw):
             books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
             for raw_book_id, raw_book_cfg in books.items():
@@ -370,7 +370,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         config: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:
-        resources_raw: object = config.get(DEMAND_KEYS["resources"])
+        resources_raw: Any = config.get(DEMAND_KEYS["resources"])
         if not _is_dict(resources_raw):
             return config
 

@@ -8,7 +8,7 @@
 
 - **不进入** `just qa` / `quick-check` 阻断门禁,直到 `block` 可收敛到可维护规模.
 - 扫描器覆盖: 模块级函数、**类方法 / 嵌套类 / 嵌套函数** 的参数与返回标注、类字段 `AnnAssign`、以及 `X = object` 别名.
-- 当前量级(完整扫描后,约数): **`block≈580` / `total≈588` / `allow=2`**(自完整扫描约 1016 起,batch1–5 持续用 `RuntimeValue`/`JsonLike`/`Any` 收窄; AdaptiveTaskKey 贯通后又少约 20).
+- 当前量级(完整扫描后,约数): **`block≈521` / `total≈529` / `allow=2`**(自完整扫描约 1016 起,batch1–6 持续用 `RuntimeValue`/`JsonLike`/`Any` 收窄; AdaptiveTaskKey 贯通后又少约 20).
 - 扫描器可按需运行;报告写入 `.tmp/artifacts/`(勿提交).
 - `scripts/` 与 `vendor/` 命中记为 `whitelist`,不参与 `--check` 阻断.
 - 分批清债走 **quick 路径**(直接改类型 / 加有理由的 pragma);**仅当**需要改 `llmanspec` MUST/SHALL 时再开 `SDD` propose. **不要**在 `block` 仍高时接入 `quick-check`.

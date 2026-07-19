@@ -43,15 +43,15 @@ def prefix(subsystem: str) -> str:
     return "[scalim] {}: ".format(subsystem_text)
 
 
-def _is_list_or_tuple(value: object) -> TypeGuard[Iterable[object]]:
+def _is_list_or_tuple(value: Any) -> TypeGuard[Iterable[Any]]:
     return isinstance(value, (list, tuple))
 
 
-def _is_set(value: object) -> TypeGuard[Iterable[object]]:
+def _is_set(value: Any) -> TypeGuard[Iterable[Any]]:
     return isinstance(value, set)
 
 
-def _is_dict(value: object) -> TypeGuard[Dict[object, object]]:
+def _is_dict(value: Any) -> TypeGuard[Dict[Any, Any]]:
     return isinstance(value, dict)
 
 

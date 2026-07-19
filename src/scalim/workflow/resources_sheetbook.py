@@ -7,7 +7,7 @@
 
 from abc import ABC
 from contextlib import suppress
-from typing import Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
 
 from .._internal.utils.excel import escape_excel_formula
 from .._internal.utils.openpyxl_helpers import save_openpyxl_workbook_atomic as _save_openpyxl_workbook_atomic_impl
@@ -27,8 +27,11 @@ _describe_header_diff = describe_header_diff
 _best_effort_close_write_only_workbook_worksheets = best_effort_close_write_only_workbook_worksheets
 _get_openpyxl_workbook_class = get_openpyxl_workbook_class
 
+if TYPE_CHECKING:
+    from openpyxl import Workbook
 
-def _save_openpyxl_workbook_atomic(workbook: object, *, output_path: str) -> None:
+
+def _save_openpyxl_workbook_atomic(workbook: "Workbook", *, output_path: str) -> None:
     try:
         _save_openpyxl_workbook_atomic_impl(workbook, output_path=output_path)
     except Exception as exc:
@@ -101,7 +104,7 @@ def _sorted_sheetbook_segments(segments: List["_SheetBookSegment"]) -> List["_Sh
     return sorted(segments, key=lambda seg: (int(seg.decl_order), str(seg.producer_node_id)))
 
 
-def _write_sheetbook_plan_to_openpyxl_workbook(workbook: object, plan: "_SheetBookPlan") -> None:
+def _write_sheetbook_plan_to_openpyxl_workbook(workbook: "Workbook", plan: "_SheetBookPlan") -> None:
     wb = cast("Any", workbook)  # pragma: allow-cast openpyxl workbook runtime boundary
     for sheet_name in plan.sheet_order:
         sheet_plan = plan.sheets.get(sheet_name)
@@ -305,10 +308,10 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         export_header: Optional[Tuple[str, ...]],
         align_by: str,
         on_mismatch: str,
-    ) -> Tuple[List[str], List[int], Optional[DiagnosticWarningEvent], Optional[Dict[str, object]], bool]:
+    ) -> Tuple[List[str], List[int], Optional[DiagnosticWarningEvent], Optional[Dict[str, Any]], bool]:
         msg: str
         pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, object]] = None
+        pending_warning_meta: Optional[Dict[str, Any]] = None
         pending_skip = False
 
         sheet_plan = plan.sheets.get(sheet_name)
@@ -672,14 +675,13 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         return _iter_sheetbook_row_dicts(baseline_header, segments)
 
     @override
-    def _commit_sheetbook(self, plan: object) -> None:
-        p = cast("_SheetBookPlan", plan)  # pragma: allow-cast sheetbook plan typed narrowing
-        export_path = p.export_path
+    def _commit_sheetbook(self, plan: "_SheetBookPlan") -> None:
+        export_path = plan.export_path
         display_path = export_path if export_path is not None else "<memory>"
-        node_id = p.last_workflow_node_id or "__wf__commit"
+        node_id = plan.last_workflow_node_id or "__wf__commit"
         if export_path is None:
-            self._emit_sheetbook_commit(p, display_path=str(display_path))
-            self._release_sheetbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
+            self._emit_sheetbook_commit(plan, display_path=str(display_path))
+            self._release_sheetbook_plan_segments(plan, workflow_node_id=str(node_id), release_reason="commit")
             return
 
         final_path = str(export_path)
@@ -692,7 +694,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         wb = workbook_cls(write_only=True)
         try:
-            _write_sheetbook_plan_to_openpyxl_workbook(wb, p)
+            _write_sheetbook_plan_to_openpyxl_workbook(wb, plan)
             _save_openpyxl_workbook_atomic(wb, output_path=staging_path)
         except Exception:
             _best_effort_close_write_only_workbook_worksheets(wb)
@@ -703,26 +705,25 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         self._register_staged_output(
             resource_type="sheetbook",
-            resource_id=p.resource_id,
+            resource_id=plan.resource_id,
             workflow_node_id=str(node_id),
             staged_path=str(staging_path),
             final_path=str(final_path),
         )
-        self._release_sheetbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="commit")
+        self._release_sheetbook_plan_segments(plan, workflow_node_id=str(node_id), release_reason="commit")
 
     @override
-    def _discard_sheetbook(self, plan: object, *, workflow_node_id: str, reason: str) -> None:
-        p = cast("_SheetBookPlan", plan)  # pragma: allow-cast sheetbook plan typed narrowing
-        node_id = p.last_workflow_node_id or str(workflow_node_id)
-        display_path = p.export_path if p.export_path is not None else "<memory>"
+    def _discard_sheetbook(self, plan: "_SheetBookPlan", *, workflow_node_id: str, reason: str) -> None:
+        node_id = plan.last_workflow_node_id or str(workflow_node_id)
+        display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._emit_resource_discard(
             workflow_node_id=node_id,
             resource_type="sheetbook",
-            resource_id=p.resource_id,
+            resource_id=plan.resource_id,
             path=str(display_path),
             reason=str(reason),
         )
-        self._release_sheetbook_plan_segments(p, workflow_node_id=str(node_id), release_reason="discard")
+        self._release_sheetbook_plan_segments(plan, workflow_node_id=str(node_id), release_reason="discard")
 
     def _release_sheetbook_plan_segments(self, plan: "_SheetBookPlan", *, workflow_node_id: str, release_reason: str) -> None:
         for sheet_plan in plan.sheets.values():

@@ -50,7 +50,7 @@ def effective_book_write_mode(
     *,
     resources_override: Optional[ResourcesOverride],
     book_id: str,
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> str:
     _ = resources_override  # `IO` `overlay` 不再承载 `write` `policy`
     policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
@@ -69,7 +69,7 @@ def effective_book_header_policy(
     *,
     resources_override: Optional[ResourcesOverride],
     book_id: str,
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> str:
     _ = resources_override  # `IO` `overlay` 不再承载 `write` `policy`
     policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
@@ -90,7 +90,7 @@ def output_target_requires_unique_effective_field_display_names(
     output: OutputTargetConfig,
     *,
     resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> bool:
     to_cfg = output.to
     if to_cfg is None:
@@ -134,7 +134,7 @@ def output_override_requires_unique_effective_field_display_names(
     *,
     default_book_id: Optional[str],
     resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> bool:
     to_cfg = output.to
     write_cfg = output.write
@@ -177,7 +177,7 @@ def outputs_require_unique_effective_field_display_names(
     *,
     outputs: Tuple[OutputTargetConfig, ...],
     resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> bool:
     return any(
         output_target_requires_unique_effective_field_display_names(
@@ -193,7 +193,7 @@ def output_overrides_require_unique_effective_field_display_names(
     outputs: Tuple[OutputOverride, ...],
     default_book_id: Optional[str],
     resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> bool:
     return any(
         output_override_requires_unique_effective_field_display_names(

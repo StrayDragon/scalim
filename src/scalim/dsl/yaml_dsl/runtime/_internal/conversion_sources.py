@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Mapping, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, FrozenSet, List, Mapping, Optional, Set, Tuple
 
 from .....spec.ir import (
     DerivedFieldIr,
@@ -16,7 +16,14 @@ from .....spec.ir._fields import CallBySpecIr, CallByValueIr, FieldDefaultCaseIr
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr
-from .....typedefs import FIELD_VALUE_TYPES, FieldValue, SourceSpecIrCacheMode, format_field_value_expected_types
+from .....typedefs import (
+    FIELD_VALUE_TYPES,
+    FieldValue,
+    RuntimeValue,
+    SourceSpecIrCacheMode,
+    StaticParams,
+    format_field_value_expected_types,
+)
 from ..._internal.config_parsing.call_by import ParsedCallBy, ScalimCallByParseError, parse_call_by
 from ..._internal.config_parsing.field_extract import ScalimFieldExtractCompileError, compile_field_extract
 from ..._internal.config_parsing.security import SecureComputeEngine, is_constant_compute_expression
@@ -48,7 +55,7 @@ if TYPE_CHECKING:
     from .....vendor.compact.typing_extensionsx import TypeGuard
 
 
-def _ensure_field_value(value: object, *, field_id: str, producer: str) -> FieldValue:
+def _ensure_field_value(value: RuntimeValue, *, field_id: str, producer: str) -> FieldValue:
     if value is None or isinstance(value, FIELD_VALUE_TYPES):
         return value
     msg = "Field '{}' {} has unsupported value type '{}'; expected {}".format(
@@ -76,7 +83,7 @@ def _is_normalize_on_missing(value: str) -> "TypeGuard[NormalizeOnMissing]":
     return value in {"error", "null"}
 
 
-def _parse_callable_ref(reference: object, *, context_label: str) -> CallableRefIr:
+def _parse_callable_ref(reference: Any, *, context_label: str) -> CallableRefIr:
     raw = str(reference or "").strip()
     if not raw:
         msg = "{} must not be empty".format(context_label)
@@ -101,7 +108,7 @@ def _parse_callable_ref(reference: object, *, context_label: str) -> CallableRef
     )
 
 
-def _convert_call_by_value_ir(value: object, *, field_id: str) -> CallByValueIr:
+def _convert_call_by_value_ir(value: Any, *, field_id: str) -> CallByValueIr:
     kind = getattr(value, "kind", None)  # pragma: allow-dynattr dsl: parsed call_by value contract
     raw = getattr(value, "value", None)  # pragma: allow-dynattr dsl: parsed call_by value contract
     kind_text = str(kind or "").strip()
@@ -138,7 +145,7 @@ def _convert_parsed_call_by_spec(
 
 class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigToIRConversionRelationMixin):
     _compute_engine: Optional[SecureComputeEngine] = None
-    _init_vars: Optional[Mapping[str, object]] = None
+    _init_vars: Optional[Mapping[str, RuntimeValue]] = None
 
     def _require_compute_engine(self) -> SecureComputeEngine:
         compute_engine = self._compute_engine
@@ -177,7 +184,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         except ScalimParamsTemplateCompileError as exc:
             raise ScalimConversionError(str(exc)) from exc
 
-        params: Dict[str, object] = {}
+        params: StaticParams = {}
         if not template.is_empty_mapping():
             params = template.render_kwargs(_build_main_source_context(config.source_id), path="main_source.params")
 
@@ -407,7 +414,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
 
     def _convert_source_normalize_project_fields_rules(
         self,
-        rules: Mapping[str, object],
+        rules: Mapping[str, Any],
         *,
         config_path: str,
     ) -> Tuple[SourceNormalizeProjectFieldRuleIr, ...]:
@@ -424,7 +431,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         self,
         *,
         name: str,
-        rule_obj: object,
+        rule_obj: Any,
         config_path: str,
     ) -> SourceNormalizeProjectFieldRuleIr:
         if not isinstance(rule_obj, NormalizeProjectFieldRuleConfig):

@@ -67,7 +67,7 @@ def validate_allowlist(
     _ensure_allowlist(allowed_modules, allowed_functions)
 
 
-def _parse_overrides_outputs_defaults_book_id(defaults: Optional[object], *, path: str) -> Optional[str]:
+def _parse_overrides_outputs_defaults_book_id(defaults: Optional[Any], *, path: str) -> Optional[str]:
     return _resource_override_ssot.parse_outputs_defaults_book_id(defaults, path=str(path))
 
 
@@ -199,7 +199,7 @@ def _finalize_retry_policy(
         # 编译期签名预检查: 避免运行期 `_safe_should_retry` 将 `TypeError` 静默降级为 `False`.
         placeholder_exc = object()
         placeholder_ctx = object()
-        empty_kwargs: Dict[str, object] = {}
+        empty_kwargs: Dict[str, Any] = {}
         candidates = (("should_retry(exc, ctx)", (placeholder_exc, placeholder_ctx), empty_kwargs),)
         ref = repr(should_retry)
         try:
@@ -273,7 +273,7 @@ def _compile_loader_retry_policies(
 def load_config(
     yaml_path: str,
     *,
-    template_vars: Optional[Mapping[str, object]] = None,
+    template_vars: Optional[Mapping[str, Any]] = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     allowed_yaml_roots: Optional[Sequence[str]] = None,
@@ -288,7 +288,7 @@ def load_config(
     )
 
 
-def _normalize_builtin_callable_id(id_raw: object, *, label: str) -> str:
+def _normalize_builtin_callable_id(id_raw: Any, *, label: str) -> str:
     builtin_id = str(id_raw or "").strip()
     if not builtin_id:
         msg = "{}: <id> must not be empty".format(label)
@@ -306,7 +306,7 @@ def _normalize_builtin_callable_id(id_raw: object, *, label: str) -> str:
 
 def _compile_builtin_callable_vocab_value(
     builtin_id: str,
-    value_raw: object,
+    value_raw: Any,
     *,
     trusted_resolver: SecurePythonReferenceResolver,
 ) -> Callable[..., Any]:
@@ -332,7 +332,7 @@ def _compile_builtin_callable_vocab_value(
 
 
 def _compile_builtin_callables_vocab(
-    builtin_callables: Optional[Mapping[str, object]],
+    builtin_callables: Optional[Mapping[str, Any]],
     *,
     allowed_modules: Optional[FrozenSet[str]] = None,
     allowed_functions: Optional[FrozenSet[str]] = None,
@@ -374,7 +374,7 @@ def create_reference_resolver(
     allowed_functions: Optional[FrozenSet[str]],
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
     base_module_path: Optional[str] = None,
-    builtin_callables: Optional[Mapping[str, object]] = None,
+    builtin_callables: Optional[Mapping[str, Any]] = None,
     public_builtin_callable_ids: Optional[Sequence[str]] = None,
 ) -> SecurePythonReferenceResolver:
     compiled_builtin_callables = _compile_builtin_callables_vocab(
@@ -396,7 +396,7 @@ def create_reference_resolver(
 def compile_ir(
     config: DemandConfig,
     *,
-    init_vars: Optional[Dict[str, object]] = None,
+    init_vars: Optional[Dict[str, Any]] = None,
 ) -> DemandIr:
     converter = ConfigToIRConverter(init_vars=init_vars)
     return converter.convert(config)

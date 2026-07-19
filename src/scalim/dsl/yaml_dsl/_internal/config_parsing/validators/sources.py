@@ -98,7 +98,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         )
         return "{}\nSuggested:\n  steps: [{{{}: {{...}}}}]".format(msg, suggested_branch)
 
-    def _collect_field_data_key_map(self, fields_raw: object) -> Dict[str, Set[str]]:
+    def _collect_field_data_key_map(self, fields_raw: Any) -> Dict[str, Set[str]]:
         data_key_map: Dict[str, Set[str]] = {}
         fields_dict = mapping_or_none(fields_raw)
         if fields_dict is None:
@@ -118,7 +118,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
     def _validate_params_template_semantics(
         self,
-        params_raw: object,
+        params_raw: Any,
         errors: List[ValidationIssue],
         *,
         path: str,
@@ -139,7 +139,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
         except ScalimParamsTemplateCompileError as exc:
             self._add_error(errors, exc.message, path=exc.path)
 
-    def _collect_declared_field_names(self, fields_raw: object) -> Set[str]:
+    def _collect_declared_field_names(self, fields_raw: Any) -> Set[str]:
         names: Set[str] = set()
         fields_dict = mapping_or_none(fields_raw)
         if fields_dict is None:
@@ -150,7 +150,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
                 names.add(field_id)
         return names
 
-    def _collect_source_key_names(self, key_raw: object) -> Set[str]:
+    def _collect_source_key_names(self, key_raw: Any) -> Set[str]:
         names: Set[str] = set()
         key_list = list_or_none(key_raw)
         if key_list is not None:
@@ -985,7 +985,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
     def _validate_normalize_map_values_step(
         self,
-        step_raw: object,
+        step_raw: Any,
         errors: List[ValidationIssue],
         *,
         steps_path: str,
@@ -1098,7 +1098,7 @@ class ValidatorSourcesMixin(ValidatorMixinBase):
 
     def _validate_normalize_project_fields_rules(
         self,
-        rules_raw: object,
+        rules_raw: Any,
         errors: List[ValidationIssue],
         *,
         fields_path: str,

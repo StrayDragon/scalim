@@ -1,6 +1,7 @@
 from typing import Dict, List, Mapping, Optional, Union
 
 from ....spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, SourceIr
+from ....typedefs import RuntimeValue
 from .._internal.config_parsing.security import SecureComputeEngine, build_compute_engine
 from ..schema_dsl.models import DemandConfig
 from ._internal.conversion_lookup import LookupCastRegistry, validate_source_id
@@ -26,12 +27,12 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
     _relation_adjacency: Optional[Dict[str, List[StepInfo]]]
     _source_field_id_map: Optional[Dict[str, Dict[str, str]]]
     _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]]
-    _init_vars: Optional[Mapping[str, object]]
+    _init_vars: Optional[Mapping[str, RuntimeValue]]
 
     def __init__(
         self,
         compute_engine: Optional[SecureComputeEngine] = None,
-        init_vars: Optional[Mapping[str, object]] = None,
+        init_vars: Optional[Mapping[str, RuntimeValue]] = None,
     ) -> None:
         self._compute_engine = compute_engine or build_compute_engine()
         self._init_vars = init_vars

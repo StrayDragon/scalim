@@ -22,13 +22,13 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 
 class ParserSourcesMixin:
     @staticmethod
-    def _normalize_opt_str(value: object) -> Optional[str]:
+    def _normalize_opt_str(value: Any) -> Optional[str]:
         if value is None:
             return None
         raw = str(value).strip()
         return raw or None
 
-    def _parse_normalize_project_fields(self, raw_value: object) -> Dict[str, NormalizeProjectFieldRuleConfig]:
+    def _parse_normalize_project_fields(self, raw_value: Any) -> Dict[str, NormalizeProjectFieldRuleConfig]:
         fields_raw = mapping_or_none(raw_value)
         if fields_raw is None:
             return {}
@@ -49,7 +49,7 @@ class ParserSourcesMixin:
             )
         return fields_by_name
 
-    def _parse_normalize_steps(self, raw_value: object) -> Tuple[NormalizeStepConfig, ...]:
+    def _parse_normalize_steps(self, raw_value: Any) -> Tuple[NormalizeStepConfig, ...]:
         steps_raw = list_or_none(raw_value)
         if steps_raw is None:
             return ()
@@ -179,7 +179,7 @@ class ParserSourcesMixin:
             )
         return updated
 
-    def _parse_lookup_chunk_size(self, raw_value: object) -> Optional[int]:
+    def _parse_lookup_chunk_size(self, raw_value: Any) -> Optional[int]:
         if raw_value is None:
             return None
         if isinstance(raw_value, bool):
@@ -191,7 +191,7 @@ class ParserSourcesMixin:
         except (TypeError, ValueError):
             return None
 
-    def _parse_lookup_cast(self, raw_lookup: object) -> Optional[LookupCastConfig]:
+    def _parse_lookup_cast(self, raw_lookup: Any) -> Optional[LookupCastConfig]:
         lookup_dict = mapping_or_none(raw_lookup)
         if lookup_dict is None:
             return None
@@ -226,7 +226,7 @@ class ParserSourcesMixin:
 
         return LookupCastConfig(name=branch, sep=None)
 
-    def _parse_normalize(self, raw_value: object) -> Optional[NormalizeConfig]:
+    def _parse_normalize(self, raw_value: Any) -> Optional[NormalizeConfig]:
         norm_dict = mapping_or_none(raw_value)
         if norm_dict is None:
             return None

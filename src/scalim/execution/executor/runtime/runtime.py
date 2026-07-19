@@ -14,7 +14,7 @@ from ....planning.plan import ExecutionPlan
 from ....sinks import ISink
 from ....spec.ir import LookupStepIr, MainSourceIr, SourceIr, SupportedFieldIr
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
-from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LookupKey, ParallelMode, RowData
+from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LoaderResultValue, LookupKey, ParallelMode, RowData, RuntimeValue
 from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ....vendor.dataclassesx import dataclass
 from ...guardrails import GuardrailsPolicy
@@ -172,7 +172,7 @@ class ExecutionRuntime:
             return cached_view
 
         # 延迟构建规范化视图(稳定字符串 `key` 空间)用于匹配.
-        out: Dict[LookupKey, object] = {}
+        out: Dict[LookupKey, LoaderResultValue] = {}
         merged_collision_count = 0
         for raw_key, value in mapping.items():
             normalized_key, status, _error_message = auto_str_normalize_key(raw_key)
@@ -264,7 +264,7 @@ class ExecutionRuntime:
     def is_source_cached(self, source_name: str) -> bool:
         return source_name in self.preloaded_cache
 
-    def get_from_cache(self, source_name: str, lookup_key: LookupKey) -> Optional[object]:
+    def get_from_cache(self, source_name: str, lookup_key: LookupKey) -> Optional[LoaderResultValue]:
         cache = self.preloaded_cache.get(source_name)
         if cache is None:
             return None
@@ -272,7 +272,7 @@ class ExecutionRuntime:
 
     def normalize_lookup_key_with_status(
         self,
-        raw_key: object,
+        raw_key: RuntimeValue,
         step: LookupStepIr,
     ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
         """将外键值规范化为目标源键类型,并返回状态信息"""
@@ -282,7 +282,7 @@ class ExecutionRuntime:
 
     def _normalize_lookup_key_status(
         self,
-        raw_key: object,
+        raw_key: RuntimeValue,
         step: LookupStepIr,
     ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
         if raw_key is None:
@@ -321,7 +321,7 @@ class ExecutionRuntime:
     def _apply_lookup_cast(
         self,
         lookup_cast: LookupCastSpecIr,
-        raw_key: object,
+        raw_key: RuntimeValue,
         *,
         is_multi: bool,
         none_message: str,
@@ -342,7 +342,7 @@ class ExecutionRuntime:
 
     def normalize_lookup_key(
         self,
-        raw_key: object,
+        raw_key: RuntimeValue,
         step: LookupStepIr,
     ) -> Optional[LookupKey]:
         """将外键值规范化为目标源键类型"""
