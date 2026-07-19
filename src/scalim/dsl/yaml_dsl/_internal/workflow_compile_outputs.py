@@ -90,7 +90,7 @@ def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, o
 def _effective_write_defaults(
     book_id: str,
     *,
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> BookWriteDefaultsConfig:
     policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
     return resolve_write_defaults_config(book_id=str(book_id), resources_policy=policy)
@@ -253,7 +253,7 @@ def _append_write_nodes_from_runs(  # noqa: C901, PLR0912, PLR0915
     effective_files: Mapping[str, FileConfig],
     overrides_outputs: Optional[Sequence[OutputOverride]],
     default_book_id: Optional[str],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> Dict[str, List[str]]:
     last_write_node_id_by_book_id: Dict[str, str] = {}
     last_write_node_id_by_file_id: Dict[str, str] = {}
@@ -534,7 +534,7 @@ def effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, ou
 def effective_write_defaults(
     book_id: str,
     *,
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> BookWriteDefaultsConfig:
     return _effective_write_defaults(str(book_id), resources_policy=resources_policy)
 
@@ -544,7 +544,7 @@ def validate_xlsx_memory_align_by(
     book: BookConfig,
     book_id: str,
     effective_defaults: Optional[BookWriteDefaultsConfig] = None,
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> None:
     defaults = effective_defaults
     if defaults is None:
@@ -637,7 +637,7 @@ def append_write_nodes_from_runs(
     effective_files: Mapping[str, FileConfig],
     overrides_outputs: Optional[Sequence[OutputOverride]],
     default_book_id: Optional[str],
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> Dict[str, List[str]]:
     return _append_write_nodes_from_runs(
         wf_obj,

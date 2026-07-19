@@ -22,6 +22,7 @@ from ._internal import workflow_compile_options as _workflow_compile_options_mod
 from ._internal import workflow_compile_outputs as _workflow_compile_outputs_mod
 from ._internal import workflow_compile_resources as _workflow_compile_resources_mod
 from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
+from .book_resource_policy import ResourcesPolicy
 from .runtime.contracts import RunOverrides
 from .schema_dsl.models import DemandConfig
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig
@@ -91,7 +92,7 @@ def compile_workflow_ir(
     init_vars: Optional[Dict[str, object]] = None,
     overrides: Optional[object] = None,
     workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
-    resources_policy: Optional[object] = None,
+    resources_policy: Optional[ResourcesPolicy] = None,
 ) -> WorkflowCompileResult:
     """将工作流配置编译为工作流 `IR`.
 

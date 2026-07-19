@@ -84,11 +84,11 @@ def _validate_no_duplicate_yaml_keys(
     source_path: str,
 ) -> None:
     explicit_seen: Dict[Any, bool] = {}
-    for key_node, _value_node in cast("Any", pairs):
+    for key_node, _value_node in pairs:
         tag = getattr(key_node, "tag", None)  # pragma: allow-dynattr third-party: ruamel node.tag
         if str(tag) == "tag:yaml.org,2002:merge":
             continue
-        key = cast("Any", constructor).construct_object(key_node, deep=True)  # pragma: allow-cast ruamel typed narrowing
+        key = constructor.construct_object(key_node, deep=True)
         key = _normalize_yaml_mapping_key(key)
         if not isinstance(key, Hashable):
             msg = "found unhashable key"
@@ -111,17 +111,17 @@ def _construct_ruamel_mapping(
         msg = "expected a mapping node, but found {}".format(str(node_id) if node_id is not None else "(unknown)")
         raise TypeError(msg)
 
-    pairs = cast("Any", node).value  # pragma: allow-cast third-party: ruamel MappingNode.value
+    pairs = getattr(node, "value", None)  # pragma: allow-dynattr third-party: ruamel MappingNode.value
     if detect_duplicate_keys:
         _validate_no_duplicate_yaml_keys(pairs, constructor=constructor, source_path=source_path)
 
-    cast("Any", constructor).flatten_mapping(node)  # pragma: allow-cast ruamel constructor typed narrowing
+    constructor.flatten_mapping(node)
 
-    mapping: Dict[Any, Any] = cast("Any", constructor).yaml_base_dict_type()  # pragma: allow-cast ruamel typed narrowing
-    for key_node, value_node in cast("Any", node).value:
-        key = cast("Any", constructor).construct_object(key_node, deep=True)  # pragma: allow-cast ruamel typed narrowing
+    mapping: Dict[Any, Any] = constructor.yaml_base_dict_type()
+    for key_node, value_node in getattr(node, "value", ()):  # pragma: allow-dynattr third-party: ruamel MappingNode.value
+        key = constructor.construct_object(key_node, deep=True)
         key = _normalize_yaml_mapping_key(key)
-        value = cast("Any", constructor).construct_object(value_node, deep=deep)  # pragma: allow-cast ruamel typed narrowing
+        value = constructor.construct_object(value_node, deep=deep)
         mapping[key] = value
     return mapping
 
