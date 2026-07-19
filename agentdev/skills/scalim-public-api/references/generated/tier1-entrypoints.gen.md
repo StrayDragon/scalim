@@ -171,7 +171,7 @@
 - desc: workflow 内置 loader 的上下文与实现
 - scenario: 在自定义 loader/运行器中复用
 - marker: `src/scalim/workflow/__init__.py:9`
-- source: `src/scalim/workflow/loaders.py:114`
+- source: `src/scalim/workflow/loaders.py:115`
 - exports (`__all__`, tuple, count=2):
   - `book_sheet_rows`
   - `workflow_loader_context`
@@ -315,7 +315,7 @@
 - desc: outputs discovery facade
 - scenario: 定位最新一次发布的 workbook/books 与 files
 - marker: `src/scalim/shortcuts/resources/__init__.py:8`
-- source: `src/scalim/shortcuts/resources/outputs.py:214`
+- source: `src/scalim/shortcuts/resources/outputs.py:216`
 - exports (`__all__`, tuple, count=5):
   - `LatestOutputs`
   - `latest_book_path`
