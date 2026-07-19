@@ -7,7 +7,7 @@
 - 主包禁止函数内导入(排除 `vendor`)
 
 该脚本是静态门禁:只依赖文件系统与 AST,不执行运行时模块的 `import`.
-失败属于严重架构违规: quiet 不得吞掉失败报告.
+失败属于严重架构违规: `quiet` 不得吞掉失败报告.
 
 用法:
 - `uv run python scripts/check-import-graph.py --check`
@@ -311,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
     scalim_root = src_root / "scalim"
 
     if not scalim_root.is_dir():
-        # 配置/路径错误同样视为严重失败信号, quiet 不得吞掉.
+        # 配置/路径错误同样视为严重失败信号, `quiet` 不得吞掉.
         print("[错误] 未找到主包目录: {}".format(scalim_root), file=sys.stderr)
         return 1 if args.check else 0
 
@@ -330,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
     local_imports = _collect_function_local_imports(py_files, scalim_root=scalim_root)
 
     if cycles or local_imports:
-        # 严重错误: 始终写 stderr(不受 --quiet 影响).
+        # 严重错误: 始终写 `stderr`(不受 `--quiet` 影响).
         print("[错误] 主包导入结构检查失败:", file=sys.stderr)
         if cycles:
             print("- 导入图存在 {} 个循环依赖:".format(len(cycles)), file=sys.stderr)

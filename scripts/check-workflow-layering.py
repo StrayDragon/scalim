@@ -7,7 +7,7 @@
 - `src/scalim/dsl/yaml_dsl/runtime/**` MUST NOT 包含 `workflow_*.py`
 
 该脚本是静态门禁:只依赖文件系统与 AST,不执行运行时模块的 `import`.
-失败属于严重架构违规: quiet 不得吞掉失败报告.
+失败属于严重架构违规: `quiet` 不得吞掉失败报告.
 
 用法:
 - `uv run python scripts/check-workflow-layering.py --check`
@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     runtime_root = repo_root / "src" / "scalim" / "dsl" / "yaml_dsl" / "runtime"
 
     if not workflow_root.is_dir():
-        # 配置/路径错误同样视为严重失败信号, quiet 不得吞掉.
+        # 配置/路径错误同样视为严重失败信号, `quiet` 不得吞掉.
         print("[错误] 未找到工作流目录: {}".format(workflow_root), file=sys.stderr)
         return 1 if args.check else 0
 
@@ -120,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         workflow_runtime_files = sorted([p.relative_to(runtime_root).as_posix() for p in runtime_root.rglob("workflow_*.py")])
 
     if violations or workflow_runtime_files:
-        # 严重错误: 始终写 stderr(不受 --quiet 影响).
+        # 严重错误: 始终写 `stderr`(不受 `--quiet` 影响).
         print("[错误] 工作流分层检查失败:", file=sys.stderr)
         if violations:
             print("- 工作流层不得导入 DSL 模块:", file=sys.stderr)
