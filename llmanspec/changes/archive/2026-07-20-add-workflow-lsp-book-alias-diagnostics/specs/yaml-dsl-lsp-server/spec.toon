@@ -1,0 +1,5 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  modify_requirement,r564,"workflow diagnostics v1 MUST stay schema-based and MAY emit static book alias migrations","对 workflow YAML,v1 diagnostics MUST 以 schema + unknown-fields 为基线: - MUST 基于 workflow.gen.json 与对应 unknown-fields 规则 - MUST NOT 进行 runtime compile/run 或递归 demand 执行类语义诊断 - 额外地,对 workflow.resources.books 下已硬删的 authoring 别名(xlsx_file/xlsx_memory/kind 等),系统 MUST 发出与 demand 侧一致的静态迁移诊断(可复制迁移示例),且 MUST 保持静态无副作用",null,null,null
+op_scenarios[1]{req_id,id,given,when,then,feature}:
+  r564,"workflow-removed-book-alias-yields-migration-diagnostic",某 workflow YAML 在 workflow.resources.books 下仍声明 xlsx_file 或 xlsx_memory,编辑器请求 diagnostics,"LSP server MUST 返回至少一条含迁移提示的 diagnostic(例如 xlsx_file was removed / xlsx_memory was removed),且 MUST NOT crash",true

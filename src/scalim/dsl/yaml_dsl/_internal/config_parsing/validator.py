@@ -2,7 +2,7 @@
 # pragma: allow-c901-file plan: c60
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, cast
 
 from .....vendor.dataclassesx import asdict, dataclass
 
@@ -315,7 +315,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
                 agg_field_index=agg_field_index,
             )
 
-    def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912
         resources_raw = config.get(DEMAND_KEYS["resources"])
         if not isinstance(resources_raw, dict):
             return
@@ -377,12 +377,27 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         books_raw = cast("Any", resources_raw).get(RESOURCES_KEYS["books"])
         if not isinstance(books_raw, dict):
             return
+        self.validate_books_mapping(
+            cast("Mapping[Any, Any]", books_raw),  # pragma: allow-cast yaml mapping typed narrowing
+            books_root_path="resources.books",
+            errors=errors,
+        )
+
+    def validate_books_mapping(  # noqa: C901, PLR0912, PLR0915
+        self,
+        books_raw: Mapping[Any, Any],
+        *,
+        books_root_path: str,
+        errors: List[ValidationIssue],
+    ) -> None:
+        """静态校验 `books` `mapping`(`demand`: `resources.books`; `workflow`: `workflow.resources.books`)."""
+
         for raw_book_id, raw_book_cfg in cast("Dict[Any, Any]", books_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
             book_id = str(raw_book_id or "").strip()
             if not book_id or not isinstance(raw_book_cfg, dict):
                 continue
             book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
-            book_path = "resources.books.{}".format(book_id)
+            book_path = "{}.{}".format(str(books_root_path), book_id)
             if "kind" in book_cfg:
                 kind = str(book_cfg.get("kind") or "").strip()
                 if kind == "xlsx_file":

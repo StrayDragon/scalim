@@ -271,7 +271,11 @@ def test_workflow_diagnostics_rejects_removed_book_aliases(tmp_path: Path) -> No
     result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
     assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_WORKFLOW
     messages = [d.message for d in result.errors]
-    assert any("xlsx_file" in msg for msg in messages)
+    assert any("xlsx_file was removed" in msg for msg in messages)
+    paths = {d.path for d in result.errors}
+    assert "workflow.resources.books.report.xlsx_file" in paths
+    # migration diagnostic replaces duplicate Unknown field for the same path
+    assert not any(d.path == "workflow.resources.books.report.xlsx_file" and "Unknown field" in d.message for d in result.errors)
 
 
 def test_workflow_diagnostics_accepts_unified_xlsx_books(tmp_path: Path) -> None:

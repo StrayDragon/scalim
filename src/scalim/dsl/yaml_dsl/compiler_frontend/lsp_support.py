@@ -18,11 +18,13 @@ from .._internal.config_parsing.presets import load_scalim_preset_yaml_text
 from .._internal.config_parsing.project_config import YamlDslProjectConfig, load_yaml_dsl_project_config
 from .._internal.config_parsing.security import SecureComputeEngine
 from .._internal.config_parsing.unknown_fields import find_unknown_fields
+from .._internal.config_parsing.validator import ConfigValidator
 from .._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
 from .._internal.config_parsing.yaml_load import envelope_from_validation_issue, error_loc_for_yaml_path, load_yaml_mapping_text
 
 __all__ = (
     "VALIDATION_SEVERITY_ERROR",
+    "ConfigValidator",
     "ErrorEnvelope",
     "ErrorLoc",
     "FieldDef",

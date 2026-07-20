@@ -19,8 +19,8 @@
         "source": "scalim"
       },
       {
-        "code": "yaml_unknown_field",
-        "message": "Unknown field 'xlsx_file'",
+        "code": "yaml_validate_error",
+        "message": "workflow.resources.books.report.xlsx_file was removed. Migration: use workflow.resources.books.report.xlsx: {path: <output_root>, allow_formulas?: false}.",
         "range": {
           "end": {
             "character": 9,

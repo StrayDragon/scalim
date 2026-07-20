@@ -17,6 +17,7 @@ from scalim.dsl import yaml_dsl
 from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend, compile_demand_frontend_diagnostics
 from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import (
     VALIDATION_SEVERITY_ERROR,
+    ConfigValidator,
     ErrorEnvelope,
     ErrorLoc,
     FieldDef,
@@ -4121,7 +4122,18 @@ def _collect_workflow_diagnostics(
             )
             errors.append(_envelope_to_diagnostic(env, severity=_SEVERITY_ERROR))
 
+    book_migration_errors = _collect_workflow_book_migration_diagnostics(
+        yaml_data,
+        yaml_path=yaml_path,
+        locations=locations,
+    )
+    book_migration_paths = {str(item.path or "") for item in book_migration_errors}
+    errors.extend(book_migration_errors)
+
     for unknown in find_unknown_fields(yaml_data, schema):
+        unknown_path = str(unknown.path or "")
+        if unknown_path in book_migration_paths:
+            continue
         issue = ValidationIssue(
             severity=VALIDATION_SEVERITY_ERROR,
             message=unknown.message,
@@ -4137,6 +4149,40 @@ def _collect_workflow_diagnostics(
         errors.append(_envelope_to_diagnostic(env, severity=_SEVERITY_ERROR))
 
     return tuple(errors), tuple(warnings)
+
+
+def _collect_workflow_book_migration_diagnostics(
+    yaml_data: Dict[str, Any],
+    *,
+    yaml_path: Path,
+    locations: Dict[str, Tuple[int, int]],
+) -> List[EditorDiagnostic]:
+    workflow_raw = yaml_data.get("workflow")
+    if not isinstance(workflow_raw, dict):
+        return []
+    resources_raw = cast("Dict[str, Any]", workflow_raw).get("resources")
+    if not isinstance(resources_raw, dict):
+        return []
+    books_raw = cast("Dict[str, Any]", resources_raw).get("books")
+    if not isinstance(books_raw, dict):
+        return []
+
+    issues: List[ValidationIssue] = []
+    ConfigValidator().validate_books_mapping(
+        cast("Dict[Any, Any]", books_raw),
+        books_root_path="workflow.resources.books",
+        errors=issues,
+    )
+    out: List[EditorDiagnostic] = []
+    for issue in issues:
+        env = envelope_from_validation_issue(
+            issue,
+            source_path=str(yaml_path),
+            locations=locations,
+            default_code="yaml_validate_error",
+        )
+        out.append(_envelope_to_diagnostic(env, severity=_SEVERITY_ERROR))
+    return out
 
 
 def _envelopes_to_diagnostics(

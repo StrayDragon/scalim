@@ -459,6 +459,6 @@ def test_lsp_contract_workflow_books_removed_alias_diagnostics(tmp_path) -> None
         assert_json_snapshot(_snapshot_path(scenario, "diagnostics.json"), diag_snapshot)
 
         messages = [str(item.get("message") or "") for item in diag_snapshot["diagnostics"]]
-        assert any("xlsx_file" in msg for msg in messages)
+        assert any("xlsx_file was removed" in msg for msg in messages)
     finally:
         session.shutdown()
