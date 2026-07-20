@@ -560,7 +560,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     ) -> None:
         if str(align_by or "field_id") == "header":
             msg = (
-                "xlsx_memory/sheetbook does not support align_by=header; "
+                "pathless books (sheetbook) do not support align_by=header; "
                 "internal rows only use canonical field keys. Migrate to align_by=field_id "
                 "and keep header_fields_output_by for export display"
             )

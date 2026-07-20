@@ -1,7 +1,7 @@
 """`workflow` 内部表格工件适配层.
 
 说明:
-- 为 `sheetbook/xlsx_memory` 提供统一的类型化读写入口.
+- 为 pathless book(`sheetbook` 内存总线)提供统一的类型化读写入口.
 - `InMemoryRows` 是类型化单一事实来源; `InMemoryCsv` / `CSV` 文件路径仅作为字符串工件适配.
 - 运行时需兼容 `Python 3.6`.
 """

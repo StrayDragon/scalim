@@ -85,7 +85,6 @@ def test_output_item_requires_unique_effective_display_names_sheet_mode_reads_in
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="./out",
                     write_defaults=BookWriteDefaultsConfig(mode="sheet"),
                 ),

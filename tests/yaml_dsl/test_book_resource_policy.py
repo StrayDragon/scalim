@@ -99,7 +99,7 @@ def test_budget_policy_as_options_mapping_and_resolve_defaults() -> None:
     assert effective_write_defaults("report", resources_policy=policy).mode == "append"
     assert effective_write_defaults("missing").mode == "sheet"
     validate_xlsx_memory_align_by(
-        book=BookConfig(kind="xlsx_memory"),
+        book=BookConfig(),
         book_id="report",
         effective_defaults=BookWriteDefaultsConfig(mode="sheet", align_by="field_id"),
     )
@@ -110,8 +110,9 @@ def test_materialize_resources_policy_onto_books_covers_memory_budget() -> None:
         name="n",
         resources=ResourcesConfig(
             books={
-                "file_book": BookConfig(kind="xlsx_file", path="./out"),
-                "mem_book": BookConfig(kind="xlsx_memory"),
+                "file_book": BookConfig(
+                path="./out"),
+                "mem_book": BookConfig(),
             }
         ),
     )

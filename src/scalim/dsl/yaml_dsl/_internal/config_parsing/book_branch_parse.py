@@ -148,7 +148,7 @@ def _parse_xlsx_branch(
 
     if book_path is not None:
         return BookConfig(
-            kind="xlsx_file",
+            kind="",
             path=book_path,
             budget=None,
             export_xlsx=None,
@@ -157,7 +157,7 @@ def _parse_xlsx_branch(
         )
 
     return BookConfig(
-        kind="xlsx_memory",
+        kind="",
         path=None,
         budget=None,
         export_xlsx=None,

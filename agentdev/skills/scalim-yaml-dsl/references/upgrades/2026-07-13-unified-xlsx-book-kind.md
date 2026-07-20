@@ -1,8 +1,10 @@
 # 2026-07-13: unified-xlsx-book-kind
 
+> **状态（2026-07-20）**：本批次引入的 deprecated 别名过渡期已结束；`xlsx_file` / `xlsx_memory` **已硬删**。当前唯一 authoring SSOT 与迁移表见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。下文保留本批次落地时的过渡描述。
+
 ## 变更摘要
 
-本批次把 YAML book identity 收敛为统一分支 `resources.books.<id>.xlsx`，用**可选 `path`**区分落盘与内存总线；旧 `xlsx_file` / `xlsx_memory` 仍可解析，但会发出 **warning 级 deprecated**（不因 deprecated 单独 fail）。
+本批次把 YAML book identity 收敛为统一分支 `resources.books.<id>.xlsx`，用**可选 `path`**区分落盘与内存总线；旧 `xlsx_file` / `xlsx_memory` 在本批次时尚可解析并发出 **warning 级 deprecated**（不因 deprecated 单独 fail）。
 
 | YAML | 语义 |
 |---|---|

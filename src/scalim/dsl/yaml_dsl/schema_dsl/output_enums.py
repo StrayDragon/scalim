@@ -10,11 +10,8 @@ from typing import Tuple
 FILE_KINDS: Tuple[str, ...] = ("csv_file",)
 """`resources.files.*.kind` 枚举."""
 
-BOOK_KINDS: Tuple[str, ...] = (
-    "xlsx_file",
-    "xlsx_memory",
-)
-"""`resources.books.*.kind` 枚举."""
+BOOK_KINDS: Tuple[str, ...] = ()
+"""YAML/Python book kind discriminator removed; identity is pathful/pathless via `path`."""
 
 BOOK_WRITE_MODE_ENUM: Tuple[str, ...] = (
     "sheet",

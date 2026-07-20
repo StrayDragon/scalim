@@ -66,9 +66,8 @@ def test_parse_xlsx_empty_and_path_emit_no_deprecation() -> None:
                 }
             }
         )
-    assert empty.resources.books["scratch"].kind == "xlsx_memory"
     assert empty.resources.books["scratch"].path is None
-    assert with_path.resources.books["report"].kind == "xlsx_file"
+    assert with_path.resources.books["report"].path is not None
     assert with_path.resources.books["report"].path == "./out"
     assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]
 
@@ -459,7 +458,7 @@ outputs:
 
 
 def test_resource_defs_book_xlsx_memory_with_path_still_builds_sheetbook_export(tmp_path: Path) -> None:
-    """内部 `BookConfig(kind=xlsx_memory, export)` 编译产物仍走 sheetbook export 布局."""
+    """内部 pathless `BookConfig(export_xlsx=...)` 编译产物仍走 sheetbook export 布局."""
 
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
     from scalim.workflow import execute as workflow_execute_mod
@@ -488,6 +487,6 @@ def test_resource_defs_book_xlsx_memory_with_path_still_builds_sheetbook_export(
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         cfg = load_workflow_config(str(_EXAMPLES / "after.workflow.yaml"))
-    assert cfg.resources.books["scratch"].kind == "xlsx_memory"
-    assert cfg.resources.books["report"].kind == "xlsx_file"
+    assert cfg.resources.books["scratch"].path is None
+    assert cfg.resources.books["report"].path is not None
     assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]

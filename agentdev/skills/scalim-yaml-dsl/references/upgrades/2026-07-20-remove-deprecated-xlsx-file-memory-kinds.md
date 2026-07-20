@@ -6,13 +6,13 @@ BREAKING：硬删 YAML book 过渡期别名 `xlsx_file` / `xlsx_memory`（含 `x
 
 同时：
 
-- 运行时身份仅 **pathful / pathless**（不再以 `kind=xlsx_file|xlsx_memory` 字符串为 IR/runtime 业务 SSOT）
+- 运行时身份仅 **pathful / pathless**（不再以 `kind=xlsx_file|xlsx_memory` 字符串为 IR/runtime 业务 SSOT；`BookConfig.kind` 恒为空串，override 传入 `kind` 会 fail-fast）
 - YAML `observability.*` 由 warning+忽略升级为 **fail-fast**
 - 公开类型别名 `RowId` / `RowIdSeq` / `RowIdList` 已移除 → 使用 `BusinessKey`
 
 **保留（调用面不变）**：`RunOverrides.xlsx_file_single_sheet(...)` 等工厂函数名与签名；内部已改为 pathful / `xlsx.path` 等价构造。
 
-对应 llmanspec change: `c999-remove-deprecated-xlsx-file-memory-kinds`
+对应 llmanspec change: `llmanspec/changes/archive/2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds/`
 
 上游：`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`
 

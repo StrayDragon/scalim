@@ -79,7 +79,7 @@ def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
         )  # noqa: SLF001
 
     parsed = loader._parse_book_config({BOOK_KEYS["xlsx"]: {}}, base_path="resources.books.report")  # noqa: SLF001
-    assert parsed.kind == "xlsx_memory"
+    assert parsed.path is None
     assert parsed.budget is None
 
     with pytest.raises(ValueError, match=r"xlsx has unknown keys"):

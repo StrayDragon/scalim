@@ -187,7 +187,7 @@ def test_run_books_output_header_fields_output_by_controls_actual_xlsx_header(
                         write=write_override,
                     ),
                 ),
-                resources=ResourcesOverride(books={"report": BookResourceOverride(kind="xlsx_file", path=str(output_root))}),
+                resources=ResourcesOverride(books={"report": BookResourceOverride(path=str(output_root))}),
             )
         ),
     )

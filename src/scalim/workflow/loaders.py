@@ -71,7 +71,7 @@ def _require_context() -> _WorkflowLoaderContext:
 
 
 def book_sheet_rows(*, ref: RuntimeValue) -> Iterator[Mapping[str, Any]]:
-    """内置 `loader`: 读取 `workflow` `books.kind=xlsx_memory` 的某个 `sheet` 行数据(`rows`).
+    """内置 `loader`: 读取 `workflow` pathless book(内存总线 / sheetbook)的某个 `sheet` 行数据(`rows`).
 
     参数:
     - `ref`: 映射对象,必填键: `node`/`book`/`sheet`

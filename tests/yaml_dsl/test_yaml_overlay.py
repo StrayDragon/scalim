@@ -200,9 +200,7 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                 ),
                 resources=ResourcesOverride(
                     books={
-                        "report": BookResourceOverride(
-                            kind="xlsx_file",
-                            path="./out",
+                        "report": BookResourceOverride(path="./out",
                         )
                     }
                 ),

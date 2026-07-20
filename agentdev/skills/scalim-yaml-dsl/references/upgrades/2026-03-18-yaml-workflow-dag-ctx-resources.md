@@ -1,7 +1,7 @@
 # 2026-03-18: yaml-workflow-dag-ctx-resources
 
 > **Superseded (部分)**: 本批次引入的 `workflow.resources.sheetbooks` / `workbooks` / `writes`、以及 YAML `workflow.options.ctx` 等写法，后续已收敛或迁出。
-> - 共享 Excel 资源请用当前 `workflow.resources.books`（推荐统一 `xlsx`；旧 `xlsx_file`/`xlsx_memory` 为 deprecated 别名，见 `2026-07-13-unified-xlsx-book-kind.md`）
+> - 共享 Excel 资源请用当前 `workflow.resources.books`（唯一分支 `xlsx` 可选 `path`；`xlsx_file`/`xlsx_memory` 已硬删，见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`）
 > - book 写入策略与内存预算请用 Python `ResourcesPolicy`（见 `2026-07-12-book-write-policy-python-ssot.md`）；YAML 不得再写 `write_defaults`/`budget`
 > - `workflow.options.*` runtime knobs 已迁出 YAML（出现即 fail-fast）
 >

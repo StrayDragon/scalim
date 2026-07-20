@@ -36,11 +36,11 @@ def test_workflow_entrypoints_merge_book_override_helpers_cover_branches() -> No
     assert merged_export.path == "a"
     assert merged_export.allow_formulas is True
 
-    left_book = BookResourceOverride(kind="xlsx_file", path="a", allow_formulas=True)
+    left_book = BookResourceOverride(path="a", allow_formulas=True)
     right_book = BookResourceOverride(path="b", allow_formulas=None)
     assert entrypoints_mod._merge_book_resource_overrides(None, right_book) is right_book  # noqa: SLF001
     merged_book = entrypoints_mod._merge_book_resource_overrides(left_book, right_book)  # noqa: SLF001
-    assert merged_book.kind == "xlsx_file"
+    assert merged_book.path is not None
     assert merged_book.path == "b"
     assert merged_book.allow_formulas is True
 
@@ -73,13 +73,11 @@ def test_workflow_entrypoints_workflow_resources_override_handles_missing_and_co
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="a",
                     allow_formulas=True,
                     write_defaults=BookWriteDefaultsConfig(mode="append"),
                 ),
                 "mem": BookConfig(
-                    kind="xlsx_memory",
                     budget=BookBudgetConfig(max_sheets=1, max_total_cells=2),
                     export_xlsx=BookExportXlsxConfig(path="x", allow_formulas=True),
                 ),

@@ -62,17 +62,6 @@ __all__ = ()
 _OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
 
 
-def _as_non_empty_str(value: Any, *, path: str) -> str:
-    if not isinstance(value, str):
-        msg = "{} must be a non-empty string".format(path)
-        raise ScalimWorkflowConfigError(msg, path=str(path))
-    v = str(value).strip()
-    if not v:
-        msg = "{} must be a non-empty string".format(path)
-        raise ScalimWorkflowConfigError(msg, path=str(path))
-    return v
-
-
 def _as_opt_non_empty_str_or_pathlike(value: Any, *, path: str) -> Optional[str]:
     if value is None:
         return None
@@ -474,7 +463,6 @@ def _apply_book_patch(
     *,
     path: str,
 ) -> BookConfig:
-    kind = str(base.kind or "").strip() if base is not None else ""
     book_path: Any = base.path if base is not None else None
     budget = base.budget if base is not None else None
     export_xlsx = base.export_xlsx if base is not None else None
@@ -496,12 +484,16 @@ def _apply_book_patch(
         ).format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
 
-    allowed_keys = {"kind", "path", "export_xlsx", "allow_formulas"}
+    if "kind" in patch:
+        msg = (
+            "{}.kind was removed. Book identity is pathful/pathless via path "
+            "(set path for pathful/xlsx export root; omit path for pathless in-memory bus)."
+        ).format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+
+    allowed_keys = {"path", "export_xlsx", "allow_formulas"}
     _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=path)
 
-    if "kind" in patch:
-        # `kind` 仅作可选历史字段;身份以 `path` 有无为 SSOT.
-        kind = _as_non_empty_str(patch.get("kind"), path="{}.kind".format(path))
     if "path" in patch:
         book_path = _as_opt_path_or_init_var(patch.get("path"), path="{}.path".format(path))
     if "allow_formulas" in patch:
@@ -521,7 +513,7 @@ def _apply_book_patch(
     )
 
     return BookConfig(
-        kind=str(kind),
+        kind="",
         path=book_path,
         budget=budget,
         export_xlsx=export_xlsx,

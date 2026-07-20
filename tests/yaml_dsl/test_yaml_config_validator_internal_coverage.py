@@ -26,7 +26,6 @@ def test_effective_book_write_mode_reads_write_defaults_value() -> None:
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="./out",
                     write_defaults=BookWriteDefaultsConfig(mode="sheet"),
                 ),
@@ -41,7 +40,6 @@ def test_output_item_requires_unique_effective_display_names_file_and_book_branc
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="./out",
                     write_defaults=BookWriteDefaultsConfig(mode="sheet"),
                 ),

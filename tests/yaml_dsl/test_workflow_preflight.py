@@ -147,7 +147,6 @@ def test_workflow_preflight_effective_book_write_defaults_come_from_config() -> 
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="./out",
                     write_defaults=BookWriteDefaultsConfig(mode="sheet", header_policy="never"),
                 ),
@@ -164,7 +163,6 @@ def test_workflow_preflight_effective_book_defaults_blank_values_fall_back_to_de
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="./out",
                     write_defaults=BookWriteDefaultsConfig(mode=None, header_policy=None),
                 ),
@@ -185,8 +183,7 @@ def test_workflow_preflight_effective_book_write_defaults_can_be_overridden() ->
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
-                    path="./out",
+                path="./out",
                 ),
             }
         )
@@ -219,7 +216,6 @@ def test_workflow_preflight_effective_book_write_defaults_ignore_resources_overr
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                    kind="xlsx_file",
                     path="./out",
                     write_defaults=BookWriteDefaultsConfig(mode="sheet", header_policy="never"),
                 ),

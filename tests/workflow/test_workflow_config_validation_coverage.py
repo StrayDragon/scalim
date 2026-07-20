@@ -218,7 +218,7 @@ def test_load_workflow_config_from_mapping_xlsx_memory_budget_is_optional() -> N
     root = _base_root()
     root["workflow"]["resources"] = {"books": {"mem": {"xlsx": {}}}}
     cfg = load_workflow_config_from_mapping(root)
-    assert cfg.resources.books["mem"].kind == "xlsx_memory"
+    assert cfg.resources.books["mem"].path is None
     assert cfg.resources.books["mem"].budget is None
 
 

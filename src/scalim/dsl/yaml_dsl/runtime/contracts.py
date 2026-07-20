@@ -264,6 +264,7 @@ class BookExportXlsxOverride:
 
 @dataclass(frozen=True)
 class BookResourceOverride:
+    # `kind` retained unused for wire compat; non-None fails in apply (`resource_override`).
     kind: Optional[str] = None
     path: OptionalPathNode = None
     export_xlsx: Optional[BookExportXlsxOverride] = None
@@ -271,7 +272,7 @@ class BookResourceOverride:
 
     def __post_init__(self) -> None:
         # `write_defaults` / `budget` 已迁出 `RunOverrides.resources`(`Python` `ResourcesPolicy` `SSOT`).
-        # 保留旧字段名时的 `fail-fast` 由 `resource_override` 补丁层负责.
+        # `kind` / 旧字段的 `fail-fast` 由 `resource_override` 补丁层负责.
         pass
 
 

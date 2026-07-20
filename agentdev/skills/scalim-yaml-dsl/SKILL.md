@@ -1,6 +1,6 @@
 ---
 name: scalim-yaml-dsl
-description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/workflow)配置,并为旧报表脚本规划渐进迁移。覆盖 resources.books identity(推荐统一 xlsx)、outputs→book 绑定、Python ResourcesPolicy/BookWritePolicy/BookBudgetPolicy(write_defaults 与 budget 已迁出 YAML)、RunOverrides IO overlay、path/init_var 输出 root、以及 scalim-cli yaml-dsl validate/schema。适用于修复 validate 报错、迁移 write_defaults/budget/旧 xlsx_file|xlsx_memory、判断逻辑应留在 Python 还是下沉 YAML 的场景。"
+description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/workflow)配置,并为旧报表脚本规划渐进迁移。覆盖 resources.books identity(唯一分支 xlsx,可选 path)、outputs→book 绑定、Python ResourcesPolicy/BookWritePolicy/BookBudgetPolicy(write_defaults 与 budget 已迁出 YAML)、RunOverrides IO overlay(含保留的 xlsx_file_single_sheet 工厂)、path/init_var 输出 root、以及 scalim-cli yaml-dsl validate/schema。适用于修复 validate 报错、迁移 write_defaults/budget/已硬删的 xlsx_file|xlsx_memory、判断逻辑应留在 Python 还是下沉 YAML 的场景。"
 ---
 
 # Scalim YAML DSL
@@ -85,7 +85,7 @@ run_workflow(
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
 - YAML `resources.books` 只声明 identity（唯一分支 `xlsx`：有 `path`=落盘，无 `path`=内存总线；`xlsx_file`/`xlsx_memory` 已硬删）;`write_defaults` 与 `budget` 已迁出,出现即 fail-fast → 用 `WorkflowRunOptions`/`DemandRunOptions.resources_policy`(`BookWritePolicy`/`BookBudgetPolicy`,StrEnum 严格 in);详见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`、`references/upgrades/2026-07-13-unified-xlsx-book-kind.md`、`references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`
 - **MUST NOT** 为降低 Excel 峰值在 YAML 发明 `write.streaming` / books streaming knobs;YAML Excel 组合层已是行 sink。列式 HOLD→WINDOW 用 Python `ExcelColumnResidency`(见 `references/streaming-column-excel-guidance.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`)
-- `path` /（过渡期旧）`export_xlsx.path` 是输出 root 目录:相对路径相对 **声明该路径的 YAML 文件目录**(不是进程 cwd);环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride`(IO-only overlay,不再含 write/budget)。新写法优先 `resources.books.*.xlsx.path`。
+- `path` 是输出 root 目录:相对路径相对 **声明该路径的 YAML 文件目录**(不是进程 cwd);环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride`(IO-only overlay,不再含 write/budget)。唯一写法 `resources.books.*.xlsx.path`（旧 `export_xlsx.path` / `xlsx_file` 已硬删）。
 - workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 outputs→book 绑定等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证
 - 若 Python 侧使用 `overrides.outputs` 把 workbook outputs 整体替换为非 workbook 输出,未显式 `path` 的 `meta/audit`

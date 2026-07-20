@@ -19,7 +19,7 @@
 
 ### 相对路径解析基准(易踩坑)
 
-- demand YAML 里的相对 `path` /（过渡期）`export_xlsx.path`(例如 `./out`)相对 **该 demand YAML 所在目录**,不是进程 cwd。新写法优先 `resources.books.*.xlsx.path`。
+- demand YAML 里的相对 `path`(例如 `./out`)相对 **该 demand YAML 所在目录**,不是进程 cwd。唯一写法 `resources.books.*.xlsx.path`。
 - workflow 托管 `workflow.resources.books` 的相对 path 相对 **workflow YAML 所在目录**。
 - `WorkflowRunOptions.path_aliases` 只解析 `run.demand` 路径(`@/...`),不改变 book/file output root 的相对基准。
 - 环境相关 root 推荐:

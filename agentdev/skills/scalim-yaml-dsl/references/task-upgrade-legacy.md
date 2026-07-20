@@ -24,7 +24,8 @@
 |---|---|
 | `write_defaults was removed` / YAML `resources.books.*.write_defaults` | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md` |
 | `xlsx_memory.budget was removed` / YAML book `budget` | 同上 |
-| `BookWriteDefaultsOverride` / `BookBudgetOverride` / write·budget overlay | 同上 |
+| `xlsx_file was removed` / `xlsx_memory was removed` / `xlsx_memory with export_xlsx was removed` | `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md` |
+| `BookWriteDefaultsOverride` / `BookBudgetOverride` / write·budget overlay | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md` |
 | `workflow.options` / `cache_pool` in YAML / `share_preload_cache` | 查 upgrades 摘要里 runtime-policy / workflow 相关批次；**不要**照抄 `2026-03-18` 里已过时的 `workflow.options.ctx` / `sheetbooks` 写法 |
 | `sheetbooks` / `workbooks` / `writes:` (旧 workflow 字段) | 先读 `2026-03-18` 理解历史，再以当前 `resources.books` + `2026-07-12` policy 为准 |
 
@@ -99,6 +100,7 @@
   - SSOT: `references/upgrades/2026-07-18-tabular-bus-object-sink-accept-precheck.md`
 - 2026-07-20: remove-deprecated-xlsx-file-memory-kinds
   - SSOT: `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`
+  - llmanspec: `llmanspec/changes/archive/2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

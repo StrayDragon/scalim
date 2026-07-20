@@ -259,7 +259,7 @@ def test_runtime_compiler_output_requires_unique_effective_field_display_names_c
 def test_runtime_compiler_overlay_book_write_defaults_override_invalid_enum_cover_branches() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"write_defaults was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_file", path="a"),
+            BookConfig(path="a"),
             {"write_defaults": {"mode": "nope"}},
             path="p",
         )
@@ -269,7 +269,7 @@ def test_runtime_compiler_overlay_book_write_defaults_override_invalid_enum_cove
 def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(),
             {"budget": {"max_total_cells": 2}},
             path="p",
         )
@@ -277,7 +277,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(),
             {"budget": {"max_sheets": True, "max_total_cells": 2}},
             path="p",
         )
@@ -285,7 +285,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(),
             {"budget": {"max_sheets": 1, "max_total_cells": True}},
             path="p",
         )
@@ -293,7 +293,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(),
             {"budget": {"max_sheets": 0, "max_total_cells": 2}},
             path="p",
         )
@@ -301,7 +301,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(),
             {"budget": {"max_sheets": 1, "max_total_cells": 0}},
             path="p",
         )
@@ -309,7 +309,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=2)),
+            BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=2)),
             {"budget": {"max_total_cells": 3}},
             path="p",
         )
@@ -342,7 +342,7 @@ def test_runtime_compiler_overlay_book_export_xlsx_override_cover_branches() -> 
 
 
 def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_branches() -> None:
-    base_file = BookConfig(kind="xlsx_file", path="a")
+    base_file = BookConfig(path="a")
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
             base_file,
@@ -353,7 +353,7 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
 
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
-            BookConfig(kind="xlsx_file", path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
+            BookConfig(path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
             BookResourceOverride(),
             path="p",
         )
@@ -362,7 +362,6 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
             BookConfig(
-                kind="xlsx_file",
                 path="a",
                 export_xlsx=BookExportXlsxConfig(path="x", allow_formulas=False),
             ),
@@ -373,7 +372,7 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
 
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory", path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
+            BookConfig(path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
             BookResourceOverride(),
             path="p",
         )
@@ -383,7 +382,6 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
             BookConfig(
-                kind="xlsx_memory",
                 budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
                 allow_formulas=True,
             ),
@@ -514,11 +512,11 @@ def test_runtime_compiler_apply_file_override_cover_branches() -> None:
 
 
 def test_runtime_compiler_apply_book_override_cover_branches() -> None:
-    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"kind was removed") as exc_info:
         _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(kind="  "), path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.kind"
 
-    # pathful identity requires non-empty path (kind is optional historical field)
+    # pathful identity requires non-empty path
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(path=""), path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.path"
@@ -560,7 +558,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
     assert exc_info.value.path == "p.budget"
 
     updated = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
-        BookConfig(kind="xlsx_file", path="a"),
+        BookConfig(path="a"),
         BookResourceOverride(path="b", allow_formulas=True),
         path="p",
     )
@@ -579,7 +577,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
 def test_runtime_compiler_apply_resources_override_and_io_overrides_cover_branches() -> None:
     base = DemandConfig(
         resources=ResourcesConfig(
-            books={"report": BookConfig(kind="xlsx_file", path="a")},
+            books={"report": BookConfig(path="a")},
             files={"detail": FileConfig(kind="csv_file", path="a")},
         )
     )
@@ -600,7 +598,7 @@ def test_runtime_compiler_apply_resources_override_and_io_overrides_cover_branch
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = compiler_mod._apply_resources_override(  # noqa: SLF001
             DemandConfig(),
-            ResourcesOverride(books={1: BookResourceOverride(kind="xlsx_file", path="x")}),  # type: ignore[dict-item]
+            ResourcesOverride(books={1: BookResourceOverride(path="x")}),  # type: ignore[dict-item]
         )
     assert exc_info.value.path == "overrides.resources.books"
 

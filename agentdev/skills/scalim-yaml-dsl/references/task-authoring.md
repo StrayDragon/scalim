@@ -74,7 +74,7 @@ resources:
   - `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)))`
   - `scalim.dsl.yaml_dsl.run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))))`
 - workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `WorkflowRunOptions(patches_by_run_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowNodePatch`(不支持 dict patch)。
-- book 写入策略 / 内存预算也已迁出 YAML: 用 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy`(`ResourcesPolicy`/`BookWritePolicy`/`BookBudgetPolicy`);YAML 不得再写 `write_defaults` / `budget`(见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)。book identity 推荐统一 `xlsx`（见 `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`）。
+- book 写入策略 / 内存预算也已迁出 YAML: 用 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy`(`ResourcesPolicy`/`BookWritePolicy`/`BookBudgetPolicy`);YAML 不得再写 `write_defaults` / `budget`(见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)。book identity 唯一分支 `xlsx`（见 `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`）。
 
 ## 关键规则
 
@@ -89,7 +89,7 @@ resources:
   - `relation: {steps: [...]}` (内联)
 - `steps.from` / `steps.to` 写 `source.field_id`,不要写 loader 的 `data_key`
 - 动态入参用 `sources.<id>.params` 模板内联指令节点表达(`$keys` / `$rows`)
-- 初始化变量用 `init_vars` 注入,并在 `main_source.params` / `sources.<id>.params` / `resources.files.*.csv_file.path` / `resources.books.*.xlsx.path`(及过渡期 deprecated `xlsx_file.path` / `xlsx_memory.export_xlsx.path`) 中用 `{$init_var: <name>}` 指令节点引用(对象节点;编译期解析一次;不做子串插值)
+- 初始化变量用 `init_vars` 注入,并在 `main_source.params` / `sources.<id>.params` / `resources.files.*.csv_file.path` / `resources.books.*.xlsx.path` 中用 `{$init_var: <name>}` 指令节点引用(对象节点;编译期解析一次;不做子串插值)
 - `outputs` 是 **有序列表**(顺序决定 primary 输出); 每个 output 必填唯一 `name`,可用 `from` 复用字段集合与 `to/write` 编排
 - `outputs.*.fields` 是字段选择列表;推荐优先用 `field_id` 字符串以保持稳定与可维护性(允许的形态以 schema 为准)
 - `field_id` 必须全局唯一(不再依赖输出层做消歧)
@@ -97,7 +97,7 @@ resources:
 
 输出路径(output root)提示:
 
-- `resources.files.*.csv_file.path` / `resources.books.*.xlsx.path`(推荐;过渡期亦含旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`) 配置的是 **输出 root 目录**(版本化写入其下 `versions/<id>/...`),不是最终文件路径。
+- `resources.files.*.csv_file.path` / `resources.books.*.xlsx.path` 配置的是 **输出 root 目录**(版本化写入其下 `versions/<id>/...`),不是最终文件路径。
 - 相对路径(例如 `./out`)相对 **该 demand YAML 所在目录** 解析, **不是** 进程 cwd。
 - 把“输出 root 决定权”交给调用方时,优先 `path: {$init_var: out_root}` + `DemandRunTemplateOptions(init_vars={"out_root": ...})`;或用 `RunOverrides(resources=ResourcesOverride(... BookResourceOverride(path=...)))` 覆盖(IO-only)。
 - 请确保路径在整个 `run()` 生命周期内有效(例如不要指向可能被提前回收的临时目录)。
@@ -180,7 +180,7 @@ compile(
 
 ## 设计偏好
 
-- CSV/Excel 输出 root 在 `resources.files.*.path` / `resources.books.*.xlsx.path` 显式声明(版本化输出 D-2;过渡期旧 `xlsx_file`/`export_xlsx` 见 upgrade 笔记)
+- CSV/Excel 输出 root 在 `resources.files.*.path` / `resources.books.*.xlsx.path` 显式声明(版本化输出 D-2;旧 `xlsx_file`/`export_xlsx` 已硬删，见 `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`)
 - 多 outputs 共享同一 book 输出时,用 `to.book/to.sheet` 明确绑定;并发写同一 root 依赖“版本目录隔离”(通过 `scalim.shortcuts.resources.outputs` 定位最新产物,或显式指定版本目录)
 - 优先使用 string ref / string sugar;仅在需要大段复用/覆写时再用 anchor
 - 输出字段优先显式声明(避免隐式全量导出);简单场景可用 string sugar

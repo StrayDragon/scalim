@@ -16,16 +16,16 @@ from scalim.workflow.resource_defs import build_workflow_resource_defs
 
 
 def test_is_pathful_book_ssot_is_path_presence() -> None:
-    assert is_pathful_book(BookConfig(kind="xlsx_file", path="./out")) is True
-    assert is_pathful_book(BookConfig(kind="xlsx_memory", path=None)) is False
-    # kind 字面量不决定身份
+    assert is_pathful_book(BookConfig(path="./out")) is True
+    assert is_pathful_book(BookConfig(path=None)) is False
+    # kind 字面量不决定身份(字段可残留,但不作 SSOT)
     assert is_pathful_book(BookConfig(kind="xlsx_memory", path="./out")) is True
     assert is_pathful_book(BookConfig(kind="xlsx_file", path=None)) is False
 
 
 def test_compile_emits_pathful_option_without_legacy_kind(tmp_path: Path) -> None:
     root, opts = _book_export_path_and_options(
-        BookConfig(kind="xlsx_file", path=str(tmp_path / "out")),
+        BookConfig(path=str(tmp_path / "out")),
         book_id="report",
         base_dir=str(tmp_path),
         init_vars=None,
@@ -36,7 +36,7 @@ def test_compile_emits_pathful_option_without_legacy_kind(tmp_path: Path) -> Non
     assert "kind" not in opts
 
     root2, opts2 = _book_export_path_and_options(
-        BookConfig(kind="xlsx_memory"),
+        BookConfig(),
         book_id="scratch",
         base_dir=str(tmp_path),
         init_vars=None,
@@ -105,7 +105,7 @@ def test_try_resolve_book_export_abs_path_swallows_resolve_errors(tmp_path: Path
 
     assert (
         wcr._try_resolve_book_export_abs_path(  # noqa: SLF001
-            BookConfig(kind="xlsx_memory"),
+            BookConfig(),
             book_id="scratch",
             base_dir=".",
             init_vars=None,
@@ -116,7 +116,7 @@ def test_try_resolve_book_export_abs_path_swallows_resolve_errors(tmp_path: Path
     # pathful 但 path 误写成 `.xlsx` 文件 → ValueError 被吞掉
     assert (
         wcr._try_resolve_book_export_abs_path(  # noqa: SLF001
-            BookConfig(kind="xlsx_file", path=str(tmp_path / "report.xlsx")),
+            BookConfig(path=str(tmp_path / "report.xlsx")),
             book_id="report",
             base_dir=str(tmp_path),
             init_vars=None,
