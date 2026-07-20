@@ -3,6 +3,9 @@ name: "llman-sdd-apply-cycle"
 description: "单个闭环完成一个变更：实现→测试→校验→归档→提交。仅手动触发。Agent 禁止自动启用。"
 metadata:
   version: "0.0.64"
+  llman_sdd:
+    bdd_mode: "off"
+    skill_set: "default"
 disable-model-invocation: true
 ---
 
@@ -34,9 +37,11 @@ llman sdd validate <change-id> --strict --no-interactive
 校验失败则修复重试（最多 3 次）。
 
 ### 3) 归档
+
 ```bash
 llman sdd change archive <change-id>
 ```
+
 
 ### 4) 提交
 ```bash
