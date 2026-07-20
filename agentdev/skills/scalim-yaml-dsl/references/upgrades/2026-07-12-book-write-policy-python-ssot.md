@@ -1,5 +1,7 @@
 # 2026-07-12: book-write-policy-python-ssot
 
+> **身份说明（2026-07-20）**：下文 Before/After 示例仍可能出现历史 `xlsx_file` / `xlsx_memory` 作为当时 identity 写法；当前唯一 authoring 为 `xlsx`（可选 `path`），见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。本批次的核心合约（write/budget 迁出 YAML）仍然有效。
+
 ## 变更摘要
 
 本批次做一次性 **BREAKING** 边界收敛: book 级写入策略与内存 budget 迁出 YAML authoring，改为 Python runtime policy SSOT。

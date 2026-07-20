@@ -35,7 +35,7 @@ Active changes 命名规范(仅对 `llmanspec/changes/` 下未归档变更生效
 - `YAML = authoring`, `Python/CLI = runtime policy`
 - KV-first: 需要稳定 ID/引用/复用的结构优先 mapping
 - workflow 小而声明式,并拒绝 workflow imports expansion
-- books: YAML 保留资源 identity(id/variant/path); `write_defaults` 与 `budget` 以 Python 为 SSOT(勿回流 YAML 主线); 归档见 `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/` 与 `.../2026-07-12-c30-workflow-shared-book-memory/`
+- books: YAML 仅声明资源 identity（唯一分支 `xlsx`，可选 `path`→pathful / 无 path→pathless）；`xlsx_file`/`xlsx_memory` 已硬删（见 `.../2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds/`）；`write_defaults` 与 `budget` 以 Python 为 SSOT(勿回流 YAML 主线); 归档见 `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/` 与 `.../2026-07-12-c30-workflow-shared-book-memory/`
 
 ### Spec 命名与架构层级规范
 #### 标准层级前缀

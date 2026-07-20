@@ -28,7 +28,7 @@ scenarios[26]{req_id,id,given,when,then,feature}:
   r620,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r620,"missing-book-id-fails-fast-with-actionable-hint","demand 声明 `outputs[0].to.book: report`",调用方执行 standalone `compile/run` 且未提供 `overrides.resources.books.report`,"MUST fail-fast",true
   r669,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
-  r669,"workflow-overrides-a-demand-book-path","demand 声明 `resources.books.report: {xlsx_file: {path: ./out/a}}`",workflow 运行该 demand,effective `report.path` MUST 等于 `./out/b`(以 workflow YAML 目录为基准解析),true
+  r669,"workflow-overrides-a-demand-book-path","demand 声明 `resources.books.report: {xlsx: {path: ./out/a}}`",workflow 运行该 demand,effective `report.path` MUST 等于 `./out/b`(以 workflow YAML 目录为基准解析),true
   r710,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r710,"unknown-book-patch-key-fails-fast-with-a-precise-path",用户在 `workflow.resources.books.report` 中提供未知字段 `unknown_key`,workflow compile 应用 book patch,"系统 MUST fail-fast",true
   r710,"nested-write-defaults-enum-validation-is-consistent",用户提供 `write_defaults.on_mismatch=not_a_policy`,workflow compile 校验该配置,"系统 MUST fail-fast",true

@@ -20,7 +20,7 @@ scenarios[14]{req_id,id,given,when,then,feature}:
   r543,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r543,"drill-down-links-are-portable","workflow snapshot 中的某个节点包含 `demand_run_id=\"run_foo\"`",用户移动整个 bundle 目录到新的位置再打开,"前端 MUST 仍能通过 run id 找到 `scalim-viz/run_foo/` 并完成 drill-down",true
   r614,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
-  r614,"resource-lifecycle-events-can-highlight-workflow-graph-nodes",workflow bundle 中存在 `books.kind=xlsx_memory` 的资源节点,事件流包含该资源的 `workflow_resource_write`,该事件的 `node_ref.id` MUST 能映射到对应的 workflow resource node,true
+  r614,"resource-lifecycle-events-can-highlight-workflow-graph-nodes",workflow bundle 中存在 pathless xlsx 资源节点,事件流包含该资源的 `workflow_resource_write`,该事件的 `node_ref.id` MUST 能映射到对应的 workflow resource node,true
   r663,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r663,"existing-demand-replay-loader-can-open-a-child-replay-unchan","workflow bundle 下某个 `scalim-viz/<demand_run_id>/` 目录",前端以现有单 run replay 逻辑读取该目录,该目录 MUST 仍可作为一个普通 demand replay 被成功加载,true
   r705,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true

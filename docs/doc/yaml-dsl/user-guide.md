@@ -229,7 +229,7 @@ outputs:
     fields: [order_id]
 ```
 
-Excel 输出路径注入在 `resources.books.*.xlsx.path`(推荐;过渡期亦接受旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`):
+Excel 输出路径注入在 `resources.books.*.xlsx.path`(唯一写法;`xlsx_file` / `xlsx_memory.export_xlsx` 已硬删):
 
 ```yaml
 resources:
@@ -264,7 +264,7 @@ result = run(
 | `main_source.params` | ✅ | ❌ | ❌ |
 | `sources.<id>.params` | ✅ | ✅ | ✅ |
 | `resources.files.<id>.csv_file.path` | ✅ | ❌ | ❌ |
-| `resources.books.<id>.xlsx.path`(推荐;过渡期亦含旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`) | ✅ | ❌ | ❌ |
+| `resources.books.<id>.xlsx.path`(唯一 pathful 写法;旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path` 已硬删) | ✅ | ❌ | ❌ |
 
 ---
 
