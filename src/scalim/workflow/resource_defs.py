@@ -110,8 +110,10 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 )
                 continue
 
-            msg = "Unknown book identity for book_id={!r}; expected options.pathful (true=pathful workbook, false=pathless sheetbook)".format(
-                str(res.resource_id)
+            msg = (
+                "Unknown book identity for book_id={!r}; expected options.pathful (true=pathful workbook, false=pathless sheetbook)".format(
+                    str(res.resource_id)
+                )
             )
             raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
 

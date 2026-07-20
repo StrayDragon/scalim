@@ -10,7 +10,6 @@ from ..init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
     BookConfig,
-    BookExportXlsxConfig,
     FileConfig,
     ResourcesConfig,
 )
@@ -197,41 +196,6 @@ def _parse_path_or_init_var(raw: Any, *, path: str) -> OptionalPathNode:
         return raw.strip()
     msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
     raise ScalimWorkflowConfigError(msg, path=path)
-
-
-def _parse_book_export_xlsx(raw: Any, *, path: str) -> BookExportXlsxConfig:
-    msg: str
-    if not isinstance(raw, dict):
-        msg = "{} must be a mapping".format(path)
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    data = cast("Dict[str, Any]", raw)  # pragma: allow-cast yaml mapping typed narrowing
-    _raise_if_import_present(data, path=path)
-    unknown = sorted({str(k) for k in data} - {"path", "allow_formulas"})
-    if unknown:
-        if "write_lock" in unknown:
-            msg = "{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.write_lock".format(path))
-        msg = "{} has unknown keys: {}".format(path, ", ".join(unknown))
-        raise ScalimWorkflowConfigError(msg, path=path)
-
-    export_path = _parse_path_or_init_var(data.get("path"), path="{}.path".format(path))
-    if not export_path or (isinstance(export_path, str) and not export_path.strip()):
-        msg = "{}.path is required".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-    if isinstance(export_path, str) and Path(export_path).suffix.lower() == ".xlsx":
-        msg = (
-            "{}.path now expects an output root directory, not a file path. "
-            "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-        ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-
-    allow_formulas_raw = data.get("allow_formulas", True)
-    if not isinstance(allow_formulas_raw, bool):
-        msg = "{}.allow_formulas must be a bool".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
-
-    return BookExportXlsxConfig(path=export_path, allow_formulas=bool(allow_formulas_raw))
 
 
 def _parse_book_config(raw: Any, *, path: str) -> BookConfig:

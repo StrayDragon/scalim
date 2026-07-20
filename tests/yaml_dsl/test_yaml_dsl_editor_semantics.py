@@ -194,6 +194,7 @@ def test_collect_demand_diagnostics_has_error_warning_and_range(tmp_path: Path) 
     warn_paths = {w.path for w in result.warnings}
     assert "observability" not in warn_paths
 
+
 def test_collect_demand_diagnostics_import_expansion_error_is_reported(tmp_path: Path) -> None:
     yaml_text = textwrap.dedent(
         """\

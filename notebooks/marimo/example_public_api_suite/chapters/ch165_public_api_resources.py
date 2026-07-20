@@ -75,7 +75,6 @@ sources: {}
             resources=api.ResourcesOverride(
                 books={
                     "report": api.BookResourceOverride(
-                        kind="xlsx_file",
                         path=output_root,
                         allow_formulas=False,
                     )

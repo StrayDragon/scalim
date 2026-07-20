@@ -23,7 +23,7 @@ from .resources import ScalimWorkflowWriteError, WorkflowResourceManager
 
 
 def is_managed_xlsx_book(resource_manager: WorkflowResourceManager, book_id: str) -> bool:
-    """判断 `book_id` 是否为已注册的 pathful/pathless xlsx book."""
+    """判断 `book_id` 是否为已注册的 `pathful`/`pathless` `xlsx` `book`."""
 
     return bool(resource_manager.has_xlsx_book(str(book_id)))
 

@@ -23,7 +23,7 @@ class WorkflowResourceManager(
     """工作流级共享输出资源管理器(延迟提交 + 原子落盘)."""
 
     def has_xlsx_book(self, book_id: str) -> bool:
-        """是否为已注册的 `pathful`/`pathless` xlsx book(`workbook_defs` 或 `sheetbook_defs`)."""
+        """是否为已注册的 `pathful`/`pathless` `xlsx` `book`(`workbook_defs` 或 `sheetbook_defs`)."""
 
         bid = str(book_id)
         return bid in self._workbook_defs or bid in self._sheetbook_defs

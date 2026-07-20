@@ -159,7 +159,8 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
     config = DemandConfig(
         resources=ResourcesConfig(
             books={
-                "mem": BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
+                "mem": BookConfig(
+                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
                     export_xlsx=BookExportXlsxConfig(path="./out"),
                 )
             }
@@ -192,8 +193,7 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
 
 def test_compile_output_composition_xlsx_file_managed_uses_rows_and_excel_format(tmp_path: Path) -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(
-        path=str(tmp_path / "out"))}),
+        resources=ResourcesConfig(books={"report": BookConfig(path=str(tmp_path / "out"))}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -363,9 +363,7 @@ def test_compile_output_composition_missing_file_resource_raises_helpful_error()
 
 def test_compile_output_composition_append_mode_rejects_include_header() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(
-            books={"report": BookConfig(path="./out", write_defaults=BookWriteDefaultsConfig(mode="append"))}
-        ),
+        resources=ResourcesConfig(books={"report": BookConfig(path="./out", write_defaults=BookWriteDefaultsConfig(mode="append"))}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -493,7 +491,8 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
     config = DemandConfig(
         resources=ResourcesConfig(
             books={
-                "mem": BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
+                "mem": BookConfig(
+                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
                     export_xlsx=BookExportXlsxConfig(path="./out", allow_formulas=True),
                 )
             }
@@ -524,8 +523,7 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
 
 def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_dir_required() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(
-        path="./out")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="Bad/Name",
@@ -540,8 +538,7 @@ def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_
         )
 
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(
-        path="./out")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -554,8 +551,7 @@ def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_
         _ = oc_yaml.compile_output_composition_from_yaml(config, _make_demand_ir(), version_id="run_0", resolver=_resolver())
 
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(
-        path="./out")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -572,8 +568,7 @@ def test_compile_output_composition_book_sheet_default_name_error_and_yaml_base_
 
 def test_compile_output_composition_books_default_header_uses_field_name() -> None:
     config = DemandConfig(
-        resources=ResourcesConfig(books={"report": BookConfig(
-        path="./out")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="./out")}),
         outputs=(
             OutputTargetConfig(
                 name="detail",
@@ -599,7 +594,7 @@ def test_compile_output_composition_books_write_override_changes_header_source()
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                path="./out",
+                    path="./out",
                 )
             }
         ),
@@ -625,7 +620,8 @@ def test_compile_output_composition_books_write_override_changes_header_source()
 
 
 def test_validate_xlsx_memory_write_contract_reports_book_default_align_by_path() -> None:
-    book = BookConfig(write_defaults=BookWriteDefaultsConfig(mode="append", align_by="header"),
+    book = BookConfig(
+        write_defaults=BookWriteDefaultsConfig(mode="append", align_by="header"),
     )
 
     with pytest.raises(ValueError, match=r"resources\.books\.report\.write_defaults\.align_by"):
@@ -636,7 +632,8 @@ def test_validate_xlsx_memory_write_contract_reports_book_default_align_by_path(
 
 
 def test_validate_xlsx_memory_write_contract_accepts_field_id_alignment() -> None:
-    book = BookConfig(write_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
+    book = BookConfig(
+        write_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
     )
 
     oc_yaml._validate_xlsx_memory_write_contract(  # noqa: SLF001

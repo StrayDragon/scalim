@@ -264,7 +264,7 @@ class BookExportXlsxOverride:
 
 @dataclass(frozen=True)
 class BookResourceOverride:
-    # `kind` retained unused for wire compat; non-None fails in apply (`resource_override`).
+    # `kind` 保留但未使用(仅兼容旧 `wire`); 非 `None` 时在 `resource_override` 应用阶段 `fail-fast`.
     kind: Optional[str] = None
     path: OptionalPathNode = None
     export_xlsx: Optional[BookExportXlsxOverride] = None

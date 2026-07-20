@@ -200,7 +200,8 @@ def test_run_overrides_outputs_legacy_dict_fail_fast() -> None:
                 ),
                 resources=ResourcesOverride(
                     books={
-                        "report": BookResourceOverride(path="./out",
+                        "report": BookResourceOverride(
+                            path="./out",
                         )
                     }
                 ),
@@ -705,6 +706,7 @@ observability:
         )
 
     assert any(env.path == "observability" for env in excinfo.value.errors)
+
 
 def test_compile_rejects_yaml_batch_size(tmp_path: Path) -> None:
     yaml_path = _write_yaml(

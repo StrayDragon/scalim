@@ -513,7 +513,7 @@ def test_workflow_options_bool_returns_default_when_opts_is_not_mapping() -> Non
     assert workflow_execute_mod._options_bool("nope", "x", default=False) is False  # noqa: SLF001
 
 
-def test_build_workflow_resource_defs_rejects_empty_output_root_for_xlsx_file_book() -> None:
+def test_build_workflow_resource_defs_rejects_empty_output_root_for_pathful_book() -> None:
     from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
     from scalim.workflow import execute as workflow_execute_mod
 
@@ -522,7 +522,7 @@ def test_build_workflow_resource_defs_rejects_empty_output_root_for_xlsx_file_bo
         nodes=(),
         edges=(),
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
-        resources=(WorkflowResourceIr(resource_id="report", resource_type="book", path="", options={"kind": "xlsx_file"}),),
+        resources=(WorkflowResourceIr(resource_id="report", resource_type="book", path="", options={"pathful": True}),),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
     with pytest.raises(workflow_execute_mod.ScalimWorkflowConfigError, match=r"Output root must be a non-empty string") as excinfo:

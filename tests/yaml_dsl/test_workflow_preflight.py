@@ -183,7 +183,7 @@ def test_workflow_preflight_effective_book_write_defaults_can_be_overridden() ->
         resources=ResourcesConfig(
             books={
                 "report": BookConfig(
-                path="./out",
+                    path="./out",
                 ),
             }
         )

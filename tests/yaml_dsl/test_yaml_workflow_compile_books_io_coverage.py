@@ -74,8 +74,7 @@ def test_workflow_compile_try_resolve_book_export_abs_path_cover_branches(tmp_pa
 
     # success -> abs path
     out = workflow_compile_mod._try_resolve_book_export_abs_path(  # noqa: SLF001
-        BookConfig(
-        path="./a"),
+        BookConfig(path="./a"),
         book_id="b",
         base_dir=str(tmp_path),
         init_vars=None,
@@ -405,16 +404,14 @@ def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_mor
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources"):
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(
-            path="a"),
+            BookConfig(path="a"),
             {"budget": {"max_sheets": 1, "max_total_cells": 1}},
             path="p",
         )
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx is not allowed for pathful books"):
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(
-            path="a"),
+            BookConfig(path="a"),
             {"export_xlsx": {"path": "x"}},
             path="p",
         )
@@ -475,8 +472,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # path-presence mismatch between workflow and demand
     wf_obj = WorkflowConfig(
         runs=(run_a,),
-        resources=ResourcesConfig(books={"report": BookConfig(
-    path="a")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="a")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(budget=BookBudgetConfig(1, 1))}))
     with pytest.raises(ScalimWorkflowConfigError, match=r"Book path-presence mismatch"):
@@ -492,8 +488,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # workflow overrides demand book definition when kind is compatible
     wf_obj = WorkflowConfig(
         runs=(run_a,),
-        resources=ResourcesConfig(books={"report": BookConfig(
-    path="wf_out")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="wf_out")}),
     )
     demand_cfg = DemandConfig(resources=ResourcesConfig(books={"report": BookConfig(path="d_out")}))
     _resources, effective_books, _effective_files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
@@ -536,18 +531,15 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
     # same config, same base_dir: duplicate ids are accepted, and loops continue when later items exist
     demand_cfg_a = DemandConfig(
         resources=ResourcesConfig(
-            books={"report": BookConfig(
-            path="./out")},
+            books={"report": BookConfig(path="./out")},
             files={"detail_csv": FileConfig(kind="csv_file", path="./out", encoding="utf-8")},
         )
     )
     demand_cfg_b = DemandConfig(
         resources=ResourcesConfig(
             books={
-                "report": BookConfig(
-                path="./out"),
-                "extra": BookConfig(
-            path="./extra"),
+                "report": BookConfig(path="./out"),
+                "extra": BookConfig(path="./extra"),
             },
             files={
                 "detail_csv": FileConfig(kind="csv_file", path="./out", encoding="utf-8"),
@@ -638,8 +630,7 @@ def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branche
         runs=(),
         resources=ResourcesConfig(
             books={
-                "a": BookConfig(
-            path=str(tmp_path / "same.xlsx")),
+                "a": BookConfig(path=str(tmp_path / "same.xlsx")),
             }
         ),
     )
@@ -659,10 +650,12 @@ def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields
     wf_obj = WorkflowConfig(runs=(), resources=ResourcesConfig())
     overrides_resources = ResourcesOverride(
         books={
-            "report": BookResourceOverride(path="./report_root",
+            "report": BookResourceOverride(
+                path="./report_root",
                 allow_formulas=True,
             ),
-            "mem": BookResourceOverride(export_xlsx=BookExportXlsxOverride(path="./mem_root", allow_formulas=True),
+            "mem": BookResourceOverride(
+                export_xlsx=BookExportXlsxOverride(path="./mem_root", allow_formulas=True),
             ),
         },
         files={
@@ -688,8 +681,7 @@ def test_workflow_compile_resources_override_to_patch_covers_all_optional_fields
 
 def test_workflow_compile_resources_override_to_patch_supports_partial_overrides_and_ignores_none_fields() -> None:
     updated = resource_override_mod.apply_book_resource_override(
-        BookConfig(
-        path="a"),
+        BookConfig(path="a"),
         BookResourceOverride(path="./out"),
         path="p",
     )
@@ -731,8 +723,7 @@ def test_workflow_compile_resources_override_to_patch_supports_partial_overrides
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"write_defaults was removed from RunOverrides\.resources") as exc_info3:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(
-            path="a"),
+            BookConfig(path="a"),
             {"write_defaults": {"align_by": "header"}},
             path="p",
         )
@@ -749,8 +740,7 @@ def test_workflow_compile_resources_override_to_patch_supports_partial_overrides
 def test_workflow_compile_resources_override_updates_existing_workflow_book(tmp_path: Path) -> None:
     wf_obj = WorkflowConfig(
         runs=(),
-        resources=ResourcesConfig(books={"report": BookConfig(
-    path="./wf")}),
+        resources=ResourcesConfig(books={"report": BookConfig(path="./wf")}),
     )
     resources, books, _files = workflow_compile_mod._compile_workflow_resources(  # noqa: SLF001
         wf_obj,
@@ -926,8 +916,7 @@ def test_workflow_compile_effective_outputs_parser_and_write_node_errors_cover_b
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={"report": BookConfig(
-            path="a")},
+            effective_books={"report": BookConfig(path="a")},
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,
@@ -975,7 +964,8 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
             nodes=[],
             edges=[],
             effective_books={
-                "report": BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
+                "report": BookConfig(
+                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
                 )
             },
             effective_files={},
@@ -987,7 +977,8 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
 
 def test_workflow_compile_accepts_xlsx_memory_align_by_field_id() -> None:
     workflow_compile_mod._validate_xlsx_memory_align_by(  # noqa: SLF001
-        book=BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
+        book=BookConfig(
+            budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
         ),
         book_id="report",
         effective_defaults=BookWriteDefaultsConfig(mode="append", align_by="field_id"),
@@ -1017,8 +1008,7 @@ def test_workflow_compile_default_book_write_mode_is_sheet() -> None:
         demand_cfg_by_run_id={"a": cfg},
         nodes=nodes,
         edges=[],
-        effective_books={"report": BookConfig(
-        path="out")},
+        effective_books={"report": BookConfig(path="out")},
         effective_files={},
         overrides_outputs=None,
         default_book_id=None,
@@ -1097,8 +1087,7 @@ def test_workflow_compile_meta_audit_fallback_and_inject_dependencies_cover_bran
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={"report": BookConfig(
-            path="a")},
+            effective_books={"report": BookConfig(path="a")},
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,

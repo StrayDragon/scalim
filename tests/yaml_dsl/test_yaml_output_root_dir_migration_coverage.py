@@ -38,6 +38,17 @@ def test_validator_reports_resources_files_path_suffix_csv_migration_issue() -> 
     assert any(str(issue.path) == "resources.files.detail_csv.csv_file.path" for issue in issues)
 
 
+def test_validator_reports_book_missing_xlsx_variant() -> None:
+    v = ConfigValidator()
+    issues = []
+    v._validate_resource_output_paths(  # noqa: SLF001
+        {"resources": {"books": {"report": {}}}},
+        issues,
+    )
+    assert any("must declare exactly one variant key: xlsx" in str(issue.message) for issue in issues)
+    assert any(str(issue.path) == "resources.books.report" for issue in issues)
+
+
 def test_validator_strips_removed_resources_write_lock_fields_under_new_paths() -> None:
     v = ConfigValidator()
     issues = []
@@ -167,30 +178,43 @@ def test_validator_reports_resources_files_and_books_kind_and_shape_migrations()
     assert any("xlsx_memory with export_xlsx was removed" in str(item.message) for item in issues)
 
 
-def test_workflow_config_parse_rejects_export_xlsx_path_with_xlsx_suffix() -> None:
-    with pytest.raises(ScalimWorkflowConfigError, match=r"now expects an output root directory"):
-        _ = parse_mod._parse_book_export_xlsx(  # noqa: SLF001
-            {"path": "out.xlsx"},
-            path="workflow.resources.books.report.export_xlsx",
+def test_workflow_config_parse_rejects_xlsx_path_with_xlsx_suffix() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"expects an output root directory") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx": {"path": "out.xlsx"}},
+            path="workflow.resources.books.report",
         )
+    assert exc_info.value.path == "workflow.resources.books.report.xlsx.path"
 
 
-def test_workflow_config_parse_book_export_xlsx_and_memory_error_branches() -> None:
-    with pytest.raises(ScalimWorkflowConfigError, match=r"must be a mapping") as exc_info:
-        _ = parse_mod._parse_book_export_xlsx("nope", path="p.export_xlsx")  # noqa: SLF001
-    assert exc_info.value.path == "p.export_xlsx"
+def test_workflow_config_parse_book_xlsx_and_removed_alias_error_branches() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx must be a mapping") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx": "nope"},
+            path="p",
+        )
+    assert exc_info.value.path == "p.xlsx"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"has unknown keys: nope") as exc_info:
-        _ = parse_mod._parse_book_export_xlsx({"path": "out", "nope": 1}, path="p.export_xlsx")  # noqa: SLF001
-    assert exc_info.value.path == "p.export_xlsx"
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx has unknown keys: nope") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx": {"path": "out", "nope": 1}},
+            path="p",
+        )
+    assert exc_info.value.path == "p.xlsx"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"path is required") as exc_info:
-        _ = parse_mod._parse_book_export_xlsx({"path": "   "}, path="p.export_xlsx")  # noqa: SLF001
-    assert exc_info.value.path == "p.export_xlsx.path"
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx\.path must be a non-empty output root") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx": {"path": "   "}},
+            path="p",
+        )
+    assert exc_info.value.path == "p.xlsx.path"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas must be a bool") as exc_info:
-        _ = parse_mod._parse_book_export_xlsx({"path": "out", "allow_formulas": "nope"}, path="p.export_xlsx")  # noqa: SLF001
-    assert exc_info.value.path == "p.export_xlsx.allow_formulas"
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx\.allow_formulas must be a bool") as exc_info:
+        _ = parse_mod._parse_book_config(  # noqa: SLF001
+            {"xlsx": {"path": "out", "allow_formulas": "nope"}},
+            path="p",
+        )
+    assert exc_info.value.path == "p.xlsx.allow_formulas"
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory was removed") as exc_info:
         _ = parse_mod._parse_book_config(  # noqa: SLF001
@@ -232,7 +256,8 @@ def test_workflow_compile_helpers_cover_output_root_dir_migration_edges(tmp_path
     assert patched.path == "out"
     assert patched.allow_formulas is True
 
-    book = BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=2),
+    book = BookConfig(
+        budget=BookBudgetConfig(max_sheets=1, max_total_cells=2),
         export_xlsx=BookExportXlsxConfig(path=str(tmp_path / "out.xlsx"), allow_formulas=True),
     )
     with pytest.raises(ValueError, match=r"export_xlsx\.path now expects an output root directory"):

@@ -6,7 +6,6 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.models import RawDemand
 from scalim.dsl.yaml_dsl.book_resource_policy import BookBudgetPolicy, BookWriteMode, BookWritePolicy
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
     BOOK_BUDGET_KEYS,
-    BOOK_EXPORT_XLSX_KEYS,
     BOOK_KEYS,
     DEMAND_KEYS,
     RESOURCES_KEYS,
@@ -215,14 +214,20 @@ def test_loader_rejects_yaml_book_budget_authoring() -> None:
         )
 
 
-def test_loader_parse_book_export_xlsx_branches_cover_success_and_error() -> None:
+def test_loader_parse_book_xlsx_path_rejects_file_suffix_and_empty() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"e\.path is required"):
-        _ = loader._parse_book_export_xlsx({}, base_path="e")  # noqa: SLF001
+    with pytest.raises(ValueError, match=r"xlsx\.path must be a non-empty output root"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {BOOK_KEYS["xlsx"]: {"path": "   "}},
+            base_path="resources.books.report",
+        )
 
-    cfg = loader._parse_book_export_xlsx({BOOK_EXPORT_XLSX_KEYS["path"]: "x.xlsx"}, base_path="e")  # noqa: SLF001
-    assert cfg.path == "x.xlsx"
+    with pytest.raises(ValueError, match=r"xlsx\.path expects an output root directory"):
+        _ = loader._parse_book_config(  # noqa: SLF001
+            {BOOK_KEYS["xlsx"]: {"path": "x.xlsx"}},
+            base_path="resources.books.report",
+        )
 
 
 def test_loader_rejects_yaml_book_write_defaults_authoring() -> None:

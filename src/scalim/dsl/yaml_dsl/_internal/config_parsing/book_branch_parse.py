@@ -1,9 +1,9 @@
-"""`Book` `identity` 解析: 统一 `xlsx` 唯一 authoring SSOT.
+"""`Book` `identity` 解析: 统一 `xlsx` 为唯一编写面 `SSOT`.
 
 说明:
-- YAML SSOT: `xlsx`(有 `path`=落盘; 无 `path`=内存总线)
-- `xlsx_file` / `xlsx_memory` YAML 分支已移除: 出现 MUST fail-fast 并给出迁移提示
-- 运行时身份以 `path` 有无(`pathful`/`pathless`)为 SSOT
+- `YAML` `SSOT`: `xlsx`(有 `path`=落盘; 无 `path`=内存总线)
+- `xlsx_file` / `xlsx_memory` `YAML` 分支已移除: 出现即 `fail-fast` 并给出迁移提示
+- 运行时身份以 `path` 有无(`pathful`/`pathless`)为 `SSOT`
 """
 
 from pathlib import Path

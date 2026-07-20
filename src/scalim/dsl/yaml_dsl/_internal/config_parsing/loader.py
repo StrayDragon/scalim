@@ -8,13 +8,11 @@ from .....typedefs import FailurePolicy
 from ...init_var_nodes import OptionalPathNode, parse_init_var_ref
 from ...schema_dsl.constants import DEFAULT_BATCH_SIZE, UTF8_ENCODING
 from ...schema_dsl.models import (
-    BOOK_EXPORT_XLSX_KEYS,
     DEMAND_KEYS,
     FILE_CSV_FILE_KEYS,
     FILE_KEYS,
     RESOURCES_KEYS,
     BookConfig,
-    BookExportXlsxConfig,
     DemandConfig,
     FileConfig,
     ResourcesConfig,
@@ -472,11 +470,3 @@ class YamlDemandLoader(
             return raw.strip()
         msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
         raise TypeError(msg)
-
-    def _parse_book_export_xlsx(self, raw: Dict[str, Any], *, base_path: str) -> BookExportXlsxConfig:
-        export_path = self._parse_path_or_init_var(raw.get(BOOK_EXPORT_XLSX_KEYS["path"]), path="{}.path".format(base_path))
-        if not export_path or (isinstance(export_path, str) and not export_path.strip()):
-            msg = "{}.path is required".format(base_path)
-            raise ValueError(msg)
-        allow_formulas = bool(raw.get(BOOK_EXPORT_XLSX_KEYS["allow_formulas"], True))
-        return BookExportXlsxConfig(path=export_path, allow_formulas=allow_formulas)

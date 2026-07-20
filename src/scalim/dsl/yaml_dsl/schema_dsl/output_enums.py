@@ -11,7 +11,7 @@ FILE_KINDS: Tuple[str, ...] = ("csv_file",)
 """`resources.files.*.kind` 枚举."""
 
 BOOK_KINDS: Tuple[str, ...] = ()
-"""YAML/Python book kind discriminator removed; identity is pathful/pathless via `path`."""
+"""`YAML`/`Python` 的 `book` `kind` 判别已移除; 身份由 `path` 有无决定(`pathful`/`pathless`)."""
 
 BOOK_WRITE_MODE_ENUM: Tuple[str, ...] = (
     "sheet",

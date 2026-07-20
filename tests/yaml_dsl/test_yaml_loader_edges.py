@@ -142,6 +142,7 @@ observability:
         "Python runtime entrypoints",
     )
 
+
 def test_loader_skips_invalid_relation_entries() -> None:
     yaml_content = """
 name: demo
@@ -219,3 +220,42 @@ sources: {}
     messages = [str(r.message) for r in caplog.records if "warn" in str(r.message)]
     assert messages
     assert all("(path=" not in msg for msg in messages)
+
+
+def test_loader_warning_logs_include_non_root_path_suffix(caplog: object, tmp_path: Path) -> None:
+    import logging
+
+    class _WarnValidator:
+        def validate_report(  # type: ignore[no-untyped-def]
+            self,
+            _data,
+            *,
+            strict_unknown_fields: bool,
+        ) -> ValidationReport:
+            _ = strict_unknown_fields
+            report = ValidationReport()
+            report.add_warning("warn-with-path", path="fields.profit")
+            return report
+
+    yaml_content = """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources: {}
+"""
+
+    caplog.set_level(logging.WARNING)
+
+    loader = YamlDemandLoader()
+    loader._validator = _WarnValidator()  # type: ignore[assignment]
+
+    yaml_path = tmp_path / "warn_path.yaml"
+    yaml_path.write_text(yaml_content, encoding="utf-8")
+
+    _ = loader.load(yaml_path)
+    _ = loader.load_string(yaml_content)
+
+    messages = [str(r.message) for r in caplog.records if "warn-with-path" in str(r.message)]
+    assert messages
+    assert all("(path=fields.profit)" in msg for msg in messages)

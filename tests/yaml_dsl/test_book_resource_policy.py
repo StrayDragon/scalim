@@ -110,8 +110,7 @@ def test_materialize_resources_policy_onto_books_covers_memory_budget() -> None:
         name="n",
         resources=ResourcesConfig(
             books={
-                "file_book": BookConfig(
-                path="./out"),
+                "file_book": BookConfig(path="./out"),
                 "mem_book": BookConfig(),
             }
         ),

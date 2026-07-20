@@ -264,3 +264,26 @@ def test_frontend_compilation_reports_plan_error(monkeypatch, tmp_path: Path) ->
     assert compilation.diagnostics.errors
     assert compilation.diagnostics.errors[0].code == "yaml_frontend_plan_error"
     assert compilation.demand_ir is not None
+
+
+def test_validate_demand_yaml_maps_warnings(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import ValidationReport
+
+    class _WarnOnlyValidator:
+        def validate_report(self, _data, *, strict_unknown_fields: bool = False):  # type: ignore[no-untyped-def]
+            _ = strict_unknown_fields
+            report = ValidationReport()
+            report.add_warning("soft-issue", path="fields.x")
+            return report
+
+    monkeypatch.setattr(frontend_compiler, "ConfigValidator", lambda: _WarnOnlyValidator())
+
+    diagnostics = frontend_compiler._validate_demand_yaml(  # type: ignore[attr-defined]
+        {"name": "demo"},
+        yaml_path=tmp_path / "demo.yaml",
+        locations={},
+    )
+    assert diagnostics.ok()
+    assert len(diagnostics.warnings) == 1
+    assert diagnostics.warnings[0].code == "yaml_validate_warning"
+    assert diagnostics.warnings[0].path == "fields.x"
