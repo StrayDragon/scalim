@@ -1,0 +1,9 @@
+workflow:
+  runs:
+    - id: r1
+      demand: ./d.yaml
+  resources:
+    books:
+      report:
+        xlsx_file:
+          path: ./out

@@ -1,0 +1,12 @@
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources: {}
+resources:
+  books:
+    report:
+      xlsx_file:
+        path: ./out
+    scratch:
+      xlsx_memory: {}

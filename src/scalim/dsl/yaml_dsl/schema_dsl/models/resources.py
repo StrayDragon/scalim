@@ -179,7 +179,8 @@ class BookXlsxConfig:
                 "可选输出 root 目录.\n\n"
                 "- 有 `path`: 版本化落盘\n"
                 "- 无 `path`: 内存总线\n"
-                "- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`"
+                "- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`\n"
+                "- 旧别名 `xlsx_file`/`xlsx_memory`/`export_xlsx` 已硬删(出现即 `fail-fast`)"
             ),
         ),
     )
@@ -243,12 +244,12 @@ class BookConfig:
         metadata=schema_meta(
             desc="xlsx: 统一 book identity(有 path=落盘;无 path=内存总线)",
             md=(
-                "xlsx: 统一 book identity(唯一 authoring SSOT).\n\n"
+                "`xlsx`: 统一 `book` identity(唯一编写面 `SSOT`).\n\n"
                 "- 有 `path`: 版本化落盘\n"
                 "- 无 `path`: 内存总线(`book_sheet_rows`)\n"
                 "- 可选: `allow_formulas`(导出相关)\n"
-                "- `write_defaults`/`budget` 在 Python ResourcesPolicy\n"
-                "- 已移除别名: `xlsx_file` / `xlsx_memory`(出现 MUST fail-fast)"
+                "- `write_defaults`/`budget` 在 `Python` `ResourcesPolicy`\n"
+                "- 已移除别名: `xlsx_file` / `xlsx_memory`(出现即 `fail-fast`)"
             ),
             ref="book_xlsx",
         ),

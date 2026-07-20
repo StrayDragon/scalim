@@ -195,6 +195,114 @@ def test_collect_demand_diagnostics_has_error_warning_and_range(tmp_path: Path) 
     assert "observability" not in warn_paths
 
 
+def test_collect_demand_diagnostics_reports_removed_book_aliases(tmp_path: Path) -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source:
+          source_id: orders
+          loader: tests.fixtures.mock_loaders.mock_loader
+        sources: {}
+        resources:
+          books:
+            report:
+              xlsx_file:
+                path: ./out
+            scratch:
+              xlsx_memory: {}
+        """
+    )
+    yaml_path = _write(tmp_path / "demand.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_DEMAND
+    messages = [d.message for d in result.errors]
+    assert any("xlsx_file was removed" in msg for msg in messages)
+    assert any("xlsx_memory was removed" in msg for msg in messages)
+    paths = {d.path for d in result.errors}
+    assert "resources.books.report.xlsx_file" in paths
+    assert "resources.books.scratch.xlsx_memory" in paths
+
+
+def test_collect_demand_diagnostics_accepts_unified_xlsx_books(tmp_path: Path) -> None:
+    yaml_text = textwrap.dedent(
+        """\
+        name: demo
+        main_source:
+          source_id: orders
+          loader: tests.fixtures.mock_loaders.mock_loader
+        sources: {}
+        resources:
+          books:
+            report:
+              xlsx:
+                path: ./out
+            scratch:
+              xlsx: {}
+        """
+    )
+    yaml_path = _write(tmp_path / "demand.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_DEMAND
+    assert result.errors == ()
+    assert result.warnings == ()
+
+
+def test_workflow_diagnostics_rejects_removed_book_aliases(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_text = textwrap.dedent(
+        """\
+        workflow:
+          runs:
+            - id: r1
+              demand: ./d.yaml
+          resources:
+            books:
+              report:
+                xlsx_file:
+                  path: ./out
+        """
+    )
+    yaml_path = _write(wf_dir / "x.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_WORKFLOW
+    messages = [d.message for d in result.errors]
+    assert any("xlsx_file" in msg for msg in messages)
+
+
+def test_workflow_diagnostics_accepts_unified_xlsx_books(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    wf_dir = repo / "wf"
+    _ = _write(
+        repo / "scalim.yaml",
+        "yaml_dsl:\n  lsp:\n    kind_overrides:\n      - glob: wf/*.yaml\n        kind: workflow\n",
+    )
+    yaml_text = textwrap.dedent(
+        """\
+        workflow:
+          runs:
+            - id: r1
+              demand: ./d.yaml
+          resources:
+            books:
+              report:
+                xlsx:
+                  path: ./out
+              scratch:
+                xlsx: {}
+        """
+    )
+    yaml_path = _write(wf_dir / "x.yaml", yaml_text)
+    result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
+    assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_WORKFLOW
+    assert result.errors == ()
+    assert result.warnings == ()
+
+
 def test_collect_demand_diagnostics_import_expansion_error_is_reported(tmp_path: Path) -> None:
     yaml_text = textwrap.dedent(
         """\

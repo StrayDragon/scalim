@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "diagnostics": [
+      {
+        "code": "yaml_schema_validate_error",
+        "message": "Schema validation error: {'xlsx_file': {'path': './out'}} is not valid under any of the given schemas",
+        "range": {
+          "end": {
+            "character": 7,
+            "line": 6
+          },
+          "start": {
+            "character": 6,
+            "line": 6
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_unknown_field",
+        "message": "Unknown field 'xlsx_file'",
+        "range": {
+          "end": {
+            "character": 9,
+            "line": 7
+          },
+          "start": {
+            "character": 8,
+            "line": 7
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      }
+    ],
+    "uri": "file://<WORKSPACE>/demo.yaml"
+  }
+}

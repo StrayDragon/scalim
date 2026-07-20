@@ -376,3 +376,89 @@ def test_lsp_contract_code_actions_create_minimal_scalim_yaml(tmp_path) -> None:
         assert_json_snapshot(_snapshot_path(scenario, "scalim_yaml.json"), scalim_yaml_snapshot)
     finally:
         session.shutdown()
+
+
+def test_lsp_contract_books_unified_xlsx_diagnostics(tmp_path) -> None:
+    scenario = "books_unified_xlsx_diagnostics"
+    workspace = tmp_path / "workspace"
+    _copy_workspace_fixture(scenario, workspace)
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+
+    proc = start_yaml_dsl_lsp_server(workspace)
+    session = LspSession(proc, workspace=workspace)
+    try:
+        session.initialize()
+        session.did_open(uri=yaml_path.as_uri(), text=yaml_text)
+        diag = session.wait_for_diagnostics(uri=yaml_path.as_uri())
+        diag_params = diag.get("params") or {}
+        diag_snapshot = {
+            "uri": diag_params.get("uri"),
+            "diagnostics": normalize_diagnostics(diag_params.get("diagnostics") or []),
+        }
+        diag_snapshot = normalize_json(diag_snapshot, workspace=workspace)
+        assert_no_path_leaks(diag_snapshot, workspace=workspace)
+        assert_json_snapshot(_snapshot_path(scenario, "diagnostics.json"), diag_snapshot)
+        assert diag_snapshot["diagnostics"] == []
+    finally:
+        session.shutdown()
+
+
+def test_lsp_contract_books_removed_alias_diagnostics(tmp_path) -> None:
+    scenario = "books_removed_alias_diagnostics"
+    workspace = tmp_path / "workspace"
+    _copy_workspace_fixture(scenario, workspace)
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+
+    proc = start_yaml_dsl_lsp_server(workspace)
+    session = LspSession(proc, workspace=workspace)
+    try:
+        session.initialize()
+        session.did_open(uri=yaml_path.as_uri(), text=yaml_text)
+        diag = session.wait_for_diagnostics(uri=yaml_path.as_uri())
+        diag_params = diag.get("params") or {}
+        diag_snapshot = {
+            "uri": diag_params.get("uri"),
+            "diagnostics": normalize_diagnostics(diag_params.get("diagnostics") or []),
+        }
+        diag_snapshot = normalize_json(diag_snapshot, workspace=workspace)
+        assert_no_path_leaks(diag_snapshot, workspace=workspace)
+        assert_json_snapshot(_snapshot_path(scenario, "diagnostics.json"), diag_snapshot)
+
+        messages = [str(item.get("message") or "") for item in diag_snapshot["diagnostics"]]
+        assert any("xlsx_file was removed" in msg for msg in messages)
+        assert any("xlsx_memory was removed" in msg for msg in messages)
+    finally:
+        session.shutdown()
+
+
+def test_lsp_contract_workflow_books_removed_alias_diagnostics(tmp_path) -> None:
+    scenario = "workflow_books_removed_alias_diagnostics"
+    workspace = tmp_path / "workspace"
+    _copy_workspace_fixture(scenario, workspace)
+
+    yaml_path = workspace / "demo.yaml"
+    yaml_text = yaml_path.read_text(encoding="utf-8")
+
+    proc = start_yaml_dsl_lsp_server(workspace)
+    session = LspSession(proc, workspace=workspace)
+    try:
+        session.initialize()
+        session.did_open(uri=yaml_path.as_uri(), text=yaml_text)
+        diag = session.wait_for_diagnostics(uri=yaml_path.as_uri())
+        diag_params = diag.get("params") or {}
+        diag_snapshot = {
+            "uri": diag_params.get("uri"),
+            "diagnostics": normalize_diagnostics(diag_params.get("diagnostics") or []),
+        }
+        diag_snapshot = normalize_json(diag_snapshot, workspace=workspace)
+        assert_no_path_leaks(diag_snapshot, workspace=workspace)
+        assert_json_snapshot(_snapshot_path(scenario, "diagnostics.json"), diag_snapshot)
+
+        messages = [str(item.get("message") or "") for item in diag_snapshot["diagnostics"]]
+        assert any("xlsx_file" in msg for msg in messages)
+    finally:
+        session.shutdown()

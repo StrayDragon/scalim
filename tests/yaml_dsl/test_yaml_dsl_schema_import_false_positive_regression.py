@@ -24,6 +24,27 @@ def test_demand_schema_book_schema_does_not_expose_legacy_kind_discriminator() -
     assert "xlsx_memory" not in props
     assert "book_xlsx_file" not in schema["definitions"]
     assert "book_xlsx_memory" not in schema["definitions"]
+    assert "book_export_xlsx" not in schema["definitions"]
+
+
+def test_workflow_schema_book_schema_rejects_removed_aliases_and_omits_export_def() -> None:
+    path = _repo_root() / "src" / "scalim" / "dsl" / "yaml_dsl" / "schema" / "workflow.gen.json"
+    schema = json.loads(path.read_text(encoding="utf-8"))
+    book = schema["definitions"]["book"]
+    props = book.get("properties") or {}
+    assert "xlsx" in props
+    assert "xlsx_file" not in props
+    assert "xlsx_memory" not in props
+    assert "kind" not in props
+    assert "book_export_xlsx" not in schema["definitions"]
+
+    wrapper = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$ref": "#/definitions/book",
+        "definitions": schema.get("definitions") or {},
+    }
+    errors = list(jsonschema.Draft7Validator(wrapper).iter_errors({"xlsx_file": {"path": "./out"}}))
+    assert errors, "xlsx_file alias must be schema-invalid for workflow book"
 
 
 def test_demand_schema_import_only_book_mapping_is_schema_valid() -> None:

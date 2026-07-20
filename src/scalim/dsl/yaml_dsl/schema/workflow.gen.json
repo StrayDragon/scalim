@@ -120,57 +120,6 @@
     }
   },
   "definitions": {
-    "book_export_xlsx": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "oneOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "$init_var": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### book_export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
-                }
-              },
-              "required": [
-                "$init_var"
-              ],
-              "additionalProperties": false,
-              "description": "运行时动态路径: {$init_var: <name>}"
-            }
-          ],
-          "description": "导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})",
-          "examples": [
-            "./output",
-            {
-              "$init_var": "output_root"
-            }
-          ],
-          "markdownDescription": "#### book_export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
-        },
-        "allow_formulas": {
-          "type": "boolean",
-          "description": "允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
-          "markdownDescription": "#### book_export_xlsx.allow_formulas\n\n允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
-          "default": true,
-          "examples": [
-            true
-          ]
-        }
-      },
-      "required": [
-        "path"
-      ],
-      "additionalProperties": false
-    },
     "book_xlsx": {
       "type": "object",
       "properties": {
@@ -205,7 +154,7 @@
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.xlsx.path\n\n可选输出 root 目录.\n\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线\n- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### workflow.resources.books.*.xlsx.path\n\n可选输出 root 目录.\n\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线\n- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`\n- 旧别名 `xlsx_file`/`xlsx_memory`/`export_xlsx` 已硬删(出现即 `fail-fast`)\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
@@ -223,8 +172,8 @@
       "type": "object",
       "properties": {
         "xlsx": {
-          "description": "xlsx: 统一 book identity(唯一 authoring SSOT).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx\n\nxlsx: 统一 book identity(唯一 authoring SSOT).\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线(`book_sheet_rows`)",
+          "description": "`xlsx`: 统一 `book` identity(唯一编写面 `SSOT`).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx\n\n`xlsx`: 统一 `book` identity(唯一编写面 `SSOT`).\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线(`book_sheet_rows`)",
           "allOf": [
             {
               "$ref": "#/definitions/book_xlsx"

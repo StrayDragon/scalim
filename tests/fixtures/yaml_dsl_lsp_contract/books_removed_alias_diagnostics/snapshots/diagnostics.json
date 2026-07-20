@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "diagnostics": [
+      {
+        "code": "yaml_validate_error",
+        "message": "Unknown field 'xlsx_file'",
+        "range": {
+          "end": {
+            "character": 7,
+            "line": 8
+          },
+          "start": {
+            "character": 6,
+            "line": 8
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "resources.books.report.xlsx_file was removed. Migration: use resources.books.report.xlsx: {path: <output_root>, allow_formulas?: false}.",
+        "range": {
+          "end": {
+            "character": 7,
+            "line": 8
+          },
+          "start": {
+            "character": 6,
+            "line": 8
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "Unknown field 'xlsx_memory'",
+        "range": {
+          "end": {
+            "character": 7,
+            "line": 11
+          },
+          "start": {
+            "character": 6,
+            "line": 11
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      },
+      {
+        "code": "yaml_validate_error",
+        "message": "resources.books.scratch.xlsx_memory was removed. Migration: use resources.books.scratch.xlsx: {}.",
+        "range": {
+          "end": {
+            "character": 7,
+            "line": 11
+          },
+          "start": {
+            "character": 6,
+            "line": 11
+          }
+        },
+        "severity": 1,
+        "source": "scalim"
+      }
+    ],
+    "uri": "file://<WORKSPACE>/demo.yaml"
+  }
+}
