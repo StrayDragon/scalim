@@ -22,7 +22,7 @@ from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import BookConfig, DemandConfig, FileConfig
 from ..workflow import ScalimWorkflowConfigError, WorkflowConfig
 from . import resource_override as _resource_override_ssot
-from .book_identity import is_pathful_book, legacy_kind_shim
+from .book_identity import is_pathful_book
 
 __all__ = ()
 
@@ -86,7 +86,6 @@ def _book_export_path_and_options(
             raise ValueError(msg)
         book_options = {
             "pathful": True,
-            "kind": legacy_kind_shim(pathful=True),  # `deprecated` `wire` `shim`
             "allow_formulas": bool(book.allow_formulas),
         }
         return str(output_root), book_options
@@ -119,7 +118,6 @@ def _book_export_path_and_options(
 
     book_options = {
         "pathful": False,
-        "kind": legacy_kind_shim(pathful=False),  # `deprecated` `wire` `shim`
     }
     if budget_mapping is not None:
         book_options["budget"] = dict(budget_mapping)

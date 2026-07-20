@@ -114,8 +114,6 @@ def _merge_resources_overrides(
 
 
 def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
-    kind = str(book.kind or "").strip() or None
-
     export_override = None
     if book.export_xlsx is not None:
         export_override = BookExportXlsxOverride(
@@ -126,7 +124,6 @@ def _book_config_to_resource_override(book: BookConfig) -> BookResourceOverride:
     allow_formulas = bool(book.allow_formulas)
 
     return BookResourceOverride(
-        kind=kind,
         path=book.path if book.path is not None else None,
         export_xlsx=export_override,
         allow_formulas=allow_formulas,

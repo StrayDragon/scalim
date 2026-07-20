@@ -11,11 +11,16 @@ from scalim.workflow import write_nodes as write_nodes_mod
 from scalim.workflow.artifacts import WorkflowArtifactsDirectory
 
 
-def test_is_xlsx_spreadsheet_book_kind() -> None:
-    assert write_nodes_mod.is_xlsx_spreadsheet_book_kind("xlsx_file") is True
-    assert write_nodes_mod.is_xlsx_spreadsheet_book_kind("xlsx_memory") is True
-    assert write_nodes_mod.is_xlsx_spreadsheet_book_kind("") is False
-    assert write_nodes_mod.is_xlsx_spreadsheet_book_kind("csv_file") is False
+def test_is_managed_xlsx_book() -> None:
+    class _Mgr:
+        def __init__(self, *, has_book: bool) -> None:
+            self._has_book = has_book
+
+        def has_xlsx_book(self, _book_id: str) -> bool:
+            return bool(self._has_book)
+
+    assert write_nodes_mod.is_managed_xlsx_book(_Mgr(has_book=True), "report") is True  # type: ignore[arg-type]
+    assert write_nodes_mod.is_managed_xlsx_book(_Mgr(has_book=False), "report") is False  # type: ignore[arg-type]
 
 
 def test_book_write_and_append_non_xlsx_kind_uses_csv_resolve() -> None:
@@ -32,8 +37,8 @@ def test_book_write_and_append_non_xlsx_kind_uses_csv_resolve() -> None:
     artifacts_dir.publish("w", "in_memory_csv_outputs", {"detail": InMemoryCsv(header=["id"], rows=[["1"]])})
 
     class _Mgr:
-        def get_book_kind(self, _book_id: str) -> str:
-            return ""
+        def has_xlsx_book(self, _book_id: str) -> bool:
+            return False
 
         def apply_book_sheet(self, **kwargs: object) -> None:
             self.sheet_kwargs = dict(kwargs)

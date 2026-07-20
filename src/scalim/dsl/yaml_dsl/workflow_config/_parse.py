@@ -249,7 +249,6 @@ def _parse_book_config(raw: Any, *, path: str) -> BookConfig:
         cfg,
         path=path,
         parse_path_or_init_var=_parse_path_or_init_var,
-        parse_export_xlsx=_parse_book_export_xlsx,
         raise_if_import_present=_raise_if_import_present,
         error_factory=_error,
     )

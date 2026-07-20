@@ -1,4 +1,4 @@
-"""c20: unified books.xlsx + deprecated xlsx_file/xlsx_memory aliases."""
+"""c20/c999: unified books.xlsx; removed xlsx_file/xlsx_memory YAML aliases fail-fast."""
 
 from __future__ import annotations
 
@@ -15,14 +15,14 @@ from scalim.dsl.yaml_dsl import (
     run_workflow,
 )
 from scalim.dsl.yaml_dsl._internal.config_parsing.book_branch_parse import (
-    DEPRECATED_XLSX_EMPTY_HINT,
-    DEPRECATED_XLSX_FILE_HINT,
-    DEPRECATED_XLSX_TO_PATH_HINT,
-    deprecated_book_branch_validation_message,
+    MIGRATE_TO_XLSX_EMPTY_HINT,
+    MIGRATE_TO_XLSX_PATH_HINT,
+    REMOVED_XLSX_FILE_HINT,
+    REMOVED_XLSX_MEMORY_HINT,
 )
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
-from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_WARNING
+from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config, load_workflow_config_from_mapping
 from scalim.execution import versioned_outputs
 from scalim.vendor.yamlx import yaml
@@ -73,34 +73,33 @@ def test_parse_xlsx_empty_and_path_emit_no_deprecation() -> None:
     assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]
 
 
-def test_parse_deprecated_aliases_warn_but_succeed() -> None:
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        cfg = load_workflow_config_from_mapping(
+def test_parse_removed_aliases_fail_fast() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=REMOVED_XLSX_MEMORY_HINT) as mem_exc:
+        _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
                     "runs": [{"id": "a", "demand": "a.yaml"}],
-                    "resources": {
-                        "books": {
-                            "scratch": {"xlsx_memory": {}},
-                            "report": {"xlsx_file": {"path": "./out"}},
-                        }
-                    },
+                    "resources": {"books": {"scratch": {"xlsx_memory": {}}}},
                 }
             }
         )
-    msgs = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
-    assert cfg.resources.books["scratch"].kind == "xlsx_memory"
-    assert cfg.resources.books["report"].kind == "xlsx_file"
-    assert len(msgs) >= 2
-    assert any(DEPRECATED_XLSX_FILE_HINT in m and DEPRECATED_XLSX_TO_PATH_HINT in m for m in msgs)
-    assert any(DEPRECATED_XLSX_EMPTY_HINT in m for m in msgs)
+    assert MIGRATE_TO_XLSX_EMPTY_HINT in str(mem_exc.value)
+
+    with pytest.raises(ScalimWorkflowConfigError, match=REMOVED_XLSX_FILE_HINT) as file_exc:
+        _ = load_workflow_config_from_mapping(
+            {
+                "workflow": {
+                    "runs": [{"id": "a", "demand": "a.yaml"}],
+                    "resources": {"books": {"report": {"xlsx_file": {"path": "./out"}}}},
+                }
+            }
+        )
+    assert MIGRATE_TO_XLSX_PATH_HINT in str(file_exc.value)
 
 
-def test_parse_xlsx_memory_export_normalizes_to_path_and_warns() -> None:
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        cfg = load_workflow_config_from_mapping(
+def test_parse_xlsx_memory_export_alias_fail_fast() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory with export_xlsx was removed") as excinfo:
+        _ = load_workflow_config_from_mapping(
             {
                 "workflow": {
                     "runs": [{"id": "a", "demand": "a.yaml"}],
@@ -112,10 +111,7 @@ def test_parse_xlsx_memory_export_normalizes_to_path_and_warns() -> None:
                 }
             }
         )
-    msgs = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
-    assert cfg.resources.books["report"].kind == "xlsx_file"
-    assert cfg.resources.books["report"].path == "./out"
-    assert any(DEPRECATED_XLSX_TO_PATH_HINT in m for m in msgs)
+    assert MIGRATE_TO_XLSX_PATH_HINT in str(excinfo.value)
 
 
 def test_xlsx_export_xlsx_is_error_not_warning() -> None:
@@ -155,17 +151,17 @@ def test_xlsx_write_defaults_and_budget_fail_fast() -> None:
         )
 
 
-def test_demand_validator_accepts_xlsx_and_warns_on_aliases() -> None:
+def test_demand_validator_accepts_xlsx_and_rejects_aliases() -> None:
     validator = ConfigValidator()
     ok = validator.validate_report({"resources": {"books": {"scratch": {"xlsx": {}}}}, "name": "n", "main_source": {}})
-    assert not any("must choose exactly one" in i.message for i in ok.issues)
+    assert not any("must declare exactly one" in i.message for i in ok.issues)
 
     report = validator.validate_report(
         {"resources": {"books": {"report": {"xlsx_file": {"path": "./out"}}}}, "name": "n", "main_source": {}}
     )
-    warning_msgs = [i.message for i in report.issues if i.severity == VALIDATION_SEVERITY_WARNING and "deprecated" in i.message]
-    assert warning_msgs
-    assert any(DEPRECATED_XLSX_TO_PATH_HINT in m for m in warning_msgs)
+    error_msgs = [i.message for i in report.issues if i.severity == VALIDATION_SEVERITY_ERROR and REMOVED_XLSX_FILE_HINT in i.message]
+    assert error_msgs
+    assert any(MIGRATE_TO_XLSX_PATH_HINT in m for m in error_msgs)
 
     mem_export = validator.validate_report(
         {
@@ -174,7 +170,9 @@ def test_demand_validator_accepts_xlsx_and_warns_on_aliases() -> None:
             "main_source": {},
         }
     )
-    assert any("xlsx_memory with export_xlsx" in i.message for i in mem_export.issues if i.severity == VALIDATION_SEVERITY_WARNING)
+    assert any(
+        "xlsx_memory with export_xlsx was removed" in i.message for i in mem_export.issues if i.severity == VALIDATION_SEVERITY_ERROR
+    )
 
     xlsx_bad = validator.validate_report(
         {
@@ -218,7 +216,7 @@ def test_demand_validator_accepts_xlsx_and_warns_on_aliases() -> None:
         _ = loader._parse_book_config({"xlsx": {"path": "out.xlsx"}}, base_path="resources.books.bad")  # noqa: SLF001
     with pytest.raises(Exception, match=r"allow_formulas must be a bool"):
         _ = loader._parse_book_config({"xlsx": {"allow_formulas": "no"}}, base_path="resources.books.bad")  # noqa: SLF001
-    with pytest.raises(TypeError, match=r"must be a mapping"):
+    with pytest.raises(Exception, match=r"xlsx_memory.*was removed"):
         _ = loader._parse_book_config(  # noqa: SLF001
             {"xlsx_memory": {"export_xlsx": []}},
             base_path="resources.books.bad",
@@ -257,23 +255,15 @@ def test_demand_validator_strips_xlsx_budget_and_write_defaults() -> None:
     assert "budget" not in next_config["resources"]["books"]["both"]["xlsx"]
     assert "write_defaults" not in next_config["resources"]["books"]["both"]["xlsx"]
 
-    warn_issues: list = []
-    _ = validator._warn_deprecated_book_branches(  # noqa: SLF001
-        {"resources": {"books": {"bad": None, "ok": {"xlsx_memory": {}}}}},
-        warn_issues,
-    )
-    assert any("xlsx_memory is deprecated" in i.message for i in warn_issues)
-    assert "xlsx: {}" in deprecated_book_branch_validation_message(book_path="resources.books.ok", branch="xlsx_memory")
 
-
-def test_parse_xlsx_file_branch_errors_and_xlsx_init_var() -> None:
+def test_parse_xlsx_init_var_and_removed_alias_errors() -> None:
     loader = YamlDemandLoader()
-    with pytest.raises(Exception, match=r"xlsx_file\.path now expects an output root"):
+    with pytest.raises(Exception, match=REMOVED_XLSX_FILE_HINT):
         _ = loader._parse_book_config(  # noqa: SLF001
             {"xlsx_file": {"path": "out.xlsx"}},
             base_path="resources.books.report",
         )
-    with pytest.raises(Exception, match=r"allow_formulas must be a bool"):
+    with pytest.raises(Exception, match=REMOVED_XLSX_FILE_HINT):
         _ = loader._parse_book_config(  # noqa: SLF001
             {"xlsx_file": {"path": "./out", "allow_formulas": "no"}},
             base_path="resources.books.report",
@@ -412,22 +402,15 @@ def test_unified_xlsx_after_runs_without_deprecation(tmp_path: Path) -> None:
     assert _latest_book_path(out, book_id="report").exists()
 
 
-def test_unified_xlsx_before_runs_with_deprecation_warnings(tmp_path: Path) -> None:
+def test_unified_xlsx_before_runs_aliases_fail_fast(tmp_path: Path) -> None:
     out = tmp_path / "out"
     wf = _write_isomorphic_tree(
         tmp_path,
         books={"scratch": {"xlsx_memory": {}}, "report": {"xlsx_file": {"path": str(out)}}},
         out_rel=str(out),
     )
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        result = run_workflow(str(wf), options=_run_options())
-    assert not result.errors()
-    deprec = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
-    assert len(deprec) >= 2
-    assert any(DEPRECATED_XLSX_FILE_HINT in m for m in deprec)
-    assert any(DEPRECATED_XLSX_EMPTY_HINT in m for m in deprec)
-    assert _latest_book_path(out, book_id="report").exists()
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_(file|memory) was removed"):
+        _ = run_workflow(str(wf), options=_run_options())
 
 
 def test_unified_xlsx_path_allow_formulas_false_escapes_formula_like_strings(tmp_path: Path) -> None:
@@ -491,7 +474,7 @@ def test_resource_defs_book_xlsx_memory_with_path_still_builds_sheetbook_export(
                 resource_id="report",
                 resource_type="book",
                 path=str(out),
-                options={"kind": "xlsx_memory", "export_xlsx": {"allow_formulas": True}},
+                options={"pathful": False, "export_xlsx": {"allow_formulas": True}},
             ),
         ),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),

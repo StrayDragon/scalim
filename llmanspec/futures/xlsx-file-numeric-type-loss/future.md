@@ -9,7 +9,7 @@
 - 内存总线**语义** → **`archive/2026-07-13-c15-decide-xlsx-memory-book-role`**
 - 统一 authoring `xlsx` + 旧 kind deprecated → **`archive/2026-07-13-c20-add-unified-xlsx-book-kind`**
 - IR 身份改为 path 有无（不再以假 kind 字符串为 SSOT）→ **`archive/2026-07-13-c25-normalize-xlsx-book-ir-path-presence`**
-- BREAKING 硬删 YAML `xlsx_file`/`xlsx_memory` 别名 → **`c999-remove-deprecated-xlsx-file-memory-kinds`（draft；勿再写回 futures）**
+- BREAKING 硬删 YAML `xlsx_file`/`xlsx_memory` 别名 → **`c999-remove-deprecated-xlsx-file-memory-kinds`（已实施；见 upgrade `2026-07-20-remove-deprecated-xlsx-file-memory-kinds`）**
 - 默认 deprecate/删除总线、无条件急切 CSV 双份、启发式数字恢复 → **已拒绝**
 
 ---

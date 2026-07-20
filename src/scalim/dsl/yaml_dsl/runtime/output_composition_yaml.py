@@ -735,7 +735,7 @@ def _validate_xlsx_memory_write_contract(
     book: BookConfig,
     book_id: str,
 ) -> None:
-    if str(book.kind or "").strip() != "xlsx_memory":
+    if is_pathful_book(book):
         return
 
     effective_defaults = _effective_book_write_defaults(book)
@@ -746,7 +746,7 @@ def _validate_xlsx_memory_write_contract(
 
     align_by_path = "resources.books.{}.write_defaults.align_by".format(str(book_id))
     msg = (
-        "books.kind=xlsx_memory does not support write_defaults.align_by=header; "
+        "pathless books (in-memory bus) do not support write_defaults.align_by=header; "
         "internal rows only use canonical field keys. Migrate to resources.books.<book_id>.write_defaults.align_by=field_id "
         "and keep write.header_fields_output_by for export display (book_id={!r})"
     ).format(str(book_id))

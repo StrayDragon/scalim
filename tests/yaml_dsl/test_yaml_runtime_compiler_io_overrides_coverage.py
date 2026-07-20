@@ -377,7 +377,8 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
             BookResourceOverride(),
             path="p",
         )
-    assert exc_info.value.path == "p.path"
+    # path presence makes this pathful; budget is rejected for pathful books
+    assert exc_info.value.path == "p.budget"
 
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
@@ -517,30 +518,27 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
         _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(kind="  "), path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.kind"
 
+    # pathful identity requires non-empty path (kind is optional historical field)
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
-        _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(kind="json_file"), path="p")  # noqa: SLF001
-    assert exc_info.value.path == "p.kind"
-
-    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
-        _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(kind="xlsx_file"), path="p")  # noqa: SLF001
+        _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(path=""), path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.path"
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
-            {"kind": "xlsx_file", "path": "a", "budget": {"max_sheets": 1, "max_total_cells": 2}},
+            {"path": "a", "budget": {"max_sheets": 1, "max_total_cells": 2}},
             path="p",
         )
     assert exc_info.value.path == "p.budget"
 
-    created_unlimited = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(kind="xlsx_memory"), path="p")  # noqa: SLF001
-    assert created_unlimited.kind == "xlsx_memory"
+    created_unlimited = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(), path="p")  # noqa: SLF001
+    assert created_unlimited.path is None
     assert created_unlimited.budget is None
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
-            {"kind": "xlsx_memory", "budget": {"max_sheets": 0, "max_total_cells": 2}},
+            {"budget": {"max_sheets": 0, "max_total_cells": 2}},
             path="p",
         )
     assert exc_info.value.path == "p.budget"
@@ -548,7 +546,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
-            {"kind": "xlsx_memory", "path": "x", "budget": {"max_sheets": 1, "max_total_cells": 2}},
+            {"path": "x", "budget": {"max_sheets": 1, "max_total_cells": 2}},
             path="p",
         )
     assert exc_info.value.path == "p.budget"
@@ -556,7 +554,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
     with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
-            {"kind": "xlsx_memory", "budget": {"max_sheets": 1, "max_total_cells": 2}},
+            {"budget": {"max_sheets": 1, "max_total_cells": 2}},
             path="p",
         )
     assert exc_info.value.path == "p.budget"
@@ -568,6 +566,14 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
     )
     assert updated.path == "b"
     assert updated.allow_formulas is True
+
+    pathful = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
+        None,
+        BookResourceOverride(path="a"),
+        path="p",
+    )
+    assert pathful.path == "a"
+    assert pathful.allow_formulas is True
 
 
 def test_runtime_compiler_apply_resources_override_and_io_overrides_cover_branches() -> None:

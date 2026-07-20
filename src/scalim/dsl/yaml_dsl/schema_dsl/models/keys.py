@@ -27,8 +27,6 @@ from .resources import (
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
     BookXlsxConfig,
-    BookXlsxFileConfig,
-    BookXlsxMemoryConfig,
     FileConfig,
     FileCsvFileConfig,
     ResourcesConfig,
@@ -90,8 +88,6 @@ OUTPUT_WRITE_KEYS = _build_key_map(OutputWriteConfig)
 BOOK_BUDGET_KEYS = _build_key_map(BookBudgetConfig)
 BOOK_EXPORT_XLSX_KEYS = _build_key_map(BookExportXlsxConfig)
 BOOK_WRITE_DEFAULTS_KEYS = _build_key_map(BookWriteDefaultsConfig)
-BOOK_XLSX_FILE_KEYS = _build_key_map(BookXlsxFileConfig)
-BOOK_XLSX_MEMORY_KEYS = _build_key_map(BookXlsxMemoryConfig)
 BOOK_XLSX_KEYS = _build_key_map(BookXlsxConfig)
 BOOK_KEYS = _build_key_map(BookConfig)
 FILE_CSV_FILE_KEYS = _build_key_map(FileCsvFileConfig)

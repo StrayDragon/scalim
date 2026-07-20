@@ -76,7 +76,6 @@ FieldPresentationKind = Literal["generic", "csv", "excel", "pandas"]
 #
 # 命名说明:
 # - 使用 `Record` 而非 `Row` 以支持未来的流式输出场景 (`JSON Lines`, 事件流等)
-# - 但为了向后兼容, 保留 `RowId`/`RowIdSeq`/`RowIdList` 作为 `BusinessKey` 的别名
 
 RecordIndex = int
 """批次内的记录索引 (0, 1, 2, ...), 由框架内部分配."""
@@ -90,18 +89,8 @@ RecordKey = Union[RecordIndex, BusinessKey]
 RecordKeySeq = Sequence[RecordKey]
 """记录键序列, 用于函数参数 (只读, 协变)."""
 
-# 向后兼容别名 (推荐使用新名称)
-RowId = BusinessKey
-"""[兼容别名] 单个行标识, 等同于 BusinessKey."""
-
-RowIdSeq = Sequence[RowId]
-"""[兼容别名] 行标识序列, 用于函数参数 (只读, 接受 `List`/`Tuple`)."""
-
-RowIdList = List[RowId]
-"""[兼容别名] 行标识列表, 用于内部存储和返回值 (可变)."""
-
-LoaderResult = Dict[RowId, RowData]
-"""`Loader` 函数返回的数据映射: `row_id` -> `row_data`."""
+LoaderResult = Dict[BusinessKey, RowData]
+"""`Loader` 函数返回的数据映射: `business_key` -> `row_data`."""
 
 LookupKey = Hashable
 """关联查找键: 单键与复合键统一按可哈希值处理."""

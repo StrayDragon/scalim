@@ -715,7 +715,7 @@ workflow:
   resources:
     books:
       report:
-        xlsx_file:
+        xlsx:
           path: ./out.xlsx
         $import: common.books.report
 

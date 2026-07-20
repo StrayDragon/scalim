@@ -32,4 +32,5 @@
 - [2026-07-13: unified-xlsx-book-kind](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-13-unified-xlsx-book-kind.md)
 - [2026-07-18 — `ISink.discard` 显式失败清理合约](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-18-sink-discard-explicit-contract.md)
 - [2026-07-18 — tabular bus object + sink accept / opt-in precheck](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-18-tabular-bus-object-sink-accept-precheck.md)
+- [2026-07-20: remove-deprecated-xlsx-file-memory-kinds](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

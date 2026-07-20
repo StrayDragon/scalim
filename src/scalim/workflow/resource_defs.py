@@ -20,16 +20,11 @@ def _is_dict_str_any(value: RuntimeValue) -> TypeGuard[Dict[str, Any]]:
 
 
 def _is_pathful_resource_options(opts: Dict[str, Any]) -> Optional[bool]:
-    """从 `WorkflowResourceIr.options` 读取 `pathful`;缺省时回退 `legacy` `kind`."""
+    """从 `WorkflowResourceIr.options` 读取 `pathful` 身份标志."""
 
-    if "pathful" in opts:
-        return bool(opts.get("pathful"))
-    kind = str(opts.get("kind") or "").strip()
-    if kind == "xlsx_file":
-        return True
-    if kind == "xlsx_memory":
-        return False
-    return None
+    if "pathful" not in opts:
+        return None
+    return bool(opts.get("pathful"))
 
 
 def options_bool(opts: RuntimeValue, key: str, *, default: bool = False) -> bool:
@@ -115,7 +110,9 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 )
                 continue
 
-            msg = "Unknown book identity for book_id={!r}; expected options.pathful or legacy options.kind".format(str(res.resource_id))
+            msg = "Unknown book identity for book_id={!r}; expected options.pathful (true=pathful workbook, false=pathless sheetbook)".format(
+                str(res.resource_id)
+            )
             raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
 
         if res_type == "workbook":

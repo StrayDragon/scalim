@@ -4399,9 +4399,9 @@ def test_workflow_resources_rejects_export_xlsx_write_lock(tmp_path: Path) -> No
         max_concurrency=1,
         failure_policy="primary_only",
     )
-    with pytest.raises(ScalimWorkflowConfigError, match="write_lock was removed") as excinfo:
+    with pytest.raises(ScalimWorkflowConfigError, match="xlsx_memory with export_xlsx was removed") as excinfo:
         _ = run_workflow(str(wf), options=_run_options(init_vars={"reserved_path": str(reserved_export)}))
-    assert excinfo.value.path == "workflow.resources.books.mem_book.xlsx_memory.export_xlsx.write_lock"
+    assert excinfo.value.path == "workflow.resources.books.mem_book.xlsx_memory"
 
 
 def test_workflow_excel_output_runtime_precheck_includes_meta_and_audit_paths(tmp_path: Path) -> None:

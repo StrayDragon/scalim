@@ -23,19 +23,19 @@ def test_workflow_resources_books_rejects_legacy_kind_branches() -> None:
         _ = load_workflow_config_from_mapping(_base_workflow_mapping(resources={"books": {"report": {"kind": "nope"}}}))
 
 
-def test_workflow_resources_books_rejects_branch_shape_and_write_lock_migrations() -> None:
-    with pytest.raises(ScalimWorkflowConfigError, match=r"workflow\.resources\.books\.report\.xlsx_file must be a mapping"):
+def test_workflow_resources_books_rejects_removed_aliases() -> None:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_file was removed"):
         _ = load_workflow_config_from_mapping(_base_workflow_mapping(resources={"books": {"report": {"xlsx_file": []}}}))
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"workflow\.resources\.books\.report\.xlsx_file\.write_lock was removed"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_file was removed"):
         _ = load_workflow_config_from_mapping(
             _base_workflow_mapping(resources={"books": {"report": {"xlsx_file": {"path": "./out", "write_lock": True}}}})
         )
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"workflow\.resources\.books\.report\.xlsx_memory must be a mapping"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory was removed"):
         _ = load_workflow_config_from_mapping(_base_workflow_mapping(resources={"books": {"report": {"xlsx_memory": []}}}))
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"now expects an output root directory"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory with export_xlsx was removed"):
         _ = load_workflow_config_from_mapping(
             _base_workflow_mapping(resources={"books": {"report": {"xlsx_memory": {"export_xlsx": {"path": "out.xlsx"}}}}})
         )

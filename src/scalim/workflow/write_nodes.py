@@ -22,10 +22,10 @@ from .input_artifacts import (
 from .resources import ScalimWorkflowWriteError, WorkflowResourceManager
 
 
-def is_xlsx_spreadsheet_book_kind(book_kind: str) -> bool:
-    """判断 `book_kind` 是否为 `xlsx_file` / `xlsx_memory`。"""
+def is_managed_xlsx_book(resource_manager: WorkflowResourceManager, book_id: str) -> bool:
+    """判断 `book_id` 是否为已注册的 pathful/pathless xlsx book."""
 
-    return str(book_kind or "").strip() in ("xlsx_file", "xlsx_memory")
+    return bool(resource_manager.has_xlsx_book(str(book_id)))
 
 
 def run_workflow_write_sheet_node(
@@ -35,8 +35,7 @@ def run_workflow_write_sheet_node(
     resource_manager: WorkflowResourceManager,
 ) -> None:
     if str(node.resource_type) == "book":
-        book_kind = resource_manager.get_book_kind(str(node.resource_id))
-        if is_xlsx_spreadsheet_book_kind(book_kind):
+        if is_managed_xlsx_book(resource_manager, str(node.resource_id)):
             input_csv = _resolve_workflow_input_tabular(
                 artifacts_dir=artifacts_dir,
                 consumer_node_id=str(node.node_id),
@@ -142,8 +141,7 @@ def run_workflow_append_sheet_node(
     resource_manager: WorkflowResourceManager,
 ) -> None:
     if str(node.resource_type) == "book":
-        book_kind = resource_manager.get_book_kind(str(node.resource_id))
-        if is_xlsx_spreadsheet_book_kind(book_kind):
+        if is_managed_xlsx_book(resource_manager, str(node.resource_id)):
             input_csv = _resolve_workflow_input_tabular(
                 artifacts_dir=artifacts_dir,
                 consumer_node_id=str(node.node_id),
@@ -319,4 +317,4 @@ def run_workflow_write_node(
     raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
-__all__ = ("is_xlsx_spreadsheet_book_kind",)
+__all__ = ("is_managed_xlsx_book",)

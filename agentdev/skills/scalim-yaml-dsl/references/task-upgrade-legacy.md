@@ -97,6 +97,8 @@
   - SSOT: `references/upgrades/2026-07-18-sink-discard-explicit-contract.md`
 - 2026-07-18 — tabular bus object + sink accept / opt-in precheck
   - SSOT: `references/upgrades/2026-07-18-tabular-bus-object-sink-accept-precheck.md`
+- 2026-07-20: remove-deprecated-xlsx-file-memory-kinds
+  - SSOT: `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

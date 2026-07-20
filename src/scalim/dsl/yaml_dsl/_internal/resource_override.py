@@ -41,7 +41,6 @@ from ..schema_dsl.models import (
     ResourcesConfig,
 )
 from ..schema_dsl.output_enums import (
-    BOOK_KINDS,
     FILE_KINDS,
 )
 from .patch_apply import (
@@ -402,9 +401,12 @@ def _apply_optional_book_export_xlsx_patch(
     return BookExportXlsxConfig(path=export_path, allow_formulas=bool(allow_formulas))
 
 
-def _validate_book_kind_semantic_contracts(
+def _is_pathful_book_path(book_path: Any) -> bool:
+    return book_path is not None
+
+
+def _validate_book_identity_contracts(
     *,
-    kind: str,
     book_path: Any,
     budget: Optional[BookBudgetConfig],
     export_xlsx: Optional[BookExportXlsxConfig],
@@ -413,29 +415,21 @@ def _validate_book_kind_semantic_contracts(
 ) -> None:
     msg: str
 
-    if kind == "xlsx_file":
-        if book_path is None or (isinstance(book_path, str) and not str(book_path).strip()):
-            msg = "{}.path is required for kind=xlsx_file".format(path)
+    if _is_pathful_book_path(book_path):
+        if isinstance(book_path, str) and not str(book_path).strip():
+            msg = "{}.path is required for pathful books".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
         if budget is not None:
-            msg = "{}.budget is not allowed for kind=xlsx_file".format(path)
+            msg = "{}.budget is not allowed for pathful books".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
         if export_xlsx is not None:
-            msg = "{}.export_xlsx is not allowed for kind=xlsx_file".format(path)
+            msg = "{}.export_xlsx is not allowed for pathful books".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
         return
 
-    if kind == "xlsx_memory":
-        if book_path is not None:
-            msg = "{}.path is not allowed for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-        if allow_formulas:
-            msg = "{}.allow_formulas is not allowed for kind=xlsx_memory".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
-        return
-
-    msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(BOOK_KINDS))
-    raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+    if allow_formulas:
+        msg = "{}.allow_formulas is not allowed for pathless books".format(path)
+        raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
 
 
 def apply_book_resource_override(
@@ -506,6 +500,7 @@ def _apply_book_patch(
     _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=path)
 
     if "kind" in patch:
+        # `kind` 仅作可选历史字段;身份以 `path` 有无为 SSOT.
         kind = _as_non_empty_str(patch.get("kind"), path="{}.kind".format(path))
     if "path" in patch:
         book_path = _as_opt_path_or_init_var(patch.get("path"), path="{}.path".format(path))
@@ -514,11 +509,10 @@ def _apply_book_patch(
     if "export_xlsx" in patch:
         export_xlsx = _apply_optional_book_export_xlsx_patch(export_xlsx, patch.get("export_xlsx"), path=path)
 
-    if base is None and "allow_formulas" not in patch and str(kind) == "xlsx_file":
+    if base is None and "allow_formulas" not in patch and _is_pathful_book_path(book_path):
         allow_formulas = True
 
-    _validate_book_kind_semantic_contracts(
-        kind=str(kind),
+    _validate_book_identity_contracts(
         book_path=book_path,
         budget=budget,
         export_xlsx=export_xlsx,

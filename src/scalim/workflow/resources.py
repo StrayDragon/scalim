@@ -3,8 +3,7 @@
 说明:
 - 本文件对外保持稳定导入路径;具体实现拆分到同目录的 `resources_*` 子模块
 - 运行时需兼容 `Python 3.6`
-- `book` 身份以 `defs` 成员关系表达(`pathful`→`workbook_defs`; `pathless`→`sheetbook_defs`);
-  `get_book_kind` 仅返回 `deprecated` `wire` `shim`
+- `book` 身份以 `defs` 成员关系表达(`pathful`→`workbook_defs`; `pathless`→`sheetbook_defs`)
 """
 
 from typing import Any, FrozenSet, Iterator, Mapping, Optional, Tuple
@@ -23,18 +22,11 @@ class WorkflowResourceManager(
 ):
     """工作流级共享输出资源管理器(延迟提交 + 原子落盘)."""
 
-    def _book_kind(self, book_id: str) -> str:
-        """`Deprecated` `shim`: `pathful`→`xlsx_file`, `pathless`→`xlsx_memory`."""
+    def has_xlsx_book(self, book_id: str) -> bool:
+        """是否为已注册的 `pathful`/`pathless` xlsx book(`workbook_defs` 或 `sheetbook_defs`)."""
 
         bid = str(book_id)
-        if bid in self._workbook_defs:
-            return "xlsx_file"
-        if bid in self._sheetbook_defs:
-            return "xlsx_memory"
-        return ""
-
-    def get_book_kind(self, book_id: str) -> str:
-        return self._book_kind(book_id)
+        return bid in self._workbook_defs or bid in self._sheetbook_defs
 
     def apply_book_sheet(
         self,

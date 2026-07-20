@@ -135,14 +135,14 @@ def test_validator_reports_resources_files_and_books_kind_and_shape_migrations()
                     "csv_file_not_object": {"csv_file": []},
                 },
                 "books": {
-                    "kind_xlsx_file": {"kind": "xlsx_file", "xlsx_file": {"path": "./out"}},
-                    "kind_xlsx_memory": {"kind": "xlsx_memory", "xlsx_memory": {}},
-                    "kind_other": {"kind": "nope", "xlsx_file": {"path": "./out"}},
-                    "file_not_object": {"xlsx_file": []},
-                    "file_path_missing": {"xlsx_file": {}},
-                    "mem_not_object": {"xlsx_memory": []},
-                    "mem_export_not_object": {"xlsx_memory": {"export_xlsx": []}},
-                    "mem_export_path_missing": {"xlsx_memory": {"export_xlsx": {}}},
+                    "kind_xlsx_file": {"kind": "xlsx_file", "xlsx": {"path": "./out"}},
+                    "kind_xlsx_memory": {"kind": "xlsx_memory", "xlsx": {}},
+                    "kind_other": {"kind": "nope", "xlsx": {"path": "./out"}},
+                    "file_alias": {"xlsx_file": []},
+                    "file_alias_obj": {"xlsx_file": {}},
+                    "mem_alias": {"xlsx_memory": []},
+                    "mem_export_alias": {"xlsx_memory": {"export_xlsx": []}},
+                    "mem_export_path_alias": {"xlsx_memory": {"export_xlsx": {}}},
                 },
             }
         },
@@ -157,11 +157,14 @@ def test_validator_reports_resources_files_and_books_kind_and_shape_migrations()
     assert "resources.books.kind_xlsx_file.kind" in paths
     assert "resources.books.kind_xlsx_memory.kind" in paths
     assert "resources.books.kind_other.kind" in paths
-    assert "resources.books.file_not_object.xlsx_file" in paths
-    assert "resources.books.file_path_missing.xlsx_file.path" in paths
-    assert "resources.books.mem_not_object.xlsx_memory" in paths
-    assert "resources.books.mem_export_not_object.xlsx_memory.export_xlsx" in paths
-    assert "resources.books.mem_export_path_missing.xlsx_memory.export_xlsx.path" in paths
+    assert "resources.books.file_alias.xlsx_file" in paths
+    assert "resources.books.file_alias_obj.xlsx_file" in paths
+    assert "resources.books.mem_alias.xlsx_memory" in paths
+    assert "resources.books.mem_export_alias.xlsx_memory" in paths
+    assert "resources.books.mem_export_path_alias.xlsx_memory" in paths
+    assert any("xlsx_file was removed" in str(item.message) for item in issues)
+    assert any("xlsx_memory was removed" in str(item.message) for item in issues)
+    assert any("xlsx_memory with export_xlsx was removed" in str(item.message) for item in issues)
 
 
 def test_workflow_config_parse_rejects_export_xlsx_path_with_xlsx_suffix() -> None:
@@ -189,14 +192,14 @@ def test_workflow_config_parse_book_export_xlsx_and_memory_error_branches() -> N
         _ = parse_mod._parse_book_export_xlsx({"path": "out", "allow_formulas": "nope"}, path="p.export_xlsx")  # noqa: SLF001
     assert exc_info.value.path == "p.export_xlsx.allow_formulas"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory\.write_lock was removed") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory was removed") as exc_info:
         _ = parse_mod._parse_book_config(  # noqa: SLF001
             {"xlsx_memory": {"write_lock": True}},
             path="p",
         )
-    assert exc_info.value.path == "p.xlsx_memory.write_lock"
+    assert exc_info.value.path == "p.xlsx_memory"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory has unknown keys: nope") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"xlsx_memory was removed") as exc_info:
         _ = parse_mod._parse_book_config(  # noqa: SLF001
             {"xlsx_memory": {"nope": 1}},
             path="p",

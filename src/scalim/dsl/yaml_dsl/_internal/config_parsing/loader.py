@@ -398,21 +398,10 @@ class YamlDemandLoader(
         def _ignore_import(_data: Mapping[str, Any], path: Optional[str] = None) -> None:
             _ = path
 
-        def _parse_export(raw_export: Any, path: Optional[str] = None) -> BookExportXlsxConfig:
-            export_path = str(path or base_path)
-            if not isinstance(raw_export, dict):
-                msg = "{} must be a mapping".format(export_path)
-                raise TypeError(msg)
-            return self._parse_book_export_xlsx(
-                cast("Dict[str, Any]", raw_export),  # pragma: allow-cast yaml mapping typed narrowing
-                base_path=export_path,
-            )
-
         return parse_book_config_mapping(
             raw,
             path=base_path,
             parse_path_or_init_var=self._parse_path_or_init_var,
-            parse_export_xlsx=_parse_export,
             raise_if_import_present=_ignore_import,
             error_factory=_error,
         )

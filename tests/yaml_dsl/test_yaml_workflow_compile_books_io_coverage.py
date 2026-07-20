@@ -321,11 +321,11 @@ def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
         _ = resource_override_mod._apply_book_patch(base, {"write_defaults": "nope"}, path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.write_defaults"
 
-    # semantic: xlsx_file requires path
-    with pytest.raises(ScalimWorkflowConfigError, match=r"path is required for kind=xlsx_file"):
-        _ = resource_override_mod._apply_book_patch(BookConfig(kind="xlsx_file"), {}, path="p")  # noqa: SLF001
+    # semantic: pathful requires non-empty path
+    with pytest.raises(ScalimWorkflowConfigError, match=r"path is required for pathful books"):
+        _ = resource_override_mod._apply_book_patch(BookConfig(kind="xlsx_file", path=""), {}, path="p")  # noqa: SLF001
 
-    # semantic: xlsx_memory budget is optional (defaults to unlimited)
+    # semantic: pathless budget is optional (defaults to unlimited)
     patched_unlimited = resource_override_mod._apply_book_patch(BookConfig(kind="xlsx_memory"), {}, path="p")  # noqa: SLF001
     assert patched_unlimited.budget is None
 
@@ -345,9 +345,9 @@ def test_workflow_compile_apply_book_patch_error_branches_cover_paths() -> None:
         )
     assert exc_info2.value.path == "p.budget"
 
-    # semantic: unknown kind
-    with pytest.raises(ScalimWorkflowConfigError, match=r"kind='nope' is invalid"):
-        _ = resource_override_mod._apply_book_patch(BookConfig(kind="nope"), {}, path="p")  # noqa: SLF001
+    # pathless with allow_formulas is rejected
+    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas is not allowed for pathless books"):
+        _ = resource_override_mod._apply_book_patch(BookConfig(path=None), {"allow_formulas": True}, path="p")  # noqa: SLF001
 
 
 def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_more_branches() -> None:
@@ -409,7 +409,7 @@ def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_mor
             path="p",
         )
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx is not allowed for kind=xlsx_file"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"export_xlsx is not allowed for pathful books"):
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             BookConfig(kind="xlsx_file", path="a"),
             {"export_xlsx": {"path": "x"}},
@@ -417,10 +417,10 @@ def test_workflow_compile_apply_book_patch_success_and_semantic_errors_cover_mor
         )
 
     base_mem = BookConfig(kind="xlsx_memory", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1))
-    with pytest.raises(ScalimWorkflowConfigError, match=r"path is not allowed for kind=xlsx_memory"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget is not allowed for pathful books"):
         _ = resource_override_mod._apply_book_patch(base_mem, {"path": "a"}, path="p")  # noqa: SLF001
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas is not allowed for kind=xlsx_memory"):
+    with pytest.raises(ScalimWorkflowConfigError, match=r"allow_formulas is not allowed for pathless books"):
         _ = resource_override_mod._apply_book_patch(base_mem, {"allow_formulas": True}, path="p")  # noqa: SLF001
 
     with pytest.raises(ScalimWorkflowConfigError, match=r"p contains unknown keys: write_lock"):
@@ -437,7 +437,7 @@ def test_workflow_compile_book_export_path_and_options_error_branches_cover_budg
     )
     assert root == ""
     assert opts["pathful"] is False
-    assert opts["kind"] == "xlsx_memory"
+    assert "kind" not in opts
 
     # kind 字符串不再是身份 SSOT: path=None → pathless(即使 kind 字面量异常)
     root2, opts2 = workflow_compile_mod._book_export_path_and_options(  # noqa: SLF001
@@ -449,7 +449,7 @@ def test_workflow_compile_book_export_path_and_options_error_branches_cover_budg
     )
     assert root2 == ""
     assert opts2["pathful"] is False
-    assert opts2["kind"] == "xlsx_memory"
+    assert "kind" not in opts2
 
 
 def test_workflow_compile_resources_demand_conflicts_and_overrides_cover_branches(tmp_path: Path) -> None:

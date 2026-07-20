@@ -722,7 +722,7 @@ def test_resource_manager_apply_book_append_routes_xlsx_memory_to_sheetbook(tmp_
         header_policy="once",
         on_mismatch="error",
     )
-    assert manager.get_book_kind("sb") == "xlsx_memory"
+    assert manager.has_xlsx_book("sb") is True
 
 
 def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(tmp_path: Path) -> None:

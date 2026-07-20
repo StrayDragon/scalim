@@ -648,9 +648,7 @@ sources: {}
     assert compilation.request.observability.viz_config is viz_config
 
 
-def test_compile_legacy_yaml_observability_is_ignored_and_emits_migration_warning(tmp_path: Path, caplog: Any) -> None:
-    import logging
-
+def test_compile_legacy_yaml_observability_fails_fast_with_migration_hint(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
         """
@@ -669,13 +667,15 @@ observability:
 """,
     )
 
-    caplog.set_level(logging.WARNING)
-    compilation = compile(str(yaml_path), options=_options())
-    assert compilation.request.observability is None
-    assert any("Legacy YAML key 'observability' is no longer supported" in str(r.message) for r in caplog.records)
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = compile(str(yaml_path), options=_options())
+
+    assert any(env.path == "observability" for env in excinfo.value.errors)
+    assert any("Legacy YAML key 'observability' is no longer supported" in env.message for env in excinfo.value.errors)
+    assert any("Python runtime entrypoints" in env.message for env in excinfo.value.errors)
 
 
-def test_compile_viz_config_override_overrides_yaml_observability(tmp_path: Path) -> None:
+def test_compile_viz_config_override_does_not_allow_yaml_observability(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
         """
@@ -700,13 +700,13 @@ observability:
     )
     overrides = RunOverrides(viz_config=viz_config)
 
-    compilation = compile(
-        str(yaml_path),
-        options=_options(overrides=overrides),
-    )
-    assert compilation.request.observability is not None
-    assert compilation.request.observability.viz_config is viz_config
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = compile(
+            str(yaml_path),
+            options=_options(overrides=overrides),
+        )
 
+    assert any(env.path == "observability" for env in excinfo.value.errors)
 
 def test_compile_rejects_yaml_batch_size(tmp_path: Path) -> None:
     yaml_path = _write_yaml(

@@ -92,10 +92,12 @@ def test_validator_validate_resource_output_paths_covers_init_var_errors_and_con
                     "": {},  # continue branch
                     "report": {
                         "xlsx_file": {"path": {"$init_var": None}},
-                        "xlsx_memory": {"export_xlsx": {"path": {"$init_var": None}}},
                     },
                     "report2": {
                         "xlsx_memory": {"export_xlsx": {"path": "x.xlsx"}},
+                    },
+                    "ok": {
+                        "xlsx": {"path": {"$init_var": None}},
                     },
                 },
             }
@@ -104,8 +106,9 @@ def test_validator_validate_resource_output_paths_covers_init_var_errors_and_con
     )
     assert errors
     assert any(i.path == "resources.files.detail_csv.csv_file.path.$init_var" for i in errors)
-    assert any(i.path == "resources.books.report.xlsx_file.path.$init_var" for i in errors)
-    assert any(i.path == "resources.books.report.xlsx_memory.export_xlsx.path.$init_var" for i in errors)
+    assert any(i.path == "resources.books.report.xlsx_file" for i in errors)
+    assert any(i.path == "resources.books.report2.xlsx_memory" for i in errors)
+    assert any(i.path == "resources.books.ok.xlsx.path.$init_var" for i in errors)
 
 
 def test_output_target_requires_unique_effective_display_names_rejects_missing_destination_and_field_id_headers() -> None:
@@ -226,7 +229,7 @@ def test_validator_error_and_strip_removed_resources_write_lock_fields_reports_a
     assert "write_lock" not in next_config["resources"]["books"]["report"]["export_xlsx"]
 
 
-def test_validator_validate_resource_output_paths_reports_migration_for_xlsx_paths() -> None:
+def test_validator_validate_resource_output_paths_reports_removed_aliases() -> None:
     v = ConfigValidator()
     errors = []
     v._validate_resource_output_paths(  # noqa: SLF001
@@ -245,5 +248,7 @@ def test_validator_validate_resource_output_paths_reports_migration_for_xlsx_pat
         errors,
     )
     assert errors
-    assert any(i.path == "resources.books.report.xlsx_file.path" for i in errors)
-    assert any(i.path == "resources.books.mem.xlsx_memory.export_xlsx.path" for i in errors)
+    assert any(i.path == "resources.books.report.xlsx_file" for i in errors)
+    assert any("xlsx_file was removed" in i.message for i in errors)
+    assert any(i.path == "resources.books.mem.xlsx_memory" for i in errors)
+    assert any("xlsx_memory with export_xlsx was removed" in i.message for i in errors)

@@ -99,7 +99,7 @@ run_workflow(
   - workflow-level ctx size guardrails 已迁出 YAML(不要写 `workflow.options.ctx`)
 - `workflow.resources.books`:
   - workflow-scope 的共享 book **identity**(Excel 输出目标/中间态)
-  - 推荐分支: `xlsx`（可选 `path`）；deprecated 别名: `xlsx_file` / `xlsx_memory`
+  - 唯一分支: `xlsx`（可选 `path`）；`xlsx_file` / `xlsx_memory` 已硬删
   - YAML **不得**写 `write_defaults` / `budget`；`xlsx` 下也 **不得**写 `export_xlsx`
   - `xlsx.path`（及旧 `xlsx_file.path` / `xlsx_memory.export_xlsx.path`）是输出 **root 目录**(相对路径相对 **workflow YAML 所在目录**,不是进程 cwd)
   - Excel 输出通过 demand 的 `outputs[*].to` 绑定到 book+sheet

@@ -1,0 +1,5 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r224,public RowId aliases MUST be removed in favor of BusinessKey,"系统 MUST 将记录业务键的公开类型 SSOT 收敛为 BusinessKey（及 RecordKey 体系）。公开兼容别名 RowId / RowIdSeq / RowIdList MUST 被移除；LoaderResult 等公开或半公开类型注解 MUST 使用 BusinessKey 而非 RowId。迁移提示 MUST 出现在变更说明或 upgrade 笔记中。",null,null,null
+op_scenarios[1]{req_id,id,given,when,then}:
+  r224,"rowid-aliases-are-not-importable","",调用方尝试 from scalim.typedefs import RowId 或等价公开导出,导入 MUST 失败或该名字 MUST 不再作为公开别名存在；推荐导入 BusinessKey

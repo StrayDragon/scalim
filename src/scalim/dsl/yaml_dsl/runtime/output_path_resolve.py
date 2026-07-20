@@ -71,8 +71,7 @@ def resolve_yaml_relative_output_path(
 
     用于:
     - `resources.files.*.csv_file.path`
-    - `resources.books.*.xlsx_file.path`
-    - `resources.books.*.xlsx_memory.export_xlsx.path`
+    - `resources.books.*.xlsx.path`
 
     约束:
     - `raw` 支持静态字符串与 `{$init_var: <name>}` 指令节点

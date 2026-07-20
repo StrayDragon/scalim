@@ -119,12 +119,9 @@ relations:
     assert first_step.to == ("mapping.mapping_region_id", "mapping.mapping_institution_id")
 
 
-def test_loader_ignores_legacy_observability_and_emits_migration_warning(caplog: object) -> None:
-    import logging
-
-    loader = YamlDemandLoader()
-
-    yaml_content = """
+def test_loader_rejects_legacy_observability_with_migration_hint() -> None:
+    _assert_load_string_errors(
+        """
 name: demo
 main_source:
   source_id: orders
@@ -140,13 +137,10 @@ observability:
   viz:
     enabled: true
     output_dir: ./tmp
-"""
-
-    caplog.set_level(logging.WARNING)
-    config = loader.load_string(yaml_content)
-    assert config.name == "demo"
-    assert any("Legacy YAML key 'observability' is no longer supported" in str(r.message) for r in caplog.records)
-
+""",
+        "Legacy YAML key 'observability' is no longer supported",
+        "Python runtime entrypoints",
+    )
 
 def test_loader_skips_invalid_relation_entries() -> None:
     yaml_content = """

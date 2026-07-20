@@ -11,19 +11,16 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 from ....._internal.type_narrowing import as_list, as_mapping
 from ...schema_dsl.models import (
     BOOK_KEYS,
-    BOOK_XLSX_MEMORY_KEYS,
     DEMAND_KEYS,
     FILE_KEYS,
     RESOURCES_KEYS,
 )
-from .book_branch_parse import deprecated_book_branch_validation_message
 
 if TYPE_CHECKING:
     from .....vendor.compact.typing_extensionsx import TypeGuard
 from .validators.base import ValidatorMixinBase
 from .validators.issues import (
     VALIDATION_SEVERITY_ERROR,
-    VALIDATION_SEVERITY_WARNING,
     ValidationIssue,
 )
 
@@ -37,58 +34,23 @@ def _is_dict(value: Any) -> "TypeGuard[Dict[Any, Any]]":
 class ValidatorMigrationsMixin(ValidatorMixinBase):
     """为 `ConfigValidator` 提供遗留字段迁移方法的 `Mixin`."""
 
-    def _warn_and_strip_legacy_observability(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
+    def _error_and_strip_legacy_observability(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
         if "observability" not in config:
             return config
 
         msg = (
-            "Legacy YAML key 'observability' is no longer supported and will be ignored. "
+            "Legacy YAML key 'observability' is no longer supported. "
             "Hint: configure observability via Python runtime entrypoints: "
             "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
             "runtime=DemandRunRuntimeOptions(components=[Observer()/Hook()]), "
             "outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(...))), "
             "...))."
         )
-        issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_WARNING, message=msg, path="observability"))
+        issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_ERROR, message=msg, path="observability"))
 
         cleaned = dict(config)
         cleaned.pop("observability", None)
         return cleaned
-
-    def _warn_deprecated_book_branches(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
-        resources_raw: Any = config.get(DEMAND_KEYS["resources"])
-        if not _is_dict(resources_raw):
-            return config
-        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
-        books_raw = resources.get(RESOURCES_KEYS["books"])
-        if not _is_dict(books_raw):
-            return config
-        books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
-
-        for raw_book_id, book_raw in books.items():
-            book_cfg = as_mapping(book_raw, path="resources.books.{}".format(raw_book_id))
-            if book_cfg is None:
-                continue
-            book_path = "resources.books.{}".format(raw_book_id)
-            if "xlsx_file" in book_cfg:
-                issues.append(
-                    ValidationIssue(
-                        severity=VALIDATION_SEVERITY_WARNING,
-                        message=deprecated_book_branch_validation_message(book_path=book_path, branch="xlsx_file"),
-                        path="{}.xlsx_file".format(book_path),
-                    )
-                )
-            if "xlsx_memory" in book_cfg:
-                mem = as_mapping(book_cfg.get("xlsx_memory"), path="{}.xlsx_memory".format(book_path))
-                branch = "xlsx_memory_export" if mem is not None and "export_xlsx" in mem else "xlsx_memory"
-                issues.append(
-                    ValidationIssue(
-                        severity=VALIDATION_SEVERITY_WARNING,
-                        message=deprecated_book_branch_validation_message(book_path=book_path, branch=branch),
-                        path="{}.xlsx_memory".format(book_path),
-                    )
-                )
-        return config
 
     @staticmethod
     def _append_removed_runtime_policy_error(issues: List["ValidationIssue"], *, path: str, msg: str) -> None:
@@ -310,7 +272,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                         next_export_cfg.pop("write_lock", None)
                         next_book_cfg["export_xlsx"] = next_export_cfg
 
-                xlsx_file_raw = book_cfg.get(BOOK_KEYS["xlsx_file"])
+                xlsx_file_raw = book_cfg.get("xlsx_file")
                 if _is_dict(xlsx_file_raw):
                     xlsx_file_cfg = cast("Dict[str, Any]", xlsx_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "write_lock" in xlsx_file_cfg:
@@ -323,9 +285,9 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                             next_book_cfg = dict(book_cfg)
                         next_xlsx_file = dict(xlsx_file_cfg)
                         next_xlsx_file.pop("write_lock", None)
-                        next_book_cfg[BOOK_KEYS["xlsx_file"]] = next_xlsx_file
+                        next_book_cfg["xlsx_file"] = next_xlsx_file
 
-                xlsx_memory_raw = book_cfg.get(BOOK_KEYS["xlsx_memory"])
+                xlsx_memory_raw = book_cfg.get("xlsx_memory")
                 if _is_dict(xlsx_memory_raw):
                     xlsx_memory_cfg = cast("Dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "write_lock" in xlsx_memory_cfg:
@@ -338,9 +300,9 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                             next_book_cfg = dict(book_cfg)
                         next_xlsx_memory = dict(xlsx_memory_cfg)
                         next_xlsx_memory.pop("write_lock", None)
-                        next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
+                        next_book_cfg["xlsx_memory"] = next_xlsx_memory
 
-                    export_mem_raw = xlsx_memory_cfg.get(BOOK_XLSX_MEMORY_KEYS["export_xlsx"])
+                    export_mem_raw = xlsx_memory_cfg.get("export_xlsx")
                     if _is_dict(export_mem_raw):
                         export_mem_cfg = cast("Dict[str, Any]", export_mem_raw)  # pragma: allow-cast yaml mapping typed narrowing
                         if "write_lock" in export_mem_cfg:
@@ -351,11 +313,11 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                             )
                             if next_book_cfg is None:
                                 next_book_cfg = dict(book_cfg)
-                            next_xlsx_memory = dict(cast("Dict[str, Any]", next_book_cfg.get(BOOK_KEYS["xlsx_memory"]) or xlsx_memory_cfg))
+                            next_xlsx_memory = dict(cast("Dict[str, Any]", next_book_cfg.get("xlsx_memory") or xlsx_memory_cfg))
                             next_export_mem = dict(export_mem_cfg)
                             next_export_mem.pop("write_lock", None)
-                            next_xlsx_memory[BOOK_XLSX_MEMORY_KEYS["export_xlsx"]] = next_export_mem
-                            next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
+                            next_xlsx_memory["export_xlsx"] = next_export_mem
+                            next_book_cfg["xlsx_memory"] = next_xlsx_memory
 
                 if next_book_cfg is not None:
                     next_resources = _ensure_next_resources()
@@ -386,7 +348,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             "or WorkflowRunOptions.resources_policy; omit for builtin defaults."
         )
         budget_hint = (
-            "xlsx_memory.budget was removed from YAML authoring (Python ResourcesPolicy SSOT). "
+            "xlsx.budget was removed from YAML authoring (Python ResourcesPolicy SSOT). "
             "Migration: configure BookBudgetPolicy via DemandRunOptions.resources_policy "
             "or WorkflowRunOptions.resources_policy; omit for unlimited."
         )
@@ -415,7 +377,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                 next_book_cfg = dict(book_cfg)
                 next_book_cfg.pop("write_defaults", None)
 
-            xlsx_memory_raw = book_cfg.get(BOOK_KEYS["xlsx_memory"])
+            xlsx_memory_raw = book_cfg.get("xlsx_memory")
             xlsx_memory_cfg = as_mapping(
                 xlsx_memory_raw,
                 path="resources.books.{}.xlsx_memory".format(raw_book_id),
@@ -430,7 +392,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                     next_book_cfg = dict(book_cfg)
                 next_xlsx_memory = dict(xlsx_memory_cfg)
                 next_xlsx_memory.pop("budget", None)
-                next_book_cfg[BOOK_KEYS["xlsx_memory"]] = next_xlsx_memory
+                next_book_cfg["xlsx_memory"] = next_xlsx_memory
 
             xlsx_raw = book_cfg.get(BOOK_KEYS["xlsx"])
             xlsx_cfg = as_mapping(xlsx_raw, path="resources.books.{}.xlsx".format(raw_book_id))

@@ -113,7 +113,7 @@
 - `export_profile`/字段展示: `DemandIr.export_profile` + `FieldPresentationIr` (Excel number_format/列宽等)。
 - 主键/主字段语义: `FieldIr.is_primary` 目前在 YAML 编译链路中固定为 `False`。
 - source 级 fk/bindings: `SourceIr.fk_fields`/`SourceIr.bindings` 目前不暴露(仅保留 `bind` 由 params 推导)。
-- 更多 sink/output 类型: YAML 当前稳定 surface 仅覆盖 `resources.files(csv_file)` 与 `resources.books`（推荐统一 `xlsx` 可选 `path`；旧 `xlsx_file`/`xlsx_memory` 为 deprecated 别名）。
+- 更多 sink/output 类型: YAML 当前稳定 surface 仅覆盖 `resources.files(csv_file)` 与 `resources.books`（统一 `xlsx` 可选 `path`；旧 `xlsx_file`/`xlsx_memory` 已硬删）。
 
 ## 8) 建议(用于下一轮评估)
 

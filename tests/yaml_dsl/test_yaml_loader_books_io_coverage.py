@@ -1,5 +1,3 @@
-import warnings
-
 import pytest
 
 from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
@@ -49,15 +47,15 @@ def test_loader_parse_resources_book_mapping_errors_cover_branches() -> None:
 def test_loader_parse_book_config_semantic_errors_cover_branches() -> None:
     loader = YamlDemandLoader()
 
-    with pytest.raises(ValueError, match=r"resources\.books\.report must choose exactly one variant key"):
+    with pytest.raises(ValueError, match=r"resources\.books\.report must declare exactly one variant key"):
         _ = loader._parse_book_config({}, base_path="resources.books.report")  # noqa: SLF001
 
     with pytest.raises(ValueError, match=r"resources\.books\.report\.kind was removed"):
         _ = loader._parse_book_config({"kind": "xlsx_file", "path": "./out"}, base_path="resources.books.report")  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"must choose exactly one variant key"):
+    with pytest.raises(ValueError, match=r"xlsx_file was removed"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {"path": "./out"}, BOOK_KEYS["xlsx_memory"]: {}},
+            {"xlsx_file": {"path": "./out"}, "xlsx_memory": {}},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
@@ -134,54 +132,49 @@ def test_loader_parse_book_config_additional_error_branches_cover_removed_write_
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_memory must be a mapping"):
+    with pytest.raises(ValueError, match=r"xlsx_memory was removed"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_memory"]: []},
+            {"xlsx_memory": []},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file\.write_lock was removed"):
+    with pytest.raises(ValueError, match=r"xlsx_file was removed"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {"path": "./out", "write_lock": True}},
+            {"xlsx_file": {"path": "./out", "write_lock": True}},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_memory\.write_lock was removed"):
+    with pytest.raises(ValueError, match=r"xlsx_memory was removed"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_memory"]: {"write_lock": True}},
+            {"xlsx_memory": {"write_lock": True}},
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    # deprecated 别名错误分支(专测覆盖;普通 fixture 已迁到 xlsx)
-    with pytest.raises(ValueError, match=r"resources\.books\.report\.xlsx_file\.path is required"):
+    with pytest.raises(ValueError, match=r"xlsx_file was removed"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {}},
+            {"xlsx_file": {}},
             base_path="resources.books.report",
         )  # noqa: SLF001
-    with pytest.raises(ValueError, match=r"xlsx_file has unknown keys"):
+    with pytest.raises(ValueError, match=r"xlsx_file was removed"):
         _ = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_file"]: {"path": "./out", "nope": 1}},
+            {"xlsx_file": {"path": "./out", "nope": 1}},
             base_path="resources.books.report",
         )  # noqa: SLF001
-    with pytest.raises(ValueError, match=r"xlsx_memory\.budget was removed from YAML authoring"):
+    with pytest.raises(ValueError, match=r"xlsx_memory was removed"):
         _ = loader._parse_book_config(
             {
-                BOOK_KEYS["xlsx_memory"]: {
+                "xlsx_memory": {
                     "budget": {BOOK_BUDGET_KEYS["max_sheets"]: 1, BOOK_BUDGET_KEYS["max_total_cells"]: 1},
                 },
             },
             base_path="resources.books.report",
         )  # noqa: SLF001
 
-    with warnings.catch_warnings(record=True):
-        warnings.simplefilter("always")
-        parsed = loader._parse_book_config(
-            {BOOK_KEYS["xlsx_memory"]: {"export_xlsx": {"path": "./out"}}},
+    with pytest.raises(ValueError, match=r"xlsx_memory with export_xlsx was removed"):
+        _ = loader._parse_book_config(
+            {"xlsx_memory": {"export_xlsx": {"path": "./out"}}},
             base_path="resources.books.report",
         )  # noqa: SLF001
-    assert parsed.kind == "xlsx_file"
-    assert parsed.path == "./out"
-    assert parsed.export_xlsx is None
 
 
 def test_loader_parse_path_or_init_var_branches_cover_dict_and_error() -> None:

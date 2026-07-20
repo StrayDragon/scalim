@@ -156,7 +156,6 @@ class RunOverrides:
         resources = ResourcesOverride(
             books={
                 str(book_id): BookResourceOverride(
-                    kind="xlsx_file",
                     path=str(output_root_str),
                     allow_formulas=bool(allow_formulas),
                 )

@@ -91,7 +91,6 @@ def test_workflow_entrypoints_workflow_resources_override_handles_missing_and_co
     assert out is not None
     assert out.books is not None
     assert out.books["report"].allow_formulas is True
-    assert out.books["report"].kind == "xlsx_file"
     assert out.books["report"].path == "a"
     assert out.books["mem"].export_xlsx is not None
     assert out.books["mem"].export_xlsx.allow_formulas is True

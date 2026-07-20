@@ -85,7 +85,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
         ({"books": "nope"}, "workflow.resources.books must be a mapping"),
         ({"books": {1: {"xlsx": {"path": "out"}}}}, "workflow.resources.books keys must be non-empty strings"),
         ({"books": {"report": "nope"}}, "workflow.resources.books.report must be a mapping"),
-        ({"books": {"report": {}}}, "must choose exactly one variant key"),
+        ({"books": {"report": {}}}, "must declare exactly one variant key"),
         ({"books": {"report": {"kind": "nope"}}}, "kind was removed"),
         ({"books": {"report": {"xlsx": {"path": ""}}}}, "xlsx.path must be a non-empty output root when provided"),
         ({"books": {"report": {"xlsx": {"path": 1}}}}, "must be a non-empty string"),
@@ -155,7 +155,7 @@ def test_load_workflow_config_from_mapping_writes_removed(writes_raw: Any) -> No
                     }
                 }
             },
-            "write_lock was removed",
+            "xlsx_memory with export_xlsx was removed",
         ),
         (
             {

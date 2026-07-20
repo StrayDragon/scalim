@@ -1,4 +1,4 @@
-"""c25: book IR identity is pathful vs pathless (not kind strings)."""
+"""c25/c999: book IR identity is pathful vs pathless (not kind strings)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scalim.dsl.yaml_dsl._internal.book_identity import is_pathful_book, legacy_kind_shim
+from scalim.dsl.yaml_dsl._internal.book_identity import is_pathful_book
 from scalim.dsl.yaml_dsl._internal.workflow_compile_resources import _book_export_path_and_options
 from scalim.dsl.yaml_dsl.schema_dsl.models import BookConfig
 from scalim.dsl.yaml_dsl.workflow import load_workflow_config
@@ -23,7 +23,7 @@ def test_is_pathful_book_ssot_is_path_presence() -> None:
     assert is_pathful_book(BookConfig(kind="xlsx_file", path=None)) is False
 
 
-def test_compile_emits_pathful_option_and_legacy_kind_shim(tmp_path: Path) -> None:
+def test_compile_emits_pathful_option_without_legacy_kind(tmp_path: Path) -> None:
     root, opts = _book_export_path_and_options(
         BookConfig(kind="xlsx_file", path=str(tmp_path / "out")),
         book_id="report",
@@ -33,7 +33,7 @@ def test_compile_emits_pathful_option_and_legacy_kind_shim(tmp_path: Path) -> No
     )
     assert root
     assert opts["pathful"] is True
-    assert opts["kind"] == legacy_kind_shim(pathful=True)
+    assert "kind" not in opts
 
     root2, opts2 = _book_export_path_and_options(
         BookConfig(kind="xlsx_memory"),
@@ -44,7 +44,7 @@ def test_compile_emits_pathful_option_and_legacy_kind_shim(tmp_path: Path) -> No
     )
     assert root2 == ""
     assert opts2["pathful"] is False
-    assert opts2["kind"] == legacy_kind_shim(pathful=False)
+    assert "kind" not in opts2
 
 
 def test_resource_defs_prefer_pathful_flag_over_kind_string(tmp_path: Path) -> None:
@@ -98,9 +98,6 @@ def test_unified_xlsx_yaml_normalizes_to_path_presence_ir(tmp_path: Path) -> Non
     cfg = load_workflow_config(str(wf_path))
     assert is_pathful_book(cfg.resources.books["report"]) is True
     assert is_pathful_book(cfg.resources.books["scratch"]) is False
-    # deprecated wire shim 仍可派生,但不是身份 SSOT
-    assert cfg.resources.books["report"].kind == "xlsx_file"
-    assert cfg.resources.books["scratch"].kind == "xlsx_memory"
 
 
 def test_try_resolve_book_export_abs_path_swallows_resolve_errors(tmp_path: Path) -> None:
@@ -129,21 +126,22 @@ def test_try_resolve_book_export_abs_path_swallows_resolve_errors(tmp_path: Path
     )
 
 
-def test_get_book_kind_empty_for_unknown_book_id() -> None:
+def test_has_xlsx_book_false_for_unknown_book_id() -> None:
     from scalim.workflow.resources import WorkflowResourceManager
 
     mgr = WorkflowResourceManager.__new__(WorkflowResourceManager)
     mgr._workbook_defs = {}  # noqa: SLF001
     mgr._sheetbook_defs = {}  # noqa: SLF001
-    assert mgr.get_book_kind("missing") == ""
+    assert mgr.has_xlsx_book("missing") is False
 
 
-def test_resource_defs_fallback_legacy_kind_and_reject_unknown(tmp_path: Path) -> None:
+def test_resource_defs_require_pathful_flag_and_reject_unknown(tmp_path: Path) -> None:
     from scalim.workflow.errors import ScalimWorkflowConfigError
 
     out = tmp_path / "out"
     out.mkdir()
-    workflow_ir = WorkflowIr(
+    # legacy kind-only options MUST NOT be accepted as identity SSOT
+    legacy_ir = WorkflowIr(
         nodes=(),
         edges=(),
         options=WorkflowOptionsIr(max_concurrency=1, failure_policy="all_fail"),
@@ -154,18 +152,11 @@ def test_resource_defs_fallback_legacy_kind_and_reject_unknown(tmp_path: Path) -
                 path=str(out),
                 options={"kind": "xlsx_file", "allow_formulas": True},
             ),
-            WorkflowResourceIr(
-                resource_id="scratch",
-                resource_type="book",
-                path="",
-                options={"kind": "xlsx_memory"},
-            ),
         ),
         artifacts=WorkflowArtifactsIr(slots_by_node_id={}),
     )
-    workbooks, _allow, _csv, sheetbooks = build_workflow_resource_defs(workflow_ir, workflow_exec_id="wf_c25_legacy")
-    assert "report" in workbooks
-    assert "scratch" in sheetbooks
+    with pytest.raises(ScalimWorkflowConfigError, match="Unknown book identity"):
+        _ = build_workflow_resource_defs(legacy_ir, workflow_exec_id="wf_c999_legacy")
 
     bad_ir = WorkflowIr(
         nodes=(),

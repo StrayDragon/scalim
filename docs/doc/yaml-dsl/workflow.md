@@ -288,7 +288,7 @@ workflow YAML 只负责两件事:
 
 - book 资源声明: `resources.books.<book_id>`
   - 既可以在 demand YAML 声明(standalone 也能跑),也可以在 workflow YAML 的 `workflow.resources.books` 统一声明/覆盖
-  - 推荐分支: 统一 `xlsx`（有 `path`=落盘；无 `path`=内存总线）；旧 `xlsx_file` / `xlsx_memory` 为 deprecated 别名（见 upgrade `2026-07-13-unified-xlsx-book-kind`）
+  - 唯一分支: 统一 `xlsx`（有 `path`=落盘；无 `path`=内存总线）；旧 `xlsx_file` / `xlsx_memory` 已硬删（见 upgrade `2026-07-20-remove-deprecated-xlsx-file-memory-kinds`）
 - 输出到 book 的绑定: `outputs[*].to.book` / `outputs[*].to.sheet`
 - 写入策略: Python `ResourcesPolicy` / `BookWritePolicy`（`WorkflowRunOptions.resources_policy` 或 `DemandRunOptions.resources_policy`；省略则用 builtin defaults）+ `outputs[*].write`（仅 output-local header 行为: `include_header` / `header_fields_output_by`）
 

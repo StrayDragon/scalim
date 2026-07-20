@@ -137,7 +137,7 @@
                   "type": "string",
                   "minLength": 1,
                   "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
+                  "markdownDescription": "#### book_export_xlsx.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
                 }
               },
               "required": [
@@ -154,12 +154,12 @@
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### book_export_xlsx.path\n\n导出 xlsx 的输出 root 目录(字符串或 {$init_var: <name>})\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
           "description": "允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx.allow_formulas\n\n允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
+          "markdownDescription": "#### book_export_xlsx.allow_formulas\n\n允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
           "default": true,
           "examples": [
             true
@@ -205,7 +205,7 @@
               "$init_var": "output_root"
             }
           ],
-          "markdownDescription": "#### workflow.resources.books.*.xlsx.path\n\n可选输出 root 目录.\n\n- 有 `path`: 版本化落盘(原 `xlsx_file` 语义)\n- 无 `path`: 内存总线(原无 export 的 `xlsx_memory` 语义)\n- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
+          "markdownDescription": "#### workflow.resources.books.*.xlsx.path\n\n可选输出 root 目录.\n\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线\n- 禁止在此分支使用 `export_xlsx`/`write_defaults`/`budget`\n\n##### 字段约束\n- 必填: 否\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
         },
         "allow_formulas": {
           "type": "boolean",
@@ -219,99 +219,15 @@
       },
       "additionalProperties": false
     },
-    "book_xlsx_file": {
-      "type": "object",
-      "properties": {
-        "path": {
-          "oneOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "description": "输出 root 目录(相对路径以 YAML 文件所在目录为基准;自动 mkdir 父目录)"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "$init_var": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "运行时变量名(编译期解析为 init_vars[<name>])",
-                  "markdownDescription": "#### workflow.resources.books.*.xlsx_file.path.$init_var\n\n运行时变量名(编译期解析为 init_vars[<name>])"
-                }
-              },
-              "required": [
-                "$init_var"
-              ],
-              "additionalProperties": false,
-              "description": "运行时动态路径: {$init_var: <name>}"
-            }
-          ],
-          "description": "**deprecated**: 请迁移到 `xlsx: {path: ...}`.",
-          "examples": [
-            "./output",
-            {
-              "$init_var": "output_root"
-            }
-          ],
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_file.path\n\n**deprecated**: 请迁移到 `xlsx: {path: ...}`.\n\n输出 root 目录(字符串或 {$init_var: <name>}).\n\n##### 字段约束\n- 必填: 是\n- oneOf\n\n##### 例子\n```yaml\n./output\n```\n```yaml\n$init_var: output_root\n```"
-        },
-        "allow_formulas": {
-          "type": "boolean",
-          "description": "允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_file.allow_formulas\n\n允许 Excel 公式(默认 true;不可信输入显式设为 false 以启用转义防护).",
-          "default": true,
-          "examples": [
-            true
-          ]
-        }
-      },
-      "required": [
-        "path"
-      ],
-      "additionalProperties": false
-    },
-    "book_xlsx_memory": {
-      "type": "object",
-      "properties": {
-        "export_xlsx": {
-          "description": "**deprecated**: 无 export 请用 `xlsx: {}`; 有导出请用 `xlsx: {path: ...}`.",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory.export_xlsx\n\n**deprecated**: 无 export 请用 `xlsx: {}`; 有导出请用 `xlsx: {path: ...}`.\n可选导出配置.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/book_export_xlsx"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "book": {
       "type": "object",
       "properties": {
         "xlsx": {
-          "description": "xlsx: 统一 book identity(新 SSOT).",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx\n\nxlsx: 统一 book identity(新 SSOT).\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线(`book_sheet_rows`)",
+          "description": "xlsx: 统一 book identity(唯一 authoring SSOT).",
+          "markdownDescription": "#### workflow.resources.books.*.xlsx\n\nxlsx: 统一 book identity(唯一 authoring SSOT).\n- 有 `path`: 版本化落盘\n- 无 `path`: 内存总线(`book_sheet_rows`)",
           "allOf": [
             {
               "$ref": "#/definitions/book_xlsx"
-            }
-          ]
-        },
-        "xlsx_file": {
-          "description": "**deprecated**: 请迁移到 `xlsx: {path: ...}`.",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_file\n\n**deprecated**: 请迁移到 `xlsx: {path: ...}`.\nxlsx_file: 文件导出 book 配置.\n- 必填: `path`",
-          "allOf": [
-            {
-              "$ref": "#/definitions/book_xlsx_file"
-            }
-          ]
-        },
-        "xlsx_memory": {
-          "description": "**deprecated**: 无导出用 `xlsx: {}`; 有导出用 `xlsx: {path: ...}`.",
-          "markdownDescription": "#### workflow.resources.books.*.xlsx_memory\n\n**deprecated**: 无导出用 `xlsx: {}`; 有导出用 `xlsx: {path: ...}`.\nxlsx_memory: 内存 book 配置.\n- 可选: `export_xlsx`(亦 deprecated)",
-          "allOf": [
-            {
-              "$ref": "#/definitions/book_xlsx_memory"
             }
           ]
         }
@@ -323,71 +239,11 @@
             {
               "required": [
                 "$import"
-              ],
-              "not": {
-                "anyOf": [
-                  {
-                    "required": [
-                      "xlsx",
-                      "xlsx_file"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "xlsx",
-                      "xlsx_memory"
-                    ]
-                  },
-                  {
-                    "required": [
-                      "xlsx_file",
-                      "xlsx_memory"
-                    ]
-                  }
-                ]
-              }
+              ]
             },
             {
-              "oneOf": [
-                {
-                  "required": [
-                    "xlsx"
-                  ],
-                  "properties": {
-                    "xlsx_file": {
-                      "not": {}
-                    },
-                    "xlsx_memory": {
-                      "not": {}
-                    }
-                  }
-                },
-                {
-                  "required": [
-                    "xlsx_file"
-                  ],
-                  "properties": {
-                    "xlsx": {
-                      "not": {}
-                    },
-                    "xlsx_memory": {
-                      "not": {}
-                    }
-                  }
-                },
-                {
-                  "required": [
-                    "xlsx_memory"
-                  ],
-                  "properties": {
-                    "xlsx": {
-                      "not": {}
-                    },
-                    "xlsx_file": {
-                      "not": {}
-                    }
-                  }
-                }
+              "required": [
+                "xlsx"
               ]
             }
           ]
@@ -469,7 +325,7 @@
         "books": {
           "type": "object",
           "description": "books 资源映射(Excel book; key 为 `book_id`).",
-          "markdownDescription": "#### workflow.resources.books\n\nbooks 资源映射(Excel book; key 为 `book_id`).\n- 对外稳定术语: `book`\n- 新 SSOT 分支: `xlsx`(可选 `path`); `xlsx_file`/`xlsx_memory` 为 deprecated 别名",
+          "markdownDescription": "#### workflow.resources.books\n\nbooks 资源映射(Excel book; key 为 `book_id`).\n- 对外稳定术语: `book`\n- 唯一 authoring SSOT: `xlsx`(可选 `path`; 有 path=落盘; 无 path=内存总线)",
           "additionalProperties": {
             "$ref": "#/definitions/book"
           },

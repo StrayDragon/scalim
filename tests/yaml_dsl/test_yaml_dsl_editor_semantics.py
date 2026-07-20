@@ -181,16 +181,18 @@ def test_collect_demand_diagnostics_has_error_warning_and_range(tmp_path: Path) 
     result = editor_semantics.collect_yaml_dsl_editor_diagnostics(yaml_path, yaml_text=yaml_text)
     assert result.yaml_kind == editor_semantics.YAML_DSL_KIND_DEMAND
     assert result.errors
-    assert result.warnings
 
     unknown = [d for d in result.errors if d.path == "main_source.unknown_field"]
     assert unknown and unknown[0].range is not None
     assert unknown[0].range.start.line == 6
     assert unknown[0].range.start.column == 3
 
+    error_paths = {e.path for e in result.errors}
+    assert "observability" in error_paths
+    assert "main_source.unknown_field" in error_paths
+    # observability is fail-fast ERROR (not a warning)
     warn_paths = {w.path for w in result.warnings}
-    assert "observability" in warn_paths
-
+    assert "observability" not in warn_paths
 
 def test_collect_demand_diagnostics_import_expansion_error_is_reported(tmp_path: Path) -> None:
     yaml_text = textwrap.dedent(
