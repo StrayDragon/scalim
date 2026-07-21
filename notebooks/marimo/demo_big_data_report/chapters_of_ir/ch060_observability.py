@@ -1,4 +1,5 @@
 """Cells-native: ch060_observability — Performance, Relation, Trace, RowGap observers."""
+
 import marimo
 
 __generated_with = "0.22.0"
@@ -16,12 +17,14 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
     ensure_repo_root_on_sys_path(__file__)
     return
 
@@ -45,12 +48,25 @@ def _():
         build_ecommerce_runtime_bindings,
     )
     from scalim_misc.demo_big_data_report.verification import verify_scalim_output
+
     return (
-        Dict, ExecutionTraceObserver, InMemoryColumnSink, ObserverManager,
-        PerformanceConfig, PerformanceObserver, PlanBuilder, RelationConfig,
-        RelationObserver, RowGapObserver, ScalimEngine, Sequence,
-        TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings,
-        build_test_config_small, verify_scalim_output,
+        Dict,
+        ExecutionTraceObserver,
+        InMemoryColumnSink,
+        ObserverManager,
+        PerformanceConfig,
+        PerformanceObserver,
+        PlanBuilder,
+        RelationConfig,
+        RelationObserver,
+        RowGapObserver,
+        ScalimEngine,
+        Sequence,
+        TARGET_FIELDS_FULL,
+        build_ecommerce_model,
+        build_ecommerce_runtime_bindings,
+        build_test_config_small,
+        verify_scalim_output,
     )
 
 
@@ -72,10 +88,20 @@ def _(PlanBuilder, build_ecommerce_model, build_ecommerce_runtime_bindings, cfg,
 
 @app.cell
 def _(
-    ExecutionTraceObserver, InMemoryColumnSink, ObserverManager,
-    PerformanceConfig, PerformanceObserver, RelationConfig, RelationObserver,
-    RowGapObserver, ScalimEngine,
-    demand, plan, runtime_bindings, targets, verify_scalim_output,
+    ExecutionTraceObserver,
+    InMemoryColumnSink,
+    ObserverManager,
+    PerformanceConfig,
+    PerformanceObserver,
+    RelationConfig,
+    RelationObserver,
+    RowGapObserver,
+    ScalimEngine,
+    demand,
+    plan,
+    runtime_bindings,
+    targets,
+    verify_scalim_output,
 ):
     perf_obs = PerformanceObserver(config=PerformanceConfig(metrics={"duration", "memory"}, sampling_interval=1, report_format="none"))
     rel_obs = RelationObserver(config=RelationConfig(sampling_rate=1.0, report_format="none"))
@@ -86,8 +112,7 @@ def _(
     for ob in [perf_obs, rel_obs, trace_obs, gap_obs]:
         observer_manager.register(ob)
 
-    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings,
-                          observer_manager=observer_manager, batch_size=10)
+    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, observer_manager=observer_manager, batch_size=10)
     with InMemoryColumnSink(field_names=targets) as mem_sink:
         engine.run(main_rows=None, sink=mem_sink)
         rows = mem_sink.get_rows()
@@ -97,31 +122,43 @@ def _(
     rel_metrics = rel_obs.get_metrics()
 
     print("rows={} verify={}".format(len(rows), verification.passed))
-    print("trace_batches={} loader_stats={} rel_lookups={}".format(
-        len(trace_obs.batches), len(metrics.loader_stats), rel_metrics.total_lookups))
+    print(
+        "trace_batches={} loader_stats={} rel_lookups={}".format(
+            len(trace_obs.batches), len(metrics.loader_stats), rel_metrics.total_lookups
+        )
+    )
     print("gap_expected={} actual={} missing={}".format(gap_obs.total_expected, gap_obs.total_actual, gap_obs.total_missing))
     return gap_obs, metrics, rel_metrics, rows, trace_obs, verification
 
 
 @app.cell
 def _(gap_obs, metrics, rel_metrics, rows, trace_obs, verification):
-    passed = bool(verification.passed and len(trace_obs.batches) > 0
-                  and len(metrics.loader_stats) > 0 and int(rel_metrics.total_lookups) > 0)
+    passed = bool(
+        verification.passed and len(trace_obs.batches) > 0 and len(metrics.loader_stats) > 0 and int(rel_metrics.total_lookups) > 0
+    )
     summary = "rows={} verify={} trace_batches={} loader_metrics={} rel_lookups={} gap_expected={}".format(
-        len(rows), verification.passed, len(trace_obs.batches), len(metrics.loader_stats),
-        int(rel_metrics.total_lookups), gap_obs.total_expected)
+        len(rows),
+        verification.passed,
+        len(trace_obs.batches),
+        len(metrics.loader_stats),
+        int(rel_metrics.total_lookups),
+        gap_obs.total_expected,
+    )
 
     chapter_result = {
         "passed": passed,
         "summary": summary,
-        "details": {"rows": len(rows), "trace_batches": len(trace_obs.batches),
-                    "loader_metrics_count": len(metrics.loader_stats),
-                    "rel_lookups": int(rel_metrics.total_lookups),
-                    "rel_hits": int(rel_metrics.hit_count),
-                    "rel_misses": int(rel_metrics.miss_count),
-                    "gap_expected": gap_obs.total_expected,
-                    "gap_actual": gap_obs.total_actual,
-                    "gap_missing": gap_obs.total_missing},
+        "details": {
+            "rows": len(rows),
+            "trace_batches": len(trace_obs.batches),
+            "loader_metrics_count": len(metrics.loader_stats),
+            "rel_lookups": int(rel_metrics.total_lookups),
+            "rel_hits": int(rel_metrics.hit_count),
+            "rel_misses": int(rel_metrics.miss_count),
+            "gap_expected": gap_obs.total_expected,
+            "gap_actual": gap_obs.total_actual,
+            "gap_missing": gap_obs.total_missing,
+        },
     }
     return chapter_result, passed, summary
 
@@ -129,14 +166,14 @@ def _(gap_obs, metrics, rel_metrics, rows, trace_obs, verification):
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     ok = chapter_result["passed"]
-    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
-               kind="success" if ok else "danger")
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])), kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+
     d_rows = details_to_rows(chapter_result["details"])
     if d_rows:
         mo.ui.table(d_rows, selection=None)

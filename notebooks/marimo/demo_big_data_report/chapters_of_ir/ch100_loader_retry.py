@@ -1,4 +1,5 @@
 """Cells-native: ch100_loader_retry — YAML DSL loader retry policy."""
+
 import marimo
 
 __generated_with = "0.22.0"
@@ -16,12 +17,14 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
     ensure_repo_root_on_sys_path(__file__)
     return
 
@@ -43,10 +46,21 @@ def _():
     )
     from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
     from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod
+
     return (
-        CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions,
-        DemandRunSecurityOptions, Dict, LoaderRetryPoliciesSpec, LoaderRetryPolicySpec,
-        Path, demo_mod, run, tempfile, textwrap,
+        CaptureRows,
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunRuntimeOptions,
+        DemandRunSecurityOptions,
+        Dict,
+        LoaderRetryPoliciesSpec,
+        LoaderRetryPolicySpec,
+        Path,
+        demo_mod,
+        run,
+        tempfile,
+        textwrap,
     )
 
 
@@ -68,7 +82,21 @@ def _(Path, demo_mod, tempfile, textwrap):
 
 
 @app.cell
-def _(CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, LoaderRetryPoliciesSpec, LoaderRetryPolicySpec, Path, allowed_modules, demand_yaml, demo_mod, run, tempfile):
+def _(
+    CaptureRows,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    LoaderRetryPoliciesSpec,
+    LoaderRetryPolicySpec,
+    Path,
+    allowed_modules,
+    demand_yaml,
+    demo_mod,
+    run,
+    tempfile,
+):
     """Run: no-retry (expects failure) and with-retry (expects success)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         demand_path = Path(tmpdir) / "demand.yaml"
@@ -78,22 +106,32 @@ def _(CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOpt
         demo_mod.reset()
         no_retry_ok = False
         try:
-            run(str(demand_path), options=DemandRunOptions(
-                security=DemandRunSecurityOptions(allowed_modules=allowed_modules)))
+            run(str(demand_path), options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=allowed_modules)))
         except demo_mod.TransientError:
             no_retry_ok = True
 
         # 2) With retry: should succeed after retry
         demo_mod.reset()
-        injected_retry = LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(
-            enabled=True, should_retry=demo_mod.should_retry,
-            max_attempts=2, max_elapsed_seconds=5.0,
-            backoff="fixed", base_delay_seconds=0.0,
-            max_delay_seconds=0.0, jitter=False))
-        result = run(str(demand_path), options=DemandRunOptions(
-            security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
-            runtime=DemandRunRuntimeOptions(loader_retry=injected_retry),
-            outputs=DemandRunOutputOptions(capture=CaptureRows())))
+        injected_retry = LoaderRetryPoliciesSpec(
+            default=LoaderRetryPolicySpec(
+                enabled=True,
+                should_retry=demo_mod.should_retry,
+                max_attempts=2,
+                max_elapsed_seconds=5.0,
+                backoff="fixed",
+                base_delay_seconds=0.0,
+                max_delay_seconds=0.0,
+                jitter=False,
+            )
+        )
+        result = run(
+            str(demand_path),
+            options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+                runtime=DemandRunRuntimeOptions(loader_retry=injected_retry),
+                outputs=DemandRunOutputOptions(capture=CaptureRows()),
+            ),
+        )
         captured = result.captured_rows
         captured_rows = [] if captured is None else list(captured.iter_row_data())
         with_retry_ok = captured_rows == [{"order_id": 1}] and demo_mod.get_call_count() == 2
@@ -118,14 +156,14 @@ def _(demo_mod, no_retry_ok, with_retry_ok):
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     ok = chapter_result["passed"]
-    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
-               kind="success" if ok else "danger")
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])), kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+
     d_rows = details_to_rows(chapter_result["details"])
     if d_rows:
         mo.ui.table(d_rows, selection=None)

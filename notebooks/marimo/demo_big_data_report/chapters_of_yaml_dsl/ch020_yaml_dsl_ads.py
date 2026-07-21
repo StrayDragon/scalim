@@ -133,7 +133,7 @@ def run_yaml_dsl_ads(
 
 
 def run_chapter():
-    """SSOT entry: headless runner / pytest import this."""
+    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
     outputs, defs = app.run()
     return defs["chapter_result"]
 

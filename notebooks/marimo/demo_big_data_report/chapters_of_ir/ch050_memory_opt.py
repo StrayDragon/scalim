@@ -1,4 +1,5 @@
 """Cells-native: ch050_memory_opt — memory optimization observer + block column CSV."""
+
 import marimo
 
 __generated_with = "0.22.0"
@@ -16,12 +17,14 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
     ensure_repo_root_on_sys_path(__file__)
     return
 
@@ -45,11 +48,24 @@ def _():
         build_ecommerce_runtime_bindings,
     )
     from scalim_misc.demo_big_data_report.verification import verify_scalim_output
+
     return (
-        BlockColumnCSVSink, ColumnCSVSink, Dict, InMemoryColumnSink, List,
-        MemoryOptimizationObserver, ObserverManager, Path, PlanBuilder, ScalimEngine,
-        TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings,
-        build_test_config_small, tempfile, verify_scalim_output,
+        BlockColumnCSVSink,
+        ColumnCSVSink,
+        Dict,
+        InMemoryColumnSink,
+        List,
+        MemoryOptimizationObserver,
+        ObserverManager,
+        Path,
+        PlanBuilder,
+        ScalimEngine,
+        TARGET_FIELDS_FULL,
+        build_ecommerce_model,
+        build_ecommerce_runtime_bindings,
+        build_test_config_small,
+        tempfile,
+        verify_scalim_output,
     )
 
 
@@ -72,16 +88,24 @@ def _(PlanBuilder, build_ecommerce_model, build_ecommerce_runtime_bindings, cfg,
 
 @app.cell
 def _(
-    BlockColumnCSVSink, ColumnCSVSink, InMemoryColumnSink,
-    MemoryOptimizationObserver, ObserverManager, ScalimEngine,
-    demand, plan, runtime_bindings, targets, tempfile, verify_scalim_output,
+    BlockColumnCSVSink,
+    ColumnCSVSink,
+    InMemoryColumnSink,
+    MemoryOptimizationObserver,
+    ObserverManager,
+    ScalimEngine,
+    demand,
+    plan,
+    runtime_bindings,
+    targets,
+    tempfile,
+    verify_scalim_output,
 ):
     observer_manager = ObserverManager()
     mem_obs = MemoryOptimizationObserver()
     observer_manager.register(mem_obs)
 
-    e1 = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings,
-                      observer_manager=observer_manager, batch_size=10)
+    e1 = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, observer_manager=observer_manager, batch_size=10)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tp = Path(tmpdir)
@@ -103,25 +127,30 @@ def _(
         with BlockColumnCSVSink(str(block_csv), field_names=targets[:10], write_delay=0.0) as block_sink:
             e3.run(main_rows=None, sink=block_sink)
 
-    print("mem_results={} verify={} col_write_events={} field_slim_events={}".format(
-        len(mem_results), verification.passed, len(mem_obs.column_write_events), len(mem_obs.field_slim_events)))
+    print(
+        "mem_results={} verify={} col_write_events={} field_slim_events={}".format(
+            len(mem_results), verification.passed, len(mem_obs.column_write_events), len(mem_obs.field_slim_events)
+        )
+    )
     return block_sink, mem_obs, mem_results, verification
 
 
 @app.cell
 def _(mem_obs, mem_results, verification):
     passed = bool(verification.passed and len(mem_obs.column_write_events) > 0)
-    summary = "rows={} verify={} column_write_events={}".format(
-        len(mem_results), verification.passed, len(mem_obs.column_write_events))
+    summary = "rows={} verify={} column_write_events={}".format(len(mem_results), verification.passed, len(mem_obs.column_write_events))
     if not verification.passed:
         summary = summary + "\n" + verification.summary
 
     chapter_result = {
         "passed": passed,
         "summary": summary,
-        "details": {"rows": len(mem_results), "verification": verification,
-                    "column_write_events": len(mem_obs.column_write_events),
-                    "field_slim_events": len(mem_obs.field_slim_events)},
+        "details": {
+            "rows": len(mem_results),
+            "verification": verification,
+            "column_write_events": len(mem_obs.column_write_events),
+            "field_slim_events": len(mem_obs.field_slim_events),
+        },
     }
     return chapter_result, passed, summary
 
@@ -129,14 +158,14 @@ def _(mem_obs, mem_results, verification):
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     ok = chapter_result["passed"]
-    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
-               kind="success" if ok else "danger")
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])), kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+
     d_rows = details_to_rows(chapter_result["details"])
     if d_rows:
         mo.ui.table(d_rows, selection=None)

@@ -27,6 +27,7 @@ app = marimo.App(width="full")
 # Cell 1 — 教学目标
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
@@ -52,6 +53,7 @@ def _(mo):
 # Cell 2 — marimo 自身
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell
 def _():
     import marimo as mo
@@ -62,6 +64,7 @@ def _():
 # ═══════════════════════════════════════════════════════════════
 # Cell 3 — 仓库路径设置(notebook 辅助)
 # ═══════════════════════════════════════════════════════════════
+
 
 @app.cell
 def _():
@@ -76,6 +79,7 @@ def _():
 #
 # app.run() 创建全新 __main__ 上下文,因此 imports 需在 cells 内完成。
 # ═══════════════════════════════════════════════════════════════
+
 
 @app.cell
 def _():
@@ -117,6 +121,7 @@ def _():
 # 你可以修改 cfg 参数来探索不同规模的场景。
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell
 def _(build_test_config_small):
     cfg = build_test_config_small()
@@ -129,6 +134,7 @@ def _(build_test_config_small):
 #
 # demand 是 IR 模型定义, runtime_bindings 是加载器/计算器注册表。
 # ═══════════════════════════════════════════════════════════════
+
 
 @app.cell
 def _(build_ecommerce_model, build_ecommerce_runtime_bindings, cfg):
@@ -148,6 +154,7 @@ def _(build_ecommerce_model, build_ecommerce_runtime_bindings, cfg):
 # PlanBuilder 将 IR model 编译为执行计划。
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell
 def _(PlanBuilder, TARGET_FIELDS_FULL, demand):
     targets = list(TARGET_FIELDS_FULL)
@@ -165,6 +172,7 @@ def _(PlanBuilder, TARGET_FIELDS_FULL, demand):
 #
 # 你可以调整 batch_size 来观察分批行为。
 # ═══════════════════════════════════════════════════════════════
+
 
 @app.cell
 def _(InMemoryColumnSink, ScalimEngine, demand, load_orders, plan, runtime_bindings, targets, time):
@@ -195,6 +203,7 @@ def _(InMemoryColumnSink, ScalimEngine, demand, load_orders, plan, runtime_bindi
 # 使用 oracle 验证输出正确性 + order_id 排序约束。
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell
 def _(results, targets, verify_order_by, verify_scalim_output):
     verification = verify_scalim_output(results, fields_to_check=targets)
@@ -217,11 +226,15 @@ def _(results, targets, verify_order_by, verify_scalim_output):
 # 契约: {"passed": bool, "summary": str, "details": dict|None}
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell
 def _(elapsed, order_by, plan, results, targets, verification):
     passed = bool(verification.passed and order_by.passed)
     summary = "rows={} elapsed={:.3f}s verify={} order_by={}".format(
-        len(results), elapsed, verification.passed, order_by.passed,
+        len(results),
+        elapsed,
+        verification.passed,
+        order_by.passed,
     )
 
     chapter_result = {
@@ -245,6 +258,7 @@ def _(elapsed, order_by, plan, results, targets, verification):
 # Cell 11 — 结果展示 (交互时可看到)
 # ═══════════════════════════════════════════════════════════════
 
+
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     ok = chapter_result["passed"]
@@ -258,6 +272,7 @@ def _(chapter_result, mo):
 # ═══════════════════════════════════════════════════════════════
 # Cell 12 — 详情表格
 # ═══════════════════════════════════════════════════════════════
+
 
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
@@ -276,6 +291,7 @@ def _(chapter_result, mo):
 # 内部调用 app.run(),从 defs 提取 chapter_result dict。
 # ChapterRegistry._safe_run() 自动将 dict 包装为 ExampleResult。
 # ═══════════════════════════════════════════════════════════════
+
 
 def run_chapter():
     """SSOT 入口: headless runner / pytest 通过此函数执行对拍。

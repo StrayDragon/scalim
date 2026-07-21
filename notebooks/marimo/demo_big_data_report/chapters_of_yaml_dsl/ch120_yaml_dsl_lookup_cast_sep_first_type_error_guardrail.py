@@ -107,7 +107,7 @@ def run_yaml_dsl_lookup_cast_sep_first_type_error_guardrail(*, yaml_path: Option
 
 
 def run_chapter():
-    """SSOT entry: headless runner / pytest import this."""
+    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
     outputs, defs = app.run()
     return defs["chapter_result"]
 

@@ -53,13 +53,19 @@ def _():
     from notebooks.marimo.example_hooks_events_scenarios.support.post_export_upload import run_post_export_upload
 
     result = run_post_export_upload()
-    chapter_result = {"passed": chapter_result["passed"], "summary": chapter_result["summary"], "details": chapter_result["details"] if chapter_result["details"] is not None else {}}
+    chapter_result = {
+        "passed": chapter_result["passed"],
+        "summary": chapter_result["summary"],
+        "details": chapter_result["details"] if chapter_result["details"] is not None else {},
+    }
     return (chapter_result,)
 
 
 @app.cell(hide_code=True)
 def _(mo, chapter_result):
-    mo.callout(mo.md("## {}".format("PASS" if chapter_result["passed"] else "FAIL")), kind="success" if chapter_result["passed"] else "danger")
+    mo.callout(
+        mo.md("## {}".format("PASS" if chapter_result["passed"] else "FAIL")), kind="success" if chapter_result["passed"] else "danger"
+    )
     mo.md("```\n{}\n```".format(chapter_result["summary"]))
     return
 

@@ -1,4 +1,5 @@
-"""ChapterRegistry for example_stage_scheduling_perf suite."""
+"""example_stage_scheduling_perf 套件的章节注册中心。"""
+
 from __future__ import annotations
 
 from typing import Iterable, List, Optional, Sequence

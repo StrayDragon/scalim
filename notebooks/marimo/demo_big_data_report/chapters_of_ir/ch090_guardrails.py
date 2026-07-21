@@ -1,4 +1,5 @@
 """Cells-native: ch090_guardrails — runtime guardrails quiet/fast_fail modes."""
+
 import marimo
 
 __generated_with = "0.22.0"
@@ -16,12 +17,14 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
     ensure_repo_root_on_sys_path(__file__)
     return
 
@@ -38,36 +41,85 @@ def _():
     from scalim.ob.observer import EventDispatchObserver
     from scalim.planning import PlanBuilder
     from scalim.spec.ir import (
-        BindingIr, CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr,
-        FieldIr, KeyIr, LoaderIr, MainSourceIr, RuntimeHandleIdIr, SourceIr, ValueOpIr,
+        BindingIr,
+        CallBySpecIr,
+        CallByValueIr,
+        DemandIr,
+        DerivedFieldIr,
+        FieldIr,
+        KeyIr,
+        LoaderIr,
+        MainSourceIr,
+        RuntimeHandleIdIr,
+        SourceIr,
+        ValueOpIr,
     )
     from scalim_misc.demo_big_data_report.guardrails_demo_loaders import (
-        load_guardrails_demo_main_rows, load_guardrails_demo_ref_table,
+        load_guardrails_demo_main_rows,
+        load_guardrails_demo_ref_table,
     )
+
     return (
-        Any, BindingIr, CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr,
-        Dict, EventDispatchObserver, EventType, FieldIr, GuardrailsLoaderPolicy,
-        GuardrailsPolicy, KeyIr, List, LoaderIr, MainSourceIr, ObserverManager,
-        PlanBuilder, RuntimeBindings, RuntimeHandleIdIr, ScalimEngine,
-        ScalimGuardrailViolationError, Sequence, SourceIr, ValueOpIr,
-        load_guardrails_demo_main_rows, load_guardrails_demo_ref_table,
+        Any,
+        BindingIr,
+        CallBySpecIr,
+        CallByValueIr,
+        DemandIr,
+        DerivedFieldIr,
+        Dict,
+        EventDispatchObserver,
+        EventType,
+        FieldIr,
+        GuardrailsLoaderPolicy,
+        GuardrailsPolicy,
+        KeyIr,
+        List,
+        LoaderIr,
+        MainSourceIr,
+        ObserverManager,
+        PlanBuilder,
+        RuntimeBindings,
+        RuntimeHandleIdIr,
+        ScalimEngine,
+        ScalimGuardrailViolationError,
+        Sequence,
+        SourceIr,
+        ValueOpIr,
+        load_guardrails_demo_main_rows,
+        load_guardrails_demo_ref_table,
     )
 
 
 @app.cell
 def _(
-    BindingIr, CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr,
-    EventDispatchObserver, EventType, FieldIr, KeyIr, List,
-    LoaderIr, MainSourceIr, RuntimeBindings, RuntimeHandleIdIr, SourceIr, ValueOpIr,
-    load_guardrails_demo_main_rows, load_guardrails_demo_ref_table,
+    BindingIr,
+    CallBySpecIr,
+    CallByValueIr,
+    DemandIr,
+    DerivedFieldIr,
+    EventDispatchObserver,
+    EventType,
+    FieldIr,
+    KeyIr,
+    List,
+    LoaderIr,
+    MainSourceIr,
+    RuntimeBindings,
+    RuntimeHandleIdIr,
+    SourceIr,
+    ValueOpIr,
+    load_guardrails_demo_main_rows,
+    load_guardrails_demo_ref_table,
 ):
     """Build IR demand and runtime bindings."""
+
     def to_int(value):
         return int(value)
 
     main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.main_loader"))
     ref_source = SourceIr(
-        source_id="ref", key=KeyIr("id"),
+        source_id="ref",
+        key=KeyIr("id"),
         loader_spec=LoaderIr(
             callable_ref=RuntimeHandleIdIr(handle_id="ref.loader"),
             bindings={"id": BindingIr(key_field="id", params_builder_ref=RuntimeHandleIdIr(handle_id="ref.params_builder.id"))},
@@ -77,19 +129,29 @@ def _(
 
     fields = [
         FieldIr(field_id="ref_id", name="ref_id", source=main_source),
-        FieldIr(field_id="a", name="a", source=main_source,
-                value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="field.a.transform")),)),
+        FieldIr(
+            field_id="a",
+            name="a",
+            source=main_source,
+            value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="field.a.transform")),),
+        ),
         FieldIr(field_id="b", name="b", source=main_source),
-        DerivedFieldIr(field_id="ratio", name="ratio", dependencies=("a", "b"),
-                       call_by=CallBySpecIr(
-                           reference=RuntimeHandleIdIr(handle_id="derived.ratio"),
-                           args=(CallByValueIr(kind="field", value="a"), CallByValueIr(kind="field", value="b")),
-                           field_names=("a", "b"))),
+        DerivedFieldIr(
+            field_id="ratio",
+            name="ratio",
+            dependencies=("a", "b"),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="derived.ratio"),
+                args=(CallByValueIr(kind="field", value="a"), CallByValueIr(kind="field", value="b")),
+                field_names=("a", "b"),
+            ),
+        ),
         FieldIr(field_id="ref_value", name="ref_value", source=ref_source, data_key="value", relation=rel_to_ref),
     ]
 
-    demand = DemandIr.from_irs(sources=[ref_source], fields=fields, main_source=main_source,
-                               name="runtime_guardrails_demo", batch_size_hint=50)
+    demand = DemandIr.from_irs(
+        sources=[ref_source], fields=fields, main_source=main_source, name="runtime_guardrails_demo", batch_size_hint=50
+    )
 
     runtime = RuntimeBindings()
     runtime.main_source_loaders["main"] = load_guardrails_demo_main_rows
@@ -98,6 +160,7 @@ def _(
     def params_fn(ctx):
         ids = ctx.lookup_keys_list or []
         return (), {"ids": ids}
+
     runtime.params_builders[("ref", "id")] = params_fn
     runtime.value_transforms["a"] = to_int
     runtime.derived_calculators["ratio"] = lambda a, b: a / b
@@ -106,6 +169,7 @@ def _(
         def __init__(self):
             self.event_types = {EventType.ERROR}
             self.errors = []
+
         def on_error(self, payload):
             self.errors.append(payload)
 
@@ -114,9 +178,14 @@ def _(
 
 @app.cell
 def _(
-    ErrorCollector, GuardrailsLoaderPolicy, GuardrailsPolicy, ObserverManager,
-    PlanBuilder, ScalimEngine,
-    demand, runtime,
+    ErrorCollector,
+    GuardrailsLoaderPolicy,
+    GuardrailsPolicy,
+    ObserverManager,
+    PlanBuilder,
+    ScalimEngine,
+    demand,
+    runtime,
 ):
     """Quiet mode: collects guardrail violations without aborting."""
     targets = ["ref_id", "a", "b", "ratio", "ref_value"]
@@ -126,8 +195,9 @@ def _(
     error_collector = ErrorCollector()
     om = ObserverManager(observers=[error_collector])
 
-    engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime,
-                          observer_manager=om, batch_size=50, guardrails=guardrails_quiet)
+    engine = ScalimEngine(
+        demand=demand, plan=plan, runtime_bindings=runtime, observer_manager=om, batch_size=50, guardrails=guardrails_quiet
+    )
     rows = list(engine.run())
 
     expected_rows = [
@@ -151,8 +221,13 @@ def _(
 
 @app.cell
 def _(
-    GuardrailsLoaderPolicy, GuardrailsPolicy, PlanBuilder, ScalimEngine, ScalimGuardrailViolationError,
-    demand, runtime,
+    GuardrailsLoaderPolicy,
+    GuardrailsPolicy,
+    PlanBuilder,
+    ScalimEngine,
+    ScalimGuardrailViolationError,
+    demand,
+    runtime,
 ):
     """Fast-fail mode: build fresh plan and verify exception."""
     plan2 = PlanBuilder(demand).build(targets=["ref_id", "a", "b", "ratio", "ref_value"])
@@ -178,14 +253,14 @@ def _(codes, codes_ok, fast_fail_ok, quiet_rows_ok):
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     ok = chapter_result["passed"]
-    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
-               kind="success" if ok else "danger")
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])), kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+
     d_rows = details_to_rows(chapter_result["details"])
     if d_rows:
         mo.ui.table(d_rows, selection=None)

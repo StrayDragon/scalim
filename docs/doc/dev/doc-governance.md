@@ -34,15 +34,15 @@ notebooks 本体是交互式 demo,但同时也是 **确定性回归入口** 的 
 - 交互式入口(本地): `uv run marimo edit notebooks/marimo/`
 - 回归入口(headless/CI): `just examples`（`just qa` 会覆盖）
   - 实际执行入口: `justfile` 的 `examples:` recipe（内联 runner）
-  - 覆盖报告(生成物): `notebooks/marimo/marimo_coverage.gen.toon`
-    - 生成: `just gen-marimo-coverage`
-    - 漂移门禁: `just marimo-coverage-drift-check`（`just qa`/CI 会覆盖）
+  - 覆盖报告(按需生成): `just report-notebooks-coverage`
+    - 门禁: `just check-notebooks-coverage`
+    - 输出: 每 notebook 的 Tier1 API 入口覆盖 CSV（suite, notebook, covered_pct, covered_modules, missing_modules）
 
 如需把 marimo notebooks 导出为 docs-site 可直接浏览的 HTML(可选),运行:
 
 - `uv run python scripts/export-marimo-to-docs.py`
 
-说明: notebooks 的 HTML 导出不属于 `just gen-docs` 的受控生成物;以 `just examples` / `marimo-coverage-drift-check` 的回归口径为准。
+说明: notebooks 的 HTML 导出不属于 `just gen-docs` 的受控生成物;以 `just examples` / `just check-notebooks-coverage` 的回归口径为准。
 
 ## doc_texts 模式(推荐)
 

@@ -79,7 +79,7 @@ schema-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-schema.py --check
 
 # 检查: 受控生成物漂移 (约定: `*.gen.*` + injected blocks)
-generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill validate-public-api-skill marimo-coverage-drift-check docs-drift-check
+generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill validate-public-api-skill docs-drift-check
 
 # 检查: 文档治理一致性(SSOT 入口/漂移源头)
 doc-governance-check:
@@ -333,13 +333,6 @@ gen-agent-skill:
 gen-public-api-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py
 
-# 生成: notebooks/marimo 覆盖报告（generated）
-gen-marimo-coverage:
-    uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py
-
-# 检查: notebooks/marimo 覆盖报告是否有 drift
-marimo-coverage-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/gen-marimo-coverage.py --check
 
 # 生成: 文档站点受控生成物(含 injected blocks)
 gen-docs:
@@ -350,7 +343,15 @@ docs-drift-check:
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
-gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-skill gen-marimo-coverage gen-viz-data gen-viz-schedule-plan gen-docs
+gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-skill gen-viz-data gen-viz-schedule-plan gen-docs
+
+# 报告: 各 notebook 对 Tier1 公开 API 入口的覆盖(CSV 格式)
+report-notebooks-coverage:
+    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py
+
+# 门禁: Tier1 公开 API 是否被至少一个 notebook 覆盖
+check-notebooks-coverage:
+    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --check
 
 # 检查: 类型检查
 type-check:

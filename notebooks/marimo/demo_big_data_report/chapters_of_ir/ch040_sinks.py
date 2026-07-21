@@ -1,4 +1,5 @@
 """Cells-native: ch040_sinks — multiple sink types and output shapes."""
+
 import marimo
 
 __generated_with = "0.22.0"
@@ -17,12 +18,14 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
     ensure_repo_root_on_sys_path(__file__)
     return
 
@@ -50,11 +53,27 @@ def _():
         python_build_order_report,
         verify_scalim_output,
     )
+
     return (
-        ColumnCSVSink, CSVSink, Dict, InMemoryColumnSink, InMemoryRowDataSink,
-        Path, PlanBuilder, RowData, ScalimEngine, TARGET_FIELDS_FULL,
-        build_ecommerce_model, build_ecommerce_runtime_bindings, build_test_config_small,
-        cast, compare_csv_files, export_to_csv, python_build_order_report, tempfile, verify_scalim_output,
+        ColumnCSVSink,
+        CSVSink,
+        Dict,
+        InMemoryColumnSink,
+        InMemoryRowDataSink,
+        Path,
+        PlanBuilder,
+        RowData,
+        ScalimEngine,
+        TARGET_FIELDS_FULL,
+        build_ecommerce_model,
+        build_ecommerce_runtime_bindings,
+        build_test_config_small,
+        cast,
+        compare_csv_files,
+        export_to_csv,
+        python_build_order_report,
+        tempfile,
+        verify_scalim_output,
     )
 
 
@@ -97,9 +116,19 @@ def _(InMemoryColumnSink, InMemoryRowDataSink, ScalimEngine, demand, plan, runti
 
 @app.cell
 def _(
-    ColumnCSVSink, CSVSink, ScalimEngine, Path,
-    col_results, compare_csv_files, export_to_csv, python_build_order_report,
-    demand, plan, runtime_bindings, targets, tempfile,
+    ColumnCSVSink,
+    CSVSink,
+    ScalimEngine,
+    Path,
+    col_results,
+    compare_csv_files,
+    export_to_csv,
+    python_build_order_report,
+    demand,
+    plan,
+    runtime_bindings,
+    targets,
+    tempfile,
 ):
     """CSV outputs: oracle comparison + real CSVSink/ColumnCSVSink files."""
     py_results = python_build_order_report(targets)
@@ -136,6 +165,7 @@ def _(col_results, targets, verify_scalim_output):
     vr_pd = None
     try:
         import pandas as pd
+
         df = pd.DataFrame(col_results)
         pd_rows = df[list(targets)].to_dict(orient="records")
         vr_pd = verify_scalim_output(pd_rows, fields_to_check=targets)
@@ -148,21 +178,26 @@ def _(col_results, targets, verify_scalim_output):
 
 @app.cell
 def _(available, col_lines, col_results, csv_matched, row_lines, vr_col, vr_pd, vr_row):
-    passed = bool(vr_row.passed and vr_col.passed and csv_matched
-                  and row_lines == len(col_results) and col_lines == len(col_results))
+    passed = bool(vr_row.passed and vr_col.passed and csv_matched and row_lines == len(col_results) and col_lines == len(col_results))
     if available and vr_pd:
         passed = passed and vr_pd.passed
 
     summary = "rows={} verify_row={} verify_col={} csv_match={} csv_sinks={}/{}".format(
-        len(col_results), vr_row.passed, vr_col.passed, csv_matched, row_lines, col_lines)
+        len(col_results), vr_row.passed, vr_col.passed, csv_matched, row_lines, col_lines
+    )
     if not csv_matched:
         summary = summary + "\n" + (csv_diff or "(csv diff unavailable)")
 
     chapter_result = {
         "passed": passed,
         "summary": summary,
-        "details": {"rows": len(col_results), "verify_row": vr_row, "verify_col": vr_col,
-                    "csv_matched": csv_matched, "pandas_available": available},
+        "details": {
+            "rows": len(col_results),
+            "verify_row": vr_row,
+            "verify_col": vr_col,
+            "csv_matched": csv_matched,
+            "pandas_available": available,
+        },
     }
     return chapter_result, passed, summary
 
@@ -180,6 +215,7 @@ def _(chapter_result, mo):
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+
     detail_rows = details_to_rows(chapter_result["details"])
     if detail_rows:
         mo.ui.table(detail_rows, selection=None)

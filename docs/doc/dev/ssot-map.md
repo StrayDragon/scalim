@@ -19,7 +19,7 @@
 | llmanspec 脱敏规则 | `llmanspec/sanitize_rules.yaml` | (无) | `just llmanspec-sanitize`(默认强制 apply) | `just llmanspec-check`(默认严格检查; 命中则自动 apply 并失败) |
 | YAML DSL schema | `src/scalim/dsl/yaml_dsl/schema_dsl/**` | `src/scalim/dsl/yaml_dsl/schema/*.gen.json` | `just gen-yaml-dsl-schema` | `just qa`(包含 schema drift check) |
 | Agent Skill (YAML DSL) | schema + CLI + specs + canonical example | `agentdev/skills/scalim-yaml-dsl/references/**/*.gen.*` + manifest | `just gen-agent-skill` | `just validate-agent-skill`、`just qa` |
-| notebooks 示例回归 | `notebooks/marimo/**` | `notebooks/marimo/marimo_coverage.gen.toon` | `just gen-marimo-coverage` | `just marimo-coverage-drift-check`、`just examples`、`just qa` |
+| notebooks 示例回归 | `notebooks/marimo/**` | `just report-notebooks-coverage`（按需生成 CSV 覆盖报告） | `just report-notebooks-coverage` | `just check-notebooks-coverage`、`just examples`、`just qa` |
 | 项目常量 | `pyproject.toml` | `src/scalim/_project_constants.py` | `just gen-project-constants` | `uv run python scripts/gen-project-constants.py --check`、`just qa` |
 
 ## 3) 最常用入口(建议记住这三个)

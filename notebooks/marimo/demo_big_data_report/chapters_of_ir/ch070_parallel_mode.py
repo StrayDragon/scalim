@@ -1,4 +1,5 @@
 """Cells-native: ch070_parallel_mode — sequential vs adaptive parallel execution."""
+
 import marimo
 
 __generated_with = "0.22.0"
@@ -16,12 +17,14 @@ def _(mo):
 @app.cell
 def _():
     import marimo as mo
+
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
     ensure_repo_root_on_sys_path(__file__)
     return
 
@@ -41,10 +44,20 @@ def _():
         build_ecommerce_runtime_bindings,
     )
     from scalim_misc.demo_big_data_report.verification import verify_scalim_output
+
     return (
-        Dict, InMemoryColumnSink, List, PlanBuilder, RowData, ScalimEngine, Sequence,
-        TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings,
-        build_test_config_small, verify_scalim_output,
+        Dict,
+        InMemoryColumnSink,
+        List,
+        PlanBuilder,
+        RowData,
+        ScalimEngine,
+        Sequence,
+        TARGET_FIELDS_FULL,
+        build_ecommerce_model,
+        build_ecommerce_runtime_bindings,
+        build_test_config_small,
+        verify_scalim_output,
     )
 
 
@@ -98,14 +111,14 @@ def _(rows_seq, vr_adp, vr_seq):
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     ok = chapter_result["passed"]
-    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
-               kind="success" if ok else "danger")
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])), kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+
     d_rows = details_to_rows(chapter_result["details"])
     if d_rows:
         mo.ui.table(d_rows, selection=None)
