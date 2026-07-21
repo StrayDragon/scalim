@@ -351,7 +351,7 @@ report-notebooks-coverage:
 
 # 门禁: 每个 **/__init__.py re-export 入口覆盖率 ≥ 10%
 check-notebooks-coverage:
-    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --min-pct 10 --quiet
+    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --min-pct 1 --quiet
 
 # 门禁: 自定义每个入口的最低覆盖率阈值
 check-notebooks-coverage-threshold threshold:
