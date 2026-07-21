@@ -3,17 +3,12 @@ import logging
 import os
 import re
 from dataclasses import dataclass, replace
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Sequence, Set, Tuple, cast
 from urllib.parse import unquote, urlparse
-
-try:
-    from importlib.metadata import PackageNotFoundError  # type: ignore[import-not-found]
-    from importlib.metadata import version as _pkg_version
-except ImportError:  # pragma: no cover
-    from importlib_metadata import PackageNotFoundError  # type: ignore[import-not-found]
-    from importlib_metadata import version as _pkg_version
 
 from lsprotocol import types
 from pygls.lsp.server import LanguageServer

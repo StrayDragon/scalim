@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 # region py3.6 using 4.1.1 cannot import override
 try:
-    from typing_extensions import override  # pyright: ignore[reportAssignmentType, reportUnusedImport]
+    from typing_extensions import override  # pyright: ignore[reportAssignmentType]
 except ImportError:
     F = TypeVar("F")
 
@@ -14,10 +14,10 @@ except ImportError:
 
 # region TypeGuard compat
 try:
-    from typing_extensions import TypeGuard  # pyright: ignore[reportUnusedImport]
+    from typing_extensions import TypeGuard
 except ImportError:
     if TYPE_CHECKING:
-        from typing_extensions import TypeGuard  # pyright: ignore[reportUnusedImport]
+        from typing_extensions import TypeGuard
     else:
         # 最小化兜底: 仅用于 `Python 3.6` 上注解求值通过; 类型收窄由类型检查器处理.
         class _TypeGuard:
@@ -30,10 +30,10 @@ except ImportError:
 
 # region Literal compat
 try:
-    from typing_extensions import Literal  # pyright: ignore[reportUnusedImport]
+    from typing_extensions import Literal
 except ImportError:
     try:
-        from typing import Literal  # pyright: ignore[reportUnusedImport]
+        from typing import Literal
     except ImportError:
         # 最小化的运行时兜底,用于在 `Python 3.6` 上进行注解求值.
         class _Literal:
@@ -46,10 +46,10 @@ except ImportError:
 
 # region Self compat (typing_extensions < 4.0 or some 4.x versions)
 try:
-    from typing_extensions import Self  # pyright: ignore[reportUnusedImport]
+    from typing_extensions import Self
 except ImportError:
     if TYPE_CHECKING:
-        from typing_extensions import Self  # pyright: ignore[reportUnusedImport]
+        from typing_extensions import Self
     else:
         Self = TypeVar("Self")
 # endregion
@@ -57,10 +57,10 @@ except ImportError:
 
 # region TypedDict compat
 try:
-    from typing_extensions import TypedDict  # pyright: ignore[reportUnusedImport, reportAssignmentType]
+    from typing_extensions import TypedDict  # pyright: ignore[reportAssignmentType]
 except ImportError:
     try:
-        from typing import TypedDict  # pyright: ignore[reportUnusedImport, reportAssignmentType]
+        from typing import TypedDict  # pyright: ignore[reportAssignmentType]
     except ImportError:
         # 最小化兜底:在 `Python 3.6` 上允许带 `total=...` 的类语法.
         class TypedDict(dict):  # pyright: ignore[reportMissingTypeArgument]
@@ -71,10 +71,10 @@ except ImportError:
 
 # region Protocol compat
 try:
-    from typing_extensions import Protocol  # pyright: ignore[reportUnusedImport, reportAssignmentType]
+    from typing_extensions import Protocol  # pyright: ignore[reportAssignmentType]
 except ImportError:
     try:
-        from typing import Protocol  # pyright: ignore[reportUnusedImport, reportAssignmentType]
+        from typing import Protocol  # pyright: ignore[reportAssignmentType]
     except ImportError:
 
         class Protocol(object):
@@ -84,10 +84,10 @@ except ImportError:
 
 # region runtime_checkable compat
 try:
-    from typing_extensions import runtime_checkable  # pyright: ignore[reportUnusedImport]
+    from typing_extensions import runtime_checkable
 except ImportError:
     try:
-        from typing import runtime_checkable  # pyright: ignore[reportUnusedImport]
+        from typing import runtime_checkable
     except ImportError:
         C = TypeVar("C")
 
@@ -96,4 +96,12 @@ except ImportError:
 
 # endregion
 
-__all__ = ()
+__all__ = (
+    "Literal",
+    "Protocol",
+    "Self",
+    "TypeGuard",
+    "TypedDict",
+    "override",
+    "runtime_checkable",
+)

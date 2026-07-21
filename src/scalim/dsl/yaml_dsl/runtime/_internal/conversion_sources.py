@@ -8,11 +8,10 @@ from .....spec.ir import (
     OrderByKeyIr,
     SourceIr,
     SourceNormalizeIr,
-    SourceNormalizeProjectFieldRuleIr,
-    SourceNormalizeStepIr,
     SourceRefIr,
 )
 from .....spec.ir._fields import CallBySpecIr, CallByValueIr, FieldDefaultCaseIr, ValueOpIr, call_by_requires_ctx
+from .....spec.ir._source_normalize import SourceNormalizeProjectFieldRuleIr, SourceNormalizeStepIr
 from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, LoaderIr
 from .....spec.ir.callable_refs import BuiltinCallableIdIr, CallableRefIr, PythonReferenceIr

@@ -429,10 +429,11 @@ class SecureComputeEngine:
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
-        ast.Div: operator.truediv,
-        ast.FloorDiv: operator.floordiv,
+        # `basedpyright`(`Python 3.6` `stubs`): `operator.truediv`/`floordiv`/`pow` 标注为 `Unknown`.
+        ast.Div: cast("Callable[..., Any]", operator.truediv),  # pragma: allow-cast stubs Unknown callable
+        ast.FloorDiv: cast("Callable[..., Any]", operator.floordiv),  # pragma: allow-cast stubs Unknown callable
         ast.Mod: operator.mod,
-        ast.Pow: operator.pow,
+        ast.Pow: cast("Callable[..., Any]", operator.pow),  # pragma: allow-cast stubs Unknown callable
     }
 
     # 一元运算符: -, +, ~, `not`

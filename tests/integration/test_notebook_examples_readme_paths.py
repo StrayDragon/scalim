@@ -15,6 +15,8 @@ def test_demo_directory_contains_unified_examples() -> None:
     assert (_NOTEBOOK_DEMO_CHAPTERS_OF_YAML_DSL_DIR / "declared_yaml_dsl" / "ecommerce_report.yaml").exists()
     assert not (_NOTEBOOK_ROOT_DIR / "example_public_api").exists()
     assert (_NOTEBOOK_ROOT_DIR / "example_public_api_suite").is_dir()
+    assert (_NOTEBOOK_ROOT_DIR / "example_hooks_events_scenarios").is_dir()
+    assert (_NOTEBOOK_ROOT_DIR / "example_hooks_events_scenarios" / "demo_main.py").exists()
 
     from notebooks.marimo.demo_big_data_report.chapters_of_ir.registry import iter_chapters as iter_ir_chapters
     from notebooks.marimo.demo_big_data_report.chapters_of_yaml_dsl.registry import iter_chapters as iter_yaml_dsl_chapters

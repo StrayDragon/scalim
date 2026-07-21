@@ -9,6 +9,7 @@
 - `notebooks/marimo/**` 的 `notebooks` 文件树(教学入口 + `SSOT` 执行入口)
 - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/**` 的 `YAML` 固定示例(真值)
 - `notebooks/marimo/example_public_api_suite/**` 的 `public API` 覆盖套件
+- `notebooks/marimo/example_hooks_events_scenarios/**` 的 `hook`/`event` 场景套件
 """
 
 from __future__ import annotations
@@ -143,16 +144,20 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
     demo_root = notebooks_root / "demo_big_data_report"
     public_api_root = notebooks_root / "example_public_api_suite"
     public_api_chapters_dir = public_api_root / "chapters"
+    hooks_events_root = notebooks_root / "example_hooks_events_scenarios"
+    hooks_events_chapters_dir = hooks_events_root / "chapters"
 
     gate_label = "just examples"
     gate_ok = _justfile_has_examples_recipe(root)
     pytest_demo_chapters = root / "tests" / "integration" / "test_demo_big_data_report_chapters.py"
     pytest_public_api = root / "tests" / "public_api" / "test_example_public_api_suite.py"
+    pytest_hooks_events = root / "tests" / "integration" / "test_example_hooks_events_scenarios.py"
 
     # --- 入口页 ---
     hubs = [
         ("hub", "demo_big_data_report/demo_main.py", demo_root / "demo_main.py"),
         ("hub", "example_public_api_suite/demo_main.py", public_api_root / "demo_main.py"),
+        ("hub", "example_hooks_events_scenarios/demo_main.py", hooks_events_root / "demo_main.py"),
     ]
     for kind, item_id, path in hubs:
         ok = path.exists()
@@ -245,6 +250,31 @@ def _collect_rows(root: Path) -> Tuple[List[_Row], List[str]]:
             _Row(
                 kind="chapter",
                 item_id="example_public_api_suite/{}".format(chapter_id),
+                notebook=notebook,
+                ssot=ssot,
+                gate=gate_label,
+                pytest=pytest_path if pytest_path.exists() else None,
+                ok=ok,
+                notes=",".join(note_parts),
+            )
+        )
+
+    # --- `hook`/`event` 场景套件章节 ---
+    hooks_chapter_ids = _load_chapter_ids_from_registry("notebooks.marimo.example_hooks_events_scenarios.chapters.registry")
+    for chapter_id in hooks_chapter_ids:
+        notebook = _find_demo_notebook_for_chapter(hooks_events_chapters_dir, chapter_id) if hooks_events_chapters_dir.exists() else None
+        ssot = notebook
+        pytest_path = pytest_hooks_events
+        ok = bool(notebook and gate_ok)
+        note_parts = []
+        if not notebook:
+            note_parts.append("missing_notebook")
+        if not gate_ok:
+            note_parts.append("missing_gate")
+        rows.append(
+            _Row(
+                kind="chapter",
+                item_id="example_hooks_events_scenarios/{}".format(chapter_id),
                 notebook=notebook,
                 ssot=ssot,
                 gate=gate_label,

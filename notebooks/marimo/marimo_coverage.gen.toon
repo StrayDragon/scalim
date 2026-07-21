@@ -1,11 +1,12 @@
 generated_by: scripts/gen-marimo-coverage.py
 summary:
-  ok: 45
-  total: 45
+  ok: 51
+  total: 51
 warnings[0	]:
-rows[45	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
+rows[51	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   hub	demo_big_data_report/demo_main.py	notebooks/marimo/demo_big_data_report/demo_main.py	null	just examples	null	true	null
   hub	example_public_api_suite/demo_main.py	notebooks/marimo/example_public_api_suite/demo_main.py	null	just examples	null	true	null
+  hub	example_hooks_events_scenarios/demo_main.py	notebooks/marimo/example_hooks_events_scenarios/demo_main.py	null	just examples	null	true	null
   fixture	canonical_yaml/demand	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml	null	just examples	null	true	"schema_ok: ../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json"
   fixture	canonical_yaml/fragments	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report_fragments.yaml	null	just examples	null	true	"schema_header: (optional)"
   fixture	canonical_yaml/workflow	notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_fixture.yaml	null	just examples	null	true	"schema_ok: ../../../../../src/scalim/dsl/yaml_dsl/schema/workflow.gen.json"
@@ -49,4 +50,9 @@ rows[45	]{kind	item	notebook	ssot	gate	pytest	ok	notes}:
   chapter	example_public_api_suite/ch180_public_api_hooks_events	notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py	notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
   chapter	example_public_api_suite/ch182_public_api_event_type_groups	notebooks/marimo/example_public_api_suite/chapters/ch182_public_api_event_type_groups.py	notebooks/marimo/example_public_api_suite/chapters/ch182_public_api_event_type_groups.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
   chapter	example_public_api_suite/ch184_public_api_sinks_pandas	notebooks/marimo/example_public_api_suite/chapters/ch184_public_api_sinks_pandas.py	notebooks/marimo/example_public_api_suite/chapters/ch184_public_api_sinks_pandas.py	just examples	tests/public_api/test_example_public_api_suite.py	true	null
+  chapter	example_hooks_events_scenarios/ch010_post_export_upload	notebooks/marimo/example_hooks_events_scenarios/chapters/ch010_post_export_upload.py	notebooks/marimo/example_hooks_events_scenarios/chapters/ch010_post_export_upload.py	just examples	tests/integration/test_example_hooks_events_scenarios.py	true	null
+  chapter	example_hooks_events_scenarios/ch020_precheck_route_sync_async	notebooks/marimo/example_hooks_events_scenarios/chapters/ch020_precheck_route_sync_async.py	notebooks/marimo/example_hooks_events_scenarios/chapters/ch020_precheck_route_sync_async.py	just examples	tests/integration/test_example_hooks_events_scenarios.py	true	null
+  chapter	example_hooks_events_scenarios/ch030_upload_retry	notebooks/marimo/example_hooks_events_scenarios/chapters/ch030_upload_retry.py	notebooks/marimo/example_hooks_events_scenarios/chapters/ch030_upload_retry.py	just examples	tests/integration/test_example_hooks_events_scenarios.py	true	null
+  chapter	example_hooks_events_scenarios/ch040_pre_use_batch_size	notebooks/marimo/example_hooks_events_scenarios/chapters/ch040_pre_use_batch_size.py	notebooks/marimo/example_hooks_events_scenarios/chapters/ch040_pre_use_batch_size.py	just examples	tests/integration/test_example_hooks_events_scenarios.py	true	null
+  chapter	example_hooks_events_scenarios/ch050_workflow_viz_finished	notebooks/marimo/example_hooks_events_scenarios/chapters/ch050_workflow_viz_finished.py	notebooks/marimo/example_hooks_events_scenarios/chapters/ch050_workflow_viz_finished.py	just examples	tests/integration/test_example_hooks_events_scenarios.py	true	null
 regenerate[2	]: just gen-marimo-coverage	uv --preview-features extra-build-dependencies run python scripts/gen-marimo-coverage.py

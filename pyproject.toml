@@ -198,8 +198,14 @@ max-args = 16
 "docs/snippets/*.py" = ["ALL"]
 "scripts/*.py" = ["ALL"]
 "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py" = ["ALL"]
-"packages/scalim-misc/src/scalim_misc/demo_big_data_report/loaders.py" = ["FBT001", "FBT002"]
-"packages/scalim-misc/src/scalim_misc/demo_big_data_report/verification.py" = ["C901", "PLR0912"]
+"packages/scalim-misc/src/scalim_misc/demo_big_data_report/loaders.py" = [
+    "FBT001",
+    "FBT002",
+]
+"packages/scalim-misc/src/scalim_misc/demo_big_data_report/verification.py" = [
+    "C901",
+    "PLR0912",
+]
 "src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
 ".tmp/**/*.py" = ["ALL"]
 
@@ -245,11 +251,7 @@ skip_covered = true
 
 [tool.basedpyright]
 # include = ["src/scalim", "tests", "notebooks"]
-exclude = [
-    "**/node_modules",
-    "**/__pycache__",
-    "src/scalim/typestubs",
-]
+exclude = ["**/node_modules", "**/__pycache__", "src/scalim/typestubs"]
 ignore = [
     "scripts",
     "agentdev/skills/scalim-yaml-dsl/scripts/**",
@@ -260,7 +262,7 @@ ignore = [
     "*.gen.py",
     ".tmp/**/*.py",
 ]
-extraPaths = ["./src/scalim/vendor/yamlx"]
+extraPaths = ["./src/scalim/vendor/yamlx", "./src/scalim/vendor/dataclassesx"]
 defineConstant = { DEBUG = true }
 pythonVersion = "3.6"
 pythonPlatform = "Linux"
@@ -296,6 +298,9 @@ reportExplicitAny = false
 reportUnnecessaryIsInstance = false
 reportAny = false
 reportPrivateLocalImportUsage = false
+# basedpyright>=1.39.9 treats empty-`__all__` reexports as private; many internal
+# modules intentionally use `__all__ = ()` while still allowing in-package imports.
+reportPrivateImportUsage = false
 reportDeprecated = false
 
 # 默认将 `src/scalim` 视为 `strict-core`; 只有显式边界目录才允许放宽.

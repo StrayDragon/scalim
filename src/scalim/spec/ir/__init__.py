@@ -16,14 +16,13 @@ from ._fields import (
     ValueOpIr,
 )
 from ._relations import FieldRefIr, JoinConditionIr, LookupStepIr, RelationIr, ScalimRelationInferenceError
+from ._source_normalize import SourceNormalizeProjectFieldRuleIr, SourceNormalizeStepIr
 from ._sources import (
     KeyIr,
     MainSourceIr,
     OrderByKeyIr,
     SourceIr,
     SourceNormalizeIr,
-    SourceNormalizeProjectFieldRuleIr,
-    SourceNormalizeStepIr,
     SourceRefIr,
 )
 from .aliases import (

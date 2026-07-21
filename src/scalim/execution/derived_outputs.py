@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import hashlib
 from abc import ABC, abstractmethod
 from decimal import Decimal, InvalidOperation
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
 
 from .._internal.utils import graph as graph_utils
 from .._internal.utils.converters import auto_str_normalize
@@ -25,6 +25,11 @@ def _auto_str_normalize_derived_key_part(*, value: RuntimeValue, field_id: str, 
         msg = "key_normalization failed for {} key field {!r} (type={})".format(str(context), str(field_id), type(value).__name__)
         raise ValueError(msg)
     return normalized
+
+
+def _cell_value_as_int(value: CellValue) -> int:
+    """将 `sink` 单元格值转为 `int`,供 `rank`/`top_k` 过滤使用."""
+    return int(cast("Any", value or 0))  # pragma: allow-cast CellValue → int for rank/top_k
 
 
 class ScalimAggregationKeyLimitExceededError(ScalimExecutionError):
@@ -930,7 +935,7 @@ class RankedGroupByAggregator(IRowAggregator):
                     bucket = bucket[:k]
                 else:
                     out_key = str(spec.out_field_id)
-                    bucket = [r for r in bucket if int(r.get(out_key) or 0) <= k]
+                    bucket = [r for r in bucket if _cell_value_as_int(r.get(out_key)) <= k]
             ordered.extend(bucket)
 
         return ordered

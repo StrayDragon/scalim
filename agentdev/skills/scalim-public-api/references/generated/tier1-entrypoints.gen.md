@@ -123,7 +123,7 @@
 - desc: IR(中间表示)数据结构(稳定导入路径)
 - scenario: 写自定义组件/扩展点/高级调试
 - marker: `src/scalim/spec/ir/__init__.py:6`
-- source: `src/scalim/spec/ir/__init__.py:53`
+- source: `src/scalim/spec/ir/__init__.py:52`
 - exports (`__all__`, tuple, count=41):
   - `BindingIr`
   - `BuiltinCallableIdIr`
