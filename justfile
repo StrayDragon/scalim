@@ -1029,7 +1029,7 @@ alias quick-qa := quick-check
 check-only-py: quick-check-only-py-no-test-gate test-gate-core-coverage py36-compat-check py36-typingext-check
 
 # QA: 所有完整的检查(最全面入口; MUST 覆盖全部质量门禁)
-check: check-only-py frontend-check examples
+check: check-only-py frontend-check examples check-notebooks-coverage
 
 alias qa := check
 

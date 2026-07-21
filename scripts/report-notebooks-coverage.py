@@ -131,12 +131,14 @@ def _compute_entrypoint_coverage(
 
     entrypoint_rows: List[Dict[str, Any]] = []
     for ep, nbs in ep_to_notebooks.items():
-        entrypoint_rows.append({
-            "entrypoint": ep,
-            "covered_count": len(nbs),
-            "coverage_pct": round(len(nbs) / total_notebooks * 100, 1),
-            "notebooks": sorted(nbs),
-        })
+        entrypoint_rows.append(
+            {
+                "entrypoint": ep,
+                "covered_count": len(nbs),
+                "coverage_pct": round(len(nbs) / total_notebooks * 100, 1),
+                "notebooks": sorted(nbs),
+            }
+        )
 
     uncovered = [e["entrypoint"] for e in entrypoint_rows if e["covered_count"] == 0]
     pcts = [e["coverage_pct"] for e in entrypoint_rows]
@@ -157,18 +159,22 @@ def _print_csv(data: Dict[str, Any]) -> None:
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(["entrypoint", "covered_count", "coverage_pct", "notebooks"])
     for ep in data["entrypoints"]:
-        writer.writerow([
-            ep["entrypoint"],
-            ep["covered_count"],
-            ep["coverage_pct"],
-            ";".join(ep["notebooks"]),
-        ])
-    writer.writerow([
-        "(summary: average coverage)",
-        "",
-        data["average_coverage_pct"],
-        f"total_notebooks={data['total_notebooks']} uncovered={len(data['uncovered'])}",
-    ])
+        writer.writerow(
+            [
+                ep["entrypoint"],
+                ep["covered_count"],
+                ep["coverage_pct"],
+                ";".join(ep["notebooks"]),
+            ]
+        )
+    writer.writerow(
+        [
+            "(summary: average coverage)",
+            "",
+            data["average_coverage_pct"],
+            f"total_notebooks={data['total_notebooks']} uncovered={len(data['uncovered'])}",
+        ]
+    )
     sys.stdout.write(out.getvalue())
 
 
