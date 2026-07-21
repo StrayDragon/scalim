@@ -80,9 +80,14 @@ def test_streaming_column_excel_incomplete_rows_fail_fast(tmp_path: Path) -> Non
 
 def test_streaming_column_excel_duplicate_row_id_fail_fast(tmp_path: Path) -> None:
     sink = StreamingColumnExcelSink(str(tmp_path / "x.xlsx"), field_names=["a"])
-    sink.set_row_ids([1])
-    with pytest.raises(RuntimeError, match="重复"):
+    try:
         sink.set_row_ids([1])
+        with pytest.raises(RuntimeError, match="重复"):
+            sink.set_row_ids([1])
+    finally:
+        # `set_row_ids` 已打开 write_only workbook;未 close 时必须 discard,避免 GC 触发
+        # `WriteOnlyWorksheet._write_rows` 对已关闭文件的 I/O → PytestUnraisableExceptionWarning.
+        sink.discard()
 
 
 def test_streaming_column_excel_empty_set_row_ids_noop(tmp_path: Path) -> None:
