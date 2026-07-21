@@ -333,8 +333,10 @@ def run_yaml_dsl_output_failure_policy(
             sink_logger.setLevel(prev_level)
 
 
-def run_chapter() -> ExampleResult:
-    return run_yaml_dsl_output_failure_policy()
+def run_chapter():
+    """SSOT entry: headless runner / pytest import this."""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)

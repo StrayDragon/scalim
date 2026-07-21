@@ -44,14 +44,14 @@ def _():
 
 @app.cell
 def _(Path, repo_root):
-    tmp_dir = repo_root / ".tmp" / "artifacts" / "workflow_stage_scheduling_perf"
+    tmp_dir = repo_root / ".tmp" / "artifacts" / "example_stage_scheduling_perf"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     return (tmp_dir,)
 
 
 @app.cell
 def _(Path, tmp_dir):
-    loaders_module = "notebooks.marimo.workflow_stage_scheduling_perf.loaders"
+    loaders_module = "notebooks.marimo.example_stage_scheduling_perf.loaders"
     demand_dir = tmp_dir / "yaml"
     demand_dir.mkdir(parents=True, exist_ok=True)
 

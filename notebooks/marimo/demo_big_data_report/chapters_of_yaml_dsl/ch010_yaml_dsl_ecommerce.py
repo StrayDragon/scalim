@@ -134,8 +134,10 @@ def run_yaml_dsl_ecommerce(
         set_config(prev)
 
 
-def run_chapter() -> ExampleResult:
-    return run_yaml_dsl_ecommerce()
+def run_chapter():
+    """SSOT entry: headless runner / pytest import this."""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)

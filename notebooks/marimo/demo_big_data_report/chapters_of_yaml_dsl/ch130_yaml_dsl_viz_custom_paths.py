@@ -127,8 +127,10 @@ def run_yaml_dsl_viz_custom_paths(*, yaml_path: Optional[Path] = None) -> Exampl
         )
 
 
-def run_chapter() -> ExampleResult:
-    return run_yaml_dsl_viz_custom_paths()
+def run_chapter():
+    """SSOT entry: headless runner / pytest import this."""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)

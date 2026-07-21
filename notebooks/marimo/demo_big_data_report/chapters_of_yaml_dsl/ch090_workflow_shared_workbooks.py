@@ -291,8 +291,10 @@ def run_workflow_shared_workbooks(
         set_config(prev)
 
 
-def run_chapter() -> ExampleResult:
-    return run_workflow_shared_workbooks()
+def run_chapter():
+    """SSOT entry: headless runner / pytest import this."""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)

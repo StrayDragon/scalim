@@ -1,143 +1,120 @@
+"""Cells-native: ch070_parallel_mode — sequential vs adaptive parallel execution."""
 import marimo
-
-from typing import Any, Dict, List, Optional, Sequence
-
-from scalim.execution.engine import ScalimEngine
-from scalim.planning import PlanBuilder
-from scalim.sinks.memory import InMemoryColumnSink
-from scalim.typedefs import RowData
-from scalim_misc.demo_big_data_report.cases import build_test_config_small
-from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
-from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings
-from scalim_misc.demo_big_data_report.verification import VerificationResult, verify_scalim_output
-from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
 
 
-def _run(cfg: ECommerceConfig, targets: Sequence[str], *, parallel_mode: str, batch_size: int) -> List[RowData]:
-    set_config(cfg)
-    demand = build_ecommerce_model(cfg)
-    runtime_bindings = build_ecommerce_runtime_bindings()
-    plan = PlanBuilder(demand).build(targets=list(targets))
-    engine = ScalimEngine(
-        demand=demand,
-        plan=plan,
-        runtime_bindings=runtime_bindings,
-        batch_size=int(batch_size),
-        parallel_mode=parallel_mode,
-    )
-    with InMemoryColumnSink(field_names=list(targets)) as sink:
-        _ = engine.run(main_rows=None, sink=sink)
-        rows: List[RowData] = sink.get_rows()
-        return rows
-
-
-def run_parallel_mode(
-    cfg: Optional[ECommerceConfig] = None,
-    *,
-    targets: Optional[Sequence[str]] = None,
-    batch_size: int = 10,
-) -> ExampleResult:
-    if cfg is None:
-        cfg = build_test_config_small()
-    prev = get_config()
-    set_config(cfg)
-    try:
-        targets_list = list(targets or TARGET_FIELDS_FULL[:12])
-        rows_seq = _run(cfg, targets_list, parallel_mode="seq", batch_size=batch_size)
-        rows_adaptive = _run(cfg, targets_list, parallel_mode="adaptive", batch_size=batch_size)
-
-        vr_seq: VerificationResult = verify_scalim_output(rows_seq, fields_to_check=targets_list)
-        vr_adaptive: VerificationResult = verify_scalim_output(rows_adaptive, fields_to_check=targets_list)
-
-        passed = bool(vr_seq.passed and vr_adaptive.passed and len(rows_seq) == len(rows_adaptive))
-        summary = "rows={} verify_seq={} verify_adaptive={}".format(len(rows_seq), vr_seq.passed, vr_adaptive.passed)
-        if not vr_seq.passed:
-            summary = summary + "\nseq: " + vr_seq.summary
-        if not vr_adaptive.passed:
-            summary = summary + "\nadaptive: " + vr_adaptive.summary
-
-        details: Dict[str, Any] = {
-            "rows": len(rows_seq),
-            "verify_seq": vr_seq,
-            "verify_adaptive": vr_adaptive,
-        }
-        return ExampleResult(
-            example_id="demo_big_data_report/ch070_parallel_mode",
-            passed=passed,
-            kind=EXAMPLE_KIND_ORACLE,
-            summary=summary,
-            details=details,
-        )
-    finally:
-        set_config(prev)
-
-
-def run_chapter() -> ExampleResult:
-    return run_parallel_mode()
-
-
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / ch070_parallel_mode
+    mo.md(r"""# Parallel Mode: seq vs adaptive
 
-        本章目标:
-        - 演示并行执行相关配置与行为的最小回归入口
-
-        SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch070_parallel_mode.py::run_parallel_mode`
-
-        Gate:
-        - `just examples`（跑全量）
-        """
-    )
+对比两种 parallel_mode 下的输出一致性和行数。""")
     return
 
 
 @app.cell
 def _():
     import marimo as mo
-
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
-
-    repo_root = ensure_repo_root_on_sys_path(__file__)
-    return (repo_root,)
+    ensure_repo_root_on_sys_path(__file__)
+    return
 
 
 @app.cell
 def _():
-    from scalim_misc.demo_big_data_report.cases import build_test_config_small
-    from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL
+    from typing import Dict, List, Sequence
 
+    from scalim.execution.engine import ScalimEngine
+    from scalim.planning import PlanBuilder
+    from scalim.sinks.memory import InMemoryColumnSink
+    from scalim.typedefs import RowData
+    from scalim_misc.demo_big_data_report.cases import build_test_config_small
+    from scalim_misc.demo_big_data_report.shared import (
+        TARGET_FIELDS_FULL,
+        build_ecommerce_model,
+        build_ecommerce_runtime_bindings,
+    )
+    from scalim_misc.demo_big_data_report.verification import verify_scalim_output
+    return (
+        Dict, InMemoryColumnSink, List, PlanBuilder, RowData, ScalimEngine, Sequence,
+        TARGET_FIELDS_FULL, build_ecommerce_model, build_ecommerce_runtime_bindings,
+        build_test_config_small, verify_scalim_output,
+    )
+
+
+@app.cell
+def _(build_test_config_small, TARGET_FIELDS_FULL):
     cfg = build_test_config_small()
-    targets = TARGET_FIELDS_FULL[:12]
-    result = run_parallel_mode(cfg, targets=targets, batch_size=10)
-    return TARGET_FIELDS_FULL, cfg, result, targets
+    targets = list(TARGET_FIELDS_FULL[:12])
+    return cfg, targets
+
+
+@app.cell
+def _(PlanBuilder, build_ecommerce_model, build_ecommerce_runtime_bindings, cfg, targets):
+    demand = build_ecommerce_model(cfg)
+    runtime_bindings = build_ecommerce_runtime_bindings()
+    plan = PlanBuilder(demand).build(targets=targets)
+    return demand, plan, runtime_bindings
+
+
+@app.cell
+def _(InMemoryColumnSink, ScalimEngine, demand, plan, runtime_bindings, targets, verify_scalim_output):
+    """Run seq and adaptive, compare outputs."""
+    e_seq = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=10, parallel_mode="seq")
+    with InMemoryColumnSink(field_names=targets) as sink_seq:
+        e_seq.run(main_rows=None, sink=sink_seq)
+        rows_seq = sink_seq.get_rows()
+
+    e_adp = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=10, parallel_mode="adaptive")
+    with InMemoryColumnSink(field_names=targets) as sink_adp:
+        e_adp.run(main_rows=None, sink=sink_adp)
+        rows_adp = sink_adp.get_rows()
+
+    vr_seq = verify_scalim_output(rows_seq, fields_to_check=targets)
+    vr_adp = verify_scalim_output(rows_adp, fields_to_check=targets)
+    print("seq: {} rows verify={}  adaptive: {} rows verify={}".format(len(rows_seq), vr_seq.passed, len(rows_adp), vr_adp.passed))
+    return rows_seq, vr_adp, vr_seq
+
+
+@app.cell
+def _(rows_seq, vr_adp, vr_seq):
+    passed = bool(vr_seq.passed and vr_adp.passed and len(rows_seq) > 0)
+    summary = "rows={} verify_seq={} verify_adaptive={}".format(len(rows_seq), vr_seq.passed, vr_adp.passed)
+
+    chapter_result = {
+        "passed": passed,
+        "summary": summary,
+        "details": {"rows": len(rows_seq), "verify_seq": vr_seq, "verify_adaptive": vr_adp},
+    }
+    return chapter_result, passed, summary
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
-    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
-    mo.md("```\n{}\n```".format(result.summary))
+def _(chapter_result, mo):
+    ok = chapter_result["passed"]
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
+               kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
+def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+    d_rows = details_to_rows(chapter_result["details"])
+    if d_rows:
+        mo.ui.table(d_rows, selection=None)
+    return
 
-    rows = details_to_rows(result.details)
-    mo.ui.table(rows, selection=None)
-    return (rows,)
+
+def run_chapter():
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

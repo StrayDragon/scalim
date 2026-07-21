@@ -123,6 +123,15 @@ class ChapterRegistry:
                 summary="{}: {}".format(type(exc).__name__, exc),
                 details={"exc_type": type(exc).__name__, "message": str(exc)},
             )
+        # Dict result support: cells-native notebooks return chapter_result dict
+        if isinstance(result, dict):
+            return ExampleResult(
+                example_id=example_id,
+                passed=bool(result.get("passed", False)),
+                kind=str(result.get("kind", EXAMPLE_KIND_ORACLE)),
+                summary=str(result.get("summary", "")),
+                details=result.get("details"),
+            )
         if result.example_id != example_id:
             return ExampleResult(
                 example_id=example_id,

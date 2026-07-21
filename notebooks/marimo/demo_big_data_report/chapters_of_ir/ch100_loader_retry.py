@@ -1,154 +1,140 @@
+"""Cells-native: ch100_loader_retry — YAML DSL loader retry policy."""
 import marimo
-
-import tempfile
-import textwrap
-from pathlib import Path
-from typing import Any, Dict
-
-from scalim.dsl.yaml_dsl import (
-    CaptureRows,
-    DemandRunOptions,
-    DemandRunOutputOptions,
-    DemandRunRuntimeOptions,
-    DemandRunSecurityOptions,
-    run,
-)
-from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
-from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod
-from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
 
 
-def run_loader_retry() -> ExampleResult:
-    demand_yaml = textwrap.dedent(
-        """
-        name: loader_retry_demo
-
-        main_source:
-          source_id: orders
-          loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod:load_orders"
-          fields:
-            order_id:
-              {}
-        """
-    ).lstrip()
-
-    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod"])
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        demand_path = Path(tmpdir) / "demand.yaml"
-        demand_path.write_text(demand_yaml, encoding="utf-8")
-
-        # 1) 不启用 `retry`: 第一次失败直接抛错
-        demo_mod.reset()
-        no_retry_ok = False
-        try:
-            _ = run(
-                str(demand_path),
-                options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=allowed_modules)),
-            )
-        except demo_mod.TransientError:
-            no_retry_ok = True
-
-        # 2) 启用 `retry`: 通过运行时注入(`loader_retry=...`)自动重试后成功
-        demo_mod.reset()
-        injected_retry = LoaderRetryPoliciesSpec(
-            default=LoaderRetryPolicySpec(
-                enabled=True,
-                should_retry=demo_mod.should_retry,
-                max_attempts=2,
-                max_elapsed_seconds=5.0,
-                backoff="fixed",
-                base_delay_seconds=0.0,
-                max_delay_seconds=0.0,
-                jitter=False,
-            )
-        )
-        result = run(
-            str(demand_path),
-            options=DemandRunOptions(
-                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
-                runtime=DemandRunRuntimeOptions(loader_retry=injected_retry),
-                outputs=DemandRunOutputOptions(capture=CaptureRows()),
-            ),
-        )
-        expected_call_count = 2
-        captured = result.captured_rows
-        captured_rows = [] if captured is None else list(captured.iter_row_data())
-        with_retry_ok = captured_rows == [{"order_id": 1}] and demo_mod.get_call_count() == expected_call_count
-
-    passed = bool(no_retry_ok and with_retry_ok)
-    summary = "no_retry_ok={} with_retry_ok={}".format(no_retry_ok, with_retry_ok)
-    details: Dict[str, Any] = {"call_count": demo_mod.get_call_count()}
-    return ExampleResult(
-        example_id="demo_big_data_report/ch100_loader_retry",
-        passed=passed,
-        kind=EXAMPLE_KIND_ORACLE,
-        summary=summary,
-        details=details,
-    )
-
-
-def run_chapter() -> ExampleResult:
-    return run_loader_retry()
-
-
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / ch100_loader_retry
+    mo.md(r"""# Loader Retry: YAML DSL 运行时重试
 
-        本章目标:
-        - 演示 YAML DSL 的 loader retry 策略：不开启则失败/开启后可恢复
-
-        SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch100_loader_retry.py::run_loader_retry`
-
-        Gate:
-        - `just examples`（跑全量）
-        """
-    )
+演示 DemandRunRuntimeOptions.loader_retry 策略：不开启则失败，开启后自动重试成功。""")
     return
 
 
 @app.cell
 def _():
     import marimo as mo
-
     return (mo,)
 
 
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
-
-    repo_root = ensure_repo_root_on_sys_path(__file__)
-    return (repo_root,)
+    ensure_repo_root_on_sys_path(__file__)
+    return
 
 
 @app.cell
 def _():
-    result = run_loader_retry()
-    return (result,)
+    import tempfile
+    import textwrap
+    from pathlib import Path
+    from typing import Dict
+
+    from scalim.dsl.yaml_dsl import (
+        CaptureRows,
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunRuntimeOptions,
+        DemandRunSecurityOptions,
+        run,
+    )
+    from scalim.execution.loader_retry import LoaderRetryPoliciesSpec, LoaderRetryPolicySpec
+    from scalim_misc.demo_big_data_report.by_yaml_dsl import loader_retry_demo_mod as demo_mod
+    return (
+        CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions,
+        DemandRunSecurityOptions, Dict, LoaderRetryPoliciesSpec, LoaderRetryPolicySpec,
+        Path, demo_mod, run, tempfile, textwrap,
+    )
+
+
+@app.cell
+def _(Path, demo_mod, tempfile, textwrap):
+    """Write demand YAML and prepare test fixtures."""
+    demand_yaml = textwrap.dedent("""
+        name: loader_retry_demo
+        main_source:
+          source_id: orders
+          loader: "scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod:load_orders"
+          fields:
+            order_id:
+              {}
+    """).lstrip()
+    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.loader_retry_demo_mod"])
+    print("demand YAML prepared, allowed_modules OK")
+    return allowed_modules, demand_yaml
+
+
+@app.cell
+def _(CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, LoaderRetryPoliciesSpec, LoaderRetryPolicySpec, Path, allowed_modules, demand_yaml, demo_mod, run, tempfile):
+    """Run: no-retry (expects failure) and with-retry (expects success)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        demand_path = Path(tmpdir) / "demand.yaml"
+        demand_path.write_text(demand_yaml, encoding="utf-8")
+
+        # 1) No retry: should fail
+        demo_mod.reset()
+        no_retry_ok = False
+        try:
+            run(str(demand_path), options=DemandRunOptions(
+                security=DemandRunSecurityOptions(allowed_modules=allowed_modules)))
+        except demo_mod.TransientError:
+            no_retry_ok = True
+
+        # 2) With retry: should succeed after retry
+        demo_mod.reset()
+        injected_retry = LoaderRetryPoliciesSpec(default=LoaderRetryPolicySpec(
+            enabled=True, should_retry=demo_mod.should_retry,
+            max_attempts=2, max_elapsed_seconds=5.0,
+            backoff="fixed", base_delay_seconds=0.0,
+            max_delay_seconds=0.0, jitter=False))
+        result = run(str(demand_path), options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+            runtime=DemandRunRuntimeOptions(loader_retry=injected_retry),
+            outputs=DemandRunOutputOptions(capture=CaptureRows())))
+        captured = result.captured_rows
+        captured_rows = [] if captured is None else list(captured.iter_row_data())
+        with_retry_ok = captured_rows == [{"order_id": 1}] and demo_mod.get_call_count() == 2
+
+    print("no_retry_ok={} with_retry_ok={} call_count={}".format(no_retry_ok, with_retry_ok, demo_mod.get_call_count()))
+    return no_retry_ok, with_retry_ok
+
+
+@app.cell
+def _(demo_mod, no_retry_ok, with_retry_ok):
+    passed = bool(no_retry_ok and with_retry_ok)
+    summary = "no_retry_ok={} with_retry_ok={}".format(no_retry_ok, with_retry_ok)
+
+    chapter_result = {
+        "passed": passed,
+        "summary": summary,
+        "details": {"call_count": demo_mod.get_call_count()},
+    }
+    return chapter_result, passed, summary
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
-    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
-    mo.md("```\n{}\n```".format(result.summary))
+def _(chapter_result, mo):
+    ok = chapter_result["passed"]
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
+               kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
+def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+    d_rows = details_to_rows(chapter_result["details"])
+    if d_rows:
+        mo.ui.table(d_rows, selection=None)
+    return
 
-    rows = details_to_rows(result.details)
-    mo.ui.table(rows, selection=None)
-    return (rows,)
+
+def run_chapter():
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

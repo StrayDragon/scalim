@@ -1,119 +1,120 @@
+"""Cells-native: ch120_derived_set_aggregations — distinct, dedup, two-stage."""
 import marimo
-
-import tempfile
-from pathlib import Path
-from typing import Any, Dict, Optional
-
-from scalim.execution.output_composition import (
-    AggMetricSpec,
-    AuditSheetSpec,
-    DedupBySpec,
-    DerivedDedupByGroupBySpec,
-    DerivedGroupBySpec,
-    DerivedOutputTargetSpec,
-    MetaSheetSpec,
-    OutputCompositionSpec,
-    OutputTargetSpec,
-    TwoStageGroupBySpec,
-)
-from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
-from scalim_misc.demo_big_data_report.cases import build_test_config_small
-from scalim_misc.demo_big_data_report.derived_set_aggregations_demo import (
-    DerivedSetAggregationsDemoResult,
-    verify_derived_set_aggregations_workbook,
-)
-from scalim_misc.demo_big_data_report.loaders import get_config, set_config
-from scalim_misc.demo_big_data_report.shared import build_ecommerce_model, build_ecommerce_runtime_bindings
-from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
 
-_SHEET_DETAIL = "Detail"
-_SHEET_DISTINCT = "Distinct"
-_SHEET_DEDUP = "Dedup"
-_SHEET_TWO_STAGE = "TwoStage"
-_SHEET_META = "Meta"
-_SHEET_AUDIT = "Audit"
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""# Derived Set Aggregations: Distinct, Dedup, Two-Stage
+
+演示 count_distinct / dedup + group-by / two-stage group-by 工作簿。""")
+    return
 
 
-def run_derived_set_aggregations(*, tmp_path: Optional[Path] = None) -> ExampleResult:
-    if tmp_path is None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            return run_derived_set_aggregations(tmp_path=Path(tmpdir))
-    workbook_path = tmp_path / "derived_set_aggregations_demo.xlsx"
-    prev_config = get_config()
-    set_config(build_test_config_small())
-    try:
-        demand_ir = build_ecommerce_model()
-        runtime_bindings = build_ecommerce_runtime_bindings()
+@app.cell
+def _():
+    import marimo as mo
+    return (mo,)
 
-        detail_fields = (
-            "order_id",
-            "customer_name",
-            "product_name",
-            "payment_method_name",
-        )
+
+@app.cell
+def _():
+    from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+    ensure_repo_root_on_sys_path(__file__)
+    return
+
+
+@app.cell
+def _():
+    import tempfile
+    from pathlib import Path
+    from typing import Dict
+
+    from scalim.execution.output_composition import (
+        AggMetricSpec, AuditSheetSpec, DedupBySpec, DerivedDedupByGroupBySpec,
+        DerivedGroupBySpec, DerivedOutputTargetSpec, MetaSheetSpec,
+        OutputCompositionSpec, OutputTargetSpec, TwoStageGroupBySpec,
+    )
+    from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
+    from scalim_misc.demo_big_data_report.cases import build_test_config_small
+    from scalim_misc.demo_big_data_report.derived_set_aggregations_demo import (
+        DerivedSetAggregationsDemoResult, verify_derived_set_aggregations_workbook,
+    )
+    from scalim_misc.demo_big_data_report.loaders import get_config, set_config
+    from scalim_misc.demo_big_data_report.shared import build_ecommerce_model, build_ecommerce_runtime_bindings
+    return (
+        AggMetricSpec, AuditSheetSpec, DedupBySpec, DerivedDedupByGroupBySpec,
+        DerivedGroupBySpec, DerivedOutputTargetSpec, DerivedSetAggregationsDemoResult,
+        Dict, ExecutionRequest, ExportLayout, MetaSheetSpec, OutputCompositionSpec,
+        OutputSpec, OutputTargetSpec, Path, TwoStageGroupBySpec,
+        build_ecommerce_model, build_ecommerce_runtime_bindings, build_test_config_small,
+        export_layout_from_demand_ir, get_config, run_ir, set_config, tempfile,
+        verify_derived_set_aggregations_workbook,
+    )
+
+
+@app.cell
+def _(build_test_config_small, get_config, set_config):
+    prev = get_config()
+    cfg = build_test_config_small()
+    set_config(cfg)
+    return cfg, prev
+
+
+@app.cell
+def _(build_ecommerce_model, build_ecommerce_runtime_bindings, cfg):
+    demand_ir = build_ecommerce_model(cfg)
+    runtime_bindings = build_ecommerce_runtime_bindings()
+    return demand_ir, runtime_bindings
+
+
+@app.cell
+def _(
+    AggMetricSpec, AuditSheetSpec, DedupBySpec, DerivedDedupByGroupBySpec,
+    DerivedGroupBySpec, DerivedOutputTargetSpec, ExecutionRequest, ExportLayout,
+    MetaSheetSpec, OutputCompositionSpec, OutputSpec, OutputTargetSpec, Path,
+    TwoStageGroupBySpec,
+    demand_ir, export_layout_from_demand_ir, run_ir, runtime_bindings, tempfile,
+    verify_derived_set_aggregations_workbook,
+):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tp = Path(tmpdir)
+        wb_path = tp / "derived_set_aggregations_demo.xlsx"
+
+        detail_fields = ("order_id", "customer_name", "product_name", "payment_method_name")
         detail_layout = export_layout_from_demand_ir(demand_ir, detail_fields)
-
         distinct_layout = ExportLayout(field_ids=("payment_method_name", "customer_cnt"), header_names=None)
         two_stage_layout = ExportLayout(field_ids=("order_cnt", "customer_cnt"), header_names=None)
 
         composition = OutputCompositionSpec(
-            targets=(
-                OutputTargetSpec(
-                    target_id="detail",
-                    layout=detail_layout,
-                    output=OutputSpec(
-                        format="excel",
-                        path=str(workbook_path),
-                        streaming=True,
-                        include_header=True,
-                        sheet_name=_SHEET_DETAIL,
-                    ),
-                    is_primary=True,
-                ),
-            ),
+            targets=(OutputTargetSpec(
+                target_id="detail", layout=detail_layout,
+                output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Detail"),
+                is_primary=True,
+            ),),
             derived_targets=(
                 DerivedOutputTargetSpec(
                     target_id="distinct_by_payment",
                     derived=DerivedGroupBySpec(
                         group_by=("payment_method_name",),
                         metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count_distinct", field_id="customer_name"),),
-                        max_distinct=100,
-                        distinct_on_overflow="error",
-                    ),
+                        max_distinct=100, distinct_on_overflow="error"),
                     output_layout=distinct_layout,
-                    output=OutputSpec(
-                        format="excel",
-                        path=str(workbook_path),
-                        streaming=True,
-                        include_header=True,
-                        sheet_name=_SHEET_DISTINCT,
-                    ),
+                    output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Distinct"),
                 ),
                 DerivedOutputTargetSpec(
                     target_id="dedup_customer_then_group",
                     derived=DerivedDedupByGroupBySpec(
-                        dedup_by=DedupBySpec(
-                            key_fields=("customer_name",),
-                            on_conflict="first",
-                            max_distinct=100,
-                            on_overflow="truncate",
-                        ),
+                        dedup_by=DedupBySpec(key_fields=("customer_name",), on_conflict="first", max_distinct=100, on_overflow="truncate"),
                         group_by=DerivedGroupBySpec(
                             group_by=("payment_method_name",),
                             metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
                         ),
                     ),
                     output_layout=distinct_layout,
-                    output=OutputSpec(
-                        format="excel",
-                        path=str(workbook_path),
-                        streaming=True,
-                        include_header=True,
-                        sheet_name=_SHEET_DEDUP,
-                    ),
+                    output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Dedup"),
                 ),
                 DerivedOutputTargetSpec(
                     target_id="two_stage_customer_order_cnt_hist",
@@ -124,129 +125,72 @@ def run_derived_set_aggregations(*, tmp_path: Optional[Path] = None) -> ExampleR
                                 AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
                                 AggMetricSpec(out_field_id="product_cnt", op="count_distinct", field_id="product_name"),
                             ),
-                            max_distinct=100,
-                            distinct_on_overflow="truncate",
-                        ),
+                            max_distinct=100, distinct_on_overflow="truncate"),
                         stage2=DerivedGroupBySpec(
                             group_by=("order_cnt",),
                             metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
                         ),
                     ),
                     output_layout=two_stage_layout,
-                    output=OutputSpec(
-                        format="excel",
-                        path=str(workbook_path),
-                        streaming=True,
-                        include_header=True,
-                        sheet_name=_SHEET_TWO_STAGE,
-                    ),
+                    output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="TwoStage"),
                 ),
             ),
-            meta_sheet=MetaSheetSpec(
-                target_id="meta",
-                output=OutputSpec(format="excel", path=str(workbook_path), streaming=True, include_header=True),
-                sheet_name=_SHEET_META,
-            ),
-            audit_sheet=AuditSheetSpec(
-                target_id="audit",
-                output=OutputSpec(format="excel", path=str(workbook_path), streaming=True, include_header=True),
-                sheet_name=_SHEET_AUDIT,
-            ),
+            meta_sheet=MetaSheetSpec(target_id="meta",
+                                     output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True),
+                                     sheet_name="Meta"),
+            audit_sheet=AuditSheetSpec(target_id="audit",
+                                       output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True),
+                                       sheet_name="Audit"),
             failure_policy="all_fail",
         )
 
-        _ = run_ir(
-            demand_ir,
-            ExecutionRequest(
-                export_layout=detail_layout,
-                output=OutputSpec(path=None),
-                sink=None,
-                output_composition=composition,
-                parallel_mode="seq",
-                batch_size=10,
-                runtime_bindings=runtime_bindings,
-            ),
-        )
+        core = run_ir(demand_ir, ExecutionRequest(
+            export_layout=detail_layout, output=OutputSpec(path=None), sink=None,
+            output_composition=composition, parallel_mode="seq", batch_size=10,
+            runtime_bindings=runtime_bindings,
+        ))
 
-        oracle_result: DerivedSetAggregationsDemoResult = verify_derived_set_aggregations_workbook(str(workbook_path))
-        passed = bool(oracle_result.passed)
-        summary = "passed={} sheets={} detail_rows={}".format(passed, len(oracle_result.sheet_names), len(oracle_result.detail_rows))
-        if not passed:
-            summary = summary + "\n" + oracle_result.message
-        details: Dict[str, Any] = {"workbook_path": str(workbook_path), "oracle_result": oracle_result}
-    finally:
-        set_config(prev_config)
-    return ExampleResult(
-        example_id="demo_big_data_report/ch120_derived_set_aggregations",
-        passed=passed,
-        kind=EXAMPLE_KIND_ORACLE,
-        summary=summary,
-        details=details,
-    )
+        oracle = verify_derived_set_aggregations_workbook(str(wb_path))
 
+    passed = bool(oracle.passed)
+    summary = "passed={} sheets={} detail_rows={}".format(passed, len(oracle.sheet_names), len(oracle.detail_rows))
+    if not passed:
+        summary = summary + "\n" + oracle.message
 
-def run_chapter() -> ExampleResult:
-    return run_derived_set_aggregations()
+    chapter_result = {
+        "passed": passed,
+        "summary": summary,
+        "details": {"workbook_path": str(wb_path), "oracle_result": oracle},
+    }
+    return chapter_result, oracle, passed, summary
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / ch120_derived_set_aggregations
-
-        本章目标:
-        - 演示派生聚合 set 口径的关键原语与护栏边界(可对拍)
-
-        SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch120_derived_set_aggregations.py::run_derived_set_aggregations`
-
-        Gate:
-        - `just examples`（跑全量）
-        """
-    )
-    return
-
-
-@app.cell
-def _():
-    import marimo as mo
-
-    return (mo,)
-
-
-@app.cell
-def _():
-    import tempfile
-    from pathlib import Path
-
-    from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
-
-    _ = ensure_repo_root_on_sys_path(__file__)
-    return Path, tempfile
-
-
-@app.cell
-def _(Path, tempfile):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        result = run_derived_set_aggregations(tmp_path=Path(tmpdir))
-    return (result,)
-
-
-@app.cell(hide_code=True)
-def _(mo, result):
-    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
-    mo.md("```\n{}\n```".format(result.summary))
+def _(chapter_result, mo):
+    ok = chapter_result["passed"]
+    mo.callout(mo.md("## {}: {}".format("✅ PASS" if ok else "❌ FAIL", chapter_result["summary"])),
+               kind="success" if ok else "danger")
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
+def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
+    d_rows = details_to_rows(chapter_result["details"])
+    if d_rows:
+        mo.ui.table(d_rows, selection=None)
+    return
 
-    rows = details_to_rows(result.details)
-    mo.ui.table(rows, selection=None)
-    return (rows,)
+
+@app.cell
+def _(prev, set_config):
+    set_config(prev)
+    return
+
+
+def run_chapter():
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

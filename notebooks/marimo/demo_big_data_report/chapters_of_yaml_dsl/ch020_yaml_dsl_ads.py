@@ -132,8 +132,10 @@ def run_yaml_dsl_ads(
         )
 
 
-def run_chapter() -> ExampleResult:
-    return run_yaml_dsl_ads()
+def run_chapter():
+    """SSOT entry: headless runner / pytest import this."""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)
