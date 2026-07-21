@@ -349,9 +349,13 @@ gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-sk
 report-notebooks-coverage:
     uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py
 
-# 门禁: Tier1 公开 API 是否被至少一个 notebook 覆盖
+# 门禁: 每个 **/__init__.py re-export 入口覆盖率 ≥ 10%
 check-notebooks-coverage:
-    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --check
+    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --min-pct 10 --quiet
+
+# 门禁: 自定义每个入口的最低覆盖率阈值
+check-notebooks-coverage-threshold threshold:
+    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --min-pct {{ threshold }} --quiet
 
 # 检查: 类型检查
 type-check:
