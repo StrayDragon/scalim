@@ -1,0 +1,6 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r801,YAML aggregate 护栏字段已移除并 fail-fast,"YAML DSL MUST NOT 再提供派生输出的基数护栏 authoring 字段(outputs.<name>.aggregate.{max_groups,max_distinct,distinct_on_overflow} 与 dedup_by.on_overflow). 当解析到这些残留字段时,系统 MUST fail-fast 报错并给出迁移提示(建议移除该字段,OOM 风险由系统层兜底). dedup_by.on_conflict MUST 继续作为去重本职语义保留.",null,null,null
+op_scenarios[2]{req_id,id,given,when,then}:
+  r801,残留护栏字段触发报错,"YAML outputs.<name>.aggregate 中存在 max_groups / max_distinct / distinct_on_overflow 任一字段,或 dedup_by 中存在 on_overflow","解析该 YAML","系统 MUST fail-fast 报错,错误信息 MUST 提示该字段已移除并建议删除"
+  r801,on-conflict-继续保留,"YAML dedup_by.on_conflict 配置为 error / first / last","解析该 YAML","系统 MUST 正常接受并按去重语义生效,MUST NOT 触发移除类报错"
