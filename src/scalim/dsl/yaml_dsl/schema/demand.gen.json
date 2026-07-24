@@ -2931,8 +2931,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:排名分区字段列表(必须是 `group_by` 子集).",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.partition_by\n\n可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.partition_by",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.partition_by\n\n#### outputs[*].aggregate.fields.*.rank.partition_by\n#### outputs[*].aggregate.fields.*.row_number.partition_by\n可选:排名分区字段列表(必须是 `group_by` 子集).",
                         "examples": [
                           [
                             "region_id"
@@ -2946,8 +2946,8 @@
                           "desc"
                         ],
                         "default": "desc",
-                        "description": "排序方向.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.order",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order\n\n#### outputs[*].aggregate.fields.*.rank.order\n\n#### outputs[*].aggregate.fields.*.row_number.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
                         "examples": [
                           "desc"
                         ]
@@ -2985,8 +2985,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:稳定排序字段列表.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.order_by\n\n可选:稳定排序字段列表.\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.order_by",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order_by\n\n#### outputs[*].aggregate.fields.*.rank.order_by\n#### outputs[*].aggregate.fields.*.row_number.order_by\n可选:稳定排序字段列表.",
                         "examples": [
                           [
                             "sum_amount",
@@ -2998,8 +2998,8 @@
                         "type": "integer",
                         "minimum": 0,
                         "default": 0,
-                        "description": "可选:每个分区保留前 K 个(0 表示不限制).",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.top_k",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k\n\n#### outputs[*].aggregate.fields.*.rank.top_k\n\n#### outputs[*].aggregate.fields.*.row_number.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `0`\n- minimum: `0`\n\n##### 例子\n```yaml\n0\n```\n```yaml\n100\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `0`\n- minimum: `0`\n\n##### 例子\n```yaml\n0\n```\n```yaml\n100\n```",
                         "examples": [
                           0,
                           100
@@ -3012,8 +3012,8 @@
                           "rows"
                         ],
                         "default": "rank",
-                        "description": "top_k 模式.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.row_number.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.top_k_mode",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k_mode\n\n#### outputs[*].aggregate.fields.*.rank.top_k_mode\n\n#### outputs[*].aggregate.fields.*.row_number.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]
@@ -3106,8 +3106,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:排名分区字段列表(必须是 `group_by` 子集).",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.partition_by\n\n可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.partition_by",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.partition_by\n\n#### outputs[*].aggregate.fields.*.rank.partition_by\n#### outputs[*].aggregate.fields.*.row_number.partition_by\n可选:排名分区字段列表(必须是 `group_by` 子集).",
                         "examples": [
                           [
                             "region_id"
@@ -3121,8 +3121,8 @@
                           "desc"
                         ],
                         "default": "desc",
-                        "description": "排序方向.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.order",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order\n\n#### outputs[*].aggregate.fields.*.rank.order\n\n#### outputs[*].aggregate.fields.*.row_number.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
                         "examples": [
                           "desc"
                         ]
@@ -3160,8 +3160,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:稳定排序字段列表.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.order_by\n\n可选:稳定排序字段列表.\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.order_by",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order_by\n\n#### outputs[*].aggregate.fields.*.rank.order_by\n#### outputs[*].aggregate.fields.*.row_number.order_by\n可选:稳定排序字段列表.",
                         "examples": [
                           [
                             "sum_amount",
@@ -3173,8 +3173,8 @@
                         "type": "integer",
                         "minimum": 0,
                         "default": 0,
-                        "description": "可选:每个分区保留前 K 个(0 表示不限制).",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.top_k",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k\n\n#### outputs[*].aggregate.fields.*.rank.top_k\n\n#### outputs[*].aggregate.fields.*.row_number.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `0`\n- minimum: `0`\n\n##### 例子\n```yaml\n0\n```\n```yaml\n100\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `0`\n- minimum: `0`\n\n##### 例子\n```yaml\n0\n```\n```yaml\n100\n```",
                         "examples": [
                           0,
                           100
@@ -3187,8 +3187,8 @@
                           "rows"
                         ],
                         "default": "rank",
-                        "description": "top_k 模式.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.rank.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.top_k_mode",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k_mode\n\n#### outputs[*].aggregate.fields.*.rank.top_k_mode\n\n#### outputs[*].aggregate.fields.*.row_number.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]
@@ -3281,8 +3281,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:排名分区字段列表(必须是 `group_by` 子集).",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.partition_by\n\n可选:排名分区字段列表(必须是 `group_by` 子集).",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.partition_by",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.partition_by\n\n#### outputs[*].aggregate.fields.*.rank.partition_by\n#### outputs[*].aggregate.fields.*.row_number.partition_by\n可选:排名分区字段列表(必须是 `group_by` 子集).",
                         "examples": [
                           [
                             "region_id"
@@ -3296,8 +3296,8 @@
                           "desc"
                         ],
                         "default": "desc",
-                        "description": "排序方向.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.order",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order\n\n#### outputs[*].aggregate.fields.*.rank.order\n\n#### outputs[*].aggregate.fields.*.row_number.order\n\n排序方向.\n\n- `asc`: 升序\n- `desc`: 降序\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `asc`, `desc`\n- 默认值: `desc`\n\n##### 例子\n```yaml\ndesc\n```",
                         "examples": [
                           "desc"
                         ]
@@ -3335,8 +3335,8 @@
                           ]
                         },
                         "minItems": 1,
-                        "description": "可选:稳定排序字段列表.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order_by\n\n可选:稳定排序字段列表.\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.order_by",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.order_by\n\n#### outputs[*].aggregate.fields.*.rank.order_by\n#### outputs[*].aggregate.fields.*.row_number.order_by\n可选:稳定排序字段列表.",
                         "examples": [
                           [
                             "sum_amount",
@@ -3348,8 +3348,8 @@
                         "type": "integer",
                         "minimum": 0,
                         "default": 0,
-                        "description": "可选:每个分区保留前 K 个(0 表示不限制).",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.top_k",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k\n\n#### outputs[*].aggregate.fields.*.rank.top_k\n\n#### outputs[*].aggregate.fields.*.row_number.top_k\n\n可选:每个分区保留前 K 个(0 表示不限制).\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `0`\n- minimum: `0`\n\n##### 例子\n```yaml\n0\n```\n```yaml\n100\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: integer\n- 默认值: `0`\n- minimum: `0`\n\n##### 例子\n```yaml\n0\n```\n```yaml\n100\n```",
                         "examples": [
                           0,
                           100
@@ -3362,8 +3362,8 @@
                           "rows"
                         ],
                         "default": "rank",
-                        "description": "top_k 模式.",
-                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
+                        "description": "#### outputs[*].aggregate.fields.*.rank.top_k_mode",
+                        "markdownDescription": "#### outputs[*].aggregate.fields.*.dense_rank.top_k_mode\n\n#### outputs[*].aggregate.fields.*.rank.top_k_mode\n\n#### outputs[*].aggregate.fields.*.row_number.top_k_mode\n\ntop_k 模式.\n\n- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `rank`, `rows`\n- 默认值: `rank`\n\n##### 例子\n```yaml\nrank\n```",
                         "examples": [
                           "rank"
                         ]

@@ -56,6 +56,52 @@ _AGG_OUT_FIELD_NAME_SCHEMA = {
         "examples": ["订单量", "积分", "排名"],
     }
 }
+_RANK_COMMON_PROPERTIES_SCHEMA = {
+    "partition_by": {
+        "type": "array",
+        "items": _FIELD_REF_LIST_ITEM_SCHEMA,
+        "minItems": 1,
+        "description": "可选:排名分区字段列表(必须是 group_by 子集)",
+        "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
+        "examples": [["region_id"]],
+    },
+    "order": {
+        "type": "string",
+        "enum": list(AGG_RANK_ORDER_ENUM),
+        "default": DEFAULT_AGG_RANK_ORDER,
+        "description": "排序方向(asc/desc)",
+        "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
+        "examples": ["desc"],
+    },
+    "order_by": {
+        "type": "array",
+        "items": _FIELD_REF_LIST_ITEM_SCHEMA,
+        "minItems": 1,
+        "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
+        "markdownDescription": ("可选:稳定排序字段列表.\n\n- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n- 缺省时等价于 `[by]`"),
+        "examples": [["sum_amount", "cs_id"]],
+    },
+    "top_k": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 0,
+        "description": "可选:每个分区保留前 K 个(0 表示不限制)",
+        "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
+        "examples": [0, 100],
+    },
+    "top_k_mode": {
+        "type": "string",
+        "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
+        "default": DEFAULT_AGG_RANK_TOP_K_MODE,
+        "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
+        "markdownDescription": (
+            "top_k 模式.\n\n"
+            "- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n"
+            "- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`"
+        ),
+        "examples": ["rank"],
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -444,54 +490,7 @@ class OutputAggregateConfig:
                                             ),
                                             "examples": ["sum_amount"],
                                         },
-                                        "partition_by": {
-                                            "type": "array",
-                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
-                                            "minItems": 1,
-                                            "description": "可选:排名分区字段列表(必须是 group_by 子集)",
-                                            "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
-                                            "examples": [["region_id"]],
-                                        },
-                                        "order": {
-                                            "type": "string",
-                                            "enum": list(AGG_RANK_ORDER_ENUM),
-                                            "default": DEFAULT_AGG_RANK_ORDER,
-                                            "description": "排序方向(asc/desc)",
-                                            "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
-                                            "examples": ["desc"],
-                                        },
-                                        "order_by": {
-                                            "type": "array",
-                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
-                                            "minItems": 1,
-                                            "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
-                                            "markdownDescription": (
-                                                "可选:稳定排序字段列表.\n\n"
-                                                "- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n"
-                                                "- 缺省时等价于 `[by]`"
-                                            ),
-                                            "examples": [["sum_amount", "cs_id"]],
-                                        },
-                                        "top_k": {
-                                            "type": "integer",
-                                            "minimum": 0,
-                                            "default": 0,
-                                            "description": "可选:每个分区保留前 K 个(0 表示不限制)",
-                                            "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
-                                            "examples": [0, 100],
-                                        },
-                                        "top_k_mode": {
-                                            "type": "string",
-                                            "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
-                                            "default": DEFAULT_AGG_RANK_TOP_K_MODE,
-                                            "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
-                                            "markdownDescription": (
-                                                "top_k 模式.\n\n"
-                                                "- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n"
-                                                "- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`"
-                                            ),
-                                            "examples": ["rank"],
-                                        },
+                                        **_RANK_COMMON_PROPERTIES_SCHEMA,
                                     },
                                     "description": "row_number: 连续序号(不合并并列)",
                                     "markdownDescription": (
@@ -526,54 +525,7 @@ class OutputAggregateConfig:
                                             ),
                                             "examples": ["sum_amount"],
                                         },
-                                        "partition_by": {
-                                            "type": "array",
-                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
-                                            "minItems": 1,
-                                            "description": "可选:排名分区字段列表(必须是 group_by 子集)",
-                                            "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
-                                            "examples": [["region_id"]],
-                                        },
-                                        "order": {
-                                            "type": "string",
-                                            "enum": list(AGG_RANK_ORDER_ENUM),
-                                            "default": DEFAULT_AGG_RANK_ORDER,
-                                            "description": "排序方向(asc/desc)",
-                                            "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
-                                            "examples": ["desc"],
-                                        },
-                                        "order_by": {
-                                            "type": "array",
-                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
-                                            "minItems": 1,
-                                            "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
-                                            "markdownDescription": (
-                                                "可选:稳定排序字段列表.\n\n"
-                                                "- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n"
-                                                "- 缺省时等价于 `[by]`"
-                                            ),
-                                            "examples": [["sum_amount", "cs_id"]],
-                                        },
-                                        "top_k": {
-                                            "type": "integer",
-                                            "minimum": 0,
-                                            "default": 0,
-                                            "description": "可选:每个分区保留前 K 个(0 表示不限制)",
-                                            "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
-                                            "examples": [0, 100],
-                                        },
-                                        "top_k_mode": {
-                                            "type": "string",
-                                            "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
-                                            "default": DEFAULT_AGG_RANK_TOP_K_MODE,
-                                            "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
-                                            "markdownDescription": (
-                                                "top_k 模式.\n\n"
-                                                "- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n"
-                                                "- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`"
-                                            ),
-                                            "examples": ["rank"],
-                                        },
+                                        **_RANK_COMMON_PROPERTIES_SCHEMA,
                                     },
                                     "description": "rank: SQL rank(并列共享名次,后续跳号)",
                                     "markdownDescription": (
@@ -608,54 +560,7 @@ class OutputAggregateConfig:
                                             ),
                                             "examples": ["sum_amount"],
                                         },
-                                        "partition_by": {
-                                            "type": "array",
-                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
-                                            "minItems": 1,
-                                            "description": "可选:排名分区字段列表(必须是 group_by 子集)",
-                                            "markdownDescription": "可选:排名分区字段列表(必须是 `group_by` 子集).",
-                                            "examples": [["region_id"]],
-                                        },
-                                        "order": {
-                                            "type": "string",
-                                            "enum": list(AGG_RANK_ORDER_ENUM),
-                                            "default": DEFAULT_AGG_RANK_ORDER,
-                                            "description": "排序方向(asc/desc)",
-                                            "markdownDescription": "排序方向.\n\n- `asc`: 升序\n- `desc`: 降序",
-                                            "examples": ["desc"],
-                                        },
-                                        "order_by": {
-                                            "type": "array",
-                                            "items": _FIELD_REF_LIST_ITEM_SCHEMA,
-                                            "minItems": 1,
-                                            "description": "可选:稳定排序字段列表(用于 tie-break; top_k_mode=rows 必填)",
-                                            "markdownDescription": (
-                                                "可选:稳定排序字段列表.\n\n"
-                                                "- 用于输出稳定排序与 `top_k_mode=rows` 的稳定 tie-break\n"
-                                                "- 缺省时等价于 `[by]`"
-                                            ),
-                                            "examples": [["sum_amount", "cs_id"]],
-                                        },
-                                        "top_k": {
-                                            "type": "integer",
-                                            "minimum": 0,
-                                            "default": 0,
-                                            "description": "可选:每个分区保留前 K 个(0 表示不限制)",
-                                            "markdownDescription": "可选:每个分区保留前 K 个(0 表示不限制).",
-                                            "examples": [0, 100],
-                                        },
-                                        "top_k_mode": {
-                                            "type": "string",
-                                            "enum": list(AGG_RANK_TOP_K_MODE_ENUM),
-                                            "default": DEFAULT_AGG_RANK_TOP_K_MODE,
-                                            "description": "top_k 模式(rank=含并列扩张; rows=固定 K 行)",
-                                            "markdownDescription": (
-                                                "top_k 模式.\n\n"
-                                                "- `rank`(默认): 保留 `rank_value <= K` 的所有行(含并列扩张)\n"
-                                                "- `rows`: 强行取前 K 行(允许截断并列);为保证确定性,必须提供 `order_by`"
-                                            ),
-                                            "examples": ["rank"],
-                                        },
+                                        **_RANK_COMMON_PROPERTIES_SCHEMA,
                                     },
                                     "description": "dense_rank: SQL dense_rank(并列共享名次,后续不跳号)",
                                     "markdownDescription": (
