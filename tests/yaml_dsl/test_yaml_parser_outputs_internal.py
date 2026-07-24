@@ -626,7 +626,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             engine=engine,
         )
 
-    with pytest.raises(TypeError, match=r"agg\.fields\.x\.score_by_rank must be an object"):
+    with pytest.raises(ValueError, match=r"agg\.fields\.x has removed 'score_by_rank'"):
         _ = loader._parse_output_aggregate_field(
             {"score_by_rank": "x"},
             base_path="agg.fields.x",
@@ -635,7 +635,7 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
             engine=engine,
         )
 
-    with pytest.raises(ValueError, match=r"agg\.fields\.x\.score_by_rank has unknown keys: bad"):
+    with pytest.raises(ValueError, match=r"agg\.fields\.x has removed 'score_by_rank'"):
         _ = loader._parse_output_aggregate_field(
             {"score_by_rank": {"bad": 1}},
             base_path="agg.fields.x",
@@ -662,34 +662,6 @@ def test_parse_output_aggregate_field_defensive_checks() -> None:
     assert parsed.config["order_by"] == ("cnt", "g")
 
 
-def test_parse_output_aggregate_field_score_by_rank_allows_missing_rank_field_key() -> None:
-    loader = YamlDemandLoader()
-    field_index = _dummy_field_index()
-    agg_field_index = loader._build_aggregate_field_index({})
-
-    cfg = loader._parse_output_aggregate_field_score_by_rank(  # type: ignore[attr-defined]
-        {},
-        base_path="agg.fields.score",
-        field_def_index=field_index,
-        agg_field_index=agg_field_index,
-    )
-    assert cfg == {"rank_field": None, "base": None, "step": None}
-
-
-def test_parse_output_aggregate_field_score_by_rank_allows_null_rank_field_value() -> None:
-    loader = YamlDemandLoader()
-    field_index = _dummy_field_index()
-    agg_field_index = loader._build_aggregate_field_index({})
-
-    cfg = loader._parse_output_aggregate_field_score_by_rank(  # type: ignore[attr-defined]
-        {"rank_field": None},
-        base_path="agg.fields.score",
-        field_def_index=field_index,
-        agg_field_index=agg_field_index,
-    )
-    assert cfg == {"rank_field": None, "base": None, "step": None}
-
-
 def test_parse_output_aggregate_supports_object_alias_field_refs_and_agg_field_refs() -> None:
     loader = YamlDemandLoader()
     engine = SecureComputeEngine()
@@ -713,7 +685,7 @@ def test_parse_output_aggregate_supports_object_alias_field_refs_and_agg_field_r
     cnt_def = {"count": {"field": amount_def}}
     distinct_def = {"count_distinct": {"fields": [[group_def, amount_def]]}}
     rank_def = {"dense_rank": {"by": cnt_def, "order_by": [cnt_def]}}
-    score_def = {"score_by_rank": {"rank_field": rank_def, "base": 100, "step": 3}}
+    score_def = {"compute": "100 - (rank - 1) * 3"}
 
     parsed = loader._parse_output_aggregate(
         {
@@ -738,8 +710,7 @@ def test_parse_output_aggregate_supports_object_alias_field_refs_and_agg_field_r
     assert parsed.fields["rank"].producer_key == "dense_rank"
     assert parsed.fields["rank"].config["by"] == "cnt"
     assert parsed.fields["rank"].config["order_by"] == ("cnt",)
-    assert parsed.fields["score"].producer_key == "score_by_rank"
-    assert parsed.fields["score"].config["rank_field"] == "rank"
+    assert parsed.fields["score"].producer_key == "compute"
 
 
 def test_parse_where_requires_defensive_blank_and_errors() -> None:
@@ -888,12 +859,12 @@ def test_validate_outputs_semantics_defensive_aggregate_constraints() -> None:
                 },
             ),
             "score": OutputAggregateFieldConfig(
-                producer_key="score_by_rank",
-                config={"rank_field": "missing"},
+                producer_key="compute",
+                config={"expression": "missing + 1", "dependencies": ("missing",)},
             ),
         },
     )
-    with pytest.raises(ValueError, match=r"score_by_rank rank_field='missing'"):
+    with pytest.raises(ValueError, match=r"compute reference unknown fields"):
         loader._validate_outputs_semantics([OutputTargetConfig(name="agg", to=to_cfg, aggregate=agg)], known_field_ids={"order_id"})
 
     agg = OutputAggregateConfig(
@@ -1018,8 +989,8 @@ def test_validate_outputs_semantics_allows_aggregate_dag_rank_by_compute_post_de
                 },
             ),
             "score1": OutputAggregateFieldConfig(
-                producer_key="score_by_rank",
-                config={"rank_field": "rank1"},
+                producer_key="compute",
+                config={"expression": "100 - (rank1 - 1) * 3", "dependencies": ("rank1",)},
             ),
             "total": OutputAggregateFieldConfig(
                 producer_key="compute",

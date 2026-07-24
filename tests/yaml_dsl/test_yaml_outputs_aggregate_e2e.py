@@ -50,7 +50,7 @@ outputs:
         order_cnt: {count: {}}
         sum_amount: {sum: {field: amount}}
         rank: {dense_rank: {by: sum_amount, order: desc, top_k: 1, top_k_mode: rank}}
-        score: {score_by_rank: {rank_field: rank, base: 100, step: 10}}
+        score: {compute: "100 - (rank - 1) * 10"}
         score2: {call_by: "tests.fixtures.yaml_outputs_e2e:score_from_rank(rank=rank, base=100, step=10)"}
 """
         % (str(out_root), str(out_root)),

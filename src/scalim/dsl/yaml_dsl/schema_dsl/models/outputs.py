@@ -576,48 +576,6 @@ class OutputAggregateConfig:
                         {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": ["score_by_rank"],
-                            "properties": {
-                                **_AGG_OUT_FIELD_NAME_SCHEMA,
-                                "score_by_rank": {
-                                    "type": "object",
-                                    "additionalProperties": False,
-                                    "properties": {
-                                        "rank_field": {
-                                            **_FIELD_REF_OR_ALIAS_SCHEMA,
-                                            "description": "可选:引用的排名字段(out_field_id);缺省为 'rank'",
-                                            "markdownDescription": "可选:引用的排名字段(out_field_id);缺省为 `rank`.",
-                                            "examples": ["rank"],
-                                        },
-                                        "base": {
-                                            "description": "可选:基础分数(base)",
-                                            "markdownDescription": "可选:基础分数(base).",
-                                            "examples": [100],
-                                        },
-                                        "step": {
-                                            "description": "可选:每名次衰减(step)",
-                                            "markdownDescription": "可选:每名次衰减(step).",
-                                            "examples": [3],
-                                        },
-                                    },
-                                    "description": "score_by_rank: 基于 rank 计算 score",
-                                    "markdownDescription": (
-                                        "基于排名字段计算 score(聚合后派生字段).\n\n"
-                                        "默认公式:\n"
-                                        "- `score = base - (rank - 1) * step`\n\n"
-                                        "参数:\n"
-                                        "- `rank_field`: 引用的排名字段(out_field_id),缺省为 `rank`\n"
-                                        "- `base`: 基础分数(缺省 0)\n"
-                                        "- `step`: 每名次衰减(缺省 1)\n\n"
-                                        "执行语义: 聚合后派生字段 DAG 的一个节点(按依赖驱动在 finalize 阶段计算)."
-                                    ),
-                                    "examples": [{"rank_field": "rank", "base": 100, "step": 3}],
-                                },
-                            },
-                        },
-                        {
-                            "type": "object",
-                            "additionalProperties": False,
                             "required": ["call_by"],
                             "properties": {
                                 **_AGG_OUT_FIELD_NAME_SCHEMA,
@@ -674,7 +632,7 @@ class OutputAggregateConfig:
                 "- producer key 分三类:\n"
                 "  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n"
                 "  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n"
-                "  3) 聚合后派生字段(例如 `compute`/`score_by_rank`/`call_by`)\n\n"
+                "  3) 聚合后派生字段(例如 `compute`/`call_by`)\n\n"
                 "执行顺序/语义(依赖驱动 DAG):\n"
                 "- `rank` + 聚合后派生字段统一视为同一套 DAG,在 finalize 阶段按拓扑序执行\n"
                 "- 引用范围: `group_by` + `aggregate.fields` 任意 out_field_id(含派生字段)\n"

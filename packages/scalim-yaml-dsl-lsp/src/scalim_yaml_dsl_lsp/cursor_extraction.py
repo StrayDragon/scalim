@@ -26,7 +26,6 @@ _OUTPUTS_AGGREGATE_FIELDS_FIELD_PATH_MIN_LEN = 7
 _OUTPUTS_AGGREGATE_FIELDS_FIELDS_ITEM_PATH_MIN_LEN = 8
 _OUTPUTS_AGGREGATE_FIELDS_RANK_BY_PATH_MIN_LEN = 7
 _OUTPUTS_AGGREGATE_FIELDS_RANK_LIST_ITEM_PATH_MIN_LEN = 8
-_OUTPUTS_AGGREGATE_FIELDS_SCORE_BY_RANK_PATH_MIN_LEN = 7
 _FIELDS_CALL_BY_PATH_MIN_LEN = 3
 _REF_DEFAULT_CALL_BY_MAIN_PATH_MIN_LEN = 6
 _REF_DEFAULT_CALL_BY_SOURCE_PATH_MIN_LEN = 7
@@ -430,7 +429,6 @@ def extract_yaml_dsl_aggregate_field_reference_by_cursor(
     - `outputs[*].aggregate.fields.*.*.field`
     - `outputs[*].aggregate.fields.*.*.fields[*]`
     - `outputs[*].aggregate.fields.*.(row_number|rank|dense_rank).by|partition_by[*]|order_by[*]`
-    - `outputs[*].aggregate.fields.*.score_by_rank.rank_field`
 
     约束:
     - 仅做静态解析,无副作用
@@ -1962,7 +1960,6 @@ def _is_output_aggregate_field_ref_path(path: List[str]) -> bool:
         or _is_output_aggregate_metric_field_ref_path(path)
         or _is_output_aggregate_metric_fields_item_ref_path(path)
         or _is_output_aggregate_rank_ref_path(path)
-        or _is_output_aggregate_score_by_rank_ref_path(path)
     )
 
 
@@ -2004,16 +2001,6 @@ def _is_output_aggregate_rank_ref_path(path: List[str]) -> bool:
         return str(path[-3]) in _AGGREGATE_RANK_KINDS and str(path[-2]) in ("partition_by", "order_by")
 
     return False
-
-
-def _is_output_aggregate_score_by_rank_ref_path(path: List[str]) -> bool:
-    if not _is_output_aggregate_fields_ref_prefix(path):
-        return False
-    return (
-        len(path) >= _OUTPUTS_AGGREGATE_FIELDS_SCORE_BY_RANK_PATH_MIN_LEN
-        and str(path[-1]) == "rank_field"
-        and str(path[-2]) == "score_by_rank"
-    )
 
 
 def _is_workflow_run_demand_path(path: List[str]) -> bool:

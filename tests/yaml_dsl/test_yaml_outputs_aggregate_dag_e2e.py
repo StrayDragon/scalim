@@ -59,7 +59,7 @@ outputs:
 
         # gap02: post can depend on post (score2 depends on score1)
         score1:
-          score_by_rank: {{rank_field: rank_by_avg, base: 100, step: 10}}
+          compute: "100 - (rank_by_avg - 1) * 10"
         score2:
           call_by: "tests.fixtures.call_by_fns:add(a=score1, b=5)"
         all_integral:

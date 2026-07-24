@@ -123,7 +123,7 @@ def _(mo):
         - `row_number` + `partition_by`：分区内连续序号(1..N)
         - `dense_rank`：并列合并名次(1,1,2...)
         - `top_k_mode=rows`：强制固定 K 行(需要稳定 `order_by` tie-break)
-        - `score_by_rank`：按名次生成积分(score = base - (rank - 1) * step)
+        - `compute`：按名次生成积分(score = base - (rank - 1) * step)（替代已移除的 `score_by_rank` 内置函数）
         - `source`：字段显式标注来源(防止 fragments 复用漂移)
 
         ## 对拍点（deterministic）

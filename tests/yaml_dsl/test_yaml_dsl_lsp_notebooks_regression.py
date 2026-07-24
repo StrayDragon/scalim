@@ -218,11 +218,9 @@ def _collect_aggregate_field_refs(node: object, *, path: List[str]) -> List[tupl
                                             refs.append(("{}.{}.{}.order_by.{}".format(output_prefix, out_id, kind, idx), v.strip()))
                                 continue
 
-                            # score_by_rank
+                            # score_by_rank has been removed; compute is the replacement.
+                            # (This branch is kept for regression safety if any fixture still contains the key.)
                             if kind == "score_by_rank":
-                                rank_field = metric_cfg.get("rank_field")
-                                if isinstance(rank_field, str) and rank_field.strip():
-                                    refs.append(("{}.{}.score_by_rank.rank_field".format(output_prefix, out_id), rank_field.strip()))
                                 continue
 
                             field_value = metric_cfg.get("field")

@@ -642,20 +642,6 @@ def test_validate_xlsx_memory_write_contract_accepts_field_id_alignment() -> Non
     )
 
 
-def test_to_decimal_handles_common_types_and_error_branches() -> None:
-    assert oc_yaml._to_decimal(None) is None  # noqa: SLF001
-    assert oc_yaml._to_decimal(Decimal("1.5")) == Decimal("1.5")  # noqa: SLF001
-    assert oc_yaml._to_decimal(True) == Decimal("1")  # noqa: SLF001
-    assert oc_yaml._to_decimal(False) == Decimal("0")  # noqa: SLF001
-    assert oc_yaml._to_decimal(2) == Decimal("2")  # noqa: SLF001
-    assert oc_yaml._to_decimal(0.1) == Decimal("0.1")  # noqa: SLF001
-    assert oc_yaml._to_decimal(" 1.50 ") == Decimal("1.50")  # noqa: SLF001
-    assert oc_yaml._to_decimal(" ") is None  # noqa: SLF001
-    assert oc_yaml._to_decimal("oops") is None  # noqa: SLF001
-    assert oc_yaml._to_decimal("NaN") is None  # noqa: SLF001
-    assert oc_yaml._to_decimal([]) is None  # noqa: SLF001
-
-
 def test_compile_call_by_post_field_covers_ctx_kinds_and_ensure_field_value_branches() -> None:
     spec = oc_yaml._compile_call_by_post_field(  # noqa: SLF001
         out_field_id="v",
@@ -739,22 +725,6 @@ def test_compile_call_by_post_field_rejects_non_callable_reference() -> None:
             call_by="tests.fixtures.call_by_fns:NOT_CALLABLE()",
             resolver=_tests_resolver(),
         )
-
-
-def test_score_by_rank_post_field_handles_missing_rank_and_invalid_rank_types() -> None:
-    from datetime import datetime
-
-    spec = oc_yaml._compile_score_by_rank_post_field(out_field_id="score", cfg={})  # noqa: SLF001
-    assert spec.calculator({}) is None
-
-    with pytest.raises(TypeError, match=r"requires integer rank"):
-        _ = spec.calculator({"rank": "oops"})
-
-    with pytest.raises(TypeError, match=r"requires integer rank"):
-        _ = spec.calculator({"rank": True})
-
-    with pytest.raises(TypeError, match=r"requires integer rank"):
-        _ = spec.calculator({"rank": datetime(2024, 1, 2, 3, 4, 5)})
 
 
 def test_compile_compute_post_field_executes_expression_and_validates_result_type() -> None:

@@ -42,9 +42,9 @@ def test_build_finalize_dag_plan_rank_after_post_is_supported_and_interleaves_ra
         post_fields=(
             PostFieldSpec(
                 out_field_id="score1",
-                kind="score_by_rank",
+                kind="compute",
                 dependencies=("rank1",),
-                fingerprint="",
+                fingerprint="rank1",
                 calculator=lambda _row: None,
             ),
             _post(out_field_id="after_top_k", deps=("cnt",)),

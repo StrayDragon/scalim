@@ -1,5 +1,4 @@
 # pragma: allow-c901-file plan: c70
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
 
@@ -67,36 +66,6 @@ def _ensure_field_value(value: Any, *, field_id: str, producer: str) -> FieldVal
         producer,
     )
     raise TypeError(msg)
-
-
-def _decimal_from_text(text: str) -> Optional[Decimal]:
-    if not text:
-        return None
-    try:
-        return Decimal(text)
-    except InvalidOperation:
-        return None
-
-
-def _to_decimal(value: Any) -> Optional[Decimal]:
-    if value is None:
-        return None
-    dec: Optional[Decimal] = None
-    if isinstance(value, Decimal):
-        dec = value
-    elif isinstance(value, bool):
-        dec = Decimal(1) if value else Decimal(0)
-    elif isinstance(value, int):
-        dec = Decimal(value)
-    elif isinstance(value, float):
-        dec = _decimal_from_text(str(value))
-    elif isinstance(value, str):
-        dec = _decimal_from_text(value.strip())
-    if dec is None:
-        return None
-    if not dec.is_finite():
-        return None
-    return dec
 
 
 def _rendered_header_row(layout: ExportLayout) -> Tuple[str, ...]:
@@ -185,41 +154,6 @@ def _compile_call_by_post_field(
         kind="call_by",
         dependencies=deps,
         fingerprint=str(call_by),
-        calculator=calculator,
-    )
-
-
-def _compile_score_by_rank_post_field(
-    *,
-    out_field_id: str,
-    cfg: Dict[str, Any],
-) -> PostFieldSpec:
-    rank_field = str(cfg.get("rank_field") or "rank").strip() or "rank"
-    base_dec = _to_decimal(cfg.get("base"))
-    step_dec = _to_decimal(cfg.get("step"))
-    base = base_dec if base_dec is not None else Decimal(0)
-    step = step_dec if step_dec is not None else Decimal(1)
-
-    def calculator(row: RowData, rf: str = rank_field, b: Decimal = base, s: Decimal = step) -> FieldValue:
-        raw_rank = row.get(rf)
-        if raw_rank is None:
-            return None
-        if isinstance(raw_rank, bool) or not isinstance(raw_rank, (int, float, Decimal, str)):
-            msg = "score_by_rank requires integer rank, got {} for rank_field={!r}".format(type(raw_rank).__name__, rf)
-            raise TypeError(msg)
-        try:
-            rank_val = int(raw_rank)
-        except Exception as exc:
-            msg = "score_by_rank requires integer rank, got {} for rank_field={!r}".format(type(raw_rank).__name__, rf)
-            raise TypeError(msg) from exc
-        return b - (Decimal(rank_val - 1) * s)
-
-    fingerprint = "rank_field={},base={},step={}".format(rank_field, str(base), str(step))
-    return PostFieldSpec(
-        out_field_id=str(out_field_id),
-        kind="score_by_rank",
-        dependencies=(rank_field,),
-        fingerprint=fingerprint,
         calculator=calculator,
     )
 
@@ -388,13 +322,6 @@ def _derived_group_by_spec_from_yaml(
                     out_field_id=str(out_field_id),
                     call_by=str(field_cfg.config),
                     resolver=resolver,
-                )
-            )
-        elif producer_key == "score_by_rank":
-            post_specs.append(
-                _compile_score_by_rank_post_field(
-                    out_field_id=str(out_field_id),
-                    cfg=cast("Dict[str, Any]", field_cfg.config),  # pragma: allow-cast yaml mapping typed narrowing
                 )
             )
         elif producer_key == "compute":

@@ -541,8 +541,7 @@ def test_cursor_extraction_outputs_aggregate_rank_refs_are_supported_and_do_not_
                     order: desc
                     order_by: [sum_amount, product_id]
                 score:
-                  score_by_rank:
-                    rank_field: rank
+                  compute: "100 - (rank - 1) * 3"
         """
     )
     by_pos = _pos(yaml_text, "by: should_not_match", offset=len("by: "))
@@ -568,11 +567,11 @@ def test_cursor_extraction_outputs_aggregate_rank_refs_are_supported_and_do_not_
     assert order_by_result.yaml_path == "outputs.0.aggregate.fields.rank.dense_rank.order_by.1"
     assert order_by_result.reference == "product_id"
 
-    score_pos = _pos(yaml_text, "rank_field: rank", offset=len("rank_field: "))
+    score_pos = _pos(yaml_text, 'compute: "100 - (rank - 1) * 3"', offset=len('compute: "'))
     score_result = editor_semantics.extract_yaml_dsl_aggregate_field_reference_by_cursor(yaml_text, score_pos)
-    assert score_result.kind == "aggregate_field_ref"
-    assert score_result.yaml_path == "outputs.0.aggregate.fields.score.score_by_rank.rank_field"
-    assert score_result.reference == "rank"
+    # score_by_rank removed; compute is not a field-ref path — cursor extraction returns empty.
+    assert score_result.kind == ""
+    assert score_result.range is None
 
 
 def test_cursor_extraction_yaml_import_ref_empty_scalar_is_supported_for_completion() -> None:

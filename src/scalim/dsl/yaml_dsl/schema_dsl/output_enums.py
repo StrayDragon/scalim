@@ -112,7 +112,6 @@ AGG_RANK_PRODUCER_KEYS: Tuple[str, ...] = (
 
 
 AGG_POST_PRODUCER_KEYS: Tuple[str, ...] = (
-    "score_by_rank",
     "call_by",
     "compute",
 )

@@ -541,12 +541,10 @@ class ParserOutputsMixin:
         elif producer_key == "call_by":
             cfg = self._parse_output_aggregate_field_call_by(producer_value, base_path=base_path)
         elif producer_key == "score_by_rank":
-            cfg = self._parse_output_aggregate_field_score_by_rank(
-                producer_value,
-                base_path=base_path,
-                field_def_index=field_def_index,
-                agg_field_index=agg_field_index,
-            )
+            msg = (
+                "{} has removed 'score_by_rank'; please replace with 'compute' expression, e.g. compute: \"base - (rank - 1) * step\""
+            ).format(base_path)
+            raise ValueError(msg)
         elif producer_key == "compute":
             cfg = self._parse_output_aggregate_field_compute(
                 producer_value,
@@ -795,40 +793,6 @@ class ParserOutputsMixin:
 
         return {"expression": expr, "dependencies": deps}
 
-    def _parse_output_aggregate_field_score_by_rank(
-        self,
-        raw: Any,
-        *,
-        base_path: str,
-        field_def_index: FieldDefIndex,
-        agg_field_index: _AggregateFieldIndex,
-    ) -> Dict[str, Any]:
-        args = mapping_or_none(raw)
-        if args is None:
-            msg = "{}.score_by_rank must be an object".format(base_path)
-            raise TypeError(msg)
-        allowed_keys = ("rank_field", "base", "step")
-        unknown = sorted({str(k) for k in args} - set(allowed_keys))
-        if unknown:
-            msg = "{}.score_by_rank has unknown keys: {}".format(base_path, ", ".join(unknown))
-            raise ValueError(msg)
-        rank_field = None
-        if "rank_field" in args:
-            rank_field_raw = args.get("rank_field")
-            if rank_field_raw is not None:
-                rank_field = self._resolve_field_ref(
-                    rank_field_raw,
-                    path="{}.score_by_rank.rank_field".format(base_path),
-                    field_def_index=field_def_index,
-                    agg_field_index=agg_field_index,
-                )
-                rank_field = _non_empty_str(rank_field) or None
-        return {
-            "rank_field": rank_field,
-            "base": args.get("base"),
-            "step": args.get("step"),
-        }
-
     def _parse_where_requires(
         self,
         expr: Optional[str],
@@ -1014,25 +978,11 @@ class ParserOutputsMixin:
         name: str,
         agg: OutputAggregateConfig,
         agg_field_ids: Set[str],
-        rank_field_ids: List[str],
         post_field_ids: List[str],
     ) -> None:
         allowed = set(agg.group_by) | set(agg_field_ids)
         for fid in post_field_ids:
             cfg = agg.fields[fid]
-            if cfg.producer_key == "score_by_rank":
-                score_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
-                rank_field = str(score_cfg.get("rank_field") or "rank").strip()
-                if rank_field not in rank_field_ids:
-                    msg = "outputs.{}.aggregate.fields.{}.score_by_rank rank_field={!r} must reference a rank field id: {}".format(
-                        name,
-                        fid,
-                        rank_field,
-                        ", ".join(sorted(rank_field_ids)),
-                    )
-                    raise ValueError(msg)
-                continue
-
             if cfg.producer_key == "call_by":
                 call_by = str(cfg.config or "").strip()
                 deps = extract_call_by_dependencies(call_by)
@@ -1069,11 +1019,6 @@ class ParserOutputsMixin:
             deps_list = [by] + [str(x) for x in order_by]
             # `order_by` 缺省时,语义等价于 `[by]`.
             return ordered_unique_str([x for x in deps_list if x])
-
-        if producer_key == "score_by_rank":
-            score_cfg = cast("Dict[str, Any]", cfg.config)  # pragma: allow-cast output aggregate config typed narrowing
-            rf = str(score_cfg.get("rank_field") or "rank").strip() or "rank"
-            return (rf,)
 
         if producer_key == "call_by":
             call_by = str(cfg.config or "").strip()
@@ -1125,7 +1070,7 @@ class ParserOutputsMixin:
         rank_field_ids, post_field_ids, allowed_agg_out_fields = self._validate_aggregate_group_and_metrics(t, name, known_field_ids, agg)
         agg_field_ids = set(agg.fields.keys())
         self._validate_rank_semantics(name, agg, rank_field_ids, allowed_agg_out_fields)
-        self._validate_aggregate_post_semantics(name, agg, agg_field_ids, rank_field_ids, post_field_ids)
+        self._validate_aggregate_post_semantics(name, agg, agg_field_ids, post_field_ids)
         self._validate_aggregate_derived_dag(name, agg, rank_field_ids, post_field_ids)
 
     def _validate_outputs_semantics(

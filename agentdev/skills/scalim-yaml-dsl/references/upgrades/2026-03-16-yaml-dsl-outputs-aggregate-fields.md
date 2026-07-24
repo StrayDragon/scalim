@@ -9,7 +9,7 @@
 - **BREAKING**: `aggregate.fields.<out_field_id>` 使用“函数当 key”的写法,替代旧 `{op: ...}` 映射
 - **NEW**: `aggregate.fields` 同时支持:
   - 排名字段: `row_number` / `rank` / `dense_rank`(支持 `partition_by` / `order_by` / `top_k_mode`)
-  - 聚合后派生字段: `score_by_rank`(内置) 与 `call_by`(hotfix 口子,受 allowlist 约束)
+  - 聚合后派生字段: `compute`(推荐) 与 `call_by`(hotfix 口子,受 allowlist 约束)
 
 llmanspec 工件:
 - `llmanspec/changes/yaml-dsl-outputs-aggregate-fields-simplify/`
@@ -80,15 +80,15 @@ aggregate:
 
 ## NEW: 聚合后派生字段(post fields)
 
-### 1) `score_by_rank`(内置,强补全)
+### 1) `compute`(推荐,安全表达式)
 
 ```yaml
 score:
-  score_by_rank:
-    rank_field: rank
-    base: 100
-    step: 10
+  compute: "100 - (rank - 1) * 10"
 ```
+
+> **历史**: `score_by_rank`(内置)已于 2026-07-24 移除,等价能力通过 `compute` 表达式实现.
+> 迁移: `score_by_rank: {rank_field: rank, base: 100, step: 10}` → `compute: "100 - (rank - 1) * 10"`
 
 ### 2) `call_by`(hotfix 口子,弱补全但受 allowlist 约束)
 
