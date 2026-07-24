@@ -1,0 +1,5 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r803,"YAML score_by_rank 字段已移除并 fail-fast","YAML DSL MUST NOT 再提供 score_by_rank authoring 字段. 当解析到残留的 score_by_rank 字段时,系统 MUST fail-fast 报错并给出迁移提示(建议替换为 compute 表达式). compute 表达式 MUST 继续作为聚合后派生字段的通用路径.",null,null,null
+op_scenarios[1]{req_id,id,given,when,then}:
+  r803,残留 score_by_rank 触发报错,"YAML outputs.<name>.aggregate.fields.<fid> 中存在 score_by_rank","解析该 YAML","系统 MUST fail-fast 报错,错误信息 MUST 提示该字段已移除并建议用 compute 表达式替代"

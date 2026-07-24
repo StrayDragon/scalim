@@ -1,0 +1,7 @@
+kind: llman.sdd.delta
+ops[1]{op,req_id,title,statement,from,to,name}:
+  add_requirement,r802,派生输出不再提供 score_by_rank 内置函数,"系统 MUST NOT 再提供 score_by_rank 内置后置派生字段. score_by_rank 的等价计算能力 MUST 通过 compute 表达式实现,公式为 base - (rank - 1) * step. 相关的 schema 定义、parser 解析函数、runtime 编译函数、AGG_POST_PRODUCER_KEYS 枚举项 MUST 被移除.",null,null,null
+op_scenarios[3]{req_id,id,given,when,then}:
+  r802,残留 score_by_rank 字段被拒绝,"YAML outputs.<name>.aggregate.fields 中存在 score_by_rank producer key","解析该配置","系统 MUST fail-fast 报错并给出迁移提示(建议替换为 compute 表达式)"
+  r802,compute 表达式等价替代,"YAML 中用 compute 表达式替代 score_by_rank","运行派生输出","系统 MUST 产生与原来 score_by_rank 相同的积分列输出"
+  r802,"AGG_POST_PRODUCER_KEYS 不再包含 score_by_rank","","读取 AGG_POST_PRODUCER_KEYS 枚举","score_by_rank MUST NOT 出现在 post producer keys 中"
