@@ -411,9 +411,6 @@ def _derived_group_by_spec_from_yaml(
         metrics=metrics,
         rank_fields=tuple(sorted(rank_specs, key=lambda r: str(r.out_field_id))),
         post_fields=tuple(sorted(post_specs, key=lambda p: str(p.out_field_id))),
-        max_groups=int(cfg.max_groups),
-        max_distinct=int(cfg.max_distinct),
-        distinct_on_overflow=str(cfg.distinct_on_overflow),
     )
 
 

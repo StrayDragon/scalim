@@ -10,13 +10,11 @@ from ..constants import (
     schema_omit,
 )
 from ..output_enums import (
-    AGG_DISTINCT_ON_OVERFLOW_ENUM,
     AGG_METRIC_PRODUCER_KEYS,
     AGG_POST_PRODUCER_KEYS,
     AGG_RANK_ORDER_ENUM,
     AGG_RANK_PRODUCER_KEYS,
     AGG_RANK_TOP_K_MODE_ENUM,
-    DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
     DEFAULT_AGG_RANK_ORDER,
     DEFAULT_AGG_RANK_TOP_K_MODE,
     OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
@@ -420,8 +418,7 @@ class OutputAggregateConfig:
                                     "markdownDescription": (
                                         "去重计数指标.\n\n"
                                         "- 支持单字段去重: `field`\n"
-                                        "- 支持复合键去重: `fields`\n"
-                                        "- 去重护栏由 `max_distinct`/`distinct_on_overflow` 控制\n\n"
+                                        "- 支持复合键去重: `fields`\n\n"
                                         "约束:\n- 必须且只能提供 `field` 或 `fields` 之一."
                                     ),
                                     "examples": [{"field": "user_id"}, {"fields": ["user_id", "item_id"]}],
@@ -784,42 +781,6 @@ class OutputAggregateConfig:
         ),
     )
     """聚合输出字段映射."""
-
-    max_groups: int = dataclass_field(
-        default=0,
-        metadata=schema_meta(
-            desc="max_groups 护栏(0 表示不限制)",
-            md="max_groups 护栏(0 表示不限制).",
-            min=0,
-            default=0,
-            examples=[0, 10000],
-        ),
-    )
-    """可选:聚合分组数护栏(0 表示不限制)."""
-
-    max_distinct: int = dataclass_field(
-        default=0,
-        metadata=schema_meta(
-            desc="max_distinct 护栏(0 表示不限制)",
-            md="max_distinct 护栏(0 表示不限制).",
-            min=0,
-            default=0,
-            examples=[0, 200000],
-        ),
-    )
-    """可选:去重护栏(0 表示不限制)."""
-
-    distinct_on_overflow: str = dataclass_field(
-        default=DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
-        metadata=schema_meta(
-            desc="distinct 护栏溢出策略(error/truncate)",
-            md="distinct 护栏溢出策略.\n\n- `error`: 失败\n- `truncate`: 截断并继续",
-            choices=list(AGG_DISTINCT_ON_OVERFLOW_ENUM),
-            default=DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
-            examples=["error"],
-        ),
-    )
-    """去重护栏溢出策略."""
 
 
 @dataclass(frozen=True)

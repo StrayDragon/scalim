@@ -147,8 +147,6 @@ def _(
                     derived=DerivedGroupBySpec(
                         group_by=("payment_method_name",),
                         metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count_distinct", field_id="customer_name"),),
-                        max_distinct=100,
-                        distinct_on_overflow="error",
                     ),
                     output_layout=distinct_layout,
                     output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Distinct"),
@@ -156,7 +154,7 @@ def _(
                 DerivedOutputTargetSpec(
                     target_id="dedup_customer_then_group",
                     derived=DerivedDedupByGroupBySpec(
-                        dedup_by=DedupBySpec(key_fields=("customer_name",), on_conflict="first", max_distinct=100, on_overflow="truncate"),
+                        dedup_by=DedupBySpec(key_fields=("customer_name",), on_conflict="first"),
                         group_by=DerivedGroupBySpec(
                             group_by=("payment_method_name",),
                             metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
@@ -174,8 +172,6 @@ def _(
                                 AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
                                 AggMetricSpec(out_field_id="product_cnt", op="count_distinct", field_id="product_name"),
                             ),
-                            max_distinct=100,
-                            distinct_on_overflow="truncate",
                         ),
                         stage2=DerivedGroupBySpec(
                             group_by=("order_cnt",),

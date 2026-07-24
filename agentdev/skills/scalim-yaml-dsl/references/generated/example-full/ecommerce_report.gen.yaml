@@ -64,9 +64,6 @@ _templates:
   # aggregate 片段复用示例: outputs 不支持 `$import`(imports scope boundary),使用 YAML anchors/merge 复用.
   agg_by_region_guardrails: &agg_by_region_guardrails
     group_by: [region_name_display]
-    max_groups: 1000
-    max_distinct: 10000
-    distinct_on_overflow: truncate
 
   metric_order_cnt: &metric_order_cnt {count: {}}
   metric_sum_order_amount: &metric_sum_order_amount {sum: {field: order_amount}}
@@ -546,10 +543,6 @@ outputs:
       sheet: 区域汇总-算子
     aggregate:
       group_by: [region_name_display]
-      # guardrails 示例(设为 0 表示不限制)
-      max_groups: 1000
-      max_distinct: 10000
-      distinct_on_overflow: truncate
       fields:
         order_cnt: {count: {}}
         order_cnt_has_promo: {count: {field: promotion_id}}

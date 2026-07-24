@@ -122,8 +122,6 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
                     derived=DerivedGroupBySpec(
                         group_by=("payment_method_name",),
                         metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count_distinct", field_id="customer_name"),),
-                        max_distinct=100,
-                        distinct_on_overflow="error",
                     ),
                     output_layout=distinct_layout,
                     output=OutputSpec(
@@ -140,8 +138,6 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
                         dedup_by=DedupBySpec(
                             key_fields=("customer_name",),
                             on_conflict="first",
-                            max_distinct=100,
-                            on_overflow="truncate",
                         ),
                         group_by=DerivedGroupBySpec(
                             group_by=("payment_method_name",),
@@ -166,8 +162,6 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
                                 AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
                                 AggMetricSpec(out_field_id="product_cnt", op="count_distinct", field_id="product_name"),
                             ),
-                            max_distinct=100,
-                            distinct_on_overflow="truncate",
                         ),
                         stage2=DerivedGroupBySpec(
                             group_by=("order_cnt",),

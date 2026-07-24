@@ -3510,41 +3510,6 @@
           },
           "description": "聚合输出字段映射(key 为 out_field_id).",
           "markdownDescription": "#### outputs[*].aggregate.fields\n\n聚合输出字段映射(key 为 out_field_id).\n\n- map key 是输出字段 ID\n- map value 是“该字段如何产生”的声明,必须且只能选择一个 producer key\n- producer key 分三类:\n  1) 聚合指标函数(例如 `count`/`sum`/`count_distinct`)\n  2) 排名函数(例如 `row_number`/`rank`/`dense_rank`)\n  3) 聚合后派生字段(例如 `compute`/`score_by_rank`/`call_by`)\n\n执行顺序/语义(依赖驱动 DAG):\n- `rank` + 聚合后派生字段统一视为同一套 DAG,在 finalize 阶段按拓扑序执行\n- 引用范围: `group_by` + `aggregate.fields` 任意 out_field_id(含派生字段)\n- 系统会在编译期构建依赖图,检测循环依赖并给出依赖链路\n- `top_k/sort` 会在计算完所有 rank 字段及其上游依赖后执行; 其余派生字段可在过滤后计算\n\n边界:\n- 不可引用明细行字段(除 `group_by`);聚合前中间状态不会被保留\n\n##### 字段约束\n- 必填: 是\n- 类型: object\n- minProperties: `1`\n- additionalProperties: object\n- propertyNames: configured\n\n##### 例子\n```yaml\n      fields:\n        order_cnt: {count: {}}\n        sum_final_amount: {sum: {field: final_amount}}\n\n        # 并列排名: (1,1,2...) —— 用于 `score_by_rank` 口径。\n        rank:\n          dense_rank:\n            by: sum_final_amount\n            partition_by: [region_id]\n            order: desc\n            # 注意: 当前实现对 `order_by` 使用统一方向(`order`),因此这里 product_category_id 也是 `desc`。\n            order_by: [sum_final_amount, product_category_id]\n\n        # 连续序号: (1..N) —— 用于“强制 Top2 固定两行”(top_k_mode=rows)。\n        row_no:\n          row_number:\n            by: sum_final_amount\n            partition_by: [region_id]\n            order: desc\n            order_by: [sum_final_amount, product_category_id]\n            top_k: 2\n            top_k_mode: rows\n\n        # 积分: 100,97,94... (按 rank 衰减)\n        score:\n          score_by_rank:\n            rank_field: rank\n            base: 100\n            step: 3\n```"
-        },
-        "max_groups": {
-          "type": "integer",
-          "description": "max_groups 护栏(0 表示不限制).",
-          "markdownDescription": "#### outputs[*].aggregate.max_groups\n\nmax_groups 护栏(0 表示不限制).",
-          "minimum": 0,
-          "default": 0,
-          "examples": [
-            0,
-            10000
-          ]
-        },
-        "max_distinct": {
-          "type": "integer",
-          "description": "max_distinct 护栏(0 表示不限制).",
-          "markdownDescription": "#### outputs[*].aggregate.max_distinct\n\nmax_distinct 护栏(0 表示不限制).",
-          "minimum": 0,
-          "default": 0,
-          "examples": [
-            0,
-            200000
-          ]
-        },
-        "distinct_on_overflow": {
-          "type": "string",
-          "description": "distinct 护栏溢出策略.",
-          "markdownDescription": "#### outputs[*].aggregate.distinct_on_overflow\n\ndistinct 护栏溢出策略.\n\n- `error`: 失败\n- `truncate`: 截断并继续\n\n##### 字段约束\n- 必填: 否\n- 类型: string\n- 取值: `error`, `truncate`\n- 默认值: `error`\n\n##### 例子\n```yaml\nerror\n```",
-          "enum": [
-            "error",
-            "truncate"
-          ],
-          "default": "error",
-          "examples": [
-            "error"
-          ]
         }
       },
       "required": [

@@ -281,42 +281,16 @@ def test_count_distinct_single_and_composite_and_missing_value_semantics() -> No
     rows = agg.finalize_rows()
     assert rows == [{"g": "x", "u": 3, "c": 2}]
 
-
-def test_count_distinct_guardrails_error_and_truncate_is_deterministic() -> None:
-    # error
-    err = mod.GroupByAggregator(
-        group_by=("g",),
-        metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
-        max_distinct=2,
-        distinct_on_overflow="error",
-    )
-    err.accumulate({"g": "x", "user_id": "u1"})
-    err.accumulate({"g": "x", "user_id": "u2"})
-    with pytest.raises(mod.ScalimDistinctKeyLimitExceededError, match="distinct_count=3"):
-        err.accumulate({"g": "x", "user_id": "u3"})
-
-    # truncate keeps stable-smallest keys, regardless of row order
-    def run(keys) -> "set[tuple[object, ...]]":
-        agg = mod.GroupByAggregator(
-            group_by=("g",),
-            metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="k"),),
-            max_distinct=2,
-            distinct_on_overflow="truncate",
-        )
-        for k in keys:
-            agg.accumulate({"g": "x", "k": k})
-        _ = agg.finalize_rows()
-        state = agg._states[("x",)][0]  # noqa: SLF001
-        assert isinstance(state, mod._CountDistinctMetric)  # noqa: SLF001
-        assert state.truncated is True
-        # stable smallest 2 keys: a, b
-        return set(state._distinct._keys)  # noqa: SLF001
-
-    assert run(["c", "b", "a"]) == {("a",), ("b",)}
-    assert run(["a", "c", "b"]) == {("a",), ("b",)}
+    # 诊断: `count_distinct` 的 `distinct_keys_total` / `distinct_keys_max_per_group` 统计(无截断事件).
+    diag = agg.diagnostics()
+    assert diag.meta["group_count"] == 1
+    assert diag.meta["metric.u.distinct_keys_total"] == 3
+    assert diag.meta["metric.u.distinct_keys_max_per_group"] == 3
+    assert diag.meta["metric.c.distinct_keys_total"] == 2
+    assert diag.audit_events == []
 
 
-def test_dedup_by_on_conflict_variants_and_truncate() -> None:
+def test_dedup_by_on_conflict_variants() -> None:
     base = mod.GroupByAggregator(
         group_by=("g",),
         metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
@@ -325,8 +299,6 @@ def test_dedup_by_on_conflict_variants_and_truncate() -> None:
     first = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="first",
-        max_distinct=0,
-        on_overflow="error",
         downstream=base,
     )
     first.accumulate({"k": "a", "g": "x", "v": 1})
@@ -337,8 +309,6 @@ def test_dedup_by_on_conflict_variants_and_truncate() -> None:
     last = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="last",
-        max_distinct=0,
-        on_overflow="error",
         downstream=mod.GroupByAggregator(
             group_by=("g",),
             metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
@@ -352,8 +322,6 @@ def test_dedup_by_on_conflict_variants_and_truncate() -> None:
     err = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="error",
-        max_distinct=0,
-        on_overflow="error",
         downstream=mod.GroupByAggregator(
             group_by=("g",),
             metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
@@ -362,36 +330,6 @@ def test_dedup_by_on_conflict_variants_and_truncate() -> None:
     err.accumulate({"k": "a", "g": "x", "v": 1})
     with pytest.raises(mod.ScalimDedupKeyConflictError):
         err.accumulate({"k": "a", "g": "x", "v": 9})
-
-    # truncate: keeps stable-smallest keys (a,b) and drops c
-    trunc = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="first",
-        max_distinct=2,
-        on_overflow="truncate",
-        downstream=mod.GroupByAggregator(
-            group_by=("g",),
-            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
-        ),
-    )
-    trunc.accumulate({"k": "c", "g": "x", "v": 100})
-    trunc.accumulate({"k": "b", "g": "x", "v": 10})
-    trunc.accumulate({"k": "a", "g": "x", "v": 1})
-    assert trunc.finalize_rows() == [{"g": "x", "sum_v": 11}]
-    diag = trunc.diagnostics()
-    assert diag.meta["dedup.truncated"] is True
-    assert any(e.get("event_type") == "dedup_truncated" for e in diag.audit_events)
-
-
-def test_bounded_distinct_key_set_unsupported_on_overflow_raises() -> None:
-    s = mod._BoundedDistinctKeySet(  # noqa: SLF001
-        max_distinct=1,
-        on_overflow="oops",
-        key_fields=("k",),
-    )
-    _ = s.add(("a",))
-    with pytest.raises(ValueError, match="Unsupported on_overflow"):
-        _ = s.add(("b",))
 
 
 def test_group_by_diagnostics_skips_unexpected_distinct_metric_state() -> None:
@@ -408,44 +346,7 @@ def test_group_by_diagnostics_skips_unexpected_distinct_metric_state() -> None:
     assert diag.meta["metric.u.distinct_keys_total"] == 0
 
 
-def test_group_by_diagnostics_count_distinct_not_truncated_has_no_audit_event() -> None:
-    agg = mod.GroupByAggregator(
-        group_by=("g",),
-        metrics=(mod.AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
-        max_distinct=0,
-        distinct_on_overflow="truncate",
-    )
-    agg.accumulate({"g": "x", "user_id": "u1"})
-    agg.accumulate({"g": "x", "user_id": "u2"})
-
-    diag = agg.diagnostics()
-
-    assert diag.meta["metric.u.distinct_truncated_groups"] == 0
-    assert not any(e.get("event_type") == "distinct_truncated" for e in diag.audit_events)
-
-
-def test_dedup_by_diagnostics_not_truncated_has_no_dedup_truncated_event() -> None:
-    downstream = mod.GroupByAggregator(
-        group_by=("g",),
-        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
-    )
-    dedup = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="first",
-        max_distinct=1,
-        on_overflow="truncate",
-        downstream=downstream,
-    )
-    dedup.accumulate({"k": "a", "g": "x"})
-    dedup.accumulate({"k": "a", "g": "x"})
-
-    diag = dedup.diagnostics()
-
-    assert diag.meta["dedup.truncated"] is False
-    assert not any(e.get("event_type") == "dedup_truncated" for e in diag.audit_events)
-
-
-def test_dedup_by_validation_required_fields_and_truncate_drops_new_key() -> None:
+def test_dedup_by_validation_required_fields_and_dedup_diagnostics() -> None:
     downstream = mod.GroupByAggregator(
         group_by=("g",),
         metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
@@ -455,16 +356,12 @@ def test_dedup_by_validation_required_fields_and_truncate_drops_new_key() -> Non
         _ = mod.DedupByThenAggregator(  # type: ignore[arg-type]
             key_fields=(),
             on_conflict="first",
-            max_distinct=0,
-            on_overflow="error",
             downstream=downstream,
         )
     with pytest.raises(ValueError, match="Unsupported dedup_by.on_conflict"):
         _ = mod.DedupByThenAggregator(
             key_fields=("k",),
             on_conflict="middle",
-            max_distinct=0,
-            on_overflow="error",
             downstream=downstream,
         )
 
@@ -472,27 +369,27 @@ def test_dedup_by_validation_required_fields_and_truncate_drops_new_key() -> Non
     dedup_key_overlaps = mod.DedupByThenAggregator(
         key_fields=("g",),
         on_conflict="first",
-        max_distinct=0,
-        on_overflow="error",
         downstream=downstream,
     )
     assert dedup_key_overlaps.required_fields() == ("g",)
 
-    # truncate: 当新 key 不优于当前最差 key 时应直接丢弃(覆盖 `retained=False` 分支).
-    trunc = mod.DedupByThenAggregator(
+    # 诊断: 无基数护栏后, `dedup.key_count` 反映保留的实体键数, `conflict_count` 反映冲突次数.
+    dedup = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="first",
-        max_distinct=2,
-        on_overflow="truncate",
         downstream=mod.GroupByAggregator(
             group_by=("g",),
             metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
         ),
     )
-    trunc.accumulate({"k": "a", "g": "x", "v": 1})
-    trunc.accumulate({"k": "b", "g": "x", "v": 2})
-    trunc.accumulate({"k": "c", "g": "x", "v": 100})
-    assert trunc.finalize_rows() == [{"g": "x", "sum_v": 3}]
+    dedup.accumulate({"k": "a", "g": "x", "v": 1})
+    dedup.accumulate({"k": "a", "g": "x", "v": 100})
+    dedup.accumulate({"k": "b", "g": "x", "v": 2})
+    assert dedup.finalize_rows() == [{"g": "x", "sum_v": 3}]
+    diag = dedup.diagnostics()
+    assert diag.meta["dedup.key_count"] == 2
+    assert diag.meta["dedup.conflict_count"] == 1
+    assert not any(e.get("event_type") == "dedup_truncated" for e in diag.audit_events)
 
 
 def test_two_stage_group_by_and_count_true_gte() -> None:
@@ -563,8 +460,6 @@ def test_dedup_by_then_aggregator_key_normalization_merges_and_outputs_normalize
     agg = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="first",
-        max_distinct=0,
-        on_overflow="error",
         downstream=downstream,
         key_normalization="auto_str",  # type: ignore[arg-type]
     )
@@ -582,8 +477,6 @@ def test_dedup_by_then_aggregator_key_normalization_conflict_uses_normalized_key
     agg = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="error",
-        max_distinct=0,
-        on_overflow="error",
         downstream=downstream,
         key_normalization="auto_str",  # type: ignore[arg-type]
     )
@@ -601,8 +494,6 @@ def test_dedup_by_then_aggregator_key_normalization_fail_fast_message_is_safe() 
     agg = mod.DedupByThenAggregator(
         key_fields=("k",),
         on_conflict="first",
-        max_distinct=0,
-        on_overflow="error",
         downstream=downstream,
         key_normalization="auto_str",  # type: ignore[arg-type]
     )

@@ -73,7 +73,7 @@ entries[33	]{id	scope	key	schema_path	required	ref	type	desc	enum	default	const	
   31	workflow	workflow	properties.workflow	true	null	object	#### workflow workflow	null	null	null	null	additionalProperties=false
   32	workflow	workflow.runs[*]	properties.workflow.properties.runs.items	false	null	object	null	null	null	null	null	additionalProperties=false
   33	workflow	workflow.resources	properties.workflow.properties.resources	false	null	null	"#### workflow.resources workflow-scope shared IO resources. - stable surface: `workflow.resources.books` / `workflow.resources.files`"	null	{}	null	null	allOf=1
-properties[100	]{entry_id	name	required	summary}:
+properties[97	]{entry_id	name	required	summary}:
   6	$import	false	string | array, oneOf(2)
   7	$import	false	string | array, oneOf(2)
   8	$import	false	string | array, oneOf(2)
@@ -127,10 +127,7 @@ properties[100	]{entry_id	name	required	summary}:
   21	params	false	object, properties $import
   21	source_id	false	string
   22	fields	true	object
-  22	distinct_on_overflow	false	string, enum error, truncate
   22	group_by	true	array, items string | object | array, anyOf(3)
-  22	max_distinct	false	integer
-  22	max_groups	false	integer
   23	allow_formulas	false	boolean
   23	path	false	string
   23	sheet	false	string

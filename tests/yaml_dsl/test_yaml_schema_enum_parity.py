@@ -86,9 +86,8 @@ def test_schema_enums_match_runtime_validation_for_books_header_fields_output_by
         )
 
 
-def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_overflow() -> None:
+def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank() -> None:
     schema = _load_schema()
-    distinct_overflow = _enum(schema, "definitions", "output_aggregate", "properties", "distinct_on_overflow")
 
     agg_fields = schema["definitions"]["output_aggregate"]["properties"]["fields"]["additionalProperties"]["oneOf"]
     dense_rank = next(item["properties"]["dense_rank"] for item in agg_fields if "dense_rank" in item.get("properties", {}))
@@ -98,33 +97,6 @@ def test_schema_enums_match_runtime_validation_for_outputs_aggregate_rank_and_ov
     top_k_mode_enum_raw = dense_rank["properties"]["top_k_mode"]["enum"]
     assert isinstance(top_k_mode_enum_raw, list)
     top_k_mode_enum = [str(x) for x in top_k_mode_enum_raw]
-
-    for value in distinct_overflow:
-        _load_ok(
-            "\n".join(
-                [
-                    "name: demo",
-                    "main_source:",
-                    "  source_id: orders",
-                    "  loader: tests.fixtures.mock_loaders.mock_loader",
-                    "  fields:",
-                    "    order_id: {extract: order_id}",
-                    "sources: {}",
-                    "resources:",
-                    "  files:",
-                    "    detail_csv: {csv_file: {path: ./out}}",
-                    "outputs:",
-                    "  - name: agg",
-                    "    to: {file: detail_csv}",
-                    "    aggregate:",
-                    "      group_by: [order_id]",
-                    "      distinct_on_overflow: %s" % value,
-                    "      fields:",
-                    "        cnt: {count: {}}",
-                    "",
-                ]
-            )
-        )
 
     for value in order_enum:
         _load_ok(

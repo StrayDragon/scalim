@@ -17,19 +17,17 @@ from ....schema_dsl.models import (
     OutputWriteConfig,
 )
 from ....schema_dsl.output_enums import (
-    AGG_DISTINCT_ON_OVERFLOW_ENUM,
-    AGG_RANK_ORDER_ENUM,
-    AGG_RANK_TOP_K_MODE_ENUM,
-    DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
-    DEFAULT_AGG_RANK_ORDER,
-    DEFAULT_AGG_RANK_TOP_K_MODE,
-    OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
-)
-from ....schema_dsl.output_enums import (
     AGG_METRIC_PRODUCER_KEYS as _AGG_FUNC_KEYS,
 )
 from ....schema_dsl.output_enums import (
     AGG_POST_PRODUCER_KEYS as _POST_FUNC_KEYS,
+)
+from ....schema_dsl.output_enums import (
+    AGG_RANK_ORDER_ENUM,
+    AGG_RANK_TOP_K_MODE_ENUM,
+    DEFAULT_AGG_RANK_ORDER,
+    DEFAULT_AGG_RANK_TOP_K_MODE,
+    OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM,
 )
 from ....schema_dsl.output_enums import (
     AGG_RANK_PRODUCER_KEYS as _RANK_FUNC_KEYS,
@@ -415,7 +413,7 @@ class ParserOutputsMixin:
 
         return OutputWriteConfig(include_header=include_header, header_fields_output_by=header_fields_output_by)
 
-    def _parse_output_aggregate(  # noqa: C901, PLR0912
+    def _parse_output_aggregate(  # noqa: C901
         self,
         raw: Dict[str, Any],
         *,
@@ -467,36 +465,19 @@ class ParserOutputsMixin:
                 engine=engine,
             )
 
-        max_groups = int(raw.get(OUTPUT_AGGREGATE_KEYS["max_groups"], 0) or 0)
-        if max_groups < 0:
-            msg = "{}.max_groups must be >= 0".format(base_path)
-            raise ValueError(msg)
-        max_distinct = int(raw.get(OUTPUT_AGGREGATE_KEYS["max_distinct"], 0) or 0)
-        if max_distinct < 0:
-            msg = "{}.max_distinct must be >= 0".format(base_path)
-            raise ValueError(msg)
-
-        distinct_on_overflow = str(
-            raw.get(
-                OUTPUT_AGGREGATE_KEYS["distinct_on_overflow"],
-                DEFAULT_AGG_DISTINCT_ON_OVERFLOW,
-            )
-            or DEFAULT_AGG_DISTINCT_ON_OVERFLOW
-        ).lower()
-        if distinct_on_overflow not in AGG_DISTINCT_ON_OVERFLOW_ENUM:
-            msg = "{}.distinct_on_overflow={!r} is invalid; expected one of: {}".format(
-                base_path,
-                distinct_on_overflow,
-                ", ".join(AGG_DISTINCT_ON_OVERFLOW_ENUM),
-            )
-            raise ValueError(msg)
+        # 派生输出基数护栏已整体移除: 残留字段 `fail-fast` 并提示迁移(`OOM` 风险交由系统层兜底).
+        for removed_key in ("max_groups", "max_distinct", "distinct_on_overflow"):
+            if removed_key in raw:
+                msg = (
+                    "{}.{} was removed (derived output cardinality guardrails are gone; ".format(base_path, removed_key)
+                    + "high-cardinality memory risk is handled by the host OS e.g. OOM killer). "
+                    + "Hint: remove this field."
+                )
+                raise ValueError(msg)
 
         return OutputAggregateConfig(
             group_by=group_by_t,
             fields=fields,
-            max_groups=max_groups,
-            max_distinct=max_distinct,
-            distinct_on_overflow=distinct_on_overflow,
         )
 
     def _parse_output_aggregate_field(  # noqa: C901, PLR0912

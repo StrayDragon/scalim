@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from ..._internal.loggingx import format_kv, get_logger, prefix
 from ..._internal.utils.iterables import ordered_unique_str
 from ...ob.hub import InstrumentationHub
 from ...sinks import ExcelWorkbookSink, IRowSink
@@ -17,20 +16,14 @@ from .router import FinalTargetState, RouterRowSink, RouteState
 from .sinks import RowCounter, create_row_sink_for_composed_output
 from .specs import (
     AuditSheetSpec,
-    DedupBySpec,
-    DerivedDedupByGroupBySpec,
-    DerivedGroupBySpec,
     DerivedOutputTargetSpec,
     IDerivedAggregationSpec,
     MetaSheetSpec,
     OutputCompositionSpec,
     OutputRowPredicate,
     OutputTargetSpec,
-    TwoStageGroupBySpec,
     fingerprint_for_derived_target,
 )
-
-_logger = get_logger("derived_outputs")
 
 
 def required_demand_fields(spec: OutputCompositionSpec) -> Tuple[str, ...]:
@@ -155,44 +148,6 @@ def _validate_derived_parallel_mode(target_id: str, derived: IDerivedAggregation
         raise ValueError(msg) from exc
 
 
-def _collect_specs_for_derived_warnings(derived: IDerivedAggregationSpec) -> Tuple[List[DerivedGroupBySpec], List[DedupBySpec]]:
-    if isinstance(derived, DerivedGroupBySpec):
-        return [derived], []
-    if isinstance(derived, DerivedDedupByGroupBySpec):
-        return [derived.group_by], [derived.dedup_by]
-    if isinstance(derived, TwoStageGroupBySpec):
-        return [derived.stage1, derived.stage2], []
-    return [], []
-
-
-def _warn_derived_guardrails(*, target_id: str, group_specs: Sequence[DerivedGroupBySpec], dedup_specs: Sequence[DedupBySpec]) -> None:
-    for g in group_specs:
-        if not int(g.max_groups):
-            kv = format_kv(target_id=target_id, group_by=g.group_by)
-            _logger.warning(
-                "%smax_groups=0(不设上限), 高基数分组可能耗尽内存; 建议设置 max_groups %s",
-                prefix("derived_outputs"),
-                kv,
-            )
-        has_count_distinct = any(str(m.op).lower() == "count_distinct" for m in g.metrics)
-        if has_count_distinct and not int(g.max_distinct):
-            kv = format_kv(target_id=target_id, group_by=g.group_by)
-            _logger.warning(
-                "%smax_distinct=0(不设上限), count_distinct 高基数可能耗尽内存; 建议设置 max_distinct %s",
-                prefix("derived_outputs"),
-                kv,
-            )
-
-    for d in dedup_specs:
-        if not int(d.max_distinct):
-            kv = format_kv(target_id=target_id, key_fields=d.key_fields)
-            _logger.warning(
-                "%sdedup_by.max_distinct=0(不设上限), 高基数去重可能耗尽内存; 建议设置 dedup_by.max_distinct %s",
-                prefix("derived_outputs"),
-                kv,
-            )
-
-
 def _append_derived_target_routes(
     *,
     routes: List[RouteState],
@@ -208,8 +163,6 @@ def _append_derived_target_routes(
         # `adaptive` 下的确定性边界 `fail-fast` 校验
         _validate_derived_parallel_mode(str(t.target_id), t.derived, run_parallel_mode)
         derived_fingerprint = fingerprint_for_derived_target(target_id=str(t.target_id), derived=t.derived)
-        group_specs, dedup_specs = _collect_specs_for_derived_warnings(t.derived)
-        _warn_derived_guardrails(target_id=str(t.target_id), group_specs=group_specs, dedup_specs=dedup_specs)
 
         out_sink, out_counter, managed_plan = create_row_sink_for_composed_output(
             target_id=str(t.target_id),

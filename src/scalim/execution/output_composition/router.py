@@ -422,31 +422,8 @@ class RouterRowSink(BaseRowSink):
                 }
             )
 
-        for route in self._routes:
-            if not isinstance(route.sink, AggregatingRowSink):
-                continue
-            diag = route.sink.aggregator.diagnostics()
-            for event in diag.audit_events:
-                raw = str(event.get("message") or "")
-                event_type = str(event.get("event_type") or "derived_event")
-                msg_hash = sha256_text(raw)
-                if self._include_full_error_message:
-                    normalized = as_single_line(raw)
-                    msg_out = truncate_text(normalized, max_chars=2000)
-                else:
-                    msg_out = "sha256={}".format(msg_hash)
-                rows.append(
-                    {
-                        "target_id": route.target_id,
-                        "event_type": event_type,
-                        "fingerprint": str(route.derived_fingerprint or ""),
-                        "error_type": event_type,
-                        "error_message": msg_out,
-                        "error_message_hash": msg_hash,
-                        "error_count": 0,
-                        "disabled": bool(route.disabled),
-                    }
-                )
+        # 派生聚合的 `audit_events` 曾用于记录基数截断事件; 护栏移除后聚合诊断不再产生
+        # `audit_events`(仅有错误路由的结构化审计行), 因此派生路由此处无需再展开事件.
         return rows
 
     def _write_audit(self) -> None:

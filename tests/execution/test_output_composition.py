@@ -13,6 +13,7 @@ from scalim.execution.output_composition import (
     MetaSheetSpec,
     OutputCompositionSpec,
     OutputTargetSpec,
+    PostFieldSpec,
     RankFieldSpec,
     build_output_composition,
 )
@@ -82,7 +83,6 @@ def test_run_ir_output_composition_workbook_detail_and_summary(tmp_path: Path) -
                 AggMetricSpec(out_field_id="sum_amount", op="sum", field_id="amount"),
                 AggMetricSpec(out_field_id="sum_profit", op="sum", field_id="profit"),
             ),
-            max_groups=100,
         ),
         output_layout=ExportLayout(field_ids=("order_source", "order_cnt", "sum_amount", "sum_profit"), header_names=None),
         output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
@@ -210,12 +210,24 @@ def test_output_composition_primary_only_disables_failed_derived(tmp_path: Path)
         is_primary=True,
     )
 
+    # 通过一个必然抛错的 `post_field` 计算器注入运行期失败(护栏已移除, 不再用 max_groups 溢出).
+    def _boom(row):  # type: ignore[no-untyped-def]
+        raise RuntimeError("injected derived failure")
+
     derived = DerivedOutputTargetSpec(
         target_id="summary_overflow",
         derived=DerivedGroupBySpec(
             group_by=("order_id",),
             metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="order_id"),),
-            max_groups=1,  # overflow when more than 1 distinct key
+            post_fields=(
+                PostFieldSpec(
+                    out_field_id="bad",
+                    kind="compute",
+                    dependencies=("cnt",),
+                    fingerprint="bad",
+                    calculator=_boom,
+                ),
+            ),
         ),
         output_layout=ExportLayout(field_ids=("order_id", "cnt"), header_names=None),
         output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
@@ -392,96 +404,6 @@ def test_meta_and_audit_redact_error_message_by_default_and_allow_full(tmp_path:
     assert secret in str(meta_kv2["output.fail.error_message"])
 
 
-def test_derived_output_max_groups_zero_emits_warning(tmp_path: Path, caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.execution.output_composition")
-    out = tmp_path / "report.xlsx"
-
-    detail = OutputTargetSpec(
-        target_id="detail",
-        layout=ExportLayout(field_ids=("order_id", "order_source"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Detail"),
-        is_primary=True,
-    )
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=DerivedGroupBySpec(
-            group_by=("order_source",),
-            metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="order_id"),),
-            max_groups=0,
-        ),
-        output_layout=ExportLayout(field_ids=("order_source", "cnt"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-    )
-
-    spec = OutputCompositionSpec(targets=(detail,), derived_targets=(derived,))
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["order_id"],
-        demand_field_fingerprints=[],
-    )
-    plan.sink.close()
-
-    assert any("max_groups=0" in record.getMessage() for record in caplog.records)
-
-
-def test_audit_includes_derived_truncate_events_and_fingerprint(tmp_path: Path) -> None:
-    out = tmp_path / "report.xlsx"
-
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
-            max_groups=10,
-            max_distinct=1,
-            distinct_on_overflow="truncate",
-        ),
-        output_layout=ExportLayout(field_ids=("g", "u"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-
-    spec = OutputCompositionSpec(
-        targets=(),
-        derived_targets=(derived,),
-        meta_sheet=MetaSheetSpec(target_id="meta", output=OutputSpec(format="excel", path=str(out)), sheet_name="Meta"),
-        audit_sheet=AuditSheetSpec(target_id="audit", output=OutputSpec(format="excel", path=str(out)), sheet_name="Audit"),
-    )
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["g"],
-        demand_field_fingerprints=[],
-        run_parallel_mode="seq",
-    )
-    router = plan.sink
-    router.write_row({"g": "x", "user_id": "u1"})
-    router.write_row({"g": "x", "user_id": "u2"})
-    router.close()
-
-    meta_rows = _read_sheet_rows(out, "Meta")
-    meta_kv = {r[0]: r[1] for r in meta_rows[1:]}
-    fp = meta_kv.get("derived.summary.fingerprint")
-    assert isinstance(fp, str)
-    assert len(fp) == 64
-
-    audit_rows = _read_sheet_rows(out, "Audit")
-    header = audit_rows[0]
-    idx_target = header.index("target_id")
-    idx_event = header.index("event_type")
-    idx_fp = header.index("fingerprint")
-    idx_msg = header.index("error_message")
-    idx_hash = header.index("error_message_hash")
-
-    row = [r for r in audit_rows[1:] if r[idx_target] == "summary" and r[idx_event] == "distinct_truncated"][0]
-    assert row[idx_fp] == fp
-    assert "sha256=" in str(row[idx_msg])
-    assert len(str(row[idx_hash])) == 64
-
-
 def test_fingerprint_for_derived_target_is_stable_and_sensitive() -> None:
     derived = DerivedGroupBySpec(
         group_by=("g",),
@@ -595,164 +517,31 @@ def test_i_derived_aggregation_spec_base_methods_raise() -> None:
         dummy.build_aggregator()
 
 
-def test_derived_group_by_spec_rejects_invalid_distinct_on_overflow() -> None:
-    spec = DerivedGroupBySpec(
-        group_by=("g",),
-        metrics=(AggMetricSpec(out_field_id="cnt", op="count"),),
-        distinct_on_overflow="oops",
-    )
-    with pytest.raises(ValueError, match="Unsupported distinct_on_overflow"):
-        spec.validate_parallel_mode("seq")
-
-
 def test_dedup_by_spec_fingerprint_parts_and_validate_errors() -> None:
     spec = output_comp_mod.DedupBySpec(
         key_fields=("k1", "k2"),
         on_conflict="FIRST",
-        max_distinct=3,
-        on_overflow="ERROR",
     )
     parts = spec.fingerprint_parts()
     assert parts[0] == "kind=dedup_by"
     assert "key_fields=k1,k2" in parts
     assert "on_conflict=first" in parts
-    assert "max_distinct=3" in parts
-    assert "on_overflow=error" in parts
+    # 基数护栏字段已移除: 指纹不再包含 max_distinct / on_overflow.
+    assert not any("max_distinct" in p for p in parts)
+    assert not any("on_overflow" in p for p in parts)
 
     with pytest.raises(ValueError, match="Unsupported dedup_by.on_conflict"):
         output_comp_mod.DedupBySpec(key_fields=("k",), on_conflict="oops").validate_parallel_mode("seq")
-    with pytest.raises(ValueError, match="Unsupported dedup_by.on_overflow"):
-        output_comp_mod.DedupBySpec(key_fields=("k",), on_overflow="oops").validate_parallel_mode("seq")
-
-
-def test_output_composition_warns_on_count_distinct_without_max_distinct(tmp_path: Path, caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.execution.output_composition")
-    out = tmp_path / "report.xlsx"
-
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
-            max_groups=1,
-            max_distinct=0,
-        ),
-        output_layout=ExportLayout(field_ids=("g", "u"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(derived_targets=(derived,))
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["g"],
-        demand_field_fingerprints=[],
-        run_parallel_mode="seq",
-    )
-    plan.sink.close()
-
-    assert any("max_distinct=0" in record.getMessage() and "count_distinct" in record.getMessage() for record in caplog.records)
-
-
-def test_output_composition_warns_on_dedup_without_max_distinct_and_spec_methods(tmp_path: Path, caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.execution.output_composition")
-    out = tmp_path / "report.xlsx"
-
-    derived_spec = output_comp_mod.DerivedDedupByGroupBySpec(
-        dedup_by=output_comp_mod.DedupBySpec(
-            key_fields=("k",),
-            on_conflict="first",
-            max_distinct=0,
-            on_overflow="error",
-        ),
-        group_by=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="cnt", op="count"),),
-            max_groups=1,
-        ),
-    )
-    assert derived_spec.required_fields() == ("k", "g")
-
-    fp_parts = derived_spec.fingerprint_parts()
-    assert fp_parts[0] == "kind=dedup_by+group_by"
-
-    derived_spec.validate_parallel_mode("seq")
-
-    agg = derived_spec.build_aggregator()
-    agg.accumulate({"k": "a", "g": "x"})
-    agg.accumulate({"k": "a", "g": "x"})
-    assert agg.finalize_rows() == [{"g": "x", "cnt": 1}]
-
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=derived_spec,
-        output_layout=ExportLayout(field_ids=("g", "cnt"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(derived_targets=(derived,))
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["g"],
-        demand_field_fingerprints=[],
-        run_parallel_mode="seq",
-    )
-    plan.sink.close()
-
-    assert any("dedup_by.max_distinct=0" in record.getMessage() for record in caplog.records)
-
-
-def test_output_composition_does_not_warn_on_dedup_when_max_distinct_is_nonzero(tmp_path: Path, caplog) -> None:
-    caplog.set_level(logging.WARNING, logger="scalim.execution.output_composition")
-    out = tmp_path / "report.xlsx"
-
-    derived_spec = output_comp_mod.DerivedDedupByGroupBySpec(
-        dedup_by=output_comp_mod.DedupBySpec(
-            key_fields=("k",),
-            on_conflict="first",
-            max_distinct=1,
-            on_overflow="error",
-        ),
-        group_by=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="cnt", op="count"),),
-            max_groups=1,
-        ),
-    )
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=derived_spec,
-        output_layout=ExportLayout(field_ids=("g", "cnt"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(derived_targets=(derived,))
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["g"],
-        demand_field_fingerprints=[],
-        run_parallel_mode="seq",
-    )
-    plan.sink.close()
-
-    assert not any("dedup_by.max_distinct=0" in record.getMessage() for record in caplog.records)
 
 
 def test_two_stage_group_by_spec_methods_and_build(tmp_path: Path) -> None:
     stage1 = DerivedGroupBySpec(
         group_by=("g", "u"),
         metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-        max_groups=10,
     )
     stage2 = DerivedGroupBySpec(
         group_by=("g",),
         metrics=(AggMetricSpec(out_field_id="sum_cnt", op="sum", field_id="cnt"),),
-        max_groups=10,
     )
 
     derived = output_comp_mod.TwoStageGroupBySpec(stage1=stage1, stage2=stage2)
@@ -799,64 +588,36 @@ def test_two_stage_group_by_spec_methods_and_build(tmp_path: Path) -> None:
     plan.sink.close()
 
 
-def test_audit_includes_full_derived_event_message_when_enabled(tmp_path: Path) -> None:
-    out = tmp_path / "report.xlsx"
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="u", op="count_distinct", field_id="user_id"),),
-            max_groups=10,
-            max_distinct=1,
-            distinct_on_overflow="truncate",
-        ),
-        output_layout=ExportLayout(field_ids=("g", "u"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(
-        derived_targets=(derived,),
-        meta_sheet=MetaSheetSpec(target_id="meta", output=OutputSpec(format="excel", path=str(out)), sheet_name="Meta"),
-        audit_sheet=AuditSheetSpec(target_id="audit", output=OutputSpec(format="excel", path=str(out)), sheet_name="Audit"),
-        include_full_error_message=True,
-    )
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["g"],
-        demand_field_fingerprints=[],
-        run_parallel_mode="seq",
-    )
-    router = plan.sink
-    router.write_row({"g": "x", "user_id": "u1"})
-    router.write_row({"g": "x", "user_id": "u2"})
-    router.close()
-
-    audit_rows = _read_sheet_rows(out, "Audit")
-    header = audit_rows[0]
-    idx_target = header.index("target_id")
-    idx_event = header.index("event_type")
-    idx_msg = header.index("error_message")
-
-    row = [r for r in audit_rows[1:] if r[idx_target] == "summary" and r[idx_event] == "distinct_truncated"][0]
-    assert "count_distinct truncated" in str(row[idx_msg])
-    assert "sha256=" not in str(row[idx_msg])
-
-
-def test_derived_dedup_by_group_by_spec_required_fields_dedupes_overlap() -> None:
+def test_derived_dedup_by_group_by_spec_methods_and_required_fields_dedupes_overlap() -> None:
     spec = output_comp_mod.DerivedDedupByGroupBySpec(
         dedup_by=output_comp_mod.DedupBySpec(key_fields=("g",), on_conflict="first"),
         group_by=DerivedGroupBySpec(
             group_by=("g",),
             metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-            max_groups=1,
         ),
     )
     assert spec.required_fields() == ("g", "id")
 
+    # fingerprint_parts: 嵌套 dedup_by + group_by 指纹, 不含已移除的护栏字段.
+    parts = spec.fingerprint_parts()
+    assert parts[0] == "kind=dedup_by+group_by"
+    assert not any("max_distinct" in p or "on_overflow" in p for p in parts)
+    assert isinstance(output_comp_mod.fingerprint_for_derived_target(target_id="t", derived=spec), str)
 
-def test_collect_specs_for_derived_warnings_unknown_spec_returns_empty(tmp_path: Path) -> None:
+    # validate_parallel_mode: 委托给 dedup_by / group_by; adaptive 下 first/last fail-fast.
+    spec.validate_parallel_mode("seq")
+    with pytest.raises(ValueError, match="order-dependent"):
+        spec.validate_parallel_mode("adaptive")
+
+    # build_aggregator: 产出 DedupByThenAggregator 并按 on_conflict 生效.
+    agg = spec.build_aggregator()
+    agg.accumulate({"g": "a", "id": 1})
+    agg.accumulate({"g": "a", "id": 2})
+    agg.accumulate({"g": "b", "id": 3})
+    assert agg.finalize_rows() == [{"g": "a", "cnt": 1}, {"g": "b", "cnt": 1}]
+
+
+def test_custom_derived_spec_is_composable_without_guardrails(tmp_path: Path) -> None:
     from scalim.execution.derived_outputs import AggregatorDiagnostics, IRowAggregator
 
     class _PassThroughAgg(IRowAggregator):

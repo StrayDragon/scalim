@@ -69,17 +69,6 @@ OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM: Tuple[str, ...] = (
 """`outputs.*.write.header_fields_output_by` 枚举."""
 
 
-AGG_DISTINCT_ON_OVERFLOW_ENUM: Tuple[str, ...] = (
-    "error",
-    "truncate",
-)
-"""`outputs.*.aggregate.distinct_on_overflow` 枚举."""
-
-
-DEFAULT_AGG_DISTINCT_ON_OVERFLOW: str = "error"
-"""`outputs.*.aggregate.distinct_on_overflow` 默认值."""
-
-
 AGG_RANK_ORDER_ENUM: Tuple[str, ...] = (
     "asc",
     "desc",
@@ -131,7 +120,6 @@ AGG_POST_PRODUCER_KEYS: Tuple[str, ...] = (
 
 
 __all__ = (
-    "AGG_DISTINCT_ON_OVERFLOW_ENUM",
     "AGG_METRIC_PRODUCER_KEYS",
     "AGG_POST_PRODUCER_KEYS",
     "AGG_RANK_ORDER_ENUM",
@@ -143,7 +131,6 @@ __all__ = (
     "BOOK_WRITE_MODE_ENUM",
     "BOOK_WRITE_ON_CONFLICT_ENUM",
     "BOOK_WRITE_ON_MISMATCH_ENUM",
-    "DEFAULT_AGG_DISTINCT_ON_OVERFLOW",
     "DEFAULT_AGG_RANK_ORDER",
     "DEFAULT_AGG_RANK_TOP_K_MODE",
     "DEFAULT_BOOK_WRITE_ALIGN_BY",

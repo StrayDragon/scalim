@@ -150,7 +150,6 @@ def _(
                             AggMetricSpec(out_field_id="sum_profit", op="sum", field_id="profit"),
                         ),
                         rank_fields=(RankFieldSpec(out_field_id="rank", kind="row_number", by="sum_profit", order="desc"),),
-                        max_groups=100,
                     ),
                     output_layout=summary_layout,
                     output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Summary"),

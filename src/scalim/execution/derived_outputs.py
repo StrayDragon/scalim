@@ -32,46 +32,6 @@ def _cell_value_as_int(value: CellValue) -> int:
     return int(cast("Any", value or 0))  # pragma: allow-cast CellValue → int for rank/top_k
 
 
-class ScalimAggregationKeyLimitExceededError(ScalimExecutionError):
-    group_count: int
-    max_groups: int
-
-    def __init__(self, *, group_count: int, max_groups: int) -> None:
-        super(ScalimAggregationKeyLimitExceededError, self).__init__(
-            "Group-by key cardinality exceeded: group_count={} > max_groups={}".format(int(group_count), int(max_groups))
-        )
-        self.group_count = int(group_count)
-        self.max_groups = int(max_groups)
-
-
-class ScalimDistinctKeyLimitExceededError(ScalimExecutionError):
-    distinct_count: int
-    max_distinct: int
-    on_overflow: str
-    key_fields: Tuple[str, ...]
-
-    def __init__(
-        self,
-        *,
-        distinct_count: int,
-        max_distinct: int,
-        on_overflow: str,
-        key_fields: Sequence[str],
-    ) -> None:
-        super(ScalimDistinctKeyLimitExceededError, self).__init__(
-            "Distinct key cardinality exceeded: distinct_count={} > max_distinct={} (on_overflow={}, key_fields={})".format(
-                int(distinct_count),
-                int(max_distinct),
-                str(on_overflow),
-                ",".join(str(x) for x in key_fields),
-            )
-        )
-        self.distinct_count = int(distinct_count)
-        self.max_distinct = int(max_distinct)
-        self.on_overflow = str(on_overflow)
-        self.key_fields = tuple(str(x) for x in key_fields)
-
-
 class ScalimDedupKeyConflictError(ScalimExecutionError):
     key_fields: Tuple[str, ...]
     on_conflict: str
@@ -312,83 +272,6 @@ def _stable_group_key_tuple(key: Tuple[RuntimeValue, ...]) -> str:
     return "\x1f".join(_stable_sort_key(item) for item in key)
 
 
-class _BoundedDistinctKeySet:
-    _keys: Set[Tuple[CellValue, ...]]
-    _max_distinct: int
-    _on_overflow: str
-    _key_fields: Tuple[str, ...]
-    _truncated: bool
-
-    def __init__(self, *, max_distinct: int, on_overflow: str, key_fields: Sequence[str]) -> None:
-        self._keys = set()
-        self._max_distinct = int(max_distinct) if max_distinct else 0
-        self._on_overflow = str(on_overflow or "error").lower()
-        self._key_fields = tuple(str(x) for x in key_fields)
-        self._truncated = False
-
-    @property
-    def max_distinct(self) -> int:
-        return int(self._max_distinct)
-
-    @property
-    def on_overflow(self) -> str:
-        return str(self._on_overflow)
-
-    @property
-    def truncated(self) -> bool:
-        return bool(self._truncated)
-
-    @property
-    def key_count(self) -> int:
-        return len(self._keys)
-
-    def add(self, key: Tuple[CellValue, ...]) -> Tuple[bool, Optional[Tuple[CellValue, ...]]]:
-        """添加去重 `key`.
-
-        返回:
-        - `retained`: 新 `key` 是否被纳入状态(截断时可能被丢弃)
-        - `removed_key`: 当 `truncate` 且新 `key` 纳入导致替换时,返回被移除的 `key`
-        """
-
-        if key in self._keys:
-            return False, None
-
-        if not self._max_distinct:
-            self._keys.add(key)
-            return True, None
-
-        if len(self._keys) < self._max_distinct:
-            self._keys.add(key)
-            return True, None
-
-        if self._on_overflow == "error":
-            raise ScalimDistinctKeyLimitExceededError(
-                distinct_count=len(self._keys) + 1,
-                max_distinct=self._max_distinct,
-                on_overflow=self._on_overflow,
-                key_fields=self._key_fields,
-            )
-
-        if self._on_overflow != "truncate":
-            msg = "Unsupported on_overflow: {!r}".format(self._on_overflow)
-            raise ValueError(msg)
-
-        # 在稳定序(按 `_stable_group_key_tuple`)下,仅保留最小的 `max_distinct` 个 `key`.
-        worst_key = max(self._keys, key=_stable_group_key_tuple)
-        worst_sig = _stable_group_key_tuple(worst_key)
-        new_sig = _stable_group_key_tuple(key)
-
-        # 若新 `key` 不优于当前最差 `key`,则直接丢弃.
-        if new_sig >= worst_sig:
-            self._truncated = True
-            return False, None
-
-        self._keys.add(key)
-        self._keys.remove(worst_key)
-        self._truncated = True
-        return True, worst_key
-
-
 class _MetricState(ABC):
     @abstractmethod
     def accumulate(self, row: RowData) -> None:
@@ -547,27 +430,19 @@ class _MaxMetric(_MetricState):
 
 class _CountDistinctMetric(_MetricState):
     _field_ids: Tuple[str, ...]
-    _distinct: _BoundedDistinctKeySet
+    _distinct: Set[Tuple[CellValue, ...]]
 
-    def __init__(self, *, field_ids: Sequence[str], max_distinct: int, on_overflow: str) -> None:
+    def __init__(self, *, field_ids: Sequence[str]) -> None:
         ids = [str(x) for x in field_ids if str(x)]
         if not ids:
             msg = "count_distinct requires field_id(s)"
             raise ValueError(msg)
         self._field_ids = tuple(ids)
-        self._distinct = _BoundedDistinctKeySet(
-            max_distinct=int(max_distinct),
-            on_overflow=str(on_overflow),
-            key_fields=self._field_ids,
-        )
-
-    @property
-    def truncated(self) -> bool:
-        return bool(self._distinct.truncated)
+        self._distinct = set()
 
     @property
     def key_count(self) -> int:
-        return int(self._distinct.key_count)
+        return len(self._distinct)
 
     @override
     def accumulate(self, row: RowData) -> None:
@@ -575,11 +450,11 @@ class _CountDistinctMetric(_MetricState):
         # 对齐 `SQL` `COUNT(DISTINCT)` 的 `NULL` 语义: 任一组成字段为 `None` 则忽略该行.
         if any(v is None for v in key):
             return
-        _ = self._distinct.add(key)
+        self._distinct.add(key)
 
     @override
     def finalize(self) -> CellValue:
-        return int(self._distinct.key_count)
+        return len(self._distinct)
 
 
 class _CountTrueGteMetric(_MetricState):
@@ -612,57 +487,51 @@ class _CountTrueGteMetric(_MetricState):
         return int(self._count)
 
 
-def _metric_state_count(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
-    _ = max_distinct, on_overflow
+def _metric_state_count(spec: AggMetricSpec) -> _MetricState:
     return _CountMetric(spec.field_id)
 
 
-def _metric_state_count_true(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
-    _ = max_distinct, on_overflow
+def _metric_state_count_true(spec: AggMetricSpec) -> _MetricState:
     if not spec.field_id:
         msg = "count_true requires field_id"
         raise ValueError(msg)
     return _CountTrueMetric(spec.field_id)
 
 
-def _metric_state_sum(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
-    _ = max_distinct, on_overflow
+def _metric_state_sum(spec: AggMetricSpec) -> _MetricState:
     if not spec.field_id:
         msg = "sum requires field_id"
         raise ValueError(msg)
     return _SumMetric(spec.field_id)
 
 
-def _metric_state_min(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
-    _ = max_distinct, on_overflow
+def _metric_state_min(spec: AggMetricSpec) -> _MetricState:
     if not spec.field_id:
         msg = "min requires field_id"
         raise ValueError(msg)
     return _MinMetric(spec.field_id)
 
 
-def _metric_state_max(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
-    _ = max_distinct, on_overflow
+def _metric_state_max(spec: AggMetricSpec) -> _MetricState:
     if not spec.field_id:
         msg = "max requires field_id"
         raise ValueError(msg)
     return _MaxMetric(spec.field_id)
 
 
-def _metric_state_count_distinct(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
+def _metric_state_count_distinct(spec: AggMetricSpec) -> _MetricState:
     if spec.field_id and spec.field_ids:
         msg = "count_distinct does not allow both field_id and field_ids"
         raise ValueError(msg)
     if spec.field_id:
-        return _CountDistinctMetric(field_ids=(str(spec.field_id),), max_distinct=max_distinct, on_overflow=on_overflow)
+        return _CountDistinctMetric(field_ids=(str(spec.field_id),))
     if spec.field_ids:
-        return _CountDistinctMetric(field_ids=tuple(str(x) for x in spec.field_ids), max_distinct=max_distinct, on_overflow=on_overflow)
+        return _CountDistinctMetric(field_ids=tuple(str(x) for x in spec.field_ids))
     msg = "count_distinct requires field_id or field_ids"
     raise ValueError(msg)
 
 
-def _metric_state_count_true_gte(spec: AggMetricSpec, *, max_distinct: int, on_overflow: str) -> _MetricState:
-    _ = max_distinct, on_overflow
+def _metric_state_count_true_gte(spec: AggMetricSpec) -> _MetricState:
     if not spec.field_id:
         msg = "count_true_gte requires field_id"
         raise ValueError(msg)
@@ -683,22 +552,19 @@ _METRIC_STATE_FACTORY_BY_OP = {
 }
 
 
-def _metric_state_from_spec(spec: AggMetricSpec, *, max_distinct: int = 0, on_overflow: str = "error") -> _MetricState:
+def _metric_state_from_spec(spec: AggMetricSpec) -> _MetricState:
     op = str(spec.op).lower()
     factory = _METRIC_STATE_FACTORY_BY_OP.get(op)
     if factory is None:
         msg = "Unsupported aggregation op: {!r}".format(spec.op)
         raise ValueError(msg)
-    return factory(spec, max_distinct=max_distinct, on_overflow=on_overflow)
+    return factory(spec)
 
 
 class GroupByAggregator(IRowAggregator):
     _group_by: Tuple[str, ...]
     _metrics: Tuple[AggMetricSpec, ...]
     _states: Dict[Tuple[CellValue, ...], Tuple[_MetricState, ...]]
-    _max_groups: int
-    _max_distinct: int
-    _distinct_on_overflow: str
     _key_normalization: KeyNormalizationMode
 
     def __init__(
@@ -706,9 +572,6 @@ class GroupByAggregator(IRowAggregator):
         *,
         group_by: Sequence[str],
         metrics: Sequence[AggMetricSpec],
-        max_groups: int = 0,
-        max_distinct: int = 0,
-        distinct_on_overflow: str = "error",
         key_normalization: KeyNormalizationMode = "raw",
     ) -> None:
         if not group_by:
@@ -720,9 +583,6 @@ class GroupByAggregator(IRowAggregator):
         self._group_by = tuple(str(item) for item in group_by)
         self._metrics = tuple(metrics)
         self._states = {}
-        self._max_groups = int(max_groups) if max_groups else 0
-        self._max_distinct = int(max_distinct) if max_distinct else 0
-        self._distinct_on_overflow = str(distinct_on_overflow or "error").lower()
         self._key_normalization = normalize_key_normalization(key_normalization)
 
     @override
@@ -753,11 +613,7 @@ class GroupByAggregator(IRowAggregator):
             )
         state = self._states.get(key)
         if state is None:
-            if self._max_groups and len(self._states) >= self._max_groups:
-                raise ScalimAggregationKeyLimitExceededError(group_count=len(self._states) + 1, max_groups=self._max_groups)
-            state = tuple(
-                _metric_state_from_spec(m, max_distinct=self._max_distinct, on_overflow=self._distinct_on_overflow) for m in self._metrics
-            )
+            state = tuple(_metric_state_from_spec(m) for m in self._metrics)
             self._states[key] = state
         for metric in state:
             metric.accumulate(row)
@@ -786,32 +642,15 @@ class GroupByAggregator(IRowAggregator):
             out_field = str(self._metrics[idx].out_field_id)
             total_keys = 0
             max_keys_per_group = 0
-            truncated_groups = 0
             for state in self._states.values():
                 metric_state = state[idx]
                 if not isinstance(metric_state, _CountDistinctMetric):
                     continue
                 total_keys += int(metric_state.key_count)
                 max_keys_per_group = max(max_keys_per_group, int(metric_state.key_count))
-                if metric_state.truncated:
-                    truncated_groups += 1
 
             meta["metric.{}.distinct_keys_total".format(out_field)] = int(total_keys)
             meta["metric.{}.distinct_keys_max_per_group".format(out_field)] = int(max_keys_per_group)
-            meta["metric.{}.distinct_truncated_groups".format(out_field)] = int(truncated_groups)
-
-            if truncated_groups:
-                audit_events.append(
-                    {
-                        "event_type": "distinct_truncated",
-                        "message": "count_distinct truncated: metric={}, truncated_groups={}, max_distinct={}, on_overflow={}".format(
-                            out_field,
-                            int(truncated_groups),
-                            int(self._max_distinct),
-                            str(self._distinct_on_overflow),
-                        ),
-                    }
-                )
 
         return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
 
@@ -837,9 +676,6 @@ class RankedGroupByAggregator(IRowAggregator):
         metrics: Sequence[AggMetricSpec],
         rank_fields: Sequence[RankFieldSpec] = (),
         post_fields: Sequence[PostFieldSpec] = (),
-        max_groups: int = 0,
-        max_distinct: int = 0,
-        distinct_on_overflow: str = "error",
         key_normalization: KeyNormalizationMode = "raw",
     ) -> None:
         self._group_by = tuple(str(item) for item in group_by)
@@ -849,9 +685,6 @@ class RankedGroupByAggregator(IRowAggregator):
         self._base = GroupByAggregator(
             group_by=self._group_by,
             metrics=metrics,
-            max_groups=max_groups,
-            max_distinct=max_distinct,
-            distinct_on_overflow=distinct_on_overflow,
             key_normalization=key_normalization,
         )
 
@@ -1039,7 +872,6 @@ class _ReversibleValue:
 class DedupByThenAggregator(IRowAggregator):
     _key_fields: Tuple[str, ...]
     _on_conflict: str
-    _distinct: _BoundedDistinctKeySet
     _downstream: IRowAggregator
     _store_fields: Tuple[str, ...]
     _rows: Dict[Tuple[CellValue, ...], Dict[str, CellValue]]
@@ -1051,8 +883,6 @@ class DedupByThenAggregator(IRowAggregator):
         *,
         key_fields: Sequence[str],
         on_conflict: str,
-        max_distinct: int,
-        on_overflow: str,
         downstream: IRowAggregator,
         key_normalization: KeyNormalizationMode = "raw",
     ) -> None:
@@ -1066,11 +896,6 @@ class DedupByThenAggregator(IRowAggregator):
             msg = "Unsupported dedup_by.on_conflict: {!r}".format(on_conflict)
             raise ValueError(msg)
 
-        self._distinct = _BoundedDistinctKeySet(
-            max_distinct=int(max_distinct),
-            on_overflow=str(on_overflow or "error"),
-            key_fields=self._key_fields,
-        )
         self._downstream = downstream
         store_fields: List[str] = list(self._key_fields) + list(downstream.required_fields())
         # 去重但保留顺序.
@@ -1115,12 +940,6 @@ class DedupByThenAggregator(IRowAggregator):
             # `first`: 保留已有行
             return
 
-        retained, removed = self._distinct.add(key)
-        if removed is not None:
-            _ = self._rows.pop(removed, None)
-        if not retained:
-            return
-
         self._rows[key] = stored_row
 
     @override
@@ -1136,21 +955,8 @@ class DedupByThenAggregator(IRowAggregator):
         meta = dict(diag.meta)
         audit_events = list(diag.audit_events)
 
-        meta["dedup.key_count"] = int(self._distinct.key_count)
-        meta["dedup.truncated"] = bool(self._distinct.truncated)
+        meta["dedup.key_count"] = len(self._rows)
         meta["dedup.conflict_count"] = int(self._conflict_count)
-
-        if self._distinct.truncated:
-            audit_events.append(
-                {
-                    "event_type": "dedup_truncated",
-                    "message": "dedup_by truncated: key_count_kept={}, max_distinct={}, on_overflow={}".format(
-                        int(self._distinct.key_count),
-                        int(self._distinct.max_distinct),
-                        str(self._distinct.on_overflow),
-                    ),
-                }
-            )
 
         return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
 

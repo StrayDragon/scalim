@@ -140,7 +140,6 @@ def run_derived_outputs_demo(output_path: str) -> DerivedOutputsDemoResult:
                             AggMetricSpec(out_field_id="sum_profit", op="sum", field_id="profit"),
                         ),
                         rank_fields=(RankFieldSpec(out_field_id="rank", kind="row_number", by="sum_profit", order="desc"),),
-                        max_groups=100,
                     ),
                     output_layout=summary_layout,
                     output=OutputSpec(

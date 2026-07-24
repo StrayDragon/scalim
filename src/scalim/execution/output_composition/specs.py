@@ -7,7 +7,7 @@ from typing import Callable, List, Optional, Set, Tuple
 from ...typedefs import FailurePolicy, KeyNormalizationMode, RowData
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
-from .._output_composition_policies import DedupOnConflictPolicy, DerivedOverflowPolicy
+from .._output_composition_policies import DedupOnConflictPolicy
 from ..derived_outputs import (
     AggMetricSpec,
     DedupByThenAggregator,
@@ -94,13 +94,10 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
     metrics: Tuple[AggMetricSpec, ...]
     rank_fields: Tuple[RankFieldSpec, ...] = ()
     post_fields: Tuple[PostFieldSpec, ...] = ()
-    max_groups: int = 0
-    max_distinct: int = 0
-    distinct_on_overflow: str = "error"
 
     @override
     def required_fields(self) -> Tuple[str, ...]:
-        agg = GroupByAggregator(group_by=self.group_by, metrics=self.metrics, max_groups=0)
+        agg = GroupByAggregator(group_by=self.group_by, metrics=self.metrics)
         return agg.required_fields()
 
     @override
@@ -108,9 +105,6 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
         parts: List[str] = []
         parts.append("kind=group_by")
         parts.append("group_by=" + ",".join(str(x) for x in self.group_by))
-        parts.append("max_groups=" + str(int(self.max_groups)))
-        parts.append("max_distinct=" + str(int(self.max_distinct)))
-        parts.append("distinct_on_overflow=" + (self.distinct_on_overflow or DerivedOverflowPolicy.ERROR).lower())
         parts.append("metrics=")
         for m in self.metrics:
             parts.append("  " + metric_fingerprint_part(m))
@@ -137,10 +131,6 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
     @override
     def validate_parallel_mode(self, parallel_mode: str) -> None:
         _ = str(parallel_mode or "").lower()
-        overflow = (self.distinct_on_overflow or DerivedOverflowPolicy.ERROR).lower()
-        if overflow not in (DerivedOverflowPolicy.ERROR, DerivedOverflowPolicy.TRUNCATE):
-            msg = "Unsupported distinct_on_overflow: {!r}".format(self.distinct_on_overflow)
-            raise ValueError(msg)
 
     @override
     def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
@@ -150,17 +140,11 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
                 metrics=self.metrics,
                 rank_fields=self.rank_fields,
                 post_fields=self.post_fields,
-                max_groups=int(self.max_groups),
-                max_distinct=int(self.max_distinct),
-                distinct_on_overflow=str(self.distinct_on_overflow),
                 key_normalization=key_normalization,
             )
         return GroupByAggregator(
             group_by=self.group_by,
             metrics=self.metrics,
-            max_groups=int(self.max_groups),
-            max_distinct=int(self.max_distinct),
-            distinct_on_overflow=str(self.distinct_on_overflow),
             key_normalization=key_normalization,
         )
 
@@ -169,16 +153,12 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
 class DedupBySpec:
     key_fields: Tuple[str, ...]
     on_conflict: str = "error"
-    max_distinct: int = 0
-    on_overflow: str = "error"
 
     def fingerprint_parts(self) -> Tuple[str, ...]:
         parts: List[str] = []
         parts.append("kind=dedup_by")
         parts.append("key_fields=" + ",".join(str(x) for x in self.key_fields))
         parts.append("on_conflict=" + (self.on_conflict or DedupOnConflictPolicy.ERROR).lower())
-        parts.append("max_distinct=" + str(int(self.max_distinct)))
-        parts.append("on_overflow=" + (self.on_overflow or DerivedOverflowPolicy.ERROR).lower())
         return tuple(parts)
 
     def validate_parallel_mode(self, parallel_mode: str) -> None:
@@ -186,10 +166,6 @@ class DedupBySpec:
         on_conflict = (self.on_conflict or DedupOnConflictPolicy.ERROR).lower()
         if on_conflict not in (DedupOnConflictPolicy.ERROR, DedupOnConflictPolicy.FIRST, DedupOnConflictPolicy.LAST):
             msg = "Unsupported dedup_by.on_conflict: {!r}".format(self.on_conflict)
-            raise ValueError(msg)
-        on_overflow = (self.on_overflow or DerivedOverflowPolicy.ERROR).lower()
-        if on_overflow not in (DerivedOverflowPolicy.ERROR, DerivedOverflowPolicy.TRUNCATE):
-            msg = "Unsupported dedup_by.on_overflow: {!r}".format(self.on_overflow)
             raise ValueError(msg)
         if mode == "adaptive" and on_conflict in (DedupOnConflictPolicy.FIRST, DedupOnConflictPolicy.LAST):
             msg = (
@@ -236,8 +212,6 @@ class DerivedDedupByGroupBySpec(IDerivedAggregationSpec):
         return DedupByThenAggregator(
             key_fields=self.dedup_by.key_fields,
             on_conflict=str(self.dedup_by.on_conflict),
-            max_distinct=int(self.dedup_by.max_distinct),
-            on_overflow=str(self.dedup_by.on_overflow),
             downstream=base,
             key_normalization=key_normalization,
         )
@@ -280,17 +254,11 @@ class TwoStageGroupBySpec(IDerivedAggregationSpec):
         agg1 = GroupByAggregator(
             group_by=self.stage1.group_by,
             metrics=self.stage1.metrics,
-            max_groups=int(self.stage1.max_groups),
-            max_distinct=int(self.stage1.max_distinct),
-            distinct_on_overflow=str(self.stage1.distinct_on_overflow),
             key_normalization=key_normalization,
         )
         agg2 = GroupByAggregator(
             group_by=self.stage2.group_by,
             metrics=self.stage2.metrics,
-            max_groups=int(self.stage2.max_groups),
-            max_distinct=int(self.stage2.max_distinct),
-            distinct_on_overflow=str(self.stage2.distinct_on_overflow),
             key_normalization=key_normalization,
         )
         return TwoStageGroupByAggregator(stage1=agg1, stage2=agg2)

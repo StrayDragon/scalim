@@ -324,29 +324,15 @@ def test_parse_output_aggregate_defensive_checks() -> None:
             engine=engine,
         )
 
-    with pytest.raises(ValueError, match=r"max_groups must be >= 0"):
-        _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "max_groups": -1},
-            base_path="aggregate",
-            field_def_index=field_index,
-            engine=engine,
-        )
-
-    with pytest.raises(ValueError, match=r"max_distinct must be >= 0"):
-        _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "max_distinct": -1},
-            base_path="aggregate",
-            field_def_index=field_index,
-            engine=engine,
-        )
-
-    with pytest.raises(ValueError, match=r"distinct_on_overflow='bad' is invalid"):
-        _ = loader._parse_output_aggregate(
-            {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, "distinct_on_overflow": "bad"},
-            base_path="aggregate",
-            field_def_index=field_index,
-            engine=engine,
-        )
+    # 派生输出基数护栏字段已移除: 残留字段 fail-fast 并给出迁移提示.
+    for removed_field in ("max_groups", "max_distinct", "distinct_on_overflow"):
+        with pytest.raises(ValueError, match=r"{} was removed".format(removed_field)):
+            _ = loader._parse_output_aggregate(
+                {"group_by": ["order_id"], "fields": {"cnt": {"count": {}}}, removed_field: "x"},
+                base_path="aggregate",
+                field_def_index=field_index,
+                engine=engine,
+            )
 
     with pytest.raises(ValueError, match=r"aggregate\.rank_by was removed"):
         _ = loader._parse_output_aggregate(
