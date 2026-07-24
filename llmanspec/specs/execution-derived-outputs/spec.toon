@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "execution-derived-outputs"
 purpose: "支持在同一次运行中基于详情行流生成派生输出(增量聚合 + finalize 阶段输出),并定义 IR/Python-only 配置入口、资源护栏与 `adaptive` 并发边界. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
-requirements[16]{req_id,title,statement}:
+requirements[17]{req_id,title,statement}:
   r36,派生输出定义(同步聚合),"系统 SHALL 支持在同一次运行中定义派生输出,派生输出可基于详情数据进行聚合/计算,并在运行结束时输出结果."
   r280,增量聚合与批次累计,"系统 SHALL 支持派生输出以增量方式累计(按批次或流式),以避免加载全部详情数据."
   r404,派生输出的数据来源选择,"系统 SHALL 允许派生输出明确选择其数据来源(例如直接消费运行期事件/批次结果,或基于已落盘的详情输出),以平衡内存与 I/O 成本."
@@ -19,7 +19,8 @@ requirements[16]{req_id,title,statement}:
   r242,meta/audit 的稳定指纹与结构化审计,"系统 MUST 为每个 derived target 生成稳定聚合指纹,并写入 meta sheet. 系统 MUST 满足: - meta 中 MUST 写入聚合指纹 - 当聚合发生错误时,系统 MUST 写入结构化 audit 行(仅脱敏信息) - 指纹 MUST 使用 `sha256` 计算,不得用于签名/认证等安全目的"
   r251,aggregate producer key enums MUST be centralized,"系统 MUST 为 aggregate 输出相关的 producer keys 提供一个 SSOT 模块,并要求 YAML 解析、运行时装配、工具自省、JSON Schema、前端 editor 共享同一份枚举集合. 该 SSOT MUST 包含并可被引用: - metric producer keys - rank producer keys - post producer keys"
   r800,派生输出不再提供基数护栏配置,"系统 MUST NOT 为派生输出提供基数护栏配置(max_groups / max_distinct / distinct_on_overflow / dedup_by.on_overflow);相关的 IR 字段、运行期构造参数、YAML 字段与警告 MUST 被移除. 高基数聚合的内存风险由宿主系统层兜底,框架不再在进程内做基数限界."
-scenarios[38]{req_id,id,given,when,then,feature}:
+  r802,派生输出不再提供 score_by_rank 内置函数,"系统 MUST NOT 再提供 score_by_rank 内置后置派生字段. score_by_rank 的等价计算能力 MUST 通过 compute 表达式实现,公式为 base - (rank - 1) * step. 相关的 schema 定义、parser 解析函数、runtime 编译函数、AGG_POST_PRODUCER_KEYS 枚举项 MUST 被移除."
+scenarios[41]{req_id,id,given,when,then,feature}:
   r36,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r36,"订单明细-供应商利润率","",详情输出包含订单ID/订单金额/订单利润/供应商ID,系统应生成包含供应商ID与利润率的汇总输出,true
   r280,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
@@ -58,3 +59,6 @@ scenarios[38]{req_id,id,given,when,then,feature}:
   r251,"json-schema-editor-bundles-同步","",系统生成 canonical JSON schema,schema 中 producer keys 的可选集合 MUST 与 SSOT 一致,true
   r800,残留护栏字段被拒绝,YAML 配置中残留 max_groups / max_distinct / distinct_on_overflow / dedup_by.on_overflow 任一字段,解析该配置,"系统 MUST fail-fast 报错并给出迁移提示(建议移除该字段)",true
   r800,"IR-构造不再接受护栏参数",代码构造 DerivedGroupBySpec 或 DedupBySpec 时传入 max_groups/max_distinct/distinct_on_overflow/on_overflow,调用构造器,系统 MUST 报 TypeError(参数不存在),true
+  r802,残留 score_by_rank 字段被拒绝,YAML outputs.<name>.aggregate.fields 中存在 score_by_rank producer key,解析该配置,"系统 MUST fail-fast 报错并给出迁移提示(建议替换为 compute 表达式)",true
+  r802,compute 表达式等价替代,YAML 中用 compute 表达式替代 score_by_rank,运行派生输出,系统 MUST 产生与原来 score_by_rank 相同的积分列输出,true
+  r802,AGG_POST_PRODUCER_KEYS 不再包含 score_by_rank,"",读取 AGG_POST_PRODUCER_KEYS 枚举,score_by_rank MUST NOT 出现在 post producer keys 中,true
