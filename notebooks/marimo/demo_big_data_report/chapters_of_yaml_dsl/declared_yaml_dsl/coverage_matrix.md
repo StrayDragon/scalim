@@ -126,7 +126,7 @@
   - `count_distinct`: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
   - `dense_rank`: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
   - `row_number` + `partition_by`: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml`
-  - `score_by_rank`（rank_field/base/step）: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml`
+  - `compute`（替代已移除的 `score_by_rank`, `base - (rank - 1) * step`）: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml`
   - 断言点（章节）：
     - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch100_yaml_dsl_row_number_score_by_rank.py`
   - aggregate `compute`（DAG 派生）: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ads/ads_campaign_report.yaml`、`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`
