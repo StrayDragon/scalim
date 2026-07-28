@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "yaml-dsl-schema"
 purpose: "通过 dataclass 元数据生成 YAML DSL JSON Schema，作为校验与编辑器提示的唯一来源。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
-requirements[28]{req_id,title,statement}:
+requirements[31]{req_id,title,statement}:
   r127,YAML DSL JSON Schema generator MUST live in dev tooling and consume core SSOT,"系统 MUST 将 YAML DSL JSON Schema 的**结构/描述 SSOT** 与**生成器实现**分层： - 结构/描述 SSOT MUST 位于 schema 元数据模块（dataclass + metadata、枚举/默认值、字段描述文本等）。 - JSON Schema 的生成器实现（builder/writer/docs standardization pipeline）MUST 位于 dev tooling packages。 - 生成器 MUST 以 core SSOT 为唯一来源构建 schema，不得在 dev 包中复制字段枚举/默认值/描述文案的另一份真相。 - runtime core MUST NOT 导入 dev tooling packages，包括 optional hook / 动态导入方式。"
   r369,schema generation entrypoint MUST remain single and output location MUST remain,"系统 MUST 保持 schema 生成入口与生成物位置为稳定契约： - 唯一生成入口 MUST 为 schema 生成脚本 - 生成物 MUST 写入 schema 输出目录 - 生成物为 `.gen.` 文件，MUST NOT 手工编辑（只能通过生成入口刷新）"
   r489,enums and defaults MUST be sourced from schema_dsl SSOT,"系统 MUST 将 YAML DSL 的枚举/默认值/描述文本收敛到 schema_dsl 作为单点 SSOT. 约束: - runtime validator/parser MUST 引用 schema_dsl 的导出，不得复制同一份枚举/默认值常量 - 系统 MUST 提供一致性自检（测试或脚本），确保 schema 接受的枚举与 runtime 接受的枚举一致"
@@ -30,8 +30,11 @@ requirements[28]{req_id,title,statement}:
   r396,`outputs.*.fields` 支持 YAML alias 与 object 条目,"系统 MUST 允许 `outputs[*].fields` 的每一项为以下两种之一： - `field_id` 字符串（已弃用，推荐使用显式对象） - YAML alias（object）条目：条目为某个\"已定义字段对象\"的 alias（展开后为 dict），系统 MUST 将其解析为该字段对象对应的 `field_id` 字段对象的来源包括： - `main_source.fields.*` - `sources.*.fields.*` - 顶层派生字段 `fields.*` schema MUST 在生成的 YAML DSL JSON Schema 中允许 `outputs[*].fields.items` 为 `string | object`，以避免 schema-only 校验与编辑器提示拦截 alias 写法。 当 object 条目无法通过\"对象身份\"（identity）反查到字段对象时，系统 SHALL 允许基于内容相等做兜底匹配，但仅当匹配结果唯一时才允许成功解析。"
   r397,"schema MUST support `{$init_var: <name>}` for resource paths","系统 MUST 在 YAML DSL JSON Schema 中对资源路径字段支持 `{$init_var: <name>}` 指令节点注入输出路径（对象节点，不是字符串插值）： - 路径字段 MUST 支持非空静态字符串路径或 `{$init_var: <name>}` 指令节点 - 路径字段为空字符串 MUST 被拒绝 说明： - `.xlsx` 输出路径注入通过 books 资源与 export_xlsx 路径字段。"
   r398,"kind-based `if/then` constraints MUST NOT trigger when `kind` is missing","系统 MUST 生成 JSON schema，使得所有基于 `kind` 分支的 `if/then` 约束在 `kind` 缺失时不触发。 动机： - 编辑器侧的 YAML schema 校验不会展开 `$import`，因此允许存在 `{ $import: ... }` 形态的 mapping（此时 `kind` 通常在 fragment 内声明）。 - JSON schema 的 `properties.kind.const` 在 `kind` 缺失时不会失败，若不额外约束会导致 `then` 被错误触发，产生假阳性。 约束： - 当 `if` 用于匹配 `properties.kind.const`（或等价模式）时，`if` MUST 同时包含 `required: [\"kind\"]`。 - 此要求 MUST 覆盖所有使用 kind-variant 生成模式的定义。"
+  r128,"workflow `resources` schema MUST expose only runtime-supported keys","workflow `resources` 的 schema 与静态校验面 MUST 以 runtime parser / compiler 实际支持的结构为准: - `workflow.resources` MUST NOT 暴露 runtime 不支持的 keys - `workflow.resources` MUST NOT 支持 imports expansion 或 `$import` - 当用户写入被移除的旧 key 时,系统 MUST 提供可执行的 migration hint"
+  r370,generated numeric constraints MUST declare numeric types,"凡是生成到 JSON Schema 的 numeric constraints,若使用了 `minimum`、`maximum`、`exclusiveMinimum` 或 `exclusiveMaximum`,对应 schema 节点 MUST 同时显式声明 `type: number` 或 `type: integer`。"
+  r490,"schema/workflow drift gate MUST protect the highest-risk surfaces first","仓库 MUST 提供针对高风险 drift 的自动化 gate,至少覆盖: - `workflow.resources` allowed keys 集合 - numeric constraints typing 完整性"
   r28,schema MUST NOT expose runtime policy fields,"某些字段属于 runtime policy（可能包含敏感信息或仅为运行时配置），系统 MUST 不将其作为 demand YAML stable authoring 字段暴露在 schema 中。 包括但不限于： - `include_full_error_message`"
-scenarios[66]{req_id,id,given,when,then,feature}:
+scenarios[72]{req_id,id,given,when,then,feature}:
   r127,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r127,"changing-a-field-description-only-touches-core-ssot","",维护者更新某个 YAML 字段的描述性信息,变更 MUST 只发生在 schema 元数据模块,true
   r127,"missing-dev-package-does-not-break-runtime-imports",用户环境未安装 dev tooling 包,用户仅使用 runtime 能力或 import 主包,import 与运行 MUST 成功,true
@@ -98,3 +101,9 @@ scenarios[66]{req_id,id,given,when,then,feature}:
   r398,"schema-validates-import-based-mapping-without-false-positive","demand YAML 中资源使用 `{ $import: <fragment> }` 且 fragment 内声明 `kind`",VSCode YAML schema（不展开 `$import`）对主 YAML 进行校验,MUST NOT 报告假阳性错误,true
   r28,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r28,"schema-no-longer-exposes-runtime-policy-fields","",生成 demand JSON Schema,schema MUST NOT 暴露 runtime policy 专用字段,true
+  r128,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r128,"workflow-resource-import-syntax-is-rejected-before-runtime",某个 workflow YAML 在 `workflow.resources.books.<id>` 下写入 `$import`,用户执行 schema 校验或 workflow validate,系统 MUST 将其识别为不受支持的结构,true
+  r370,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r370,"schema-generation-fails-on-a-clearly-invalid-numeric-constra","",schema generation 遇到某个节点声明 minimum 但未声明数值类型,生成流程 MUST fail-fast,true
+  r490,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r490,"a-drift-regression-is-caught-by-the-gate","","某次改动让 workflow schema 暴露了 runtime 不支持的 key 或重新引入 numeric typing hole",自动化 gate MUST 在提交前或 CI 中失败,true
