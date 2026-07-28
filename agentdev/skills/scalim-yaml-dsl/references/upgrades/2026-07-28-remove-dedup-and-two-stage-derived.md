@@ -13,7 +13,7 @@ BREAKING：移除派生输出上的 Python-only 装配原语 `dedup_by` / `two_s
 
 **保留**：`DerivedGroupBySpec` + metrics（含 `count_distinct` / `count_true` / `count_true_gte`）、rank、post `compute`/`call_by`。
 
-对应 change：`llmanspec/changes/c10-remove-dedup-and-two-stage-derived/`
+对应 change：`llmanspec/changes/archive/2026-07-28-c10-remove-dedup-and-two-stage-derived/`
 
 历史上下文：`2026-03-13-derived-outputs-set-aggregations.md`（引入）；`2026-07-24-remove-derived-outputs-cardinality-guardrails.md`（曾收窄 `DedupBySpec` 护栏字段，本批次整类删除）。
 

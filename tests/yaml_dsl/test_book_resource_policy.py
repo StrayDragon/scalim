@@ -107,3 +107,20 @@ def test_materialize_resources_policy_onto_books_write_defaults_only() -> None:
 
     empty = replace(config, resources=None)
     assert materialize_resources_policy_onto_books(empty, policy) is empty
+
+
+def test_removed_book_budget_types_are_not_importable() -> None:
+    """r27: BookBudgetPolicy / budget_policy_for MUST NOT remain on public facade."""
+    import scalim.dsl.yaml_dsl as yaml_dsl_mod
+
+    removed = ("BookBudgetPolicy", "BookBudgetConfig", "BookBudgetOverride")
+    for name in removed:
+        assert not hasattr(yaml_dsl_mod, name), name
+        src = "from scalim.dsl.yaml_dsl import {}".format(name)
+        with pytest.raises(ImportError):
+            exec(src, {"__name__": "__not_main__"})
+
+    assert not hasattr(ResourcesPolicy, "budget_policy_for")
+    policy = ResourcesPolicy(books={"report": BookResourcePolicy()})
+    assert not hasattr(policy, "budget")
+    assert not hasattr(policy.books["report"], "budget")

@@ -8,7 +8,7 @@
 
 本批次做一次性 **BREAKING** 边界收敛: book 级写入策略与内存 budget 迁出 YAML authoring，改为 Python runtime policy SSOT。
 
-> 复制示例时只抄 **After** 段落；文中 `Before` 块里的 `write_defaults` / `BookWriteDefaultsOverride` / `BookBudgetOverride` 是故意展示的旧写法，不可再用于新代码。
+> 复制示例时只抄 **After** 段落里的 **write/`BookWritePolicy`** 部分；文中 `Before` 块与 After 里出现的 `BookBudgetPolicy` / `budget=` 是历史写法（budget 能力已删，见文首 NOTE），不可再用于新代码。
 
 - **BREAKING**: YAML `resources.books.*.write_defaults` 已移除（出现即 fail-fast + 迁移提示）
 - **BREAKING**: YAML `resources.books.*.xlsx_memory.budget` 已移除（出现即 fail-fast + 迁移提示）
@@ -82,11 +82,12 @@ resources:
         export_xlsx: {path: ./out}
 ```
 
-### 2) 在 Python 入口配置 policy
+### 2) 在 Python 入口配置 policy（write）
+
+> **历史**：本批次 After 曾同时配置 `budget=BookBudgetPolicy(...)`；该能力已在 `2026-07-28-remove-book-budget-policy` 删除——下面示例**只保留 write**。
 
 ```python
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWriteHeaderPolicy,
     BookWriteMode,
@@ -109,7 +110,6 @@ result = run_workflow(
                         mode=BookWriteMode.APPEND,
                         header_policy=BookWriteHeaderPolicy.ONCE,
                     ),
-                    budget=BookBudgetPolicy(max_sheets=8, max_total_cells=1_000_000),
                 )
             }
         ),

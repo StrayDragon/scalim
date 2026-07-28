@@ -4,12 +4,13 @@
 
 上位原则 SSOT: `llmanspec/specs/governance-mainline-principles/spec.toon`。
 
-**Authoring 边界速记**（`c20`/`c30`/`c15`/`c20-unified`/`c25`/`c999` 已归档；`remove-book-budget-policy` 已移除 book cell/sheet 预算）:
+**Authoring 边界速记**（`c20`/`c30`/`c15`/`c20-unified`/`c25`/`c999` 已归档；`remove-book-budget-policy` / `remove-dedup-and-two-stage-derived` 已归档）:
 - YAML `resources.books`：仅 identity；唯一分支 `xlsx`（有 `path`=落盘，无 `path`=内存总线）；`xlsx_file` / `xlsx_memory` 已硬删；暂留 `allow_formulas`
 - 运行时身份：parse 后以 **pathful / pathless** 为准（勿把旧 kind 字符串当 IR SSOT）
 - Python：`WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`（`BookWritePolicy`）；省略 = builtin defaults
 - YAML 再写 `write_defaults` / `budget`（含旧 `xlsx_memory.budget`）→ fail-fast；`budget` 是**已删除能力**（删字段，勿迁到 Python）；内存风险交宿主限制
-- Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`2026-07-28-remove-book-budget-policy.md`
+- Python IR 勿再引用 `DedupBy*` / `TwoStageGroupBy*`（已移除；loader 去重 / workflow 两段 demand）
+- Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`2026-07-28-remove-book-budget-policy.md`、`2026-07-28-remove-dedup-and-two-stage-derived.md`
 - 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。进程内 book cell/sheet 预算护栏已移除（见 `2026-07-28-remove-book-budget-policy`）
 ## 0) 必须遵守的主线原则(硬约束)
 

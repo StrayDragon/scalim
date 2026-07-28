@@ -113,10 +113,10 @@
   - llmanspec: `llmanspec/changes/archive/2026-07-24-c0-remove-score-by-rank-builtin/`
 - 2026-07-28: remove-book-budget-policy
   - SSOT: `references/upgrades/2026-07-28-remove-book-budget-policy.md`
-  - llmanspec: `llmanspec/changes/c0-remove-book-budget-policy/`
+  - llmanspec: `llmanspec/changes/archive/2026-07-28-c0-remove-book-budget-policy/`
 - 2026-07-28: remove-dedup-and-two-stage-derived
   - SSOT: `references/upgrades/2026-07-28-remove-dedup-and-two-stage-derived.md`
-  - llmanspec: `llmanspec/changes/c10-remove-dedup-and-two-stage-derived/`
+  - llmanspec: `llmanspec/changes/archive/2026-07-28-c10-remove-dedup-and-two-stage-derived/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

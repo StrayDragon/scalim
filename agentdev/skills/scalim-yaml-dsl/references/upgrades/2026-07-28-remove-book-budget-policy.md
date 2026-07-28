@@ -12,7 +12,7 @@ BREAKING：移除 pathless/pathful book 的进程内 cell/sheet 预算护栏。
 
 **保留**：`BookWritePolicy`（写入策略 Python SSOT）；workflow `cache_pool` budget（另一套能力）。
 
-对应 change：`llmanspec/changes/c0-remove-book-budget-policy/`
+对应 change：`llmanspec/changes/archive/2026-07-28-c0-remove-book-budget-policy/`
 
 历史上下文：`2026-07-12-book-write-policy-python-ssot.md`（当时把 budget 迁到 Python；本批次删除该能力）。
 
