@@ -269,6 +269,9 @@ go.sum
 # Local artifacts / CI uploads (not committed)
 .tmp/
 
+# Accidental notebook/local scratch at repo root (do not commit)
+/out.csv
+
 # Viz replay artifacts (generated; not committed)
 artifacts/scalim-viz/
 
