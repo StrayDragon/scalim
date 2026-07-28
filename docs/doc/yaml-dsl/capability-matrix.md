@@ -81,7 +81,7 @@
 | `resources.files.<id>.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast;相对路径相对 **YAML 文件目录** | 用 Python 侧 `init_vars` 注入、`BookResourceOverride`/`FileResourceOverride` 覆盖,或改用绝对路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |
-| `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | 当前 YAML 只暴露 `group_by+metrics` 这一类派生汇总 | 更复杂派生输出装配走 Python-only `OutputCompositionSpec` |
+| `outputs.*.aggregate` | `DerivedOutputTargetSpec.derived`(group_by) | YAML 暴露 `group_by` + `fields`(metric / rank / `compute` / `call_by`);旧 `metrics` 与基数护栏字段(`max_groups` 等)已移除并 fail-fast | 更复杂派生输出装配(如 `dedup_by` / 两阶段)走 Python-only `OutputCompositionSpec` |
 | `outputs.*.from` | 输出继承(字段/容器) | 不继承 where/aggregate | - |
 | `meta` / `audit`（已迁出） | `OutputCompositionSpec.meta_sheet/audit_sheet` | 不再属于 YAML 主线;通过 `RunOverrides.output_extras` 配置(需要 workbook 上下文;workflow 模式不支持显式 path) | `run(..., options=DemandRunOptions(..., outputs=DemandRunOutputOptions(overrides=RunOverrides(output_extras=OutputExtrasOverride(meta=True, audit=True)))))` |
 | `failure_policy`（已迁出） | `OutputCompositionSpec.failure_policy` | `all_fail/primary_only` | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(demand_failure_policy=\"all_fail\"|\"primary_only\")))` |

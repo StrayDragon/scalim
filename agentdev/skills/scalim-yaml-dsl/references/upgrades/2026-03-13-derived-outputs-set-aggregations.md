@@ -26,10 +26,12 @@
 > 上述 `max_groups` / `max_distinct` / `distinct_on_overflow` / `dedup_by.on_overflow` 基数护栏体系已整体移除。
 > `count_distinct` 的 distinct 状态退化为无界 `set`;高基数聚合的内存风险交由宿主系统层(如 `OOM` killer)兜底。
 > meta/audit 中的 `truncated` 标记与截断审计行也不再产生。`dedup_by.on_conflict` / `DedupOnConflictPolicy` 作为去重本职语义保留。
+>
+> **迁移 SSOT**: `2026-07-24-remove-derived-outputs-cardinality-guardrails.md`
 
 ## 升级建议
 
 - 若你仅使用基础 `group_by` + `count/sum/min/max/count_true`,不需要改动。
 - 若需要 distinct/去重/两阶段口径:
-  - 基数护栏已移除: 无需(也无法)再设置 `max_distinct` / `distinct_on_overflow` / `on_overflow`;残留字段会在解析期 `fail-fast`。
+  - 基数护栏已移除: 详见 `2026-07-24-remove-derived-outputs-cardinality-guardrails.md`;残留字段会在解析期 `fail-fast`。
   - 若必须使用 `first/last`,确保运行在 `parallel_mode="seq"` 以保持确定性与可对拍。

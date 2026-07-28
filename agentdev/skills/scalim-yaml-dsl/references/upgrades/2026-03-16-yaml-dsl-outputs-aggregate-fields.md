@@ -88,7 +88,8 @@ score:
 ```
 
 > **历史**: `score_by_rank`(内置)已于 2026-07-24 移除,等价能力通过 `compute` 表达式实现.
-> 迁移: `score_by_rank: {rank_field: rank, base: 100, step: 10}` → `compute: "100 - (rank - 1) * 10"`
+> **迁移 SSOT**: `2026-07-24-remove-score-by-rank-builtin.md`
+> 速查: `score_by_rank: {rank_field: rank, base: 100, step: 10}` → `compute: "100 - (rank - 1) * 10"`
 
 ### 2) `call_by`(hotfix 口子,弱补全但受 allowlist 约束)
 

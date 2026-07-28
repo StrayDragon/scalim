@@ -33,4 +33,6 @@
 - [2026-07-18 — `ISink.discard` 显式失败清理合约](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-18-sink-discard-explicit-contract.md)
 - [2026-07-18 — tabular bus object + sink accept / opt-in precheck](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-18-tabular-bus-object-sink-accept-precheck.md)
 - [2026-07-20: remove-deprecated-xlsx-file-memory-kinds](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md)
+- [2026-07-24: remove-derived-outputs-cardinality-guardrails](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-24-remove-derived-outputs-cardinality-guardrails.md)
+- [2026-07-24: remove-score-by-rank-builtin](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-24-remove-score-by-rank-builtin.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->
