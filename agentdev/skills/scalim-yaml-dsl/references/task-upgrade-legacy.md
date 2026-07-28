@@ -28,6 +28,7 @@
 | `BookWriteDefaultsOverride` / `BookBudgetOverride` / write·budget overlay | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`（write→`BookWritePolicy`）；budget 再删见 `2026-07-28-remove-book-budget-policy.md` |
 | `BookBudgetPolicy` / `budget=` on `BookResourcePolicy` | `references/upgrades/2026-07-28-remove-book-budget-policy.md` |
 | `max_groups was removed` / `max_distinct was removed` / `distinct_on_overflow was removed` / cardinality guardrails | `references/upgrades/2026-07-24-remove-derived-outputs-cardinality-guardrails.md` |
+| `DedupBySpec` / `DerivedDedupByGroupBySpec` / `TwoStageGroupBySpec` / `ScalimDedupKeyConflictError` / `DedupOnConflictPolicy` | `references/upgrades/2026-07-28-remove-dedup-and-two-stage-derived.md`（loader 去重 / workflow 两段 demand） |
 | `has removed 'score_by_rank'` / `score_by_rank` → `compute` | `references/upgrades/2026-07-24-remove-score-by-rank-builtin.md` |
 | `workflow.options` / `cache_pool` in YAML / `share_preload_cache` | 查 upgrades 摘要里 runtime-policy / workflow 相关批次；**不要**照抄 `2026-03-18` 里已过时的 `workflow.options.ctx` / `sheetbooks` 写法 |
 | `sheetbooks` / `workbooks` / `writes:` (旧 workflow 字段) | 先读 `2026-03-18` 理解历史，再以当前 `resources.books` + `2026-07-12` policy 为准 |
@@ -113,6 +114,9 @@
 - 2026-07-28: remove-book-budget-policy
   - SSOT: `references/upgrades/2026-07-28-remove-book-budget-policy.md`
   - llmanspec: `llmanspec/changes/c0-remove-book-budget-policy/`
+- 2026-07-28: remove-dedup-and-two-stage-derived
+  - SSOT: `references/upgrades/2026-07-28-remove-dedup-and-two-stage-derived.md`
+  - llmanspec: `llmanspec/changes/c10-remove-dedup-and-two-stage-derived/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

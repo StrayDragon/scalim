@@ -9,7 +9,6 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set,
 from .._internal.utils import graph as graph_utils
 from .._internal.utils.converters import auto_str_normalize
 from .._internal.utils.iterables import ordered_unique_str
-from ..exceptions import ScalimExecutionError
 from ..sinks import BaseRowSink, IRowSink
 from ..typedefs import CellValue, FieldValue, KeyNormalizationMode, RowData, RuntimeValue
 from ..vendor.compact.typing_extensionsx import override
@@ -30,20 +29,6 @@ def _auto_str_normalize_derived_key_part(*, value: RuntimeValue, field_id: str, 
 def _cell_value_as_int(value: CellValue) -> int:
     """将 `sink` 单元格值转为 `int`,供 `rank`/`top_k` 过滤使用."""
     return int(cast("Any", value or 0))  # pragma: allow-cast CellValue → int for rank/top_k
-
-
-class ScalimDedupKeyConflictError(ScalimExecutionError):
-    key_fields: Tuple[str, ...]
-    on_conflict: str
-
-    def __init__(self, *, key_fields: Sequence[str], on_conflict: str) -> None:
-        super(ScalimDedupKeyConflictError, self).__init__(
-            "dedup_by key conflict: on_conflict={!r} requires deterministic resolution; duplicate keys encountered (key_fields={})".format(
-                str(on_conflict), ",".join(str(x) for x in key_fields)
-            )
-        )
-        self.key_fields = tuple(str(x) for x in key_fields)
-        self.on_conflict = str(on_conflict)
 
 
 @dataclass
@@ -867,136 +852,6 @@ class _ReversibleValue:
         if not isinstance(other, _ReversibleValue):
             return False
         return bool(self.desc) == bool(other.desc) and self.value == other.value
-
-
-class DedupByThenAggregator(IRowAggregator):
-    _key_fields: Tuple[str, ...]
-    _on_conflict: str
-    _downstream: IRowAggregator
-    _store_fields: Tuple[str, ...]
-    _rows: Dict[Tuple[CellValue, ...], Dict[str, CellValue]]
-    _conflict_count: int
-    _key_normalization: KeyNormalizationMode
-
-    def __init__(
-        self,
-        *,
-        key_fields: Sequence[str],
-        on_conflict: str,
-        downstream: IRowAggregator,
-        key_normalization: KeyNormalizationMode = "raw",
-    ) -> None:
-        ids = [str(x) for x in key_fields if str(x)]
-        if not ids:
-            msg = "dedup_by requires key_fields"
-            raise ValueError(msg)
-        self._key_fields = tuple(ids)
-        self._on_conflict = str(on_conflict or "error").lower()
-        if self._on_conflict not in ("error", "first", "last"):
-            msg = "Unsupported dedup_by.on_conflict: {!r}".format(on_conflict)
-            raise ValueError(msg)
-
-        self._downstream = downstream
-        store_fields: List[str] = list(self._key_fields) + list(downstream.required_fields())
-        # 去重但保留顺序.
-        seen: Set[str] = set()
-        ordered: List[str] = []
-        for fid in store_fields:
-            if fid in seen:
-                continue
-            seen.add(fid)
-            ordered.append(fid)
-        self._store_fields = tuple(ordered)
-
-        self._rows = {}
-        self._conflict_count = 0
-        self._key_normalization = normalize_key_normalization(key_normalization)
-
-    @override
-    def required_fields(self) -> Tuple[str, ...]:
-        return self._store_fields
-
-    @override
-    def accumulate(self, row: RowData) -> None:
-        if self._key_normalization == "raw":
-            key = tuple(row.get(fid) for fid in self._key_fields)
-            stored_row = {fid: row.get(fid) for fid in self._store_fields}
-        else:
-            normalized_by_fid: Dict[str, CellValue] = {}
-            parts: List[CellValue] = []
-            for fid in self._key_fields:
-                normalized_part = _auto_str_normalize_derived_key_part(value=row.get(fid), field_id=fid, context="dedup_by")
-                normalized_by_fid[fid] = normalized_part
-                parts.append(normalized_part)
-            key = tuple(parts)
-            stored_row = {fid: (normalized_by_fid[fid] if fid in normalized_by_fid else row.get(fid)) for fid in self._store_fields}
-        existing = self._rows.get(key)
-        if existing is not None:
-            self._conflict_count += 1
-            if self._on_conflict == "error":
-                raise ScalimDedupKeyConflictError(key_fields=self._key_fields, on_conflict=self._on_conflict)
-            if self._on_conflict == "last":
-                self._rows[key] = stored_row
-            # `first`: 保留已有行
-            return
-
-        self._rows[key] = stored_row
-
-    @override
-    def finalize_rows(self) -> List[RowData]:
-        # 将 `dedup_by` 后的“实体行”按稳定顺序喂给下游聚合器,确保对拍友好.
-        for key in sorted(self._rows.keys(), key=_stable_group_key_tuple):
-            self._downstream.accumulate(self._rows[key])
-        return self._downstream.finalize_rows()
-
-    @override
-    def diagnostics(self) -> AggregatorDiagnostics:
-        diag = self._downstream.diagnostics()
-        meta = dict(diag.meta)
-        audit_events = list(diag.audit_events)
-
-        meta["dedup.key_count"] = len(self._rows)
-        meta["dedup.conflict_count"] = int(self._conflict_count)
-
-        return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
-
-
-class TwoStageGroupByAggregator(IRowAggregator):
-    _stage1: GroupByAggregator
-    _stage2: GroupByAggregator
-
-    def __init__(self, *, stage1: GroupByAggregator, stage2: GroupByAggregator) -> None:
-        self._stage1 = stage1
-        self._stage2 = stage2
-
-    @override
-    def required_fields(self) -> Tuple[str, ...]:
-        return self._stage1.required_fields()
-
-    @override
-    def accumulate(self, row: RowData) -> None:
-        self._stage1.accumulate(row)
-
-    @override
-    def finalize_rows(self) -> List[RowData]:
-        rows1 = self._stage1.finalize_rows()
-        for row in rows1:
-            self._stage2.accumulate(row)
-        return self._stage2.finalize_rows()
-
-    @override
-    def diagnostics(self) -> AggregatorDiagnostics:
-        diag1 = self._stage1.diagnostics()
-        diag2 = self._stage2.diagnostics()
-
-        meta: Dict[str, CellValue] = {}
-        for k, v in diag1.meta.items():
-            meta["stage1." + str(k)] = v
-        for k, v in diag2.meta.items():
-            meta["stage2." + str(k)] = v
-
-        audit_events = list(diag1.audit_events) + list(diag2.audit_events)
-        return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
 
 
 class AggregatingRowSink(BaseRowSink):

@@ -1,4 +1,12 @@
-"""派生聚合 set 口径示例的共享执行与对拍逻辑."""
+"""派生聚合 set 口径示例的共享执行与对拍逻辑.
+
+BREAKING (c10-remove-dedup-and-two-stage-derived):
+- `DedupBySpec` / `DerivedDedupByGroupBySpec` / `TwoStageGroupBySpec` 已移除.
+- 去重: 在 loader / 上游先去重, 或接受重复行后只用 `DerivedGroupBySpec`.
+- 两阶段聚合: 用 workflow 两个 demand/run(中间表 → 再聚合), 不再单进程 `TwoStageGroupBySpec`.
+
+本 demo 仅保留仍支持的 `count_distinct` + `DerivedGroupBySpec`.
+"""
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
@@ -7,24 +15,19 @@ from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_
 from scalim.execution.output_composition import (
     AggMetricSpec,
     AuditSheetSpec,
-    DedupBySpec,
-    DerivedDedupByGroupBySpec,
     DerivedGroupBySpec,
     DerivedOutputTargetSpec,
     MetaSheetSpec,
     OutputCompositionSpec,
     OutputTargetSpec,
-    TwoStageGroupBySpec,
 )
 
 from .cases import build_test_config_small
 from .loaders import get_config, set_config
-from .shared import build_ecommerce_model
+from .shared import build_ecommerce_model, build_ecommerce_runtime_bindings
 
 _SHEET_DETAIL = "Detail"
 _SHEET_DISTINCT = "Distinct"
-_SHEET_DEDUP = "Dedup"
-_SHEET_TWO_STAGE = "TwoStage"
 _SHEET_META = "Meta"
 _SHEET_AUDIT = "Audit"
 
@@ -35,11 +38,7 @@ class DerivedSetAggregationsDemoResult:
     sheet_names: List[str]
     detail_rows: List[Dict[str, Any]]
     distinct_rows: List[Dict[str, Any]]
-    dedup_rows: List[Dict[str, Any]]
-    two_stage_rows: List[Dict[str, Any]]
     expected_distinct_rows: List[Dict[str, Any]]
-    expected_dedup_rows: List[Dict[str, Any]]
-    expected_two_stage_rows: List[Dict[str, Any]]
     passed: bool
     message: str
 
@@ -54,30 +53,20 @@ def verify_derived_set_aggregations_workbook(workbook_path: str) -> "DerivedSetA
     workbook_path = str(workbook_path)
     detail_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DETAIL)
     distinct_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DISTINCT)
-    dedup_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_DEDUP)
-    two_stage_rows = _read_sheet_rows_as_dicts(workbook_path, _SHEET_TWO_STAGE)
 
     expected_distinct_rows = _expected_distinct_by_payment(detail_rows)
-    expected_dedup_rows = _expected_dedup_then_group(detail_rows)
-    expected_two_stage_rows = _expected_two_stage_hist(detail_rows)
 
     ok1, msg1 = _compare_rows(distinct_rows, expected_distinct_rows, ("payment_method_name", "customer_cnt"))
-    ok2, msg2 = _compare_rows(dedup_rows, expected_dedup_rows, ("payment_method_name", "customer_cnt"))
-    ok3, msg3 = _compare_rows(two_stage_rows, expected_two_stage_rows, ("order_cnt", "customer_cnt"))
 
-    passed = bool(ok1 and ok2 and ok3)
-    message = "{}\n{}\n{}".format(msg1, msg2, msg3)
+    passed = bool(ok1)
+    message = str(msg1)
 
     return DerivedSetAggregationsDemoResult(
         workbook_path=workbook_path,
         sheet_names=_read_workbook_sheet_names(workbook_path),
         detail_rows=detail_rows,
         distinct_rows=distinct_rows,
-        dedup_rows=dedup_rows,
-        two_stage_rows=two_stage_rows,
         expected_distinct_rows=expected_distinct_rows,
-        expected_dedup_rows=expected_dedup_rows,
-        expected_two_stage_rows=expected_two_stage_rows,
         passed=passed,
         message=message,
     )
@@ -89,6 +78,7 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
     set_config(build_test_config_small())
     try:
         demand_ir = build_ecommerce_model()
+        runtime_bindings = build_ecommerce_runtime_bindings()
 
         detail_fields: Tuple[str, ...] = (
             "order_id",
@@ -99,7 +89,6 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
         detail_layout = export_layout_from_demand_ir(demand_ir, detail_fields)
 
         distinct_layout = ExportLayout(field_ids=("payment_method_name", "customer_cnt"), header_names=None)
-        two_stage_layout = ExportLayout(field_ids=("order_cnt", "customer_cnt"), header_names=None)
 
         composition = OutputCompositionSpec(
             targets=(
@@ -132,51 +121,6 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
                         sheet_name=_SHEET_DISTINCT,
                     ),
                 ),
-                DerivedOutputTargetSpec(
-                    target_id="dedup_customer_then_group",
-                    derived=DerivedDedupByGroupBySpec(
-                        dedup_by=DedupBySpec(
-                            key_fields=("customer_name",),
-                            on_conflict="first",
-                        ),
-                        group_by=DerivedGroupBySpec(
-                            group_by=("payment_method_name",),
-                            metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
-                        ),
-                    ),
-                    output_layout=distinct_layout,
-                    output=OutputSpec(
-                        format="excel",
-                        path=workbook_path,
-                        streaming=True,
-                        include_header=True,
-                        sheet_name=_SHEET_DEDUP,
-                    ),
-                ),
-                DerivedOutputTargetSpec(
-                    target_id="two_stage_customer_order_cnt_hist",
-                    derived=TwoStageGroupBySpec(
-                        stage1=DerivedGroupBySpec(
-                            group_by=("customer_name",),
-                            metrics=(
-                                AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
-                                AggMetricSpec(out_field_id="product_cnt", op="count_distinct", field_id="product_name"),
-                            ),
-                        ),
-                        stage2=DerivedGroupBySpec(
-                            group_by=("order_cnt",),
-                            metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
-                        ),
-                    ),
-                    output_layout=two_stage_layout,
-                    output=OutputSpec(
-                        format="excel",
-                        path=workbook_path,
-                        streaming=True,
-                        include_header=True,
-                        sheet_name=_SHEET_TWO_STAGE,
-                    ),
-                ),
             ),
             meta_sheet=MetaSheetSpec(
                 target_id="meta",
@@ -198,6 +142,7 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
                 output=OutputSpec(path=None),
                 sink=None,
                 output_composition=composition,
+                runtime_bindings=runtime_bindings,
                 parallel_mode="seq",
                 batch_size=10,
             ),
@@ -248,39 +193,6 @@ def _expected_distinct_by_payment(detail_rows: List[Dict[str, Any]]) -> List[Dic
         groups.setdefault(payment, set()).add(customer_name)
     out = [{"payment_method_name": k, "customer_cnt": len(v)} for k, v in groups.items()]
     out.sort(key=lambda r: str(r.get("payment_method_name") or ""))
-    return out
-
-
-def _expected_dedup_then_group(detail_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    seen = set()
-    counts: Dict[str, int] = {}
-    for row in detail_rows:
-        customer_name = row.get("customer_name")
-        if customer_name in seen:
-            continue
-        seen.add(customer_name)
-        payment = str(row.get("payment_method_name") or "")
-        counts[payment] = counts.get(payment, 0) + 1
-    out = [{"payment_method_name": k, "customer_cnt": v} for k, v in counts.items()]
-    out.sort(key=lambda r: str(r.get("payment_method_name") or ""))
-    return out
-
-
-def _expected_two_stage_hist(detail_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    per_customer: Dict[object, Dict[str, object]] = {}
-    for row in detail_rows:
-        cid = row.get("customer_name")
-        bucket = per_customer.setdefault(cid, {"order_cnt": 0, "products": set()})
-        bucket["order_cnt"] = int(bucket["order_cnt"]) + 1
-        bucket["products"].add(row.get("product_name"))
-
-    hist: Dict[int, int] = {}
-    for item in per_customer.values():
-        order_cnt = int(item["order_cnt"])
-        hist[order_cnt] = hist.get(order_cnt, 0) + 1
-
-    out = [{"order_cnt": k, "customer_cnt": v} for k, v in hist.items()]
-    out.sort(key=lambda r: int(r.get("order_cnt") or 0))
     return out
 
 

@@ -2,21 +2,18 @@ from __future__ import absolute_import
 
 import hashlib
 from abc import ABC, abstractmethod
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from ...typedefs import FailurePolicy, KeyNormalizationMode, RowData
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass
-from .._output_composition_policies import DedupOnConflictPolicy
 from ..derived_outputs import (
     AggMetricSpec,
-    DedupByThenAggregator,
     GroupByAggregator,
     IRowAggregator,
     PostFieldSpec,
     RankedGroupByAggregator,
     RankFieldSpec,
-    TwoStageGroupByAggregator,
     build_finalize_dag_plan,
 )
 from ..output_contracts import ExportLayout, OutputSpec
@@ -130,6 +127,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
 
     @override
     def validate_parallel_mode(self, parallel_mode: str) -> None:
+        # 内置 group_by metrics 在 adaptive 下保持确定性；顺序依赖装配（旧 dedup_by.on_conflict）已移除。
         _ = str(parallel_mode or "").lower()
 
     @override
@@ -147,121 +145,6 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
             metrics=self.metrics,
             key_normalization=key_normalization,
         )
-
-
-@dataclass(frozen=True)
-class DedupBySpec:
-    key_fields: Tuple[str, ...]
-    on_conflict: str = "error"
-
-    def fingerprint_parts(self) -> Tuple[str, ...]:
-        parts: List[str] = []
-        parts.append("kind=dedup_by")
-        parts.append("key_fields=" + ",".join(str(x) for x in self.key_fields))
-        parts.append("on_conflict=" + (self.on_conflict or DedupOnConflictPolicy.ERROR).lower())
-        return tuple(parts)
-
-    def validate_parallel_mode(self, parallel_mode: str) -> None:
-        mode = str(parallel_mode or "").lower()
-        on_conflict = (self.on_conflict or DedupOnConflictPolicy.ERROR).lower()
-        if on_conflict not in (DedupOnConflictPolicy.ERROR, DedupOnConflictPolicy.FIRST, DedupOnConflictPolicy.LAST):
-            msg = "Unsupported dedup_by.on_conflict: {!r}".format(self.on_conflict)
-            raise ValueError(msg)
-        if mode == "adaptive" and on_conflict in (DedupOnConflictPolicy.FIRST, DedupOnConflictPolicy.LAST):
-            msg = (
-                "dedup_by.on_conflict={!r} is order-dependent and is not supported in parallel_mode='adaptive'; "
-                "use parallel_mode='seq' or switch to on_conflict='error'"
-            ).format(on_conflict)
-            raise ValueError(msg)
-
-
-@dataclass(frozen=True)
-class DerivedDedupByGroupBySpec(IDerivedAggregationSpec):
-    dedup_by: DedupBySpec
-    group_by: DerivedGroupBySpec
-
-    @override
-    def required_fields(self) -> Tuple[str, ...]:
-        required: List[str] = list(self.dedup_by.key_fields) + list(self.group_by.required_fields())
-        # 去重但保留顺序.
-        seen: Set[str] = set()
-        ordered: List[str] = []
-        for fid in required:
-            if fid in seen:
-                continue
-            seen.add(fid)
-            ordered.append(fid)
-        return tuple(ordered)
-
-    @override
-    def fingerprint_parts(self) -> Tuple[str, ...]:
-        parts: List[str] = ["kind=dedup_by+group_by", "dedup_by:"]
-        parts.extend(["  " + x for x in self.dedup_by.fingerprint_parts()])
-        parts.append("group_by:")
-        parts.extend(["  " + x for x in self.group_by.fingerprint_parts()])
-        return tuple(parts)
-
-    @override
-    def validate_parallel_mode(self, parallel_mode: str) -> None:
-        self.dedup_by.validate_parallel_mode(parallel_mode)
-        self.group_by.validate_parallel_mode(parallel_mode)
-
-    @override
-    def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
-        base = self.group_by.build_aggregator(key_normalization=key_normalization)
-        return DedupByThenAggregator(
-            key_fields=self.dedup_by.key_fields,
-            on_conflict=str(self.dedup_by.on_conflict),
-            downstream=base,
-            key_normalization=key_normalization,
-        )
-
-
-@dataclass(frozen=True)
-class TwoStageGroupBySpec(IDerivedAggregationSpec):
-    stage1: DerivedGroupBySpec
-    stage2: DerivedGroupBySpec
-
-    @override
-    def required_fields(self) -> Tuple[str, ...]:
-        return self.stage1.required_fields()
-
-    @override
-    def fingerprint_parts(self) -> Tuple[str, ...]:
-        parts: List[str] = ["kind=two_stage_group_by", "stage1:"]
-        parts.extend(["  " + x for x in self.stage1.fingerprint_parts()])
-        parts.append("stage2:")
-        parts.extend(["  " + x for x in self.stage2.fingerprint_parts()])
-        return tuple(parts)
-
-    @override
-    def validate_parallel_mode(self, parallel_mode: str) -> None:
-        if self.stage1.rank_fields or self.stage1.post_fields or self.stage2.rank_fields or self.stage2.post_fields:
-            msg = "two_stage_group_by does not support rank/post fields in stage specs"
-            raise ValueError(msg)
-        self.stage1.validate_parallel_mode(parallel_mode)
-        self.stage2.validate_parallel_mode(parallel_mode)
-
-        stage1_fields: Set[str] = set(self.stage1.group_by)
-        stage1_fields.update([str(m.out_field_id) for m in self.stage1.metrics])
-        missing = [x for x in self.stage2.required_fields() if x not in stage1_fields]
-        if missing:
-            msg = "two_stage_group_by stage2 requires fields not produced by stage1: {}".format(", ".join(sorted(missing)))
-            raise ValueError(msg)
-
-    @override
-    def build_aggregator(self, *, key_normalization: KeyNormalizationMode = "raw") -> IRowAggregator:
-        agg1 = GroupByAggregator(
-            group_by=self.stage1.group_by,
-            metrics=self.stage1.metrics,
-            key_normalization=key_normalization,
-        )
-        agg2 = GroupByAggregator(
-            group_by=self.stage2.group_by,
-            metrics=self.stage2.metrics,
-            key_normalization=key_normalization,
-        )
-        return TwoStageGroupByAggregator(stage1=agg1, stage2=agg2)
 
 
 @dataclass(frozen=True)

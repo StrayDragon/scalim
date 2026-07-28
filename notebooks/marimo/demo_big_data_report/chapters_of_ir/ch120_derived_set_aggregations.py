@@ -1,4 +1,4 @@
-"""Cells-native: ch120_derived_set_aggregations — distinct, dedup, two-stage."""
+"""Cells-native: ch120_derived_set_aggregations — count_distinct (+ migration notes)."""
 
 import marimo
 
@@ -8,9 +8,18 @@ app = marimo.App(width="full")
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""# Derived Set Aggregations: Distinct, Dedup, Two-Stage
+    mo.md(
+        r"""# Derived Set Aggregations: `count_distinct`
 
-演示 count_distinct / dedup + group-by / two-stage group-by 工作簿。""")
+演示 `DerivedGroupBySpec` + `count_distinct`。
+
+**已移除**（BREAKING）: `DedupBySpec` / `DerivedDedupByGroupBySpec` / `TwoStageGroupBySpec`。
+
+迁移替代:
+- 去重 → loader / 上游先去重，或接受重复行后只用 `DerivedGroupBySpec`
+- 两阶段聚合 → workflow 两个 demand/run（中间表 → 再聚合）
+"""
+    )
     return
 
 
@@ -38,14 +47,11 @@ def _():
     from scalim.execution.output_composition import (
         AggMetricSpec,
         AuditSheetSpec,
-        DedupBySpec,
-        DerivedDedupByGroupBySpec,
         DerivedGroupBySpec,
         DerivedOutputTargetSpec,
         MetaSheetSpec,
         OutputCompositionSpec,
         OutputTargetSpec,
-        TwoStageGroupBySpec,
     )
     from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
     from scalim_misc.demo_big_data_report.cases import build_test_config_small
@@ -59,8 +65,6 @@ def _():
     return (
         AggMetricSpec,
         AuditSheetSpec,
-        DedupBySpec,
-        DerivedDedupByGroupBySpec,
         DerivedGroupBySpec,
         DerivedOutputTargetSpec,
         DerivedSetAggregationsDemoResult,
@@ -72,7 +76,6 @@ def _():
         OutputSpec,
         OutputTargetSpec,
         Path,
-        TwoStageGroupBySpec,
         build_ecommerce_model,
         build_ecommerce_runtime_bindings,
         build_test_config_small,
@@ -104,8 +107,6 @@ def _(build_ecommerce_model, build_ecommerce_runtime_bindings, cfg):
 def _(
     AggMetricSpec,
     AuditSheetSpec,
-    DedupBySpec,
-    DerivedDedupByGroupBySpec,
     DerivedGroupBySpec,
     DerivedOutputTargetSpec,
     ExecutionRequest,
@@ -115,7 +116,6 @@ def _(
     OutputSpec,
     OutputTargetSpec,
     Path,
-    TwoStageGroupBySpec,
     demand_ir,
     export_layout_from_demand_ir,
     run_ir,
@@ -130,7 +130,6 @@ def _(
         detail_fields = ("order_id", "customer_name", "product_name", "payment_method_name")
         detail_layout = export_layout_from_demand_ir(demand_ir, detail_fields)
         distinct_layout = ExportLayout(field_ids=("payment_method_name", "customer_cnt"), header_names=None)
-        two_stage_layout = ExportLayout(field_ids=("order_cnt", "customer_cnt"), header_names=None)
 
         composition = OutputCompositionSpec(
             targets=(
@@ -150,36 +149,6 @@ def _(
                     ),
                     output_layout=distinct_layout,
                     output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Distinct"),
-                ),
-                DerivedOutputTargetSpec(
-                    target_id="dedup_customer_then_group",
-                    derived=DerivedDedupByGroupBySpec(
-                        dedup_by=DedupBySpec(key_fields=("customer_name",), on_conflict="first"),
-                        group_by=DerivedGroupBySpec(
-                            group_by=("payment_method_name",),
-                            metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
-                        ),
-                    ),
-                    output_layout=distinct_layout,
-                    output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="Dedup"),
-                ),
-                DerivedOutputTargetSpec(
-                    target_id="two_stage_customer_order_cnt_hist",
-                    derived=TwoStageGroupBySpec(
-                        stage1=DerivedGroupBySpec(
-                            group_by=("customer_name",),
-                            metrics=(
-                                AggMetricSpec(out_field_id="order_cnt", op="count", field_id="order_id"),
-                                AggMetricSpec(out_field_id="product_cnt", op="count_distinct", field_id="product_name"),
-                            ),
-                        ),
-                        stage2=DerivedGroupBySpec(
-                            group_by=("order_cnt",),
-                            metrics=(AggMetricSpec(out_field_id="customer_cnt", op="count"),),
-                        ),
-                    ),
-                    output_layout=two_stage_layout,
-                    output=OutputSpec(format="excel", path=str(wb_path), streaming=True, include_header=True, sheet_name="TwoStage"),
                 ),
             ),
             meta_sheet=MetaSheetSpec(

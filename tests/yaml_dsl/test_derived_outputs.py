@@ -290,48 +290,6 @@ def test_count_distinct_single_and_composite_and_missing_value_semantics() -> No
     assert diag.audit_events == []
 
 
-def test_dedup_by_on_conflict_variants() -> None:
-    base = mod.GroupByAggregator(
-        group_by=("g",),
-        metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
-    )
-
-    first = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="first",
-        downstream=base,
-    )
-    first.accumulate({"k": "a", "g": "x", "v": 1})
-    first.accumulate({"k": "a", "g": "x", "v": 9})
-    first.accumulate({"k": "b", "g": "x", "v": 2})
-    assert first.finalize_rows() == [{"g": "x", "sum_v": 3}]
-
-    last = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="last",
-        downstream=mod.GroupByAggregator(
-            group_by=("g",),
-            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
-        ),
-    )
-    last.accumulate({"k": "a", "g": "x", "v": 1})
-    last.accumulate({"k": "a", "g": "x", "v": 9})
-    last.accumulate({"k": "b", "g": "x", "v": 2})
-    assert last.finalize_rows() == [{"g": "x", "sum_v": 11}]
-
-    err = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="error",
-        downstream=mod.GroupByAggregator(
-            group_by=("g",),
-            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
-        ),
-    )
-    err.accumulate({"k": "a", "g": "x", "v": 1})
-    with pytest.raises(mod.ScalimDedupKeyConflictError):
-        err.accumulate({"k": "a", "g": "x", "v": 9})
-
-
 def test_group_by_diagnostics_skips_unexpected_distinct_metric_state() -> None:
     agg = mod.GroupByAggregator(
         group_by=("g",),
@@ -346,53 +304,8 @@ def test_group_by_diagnostics_skips_unexpected_distinct_metric_state() -> None:
     assert diag.meta["metric.u.distinct_keys_total"] == 0
 
 
-def test_dedup_by_validation_required_fields_and_dedup_diagnostics() -> None:
-    downstream = mod.GroupByAggregator(
-        group_by=("g",),
-        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
-    )
-
-    with pytest.raises(ValueError, match="dedup_by requires key_fields"):
-        _ = mod.DedupByThenAggregator(  # type: ignore[arg-type]
-            key_fields=(),
-            on_conflict="first",
-            downstream=downstream,
-        )
-    with pytest.raises(ValueError, match="Unsupported dedup_by.on_conflict"):
-        _ = mod.DedupByThenAggregator(
-            key_fields=("k",),
-            on_conflict="middle",
-            downstream=downstream,
-        )
-
-    # key_fields 与下游 required_fields 重叠时,仍应保序去重.
-    dedup_key_overlaps = mod.DedupByThenAggregator(
-        key_fields=("g",),
-        on_conflict="first",
-        downstream=downstream,
-    )
-    assert dedup_key_overlaps.required_fields() == ("g",)
-
-    # 诊断: 无基数护栏后, `dedup.key_count` 反映保留的实体键数, `conflict_count` 反映冲突次数.
-    dedup = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="first",
-        downstream=mod.GroupByAggregator(
-            group_by=("g",),
-            metrics=(mod.AggMetricSpec(out_field_id="sum_v", op="sum", field_id="v"),),
-        ),
-    )
-    dedup.accumulate({"k": "a", "g": "x", "v": 1})
-    dedup.accumulate({"k": "a", "g": "x", "v": 100})
-    dedup.accumulate({"k": "b", "g": "x", "v": 2})
-    assert dedup.finalize_rows() == [{"g": "x", "sum_v": 3}]
-    diag = dedup.diagnostics()
-    assert diag.meta["dedup.key_count"] == 2
-    assert diag.meta["dedup.conflict_count"] == 1
-    assert not any(e.get("event_type") == "dedup_truncated" for e in diag.audit_events)
-
-
-def test_two_stage_group_by_and_count_true_gte() -> None:
+def test_count_true_gte_via_manual_stage_feed() -> None:
+    # Migration alternative to removed TwoStageGroupByAggregator: stage1 finalize → stage2 accumulate.
     stage1 = mod.GroupByAggregator(
         group_by=("cs_id", "user_id"),
         metrics=(mod.AggMetricSpec(out_field_id="pay_order_cnt", op="count", field_id="order_id"),),
@@ -401,8 +314,7 @@ def test_two_stage_group_by_and_count_true_gte() -> None:
         group_by=("cs_id",),
         metrics=(mod.AggMetricSpec(out_field_id="repeat_paid_users", op="count_true_gte", field_id="pay_order_cnt", threshold=2),),
     )
-    agg = mod.TwoStageGroupByAggregator(stage1=stage1, stage2=stage2)
-    assert agg.required_fields() == ("cs_id", "user_id", "order_id")
+    assert stage1.required_fields() == ("cs_id", "user_id", "order_id")
 
     rows = [
         {"order_id": 1, "cs_id": 1, "user_id": "u1"},
@@ -413,16 +325,18 @@ def test_two_stage_group_by_and_count_true_gte() -> None:
         {"order_id": 6, "cs_id": 2, "user_id": "u3"},
     ]
     for r in rows:
-        agg.accumulate(r)
+        stage1.accumulate(r)
 
-    out = agg.finalize_rows()
+    for mid in stage1.finalize_rows():
+        stage2.accumulate(mid)
+
+    out = stage2.finalize_rows()
     assert out == [
         {"cs_id": 1, "repeat_paid_users": 1},
         {"cs_id": 2, "repeat_paid_users": 1},
     ]
-    diag = agg.diagnostics()
-    assert diag.meta["stage1.group_count"] == 3
-    assert diag.meta["stage2.group_count"] == 2
+    assert stage1.diagnostics().meta["group_count"] == 3
+    assert stage2.diagnostics().meta["group_count"] == 2
 
 
 def test_group_by_aggregator_key_normalization_merges_semantically_equal_keys() -> None:
@@ -447,59 +361,5 @@ def test_group_by_aggregator_key_normalization_fail_fast_message_is_safe() -> No
     with pytest.raises(ValueError) as excinfo:
         agg.accumulate({"g": raw})
     assert "key_normalization failed for group_by key field" in str(excinfo.value)
-    assert "type=object" in str(excinfo.value)
-    assert "0x" not in str(excinfo.value)
-
-
-def test_dedup_by_then_aggregator_key_normalization_merges_and_outputs_normalized_key() -> None:
-    downstream = mod.GroupByAggregator(
-        group_by=("k",),
-        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
-        key_normalization="auto_str",  # type: ignore[arg-type]
-    )
-    agg = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="first",
-        downstream=downstream,
-        key_normalization="auto_str",  # type: ignore[arg-type]
-    )
-    agg.accumulate({"k": 1})
-    agg.accumulate({"k": "1"})
-    assert agg.finalize_rows() == [{"k": "1", "cnt": 1}]
-
-
-def test_dedup_by_then_aggregator_key_normalization_conflict_uses_normalized_key() -> None:
-    downstream = mod.GroupByAggregator(
-        group_by=("k",),
-        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
-        key_normalization="auto_str",  # type: ignore[arg-type]
-    )
-    agg = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="error",
-        downstream=downstream,
-        key_normalization="auto_str",  # type: ignore[arg-type]
-    )
-    agg.accumulate({"k": 1})
-    with pytest.raises(mod.ScalimDedupKeyConflictError):
-        agg.accumulate({"k": "1"})
-
-
-def test_dedup_by_then_aggregator_key_normalization_fail_fast_message_is_safe() -> None:
-    downstream = mod.GroupByAggregator(
-        group_by=("k",),
-        metrics=(mod.AggMetricSpec(out_field_id="cnt", op="count"),),
-        key_normalization="auto_str",  # type: ignore[arg-type]
-    )
-    agg = mod.DedupByThenAggregator(
-        key_fields=("k",),
-        on_conflict="first",
-        downstream=downstream,
-        key_normalization="auto_str",  # type: ignore[arg-type]
-    )
-    raw = object()
-    with pytest.raises(ValueError) as excinfo:
-        agg.accumulate({"k": raw})
-    assert "key_normalization failed for dedup_by key field" in str(excinfo.value)
     assert "type=object" in str(excinfo.value)
     assert "0x" not in str(excinfo.value)

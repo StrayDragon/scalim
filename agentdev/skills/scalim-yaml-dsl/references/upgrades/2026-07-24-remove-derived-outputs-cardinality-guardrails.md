@@ -8,7 +8,7 @@ BREAKING：派生输出（derived outputs）的**基数护栏体系**整体移�
 |---|---|
 | YAML `outputs.<name>.aggregate` | `max_groups` / `max_distinct` / `distinct_on_overflow` |
 | Python IR `DerivedGroupBySpec` | 同上三构造参数 |
-| Python IR `DedupBySpec` | `max_distinct` / `on_overflow`（**保留** `on_conflict`） |
+| Python IR `DedupBySpec` | `max_distinct` / `on_overflow`（当时保留 `on_conflict`；**整类 Dedup/TwoStage 已于 2026-07-28 移除**，见 `2026-07-28-remove-dedup-and-two-stage-derived.md`） |
 | 策略枚举 | `DerivedOverflowPolicy` |
 | 错误类 | `ScalimAggregationKeyLimitExceededError` / `ScalimDistinctKeyLimitExceededError` |
 | 运行期行为 | 未设护栏时的 `scalim.derived_outputs` WARNING；meta/audit 的 `truncated` 截断审计 |
@@ -66,7 +66,7 @@ DerivedGroupBySpec(
 
 After：只保留业务语义字段（`group_by` / metrics / ranks / post fields 等）；不要再传护栏参数，也不要再 import `DerivedOverflowPolicy`。
 
-`DedupBySpec` 同理：删除 `max_distinct` / `on_overflow`，保留 `on_conflict`。
+（历史）`DedupBySpec` 同理曾删除 `max_distinct` / `on_overflow` 并保留 `on_conflict`；随后整类已移除，见 `2026-07-28-remove-dedup-and-two-stage-derived.md`。
 
 ### 3) 下游 try/except
 

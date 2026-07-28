@@ -1,5 +1,8 @@
 ---
 depends_on: []
+branch: sdd/c10-remove-dedup-and-two-stage-derived
+base_sha: eeff547c347e361a04abb0892abf7da6ebc4ffdf
+checkpointed: false
 ---
 
 ## Why
