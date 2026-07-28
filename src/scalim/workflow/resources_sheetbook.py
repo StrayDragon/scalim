@@ -146,7 +146,6 @@ class _SheetBookSheetPlan:
     baseline_header: List[str]
     export_header: Optional[List[str]]
     segments: List[_SheetBookSegment]
-    cell_count: int = 0
 
 
 @dataclass
@@ -157,7 +156,6 @@ class _SheetBookPlan:
     sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
     sheets: Dict[str, _SheetBookSheetPlan]
-    total_cells: int = 0
     last_workflow_node_id: Optional[str] = None
 
 
@@ -241,15 +239,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         expected: List[str],
         export_header: Optional[Tuple[str, ...]],
         rows: List[List[CellValue]],
-        new_sheet_cells: int,
     ) -> None:
-        existing = plan.sheets.get(sheet_name)
-        old_cells = 0
-        if existing is not None:
-            old_cells = int(existing.cell_count)
-
-        new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
-
         existing_decl_order = plan.sheet_decl_order.get(sheet_name)
         resolved_decl_order = int(decl_order)
         if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
@@ -266,7 +256,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 sheet_name=sheet_name,
             ),
             segments=[],
-            cell_count=int(new_sheet_cells),
         )
         sheet_plan.segments.append(
             _SheetBookSegment(
@@ -277,7 +266,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             )
         )
         plan.sheets[sheet_name] = sheet_plan
-        plan.total_cells = int(new_total)
         plan.last_workflow_node_id = str(workflow_node_id)
 
     def _sheetbook_append_prepare(
@@ -313,7 +301,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                     sheet_name=sheet_name,
                 ),
                 segments=[],
-                cell_count=0,
             )
             plan.sheets[sheet_name] = sheet_plan
         else:
@@ -371,7 +358,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         *,
         sheetbook_id: str,
         sheet_name: str,
-        append_cells: int,
         workflow_node_id: str,
         input_node_id: str,
         decl_order: int,
@@ -383,7 +369,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
             raise ScalimWorkflowWriteError(msg)
 
-        new_total = int(plan.total_cells) + int(append_cells)
         sheet_plan.segments.append(
             _SheetBookSegment(
                 producer_node_id=str(input_node_id),
@@ -392,8 +377,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 header_policy=str(header_policy),
             )
         )
-        sheet_plan.cell_count = int(sheet_plan.cell_count) + int(append_cells)
-        plan.total_cells = int(new_total)
         plan.last_workflow_node_id = str(workflow_node_id)
 
     def _get_or_create_sheetbook(self, sheetbook_id: str, *, workflow_node_id: str) -> _SheetBookPlan:
@@ -470,8 +453,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         mapping = _build_alignment_mapping(expected, input_header)
 
         rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
-        row_count = len(rows)
-        new_sheet_cells = int(row_count) * len(expected)
 
         self._sheetbook_sheet_store(
             plan,
@@ -482,7 +463,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             expected=expected,
             export_header=export_header,
             rows=rows,
-            new_sheet_cells=int(new_sheet_cells),
         )
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
@@ -557,14 +537,10 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
 
-        append_rows = len(rows)
-        append_cells = int(append_rows) * len(expected)
-
         self._sheetbook_append_apply(
             plan,
             sheetbook_id=str(sheetbook_id),
             sheet_name=sheet_name,
-            append_cells=int(append_cells),
             workflow_node_id=str(workflow_node_id),
             input_node_id=str(input_node_id),
             decl_order=int(decl_order),
@@ -685,8 +661,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             for seg in sheet_plan.segments:
                 seg.rows = []
             sheet_plan.segments = []
-            sheet_plan.cell_count = 0
-        plan.total_cells = 0
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._log_plan_segment_release(
             workflow_node_id=str(workflow_node_id),

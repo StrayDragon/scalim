@@ -26,7 +26,7 @@
   1. YAML: `path: {$init_var: out_root}` + Python `init_vars={"out_root": str(abs_root)}`
   2. 或 `RunOverrides(resources=ResourcesOverride(books={...: BookResourceOverride(path=str(abs_root))}))`
   3. 或直接写绝对路径
-- book 写入策略 / 内存 budget 不在 path 层: 用 `resources_policy`,不要写回 YAML `write_defaults`/`budget`。
+- book 写入策略不在 path 层: 用 `resources_policy`/`BookWritePolicy`，不要写回 YAML `write_defaults`。book cell/sheet `budget` 已移除（YAML/`RunOverrides` 残留删字段即可）。
 
 ## 目录布局(约定)
 

@@ -1,7 +1,8 @@
-"""`Book` 级写入策略(`Python` `SSOT`).
+"""`Book` 级写入策略（`Python` `SSOT`）。
 
-`YAML` 不再 `authoring` `write_defaults` / `budget`;缺省使用 `builtin` `defaults`.
-公开构造函数仅接受 `StrEnum`(严格 `in`);内部/`IR` 仍使用 `builtin` `str`.
+`YAML` 不再 `authoring` `write_defaults`；缺省使用 `builtin` `defaults`。
+`budget` / `BookBudgetPolicy` 已移除（残留 YAML/`RunOverrides` fail-fast）。
+公开构造函数仅接受 `StrEnum`(严格 `in`)；内部/`IR` 仍使用 `builtin` `str`。
 """
 
 from typing import TYPE_CHECKING, Dict, Mapping, Optional

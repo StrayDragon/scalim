@@ -23,14 +23,11 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.book_branch_parse import (
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR
-from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config, load_workflow_config_from_mapping
+from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config_from_mapping
 from scalim.execution import versioned_outputs
 from scalim.vendor.yamlx import yaml
 
 
-_EXAMPLES = (
-    Path(__file__).resolve().parents[2] / "llmanspec/changes/archive/2026-07-13-c20-add-unified-xlsx-book-kind/examples/unified-xlsx"
-)
 _ALLOWED = frozenset(["tests.fixtures.workflow_loaders", "scalim.workflow.loaders"])
 
 
@@ -486,7 +483,24 @@ def test_resource_defs_book_xlsx_memory_with_path_still_builds_sheetbook_export(
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        cfg = load_workflow_config(str(_EXAMPLES / "after.workflow.yaml"))
+        # Archive examples were frozen out of tree; keep the load contract inline.
+        cfg = load_workflow_config_from_mapping(
+            {
+                "workflow": {
+                    "resources": {
+                        "books": {
+                            "scratch": {"xlsx": {}},
+                            "report": {"xlsx": {"path": "./out"}},
+                        }
+                    },
+                    "runs": [
+                        {"id": "stage_a", "demand": "./stage_a.demand.yaml"},
+                        {"id": "stage_b", "demand": "./stage_b.demand.yaml", "depends_on": ["stage_a"]},
+                        {"id": "summary", "demand": "./summary.demand.yaml", "depends_on": ["stage_b"]},
+                    ],
+                }
+            }
+        )
     assert cfg.resources.books["scratch"].path is None
     assert cfg.resources.books["report"].path is not None
     assert not [w for w in caught if issubclass(w.category, DeprecationWarning)]

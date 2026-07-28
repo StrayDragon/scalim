@@ -348,7 +348,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             "or WorkflowRunOptions.resources_policy; omit for builtin defaults."
         )
         budget_hint = (
-            "budget was removed; delete this field. Book cell/sheet budget is no longer "
+            "budget was removed. Delete this field; book cell/sheet budget is no longer "
             "supported — rely on host resource limits for memory risk."
         )
 

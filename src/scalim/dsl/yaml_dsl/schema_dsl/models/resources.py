@@ -216,7 +216,8 @@ class BookConfig:
                 "- 有 `path`: 版本化落盘\n"
                 "- 无 `path`: 内存总线(`book_sheet_rows`)\n"
                 "- 可选: `allow_formulas`(导出相关)\n"
-                "- `write_defaults`/`budget` 在 `Python` `ResourcesPolicy`\n"
+                "- `write_defaults` 在 Python `BookWritePolicy`\n"
+                "- `budget` 已移除（残留 fail-fast，删字段；内存交宿主限制）\n"
                 "- 已移除别名: `xlsx_file` / `xlsx_memory`(出现即 `fail-fast`)"
             ),
             ref="book_xlsx",
