@@ -232,9 +232,9 @@ def _load_ref_once(
         if binding is not None and binding.mode == "rows":
             # 避免将可能很大的 `batch_rows` 列表保存在长生命周期 `cache` 中.
             cached_batch_rows = None
-        # `NOTE:` `load_ref_cache` 在 `parallel_mode="adaptive"` 下会被多个工作线程读写。
-        # `NOTE:` 并发下此处写入可能导致重复 `loader` 调用或覆盖写入(取决于调度/命中时序),但在 `CPython`+`GIL` 下通常不应导致崩溃。
-        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须为该共享 `dict` 引入锁或线程安全容器。
+        # `NOTE:` `load_ref_cache` 在 `parallel_mode="adaptive"` 下会被多个工作线程读写.
+        # `NOTE:` 并发下此处写入可能导致重复 `loader` 调用或覆盖写入(取决于调度/命中时序),但在 `CPython`+`GIL` 下通常不应导致崩溃.
+        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须为该共享 `dict` 引入锁或线程安全容器.
         runtime.load_ref_cache[cache_key] = LoadRefCacheEntry(
             result=result,
             batch_rows=cached_batch_rows,

@@ -82,11 +82,11 @@ def _format_trace(trace: Tuple[ImportTraceItem, ...]) -> str:
 
 
 def _is_import_allowed_at_logical_path(logical_path: str) -> bool:
-    """判断在给定的映射逻辑路径上是否允许 `$import`。
+    """判断在给定的映射逻辑路径上是否允许 `$import`.
 
     说明:
-    - 作用域刻意保持严格: `$import` 仅用于稳定的 `demand` 编写入口。
-    - 这里在"导入展开"阶段就做检查, 以便在 `schema`/语义校验之前给出稳定诊断。
+    - 作用域刻意保持严格: `$import` 仅用于稳定的 `demand` 编写入口.
+    - 这里在"导入展开"阶段就做检查, 以便在 `schema`/语义校验之前给出稳定诊断.
     """
     path = str(logical_path or "").strip()
     if not path:

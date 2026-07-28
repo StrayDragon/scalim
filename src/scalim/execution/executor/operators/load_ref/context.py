@@ -38,9 +38,9 @@ class LoadRefExecutionContext:
 
     def record_default_applied(self, field_key: str) -> None:
         key = str(field_key)
-        # `NOTE:` `default_applied_counts` 在 `parallel_mode="adaptive"` 下可能被多个工作线程读写。
-        # `NOTE:` 这里的 `read-modify-write`(`get()+1`) 并非原子语义;当前依赖 `CPython` `GIL` 的实现细节避免内存破坏。
-        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,需要显式锁或等价同步策略。
+        # `NOTE:` `default_applied_counts` 在 `parallel_mode="adaptive"` 下可能被多个工作线程读写.
+        # `NOTE:` 这里的 `read-modify-write`(`get()+1`) 并非原子语义;当前依赖 `CPython` `GIL` 的实现细节避免内存破坏.
+        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,需要显式锁或等价同步策略.
         self.default_applied_counts[key] = int(self.default_applied_counts.get(key, 0)) + 1
 
     def record_lookup(
@@ -90,9 +90,9 @@ class LoadRefExecutionContext:
         if from_fields is None:
             from_fields = step.get_from_fields()
 
-        # `NOTE:` `key_normalize_cache` 在 `parallel_mode="adaptive"` 下会被多个工作线程共享读写,但当前未做显式锁保护。
-        # `NOTE:` 并发下的 `check-then-act` 可能导致重复工作(例如多次 `normalize`),但在 `CPython`+`GIL` 下通常不会导致崩溃。
-        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须为这些共享 `dict` 引入锁或线程安全容器。
+        # `NOTE:` `key_normalize_cache` 在 `parallel_mode="adaptive"` 下会被多个工作线程共享读写,但当前未做显式锁保护.
+        # `NOTE:` 并发下的 `check-then-act` 可能导致重复工作(例如多次 `normalize`),但在 `CPython`+`GIL` 下通常不会导致崩溃.
+        # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须为这些共享 `dict` 引入锁或线程安全容器.
         relation_cache = self.runtime.key_normalize_cache.get(self.relation_signature)
         if relation_cache is None:
             relation_cache = {}

@@ -428,11 +428,11 @@ class SeqPipeline(Pipeline):
             main_rows = self._load_main_rows()
             loaded_main_rows = True
 
-        # 内存优化: 对“主 `loader` 返回 `list`”的常见形态,在批次消费后清空已消费元素引用,以便更早释放行对象占用的内存。
+        # 内存优化: 对“主 `loader` 返回 `list`”的常见形态,在批次消费后清空已消费元素引用,以便更早释放行对象占用的内存.
         #
         # 约束:
-        # - 仅在 `main_rows` 由框架内部 `loader` 加载时启用(避免意外修改用户显式传入的 `list`)。
-        # - 仅做“定长 `slice` 置哨兵”,不改变 `list` 长度,避免影响 `list iterator` 语义。
+        # - 仅在 `main_rows` 由框架内部 `loader` 加载时启用(避免意外修改用户显式传入的 `list`).
+        # - 仅做“定长 `slice` 置哨兵”,不改变 `list` 长度,避免影响 `list iterator` 语义.
         consume_clear_main_rows_list = bool(loaded_main_rows and isinstance(main_rows, list))
 
         column_sink, streaming_sink = self._classify_sink(sink)

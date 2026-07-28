@@ -5,8 +5,8 @@
 - `workflow` 编译 (`scalim.dsl.yaml_dsl.workflow_compile`)
 
 约束:
-- 运行时必须保持 `Python 3.6` 兼容。
-- 覆盖项非法时必须抛 `ScalimWorkflowConfigError`, 并提供稳定可定位的 `.path`。
+- 运行时必须保持 `Python 3.6` 兼容.
+- 覆盖项非法时必须抛 `ScalimWorkflowConfigError`, 并提供稳定可定位的 `.path`.
 """
 
 import os
@@ -81,7 +81,7 @@ def _as_opt_non_empty_str_or_pathlike(value: Any, *, path: str) -> Optional[str]
 
 
 def _as_opt_path_or_init_var(value: Any, *, path: str) -> OptionalPathNode:
-    """校验可选的 `{ $init_var: ... }` / 路径类值。
+    """校验可选的 `{ $init_var: ... }` / 路径类值.
 
     返回规范化后的表示:
     - 缺失时返回 `None`
@@ -244,9 +244,9 @@ def parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915  # pragma: 
     default_book_ref: str,
     known_field_ids: Optional[Set[str]],
 ) -> Tuple[OutputTargetConfig, ...]:
-    """将强类型 `RunOverrides.outputs` 解析为有效的 `OutputTargetConfig` 列表。
+    """将强类型 `RunOverrides.outputs` 解析为有效的 `OutputTargetConfig` 列表.
 
-    若提供 `known_field_ids`, 会校验 `fields` 中引用的 `field_id` 是否存在。
+    若提供 `known_field_ids`, 会校验 `fields` 中引用的 `field_id` 是否存在.
     """
 
     if not isinstance(overrides, tuple) and not isinstance(overrides, list):
@@ -358,7 +358,7 @@ def _apply_optional_book_export_xlsx_patch(
 ) -> Optional[BookExportXlsxConfig]:
     patch = _patch_as_opt_mapping(value, path="{}.export_xlsx".format(path))
     if patch is None:
-        # 显式指定 `None` 表示清空可选的 `export_xlsx` 补丁。
+        # 显式指定 `None` 表示清空可选的 `export_xlsx` 补丁.
         return None
 
     if "write_lock" in patch:
@@ -567,7 +567,7 @@ def overlay_resources_override(
     *,
     path: str,
 ) -> DemandConfig:
-    """对 `DemandConfig` 应用仅涉及 `IO` 的 `overrides.resources` 叠加。"""
+    """对 `DemandConfig` 应用仅涉及 `IO` 的 `overrides.resources` 叠加."""
 
     if not override.books and not override.files:
         return config

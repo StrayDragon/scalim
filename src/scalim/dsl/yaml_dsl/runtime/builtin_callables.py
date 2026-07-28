@@ -13,7 +13,7 @@ def default_of_value_cast() -> int:
 
     注意:
     - `^defaults/default_of_value_cast()` / `^defaults/default()` 的完整语义依赖“被写回字段”的 `value_cast`,
-      因此在 YAML `runtime linking` 中会为 `default` `case` 做按字段(`per-field`)的内联处理。
+      因此在 YAML `runtime linking` 中会为 `default` `case` 做按字段(`per-field`)的内联处理.
     - 这里保留一个可解析的 `builtin callable`,用于受控词表(`vocabulary`)/`LSP` 与兜底解析路径.
     """
 
@@ -82,8 +82,8 @@ def list_public_builtin_callable_python_references() -> Dict[str, str]:
     - 值: `Python reference`,形如 `pkg.module:func`
 
     说明:
-    - 该映射仅用于编辑器/`LSP` 的 `hover`/`definition`,不影响运行时解析逻辑。
-    - 仅暴露对外公开的 `builtin ids`,避免把内部实现细节变成“可枚举的任意符号入口”。
+    - 该映射仅用于编辑器/`LSP` 的 `hover`/`definition`,不影响运行时解析逻辑.
+    - 仅暴露对外公开的 `builtin ids`,避免把内部实现细节变成“可枚举的任意符号入口”.
     """
     refs: Dict[str, str] = {}
     for builtin_id in list_public_builtin_callable_ids():

@@ -22,7 +22,7 @@
 ## yamlx
 
 - **用途**: 为 `vendors/libs` 同步场景提供自包含 `YAML` 解析能力.默认运行时后端为 vendored `ruamel.yaml`(YAML 1.2 语义);vendored `PyYAML` 仅保留为源码/审计/迁移对拍用途(不作为主线运行时入口).
-- **来源**: PyPI `PyYAML==6.0.1` 与 `ruamel.yaml==0.18.3`（含可选 `CPython 3.6` `C-extension`）。
+- **来源**: PyPI `PyYAML==6.0.1` 与 `ruamel.yaml==0.18.3`(含可选 `CPython 3.6` `C-extension`).
 - **许可证**: MIT(见 `src/scalim/vendor/yamlx/LICENSE.PyYAML-6.0.1.txt` 与 `src/scalim/vendor/yamlx/LICENSE.ruamel.yaml-0.18.3.txt`)
 - **更新**: 见 `src/scalim/vendor/yamlx/SOURCE.md`
 

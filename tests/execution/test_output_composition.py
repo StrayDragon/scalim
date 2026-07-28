@@ -514,6 +514,57 @@ def test_custom_derived_spec_is_composable_without_guardrails(tmp_path: Path) ->
     plan.sink.close()
 
 
+def test_custom_derived_spec_parallel_mode_rejection_is_wrapped(tmp_path: Path) -> None:
+    from scalim.execution.derived_outputs import AggregatorDiagnostics, IRowAggregator
+
+    class _UnusedAgg(IRowAggregator):
+        def required_fields(self):  # type: ignore[no-untyped-def]
+            return ("x",)
+
+        def accumulate(self, row):  # type: ignore[no-untyped-def]
+            _ = row
+
+        def finalize_rows(self):  # type: ignore[no-untyped-def]
+            return []
+
+        def diagnostics(self) -> AggregatorDiagnostics:
+            return AggregatorDiagnostics(meta={}, audit_events=[])
+
+    class _RejectAdaptiveSpec(output_comp_mod.IDerivedAggregationSpec):
+        def required_fields(self):  # type: ignore[no-untyped-def]
+            return ("x",)
+
+        def fingerprint_parts(self):  # type: ignore[no-untyped-def]
+            return ("kind=reject_adaptive",)
+
+        def validate_parallel_mode(self, parallel_mode: str) -> None:
+            if str(parallel_mode or "").lower() == "adaptive":
+                raise ValueError("order-dependent aggregation")
+
+        def build_aggregator(self, *, key_normalization: str = "raw") -> IRowAggregator:
+            _ = key_normalization
+            return _UnusedAgg()
+
+    out = tmp_path / "report.xlsx"
+    derived = DerivedOutputTargetSpec(
+        target_id="reject_adaptive",
+        derived=_RejectAdaptiveSpec(),
+        output_layout=ExportLayout(field_ids=("x",), header_names=None),
+        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Custom"),
+        is_primary=True,
+    )
+    spec = OutputCompositionSpec(derived_targets=(derived,))
+    with pytest.raises(ValueError, match=r"派生输出不支持 parallel_mode='adaptive': target_id='reject_adaptive'"):
+        build_output_composition(
+            spec=spec,
+            demand_name="d",
+            demand_main_source_id="s",
+            demand_target_fields=["x"],
+            demand_field_fingerprints=[],
+            run_parallel_mode="adaptive",
+        )
+
+
 def test_removed_dedup_and_two_stage_types_are_not_importable() -> None:
     """r160/r199: Dedup/TwoStage assembly types MUST NOT be importable."""
     removed = (

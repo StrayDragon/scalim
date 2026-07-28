@@ -98,8 +98,8 @@ class RowEmissionCoordinator:
             prev = self._ready_counts.get(row_id, 0)
             now = prev + 1
             self._ready_counts[row_id] = now
-        # 快路径: 仅当“写出头部行”变为就绪时才尝试连续写出。
-        # 一旦头部行被写出, `_drain_write_rows()` 会顺带写出后续已就绪的连续前缀。
+        # 快路径: 仅当“写出头部行”变为就绪时才尝试连续写出.
+        # 一旦头部行被写出, `_drain_write_rows()` 会顺带写出后续已就绪的连续前缀.
         if now < required:
             return
         if self._next_write_row_id is not None and row_id == self._next_write_row_id:

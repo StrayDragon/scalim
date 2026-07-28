@@ -46,9 +46,9 @@ class ExecutionRuntime:
     workflow_node_id: Optional[str]
     _preload_source_ids: FrozenSet[str]
     _preloaded_cache_str_views: Dict[str, LoaderResultMapping]
-    # `NOTE:` `parallel_mode="adaptive"` 会在同一批次内并发执行多个 `LoadRef(keys)` 任务,这些缓存/集合会被多个工作线程读写。
-    # `NOTE:` 当前实现未对这些共享结构加锁,其并发正确性依赖 `CPython` 的 `GIL`(实现细节),而非语言层面保证。
-    # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须引入显式锁或线程安全容器/同步策略。
+    # `NOTE:` `parallel_mode="adaptive"` 会在同一批次内并发执行多个 `LoadRef(keys)` 任务,这些缓存/集合会被多个工作线程读写.
+    # `NOTE:` 当前实现未对这些共享结构加锁,其并发正确性依赖 `CPython` 的 `GIL`(实现细节),而非语言层面保证.
+    # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须引入显式锁或线程安全容器/同步策略.
     load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
     key_normalize_cache: Dict[RelationSignature, Dict[Tuple[str, ...], Dict[Hashable, Optional[LookupKey]]]]
     load_ref_group_fields: Dict[RelationSignature, Tuple[str, ...]]

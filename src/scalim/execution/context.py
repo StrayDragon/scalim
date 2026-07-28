@@ -206,7 +206,7 @@ class DenseBatchContext(BatchContext):
         """返回 `row_id` 在稠密批次内的索引,用于热路径复用.
 
         说明:
-        - 返回 `None` 表示 `row_id` 不是本批次范围内的 `int`。
+        - 返回 `None` 表示 `row_id` 不是本批次范围内的 `int`.
         - 该方法是内部优化支撑,避免调用方重复实现边界判断.
         """
 
@@ -280,8 +280,8 @@ class DenseBatchContext(BatchContext):
         """固定(`pin`)稠密字段存储,避免在流式释放时被从上下文中移除.
 
         说明:
-        - 这是内部热路径契约: 某些优化会直接持有 `_DenseFieldStorage` 引用。
-        - `RowEmissionCoordinator` 可能在同一算子执行过程中触发 `flush` + `release`,导致字段存储在变空时被 `pop` 掉。
+        - 这是内部热路径契约: 某些优化会直接持有 `_DenseFieldStorage` 引用.
+        - `RowEmissionCoordinator` 可能在同一算子执行过程中触发 `flush` + `release`,导致字段存储在变空时被 `pop` 掉.
         """
 
         refs = self._dense_pinned_refcounts

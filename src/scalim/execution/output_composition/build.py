@@ -160,7 +160,7 @@ def _append_derived_target_routes(
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> None:
     for t in targets:
-        # 扩展点：自定义 IDerivedAggregationSpec 可在此 fail-fast（内置 DerivedGroupBySpec 为 no-op）
+        # 扩展点:自定义 `IDerivedAggregationSpec` 可在此 `fail-fast`(内置 `DerivedGroupBySpec` 为 `no-op`)
         _validate_derived_parallel_mode(str(t.target_id), t.derived, run_parallel_mode)
         derived_fingerprint = fingerprint_for_derived_target(target_id=str(t.target_id), derived=t.derived)
 

@@ -127,7 +127,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
 
     @override
     def validate_parallel_mode(self, parallel_mode: str) -> None:
-        # 内置 group_by metrics 在 adaptive 下保持确定性；顺序依赖装配（旧 dedup_by.on_conflict）已移除。
+        # 内置 `group_by metrics` 在 `adaptive` 下保持确定性;顺序依赖装配(旧 `dedup_by.on_conflict`)已移除.
         _ = str(parallel_mode or "").lower()
 
     @override

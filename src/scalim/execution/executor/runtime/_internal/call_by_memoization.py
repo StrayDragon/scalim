@@ -116,7 +116,7 @@ class CallByMemoizationFieldCache:
         self._cache.clear()
 
     def try_get(self, key: Hashable) -> Tuple[bool, FieldValue, bool]:
-        """返回 `(hit, value, hashable)`。"""
+        """返回 `(hit, value, hashable)`."""
 
         self.calls += 1
         if not self.is_enabled():

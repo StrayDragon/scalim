@@ -271,8 +271,8 @@ class BookResourceOverride:
     allow_formulas: Optional[bool] = None
 
     def __post_init__(self) -> None:
-        # `write_defaults` 已迁出 `RunOverrides.resources`（Python `BookWritePolicy` SSOT）。
-        # `budget` 能力已移除（残留补丁 fail-fast，删字段）。
+        # `write_defaults` 已迁出 `RunOverrides.resources`(`Python` `BookWritePolicy` `SSOT`).
+        # `budget` 能力已移除(残留补丁 `fail-fast`,删字段).
         # `kind` / 旧字段的 `fail-fast` 由 `resource_override` 补丁层负责.
         pass
 

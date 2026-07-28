@@ -250,7 +250,7 @@ class _WorkflowResourceManagerBase(ABC):
             if not self._output_staging_keep_on_success:
                 self._cleanup_output_staging_exec_dir_for_final_path(final_path)
 
-        # 成功发布后才写入版本 `manifest` 并更新 `latest` 指示 (`root` 维度 `last-writer-wins`)。
+        # 成功发布后才写入版本 `manifest` 并更新 `latest` 指示 (`root` 维度 `last-writer-wins`).
         by_root: Dict[str, Dict[str, Dict[str, str]]] = {}
         for item in staged:
             parsed = versioned_outputs.parse_versioned_output_path(Path(str(item.final_path)))

@@ -254,7 +254,7 @@ def _dense_prefill_rowwise(
     # 注意: 为保证 `guardrails` 在 `fast_fail` 下的“首个违规”一致性,此处保持“按行优先”的执行顺序:
     # - 先处理第 0 行的所有字段,再处理第 1 行……
     #
-    # 该顺序与通用 `BatchContext` 预填充路径保持一致。
+    # 该顺序与通用 `BatchContext` 预填充路径保持一致.
     prepared_main = _dense_prepare_rowwise_main_ops(
         context=context,
         row_count=row_count,

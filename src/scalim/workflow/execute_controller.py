@@ -416,7 +416,7 @@ class WorkflowRunController:
 
             # 单写者模型: `write node` 在 `controller` 线程同步执行,
             # 且不会与 `in-flight` 的 `demand future` 重叠; 共享状态更新被约束在 `controller` 内,
-            # 从而不再依赖 `artifacts/ctx/resources` 的线程锁。
+            # 从而不再依赖 `artifacts/ctx/resources` 的线程锁.
             if self._state.submitted:
                 if not can_schedule_more(len(self._state.submitted), self._state.max_concurrency):
                     return

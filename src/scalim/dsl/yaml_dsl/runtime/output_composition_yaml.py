@@ -491,7 +491,7 @@ _VERSIONED_OUTPUT_MIGRATION_HINT = (
 
 
 def _validate_output_root_path(root: str, *, path: str) -> None:
-    # `path` 语义升级为 `output root` (目录); 旧语义常见为 `./out/report.xlsx` / `./out/detail.csv`。
+    # `path` 语义升级为 `output root` (目录); 旧语义常见为 `./out/report.xlsx` / `./out/detail.csv`.
     suffix = Path(str(root)).suffix.lower()
     if suffix in (".xlsx", ".csv"):
         msg = "{} now expects an output root directory, not a file path: {!r}. {}".format(
@@ -797,8 +797,8 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
                 )
                 # `MANAGED_ARTIFACT_KIND_ROWS` = 类型化行工件(`InMemoryRows`/`FieldValue`);
-                # 与 `MANAGED_ARTIFACT_KIND_CSV`(字符串化)相对。不是 `pipeline` 的列写(`IColumnSink`)
-                # 或块列写(`BlockColumnCSVSink`)模式——那些是 `sink` 布局,不在 `managed-artifact kind` 闭集内。
+                # 与 `MANAGED_ARTIFACT_KIND_CSV`(字符串化)相对.不是 `pipeline` 的列写(`IColumnSink`)
+                # 或块列写(`BlockColumnCSVSink`)模式——那些是 `sink` 布局,不在 `managed-artifact kind` 闭集内.
                 managed_artifact_kind = MANAGED_ARTIFACT_KIND_ROWS
                 output_spec = OutputSpec(
                     format="excel",

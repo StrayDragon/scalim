@@ -9,7 +9,7 @@ from .callable_preflight import (
 
 
 def validate_call_by_signature(*, location: str, call_by: str, parsed: ParsedCallBy, fn: Callable[..., Any]) -> None:
-    """校验解析后的 `call_by` 参数是否能绑定到目标函数 `fn` 的签名。
+    """校验解析后的 `call_by` 参数是否能绑定到目标函数 `fn` 的签名.
 
     这是一个编译期检查: 用于尽早发现"参数绑定"类错误(例如: 把位置参数传给仅关键字参数),
     避免在运行期 `guardrails` 将 `TypeError` 归为可预期的计算错误后被静默吞掉.

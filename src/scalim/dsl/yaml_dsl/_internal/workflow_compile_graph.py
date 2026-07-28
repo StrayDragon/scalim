@@ -98,7 +98,7 @@ def build_demand_nodes_and_graph(
     """`_build_demand_nodes_and_graph` 的跨模块入口包装.
 
     说明:
-    - `pyright` 会将下划线前缀符号视为模块私有;该包装函数用于跨模块调用。
+    - `pyright` 会将下划线前缀符号视为模块私有;该包装函数用于跨模块调用.
     """
 
     return _build_demand_nodes_and_graph(
