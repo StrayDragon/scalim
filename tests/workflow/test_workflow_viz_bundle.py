@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl import (
-        BookResourcePolicy,
+    BookResourcePolicy,
     DemandRunOptions,
     DemandRunOutputOptions,
     DemandRunSecurityOptions,

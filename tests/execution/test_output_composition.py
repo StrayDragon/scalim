@@ -530,4 +530,3 @@ def test_removed_dedup_and_two_stage_types_are_not_importable() -> None:
         src = "from scalim.execution.output_composition import {}".format(name)
         with pytest.raises(ImportError):
             exec(src, {"__name__": "__not_main__"})
-

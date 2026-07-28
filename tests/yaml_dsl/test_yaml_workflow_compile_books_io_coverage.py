@@ -956,9 +956,7 @@ def test_workflow_compile_rejects_xlsx_memory_align_by_header() -> None:
             demand_cfg_by_run_id={"a": cfg},
             nodes=[],
             edges=[],
-            effective_books={
-                "report": BookConfig()
-            },
+            effective_books={"report": BookConfig()},
             effective_files={},
             overrides_outputs=None,
             default_book_id=None,
