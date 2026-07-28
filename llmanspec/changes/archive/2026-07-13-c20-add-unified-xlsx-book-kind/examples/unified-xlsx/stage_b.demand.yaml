@@ -1,9 +1,0 @@
-# Shape-only MVP (not a runnable demand). See tests/yaml_dsl/test_c20_unified_xlsx_book_kind.py for executable isomorphic fixtures.
-resources:
-  books:
-    scratch:
-      xlsx: {}
-
-outputs:
-  - name: metrics_b
-    to: {book: scratch, sheet: metrics_b}

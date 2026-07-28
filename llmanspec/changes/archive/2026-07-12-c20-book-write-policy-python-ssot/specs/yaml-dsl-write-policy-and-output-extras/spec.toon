@@ -1,7 +1,0 @@
-kind: llman.sdd.delta
-ops[2]{op,req_id,title,statement,from,to,name}:
-  modify_requirement,r2,workbook write policy MUST use Python BookWritePolicy as the single SSOT,"workbook 写策略 MUST 以 Python typed BookWritePolicy（或 ResourcesPolicy.books.*.write）为单一 SSOT: - workbook 级写入行为（mode/align_by/header_policy/on_mismatch/on_conflict）MUST 由 Python runtime policy 表达 - YAML resources.books.*.write_defaults MUST NOT 再作为 authoring SSOT（出现 MUST fail-fast） - outputs[*].write MUST 继续仅承载 output-local 的最小展示/表头 override - outputs[*].write MUST NOT 承载 workbook 级 mode/align_by/header_policy/on_mismatch/on_conflict",null,null,null
-  modify_requirement,r4,docs and overrides contracts MUST reflect YAML declaration vs Python write policy,"输出相关文档与 typed overrides/policy 契约 MUST 反映以下四层分工: - resources.books/files = YAML 输出目标声明（id/variant/path） - Python BookWritePolicy/BookBudgetPolicy = workbook 写策略与预算 SSOT - outputs[*].to/fields/... = output 内容编排 - runtime output extras = meta/audit 等附加产物",null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r2,"append-via-python-policy",两个 demand outputs 绑定同一 book 同一 sheet 且需要 append 合并,调用方通过 Python BookWritePolicy(mode=append) 运行 workflow,系统 MUST 按 append 语义合并写入且 MUST NOT 要求 YAML 声明 write_defaults
-  r4,"docs-explain-python-write-ssot","",用户查阅 YAML DSL 输出或 workflow 资源文档,文档 MUST 说明 write_defaults/budget 已迁出 YAML 并由 Python policy 配置

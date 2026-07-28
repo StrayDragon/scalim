@@ -1,6 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r8,xlsx_memory budget guards MUST read Python BookBudgetPolicy only,xlsx_memory 预算护栏 MUST 从 effective Python BookBudgetPolicy 读取并强制执行；YAML xlsx_memory.budget authoring MUST 已被拒绝（依赖已归档的 book-write-policy-python-ssot）。未提供 policy 时 MUST 视为 unlimited。xlsx_file MUST NOT 因本需求启用同一 budget。其余 sheetbook typed/export/canonical-key 契约保持不变。,null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r8,"budget-from-python-not-yaml","YAML 无 budget 且 Python 提供 BookBudgetPolicy(max_total_cells=1) 于 xlsx_memory",写入导致 cell 超限,"系统 MUST fail-fast"
-  r8,"xlsx-file-remains-unlimited-without-budget","YAML/Python 均未对 xlsx_file 声明 budget",多 sheet/多 cell 写入 xlsx_file book,"系统 MUST NOT 因本需求以 max_sheets/max_total_cells 护栏 fail-fast"

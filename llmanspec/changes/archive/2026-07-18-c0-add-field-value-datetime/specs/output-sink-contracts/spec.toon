@@ -1,7 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r918,"Excel sinks MUST pass through temporal FieldValues without rewriting timezone","当内建 Excel / workbook / sheetbook 写出路径接收 `FieldValue` 时，系统 MUST 允许 `datetime`/`date`/`time`/`timedelta` 原样交给 openpyxl（不得仅因类型而先 `str()`）。系统 MUST NOT 为兼容 openpyxl 而清除 `tzinfo`、转换为 UTC、或以其它方式改写用户时间值；timezone-aware 值若被 openpyxl 拒绝，该错误 MUST 向上暴露。`escape_excel_formula` MUST 仍仅对 `str` 做公式转义。",null,null,null
-op_scenarios[3]{req_id,id,given,when,then}:
-  r918,"excel-write-preserves-naive-datetime","segment/row contains naive datetime",commit/export via openpyxl,"cell value MUST be datetime-like with Excel date data_type (not forced text)"
-  r918,"excel-write-preserves-date-time-timedelta","segment/row contains date or time or timedelta",commit/export via openpyxl,"cell MUST write successfully as openpyxl temporal/date type"
-  r918,"excel-write-does-not-strip-tzinfo","segment/row contains aware datetime",commit/export via openpyxl path,"system MUST NOT clear tzinfo; openpyxl timezone TypeError MAY propagate"

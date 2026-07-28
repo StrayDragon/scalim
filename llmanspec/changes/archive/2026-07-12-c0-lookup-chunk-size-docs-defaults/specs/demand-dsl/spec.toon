@@ -1,6 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  modify_requirement,r6,Source/Bind 结构与 keys 分片参数,"系统 SHALL 支持为数据源定义 `key`、`lookup_cast`、`cache_mode`、`params` 与 `lookup_chunk_size`. 其中: - `main_source.params` 与 `sources.<id>.params` MUST 被视为 loader kwargs 模板 - `main_source.params` 仅允许静态值与 `{$init_var: <name>}` 指令节点(禁止 `$keys/$rows`) - `sources.<id>.params` 允许包含 `{$init_var: <name>}` 指令节点与 `$keys/$rows` 指令节点 - `sources.*.bind` 不再属于该能力的稳定 YAML authoring surface - 当 `sources.<id>.params` 中使用 `$keys: {as: list}` 时,从 YAML 转换到运行时参数构建器的行为 MUST 产生稳定顺序列表 - `lookup_chunk_size` 省略/`0`/`null` MUST 表示不分片(单次 loader 调用;此为运行时默认) - 文档与 schema 描述 MUST 说明:仅在下游有 payload/IN 上限时设置 chunk,并取最大安全值;MUST NOT 把过小 chunk 描述为默认推荐 - 本需求 MUST NOT 静默改变运行时默认分片行为(保持不分片)",null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r6,"lookup-chunk-omit-means-no-chunk","source 未设置 lookup_chunk_size 或为 0/null",执行 keys 模式 LoadRef,"系统 MUST 以单次 loader 调用加载(不分片)"
-  r6,"lookup-chunk-docs-recommend-max-safe","作者阅读 user-guide/schema 关于 lookup_chunk_size 的指引",对照推荐策略,"文档 MUST 说明省略为默认且需要分片时应取下游限制的最大安全值"

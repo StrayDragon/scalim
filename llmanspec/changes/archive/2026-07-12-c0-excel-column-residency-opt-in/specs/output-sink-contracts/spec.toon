@@ -1,7 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r13,Excel column residency MUST be Python opt-in for IR file sinks,"系统 MUST 提供闭集 `ExcelColumnResidency`(`HOLD`|`WINDOW`)作为 Python runtime SSOT,用于在列式 Excel 文件写出时选择驻留策略: - 默认 MUST 为 `HOLD`(继续使用 `ColumnExcelSink`) - 当 `OutputSpec.format=excel` 且 `streaming=False` 且 residency=`WINDOW` 时,工厂 MUST 构造 `StreamingColumnExcelSink` - MUST NOT 改变默认 `ColumnExcelSink` 行为 - MUST NOT 将 residency/streaming knobs 引入 YAML 主线 - 调用方显式传入 `ExecutionRequest.sink` 时 MUST 优先于工厂选择",null,null,null
-op_scenarios[3]{req_id,id,given,when,then}:
-  r13,default-hold-uses-column-excel,"调用方未设置 residency 或显式 HOLD 且 excel streaming=False",框架经 `_create_file_sink` 创建文件 sink,"系统 MUST 使用 ColumnExcelSink"
-  r13,window-selects-streaming-column-excel,"调用方设置 ExcelColumnResidency.WINDOW 且 excel streaming=False 且无 output_composition",框架经 `_create_file_sink` 创建文件 sink,"系统 MUST 使用 StreamingColumnExcelSink"
-  r13,no-yaml-residency-knobs,"维护者审阅 YAML DSL 主线与 schema",检查 residency/streaming 配置面,"MUST NOT 出现 write.streaming 或 excel_column_residency YAML 字段"

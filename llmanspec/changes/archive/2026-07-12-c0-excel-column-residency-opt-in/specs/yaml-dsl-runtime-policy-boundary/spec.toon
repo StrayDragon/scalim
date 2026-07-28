@@ -1,6 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r11,ExcelColumnResidency WINDOW MUST fail-fast with YAML output composition,"系统 MUST 将 `ExcelColumnResidency` 仅作为 Python runtime policy(例如 `DemandRunRuntimeOptions` / `ExecutionRequest`)暴露: - YAML authoring MUST NOT 声明 residency/streaming sink 实现字段 - 当请求同时携带 `output_composition`(YAML books/多输出行组合)与 `ExcelColumnResidency.WINDOW` 时,系统 MUST fail-fast 并给出可诊断迁移提示 - MUST NOT 静默忽略 WINDOW(避免假开关)",null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r11,window-with-composition-fails-fast,"DemandRun/ExecutionRequest 设置 WINDOW 且存在 output_composition",进入 run_ir 装配输出,"系统 MUST fail-fast 并提示 WINDOW 仅适用于列式 IR 文件 sink"
-  r11,yaml-must-not-author-residency,"某 demand YAML 试图声明 excel_column_residency 或 write.streaming",validate 或 parse,"系统 MUST 拒绝作为主线 authoring 字段"

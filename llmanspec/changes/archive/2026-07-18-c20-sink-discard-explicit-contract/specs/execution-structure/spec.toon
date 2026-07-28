@@ -1,5 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r925,run_ir failure cleanup MUST discard sinks not close,当 `run_ir`（或等价统一 IR 编排入口）在 engine 初始化/运行失败，或装配失败需要中止时，系统 MUST 对已创建的输出 sink 调用失败清理（`discard()` / `discard_sink`），MUST NOT 调用成功语义的 `close()` 以免 promote 半成品；原始错误 MUST 向上抛出且 MUST NOT 被清理错误覆盖。成功路径仍 MUST 以 `close()` 作为落盘/提交标准。,null,null,null
-op_scenarios[1]{req_id,id,given,when,then,feature}:
-  r925,"run-ir-engine-fail-discards-excel",run_ir 目标为 Excel 文件且 loader/engine 中途抛错,异常向上抛出,最终 Excel 路径 MUST NOT 存在；sink MUST 被 discard 而非 close promote,true

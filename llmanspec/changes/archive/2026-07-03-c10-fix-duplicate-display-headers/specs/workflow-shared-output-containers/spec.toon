@@ -1,6 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r22,workflow 写入节点按 field_id 对齐展示名仅用于表头行,"workflow 共享输出容器的写入节点进行字段对齐时,MUST 基于唯一 field_id 而非展示列名;可重复的展示列名 MUST 仅用于表头行输出,不得参与列对齐映射。该约束 MUST 统一适用于所有共享输出容器类型(workbook/xlsx_file、csv/file、sheetbook/xlsx_memory)。具体地:workflow-managed 中间工件(InMemoryCsv 与 InMemoryRows)的 header MUST 为 field_id;可重复的展示名经独立 export_header 透传,仅在导出表头行使用;列对齐映射 MUST 始终在唯一 field_id 上运行,不得因展示名重复而坍缩。",null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r22,"field-id-alignment-preserves-data-under-duplicate-display-headers","workflow 输出声明 header_fields_output_by=name 且多个字段共用相同展示名(例如多个指标块共用「人数」「金额」)","workflow write 节点消费 workflow-managed 中间工件并导出 xlsx/csv","导出的每条数据行 MUST 按 field_id 位置正确取值,后续同名列 MUST NOT 被首列值填充;表头行 MUST 输出可重复的展示名"
-  r22,"export-header-decoupled-from-alignment-key","workflow-managed 中间工件的 header 为唯一 field_id 且 export_header 携带可重复展示名","写入节点执行字段对齐并写出表头行","列对齐映射 MUST 基于 field_id 不得坍缩;表头行 MUST 使用 export_header 而非 field_id"
