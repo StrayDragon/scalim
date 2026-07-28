@@ -513,6 +513,7 @@ def test_custom_derived_spec_is_composable_without_guardrails(tmp_path: Path) ->
     plan.sink.write_row({"x": 1})
     plan.sink.close()
 
+
 def test_removed_dedup_and_two_stage_types_are_not_importable() -> None:
     """r160/r199: Dedup/TwoStage assembly types MUST NOT be importable."""
     removed = (
