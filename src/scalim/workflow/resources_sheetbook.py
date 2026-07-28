@@ -128,8 +128,6 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: "Workbook", plan: "_She
 @dataclass(frozen=True)
 class SheetBookDef:
     resource_id: str
-    budget_max_sheets: int
-    budget_max_total_cells: int
     export_path: Optional[str]
     export_allow_formulas: bool = True
 
@@ -154,8 +152,6 @@ class _SheetBookSheetPlan:
 @dataclass
 class _SheetBookPlan:
     resource_id: str
-    budget_max_sheets: int
-    budget_max_total_cells: int
     export_path: Optional[str]
     export_allow_formulas: bool
     sheet_decl_order: Dict[str, int]
@@ -232,16 +228,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
             if on_conflict == "overwrite":
                 action = "overwrite"
-        else:
-            max_sheets_limit = int(plan.budget_max_sheets)
-            if max_sheets_limit > 0 and len(plan.sheets) >= max_sheets_limit:
-                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                diff = [
-                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                    "current_sheets={}".format(len(plan.sheets)),
-                    "new_sheet={!r}".format(sheet_name),
-                ]
-                raise ScalimWorkflowWriteError(msg, diff=diff)
         return action, pending_skip
 
     def _sheetbook_sheet_store(
@@ -263,7 +249,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             old_cells = int(existing.cell_count)
 
         new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
-        self._check_sheetbook_budget(plan, new_total_cells=new_total)
 
         existing_decl_order = plan.sheet_decl_order.get(sheet_name)
         resolved_decl_order = int(decl_order)
@@ -316,15 +301,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:
-            max_sheets_limit = int(plan.budget_max_sheets)
-            if max_sheets_limit > 0 and len(plan.sheets) >= max_sheets_limit:
-                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                diff = [
-                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                    "current_sheets={}".format(len(plan.sheets)),
-                    "new_sheet={!r}".format(sheet_name),
-                ]
-                raise ScalimWorkflowWriteError(msg, diff=diff)
             plan.sheet_decl_order[sheet_name] = int(decl_order)
             plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
             sheet_plan = _SheetBookSheetPlan(
@@ -408,7 +384,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             raise ScalimWorkflowWriteError(msg)
 
         new_total = int(plan.total_cells) + int(append_cells)
-        self._check_sheetbook_budget(plan, new_total_cells=new_total)
         sheet_plan.segments.append(
             _SheetBookSegment(
                 producer_node_id=str(input_node_id),
@@ -435,8 +410,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
         plan = SheetBookPlan(
             resource_id=str(raw_def.resource_id),
-            budget_max_sheets=int(raw_def.budget_max_sheets),
-            budget_max_total_cells=int(raw_def.budget_max_total_cells),
             export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
             export_allow_formulas=bool(raw_def.export_allow_formulas),
             sheet_decl_order={},
@@ -453,24 +426,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             path=str(display_path),
         )
         return plan
-
-    def _check_sheetbook_budget(
-        self,
-        plan: _SheetBookPlan,
-        *,
-        new_total_cells: int,
-    ) -> None:
-        limit = int(plan.budget_max_total_cells)
-        if limit <= 0:
-            return
-        if int(new_total_cells) <= limit:
-            return
-        diff = [
-            "budget.max_total_cells={}".format(limit),
-            "new_total_cells={}".format(int(new_total_cells)),
-        ]
-        msg = "Sheetbook budget exceeded: sheetbook={!r}".format(str(plan.resource_id))
-        raise ScalimWorkflowWriteError(msg, diff=diff)
 
     def apply_sheetbook_sheet(
         self,

@@ -1,5 +1,8 @@
 ---
 depends_on: []
+branch: sdd/c0-remove-book-budget-policy
+base_sha: eeff547c347e361a04abb0892abf7da6ebc4ffdf
+checkpointed: false
 ---
 
 ## Why

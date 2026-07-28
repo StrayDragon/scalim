@@ -29,7 +29,6 @@ from ..runtime.contracts import (
 )
 from ..schema_dsl.constants import DEFAULT_OUTPUT_ENCODING
 from ..schema_dsl.models import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     DemandConfig,
@@ -397,7 +396,6 @@ def _is_pathful_book_path(book_path: Any) -> bool:
 def _validate_book_identity_contracts(
     *,
     book_path: Any,
-    budget: Optional[BookBudgetConfig],
     export_xlsx: Optional[BookExportXlsxConfig],
     allow_formulas: bool,
     path: str,
@@ -408,9 +406,6 @@ def _validate_book_identity_contracts(
         if isinstance(book_path, str) and not str(book_path).strip():
             msg = "{}.path is required for pathful books".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-        if budget is not None:
-            msg = "{}.budget is not allowed for pathful books".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
         if export_xlsx is not None:
             msg = "{}.export_xlsx is not allowed for pathful books".format(path)
             raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
@@ -464,7 +459,6 @@ def _apply_book_patch(
     path: str,
 ) -> BookConfig:
     book_path: Any = base.path if base is not None else None
-    budget = base.budget if base is not None else None
     export_xlsx = base.export_xlsx if base is not None else None
     allow_formulas = bool(base.allow_formulas) if base is not None else False
     write_defaults = base.write_defaults if base is not None else None
@@ -478,9 +472,8 @@ def _apply_book_patch(
         raise ScalimWorkflowConfigError(msg, path="{}.write_defaults".format(path))
     if "budget" in patch:
         msg = (
-            "{}.budget was removed from RunOverrides.resources. "
-            "Migration: configure BookBudgetPolicy via DemandRunOptions.resources_policy "
-            "or WorkflowRunOptions.resources_policy (Python SSOT)."
+            "{}.budget was removed. Delete this field; book cell/sheet budget is no longer "
+            "supported — rely on host resource limits for memory risk."
         ).format(path)
         raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
 
@@ -506,7 +499,6 @@ def _apply_book_patch(
 
     _validate_book_identity_contracts(
         book_path=book_path,
-        budget=budget,
         export_xlsx=export_xlsx,
         allow_formulas=bool(allow_formulas),
         path=path,
@@ -515,7 +507,6 @@ def _apply_book_patch(
     return BookConfig(
         kind="",
         path=book_path,
-        budget=budget,
         export_xlsx=export_xlsx,
         allow_formulas=bool(allow_formulas),
         write_defaults=write_defaults,

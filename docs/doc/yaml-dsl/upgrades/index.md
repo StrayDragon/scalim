@@ -35,4 +35,5 @@
 - [2026-07-20: remove-deprecated-xlsx-file-memory-kinds](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md)
 - [2026-07-24: remove-derived-outputs-cardinality-guardrails](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-24-remove-derived-outputs-cardinality-guardrails.md)
 - [2026-07-24: remove-score-by-rank-builtin](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-24-remove-score-by-rank-builtin.md)
+- [2026-07-28: remove-book-budget-policy](#code=agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-28-remove-book-budget-policy.md)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

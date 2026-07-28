@@ -23,9 +23,10 @@
 | 症状 / 关键词 | 打开 |
 |---|---|
 | `write_defaults was removed` / YAML `resources.books.*.write_defaults` | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md` |
-| `xlsx_memory.budget was removed` / YAML book `budget` | 同上 |
+| `xlsx_memory.budget was removed` / YAML book `budget` / `budget was removed; delete this field` | `references/upgrades/2026-07-28-remove-book-budget-policy.md`（删字段；**不要**迁到 Python `BookBudgetPolicy`） |
 | `xlsx_file was removed` / `xlsx_memory was removed` / `xlsx_memory with export_xlsx was removed` | `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md` |
-| `BookWriteDefaultsOverride` / `BookBudgetOverride` / write·budget overlay | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md` |
+| `BookWriteDefaultsOverride` / `BookBudgetOverride` / write·budget overlay | `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`（write→`BookWritePolicy`）；budget 再删见 `2026-07-28-remove-book-budget-policy.md` |
+| `BookBudgetPolicy` / `budget=` on `BookResourcePolicy` | `references/upgrades/2026-07-28-remove-book-budget-policy.md` |
 | `max_groups was removed` / `max_distinct was removed` / `distinct_on_overflow was removed` / cardinality guardrails | `references/upgrades/2026-07-24-remove-derived-outputs-cardinality-guardrails.md` |
 | `has removed 'score_by_rank'` / `score_by_rank` → `compute` | `references/upgrades/2026-07-24-remove-score-by-rank-builtin.md` |
 | `workflow.options` / `cache_pool` in YAML / `share_preload_cache` | 查 upgrades 摘要里 runtime-policy / workflow 相关批次；**不要**照抄 `2026-03-18` 里已过时的 `workflow.options.ctx` / `sheetbooks` 写法 |
@@ -109,6 +110,9 @@
 - 2026-07-24: remove-score-by-rank-builtin
   - SSOT: `references/upgrades/2026-07-24-remove-score-by-rank-builtin.md`
   - llmanspec: `llmanspec/changes/archive/2026-07-24-c0-remove-score-by-rank-builtin/`
+- 2026-07-28: remove-book-budget-policy
+  - SSOT: `references/upgrades/2026-07-28-remove-book-budget-policy.md`
+  - llmanspec: `llmanspec/changes/c0-remove-book-budget-policy/`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`
@@ -138,7 +142,7 @@
 - `key_transform`
 - `primary`
 - `resources.books.*.write_defaults`(迁到 Python `BookWritePolicy` / `resources_policy`;见 `2026-07-12-book-write-policy-python-ssot.md`)
-- `resources.books.*.xlsx_memory.budget`(迁到 Python `BookBudgetPolicy`;同上)
+- `resources.books.*.budget` / `xlsx.budget` / 旧 `xlsx_memory.budget`(**已移除**；删字段，勿迁到 Python；见 `2026-07-28-remove-book-budget-policy.md`)
 - `workflow.options.*`(runtime policy boundary;不要写回 YAML)
 
 ### 2. 顶层 `fields`

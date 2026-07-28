@@ -450,8 +450,8 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
                         self._add_error(errors, msg, path="{}.xlsx.write_defaults".format(book_path))
                     if "budget" in xlsx_cfg:
                         msg = (
-                            "{}.xlsx.budget was removed from YAML authoring. "
-                            "Migration: configure BookBudgetPolicy via Python ResourcesPolicy."
+                            "{}.xlsx.budget was removed. Delete this field; book cell/sheet budget "
+                            "is no longer supported — rely on host resource limits for memory risk."
                         ).format(book_path)
                         self._add_error(errors, msg, path="{}.xlsx.budget".format(book_path))
 

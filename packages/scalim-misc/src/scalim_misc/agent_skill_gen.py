@@ -103,7 +103,7 @@ SYNTAX_SPEC_RELS = (
     Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "spec.toon",
     Path("llmanspec") / "specs" / "ir-source-relations" / "spec.toon",
     Path("llmanspec") / "specs" / "ir-field-compute" / "spec.toon",
-    Path("llmanspec") / "specs" / "execution-source-cache" / "spec.toon",
+    Path("llmanspec") / "specs" / "execution-preload-cache" / "spec.toon",
     Path("llmanspec") / "specs" / "workflow-cache-pool" / "spec.toon",
     Path("llmanspec") / "specs" / "workflow-observability-bridge" / "spec.toon",
     Path("llmanspec") / "specs" / "runtime-pruning" / "spec.toon",

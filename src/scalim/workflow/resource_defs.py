@@ -88,11 +88,6 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", True))
                 continue
             if pathful is False:
-                budget_obj = opts.get("budget")
-                budget_dict: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
-                max_sheets = int(budget_dict.get("max_sheets") or 0)
-                max_total_cells = int(budget_dict.get("max_total_cells") or 0)
-
                 export_cfg_obj = opts.get("export_xlsx")
                 export_cfg_dict: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
                 export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", True))
@@ -103,8 +98,6 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                     export_path = str(final_path)
                 sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                     resource_id=str(res.resource_id),
-                    budget_max_sheets=int(max_sheets),
-                    budget_max_total_cells=int(max_total_cells),
                     export_path=str(export_path) if export_path is not None else None,
                     export_allow_formulas=bool(export_allow_formulas),
                 )
@@ -135,11 +128,6 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
 
         if res_type == "sheetbook":
             opts = res.options or {}
-            budget_obj = opts.get("budget")
-            sheetbook_budget: Dict[str, Any] = budget_obj if _is_dict_str_any(budget_obj) else {}
-            max_sheets = int(sheetbook_budget.get("max_sheets") or 0)
-            max_total_cells = int(sheetbook_budget.get("max_total_cells") or 0)
-
             export_cfg_obj = opts.get("export_xlsx")
             sheetbook_export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
             export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", True))
@@ -150,8 +138,6 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 export_path = str(final_path)
             sheetbook_defs[str(res.resource_id)] = SheetBookDef(
                 resource_id=str(res.resource_id),
-                budget_max_sheets=int(max_sheets),
-                budget_max_total_cells=int(max_total_cells),
                 export_path=str(export_path) if export_path is not None else None,
                 export_allow_formulas=bool(export_allow_formulas),
             )

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWriteAlignBy,
     BookWriteHeaderPolicy,
@@ -100,7 +99,6 @@ def run_workflow_shared_workbooks(
                     template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
                     runtime=DemandRunRuntimeOptions(batch_size=30),
                 )
-                memory_budget = BookBudgetPolicy(max_sheets=6, max_total_cells=200000)
                 resources_policy = ResourcesPolicy(
                     books={
                         "shared_report_sheet": BookResourcePolicy(
@@ -122,7 +120,6 @@ def run_workflow_shared_workbooks(
                                 mode=BookWriteMode.SHEET,
                                 on_conflict=BookWriteOnConflict.OVERWRITE,
                             ),
-                            budget=memory_budget,
                         ),
                         "sheetbook_report_append": BookResourcePolicy(
                             write=BookWritePolicy(
@@ -131,7 +128,6 @@ def run_workflow_shared_workbooks(
                                 header_policy=BookWriteHeaderPolicy.ONCE,
                                 on_mismatch=BookWriteOnMismatch.ERROR,
                             ),
-                            budget=memory_budget,
                         ),
                     }
                 )

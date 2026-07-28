@@ -1,6 +1,8 @@
 # 2026-07-12: book-write-policy-python-ssot
 
-> **身份说明（2026-07-20）**：下文 Before/After 示例仍可能出现历史 `xlsx_file` / `xlsx_memory` 作为当时 identity 写法；当前唯一 authoring 为 `xlsx`（可选 `path`），见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。本批次的核心合约（write/budget 迁出 YAML）仍然有效。
+> **NOTE（后续 BREAKING）**：`BookBudgetPolicy` 已在 `2026-07-28-remove-book-budget-policy` 移除；勿再抄 After 中的 budget 示例。当前 budget 迁移：删除 YAML/`RunOverrides`/`ResourcesPolicy` 中的 budget 字段（见该 upgrade）。
+
+> **身份说明（2026-07-20）**：下文 Before/After 示例仍可能出现历史 `xlsx_file` / `xlsx_memory` 作为当时 identity 写法；当前唯一 authoring 为 `xlsx`（可选 `path`），见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。本批次的核心合约（write 迁出 YAML）仍然有效；budget 面已被后续批次删除。
 
 ## 变更摘要
 

@@ -30,8 +30,6 @@ def test_resource_manager_commit_clears_workbook_and_sheetbook_plan_segments(tmp
         sheetbook_defs={
             "mem": resources_mod.SheetBookDef(
                 resource_id="mem",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path),
             )
         },
@@ -89,8 +87,6 @@ def test_resource_manager_discard_clears_sheetbook_plan_segments(tmp_path: Path,
         sheetbook_defs={
             "mem": resources_mod.SheetBookDef(
                 resource_id="mem",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -111,9 +107,8 @@ def test_resource_manager_discard_clears_sheetbook_plan_segments(tmp_path: Path,
     assert "release_reason=discard" in caplog.text
 
 
-def test_xlsx_memory_book_budget_policy_fail_fast_via_resources_policy(tmp_path: Path) -> None:
+def test_xlsx_memory_multi_sheet_write_succeeds_without_budget(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl import (
-        BookBudgetPolicy,
         BookResourcePolicy,
         ResourcesPolicy,
         WorkflowRunOptions,
@@ -177,20 +172,14 @@ workflow:
 
     options = WorkflowRunOptions(
         demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))),
-        resources_policy=ResourcesPolicy(
-            books={"report": BookResourcePolicy(budget=BookBudgetPolicy(max_sheets=1, max_total_cells=10000))}
-        ),
+        resources_policy=ResourcesPolicy(books={"report": BookResourcePolicy()}),
     )
-    with pytest.raises(Exception) as excinfo:
-        _ = run_workflow(str(workflow), options=options)
-    cause = excinfo.value.__cause__ or excinfo.value.__context__
-    text = "{} {}".format(excinfo.value, cause)
-    assert "budget" in text.lower() or "max_sheets" in text.lower() or "Sheetbook budget" in text
+    result = run_workflow(str(workflow), options=options)
+    assert all(o.error is None for o in result.outcomes)
 
 
-def test_xlsx_file_ignores_book_budget_policy(tmp_path: Path) -> None:
+def test_xlsx_file_multi_sheet_write_succeeds_without_budget(tmp_path: Path) -> None:
     from scalim.dsl.yaml_dsl import (
-        BookBudgetPolicy,
         BookResourcePolicy,
         ResourcesPolicy,
         WorkflowRunOptions,
@@ -255,7 +244,7 @@ workflow:
 
     options = WorkflowRunOptions(
         demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures.mock_loaders"]))),
-        resources_policy=ResourcesPolicy(books={"report": BookResourcePolicy(budget=BookBudgetPolicy(max_sheets=1, max_total_cells=1))}),
+        resources_policy=ResourcesPolicy(books={"report": BookResourcePolicy()}),
     )
     result = run_workflow(str(workflow), options=options)
     assert all(o.error is None for o in result.outcomes)

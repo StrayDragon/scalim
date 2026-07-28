@@ -15,7 +15,6 @@ from scalim.dsl.yaml_dsl import (
 from scalim.dsl.yaml_dsl._internal.workflow_injected_entrypoints import run_workflow_injected
 from scalim.dsl.yaml_dsl import workflow_entrypoints as entrypoints_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
@@ -78,7 +77,6 @@ def test_workflow_entrypoints_workflow_resources_override_handles_missing_and_co
                     write_defaults=BookWriteDefaultsConfig(mode="append"),
                 ),
                 "mem": BookConfig(
-                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=2),
                     export_xlsx=BookExportXlsxConfig(path="x", allow_formulas=True),
                 ),
             },

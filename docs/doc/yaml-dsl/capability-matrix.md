@@ -77,7 +77,7 @@
 | `outputs.*.to` / `outputs.*.write` | `OutputTargetSpec.output` (`OutputSpec`) | `to` 必须二选一: `to.file` 或 `to.book`; `write` 仅承载 output-local header 行为(`include_header/header_fields_output_by`),workbook 写入策略以 Python `ResourcesPolicy`/`BookWritePolicy` 为 SSOT | DSL `run` 不再支持自定义 `sink`;如需捕获行数据用 `DemandRunOutputOptions(capture=CaptureRows())`;如需完全自定义 sink 走 execution 层入口 |
 | `outputs.*.container`（已移除） | - | 已移除;`validate/compile` 会 `fail-fast` | CSV: `resources.files` + `outputs.*.to.file`; Excel: `resources.books` + `outputs.*.to.book/to.sheet` |
 | `resources.books.*.write_defaults`（已迁出） | - | 已迁出 YAML;`validate/compile` fail-fast | `DemandRunOptions`/`WorkflowRunOptions.resources_policy` → `BookWritePolicy`(StrEnum) |
-| `resources.books.*.xlsx_memory.budget`（已迁出） | - | 已迁出 YAML;`validate/compile` fail-fast;缺省 unlimited | `resources_policy` → `BookBudgetPolicy(max_sheets=..., max_total_cells=...)` |
+| `resources.books.*.budget` / `xlsx.budget` / 旧 `xlsx_memory.budget`（已移除） | - | 能力已删除;`validate/compile` 残留即 fail-fast；内存风险交宿主 cgroup/OOM/作业配额 | 删除该字段；**不要**再找 `BookBudgetPolicy`（已移除，见 upgrade `2026-07-28-remove-book-budget-policy`） |
 | `resources.files.<id>.path` | `OutputSpec.path` | 支持静态 string 或 `{$init_var: <name>}`(对象节点;仅编译期解析一次;不做子串插值);缺失 init_var fail-fast;相对路径相对 **YAML 文件目录** | 用 Python 侧 `init_vars` 注入、`BookResourceOverride`/`FileResourceOverride` 覆盖,或改用绝对路径 |
 | `outputs.*.fields` | `ExportLayout.field_ids` | 支持 `field_id` string + YAML alias(object/list)并 flatten | 若 alias identity 丢失且内容匹配歧义,改用 string `field_id` |
 | `outputs.*.where` | `OutputTargetSpec.predicate` | 安全表达式;依赖字段静态提取注入 required fields | 复杂分发逻辑放到 loader/derived field 里生成路由字段 |
@@ -104,7 +104,7 @@
 | 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | 使用 execution 层入口 `scalim.execution.run_ir(...)` 自行构造 `ExecutionRequest(output_composition=...)` |
 | 自定义 hooks/observers | `ExecutionRequest.components` | 运行期组件需要 Python 对象 | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(components=[Observer(), Hook()])))` |
 | 内置可观测 presets + Viz | `ExecutionRequest.components` + `ExecutionRequest.observability.viz_config` | 可观测性属于 runtime integration surface,不作为 YAML authoring surface | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(components=[PerformanceObserver(), RelationObserver(), ...]), outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(...)))))` |
-| book 写入策略 / 内存预算 | `ResourcesPolicy` / `BookWritePolicy` / `BookBudgetPolicy` | runtime policy boundary(环境/安全/性能差异大);YAML 再写会 fail-fast | `run`/`run_workflow(..., options=... resources_policy=ResourcesPolicy(books={...}))`;迁移见 skill upgrade `2026-07-12-book-write-policy-python-ssot` |
+| book 写入策略 | `ResourcesPolicy` / `BookWritePolicy` | runtime policy boundary(环境/安全/性能差异大);YAML `write_defaults` 再写会 fail-fast | `run`/`run_workflow(..., options=... resources_policy=ResourcesPolicy(books={...}))`;迁移见 skill upgrade `2026-07-12-book-write-policy-python-ssot`。book cell/sheet **budget 已移除**（`2026-07-28-remove-book-budget-policy`）；YAML/`RunOverrides` 残留 `budget` 仍 fail-fast，请删除 |
 
 ## 7) IR 已存在但 YAML 未暴露的典型缺口(候选清单)
 

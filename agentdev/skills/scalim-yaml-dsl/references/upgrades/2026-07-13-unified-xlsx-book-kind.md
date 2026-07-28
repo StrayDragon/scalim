@@ -1,5 +1,7 @@
 # 2026-07-13: unified-xlsx-book-kind
 
+> **NOTE（后续 BREAKING）**：`BookBudgetPolicy` 已在 `2026-07-28-remove-book-budget-policy` 移除；勿再抄 After 中的 budget 示例。
+
 > **状态（2026-07-20）**：本批次引入的 deprecated 别名过渡期已结束；`xlsx_file` / `xlsx_memory` **已硬删**。当前唯一 authoring SSOT 与迁移表见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。下文保留本批次落地时的过渡描述。
 
 ## 变更摘要
