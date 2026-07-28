@@ -574,8 +574,6 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -650,7 +648,7 @@ def test_resource_manager_sheetbook_sheet_conflict_skip_error_overwrite(tmp_path
     assert rows == [{"id": "b1", "value": "B1"}]
 
 
-def test_resource_manager_sheetbook_sheet_budget_max_sheets_is_enforced(tmp_path: Path) -> None:
+def test_resource_manager_sheetbook_sheet_multi_sheet_write_succeeds_without_budget(tmp_path: Path) -> None:
     instrumentation = _Instrumentation()
     manager = resources_mod.WorkflowResourceManager(
         workflow_exec_id="wf",
@@ -660,8 +658,6 @@ def test_resource_manager_sheetbook_sheet_budget_max_sheets_is_enforced(tmp_path
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=1,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -680,17 +676,17 @@ def test_resource_manager_sheetbook_sheet_budget_max_sheets_is_enforced(tmp_path
         on_conflict="error",
     )
 
-    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="max_sheets"):
-        manager.apply_sheetbook_sheet(
-            workflow_node_id="n1",
-            decl_order=1,
-            sheetbook_id="sb",
-            sheet="S2",
-            input_node_id="b",
-            input_output_id="detail",
-            input_csv=str(first),
-            on_conflict="error",
-        )
+    manager.apply_sheetbook_sheet(
+        workflow_node_id="n1",
+        decl_order=1,
+        sheetbook_id="sb",
+        sheet="S2",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(first),
+        on_conflict="error",
+    )
+    manager.discard_all(workflow_node_id="n_discard", reason="test")
 
 
 def test_resource_manager_apply_book_append_routes_xlsx_memory_to_sheetbook(tmp_path: Path) -> None:
@@ -703,8 +699,6 @@ def test_resource_manager_apply_book_append_routes_xlsx_memory_to_sheetbook(tmp_
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -735,8 +729,6 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -781,8 +773,6 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -823,8 +813,6 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -868,8 +856,6 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=1,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -886,19 +872,18 @@ def test_resource_manager_sheetbook_append_mismatch_error_warn_skip_and_budget(t
         header_policy="once",
         on_mismatch="error",
     )
-    with pytest.raises(resources_mod.ScalimWorkflowWriteError, match="max_sheets"):
-        manager.apply_sheetbook_append(
-            workflow_node_id="n1",
-            decl_order=1,
-            sheetbook_id="sb",
-            sheet="S2",
-            input_node_id="b",
-            input_output_id="detail",
-            input_csv=str(first),
-            align_by="field_id",
-            header_policy="once",
-            on_mismatch="error",
-        )
+    manager.apply_sheetbook_append(
+        workflow_node_id="n1",
+        decl_order=1,
+        sheetbook_id="sb",
+        sheet="S2",
+        input_node_id="b",
+        input_output_id="detail",
+        input_csv=str(first),
+        align_by="field_id",
+        header_policy="once",
+        on_mismatch="error",
+    )
     manager.discard_all(workflow_node_id="n_discard", reason="test")
 
 
@@ -912,8 +897,6 @@ def test_resource_manager_sheetbook_append_duplicate_producer_is_rejected(tmp_pa
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -967,8 +950,6 @@ def test_resource_manager_sheetbook_export_header_metadata_controls_xlsx_header(
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path),
             )
         },
@@ -1039,8 +1020,6 @@ def test_resource_manager_sheetbook_rejects_header_alignment(tmp_path: Path) -> 
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -1323,8 +1302,6 @@ def test_resource_manager_sheetbook_iter_rows_visibility_and_errors(tmp_path: Pa
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=None,
             )
         },
@@ -1415,8 +1392,6 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path),
             )
         },
@@ -1472,8 +1447,6 @@ def test_resource_manager_sheetbook_commit_import_error_and_save_failure(tmp_pat
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path2),
             )
         },
@@ -1515,8 +1488,6 @@ def test_resource_manager_sheetbook_discard_does_not_remove_external_files(tmp_p
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path),
             )
         },
@@ -1694,8 +1665,6 @@ def test_resource_manager_commit_sheetbook_preserves_raw_strings_by_default(tmp_
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path),
             )
         },
@@ -1753,8 +1722,6 @@ def test_resource_manager_commit_sheetbook_allow_formulas_false_escapes_formula_
         sheetbook_defs={
             "sb": resources_mod.SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=4,
-                budget_max_total_cells=1000,
                 export_path=str(export_path),
                 export_allow_formulas=False,
             )

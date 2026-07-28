@@ -74,7 +74,7 @@ resources:
   - `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...)))`
   - `scalim.dsl.yaml_dsl.run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))))`
 - workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `WorkflowRunOptions(patches_by_run_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowNodePatch`(不支持 dict patch)。
-- book 写入策略 / 内存预算也已迁出 YAML: 用 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy`(`ResourcesPolicy`/`BookWritePolicy`/`BookBudgetPolicy`);YAML 不得再写 `write_defaults` / `budget`(见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)。book identity 唯一分支 `xlsx`（见 `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`）。
+- book 写入策略已迁出 YAML: 用 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy`(`ResourcesPolicy`/`BookWritePolicy`);YAML 不得再写 `write_defaults`(见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)。book cell/sheet `budget` / `BookBudgetPolicy` **已移除**（残留字段删即可，见 `references/upgrades/2026-07-28-remove-book-budget-policy.md`）。book identity 唯一分支 `xlsx`（见 `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`）。
 
 ## 关键规则
 

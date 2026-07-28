@@ -1,5 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  modify_requirement,r4,"tests MUST avoid time.sleep-driven scheduling and polling loops for synchronization","当测试用例需要等待某个并发事件发生时,测试 MUST 使用事件驱动的同步机制(例如 threading.Event/Barrier)来表达明确完成信号,并避免以下 flaky 模式: - 通过 time.sleep(0.01/0.05) 推进时序 - 通过轮询共享列表/队列+ sleep 的 busy-wait - 使用微小 wall-clock 阈值做不会发生断言。共享 workflow loader fixtures MUST 用 Event-gate 替代真实 sleep,并提供可重置的释放控制。",null,null,null
-op_scenarios[1]{req_id,id,given,when,then}:
-  r4,"workflow-loader-fixtures-use-event-gates",tests/fixtures/workflow_loaders.py 提供 slow/very_slow loader,workflow 并发测试需要可控时序,"loader MUST 通过 threading.Event gate 等待释放,不得 time.sleep"

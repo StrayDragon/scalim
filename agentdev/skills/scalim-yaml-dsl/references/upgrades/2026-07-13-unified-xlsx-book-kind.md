@@ -1,5 +1,7 @@
 # 2026-07-13: unified-xlsx-book-kind
 
+> **NOTE（后续 BREAKING）**：`BookBudgetPolicy` 已在 `2026-07-28-remove-book-budget-policy` 移除；勿再抄 After 中的 budget 示例。
+
 > **状态（2026-07-20）**：本批次引入的 deprecated 别名过渡期已结束；`xlsx_file` / `xlsx_memory` **已硬删**。当前唯一 authoring SSOT 与迁移表见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。下文保留本批次落地时的过渡描述。
 
 ## 变更摘要
@@ -15,7 +17,8 @@
 硬约束（不变）：
 
 - YAML **只**声明 identity / 结构；**禁止**在 `xlsx` 下写 `export_xlsx` / `write_defaults` / `budget`
-- write / budget 仍在 Python：`ResourcesPolicy` / `BookWritePolicy` / `BookBudgetPolicy`（`WorkflowRunOptions.resources_policy`）
+- write 仍在 Python：`ResourcesPolicy` / `BookWritePolicy`（`WorkflowRunOptions.resources_policy`）
+- book cell/sheet **budget 已移除**（见 `2026-07-28-remove-book-budget-policy.md`）；勿再配置 `BookBudgetPolicy`
 - 本批次 **不**硬删旧 kind；硬删属后续 BREAKING follow-up
 
 对应 llmanspec change: `llmanspec/changes/archive/2026-07-13-c20-add-unified-xlsx-book-kind/`
@@ -99,11 +102,12 @@ resources:
         export_xlsx: {path: ./out}
 ```
 
-### 5) write / budget 仍在 Python
+### 5) write 仍在 Python（budget 勿再配）
+
+> 下文仅展示仍有效的 `BookWritePolicy`。历史示例中的 `budget=BookBudgetPolicy(...)` 已删除。
 
 ```python
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWriteMode,
     BookWritePolicy,
@@ -116,7 +120,6 @@ WorkflowRunOptions(
         books={
             "report": BookResourcePolicy(
                 write=BookWritePolicy(mode=BookWriteMode.SHEET),
-                budget=BookBudgetPolicy(max_sheets=16, max_total_cells=2_000_000),
             )
         }
     )

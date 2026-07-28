@@ -12,10 +12,9 @@
 - desc: YAML DSL 官方运行入口 + 运行期契约
 - scenario: 运行 demand/workflow YAML
 - marker: `src/scalim/dsl/yaml_dsl/__init__.py:6`
-- source: `src/scalim/dsl/yaml_dsl/__init__.py:84`
-- exports (`__all__`, tuple, count=40):
+- source: `src/scalim/dsl/yaml_dsl/__init__.py:83`
+- exports (`__all__`, tuple, count=39):
   - `UNSET`
-  - `BookBudgetPolicy`
   - `BookExportXlsxOverride`
   - `BookResourceOverride`
   - `BookResourcePolicy`

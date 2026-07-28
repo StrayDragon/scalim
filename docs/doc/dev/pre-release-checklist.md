@@ -26,7 +26,7 @@ git diff --stat <tag>..HEAD -- src/scalim/ tests/ docs/doc/ agentdev/skills/ AGE
 
 对照 `AGENTS.md` Hard Rules，至少确认：
 
-- YAML vs Python policy：book **write / budget** 是否仍只在 Python `ResourcesPolicy` / `BookWritePolicy` / `BookBudgetPolicy`；YAML 不得回潮 `write_defaults` / `xlsx_memory.budget`。
+- YAML vs Python policy：book **write** 是否仍只在 Python `ResourcesPolicy` / `BookWritePolicy`；YAML 不得回潮 `write_defaults`；book **budget** / `BookBudgetPolicy` 已移除（残留 `budget` 仍 fail-fast，应删字段，勿再当 current API）。
 - 若有 breaking：skill upgrade SSOT（`agentdev/skills/scalim-yaml-dsl/references/upgrades/`）与站点 upgrades 索引是否已挂上；迁移文案是否可被下游照做。
 - Enum / policy SSOT：公开构造函数是否仍 **strict-in Enum**；wire/state 是否仍 emit builtin `str`。
 - 运行时边界：`src/scalim/` Python 3.6 兼容、相对 import、`.gen.*` 未手改。

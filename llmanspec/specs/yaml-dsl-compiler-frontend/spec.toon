@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-compiler-frontend"
-purpose: "TBD - created by archiving change c30-yaml-dsl-compiler-frontend. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
+purpose: "定义 YAML DSL 编译前端的两个步骤：静态编译（只解析 YAML/AST、不导入用户代码、不依赖 allowlist）与运行时链接（resolve modules + 执行 allowlist 约束）。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[2]{req_id,title,statement}:
   r109,"Front-end compilation MUST build ExecutionPlan without importing user code","系统 MUST 提供一个编译前端入口（front-end compilation），将单个 demand YAML 编译到： - diagnostics（errors/warnings，含稳定 path + range） - 静态 IR（不包含任何 Python callable） - ExecutionPlan 与依赖索引（可用于“字段上游依赖展开”等 dev features） 编译前端 MUST 满足： - MUST NOT 导入/执行任何用户模块（仅允许文件系统读取 + YAML/AST 静态解析）。 - MUST NOT 依赖 allowlist（allowlist 仅属于运行时解析与执行边界）。 - MUST 在失败时降级为可诊断结果（不 crash、不退出）。"

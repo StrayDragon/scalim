@@ -4,8 +4,7 @@ from pathlib import Path
 import pytest
 
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
-    BookResourcePolicy,
+        BookResourcePolicy,
     DemandRunOptions,
     DemandRunOutputOptions,
     DemandRunSecurityOptions,
@@ -234,7 +233,7 @@ workflow:
             ),
             runtime=_workflow_runtime_options(failure_policy="primary_only"),
             resources_policy=ResourcesPolicy(
-                books={"report": BookResourcePolicy(budget=BookBudgetPolicy(max_sheets=10, max_total_cells=1000))},
+                books={"report": BookResourcePolicy()},
             ),
         ),
     )

@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "workflow-intermediate-store"
-purpose: "TBD - created by archiving change c15-workflow-intermediate-store-optimizations. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
+purpose: "定义 workflow 中间存储 `InMemoryRows` 作为节点间纯 Python 表格数据传递的基础设施：表结构契约、workflow YAML `main_rows_from` 显式接线、`InMemoryCsv` 转换、生命周期管理与稳定公开导入路径。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[9]{req_id,title,statement}:
   r88,workflow intermediate store MUST support a tabular row artifact (InMemoryRows),"当 workflow 需要在节点之间传递纯 Python 表格数据（而不是强制落盘/字符串化）时，系统 MUST 支持稳定表结构 `InMemoryRows`： - MUST 是明确表结构（header + 等长 rows），避免任意 object 图成为隐式耦合点。 - 细胞值域 MUST 允许任意 Python `object`（原样持有）；系统 MUST NOT 在 ROWS 中间态以 `FieldValue` 闭集做运行时门禁，也 MUST NOT 对未知类型静默 `str()`。 - 结构 MUST 为：`header: list[str]`（字段顺序 SSOT）；`rows: list[list[object]]`（每行与 header 等长、列序一致）。 - `FieldValue` / 内建 Excel 推荐类型集 MAY 作为文档与 opt-in 预检参考，但 MUST NOT 作为 ROWS 写入的硬门禁。"

@@ -22,7 +22,6 @@ from .outputs import (
     OutputWriteConfig,
 )
 from .resources import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
@@ -85,7 +84,6 @@ OUTPUT_TARGET_KEYS = _build_key_map(OutputTargetConfig)
 OUTPUT_EXTRA_SHEET_KEYS = _build_key_map(OutputExtraSheetConfig)
 OUTPUT_TO_KEYS = _build_key_map(OutputToConfig)
 OUTPUT_WRITE_KEYS = _build_key_map(OutputWriteConfig)
-BOOK_BUDGET_KEYS = _build_key_map(BookBudgetConfig)
 BOOK_EXPORT_XLSX_KEYS = _build_key_map(BookExportXlsxConfig)
 BOOK_WRITE_DEFAULTS_KEYS = _build_key_map(BookWriteDefaultsConfig)
 BOOK_XLSX_KEYS = _build_key_map(BookXlsxConfig)

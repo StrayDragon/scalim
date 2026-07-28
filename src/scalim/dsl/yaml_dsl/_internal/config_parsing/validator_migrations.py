@@ -348,9 +348,8 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             "or WorkflowRunOptions.resources_policy; omit for builtin defaults."
         )
         budget_hint = (
-            "xlsx.budget was removed from YAML authoring (Python ResourcesPolicy SSOT). "
-            "Migration: configure BookBudgetPolicy via DemandRunOptions.resources_policy "
-            "or WorkflowRunOptions.resources_policy; omit for unlimited."
+            "budget was removed. Delete this field; book cell/sheet budget is no longer "
+            "supported — rely on host resource limits for memory risk."
         )
 
         next_config: Optional[Dict[str, Any]] = None

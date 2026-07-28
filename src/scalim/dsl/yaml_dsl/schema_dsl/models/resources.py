@@ -47,33 +47,6 @@ _PATH_OR_INIT_VAR_SCHEMA = {
 
 
 @dataclass(frozen=True)
-class BookBudgetConfig:
-    SCHEMA_NAME: ClassVar[str] = "book_budget"
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("max_sheets", "max_total_cells")
-    SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-
-    max_sheets: int = dataclass_field(
-        default=0,
-        metadata=schema_meta(
-            desc="sheet 数量预算(>=1)",
-            md="sheet 数量预算(>=1).",
-            min=1,
-            examples=[64],
-        ),
-    )
-
-    max_total_cells: int = dataclass_field(
-        default=0,
-        metadata=schema_meta(
-            desc="总 cell 数预算(>=1)",
-            md="总 cell 数预算(>=1).",
-            min=1,
-            examples=[1000000],
-        ),
-    )
-
-
-@dataclass(frozen=True)
 class BookExportXlsxConfig:
     SCHEMA_NAME: ClassVar[str] = "book_export_xlsx"
     SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
@@ -219,11 +192,6 @@ class BookConfig:
         metadata=schema_omit(),
     )
 
-    budget: Optional[BookBudgetConfig] = dataclass_field(
-        default=None,
-        metadata=schema_omit(),
-    )
-
     export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
         default=None,
         metadata=schema_omit(),
@@ -248,7 +216,8 @@ class BookConfig:
                 "- 有 `path`: 版本化落盘\n"
                 "- 无 `path`: 内存总线(`book_sheet_rows`)\n"
                 "- 可选: `allow_formulas`(导出相关)\n"
-                "- `write_defaults`/`budget` 在 `Python` `ResourcesPolicy`\n"
+                "- `write_defaults` 在 Python `BookWritePolicy`\n"
+                "- `budget` 已移除（残留 fail-fast，删字段；内存交宿主限制）\n"
                 "- 已移除别名: `xlsx_file` / `xlsx_memory`(出现即 `fail-fast`)"
             ),
             ref="book_xlsx",

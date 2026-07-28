@@ -83,7 +83,6 @@ def test_workflow_compile_build_cache_pool_ir_from_runtime_rejects_invalid_input
     unlimited = workflow_compile_mod._build_workflow_cache_pool_ir_from_runtime(WorkflowCachePoolPreloadForeverUnlimited())  # noqa: SLF001
     assert unlimited is not None
     assert unlimited.release_policy == "workflow_end"
-    assert unlimited.budget is None
 
     cfg = WorkflowCachePoolPreloadForeverShared(
         max_entries=16,

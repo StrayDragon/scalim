@@ -1,5 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r926,output composition wrappers MUST forward discard,"系统 MUST 使 output composition 相关 wrapper sinks（至少 router、tee、counting、以及为 in-memory capture 组装的 tee）在 `discard()` 时向其持有的下游 sink（含 workbook 资源）转发清理；转发失败 MAY best-effort suppress，但 MUST NOT 改为对下游调用成功语义 `close()`。",null,null,null
-op_scenarios[1]{req_id,id,given,when,then,feature}:
-  r926,"router-discard-forwards-to-routes",RouterRowSink 持有带 discard 的 route/meta sinks,调用 router.discard,MUST 各转发一次；再次 discard MUST 幂等且 MUST NOT close promote,true

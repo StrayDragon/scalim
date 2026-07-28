@@ -6,7 +6,7 @@
 - 用户要加 DAG 依赖(`depends_on`)或跨节点注入 init vars(`init_vars`)
 - 用户要用 workflow-level ctx(`$ctx`)减少 Python glue
 - 用户要声明 workflow-scope 共享输出资源(`workflow.resources.books`)
-- 用户要配置 book 写入策略 / 内存预算(`ResourcesPolicy` / `BookWritePolicy` / `BookBudgetPolicy`)
+- 用户要配置 book 写入策略(`ResourcesPolicy` / `BookWritePolicy`)
 
 ## 工作顺序
 
@@ -14,12 +14,12 @@
 2. 画出依赖图: 哪些 runs 必须等上游完成? 用 `depends_on` 明确表达
 3. 若需要把上游结果注入下游 demand,用 `init_vars` + `$ctx` 指令节点表达
 4. 若需要共享输出(多个 demand 共享同一个 `.xlsx` 或同一个内存 book),优先在 `workflow.resources.books` 统一声明 book **identity**(path/export),再由各 demand 的 outputs 绑定到 `to.book/to.sheet`
-5. 写入策略 / 内存 budget 在 Python `WorkflowRunOptions.resources_policy` 配置(不要写回 YAML)
+5. 写入策略在 Python `WorkflowRunOptions.resources_policy` 配置(不要写回 YAML)；勿配置已移除的 book `budget`
 6. 先跑 schema-only 校验(显式指定 workflow schema),再跑 workflow-level validate,最后在 Python 入口中做一次小规模试运行
 
 ## 推荐骨架(YAML identity + Python policy)
 
-YAML 只声明 DAG / books identity / `$ctx` 注入; concurrency、cache_pool、write_defaults、budget 等 runtime knobs **不要**写进 `workflow.options` 或 `resources.books.*.write_defaults` / `budget`(出现即 fail-fast)。
+YAML 只声明 DAG / books identity / `$ctx` 注入; concurrency、cache_pool、write_defaults、budget 等 runtime knobs **不要**写进 `workflow.options` 或 `resources.books.*.write_defaults` / `budget`(出现即 fail-fast；`budget` 是已删除能力)。
 
 推荐 book identity：唯一分支 `xlsx`（有 `path`=落盘；无 `path`=内存总线）。`xlsx_file` / `xlsx_memory` **已硬删**（出现即 fail-fast）— 见 `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`。
 
@@ -49,7 +49,6 @@ workflow:
 
 ```python
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWriteMode,
     BookWritePolicy,
@@ -66,12 +65,11 @@ run_workflow(
         demand=DemandRunOptions(
             security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"])),
         ),
-        # 可选: 省略则 write=builtin defaults, budget=unlimited
+        # 可选: 省略则 write=builtin defaults
         resources_policy=ResourcesPolicy(
             books={
                 "report": BookResourcePolicy(
                     write=BookWritePolicy(mode=BookWriteMode.SHEET),
-                    budget=BookBudgetPolicy(max_sheets=16, max_total_cells=2_000_000),
                 )
             }
         ),
@@ -80,7 +78,8 @@ run_workflow(
 ```
 
 迁移细节:
-- write/budget Python SSOT: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- write Python SSOT: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- book budget 移除: `references/upgrades/2026-07-28-remove-book-budget-policy.md`
 - 统一 `xlsx` identity: `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`
 
 ## 关键规则
@@ -103,7 +102,7 @@ run_workflow(
   - YAML **不得**写 `write_defaults` / `budget`；`xlsx` 下也 **不得**写 `export_xlsx`
   - `xlsx.path` 是输出 **root 目录**(相对路径相对 **workflow YAML 所在目录**,不是进程 cwd)
   - Excel 输出通过 demand 的 `outputs[*].to` 绑定到 book+sheet
-  - workbook 写入策略 / 内存预算以 Python `ResourcesPolicy` 为 SSOT（`WorkflowRunOptions.resources_policy`）；`outputs[*].write` 仅用于 output-local header 行为
+  - workbook 写入策略以 Python `ResourcesPolicy`/`BookWritePolicy` 为 SSOT（`WorkflowRunOptions.resources_policy`）；book cell/sheet budget 已移除；`outputs[*].write` 仅用于 output-local header 行为
   - IO 路径仍可用 `RunOverrides.resources` / `BookResourceOverride` 覆盖；write/budget overlay 已移除
 
 demand YAML(示意): 绑定输出到 workflow 声明的 book:

@@ -9,7 +9,6 @@ from scalim.dsl.yaml_dsl.init_var_nodes import InitVarRef
 from scalim.dsl.yaml_dsl.runtime import output_composition_yaml as oc_yaml
 from scalim.dsl.yaml_dsl.runtime.references import SecurePythonReferenceResolver
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     BookWriteDefaultsConfig,
@@ -160,7 +159,6 @@ def test_compile_output_composition_keeps_xlsx_memory_internal_headers_canonical
         resources=ResourcesConfig(
             books={
                 "mem": BookConfig(
-                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=10),
                     export_xlsx=BookExportXlsxConfig(path="./out"),
                 )
             }
@@ -492,7 +490,6 @@ def test_require_book_resource_and_resolve_book_export_path_errors_cover_branche
         resources=ResourcesConfig(
             books={
                 "mem": BookConfig(
-                    budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
                     export_xlsx=BookExportXlsxConfig(path="./out", allow_formulas=True),
                 )
             }

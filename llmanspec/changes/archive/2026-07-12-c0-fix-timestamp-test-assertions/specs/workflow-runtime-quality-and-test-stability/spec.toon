@@ -1,5 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  modify_requirement,r3,"concurrency tests MUST be deterministic and avoid wall-clock flakiness","系统的并发/诊断类测试 MUST 避免依赖极小的真实时间阈值与 time.sleep 驱动,并提供足够的 timeout 与明确的完成信号,以降低 CI 抖动导致的 flaky 或误报死锁。事件顺序断言 MUST 优先使用 Event.seq(单调序号)而非 wall-clock Event.timestamp。为保证可重复+可诊断,系统 MUST 同时满足: - 正向等待的超时阈值 MUST 通过测试 SSOT 常量统一管理(例如 CI_TIMEOUT_S) - 负向断言的超时阈值 MUST 使用单独常量(例如 NEGATIVE_TIMEOUT_S) - 当等待发生超时/卡死时,测试 SHOULD 输出足够诊断信息",null,null,null
-op_scenarios[1]{req_id,id,given,when,then}:
-  r3,"workflow-node-order-uses-seq",workflow 并发测试记录 WORKFLOW_NODE_START/END 事件,断言节点 b 在节点 a 结束后启动(或与 x 重叠),断言 MUST 比较 Event.seq 而非 Event.timestamp

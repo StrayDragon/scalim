@@ -1,7 +1,8 @@
-"""`Book` 级写入策略与预算(`Python` `SSOT`).
+"""`Book` 级写入策略（`Python` `SSOT`）。
 
-`YAML` 不再 `authoring` `write_defaults` / `xlsx_memory.budget`;缺省使用 `builtin` `defaults`.
-公开构造函数仅接受 `StrEnum`(严格 `in`);内部/`IR` 仍使用 `builtin` `str`.
+`YAML` 不再 `authoring` `write_defaults`；缺省使用 `builtin` `defaults`。
+`budget` / `BookBudgetPolicy` 已移除（残留 YAML/`RunOverrides` fail-fast）。
+公开构造函数仅接受 `StrEnum`(严格 `in`)；内部/`IR` 仍使用 `builtin` `str`。
 """
 
 from typing import TYPE_CHECKING, Dict, Mapping, Optional
@@ -9,8 +10,7 @@ from typing import TYPE_CHECKING, Dict, Mapping, Optional
 from ...vendor.compact import StrEnum
 from ...vendor.dataclassesx import dataclass, replace
 from ...vendor.dataclassesx import field as dataclass_field
-from ._internal.book_identity import is_pathful_book
-from .schema_dsl.models import BookBudgetConfig, BookWriteDefaultsConfig
+from .schema_dsl.models import BookWriteDefaultsConfig
 from .schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_ALIGN_BY,
     DEFAULT_BOOK_WRITE_HEADER_POLICY,
@@ -89,57 +89,12 @@ class BookWritePolicy:
 
 
 @dataclass(frozen=True)
-class BookBudgetPolicy:
-    """`Book` 内存预算(`Python` `SSOT`). `None` = `unlimited`(无上限)."""
-
-    max_sheets: Optional[int] = None
-    max_total_cells: Optional[int] = None
-
-    def __post_init__(self) -> None:
-        if self.max_sheets is not None:
-            if not isinstance(self.max_sheets, int) or isinstance(self.max_sheets, bool):
-                msg = "BookBudgetPolicy.max_sheets must be an int or None"
-                raise TypeError(msg)
-            if int(self.max_sheets) < 1:
-                msg = "BookBudgetPolicy.max_sheets must be >= 1 when set"
-                raise ValueError(msg)
-        if self.max_total_cells is not None:
-            if not isinstance(self.max_total_cells, int) or isinstance(self.max_total_cells, bool):
-                msg = "BookBudgetPolicy.max_total_cells must be an int or None"
-                raise TypeError(msg)
-            if int(self.max_total_cells) < 1:
-                msg = "BookBudgetPolicy.max_total_cells must be >= 1 when set"
-                raise ValueError(msg)
-
-    def as_options_mapping(self) -> Optional[Mapping[str, int]]:
-        if self.max_sheets is None and self.max_total_cells is None:
-            return None
-        out: Dict[str, int] = {}
-        if self.max_sheets is not None:
-            out["max_sheets"] = int(self.max_sheets)
-        if self.max_total_cells is not None:
-            out["max_total_cells"] = int(self.max_total_cells)
-        # `resource_defs` 在启用 `budget` 时要求两个 `key` 都存在
-        if "max_sheets" not in out or "max_total_cells" not in out:
-            msg = (
-                "BookBudgetPolicy requires both max_sheets and max_total_cells when enabling a budget "
-                "(got max_sheets={!r}, max_total_cells={!r})"
-            ).format(self.max_sheets, self.max_total_cells)
-            raise ValueError(msg)
-        return out
-
-
-@dataclass(frozen=True)
 class BookResourcePolicy:
     write: BookWritePolicy = dataclass_field(default_factory=BookWritePolicy)
-    budget: BookBudgetPolicy = dataclass_field(default_factory=BookBudgetPolicy)
 
     def __post_init__(self) -> None:
         if not isinstance(self.write, BookWritePolicy):
             msg = "BookResourcePolicy.write must be a BookWritePolicy"
-            raise TypeError(msg)
-        if not isinstance(self.budget, BookBudgetPolicy):
-            msg = "BookResourcePolicy.budget must be a BookBudgetPolicy"
             raise TypeError(msg)
 
 
@@ -175,13 +130,6 @@ class ResourcesPolicy:
             return BookWritePolicy()
         return policy.write
 
-    def budget_policy_for(self, book_id: str) -> BookBudgetPolicy:
-        books = self.books or {}
-        policy = books.get(str(book_id))
-        if policy is None:
-            return BookBudgetPolicy()
-        return policy.budget
-
 
 def builtin_write_defaults_config() -> BookWriteDefaultsConfig:
     return BookWriteDefaultsConfig(
@@ -207,7 +155,7 @@ def materialize_resources_policy_onto_books(
     config: "DemandConfig",
     resources_policy: Optional[ResourcesPolicy],
 ) -> "DemandConfig":
-    """将 `Python` `ResourcesPolicy` 物化到 `DemandConfig.books` 的内部 `write_defaults`/`budget` 槽位.
+    """将 `Python` `ResourcesPolicy` 物化到 `DemandConfig.books` 的内部 `write_defaults` 槽位.
 
     `YAML` 不再 `authoring` 这些字段;物化后供 `demand` 路径 `composition` / `effective_outputs` 读取.
     """
@@ -217,23 +165,13 @@ def materialize_resources_policy_onto_books(
     next_books = {}
     for book_id, book in config.resources.books.items():
         write_cfg = resolve_write_defaults_config(book_id=str(book_id), resources_policy=resources_policy)
-        budget_cfg = None
-        if not is_pathful_book(book):
-            budget_policy = BookBudgetPolicy() if resources_policy is None else resources_policy.budget_policy_for(str(book_id))
-            budget_mapping = budget_policy.as_options_mapping()
-            if budget_mapping is not None:
-                budget_cfg = BookBudgetConfig(
-                    max_sheets=int(budget_mapping["max_sheets"]),
-                    max_total_cells=int(budget_mapping["max_total_cells"]),
-                )
-        next_books[str(book_id)] = replace(book, write_defaults=write_cfg, budget=budget_cfg)
+        next_books[str(book_id)] = replace(book, write_defaults=write_cfg)
 
     next_resources = replace(config.resources, books=next_books)
     return replace(config, resources=next_resources)
 
 
 __all__ = (
-    "BookBudgetPolicy",
     "BookResourcePolicy",
     "BookWriteAlignBy",
     "BookWriteHeaderPolicy",

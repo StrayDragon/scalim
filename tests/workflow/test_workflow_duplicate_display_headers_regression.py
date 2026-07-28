@@ -72,8 +72,6 @@ def test_sheetbook_xlsx_memory_duplicate_display_headers_remains_correct(tmp_pat
         sheetbook_defs={
             "sb": SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=0,
-                budget_max_total_cells=0,
                 export_path=str(export_path),
                 export_allow_formulas=True,
             )

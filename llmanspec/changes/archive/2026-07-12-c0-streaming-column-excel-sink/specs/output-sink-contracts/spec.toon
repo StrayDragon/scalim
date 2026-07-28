@@ -1,7 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r11,StreamingColumnExcelSink MUST be opt-in and may release residency before close,"系统 MUST 提供可选的 `StreamingColumnExcelSink`(或等价命名)作为 `IColumnSink` 实现以降低宽表 `pre_close` 驻留: - MUST NOT 改变默认 `ColumnExcelSink` 行为 - 调用方可在行字段齐备后触发刷盘并释放对应缓冲(显式 `flush` 或等价语义) - `close()` MUST 刷剩余数据并以原子临时文件落盘,失败路径 MUST best-effort 清理临时文件并对 write_only worksheet 尽力关闭 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线 - 行为变更 MUST 有 evidence-mvp 证明相对 `ColumnExcelSink` 在目标 shape 上降低 `pre_close`/`peak` RSS 且输出正确",null,null,null
-op_scenarios[3]{req_id,id,given,when,then}:
-  r11,default-column-excel-unchanged,"既有调用方仅使用 ColumnExcelSink",执行既有写出路径,"行为与归档前契约一致,不受 StreamingColumnExcelSink 引入影响"
-  r11,streaming-opt-in-reduces-pre-close,"调用方显式构造 StreamingColumnExcelSink 并写入宽表列",在齐备行上 flush 后继续写入,"系统 MUST 允许释放已刷行缓冲,且 evidence 显示 pre_close/peak 低于同 shape 的 ColumnExcelSink hold"
-  r11,no-yaml-streaming-knobs,"维护者审阅 YAML DSL 主线与 schema",检查 streaming/flush 配置面,"MUST NOT 出现 write.streaming 或等价 YAML knobs"

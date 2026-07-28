@@ -1,6 +1,6 @@
 kind: llman.sdd.spec
 name: "yaml-dsl-workflow-lifecycle-pipeline"
-purpose: "TBD - created by archiving change c0-yaml-dsl-workflow-lifecycle-pipeline. Update Purpose after archive. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
+purpose: "定义 workflow 生命周期显式阶段管线（phase pipeline）：structural preload 保持 parser-only、overrides 合并、effective outputs/resources 驱动的 preflight diagnostics、确定性的 fail-fast 顺序。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
 requirements[7]{req_id,title,statement}:
   r131,workflow runtime MUST implement a lifecycle pipeline with explicit phase results,"系统 MUST 将 workflow 的生命周期实现为一组显式阶段（phase pipeline），并为每个阶段提供可被测试消费的阶段结果对象（phase result），以便： - 将阶段顺序变成 SSOT（避免多入口各自拼装导致 drift） - 使边界约束“靠数据结构表达”（早期阶段结果不暴露后期阶段所需信息） - 让单测可以在不启动 engine 的情况下覆盖 boundary 行为"

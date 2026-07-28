@@ -1,5 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  modify_requirement,r363,known legacy observability keys MUST fail-fast with migration hints,"系统 MUST 对已知 legacy YAML observability.* key 执行 fail-fast（不得再 warning 后忽略继续运行）: - 错误信息 MUST 明确 observability 已从 YAML 主线移除 - 错误信息 MUST 指向 Python / CLI runtime entrypoint 的迁移路径 - 普通未知字段 MUST 继续按现有 unknown-field 规则处理,不得一律当作 observability 处理",null,null,null
-op_scenarios[1]{req_id,id,given,when,then}:
-  r363,"legacy-observability-key-fails-fast",某个旧 YAML 仍包含已知的 observability.logging 或等价 key,用户执行 validate 或运行入口解析,系统 MUST fail-fast 并给出迁移到 Python/CLI runtime entrypoints 的提示

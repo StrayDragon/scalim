@@ -62,8 +62,6 @@ def test_sheetbook_sheet_decl_order_is_updated_when_first_touch_is_out_of_order(
         sheetbook_defs={
             "sb": SheetBookDef(
                 resource_id="sb",
-                budget_max_sheets=10,
-                budget_max_total_cells=10000,
                 export_path=None,
             )
         },

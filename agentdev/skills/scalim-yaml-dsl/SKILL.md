@@ -1,6 +1,6 @@
 ---
 name: scalim-yaml-dsl
-description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/workflow)配置,并为旧报表脚本规划渐进迁移。覆盖 resources.books identity(唯一分支 xlsx,可选 path)、outputs→book 绑定、Python ResourcesPolicy/BookWritePolicy/BookBudgetPolicy(write_defaults 与 budget 已迁出 YAML)、RunOverrides IO overlay(含保留的 xlsx_file_single_sheet 工厂)、path/init_var 输出 root、以及 scalim-cli yaml-dsl validate/schema。适用于修复 validate 报错、迁移 write_defaults/budget/已硬删的 xlsx_file|xlsx_memory、判断逻辑应留在 Python 还是下沉 YAML 的场景。"
+description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/workflow)配置,并为旧报表脚本规划渐进迁移。覆盖 resources.books identity(唯一分支 xlsx,可选 path)、outputs→book 绑定、Python ResourcesPolicy/BookWritePolicy(write_defaults 已迁出 YAML；book budget/BookBudgetPolicy 已移除)、Python IR 侧 DedupBy/TwoStageGroupBy 已移除、RunOverrides IO overlay(含保留的 xlsx_file_single_sheet 工厂)、path/init_var 输出 root、以及 scalim-cli yaml-dsl validate/schema。适用于修复 validate 报错、迁移 write_defaults/删除残留 budget/已硬删的 xlsx_file|xlsx_memory、迁移已删 Dedup/TwoStage IR、判断逻辑应留在 Python 还是下沉 YAML 的场景。"
 ---
 
 # Scalim YAML DSL
@@ -18,7 +18,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 - 宽表 Excel 峰值 / `StreamingColumnExcelSink` / `ExcelColumnResidency` 选型: 读 [references/streaming-column-excel-guidance.md](references/streaming-column-excel-guidance.md)（人类文档: `docs/doc/getting-started/excel-column-residency.md`）
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
-- 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`(book write/budget: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)
+- 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`(book write: `2026-07-12-book-write-policy-python-ssot.md`；book budget 移除: `2026-07-28-remove-book-budget-policy.md`；Dedup/TwoStage IR 移除: `2026-07-28-remove-dedup-and-two-stage-derived.md`)
 - 需要全量语法/API: 读 [references/syntax-catalog.gen.md](references/syntax-catalog.gen.md) 和 [references/generated/cli-lsp-reference.gen.md](references/generated/cli-lsp-reference.gen.md)
 - 需要完整 canonical example: 读 [references/generated/example-full/ecommerce_report.gen.yaml](references/generated/example-full/ecommerce_report.gen.yaml)
 
@@ -83,7 +83,7 @@ run_workflow(
 - 不要硬记/猜语法: 以 schema / 生成文档为准(需要时看 `references/syntax-catalog.gen.md`、`references/generated/cli-lsp-reference.gen.md`、`references/generated/example-full/ecommerce_report.gen.yaml`)
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
-- YAML `resources.books` 只声明 identity（唯一分支 `xlsx`：有 `path`=落盘，无 `path`=内存总线；`xlsx_file`/`xlsx_memory` 已硬删）;`write_defaults` 与 `budget` 已迁出,出现即 fail-fast → 用 `WorkflowRunOptions`/`DemandRunOptions.resources_policy`(`BookWritePolicy`/`BookBudgetPolicy`,StrEnum 严格 in);详见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`、`references/upgrades/2026-07-13-unified-xlsx-book-kind.md`、`references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`
+- YAML `resources.books` 只声明 identity（唯一分支 `xlsx`：有 `path`=落盘，无 `path`=内存总线；`xlsx_file`/`xlsx_memory` 已硬删）;`write_defaults` 已迁出 → 用 `WorkflowRunOptions`/`DemandRunOptions.resources_policy`(`BookWritePolicy`,StrEnum 严格 in)；`budget` / `BookBudgetPolicy` **已移除**（YAML/`RunOverrides` 残留仍 fail-fast，删字段；内存交宿主限制）；Python IR `DedupBy*` / `TwoStageGroupBy*` **已移除**（loader 去重 / workflow 两段 demand）；详见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`、`references/upgrades/2026-07-28-remove-book-budget-policy.md`、`references/upgrades/2026-07-28-remove-dedup-and-two-stage-derived.md`、`references/upgrades/2026-07-13-unified-xlsx-book-kind.md`、`references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`
 - **MUST NOT** 为降低 Excel 峰值在 YAML 发明 `write.streaming` / books streaming knobs;YAML Excel 组合层已是行 sink。列式 HOLD→WINDOW 用 Python `ExcelColumnResidency`(见 `references/streaming-column-excel-guidance.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`)
 - `path` 是输出 root 目录:相对路径相对 **声明该路径的 YAML 文件目录**(不是进程 cwd);环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride`(IO-only overlay,不再含 write/budget)。唯一写法 `resources.books.*.xlsx.path`（旧 `export_xlsx.path` / `xlsx_file` 已硬删）。
 - workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 outputs→book 绑定等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`

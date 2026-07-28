@@ -1,7 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r12,StreamingColumnExcelSink MUST accept append set_row_ids for multi-batch windows,"系统 MUST 使可选的 `StreamingColumnExcelSink` 的 `set_row_ids` 支持多次调用以追加行窗: - 首次调用 MUST 打开 `write_only` workbook(并按需写表头) - 后续调用 MUST 追加新 `row_id` 与对应行缓冲,且 MUST NOT 重建已打开的 workbook - 重复 `row_id` MUST fail-fast - MUST NOT 改变默认 `ColumnExcelSink` 行为 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线",null,null,null
-op_scenarios[3]{req_id,id,given,when,then}:
-  r12,multi-batch-append-matches-hold,"调用方对 StreamingColumnExcelSink 按 batch 多次 set_row_ids 并写满各批全部列",close 后读取 xlsx,"输出 MUST 与同数据的 ColumnExcelSink 一致,且已刷行缓冲可在过程中释放"
-  r12,duplicate-row-id-fail-fast,"StreamingColumnExcelSink 已登记某 row_id",再次 set_row_ids 含同一 row_id,"系统 MUST 抛出错误且不得静默覆盖"
-  r12,default-column-excel-unchanged,"既有调用方仅使用 ColumnExcelSink",执行既有写出路径,"行为不受本变更影响"

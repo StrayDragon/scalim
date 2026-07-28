@@ -2,7 +2,8 @@
 
 > **Superseded (部分)**: 本批次引入的 `workflow.resources.sheetbooks` / `workbooks` / `writes`、以及 YAML `workflow.options.ctx` 等写法，后续已收敛或迁出。
 > - 共享 Excel 资源请用当前 `workflow.resources.books`（唯一分支 `xlsx` 可选 `path`；`xlsx_file`/`xlsx_memory` 已硬删，见 `2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`）
-> - book 写入策略与内存预算请用 Python `ResourcesPolicy`（见 `2026-07-12-book-write-policy-python-ssot.md`）；YAML 不得再写 `write_defaults`/`budget`
+> - book 写入策略请用 Python `BookWritePolicy` / `ResourcesPolicy`（见 `2026-07-12-book-write-policy-python-ssot.md`）；YAML 不得再写 `write_defaults`
+> - book cell/sheet **内存预算已移除**（勿再找 `BookBudgetPolicy`）；YAML/`RunOverrides` 残留 `budget` 删字段即可（见 `2026-07-28-remove-book-budget-policy.md`）
 > - `workflow.options.*` runtime knobs 已迁出 YAML（出现即 fail-fast）
 >
 > 阅读本文件仅用于理解历史迁移路径；**不要**把下方 Migration Checklist 原样抄进新配置。
@@ -46,9 +47,9 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 4) 若存在共享输出或潜在输出路径冲突:
    - 将共享目标声明到 `workflow.resources.*`
    - 用 `runs[*].writes` 声明写入 intents(每个 run 可声明 0..N 条；每条 intent 恰好一个 intent key)
-5) 若使用 sheetbook:
-   - 必须声明 `sheetbooks.<id>.budget.max_sheets/max_total_cells`
-   - 需要导出为最终 xlsx 时,声明 `export_xlsx.path`(输出 root 目录)
+5) 若使用 sheetbook（**历史**）:
+   - 当时必须声明 `sheetbooks.<id>.budget.max_sheets/max_total_cells`——该护栏已随 books 收敛与 `2026-07-28-remove-book-budget-policy` **删除**；当前勿再配置
+   - 需要导出为最终 xlsx 时,声明 `export_xlsx.path`(输出 root 目录)——现已收敛为 `resources.books.<id>.xlsx.path`
 6) 校验与编辑器配置:
    - workflow YAML full validate(静态/编译期;递归校验引用的 demands;不执行 workflow):
      - `uv run scalim-cli yaml-dsl validate --type workflow <workflow.yaml>`

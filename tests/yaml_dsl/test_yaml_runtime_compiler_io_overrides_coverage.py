@@ -24,7 +24,6 @@ from scalim.dsl.yaml_dsl.runtime.contracts import (
     RunOverrides,
 )
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     DemandConfig,
@@ -267,7 +266,7 @@ def test_runtime_compiler_overlay_book_write_defaults_override_invalid_enum_cove
 
 
 def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             BookConfig(),
             {"budget": {"max_total_cells": 2}},
@@ -275,7 +274,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             BookConfig(),
             {"budget": {"max_sheets": True, "max_total_cells": 2}},
@@ -283,7 +282,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             BookConfig(),
             {"budget": {"max_sheets": 1, "max_total_cells": True}},
@@ -291,7 +290,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             BookConfig(),
             {"budget": {"max_sheets": 0, "max_total_cells": 2}},
@@ -299,7 +298,7 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             BookConfig(),
             {"budget": {"max_sheets": 1, "max_total_cells": 0}},
@@ -307,9 +306,9 @@ def test_runtime_compiler_overlay_book_budget_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
-            BookConfig(budget=BookBudgetConfig(max_sheets=1, max_total_cells=2)),
+            BookConfig(),
             {"budget": {"max_total_cells": 3}},
             path="p",
         )
@@ -351,10 +350,10 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
         )
     assert exc_info.value.path == "p.allow_formulas"
 
-    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
-        _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
-            BookConfig(path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
-            BookResourceOverride(),
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
+        _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
+            BookConfig(path="a"),
+            {"budget": {"max_sheets": 1, "max_total_cells": 1}},
             path="p",
         )
     assert exc_info.value.path == "p.budget"
@@ -372,17 +371,7 @@ def test_runtime_compiler_apply_book_override_semantic_and_type_errors_cover_bra
 
     with pytest.raises(ScalimWorkflowConfigError) as exc_info:
         _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
-            BookConfig(path="a", budget=BookBudgetConfig(max_sheets=1, max_total_cells=1)),
-            BookResourceOverride(),
-            path="p",
-        )
-    # path presence makes this pathful; budget is rejected for pathful books
-    assert exc_info.value.path == "p.budget"
-
-    with pytest.raises(ScalimWorkflowConfigError) as exc_info:
-        _ = resource_override_mod.apply_book_resource_override(  # noqa: SLF001
             BookConfig(
-                budget=BookBudgetConfig(max_sheets=1, max_total_cells=1),
                 allow_formulas=True,
             ),
             BookResourceOverride(),
@@ -521,7 +510,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
         _ = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(path=""), path="p")  # noqa: SLF001
     assert exc_info.value.path == "p.path"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
             {"path": "a", "budget": {"max_sheets": 1, "max_total_cells": 2}},
@@ -531,9 +520,8 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
 
     created_unlimited = resource_override_mod.apply_book_resource_override(None, BookResourceOverride(), path="p")  # noqa: SLF001
     assert created_unlimited.path is None
-    assert created_unlimited.budget is None
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
             {"budget": {"max_sheets": 0, "max_total_cells": 2}},
@@ -541,7 +529,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
             {"path": "x", "budget": {"max_sheets": 1, "max_total_cells": 2}},
@@ -549,7 +537,7 @@ def test_runtime_compiler_apply_book_override_cover_branches() -> None:
         )
     assert exc_info.value.path == "p.budget"
 
-    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed from RunOverrides\.resources") as exc_info:
+    with pytest.raises(ScalimWorkflowConfigError, match=r"budget was removed") as exc_info:
         _ = resource_override_mod._apply_book_patch(  # noqa: SLF001
             None,
             {"budget": {"max_sheets": 1, "max_total_cells": 2}},

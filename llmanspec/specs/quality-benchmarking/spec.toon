@@ -2,7 +2,7 @@ kind: llman.sdd.spec
 name: "quality-benchmarking"
 purpose: "定义基准测试入口与依赖约束，覆盖 pytest-benchmark 执行、JSON 导出、baseline 对比、benchlib 复用与可选 memray 剖析。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]"
 valid_scope[1]: src/scalim/
-requirements[8]{req_id,title,statement}:
+requirements[11]{req_id,title,statement}:
   r70,"pytest-benchmark 基准入口","基准 MUST 基于 pytest-benchmark 执行，MUST 支持导出 JSON 结果，并可通过 baseline 进行对比。"
   r314,examples 复用与全链路覆盖,基准用例 MUST 复用 examples 的共享模块，避免重复实现。基准 MUST 覆盖核心链路(源加载、关联、派生、sink、hooks、质量/诊断等)。
   r437,资源指标采样,"基准 MUST 采集 CPU 与 RSS 指标(psutil 可选)。未安装 psutil 时 MUST 不导致基准失败。资源指标 MUST 写入 pytest-benchmark 的 extra_info 并随 JSON 输出。"
@@ -11,7 +11,10 @@ requirements[8]{req_id,title,statement}:
   r657,基准对比元数据,基准结果 MUST 在 extra_info 中记录用于对比的 scenario、scale、scope 元数据。
   r699,"可选 memray 内存剖析 (dev-only)","内存剖析 MUST 通过 pytest-memray 独立入口启用，且仅作为 dev 依赖存在。默认 bench MUST NOT 依赖 memray。"
   r736,"可选 py-spy CPU profiling (dev-only)","系统 MUST 提供 dev-only 的 CPU profiling 入口，用于定位执行热路径的 CPU sampling hotspot。默认 bench MUST NOT 依赖 py-spy。"
-scenarios[12]{req_id,id,given,when,then,feature}:
+  r71,Deterministic hotpath regression guardrails,"系统 MUST 为执行热路径提供确定性的回归护栏（单元测试级别），用于防止“wants-gated 退化”与无订阅时的额外循环/分配被重新引入。 该护栏 MUST 满足： - 不依赖机器性能阈值（避免 CI 抖动）。 - 以“调用次数/分支路径/是否构造中间结构”为断言信号。"
+  r315,Benchmark suites exist for trend measurement,系统 MUST 提供可重复执行的 benchmark suites 用于趋势测量，并支持导出结构化结果用于对比。
+  r438,"Memory profiling entrypoints exist (dev-only)","系统 MUST 提供 dev-only 的内存剖析入口（例如 memray），并将产物写入受控目录，便于定位“分配热点”与“峰值驻留”来源。"
+scenarios[18]{req_id,id,given,when,then,feature}:
   r70,"json-export","运行基准命令并指定 --benchmark-json","执行 pytest-benchmark",生成包含测试条目与统计的 JSON 文件,true
   r70,"baseline-compare",已保存 baseline 结果,"使用 --benchmark-compare 进行对比",输出对比结果并标注差异,true
   r314,"reuse-shared",examples 提供 _shared.py / _loaders.py,基准执行需要构建 IR 与加载数据,复用共享模块完成构建与执行,true
@@ -24,3 +27,9 @@ scenarios[12]{req_id,id,given,when,then,feature}:
   r699,"no-memray-dep","","执行 pytest tests/bench -m bench",未安装 memray 也能正常运行且不触发导入错误,true
   r699,"memray-output","",执行 memray 基准入口,生成可用于分析的内存剖析输出,true
   r736,"no-pyspy-dep","环境未安装 py-spy",开发者运行默认基准入口,基准 MUST 正常运行,true
+  r71,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r71,"relation-diagnostics-is-skipped-when-not-wanted","",未订阅 `relation_lookup` 事件且执行一次包含 `LoadRef` 的批次,系统 MUST 不执行逐行的 lookup 命中/缺失诊断循环（等价于不产生与 `row_count` 成正比的诊断开销）,true
+  r315,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r315,"benchmark-run-produces-structured-output","",运行基准入口并启用 JSON 导出,输出 MUST 包含每个场景的统计数据与 `extra_info`（至少包含 `scenario`/`scale`/`scope`）,true
+  r438,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r438,"memray-output-is-written-under-a-stable-directory","",运行内存剖析入口,剖析产物 MUST 输出到稳定目录（例如 `.benchmarks/memray/`）且不影响默认 benchmark 执行,true

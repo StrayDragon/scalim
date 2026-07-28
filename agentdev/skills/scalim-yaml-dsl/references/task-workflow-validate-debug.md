@@ -51,7 +51,6 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type workflow --comment-style al
 
 ```python
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWritePolicy,
     DemandRunOptions,
@@ -65,9 +64,9 @@ run_workflow(
     "path/to/workflow.yaml",
     options=WorkflowRunOptions(
         demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
-        # 若 YAML 仍残留 write_defaults/budget,或需要非默认写入策略/预算护栏,在此配置
+        # 若需要非默认写入策略,在此配置；YAML 残留 write_defaults/budget 请先删字段
         resources_policy=ResourcesPolicy(
-            books={"report": BookResourcePolicy(write=BookWritePolicy(), budget=BookBudgetPolicy(max_sheets=16, max_total_cells=2_000_000))}
+            books={"report": BookResourcePolicy(write=BookWritePolicy())}
         ),
     ),
 )
@@ -121,20 +120,20 @@ run_workflow(
 - 下游 run 必须显式 `depends_on: [A]`(或依赖闭包中包含 A)
 - 避免把大对象塞进 ctx；只放小体量 summary/path 等
 
-### 5) YAML 仍写 `write_defaults` / `budget`(已迁出)
+### 5) YAML 仍写 `write_defaults` / `budget`(已迁出 / 已移除)
 
 症状:
 
-- validate / parse / compile fail-fast: `write_defaults was removed from YAML authoring` 或 `budget was removed`
-- 或运行期命中 Python `BookBudgetPolicy` 护栏(超限 fail-fast)
+- validate / parse / compile fail-fast: `write_defaults was removed from YAML authoring` 或 `budget was removed` / `budget was removed; delete this field... host resource limits`
+- `TypeError` / `ImportError` 涉及 `BookBudgetPolicy` 或 `budget=`
 
 修复:
 
 - 从 YAML `resources.books.*` 删除 `write_defaults` 与 `budget`(只留 identity: 推荐 `xlsx` + 可选 `path`)
-- 在 Python 配置 `WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy`:
-  - write → `BookWritePolicy`(构造只用 StrEnum)
-  - budget → `BookBudgetPolicy(max_sheets=..., max_total_cells=...)`(启用时两者都要给;省略 = unlimited)
-- 完整迁移: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- write → 在 Python 配置 `WorkflowRunOptions.resources_policy` / `DemandRunOptions.resources_policy` → `BookWritePolicy`(构造只用 StrEnum)
+- budget → **不要**迁到 Python；`BookBudgetPolicy` 已移除；删字段即可，内存风险交宿主限制
+- write 迁移: `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`
+- budget 移除: `references/upgrades/2026-07-28-remove-book-budget-policy.md`
 - book identity 统一: `references/upgrades/2026-07-13-unified-xlsx-book-kind.md`
 - `RunOverrides.resources` / `BookResourceOverride` 仍可覆盖 path/`allow_formulas`,但 **不能**再 overlay write/budget
 

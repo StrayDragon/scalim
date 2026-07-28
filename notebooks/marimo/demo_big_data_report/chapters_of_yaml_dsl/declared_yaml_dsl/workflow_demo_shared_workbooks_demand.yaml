@@ -7,7 +7,7 @@ description: |
   Notes:
   - workflow manages the book resource identity (paths/export)
   - demand defines stable output contracts: `outputs[*].to` (+ optional output-local header behavior via `outputs[*].write`)
-  - workbook write policy / memory budget are Python SSOT via `WorkflowRunOptions.resources_policy` (`ResourcesPolicy`/`BookWritePolicy`/`BookBudgetPolicy`)
+  - workbook write policy is Python SSOT via `WorkflowRunOptions.resources_policy` (`ResourcesPolicy`/`BookWritePolicy`); book cell/sheet budget / `BookBudgetPolicy` removed — do not configure
 
 # NOTE: `batch_size` moved out of YAML runtime policy boundary.
 # Pass via workflow runtime entrypoints, e.g. `WorkflowRunOptions(demand=DemandRunOptions(runtime=DemandRunRuntimeOptions(batch_size=30), ...))`.

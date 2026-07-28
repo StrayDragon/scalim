@@ -128,8 +128,6 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: "Workbook", plan: "_She
 @dataclass(frozen=True)
 class SheetBookDef:
     resource_id: str
-    budget_max_sheets: int
-    budget_max_total_cells: int
     export_path: Optional[str]
     export_allow_formulas: bool = True
 
@@ -148,20 +146,16 @@ class _SheetBookSheetPlan:
     baseline_header: List[str]
     export_header: Optional[List[str]]
     segments: List[_SheetBookSegment]
-    cell_count: int = 0
 
 
 @dataclass
 class _SheetBookPlan:
     resource_id: str
-    budget_max_sheets: int
-    budget_max_total_cells: int
     export_path: Optional[str]
     export_allow_formulas: bool
     sheet_decl_order: Dict[str, int]
     sheet_order: List[str]
     sheets: Dict[str, _SheetBookSheetPlan]
-    total_cells: int = 0
     last_workflow_node_id: Optional[str] = None
 
 
@@ -232,16 +226,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
             if on_conflict == "overwrite":
                 action = "overwrite"
-        else:
-            max_sheets_limit = int(plan.budget_max_sheets)
-            if max_sheets_limit > 0 and len(plan.sheets) >= max_sheets_limit:
-                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                diff = [
-                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                    "current_sheets={}".format(len(plan.sheets)),
-                    "new_sheet={!r}".format(sheet_name),
-                ]
-                raise ScalimWorkflowWriteError(msg, diff=diff)
         return action, pending_skip
 
     def _sheetbook_sheet_store(
@@ -255,16 +239,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         expected: List[str],
         export_header: Optional[Tuple[str, ...]],
         rows: List[List[CellValue]],
-        new_sheet_cells: int,
     ) -> None:
-        existing = plan.sheets.get(sheet_name)
-        old_cells = 0
-        if existing is not None:
-            old_cells = int(existing.cell_count)
-
-        new_total = int(plan.total_cells) - int(old_cells) + int(new_sheet_cells)
-        self._check_sheetbook_budget(plan, new_total_cells=new_total)
-
         existing_decl_order = plan.sheet_decl_order.get(sheet_name)
         resolved_decl_order = int(decl_order)
         if existing_decl_order is None or resolved_decl_order < int(existing_decl_order):
@@ -281,7 +256,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 sheet_name=sheet_name,
             ),
             segments=[],
-            cell_count=int(new_sheet_cells),
         )
         sheet_plan.segments.append(
             _SheetBookSegment(
@@ -292,7 +266,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             )
         )
         plan.sheets[sheet_name] = sheet_plan
-        plan.total_cells = int(new_total)
         plan.last_workflow_node_id = str(workflow_node_id)
 
     def _sheetbook_append_prepare(
@@ -316,15 +289,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:
-            max_sheets_limit = int(plan.budget_max_sheets)
-            if max_sheets_limit > 0 and len(plan.sheets) >= max_sheets_limit:
-                msg = "Sheetbook budget exceeded: max_sheets (sheetbook={!r})".format(str(sheetbook_id))
-                diff = [
-                    "budget.max_sheets={}".format(int(plan.budget_max_sheets)),
-                    "current_sheets={}".format(len(plan.sheets)),
-                    "new_sheet={!r}".format(sheet_name),
-                ]
-                raise ScalimWorkflowWriteError(msg, diff=diff)
             plan.sheet_decl_order[sheet_name] = int(decl_order)
             plan.sheet_order = sorted(plan.sheet_decl_order.keys(), key=lambda name: (plan.sheet_decl_order.get(name, 0), str(name)))
             sheet_plan = _SheetBookSheetPlan(
@@ -337,7 +301,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                     sheet_name=sheet_name,
                 ),
                 segments=[],
-                cell_count=0,
             )
             plan.sheets[sheet_name] = sheet_plan
         else:
@@ -395,7 +358,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         *,
         sheetbook_id: str,
         sheet_name: str,
-        append_cells: int,
         workflow_node_id: str,
         input_node_id: str,
         decl_order: int,
@@ -407,8 +369,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
             raise ScalimWorkflowWriteError(msg)
 
-        new_total = int(plan.total_cells) + int(append_cells)
-        self._check_sheetbook_budget(plan, new_total_cells=new_total)
         sheet_plan.segments.append(
             _SheetBookSegment(
                 producer_node_id=str(input_node_id),
@@ -417,8 +377,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 header_policy=str(header_policy),
             )
         )
-        sheet_plan.cell_count = int(sheet_plan.cell_count) + int(append_cells)
-        plan.total_cells = int(new_total)
         plan.last_workflow_node_id = str(workflow_node_id)
 
     def _get_or_create_sheetbook(self, sheetbook_id: str, *, workflow_node_id: str) -> _SheetBookPlan:
@@ -435,8 +393,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
         plan = SheetBookPlan(
             resource_id=str(raw_def.resource_id),
-            budget_max_sheets=int(raw_def.budget_max_sheets),
-            budget_max_total_cells=int(raw_def.budget_max_total_cells),
             export_path=str(raw_def.export_path) if raw_def.export_path is not None else None,
             export_allow_formulas=bool(raw_def.export_allow_formulas),
             sheet_decl_order={},
@@ -453,24 +409,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             path=str(display_path),
         )
         return plan
-
-    def _check_sheetbook_budget(
-        self,
-        plan: _SheetBookPlan,
-        *,
-        new_total_cells: int,
-    ) -> None:
-        limit = int(plan.budget_max_total_cells)
-        if limit <= 0:
-            return
-        if int(new_total_cells) <= limit:
-            return
-        diff = [
-            "budget.max_total_cells={}".format(limit),
-            "new_total_cells={}".format(int(new_total_cells)),
-        ]
-        msg = "Sheetbook budget exceeded: sheetbook={!r}".format(str(plan.resource_id))
-        raise ScalimWorkflowWriteError(msg, diff=diff)
 
     def apply_sheetbook_sheet(
         self,
@@ -515,8 +453,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         mapping = _build_alignment_mapping(expected, input_header)
 
         rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
-        row_count = len(rows)
-        new_sheet_cells = int(row_count) * len(expected)
 
         self._sheetbook_sheet_store(
             plan,
@@ -527,7 +463,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             expected=expected,
             export_header=export_header,
             rows=rows,
-            new_sheet_cells=int(new_sheet_cells),
         )
 
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
@@ -602,14 +537,10 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         rows = materialize_aligned_tabular_rows(expected, mapping, input_tabular=input_csv)
 
-        append_rows = len(rows)
-        append_cells = int(append_rows) * len(expected)
-
         self._sheetbook_append_apply(
             plan,
             sheetbook_id=str(sheetbook_id),
             sheet_name=sheet_name,
-            append_cells=int(append_cells),
             workflow_node_id=str(workflow_node_id),
             input_node_id=str(input_node_id),
             decl_order=int(decl_order),
@@ -730,8 +661,6 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
             for seg in sheet_plan.segments:
                 seg.rows = []
             sheet_plan.segments = []
-            sheet_plan.cell_count = 0
-        plan.total_cells = 0
         display_path = plan.export_path if plan.export_path is not None else "<memory>"
         self._log_plan_segment_release(
             workflow_node_id=str(workflow_node_id),

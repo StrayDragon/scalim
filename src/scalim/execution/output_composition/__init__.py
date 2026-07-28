@@ -21,8 +21,6 @@ from .sinks import RowCounter as RowCounter
 from .sinks import create_row_sink_for_composed_output as create_row_sink_for_composed_output
 from .sinks import get_or_create_excel_workbook_sink as get_or_create_excel_workbook_sink
 from .specs import AuditSheetSpec as AuditSheetSpec
-from .specs import DedupBySpec as DedupBySpec
-from .specs import DerivedDedupByGroupBySpec as DerivedDedupByGroupBySpec
 from .specs import DerivedGroupBySpec as DerivedGroupBySpec
 from .specs import DerivedOutputTargetSpec as DerivedOutputTargetSpec
 from .specs import IDerivedAggregationSpec as IDerivedAggregationSpec
@@ -31,7 +29,6 @@ from .specs import OutputCompositionSpec as OutputCompositionSpec
 from .specs import OutputRowPredicate as OutputRowPredicate
 from .specs import OutputTargetSpec as OutputTargetSpec
 from .specs import OutputTargetStats as OutputTargetStats
-from .specs import TwoStageGroupBySpec as TwoStageGroupBySpec
 from .specs import fingerprint_for_derived_target as fingerprint_for_derived_target
 from .specs import metric_fingerprint_part as metric_fingerprint_part
 from .specs import post_field_fingerprint_part as post_field_fingerprint_part
@@ -57,8 +54,6 @@ _truncate_text = truncate_text
 
 __all__ = (
     "AuditSheetSpec",
-    "DedupBySpec",
-    "DerivedDedupByGroupBySpec",
     "DerivedGroupBySpec",
     "DerivedOutputTargetSpec",
     "IDerivedAggregationSpec",
@@ -69,7 +64,6 @@ __all__ = (
     "OutputTargetStats",
     "RouterRowSink",
     "ScalimOutputTargetWriteError",
-    "TwoStageGroupBySpec",
     "build_output_composition",
     "required_demand_fields",
 )

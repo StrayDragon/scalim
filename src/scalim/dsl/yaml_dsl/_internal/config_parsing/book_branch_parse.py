@@ -119,9 +119,10 @@ def _parse_xlsx_branch(
         ).format(path)
         raise error_factory(msg, path="{}.xlsx.write_defaults".format(path))
     if "budget" in xlsx:
-        msg = ("{}.xlsx.budget was removed from YAML authoring. Migration: configure BookBudgetPolicy via Python ResourcesPolicy.").format(
-            path
-        )
+        msg = (
+            "{}.xlsx.budget was removed. Delete this field; book cell/sheet budget "
+            "is no longer supported — rely on host resource limits for memory risk."
+        ).format(path)
         raise error_factory(msg, path="{}.xlsx.budget".format(path))
 
     unknown_branch = sorted({str(k) for k in xlsx} - {"path", "allow_formulas"})
@@ -150,7 +151,6 @@ def _parse_xlsx_branch(
         return BookConfig(
             kind="",
             path=book_path,
-            budget=None,
             export_xlsx=None,
             allow_formulas=bool(allow_formulas_raw),
             write_defaults=None,
@@ -159,7 +159,6 @@ def _parse_xlsx_branch(
     return BookConfig(
         kind="",
         path=None,
-        budget=None,
         export_xlsx=None,
         allow_formulas=False,
         write_defaults=None,

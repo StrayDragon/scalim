@@ -5,7 +5,6 @@ import pytest
 from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidator
 from scalim.dsl.yaml_dsl._internal import resource_override as resource_override_mod
 from scalim.dsl.yaml_dsl.schema_dsl.models import (
-    BookBudgetConfig,
     BookConfig,
     BookExportXlsxConfig,
     DemandConfig,
@@ -257,7 +256,6 @@ def test_workflow_compile_helpers_cover_output_root_dir_migration_edges(tmp_path
     assert patched.allow_formulas is True
 
     book = BookConfig(
-        budget=BookBudgetConfig(max_sheets=1, max_total_cells=2),
         export_xlsx=BookExportXlsxConfig(path=str(tmp_path / "out.xlsx"), allow_formulas=True),
     )
     with pytest.raises(ValueError, match=r"export_xlsx\.path now expects an output root directory"):

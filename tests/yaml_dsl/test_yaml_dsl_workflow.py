@@ -10,7 +10,6 @@ from scalim.dsl.yaml_dsl import DemandDiagnosticsPolicy
 from scalim.dsl.yaml_dsl import OutputOverride, OutputToOverride, OutputWriteOverride
 from scalim.dsl.yaml_dsl import RunOverrides
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWriteHeaderPolicy,
     BookWriteMode,
@@ -82,8 +81,6 @@ def _workflow_resources_policy(  # type: ignore[no-untyped-def] test helper
     header_policy: Optional[str] = None,
     on_mismatch: Optional[str] = None,
     on_conflict: Optional[str] = None,
-    max_sheets: Optional[int] = None,
-    max_total_cells: Optional[int] = None,
 ) -> ResourcesPolicy:
     write_kwargs: Dict[str, Any] = {}
     if write_mode is not None:
@@ -95,18 +92,10 @@ def _workflow_resources_policy(  # type: ignore[no-untyped-def] test helper
     if on_conflict is not None:
         write_kwargs["on_conflict"] = BookWriteOnConflict(str(on_conflict))
 
-    budget = None
-    if max_sheets is not None or max_total_cells is not None:
-        budget = BookBudgetPolicy(
-            max_sheets=max_sheets,
-            max_total_cells=max_total_cells,
-        )
-
     return ResourcesPolicy(
         books={
             str(book_id): BookResourcePolicy(
                 write=BookWritePolicy(**write_kwargs),
-                budget=budget if budget is not None else BookBudgetPolicy(),
             )
         }
     )
@@ -3805,7 +3794,7 @@ def test_workflow_sheetbook_loader_consumes_rows_and_enforces_visibility(tmp_pat
     )
 
     runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
-    sheetbook_policy = _workflow_resources_policy(max_sheets=8, max_total_cells=1000)
+    sheetbook_policy = _workflow_resources_policy()
     result = run_workflow(
         str(wf),
         options=_run_options(allowed_modules=_ALLOWED_MODULES_WITH_SHEETBOOK),
@@ -4062,7 +4051,7 @@ outputs:
     assert exported[1][4] == ""
 
 
-def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path) -> None:
+def test_workflow_sheetbook_multi_sheet_write_succeeds_without_budget_and_discard_on_failure(tmp_path: Path) -> None:
     _ = _write_table_demand_yaml_with_book_output(
         tmp_path,
         file_name="a.yaml",
@@ -4084,17 +4073,12 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         field_ids=["id", "value"],
     )
 
-    out_root = tmp_path / "out"
-    wf_max_sheets = _write_workflow_yaml(
+    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
+
+    # pathless multi-sheet write succeeds without any book cell/sheet budget
+    wf_multi = _write_workflow_yaml(
         tmp_path,
-        resources={
-            "books": {
-                "report": {
-                    # budget 仅 sheetbook(无 path 总线)生效; export 别名已正规化为 workbook
-                    "xlsx": {},
-                }
-            }
-        },
+        resources={"books": {"report": {"xlsx": {}}}},
         runs=[
             {"id": "a", "demand": "a.yaml"},
             {"id": "b", "demand": "b.yaml"},
@@ -4102,42 +4086,8 @@ def test_workflow_sheetbook_budget_guards_and_discard_on_failure(tmp_path: Path)
         max_concurrency=2,
         failure_policy="primary_only",
     )
-    runtime = WorkflowRuntimeOptions(execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="primary_only"))
-    result_sheets = run_workflow(
-        str(wf_max_sheets),
-        options=_run_options(),
-        workflow_runtime_options=runtime,
-        resources_policy=_workflow_resources_policy(max_sheets=1, max_total_cells=1000),
-    )
-    assert result_sheets.errors()
-    assert not (out_root / "manifest" / "latest.json").exists()
-    assert list(out_root.rglob("*.xlsx")) == []
-    assert list(out_root.rglob("*.scalim.lock")) == []
-
-    out_root2 = tmp_path / "out2"
-    wf_max_cells = _write_workflow_yaml(
-        tmp_path,
-        resources={
-            "books": {
-                "report": {
-                    "xlsx": {},
-                }
-            }
-        },
-        runs=[{"id": "a", "demand": "a.yaml"}],
-        max_concurrency=1,
-        failure_policy="primary_only",
-    )
-    result_cells = run_workflow(
-        str(wf_max_cells),
-        options=_run_options(),
-        workflow_runtime_options=runtime,
-        resources_policy=_workflow_resources_policy(max_sheets=8, max_total_cells=3),
-    )
-    assert result_cells.errors()
-    assert not (out_root2 / "manifest" / "latest.json").exists()
-    assert list(out_root2.rglob("*.xlsx")) == []
-    assert list(out_root2.rglob("*.scalim.lock")) == []
+    result_multi = run_workflow(str(wf_multi), options=_run_options(), workflow_runtime_options=runtime)
+    assert not result_multi.errors()
 
     out_root3 = tmp_path / "out3"
     _ = _write_demand_yaml(
@@ -5273,7 +5223,7 @@ def test_workflow_sheetbook_append_export_xlsx_is_deterministic(tmp_path: Path) 
         result = run_workflow(
             str(wf),
             options=_run_options(),
-            resources_policy=_workflow_resources_policy(write_mode="append", max_sheets=8, max_total_cells=1000),
+            resources_policy=_workflow_resources_policy(write_mode="append"),
         )
         assert not result.errors()
         export_path = _latest_book_path(out_root, book_id="report")

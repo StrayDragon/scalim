@@ -1,6 +1,0 @@
-kind: llman.sdd.delta
-ops[1]{op,req_id,title,statement,from,to,name}:
-  add_requirement,r9,ColumnExcelSink close MUST use write_only workbook,"系统 MUST 使内建 `ColumnExcelSink` 在 `close()` 写出 xlsx 时使用 openpyxl `Workbook(write_only=True)`(与 `ExcelSink` 一致的写出策略): - MUST 通过 `create_sheet` 创建目标 sheet(不得依赖常规 workbook 的 `active` 语义) - 保存失败路径 MUST 尽力清理临时文件,并对 write_only worksheet 做 best-effort close - MUST NOT 改变 `IColumnSink` 公共写入契约与输出单元格语义 - MUST NOT 将 streaming/flush knobs 引入 YAML 主线",null,null,null
-op_scenarios[2]{req_id,id,given,when,then}:
-  r9,"column-excel-close-uses-write-only","调用方已向 ColumnExcelSink 写入列数据",调用 close 保存 xlsx,"系统 MUST 使用 write_only Workbook 完成写出且输出可读"
-  r9,"column-excel-save-failure-cleans-temp",close 阶段 openpyxl save 抛出 OSError,异常向上抛出,"系统 MUST best-effort 清理临时 .xlsx.tmp 并关闭 write_only worksheet"

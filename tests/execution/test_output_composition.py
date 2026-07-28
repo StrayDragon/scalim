@@ -426,63 +426,6 @@ def test_fingerprint_for_derived_target_is_stable_and_sensitive() -> None:
     assert fp_other_parts != fp1
 
 
-def test_dedup_by_first_fail_fast_under_adaptive(tmp_path: Path) -> None:
-    out = tmp_path / "report.xlsx"
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=output_comp_mod.DerivedDedupByGroupBySpec(
-            dedup_by=output_comp_mod.DedupBySpec(key_fields=("k",), on_conflict="first"),
-            group_by=DerivedGroupBySpec(
-                group_by=("g",),
-                metrics=(AggMetricSpec(out_field_id="cnt", op="count"),),
-            ),
-        ),
-        output_layout=ExportLayout(field_ids=("g", "cnt"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(derived_targets=(derived,))
-    with pytest.raises(ValueError, match="parallel_mode='adaptive'"):
-        _ = build_output_composition(
-            spec=spec,
-            demand_name="d",
-            demand_main_source_id="s",
-            demand_target_fields=["g"],
-            demand_field_fingerprints=[],
-            run_parallel_mode="adaptive",
-        )
-
-
-def test_two_stage_group_by_stage2_requires_fields_produced_by_stage1(tmp_path: Path) -> None:
-    out = tmp_path / "report.xlsx"
-    derived = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=output_comp_mod.TwoStageGroupBySpec(
-            stage1=DerivedGroupBySpec(
-                group_by=("g",),
-                metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-            ),
-            stage2=DerivedGroupBySpec(
-                group_by=("g",),
-                metrics=(AggMetricSpec(out_field_id="sum_x", op="sum", field_id="missing_stage1_field"),),
-            ),
-        ),
-        output_layout=ExportLayout(field_ids=("g", "sum_x"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(derived_targets=(derived,))
-    with pytest.raises(ValueError, match="stage2 requires fields not produced by stage1"):
-        _ = build_output_composition(
-            spec=spec,
-            demand_name="d",
-            demand_main_source_id="s",
-            demand_target_fields=["g"],
-            demand_field_fingerprints=[],
-            run_parallel_mode="seq",
-        )
-
-
 def test_truncate_text_returns_empty_when_max_chars_nonpositive() -> None:
     assert output_comp_mod._truncate_text("abc", max_chars=0) == ""
     assert output_comp_mod._truncate_text("abc", max_chars=-1) == ""
@@ -515,106 +458,6 @@ def test_i_derived_aggregation_spec_base_methods_raise() -> None:
         dummy.validate_parallel_mode("seq")
     with pytest.raises(NotImplementedError):
         dummy.build_aggregator()
-
-
-def test_dedup_by_spec_fingerprint_parts_and_validate_errors() -> None:
-    spec = output_comp_mod.DedupBySpec(
-        key_fields=("k1", "k2"),
-        on_conflict="FIRST",
-    )
-    parts = spec.fingerprint_parts()
-    assert parts[0] == "kind=dedup_by"
-    assert "key_fields=k1,k2" in parts
-    assert "on_conflict=first" in parts
-    # 基数护栏字段已移除: 指纹不再包含 max_distinct / on_overflow.
-    assert not any("max_distinct" in p for p in parts)
-    assert not any("on_overflow" in p for p in parts)
-
-    with pytest.raises(ValueError, match="Unsupported dedup_by.on_conflict"):
-        output_comp_mod.DedupBySpec(key_fields=("k",), on_conflict="oops").validate_parallel_mode("seq")
-
-
-def test_two_stage_group_by_spec_methods_and_build(tmp_path: Path) -> None:
-    stage1 = DerivedGroupBySpec(
-        group_by=("g", "u"),
-        metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-    )
-    stage2 = DerivedGroupBySpec(
-        group_by=("g",),
-        metrics=(AggMetricSpec(out_field_id="sum_cnt", op="sum", field_id="cnt"),),
-    )
-
-    derived = output_comp_mod.TwoStageGroupBySpec(stage1=stage1, stage2=stage2)
-    assert derived.required_fields() == ("g", "u", "id")
-    fp_parts = derived.fingerprint_parts()
-    assert fp_parts[0] == "kind=two_stage_group_by"
-    derived.validate_parallel_mode("seq")
-
-    agg = derived.build_aggregator()
-    agg.accumulate({"g": "x", "u": "u1", "id": 1})
-    agg.accumulate({"g": "x", "u": "u1", "id": 2})
-    agg.accumulate({"g": "x", "u": "u2", "id": 3})
-    assert agg.finalize_rows() == [{"g": "x", "sum_cnt": 3}]
-
-    bad = output_comp_mod.TwoStageGroupBySpec(
-        stage1=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-            rank_fields=(RankFieldSpec(out_field_id="rank", kind="dense_rank", by="cnt", order="desc"),),
-        ),
-        stage2=stage2,
-    )
-    with pytest.raises(ValueError, match="two_stage_group_by does not support rank/post fields"):
-        bad.validate_parallel_mode("seq")
-
-    out = tmp_path / "report.xlsx"
-    derived_target = DerivedOutputTargetSpec(
-        target_id="summary",
-        derived=derived,
-        output_layout=ExportLayout(field_ids=("g", "sum_cnt"), header_names=None),
-        output=OutputSpec(format="excel", path=str(out), streaming=True, include_header=True, sheet_name="Summary"),
-        is_primary=True,
-    )
-    spec = OutputCompositionSpec(derived_targets=(derived_target,))
-    plan = build_output_composition(
-        spec=spec,
-        demand_name="d",
-        demand_main_source_id="s",
-        demand_target_fields=["g"],
-        demand_field_fingerprints=[],
-        run_parallel_mode="seq",
-    )
-    plan.sink.write_row({"g": "x", "u": "u1", "id": 1})
-    plan.sink.close()
-
-
-def test_derived_dedup_by_group_by_spec_methods_and_required_fields_dedupes_overlap() -> None:
-    spec = output_comp_mod.DerivedDedupByGroupBySpec(
-        dedup_by=output_comp_mod.DedupBySpec(key_fields=("g",), on_conflict="first"),
-        group_by=DerivedGroupBySpec(
-            group_by=("g",),
-            metrics=(AggMetricSpec(out_field_id="cnt", op="count", field_id="id"),),
-        ),
-    )
-    assert spec.required_fields() == ("g", "id")
-
-    # fingerprint_parts: 嵌套 dedup_by + group_by 指纹, 不含已移除的护栏字段.
-    parts = spec.fingerprint_parts()
-    assert parts[0] == "kind=dedup_by+group_by"
-    assert not any("max_distinct" in p or "on_overflow" in p for p in parts)
-    assert isinstance(output_comp_mod.fingerprint_for_derived_target(target_id="t", derived=spec), str)
-
-    # validate_parallel_mode: 委托给 dedup_by / group_by; adaptive 下 first/last fail-fast.
-    spec.validate_parallel_mode("seq")
-    with pytest.raises(ValueError, match="order-dependent"):
-        spec.validate_parallel_mode("adaptive")
-
-    # build_aggregator: 产出 DedupByThenAggregator 并按 on_conflict 生效.
-    agg = spec.build_aggregator()
-    agg.accumulate({"g": "a", "id": 1})
-    agg.accumulate({"g": "a", "id": 2})
-    agg.accumulate({"g": "b", "id": 3})
-    assert agg.finalize_rows() == [{"g": "a", "cnt": 1}, {"g": "b", "cnt": 1}]
 
 
 def test_custom_derived_spec_is_composable_without_guardrails(tmp_path: Path) -> None:
@@ -669,3 +512,22 @@ def test_custom_derived_spec_is_composable_without_guardrails(tmp_path: Path) ->
     )
     plan.sink.write_row({"x": 1})
     plan.sink.close()
+
+
+def test_removed_dedup_and_two_stage_types_are_not_importable() -> None:
+    """r160/r199: Dedup/TwoStage assembly types MUST NOT be importable."""
+    removed = (
+        "DedupBySpec",
+        "DerivedDedupByGroupBySpec",
+        "TwoStageGroupBySpec",
+        "DedupByThenAggregator",
+        "TwoStageGroupByAggregator",
+        "ScalimDedupKeyConflictError",
+        "DedupOnConflictPolicy",
+    )
+    for name in removed:
+        assert not hasattr(output_comp_mod, name), name
+        src = "from scalim.execution.output_composition import {}".format(name)
+        with pytest.raises(ImportError):
+            exec(src, {"__name__": "__not_main__"})
+

@@ -305,7 +305,7 @@ workflow YAML 只负责两件事:
 示例: workflow 统一声明一个共享落盘 book(`xlsx.path`),各 run 的 demand 只负责声明 outputs 绑定:
 
 说明:
-- 对 **pathless**（无 `path`）的内存总线 book,内存 `budget` 已迁出 YAML；缺省 unlimited。若需要护栏,在 Python 侧配置 `BookBudgetPolicy`（经 `WorkflowRunOptions.resources_policy`）。
+- book cell/sheet `budget` 已**移除**（YAML / `RunOverrides` 残留仍 fail-fast，请删除）；内存风险交宿主 cgroup / OOM / 作业配额。写入策略仍用 Python `BookWritePolicy`（`WorkflowRunOptions.resources_policy`）。
 
 workflow YAML:
 
@@ -340,7 +340,6 @@ outputs:
 
 ```python
 from scalim.dsl.yaml_dsl import (
-    BookBudgetPolicy,
     BookResourcePolicy,
     BookWriteMode,
     BookWritePolicy,
@@ -356,12 +355,11 @@ result = run_workflow(
     options=WorkflowRunOptions(
         demand=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=frozenset(["myapp.loaders"]))),
         path_aliases={"@": "/abs/project_root"},
-        # 可选: book 写入策略 / 内存预算（省略则用 builtin defaults / unlimited）
+        # 可选: book 写入策略（省略则用 builtin defaults）
         resources_policy=ResourcesPolicy(
             books={
                 "report": BookResourcePolicy(
                     write=BookWritePolicy(mode=BookWriteMode.SHEET),
-                    budget=BookBudgetPolicy(max_sheets=16, max_total_cells=2_000_000),
                 )
             }
         ),

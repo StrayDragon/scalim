@@ -10,7 +10,9 @@
 - 统一 authoring `xlsx` + 旧 kind deprecated → **`archive/2026-07-13-c20-add-unified-xlsx-book-kind`**
 - IR 身份改为 path 有无（不再以假 kind 字符串为 SSOT）→ **`archive/2026-07-13-c25-normalize-xlsx-book-ir-path-presence`**
 - BREAKING 硬删 YAML `xlsx_file`/`xlsx_memory` 别名 → **`c999-remove-deprecated-xlsx-file-memory-kinds`（已实施；见 upgrade `2026-07-20-remove-deprecated-xlsx-file-memory-kinds`）**
+- book cell/sheet 预算 / `BookBudgetPolicy` → **已移除**（upgrade `2026-07-28-remove-book-budget-policy`；残留 YAML/`RunOverrides` `budget` 仍 fail-fast，删字段；内存交宿主限制）
 - 默认 deprecate/删除总线、无条件急切 CSV 双份、启发式数字恢复 → **已拒绝**
+- ~~有 path 的 book 可选 cell/sheet budget~~ → **取消**（挂 `BookBudgetPolicy`；该 API 已移除，不再做 pathful 对称护栏）
 
 ---
 
@@ -55,17 +57,15 @@
 - **触发**: 审计/不可变 sheet。
 - **落地**: `shared-book-sheet-seal`；**禁止 YAML knobs**。
 
-### later — 有 path 的 book 可选 cell/sheet budget
+### cancelled — 有 path 的 book 可选 cell/sheet budget
 
-- **必要？** **低优先**。原 `xlsx_file` unlimited；统一 `xlsx` 后仍是「有 path 是否套 `BookBudgetPolicy`」。
-- **触发**: 有 path 的 plan OOM / 要与无 path 总线对称护栏。
-- **落地**: 独立 change；opt-in；挂既有 Python `BookBudgetPolicy`。
+- **状态**: **取消**。原计划挂 `BookBudgetPolicy`；该 API 已在 `2026-07-28-remove-book-budget-policy` 移除，不再做 pathful 对称护栏。
+- **替代**: 内存风险交宿主 cgroup / OOM / 作业配额。
 
-### later — `BookBudgetPolicy` 限流或移除
+### done — `BookBudgetPolicy` 限流或移除
 
-- **必要？** **暂不必要**。用量≈0；fail-fast 是否改限流未证实。
-- **触发**: 真实配置者痛点或明确要背压 API。
-- **落地**: `book-budget-rate-limit-or-remove`。
+- **状态**: **已移除**（不做限流）。见 upgrade `2026-07-28-remove-book-budget-policy` / change `c0-remove-book-budget-policy`。
+- **保留**: `BookWritePolicy`；workflow `cache_pool` budget（另一套能力）。
 
 ### later — 边写 openpyxl + runtime profile
 
