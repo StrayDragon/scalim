@@ -223,12 +223,31 @@ flowchart TD
 
 - [并行模式(seq/adaptive)](parallel-modes.md)
 
+### 5.3 write-precompute: 只用于写出的派生字段延后到写出前算
+
+规划期会自动挑出一批“只喂给最终写出”的派生字段(`ExecutionPlan.late_fields`),它们在 `Compute` 段被跳过,改为在写出前现场物化:
+
+- 行式 sink: 写该行之前按拓扑序算出这些字段,值直接进入写出行,不回写 `BatchContext`
+- 列式 sink: 写该列之前算出整列;链式依赖的中间列暂留到其消费列写完即释放
+
+判定完全依据 `Plan`/`IR` 的显式依赖,任何不确定的情况都退回早算:
+
+- 必须是写出目标,且在 `late` 子图之外没有消费者(被别的派生字段或 `LoadRef` 消费即退回)
+- 主键/外键与 `order_by` 排序键不参与
+- `call_by` 若需要注入 `$ctx`(或 `ctx_attr`)则永远早算;常量 `compute` 同样早算(求值次数语义)
+
+对二次开发的可见影响:
+
+- 计算器/`call_by` 的调用**次数**不变,但**时机**后移到写出前;因此不要依赖“`compute` 段结束时所有派生值都在上下文里”
+- `FIELD_COMPUTE` 事件带 `meta` 键 `scalim_compute_phase`(`operator` / `write_precompute`),用于区分两个阶段
+- `guardrails` 语义不变: `quiet` 把失败单元格降级为 `None`,`fast_fail` 抛错并 `discard` sink(不产出半成品)
+
 ## 6. 内存优化: 三个层次(定位用)
 
 内存相关问题通常可以按三个层次定位:
 
 - FR021(规划时剪枝): `planning/`
-- FR022(运行时瘦身): `execution/`
+- FR022(运行时瘦身): `execution/`(含 [write-precompute](#53-write-precompute-只用于写出的派生字段延后到写出前算): 只用于写出的派生字段不在批次内驻留)
 - FR023(流式输出): `sinks/` + `execution/pipeline/`
 
 ```mermaid

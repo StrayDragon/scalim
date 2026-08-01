@@ -78,8 +78,8 @@ def _run_timed(fn, runs):
     }
 
 
-def _build_engine_column(rows, n_derived):
-    # type: (int, int) -> Callable[[], Dict[str, Any]]
+def _build_engine_column(rows, n_derived, late=True):
+    # type: (int, int, bool) -> Callable[[], Dict[str, Any]]
     from scalim.execution.engine import ScalimEngine
     from scalim.execution.runtime_bindings import RuntimeBindings
     from scalim.planning import PlanBuilder
@@ -132,6 +132,10 @@ def _build_engine_column(rows, n_derived):
 
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=main)
     plan = PlanBuilder(demand).build(targets=targets)
+    late_fields = tuple(plan.late_fields)
+    if not late:
+        # A/B 对照: 强制关闭 write-precompute(其余完全一致).
+        plan.late_fields = ()
     bindings = RuntimeBindings(derived_calculators=calcs)
     data = [{"id": i, "v0": float(i % 97), "v1": float(i % 13)} for i in range(rows)]
 
@@ -153,7 +157,8 @@ def _build_engine_column(rows, n_derived):
             "calc_calls": calc_calls["n"],
             "expected_calc_calls": rows * n_derived,
             "sink": "InMemoryColumnSink",
-            "shape": "engine_eager_column",
+            "shape": "engine_late_column" if late else "engine_eager_column",
+            "late_fields": len(late_fields) if late else 0,
         }
 
     return _run
@@ -243,7 +248,10 @@ def main():
     results = {}  # type: Dict[str, Any]
 
     print("==> engine_eager_column", flush=True)
-    results["engine_eager_column"] = _run_timed(_build_engine_column(args.rows, args.derived_fields), args.runs)
+    results["engine_eager_column"] = _run_timed(_build_engine_column(args.rows, args.derived_fields, late=False), args.runs)
+
+    print("==> engine_late_column", flush=True)
+    results["engine_late_column"] = _run_timed(_build_engine_column(args.rows, args.derived_fields, late=True), args.runs)
 
     print("==> sim_eager_hold_derived", flush=True)
     results["sim_eager_hold_derived"] = _run_timed(
@@ -256,7 +264,16 @@ def main():
 
     eager = results["sim_eager_hold_derived"]["meta"]
     late = results["sim_late_at_write_column"]["meta"]
+    engine_eager_s = results["engine_eager_column"]["duration_s_median"]
+    engine_late_s = results["engine_late_column"]["duration_s_median"]
     comparisons = {
+        "engine_duration_s_eager": engine_eager_s,
+        "engine_duration_s_late": engine_late_s,
+        "engine_speedup_eager_over_late": (float(engine_eager_s) / float(engine_late_s)) if engine_late_s else None,
+        "engine_late_fields": results["engine_late_column"]["meta"].get("late_fields"),
+        "engine_calc_calls_equal": (
+            results["engine_eager_column"]["meta"].get("calc_calls") == results["engine_late_column"]["meta"].get("calc_calls")
+        ),
         "peak_derived_cells_eager": eager.get("peak_derived_cells"),
         "peak_derived_cells_late": late.get("peak_derived_cells"),
         "peak_cells_ratio_eager_over_late": (
