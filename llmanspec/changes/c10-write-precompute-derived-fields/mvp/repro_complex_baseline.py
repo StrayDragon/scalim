@@ -181,7 +181,7 @@ def sim_column_late_with_chain(rows, n_flat, chain_depth):
     Peak model (conservative): while writing chain, retain prefix of chain columns
     still needed → worst peak ≈ rows * chain_depth at end of chain before deletes,
     plus at most 1 flat column in flight. Flat columns: peak += rows (one at a time).
-    Combined worst-case peak_derived_cells ≈ rows * chain_depth (chain prefix) 
+    Combined worst-case peak_derived_cells ≈ rows * chain_depth (chain prefix)
     when chain_depth >= 1, else rows.
     """
     n_derived = n_flat + chain_depth
@@ -375,13 +375,9 @@ def main():
     results["sim_column_late_chain"] = sim_column_late_with_chain(args.rows, args.flat_fields, args.chain_depth)
 
     print("==> engine_eager_row", flush=True)
-    results["engine_eager_row"] = _run_timed(
-        _engine_case(args.rows, args.flat_fields, args.chain_depth, "row"), args.runs
-    )
+    results["engine_eager_row"] = _run_timed(_engine_case(args.rows, args.flat_fields, args.chain_depth, "row"), args.runs)
     print("==> engine_eager_column", flush=True)
-    results["engine_eager_column"] = _run_timed(
-        _engine_case(args.rows, args.flat_fields, args.chain_depth, "column"), args.runs
-    )
+    results["engine_eager_column"] = _run_timed(_engine_case(args.rows, args.flat_fields, args.chain_depth, "column"), args.runs)
 
     sr = results["sim_row_eager"]
     sl = results["sim_row_late"]

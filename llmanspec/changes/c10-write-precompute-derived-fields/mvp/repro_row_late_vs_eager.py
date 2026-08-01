@@ -251,9 +251,7 @@ def main():
         lambda: _sim_eager_hold_batch(args.rows, args.derived_fields, args.deps), args.runs
     )
     print("==> sim_late_at_write_row", flush=True)
-    results["sim_late_at_write_row"] = _run_timed(
-        lambda: _sim_late_at_write_row(args.rows, args.derived_fields, args.deps), args.runs
-    )
+    results["sim_late_at_write_row"] = _run_timed(lambda: _sim_late_at_write_row(args.rows, args.derived_fields, args.deps), args.runs)
 
     eager = results["sim_eager_hold_batch_derived"]["meta"]
     late = results["sim_late_at_write_row"]["meta"]
@@ -270,15 +268,11 @@ def main():
         "peak_derived_cells_eager": eager.get("peak_derived_cells"),
         "peak_derived_cells_late": late.get("peak_derived_cells"),
         "peak_cells_ratio_eager_over_late": (
-            float(eager["peak_derived_cells"]) / float(late["peak_derived_cells"])
-            if late.get("peak_derived_cells")
-            else None
+            float(eager["peak_derived_cells"]) / float(late["peak_derived_cells"]) if late.get("peak_derived_cells") else None
         ),
         "dep_reads_eager": eager.get("dep_reads"),
         "dep_reads_late": late.get("dep_reads"),
-        "dep_reads_ratio_eager_over_late": (
-            float(eager["dep_reads"]) / float(late["dep_reads"]) if late.get("dep_reads") else None
-        ),
+        "dep_reads_ratio_eager_over_late": (float(eager["dep_reads"]) / float(late["dep_reads"]) if late.get("dep_reads") else None),
         "note": (
             "Row late-at-write: peak derived scratch ~M (one row); eager batch hold ~N*M. "
             "Late also reads deps once per row (N*D) vs eager field-major (N*M*D) in this sim."

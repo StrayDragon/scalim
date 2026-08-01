@@ -254,13 +254,9 @@ def main():
     results["engine_late_column"] = _run_timed(_build_engine_column(args.rows, args.derived_fields, late=True), args.runs)
 
     print("==> sim_eager_hold_derived", flush=True)
-    results["sim_eager_hold_derived"] = _run_timed(
-        lambda: _sim_eager_hold(args.rows, args.derived_fields, args.deps), args.runs
-    )
+    results["sim_eager_hold_derived"] = _run_timed(lambda: _sim_eager_hold(args.rows, args.derived_fields, args.deps), args.runs)
     print("==> sim_late_at_write_column", flush=True)
-    results["sim_late_at_write_column"] = _run_timed(
-        lambda: _sim_late_at_write(args.rows, args.derived_fields, args.deps), args.runs
-    )
+    results["sim_late_at_write_column"] = _run_timed(lambda: _sim_late_at_write(args.rows, args.derived_fields, args.deps), args.runs)
 
     eager = results["sim_eager_hold_derived"]["meta"]
     late = results["sim_late_at_write_column"]["meta"]
@@ -277,9 +273,7 @@ def main():
         "peak_derived_cells_eager": eager.get("peak_derived_cells"),
         "peak_derived_cells_late": late.get("peak_derived_cells"),
         "peak_cells_ratio_eager_over_late": (
-            float(eager["peak_derived_cells"]) / float(late["peak_derived_cells"])
-            if late.get("peak_derived_cells")
-            else None
+            float(eager["peak_derived_cells"]) / float(late["peak_derived_cells"]) if late.get("peak_derived_cells") else None
         ),
         "dep_reads_both_sims": eager.get("dep_reads"),
         "note": (

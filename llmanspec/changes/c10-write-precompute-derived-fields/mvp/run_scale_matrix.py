@@ -27,7 +27,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 
 BYTES_PER_CELL = 64.0  # calibrated ~58–74 on column eager hold
-GIB = 1024.0 ** 3
+GIB = 1024.0**3
 
 
 def _repo_root():
@@ -565,9 +565,13 @@ def main():
             params["note"] = meta.get("note") or ""
             for sink in ("row", "column"):
                 case_id = "%s_%s_%s" % (scale, topology, sink)
-                print("==> sim", case_id, "rows=%s flat=%s chain=%s est_eager=%.2fGiB" % (
-                    params["rows"], params["flat_fields"], params["chain_depth"], params["est_eager_hold_gib"]
-                ), flush=True)
+                print(
+                    "==> sim",
+                    case_id,
+                    "rows=%s flat=%s chain=%s est_eager=%.2fGiB"
+                    % (params["rows"], params["flat_fields"], params["chain_depth"], params["est_eager_hold_gib"]),
+                    flush=True,
+                )
                 sim = run_sim_case(params, sink)
                 entry = {
                     "case_id": case_id,
