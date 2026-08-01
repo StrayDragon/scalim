@@ -13,7 +13,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from concurrent.futures import Executor
-from typing import Any, Callable, Dict, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, Callable, Dict, FrozenSet, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
 
 from ....events import EventType
 from ....hooks import HookManager
@@ -35,6 +35,7 @@ from ...executor.runtime.runtime import ExecutionRuntime
 from ...loader_call_params import build_loader_call_params
 from ...loader_retry import CALLSITE_MAIN_SOURCE, CALLSITE_PRELOAD_FOREVER, call_with_loader_retry
 from ...workflow_cache_pool import build_preload_forever_signature
+from ...write_precompute import LateColumnMaterializer, LateFieldMaterializer
 from ..overrides import PipelineOverrides, chunk_iterable
 from ._adaptive_pool import maybe_create_adaptive_pool
 from ._row_emission import RowEmissionCoordinator
@@ -83,6 +84,9 @@ class Pipeline(ABC):
     demand: DemandIr
     _required_fields: Set[str]
     _overrides: PipelineOverrides
+    _late_fields: FrozenSet[str]
+    _late_materializer: Optional[LateFieldMaterializer]
+    _late_column_materializer: Optional[LateColumnMaterializer]
 
     def __init__(
         self,
@@ -106,6 +110,23 @@ class Pipeline(ABC):
         self.gc_interval = gc_interval
         self._overrides = overrides or PipelineOverrides(chunk_iterable=chunk_iterable)
         self._required_fields = self._compute_required_fields()
+        self._late_fields = frozenset(plan.late_fields)
+        self._late_materializer = LateFieldMaterializer(runtime=self.runtime, late_fields=plan.late_fields) if self._late_fields else None
+        # 列写出布局按需构建: 行写出路径不必为它付出建表成本.
+        self._late_column_materializer = None
+
+    def _ensure_late_column_materializer(self) -> Optional[LateColumnMaterializer]:
+        materializer = self._late_materializer
+        if materializer is None:
+            return None
+        late_columns = self._late_column_materializer
+        if late_columns is None:
+            late_columns = LateColumnMaterializer(
+                materializer=materializer,
+                field_dependencies=dict(self.plan.field_dependencies),
+            )
+            self._late_column_materializer = late_columns
+        return late_columns
 
     def _compute_required_fields(self) -> Set[str]:
         """计算需要保留的字段集合(包含传递闭包).
@@ -579,6 +600,11 @@ class SeqPipeline(Pipeline):
         self.runtime.sink = column_sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
+        # `write-precompute`(切片 B): `late` 列在写出该列前现场物化.
+        self.runtime.late_fields = self._late_fields
+        late_columns = self._ensure_late_column_materializer()
+        if late_columns is not None:
+            late_columns.reset()
         self.executor.prefill_main_source_fields(context, row_ids, batch_rows, required_fields=self._required_fields)
 
         write_row_ids = self._sort_row_ids_for_write(row_ids, context)
@@ -589,9 +615,16 @@ class SeqPipeline(Pipeline):
         def after_operator(operator: Any) -> None:
             if isinstance(operator, LoadOperatorIr):
                 for fk in operator.field_keys:
-                    self._write_column_if_target(fk, write_row_ids, context, column_sink, batch_num)
+                    self._write_column_if_target(fk, write_row_ids, context, column_sink, batch_num, late_columns=late_columns)
             elif isinstance(operator, (LoadRefOperatorIr, ComputeOperatorIr)):
-                self._write_column_if_target(operator.field_key, write_row_ids, context, column_sink, batch_num)
+                self._write_column_if_target(
+                    operator.field_key,
+                    write_row_ids,
+                    context,
+                    column_sink,
+                    batch_num,
+                    late_columns=late_columns,
+                )
 
         stage_durations = self.executor.execute_operators(
             context,
@@ -636,27 +669,33 @@ class SeqPipeline(Pipeline):
         context: BatchContext,
         column_sink: IColumnSink,
         batch_num: int,
+        late_columns: Optional[LateColumnMaterializer] = None,
     ) -> None:
         """如果是目标字段,写入列"""
         if field_key not in self.plan.target_fields:
             return
 
+        is_late = late_columns is not None and late_columns.is_late(field_key)
+        if is_late and late_columns is not None:
+            # `write-precompute`: 该列此刻才现场物化(未落 `BatchContext`).
+            values = late_columns.materialize_column(context, field_key, row_ids)
+        else:
+            values = [context.get_field_value(field_key, row_id) for row_id in row_ids]
+
         write_column_aligned = None
         if isinstance(column_sink, SupportsWriteColumnAligned):
             write_column_aligned = column_sink.write_column_aligned
         if write_column_aligned is not None:
-            values: List[FieldValue] = [context.get_field_value(field_key, row_id) for row_id in row_ids]
             aligned_row_ids = cast("SinkRowKeySeq", row_ids)  # pragma: allow-cast sink row ids typed narrowing
             write_column_aligned(field_key, aligned_row_ids, values)
             row_count = len(values)
         else:
-            col_data: Dict[Hashable, FieldValue] = {}
-            for row_id in row_ids:
-                value = context.get_field_value(field_key, row_id)
-                col_data[row_id] = value
-
+            col_data: Dict[Hashable, FieldValue] = dict(zip(row_ids, values))
             column_sink.write_column(field_key, col_data)
             row_count = len(col_data)
+
+        if is_late and late_columns is not None:
+            late_columns.release_after_write(field_key)
 
         self.runtime.instrumentation.emit_column_write(
             field_key=field_key,
@@ -718,6 +757,8 @@ class SeqPipeline(Pipeline):
         self.runtime.sink = streaming_sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
+        # `write-precompute`(切片 A): `late` 字段跳过 `compute` 段,在 `write_row` 前逐行物化.
+        self.runtime.late_fields = self._late_fields
 
         global_ready_target_fields = self._resolve_streaming_global_ready_target_fields()
         rows_binding_relations, rows_binding_ops = self._collect_streaming_rows_binding_barriers()
@@ -729,9 +770,10 @@ class SeqPipeline(Pipeline):
             retained_fields=set(self.plan.key_fields),
             global_ready_fields=global_ready_target_fields,
             allow_release=allow_release,
+            late_materializer=self._late_materializer,
         )
 
-        on_field_set_fields = set(self.plan.target_fields) - set(global_ready_target_fields)
+        on_field_set_fields = coordinator.on_field_set_fields()
         context = create_batch_context_for_rows(
             row_ids,
             required_fields=self._required_fields,

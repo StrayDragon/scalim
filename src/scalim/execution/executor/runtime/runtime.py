@@ -68,6 +68,7 @@ class ExecutionRuntime:
     reverse_deps: Dict[str, Set[str]]
     field_consumers: Dict[str, int]
     target_fields: List[str]
+    late_fields: FrozenSet[str]
     primary_field: Optional[str]
     main_source: Optional[MainSourceIr]
     sink: Optional[ISink]
@@ -115,6 +116,9 @@ class ExecutionRuntime:
         self.sources = dict(sources)
         self.key_fields = plan.key_fields
         self.target_fields = plan.target_fields
+        # `write-precompute`: 由具体写出模式(行 `sink` / 列 `sink`)在批次开始时启用;
+        # 默认为空集,`compute` 算子保持早算.
+        self.late_fields = frozenset()
         self.primary_field = plan.primary_field
         self.main_source = main_source
         self.sink = None

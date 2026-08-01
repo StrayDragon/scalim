@@ -147,6 +147,13 @@ class ExecutionPlan:
     field_dependencies: "Dict[str, Tuple[str, ...]]" = field(default_factory=dict)
     """字段依赖映射(`field_key` -> 依赖字段列表),基于主数据源方向推断."""
 
+    late_fields: Tuple[str, ...] = field(default_factory=tuple)
+    """可延迟到写出前物化(`write-precompute`)的派生字段,按拓扑序排列.
+
+    仅包含“属于 `target_fields`、且无 `late` 子图以外消费者”的派生字段;
+    判定不确定时为空(保守早算).
+    """
+
     def to_viz_graph_snapshot(
         self,
         *,

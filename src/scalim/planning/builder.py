@@ -6,6 +6,7 @@ from .._internal.utils import graph
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SourceIr
 from .builder_helpers.dep_graph import build_dependency_graph, build_field_dependencies
 from .builder_helpers.key_fields import compute_key_fields
+from .builder_helpers.late_fields import derive_late_fields
 from .builder_helpers.operators import (
     build_plan_operators,
     derive_pre_ref_available_field_keys,
@@ -127,6 +128,15 @@ class PlanBuilder:
         # 构建字段依赖映射(基于主数据源方向推断)
         field_dependencies = build_field_dependencies(field_order=field_order, dep_graph=self._graph)
 
+        late_fields = derive_late_fields(
+            field_specs=field_specs,
+            field_dependencies=field_dependencies,
+            target_fields=targets,
+            key_fields=set(key_fields),
+            protected_fields=self._collect_order_by_field_keys(),
+            main_source_id=str(self.demand.main_source.source_id),
+        )
+
         return ExecutionPlan(
             operators=operators,
             primary_field=primary_field,
@@ -140,7 +150,15 @@ class PlanBuilder:
             field_specs=field_specs,
             target_fields=targets,
             field_dependencies=field_dependencies,
+            late_fields=late_fields,
         )
+
+    def _collect_order_by_field_keys(self) -> Set[str]:
+        """收集写出排序键(必须在写出排序前可得,因此不可 `late`)."""
+        order_by = self.demand.main_source.order_by
+        if not order_by:
+            return set()
+        return {str(order.field_key) for order in order_by}
 
     def _validate_relation_from_derived_fields(
         self,

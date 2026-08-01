@@ -6,11 +6,17 @@ from .....events import EventType
 from .....planning.operators import ComputeOperatorIr, SupportedOperatorIr
 from .....spec.ir import ComputeCallContextIr, DerivedFieldIr
 from .....vendor.compact.typing_extensionsx import override
+from ....compute_phase import COMPUTE_PHASE_META_KEY, COMPUTE_PHASE_OPERATOR
 from ....context import BatchContext, DenseBatchContext
 from ...runtime.runtime import ExecutionRuntime
 from ..base import OperatorExecutor
 from .errors import handle_compute_error
 from .payloads import build_field_compute_dependencies_payload
+
+
+def _operator_phase_meta() -> Dict[str, Any]:
+    return {COMPUTE_PHASE_META_KEY: COMPUTE_PHASE_OPERATOR}
+
 
 _EXPECTED_COMPUTE_ERRORS = (
     TypeError,
@@ -238,7 +244,13 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
                     on_field_set(field_spec.field_id, row_id)
 
                 if wants_field_compute:
-                    runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_values_payload, result)
+                    runtime.instrumentation.emit_field_compute(
+                        field_spec.field_id,
+                        row_id,
+                        dep_values_payload,
+                        result,
+                        meta=_operator_phase_meta(),
+                    )
             except _EXPECTED_COMPUTE_ERRORS as exc:  # type: ignore[misc]
                 deps_payload = {}
                 if not guardrails_enabled:
@@ -354,7 +366,13 @@ def _execute_constant_compute(
     for row_id in batch_row_nth:
         context.set_field_value(field_spec.field_id, row_id, result)
         if wants_field_compute:
-            runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_payload, result)
+            runtime.instrumentation.emit_field_compute(
+                field_spec.field_id,
+                row_id,
+                dep_payload,
+                result,
+                meta=_operator_phase_meta(),
+            )
 
 
 def _execute_row_compute(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c0
@@ -424,7 +442,13 @@ def _execute_row_compute(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
             context.set_field_value(field_spec.field_id, row_id, result)
 
             if wants_field_compute:
-                runtime.instrumentation.emit_field_compute(field_spec.field_id, row_id, dep_values_payload, result)
+                runtime.instrumentation.emit_field_compute(
+                    field_spec.field_id,
+                    row_id,
+                    dep_values_payload,
+                    result,
+                    meta=_operator_phase_meta(),
+                )
         except _EXPECTED_COMPUTE_ERRORS as exc:  # type: ignore[misc]
             deps_payload = {}
             if not guardrails_enabled:
@@ -478,6 +502,9 @@ class ComputeOperatorExecutor(OperatorExecutor):
         runtime: ExecutionRuntime,
     ) -> None:
         op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
+        # `write-precompute`: `late` 字段跳过 `compute` 段,由写出路径在写出前物化.
+        if op.field_key in runtime.late_fields:
+            return
         field_spec = runtime.field_specs.get(op.field_key)
         if not isinstance(field_spec, DerivedFieldIr):
             return

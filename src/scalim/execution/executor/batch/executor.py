@@ -94,6 +94,8 @@ class BatchExecutor:
         self.runtime.sink = sink
         self.runtime.batch_num = batch_num
         self.runtime.reset_load_ref_cache()
+        # 结果需要从 `BatchContext` 逐行提取,`write-precompute` 不适用于该路径.
+        self.runtime.late_fields = frozenset()
 
         self.prefill_main_source_fields(context, batch_row_nth, main_rows, required_fields=required_fields)
 

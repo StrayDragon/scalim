@@ -4,6 +4,7 @@ from ....sinks import IRowSink
 from ....sinks._internal.base import SupportsWriteRowAligned
 from ...context import BatchContext, DenseBatchContext
 from ...executor.runtime.runtime import ExecutionRuntime
+from ...write_precompute import LateFieldMaterializer, LateRowWriteLayout
 
 if TYPE_CHECKING:
     from ....typedefs import FieldValue, RowData
@@ -14,7 +15,9 @@ class RowEmissionCoordinator:
     _sink: IRowSink
     _context: BatchContext
     _target_fields: List[str]
-    _target_fields_set: Set[str]
+    _gate_fields: Set[str]
+    _late_materializer: Optional[LateFieldMaterializer]
+    _late_layout: Optional[LateRowWriteLayout]
     _global_ready_fields: Set[str]
     _required_non_global_targets: int
     _ready_counts: Dict[Hashable, int]
@@ -38,14 +41,19 @@ class RowEmissionCoordinator:
         retained_fields: Set[str],
         global_ready_fields: Set[str],
         allow_release: bool,
+        late_materializer: Optional[LateFieldMaterializer] = None,
     ) -> None:
         self._runtime = runtime
         self._sink = sink
         self._context = BatchContext()
         self._target_fields = list(target_fields)
-        self._target_fields_set = set(self._target_fields)
-        self._global_ready_fields = set(global_ready_fields)
-        self._required_non_global_targets = max(0, len(self._target_fields) - len(self._global_ready_fields))
+        self._late_materializer = late_materializer
+        self._late_layout = None
+        # 写出闸门: `late` 字段不在 `compute` 段落库,因此不参与“行是否就绪”的计数.
+        late_fields: Set[str] = set(late_materializer.late_fields) if late_materializer is not None else set()
+        self._gate_fields = set(self._target_fields) - late_fields
+        self._global_ready_fields = set(global_ready_fields) - late_fields
+        self._required_non_global_targets = max(0, len(self._gate_fields) - len(self._global_ready_fields))
         self._ready_counts = {}
         self._dense_base_row_id = None
         self._dense_row_count = 0
@@ -57,6 +65,10 @@ class RowEmissionCoordinator:
         self._allow_release = bool(allow_release)
         self._rows_to_remove = set()
         self._retained_fields = set(retained_fields)
+
+    def on_field_set_fields(self) -> Set[str]:
+        """需要触发就绪计数回调的字段集合(排除全局就绪与 `late` 字段)."""
+        return self._gate_fields - self._global_ready_fields
 
     def attach_context(self, context: BatchContext) -> None:
         self._context = context
@@ -75,7 +87,7 @@ class RowEmissionCoordinator:
             self._next_write_row_id = self._write_row_ids[self._next_write_idx]
 
     def on_field_set(self, field_key: str, row_id: Hashable) -> None:
-        if field_key not in self._target_fields_set:
+        if field_key not in self._gate_fields:
             return
         if field_key in self._global_ready_fields:
             return
@@ -153,12 +165,47 @@ class RowEmissionCoordinator:
         return self._ready_counts.get(row_id, 0) >= self._required_non_global_targets
 
     def _write_row(self, *, row_id: Hashable, row_index: int) -> None:
+        late_materializer = self._late_materializer
+        if late_materializer is not None:
+            self._write_row_with_late_fields(row_id=row_id, row_index=row_index, late_materializer=late_materializer)
+            return
+
         if isinstance(self._sink, SupportsWriteRowAligned):
             values: List["FieldValue"] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
             self._sink.write_row_aligned(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
             row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)
+            self._sink.write_row(row)
+            field_count = len(row)
+        self._runtime.instrumentation.emit_row_write(
+            row_id=row_id,
+            field_count=field_count,
+            batch_num=self._runtime.batch_num,
+            row_index=int(row_index),
+        )
+
+    def _write_row_with_late_fields(
+        self,
+        *,
+        row_id: Hashable,
+        row_index: int,
+        late_materializer: LateFieldMaterializer,
+    ) -> None:
+        # `write-precompute`: 写出前按 `late` 子图拓扑就地算出本行的 `late` 值(不写回上下文).
+        layout = self._late_layout
+        if layout is None:
+            layout = late_materializer.build_row_layout(self._target_fields)
+            self._late_layout = layout
+        values: List["FieldValue"] = late_materializer.fill_row_values(layout, self._context, row_id)
+
+        if isinstance(self._sink, SupportsWriteRowAligned):
+            self._sink.write_row_aligned(self._target_fields, values)
+            field_count = len(self._target_fields)
+        else:
+            row: "RowData" = {}
+            for idx, field_key in enumerate(self._target_fields):
+                row[field_key] = values[idx]
             self._sink.write_row(row)
             field_count = len(row)
         self._runtime.instrumentation.emit_row_write(
