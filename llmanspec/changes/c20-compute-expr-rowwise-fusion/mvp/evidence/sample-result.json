@@ -1,0 +1,126 @@
+{
+  "change": "c20-compute-expr-rowwise-fusion",
+  "comparisons": {
+    "engine_narrow_calc_calls": 8000,
+    "engine_wide_calc_calls": 160000,
+    "engine_wide_over_narrow_duration": 5.18207167705812,
+    "micro_dep_reads_field_major": 320000,
+    "micro_dep_reads_ratio_field_over_row": 40.0,
+    "micro_dep_reads_row_wise": 8000,
+    "micro_duration_speedup_row_over_field": 2.832116378579769,
+    "note": "Engine cases show current Scalim cost grows with M (field count) for thin call_by. Micro loops show same-deps row-wise cuts dep_reads from ~N*M*D to ~N*D while calc_calls stay N*M."
+  },
+  "example_walkthrough": {
+    "D": 2,
+    "M": 3,
+    "N": 2,
+    "calc_calls_both": 6,
+    "field_major_dep_reads": 12,
+    "row_wise_dep_reads": 4
+  },
+  "params": {
+    "deps": 2,
+    "narrow_fields": 2,
+    "rows": 4000,
+    "runs": 3,
+    "wide_fields": 40
+  },
+  "python": "3.10",
+  "results": {
+    "engine_narrow_few_call_by": {
+      "calc_calls": 8000,
+      "delta_rss_kb": 0,
+      "dep_reads": null,
+      "duration_s_all": [
+        0.04734209700109204,
+        0.04918144299881533,
+        0.04726300300171715
+      ],
+      "duration_s_median": 0.04734209700109204,
+      "fields": 2,
+      "meta": {
+        "calc_calls": 8000,
+        "expected_calc_calls": 8000,
+        "fields": 2,
+        "rows": 4000,
+        "shape": "engine_call_by"
+      },
+      "rows": 4000,
+      "rows_per_s": 84491.39884757812,
+      "rss_kb_after": 39336,
+      "rss_kb_before": 39336
+    },
+    "engine_wide_many_call_by": {
+      "calc_calls": 160000,
+      "delta_rss_kb": 8308,
+      "dep_reads": null,
+      "duration_s_all": [
+        0.24533014000189723,
+        0.23880337800073903,
+        0.24640809099946637
+      ],
+      "duration_s_median": 0.24533014000189723,
+      "fields": 40,
+      "meta": {
+        "calc_calls": 160000,
+        "expected_calc_calls": 160000,
+        "fields": 40,
+        "rows": 4000,
+        "shape": "engine_call_by"
+      },
+      "rows": 4000,
+      "rows_per_s": 16304.56005107675,
+      "rss_kb_after": 39332,
+      "rss_kb_before": 31024
+    },
+    "micro_field_major": {
+      "calc_calls": 160000,
+      "delta_rss_kb": 1708,
+      "dep_reads": 320000,
+      "duration_s_all": [
+        0.04303063299812493,
+        0.0420112660031009,
+        0.041924897999706445
+      ],
+      "duration_s_median": 0.0420112660031009,
+      "fields": 40,
+      "meta": {
+        "calc_calls": 160000,
+        "checksum": 18412840.0,
+        "dep_reads": 320000,
+        "fields": 40,
+        "rows": 4000,
+        "shape": "micro_field_major"
+      },
+      "rows": 4000,
+      "rows_per_s": 95212.55559650964,
+      "rss_kb_after": 41044,
+      "rss_kb_before": 39336
+    },
+    "micro_row_wise": {
+      "calc_calls": 160000,
+      "delta_rss_kb": 1316,
+      "dep_reads": 8000,
+      "duration_s_all": [
+        0.0150149799992505,
+        0.014750284000911051,
+        0.014833876997727202
+      ],
+      "duration_s_median": 0.014833876997727202,
+      "fields": 40,
+      "meta": {
+        "calc_calls": 160000,
+        "checksum": 18412840.0,
+        "dep_reads": 8000,
+        "fields": 40,
+        "rows": 4000,
+        "shape": "micro_row_wise"
+      },
+      "rows": 4000,
+      "rows_per_s": 269653.0381513118,
+      "rss_kb_after": 42360,
+      "rss_kb_before": 41044
+    }
+  },
+  "topic": "c20-nxm-framework-tax"
+}

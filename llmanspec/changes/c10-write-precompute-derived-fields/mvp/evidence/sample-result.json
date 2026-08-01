@@ -1,0 +1,86 @@
+{
+  "change": "c10-write-precompute-derived-fields",
+  "comparisons": {
+    "dep_reads_both_sims": 320000,
+    "note": "Late-at-write_column keeps peak derived scratch ~1 column (N cells); eager-hold peaks at N*M. Dep reads equal in these sims (both field-major per column); CPU win is not the point here — residency shape is. Engine case is eager baseline only.",
+    "peak_cells_ratio_eager_over_late": 40.0,
+    "peak_derived_cells_eager": 160000,
+    "peak_derived_cells_late": 4000,
+    "policy": "auto-late via existing deps only; no master switch; no new YAML"
+  },
+  "params": {
+    "deps": 2,
+    "derived_fields": 40,
+    "rows": 4000,
+    "runs": 3
+  },
+  "python": "3.10",
+  "results": {
+    "engine_eager_column": {
+      "delta_rss_kb": 6212,
+      "duration_s_all": [
+        0.16298229299718514,
+        0.15196748800008208,
+        0.14933449599993764
+      ],
+      "duration_s_median": 0.15196748800008208,
+      "meta": {
+        "calc_calls": 160000,
+        "expected_calc_calls": 160000,
+        "fields_derived": 40,
+        "rows": 4000,
+        "shape": "engine_eager_column",
+        "sink": "InMemoryColumnSink"
+      },
+      "rows": 4000,
+      "rows_per_s": 26321.41948676443,
+      "rss_kb_after": 36056,
+      "rss_kb_before": 29844
+    },
+    "sim_eager_hold_derived": {
+      "delta_rss_kb": 12,
+      "duration_s_all": [
+        0.03766596199784544,
+        0.03775550499995006,
+        0.03721953399872291
+      ],
+      "duration_s_median": 0.03766596199784544,
+      "meta": {
+        "calc_calls": 160000,
+        "columns_written": 40,
+        "dep_reads": 320000,
+        "fields_derived": 40,
+        "peak_derived_cells": 160000,
+        "rows": 4000,
+        "shape": "sim_eager_hold_derived"
+      },
+      "rows": 4000,
+      "rows_per_s": 106196.67699523529,
+      "rss_kb_after": 35060,
+      "rss_kb_before": 35048
+    },
+    "sim_late_at_write_column": {
+      "delta_rss_kb": 0,
+      "duration_s_all": [
+        0.03632410600039293,
+        0.036408570002095075,
+        0.03638734899868723
+      ],
+      "duration_s_median": 0.03638734899868723,
+      "meta": {
+        "calc_calls": 160000,
+        "columns_written": 40,
+        "dep_reads": 320000,
+        "fields_derived": 40,
+        "peak_derived_cells": 4000,
+        "rows": 4000,
+        "shape": "sim_late_at_write_column"
+      },
+      "rows": 4000,
+      "rows_per_s": 109928.31602391014,
+      "rss_kb_after": 35060,
+      "rss_kb_before": 35060
+    }
+  },
+  "topic": "c10-column-late-vs-eager"
+}

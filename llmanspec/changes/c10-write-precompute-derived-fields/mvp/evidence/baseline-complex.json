@@ -1,0 +1,178 @@
+{
+  "change": "c10-write-precompute-derived-fields",
+  "comparisons": {
+    "column_peak_ratio_eager_over_late_chain": 3.4,
+    "engine_column_golden_ok": true,
+    "engine_column_mismatches": 0,
+    "engine_row_golden_ok": true,
+    "engine_row_mismatches": 0,
+    "regression_contract": {
+      "fast_fail": "failure MUST discard; no final artifact",
+      "peak_column_chain": "sim_column_late_chain.peak_derived_cells documents retain-until-dependents-written",
+      "peak_row": "sim_row_late.peak_derived_cells is upper-bound target for derived scratch per row",
+      "values": "After late impl, engine output MUST match golden_table for same params"
+    },
+    "row_peak_ratio_eager_over_late": 500.0
+  },
+  "decision_q3": "C-full-row-and-column-chains",
+  "golden_sample_first_rows": [
+    {
+      "c0": 1.0,
+      "c1": 2.0,
+      "c2": 3.0,
+      "c3": 4.0,
+      "c4": 5.0,
+      "d0": 0.0,
+      "d1": 0.0,
+      "d10": 0.0,
+      "d11": 0.0,
+      "d2": 0.0,
+      "d3": 0.0,
+      "d4": 0.0,
+      "d5": 0.0,
+      "d6": 0.0,
+      "d7": 0.0,
+      "d8": 0.0,
+      "d9": 0.0,
+      "id": 0.0,
+      "v0": 0.0,
+      "v1": 0.0
+    },
+    {
+      "c0": 2.0,
+      "c1": 3.0,
+      "c2": 4.0,
+      "c3": 5.0,
+      "c4": 6.0,
+      "d0": 2.0,
+      "d1": 0.0,
+      "d10": 0.0,
+      "d11": 1.0,
+      "d2": 1.0,
+      "d3": 2.0,
+      "d4": 0.0,
+      "d5": 1.0,
+      "d6": 2.0,
+      "d7": 0.0,
+      "d8": 1.0,
+      "d9": 2.0,
+      "id": 1.0,
+      "v0": 1.0,
+      "v1": 1.0
+    },
+    {
+      "c0": 3.0,
+      "c1": 4.0,
+      "c2": 5.0,
+      "c3": 6.0,
+      "c4": 7.0,
+      "d0": 4.0,
+      "d1": 0.0,
+      "d10": 0.0,
+      "d11": 4.0,
+      "d2": 4.0,
+      "d3": 4.0,
+      "d4": 0.0,
+      "d5": 4.0,
+      "d6": 4.0,
+      "d7": 0.0,
+      "d8": 4.0,
+      "d9": 4.0,
+      "id": 2.0,
+      "v0": 2.0,
+      "v1": 2.0
+    }
+  ],
+  "params": {
+    "chain_depth": 5,
+    "flat_fields": 12,
+    "rows": 500,
+    "runs": 3
+  },
+  "python": "3.10",
+  "results": {
+    "engine_eager_column": {
+      "delta_rss_kb": 1508,
+      "duration_s_all": [
+        0.01091475800058106,
+        0.010442768994835205,
+        0.01083316799486056
+      ],
+      "duration_s_median": 0.01083316799486056,
+      "meta": {
+        "chain_depth": 5,
+        "golden_ok": true,
+        "got_row_count": 500,
+        "n_flat": 12,
+        "rows": 500,
+        "shape": "engine_eager_column",
+        "sink": "column",
+        "value_cells_checked": 10000,
+        "value_mismatches": 0
+      },
+      "rss_kb_after": 33600,
+      "rss_kb_before": 32092
+    },
+    "engine_eager_row": {
+      "delta_rss_kb": 984,
+      "duration_s_all": [
+        0.01595060199906584,
+        0.015627335997123737,
+        0.015128883998841047
+      ],
+      "duration_s_median": 0.015627335997123737,
+      "meta": {
+        "chain_depth": 5,
+        "golden_ok": true,
+        "got_row_count": 500,
+        "n_flat": 12,
+        "rows": 500,
+        "shape": "engine_eager_row",
+        "sink": "row",
+        "value_cells_checked": 10000,
+        "value_mismatches": 0
+      },
+      "rss_kb_after": 31960,
+      "rss_kb_before": 30976
+    },
+    "sim_column_eager": {
+      "calc_calls": 8500,
+      "chain_depth": 5,
+      "dep_reads": 14500,
+      "max_retained_intermediates": 17,
+      "n_flat": 12,
+      "peak_derived_cells": 8500,
+      "rows": 500,
+      "shape": "sim_column_eager"
+    },
+    "sim_column_late_chain": {
+      "calc_calls": 8500,
+      "chain_depth": 5,
+      "dep_reads": 14500,
+      "n_flat": 12,
+      "note": "Column late+chain must retain intermediate late columns until dependents written; peak ~ rows*chain_depth before trim.",
+      "peak_derived_cells": 2500,
+      "rows": 500,
+      "shape": "sim_column_late_chain"
+    },
+    "sim_row_eager": {
+      "calc_calls": 8500,
+      "chain_depth": 5,
+      "dep_reads": 14500,
+      "n_flat": 12,
+      "peak_derived_cells": 8500,
+      "rows": 500,
+      "shape": "sim_row_eager"
+    },
+    "sim_row_late": {
+      "calc_calls": 8500,
+      "chain_depth": 5,
+      "dep_reads": 14500,
+      "n_flat": 12,
+      "peak_derived_cells": 17,
+      "rows": 500,
+      "shape": "sim_row_late"
+    }
+  },
+  "topic": "c10-complex-baseline"
+}

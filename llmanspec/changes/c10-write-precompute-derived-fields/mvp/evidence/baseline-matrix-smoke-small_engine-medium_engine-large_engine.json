@@ -1,0 +1,1816 @@
+{
+  "allow_rss_gb": 28.0,
+  "bytes_per_cell_calibrated": 64.0,
+  "cases": [
+    {
+      "case_id": "smoke_flat_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 1603000,
+        "duration_s": 2.596455705999688,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 1600000,
+          "est_eager_hold_gib": 0.095367431640625,
+          "flat_fields": 1600,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "flat",
+          "width_mode": "full"
+        },
+        "rss_kb_after": 56008,
+        "rss_kb_before": 32888,
+        "rss_kb_peak_approx": 66492,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 1600000,
+        "est_eager_hold_gib": 0.095367431640625,
+        "flat_fields": 1600,
+        "note": "fast CI / local sanity",
+        "rows": 1000,
+        "scale": "smoke",
+        "target_gib": 0.02,
+        "tier_alias": "smoke",
+        "topology": "flat",
+        "width_mode": "full"
+      },
+      "scale": "smoke",
+      "sim": {
+        "eager": {
+          "calc_calls": 1600000,
+          "dep_reads": 3200000,
+          "peak_derived_cells": 1600000
+        },
+        "est_eager_gib": 0.095367431640625,
+        "est_late_gib": 9.5367431640625e-05,
+        "late": {
+          "calc_calls": 1600000,
+          "dep_reads": 3200000,
+          "peak_derived_cells": 1600
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 1600000,
+          "est_eager_hold_gib": 0.095367431640625,
+          "flat_fields": 1600,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "flat",
+          "width_mode": "full"
+        },
+        "peak_ratio_eager_over_late": 1000.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "smoke",
+      "topology": "flat"
+    },
+    {
+      "case_id": "smoke_flat_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 1603000,
+        "duration_s": 2.200614774999849,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 1600000,
+          "est_eager_hold_gib": 0.095367431640625,
+          "flat_fields": 1600,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "flat",
+          "width_mode": "full"
+        },
+        "rss_kb_after": 49976,
+        "rss_kb_before": 49972,
+        "rss_kb_peak_approx": 49976,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 1600000,
+        "est_eager_hold_gib": 0.095367431640625,
+        "flat_fields": 1600,
+        "note": "fast CI / local sanity",
+        "rows": 1000,
+        "scale": "smoke",
+        "target_gib": 0.02,
+        "tier_alias": "smoke",
+        "topology": "flat",
+        "width_mode": "full"
+      },
+      "scale": "smoke",
+      "sim": {
+        "eager": {
+          "calc_calls": 1600000,
+          "dep_reads": 3200000,
+          "peak_derived_cells": 1600000
+        },
+        "est_eager_gib": 0.095367431640625,
+        "est_late_gib": 5.9604644775390625e-05,
+        "late": {
+          "calc_calls": 1600000,
+          "dep_reads": 3200000,
+          "peak_derived_cells": 1000,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 1600000,
+          "est_eager_hold_gib": 0.095367431640625,
+          "flat_fields": 1600,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "flat",
+          "width_mode": "full"
+        },
+        "peak_ratio_eager_over_late": 1600.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "smoke",
+      "topology": "flat"
+    },
+    {
+      "case_id": "smoke_chain_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 393150,
+        "duration_s": 0.5995333320024656,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 64,
+          "derived_cells": 377424,
+          "est_eager_hold_gib": 0.02249622344970703,
+          "flat_fields": 8,
+          "note": "fast CI / local sanity",
+          "rows": 5242,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "chain",
+          "width_mode": "full"
+        },
+        "rss_kb_after": 48976,
+        "rss_kb_before": 48968,
+        "rss_kb_peak_approx": 48976,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 64,
+        "derived_cells": 377424,
+        "est_eager_hold_gib": 0.02249622344970703,
+        "flat_fields": 8,
+        "note": "fast CI / local sanity",
+        "rows": 5242,
+        "scale": "smoke",
+        "target_gib": 0.02,
+        "tier_alias": "smoke",
+        "topology": "chain",
+        "width_mode": "full"
+      },
+      "scale": "smoke",
+      "sim": {
+        "eager": {
+          "calc_calls": 377424,
+          "dep_reads": 419360,
+          "peak_derived_cells": 377424
+        },
+        "est_eager_gib": 0.02249622344970703,
+        "est_late_gib": 4.291534423828125e-06,
+        "late": {
+          "calc_calls": 377424,
+          "dep_reads": 419360,
+          "peak_derived_cells": 72
+        },
+        "params": {
+          "chain_depth": 64,
+          "derived_cells": 377424,
+          "est_eager_hold_gib": 0.02249622344970703,
+          "flat_fields": 8,
+          "note": "fast CI / local sanity",
+          "rows": 5242,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "chain",
+          "width_mode": "full"
+        },
+        "peak_ratio_eager_over_late": 5242.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "smoke",
+      "topology": "chain"
+    },
+    {
+      "case_id": "smoke_chain_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 393150,
+        "duration_s": 0.4647965420008404,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 64,
+          "derived_cells": 377424,
+          "est_eager_hold_gib": 0.02249622344970703,
+          "flat_fields": 8,
+          "note": "fast CI / local sanity",
+          "rows": 5242,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "chain",
+          "width_mode": "full"
+        },
+        "rss_kb_after": 48976,
+        "rss_kb_before": 48976,
+        "rss_kb_peak_approx": 48976,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 64,
+        "derived_cells": 377424,
+        "est_eager_hold_gib": 0.02249622344970703,
+        "flat_fields": 8,
+        "note": "fast CI / local sanity",
+        "rows": 5242,
+        "scale": "smoke",
+        "target_gib": 0.02,
+        "tier_alias": "smoke",
+        "topology": "chain",
+        "width_mode": "full"
+      },
+      "scale": "smoke",
+      "sim": {
+        "eager": {
+          "calc_calls": 377424,
+          "dep_reads": 419360,
+          "peak_derived_cells": 377424
+        },
+        "est_eager_gib": 0.02249622344970703,
+        "est_late_gib": 0.01999664306640625,
+        "late": {
+          "calc_calls": 377424,
+          "dep_reads": 419360,
+          "peak_derived_cells": 335488,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 64,
+          "derived_cells": 377424,
+          "est_eager_hold_gib": 0.02249622344970703,
+          "flat_fields": 8,
+          "note": "fast CI / local sanity",
+          "rows": 5242,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "chain",
+          "width_mode": "full"
+        },
+        "peak_ratio_eager_over_late": 1.125,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "smoke",
+      "topology": "chain"
+    },
+    {
+      "case_id": "smoke_mixed_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 819000,
+        "duration_s": 1.2883348390023457,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 816000,
+          "est_eager_hold_gib": 0.04863739013671875,
+          "flat_fields": 800,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "mixed",
+          "width_mode": "full"
+        },
+        "rss_kb_after": 50956,
+        "rss_kb_before": 47968,
+        "rss_kb_peak_approx": 51960,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 816000,
+        "est_eager_hold_gib": 0.04863739013671875,
+        "flat_fields": 800,
+        "note": "fast CI / local sanity",
+        "rows": 1000,
+        "scale": "smoke",
+        "target_gib": 0.02,
+        "tier_alias": "smoke",
+        "topology": "mixed",
+        "width_mode": "full"
+      },
+      "scale": "smoke",
+      "sim": {
+        "eager": {
+          "calc_calls": 816000,
+          "dep_reads": 1616000,
+          "peak_derived_cells": 816000
+        },
+        "est_eager_gib": 0.04863739013671875,
+        "est_late_gib": 4.863739013671875e-05,
+        "late": {
+          "calc_calls": 816000,
+          "dep_reads": 1616000,
+          "peak_derived_cells": 816
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 816000,
+          "est_eager_hold_gib": 0.04863739013671875,
+          "flat_fields": 800,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "mixed",
+          "width_mode": "full"
+        },
+        "peak_ratio_eager_over_late": 1000.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "smoke",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "smoke_mixed_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 819000,
+        "duration_s": 1.108278601001075,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 816000,
+          "est_eager_hold_gib": 0.04863739013671875,
+          "flat_fields": 800,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "mixed",
+          "width_mode": "full"
+        },
+        "rss_kb_after": 50960,
+        "rss_kb_before": 50956,
+        "rss_kb_peak_approx": 50960,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 816000,
+        "est_eager_hold_gib": 0.04863739013671875,
+        "flat_fields": 800,
+        "note": "fast CI / local sanity",
+        "rows": 1000,
+        "scale": "smoke",
+        "target_gib": 0.02,
+        "tier_alias": "smoke",
+        "topology": "mixed",
+        "width_mode": "full"
+      },
+      "scale": "smoke",
+      "sim": {
+        "eager": {
+          "calc_calls": 816000,
+          "dep_reads": 1616000,
+          "peak_derived_cells": 816000
+        },
+        "est_eager_gib": 0.04863739013671875,
+        "est_late_gib": 0.00095367431640625,
+        "late": {
+          "calc_calls": 816000,
+          "dep_reads": 1616000,
+          "peak_derived_cells": 16000,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 816000,
+          "est_eager_hold_gib": 0.04863739013671875,
+          "flat_fields": 800,
+          "note": "fast CI / local sanity",
+          "rows": 1000,
+          "scale": "smoke",
+          "target_gib": 0.02,
+          "tier_alias": "smoke",
+          "topology": "mixed",
+          "width_mode": "full"
+        },
+        "peak_ratio_eager_over_late": 51.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "smoke",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "small_engine_flat_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 4299096,
+        "duration_s": 6.921717056997295,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 34952,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 52216,
+        "rss_kb_before": 50964,
+        "rss_kb_peak_approx": 52216,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 4194240,
+        "est_eager_hold_gib": 0.24999618530273438,
+        "flat_fields": 120,
+        "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+        "rows": 34952,
+        "scale": "small_engine",
+        "target_gib": 0.25,
+        "tier_alias": "small",
+        "topology": "flat",
+        "width_mode": "engine"
+      },
+      "scale": "small_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 4194240,
+          "dep_reads": 8388480,
+          "peak_derived_cells": 4194240
+        },
+        "est_eager_gib": 0.24999618530273438,
+        "est_late_gib": 7.152557373046875e-06,
+        "late": {
+          "calc_calls": 4194240,
+          "dep_reads": 8388480,
+          "peak_derived_cells": 120
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 34952,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 34952.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "small",
+      "topology": "flat"
+    },
+    {
+      "case_id": "small_engine_flat_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 4299096,
+        "duration_s": 5.646992638998199,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 34952,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 51208,
+        "rss_kb_before": 51208,
+        "rss_kb_peak_approx": 51208,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 4194240,
+        "est_eager_hold_gib": 0.24999618530273438,
+        "flat_fields": 120,
+        "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+        "rows": 34952,
+        "scale": "small_engine",
+        "target_gib": 0.25,
+        "tier_alias": "small",
+        "topology": "flat",
+        "width_mode": "engine"
+      },
+      "scale": "small_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 4194240,
+          "dep_reads": 8388480,
+          "peak_derived_cells": 4194240
+        },
+        "est_eager_gib": 0.24999618530273438,
+        "est_late_gib": 0.002083301544189453,
+        "late": {
+          "calc_calls": 4194240,
+          "dep_reads": 8388480,
+          "peak_derived_cells": 34952,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 34952,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 120.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "small",
+      "topology": "flat"
+    },
+    {
+      "case_id": "small_engine_chain_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 5155479,
+        "duration_s": 7.892372973998135,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 4893336,
+          "est_eager_hold_gib": 0.29166555404663086,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 87381,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 67056,
+        "rss_kb_before": 65960,
+        "rss_kb_peak_approx": 67056,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 48,
+        "derived_cells": 4893336,
+        "est_eager_hold_gib": 0.29166555404663086,
+        "flat_fields": 8,
+        "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+        "rows": 87381,
+        "scale": "small_engine",
+        "target_gib": 0.25,
+        "tier_alias": "small",
+        "topology": "chain",
+        "width_mode": "engine"
+      },
+      "scale": "small_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 4893336,
+          "dep_reads": 5592384,
+          "peak_derived_cells": 4893336
+        },
+        "est_eager_gib": 0.29166555404663086,
+        "est_late_gib": 3.337860107421875e-06,
+        "late": {
+          "calc_calls": 4893336,
+          "dep_reads": 5592384,
+          "peak_derived_cells": 56
+        },
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 4893336,
+          "est_eager_hold_gib": 0.29166555404663086,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 87381,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 87381.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "small",
+      "topology": "chain"
+    },
+    {
+      "case_id": "small_engine_chain_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 5155479,
+        "duration_s": 6.059721125995566,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 4893336,
+          "est_eager_hold_gib": 0.29166555404663086,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 87381,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 66800,
+        "rss_kb_before": 65952,
+        "rss_kb_peak_approx": 66800,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 48,
+        "derived_cells": 4893336,
+        "est_eager_hold_gib": 0.29166555404663086,
+        "flat_fields": 8,
+        "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+        "rows": 87381,
+        "scale": "small_engine",
+        "target_gib": 0.25,
+        "tier_alias": "small",
+        "topology": "chain",
+        "width_mode": "engine"
+      },
+      "scale": "small_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 4893336,
+          "dep_reads": 5592384,
+          "peak_derived_cells": 4893336
+        },
+        "est_eager_gib": 0.29166555404663086,
+        "est_late_gib": 0.2499990463256836,
+        "late": {
+          "calc_calls": 4893336,
+          "dep_reads": 5592384,
+          "peak_derived_cells": 4194288,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 4893336,
+          "est_eager_hold_gib": 0.29166555404663086,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 87381,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 1.1666666666666667,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "small",
+      "topology": "chain"
+    },
+    {
+      "case_id": "small_engine_mixed_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 4325310,
+        "duration_s": 6.807460993004497,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 43690,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 57012,
+        "rss_kb_before": 57004,
+        "rss_kb_peak_approx": 57012,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 4194240,
+        "est_eager_hold_gib": 0.24999618530273438,
+        "flat_fields": 80,
+        "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+        "rows": 43690,
+        "scale": "small_engine",
+        "target_gib": 0.25,
+        "tier_alias": "small",
+        "topology": "mixed",
+        "width_mode": "engine"
+      },
+      "scale": "small_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 4194240,
+          "dep_reads": 7689440,
+          "peak_derived_cells": 4194240
+        },
+        "est_eager_gib": 0.24999618530273438,
+        "est_late_gib": 5.7220458984375e-06,
+        "late": {
+          "calc_calls": 4194240,
+          "dep_reads": 7689440,
+          "peak_derived_cells": 96
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 43690,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 43690.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "small",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "small_engine_mixed_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 4325310,
+        "duration_s": 5.632889420994616,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 43690,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 57012,
+        "rss_kb_before": 57012,
+        "rss_kb_peak_approx": 57012,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 4194240,
+        "est_eager_hold_gib": 0.24999618530273438,
+        "flat_fields": 80,
+        "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+        "rows": 43690,
+        "scale": "small_engine",
+        "target_gib": 0.25,
+        "tier_alias": "small",
+        "topology": "mixed",
+        "width_mode": "engine"
+      },
+      "scale": "small_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 4194240,
+          "dep_reads": 7689440,
+          "peak_derived_cells": 4194240
+        },
+        "est_eager_gib": 0.24999618530273438,
+        "est_late_gib": 0.04166603088378906,
+        "late": {
+          "calc_calls": 4194240,
+          "dep_reads": 7689440,
+          "peak_derived_cells": 699040,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 4194240,
+          "est_eager_hold_gib": 0.24999618530273438,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ small(~5GiB) sims; golden+topology cross-check",
+          "rows": 43690,
+          "scale": "small_engine",
+          "target_gib": 0.25,
+          "tier_alias": "small",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 6.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "small",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "medium_engine_flat_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 8598315,
+        "duration_s": 13.787151787000766,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 8388600,
+          "est_eager_hold_gib": 0.4999995231628418,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 69905,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 63052,
+        "rss_kb_before": 60160,
+        "rss_kb_peak_approx": 63052,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 8388600,
+        "est_eager_hold_gib": 0.4999995231628418,
+        "flat_fields": 120,
+        "note": "engine proxy ↔ medium(~15GiB) sims",
+        "rows": 69905,
+        "scale": "medium_engine",
+        "target_gib": 0.5,
+        "tier_alias": "medium",
+        "topology": "flat",
+        "width_mode": "engine"
+      },
+      "scale": "medium_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 8388600,
+          "dep_reads": 16777200,
+          "peak_derived_cells": 8388600
+        },
+        "est_eager_gib": 0.4999995231628418,
+        "est_late_gib": 7.152557373046875e-06,
+        "late": {
+          "calc_calls": 8388600,
+          "dep_reads": 16777200,
+          "peak_derived_cells": 120
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 8388600,
+          "est_eager_hold_gib": 0.4999995231628418,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 69905,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 69905.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "medium",
+      "topology": "flat"
+    },
+    {
+      "case_id": "medium_engine_flat_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 8598315,
+        "duration_s": 11.38293373000488,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 8388600,
+          "est_eager_hold_gib": 0.4999995231628418,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 69905,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 60236,
+        "rss_kb_before": 60160,
+        "rss_kb_peak_approx": 60236,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 8388600,
+        "est_eager_hold_gib": 0.4999995231628418,
+        "flat_fields": 120,
+        "note": "engine proxy ↔ medium(~15GiB) sims",
+        "rows": 69905,
+        "scale": "medium_engine",
+        "target_gib": 0.5,
+        "tier_alias": "medium",
+        "topology": "flat",
+        "width_mode": "engine"
+      },
+      "scale": "medium_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 8388600,
+          "dep_reads": 16777200,
+          "peak_derived_cells": 8388600
+        },
+        "est_eager_gib": 0.4999995231628418,
+        "est_late_gib": 0.004166662693023682,
+        "late": {
+          "calc_calls": 8388600,
+          "dep_reads": 16777200,
+          "peak_derived_cells": 69905,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 8388600,
+          "est_eager_hold_gib": 0.4999995231628418,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 69905,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 120.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "medium",
+      "topology": "flat"
+    },
+    {
+      "case_id": "medium_engine_chain_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 10310958,
+        "duration_s": 15.977114911998797,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 9786672,
+          "est_eager_hold_gib": 0.5833311080932617,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 174762,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 95920,
+        "rss_kb_before": 94820,
+        "rss_kb_peak_approx": 95920,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 48,
+        "derived_cells": 9786672,
+        "est_eager_hold_gib": 0.5833311080932617,
+        "flat_fields": 8,
+        "note": "engine proxy ↔ medium(~15GiB) sims",
+        "rows": 174762,
+        "scale": "medium_engine",
+        "target_gib": 0.5,
+        "tier_alias": "medium",
+        "topology": "chain",
+        "width_mode": "engine"
+      },
+      "scale": "medium_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 9786672,
+          "dep_reads": 11184768,
+          "peak_derived_cells": 9786672
+        },
+        "est_eager_gib": 0.5833311080932617,
+        "est_late_gib": 3.337860107421875e-06,
+        "late": {
+          "calc_calls": 9786672,
+          "dep_reads": 11184768,
+          "peak_derived_cells": 56
+        },
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 9786672,
+          "est_eager_hold_gib": 0.5833311080932617,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 174762,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 174762.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "medium",
+      "topology": "chain"
+    },
+    {
+      "case_id": "medium_engine_chain_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 10310958,
+        "duration_s": 12.030891169000824,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 9786672,
+          "est_eager_hold_gib": 0.5833311080932617,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 174762,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 95660,
+        "rss_kb_before": 94816,
+        "rss_kb_peak_approx": 95660,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 48,
+        "derived_cells": 9786672,
+        "est_eager_hold_gib": 0.5833311080932617,
+        "flat_fields": 8,
+        "note": "engine proxy ↔ medium(~15GiB) sims",
+        "rows": 174762,
+        "scale": "medium_engine",
+        "target_gib": 0.5,
+        "tier_alias": "medium",
+        "topology": "chain",
+        "width_mode": "engine"
+      },
+      "scale": "medium_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 9786672,
+          "dep_reads": 11184768,
+          "peak_derived_cells": 9786672
+        },
+        "est_eager_gib": 0.5833311080932617,
+        "est_late_gib": 0.4999980926513672,
+        "late": {
+          "calc_calls": 9786672,
+          "dep_reads": 11184768,
+          "peak_derived_cells": 8388576,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 9786672,
+          "est_eager_hold_gib": 0.5833311080932617,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 174762,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 1.1666666666666667,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "medium",
+      "topology": "chain"
+    },
+    {
+      "case_id": "medium_engine_mixed_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 8650719,
+        "duration_s": 13.568884034997609,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 8388576,
+          "est_eager_hold_gib": 0.4999980926513672,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 87381,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 68100,
+        "rss_kb_before": 65940,
+        "rss_kb_peak_approx": 68100,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 8388576,
+        "est_eager_hold_gib": 0.4999980926513672,
+        "flat_fields": 80,
+        "note": "engine proxy ↔ medium(~15GiB) sims",
+        "rows": 87381,
+        "scale": "medium_engine",
+        "target_gib": 0.5,
+        "tier_alias": "medium",
+        "topology": "mixed",
+        "width_mode": "engine"
+      },
+      "scale": "medium_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 8388576,
+          "dep_reads": 15379056,
+          "peak_derived_cells": 8388576
+        },
+        "est_eager_gib": 0.4999980926513672,
+        "est_late_gib": 5.7220458984375e-06,
+        "late": {
+          "calc_calls": 8388576,
+          "dep_reads": 15379056,
+          "peak_derived_cells": 96
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 8388576,
+          "est_eager_hold_gib": 0.4999980926513672,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 87381,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 87381.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "medium",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "medium_engine_mixed_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 8650719,
+        "duration_s": 11.248502567003015,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 8388576,
+          "est_eager_hold_gib": 0.4999980926513672,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 87381,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 67100,
+        "rss_kb_before": 67100,
+        "rss_kb_peak_approx": 67100,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 8388576,
+        "est_eager_hold_gib": 0.4999980926513672,
+        "flat_fields": 80,
+        "note": "engine proxy ↔ medium(~15GiB) sims",
+        "rows": 87381,
+        "scale": "medium_engine",
+        "target_gib": 0.5,
+        "tier_alias": "medium",
+        "topology": "mixed",
+        "width_mode": "engine"
+      },
+      "scale": "medium_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 8388576,
+          "dep_reads": 15379056,
+          "peak_derived_cells": 8388576
+        },
+        "est_eager_gib": 0.4999980926513672,
+        "est_late_gib": 0.08333301544189453,
+        "late": {
+          "calc_calls": 8388576,
+          "dep_reads": 15379056,
+          "peak_derived_cells": 1398096,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 8388576,
+          "est_eager_hold_gib": 0.4999980926513672,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ medium(~15GiB) sims",
+          "rows": 87381,
+          "scale": "medium_engine",
+          "target_gib": 0.5,
+          "tier_alias": "medium",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 6.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "medium",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "large_engine_flat_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 12897411,
+        "duration_s": 20.91433629799576,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 12582840,
+          "est_eager_hold_gib": 0.7499957084655762,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 104857,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 74156,
+        "rss_kb_before": 71720,
+        "rss_kb_peak_approx": 74156,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 12582840,
+        "est_eager_hold_gib": 0.7499957084655762,
+        "flat_fields": 120,
+        "note": "engine proxy ↔ large(~30GiB) sims",
+        "rows": 104857,
+        "scale": "large_engine",
+        "target_gib": 0.75,
+        "tier_alias": "large",
+        "topology": "flat",
+        "width_mode": "engine"
+      },
+      "scale": "large_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 12582840,
+          "dep_reads": 25165680,
+          "peak_derived_cells": 12582840
+        },
+        "est_eager_gib": 0.7499957084655762,
+        "est_late_gib": 7.152557373046875e-06,
+        "late": {
+          "calc_calls": 12582840,
+          "dep_reads": 25165680,
+          "peak_derived_cells": 120
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 12582840,
+          "est_eager_hold_gib": 0.7499957084655762,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 104857,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 104857.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "large",
+      "topology": "flat"
+    },
+    {
+      "case_id": "large_engine_flat_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 12897411,
+        "duration_s": 17.043312599002093,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 12582840,
+          "est_eager_hold_gib": 0.7499957084655762,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 104857,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 71804,
+        "rss_kb_before": 71728,
+        "rss_kb_peak_approx": 71804,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 0,
+        "derived_cells": 12582840,
+        "est_eager_hold_gib": 0.7499957084655762,
+        "flat_fields": 120,
+        "note": "engine proxy ↔ large(~30GiB) sims",
+        "rows": 104857,
+        "scale": "large_engine",
+        "target_gib": 0.75,
+        "tier_alias": "large",
+        "topology": "flat",
+        "width_mode": "engine"
+      },
+      "scale": "large_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 12582840,
+          "dep_reads": 25165680,
+          "peak_derived_cells": 12582840
+        },
+        "est_eager_gib": 0.7499957084655762,
+        "est_late_gib": 0.006249964237213135,
+        "late": {
+          "calc_calls": 12582840,
+          "dep_reads": 25165680,
+          "peak_derived_cells": 104857,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 0,
+          "derived_cells": 12582840,
+          "est_eager_hold_gib": 0.7499957084655762,
+          "flat_fields": 120,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 104857,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "flat",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 120.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "large",
+      "topology": "flat"
+    },
+    {
+      "case_id": "large_engine_chain_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 15466496,
+        "duration_s": 24.299433064006735,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 14680064,
+          "est_eager_hold_gib": 0.875,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 262144,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 124828,
+        "rss_kb_before": 123728,
+        "rss_kb_peak_approx": 124828,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 48,
+        "derived_cells": 14680064,
+        "est_eager_hold_gib": 0.875,
+        "flat_fields": 8,
+        "note": "engine proxy ↔ large(~30GiB) sims",
+        "rows": 262144,
+        "scale": "large_engine",
+        "target_gib": 0.75,
+        "tier_alias": "large",
+        "topology": "chain",
+        "width_mode": "engine"
+      },
+      "scale": "large_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 14680064,
+          "dep_reads": 16777216,
+          "peak_derived_cells": 14680064
+        },
+        "est_eager_gib": 0.875,
+        "est_late_gib": 3.337860107421875e-06,
+        "late": {
+          "calc_calls": 14680064,
+          "dep_reads": 16777216,
+          "peak_derived_cells": 56
+        },
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 14680064,
+          "est_eager_hold_gib": 0.875,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 262144,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 262144.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "large",
+      "topology": "chain"
+    },
+    {
+      "case_id": "large_engine_chain_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 15466496,
+        "duration_s": 18.608627399997204,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 14680064,
+          "est_eager_hold_gib": 0.875,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 262144,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 124564,
+        "rss_kb_before": 123720,
+        "rss_kb_peak_approx": 124564,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 48,
+        "derived_cells": 14680064,
+        "est_eager_hold_gib": 0.875,
+        "flat_fields": 8,
+        "note": "engine proxy ↔ large(~30GiB) sims",
+        "rows": 262144,
+        "scale": "large_engine",
+        "target_gib": 0.75,
+        "tier_alias": "large",
+        "topology": "chain",
+        "width_mode": "engine"
+      },
+      "scale": "large_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 14680064,
+          "dep_reads": 16777216,
+          "peak_derived_cells": 14680064
+        },
+        "est_eager_gib": 0.875,
+        "est_late_gib": 0.75,
+        "late": {
+          "calc_calls": 14680064,
+          "dep_reads": 16777216,
+          "peak_derived_cells": 12582912,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 48,
+          "derived_cells": 14680064,
+          "est_eager_hold_gib": 0.875,
+          "flat_fields": 8,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 262144,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "chain",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 1.1666666666666667,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "large",
+      "topology": "chain"
+    },
+    {
+      "case_id": "large_engine_mixed_row",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 12976128,
+        "duration_s": 20.713934490995598,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 12582912,
+          "est_eager_hold_gib": 0.75,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 131072,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 82208,
+        "rss_kb_before": 80396,
+        "rss_kb_peak_approx": 82208,
+        "sink": "row"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 12582912,
+        "est_eager_hold_gib": 0.75,
+        "flat_fields": 80,
+        "note": "engine proxy ↔ large(~30GiB) sims",
+        "rows": 131072,
+        "scale": "large_engine",
+        "target_gib": 0.75,
+        "tier_alias": "large",
+        "topology": "mixed",
+        "width_mode": "engine"
+      },
+      "scale": "large_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 12582912,
+          "dep_reads": 23068672,
+          "peak_derived_cells": 12582912
+        },
+        "est_eager_gib": 0.75,
+        "est_late_gib": 5.7220458984375e-06,
+        "late": {
+          "calc_calls": 12582912,
+          "dep_reads": 23068672,
+          "peak_derived_cells": 96
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 12582912,
+          "est_eager_hold_gib": 0.75,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 131072,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 131072.0,
+        "sink": "row"
+      },
+      "sink": "row",
+      "tier_alias": "large",
+      "topology": "mixed"
+    },
+    {
+      "case_id": "large_engine_mixed_column",
+      "engine": {
+        "aborted_rss": false,
+        "cells_checked": 12976128,
+        "duration_s": 16.752029749994108,
+        "golden_ok": true,
+        "mismatches": 0,
+        "ok": true,
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 12582912,
+          "est_eager_hold_gib": 0.75,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 131072,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "rss_kb_after": 80720,
+        "rss_kb_before": 80412,
+        "rss_kb_peak_approx": 80720,
+        "sink": "column"
+      },
+      "params": {
+        "chain_depth": 16,
+        "derived_cells": 12582912,
+        "est_eager_hold_gib": 0.75,
+        "flat_fields": 80,
+        "note": "engine proxy ↔ large(~30GiB) sims",
+        "rows": 131072,
+        "scale": "large_engine",
+        "target_gib": 0.75,
+        "tier_alias": "large",
+        "topology": "mixed",
+        "width_mode": "engine"
+      },
+      "scale": "large_engine",
+      "sim": {
+        "eager": {
+          "calc_calls": 12582912,
+          "dep_reads": 23068672,
+          "peak_derived_cells": 12582912
+        },
+        "est_eager_gib": 0.75,
+        "est_late_gib": 0.125,
+        "late": {
+          "calc_calls": 12582912,
+          "dep_reads": 23068672,
+          "peak_derived_cells": 2097152,
+          "retain_model": "chain_prefix_until_dependents_written"
+        },
+        "params": {
+          "chain_depth": 16,
+          "derived_cells": 12582912,
+          "est_eager_hold_gib": 0.75,
+          "flat_fields": 80,
+          "note": "engine proxy ↔ large(~30GiB) sims",
+          "rows": 131072,
+          "scale": "large_engine",
+          "target_gib": 0.75,
+          "tier_alias": "large",
+          "topology": "mixed",
+          "width_mode": "engine"
+        },
+        "peak_ratio_eager_over_late": 6.0,
+        "sink": "column"
+      },
+      "sink": "column",
+      "tier_alias": "large",
+      "topology": "mixed"
+    }
+  ],
+  "change": "c10-write-precompute-derived-fields",
+  "cross_validation": {
+    "cases": 24,
+    "engine_failures": [],
+    "issues": [],
+    "ok": true
+  },
+  "engine_enabled": true,
+  "regression_contract": {
+    "column_late_peak": "rows*max(chain,1) retain model",
+    "fast_fail": "discard; no final artifact",
+    "row_late_peak": "always flat+chain (one row)",
+    "scale_monotonic": "eager peak cells must not shrink when scale increases",
+    "values": "engine golden_ok must stay true for same params"
+  },
+  "scales_requested": [
+    "smoke",
+    "small_engine",
+    "medium_engine",
+    "large_engine"
+  ],
+  "topic": "c10-scale-matrix"
+}

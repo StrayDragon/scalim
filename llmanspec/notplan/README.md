@@ -15,3 +15,13 @@
 3. 运行 `just llmanspec-check` 与 `just qa`，确保 sanitize/validate 与 repo 门禁全部通过。
 4. 完成实施后按流程 `llman sdd archive run <id>` 归档。
 
+## 已转正（superseded）短指针
+
+转正后 **删除 notplan 长文**，只留本表或各目录下 `SUPERSEDED` 短页，避免与 `llmanspec/changes/` 双源漂移：
+
+| notplan 目录 | 替代 active change |
+|--------------|-------------------|
+| `c0-write-precompute-derived-fields` | `c10-write-precompute-derived-fields` |
+| `c0-compute-rowwise-fusion` | `c20-compute-expr-rowwise-fusion`（范围已含安全外壳下无 `$ctx` 的 `call_by`） |
+| `c0-perf-refloader-chunk-parallelism` | `c30-refloader-chunk-parallelism` |
+
