@@ -4,7 +4,7 @@
 
 ## 0. Specs landing（start 之后）
 
-- [ ] 0.1 在 live `execution-hotpath-fastpaths` 增补/改写 MUST（late 判定、禁止 `$ctx` late、副作用时机、事件 phase、fast_fail+discard、内存有界）；**不**新建平行 capability
+- [x] 0.1 在 live `execution-hotpath-fastpaths` 增补/改写 MUST（late 判定、禁止 `$ctx` late、副作用时机、事件 phase、fast_fail+discard、内存有界）；**不**新建平行 capability
 - [ ] 0.2 `llman sdd validate <id> --strict --no-interactive` 全绿
 
 ## 1. 判定与计划面

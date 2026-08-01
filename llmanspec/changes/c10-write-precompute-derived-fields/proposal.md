@@ -1,5 +1,8 @@
 ---
 depends_on: []
+branch: sdd/c10-write-precompute-derived-fields
+base_sha: 385eb688a8e60d15cb805fb2b1c295055de4241f
+checkpointed: false
 ---
 
 ## Why
