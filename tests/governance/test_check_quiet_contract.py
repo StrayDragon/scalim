@@ -166,10 +166,10 @@ def test_user_material_quiet_pass_and_tmp_failure(tmp_path, capsys) -> None:
     assert "[错误]" in captured.err
 
 
-def test_module_size_quiet_pass_and_tmp_over_limit(tmp_path, capsys) -> None:
+def test_module_size_quiet_pass_soft_over_and_hard_taste(tmp_path, capsys) -> None:
     module = _load_script("check-module-size.py")
 
-    # Recreate the gated hotspot tree under a temp repo root, then exceed the real limit.
+    # Recreate the gated hotspot tree under a temp repo root.
     fake_root = tmp_path / "repo"
     for rel in (
         "src/scalim/workflow/execute.py",
@@ -190,13 +190,71 @@ def test_module_size_quiet_pass_and_tmp_over_limit(tmp_path, capsys) -> None:
     assert captured.out == ""
     assert captured.err == ""
 
-    # `_parse.py` limit is 1000; write enough lines to trip the gate.
-    _write(fake_root / "src/scalim/dsl/yaml_dsl/workflow_config/_parse.py", "\n".join(["x = {}".format(i) for i in range(1001)]) + "\n")
+    # Soft comfort limit for `_parse.py` is 1000; exceeding it MUST NOT fail --check anymore.
+    _write(
+        fake_root / "src/scalim/dsl/yaml_dsl/workflow_config/_parse.py",
+        "\n".join(["x = {}".format(i) for i in range(1001)]) + "\n",
+    )
+    assert module.main(["--root", str(fake_root), "--check", "--quiet"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+    # LOC_HARD_TASTE ceiling still fails --check.
+    hard = int(module.LOC_HARD_TASTE) + 1
+    _write(
+        fake_root / "src/scalim/dsl/yaml_dsl/workflow_config/_parse.py",
+        "\n".join(["x = {}".format(i) for i in range(hard)]) + "\n",
+    )
     assert module.main(["--root", str(fake_root), "--check", "--quiet"]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "[错误]" in captured.err
     assert "_parse.py" in captured.err
+
+
+def test_complexity_quiet_pass_and_tmp_failure(tmp_path, capsys) -> None:
+    module = _load_script("check-complexity.py")
+
+    fake_root = tmp_path / "repo"
+    for rel in module.ENTRY_PATHS:
+        path = fake_root / rel
+        if rel.endswith(".py"):
+            _write(path, "def ok():\n    return 1\n")
+        else:
+            path.mkdir(parents=True, exist_ok=True)
+            _write(path / "__init__.py", "def ok():\n    return 1\n")
+
+    ok_row = module.FuncComplexity(path="ok.py", qualname="ok", lineno=1, cognitive=1, cyclomatic=1)
+    hot_row = module.FuncComplexity(path="hot.py", qualname="hot", lineno=1, cognitive=9, cyclomatic=9)
+
+    with mock.patch.object(module, "_try_import_tools", return_value=True):
+        with mock.patch.object(module, "collect_paths", return_value=[ok_row]):
+            assert module.main(["--root", str(fake_root), "--check", "--quiet"]) == 0
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == ""
+
+        with mock.patch.object(module, "collect_paths", return_value=[hot_row]):
+            assert (
+                module.main(
+                    [
+                        "--root",
+                        str(fake_root),
+                        "--check",
+                        "--quiet",
+                        "--max-cognitive",
+                        "1",
+                        "--max-cyclomatic",
+                        "1",
+                    ]
+                )
+                == 1
+            )
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "[错误]" in captured.err
+        assert "hot.py" in captured.err
 
 
 def test_dispatch_map_quiet_pass_and_catalog_gap(capsys) -> None:
