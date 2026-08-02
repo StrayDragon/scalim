@@ -13,9 +13,9 @@
 
 ## 0. Specs landing（`change start` 之后）
 
-- [ ] 0.1 更新 live `llmanspec/specs/hooks-observability-structure/spec.toon`：typed Observer/Hook handler MUST 接收 `Event`；经 `.payload` 消费公开类型；scenario：`FIELD_COMPUTE` + `meta.scalim_compute_phase` 在 typed 路径可见
-- [ ] 0.2 更新 `governance-extension-points` r417（或旁注）：缓存 callable 入参为 `Event` envelope
-- [ ] 0.3 `llman sdd validate c35-typed-handlers-receive-event --strict --no-interactive`；`readyToImplement=true`
+- [x] 0.1 更新 live `llmanspec/specs/hooks-observability-structure/spec.toon`：typed Observer/Hook handler MUST 接收 `Event`；经 `.payload` 消费公开类型；scenario：`FIELD_COMPUTE` + `meta.scalim_compute_phase` 在 typed 路径可见
+- [x] 0.2 更新 `governance-extension-points` r417（或旁注）：缓存 callable 入参为 `Event` envelope
+- [x] 0.3 `llman sdd validate c35-typed-handlers-receive-event --strict --no-interactive`；`readyToImplement=true`
 
 ## 1. 分发核心（Seam A + B）
 
