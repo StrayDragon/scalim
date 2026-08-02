@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from .._internal.utils import graph
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SourceIr
 from .builder_helpers.dep_graph import build_dependency_graph, build_field_dependencies
+from .builder_helpers.fusion_groups import derive_compute_fusion_groups
 from .builder_helpers.key_fields import compute_key_fields
 from .builder_helpers.late_fields import derive_late_fields
 from .builder_helpers.operators import (
@@ -137,6 +138,12 @@ class PlanBuilder:
             main_source_id=str(self.demand.main_source.source_id),
         )
 
+        compute_fusion_groups = derive_compute_fusion_groups(
+            operators=operators,
+            field_specs=field_specs,
+            field_dependencies=field_dependencies,
+        )
+
         return ExecutionPlan(
             operators=operators,
             primary_field=primary_field,
@@ -151,6 +158,7 @@ class PlanBuilder:
             target_fields=targets,
             field_dependencies=field_dependencies,
             late_fields=late_fields,
+            compute_fusion_groups=compute_fusion_groups,
         )
 
     def _collect_order_by_field_keys(self) -> Set[str]:

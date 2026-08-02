@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, U
 
 from ..spec.ir import SupportedFieldIr
 from ..vendor.dataclassesx import dataclass, field
+from .builder_helpers.fusion_groups import ComputeFusionGroup
 from .operators import PlanOperatorIr
 from .viz import build_viz_graph_snapshot
 from .viz_schedule import build_viz_schedule_plan
@@ -154,6 +155,12 @@ class ExecutionPlan:
     判定不确定时为空(保守早算).
     """
 
+    compute_fusion_groups: Tuple[ComputeFusionGroup, ...] = field(default_factory=tuple)
+    """同一 compute 段内可 row-wise 融合的字段组(size>=2).
+
+    计划期仅按 deps/段/候选规则识别;运行时再过安全外壳与 `runtime.late_fields` 过滤.
+    """
+
     def to_viz_graph_snapshot(
         self,
         *,
@@ -183,6 +190,7 @@ class ExecutionPlan:
 
 
 __all__ = (
+    "ComputeFusionGroup",
     "ExecutionPlan",
     "PlanMetadata",
     "Stage",

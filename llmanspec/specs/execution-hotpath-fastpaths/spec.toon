@@ -1,9 +1,9 @@
 kind: llman.sdd.spec
 name: "execution-hotpath-fastpaths"
-purpose: "在不要求业务改动的前提下，降低 execution 热路径（`compute` / `call_by` / `load_ref` / write-precompute）的 per-row 固定开销与中间驻留，并保持既有值语义、可观测性与低内存特性。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence] [c10-write-precompute-derived-fields]"
+purpose: "在不要求业务改动的前提下，降低 execution 热路径（`compute` / `call_by` / `load_ref` / write-precompute / row-wise fusion）的 per-row 固定开销与中间驻留，并保持既有值语义、可观测性与低内存特性。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence] [c10-write-precompute-derived-fields] [c20-compute-expr-rowwise-fusion]"
 valid_scope[1]: src/scalim/
-requirements[10]{req_id,title,statement}:
-  r38,"Fastpaths are default-on and behavior-preserving","系统 MUST 默认启用面向执行热路径的 fastpaths。对外 MUST 保持：写出目标字段的值语义、异常类别、以及在未改变物化时机时的事件顺序/边界。允许将“仅用于最终写出、且无 late 子图外消费者”的派生字段物化时机从 compute 段延后到写出前（write-precompute），但写出值 MUST 与延后前一致。"
+requirements[11]{req_id,title,statement}:
+  r38,"Fastpaths are default-on and behavior-preserving","系统 MUST 默认启用面向执行热路径的 fastpaths。对外 MUST 保持：写出目标字段的值语义、异常类别、以及在未改变物化时机时的事件顺序/边界。允许将“仅用于最终写出、且无 late 子图外消费者”的派生字段物化时机从 compute 段延后到写出前（write-precompute），但写出值 MUST 与延后前一致。允许在安全外壳内对同 deps 派生字段做 row-wise 融合（见 `execution-compute-rowwise-fusion`）；外壳外 MUST 回退 field-major。"
   r282,Compute evaluation preserves name shadowing semantics,在 `compute` 表达式中，依赖字段名与安全函数名冲突时（例如 `len` / `sum`），系统 MUST 保持“字段值优先”的解析语义不变。
   r406,Compute audit mode semantics remain unchanged,"系统 MUST 保持既有 compute 审计模式语义不变： - `audit_mode=\"none\"`：不记录字段值/结果 - `audit_mode=\"redacted\"`：仅记录表达式 hash、字段名与结果类型，不记录字段值与结果原文 - `audit_mode=\"full\"`：仅在显式解锁条件满足时启用，并可能记录敏感数据"
   r501,call_by ctx injection is conditional and minimal,"系统 MUST 将 `$ctx` / `$ctx.<attr>` 作为“受控且可选”的上下文注入能力： - 当 `call_by` 参数中未使用 `$ctx` / `$ctx.<attr>` 时，系统 MUST NOT 要求用户函数接受 `ctx` 参数，也 MUST NOT 在执行期 per-row 构造 ctx 对象。 - 当 `call_by` 参数中使用 `$ctx` / `$ctx.<attr>` 时，系统 MUST 提供 `ComputeCallContextIr`，且仅暴露白名单属性：`row_id` / `batch_num` / `field_id` / `deps` / `values`。"
@@ -13,7 +13,8 @@ requirements[10]{req_id,title,statement}:
   r952,"Late materialization happens at write for row and column sinks","对 late 字段，系统 MUST 在 compute 算子段跳过其求值，并在写出前物化： - 行 sink：在 `write_row` / `write_row_aligned`（或等价行写出）之前按 late 子图拓扑计算，结果写入待写出行；默认 MUST NOT 将 late 结果写回 `BatchContext`。 - 列 sink：在写出该 late 列之前物化该列（及为写出该列所必需的尚未物化的 late 依赖列）；写完后默认可不驻留。 - late→late 链式依赖 MUST 按拓扑顺序物化；列路径 MUST 在依赖方写完前保留必要的中间 late 列。"
   r953,"Write-precompute preserves call counts and event phase meta","对 late 的 `call_by`/`compute_expr`，系统 MUST 保持每个目标字段每个输入行的计算器/表达式求值次数与早算路径一致（不得因 late 合并多次调用为一次）。当 instrumentation 订阅 `FIELD_COMPUTE` 时，系统 MUST 仍发出对应事件，并 MAY 在事件 meta 中标注 `scalim_compute_phase` 为 `operator` 或 `write_precompute`；未订阅时 MUST NOT 因 phase 标注引入额外可观测税。"
   r954,"Fast-fail discards partial write-precompute output","当 `compute_mode`/`guardrails` 为 `fast_fail`（或等价快速失败）且 write-precompute 或早算路径计算失败时，系统 MUST 报错并对 sink 执行 discard/回滚，MUST NOT 将半成品当作最终可用输出。`quiet`（或等价）路径 MUST 保持既有按格降级语义并允许正常收尾。"
-scenarios[22]{req_id,id,given,when,then,feature}:
+  r955,"Row-wise fusion cross-ref","系统 MAY 在默认 fastpath 下启用 `execution-compute-rowwise-fusion` 所述 row-wise 融合；融合的候选规则、安全外壳、值/调用次数等价与内存有界 MUST 以该 capability 为 SSOT。本 requirement 仅作交叉引用，MUST NOT 与之冲突。"
+scenarios[24]{req_id,id,given,when,then,feature}:
   r38,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r38,"same-inputs-yield-same-outputs","",使用同一份 `DemandIr`、同一批 main rows 与相同 runtime bindings 执行,目标字段的值 MUST 与 fastpath 引入前一致,true
   r282,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
@@ -36,3 +37,5 @@ scenarios[22]{req_id,id,given,when,then,feature}:
   r953,"late-call-by-keeps-per-row-call-count",无 ctx 的 late `call_by` 字段与早算对照,执行完整写出,instrumented 计算器每行调用次数 MUST 与早算路径相同,true
   r954,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r954,"fast-fail-discards-sink-on-late-error",`fast_fail` 下 write-precompute 计算抛错,执行失败收尾,系统 MUST discard sink 且 MUST NOT 留下可用最终产出,true
+  r955,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
+  r955,"fusion-delegates-to-rowwise-fusion-spec","","存在同 deps 无 ctx `call_by` 候选组且安全外壳允许",融合行为 MUST 遵循 `execution-compute-rowwise-fusion`,true

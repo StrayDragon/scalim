@@ -10,6 +10,7 @@ from concurrent.futures import Executor
 from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
 
 from ....events import EventType
+from ....planning.builder_helpers.fusion_groups import ComputeFusionGroup
 from ....planning.operators import ComputeOperatorIr, OperatorType, SupportedOperatorIr
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
 from ....planning.plan import ExecutionPlan
@@ -21,6 +22,7 @@ from ...context import BatchContext, create_batch_context_for_rows
 from ...pipeline.overrides import PipelineOverrides
 from ..operators.base import OperatorExecutor
 from ..operators.compute.executor import ComputeOperatorExecutor
+from ..operators.compute.fusion import active_fusion_members, execute_fused_compute_group, fusion_disabled_reason
 from ..operators.load import LoadOperatorExecutor
 from ..operators.load_ref.executor import LoadRefOperatorExecutor
 from ..operators.release import ReleaseOperatorExecutor
@@ -132,6 +134,13 @@ class BatchExecutor:
         if runtime.parallel_mode == "adaptive":
             _, _, resolved_workers = resolve_adaptive_policy_tuning_and_workers(runtime=runtime, overrides=self._overrides)
 
+        # field_key -> fusion group; 同组后续字段在已融合时跳过.
+        fusion_by_field: Dict[str, ComputeFusionGroup] = {}
+        for group in self.plan.compute_fusion_groups:
+            for field_key in group.field_keys:
+                fusion_by_field[field_key] = group
+        fused_done: Set[str] = set()
+
         for is_loadref, segment in iter_operator_segments(
             cast("Sequence[SupportedOperatorIr]", self.plan.operators)  # pragma: allow-cast plan operators typed narrowing
         ):
@@ -166,6 +175,47 @@ class BatchExecutor:
                 continue
 
             operator = cast("SupportedOperatorIr", segment)  # pragma: allow-cast segment typed narrowing
+
+            if operator.operator_type == OperatorType.COMPUTE.value:
+                compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
+                field_key = str(compute_op.field_key)
+                if field_key in fused_done:
+                    if after_operator is not None:
+                        after_operator(operator)
+                    continue
+                group = fusion_by_field.get(field_key)
+                if group is not None:
+                    active = active_fusion_members(group, runtime.late_fields)
+                    if (
+                        len(active) >= 2
+                        and field_key == active[0]
+                        and fusion_disabled_reason(runtime, group, active) is None
+                    ):
+                        stage = stage_map.get(OperatorType.COMPUTE.value)
+                        if wants_stage_spans and stage:
+                            perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
+                            start = perf_counter()
+                            execute_fused_compute_group(
+                                group=group,
+                                field_keys=active,
+                                context=context,
+                                batch_row_nth=batch_row_nth,
+                                runtime=runtime,
+                            )
+                            stage_durations[stage] += max(0.0, perf_counter() - start)
+                        else:
+                            execute_fused_compute_group(
+                                group=group,
+                                field_keys=active,
+                                context=context,
+                                batch_row_nth=batch_row_nth,
+                                runtime=runtime,
+                            )
+                        fused_done.update(active)
+                        if after_operator is not None:
+                            after_operator(operator)
+                        continue
+
             executor = self._executors.get(operator.operator_type)
 
             if executor:

@@ -7,9 +7,10 @@
 
 from .builder import PlanBuilder
 from .operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr, OperatorType, PlanOperatorIr
-from .plan import ExecutionPlan, PlanMetadata, Stage
+from .plan import ComputeFusionGroup, ExecutionPlan, PlanMetadata, Stage
 
 __all__ = (
+    "ComputeFusionGroup",
     "ComputeOperatorIr",
     "ExecutionPlan",
     "LoadOperatorIr",

@@ -83,8 +83,8 @@ def _run_timed(fn, runs):
     }
 
 
-def _build_engine_case(rows, n_derived):
-    # type: (int, int) -> Tuple[Callable[[], Dict[str, Any]], Dict[str, int]]
+def _build_engine_case(rows, n_derived, *, fuse=True):
+    # type: (int, int, bool) -> Tuple[Callable[[], Dict[str, Any]], Dict[str, int]]
     from scalim.execution.engine import ScalimEngine
     from scalim.execution.runtime_bindings import RuntimeBindings
     from scalim.planning import PlanBuilder
@@ -137,6 +137,10 @@ def _build_engine_case(rows, n_derived):
 
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=main)
     plan = PlanBuilder(demand).build(targets=targets)
+    # 强制走 compute 段以测量 c20 融合(否则 write-only 会进 late).
+    plan.late_fields = ()
+    if not fuse:
+        plan.compute_fusion_groups = ()
     bindings = RuntimeBindings(derived_calculators=calcs)
     data = [{"id": i, "v0": float(i % 97), "v1": float(i % 13)} for i in range(rows)]
 
@@ -157,7 +161,9 @@ def _build_engine_case(rows, n_derived):
             "fields": n_derived,
             "calc_calls": counters["calc_calls"],
             "expected_calc_calls": rows * n_derived,
-            "shape": "engine_call_by",
+            "fusion_groups": len(plan.compute_fusion_groups),
+            "fuse": fuse,
+            "shape": "engine_call_by_fuse" if fuse else "engine_call_by_field_major",
         }
 
     return _run, counters
@@ -233,12 +239,19 @@ def main():
 
     results = {}  # type: Dict[str, Any]
 
-    print("==> engine wide_many_call_by", flush=True)
-    wide_fn, _ = _build_engine_case(args.rows, args.wide_fields)
-    results["engine_wide_many_call_by"] = _run_timed(wide_fn, args.runs)
+    print("==> engine wide fused", flush=True)
+    wide_fused_fn, _ = _build_engine_case(args.rows, args.wide_fields, fuse=True)
+    results["engine_wide_fused"] = _run_timed(wide_fused_fn, args.runs)
+
+    print("==> engine wide field_major", flush=True)
+    wide_major_fn, _ = _build_engine_case(args.rows, args.wide_fields, fuse=False)
+    results["engine_wide_field_major"] = _run_timed(wide_major_fn, args.runs)
+
+    print("==> engine wide_many_call_by (alias fused)", flush=True)
+    results["engine_wide_many_call_by"] = results["engine_wide_fused"]
 
     print("==> engine narrow_few_call_by", flush=True)
-    narrow_fn, _ = _build_engine_case(args.rows, args.narrow_fields)
+    narrow_fn, _ = _build_engine_case(args.rows, args.narrow_fields, fuse=True)
     results["engine_narrow_few_call_by"] = _run_timed(narrow_fn, args.runs)
 
     print("==> micro field_major", flush=True)
@@ -246,12 +259,17 @@ def main():
     print("==> micro row_wise", flush=True)
     results["micro_row_wise"] = _run_timed(lambda: _micro_row_wise(args.rows, args.wide_fields, args.deps), args.runs)
 
-    ew = results["engine_wide_many_call_by"]
+    ew = results["engine_wide_fused"]
+    em = results["engine_wide_field_major"]
     en = results["engine_narrow_few_call_by"]
     mf = results["micro_field_major"]
     mr = results["micro_row_wise"]
 
     comparisons = {
+        "engine_fuse_speedup_over_field_major": (em["duration_s_median"] / ew["duration_s_median"] if ew["duration_s_median"] else None),
+        "engine_fuse_calc_calls": ew.get("calc_calls"),
+        "engine_field_major_calc_calls": em.get("calc_calls"),
+        "engine_calc_calls_equal": ew.get("calc_calls") == em.get("calc_calls"),
         "engine_wide_over_narrow_duration": (ew["duration_s_median"] / en["duration_s_median"] if en["duration_s_median"] else None),
         "engine_wide_calc_calls": ew.get("calc_calls"),
         "engine_narrow_calc_calls": en.get("calc_calls"),
@@ -260,8 +278,8 @@ def main():
         "micro_dep_reads_ratio_field_over_row": (float(mf["dep_reads"]) / float(mr["dep_reads"]) if mr.get("dep_reads") else None),
         "micro_duration_speedup_row_over_field": (mf["duration_s_median"] / mr["duration_s_median"] if mr["duration_s_median"] else None),
         "note": (
-            "Engine cases show current Scalim cost grows with M (field count) for thin call_by. "
-            "Micro loops show same-deps row-wise cuts dep_reads from ~N*M*D to ~N*D while calc_calls stay N*M."
+            "Engine A/B clears late_fields so compute-segment fusion is measurable. "
+            "calc_calls MUST stay N*M on both paths; wall-time speedup is framework-tax reduction."
         ),
     }
 
