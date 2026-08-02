@@ -325,8 +325,6 @@ def _encode_toon(repo_root: Path, value: Any) -> str:
     payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
     cmd = [
         "uv",
-        "--preview-features",
-        "extra-build-dependencies",
         "run",
         str(tool),
         "encode",

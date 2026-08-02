@@ -8,7 +8,7 @@ QA_VERBOSE := ""
 # pytest 静默模式共用参数。三个 test 配方共享,改一处即生效。
 _qa_pytest_quiet := "--no-header -W once::DeprecationWarning -rN --tb=short -o console_output_style=classic"
 
-UV_OPTIONS := "--preview-features extra-build-dependencies"
+UV_OPTIONS := ""
 
 # 统一在 just 子进程里固定到默认 PyPI,避免继承本地镜像环境后把 `uv.lock` 再次写脏。
 export UV_DEFAULT_INDEX := "https://pypi.org/simple"
