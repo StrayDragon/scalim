@@ -21,7 +21,8 @@
 1. 先跑通: [入门](getting-started/index.md) → [写 YAML](yaml-dsl/index.md) → [YAML 语法速查](yaml-dsl/syntax.md)
 2. 写得完整: [YAML 用户指南](yaml-dsl/user-guide.md)(需要补全就看 [补全/编辑体验](yaml-dsl/editor.md))
 3. 跑得更快: [并行模式(seq/adaptive)](architecture/parallel-modes.md)
-4. 遇到问题: [可视化工具](viz/scalim-viz.md) / [基准测试](benchmark/index.md)
+4. 升级到 0.10: [版本亮点 · 0.10.0](releases/0.10.0.md)（默认行为 / opt-in；YAML 无强制迁移）
+5. 遇到问题: [可视化工具](viz/scalim-viz.md) / [基准测试](benchmark/index.md)
 
 想弄清楚原理,再看下面这组:
 

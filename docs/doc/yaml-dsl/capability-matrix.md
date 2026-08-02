@@ -49,7 +49,7 @@
 | `sources.*.loader` | `SourceIr.loader_spec.callable_ref` / `RuntimeBindings.source_loaders[source_id]` | 静态前端不 import;在“运行时链接”阶段做 allowlist 校验并解析引用(安全边界) | - |
 | `sources.*.key` | `SourceIr.key` (`KeyIr.key`) | 支持单键或复合键(tuple/list) | - |
 | `sources.*.lookup_cast` | `SourceIr.key.cast` | 仅提供预置 cast(见 schema choices) | 更复杂归一化用 `normalize.call_by` 或 loader 内处理 |
-| `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | 仅 keys 模式有效;省略/`0`/`None`=不分片(延迟通常最优);过小会线性放大 loader 调用次数 | 仅在下游有 payload/IN 上限时设置,并取最大安全值;见 user-guide §4.4.3 |
+| `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | 仅 keys 模式有效;省略/`0`/`None`=不分片(延迟通常最优);过小会线性放大 loader 调用次数;**不是并行开关** | 仅在下游有 payload/IN 上限时设置,并取最大安全值;片间并行见 Python `parallelize_lookup_chunks`（[0.10.0](../releases/0.10.0.md)） |
 | `sources.*.normalize` | `SourceIr.normalize` (`SourceNormalizeIr`) | 仅提供受控 kind + 可选 `call_by` 扩展点 | 若需要任意 reshape,放到 loader 中处理 |
 | `sources.*.cache_mode` | `SourceIr.cache_mode` | 目前仅 `none/preload_forever` | 更细粒度缓存策略需 Python 层扩展 |
 | `sources.*.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(loader_retry=...)))` 配置 |
@@ -100,6 +100,7 @@
 | allowlist | `SecurePythonReferenceResolver` | 安全边界(运行环境/组织策略差异大) | `scalim.dsl.yaml_dsl.run(..., options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=..., allowed_functions=...)))` 或 CLI flags |
 | `init_vars` | `DemandRunTemplateOptions.init_vars` | 运行时输入,不应写死在共享 YAML | `run(..., options=DemandRunOptions(..., template=DemandRunTemplateOptions(init_vars={...})))` |
 | 并行模式/并发数 | `ExecutionRequest.parallel_mode/max_workers` | 与环境/资源相关,容易导致不可复现 | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(parallel_mode=\"seq|adaptive\", max_workers=...)))` |
+| lookup chunk 并行（0.10） | `DemandRunRuntimeOptions.parallelize_lookup_chunks` / `max_chunk_workers` | 运行期 opt-in；`lookup_chunk_size` 仍只表示分片大小 | `DemandRunRuntimeOptions(parallel_mode=\"adaptive\", parallelize_lookup_chunks=True)`；详见 [0.10.0 重点特性](../releases/0.10.0.md) / [§3.6](../architecture/parallel-modes.md) |
 | 自定义 sink | `ExecutionRequest.sink` | sink 往往是运行环境能力(文件系统/内存/对象存储) | DSL `run` 不再接受 `sink`;捕获行数据用 `DemandRunOutputOptions(capture=CaptureRows())`;完全自定义 sink 走 execution 层入口 |
 | 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | 使用 execution 层入口 `scalim.execution.run_ir(...)` 自行构造 `ExecutionRequest(output_composition=...)` |
 | 自定义 hooks/observers | `ExecutionRequest.components` | 运行期组件需要 Python 对象 | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(components=[Observer(), Hook()])))` |

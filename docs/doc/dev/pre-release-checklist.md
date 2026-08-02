@@ -39,9 +39,9 @@ git diff --stat <tag>..HEAD -- src/scalim/ tests/ docs/doc/ agentdev/skills/ AGE
 | --- | --- |
 | Public API | `# pragma: scalim-public-api` / `docs/doc/getting-started/public-api.gen.md`（改 SSOT 后走 gen，不手改 `.gen.`） |
 | Agent skills | 相关 `SKILL.md` + `references/`（含 upgrades / guidance） |
-| 人类文档 | `docs/doc/` 入口页、专页、`capability-matrix` / `review-checklist` / `user-guide` / `workflow` 等是否互相矛盾 |
+| 人类文档 | `docs/doc/` 入口页、专页、`capability-matrix` / `review-checklist` / `user-guide` / `workflow`；**版本亮点**在 `docs/doc/releases/`（勿把对拍专页塞进入门主线） |
 | 架构图 | `docs/doc/architecture/arch.md` 的 sinks / 分层图是否漏掉新的稳定类型 |
-| 阅读地图 | `getting-started/index.md`、`reading-guide.md`、`zensical.toml` nav 是否挂上新专页 |
+| 阅读地图 | `getting-started/index.md`、`reading-guide.md`、`zensical.toml` nav、`releases/index.md` 是否挂上本版亮点 |
 | 示例 | `packages/scalim-misc` / `notebooks/` 是否仍演示已删除 YAML 字段 |
 
 可选：对 `.tmp/known-outer-paths-using-this-package.txt` **只做路径级影响盘点**，勿复述文件内容。

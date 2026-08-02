@@ -10,6 +10,7 @@
 
 - 升级指南 SSOT 仅维护在 `agentdev/skills/scalim-yaml-dsl/references/upgrades/`。
 - docs-site 不再生成升级页副本；本页仅提供到 SSOT 的链接索引(运行 `just gen-docs` 更新索引区块)。
+- **非 breaking 的版本亮点**（如 0.10 默认性能行为 / opt-in）不在本索引：见 [版本亮点](../releases/index.md) / [0.10.0 重点特性](../releases/0.10.0.md)。
 
 升级清单:
 

@@ -19,6 +19,7 @@
 | EXP `call_by` memo 命中组内字段 | **整组不融合** |
 
 架构：[`arch.md` §5.4](../architecture/arch.md#54-row-wise-fusion-同-deps-派生字段按行融合减-nm-框架税)。  
+版本亮点总览：[0.10.0 重点特性](0.10.0.md)。  
 姊妹能力（写出前晚算）：[write-precompute-0.10](write-precompute-0.10.md)。  
 姊妹能力（同 LoadRef 分片并行）：[lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md)。
 
@@ -148,8 +149,8 @@ flowchart TD
 ```text
 ## Highlights
 - row-wise fusion（默认）：同 deps 派生字段按行融合，减 N×M 框架税；calc_calls 不变。
-  详述与对拍：docs/doc/getting-started/rowwise-fusion-0.10.md
-- write-precompute：docs/doc/getting-started/write-precompute-0.10.md
+  详述与对拍：docs/doc/releases/rowwise-fusion-0.10.md
+- write-precompute：docs/doc/releases/write-precompute-0.10.md
 ```
 
 ---

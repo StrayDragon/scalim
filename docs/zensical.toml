@@ -38,9 +38,13 @@ nav = [
   { "运行与调参" = [
     { "并行模式(seq/adaptive)" = "architecture/parallel-modes.md" },
     { "Excel 列式写出策略(HOLD/WINDOW)" = "getting-started/excel-column-residency.md" },
-    { "0.10.0 write-precompute 性能" = "getting-started/write-precompute-0.10.md" },
-    { "0.10.0 row-wise fusion 性能" = "getting-started/rowwise-fusion-0.10.md" },
-    { "0.10.0 lookup chunk 并行" = "getting-started/lookup-chunk-parallel-0.10.md" },
+  ] },
+  { "版本亮点" = [
+    "releases/index.md",
+    { "0.10.0 重点特性" = "releases/0.10.0.md" },
+    { "0.10.0 write-precompute" = "releases/write-precompute-0.10.md" },
+    { "0.10.0 row-wise fusion" = "releases/rowwise-fusion-0.10.md" },
+    { "0.10.0 lookup chunk 并行" = "releases/lookup-chunk-parallel-0.10.md" },
   ] },
   { "工具与排查" = [
     "tools/index.md",

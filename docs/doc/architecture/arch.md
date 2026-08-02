@@ -222,11 +222,11 @@ flowchart TD
 细节与流程图放在独立页面:
 
 - [并行模式(seq/adaptive)](parallel-modes.md)
-- **0.10.0** lookup chunk 并行对拍专页: [lookup-chunk-parallel-0.10](../getting-started/lookup-chunk-parallel-0.10.md)
+- **0.10.0** 版本亮点 / 对拍: [0.10.0 重点特性](../releases/0.10.0.md) · [lookup chunk 并行](../releases/lookup-chunk-parallel-0.10.md)
 
 ### 5.3 write-precompute: 只用于写出的派生字段延后到写出前算
 
-**0.10.0** 人类可读性能专页（workload 表、Mermaid、D3 图）: [write-precompute-0.10](../getting-started/write-precompute-0.10.md)。
+**0.10.0** 版本亮点专页（workload 表、Mermaid、D3 图）: [write-precompute-0.10](../releases/write-precompute-0.10.md)。总览: [0.10.0](../releases/0.10.0.md)。
 
 规划期会自动挑出一批“只喂给最终写出”的派生字段(`ExecutionPlan.late_fields`),它们在 `Compute` 段被跳过,改为在写出前现场物化:
 
@@ -247,7 +247,7 @@ flowchart TD
 
 ### 5.4 row-wise fusion: 同 deps 派生字段按行融合(减 N×M 框架税)
 
-**0.10.0** 人类可读对拍专页（workload 表、Mermaid、D3）: [rowwise-fusion-0.10](../getting-started/rowwise-fusion-0.10.md)。
+**0.10.0** 版本亮点对拍专页: [rowwise-fusion-0.10](../releases/rowwise-fusion-0.10.md)。总览: [0.10.0](../releases/0.10.0.md)。
 
 规划期识别 `ExecutionPlan.compute_fusion_groups`(同一 pre/post-ref 段、deps 完全相同、互不依赖、无 `$ctx` / 非常量)。运行时在安全外壳内改为 **按行读一次依赖 → 依次算组内字段**;每字段每行仍调用一次 calculator(**不**减少 `calc_calls`)。
 

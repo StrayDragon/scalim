@@ -9,8 +9,7 @@
 阅读顺序:
 
 - 先了解运行时行为边界(尤其是 `adaptive`): [并行模式(seq/adaptive)](../architecture/parallel-modes.md)
-- **0.10.0** write-precompute 人类可读性能专页（图表 / 规模矩阵）: [write-precompute-0.10](../getting-started/write-precompute-0.10.md)
-- **0.10.0** row-wise fusion 对拍专页: [rowwise-fusion-0.10](../getting-started/rowwise-fusion-0.10.md)
-- **0.10.0** lookup chunk 并行对拍专页: [lookup-chunk-parallel-0.10](../getting-started/lookup-chunk-parallel-0.10.md)
+- **0.10.0** 版本亮点总览（默认行为 / opt-in / 迁移最短清单）: [0.10.0 重点特性](../releases/0.10.0.md)
+- 对拍专页: [write-precompute](../releases/write-precompute-0.10.md) · [row-wise fusion](../releases/rowwise-fusion-0.10.md) · [lookup chunk 并行](../releases/lookup-chunk-parallel-0.10.md)
 - 跑基准与保存基线: [Guide](guide.md)
 - 阅读对比报告: [Compare Report](compare-report.md)

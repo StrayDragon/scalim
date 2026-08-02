@@ -16,7 +16,8 @@
 | 失败 | `fast_fail` → 报错 + sink discard |
 | 观测 | `FIELD_COMPUTE` 带 `meta.scalim_compute_phase` = `operator` \| `write_precompute` |
 
-架构语义：[`arch.md` §5.3](../architecture/arch.md#53-write-precompute-只用于写出的派生字段延后到写出前算)。
+架构语义：[`arch.md` §5.3](../architecture/arch.md#53-write-precompute-只用于写出的派生字段延后到写出前算)。  
+版本亮点总览：[0.10.0 重点特性](0.10.0.md)。
 
 姊妹能力（同 deps 行内融合）：[rowwise-fusion-0.10](rowwise-fusion-0.10.md)。  
 姊妹能力（同 LoadRef 分片并行）：[lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md)。
@@ -218,7 +219,7 @@ uv run python llmanspec/changes/archive/2026-08-01-c10-write-precompute-derived-
 ```text
 ## Highlights
 - write-precompute（默认）：只写出派生字段延后到写出前物化。详述与图表见文档：
-  docs/doc/getting-started/write-precompute-0.10.md
+  docs/doc/releases/write-precompute-0.10.md
 ```
 
 （站点发布后换成站点 URL 对应路径。）

@@ -19,6 +19,7 @@
 | 观测 | `loader_call.chunk_offset`；完成序；回调可能在 worker 线程 |
 
 架构 / 护栏：[`parallel-modes.md` §3.6](../architecture/parallel-modes.md#36-opt-in-lookup_chunk_size-分片并行仅-adaptive)。  
+版本亮点总览：[0.10.0 重点特性](0.10.0.md)。  
 姊妹能力：[write-precompute-0.10](write-precompute-0.10.md) · [rowwise-fusion-0.10](rowwise-fusion-0.10.md)。
 
 测量摘要日期：<span id="lcp10-measured-at"></span>。  
@@ -156,9 +157,9 @@ flowchart TD
 ## Highlights
 - lookup chunk 并行（opt-in）：adaptive + parallelize_lookup_chunks，
   同 LoadRef 多片重叠 RTT；无新 YAML；lookup_chunk_size ≠ 并行开关。
-  详述与对拍：docs/doc/getting-started/lookup-chunk-parallel-0.10.md
-- write-precompute：docs/doc/getting-started/write-precompute-0.10.md
-- row-wise fusion：docs/doc/getting-started/rowwise-fusion-0.10.md
+  详述与对拍：docs/doc/releases/lookup-chunk-parallel-0.10.md
+- write-precompute：docs/doc/releases/write-precompute-0.10.md
+- row-wise fusion：docs/doc/releases/rowwise-fusion-0.10.md
 ```
 
 ---
