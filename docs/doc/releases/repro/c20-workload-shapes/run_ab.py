@@ -7,9 +7,14 @@ Clears plan.late_fields so fusion is measured in the compute segment
 
 Outputs: <repo>/.tmp/evidence/c20-perf-report/ + docs-ready summary JSON (rebuildable; not committed)
 
-如何运行（仓库根目录）：
+如何运行（仓库根目录；脚本兼容 Python 3.6+）:
 
     uv run python docs/doc/releases/repro/c20-workload-shapes/run_ab.py --runs 3
+
+    PYTHONPATH=src .tmp/venvs/py36-scalim/bin/python \\
+      docs/doc/releases/repro/c20-workload-shapes/run_ab.py --runs 1
+
+    .../run_ab.py --runs 1 --rows-scale 0.25
 """
 
 from __future__ import absolute_import, print_function
@@ -237,15 +242,23 @@ def _build_and_run(rows, n_derived, sink_kind, fuse, runs):
 def main():
     # type: () -> None
     _ensure_src()
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="c20 row-wise fusion A/B (Python 3.6+)")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--only", type=str, default="")
+    parser.add_argument(
+        "--rows-scale",
+        type=float,
+        default=1.0,
+        help="multiply each shape's rows by this factor (min 1 row; default 1.0)",
+    )
     parser.add_argument(
         "--out-dir",
         type=str,
         default=os.path.join(_repo_root(), ".tmp", "evidence", "c20-perf-report"),
     )
     args = parser.parse_args()
+    if float(args.rows_scale) <= 0:
+        raise SystemExit("--rows-scale must be > 0")
     only = set([x.strip() for x in args.only.split(",") if x.strip()]) if args.only else None
     shapes = [s for s in SHAPES if only is None or s["id"] in only]
     os.makedirs(args.out_dir, exist_ok=True)
@@ -254,7 +267,7 @@ def main():
     for shape in shapes:
         sid = shape["id"]
         print("==> {}".format(sid), flush=True)
-        rows = int(shape["rows"])
+        rows = max(1, int(round(float(shape["rows"]) * float(args.rows_scale))))
         n_derived = int(shape["n_derived"])
         sink = str(shape["sink"])
         print("  field_major...", flush=True)
@@ -268,7 +281,13 @@ def main():
             "id": sid,
             "label": shape["label"],
             "why": shape["why"],
-            "params": {"rows": rows, "n_derived": n_derived, "sink": sink},
+            "params": {
+                "rows": rows,
+                "rows_base": int(shape["rows"]),
+                "rows_scale": float(args.rows_scale),
+                "n_derived": n_derived,
+                "sink": sink,
+            },
             "field_major": major,
             "fused": fused,
             "speedup_major_over_fused": speedup,
@@ -286,6 +305,7 @@ def main():
                     "calc_equal": case["calc_calls_equal"],
                     "golden_ok": case["golden_ok_both"],
                     "groups": fused["fusion_groups_planned"],
+                    "rows": rows,
                 },
                 ensure_ascii=False,
             ),
@@ -297,6 +317,8 @@ def main():
         "change": "c20-compute-expr-rowwise-fusion",
         "version": "0.10.0",
         "measured_at": time.strftime("%Y-%m-%d"),
+        "python": "{}.{}.{}".format(sys.version_info[0], sys.version_info[1], sys.version_info[2]),
+        "rows_scale": float(args.rows_scale),
         "host_note": "合成 workload；本机；清 late_fields 以隔离 compute 段融合；内存 sink + 全表黄金",
         "policy": "auto fusion groups; A/B clears compute_fusion_groups for field-major",
         "cases": cases,

@@ -10,9 +10,17 @@ Shapes use counts only (no business field names). Each case:
 
 Output: <repo>/.tmp/evidence/c10-perf-report/workload-shapes/result.json (rebuildable; not committed)
 
-如何运行（仓库根目录）：
+如何运行（仓库根目录；脚本兼容 Python 3.6+）:
 
+    # 开发环境
     uv run python docs/doc/releases/repro/c10-workload-shapes/run_ab.py --runs 3
+
+    # Python 3.6 运行时边界复现（本仓库 .tmp/venvs/py36-scalim）
+    PYTHONPATH=src .tmp/venvs/py36-scalim/bin/python \\
+      docs/doc/releases/repro/c10-workload-shapes/run_ab.py --runs 1
+
+    # 缩小行数做冒烟（仍跑完整 shape 集合）
+    .../run_ab.py --runs 1 --rows-scale 0.25
 """
 
 from __future__ import absolute_import, print_function
@@ -353,15 +361,24 @@ def _run_timed(fn, runs):
 def main():
     # type: () -> None
     _ensure_src_path()
-    parser = argparse.ArgumentParser(description="c10 workload-shaped A/B")
+    parser = argparse.ArgumentParser(description="c10 workload-shaped A/B (Python 3.6+)")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--only", type=str, default="", help="comma-separated shape ids")
+    parser.add_argument(
+        "--rows-scale",
+        type=float,
+        default=1.0,
+        help="multiply each shape's rows by this factor (min 1 row; default 1.0)",
+    )
     parser.add_argument(
         "--out-dir",
         type=str,
         default=os.path.join(_repo_root(), ".tmp", "evidence", "c10-perf-report", "workload-shapes"),
     )
     args = parser.parse_args()
+
+    if float(args.rows_scale) <= 0:
+        raise SystemExit("--rows-scale must be > 0")
 
     only = set([x.strip() for x in args.only.split(",") if x.strip()]) if args.only else None
     shapes = [s for s in SHAPES if only is None or s["id"] in only]
@@ -371,7 +388,7 @@ def main():
     for shape in shapes:
         sid = shape["id"]
         print("==> {}".format(sid), flush=True)
-        rows = int(shape["rows"])
+        rows = max(1, int(round(float(shape["rows"]) * float(args.rows_scale))))
         n_flat = int(shape["flat_fields"])
         chain = int(shape["chain_depth"])
         sink = str(shape["sink"])
@@ -394,6 +411,8 @@ def main():
             "why": shape["why"],
             "params": {
                 "rows": rows,
+                "rows_base": int(shape["rows"]),
+                "rows_scale": float(args.rows_scale),
                 "flat_fields": n_flat,
                 "chain_depth": chain,
                 "sink": sink,
@@ -418,6 +437,7 @@ def main():
                     "golden_ok": case["golden_ok_both"],
                     "late_fields": late["meta"].get("late_fields"),
                     "peak_ratio": sim["peak_ratio_eager_over_late"],
+                    "rows": rows,
                 },
                 ensure_ascii=False,
             ),
@@ -428,8 +448,9 @@ def main():
         "topic": "c10-workload-shapes",
         "change": "c10-write-precompute-derived-fields",
         "purpose": "0.10.0 human-docs evidence: report-like / wide / chain shapes",
-        "python": "{}.{}".format(sys.version_info[0], sys.version_info[1]),
+        "python": "{}.{}.{}".format(sys.version_info[0], sys.version_info[1], sys.version_info[2]),
         "runs": args.runs,
+        "rows_scale": float(args.rows_scale),
         "policy": "auto-late via existing deps; A/B clears late_fields for eager",
         "cases": cases,
         "summary": {
