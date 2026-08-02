@@ -30,8 +30,8 @@ def on_field_compute(self, event: Event) -> None:
 
 | Spec | 动作 |
 |------|------|
-| `hooks-observability-structure` | 更新 r56（或新增 req）：typed handler MUST 接收 `Event`；MUST 仍能经 `.payload` 消费公开类型；补 scenario：`FIELD_COMPUTE` + `meta.scalim_compute_phase` |
-| `governance-extension-points` | r417 补一句：缓存的 callable 入参为 `Event` envelope |
+| `hooks-observability-structure` | 新增 **r217**：typed Observer/Hook handler MUST 接收 `Event`；经 `.payload` 消费公开类型；scenario 覆盖 phase meta |
+| `governance-extension-points` | r417：缓存 callable 入参为 `Event` envelope |
 
 无新 capability 目录。
 
