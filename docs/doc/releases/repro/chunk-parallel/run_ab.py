@@ -1,17 +1,18 @@
 """c30 证据: `lookup_chunk_size` 分片 串行 vs opt-in 并行 A/B(模拟 RTT).
 
 用法（仓库根目录）:
-    uv run python docs/doc/releases/repro/chunk-parallel/run_ab.py
-    uv run python docs/doc/releases/repro/chunk-parallel/run_ab.py --keys 20000 --chunk-size 100 --rtt-ms 5 --max-workers 8
+    PYTHONPATH=src python docs/doc/releases/repro/chunk-parallel/run_ab.py
+    PYTHONPATH=src python docs/doc/releases/repro/chunk-parallel/run_ab.py --keys 20000 --chunk-size 100 --rtt-ms 5 --max-workers 8
 
 说明:
 - 已随仓库提交(`docs/doc/releases/repro/chunk-parallel/`),供用户自行复现.
 - 默认用**独立子进程**分别跑 serial / parallel,避免同进程 `ru_maxrss` 高水位被先跑臂污染.
 - loader 用 `time.sleep` 模拟固定 RTT;加速比反映「等待重叠」上限,不代表真实数据库表现.
 - 结果写入运行目录下 `.tmp/evidence/c30-chunk-parallel/ab_multiprocess.json`(可用 `--out` 覆盖;可再生、不入库).
+- 脚本保持 Python 3.6 可跑(与 `src/scalim/` 运行时边界一致).
 """
 
-from __future__ import annotations
+from __future__ import absolute_import, print_function
 
 import argparse
 import json

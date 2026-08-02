@@ -12,9 +12,9 @@
 
 | 能力 | 默认 | YAML 要改吗 | 专页 |
 |------|------|-------------|------|
-| write-precompute（写出前晚算） | **开** | 否 | [write-precompute-0.10(../write-precompute-0.10.md) |
-| row-wise fusion（同 deps 行内融合） | **开**（安全外壳内） | 否 | [rowwise-fusion-0.10(../rowwise-fusion-0.10.md) |
-| lookup chunk 并行 | **关** | 否（开关只在 Python） | [lookup-chunk-parallel-0.10(../lookup-chunk-parallel-0.10.md) |
+| write-precompute（写出前晚算） | **开** | 否 | [write-precompute-0.10](../write-precompute-0.10.md) |
+| row-wise fusion（同 deps 行内融合） | **开**（安全外壳内） | 否 | [rowwise-fusion-0.10](../rowwise-fusion-0.10.md) |
+| lookup chunk 并行 | **关** | 否（开关只在 Python） | [lookup-chunk-parallel-0.10](../lookup-chunk-parallel-0.10.md) |
 
 ```mermaid
 flowchart TD
@@ -51,7 +51,7 @@ flowchart TD
 
 ### 4. 与 YAML breaking 的关系
 
-本页**不**替代 [upgrades 索引../../yaml-dsl/upgrades/index.md)。若配置仍含已删字段（如 `write_defaults` / `budget` / `xlsx_file`），先按对应 upgrade 批次改 YAML。
+本页**不**替代 [upgrades 索引](../../yaml-dsl/upgrades/index.md)。若配置仍含已删字段（如 `write_defaults` / `budget` / `xlsx_file`），先按对应 upgrade 批次改 YAML。
 
 ## 发版引用（可贴 Release）
 
