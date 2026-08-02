@@ -550,6 +550,7 @@ class DemandRunRuntimeOptions:
     - 仅当 `parallel_mode="adaptive"` 时生效;`seq` 永不分片并行.
     - `lookup_chunk_size`(`YAML` `authoring`)本身**不是**并行开关,它只表示分片大小.
     - 开启后会放大对外部系统(数据库/接口)的瞬时并发;全局在途 `ref-loader` 帽 = 解析后的 `workers` `W`.
+    - `loader_call` 回调可能直接发生在分片工作线程上(非主线程回放),订阅方须自行保证线程安全.
     """
 
     max_chunk_workers: Optional[int] = None

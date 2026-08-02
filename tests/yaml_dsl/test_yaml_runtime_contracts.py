@@ -289,6 +289,20 @@ class TestDemandRunOptionsContractsCoverage:
         with pytest.raises(ValueError, match=r"max_workers"):
             _ = DemandRunRuntimeOptions(max_workers=-1)
 
+    def test_runtime_options_chunk_parallelism_validation_cover_branches(self) -> None:
+        with pytest.raises(TypeError, match=r"parallelize_lookup_chunks must be a boolean"):
+            _ = DemandRunRuntimeOptions(parallelize_lookup_chunks="yes")  # type: ignore[arg-type] contract validation boundary
+
+        with pytest.raises(TypeError, match=r"max_chunk_workers must be an int"):
+            _ = DemandRunRuntimeOptions(max_chunk_workers=True)  # type: ignore[arg-type] contract validation boundary
+
+        with pytest.raises(ValueError, match=r"max_chunk_workers must be >= 1"):
+            _ = DemandRunRuntimeOptions(max_chunk_workers=0)
+
+        options = DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True, max_chunk_workers=2)
+        assert options.parallelize_lookup_chunks is True
+        assert options.max_chunk_workers == 2
+
     def test_output_options_capture_validation_cover_branch(self) -> None:
         with pytest.raises(TypeError, match=r"capture"):
             _ = DemandRunOutputOptions(capture="nope")  # type: ignore[arg-type] contract validation boundary

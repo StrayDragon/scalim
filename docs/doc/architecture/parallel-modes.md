@@ -308,6 +308,15 @@ fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,�
 并携带 `chunk_offset`(keys 切片起点). 并行下事件按**完成序**发出,框架不做排序缓冲;
 若需要稳定顺序,请订阅方自行按 `chunk_offset` 排序.
 
+!!! warning "订阅方必须线程安全"
+
+    这是分片并行相对 §3.5 capture/replay 的**例外**. 当分片所在的 LoadRef 没有跑在 adaptive 工作任务里
+    (例如该层只有一个 LoadRef,按阈值退化为串行——恰恰是「单 ref 超大键集」的典型场景),
+    `loader_call` 回调会**直接在分片工作线程上并发执行**,而不是在提交点由主线程回放.
+
+    因此 opt-in 之前,请确认你的 hook / observer / sink 对 `loader_call` 的处理是线程安全的
+    (共享计数器、文件句柄、列表追加等都需要自行加锁). 其它事件类型不受影响.
+
 ## 4. 深度调参(需要 Python/IR 注入)
 
 如果你要调的不是“并发上限”,而是“每层是否并行 / 资源池怎么分 / backend seam(当前仅支持 `thread`)”,需要走 `PipelineOverrides`.

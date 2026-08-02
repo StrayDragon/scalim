@@ -32,11 +32,13 @@ class _CaptureLoaderCallObserver(Observer):
 
     def __init__(self) -> None:
         self.events: List[Event] = []
+        self.threads: List[str] = []
         self._lock = threading.Lock()
 
     def on_event(self, event: Event) -> None:
         with self._lock:
             self.events.append(event)
+            self.threads.append(threading.current_thread().name)
 
 
 class _Scenario(object):
@@ -446,6 +448,36 @@ def test_chunk_parallelism_policy_rejects_invalid_max_chunk_workers() -> None:
         _ = LookupChunkParallelismPolicy(parallelize_lookup_chunks=True, max_chunk_workers=0)
     with pytest.raises(TypeError, match="max_chunk_workers must be an int"):
         _ = LookupChunkParallelismPolicy(max_chunk_workers="2")  # type: ignore[arg-type]
+
+
+def test_chunk_parallelism_policy_rejects_non_boolean_opt_in() -> None:
+    with pytest.raises(TypeError, match="parallelize_lookup_chunks must be a boolean"):
+        _ = LookupChunkParallelismPolicy(parallelize_lookup_chunks="yes")  # type: ignore[arg-type]
+
+
+def test_chunk_loader_call_events_may_run_on_worker_threads() -> None:
+    """opt-in 分片并行下,`loader_call` 回调可能发生在分片工作线程(订阅方须线程安全)."""
+    observer = _CaptureLoaderCallObserver()
+    barrier = threading.Barrier(2)
+
+    def _loader(ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        # 强制两个分片真正重叠,使「回调发生在工作线程」成为确定性事实而非时序巧合.
+        assert barrier.wait(timeout=CI_TIMEOUT_S) is not None
+        return {key: {"name": "Name{}".format(key)} for key in ids}
+
+    scenario = _build_scenario(
+        loader=_loader,
+        row_count=4,
+        parallel_mode="adaptive",
+        parallelize_lookup_chunks=True,
+        max_workers=2,
+        observer_manager=ObserverManager(observers=[observer]),
+    )
+    scenario.execute()
+
+    main_thread_name = threading.current_thread().name
+    assert len(observer.events) == 2
+    assert all(name != main_thread_name for name in observer.threads)
 
 
 def _build_two_source_plan(

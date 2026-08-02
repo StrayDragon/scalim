@@ -44,6 +44,31 @@ def test_execution_request_rejects_invalid_parallel_mode() -> None:
         _ = ExecutionRequest(export_layout=ExportLayout(field_ids=()), parallel_mode="nope")  # type: ignore[arg-type] contract validation boundary
 
 
+def test_execution_request_rejects_invalid_chunk_parallelism_options() -> None:
+    with pytest.raises(TypeError, match=r"ExecutionRequest\.parallelize_lookup_chunks"):
+        _ = ExecutionRequest(
+            export_layout=ExportLayout(field_ids=()),
+            parallelize_lookup_chunks="yes",  # type: ignore[arg-type] contract validation boundary
+        )
+
+    with pytest.raises(TypeError, match=r"ExecutionRequest\.max_chunk_workers"):
+        _ = ExecutionRequest(export_layout=ExportLayout(field_ids=()), max_chunk_workers=True)  # type: ignore[arg-type] contract validation boundary
+
+    with pytest.raises(ValueError, match=r"ExecutionRequest\.max_chunk_workers"):
+        _ = ExecutionRequest(export_layout=ExportLayout(field_ids=()), max_chunk_workers=0)
+
+
+def test_execution_request_accepts_chunk_parallelism_opt_in() -> None:
+    req = ExecutionRequest(
+        export_layout=ExportLayout(field_ids=("id",)),
+        parallel_mode="adaptive",
+        parallelize_lookup_chunks=True,
+        max_chunk_workers=2,
+    )
+    assert req.parallelize_lookup_chunks is True
+    assert req.max_chunk_workers == 2
+
+
 def test_execution_request_rejects_invalid_capture_in_memory_rows_type() -> None:
     with pytest.raises(TypeError, match=r"ExecutionRequest\.capture_in_memory_rows"):
         _ = ExecutionRequest(

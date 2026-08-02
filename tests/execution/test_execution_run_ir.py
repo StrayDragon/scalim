@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
 import pytest
 
@@ -713,6 +713,42 @@ def test_run_ir_discards_sink_and_closes_observers_when_engine_init_fails() -> N
     assert sink.discarded is True
     assert sink.closed is False
     assert observer.closed is True
+
+
+def test_run_ir_forwards_chunk_parallelism_opt_in_as_pipeline_overrides() -> None:
+    captured: List[Any] = []
+
+    class _RecordingEngine:
+        def __init__(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
+            captured.append(kwargs.get("pipeline_overrides"))
+            msg = "stop after engine construction"
+            raise RuntimeError(msg)
+
+    main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
+    demand_ir = DemandIr.from_irs(
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+    )
+
+    def _run(**request_kwargs: Any) -> None:
+        request = ExecutionRequest(
+            export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
+            output=OutputSpec(path=None),
+            sink=InMemoryRowDataSink(),
+            runtime_bindings=runtime_bindings,
+            **request_kwargs,
+        )
+        with pytest.raises(RuntimeError, match="stop after engine construction"):
+            _ = run_ir(demand_ir, request, engine_factory=_RecordingEngine)
+
+    _run()
+    _run(parallel_mode="adaptive", parallelize_lookup_chunks=True, max_chunk_workers=3)
+
+    assert captured[0] is None
+    opt_in_overrides = captured[1]
+    assert opt_in_overrides is not None
+    assert opt_in_overrides.parallelize_lookup_chunks is True
+    assert opt_in_overrides.max_chunk_workers == 3
 
 
 def test_wrap_sink_for_row_count_row_sink_counts_write_batch() -> None:
