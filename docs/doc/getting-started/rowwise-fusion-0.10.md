@@ -19,7 +19,8 @@
 | EXP `call_by` memo 命中组内字段 | **整组不融合** |
 
 架构：[`arch.md` §5.4](../architecture/arch.md#54-row-wise-fusion-同-deps-派生字段按行融合减-nm-框架税)。  
-姊妹能力（写出前晚算）：[write-precompute-0.10](write-precompute-0.10.md)。
+姊妹能力（写出前晚算）：[write-precompute-0.10](write-precompute-0.10.md)。  
+姊妹能力（同 LoadRef 分片并行）：[lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md)。
 
 测量摘要日期：<span id="rf10-measured-at"></span>。  
 <span id="rf10-host-note" class="rf10-note"></span>

@@ -3,7 +3,7 @@ import logging
 import time
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, cast
 
 from .....events import EventType
 from .....spec.ir import LookupStepIr
@@ -281,8 +281,7 @@ class _ChunkPlan:
 
 
 def _chunk_count(n_keys: int, chunk_size: int) -> int:
-    if n_keys <= 0:
-        return 0
+    # `n_keys == 0` 时整除结果亦为 0,无需单独分支.
     return (n_keys + chunk_size - 1) // chunk_size
 
 
@@ -321,7 +320,7 @@ def _build_chunk_plans(
     batch_rows: Optional[List[RowData]],
     chunk_size: int,
 ) -> List[_ChunkPlan]:
-    """仅并行路径使用:提交 futures 前需要全部 plan 已构造."""
+    """仅并行路径使用:提交 `futures` 前需要全部 `plan` 已构造."""
     plans: List[_ChunkPlan] = []
     for offset in range(0, len(lookup_keys_list), chunk_size):
         plans.append(
@@ -377,7 +376,7 @@ def _load_chunks_serially(
     batch_rows: Optional[List[RowData]],
     chunk_size: int,
 ) -> LoaderResultMap:
-    """默认/未扇出路径:按 offset 懒建单个 plan,避免一次性物化全部分片上下文."""
+    """默认/未扇出路径:按 `offset` 懒建单个 `plan`,避免一次性物化全部分片上下文."""
     merged: LoaderResultMap = {}
     for offset in range(0, len(lookup_keys_list), chunk_size):
         plan = _build_one_chunk_plan(
@@ -428,8 +427,8 @@ def _load_chunks_in_parallel(
             for plan in plans
         ]
         try:
-            # 按 `offset` 升序取结果并即时 merge:失败时抛出「串行会最先遇到」的异常,
-            # 且不把全部 chunk dict 同时挂在 `results_by_offset` 上抬高峰值.
+            # 按 `offset` 升序取结果并即时 `merge`:失败时抛出「串行会最先遇到」的异常,
+            # 且不把全部 `chunk` `dict` 同时挂在 `results_by_offset` 上抬高峰值.
             for _plan, future in futures:
                 result = future.result()
                 _merge_chunk_result(merged, result)
@@ -456,7 +455,7 @@ def _load_ref_chunked(
 ) -> LoaderResultMap:
     fanout = runtime.resolve_chunk_fanout(_chunk_count(len(lookup_keys_list), chunk_size))
     if fanout > 1:
-        # 仅并行路径一次性构造全部 plan(提交 futures 需要);串行保持懒建.
+        # 仅并行路径一次性构造全部 `plan`(提交 `futures` 需要);串行保持懒建.
         plans = _build_chunk_plans(
             exec_ctx=exec_ctx,
             source=source,
@@ -492,6 +491,7 @@ def _load_ref_chunked(
             batch_rows=batch_rows,
         )
     return merged
+
 
 def load_step_data(
     *,

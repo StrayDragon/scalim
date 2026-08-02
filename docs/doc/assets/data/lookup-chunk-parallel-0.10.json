@@ -1,0 +1,150 @@
+{
+  "version": "0.10.0",
+  "feature": "lookup-chunk-parallelism",
+  "measured_at": "2026-08-02",
+  "host_note": "合成 sleep-RTT workload；分进程 A/B（spawn），避免同进程 ru_maxrss 交叉污染；内存 sink 无业务库",
+  "contracts": {
+    "opt_in": "parallelize_lookup_chunks + parallel_mode=adaptive",
+    "authoring_yaml": "no new YAML keys; lookup_chunk_size still size-only",
+    "merge": "first-wins by chunk offset (= serial)",
+    "calls_success_path": "equal",
+    "values": "sample equal (full golden in unit tests)",
+    "rss_gate": "peak RSS delta ≤ +10% (multiprocess)"
+  },
+  "naming": [
+    {
+      "surface": "DemandRunRuntimeOptions / PipelineOverrides / ExecutionRequest",
+      "name": "parallelize_lookup_chunks",
+      "kind": "new",
+      "note": "bool；默认 False；仅 adaptive 生效"
+    },
+    {
+      "surface": "同上",
+      "name": "max_chunk_workers",
+      "kind": "new",
+      "note": "Optional[int]；单步扇出帽；None=只受 W"
+    },
+    {
+      "surface": "YAML sources.*.lookup_chunk_size",
+      "name": "lookup_chunk_size",
+      "kind": "unchanged",
+      "note": "仍只表示分片大小；不是并行开关"
+    },
+    {
+      "surface": "parallel_mode",
+      "name": "seq | adaptive",
+      "kind": "unchanged",
+      "note": "不新增第三种 mode；seq 永不分片并行"
+    },
+    {
+      "surface": "LoaderCallEvent",
+      "name": "chunk_offset",
+      "kind": "new_optional",
+      "note": "分片路径填充；并行为完成序；订阅方须线程安全"
+    }
+  ],
+  "workload": [
+    {
+      "id": "sleep_rtt_small",
+      "label": "小键集·高 RTT",
+      "why": "经典 6 片 × 50ms：重叠等待上限直观",
+      "keys": 600,
+      "chunk_size": 100,
+      "n_chunks": 6,
+      "rtt_ms": 50.0,
+      "max_workers": 6,
+      "serial_s": 0.3026,
+      "parallel_s": 0.0529,
+      "speedup": 5.72,
+      "serial_rss_kb": 28260,
+      "parallel_rss_kb": 28260,
+      "rss_delta_pct": 0.0,
+      "calls": 6,
+      "calls_equal": true,
+      "values_ok": true,
+      "max_inflight_parallel": 6
+    },
+    {
+      "id": "sleep_rtt_mid",
+      "label": "中等键集·200 片",
+      "why": "20k keys / chunk 100；主证据 shape",
+      "keys": 20000,
+      "chunk_size": 100,
+      "n_chunks": 200,
+      "rtt_ms": 5.0,
+      "max_workers": 8,
+      "serial_s": 1.0702,
+      "parallel_s": 0.1801,
+      "speedup": 5.94,
+      "serial_rss_kb": 40128,
+      "parallel_rss_kb": 44108,
+      "rss_delta_pct": 9.92,
+      "calls": 200,
+      "calls_equal": true,
+      "values_ok": true,
+      "max_inflight_parallel": 8
+    },
+    {
+      "id": "sleep_rtt_large",
+      "label": "大键集·100k",
+      "why": "100k keys / chunk 500；RSS 门禁加压",
+      "keys": 100000,
+      "chunk_size": 500,
+      "n_chunks": 200,
+      "rtt_ms": 5.0,
+      "max_workers": 8,
+      "serial_s": 1.2883,
+      "parallel_s": 0.3652,
+      "speedup": 3.53,
+      "serial_rss_kb": 99928,
+      "parallel_rss_kb": 108044,
+      "rss_delta_pct": 8.12,
+      "calls": 200,
+      "calls_equal": true,
+      "values_ok": true,
+      "max_inflight_parallel": 8
+    },
+    {
+      "id": "sleep_rtt_fanout",
+      "label": "高扇出·800 片",
+      "why": "40k keys / chunk 50；片数主导时加速更接近 W",
+      "keys": 40000,
+      "chunk_size": 50,
+      "n_chunks": 800,
+      "rtt_ms": 5.0,
+      "max_workers": 8,
+      "serial_s": 4.1917,
+      "parallel_s": 0.6163,
+      "speedup": 6.80,
+      "serial_rss_kb": 52672,
+      "parallel_rss_kb": 56648,
+      "rss_delta_pct": 7.55,
+      "calls": 800,
+      "calls_equal": true,
+      "values_ok": true,
+      "max_inflight_parallel": 8
+    }
+  ],
+  "shell_notes": [
+    {
+      "id": "seq_never",
+      "effect": "parallel_mode=seq 即使 opt-in 也串行分片"
+    },
+    {
+      "id": "adaptive_without_opt_in",
+      "effect": "未设 parallelize_lookup_chunks → 仍串行分片"
+    },
+    {
+      "id": "rows_mode",
+      "effect": "bind.mode=rows 强制不分片 → 无 chunk 并行"
+    },
+    {
+      "id": "loader_call_threads",
+      "effect": "单 LoadRef 退化串行层时，回调 MAY 在 chunk worker 线程上跑"
+    },
+    {
+      "id": "error_path_calls",
+      "effect": "失败时已在途 chunk MAY 仍跑完；调用次数 MAY > 串行"
+    }
+  ]
+}

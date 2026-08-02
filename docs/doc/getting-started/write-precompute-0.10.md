@@ -18,7 +18,8 @@
 
 架构语义：[`arch.md` §5.3](../architecture/arch.md#53-write-precompute-只用于写出的派生字段延后到写出前算)。
 
-姊妹能力（同 deps 行内融合）：[rowwise-fusion-0.10](rowwise-fusion-0.10.md)。
+姊妹能力（同 deps 行内融合）：[rowwise-fusion-0.10](rowwise-fusion-0.10.md)。  
+姊妹能力（同 LoadRef 分片并行）：[lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md)。
 
 测量摘要日期：<span id="wp10-measured-at"></span>。
 <span id="wp10-host-note" class="wp10-note"></span>

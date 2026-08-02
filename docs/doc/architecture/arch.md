@@ -222,6 +222,7 @@ flowchart TD
 细节与流程图放在独立页面:
 
 - [并行模式(seq/adaptive)](parallel-modes.md)
+- **0.10.0** lookup chunk 并行对拍专页: [lookup-chunk-parallel-0.10](../getting-started/lookup-chunk-parallel-0.10.md)
 
 ### 5.3 write-precompute: 只用于写出的派生字段延后到写出前算
 

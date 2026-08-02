@@ -309,6 +309,8 @@ fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,�
 并携带 `chunk_offset`(keys 切片起点). 并行下事件按**完成序**发出,框架不做排序缓冲;
 若需要稳定顺序,请订阅方自行按 `chunk_offset` 排序.
 
+人类可读对拍专页(命名变更 / sleep-RTT 证据 / D3 图): [lookup-chunk-parallel-0.10](../getting-started/lookup-chunk-parallel-0.10.md).
+
 !!! warning "订阅方必须线程安全"
 
     这是分片并行相对 §3.5 capture/replay 的**例外**. 当分片所在的 LoadRef 没有跑在 adaptive 工作任务里
