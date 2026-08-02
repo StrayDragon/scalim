@@ -21,7 +21,7 @@ depends_on: []
 - 为 `lookup_chunk_size` 分片路径增加 **opt-in 并行**：同批、同一步的多个 chunk loader 调用可线程并发，合并结果与串行分片语义等价。
 - 显式并发上限与取消/超时与现有 adaptive 护栏对齐或复用（见 design）。
 - 可观测：每 chunk 仍发 `loader_call`（含 key 计数），可对比串行/并行。
-- Specs：`refloader-chunk-parallelism`（或并入 `parallel-execution` / `execution-adaptive-guardrails`——landing 时定一处 SSOT）。
+- Specs：**新建** `execution-refloader-chunk-parallelism` 为并行分片合约 SSOT；`parallel-execution` / `ir-source-relations` / `execution-adaptive-guardrails` / `demand-dsl` 仅交叉引用（见 design「Specs SSOT」）。
 - 证据：多 chunk + 模拟 RTT 的 A/B；`seq` 无 opt-in 时零回退；py3.6。
 
 **不改**
@@ -34,13 +34,14 @@ depends_on: []
 
 ### New Capabilities
 
-- `refloader-chunk-parallelism`：opt-in 分片并行语义、合并等价、限流、观测、默认关。
+- `execution-refloader-chunk-parallelism`：opt-in 分片并行语义、合并等价、限流、观测、默认关。
 
 ### Modified Capabilities
 
-- `parallel-execution`：说明与 `adaptive`（跨 LoadRef）和 chunk 并行（跨同 ref 分片）的层次关系。
-- `execution-adaptive-guardrails`：并发上限 / 池复用边界（若共享线程池）。
-- `ir-source-relations`：仅文档交叉引用 `lookup_chunk_size` 已有语义。
+- `parallel-execution`：交叉引用——说明与 `adaptive`（跨 LoadRef）和 chunk 并行（同 ref 分片）的层次关系；**不**把 chunk 并行塞进 r311 边界定义。
+- `execution-adaptive-guardrails`：交叉引用——全局帽复用 resolved workers W / 父任务超时；**不**在此 spec 展开 chunk 算法。
+- `ir-source-relations`：交叉引用——串行 `lookup_chunk_size` 合并（r694）仍为分片合并语义 SSOT；并行 MUST ≡ 该语义。
+- `demand-dsl`：不变（`lookup_chunk_size` 仍只表示分片大小 / authoring）。
 
 ## Impact
 

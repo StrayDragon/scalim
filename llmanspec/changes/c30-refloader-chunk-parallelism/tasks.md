@@ -14,8 +14,8 @@
 
 ## 0. Specs landing（start 之后）
 
-- [ ] 0.1 落地 `refloader-chunk-parallelism`（或并入 `parallel-execution`）MUST：默认关、等价合并、全局帽、观测
-- [ ] 0.2 写清与 `adaptive` 的层次关系；validate strict
+- [ ] 0.1 新建 live `llmanspec/specs/execution-refloader-chunk-parallelism/spec.toon`：MUST 默认关、仅 `adaptive`+opt-in、合并≡r694 串行、全局帽=W、`loader_call.chunk_offset`、完成序不排序
+- [ ] 0.2 `parallel-execution` 增交叉引用（层次关系）；`ir-source-relations` / `execution-adaptive-guardrails` 按需轻量交叉引用；`llman sdd validate` strict
 
 ## 1. 选项面（Python policy）
 

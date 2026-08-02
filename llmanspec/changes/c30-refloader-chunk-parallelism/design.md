@@ -10,6 +10,18 @@ seq / 未 opt-in         →  全部串行（今日默认）
 
 用户心智：仍然只有「顺序 / 自适应关联并行」；分片并行是 **runtime 上的附加许可**，不是第三种 `parallel_mode` 枚举值（避免模式爆炸）。若实现上发现必须挂在 `adaptive` 下才允许，须在 spec 写清：「仅 `adaptive` + opt-in 时启用」，`seq` 永不 chunk 并行。
 
+## Specs SSOT（2026-08-02 评估收口）
+
+| Spec | 角色 |
+|------|------|
+| **`execution-refloader-chunk-parallelism`（新建）** | **本 change 合约 SSOT**：opt-in、仅 adaptive、合并≡串行、独立池+帽=W、`chunk_offset` 事件、默认关 |
+| `parallel-execution` | **层次交叉引用**：r311 仍只描述「批次内多 LoadRef fan-out」；追加一句 MUST NOT 把同 ref 分片并行误读成第三种 `parallel_mode` |
+| `execution-adaptive-guardrails` | **护栏交叉引用**：W / `task_timeout_s` 仍属本 spec；chunk 并行复用、不另开 timeout |
+| `ir-source-relations` r694 | **串行分片合并 SSOT**（先 wins / keys 分片）；并行路径 MUST 引用并保持 ≡ |
+| `demand-dsl` r6 | **authoring**：`lookup_chunk_size` 语义不变；MUST NOT 暗示「有 chunk_size 即并行」 |
+
+**不并入** `parallel-execution` / `execution-adaptive-guardrails` 的原因：二者边界已窄（跨 LoadRef / hard cap+timeout）；chunk 并行是同一步内的第二维，独立 capability 更易维护与归档对照。
+
 ## Goals / Non-goals
 
 **Goals**
