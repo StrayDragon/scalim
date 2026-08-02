@@ -2,7 +2,8 @@
 depends_on: []
 branch: sdd/c20-compute-expr-rowwise-fusion
 base_sha: 385eb688a8e60d15cb805fb2b1c295055de4241f
-checkpointed: false
+checkpointed: true
+checkpoint_sha: ffe3f3098023070b64ab12f7ac222e6926ede3f9
 ---
 
 ## Why
