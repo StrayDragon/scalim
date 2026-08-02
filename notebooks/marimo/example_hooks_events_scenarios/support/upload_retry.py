@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from scalim.dsl import yaml_dsl as api
-from scalim.events import EventType, OutputTargetEndEvent
+from scalim.events import Event, EventType, OutputTargetEndEvent
 from scalim.ob.observer import EventDispatchObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
@@ -30,11 +30,12 @@ class UploadWithRetry(EventDispatchObserver):
         self.uploaded: List[Dict[str, Any]] = []
         self.errors: List[str] = []
 
-    def on_output_target_end(self, event: OutputTargetEndEvent) -> None:
+    def on_output_target_end(self, event: Event) -> None:
+        body = event.payload
         payload = build_upload_payload(
-            target_id=str(event.target_id),
-            output_path=None if event.output_path is None else str(event.output_path),
-            row_count=int(event.row_count),
+            target_id=str(body.target_id),
+            output_path=None if body.output_path is None else str(body.output_path),
+            row_count=int(body.row_count),
         )
         last_error: Optional[str] = None
         for attempt in range(1, self.max_attempts + 1):

@@ -274,7 +274,7 @@ def test_execute_fused_dense_reports_expected_error_with_dependency_payload() ->
     assert ctx.get_field_value("d0", 0) is None
     # 同一行内两个字段都失败: 依赖负载只构建一次并复用.
     assert len(hook.errors) == 2
-    assert hook.errors[0].context["dependencies"] == {"a": 1}
+    assert hook.errors[0].payload.context["dependencies"] == {"a": 1}
 
 
 def test_execute_fused_dense_reports_unexpected_error() -> None:
@@ -301,7 +301,7 @@ def test_execute_fused_dense_reports_unexpected_error() -> None:
     assert ok is True
     assert ctx.get_field_value("d1", 0) is None
     assert len(hook.errors) == 2
-    assert hook.errors[0].context["unexpected"] is True
+    assert hook.errors[0].payload.context["unexpected"] is True
 
 
 def test_execute_fused_compute_group_bails_out_on_non_derived_member() -> None:
@@ -370,7 +370,7 @@ def test_execute_fused_compute_group_generic_context_reports_expected_error() ->
 
     assert ctx.get_field_value("d0", "r0") is None
     assert len(hook.errors) == 2
-    assert hook.errors[0].context["dependencies"] == {"a": 7}
+    assert hook.errors[0].payload.context["dependencies"] == {"a": 7}
 
 
 def test_execute_fused_compute_group_generic_context_reports_unexpected_error() -> None:
@@ -396,4 +396,4 @@ def test_execute_fused_compute_group_generic_context_reports_unexpected_error() 
 
     assert ctx.get_field_value("d1", "r0") is None
     assert len(hook.errors) == 2
-    assert hook.errors[0].context["unexpected"] is True
+    assert hook.errors[0].payload.context["unexpected"] is True

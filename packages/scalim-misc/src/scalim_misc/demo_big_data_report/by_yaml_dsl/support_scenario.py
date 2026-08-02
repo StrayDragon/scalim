@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from scalim.ob.observer import EventDispatchObserver
 from scalim_misc.examples.oracle import diff_first_mismatch, stable_sort_rows
+
+if TYPE_CHECKING:
+    from scalim.events import Event
 
 _SLA_BREACH_THRESHOLD_MINUTES = 60
 
@@ -305,9 +308,9 @@ class GuardrailCaptureObserver(EventDispatchObserver):
     def __init__(self) -> None:
         self.signals: List[GuardrailSignal] = []
 
-    def on_error(self, event: Any) -> None:
-        # payload is `ErrorEvent(error, context)`
-        context = getattr(event, "context", None)
+    def on_error(self, event: Event) -> None:
+        payload = event.payload
+        context = payload.context
         if not isinstance(context, dict):
             return
         if not context.get("guardrail"):

@@ -20,6 +20,7 @@ from scalim.events._events import (
 )
 from scalim.ob.presets.logs import LoggingObserver, PrettyLoggingObserver
 from scalim.ob.structured_logging import install_jsonl_logging
+from tests.support.event_envelope import event_envelope
 
 
 @contextlib.contextmanager
@@ -44,38 +45,42 @@ def test_logging_observer_jsonl_branches() -> None:
         logger = logging.getLogger("scalim.tests.logs")
         obs = LoggingObserver(logger=logger)
 
-        obs.on_pipeline_start(PipelineStartEvent(targets=["a", "b"], batch_size=None))
-        obs.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2]))
+        obs.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a", "b"], batch_size=None)))
+        obs.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2])))
         obs.on_loader_call(
-            LoaderCallEvent(
-                loader_name="demo",
-                params={"x": 1},
-                result={1: {"x": 1}},
-                duration=0.01,
-                cache_status="hit",
-                field_keys=["a"],
+            event_envelope(
+                LoaderCallEvent(
+                    loader_name="demo",
+                    params={"x": 1},
+                    result={1: {"x": 1}},
+                    duration=0.01,
+                    cache_status="hit",
+                    field_keys=["a"],
+                )
             )
         )
-        obs.on_field_compute(FieldComputeEvent(field_key="a", row_id=1, dependencies={}, result=1))
-        obs.on_field_slim(FieldSlimEvent(field_key="a", reason="demo", batch_num=1, remaining_fields=1))
-        obs.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0))
-        obs.on_row_release(RowReleaseEvent(row_id=1, released_fields=["a"], retained_fields=["b"], batch_num=1))
-        obs.on_loader_slim(LoaderSlimEvent(loader_name="demo", original_keys=3, extracted_fields=["a"], batch_num=1))
-        obs.on_column_write(ColumnWriteEvent(field_key="a", row_count=1, batch_num=1))
+        obs.on_field_compute(event_envelope(FieldComputeEvent(field_key="a", row_id=1, dependencies={}, result=1)))
+        obs.on_field_slim(event_envelope(FieldSlimEvent(field_key="a", reason="demo", batch_num=1, remaining_fields=1)))
+        obs.on_row_write(event_envelope(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0)))
+        obs.on_row_release(event_envelope(RowReleaseEvent(row_id=1, released_fields=["a"], retained_fields=["b"], batch_num=1)))
+        obs.on_loader_slim(event_envelope(LoaderSlimEvent(loader_name="demo", original_keys=3, extracted_fields=["a"], batch_num=1)))
+        obs.on_column_write(event_envelope(ColumnWriteEvent(field_key="a", row_count=1, batch_num=1)))
 
         obs.on_diagnostic_warning(
-            DiagnosticWarningEvent(
-                message="warn",
-                source_id="s",
-                field_id="f",
-                lookup_key="k",
-                row_id=1,
+            event_envelope(
+                DiagnosticWarningEvent(
+                    message="warn",
+                    source_id="s",
+                    field_id="f",
+                    lookup_key="k",
+                    row_id=1,
+                )
             )
         )
-        obs.on_error(ErrorEvent(error=ValueError("boom"), context={"x": 1}))
+        obs.on_error(event_envelope(ErrorEvent(error=ValueError("boom"), context={"x": 1})))
 
-        obs.on_batch_end(BatchEndEvent(batch_num=1, duration=0.2))
-        obs.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.2))
+        obs.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.2)))
+        obs.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.2)))
 
     assert buf.getvalue()
 
@@ -84,19 +89,21 @@ def test_pretty_logging_observer_jsonl_branches() -> None:
     buf = io.StringIO()
     with _installed_jsonl(buf):
         obs = PrettyLoggingObserver()
-        obs.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
-        obs.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
+        obs.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=1)))
+        obs.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
         obs.on_loader_call(
-            LoaderCallEvent(
-                loader_name="demo",
-                params={},
-                result=[1, 2, 3],
-                duration=0.01,
-                cache_status="miss",
+            event_envelope(
+                LoaderCallEvent(
+                    loader_name="demo",
+                    params={},
+                    result=[1, 2, 3],
+                    duration=0.01,
+                    cache_status="miss",
+                )
             )
         )
-        obs.on_batch_end(BatchEndEvent(batch_num=1, duration=0.02))
-        obs.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.02))
+        obs.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.02)))
+        obs.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.02)))
 
     assert buf.getvalue()
 

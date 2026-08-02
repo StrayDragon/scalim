@@ -154,9 +154,10 @@ class ObserverManagerEmitMixin(ABC):
                 continue
             self._safe_call(observer, observer.on_event, event)
 
-    def emit_event(self, event_type: EventType, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+    def build_event(self, event_type: EventType, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+        """构造 `Event` 信封(分配 `seq` / 合并 `meta`),不进行分发."""
         merged_meta = self._merge_event_meta_defaults(meta)
-        event = Event(
+        return Event(
             event_type=event_type,
             timestamp=now_ts(),
             run_id=self.run_id,
@@ -164,6 +165,9 @@ class ObserverManagerEmitMixin(ABC):
             meta=merged_meta,
             seq=self._next_seq(),
         )
+
+    def emit_event(self, event_type: EventType, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+        event = self.build_event(event_type, payload, meta=meta)
         self.emit(event)
         return event
 

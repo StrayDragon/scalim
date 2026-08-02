@@ -8,6 +8,7 @@ from ...events import (
     Event,
     EventType,
 )
+from ...events._event import now_ts
 from ...events._events import (
     BatchEndEvent,
     BatchStartEvent,
@@ -59,6 +60,22 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             return
         self._manager().dispatch_strategy.dispatch(handler_pairs, event, self._safe_call)
 
+    def _typed_envelope(
+        self,
+        event_type: EventType,
+        payload: Any,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> Event:
+        """为类型化分发包装最小 `Event` 信封(直调 `trigger_*` / 无 `ObserverManager` 时)."""
+        return Event(
+            event_type=event_type,
+            timestamp=now_ts(),
+            run_id="",
+            payload=payload,
+            meta=dict(meta) if meta else {},
+            seq=0,
+        )
+
     def _get_typed_handler_pairs(self, event_type: EventType) -> Optional[Tuple[HookTypedHandlerPair, ...]]:
         manager = self._manager()
         if not manager.has_hooks:
@@ -79,8 +96,8 @@ class HookManagerEventMixin(HookManagerBase, ABC):
                 return None
             return manager.on_event_handlers_by_event_type.get(event_type)
 
-    def emit_typed(self, event_type: EventType, payload: Any) -> None:
-        self._dispatch(self._get_typed_handler_pairs(event_type), payload)
+    def emit_typed(self, event_type: EventType, event: Event) -> None:
+        self._dispatch(self._get_typed_handler_pairs(event_type), event)
 
     def emit_typed_policy(self, event_type: EventType, payload: Any) -> None:
         """发射类型化的策略决策 `signal`(默认 `fail-fast` 且保持确定性顺序).
@@ -112,25 +129,28 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         handler_pairs = self._get_typed_handler_pairs(EventType.PIPELINE_START)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, PipelineStartEvent(targets, batch_size))
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.PIPELINE_START, PipelineStartEvent(targets, batch_size)))
 
     def trigger_pipeline_end(self, total_batches: int, total_duration: float) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.PIPELINE_END)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, PipelineEndEvent(total_batches, total_duration))
+        self._dispatch(
+            handler_pairs,
+            self._typed_envelope(EventType.PIPELINE_END, PipelineEndEvent(total_batches, total_duration)),
+        )
 
     def trigger_batch_start(self, batch_num: int, row_ids: List[Any]) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.BATCH_START)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, BatchStartEvent(batch_num, row_ids))
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.BATCH_START, BatchStartEvent(batch_num, row_ids)))
 
     def trigger_batch_end(self, batch_num: int, duration: float) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.BATCH_END)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, BatchEndEvent(batch_num, duration))
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.BATCH_END, BatchEndEvent(batch_num, duration)))
 
     def trigger_loader_call(
         self,
@@ -146,6 +166,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         field_keys: Optional[List[str]] = None,
         skipped_none_rows: Optional[int] = None,
         chunk_offset: Optional[int] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         manager = self._manager()
         handler_pairs = self._get_typed_handler_pairs(EventType.LOADER_CALL)
@@ -165,7 +186,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             payload = self._sample_result(result)
         else:
             payload = result
-        event = LoaderCallEvent(
+        loader_payload = LoaderCallEvent(
             loader_name=loader_name,
             params=params,
             result=payload,
@@ -178,7 +199,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             field_keys=field_keys,
             chunk_offset=chunk_offset,
         )
-        self._dispatch(handler_pairs, event)
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.LOADER_CALL, loader_payload, meta=meta))
 
     def trigger_field_compute(
         self,
@@ -186,17 +207,25 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         row_id: Hashable,
         dependencies: Dict[str, Any],
         result: Any,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.FIELD_COMPUTE)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, FieldComputeEvent(field_key, row_id, dependencies, result))
+        self._dispatch(
+            handler_pairs,
+            self._typed_envelope(
+                EventType.FIELD_COMPUTE,
+                FieldComputeEvent(field_key, row_id, dependencies, result),
+                meta=meta,
+            ),
+        )
 
-    def trigger_error(self, error: Exception, context: Dict[str, Any]) -> None:
+    def trigger_error(self, error: Exception, context: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.ERROR)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, ErrorEvent(error, context))
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.ERROR, ErrorEvent(error, context), meta=meta))
 
     def trigger_diagnostic_warning(
         self,
@@ -207,6 +236,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         row_id: Any = None,
         *,
         sample_once: bool = False,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         manager = self._manager()
         handler_pairs: Optional[Tuple[HookTypedHandlerPair, ...]] = None
@@ -222,14 +252,14 @@ class HookManagerEventMixin(HookManagerBase, ABC):
                 manager.has_hooks = False
 
         if handler_pairs is not None:
-            event = DiagnosticWarningEvent(
+            payload = DiagnosticWarningEvent(
                 message=message,
                 source_id=source_id,
                 field_id=field_id,
                 lookup_key=lookup_key,
                 row_id=row_id,
             )
-            self._dispatch(handler_pairs, event)
+            self._dispatch(handler_pairs, self._typed_envelope(EventType.DIAGNOSTIC_WARNING, payload, meta=meta))
             return
 
         if manager.fallback_logger_enabled:
@@ -249,12 +279,13 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         *,
         batch_num: Optional[int] = None,
         remaining_fields: Optional[int] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.FIELD_SLIM)
         if handler_pairs is None:
             return
-        event = FieldSlimEvent(field_key=field_key, reason=reason, batch_num=batch_num, remaining_fields=remaining_fields)
-        self._dispatch(handler_pairs, event)
+        payload = FieldSlimEvent(field_key=field_key, reason=reason, batch_num=batch_num, remaining_fields=remaining_fields)
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.FIELD_SLIM, payload, meta=meta))
 
     def trigger_row_write(
         self,
@@ -263,12 +294,13 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         field_count: int,
         batch_num: Optional[int] = None,
         row_index: Optional[int] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.ROW_WRITE)
         if handler_pairs is None:
             return
-        event = RowWriteEvent(row_id=row_id, field_count=field_count, batch_num=batch_num, row_index=row_index)
-        self._dispatch(handler_pairs, event)
+        payload = RowWriteEvent(row_id=row_id, field_count=field_count, batch_num=batch_num, row_index=row_index)
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.ROW_WRITE, payload, meta=meta))
 
     def trigger_row_release(
         self,
@@ -277,17 +309,18 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         released_fields: List[str],
         retained_fields: List[str],
         batch_num: Optional[int] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.ROW_RELEASE)
         if handler_pairs is None:
             return
-        event = RowReleaseEvent(
+        payload = RowReleaseEvent(
             row_id=row_id,
             released_fields=released_fields,
             retained_fields=retained_fields,
             batch_num=batch_num,
         )
-        self._dispatch(handler_pairs, event)
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.ROW_RELEASE, payload, meta=meta))
 
     def trigger_loader_slim(
         self,
@@ -295,28 +328,33 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         original_keys: int,
         extracted_fields: List[str],
         batch_num: Optional[int] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.LOADER_SLIM)
         if handler_pairs is None:
             return
-        event = LoaderSlimEvent(
+        payload = LoaderSlimEvent(
             loader_name=loader_name,
             original_keys=original_keys,
             extracted_fields=extracted_fields,
             batch_num=batch_num,
         )
-        self._dispatch(handler_pairs, event)
+        self._dispatch(handler_pairs, self._typed_envelope(EventType.LOADER_SLIM, payload, meta=meta))
 
     def trigger_column_write(
         self,
         field_key: str,
         row_count: int,
         batch_num: int,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.COLUMN_WRITE)
         if handler_pairs is None:
             return
-        self._dispatch(handler_pairs, ColumnWriteEvent(field_key, row_count, batch_num))
+        self._dispatch(
+            handler_pairs,
+            self._typed_envelope(EventType.COLUMN_WRITE, ColumnWriteEvent(field_key, row_count, batch_num), meta=meta),
+        )
 
 
 __all__ = ()

@@ -5,6 +5,7 @@ from scalim.execution.context import BatchContext
 from scalim.execution.executor.operators.load_ref.executor import LoadRefOperatorExecutor
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.events import Event
 from scalim.events._events import LoaderCallEvent
 from scalim.hooks import BaseHook, HookManager
 from scalim.ob.manager import ObserverManager
@@ -13,14 +14,15 @@ from scalim.planning.operators import LoadRefOperatorIr, OperatorType
 from scalim.planning.plan import ExecutionPlan
 from scalim.spec.ir import BindingIr, FieldIr, KeyIr, LoaderIr, LookupCastSpecIr, LookupStepIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 from scalim.spec.ir.lookup_casts import lookup_cast_id
+from tests.support.event_envelope import event_envelope
 
 
 class _LoaderEventCapture(BaseHook):
     def __init__(self) -> None:
         self.events: List[LoaderCallEvent] = []
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        self.events.append(event)
+    def on_loader_call(self, event: Event) -> None:
+        self.events.append(event.payload)
 
 
 def _make_main_source(source_id: str = "orders") -> MainSourceIr:
@@ -334,13 +336,15 @@ def test_loadref_skip_repeated_execution_for_same_relation_group() -> None:
 def test_logging_hook_outputs_cache_status(caplog) -> None:
     logger = logging.getLogger("scalim.tests.loader_cache")
     hook = LoggingObserver(logger=logger)
-    event = LoaderCallEvent(
-        loader_name="demo_loader",
-        params={},
-        result={1: {"x": 1}},
-        duration=0.1,
-        cache_status="hit",
-        field_keys=["amount", "extra"],
+    event = event_envelope(
+        LoaderCallEvent(
+            loader_name="demo_loader",
+            params={},
+            result={1: {"x": 1}},
+            duration=0.1,
+            cache_status="hit",
+            field_keys=["amount", "extra"],
+        )
     )
 
     with caplog.at_level(logging.INFO, logger=logger.name):

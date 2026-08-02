@@ -687,10 +687,10 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
 
     class _OrderHook(BaseHook):
         def on_row_write(self, event) -> None:  # type: ignore[override]
-            events.append(("write", event.row_id))
+            events.append(("write", event.payload.row_id))
 
         def on_row_release(self, event) -> None:  # type: ignore[override]
-            events.append(("release", event.row_id))
+            events.append(("release", event.payload.row_id))
 
     sink = InMemoryRowDataSink()
     hook = _OrderHook()
@@ -1052,7 +1052,7 @@ def test_pipeline_streaming_order_by_sorts_rows_and_stable() -> None:
     pipeline._execute_batch_streaming_mode(row_ids, batch_rows, sink, batch_num=1)
 
     assert [row["order_id"] for row in sink.get_data()] == [1, 2, 2]
-    assert [event.row_id for event in capture.row_writes] == [1, 0, 2]
+    assert [event.payload.row_id for event in capture.row_writes] == [1, 0, 2]
 
 
 def test_pipeline_streaming_order_by_desc_nulls_last() -> None:

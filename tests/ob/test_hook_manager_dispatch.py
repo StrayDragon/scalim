@@ -38,7 +38,7 @@ def test_hook_manager_emit_typed_returns_when_non_catalog_event_type() -> None:
     manager = HookManager()
     manager.register(BaseHook())
 
-    manager.emit_typed("non_catalog", payload=None)
+    manager.emit_typed("non_catalog", Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="", payload=None, meta={}, seq=0))
 
 
 class _GetattrNoneHook(object):
@@ -59,7 +59,9 @@ def test_hook_manager_emit_typed_skips_hooks_with_missing_handler() -> None:
     manager = HookManager()
     manager.register(hook)  # type: ignore[arg-type]
 
-    manager.emit_typed(EventType.PIPELINE_START, payload=None)
+    manager.emit_typed(
+        EventType.PIPELINE_START, Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="", payload=None, meta={}, seq=0)
+    )
     assert hook.called is False
 
 
@@ -86,7 +88,9 @@ def test_hook_manager_emit_typed_does_not_use_getattr_after_cache_build() -> Non
     manager.register(hook)
     initial_calls = hook.getattr_calls
 
-    manager.emit_typed(EventType.PIPELINE_START, payload=None)
+    manager.emit_typed(
+        EventType.PIPELINE_START, Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="", payload=None, meta={}, seq=0)
+    )
 
     assert hook.called == 1
     assert hook.getattr_calls == initial_calls

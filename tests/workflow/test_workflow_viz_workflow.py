@@ -1,3 +1,4 @@
+from scalim.events import Event, EventType
 import json
 from pathlib import Path
 from typing import Any, Dict, List
@@ -30,6 +31,10 @@ from scalim.spec.ir._workflow import (
 
 def _read_events(path: Path) -> List[Dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _evt(event_type, payload):
+    return Event(event_type=event_type, timestamp=0.0, run_id="run", payload=payload, meta={}, seq=0)
 
 
 def test_workflow_viz_stage_levels_handles_cycle_and_caching() -> None:
@@ -227,17 +232,20 @@ def test_workflow_viz_observer_disabled_branches(tmp_path: Path) -> None:
     obs.snapshot = {"nodes": [{"id": "field:x"}], "meta": {}}
     assert obs._entry_workflow_node_ref_id() == "workflow_node:__workflow__"
 
-    obs.on_workflow_started("not a dict")
-    obs.on_workflow_finished("not a dict")
+    obs.on_workflow_started(_evt(EventType.WORKFLOW_STARTED, "not a dict"))
+    obs.on_workflow_finished(_evt(EventType.WORKFLOW_FINISHED, "not a dict"))
     obs.on_workflow_node_end(
-        WorkflowNodeEndEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="not_started",
-            node_type="demand",
-            status="ok",
-            demand_path="x.yaml",
-            error_type=None,
-            error_message=None,
+        _evt(
+            EventType.WORKFLOW_NODE_END,
+            WorkflowNodeEndEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="not_started",
+                node_type="demand",
+                status="ok",
+                demand_path="x.yaml",
+                error_type=None,
+                error_message=None,
+            ),
         )
     )
 
@@ -247,106 +255,141 @@ def test_workflow_viz_observer_disabled_branches(tmp_path: Path) -> None:
     snapshot = {"nodes": [{"id": "workflow_node:b"}, {"id": "workflow_node:a"}], "meta": {}}
     obs = WorkflowVizObserver(config=config, snapshot=snapshot)
 
-    obs.on_workflow_started({"workflow_id": "wf"})
-    obs.on_workflow_started("not a dict")
-    obs.on_workflow_finished({"status": "ok"})
+    obs.on_workflow_started(_evt(EventType.WORKFLOW_STARTED, {"workflow_id": "wf"}))
+    obs.on_workflow_started(_evt(EventType.WORKFLOW_STARTED, "not a dict"))
+    obs.on_workflow_finished(_evt(EventType.WORKFLOW_FINISHED, {"status": "ok"}))
 
     obs.on_workflow_node_start(
-        WorkflowNodeStartEvent(workflow_exec_id="wf_exec", workflow_node_id="a", node_type="demand", demand_path="a.yaml")
+        _evt(
+            EventType.WORKFLOW_NODE_START,
+            WorkflowNodeStartEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                node_type="demand",
+                demand_path="a.yaml",
+            ),
+        )
     )
     obs.on_workflow_node_end(
-        WorkflowNodeEndEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            node_type="demand",
-            status="ok",
-            demand_path="a.yaml",
-            error_type=None,
-            error_message=None,
+        _evt(
+            EventType.WORKFLOW_NODE_END,
+            WorkflowNodeEndEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                node_type="demand",
+                status="ok",
+                demand_path="a.yaml",
+                error_type=None,
+                error_message=None,
+            ),
         )
     )
     obs.on_workflow_node_cancelled(
-        WorkflowNodeCancelledEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="b",
-            node_type="demand",
-            reason="policy_all_fail",
-            message="cancelled",
-            demand_path="b.yaml",
+        _evt(
+            EventType.WORKFLOW_NODE_CANCELLED,
+            WorkflowNodeCancelledEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="b",
+                node_type="demand",
+                reason="policy_all_fail",
+                message="cancelled",
+                demand_path="b.yaml",
+            ),
         )
     )
 
     obs.on_workflow_cache_acquire(
-        WorkflowCacheAcquireEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            cache_kind="preload_forever",
-            source_id="src",
-            signature_digest="deadbeef",
-            cache_status="miss",
-            conflict_policy="error",
+        _evt(
+            EventType.WORKFLOW_CACHE_ACQUIRE,
+            WorkflowCacheAcquireEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                cache_kind="preload_forever",
+                source_id="src",
+                signature_digest="deadbeef",
+                cache_status="miss",
+                conflict_policy="error",
+            ),
         )
     )
     obs.on_workflow_cache_release(
-        WorkflowCacheReleaseEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            cache_kind="preload_forever",
-            source_id="src",
-            signature_digest="deadbeef",
-            remaining_consumers=1,
-            release_policy="dag_refcount",
-            is_pinned=False,
+        _evt(
+            EventType.WORKFLOW_CACHE_RELEASE,
+            WorkflowCacheReleaseEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                cache_kind="preload_forever",
+                source_id="src",
+                signature_digest="deadbeef",
+                remaining_consumers=1,
+                release_policy="dag_refcount",
+                is_pinned=False,
+            ),
         )
     )
     obs.on_workflow_cache_evict(
-        WorkflowCacheEvictEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            cache_kind="preload_forever",
-            source_id="src",
-            signature_digest="deadbeef",
-            reason="refcount_zero",
+        _evt(
+            EventType.WORKFLOW_CACHE_EVICT,
+            WorkflowCacheEvictEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                cache_kind="preload_forever",
+                source_id="src",
+                signature_digest="deadbeef",
+                reason="refcount_zero",
+            ),
         )
     )
 
     obs.on_workflow_resource_create(
-        WorkflowResourceCreateEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            resource_type="excel",
-            resource_id="r1",
-            path="/tmp/r1.xlsx",
+        _evt(
+            EventType.WORKFLOW_RESOURCE_CREATE,
+            WorkflowResourceCreateEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                resource_type="excel",
+                resource_id="r1",
+                path="/tmp/r1.xlsx",
+            ),
         )
     )
     obs.on_workflow_resource_write(
-        WorkflowResourceWriteEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            resource_type="excel",
-            resource_id="r1",
-            path="/tmp/r1.xlsx",
-            write_kind="write_sheet",
-            action="write",
+        _evt(
+            EventType.WORKFLOW_RESOURCE_WRITE,
+            WorkflowResourceWriteEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                resource_type="excel",
+                resource_id="r1",
+                path="/tmp/r1.xlsx",
+                write_kind="write_sheet",
+                action="write",
+            ),
         )
     )
     obs.on_workflow_resource_commit(
-        WorkflowResourceCommitEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            resource_type="excel",
-            resource_id="r1",
-            path="/tmp/r1.xlsx",
+        _evt(
+            EventType.WORKFLOW_RESOURCE_COMMIT,
+            WorkflowResourceCommitEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                resource_type="excel",
+                resource_id="r1",
+                path="/tmp/r1.xlsx",
+            ),
         )
     )
     obs.on_workflow_resource_discard(
-        WorkflowResourceDiscardEvent(
-            workflow_exec_id="wf_exec",
-            workflow_node_id="a",
-            resource_type="excel",
-            resource_id="r1",
-            path="/tmp/r1.xlsx",
-            reason="error",
+        _evt(
+            EventType.WORKFLOW_RESOURCE_DISCARD,
+            WorkflowResourceDiscardEvent(
+                workflow_exec_id="wf_exec",
+                workflow_node_id="a",
+                resource_type="excel",
+                resource_id="r1",
+                path="/tmp/r1.xlsx",
+                reason="error",
+            ),
         )
     )
 

@@ -1136,13 +1136,16 @@ def test_run_workflow_concurrency_capture_replay_summarizes_loader_call_payload_
 
     preload_events: List[Any] = []
     for event in hook.events:
-        if str(getattr(event, "loader_name", "")) != "preload":
+        payload = getattr(event, "payload", None)
+        if payload is None:
             continue
-        preload_events.append(event)
+        if str(getattr(payload, "loader_name", "")) != "preload":
+            continue
+        preload_events.append(payload)
 
     assert preload_events
-    for event in preload_events:
-        assert event.result == {"type": "dict", "size": 1}
+    for payload in preload_events:
+        assert payload.result == {"type": "dict", "size": 1}
 
 
 def test_run_workflow_run_options_patches_by_run_id_batch_size_overrides_global(tmp_path: Path) -> None:

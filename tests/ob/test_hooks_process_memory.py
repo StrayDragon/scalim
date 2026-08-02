@@ -6,6 +6,7 @@ import pytest
 from scalim.events._events import BatchEndEvent, PipelineEndEvent, PipelineStartEvent, StageSpanEvent
 from scalim.ob.presets.performance import PSUTIL_NOT_INSTALLED_WARNING_PREFIX, PerformanceConfig, PerformanceObserver
 from tests.support.testing_utils import missing_optional_dependency
+from tests.support.event_envelope import event_envelope
 
 
 class _FakeMemInfo:
@@ -35,9 +36,9 @@ def test_performance_observer_samples_memory(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "psutil", _FakePsutil())
 
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"memory"}, report_format="none"))
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.01))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.02))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=1)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.01)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.02)))
 
     samples = observer.metrics.memory_samples
     assert samples is not None
@@ -117,9 +118,9 @@ def test_performance_observer_threshold_and_sampling_helpers_cover_missing_branc
 
 def test_performance_observer_batch_end_skips_sampling_when_interval_not_reached() -> None:
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none", sampling_interval=2))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.01))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.01)))
 
 
 def test_performance_observer_stage_span_ignores_unknown_stage() -> None:
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none"))
-    observer.on_stage_span(StageSpanEvent(stage="unknown", batch_num=1, duration=0.01))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="unknown", batch_num=1, duration=0.01)))

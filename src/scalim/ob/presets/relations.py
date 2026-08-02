@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..._internal.loggingx import get_logger, prefix
+from ...events import Event, EventType
 from ...events._events import RelationLookupEvent
 from ...typedefs import RelationLookupResult, RelationReportFormat
 from ...vendor.compact.typing_extensionsx import override
@@ -128,25 +129,26 @@ class RelationObserver(EventDispatchObserver):
         self.metrics = RelationMetrics()
         self._reported = False
 
-    def on_relation_lookup(self, event: RelationLookupEvent) -> None:  # noqa: C901
+    def on_relation_lookup(self, event: Event) -> None:  # noqa: C901
+        payload = event.payload
         if not self.config.enabled:
             return
 
         m = self.metrics
         m.total_lookups += 1
-        source_stats = m.get_source_stats(event.target_source)
+        source_stats = m.get_source_stats(payload.target_source)
         source_stats.total_lookups += 1
 
-        if event.result == "hit":
+        if payload.result == "hit":
             m.hit_count += 1
             source_stats.hit_count += 1
-        elif event.result == "miss":
+        elif payload.result == "miss":
             m.miss_count += 1
             source_stats.miss_count += 1
-        elif event.result == "null_key":
+        elif payload.result == "null_key":
             m.null_key_count += 1
             source_stats.null_key_count += 1
-        elif event.result == "type_error":
+        elif payload.result == "type_error":
             m.type_mismatch_count += 1
             source_stats.type_mismatch_count += 1
 
@@ -154,17 +156,17 @@ class RelationObserver(EventDispatchObserver):
             return
 
         sample = RelationSample(
-            row_id=event.row_id,
-            fk_raw=event.fk_raw,
-            fk_normalized=event.fk_normalized,
-            target_source=event.target_source,
-            result=event.result,
-            fk_type=event.fk_type,
-            expected_type=event.expected_type,
-            error_message=event.error_message,
+            row_id=payload.row_id,
+            fk_raw=payload.fk_raw,
+            fk_normalized=payload.fk_normalized,
+            target_source=payload.target_source,
+            result=payload.result,
+            fk_type=payload.fk_type,
+            expected_type=payload.expected_type,
+            error_message=payload.error_message,
         )
 
-        if event.result == "type_error":
+        if payload.result == "type_error":
             if self.config.log_type_mismatch:
                 if is_jsonl_logging_installed():
                     emit_structured(
@@ -173,10 +175,10 @@ class RelationObserver(EventDispatchObserver):
                         kind="relations.type_error",
                         message="relations.type_error",
                         fields={
-                            "row_id": event.row_id,
-                            "fk_raw": event.fk_raw,
-                            "target_source": str(event.target_source),
-                            "error_message": str(event.error_message) if event.error_message is not None else None,
+                            "row_id": payload.row_id,
+                            "fk_raw": payload.fk_raw,
+                            "target_source": str(payload.target_source),
+                            "error_message": str(payload.error_message) if payload.error_message is not None else None,
                         },
                     )
                 else:
@@ -184,10 +186,10 @@ class RelationObserver(EventDispatchObserver):
                         self.config.logger,
                         "relations",
                         "type_error",
-                        row_id=event.row_id,
-                        fk_raw=event.fk_raw,
-                        target_source=event.target_source,
-                        error=event.error_message,
+                        row_id=payload.row_id,
+                        fk_raw=payload.fk_raw,
+                        target_source=payload.target_source,
+                        error=payload.error_message,
                     )
             if len(m.type_mismatch_samples) < self.config.max_samples:
                 m.type_mismatch_samples.append(sample)
@@ -205,7 +207,7 @@ class RelationObserver(EventDispatchObserver):
         expected_type: Optional[str] = None,
         error_message: Optional[str] = None,
     ) -> None:
-        event = RelationLookupEvent(
+        payload = RelationLookupEvent(
             field_key="",
             row_id=row_id,
             fk_raw=fk_raw,
@@ -216,16 +218,25 @@ class RelationObserver(EventDispatchObserver):
             expected_type=expected_type,
             error_message=error_message,
         )
-        self.on_relation_lookup(event)
+        self.on_relation_lookup(
+            Event(
+                event_type=EventType.RELATION_LOOKUP,
+                timestamp=time.time(),
+                run_id="",
+                payload=payload,
+                meta={},
+                seq=0,
+            )
+        )
 
     def get_metrics(self) -> RelationMetrics:
         return self.metrics
 
-    def on_pipeline_start(self, event: Any) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
         _ = event
         self.reset()
 
-    def on_pipeline_end(self, event: Any) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
         _ = event
         self._output_report()
         self._reported = True

@@ -5,16 +5,7 @@ import time
 from collections.abc import Sized
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Union, cast
 
-from ...events._events import (
-    BatchEndEvent,
-    BatchStartEvent,
-    FieldSlimEvent,
-    LoaderCallEvent,
-    PipelineEndEvent,
-    PipelineStartEvent,
-    RowReleaseEvent,
-    RowWriteEvent,
-)
+from ...events import Event
 from ...vendor.dataclassesx import asdict, dataclass, field
 from .._internal.console_report import emit_info, format_seconds
 from ..observer import EventDispatchObserver
@@ -120,61 +111,66 @@ class ExecutionTraceObserver(EventDispatchObserver):
         self.total_field_slims: int = 0
         self.total_row_writes: int = 0
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
+        payload = event.payload
         self.pipeline_start_time = time.time()
-        self.target_fields = event.targets
-        self.batch_size = event.batch_size
+        self.target_fields = payload.targets
+        self.batch_size = payload.batch_size
 
-    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
         _ = event
         self.pipeline_end_time = time.time()
 
-    def on_batch_start(self, event: BatchStartEvent) -> None:
+    def on_batch_start(self, event: Event) -> None:
+        payload = event.payload
         self.current_batch = BatchTrace(
-            batch_num=event.batch_num,
-            row_ids=event.row_ids,
+            batch_num=payload.batch_num,
+            row_ids=payload.row_ids,
             start_time=time.time(),
         )
 
-    def on_batch_end(self, event: BatchEndEvent) -> None:
+    def on_batch_end(self, event: Event) -> None:
         _ = event
         if self.current_batch:
             self.current_batch.finish()
             self.batches.append(self.current_batch)
             self.current_batch = None
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        result_count = len(event.result) if isinstance(event.result, Sized) else 0
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload
+        result_count = len(payload.result) if isinstance(payload.result, Sized) else 0
         self.total_loader_calls += 1
         if self.current_batch:
             step = LoaderCallStep(
-                loader_name=event.loader_name,
-                params=LoaderCallStep.serialize_params(event.params),
+                loader_name=payload.loader_name,
+                params=LoaderCallStep.serialize_params(payload.params),
                 result_count=result_count,
-                duration=event.duration,
+                duration=payload.duration,
             )
             self.current_batch.add_step(step)
 
-    def on_field_slim(self, event: FieldSlimEvent) -> None:
+    def on_field_slim(self, event: Event) -> None:
+        payload = event.payload
         if self.current_batch:
             step = FieldSlimStep(
-                field_key=event.field_key,
-                reason=event.reason,
-                remaining_fields=event.remaining_fields,
+                field_key=payload.field_key,
+                reason=payload.reason,
+                remaining_fields=payload.remaining_fields,
             )
             self.current_batch.add_step(step)
             self.total_field_slims += 1
 
-    def on_row_write(self, event: RowWriteEvent) -> None:
+    def on_row_write(self, event: Event) -> None:
+        payload = event.payload
         if self.current_batch:
             step = RowWriteStep(
-                row_id=event.row_id,
-                batch_num=event.batch_num,
+                row_id=payload.row_id,
+                batch_num=payload.batch_num,
             )
             self.current_batch.add_step(step)
             self.total_row_writes += 1
 
-    def on_row_release(self, event: RowReleaseEvent) -> None:
+    def on_row_release(self, event: Event) -> None:
         _ = event
 
     def export_to_json(self, indent: int = 2) -> str:

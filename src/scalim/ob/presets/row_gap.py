@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, Hashable, Iterable, List, Optional, Set, Sized, cast
 
 from ..._internal.loggingx import get_logger, prefix
-from ...events._events import LoaderCallEvent, PipelineEndEvent
+from ...events import Event
 from ..observer import EventDispatchObserver
 
 # endregion
@@ -46,23 +46,24 @@ class RowGapObserver(EventDispatchObserver):
         self._total_actual = 0
         self._total_missing = 0
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        if event.loader_name == self.primary_loader_name:
-            result_size = self._result_size(event.result)
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload
+        if payload.loader_name == self.primary_loader_name:
+            result_size = self._result_size(payload.result)
             self._primary_count = result_size
             self.logger.info(
                 ROW_GAP_LOG_PRIMARY,
                 result_size,
-                event.loader_name,
+                payload.loader_name,
             )
             return
 
-        if event.loader_name not in self.data_loader_names:
+        if payload.loader_name not in self.data_loader_names:
             return
 
-        expected_keys = self._extract_expected_keys(event.params)
+        expected_keys = self._extract_expected_keys(payload.params)
         expected_len = len(expected_keys) if expected_keys is not None else None
-        actual_len = self._result_size(event.result)
+        actual_len = self._result_size(payload.result)
         missing = None
 
         if expected_len is not None:
@@ -72,8 +73,8 @@ class RowGapObserver(EventDispatchObserver):
             self._total_missing += missing
 
         sample_missing: List[Hashable] = []
-        if expected_keys is not None and isinstance(event.result, dict) and self.sample_limit > 0:
-            result_dict = cast("Dict[Hashable, Any]", event.result)  # pragma: allow-cast loader result typed narrowing
+        if expected_keys is not None and isinstance(payload.result, dict) and self.sample_limit > 0:
+            result_dict = cast("Dict[Hashable, Any]", payload.result)  # pragma: allow-cast loader result typed narrowing
             for key in expected_keys:
                 try:
                     if key not in result_dict:
@@ -85,14 +86,14 @@ class RowGapObserver(EventDispatchObserver):
 
         self.logger.info(
             ROW_GAP_LOG_DATA,
-            event.loader_name,
+            payload.loader_name,
             expected_len,
             actual_len,
             missing,
             sample_missing or None,
         )
 
-    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
         _ = event
         if self._total_expected:
             self.logger.info(

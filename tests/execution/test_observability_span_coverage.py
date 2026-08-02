@@ -24,8 +24,8 @@ def test_instrumentation_hub_emit_operator_span_wants_gated() -> None:
         def __init__(self) -> None:
             self.payloads = []
 
-        def on_operator_span(self, payload: OperatorSpanEvent) -> None:  # type: ignore[override]
-            self.payloads.append(payload)
+        def on_operator_span(self, event) -> None:  # type: ignore[override]
+            self.payloads.append(event.payload)
 
     obs = _Observer()
     hub = InstrumentationHub(observer_manager=ObserverManager(observers=[obs]))

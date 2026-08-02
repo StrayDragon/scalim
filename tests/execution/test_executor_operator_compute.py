@@ -79,7 +79,7 @@ def test_compute_operator_emits_errors_and_success() -> None:
     assert context.get_field_value("score", 3) == 6
     assert len(hook.errors) == 2
     assert len(hook.field_computed) == 1
-    assert any(getattr(event, "context", {}).get("unexpected") for event in hook.errors)
+    assert any(getattr(getattr(event, "payload", event), "context", {}).get("unexpected") for event in hook.errors)
 
 
 def test_compute_operator_secure_compute_wants_gated_dependencies_payload(monkeypatch) -> None:
@@ -153,7 +153,7 @@ def test_compute_operator_builds_dependencies_payload_on_expected_error_when_wan
 
     ComputeOperatorExecutor().execute(operator, context, [1], runtime)
     assert len(hook.errors) == 1
-    assert hook.errors[0].context["dependencies"] == {"a": 1, "b": 0}
+    assert hook.errors[0].payload.context["dependencies"] == {"a": 1, "b": 0}
 
 
 def test_compute_operator_builds_dependencies_payload_on_unexpected_error_when_wants_gated(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -187,7 +187,7 @@ def test_compute_operator_builds_dependencies_payload_on_unexpected_error_when_w
 
     ComputeOperatorExecutor().execute(operator, context, [1], runtime)
     assert len(hook.errors) == 1
-    assert hook.errors[0].context["dependencies"] == {"a": 1, "b": 2}
+    assert hook.errors[0].payload.context["dependencies"] == {"a": 1, "b": 2}
 
 
 def test_compute_operator_secure_compute_emits_field_compute_and_formats_value() -> None:
@@ -237,8 +237,8 @@ def test_compute_operator_secure_compute_emits_field_compute_and_formats_value()
     assert context.get_field_value("sum", 1) == 30
     assert context.get_field_value("sum", 2) == 70
     assert len(hook.field_computed) == 2
-    assert hook.field_computed[0].dependencies == {"a": 1, "b": 2}
-    assert hook.field_computed[1].dependencies == {"a": 3, "b": 4}
+    assert hook.field_computed[0].payload.dependencies == {"a": 1, "b": 2}
+    assert hook.field_computed[1].payload.dependencies == {"a": 3, "b": 4}
 
 
 @pytest.mark.parametrize(
@@ -298,13 +298,13 @@ def test_compute_operator_secure_compute_expected_error_variants(
     assert len(hook.errors) == 1
 
     if guardrails is None:
-        assert hook.errors[0].context["dependencies"] == {"a": 1, "b": 2}
-        assert hook.errors[0].context.get("guardrail") is None
-        assert hook.errors[0].context.get("unexpected") is None
+        assert hook.errors[0].payload.context["dependencies"] == {"a": 1, "b": 2}
+        assert hook.errors[0].payload.context.get("guardrail") is None
+        assert hook.errors[0].payload.context.get("unexpected") is None
     else:
-        assert isinstance(hook.errors[0].error, GuardrailViolation)
-        assert hook.errors[0].context.get("guardrail") is True
-        assert hook.errors[0].context.get("unexpected") is None
+        assert isinstance(hook.errors[0].payload.error, GuardrailViolation)
+        assert hook.errors[0].payload.context.get("guardrail") is True
+        assert hook.errors[0].payload.context.get("unexpected") is None
 
 
 @pytest.mark.parametrize(
@@ -362,14 +362,14 @@ def test_compute_operator_secure_compute_unexpected_error_variants(
 
     assert context.get_field_value("div", 1) is None
     assert len(hook.errors) == 1
-    assert hook.errors[0].context.get("unexpected") is True
+    assert hook.errors[0].payload.context.get("unexpected") is True
 
     if guardrails is None:
-        assert hook.errors[0].context["dependencies"] == {"a": 1, "b": 0}
-        assert hook.errors[0].context.get("guardrail") is None
+        assert hook.errors[0].payload.context["dependencies"] == {"a": 1, "b": 0}
+        assert hook.errors[0].payload.context.get("guardrail") is None
     else:
-        assert isinstance(hook.errors[0].error, GuardrailViolation)
-        assert hook.errors[0].context.get("guardrail") is True
+        assert isinstance(hook.errors[0].payload.error, GuardrailViolation)
+        assert hook.errors[0].payload.context.get("guardrail") is True
 
 
 def test_compute_operator_injects_ctx_when_configured_and_emits_deps_without_ctx() -> None:
@@ -425,8 +425,8 @@ def test_compute_operator_injects_ctx_when_configured_and_emits_deps_without_ctx
     assert seen["ctx_values_type"] == "mappingproxy"
     assert seen["ctx_values"] in ({"amount": 100}, {"amount": 200})
     assert len(hook.field_computed) == 2
-    assert hook.field_computed[0].dependencies == {"amount": 100}
-    assert hook.field_computed[1].dependencies == {"amount": 200}
+    assert hook.field_computed[0].payload.dependencies == {"amount": 100}
+    assert hook.field_computed[1].payload.dependencies == {"amount": 200}
 
 
 def test_compute_operator_general_compute_guardrails_quiet_records_expected_and_unexpected_errors() -> None:
@@ -637,9 +637,9 @@ def test_compute_operator_constant_compute_errors_emit_per_row_and_compute_once(
     assert context.get_field_value("const", 3) is None
     assert len(hook.errors) == 3
     if unexpected:
-        assert all(getattr(event, "context", {}).get("unexpected") for event in hook.errors)
+        assert all(getattr(getattr(event, "payload", event), "context", {}).get("unexpected") for event in hook.errors)
     else:
-        assert all(getattr(event, "context", {}).get("unexpected") is None for event in hook.errors)
+        assert all(getattr(getattr(event, "payload", event), "context", {}).get("unexpected") is None for event in hook.errors)
 
 
 @pytest.mark.parametrize(
@@ -716,11 +716,11 @@ def test_compute_operator_constant_compute_errors_guardrails_variants(
     else:
         ComputeOperatorExecutor().execute(operator, context, [1, 2, 3], runtime)
         assert len(hook.errors) == 3
-        assert all(getattr(event, "context", {}).get("guardrail") for event in hook.errors)
+        assert all(getattr(getattr(event, "payload", event), "context", {}).get("guardrail") for event in hook.errors)
         if unexpected:
-            assert all(getattr(event, "context", {}).get("unexpected") for event in hook.errors)
+            assert all(getattr(getattr(event, "payload", event), "context", {}).get("unexpected") for event in hook.errors)
         else:
-            assert all(getattr(event, "context", {}).get("unexpected") is None for event in hook.errors)
+            assert all(getattr(getattr(event, "payload", event), "context", {}).get("unexpected") is None for event in hook.errors)
 
     assert calls["count"] == 1
     assert context.get_field_value("const", 1) is None

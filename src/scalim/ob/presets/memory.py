@@ -3,6 +3,7 @@
 import logging
 from typing import List, Set
 
+from ...events import Event
 from ...events._events import ColumnWriteEvent, FieldSlimEvent, LoaderSlimEvent, RowReleaseEvent, RowWriteEvent
 from ...vendor.compact.typing_extensionsx import override
 from .._internal.console_report import emit_info
@@ -40,25 +41,30 @@ class MemoryOptimizationObserver(EventDispatchObserver):
         self.auto_report = auto_report
         self.max_fields = max(0, max_fields)
 
-    def on_field_slim(self, event: FieldSlimEvent) -> None:
-        self.field_slim_events.append(event)
-        self._logger.debug("  [瘦身] %s | %s", event.field_key, event.reason)
+    def on_field_slim(self, event: Event) -> None:
+        payload = event.payload
+        self.field_slim_events.append(payload)
+        self._logger.debug("  [瘦身] %s | %s", payload.field_key, payload.reason)
 
-    def on_row_write(self, event: RowWriteEvent) -> None:
-        self.row_write_events.append(event)
-        self._logger.debug("  [写入] 行 row_id=%s", event.row_id)
+    def on_row_write(self, event: Event) -> None:
+        payload = event.payload
+        self.row_write_events.append(payload)
+        self._logger.debug("  [写入] 行 row_id=%s", payload.row_id)
 
-    def on_row_release(self, event: RowReleaseEvent) -> None:
-        self.row_release_events.append(event)
-        self._logger.debug("  [释放] 行 row_id=%s", event.row_id)
+    def on_row_release(self, event: Event) -> None:
+        payload = event.payload
+        self.row_release_events.append(payload)
+        self._logger.debug("  [释放] 行 row_id=%s", payload.row_id)
 
-    def on_loader_slim(self, event: LoaderSlimEvent) -> None:
-        self.loader_slim_events.append(event)
-        self._logger.debug("  [瘦身] 加载器 %s", event.loader_name)
+    def on_loader_slim(self, event: Event) -> None:
+        payload = event.payload
+        self.loader_slim_events.append(payload)
+        self._logger.debug("  [瘦身] 加载器 %s", payload.loader_name)
 
-    def on_column_write(self, event: ColumnWriteEvent) -> None:
-        self.column_write_events.append(event)
-        self._logger.debug("  [列写入] %s | %d 行", event.field_key, event.row_count)
+    def on_column_write(self, event: Event) -> None:
+        payload = event.payload
+        self.column_write_events.append(payload)
+        self._logger.debug("  [列写入] %s | %d 行", payload.field_key, payload.row_count)
 
     def get_slimmed_fields(self) -> Set[str]:
         return {e.field_key for e in self.field_slim_events}

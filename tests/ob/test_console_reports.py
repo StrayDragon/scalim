@@ -16,6 +16,7 @@ from scalim.ob.perf_metrics import PerformanceMetrics, StageMetrics
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.performance_presentation import PerformancePresentationLayer
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
+from tests.support.event_envelope import event_envelope
 
 
 def test_console_report_build_line_orders_kv_and_omits_none() -> None:
@@ -87,16 +88,16 @@ def test_performance_console_report_contains_summary_and_breakdown(caplog) -> No
         )
     )
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["x"], batch_size=3))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3]))
-    observer.on_stage_span(StageSpanEvent(batch_num=1, stage="loader", duration=0.1))
-    observer.on_stage_span(StageSpanEvent(batch_num=1, stage="compute", duration=0.05))
-    observer.on_stage_span(StageSpanEvent(batch_num=1, stage="write", duration=0.02))
-    observer.on_loader_call(LoaderCallEvent(loader_name="demo_loader", params={}, result=[{"x": 1}], duration=0.02))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.3))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["x"], batch_size=3)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="loader", duration=0.1)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="compute", duration=0.05)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="write", duration=0.02)))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="demo_loader", params={}, result=[{"x": 1}], duration=0.02)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.3)))
 
     with caplog.at_level(logging.INFO, logger=logger.name):
-        observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.3))
+        observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.3)))
 
     text = "\n".join(r.getMessage() for r in caplog.records)
     assert "[scalim] performance:" in text

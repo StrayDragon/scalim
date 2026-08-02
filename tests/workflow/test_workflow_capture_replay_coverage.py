@@ -22,7 +22,9 @@ class _RecordingHook(BaseHook):
     def __init__(self) -> None:
         self.typed: List[str] = []
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:  # type: ignore[override]
+    def on_pipeline_start(self, event: Event) -> None:  # type: ignore[override]
+        _ = event
+        self.typed.append("pipeline_start")
         _ = event
         self.typed.append("pipeline_start")
 
@@ -165,7 +167,17 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
         Event(event_type=EventType.WORKFLOW_FINISHED, timestamp=ts, run_id=workflow_exec_id, payload={"x": 2}, meta={}, seq=7),
     ]
     workflow_hook_events = [
-        HookRecordedEvent(event_type=EventType.PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
+        HookRecordedEvent(
+            event_type=EventType.PIPELINE_START,
+            event=Event(
+                event_type=EventType.PIPELINE_START,
+                timestamp=ts,
+                run_id=workflow_exec_id,
+                payload=PipelineStartEvent(targets=[], batch_size=None),
+                meta={},
+                seq=0,
+            ),
+        ),
     ]
 
     extra_hook = _RecordingHook()
@@ -178,7 +190,17 @@ def test_replay_captured_workflow_observability_replays_workflow_and_demand_even
     )
 
     demand_hook_events = [
-        HookRecordedEvent(event_type=EventType.PIPELINE_START, payload=PipelineStartEvent(targets=[], batch_size=None)),
+        HookRecordedEvent(
+            event_type=EventType.PIPELINE_START,
+            event=Event(
+                event_type=EventType.PIPELINE_START,
+                timestamp=ts,
+                run_id=node_id,
+                payload=PipelineStartEvent(targets=[], batch_size=None),
+                meta={},
+                seq=0,
+            ),
+        ),
     ]
     demand_observer_events = [
         Event(

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Set
 import pytest
 
 from scalim._internal.utils.loader_result import LoaderResultPolicy
-from scalim.events import EventType
+from scalim.events import Event, EventType
 from scalim.events._events import BatchStartEvent
 from scalim.execution.adaptive.capture import HookCaptureManager
 from scalim.execution.engine import ScalimEngine
@@ -19,6 +19,7 @@ from scalim.spec.ir import DemandIr
 from scalim.spec.ir import FieldIr
 from scalim.spec.ir import KeyIr, MainSourceIr, RuntimeHandleIdIr, SourceIr
 
+from tests.support.event_envelope import event_envelope
 from tests.support.testing_utils import CI_TIMEOUT_S
 
 
@@ -35,19 +36,23 @@ class _LoaderCallHook(BaseHook):
 def test_hook_capture_manager_emit_typed_gates_and_records() -> None:
     empty = HookManager()
     capture = HookCaptureManager(empty)
-    capture.emit_typed(EventType.BATCH_START, BatchStartEvent(batch_num=1, row_ids=[1]))
+    capture.emit_typed(EventType.BATCH_START, event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
     assert capture.drain_events() == []
 
     source = HookManager()
     source.register(_BatchStartHook())
     capture = HookCaptureManager(source)
-    capture.emit_typed("not-a-real-event-type", object())
+    capture.emit_typed(
+        "not-a-real-event-type", Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="", payload=None, meta={}, seq=0)
+    )
     assert capture.drain_events() == []
 
-    capture.emit_typed(EventType.BATCH_START, BatchStartEvent(batch_num=1, row_ids=[1]))
+    envelope = event_envelope(BatchStartEvent(batch_num=1, row_ids=[1]))
+    capture.emit_typed(EventType.BATCH_START, envelope)
     events = capture.drain_events()
     assert len(events) == 1
     assert events[0].event_type == EventType.BATCH_START
+    assert events[0].event.payload.batch_num == 1
 
 
 @pytest.mark.parametrize(
@@ -79,8 +84,8 @@ def test_hook_capture_manager_trigger_loader_call_policies(
     assert len(events) == 1
     recorded = events[0]
     assert recorded.event_type == EventType.LOADER_CALL
-    assert recorded.payload.loader_name == "customers"
-    assert recorded.payload.result == expected
+    assert recorded.event.payload.loader_name == "customers"
+    assert recorded.event.payload.result == expected
 
 
 def test_hook_capture_manager_trigger_loader_call_gates_no_hooks_and_no_subscription() -> None:
@@ -210,7 +215,7 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
 
     class _RecordingHook(BaseHook):
         def on_loader_call(self, event) -> None:  # type: ignore[override]
-            seen_loader_names.append(event.loader_name)
+            seen_loader_names.append(event.payload.loader_name)
             seen_thread_ids.add(threading.get_ident())
 
     hooks = HookManager()
@@ -393,3 +398,65 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
     assert seen_thread_ids == {main_thread}
     assert seen_loader_names == expected
     assert completion_order == [expected[1], expected[0]]
+
+
+def test_hook_capture_replay_preserves_field_compute_phase_meta() -> None:
+    """capture→replay MUST 保留 typed FIELD_COMPUTE 的 Event.meta（含 scalim_compute_phase）."""
+    from scalim.events import Event, FieldComputeEvent
+    from scalim.execution.adaptive.aggregation_unit import commit_task_result
+    from scalim.execution.context import BatchContext
+
+    class _PhaseHook(BaseHook):
+        def __init__(self) -> None:
+            self.events: List[Event] = []
+
+        def on_field_compute(self, event: Event) -> None:  # type: ignore[override]
+            self.events.append(event)
+
+    hook = _PhaseHook()
+    replay_manager = HookManager()
+    replay_manager.register(hook)
+
+    source = HookManager()
+    source.register(_PhaseHook())  # subscription discovery only
+    capture = HookCaptureManager(source)
+
+    envelope = event_envelope(
+        FieldComputeEvent(field_key="profit", row_id=1, dependencies={"a": 1}, result=10),
+        meta={"scalim_compute_phase": "write_precompute"},
+    )
+    capture.emit_typed(EventType.FIELD_COMPUTE, envelope)
+    recorded = capture.drain_events()
+    assert len(recorded) == 1
+    assert recorded[0].event.meta.get("scalim_compute_phase") == "write_precompute"
+
+    class _Result(object):
+        overlay = {}
+        group_enabled = False
+        relation_key = None
+        hook_events = recorded
+        observer_events = []  # type: List[Event]
+
+    class _Runtime(object):
+        hook_manager = replay_manager
+        load_ref_group_executed = set()  # type: Set[object]
+
+        class instrumentation(object):
+            @staticmethod
+            def emit_recorded_event(_event: Event) -> None:
+                return None
+
+    commit_task_result(
+        _Result(),
+        context=BatchContext(),
+        runtime=_Runtime(),  # type: ignore[arg-type]
+        committed_relation_keys=set(),
+    )
+
+    assert len(hook.events) == 1
+    replayed = hook.events[0]
+    assert isinstance(replayed, Event)
+    assert replayed.meta.get("scalim_compute_phase") == "write_precompute"
+    assert isinstance(replayed.payload, FieldComputeEvent)
+    assert replayed.payload.field_key == "profit"
+    assert replayed.payload.result == 10

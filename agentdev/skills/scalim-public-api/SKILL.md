@@ -48,6 +48,7 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 
 - EventType 下游适配任务卡: `references/task-event-type-adaptation.md`
 - EventType Enum 身份升级批次: `references/upgrades/2026-07-19-event-type-enum-identity.md`
+- typed handlers 收 `Event`（可读 `meta`）: `references/upgrades/2026-08-02-typed-handlers-receive-event.md`
 - 宽表 Excel: `references/streaming-column-excel.md`
 
 与 YAML DSL 的交叉入口:
@@ -57,5 +58,5 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - **0.10.0 性能亮点**(write-precompute / fusion / chunk 并行;YAML 无强制迁移):`scalim-yaml-dsl/references/0.10-release-highlights.md` + 人类总览 `docs/doc/releases/0.10.0/`。
   - 订阅 `FIELD_COMPUTE` / `OPERATOR_SPAN` 或 `VizObserverConfig(trace_enabled=True)` → **关掉** row-wise fusion(安全外壳)。
   - `lookup_chunk_size` ≠ 并行开关;片间并行仅 Python `parallelize_lookup_chunks` + `adaptive`。
-  - `FIELD_COMPUTE` 的 `meta.scalim_compute_phase` 仅在 `Event.meta`;typed `on_field_compute(payload)` 默认看不到——需要 phase 时覆写 `on_event` 读 `event.meta`,或等后续 meta→typed 契约变更。
-- YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType 批次属于 Python public API**,不进 YAML upgrades 索引。
+  - typed `on_field_compute` 等收完整 `Event`：经 `event.payload` 读公开类型，经 `event.meta` 读 `scalim_compute_phase` 等横切字段（breaking；见 `2026-08-02-typed-handlers-receive-event.md`）。
+- YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType / typed Event 批次属于 Python public API**,不进 YAML upgrades 索引。

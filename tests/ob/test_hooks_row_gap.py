@@ -2,16 +2,19 @@ import logging
 
 from scalim.events._events import LoaderCallEvent, PipelineEndEvent
 from scalim.ob.presets.row_gap import ROW_GAP_LOG_PRIMARY, ROW_GAP_LOG_SUMMARY, RowGapObserver
+from tests.support.event_envelope import event_envelope
 
 
 def test_row_gap_primary_loader_records_count(caplog) -> None:
     hook = RowGapObserver(primary_loader_name="primary", data_loader_names={"data"})
 
-    event = LoaderCallEvent(
-        loader_name="primary",
-        params={},
-        result={1: {"id": 1}, 2: {"id": 2}},
-        duration=0.1,
+    event = event_envelope(
+        LoaderCallEvent(
+            loader_name="primary",
+            params={},
+            result={1: {"id": 1}, 2: {"id": 2}},
+            duration=0.1,
+        )
     )
 
     with caplog.at_level(logging.INFO, logger=hook.logger.name):
@@ -24,16 +27,18 @@ def test_row_gap_primary_loader_records_count(caplog) -> None:
 def test_row_gap_data_loader_tracks_missing_and_summary(caplog) -> None:
     hook = RowGapObserver(primary_loader_name="primary", data_loader_names={"data"}, sample_limit=2)
 
-    data_event = LoaderCallEvent(
-        loader_name="data",
-        params={"batch_row_nth": [1, 2, 3]},
-        result={1: {"id": 1}},
-        duration=0.2,
+    data_event = event_envelope(
+        LoaderCallEvent(
+            loader_name="data",
+            params={"batch_row_nth": [1, 2, 3]},
+            result={1: {"id": 1}},
+            duration=0.2,
+        )
     )
 
     with caplog.at_level(logging.INFO, logger=hook.logger.name):
         hook.on_loader_call(data_event)
-        hook.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.5))
+        hook.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.5)))
 
     assert hook.total_expected == 3
     assert hook.total_actual == 1
@@ -44,16 +49,18 @@ def test_row_gap_data_loader_tracks_missing_and_summary(caplog) -> None:
 def test_row_gap_data_loader_handles_missing_expected_keys_and_skips_summary(caplog) -> None:
     hook = RowGapObserver(primary_loader_name="primary", data_loader_names={"data"}, sample_limit=1)
 
-    data_event = LoaderCallEvent(
-        loader_name="data",
-        params={},
-        result={1: {"id": 1}},
-        duration=0.0,
+    data_event = event_envelope(
+        LoaderCallEvent(
+            loader_name="data",
+            params={},
+            result={1: {"id": 1}},
+            duration=0.0,
+        )
     )
 
     with caplog.at_level(logging.INFO, logger=hook.logger.name):
         hook.on_loader_call(data_event)
-        hook.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+        hook.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=0, total_duration=0.0)))
 
     assert hook.total_expected == 0
     assert not any(ROW_GAP_LOG_SUMMARY in record.getMessage() for record in caplog.records)
@@ -75,18 +82,22 @@ def test_row_gap_extract_expected_keys_and_result_size() -> None:
 def test_row_gap_ignores_untracked_loader_and_unhashable_keys(caplog) -> None:
     hook = RowGapObserver(primary_loader_name="primary", data_loader_names={"data"}, sample_limit=1)
 
-    untracked_event = LoaderCallEvent(
-        loader_name="other",
-        params={"batch_row_nth": [1]},
-        result={},
-        duration=0.1,
+    untracked_event = event_envelope(
+        LoaderCallEvent(
+            loader_name="other",
+            params={"batch_row_nth": [1]},
+            result={},
+            duration=0.1,
+        )
     )
 
-    bad_key_event = LoaderCallEvent(
-        loader_name="data",
-        params={"batch_row_nth": [[1]]},
-        result={},
-        duration=0.1,
+    bad_key_event = event_envelope(
+        LoaderCallEvent(
+            loader_name="data",
+            params={"batch_row_nth": [[1]]},
+            result={},
+            duration=0.1,
+        )
     )
 
     with caplog.at_level(logging.INFO, logger=hook.logger.name):

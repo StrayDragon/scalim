@@ -2,19 +2,7 @@
 import time
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, cast
 
-from ....events import EventType
-from ....events._events import (
-    WorkflowCacheAcquireEvent,
-    WorkflowCacheEvictEvent,
-    WorkflowCacheReleaseEvent,
-    WorkflowNodeCancelledEvent,
-    WorkflowNodeEndEvent,
-    WorkflowNodeStartEvent,
-    WorkflowResourceCommitEvent,
-    WorkflowResourceCreateEvent,
-    WorkflowResourceDiscardEvent,
-    WorkflowResourceWriteEvent,
-)
+from ....events import Event, EventType
 from ....spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowIr,
@@ -338,7 +326,8 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
         self._ensure_started()
         self._emit_event(event_type, node_ref, payload)
 
-    def on_workflow_started(self, payload: Any) -> None:
+    def on_workflow_started(self, event: Event) -> None:
+        payload = event.payload
         self._workflow_wall_start_ts = time.time()
         node_ref_id = self._entry_workflow_node_ref_id()
         data: Dict[str, Any]
@@ -352,7 +341,8 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
             data,
         )
 
-    def on_workflow_finished(self, payload: Any) -> None:
+    def on_workflow_finished(self, event: Event) -> None:
+        payload = event.payload
         node_ref_id = self._entry_workflow_node_ref_id()
         data: Dict[str, Any]
         if isinstance(payload, dict):
@@ -365,7 +355,8 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
             data,
         )
 
-    def on_workflow_node_start(self, payload: WorkflowNodeStartEvent) -> None:
+    def on_workflow_node_start(self, event: Event) -> None:
+        payload = event.payload
         node_id = str(payload.workflow_node_id)
         self._node_wall_start_ts[node_id] = time.time()
         self._emit_workflow_event(
@@ -379,7 +370,8 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
             },
         )
 
-    def on_workflow_node_end(self, payload: WorkflowNodeEndEvent) -> None:
+    def on_workflow_node_end(self, event: Event) -> None:
+        payload = event.payload
         node_id = str(payload.workflow_node_id)
         started = self._node_wall_start_ts.get(node_id)
         duration_ms: Optional[int] = None
@@ -402,7 +394,8 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
             out,
         )
 
-    def on_workflow_node_cancelled(self, payload: WorkflowNodeCancelledEvent) -> None:
+    def on_workflow_node_cancelled(self, event: Event) -> None:
+        payload = event.payload
         node_id = str(payload.workflow_node_id)
         self._emit_workflow_event(
             "workflow_node_cancelled",
@@ -417,49 +410,56 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
             },
         )
 
-    def on_workflow_cache_acquire(self, payload: WorkflowCacheAcquireEvent) -> None:
+    def on_workflow_cache_acquire(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_CACHE_ACQUIRE,
             _workflow_node_ref(str(payload.workflow_node_id)),
             asdict(payload),
         )
 
-    def on_workflow_cache_release(self, payload: WorkflowCacheReleaseEvent) -> None:
+    def on_workflow_cache_release(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_CACHE_RELEASE,
             _workflow_node_ref(str(payload.workflow_node_id)),
             asdict(payload),
         )
 
-    def on_workflow_cache_evict(self, payload: WorkflowCacheEvictEvent) -> None:
+    def on_workflow_cache_evict(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_CACHE_EVICT,
             _workflow_node_ref(str(payload.workflow_node_id)),
             asdict(payload),
         )
 
-    def on_workflow_resource_create(self, payload: WorkflowResourceCreateEvent) -> None:
+    def on_workflow_resource_create(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_RESOURCE_CREATE,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )
 
-    def on_workflow_resource_write(self, payload: WorkflowResourceWriteEvent) -> None:
+    def on_workflow_resource_write(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_RESOURCE_WRITE,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )
 
-    def on_workflow_resource_commit(self, payload: WorkflowResourceCommitEvent) -> None:
+    def on_workflow_resource_commit(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_RESOURCE_COMMIT,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),
             asdict(payload),
         )
 
-    def on_workflow_resource_discard(self, payload: WorkflowResourceDiscardEvent) -> None:
+    def on_workflow_resource_discard(self, event: Event) -> None:
+        payload = event.payload
         self._emit_workflow_event(
             EventType.WORKFLOW_RESOURCE_DISCARD,
             _workflow_resource_ref(payload.resource_type, payload.resource_id),

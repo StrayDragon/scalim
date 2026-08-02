@@ -26,6 +26,7 @@ from scalim.ob.presets.execution_trace import ExecutionTraceObserver
 from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.typedefs import DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY
 from scalim.execution.runtime_bindings import RuntimeBindings
+from tests.support.event_envelope import event_envelope
 
 
 def _get_main_rows(demand, runtime_bindings: RuntimeBindings, limit: int = 3):
@@ -129,19 +130,19 @@ class _CaptureHook(BaseHook):
         self.loader_calls = []
         self.loader_slim_events = []
 
-    def on_loader_call(self, event) -> None:  # type: ignore[override]
-        self.loader_calls.append(event)
+    def on_loader_call(self, event: Event) -> None:  # type: ignore[override]
+        self.loader_calls.append(event.payload)
 
-    def on_loader_slim(self, event) -> None:  # type: ignore[override]
-        self.loader_slim_events.append(event)
+    def on_loader_slim(self, event: Event) -> None:  # type: ignore[override]
+        self.loader_slim_events.append(event.payload)
 
 
 class _DiagnosticCaptureObserver(EventDispatchObserver):
     def __init__(self) -> None:
         self.events = []
 
-    def on_diagnostic_warning(self, event: DiagnosticWarningEvent) -> None:
-        self.events.append(event)
+    def on_diagnostic_warning(self, event: Event) -> None:
+        self.events.append(event.payload)
 
 
 class _PipelineEventCaptureObserver(EventDispatchObserver):
@@ -151,17 +152,17 @@ class _PipelineEventCaptureObserver(EventDispatchObserver):
         self.batch_start_events = []
         self.batch_end_events = []
 
-    def on_pipeline_start(self, event) -> None:  # type: ignore[override]
-        self.pipeline_start_events.append(event)
+    def on_pipeline_start(self, event: Event) -> None:  # type: ignore[override]
+        self.pipeline_start_events.append(event.payload)
 
-    def on_pipeline_end(self, event) -> None:  # type: ignore[override]
-        self.pipeline_end_events.append(event)
+    def on_pipeline_end(self, event: Event) -> None:  # type: ignore[override]
+        self.pipeline_end_events.append(event.payload)
 
-    def on_batch_start(self, event) -> None:  # type: ignore[override]
-        self.batch_start_events.append(event)
+    def on_batch_start(self, event: Event) -> None:  # type: ignore[override]
+        self.batch_start_events.append(event.payload)
 
-    def on_batch_end(self, event) -> None:  # type: ignore[override]
-        self.batch_end_events.append(event)
+    def on_batch_end(self, event: Event) -> None:  # type: ignore[override]
+        self.batch_end_events.append(event.payload)
 
 
 class _EventOrderObserver(Observer):
@@ -205,7 +206,7 @@ def test_hook_manager_debug_mode_non_exploding_hook_returns() -> None:
 
     hook_manager.trigger_pipeline_start(["order_id"], 2)
 
-    assert hook.events and hook.events[0].targets == ["order_id"]
+    assert hook.events and hook.events[0].payload.targets == ["order_id"]
 
 
 def test_hook_manager_emit_on_event_clears_stale_has_hooks_flag() -> None:
@@ -318,7 +319,7 @@ def test_logging_hook_error_context(caplog) -> None:
     logger = logging.getLogger("scalim.tests.logging_error")
     hook = LoggingObserver(logger=logger)
 
-    event = ErrorEvent(RuntimeError("boom"), {"field": "value"})
+    event = event_envelope(ErrorEvent(RuntimeError("boom"), {"field": "value"}))
     with caplog.at_level(logging.ERROR, logger=logger.name):
         hook.on_error(event)
 
@@ -329,7 +330,7 @@ def test_logging_hook_error_skips_context_loop_when_empty(caplog) -> None:
     logger = logging.getLogger("scalim.tests.logging_error.empty_ctx")
     hook = LoggingObserver(logger=logger)
 
-    event = ErrorEvent(RuntimeError("boom"), {})
+    event = event_envelope(ErrorEvent(RuntimeError("boom"), {}))
     with caplog.at_level(logging.ERROR, logger=logger.name):
         hook.on_error(event)
 
@@ -348,7 +349,7 @@ def test_logging_hook_loader_call_len_error(caplog) -> None:
 
     logger = logging.getLogger("scalim.tests.logging_len_error")
     hook = LoggingObserver(logger=logger)
-    event = LoaderCallEvent(loader_name="loader", params={}, result=_BadLen(), duration=0.1)
+    event = event_envelope(LoaderCallEvent(loader_name="loader", params={}, result=_BadLen(), duration=0.1))
     with caplog.at_level(logging.INFO, logger=logger.name):
         hook.on_loader_call(event)
 
@@ -358,7 +359,7 @@ def test_logging_hook_loader_call_len_error(caplog) -> None:
 def test_logging_hook_loader_call_cache_status_without_field_keys(caplog) -> None:
     logger = logging.getLogger("scalim.tests.logging_cache")
     hook = LoggingObserver(logger=logger)
-    event = LoaderCallEvent(loader_name="loader", params={}, result={}, duration=0.1, cache_status="hit", field_keys=None)
+    event = event_envelope(LoaderCallEvent(loader_name="loader", params={}, result={}, duration=0.1, cache_status="hit", field_keys=None))
 
     with caplog.at_level(logging.INFO, logger=logger.name):
         hook.on_loader_call(event)
@@ -372,12 +373,14 @@ def test_logging_hook_diagnostic_warning(caplog) -> None:
     logger = logging.getLogger("scalim.tests.logging_warning")
     hook = LoggingObserver(logger=logger)
 
-    event = DiagnosticWarningEvent(
-        message=DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY,
-        source_id="customers",
-        field_id="customer_name",
-        lookup_key=1.0,
-        row_id=0,
+    event = event_envelope(
+        DiagnosticWarningEvent(
+            message=DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY,
+            source_id="customers",
+            field_id="customer_name",
+            lookup_key=1.0,
+            row_id=0,
+        )
     )
     with caplog.at_level(logging.WARNING, logger=logger.name):
         hook.on_diagnostic_warning(event)
@@ -512,11 +515,11 @@ def test_seq_pipeline_emits_event_order(plan_builder, engine_factory, example_ru
 def test_memory_optimization_hook_summary_truncates(caplog) -> None:
     hook = MemoryOptimizationObserver()
 
-    hook.on_field_slim(FieldSlimEvent(field_key="a", reason="test", batch_num=1, remaining_fields=1))
-    hook.on_field_slim(FieldSlimEvent(field_key="b", reason="test", batch_num=1, remaining_fields=1))
-    hook.on_column_write(ColumnWriteEvent(field_key="c1", row_count=1, batch_num=1))
-    hook.on_column_write(ColumnWriteEvent(field_key="c2", row_count=1, batch_num=1))
-    hook.on_loader_slim(LoaderSlimEvent(loader_name="loader", original_keys=3, extracted_fields=["a"], batch_num=1))
+    hook.on_field_slim(event_envelope(FieldSlimEvent(field_key="a", reason="test", batch_num=1, remaining_fields=1)))
+    hook.on_field_slim(event_envelope(FieldSlimEvent(field_key="b", reason="test", batch_num=1, remaining_fields=1)))
+    hook.on_column_write(event_envelope(ColumnWriteEvent(field_key="c1", row_count=1, batch_num=1)))
+    hook.on_column_write(event_envelope(ColumnWriteEvent(field_key="c2", row_count=1, batch_num=1)))
+    hook.on_loader_slim(event_envelope(LoaderSlimEvent(loader_name="loader", original_keys=3, extracted_fields=["a"], batch_num=1)))
 
     with caplog.at_level(logging.INFO, logger=hook._logger.name):
         hook.print_summary(max_fields=1)

@@ -106,20 +106,22 @@ from scalim.events import PipelineStartEvent, BatchEndEvent
 
 **若使用:** 覆盖 `on_pipeline_start`、`on_loader_call` 等 typed handler。
 
-**调整:** 参数类型使用公开 `payload` 类;订阅集仍须满足 A。
+**调整（2026-08-02 起）:** typed 入参为完整 `Event`；公开 payload 经 `event.payload`。详见 `2026-08-02-typed-handlers-receive-event.md`。订阅集仍须满足 A。
 
 ```python
-from scalim.events import EventType, PipelineStartEvent, LoaderCallEvent
+from scalim.events import Event, EventType, PipelineStartEvent, LoaderCallEvent
 from scalim.ob.observer import EventDispatchObserver
 
 class MyObserver(EventDispatchObserver):
     event_types = {EventType.PIPELINE_START, EventType.LOADER_CALL}
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
-        _ = event.targets
+    def on_pipeline_start(self, event: Event) -> None:
+        payload = event.payload  # PipelineStartEvent
+        _ = payload.targets
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        _ = event.loader_name
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload  # LoaderCallEvent
+        _ = payload.loader_name
 ```
 
 ---

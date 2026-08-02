@@ -144,9 +144,9 @@ def test_direct_row_call_degrades_unexpected_error_to_none() -> None:
 
     assert materializer.fill_row_values(layout, context, 0) == [3, None]
     assert len(hook.errors) == 1
-    assert hook.errors[0].context["unexpected"] is True
+    assert hook.errors[0].payload.context["unexpected"] is True
     # `guardrails` 未启用: 错误负载按依赖名重建.
-    assert hook.errors[0].context["dependencies"] == {"amount": 3}
+    assert hook.errors[0].payload.context["dependencies"] == {"amount": 3}
 
 
 def test_call_by_memoization_reuses_cached_result(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -215,8 +215,8 @@ def test_compute_value_degrades_expected_and_unexpected_errors() -> None:
     assert materializer.compute_value(plan, 1, (-1,), wants_field_compute=True, compute_mode="full") is None
 
     assert len(hook.errors) == 2
-    assert hook.errors[0].context["dependencies"] == {"amount": 3}
-    assert hook.errors[1].context["unexpected"] is True
+    assert hook.errors[0].payload.context["dependencies"] == {"amount": 3}
+    assert hook.errors[1].payload.context["unexpected"] is True
 
 
 def test_dense_dep_reader_rejects_out_of_range_and_non_int_rows() -> None:
@@ -282,7 +282,7 @@ def test_column_direct_call_degrades_unexpected_error_to_none() -> None:
 
     assert column.materialize_column(context, "late", [0]) == [None]
     assert len(hook.errors) == 1
-    assert hook.errors[0].context["unexpected"] is True
+    assert hook.errors[0].payload.context["unexpected"] is True
 
 
 def test_row_values_reuse_late_column_dependency_values() -> None:

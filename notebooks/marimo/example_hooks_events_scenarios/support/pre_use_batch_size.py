@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Set
 from scalim.dsl import yaml_dsl as api
 from scalim.dsl.yaml_dsl import UNSET
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions
-from scalim.events import EventType, PipelineStartEvent
+from scalim.events import Event, EventType, PipelineStartEvent
 from scalim.hooks import BaseHook
 from scalim.ob.observer import EventDispatchObserver
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
@@ -49,8 +49,9 @@ class BatchSizeProbe(EventDispatchObserver):
         self.event_types: Optional[Set[EventType]] = {EventType.PIPELINE_START}
         self.batch_sizes: List[Optional[int]] = []
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
-        raw = getattr(event, "batch_size", None)
+    def on_pipeline_start(self, event: Event) -> None:
+        body = event.payload
+        raw = getattr(body, "batch_size", None)
         self.batch_sizes.append(None if raw is None else int(raw))
 
 

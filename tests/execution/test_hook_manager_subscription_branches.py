@@ -33,7 +33,7 @@ class _CaptureLoaderCallHook(BaseHook):
         self.seen_results: list[object] = []
 
     def on_loader_call(self, event) -> None:  # type: ignore[override]
-        self.seen_results.append(event.result)
+        self.seen_results.append(event.payload.result)
 
 
 def test_hook_manager_rejects_bare_str_on_event_types() -> None:

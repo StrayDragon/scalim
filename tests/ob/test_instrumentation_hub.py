@@ -136,7 +136,7 @@ def test_hub_on_event_and_typed_callbacks_are_both_invoked() -> None:
 
     hub.emit_pipeline_start(targets=["x"], batch_size=1)
 
-    assert hook.typed_events and isinstance(hook.typed_events[0], PipelineStartEvent)
+    assert hook.typed_events and isinstance(hook.typed_events[0].payload, PipelineStartEvent)
     assert hook.on_event_events and hook.on_event_events[0].event_type == EventType.PIPELINE_START
 
 

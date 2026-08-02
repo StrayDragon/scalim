@@ -7,20 +7,7 @@ from collections.abc import Sized
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
-from ...events import EventType
-from ...events._events import (
-    AdaptiveSchedulerDecisionEvent,
-    BatchEndEvent,
-    BatchStartEvent,
-    ColumnWriteEvent,
-    FieldComputeEvent,
-    LoaderCallEvent,
-    OperatorSpanEvent,
-    PipelineEndEvent,
-    PipelineStartEvent,
-    RowWriteEvent,
-    StageSpanEvent,
-)
+from ...events import Event, EventType
 from ...typedefs import PerformanceReportFormat
 from ...vendor.compact.importlibx import import_module
 from ...vendor.dataclassesx import dataclass, field
@@ -249,7 +236,7 @@ class PerformanceObserver(EventDispatchObserver):
             self._batch_stage_durations[batch_num] = entry
         return entry
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
         _ = event
         self.metrics = PerformanceMetrics()
         self._batch_stage_durations.clear()
@@ -265,9 +252,10 @@ class PerformanceObserver(EventDispatchObserver):
 
         self._sample_cpu("pipeline_start")
 
-    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
-        self.metrics.total_duration = event.total_duration
-        self.metrics.batch_count = event.total_batches
+    def on_pipeline_end(self, event: Event) -> None:
+        payload = event.payload
+        self.metrics.total_duration = payload.total_duration
+        self.metrics.batch_count = payload.total_batches
 
         mem_mb = self._get_memory_mb()
         if mem_mb is not None:
@@ -280,18 +268,20 @@ class PerformanceObserver(EventDispatchObserver):
 
         self._output_report()
 
-    def on_batch_start(self, event: BatchStartEvent) -> None:
-        self._current_batch_num = event.batch_num
-        _ = self._get_batch_stage_entry(event.batch_num)
+    def on_batch_start(self, event: Event) -> None:
+        payload = event.payload
+        self._current_batch_num = payload.batch_num
+        _ = self._get_batch_stage_entry(payload.batch_num)
         # `PerformanceMetrics.total_rows` 统计输入的 `row_ids`,用于低开销估算吞吐量.
         # 它可能与 `sink` 实际写出的行数不同.
-        self.metrics.total_rows += len(event.row_ids)
+        self.metrics.total_rows += len(payload.row_ids)
 
-    def on_batch_end(self, event: BatchEndEvent) -> None:
-        self.metrics.batch_durations.append(event.duration)
+    def on_batch_end(self, event: Event) -> None:
+        payload = event.payload
+        self.metrics.batch_durations.append(payload.duration)
 
         stage_entry = self._batch_stage_durations.pop(
-            event.batch_num,
+            payload.batch_num,
             {"stream": 0.0, "loader": 0.0, "compute": 0.0, "write": 0.0},
         )
         self.metrics.stage_metrics.stream_duration += stage_entry.get("stream", 0.0)
@@ -299,13 +289,13 @@ class PerformanceObserver(EventDispatchObserver):
         self.metrics.stage_metrics.compute_duration += stage_entry["compute"]
         self.metrics.stage_metrics.write_duration += stage_entry["write"]
 
-        should_sample = event.batch_num % self.config.sampling_interval == 0
+        should_sample = payload.batch_num % self.config.sampling_interval == 0
         if should_sample:
-            label = "batch_{}".format(event.batch_num)
+            label = "batch_{}".format(payload.batch_num)
             self._sample_memory(label)
             self._sample_cpu(label)
 
-        self._check_thresholds("batch_duration", event.duration)
+        self._check_thresholds("batch_duration", payload.duration)
 
         if self.config.include_batch_lines and self.config.report_format != "none":
             mem_mb = self._get_memory_mb()
@@ -317,8 +307,8 @@ class PerformanceObserver(EventDispatchObserver):
                     kind="performance.batch",
                     message="performance.batch",
                     fields={
-                        "batch_num": int(event.batch_num),
-                        "duration_s": float(event.duration),
+                        "batch_num": int(payload.batch_num),
+                        "duration_s": float(payload.duration),
                         "stream_s": float(stage_entry.get("stream", 0.0)),
                         "source_lookup_s": float(stage_entry.get("loader", 0.0)),
                         "compute_s": float(stage_entry.get("compute", 0.0)),
@@ -329,7 +319,7 @@ class PerformanceObserver(EventDispatchObserver):
                 )
                 return
 
-            parts = ["duration={:.2f}s".format(event.duration)]
+            parts = ["duration={:.2f}s".format(payload.duration)]
             parts.append("stream={:.2f}s".format(stage_entry.get("stream", 0.0)))
             parts.append("loader={:.2f}s".format(stage_entry["loader"]))
             parts.append("compute={:.2f}s".format(stage_entry["compute"]))
@@ -341,43 +331,47 @@ class PerformanceObserver(EventDispatchObserver):
             self.config.logger.info(
                 "%s批次 %d | %s",
                 prefix("performance"),
-                event.batch_num,
+                payload.batch_num,
                 ", ".join(parts),
             )
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        stats = self.metrics.get_loader_stats(event.loader_name)
-        result_count = len(event.result) if isinstance(event.result, Sized) else 0
-        stats.record_call(event.duration, result_count, event.cache_status)
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload
+        stats = self.metrics.get_loader_stats(payload.loader_name)
+        result_count = len(payload.result) if isinstance(payload.result, Sized) else 0
+        stats.record_call(payload.duration, result_count, payload.cache_status)
 
-    def on_field_compute(self, event: FieldComputeEvent) -> None:
+    def on_field_compute(self, event: Event) -> None:
         _ = event
 
-    def on_row_write(self, event: RowWriteEvent) -> None:
+    def on_row_write(self, event: Event) -> None:
         _ = event
 
-    def on_column_write(self, event: ColumnWriteEvent) -> None:
+    def on_column_write(self, event: Event) -> None:
         _ = event
 
-    def on_stage_span(self, event: StageSpanEvent) -> None:
-        entry = self._get_batch_stage_entry(event.batch_num)
-        if event.stage in entry:
-            entry[event.stage] += max(0.0, event.duration)
+    def on_stage_span(self, event: Event) -> None:
+        payload = event.payload
+        entry = self._get_batch_stage_entry(payload.batch_num)
+        if payload.stage in entry:
+            entry[payload.stage] += max(0.0, payload.duration)
 
-    def on_operator_span(self, event: OperatorSpanEvent) -> None:
-        if event.operator_type != "compute":
+    def on_operator_span(self, event: Event) -> None:
+        payload = event.payload
+        if payload.operator_type != "compute":
             return
-        if not event.field_key:
+        if not payload.field_key:
             return
-        stats = self.metrics.get_field_compute_stats(str(event.field_key))
-        stats.record_call(float(event.duration))
+        stats = self.metrics.get_field_compute_stats(str(payload.field_key))
+        stats.record_call(float(payload.duration))
 
-    def on_adaptive_scheduler_decision(self, event: AdaptiveSchedulerDecisionEvent) -> None:
+    def on_adaptive_scheduler_decision(self, event: Event) -> None:
+        payload = event.payload
         metrics = self.metrics.adaptive_scheduler
         if metrics is None:
             metrics = AdaptiveSchedulerMetrics()
             self.metrics.adaptive_scheduler = metrics
-        metrics.record_decision(event)
+        metrics.record_decision(payload)
 
     def _output_report(self) -> None:
         self._presentation.output_report(

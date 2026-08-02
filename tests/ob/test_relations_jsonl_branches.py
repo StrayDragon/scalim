@@ -5,6 +5,7 @@ import logging
 from scalim.events._events import RelationLookupEvent
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.ob.structured_logging import install_jsonl_logging
+from tests.support.event_envelope import event_envelope
 
 
 @contextlib.contextmanager
@@ -40,16 +41,18 @@ def test_relations_type_error_and_samples_are_structured_under_jsonl() -> None:
         # generate type mismatch samples
         for i in range(3):
             obs.on_relation_lookup(
-                RelationLookupEvent(
-                    field_key="x",
-                    row_id=i,
-                    fk_raw="1",
-                    fk_normalized=1,
-                    target_source="customers",
-                    result="type_error",
-                    fk_type="str",
-                    expected_type="int",
-                    error_message="bad type",
+                event_envelope(
+                    RelationLookupEvent(
+                        field_key="x",
+                        row_id=i,
+                        fk_raw="1",
+                        fk_normalized=1,
+                        target_source="customers",
+                        result="type_error",
+                        fk_type="str",
+                        expected_type="int",
+                        error_message="bad type",
+                    )
                 )
             )
 

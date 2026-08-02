@@ -33,6 +33,7 @@ from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr
 from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 from tests.support.pathing import fixtures_dir
 from tests.support.testing_utils import missing_optional_dependency
+from tests.support.event_envelope import event_envelope
 
 _ALLOWED_MODULES = frozenset(["scalim_misc.example_report_ir"])
 
@@ -288,11 +289,11 @@ def test_run_uses_config_output_path(example_model, tmp_path: Path) -> None:
 def test_pretty_logging_observer_renders_stats(capsys) -> None:
     observer = PrettyLoggingObserver()
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a", "b"], batch_size=2))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2]))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.01))
-    observer.on_loader_call(LoaderCallEvent(loader_name="demo_loader", params={}, result={1: {"x": 1}}, duration=0.5))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.02))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a", "b"], batch_size=2)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2])))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.01)))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="demo_loader", params={}, result={1: {"x": 1}}, duration=0.5)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.02)))
 
     output = capsys.readouterr().out
     assert "[scalim] pretty:" in output
@@ -304,8 +305,8 @@ def test_pretty_logging_observer_renders_stats(capsys) -> None:
 def test_pretty_logging_observer_pipeline_end_skips_empty_loader_stats(capsys) -> None:
     observer = PrettyLoggingObserver()
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=1)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=0, total_duration=0.0)))
 
     output = capsys.readouterr().out
     assert "pipeline_end" in output
@@ -315,9 +316,9 @@ def test_pretty_logging_observer_pipeline_end_skips_empty_loader_stats(capsys) -
 def test_pretty_logging_observer_renders_batch_duration_from_event(capsys) -> None:
     observer = PrettyLoggingObserver()
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=1.23))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=1)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=1.23)))
 
     output = capsys.readouterr().out
     assert "duration_s=1.23" in output
@@ -383,11 +384,13 @@ def test_pretty_logging_observer_handles_non_sized_result() -> None:
     observer = PrettyLoggingObserver()
 
     observer.on_loader_call(
-        LoaderCallEvent(
-            loader_name="demo_loader",
-            params={},
-            result=object(),
-            duration=0.1,
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="demo_loader",
+                params={},
+                result=object(),
+                duration=0.1,
+            )
         )
     )
 
@@ -399,7 +402,7 @@ def test_pretty_logging_observer_handles_non_sized_result() -> None:
 def test_pretty_logging_observer_uses_unknown_loader_name_when_empty() -> None:
     observer = PrettyLoggingObserver()
 
-    observer.on_loader_call(LoaderCallEvent(loader_name="", params={}, result={}, duration=0.1))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="", params={}, result={}, duration=0.1)))
 
     assert "<unknown>" in observer._loader_stats
 
@@ -408,23 +411,27 @@ def test_pretty_logging_observer_formats_cache_status() -> None:
     observer = PrettyLoggingObserver()
 
     observer.on_loader_call(
-        LoaderCallEvent(
-            loader_name="demo_loader",
-            params={},
-            result={},
-            duration=0.5,
-            cache_status="hit",
-            field_keys=["order_id"],
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="demo_loader",
+                params={},
+                result={},
+                duration=0.5,
+                cache_status="hit",
+                field_keys=["order_id"],
+            )
         )
     )
     observer.on_loader_call(
-        LoaderCallEvent(
-            loader_name="demo_loader",
-            params={},
-            result={},
-            duration=0.2,
-            cache_status="miss",
-            field_keys=None,
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="demo_loader",
+                params={},
+                result={},
+                duration=0.2,
+                cache_status="miss",
+                field_keys=None,
+            )
         )
     )
 

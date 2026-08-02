@@ -12,6 +12,7 @@ from scalim.events._events import (
 from scalim.ob.presets.performance import PerformanceConfig, PerformanceObserver
 from scalim.ob.presets.relations import RelationConfig, RelationObserver
 from scalim.ob.structured_logging import install_jsonl_logging, log_context, normalize_keys_to_full
+from tests.support.event_envelope import event_envelope
 
 
 def test_jsonl_logging_is_line_oriented_and_includes_context() -> None:
@@ -43,14 +44,14 @@ def test_jsonl_logging_is_line_oriented_and_includes_context() -> None:
                     logger=perf_logger,
                 )
             )
-            perf.on_pipeline_start(PipelineStartEvent(targets=["x"], batch_size=3))
-            perf.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3]))
-            perf.on_stage_span(StageSpanEvent(batch_num=1, stage="stream", duration=0.01))
-            perf.on_stage_span(StageSpanEvent(batch_num=1, stage="loader", duration=0.1))
-            perf.on_stage_span(StageSpanEvent(batch_num=1, stage="compute", duration=0.05))
-            perf.on_stage_span(StageSpanEvent(batch_num=1, stage="write", duration=0.02))
-            perf.on_batch_end(BatchEndEvent(batch_num=1, duration=0.3))
-            perf.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.3))
+            perf.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["x"], batch_size=3)))
+            perf.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3])))
+            perf.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="stream", duration=0.01)))
+            perf.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="loader", duration=0.1)))
+            perf.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="compute", duration=0.05)))
+            perf.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="write", duration=0.02)))
+            perf.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.3)))
+            perf.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.3)))
 
         text = buf.getvalue()
         lines = [ln for ln in text.splitlines() if ln.strip()]

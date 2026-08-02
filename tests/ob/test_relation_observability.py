@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from tests.support.event_envelope import event_envelope
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -232,13 +233,15 @@ class TestRelationObserver:
 
         observer = RelationObserver(config=RelationConfig(sampling_rate=1.0))
         observer.on_relation_lookup(  # type: ignore[arg-type]
-            RelationLookupEvent(
-                field_key="",
-                row_id=1,
-                fk_raw="1",
-                fk_normalized="1",
-                target_source="customers",
-                result="unknown",
+            event_envelope(
+                RelationLookupEvent(
+                    field_key="",
+                    row_id=1,
+                    fk_raw="1",
+                    fk_normalized="1",
+                    target_source="customers",
+                    result="unknown",
+                )
             )
         )
         assert observer.metrics.total_lookups == 1
@@ -322,7 +325,7 @@ class TestRelationObserver:
         observer = RelationObserver()
         observer.record_lookup(1, 10, 10, "customers", "hit")
 
-        event = PipelineStartEvent(targets=["field1"], batch_size=100)
+        event = event_envelope(PipelineStartEvent(targets=["field1"], batch_size=100))
         observer.on_pipeline_start(event)
 
         assert observer.metrics.total_lookups == 0
@@ -334,7 +337,7 @@ class TestRelationObserver:
         observer = RelationObserver(config=config)
         observer.record_lookup(1, 10, 10, "customers", "hit")
 
-        event = PipelineEndEvent(total_batches=10, total_duration=1.0)
+        event = event_envelope(PipelineEndEvent(total_batches=10, total_duration=1.0))
         observer.on_pipeline_end(event)
 
     def test_print_summary(self) -> None:

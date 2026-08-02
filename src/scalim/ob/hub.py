@@ -92,12 +92,14 @@ class InstrumentationHub:
         payload: Any,
         meta: Optional[Dict[str, Any]] = None,
     ) -> Optional[Event]:
-        self.hook_manager.emit_typed(event_type, payload)
+        # 类型化 / `observer` / `on_event` 共用同一 `Event` 信封(`r217`);顺序: 类型化 → `observer` → `on_event`.
+        event = self.observer_manager.build_event(event_type, payload, meta=meta)
+        self.hook_manager.emit_typed(event_type, event)
 
         if not (self.observer_manager.wants(event_type) or self.hook_manager.wants_on_event(event_type)):
             return None
 
-        event = self.observer_manager.emit_event(event_type, payload, meta=meta)
+        self.observer_manager.emit(event)
         if self.observer_manager.mode != "capture":
             self.hook_manager.emit_on_event(event)
         return event
@@ -185,6 +187,7 @@ class InstrumentationHub:
                 field_keys=field_keys,
                 skipped_none_rows=skipped_none_rows,
                 chunk_offset=chunk_offset,
+                meta=meta,
             )
 
         if not (self.observer_manager.wants(EventType.LOADER_CALL) or self.hook_manager.wants_on_event(EventType.LOADER_CALL)):
@@ -308,13 +311,12 @@ class InstrumentationHub:
             row_id=row_id,
         )
 
+        event = self.observer_manager.build_event(EventType.DIAGNOSTIC_WARNING, payload, meta=meta)
         if hooks_want:
-            self.hook_manager.emit_typed(EventType.DIAGNOSTIC_WARNING, payload)
-
+            self.hook_manager.emit_typed(EventType.DIAGNOSTIC_WARNING, event)
         if not event_want:
             return
-
-        event = self.observer_manager.emit_event(EventType.DIAGNOSTIC_WARNING, payload, meta=meta)
+        self.observer_manager.emit(event)
         if self.observer_manager.mode != "capture":
             self.hook_manager.emit_on_event(event)
 

@@ -23,8 +23,8 @@ def test_observer_supports_respects_event_types() -> None:
 class _BadDispatchObserver(EventDispatchObserver):
     dispatch_map = None  # type: ignore[assignment]
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
-        _ = event
+    def on_pipeline_start(self, event: Event) -> None:
+        _ = event.payload
 
 
 def test_observer_manager_infers_no_subscriptions_when_dispatch_map_is_not_dict() -> None:
@@ -38,8 +38,8 @@ class _NonCatalogDispatchObserver(EventDispatchObserver):
     def __init__(self) -> None:
         self.events = []
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
-        self.events.append(event)
+    def on_pipeline_start(self, event: Event) -> None:
+        self.events.append(event.payload)
 
 
 def test_observer_manager_inference_skips_non_catalog_event_types_in_dispatch_map() -> None:

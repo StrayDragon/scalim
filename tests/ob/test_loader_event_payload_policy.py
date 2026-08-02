@@ -1,3 +1,4 @@
+from scalim.events import Event
 from collections.abc import Sequence
 
 import pytest
@@ -12,8 +13,8 @@ class _CaptureObserver(EventDispatchObserver):
     def __init__(self) -> None:
         self.events = []  # type: ignore[var-annotated]
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        self.events.append(event)
+    def on_loader_call(self, event: Event) -> None:
+        self.events.append(event.payload)
 
 
 class _BadSequence(Sequence):

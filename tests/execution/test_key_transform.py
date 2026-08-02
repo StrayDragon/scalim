@@ -370,7 +370,7 @@ def test_lookup_cast_auto_float_emits_diagnostic_warning(mock_float_key_loader: 
     )
     assert all(row["customer_name"] is None for row in results)
     assert len(hook.events) == 1
-    assert isinstance(hook.events[0].lookup_key, float)
+    assert isinstance(hook.events[0].payload.lookup_key, float)
 
 
 def test_lookup_cast_auto_non_float_has_no_warning(mock_loader_with_types: MockDataLoaderWithTypes) -> None:

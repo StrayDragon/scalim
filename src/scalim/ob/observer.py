@@ -82,7 +82,7 @@ class EventDispatchObserver(Observer):
         handler = handler_cache[event_type]
         if handler is None:
             return
-        _ = handler(event.payload)
+        _ = handler(event)
 
 
 __all__ = (

@@ -32,7 +32,7 @@ flowchart TD
 
 - **不必改 YAML**。仅被最终写出消费的派生字段，Compute 段可能跳过，写出前再物化。
 - 若依赖「Compute 段结束后 `BatchContext` 已有全部派生」的旁路逻辑（少见），需要改调用侧或把字段变成被其它派生 / LoadRef 消费。
-- 观测：`FIELD_COMPUTE` 可能带 `meta.scalim_compute_phase` = `operator` \| `write_precompute`。
+- 观测：`FIELD_COMPUTE` 可能带 `meta.scalim_compute_phase` = `operator` \| `write_precompute`；typed Observer/Hook `on_*` 收完整 `Event`，可经 `event.meta` 读取。
 - 契约：输出值与 calculator 调用次数与早算路径一致（`golden_ok`）。
 
 ### 2. row-wise fusion（默认，有外壳）

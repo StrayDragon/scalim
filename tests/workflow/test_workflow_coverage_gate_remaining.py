@@ -976,7 +976,12 @@ def test_workflow_controller_process_completed_future_capture_skips_request_when
     )
     captured = _CapturedNodeRun(
         core=core,
-        captured_hook_events=[HookRecordedEvent(event_type=EventType.PIPELINE_START, payload={"x": 1})],
+        captured_hook_events=[
+            HookRecordedEvent(
+                event_type=EventType.PIPELINE_START,
+                event=Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="a", payload={"x": 1}, meta={}, seq=0),
+            )
+        ],
         captured_events=[Event(event_type="evt", timestamp=0.0, run_id="a", payload=None, meta=None, seq=0)],
         viz_observer=None,
     )
@@ -1041,7 +1046,7 @@ def test_build_demand_replay_instrumentation_allows_viz_observer_without_request
 
 
 def test_replay_captured_observability_replays_hook_events_without_node_replay() -> None:
-    from scalim.events import EventType
+    from scalim.events import Event, EventType
     from scalim.execution.adaptive.capture import HookRecordedEvent
     from scalim.spec.ir._workflow import (
         WorkflowArtifactsIr,
@@ -1078,12 +1083,21 @@ def test_replay_captured_observability_replays_hook_events_without_node_replay()
         workflow_exec_id="wf_test",
         workflow_components=(),
         captured_demand_events_by_node_id={"a": []},
-        captured_demand_hook_events_by_node_id={"a": [HookRecordedEvent(event_type=EventType.PIPELINE_START, payload={"x": 1})]},
+        captured_demand_hook_events_by_node_id={
+            "a": [
+                HookRecordedEvent(
+                    event_type=EventType.PIPELINE_START,
+                    event=Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="a", payload={"x": 1}, meta={}, seq=0),
+                )
+            ]
+        },
         captured_demand_viz_observer_by_node_id={},
         captured_demand_request_by_node_id={},
     )
 
-    assert replay.hook_manager.emitted == [(EventType.PIPELINE_START.value, {"x": 1})]
+    assert len(replay.hook_manager.emitted) == 1
+    assert replay.hook_manager.emitted[0][0] == EventType.PIPELINE_START.value
+    assert replay.hook_manager.emitted[0][1].payload == {"x": 1}
 
 
 def test_sheetbook_decide_alignment_action_returns_error_for_unknown_policy() -> None:

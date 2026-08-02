@@ -6,21 +6,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
 from ..events import Event, EventType
-from ..events._events import (
-    BatchEndEvent,
-    BatchStartEvent,
-    ColumnWriteEvent,
-    DiagnosticWarningEvent,
-    ErrorEvent,
-    FieldComputeEvent,
-    FieldSlimEvent,
-    LoaderCallEvent,
-    LoaderSlimEvent,
-    PipelineEndEvent,
-    PipelineStartEvent,
-    RowReleaseEvent,
-    RowWriteEvent,
-)
 from ..vendor.compact.typing_extensionsx import override
 from ._dispatch import HookDispatchStrategy
 from ._internal.common import HOOK_TYPED_DISPATCH_MAP
@@ -37,55 +22,55 @@ class IExecutionHook(ABC):
     """执行钩子接口."""
 
     @abstractmethod
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
         """当管线开始时调用."""
 
     @abstractmethod
-    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
         """当管线结束时调用."""
 
     @abstractmethod
-    def on_batch_start(self, event: BatchStartEvent) -> None:
+    def on_batch_start(self, event: Event) -> None:
         """当批次开始时调用."""
 
     @abstractmethod
-    def on_batch_end(self, event: BatchEndEvent) -> None:
+    def on_batch_end(self, event: Event) -> None:
         """当批次结束时调用."""
 
     @abstractmethod
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
+    def on_loader_call(self, event: Event) -> None:
         """当加载函数被调用时调用."""
 
     @abstractmethod
-    def on_field_compute(self, event: FieldComputeEvent) -> None:
+    def on_field_compute(self, event: Event) -> None:
         """当字段被计算时调用"""
 
     @abstractmethod
-    def on_error(self, event: ErrorEvent) -> None:
+    def on_error(self, event: Event) -> None:
         """当发生错误时调用"""
 
     @abstractmethod
-    def on_diagnostic_warning(self, event: DiagnosticWarningEvent) -> None:
+    def on_diagnostic_warning(self, event: Event) -> None:
         """当发生诊断告警时调用"""
 
     @abstractmethod
-    def on_field_slim(self, event: FieldSlimEvent) -> None:
+    def on_field_slim(self, event: Event) -> None:
         """当字段从上下文中删除时调用 (FR022)"""
 
     @abstractmethod
-    def on_row_write(self, event: RowWriteEvent) -> None:
+    def on_row_write(self, event: Event) -> None:
         """当行被写入行式输出端时调用 (FR023)."""
 
     @abstractmethod
-    def on_row_release(self, event: RowReleaseEvent) -> None:
+    def on_row_release(self, event: Event) -> None:
         """当行的内存被释放时调用 (FR023)"""
 
     @abstractmethod
-    def on_loader_slim(self, event: LoaderSlimEvent) -> None:
+    def on_loader_slim(self, event: Event) -> None:
         """当加载结果被压缩时调用 (FR022)."""
 
     @abstractmethod
-    def on_column_write(self, event: ColumnWriteEvent) -> None:
+    def on_column_write(self, event: Event) -> None:
         """当列被写入列式输出端时调用 (FR023)."""
 
     def on_pre_use_batch_size(self, decision: Any) -> None:
@@ -106,55 +91,55 @@ class BaseHook(IExecutionHook):
         _ = event
 
     @override
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_batch_start(self, event: BatchStartEvent) -> None:
+    def on_batch_start(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_batch_end(self, event: BatchEndEvent) -> None:
+    def on_batch_end(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
+    def on_loader_call(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_field_compute(self, event: FieldComputeEvent) -> None:
+    def on_field_compute(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_error(self, event: ErrorEvent) -> None:
+    def on_error(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_diagnostic_warning(self, event: DiagnosticWarningEvent) -> None:
+    def on_diagnostic_warning(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_field_slim(self, event: FieldSlimEvent) -> None:
+    def on_field_slim(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_row_write(self, event: RowWriteEvent) -> None:
+    def on_row_write(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_row_release(self, event: RowReleaseEvent) -> None:
+    def on_row_release(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_loader_slim(self, event: LoaderSlimEvent) -> None:
+    def on_loader_slim(self, event: Event) -> None:
         """空操作实现"""
 
     @override
-    def on_column_write(self, event: ColumnWriteEvent) -> None:
+    def on_column_write(self, event: Event) -> None:
         """空操作实现"""
 
     @override

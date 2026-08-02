@@ -16,6 +16,7 @@ from scalim.spec.ir import CallBySpecIr, CallByValueIr, DerivedFieldIr, FieldIr,
 from scalim.spec.ir import LookupStepIr
 from scalim.spec.ir import KeyIr, MainSourceIr, SourceIr
 from tests.support.pathing import fixtures_dir
+from tests.support.event_envelope import event_envelope
 
 # endregion
 
@@ -146,26 +147,30 @@ def test_viz_observer_outputs_jsonl_sample(tmp_path: Path) -> None:
     )
     observer = VizObserver(config=config, snapshot={"meta": {"target_fields": ["profit"]}})
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=100))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=100)))
     observer.on_loader_call(
-        LoaderCallEvent(
-            loader_name="orders",
-            params={},
-            result=[{"order_id": 1}, {"order_id": 2}, {"order_id": 3}],
-            duration=0.05,
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="orders",
+                params={},
+                result=[{"order_id": 1}, {"order_id": 2}, {"order_id": 3}],
+                duration=0.05,
+            )
         )
     )
-    observer.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1}))
+    observer.on_error(event_envelope(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1})))
     observer.on_diagnostic_warning(
-        DiagnosticWarningEvent(
-            message="float lookup key",
-            source_id="orders",
-            field_id="profit",
-            lookup_key="1001.0",
-            row_id=1,
+        event_envelope(
+            DiagnosticWarningEvent(
+                message="float lookup key",
+                source_id="orders",
+                field_id="profit",
+                lookup_key="1001.0",
+                row_id=1,
+            )
         )
     )
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.2))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.2)))
 
     lines = output_path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) >= 2
@@ -192,8 +197,8 @@ def test_viz_observer_writes_snapshot_and_events_to_output_dir(tmp_path: Path) -
     )
     observer = VizObserver(config=config, snapshot={"meta": {"target_fields": ["profit"]}})
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=10))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=10)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
 
     base_dir = tmp_path / "scalim-viz"
     run_dirs = [item for item in base_dir.iterdir() if item.is_dir()]
@@ -214,21 +219,23 @@ def test_viz_observer_emits_error_and_warning_node_refs(tmp_path: Path) -> None:
     )
     observer = VizObserver(config=config, snapshot={"meta": {"target_fields": ["profit"]}})
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=10))
-    observer.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1}))
-    observer.on_error(ErrorEvent(RuntimeError("oops"), {"loader_name": "orders"}))
-    observer.on_error(ErrorEvent(RuntimeError("oops2"), {"source_id": "orders"}))
-    observer.on_error(ErrorEvent(RuntimeError("oops3"), {}))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=10)))
+    observer.on_error(event_envelope(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1})))
+    observer.on_error(event_envelope(ErrorEvent(RuntimeError("oops"), {"loader_name": "orders"})))
+    observer.on_error(event_envelope(ErrorEvent(RuntimeError("oops2"), {"source_id": "orders"})))
+    observer.on_error(event_envelope(ErrorEvent(RuntimeError("oops3"), {})))
     observer.on_diagnostic_warning(
-        DiagnosticWarningEvent(
-            message="float lookup key",
-            source_id="orders",
-            field_id="profit",
-            lookup_key="1001.0",
-            row_id=1,
+        event_envelope(
+            DiagnosticWarningEvent(
+                message="float lookup key",
+                source_id="orders",
+                field_id="profit",
+                lookup_key="1001.0",
+                row_id=1,
+            )
         )
     )
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
 
     events = [json.loads(line) for line in output_path.read_text(encoding="utf-8").strip().splitlines()]
     error_events = [evt for evt in events if evt["event_type"] == "error"]

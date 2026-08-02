@@ -650,7 +650,7 @@ class WorkflowRunController:
         with contextlib.suppress(Exception):
             workflow_hook_events = cast("Any", capture.hook_manager).drain_events()  # pragma: allow-cast capture hook manager drain
         for event in workflow_hook_events:
-            replay.hook_manager.emit_typed(_coerce_event_type(event.event_type), event.payload)
+            replay.hook_manager.emit_typed(_coerce_event_type(event.event_type), event.event)
 
         workflow_events: List[Event] = []
         with contextlib.suppress(Exception):
@@ -691,9 +691,9 @@ class WorkflowRunController:
             )
             for event in hook_events:
                 hook_event_type = _coerce_event_type(event.event_type)
-                replay.hook_manager.emit_typed(hook_event_type, event.payload)
+                replay.hook_manager.emit_typed(hook_event_type, event.event)
                 if node_replay is not None:
-                    node_replay.hook_manager.emit_typed(hook_event_type, event.payload)
+                    node_replay.hook_manager.emit_typed(hook_event_type, event.event)
             for event in observer_events:
                 replay.emit_recorded_event(event)
                 if node_replay is not None:

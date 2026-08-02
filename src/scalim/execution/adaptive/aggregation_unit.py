@@ -23,8 +23,9 @@ def commit_task_result(
         committed_relation_keys.add(result.relation_key)
         runtime.load_ref_group_executed.add(result.relation_key)
 
-    for event in result.hook_events:
-        runtime.hook_manager.emit_typed(event.event_type, event.payload)
+    for recorded in result.hook_events:
+        # `HookCaptureManager` 记录完整 `Event` 信封(`r217`).
+        runtime.hook_manager.emit_typed(recorded.event_type, recorded.event)
     for event in result.observer_events:
         runtime.instrumentation.emit_recorded_event(event)
 

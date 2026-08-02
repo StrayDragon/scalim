@@ -17,6 +17,15 @@ def test_instrumentation_hub_emit_recorded_event_capture_skips_hook_on_event() -
             self.mode = "capture"
             self.emitted: List[object] = []
 
+        def build_event(
+            self,
+            event_type: object,
+            payload: object = None,
+            *,
+            meta: Optional[Dict[str, Any]] = None,
+        ) -> Event:
+            return Event(event_type=event_type, timestamp=0.0, run_id="run", payload=payload, meta=meta or {})
+
         def emit(self, event: object) -> None:  # type: ignore[no-untyped-def]
             self.emitted.append(event)
 
@@ -75,8 +84,20 @@ def test_instrumentation_hub_emit_diagnostic_warning_capture_mode_skips_hook_on_
         def wants(self, _event_type: str) -> bool:
             return False
 
-        def emit_event(self, event_type: str, payload: object, *, meta: Optional[Dict[str, Any]] = None) -> Event:
+        def build_event(
+            self,
+            event_type: object,
+            payload: object = None,
+            *,
+            meta: Optional[Dict[str, Any]] = None,
+        ) -> Event:
             return Event(event_type=event_type, timestamp=0.0, run_id="run", payload=payload, meta=meta or {}, seq=1)
+
+        def emit_event(self, event_type: str, payload: object, *, meta: Optional[Dict[str, Any]] = None) -> Event:
+            return self.build_event(event_type, payload, meta=meta)
+
+        def emit(self, event: object) -> None:  # type: ignore[no-untyped-def]
+            return None
 
     hook_manager = _HookManagerStub()
     observer_manager = _ObserverManagerStub()
@@ -117,9 +138,18 @@ def test_instrumentation_hub_emit_loader_call_unknown_policy_keeps_payload() -> 
         def wants(self, _event_type: str) -> bool:
             return False
 
+        def build_event(
+            self,
+            event_type: object,
+            payload: object = None,
+            *,
+            meta: Optional[Dict[str, Any]] = None,
+        ) -> Event:
+            return Event(event_type=event_type, timestamp=0.0, run_id="run", payload=payload, meta=meta or {}, seq=1)
+
         def emit_event(self, event_type: str, payload: object, *, meta: Optional[Dict[str, Any]] = None) -> Event:
             self.payloads.append(payload)
-            return Event(event_type=event_type, timestamp=0.0, run_id="run", payload=payload, meta=meta or {}, seq=1)
+            return self.build_event(event_type, payload, meta=meta)
 
     hook_manager = _HookManagerStub()
     observer_manager = _ObserverManagerStub()

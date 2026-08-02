@@ -35,6 +35,7 @@ from scalim.ob.presets._internal import viz_config as viz_config_module
 from scalim.ob.presets._internal import viz_handlers as viz_handlers_module
 from scalim.ob.presets.viz import VizEventEmitter, VizObserver, VizObserverConfig
 from tests.support.testing_utils import CI_TIMEOUT_S
+from tests.support.event_envelope import event_envelope
 
 # endregion
 
@@ -360,37 +361,41 @@ def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
     )
     hook = VizObserver(config=config, snapshot=snapshot)
 
-    hook.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=10))
-    hook.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3]))
+    hook.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=10)))
+    hook.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2, 3])))
     hook.on_loader_call(
-        LoaderCallEvent(
-            loader_name="orders",
-            params={},
-            result={"order": {"order_id": 1}, "status": "ok"},
-            duration=0.01,
-            batch_num=1,
-            cache_status="miss",
-            lookup_key_count=2,
-            field_keys=["order_id"],
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="orders",
+                params={},
+                result={"order": {"order_id": 1}, "status": "ok"},
+                duration=0.01,
+                batch_num=1,
+                cache_status="miss",
+                lookup_key_count=2,
+                field_keys=["order_id"],
+            )
         )
     )
-    hook.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={"a": 1}, result=10))
-    hook.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1}))
+    hook.on_field_compute(event_envelope(FieldComputeEvent(field_key="profit", row_id=1, dependencies={"a": 1}, result=10)))
+    hook.on_error(event_envelope(ErrorEvent(ValueError("boom"), {"field_key": "profit", "row_id": 1})))
     hook.on_diagnostic_warning(
-        DiagnosticWarningEvent(
-            message="float lookup key",
-            source_id="orders",
-            field_id="profit",
-            lookup_key="1001.0",
-            row_id=1,
+        event_envelope(
+            DiagnosticWarningEvent(
+                message="float lookup key",
+                source_id="orders",
+                field_id="profit",
+                lookup_key="1001.0",
+                row_id=1,
+            )
         )
     )
-    hook.on_column_write(ColumnWriteEvent(field_key="profit", row_count=2, batch_num=1))
-    hook.on_row_write(RowWriteEvent(row_id=1, field_count=2, batch_num=1, row_index=0))
-    hook.on_row_release(RowReleaseEvent(row_id=1, released_fields=["a"], retained_fields=["b"], batch_num=1))
-    hook.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
-    hook.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=2, extracted_fields=["order_id"], batch_num=1))
-    hook.on_batch_end(BatchEndEvent(batch_num=1, duration=0.02))
+    hook.on_column_write(event_envelope(ColumnWriteEvent(field_key="profit", row_count=2, batch_num=1)))
+    hook.on_row_write(event_envelope(RowWriteEvent(row_id=1, field_count=2, batch_num=1, row_index=0)))
+    hook.on_row_release(event_envelope(RowReleaseEvent(row_id=1, released_fields=["a"], retained_fields=["b"], batch_num=1)))
+    hook.on_field_slim(event_envelope(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0)))
+    hook.on_loader_slim(event_envelope(LoaderSlimEvent(loader_name="orders", original_keys=2, extracted_fields=["order_id"], batch_num=1)))
+    hook.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.02)))
     hook.on_event(
         Event(
             event_type=EventType.OUTPUT_TARGET_END,
@@ -409,7 +414,7 @@ def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
             ),
         )
     )
-    hook.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.3))
+    hook.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.3)))
 
     assert snapshot_path.exists()
     assert output_path.exists()
@@ -445,32 +450,36 @@ def test_viz_observer_hook_emits_events(tmp_path: Path) -> None:
 def test_viz_output_target_end_handler_branches(tmp_path: Path) -> None:
     disabled = VizObserver(config=VizObserverConfig())
     disabled.on_output_target_end(
-        OutputTargetEndEvent(
-            target_id="t1",
-            output_path="/tmp/demo.xlsx",
-            sheet_name="Sheet1",
-            row_count=0,
-            error_count=0,
-            duration=0.0,
-            disabled=False,
-            error_type=None,
-            error_message=None,
+        event_envelope(
+            OutputTargetEndEvent(
+                target_id="t1",
+                output_path="/tmp/demo.xlsx",
+                sheet_name="Sheet1",
+                row_count=0,
+                error_count=0,
+                duration=0.0,
+                disabled=False,
+                error_type=None,
+                error_message=None,
+            )
         )
     )
 
     output_path = tmp_path / "events.jsonl"
     enabled = VizObserver(config=VizObserverConfig(output_path=str(output_path)), snapshot={"meta": {}})
     enabled.on_output_target_end(
-        OutputTargetEndEvent(
-            target_id="t1",
-            output_path="/tmp/demo.xlsx",
-            sheet_name="Sheet1",
-            row_count=0,
-            error_count=0,
-            duration=0.0,
-            disabled=False,
-            error_type=None,
-            error_message=None,
+        event_envelope(
+            OutputTargetEndEvent(
+                target_id="t1",
+                output_path="/tmp/demo.xlsx",
+                sheet_name="Sheet1",
+                row_count=0,
+                error_count=0,
+                duration=0.0,
+                disabled=False,
+                error_type=None,
+                error_message=None,
+            )
         )
     )
     assert not output_path.exists()
@@ -486,24 +495,26 @@ def test_viz_observer_hook_branches(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     _ = VizObserver.from_plan(DummyPlan(), VizObserverConfig(output_path=str(tmp_path / "plan.jsonl")))
 
     disabled = VizObserver(config=VizObserverConfig())
-    disabled.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
-    disabled.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
-    disabled.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    disabled.on_batch_end(BatchEndEvent(batch_num=1, duration=0.1))
-    disabled.on_loader_call(LoaderCallEvent(loader_name="orders", params={}, result=[], duration=0.0))
-    disabled.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None))
-    disabled.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit"}))
-    disabled.on_diagnostic_warning(DiagnosticWarningEvent(message="warn", source_id="orders", field_id="profit", lookup_key="k", row_id=1))
-    disabled.on_column_write(ColumnWriteEvent(field_key="profit", row_count=1, batch_num=1))
-    disabled.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0))
-    disabled.on_row_release(RowReleaseEvent(row_id=1, released_fields=[], retained_fields=[], batch_num=1))
-    disabled.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
-    disabled.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=0, extracted_fields=[], batch_num=1))
+    disabled.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
+    disabled.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
+    disabled.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    disabled.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.1)))
+    disabled.on_loader_call(event_envelope(LoaderCallEvent(loader_name="orders", params={}, result=[], duration=0.0)))
+    disabled.on_field_compute(event_envelope(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None)))
+    disabled.on_error(event_envelope(ErrorEvent(ValueError("boom"), {"field_key": "profit"})))
+    disabled.on_diagnostic_warning(
+        event_envelope(DiagnosticWarningEvent(message="warn", source_id="orders", field_id="profit", lookup_key="k", row_id=1))
+    )
+    disabled.on_column_write(event_envelope(ColumnWriteEvent(field_key="profit", row_count=1, batch_num=1)))
+    disabled.on_row_write(event_envelope(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0)))
+    disabled.on_row_release(event_envelope(RowReleaseEvent(row_id=1, released_fields=[], retained_fields=[], batch_num=1)))
+    disabled.on_field_slim(event_envelope(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0)))
+    disabled.on_loader_slim(event_envelope(LoaderSlimEvent(loader_name="orders", original_keys=0, extracted_fields=[], batch_num=1)))
 
     config = VizObserverConfig(output_dir=str(tmp_path))
     hook = VizObserver(config=config, snapshot={"meta": {}})
     hook.run_id = "run_1"
-    hook.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    hook.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     assert hook.config.output_dir is not None
     assert hook.config.output_dir.endswith(os.path.join("scalim-viz", "run_1"))
     events_path = Path(hook.config.output_dir) / "viz_events.jsonl"
@@ -779,15 +790,15 @@ def test_viz_output_path_truncates_by_default_and_append_is_opt_in(tmp_path: Pat
     config = VizObserverConfig(output_path=str(events_path), snapshot_path=str(snapshot_path))
     observer = VizObserver(config=config, snapshot={"meta": {}})
     observer.run_id = "run_a"
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
     text = events_path.read_text(encoding="utf-8")
     assert "run_a" in text
 
     observer2 = VizObserver(config=config, snapshot={"meta": {}})
     observer2.run_id = "run_b"
-    observer2.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
-    observer2.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer2.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
+    observer2.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
     text = events_path.read_text(encoding="utf-8")
     assert "run_b" in text
     assert "run_a" not in text
@@ -797,12 +808,12 @@ def test_viz_output_path_truncates_by_default_and_append_is_opt_in(tmp_path: Pat
     config_append = VizObserverConfig(output_path=str(events_path_append), snapshot_path=str(snapshot_path_append), append=True)
     observer3 = VizObserver(config=config_append, snapshot={"meta": {}})
     observer3.run_id = "run_c"
-    observer3.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
-    observer3.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer3.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
+    observer3.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
     observer4 = VizObserver(config=config_append, snapshot={"meta": {}})
     observer4.run_id = "run_d"
-    observer4.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
-    observer4.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer4.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
+    observer4.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
     text = events_path_append.read_text(encoding="utf-8")
     assert "run_c" in text
     assert "run_d" in text
@@ -824,10 +835,10 @@ def test_viz_node_ref_normalization_and_loader_display_name(tmp_path: Path) -> N
     config = VizObserverConfig(output_path=str(events_path), snapshot_path=str(snapshot_path), trace_enabled=True, payload_policy="summary")
     observer = VizObserver(config=config, snapshot=snapshot)
     observer.run_id = "run_norm"
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
-    observer.on_loader_call(LoaderCallEvent(loader_name="orders [preload_forever]", params={}, result=[], duration=0.0))
-    observer.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="orders [preload_forever]", params={}, result=[], duration=0.0)))
+    observer.on_field_compute(event_envelope(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
 
     events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     loader_events = [evt for evt in events if evt["event_type"] == "loader_called"]
@@ -846,18 +857,20 @@ def test_viz_loader_call_summary_includes_chunk_offset(tmp_path: Path) -> None:
     config = VizObserverConfig(output_path=str(events_path), payload_policy="summary")
     observer = VizObserver(config=config, snapshot={"meta": {}})
     observer.run_id = "run_chunk_offset"
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     observer.on_loader_call(
-        LoaderCallEvent(
-            loader_name="orders",
-            params={},
-            result={"1": {"name": "a"}},
-            duration=0.01,
-            lookup_key_count=2,
-            chunk_offset=40,
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="orders",
+                params={},
+                result={"1": {"name": "a"}},
+                duration=0.01,
+                lookup_key_count=2,
+                chunk_offset=40,
+            )
         )
     )
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
 
     events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     loader_events = [evt for evt in events if evt["event_type"] == "loader_called"]
@@ -871,7 +884,7 @@ def test_viz_payload_policy_none_and_full(tmp_path: Path) -> None:
     config = VizObserverConfig(output_path=str(events_path), payload_policy="none")
     observer = VizObserver(config=config, snapshot={"meta": {}})
     observer.run_id = "run_payload_none"
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     observer.close()
     events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert events
@@ -881,7 +894,7 @@ def test_viz_payload_policy_none_and_full(tmp_path: Path) -> None:
     config_full = VizObserverConfig(output_path=str(events_path_full), payload_policy="full")
     observer_full = VizObserver(config=config_full, snapshot={"meta": {}})
     observer_full.run_id = "run_payload_full"
-    observer_full.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer_full.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     observer_full.close()
     events = [json.loads(line) for line in events_path_full.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert events
@@ -904,58 +917,66 @@ def test_viz_observer_additional_coverage(tmp_path: Path) -> None:
     observer_disabled._emit_to(None, "noop", {"type": "pipeline", "id": "pipeline"}, {})
     observer_disabled._emit_trace("noop", {"type": "pipeline", "id": "pipeline"}, {})
     observer_disabled.on_relation_lookup(
-        RelationLookupEvent(
-            field_key="profit",
-            row_id=1,
-            fk_raw="1",
-            fk_normalized=1,
-            target_source="orders",
-            result="hit",
-            fk_type="str",
-            expected_type="int",
-            error_message="bad key",
+        event_envelope(
+            RelationLookupEvent(
+                field_key="profit",
+                row_id=1,
+                fk_raw="1",
+                fk_normalized=1,
+                target_source="orders",
+                result="hit",
+                fk_type="str",
+                expected_type="int",
+                error_message="bad key",
+            )
         )
     )
-    observer_disabled.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.1))
+    observer_disabled.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.1)))
     observer_disabled.on_adaptive_scheduler_decision(
-        AdaptiveSchedulerDecisionEvent(
-            batch_num=1,
-            layer_index=0,
-            decision="process",
-            backend="multiprocessing",
-            reason="because",
-            layer_task_count=1,
-            process_failure_mode="fail_fast",
+        event_envelope(
+            AdaptiveSchedulerDecisionEvent(
+                batch_num=1,
+                layer_index=0,
+                decision="process",
+                backend="multiprocessing",
+                reason="because",
+                layer_task_count=1,
+                process_failure_mode="fail_fast",
+            )
         )
     )
 
     config_enabled = VizObserverConfig(output_path=str(tmp_path / "enabled.jsonl"))
     observer = VizObserver(config=config_enabled, snapshot={"meta": {}})
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.0))
-    observer.on_loader_call(LoaderCallEvent(loader_name="orders", params={}, result=[], duration=0.0))
-    observer.on_error(ErrorEvent(ValueError("boom"), {"field_key": "profit"}))
-    observer.on_diagnostic_warning(DiagnosticWarningEvent(message="warn", source_id="orders", field_id="profit", lookup_key="k", row_id=1))
-    observer.on_column_write(ColumnWriteEvent(field_key="profit", row_count=1, batch_num=1))
-    observer.on_field_compute(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None))
-    observer.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0))
-    observer.on_row_release(RowReleaseEvent(row_id=1, released_fields=[], retained_fields=[], batch_num=1))
-    observer.on_field_slim(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0))
-    observer.on_loader_slim(LoaderSlimEvent(loader_name="orders", original_keys=0, extracted_fields=[], batch_num=1))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=0, total_duration=0.0)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.0)))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="orders", params={}, result=[], duration=0.0)))
+    observer.on_error(event_envelope(ErrorEvent(ValueError("boom"), {"field_key": "profit"})))
+    observer.on_diagnostic_warning(
+        event_envelope(DiagnosticWarningEvent(message="warn", source_id="orders", field_id="profit", lookup_key="k", row_id=1))
+    )
+    observer.on_column_write(event_envelope(ColumnWriteEvent(field_key="profit", row_count=1, batch_num=1)))
+    observer.on_field_compute(event_envelope(FieldComputeEvent(field_key="profit", row_id=1, dependencies={}, result=None)))
+    observer.on_row_write(event_envelope(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0)))
+    observer.on_row_release(event_envelope(RowReleaseEvent(row_id=1, released_fields=[], retained_fields=[], batch_num=1)))
+    observer.on_field_slim(event_envelope(FieldSlimEvent(field_key="profit", reason="done", batch_num=1, remaining_fields=0)))
+    observer.on_loader_slim(event_envelope(LoaderSlimEvent(loader_name="orders", original_keys=0, extracted_fields=[], batch_num=1)))
     observer.on_relation_lookup(
-        RelationLookupEvent(
-            field_key="profit",
-            row_id=1,
-            fk_raw="1",
-            fk_normalized=1,
-            target_source="orders",
-            result="hit",
+        event_envelope(
+            RelationLookupEvent(
+                field_key="profit",
+                row_id=1,
+                fk_raw="1",
+                fk_normalized=1,
+                target_source="orders",
+                result="hit",
+            )
         )
     )
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.1))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.1)))
     observer.on_adaptive_scheduler_decision(
-        AdaptiveSchedulerDecisionEvent(batch_num=1, layer_index=0, decision="process", backend="multiprocessing")
+        event_envelope(AdaptiveSchedulerDecisionEvent(batch_num=1, layer_index=0, decision="process", backend="multiprocessing"))
     )
 
     class DummyEmitter:
@@ -1004,41 +1025,45 @@ def test_viz_observer_additional_coverage(tmp_path: Path) -> None:
     observer_active._ensure_emitters()
     observer_active._write_snapshot_if_needed()
     observer_active._write_snapshot_if_needed()
-    observer_active.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer_active.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     observer_active.on_loader_slim(
-        LoaderSlimEvent(loader_name="orders [preload_forever]", original_keys=1, extracted_fields=["order_id"], batch_num=1)
+        event_envelope(LoaderSlimEvent(loader_name="orders [preload_forever]", original_keys=1, extracted_fields=["order_id"], batch_num=1))
     )
     observer_active.on_relation_lookup(
-        RelationLookupEvent(
-            field_key="profit",
-            row_id=1,
-            fk_raw="1",
-            fk_normalized=1,
-            target_source="orders",
-            result="hit",
-            fk_type="str",
-            expected_type="int",
-            error_message="bad key",
+        event_envelope(
+            RelationLookupEvent(
+                field_key="profit",
+                row_id=1,
+                fk_raw="1",
+                fk_normalized=1,
+                target_source="orders",
+                result="hit",
+                fk_type="str",
+                expected_type="int",
+                error_message="bad key",
+            )
         )
     )
-    observer_active.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.1))
+    observer_active.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.1)))
     observer_active.on_adaptive_scheduler_decision(
-        AdaptiveSchedulerDecisionEvent(
-            batch_num=1,
-            layer_index=0,
-            decision="process",
-            backend="multiprocessing",
-            reason="because",
-            layer_task_count=1,
-            process_failure_mode="fail_fast",
-            pool_limits={"process": 1},
-            pool_wait_ms_total={"process": 10.0},
-            pool_wait_ms_max={"process": 10.0},
-            pool_wait_count={"process": 1},
+        event_envelope(
+            AdaptiveSchedulerDecisionEvent(
+                batch_num=1,
+                layer_index=0,
+                decision="process",
+                backend="multiprocessing",
+                reason="because",
+                layer_task_count=1,
+                process_failure_mode="fail_fast",
+                pool_limits={"process": 1},
+                pool_wait_ms_total={"process": 10.0},
+                pool_wait_ms_max={"process": 10.0},
+                pool_wait_count={"process": 1},
+            )
         )
     )
     assert observer_active._normalize_node_ref_id("loader:orders [preload_forever]") == "loader:orders"
-    observer_active.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+    observer_active.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.1)))
 
 
 def test_viz_pipeline_end_closes_trace_emitter_when_events_emitter_is_missing(tmp_path: Path) -> None:
@@ -1047,11 +1072,11 @@ def test_viz_pipeline_end_closes_trace_emitter_when_events_emitter_is_missing(tm
     observer = VizObserver(config=config, snapshot={"meta": {}})
     observer.run_id = "run_trace_only"
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     assert observer._events_emitter is None
     assert observer._trace_emitter is not None
 
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=0, total_duration=0.0))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=0, total_duration=0.0)))
     assert observer._events_emitter is None
     assert observer._trace_emitter is None
 
@@ -1068,34 +1093,38 @@ def test_viz_handlers_cover_optional_field_skip_branches(tmp_path: Path) -> None
     observer = VizObserver(config=config, snapshot={"meta": {}})
     observer.run_id = "run_optional"
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["profit"], batch_size=1)))
     assert observer._events_emitter is not None
     assert observer._trace_emitter is not None
 
     observer.on_relation_lookup(
-        RelationLookupEvent(
-            field_key="profit",
-            row_id=1,
-            fk_raw="1",
-            fk_normalized=1,
-            target_source="orders",
-            result="hit",
+        event_envelope(
+            RelationLookupEvent(
+                field_key="profit",
+                row_id=1,
+                fk_raw="1",
+                fk_normalized=1,
+                target_source="orders",
+                result="hit",
+            )
         )
     )
     observer.on_adaptive_scheduler_decision(
-        AdaptiveSchedulerDecisionEvent(batch_num=1, layer_index=0, decision="process", backend="multiprocessing")
+        event_envelope(AdaptiveSchedulerDecisionEvent(batch_num=1, layer_index=0, decision="process", backend="multiprocessing"))
     )
     observer.on_output_target_end(
-        OutputTargetEndEvent(
-            target_id="summary",
-            output_path="/tmp/demo.xlsx",
-            sheet_name=None,
-            row_count=10,
-            error_count=0,
-            duration=0.0,
-            disabled=False,
-            error_type=None,
-            error_message=None,
+        event_envelope(
+            OutputTargetEndEvent(
+                target_id="summary",
+                output_path="/tmp/demo.xlsx",
+                sheet_name=None,
+                row_count=10,
+                error_count=0,
+                duration=0.0,
+                disabled=False,
+                error_type=None,
+                error_message=None,
+            )
         )
     )
     observer.close()

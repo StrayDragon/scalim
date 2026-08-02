@@ -33,7 +33,7 @@ def _():
 def _():
     from typing import Any, Dict, List, Sequence
 
-    from scalim.events import EventType
+    from scalim.events import Event, EventType
     from scalim.execution.engine import ScalimEngine
     from scalim.execution.guardrails import GuardrailsLoaderPolicy, GuardrailsPolicy, ScalimGuardrailViolationError
     from scalim.execution.runtime_bindings import RuntimeBindings
@@ -67,6 +67,7 @@ def _():
         DemandIr,
         DerivedFieldIr,
         Dict,
+        Event,
         EventDispatchObserver,
         EventType,
         FieldIr,
@@ -97,6 +98,7 @@ def _(
     CallByValueIr,
     DemandIr,
     DerivedFieldIr,
+    Event,
     EventDispatchObserver,
     EventType,
     FieldIr,
@@ -170,7 +172,8 @@ def _(
             self.event_types = {EventType.ERROR}
             self.errors = []
 
-        def on_error(self, payload):
+        def on_error(self, event: Event) -> None:
+            payload = event.payload
             self.errors.append(payload)
 
     return ErrorCollector, demand, runtime, to_int

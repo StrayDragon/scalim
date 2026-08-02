@@ -2,7 +2,8 @@
 depends_on: []
 branch: sdd/c35-typed-handlers-receive-event
 base_sha: bc256677abfeaac7c8f5639b071987d266068584
-checkpointed: false
+checkpointed: true
+checkpoint_sha: bc256677abfeaac7c8f5639b071987d266068584
 ---
 
 ## Why

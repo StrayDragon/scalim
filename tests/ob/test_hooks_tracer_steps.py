@@ -2,6 +2,7 @@ import logging
 
 from scalim.events._events import BatchEndEvent, BatchStartEvent, FieldSlimEvent, LoaderCallEvent, RowWriteEvent
 from scalim.ob.presets.execution_trace import ExecutionTraceObserver, FieldSlimStep, LoaderCallStep, RowWriteStep
+from tests.support.event_envelope import event_envelope
 
 
 def test_tracer_steps_to_dict() -> None:
@@ -24,9 +25,9 @@ def test_tracer_steps_to_dict() -> None:
 
 def test_tracer_handlers_noop_when_batch_is_missing() -> None:
     observer = ExecutionTraceObserver()
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.2))
-    observer.on_field_slim(FieldSlimEvent(field_key="f", reason="test", batch_num=None, remaining_fields=0))
-    observer.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=None, row_index=0))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.2)))
+    observer.on_field_slim(event_envelope(FieldSlimEvent(field_key="f", reason="test", batch_num=None, remaining_fields=0)))
+    observer.on_row_write(event_envelope(RowWriteEvent(row_id=1, field_count=1, batch_num=None, row_index=0)))
 
     assert observer.batches == []
     assert observer.total_field_slims == 0
@@ -46,9 +47,9 @@ def test_tracer_serialize_params_handles_collections() -> None:
 
 def test_tracer_loader_call_records_step(caplog) -> None:
     observer = ExecutionTraceObserver()
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2]))
-    observer.on_loader_call(LoaderCallEvent(loader_name="demo", params={"ids": {1}}, result=[{"id": 1}], duration=0.1))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.2))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2])))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="demo", params={"ids": {1}}, result=[{"id": 1}], duration=0.1)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.2)))
 
     assert observer.total_loader_calls == 1
     assert len(observer.batches) == 1

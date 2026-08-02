@@ -1,7 +1,7 @@
 import threading
 from typing import List
 
-from scalim.events import EventType
+from scalim.events import Event, EventType
 from scalim.execution.engine import ScalimEngine
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.hooks import BaseHook, HookManager
@@ -125,7 +125,10 @@ def test_hook_manager_register_unreg_while_emitting_is_thread_safe() -> None:
         try:
             barrier_wait(start, label="hook_manager._emit.start")
             for _i in range(2000):
-                manager.emit_typed(EventType.PIPELINE_START, payload=None)
+                manager.emit_typed(
+                    EventType.PIPELINE_START,
+                    Event(event_type=EventType.PIPELINE_START, timestamp=0.0, run_id="", payload=None, meta={}, seq=0),
+                )
         except BaseException as exc:  # noqa: BLE001
             errors.append(exc)
         finally:

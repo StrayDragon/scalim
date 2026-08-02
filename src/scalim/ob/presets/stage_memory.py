@@ -6,8 +6,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Set
 
 from ..._internal.loggingx import get_logger
-from ...events import EventType
-from ...events._events import BatchEndEvent, BatchStartEvent, PipelineEndEvent, PipelineStartEvent, StageSpanEvent
+from ...events import Event, EventType
 from ...vendor.compact.importlibx import import_module
 from ...vendor.compact.typing_extensionsx import override
 from ...vendor.dataclassesx import dataclass, field
@@ -151,37 +150,42 @@ class StageMemoryObserver(EventDispatchObserver):
             delta_mb=delta_text,
         )
 
-    def on_pipeline_start(self, _event: PipelineStartEvent) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
+        _ = event
         if not self._enabled:
             return
         self._batch_last_rss_mb.clear()
 
-    def on_pipeline_end(self, _event: PipelineEndEvent) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
+        _ = event
         if not self._enabled:
             return
         self._batch_last_rss_mb.clear()
 
-    def on_batch_start(self, event: BatchStartEvent) -> None:
+    def on_batch_start(self, event: Event) -> None:
+        payload = event.payload
         if not self._enabled:
             return
-        if not self._should_sample(event.batch_num):
+        if not self._should_sample(payload.batch_num):
             return
-        self._batch_last_rss_mb[int(event.batch_num)] = self._get_rss_mb()
+        self._batch_last_rss_mb[int(payload.batch_num)] = self._get_rss_mb()
 
-    def on_batch_end(self, event: BatchEndEvent) -> None:
+    def on_batch_end(self, event: Event) -> None:
+        payload = event.payload
         if not self._enabled:
             return
-        if not self._should_sample(event.batch_num):
+        if not self._should_sample(payload.batch_num):
             return
-        _ = self._batch_last_rss_mb.pop(int(event.batch_num), None)
+        _ = self._batch_last_rss_mb.pop(int(payload.batch_num), None)
 
-    def on_stage_span(self, event: StageSpanEvent) -> None:
+    def on_stage_span(self, event: Event) -> None:
+        payload = event.payload
         if not self._enabled:
             return
-        if not self._should_sample(event.batch_num):
+        if not self._should_sample(payload.batch_num):
             return
 
-        batch_num = int(event.batch_num)
+        batch_num = int(payload.batch_num)
         rss_mb = self._get_rss_mb()
         last_mb = self._batch_last_rss_mb.get(batch_num)
 
@@ -193,8 +197,8 @@ class StageMemoryObserver(EventDispatchObserver):
 
         sample = StageMemorySample(
             batch_num=batch_num,
-            stage=str(event.stage),
-            duration_s=float(event.duration),
+            stage=str(payload.stage),
+            duration_s=float(payload.duration),
             rss_mb=rss_mb,
             delta_mb=delta_mb,
         )

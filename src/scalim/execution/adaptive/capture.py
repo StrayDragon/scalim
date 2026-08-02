@@ -1,7 +1,8 @@
 from typing import Any, Dict, List, Optional
 
 from ..._internal.utils.loader_result import LoaderResultPolicy, parse_loader_result_policy
-from ...events import EventType, parse_event_type
+from ...events import Event, EventType, parse_event_type
+from ...events._event import now_ts
 from ...events._events import LoaderCallEvent
 from ...hooks import HookManager
 from ...vendor.compact.typing_extensionsx import override
@@ -11,13 +12,13 @@ from ...vendor.dataclassesx import dataclass
 @dataclass(frozen=True)
 class HookRecordedEvent:
     event_type: EventType
-    payload: Any
+    event: Event
 
 
 class HookCaptureManager(HookManager):
     """用于“捕获 + 提交时回放”的 `HookManager` 适配器.
 
-    该管理器会记录类型化的 `hook` 负载,但不会调用用户 `hook`.
+    该管理器会记录类型化的完整 `Event` 信封,但不会调用用户 `hook`.
     `hook.on_event(Event)` 会通过 `ObserverManager` 的捕获模式被记录,并在提交时回放.
 
     线程安全/生命周期约束:
@@ -47,16 +48,27 @@ class HookCaptureManager(HookManager):
         self._recorded_events.clear()
         return [self._normalize_recorded_event(event) for event in events]
 
-    def _normalize_recorded_event(self, event: HookRecordedEvent) -> HookRecordedEvent:
-        return HookRecordedEvent(event_type=parse_event_type(event.event_type), payload=event.payload)
+    def _normalize_recorded_event(self, recorded: HookRecordedEvent) -> HookRecordedEvent:
+        event = recorded.event
+        return HookRecordedEvent(
+            event_type=parse_event_type(event.event_type),
+            event=Event(
+                event_type=parse_event_type(event.event_type),
+                timestamp=event.timestamp,
+                run_id=event.run_id,
+                payload=event.payload,
+                meta=dict(event.meta) if event.meta else {},
+                seq=event.seq,
+            ),
+        )
 
     @override
-    def emit_typed(self, event_type: EventType, payload: Any) -> None:
+    def emit_typed(self, event_type: EventType, event: Event) -> None:
         if not self._has_hooks:
             return
         if event_type not in self._typed_handlers_by_event_type:
             return
-        self._recorded_events.append(HookRecordedEvent(event_type=event_type, payload=payload))
+        self._recorded_events.append(HookRecordedEvent(event_type=event_type, event=event))
 
     @override
     def trigger_loader_call(
@@ -73,6 +85,7 @@ class HookCaptureManager(HookManager):
         field_keys: Optional[List[str]] = None,
         skipped_none_rows: Optional[int] = None,
         chunk_offset: Optional[int] = None,
+        meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         if not self._has_hooks:
             return
@@ -87,7 +100,7 @@ class HookCaptureManager(HookManager):
         elif self.loader_result_policy == "sample":
             payload = self._sample_result(result)
 
-        event = LoaderCallEvent(
+        loader_payload = LoaderCallEvent(
             loader_name=loader_name,
             params=params,
             result=payload,
@@ -100,7 +113,15 @@ class HookCaptureManager(HookManager):
             field_keys=field_keys,
             chunk_offset=chunk_offset,
         )
-        self._recorded_events.append(HookRecordedEvent(event_type=EventType.LOADER_CALL, payload=event))
+        envelope = Event(
+            event_type=EventType.LOADER_CALL,
+            timestamp=now_ts(),
+            run_id="",
+            payload=loader_payload,
+            meta=dict(meta) if meta else {},
+            seq=0,
+        )
+        self._recorded_events.append(HookRecordedEvent(event_type=EventType.LOADER_CALL, event=envelope))
 
 
 __all__ = ("HookCaptureManager", "HookRecordedEvent")

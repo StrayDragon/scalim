@@ -3,7 +3,7 @@ import marimo
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from scalim.events import EventType, LoaderCallEvent, PipelineEndEvent, PipelineStartEvent
+from scalim.events import Event, EventType
 from scalim.execution import ExecutionRequest, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.hooks import BaseHook
 from scalim.ob.observer import Observer
@@ -32,16 +32,17 @@ class _CounterHook(BaseHook):
         }
         self.stats = _HookStats()
 
-    def on_pipeline_start(self, event: PipelineStartEvent) -> None:
+    def on_pipeline_start(self, event: Event) -> None:
         _ = event
         self.stats.pipeline_start += 1
 
-    def on_pipeline_end(self, event: PipelineEndEvent) -> None:
+    def on_pipeline_end(self, event: Event) -> None:
         _ = event
         self.stats.pipeline_end += 1
 
-    def on_loader_call(self, event: LoaderCallEvent) -> None:
-        loader_name = getattr(event, "loader_name", None)
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload
+        loader_name = getattr(payload, "loader_name", None)
         if loader_name:
             self.stats.loader_calls.append(str(loader_name))
 

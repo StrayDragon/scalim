@@ -12,6 +12,7 @@ from scalim.events._events import (
 from scalim.ob.presets.stage_memory import PSUTIL_NOT_INSTALLED_WARNING_PREFIX, StageMemoryConfig, StageMemoryObserver
 from scalim.ob.report_formats import ConsoleJsonlReportFormat
 from tests.support.testing_utils import missing_optional_dependency
+from tests.support.event_envelope import event_envelope
 
 
 class _FakeMemInfo:
@@ -54,12 +55,12 @@ def test_stage_memory_observer_records_samples_and_deltas(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "psutil", _FakePsutil())
 
     observer = StageMemoryObserver(config=StageMemoryConfig(report_format=ConsoleJsonlReportFormat.NONE))
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.01))
-    observer.on_stage_span(StageSpanEvent(stage="compute", batch_num=1, duration=0.02))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.03))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.03))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=1)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.01)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="compute", batch_num=1, duration=0.02)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.03)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.03)))
     observer.close()
 
     assert len(observer.samples) >= 2
@@ -75,8 +76,8 @@ def test_stage_memory_observer_disables_when_psutil_missing(monkeypatch) -> None
 
     assert observer.event_types == set()
 
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.01))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.01)))
     observer.close()
     assert observer.samples == []
 
@@ -109,14 +110,14 @@ def test_stage_memory_observer_auto_selects_jsonl_or_console(monkeypatch) -> Non
 
     monkeypatch.setattr(stage_memory_module, "is_jsonl_logging_installed", lambda: True)
     observer = StageMemoryObserver(config=StageMemoryConfig(report_format=ConsoleJsonlReportFormat.AUTO))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.01))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.01)))
     observer.close()
 
     monkeypatch.setattr(stage_memory_module, "is_jsonl_logging_installed", lambda: False)
     observer2 = StageMemoryObserver(config=StageMemoryConfig(report_format=ConsoleJsonlReportFormat.AUTO))
-    observer2.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer2.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.01))
+    observer2.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer2.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.01)))
     observer2.close()
 
     assert calls["structured"] == 1
@@ -133,9 +134,9 @@ def test_stage_memory_observer_disabled_config_hits_early_returns(monkeypatch) -
     observer = StageMemoryObserver(config=StageMemoryConfig(enabled=False, report_format=ConsoleJsonlReportFormat.NONE))
     assert observer._get_rss_mb() is None  # noqa: SLF001
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=1))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.0))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.0))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=1)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.0)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.0)))
     observer.close()
 
 
@@ -151,9 +152,9 @@ def test_stage_memory_observer_sampling_interval_skips_branches(monkeypatch) -> 
     assert observer._should_sample(1) is False  # noqa: SLF001
     assert observer._should_sample(2) is True  # noqa: SLF001
 
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.01))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.01))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.01)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.01)))
     observer.close()
     assert observer.samples == []
 
@@ -177,7 +178,7 @@ def test_stage_memory_observer_stage_span_without_batch_start_has_no_delta(monke
     monkeypatch.setitem(sys.modules, "psutil", _FakePsutil())
     observer = StageMemoryObserver(config=StageMemoryConfig(report_format=ConsoleJsonlReportFormat.NONE))
 
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.01))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.01)))
     assert observer.samples
     assert observer.samples[0].delta_mb is None
     observer.close()

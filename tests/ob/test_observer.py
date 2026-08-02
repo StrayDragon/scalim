@@ -36,6 +36,7 @@ from scalim.ob.presets.performance import (
 )
 from scalim.execution.runtime_bindings import RuntimeBindings
 from tests.support.testing_utils import missing_optional_dependency
+from tests.support.event_envelope import event_envelope
 
 
 def _get_main_rows(demand, runtime_bindings: RuntimeBindings, limit: int = 3):
@@ -131,26 +132,32 @@ def test_performance_observer_cache_metrics_counts() -> None:
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none"))
     stats = observer.metrics.get_loader_stats("loader")
 
-    event_miss = LoaderCallEvent(
-        loader_name="loader",
-        params={},
-        result={1: {"x": 1}},
-        duration=0.1,
-        cache_status="miss",
+    event_miss = event_envelope(
+        LoaderCallEvent(
+            loader_name="loader",
+            params={},
+            result={1: {"x": 1}},
+            duration=0.1,
+            cache_status="miss",
+        )
     )
-    event_hit = LoaderCallEvent(
-        loader_name="loader",
-        params={},
-        result={1: {"x": 1}},
-        duration=0.0,
-        cache_status="hit",
+    event_hit = event_envelope(
+        LoaderCallEvent(
+            loader_name="loader",
+            params={},
+            result={1: {"x": 1}},
+            duration=0.0,
+            cache_status="hit",
+        )
     )
-    event_no_cache = LoaderCallEvent(
-        loader_name="loader",
-        params={},
-        result={1: {"x": 1}},
-        duration=0.2,
-        cache_status=None,
+    event_no_cache = event_envelope(
+        LoaderCallEvent(
+            loader_name="loader",
+            params={},
+            result={1: {"x": 1}},
+            duration=0.2,
+            cache_status=None,
+        )
     )
 
     observer.on_loader_call(event_miss)
@@ -343,12 +350,12 @@ def test_performance_observer_field_compute_profiling_reports_top(caplog) -> Non
         )
     )
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=2))
-    observer.on_operator_span(OperatorSpanEvent(operator_type="compute", field_key="a", batch_num=1, duration=0.2))
-    observer.on_operator_span(OperatorSpanEvent(operator_type="compute", field_key="b", batch_num=1, duration=0.1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=2)))
+    observer.on_operator_span(event_envelope(OperatorSpanEvent(operator_type="compute", field_key="a", batch_num=1, duration=0.2)))
+    observer.on_operator_span(event_envelope(OperatorSpanEvent(operator_type="compute", field_key="b", batch_num=1, duration=0.1)))
 
     with caplog.at_level(logging.INFO, logger=logger.name):
-        observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.5))
+        observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.5)))
 
     assert any("field_top" in record.getMessage() for record in caplog.records)
 
@@ -439,28 +446,28 @@ def test_performance_observer_details_and_events(caplog) -> None:
 
     observer._process = _Proc()
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=2))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2]))
-    observer.on_loader_call(LoaderCallEvent(loader_name="demo", params={}, result={}, duration=0.01))
-    observer.on_field_compute(FieldComputeEvent(field_key="a", row_id=1, dependencies={}, result=1))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=2)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2])))
+    observer.on_loader_call(event_envelope(LoaderCallEvent(loader_name="demo", params={}, result={}, duration=0.01)))
+    observer.on_field_compute(event_envelope(FieldComputeEvent(field_key="a", row_id=1, dependencies={}, result=1)))
 
     with caplog.at_level(logging.INFO, logger=logger.name):
-        observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.1))
+        observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.1)))
 
-    observer.on_row_write(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0))
-    observer.on_column_write(ColumnWriteEvent(field_key="a", row_count=1, batch_num=1))
+    observer.on_row_write(event_envelope(RowWriteEvent(row_id=1, field_count=1, batch_num=1, row_index=0)))
+    observer.on_column_write(event_envelope(ColumnWriteEvent(field_key="a", row_count=1, batch_num=1)))
 
 
 def test_performance_observer_stage_metrics_from_spans() -> None:
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none"))
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=2))
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.4))
-    observer.on_stage_span(StageSpanEvent(stage="compute", batch_num=1, duration=0.6))
-    observer.on_stage_span(StageSpanEvent(stage="write", batch_num=1, duration=0.5))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=1.5))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=1.5))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=2)))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.4)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="compute", batch_num=1, duration=0.6)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="write", batch_num=1, duration=0.5)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=1.5)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=1.5)))
 
     stages = observer.get_metrics().stage_metrics
     assert stages.loader_duration == pytest.approx(0.4)
@@ -472,9 +479,9 @@ def test_performance_observer_stage_metrics_from_spans() -> None:
 def test_performance_observer_stage_metrics_negative_duration_clamped() -> None:
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none"))
 
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=-1.0))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.1))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=-1.0)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.1)))
 
     stages = observer.get_metrics().stage_metrics
     assert stages.loader_duration == 0.0
@@ -482,21 +489,21 @@ def test_performance_observer_stage_metrics_negative_duration_clamped() -> None:
 
 def test_performance_observer_stage_metrics_multi_batch() -> None:
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none"))
-    observer.on_pipeline_start(PipelineStartEvent(targets=["a"], batch_size=2))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["a"], batch_size=2)))
 
-    observer.on_batch_start(BatchStartEvent(batch_num=1, row_ids=[1, 2]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=1, duration=0.2))
-    observer.on_stage_span(StageSpanEvent(stage="compute", batch_num=1, duration=0.3))
-    observer.on_stage_span(StageSpanEvent(stage="write", batch_num=1, duration=0.1))
-    observer.on_batch_end(BatchEndEvent(batch_num=1, duration=0.8))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[1, 2])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=1, duration=0.2)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="compute", batch_num=1, duration=0.3)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="write", batch_num=1, duration=0.1)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=1, duration=0.8)))
 
-    observer.on_batch_start(BatchStartEvent(batch_num=2, row_ids=[3, 4]))
-    observer.on_stage_span(StageSpanEvent(stage="loader", batch_num=2, duration=0.3))
-    observer.on_stage_span(StageSpanEvent(stage="compute", batch_num=2, duration=0.4))
-    observer.on_stage_span(StageSpanEvent(stage="write", batch_num=2, duration=0.2))
-    observer.on_batch_end(BatchEndEvent(batch_num=2, duration=1.2))
+    observer.on_batch_start(event_envelope(BatchStartEvent(batch_num=2, row_ids=[3, 4])))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="loader", batch_num=2, duration=0.3)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="compute", batch_num=2, duration=0.4)))
+    observer.on_stage_span(event_envelope(StageSpanEvent(stage="write", batch_num=2, duration=0.2)))
+    observer.on_batch_end(event_envelope(BatchEndEvent(batch_num=2, duration=1.2)))
 
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=2, total_duration=2.0))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=2, total_duration=2.0)))
 
     stages = observer.get_metrics().stage_metrics
     assert stages.loader_duration == pytest.approx(0.5)
@@ -786,8 +793,8 @@ def test_performance_observer_presentation_layer_is_replaceable() -> None:
     presentation = _CapturePresentation()
     observer = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="console", presentation=presentation))
 
-    observer.on_pipeline_start(PipelineStartEvent(targets=["x"], batch_size=1))
-    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.2))
+    observer.on_pipeline_start(event_envelope(PipelineStartEvent(targets=["x"], batch_size=1)))
+    observer.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.2)))
 
     assert observer.get_metrics().batch_count == 1
     assert presentation.called is True
