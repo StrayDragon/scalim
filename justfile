@@ -841,11 +841,11 @@ check-dynattr:
     fi
     uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check $quiet_flag
 
-# 报告: hotspot module 体量基线
+# 报告: hotspot module 体量基线 (行数 SHOULD; 不阻断)
 report-module-size:
     uv {{ UV_OPTIONS }} run python scripts/check-module-size.py
 
-# 检查: hotspot module 体量护栏(避免继续增长)
+# 检查: hotspot module 硬味天花板 (LOC_HARD_TASTE); 舒适区超阈不再硬失败
 check-module-size:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -854,6 +854,24 @@ check-module-size:
         quiet_flag="--quiet"
     fi
     uv {{ UV_OPTIONS }} run python scripts/check-module-size.py --check $quiet_flag
+
+# 报告: ENTRY 函数复杂度基线
+report-complexity:
+    uv {{ UV_OPTIONS }} run --with radon --with cognitive-complexity python scripts/check-complexity.py
+
+# 检查: ENTRY 函数复杂度硬闸 (cognitive + cyclomatic)
+check-complexity:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run --with radon --with cognitive-complexity python scripts/check-complexity.py --check $quiet_flag
+
+# 软雷达: 更广 src/scalim top-N (不失败)
+complexity:
+    uv {{ UV_OPTIONS }} run --with radon --with cognitive-complexity python scripts/check-complexity.py --radar
 
 # 报告: core event dispatch map 完整性基线
 report-dispatch-map-completeness:
@@ -1013,7 +1031,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check $quiet_flag
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
-quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-object-type check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check
+quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-object-type check-complexity check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check
 
 # QA: 仅py轻量的检查
 quick-check-only-py: quick-check-only-py-no-test-gate test-gate

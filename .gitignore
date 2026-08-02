@@ -282,8 +282,9 @@ docs/doc/notebooks/**/*.html
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 
-# Local llmanspec sanitization rules
-llmanspec/sanitize_rules.local.yaml
+# Local tool pins (complexity CLI etc.; not application deps)
+.tools/
+
 
 # vendors clib
 !src/scalim/vendor/yamlx/**/*.so
