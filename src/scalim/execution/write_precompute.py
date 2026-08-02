@@ -252,7 +252,7 @@ class LateFieldMaterializer:
                     values[slot.position] = self.handle_direct_call_error(slot.plan, row_id, dep_args, exc, compute_mode, unexpected=False)
                 except Exception as exc:
                     logging.exception(  # noqa: LOG015
-                        "字段计算发生未预期的异常(write-precompute): 字段=%s, 行标识=%s",
+                        "字段计算发生未预期的异常(`write-precompute`): 字段=%s, 行标识=%s",
                         slot.plan.field_key,
                         row_id,
                     )
@@ -345,7 +345,7 @@ class LateFieldMaterializer:
             return None
         except Exception as exc:
             logging.exception(  # noqa: LOG015
-                "字段计算发生未预期的异常(write-precompute): 字段=%s, 行标识=%s",
+                "字段计算发生未预期的异常(`write-precompute`): 字段=%s, 行标识=%s",
                 plan.field_key,
                 row_id,
             )
@@ -501,7 +501,7 @@ class LateColumnMaterializer:
                 values.append(materializer.handle_direct_call_error(plan, row_id, dep_args, exc, compute_mode, unexpected=False))
             except Exception as exc:
                 logging.exception(  # noqa: LOG015
-                    "字段计算发生未预期的异常(write-precompute): 字段=%s, 行标识=%s",
+                    "字段计算发生未预期的异常(`write-precompute`): 字段=%s, 行标识=%s",
                     plan.field_key,
                     row_id,
                 )

@@ -242,13 +242,9 @@ def main():
     results["engine_narrow_few_call_by"] = _run_timed(narrow_fn, args.runs)
 
     print("==> micro field_major", flush=True)
-    results["micro_field_major"] = _run_timed(
-        lambda: _micro_field_major(args.rows, args.wide_fields, args.deps), args.runs
-    )
+    results["micro_field_major"] = _run_timed(lambda: _micro_field_major(args.rows, args.wide_fields, args.deps), args.runs)
     print("==> micro row_wise", flush=True)
-    results["micro_row_wise"] = _run_timed(
-        lambda: _micro_row_wise(args.rows, args.wide_fields, args.deps), args.runs
-    )
+    results["micro_row_wise"] = _run_timed(lambda: _micro_row_wise(args.rows, args.wide_fields, args.deps), args.runs)
 
     ew = results["engine_wide_many_call_by"]
     en = results["engine_narrow_few_call_by"]
@@ -256,19 +252,13 @@ def main():
     mr = results["micro_row_wise"]
 
     comparisons = {
-        "engine_wide_over_narrow_duration": (
-            ew["duration_s_median"] / en["duration_s_median"] if en["duration_s_median"] else None
-        ),
+        "engine_wide_over_narrow_duration": (ew["duration_s_median"] / en["duration_s_median"] if en["duration_s_median"] else None),
         "engine_wide_calc_calls": ew.get("calc_calls"),
         "engine_narrow_calc_calls": en.get("calc_calls"),
         "micro_dep_reads_field_major": mf.get("dep_reads"),
         "micro_dep_reads_row_wise": mr.get("dep_reads"),
-        "micro_dep_reads_ratio_field_over_row": (
-            float(mf["dep_reads"]) / float(mr["dep_reads"]) if mr.get("dep_reads") else None
-        ),
-        "micro_duration_speedup_row_over_field": (
-            mf["duration_s_median"] / mr["duration_s_median"] if mr["duration_s_median"] else None
-        ),
+        "micro_dep_reads_ratio_field_over_row": (float(mf["dep_reads"]) / float(mr["dep_reads"]) if mr.get("dep_reads") else None),
+        "micro_duration_speedup_row_over_field": (mf["duration_s_median"] / mr["duration_s_median"] if mr["duration_s_median"] else None),
         "note": (
             "Engine cases show current Scalim cost grows with M (field count) for thin call_by. "
             "Micro loops show same-deps row-wise cuts dep_reads from ~N*M*D to ~N*D while calc_calls stay N*M."
