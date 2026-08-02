@@ -46,6 +46,7 @@ from .key_normalization import normalize_key_normalization
 from .managed_artifacts import MANAGED_ARTIFACT_KIND_ROWS
 from .output_composition import build_output_composition, required_demand_fields
 from .output_contracts import ExportLayout, OutputSpec
+from .pipeline.overrides import PipelineOverrides
 
 if TYPE_CHECKING:
     from ..ob.manager import ObserverManager
@@ -769,6 +770,13 @@ def _create_engine_with_cleanup(
     if runtime_bindings is None:
         msg = "ExecutionRequest.runtime_bindings is required (missing runtime linking stage)"
         raise ValueError(msg)
+    # 分片并行 `opt-in`(`Python` 策略面)通过 `PipelineOverrides` 传入 `engine`;未 `opt-in` 时保持 `None`.
+    pipeline_overrides: Optional[PipelineOverrides] = None
+    if request.parallelize_lookup_chunks:
+        pipeline_overrides = PipelineOverrides(
+            parallelize_lookup_chunks=True,
+            max_chunk_workers=request.max_chunk_workers,
+        )
     try:
         return engine_cls(
             demand=demand_ir,
@@ -782,6 +790,7 @@ def _create_engine_with_cleanup(
             parallel_mode=request.parallel_mode,
             max_workers=request.max_workers,
             key_normalization=request.key_normalization,
+            pipeline_overrides=pipeline_overrides,
         )
     except Exception:
         with contextlib.suppress(Exception):

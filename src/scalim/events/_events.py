@@ -102,6 +102,15 @@ class LoaderCallEvent:
     field_keys: Optional[List[str]] = None
     """加载器关联字段键列表(可选)."""
 
+    chunk_offset: Optional[int] = None
+    """可选: `lookup_chunk_size` 分片调用在 `keys` 列表上的切片起点.
+
+    说明:
+    - 仅分片路径填充;非分片调用为 `None`.
+    - 开启分片并行(`parallelize_lookup_chunks`)后事件按完成序发出,顺序可能与 `chunk_offset` 升序不同;
+      订阅方若需要稳定顺序,应自行按该字段排序.
+    """
+
 
 @dataclass(frozen=True)
 class LoaderRetryEvent:

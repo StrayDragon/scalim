@@ -543,6 +543,18 @@ class DemandRunRuntimeOptions:
       且当发生裁剪时会发出 `warning`(避免外部输入不受控放大并发).
     """
 
+    parallelize_lookup_chunks: bool = False
+    """是否允许 `lookup_chunk_size` 分片并行(默认关闭).
+
+    注意:
+    - 仅当 `parallel_mode="adaptive"` 时生效;`seq` 永不分片并行.
+    - `lookup_chunk_size`(`YAML` `authoring`)本身**不是**并行开关,它只表示分片大小.
+    - 开启后会放大对外部系统(数据库/接口)的瞬时并发;全局在途 `ref-loader` 帽 = 解析后的 `workers` `W`.
+    """
+
+    max_chunk_workers: Optional[int] = None
+    """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
+
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""
 
@@ -575,6 +587,8 @@ class DemandRunRuntimeOptions:
             raise ValueError(msg)
         object.__setattr__(self, "max_workers", int(max_workers))
 
+        self._validate_chunk_parallelism()
+
         object.__setattr__(self, "key_normalization", normalize_key_normalization(self.key_normalization))
 
         raw = self.batch_size
@@ -588,6 +602,22 @@ class DemandRunRuntimeOptions:
         if int(raw) < 1:
             msg = "DemandRunRuntimeOptions.batch_size must be >= 1 when provided"
             raise ValueError(msg)
+
+    def _validate_chunk_parallelism(self) -> None:
+        if not isinstance(self.parallelize_lookup_chunks, bool):
+            msg = "DemandRunRuntimeOptions.parallelize_lookup_chunks must be a boolean"
+            raise TypeError(msg)
+
+        max_chunk_workers = self.max_chunk_workers
+        if max_chunk_workers is None:
+            return
+        if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
+            msg = "DemandRunRuntimeOptions.max_chunk_workers must be an int or None"
+            raise TypeError(msg)
+        if int(max_chunk_workers) < 1:
+            msg = "DemandRunRuntimeOptions.max_chunk_workers must be >= 1 when provided"
+            raise ValueError(msg)
+        object.__setattr__(self, "max_chunk_workers", int(max_chunk_workers))
 
 
 @dataclass(frozen=True)

@@ -101,6 +101,20 @@ def _validate_execution_request_parallel_mode(parallel_mode: RuntimeValue) -> No
         raise ValueError(msg)
 
 
+def _validate_execution_request_chunk_parallelism(parallelize_lookup_chunks: RuntimeValue, max_chunk_workers: Optional[int]) -> None:
+    if not isinstance(parallelize_lookup_chunks, bool):
+        msg = "ExecutionRequest.parallelize_lookup_chunks must be a boolean"
+        raise TypeError(msg)
+    if max_chunk_workers is None:
+        return
+    if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
+        msg = "ExecutionRequest.max_chunk_workers must be an int or None"
+        raise TypeError(msg)
+    if int(max_chunk_workers) < 1:
+        msg = "ExecutionRequest.max_chunk_workers must be >= 1 when provided"
+        raise ValueError(msg)
+
+
 def _validate_execution_request_capture_in_memory_rows(capture_in_memory_rows: RuntimeValue) -> None:
     if not isinstance(capture_in_memory_rows, bool):
         msg = "ExecutionRequest.capture_in_memory_rows must be a boolean"
@@ -156,6 +170,18 @@ class ExecutionRequest:
       且当发生裁剪时会发出 `warning`(避免外部输入不受控放大并发).
     """
 
+    parallelize_lookup_chunks: bool = False
+    """是否允许 `lookup_chunk_size` 分片并行(默认关闭).
+
+    注意:
+    - 仅当 `parallel_mode="adaptive"` 时生效;`seq` 永不分片并行.
+    - `lookup_chunk_size` 本身**不是**并行开关(它只表示分片大小).
+    - 开启后会放大对外部系统的瞬时并发;全局在途 `ref-loader` 帽 = 解析后的 `adaptive` `workers` `W`.
+    """
+
+    max_chunk_workers: Optional[int] = None
+    """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
+
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性;默认 `raw`)."""
 
@@ -200,6 +226,7 @@ class ExecutionRequest:
         _validate_execution_request_batch_size(self.batch_size)
         _validate_execution_request_max_workers(self.max_workers)
         _validate_execution_request_parallel_mode(self.parallel_mode)
+        _validate_execution_request_chunk_parallelism(self.parallelize_lookup_chunks, self.max_chunk_workers)
         _validate_execution_request_capture_in_memory_rows(self.capture_in_memory_rows)
         _validate_execution_request_key_normalization(self.key_normalization)
         _validate_execution_request_excel_column_residency(self.excel_column_residency)

@@ -168,6 +168,7 @@ class InstrumentationHub:
         lookup_key_count: Optional[int] = None,
         field_keys: Optional[List[str]] = None,
         skipped_none_rows: Optional[int] = None,
+        chunk_offset: Optional[int] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> None:
         # 类型化钩子的 `loader_result_policy` 可能与观测器/事件路径不同.
@@ -183,6 +184,7 @@ class InstrumentationHub:
                 lookup_key_count=lookup_key_count,
                 field_keys=field_keys,
                 skipped_none_rows=skipped_none_rows,
+                chunk_offset=chunk_offset,
             )
 
         if not (self.observer_manager.wants(EventType.LOADER_CALL) or self.hook_manager.wants_on_event(EventType.LOADER_CALL)):
@@ -208,6 +210,7 @@ class InstrumentationHub:
             lookup_key_count=lookup_key_count,
             skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
+            chunk_offset=chunk_offset,
         )
         event = self.observer_manager.emit_event(EventType.LOADER_CALL, event_payload, meta=meta)
         if self.observer_manager.mode != "capture":

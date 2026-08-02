@@ -65,6 +65,8 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
         )
         task_runtime.preloaded_cache = runtime.preloaded_cache
         task_runtime.batch_num = runtime.batch_num
+        # 运行级分片并行范围(含共享在途帽)必须跨工作线程继承:子运行时的 `parallel_mode` 已被置为 `seq`.
+        task_runtime.inherit_chunk_parallelism(runtime)
 
         task_context = OverlayBatchContext(base_context, required_fields=required_fields)
         self._build_loadref_executor().execute(spec.op, task_context, batch_row_nth, task_runtime)

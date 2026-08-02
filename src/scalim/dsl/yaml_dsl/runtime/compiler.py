@@ -546,6 +546,8 @@ def build_request(
         batch_size=batch_size,
         parallel_mode=options.runtime.parallel_mode,
         max_workers=options.runtime.max_workers,
+        parallelize_lookup_chunks=options.runtime.parallelize_lookup_chunks,
+        max_chunk_workers=options.runtime.max_chunk_workers,
         key_normalization=options.runtime.key_normalization,
         runtime_bindings=runtime_bindings,
         capture_in_memory_rows=isinstance(options.outputs.capture, CaptureRows),

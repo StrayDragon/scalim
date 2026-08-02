@@ -38,6 +38,18 @@ class PipelineOverrides:
     adaptive_loadref_executor_factory: Optional[Callable[[], Any]] = None
     """可选:为 `LoadRef` 关联加载创建执行器的工厂函数."""
 
+    parallelize_lookup_chunks: bool = False
+    """是否允许 `lookup_chunk_size` 分片并行(默认关闭).
+
+    注意:
+    - 仅当 `parallel_mode="adaptive"` 时生效;`seq` 永不分片并行.
+    - `lookup_chunk_size` 本身**不是**并行开关(它只表示分片大小).
+    - 开启后会放大对外部系统(数据库/接口)的瞬时并发;全局在途帽 = 解析后的 `adaptive` `workers` `W`.
+    """
+
+    max_chunk_workers: Optional[int] = None
+    """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
+
     stage_perf_counter_fn: Optional[Callable[[], float]] = None
     """可选:阶段计时函数(默认使用系统计时)."""
 

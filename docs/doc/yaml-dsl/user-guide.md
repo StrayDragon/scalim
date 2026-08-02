@@ -1286,7 +1286,10 @@ sources:
   - wall time ≈ `loader_calls × RTT`(外加固定开销)
 - 仅在下游有硬限制时设置(例如 SQL `IN (...)` 长度、HTTP payload、供应商 API 批次上限).
 - 需要分片时:**取下游限制允许的最大安全值**(例如上限的 50–80%),避免习惯性写 `50`/`100`.
-- 与 `parallel_mode=adaptive` 正交:adaptive 并行的是不同 LoadRef 任务;同一 source 的 chunk 调用当前仍顺序执行.
+- `lookup_chunk_size` **不是并行开关**:它只表示分片大小.同一 source 的 chunk 调用默认仍顺序执行.
+- 若要让同一 LoadRef 的多个 chunk 重叠等待,必须在 Python 运行入口显式 opt-in
+  (`DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True)`),
+  并接受它对外部系统 QPS 的放大;详见 [执行并行模式 §3.6](../architecture/parallel-modes.md).
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
 

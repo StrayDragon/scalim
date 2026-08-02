@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.execution.chunk_parallelism import LookupChunkParallelismPolicy
 from scalim.execution.guardrails import GuardrailsPolicy
 from scalim.execution.executor.runtime.runtime import ExecutionRuntime
 from scalim.hooks import BaseHook, HookManager
@@ -86,6 +87,10 @@ def _make_runtime(
     runtime_bindings: Optional[RuntimeBindings] = None,
     guardrails: Optional[GuardrailsPolicy] = None,
     key_normalization: str = "raw",
+    parallel_mode: str = "seq",
+    max_workers: int = 0,
+    parallelize_lookup_chunks: bool = False,
+    max_chunk_workers: Optional[int] = None,
 ) -> ExecutionRuntime:
     hook_manager = hook_manager or HookManager()
     observer_manager = observer_manager or ObserverManager()
@@ -103,6 +108,12 @@ def _make_runtime(
         runtime_bindings=runtime_bindings,
         guardrails=guardrails,
         key_normalization=key_normalization,
+        parallel_mode=parallel_mode,  # type: ignore[arg-type]
+        max_workers=max_workers,
+        chunk_parallelism=LookupChunkParallelismPolicy(
+            parallelize_lookup_chunks=parallelize_lookup_chunks,
+            max_chunk_workers=max_chunk_workers,
+        ),
     )
 
 

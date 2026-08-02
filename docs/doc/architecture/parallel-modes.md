@@ -268,6 +268,46 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
 `adaptive` 会为并发任务创建捕获管理器,订阅发现基于 `HookManager.hooks` 的快照语义.
 因此在一次 `run` 期间动态 `register/unregister hooks` 属于不受支持用法,可能不会影响并发任务的捕获/回放.
 
+#### 3.5.3 `load_ref_cache` 不跨并发任务共享
+
+`adaptive` 下每个 `LoadRef` 任务使用**独立的** `ExecutionRuntime`(各自一份空的批次级 `load_ref_cache`),
+fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,可能各调一次 loader(这是既有语义,不是分片并行引入的).
+热维表请用 `cache_mode: preload_forever`;分片并行与该缓存层正交.
+
+### 3.6 opt-in: `lookup_chunk_size` 分片并行(仅 `adaptive`)
+
+`adaptive` 重叠的是**不同** `LoadRef` 任务之间的等待;而 `lookup_chunk_size` 把一次 `LoadRef(keys)` 拆成多片后,
+这些片默认仍然**顺序**调用 loader. 在 RTT 主导(DB/远程接口)时,片数会线性放大固定等待.
+
+可以显式许可「同一 `LoadRef` 内的多片并行」:
+
+- `DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True, max_chunk_workers=None)`(YAML DSL 运行入口)
+- `ExecutionRequest(parallel_mode="adaptive", parallelize_lookup_chunks=True, ...)`(IR 入口)
+- `ScalimEngine(parallel_mode="adaptive", pipeline_overrides=PipelineOverrides(parallelize_lookup_chunks=True))`(Engine 入口)
+
+语义边界:
+
+- **默认关闭**;未 opt-in 时与改前完全一致(顺序分片、调用次数不变).
+- **`seq` 永不分片并行**:`parallel_mode="seq"` 即使 opt-in 也保持顺序分片.
+- **不是第三种 `parallel_mode`**:它是运行级的附加许可,`parallel_mode` 仍只有 `seq` / `adaptive`.
+- **`lookup_chunk_size` 不是并行开关**:只设置它不会产生任何并发.
+- 合并结果与顺序分片**完全一致**:按 chunk 在 keys 列表上的 offset 升序合并,同 key 冲突时先写入者胜.
+- 失败/超时跟随父 `LoadRef` 任务(含 `AdaptiveTuning.task_timeout_s`),不新增 chunk 级 timeout;失败时不会写入半份合并结果.
+- `bind.use_rows`(`rows` 模式)强制不分片,因此也不会出现分片并行.
+
+限流(必须理解的护栏):
+
+- 分片使用**独立**的小线程池(不复用 `adaptive` 池),避免「同池 submit 后再 wait」的嵌套死锁.
+- 全局在途 ref-loader 调用数 ≤ 解析后的 `adaptive` workers `W`(与 `max_workers` 同一护栏),由进程内共享信号量强制.
+- `max_chunk_workers` 额外限制**单步**扇出(默认 `None` = 只受 `W` 与分片数限制).
+
+风险提示: opt-in 会把「片数 × 并发」直接压到外部系统上. 请先确认数据库/接口的 QPS 与连接池能承受 `W` 个并发查询,
+再决定是否开启;必要时用 `max_workers` / `max_chunk_workers` 收敛.
+
+可观测性: 每个 chunk 仍会发出一条 `loader_call`(条数 = 分片数,`lookup_key_count` 为当片大小),
+并携带 `chunk_offset`(keys 切片起点). 并行下事件按**完成序**发出,框架不做排序缓冲;
+若需要稳定顺序,请订阅方自行按 `chunk_offset` 排序.
+
 ## 4. 深度调参(需要 Python/IR 注入)
 
 如果你要调的不是“并发上限”,而是“每层是否并行 / 资源池怎么分 / backend seam(当前仅支持 `thread`)”,需要走 `PipelineOverrides`.
@@ -278,6 +318,7 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
   - `adaptive_min_parallel_tasks`: 每层最小并行任务数阈值(默认 2)
   - `adaptive_tuning`: `AdaptiveTuning`(池/阈值/全局上限等)
   - `adaptive_policy`: `AdaptivePolicy`(决策/backend seam/池选择)
+  - `parallelize_lookup_chunks` / `max_chunk_workers`: 分片并行 opt-in(见 §3.6;默认关闭,`seq` 下无效)
 
 重要约束:
 
@@ -296,6 +337,11 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
     - 批次内存在较多相互独立的 `LoadRef(keys)` 任务
     - loader 主要是 I/O 等待(HTTP/DB/远程服务),并发能隐藏等待时间
     - 你能接受并发带来的外部压力,并愿意用 `max_workers` 做上限
+
+- 再考虑 `adaptive` + 分片并行 opt-in(§3.6)
+    - 单个 `LoadRef` 的键集很大且被 `lookup_chunk_size` 拆成多片
+    - 片数 × RTT 已经成为主要耗时,而外部系统能承受 `W` 个并发查询
+    - 你不需要「顺序观感」的 `loader_call` 事件流(并行下为完成序 + `chunk_offset`)
 
 - backend seam(只在 `adaptive` 下生效)
     - 当前仅支持 `thread`(默认策略也只返回 `thread`;可通过 `overrides.adaptive_executor_cls` 替换线程执行器实现)

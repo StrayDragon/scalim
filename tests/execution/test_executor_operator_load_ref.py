@@ -118,6 +118,10 @@ def test_load_ref_loader_chunked_skips_duplicate_keys_without_cache(monkeypatch:
             self.instrumentation = _InstrumentationStub()
             self.batch_num = 0
             self.guardrails = _GuardrailsStub()
+            self.chunk_inflight_semaphore = None
+
+        def resolve_chunk_fanout(self, _chunk_count: int) -> int:
+            return 1
 
     merged = load_ref_loader._load_ref_chunked(  # noqa: SLF001
         exec_ctx=object(),  # type: ignore[arg-type]

@@ -2,7 +2,8 @@ import contextlib
 import logging
 import time
 from collections.abc import Mapping
-from typing import List, Optional, Tuple, cast
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, cast
 
 from .....events import EventType
 from .....spec.ir import LookupStepIr
@@ -12,11 +13,15 @@ from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lo
 from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData, RuntimeValue
 from .....utils.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
 from .....vendor.compact.typing_extensionsx import Protocol
+from .....vendor.dataclassesx import dataclass
 from ....loader_call_params import build_loader_call_params
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
 from ...runtime.runtime import ExecutionRuntime, LoadRefCacheEntry
 from .context import LoadRefExecutionContext
+
+if TYPE_CHECKING:
+    from concurrent.futures import Future
 
 # 模块级日志记录器
 _logger = logging.getLogger(__name__.rsplit(".", 1)[0])
@@ -57,6 +62,7 @@ def _trigger_ref_loader_call(
     lookup_key_count: int,
     event_field_keys: Tuple[str, ...],
     cache_status: Optional[str],
+    chunk_offset: Optional[int] = None,
 ) -> None:
     if not runtime.instrumentation.wants(EventType.LOADER_CALL):
         return
@@ -84,7 +90,25 @@ def _trigger_ref_loader_call(
         lookup_key_count=lookup_key_count,
         field_keys=list(event_field_keys),
         skipped_none_rows=skipped_none_rows,
+        chunk_offset=chunk_offset,
     )
+
+
+def _call_with_inflight_cap(runtime: ExecutionRuntime, call: Callable[[], RuntimeValue]) -> RuntimeValue:
+    """在启用分片并行时,让所有 `ref-loader` 调用共享全局在途帽(容量 = `W`).
+
+    说明:
+    - 未启用分片并行(信号量为 `None`)时零开销,行为与改前一致.
+    - 持有槽位期间**不会**再等待其它分片 `future`(等待发生在未持槽的父线程),因此不存在同帽嵌套死锁.
+    """
+    semaphore = runtime.chunk_inflight_semaphore
+    if semaphore is None:
+        return call()
+    _ = semaphore.acquire()
+    try:
+        return call()
+    finally:
+        semaphore.release()
 
 
 def _call_ref_loader(
@@ -97,6 +121,7 @@ def _call_ref_loader(
     lookup_key_count: int,
     event_field_keys: Tuple[str, ...],
     cache_status: str,
+    chunk_offset: Optional[int] = None,
 ) -> LoaderResultMapping:
     loader_fn = runtime.runtime_bindings.require_source_loader(source.source_id)
 
@@ -108,16 +133,19 @@ def _call_ref_loader(
         )
         return loader_fn(*args, **kwargs)
 
+    def _call_loader_with_retry() -> RuntimeValue:
+        return call_with_loader_retry(
+            call=_call_loader,
+            instrumentation=runtime.instrumentation,
+            policy=policy,
+            loader_name=source.source_id,
+            callsite=CALLSITE_LOAD_REF,
+            batch_num=runtime.batch_num,
+        )
+
     loader_start = time.perf_counter()
     policy = runtime.loader_retry.resolve(source.source_id)
-    result_raw: RuntimeValue = call_with_loader_retry(
-        call=_call_loader,
-        instrumentation=runtime.instrumentation,
-        policy=policy,
-        loader_name=source.source_id,
-        callsite=CALLSITE_LOAD_REF,
-        batch_num=runtime.batch_num,
-    )
+    result_raw: RuntimeValue = _call_with_inflight_cap(runtime, _call_loader_with_retry)
     loader_duration = time.perf_counter() - loader_start
 
     result_obj: RuntimeValue = result_raw
@@ -138,6 +166,7 @@ def _call_ref_loader(
         lookup_key_count=lookup_key_count,
         event_field_keys=event_field_keys,
         cache_status=cache_status,
+        chunk_offset=chunk_offset,
     )
     guardrails = runtime.guardrails
     if guardrails.enabled and guardrails.loader.validate_result and not isinstance(result_obj, Mapping):
@@ -242,6 +271,138 @@ def _load_ref_once(
     return result
 
 
+@dataclass(frozen=True)
+class _ChunkPlan:
+    """单个 `lookup_chunk_size` 分片的调用计划(`loader_context` 在父线程预先构造)."""
+
+    offset: int
+    lookup_key_count: int
+    loader_context: LoaderCallContextIr
+
+
+def _build_chunk_plans(
+    *,
+    exec_ctx: LoadRefExecutionContext,
+    source: LookupSourceRefIrBase,
+    event_field_keys: Tuple[str, ...],
+    lookup_keys_list: LookupKeyList,
+    batch_rows: Optional[List[RowData]],
+    chunk_size: int,
+) -> List[_ChunkPlan]:
+    plans: List[_ChunkPlan] = []
+    for offset in range(0, len(lookup_keys_list), chunk_size):
+        chunk_list = lookup_keys_list[offset : offset + chunk_size]
+        chunk_set = set(chunk_list)
+        plans.append(
+            _ChunkPlan(
+                offset=offset,
+                lookup_key_count=len(chunk_set),
+                loader_context=build_ref_loader_context(
+                    exec_ctx,
+                    source.source_id,
+                    event_field_keys,
+                    batch_rows,
+                    chunk_set,
+                    chunk_list,
+                ),
+            )
+        )
+    return plans
+
+
+def _load_one_chunk(
+    *,
+    runtime: ExecutionRuntime,
+    source: LookupSourceRefIrBase,
+    binding: Optional[BindingIr],
+    event_field_keys: Tuple[str, ...],
+    plan: _ChunkPlan,
+) -> LoaderResultMapping:
+    return _call_ref_loader(
+        runtime=runtime,
+        source=source,
+        binding=binding,
+        loader_context=plan.loader_context,
+        cache_enabled=True,
+        lookup_key_count=plan.lookup_key_count,
+        event_field_keys=event_field_keys,
+        cache_status="miss",
+        chunk_offset=plan.offset,
+    )
+
+
+def _merge_chunk_result(merged: LoaderResultMap, result: LoaderResultMapping) -> None:
+    # 先写入者胜: 与串行分片 `for-loop` 完全一致(见 `ir-source-relations` `r694`).
+    for key, value in result.items():
+        if key not in merged:
+            merged[key] = value
+
+
+def _load_chunks_serially(
+    *,
+    runtime: ExecutionRuntime,
+    source: LookupSourceRefIrBase,
+    binding: Optional[BindingIr],
+    event_field_keys: Tuple[str, ...],
+    plans: List[_ChunkPlan],
+) -> LoaderResultMap:
+    merged: LoaderResultMap = {}
+    for plan in plans:
+        result = _load_one_chunk(
+            runtime=runtime,
+            source=source,
+            binding=binding,
+            event_field_keys=event_field_keys,
+            plan=plan,
+        )
+        _merge_chunk_result(merged, result)
+    return merged
+
+
+def _load_chunks_in_parallel(
+    *,
+    runtime: ExecutionRuntime,
+    source: LookupSourceRefIrBase,
+    binding: Optional[BindingIr],
+    event_field_keys: Tuple[str, ...],
+    plans: List[_ChunkPlan],
+    fanout: int,
+) -> LoaderResultMap:
+    """`opt-in` 分片并行:独立小池扇出 + 全局在途帽;合并顺序仍按 `offset` 升序."""
+    results_by_offset: Dict[int, LoaderResultMapping] = {}
+    executor = ThreadPoolExecutor(max_workers=fanout)
+    try:
+        futures: List[Tuple[_ChunkPlan, "Future[LoaderResultMapping]"]] = [
+            (
+                plan,
+                executor.submit(
+                    _load_one_chunk,
+                    runtime=runtime,
+                    source=source,
+                    binding=binding,
+                    event_field_keys=event_field_keys,
+                    plan=plan,
+                ),
+            )
+            for plan in plans
+        ]
+        try:
+            # 按 `offset` 升序取结果: 失败时抛出的是「串行会最先遇到」的那个分片异常.
+            for plan, future in futures:
+                results_by_offset[plan.offset] = future.result()
+        finally:
+            # 尽力取消未开始的分片(已在跑的线程无法强杀,与 `adaptive` 池 `shutdown` 语义一致).
+            for _plan, pending in futures:
+                _ = pending.cancel()
+    finally:
+        executor.shutdown(wait=True)
+
+    merged: LoaderResultMap = {}
+    for plan in plans:
+        _merge_chunk_result(merged, results_by_offset[plan.offset])
+    return merged
+
+
 def _load_ref_chunked(
     *,
     exec_ctx: LoadRefExecutionContext,
@@ -254,34 +415,35 @@ def _load_ref_chunked(
     chunk_size: int,
     cache_key: Optional[LoadRefCacheKey],
 ) -> LoaderResultMap:
-    merged: LoaderResultMap = {}
-    for offset in range(0, len(lookup_keys_list), chunk_size):
-        chunk_list = lookup_keys_list[offset : offset + chunk_size]
-        chunk_set = set(chunk_list)
-        loader_context = build_ref_loader_context(
-            exec_ctx,
-            source.source_id,
-            event_field_keys,
-            batch_rows,
-            chunk_set,
-            chunk_list,
-        )
+    plans = _build_chunk_plans(
+        exec_ctx=exec_ctx,
+        source=source,
+        event_field_keys=event_field_keys,
+        lookup_keys_list=lookup_keys_list,
+        batch_rows=batch_rows,
+        chunk_size=chunk_size,
+    )
 
-        result = _call_ref_loader(
+    fanout = runtime.resolve_chunk_fanout(len(plans))
+    if fanout > 1:
+        merged = _load_chunks_in_parallel(
             runtime=runtime,
             source=source,
             binding=binding,
-            loader_context=loader_context,
-            cache_enabled=True,
-            lookup_key_count=len(chunk_set),
             event_field_keys=event_field_keys,
-            cache_status="miss",
+            plans=plans,
+            fanout=fanout,
+        )
+    else:
+        merged = _load_chunks_serially(
+            runtime=runtime,
+            source=source,
+            binding=binding,
+            event_field_keys=event_field_keys,
+            plans=plans,
         )
 
-        for key, value in result.items():
-            if key not in merged:
-                merged[key] = value
-
+    # 分片期间不写 `load_ref_cache`;全部合并完成后至多写一次(异常时不写半份).
     if cache_key is not None:
         runtime.load_ref_cache[cache_key] = LoadRefCacheEntry(
             result=merged,

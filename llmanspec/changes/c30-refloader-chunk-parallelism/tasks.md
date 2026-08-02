@@ -19,26 +19,26 @@
 
 ## 1. 选项面（Python policy）
 
-- [ ] 1.1 `parallelize_lookup_chunks` + `max_chunk_workers`（命名以实现时最小公开面为准）
-- [ ] 1.2 `seq` 或未 opt-in → 代码路径与今日一致（测试锁定）
-- [ ] 1.3 adaptive 但未 opt-in → 仍串行分片
+- [x] 1.1 `parallelize_lookup_chunks` + `max_chunk_workers`（命名以实现时最小公开面为准）
+- [x] 1.2 `seq` 或未 opt-in → 代码路径与今日一致（测试锁定）
+- [x] 1.3 adaptive 但未 opt-in → 仍串行分片
 
 ## 2. 分片并行实现（垂直切片）
 
-- [ ] 2.1 `_load_ref_chunked`：opt-in 时 fan-out 独立池；合并 ≡ 串行（含键冲突「先到先得」语义）
-- [ ] 2.2 全局 semaphore/帽 = W；单测：在途 ≤ W；无嵌套同池死锁
-- [ ] 2.3 异常语义 ≡ 串行；每 chunk `loader_call` 仍发出（完成序；载荷含 `chunk_offset`）；框架不排序缓冲
-- [ ] 2.4 cache：分片 worker 不写 `load_ref_cache`；合并后单次写入；测例钉死
-- [ ] 2.5 `LoaderCallEvent`（或等价 meta）增加可选 `chunk_offset`；串行分片亦可填（便于统一）
+- [x] 2.1 `_load_ref_chunked`：opt-in 时 fan-out 独立池；合并 ≡ 串行（含键冲突「先到先得」语义）
+- [x] 2.2 全局 semaphore/帽 = W；单测：在途 ≤ W；无嵌套同池死锁
+- [x] 2.3 异常语义 ≡ 串行；每 chunk `loader_call` 仍发出（完成序；载荷含 `chunk_offset`）；框架不排序缓冲
+- [x] 2.4 cache：分片 worker 不写 `load_ref_cache`；合并后单次写入；测例钉死
+- [x] 2.5 `LoaderCallEvent`（或等价 meta）增加可选 `chunk_offset`；串行分片亦可填（便于统一）
 
 ## 3. 护栏
 
-- [ ] 3.1 workers / 帽上限；拒绝无界
-- [ ] 3.2 文档：外部 QPS 风险与推荐用法；`lookup_chunk_size` ≠ 并行开关
-- [ ] 3.3 合并 ≡ 串行 first-wins（按 chunk offset 序）；rows 模式不分片单测
-- [ ] 3.5 文档一句：adaptive 跨 relation **不**共享 `load_ref_cache`（per-task 隔离）；热维表用 `preload_forever`；与 c30 正交（不在本 change 做跨 task dedup）
+- [x] 3.1 workers / 帽上限；拒绝无界
+- [x] 3.2 文档：外部 QPS 风险与推荐用法；`lookup_chunk_size` ≠ 并行开关
+- [x] 3.3 合并 ≡ 串行 first-wins（按 chunk offset 序）；rows 模式不分片单测
+- [x] 3.5 文档一句：adaptive 跨 relation **不**共享 `load_ref_cache`（per-task 隔离）；热维表用 `preload_forever`；与 c30 正交（不在本 change 做跨 task dedup）
 
 ## 4. 证据与回归
 
-- [ ] 4.1 `.tmp/repro/chunk-parallel/` A/B（sleep RTT）+ RSS ≤10%
-- [ ] 4.3 交叉：`preload_forever` + `lookup_chunk_size` + opt-in → LoadRef 热路径零 ref-loader；preload 阶段仍只 load 一次
+- [x] 4.1 `.tmp/repro/chunk-parallel/` A/B（sleep RTT）+ RSS ≤10%
+- [x] 4.3 交叉：`preload_forever` + `lookup_chunk_size` + opt-in → LoadRef 热路径零 ref-loader；preload 阶段仍只 load 一次

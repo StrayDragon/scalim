@@ -9,6 +9,7 @@ from ..planning.plan import ExecutionPlan
 from ..sinks import ISink
 from ..spec.ir import DemandIr
 from ..typedefs import KeyNormalizationMode, LoaderResultMapping, RowData
+from .chunk_parallelism import LookupChunkParallelismPolicy
 from .executor.batch.executor import BatchExecutor
 from .executor.runtime.runtime import ExecutionRuntime
 from .guardrails import GuardrailsPolicy
@@ -69,6 +70,8 @@ class ScalimEngine:
             `parallel_mode`: 执行模式(`seq`:顺序;`adaptive`:自适应并发)
             `max_workers`: `adaptive` 并发上限(`0` 表示自动;`seq` 下忽略)
             `pipeline_overrides`: 可选的 `pipeline` 扩展点覆盖对象
+                (亦是 `lookup_chunk_size` 分片并行的 `opt-in` 入口:
+                `parallelize_lookup_chunks` / `max_chunk_workers`;仅 `adaptive` 生效)
             `guardrails`: 可选的防护策略
             `loader_retry`: 可选的加载重试策略
             `preloaded_cache`: 可选:预加载缓存容器(用于 `preload_forever`).
@@ -107,6 +110,14 @@ class ScalimEngine:
             msg = "Invalid parallel_mode='{}'. Expected 'seq' or 'adaptive'.".format(parallel_mode)
             raise ValueError(msg)
 
+        # 分片并行是 `Python` 运行策略(无 `YAML` 键):`opt-in` 走 `PipelineOverrides`.
+        chunk_parallelism = LookupChunkParallelismPolicy.disabled()
+        if pipeline_overrides is not None:
+            chunk_parallelism = LookupChunkParallelismPolicy(
+                parallelize_lookup_chunks=bool(pipeline_overrides.parallelize_lookup_chunks),
+                max_chunk_workers=pipeline_overrides.max_chunk_workers,
+            )
+
         runtime = ExecutionRuntime(
             plan=plan,
             hook_manager=self.hook_manager,
@@ -122,6 +133,7 @@ class ScalimEngine:
             preloaded_cache=preloaded_cache,
             workflow_cache_pool=workflow_cache_pool,
             workflow_node_id=workflow_node_id,
+            chunk_parallelism=chunk_parallelism,
         )
         executor = BatchExecutor(plan, runtime, overrides=pipeline_overrides)
 

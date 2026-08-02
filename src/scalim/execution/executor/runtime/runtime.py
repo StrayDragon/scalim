@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Dict, FrozenSet, Hashable, List, Mapping, MutableMapping, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Hashable, List, Mapping, MutableMapping, Optional, Set, Tuple
 
 from ...._internal.loggingx import prefix
 from ...._internal.utils.converters import auto_str_normalize_key
@@ -17,6 +17,7 @@ from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LoaderResultValue, LookupKey, ParallelMode, RowData, RuntimeValue
 from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
 from ....vendor.dataclassesx import dataclass
+from ...chunk_parallelism import LookupChunkParallelismPolicy, build_chunk_inflight_semaphore, resolve_chunk_inflight_capacity
 from ...guardrails import GuardrailsPolicy
 from ...key_normalization import normalize_key_normalization, should_apply_str_key_normalization
 from ...loader_retry import LoaderRetryPolicies
@@ -25,6 +26,9 @@ from ...workflow_cache_pool import WorkflowCachePool
 from ._internal.call_by_dep_cardinality import CallByDepCardinalityCollector, build_call_by_dep_cardinality_collector
 from ._internal.call_by_memoization import CallByMemoizationController, build_call_by_memoization_controller
 from ._internal.relation_guardrails import maybe_enforce_relation_guardrails
+
+if TYPE_CHECKING:
+    import threading
 
 # endregion
 
@@ -74,6 +78,14 @@ class ExecutionRuntime:
     sink: Optional[ISink]
     batch_num: int
     parallel_mode: ParallelMode
+    # `NOTE:` `adaptive` 的每任务子运行时会被置为 `parallel_mode="seq"`(任务内串行),
+    # 因此「本次运行是否为 `adaptive`」必须由 `run_parallel_mode` 承载(子运行时继承父值),
+    # 否则分片并行的 `gate` 会在工作线程里被误判为 `seq`.
+    run_parallel_mode: ParallelMode
+    chunk_parallelism: LookupChunkParallelismPolicy
+    # 进程内共享的在途 `ref-loader` 调用帽(容量 = 解析后的 `adaptive` `workers` `W`);未启用分片并行时为 `None`.
+    chunk_inflight_semaphore: Optional["threading.BoundedSemaphore"]
+    chunk_inflight_capacity: int
     max_workers: int
     key_normalization: KeyNormalizationMode
     adaptive_backend: Optional[str]
@@ -99,6 +111,7 @@ class ExecutionRuntime:
         preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
         workflow_cache_pool: Optional[WorkflowCachePool] = None,
         workflow_node_id: Optional[str] = None,
+        chunk_parallelism: Optional[LookupChunkParallelismPolicy] = None,
     ) -> None:
         self.preloaded_cache = preloaded_cache if preloaded_cache is not None else {}
         self._preloaded_cache_str_views = {}
@@ -124,6 +137,13 @@ class ExecutionRuntime:
         self.sink = None
         self.batch_num = 0
         self.parallel_mode = parallel_mode
+        self.run_parallel_mode = parallel_mode
+        self.chunk_parallelism = chunk_parallelism or LookupChunkParallelismPolicy.disabled()
+        self.chunk_inflight_semaphore = None
+        self.chunk_inflight_capacity = 0
+        if self.is_chunk_parallelism_enabled():
+            self.chunk_inflight_capacity = resolve_chunk_inflight_capacity(max_workers)
+            self.chunk_inflight_semaphore = build_chunk_inflight_semaphore(self.chunk_inflight_capacity)
         self.max_workers = max_workers
         self.key_normalization = normalize_key_normalization(key_normalization)
         self.adaptive_backend = None
@@ -140,6 +160,35 @@ class ExecutionRuntime:
         self.relation_guardrail_stats = {}
         self.call_by_dep_cardinality = build_call_by_dep_cardinality_collector()
         self.call_by_memoization = build_call_by_memoization_controller()
+
+    def is_chunk_parallelism_enabled(self) -> bool:
+        """是否允许分片并行:仅运行级 `adaptive` + 显式 `opt-in`."""
+        return self.chunk_parallelism.is_enabled_for(self.run_parallel_mode)
+
+    def inherit_chunk_parallelism(self, parent: "ExecutionRuntime") -> None:
+        """让 `adaptive` 每任务子运行时继承运行级分片并行范围.
+
+        说明:
+        - 子运行时的 `parallel_mode` 为 `seq`(任务内串行),但运行级仍是 `adaptive`.
+        - 在途帽信号量必须**共享同一实例**,否则全局帽会退化成「每任务各一份 `W`」.
+        """
+        self.run_parallel_mode = parent.run_parallel_mode
+        self.chunk_parallelism = parent.chunk_parallelism
+        self.chunk_inflight_capacity = parent.chunk_inflight_capacity
+        self.chunk_inflight_semaphore = parent.chunk_inflight_semaphore
+
+    def resolve_chunk_fanout(self, chunk_count: int) -> int:
+        """解析单步分片扇出并发度(`1` 表示串行分片).
+
+        上限来源:分片数 / 全局在途帽 `W` / 可选 `max_chunk_workers`.
+        """
+        if chunk_count <= 1 or not self.is_chunk_parallelism_enabled():
+            return 1
+        fanout = min(int(chunk_count), max(1, int(self.chunk_inflight_capacity)))
+        max_chunk_workers = self.chunk_parallelism.max_chunk_workers
+        if max_chunk_workers is not None:
+            fanout = min(fanout, int(max_chunk_workers))
+        return max(1, fanout)
 
     def maybe_log_call_by_dep_cardinality_summary(self) -> None:
         collector = self.call_by_dep_cardinality

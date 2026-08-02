@@ -72,6 +72,7 @@ class HookCaptureManager(HookManager):
         lookup_key_count: Optional[int] = None,
         field_keys: Optional[List[str]] = None,
         skipped_none_rows: Optional[int] = None,
+        chunk_offset: Optional[int] = None,
     ) -> None:
         if not self._has_hooks:
             return
@@ -97,6 +98,7 @@ class HookCaptureManager(HookManager):
             lookup_key_count=lookup_key_count,
             skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
+            chunk_offset=chunk_offset,
         )
         self._recorded_events.append(HookRecordedEvent(event_type=EventType.LOADER_CALL, payload=event))
 
