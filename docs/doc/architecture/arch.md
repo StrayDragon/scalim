@@ -225,6 +225,8 @@ flowchart TD
 
 ### 5.3 write-precompute: 只用于写出的派生字段延后到写出前算
 
+**0.10.0** 人类可读性能专页（workload 表、Mermaid、D3 图）: [write-precompute-0.10](../getting-started/write-precompute-0.10.md)。
+
 规划期会自动挑出一批“只喂给最终写出”的派生字段(`ExecutionPlan.late_fields`),它们在 `Compute` 段被跳过,改为在写出前现场物化:
 
 - 行式 sink: 写该行之前按拓扑序算出这些字段,值直接进入写出行,不回写 `BatchContext`
@@ -241,6 +243,19 @@ flowchart TD
 - 计算器/`call_by` 的调用**次数**不变,但**时机**后移到写出前;因此不要依赖“`compute` 段结束时所有派生值都在上下文里”
 - `FIELD_COMPUTE` 事件带 `meta` 键 `scalim_compute_phase`(`operator` / `write_precompute`),用于区分两个阶段
 - `guardrails` 语义不变: `quiet` 把失败单元格降级为 `None`,`fast_fail` 抛错并 `discard` sink(不产出半成品)
+
+### 5.4 row-wise fusion: 同 deps 派生字段按行融合(减 N×M 框架税)
+
+规划期识别 `ExecutionPlan.compute_fusion_groups`(同一 pre/post-ref 段、deps 完全相同、互不依赖、无 `$ctx` / 非常量)。运行时在安全外壳内改为 **按行读一次依赖 → 依次算组内字段**;每字段每行仍调用一次 calculator(**不**减少 `calc_calls`)。
+
+安全外壳外回退 field-major:
+
+- 列 sink(`IColumnSink`)
+- 订阅 `FIELD_COMPUTE` / `OPERATOR_SPAN`
+- guardrails 启用且 compute 为 `fast_fail`
+- 组内任一字段 EXP `call_by` memo 生效
+
+与 §5.3 的边界: fusion 只作用于仍在 `Compute` 段的字段;`late_fields` 的行内复用归 write-precompute。
 
 ## 6. 内存优化: 三个层次(定位用)
 

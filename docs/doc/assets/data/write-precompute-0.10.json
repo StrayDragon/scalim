@@ -1,0 +1,410 @@
+{
+  "version": "0.10.0",
+  "feature": "write-precompute",
+  "measured_at": "2026-08-02",
+  "host_note": "合成 workload；本机 Python 3.10；内存 sink + 全表黄金；同一 plan 仅切 late_fields",
+  "contracts": {
+    "calc_calls": "equal N×M",
+    "values": "golden_ok",
+    "authoring": "no new YAML / no master switch"
+  },
+  "workload": [
+    {
+      "id": "report_mixed_row",
+      "label": "报表混合·行写出",
+      "sink": "row",
+      "rows": 20000,
+      "flat": 48,
+      "chain": 8,
+      "derived": 56,
+      "eager_s": 1.919,
+      "late_s": 0.8706,
+      "speedup": 2.204,
+      "peak_ratio": 20000.0,
+      "est_eager_gib": 0.0668,
+      "est_late_gib": 3e-06,
+      "late_fields": 56,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    },
+    {
+      "id": "report_mixed_column",
+      "label": "报表混合·列写出",
+      "sink": "column",
+      "rows": 20000,
+      "flat": 48,
+      "chain": 8,
+      "derived": 56,
+      "eager_s": 1.353,
+      "late_s": 1.124,
+      "speedup": 1.204,
+      "peak_ratio": 7.0,
+      "est_eager_gib": 0.0668,
+      "est_late_gib": 0.009537,
+      "late_fields": 56,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    },
+    {
+      "id": "wide_export_row",
+      "label": "宽表纯导出·行",
+      "sink": "row",
+      "rows": 10000,
+      "flat": 80,
+      "chain": 0,
+      "derived": 80,
+      "eager_s": 1.3229,
+      "late_s": 0.5783,
+      "speedup": 2.287,
+      "peak_ratio": 10000.0,
+      "est_eager_gib": 0.0477,
+      "est_late_gib": 5e-06,
+      "late_fields": 80,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    },
+    {
+      "id": "wide_export_column",
+      "label": "宽表纯导出·列",
+      "sink": "column",
+      "rows": 10000,
+      "flat": 80,
+      "chain": 0,
+      "derived": 80,
+      "eager_s": 0.9383,
+      "late_s": 0.8015,
+      "speedup": 1.171,
+      "peak_ratio": 80.0,
+      "est_eager_gib": 0.0477,
+      "est_late_gib": 0.000596,
+      "late_fields": 80,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    },
+    {
+      "id": "chain_export_row",
+      "label": "链式派生·行",
+      "sink": "row",
+      "rows": 30000,
+      "flat": 4,
+      "chain": 24,
+      "derived": 28,
+      "eager_s": 1.4506,
+      "late_s": 0.7046,
+      "speedup": 2.059,
+      "peak_ratio": 30000.0,
+      "est_eager_gib": 0.0501,
+      "est_late_gib": 2e-06,
+      "late_fields": 28,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    },
+    {
+      "id": "engine_proxy_flat_row",
+      "label": "引擎代理宽表·行",
+      "sink": "row",
+      "rows": 8000,
+      "flat": 120,
+      "chain": 0,
+      "derived": 120,
+      "eager_s": 1.5997,
+      "late_s": 0.656,
+      "speedup": 2.439,
+      "peak_ratio": 8000.0,
+      "est_eager_gib": 0.0572,
+      "est_late_gib": 7e-06,
+      "late_fields": 120,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    },
+    {
+      "id": "dense_rows_moderate_row",
+      "label": "大行数中等宽·行",
+      "sink": "row",
+      "rows": 50000,
+      "flat": 32,
+      "chain": 4,
+      "derived": 36,
+      "eager_s": 3.1999,
+      "late_s": 1.518,
+      "speedup": 2.108,
+      "peak_ratio": 50000.0,
+      "est_eager_gib": 0.1073,
+      "est_late_gib": 2e-06,
+      "late_fields": 36,
+      "calc_calls_equal": true,
+      "golden_ok": true
+    }
+  ],
+  "micro_m_sweep": [
+    {
+      "m": 1,
+      "row_speedup": 1.23
+    },
+    {
+      "m": 4,
+      "row_speedup": 1.46
+    },
+    {
+      "m": 40,
+      "row_speedup": 2.18,
+      "col_speedup": 1.23
+    }
+  ],
+  "residency_matrix": [
+    {
+      "scale": "small",
+      "topology": "flat",
+      "sink": "row",
+      "rows": 52428,
+      "flat": 1600,
+      "chain": 0,
+      "est_eager_gib": 5.0,
+      "est_late_gib": 0.0001,
+      "peak_ratio": 52428.0
+    },
+    {
+      "scale": "small",
+      "topology": "flat",
+      "sink": "column",
+      "rows": 52428,
+      "flat": 1600,
+      "chain": 0,
+      "est_eager_gib": 5.0,
+      "est_late_gib": 0.0031,
+      "peak_ratio": 1600.0
+    },
+    {
+      "scale": "small",
+      "topology": "chain",
+      "sink": "row",
+      "rows": 1310720,
+      "flat": 8,
+      "chain": 64,
+      "est_eager_gib": 5.62,
+      "est_late_gib": 0.0,
+      "peak_ratio": 1310720.0
+    },
+    {
+      "scale": "small",
+      "topology": "chain",
+      "sink": "column",
+      "rows": 1310720,
+      "flat": 8,
+      "chain": 64,
+      "est_eager_gib": 5.62,
+      "est_late_gib": 5.0,
+      "peak_ratio": 1.1
+    },
+    {
+      "scale": "small",
+      "topology": "mixed",
+      "sink": "row",
+      "rows": 102801,
+      "flat": 800,
+      "chain": 16,
+      "est_eager_gib": 5.0,
+      "est_late_gib": 0.0,
+      "peak_ratio": 102801.0
+    },
+    {
+      "scale": "small",
+      "topology": "mixed",
+      "sink": "column",
+      "rows": 102801,
+      "flat": 800,
+      "chain": 16,
+      "est_eager_gib": 5.0,
+      "est_late_gib": 0.098,
+      "peak_ratio": 51.0
+    },
+    {
+      "scale": "medium",
+      "topology": "flat",
+      "sink": "row",
+      "rows": 104857,
+      "flat": 2400,
+      "chain": 0,
+      "est_eager_gib": 15.0,
+      "est_late_gib": 0.0001,
+      "peak_ratio": 104857.0
+    },
+    {
+      "scale": "medium",
+      "topology": "flat",
+      "sink": "column",
+      "rows": 104857,
+      "flat": 2400,
+      "chain": 0,
+      "est_eager_gib": 15.0,
+      "est_late_gib": 0.0062,
+      "peak_ratio": 2400.0
+    },
+    {
+      "scale": "medium",
+      "topology": "chain",
+      "sink": "row",
+      "rows": 2621440,
+      "flat": 8,
+      "chain": 96,
+      "est_eager_gib": 16.25,
+      "est_late_gib": 0.0,
+      "peak_ratio": 2621440.0
+    },
+    {
+      "scale": "medium",
+      "topology": "chain",
+      "sink": "column",
+      "rows": 2621440,
+      "flat": 8,
+      "chain": 96,
+      "est_eager_gib": 16.25,
+      "est_late_gib": 15.0,
+      "peak_ratio": 1.1
+    },
+    {
+      "scale": "medium",
+      "topology": "mixed",
+      "sink": "row",
+      "rows": 205603,
+      "flat": 1200,
+      "chain": 24,
+      "est_eager_gib": 15.0,
+      "est_late_gib": 0.0001,
+      "peak_ratio": 205603.0
+    },
+    {
+      "scale": "medium",
+      "topology": "mixed",
+      "sink": "column",
+      "rows": 205603,
+      "flat": 1200,
+      "chain": 24,
+      "est_eager_gib": 15.0,
+      "est_late_gib": 0.2941,
+      "peak_ratio": 51.0
+    },
+    {
+      "scale": "large",
+      "topology": "flat",
+      "sink": "row",
+      "rows": 157286,
+      "flat": 3200,
+      "chain": 0,
+      "est_eager_gib": 30.0,
+      "est_late_gib": 0.0002,
+      "peak_ratio": 157286.0
+    },
+    {
+      "scale": "large",
+      "topology": "flat",
+      "sink": "column",
+      "rows": 157286,
+      "flat": 3200,
+      "chain": 0,
+      "est_eager_gib": 30.0,
+      "est_late_gib": 0.0094,
+      "peak_ratio": 3200.0
+    },
+    {
+      "scale": "large",
+      "topology": "chain",
+      "sink": "row",
+      "rows": 3932160,
+      "flat": 8,
+      "chain": 128,
+      "est_eager_gib": 31.88,
+      "est_late_gib": 0.0,
+      "peak_ratio": 3932160.0
+    },
+    {
+      "scale": "large",
+      "topology": "chain",
+      "sink": "column",
+      "rows": 3932160,
+      "flat": 8,
+      "chain": 128,
+      "est_eager_gib": 31.88,
+      "est_late_gib": 30.0,
+      "peak_ratio": 1.1
+    },
+    {
+      "scale": "large",
+      "topology": "mixed",
+      "sink": "row",
+      "rows": 308404,
+      "flat": 1600,
+      "chain": 32,
+      "est_eager_gib": 30.0,
+      "est_late_gib": 0.0001,
+      "peak_ratio": 308404.0
+    },
+    {
+      "scale": "large",
+      "topology": "mixed",
+      "sink": "column",
+      "rows": 308404,
+      "flat": 1600,
+      "chain": 32,
+      "est_eager_gib": 30.0,
+      "est_late_gib": 0.5882,
+      "peak_ratio": 51.0
+    }
+  ],
+  "engine_small_5gib": [
+    {
+      "case_id": "small_flat_row",
+      "topology": "flat",
+      "sink": "row",
+      "duration_s": 127.12,
+      "rss_peak_mib": 83.7,
+      "est_eager_gib": 5.0,
+      "golden_ok": true
+    },
+    {
+      "case_id": "small_flat_column",
+      "topology": "flat",
+      "sink": "column",
+      "duration_s": 110.15,
+      "rss_peak_mib": 64.1,
+      "est_eager_gib": 5.0,
+      "golden_ok": true
+    },
+    {
+      "case_id": "small_chain_row",
+      "topology": "chain",
+      "sink": "row",
+      "duration_s": 145.8,
+      "rss_peak_mib": 472.2,
+      "est_eager_gib": 5.62,
+      "golden_ok": true
+    },
+    {
+      "case_id": "small_chain_column",
+      "topology": "chain",
+      "sink": "column",
+      "duration_s": 116.65,
+      "rss_peak_mib": 471.4,
+      "est_eager_gib": 5.62,
+      "golden_ok": true
+    },
+    {
+      "case_id": "small_mixed_row",
+      "topology": "mixed",
+      "sink": "row",
+      "duration_s": 125.88,
+      "rss_peak_mib": 95.0,
+      "est_eager_gib": 5.0,
+      "golden_ok": true
+    },
+    {
+      "case_id": "small_mixed_column",
+      "topology": "mixed",
+      "sink": "column",
+      "duration_s": 111.11,
+      "rss_peak_mib": 86.1,
+      "est_eager_gib": 5.0,
+      "golden_ok": true
+    }
+  ]
+}
