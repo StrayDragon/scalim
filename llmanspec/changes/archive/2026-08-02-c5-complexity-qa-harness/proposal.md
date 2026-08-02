@@ -2,7 +2,8 @@
 depends_on: []
 branch: sdd/c5-complexity-qa-harness
 base_sha: 385eb688a8e60d15cb805fb2b1c295055de4241f
-checkpointed: false
+checkpointed: true
+checkpoint_sha: 385eb688a8e60d15cb805fb2b1c295055de4241f
 ---
 
 # 复杂度 QA harness：用函数级闸替代纯行数硬闸
