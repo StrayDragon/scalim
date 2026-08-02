@@ -154,11 +154,13 @@ memray tree .benchmarks/memray/<prefix>-test_bench_xxx.bin
 
 ### 4.1 基准保存与比较
 
+基准产物落在本地 `.benchmarks/`（已 gitignore）。**不要提交**：跨机器 / CI / 不同负载下的数字没有可比性，只适合本机前后对比。
+
 ```bash
-# 保存当前基准
+# 保存当前基准（仅本机）
 just bench-baseline-save
 
-# 与基准比较(显示差异)
+# 与本机基准比较(显示差异)
 just bench-compare
 
 # 回归检测(超过阈值则失败)
