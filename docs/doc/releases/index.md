@@ -15,6 +15,7 @@
 
 ## 已发布
 
+- [0.10.1 重点特性](0.10.1/) — typed handlers 收 `Event`（相对 0.10.0 的 Python breaking；YAML 无强制迁移）
 - [0.10.0 重点特性](0.10.0/) — SSOT 总览（默认行为 / opt-in / 最短迁移清单；三个专页共用本章）
   - [write-precompute-0.10](write-precompute-0.10.md) — 默认开启
   - [rowwise-fusion-0.10](rowwise-fusion-0.10.md) — 默认开启（安全外壳）

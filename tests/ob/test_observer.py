@@ -745,7 +745,8 @@ def test_event_dispatch_observer_caches_handler_callable() -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        def on_pipeline_start(self, event: PipelineStartEvent) -> None:  # type: ignore[override]
+        def on_pipeline_start(self, event: Event) -> None:  # type: ignore[override]
+            _ = event
             self.calls += 1
 
     observer = _CaptureObserver()

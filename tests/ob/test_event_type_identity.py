@@ -42,7 +42,7 @@ def test_hook_register_accepts_event_type_set() -> None:
     class _GoodHook(BaseHook):
         event_types = {EventType.PIPELINE_START}
 
-        def on_pipeline_start(self, event: PipelineStartEvent) -> None:  # type: ignore[override]
+        def on_pipeline_start(self, event: Event) -> None:  # type: ignore[override]
             _ = event
 
     manager = HookManager()

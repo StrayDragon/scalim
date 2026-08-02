@@ -17,6 +17,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
 - 宽表 Excel 峰值 / `StreamingColumnExcelSink` / `ExcelColumnResidency` 选型: 读 [references/streaming-column-excel-guidance.md](references/streaming-column-excel-guidance.md)（人类文档: `docs/doc/getting-started/excel-column-residency.md`）
 - **0.10.0 版本亮点**（默认 write-precompute / row-wise fusion；opt-in lookup chunk 并行；YAML 无强制迁移）: 读 [references/0.10-release-highlights.md](references/0.10-release-highlights.md)（人类总览: `docs/doc/releases/0.10.0/index.md`）
+- **0.10.1**（相对 0.10.0；YAML 无强制迁移；Python typed handlers 收 `Event`）: [references/0.10.1-release-highlights.md](references/0.10.1-release-highlights.md) + `docs/doc/releases/0.10.1/`；Observer/Hook 迁移走 `scalim-public-api`
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
 - 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`(book write: `2026-07-12-book-write-policy-python-ssot.md`；book budget 移除: `2026-07-28-remove-book-budget-policy.md`；Dedup/TwoStage IR 移除: `2026-07-28-remove-dedup-and-two-stage-derived.md`)

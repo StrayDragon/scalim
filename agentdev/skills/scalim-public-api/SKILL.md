@@ -58,5 +58,5 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - **0.10.0 性能亮点**(write-precompute / fusion / chunk 并行;YAML 无强制迁移):`scalim-yaml-dsl/references/0.10-release-highlights.md` + 人类总览 `docs/doc/releases/0.10.0/`。
   - 订阅 `FIELD_COMPUTE` / `OPERATOR_SPAN` 或 `VizObserverConfig(trace_enabled=True)` → **关掉** row-wise fusion(安全外壳)。
   - `lookup_chunk_size` ≠ 并行开关;片间并行仅 Python `parallelize_lookup_chunks` + `adaptive`。
-  - typed `on_field_compute` 等收完整 `Event`：经 `event.payload` 读公开类型，经 `event.meta` 读 `scalim_compute_phase` 等横切字段（breaking；见 `2026-08-02-typed-handlers-receive-event.md`）。
+- **0.10.1**(相对 0.10.0): typed `on_*` 收完整 `Event`（breaking；YAML 无强制迁移）— `scalim-yaml-dsl/references/0.10.1-release-highlights.md` + `docs/doc/releases/0.10.1/` + `2026-08-02-typed-handlers-receive-event.md`。经 `event.payload` / `event.meta`（含 `scalim_compute_phase`）。
 - YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType / typed Event 批次属于 Python public API**,不进 YAML upgrades 索引。

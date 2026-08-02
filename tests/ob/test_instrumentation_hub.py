@@ -127,7 +127,7 @@ def test_hub_on_event_and_typed_callbacks_are_both_invoked() -> None:
         def on_event(self, event: Event) -> None:  # type: ignore[override]
             self.on_event_events.append(event)
 
-        def on_pipeline_start(self, event: PipelineStartEvent) -> None:  # type: ignore[override]
+        def on_pipeline_start(self, event: Event) -> None:  # type: ignore[override]
             self.typed_events.append(event)
 
     hook = _DualHook()

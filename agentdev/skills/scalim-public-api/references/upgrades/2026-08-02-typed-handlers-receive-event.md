@@ -89,5 +89,5 @@ Hook 侧同理：`BaseHook.on_field_compute(self, event: Event)`。
 ## 交叉入口
 
 - 本 skill：`task-event-type-adaptation.md`（EventType 身份批次仍见 `2026-07-19-event-type-enum-identity.md`）
-- 人类文档：`docs/doc/viz/scalim-viz.md`、`docs/doc/releases/0.10.0/`
+- 人类文档：`docs/doc/releases/0.10.1/`、`docs/doc/viz/scalim-viz.md`；0.10.0 性能总览仍见 `docs/doc/releases/0.10.0/`
 - 示例：`ch180_public_api_hooks_events`（若仍有 payload 直读，按本节 A 迁移）
