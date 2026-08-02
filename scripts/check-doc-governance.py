@@ -44,8 +44,8 @@ def _check_repo_guide_single_link(root: Path) -> list[str]:
         return ["missing file: {}".format(repo_guide)]
 
     text = _read_text(repo_guide)
-    if "#code=AGENTS.md" not in text:
-        return ["`docs/doc/dev/repo-guide.md` MUST link to `AGENTS.md` via `#code=AGENTS.md`."]
+    if "repo:AGENTS.md" not in text:
+        return ["`docs/doc/dev/repo-guide.md` MUST link to `AGENTS.md` via `repo:AGENTS.md`."]
 
     # 保持为“单链接入口页”,避免在 `docs-site` 内重复维护 `SSOT` 规则.
     if "## " in text:
@@ -91,8 +91,8 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
         errors.append("`{}` MUST include injected upgrades index block markers.".format(index_md))
 
     ssot_dir_rel = "agentdev/skills/scalim-yaml-dsl/references/upgrades/"
-    if "#code={}".format(ssot_dir_rel) not in text:
-        errors.append("`{}` upgrades links MUST point to SSOT under `#code={}`.".format(index_md, ssot_dir_rel))
+    if "repo:{}".format(ssot_dir_rel) not in text:
+        errors.append("`{}` upgrades links MUST point to SSOT under `repo:{}`.".format(index_md, ssot_dir_rel))
 
     return errors
 

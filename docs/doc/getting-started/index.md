@@ -11,5 +11,5 @@
 - 配套工具: [补全/编辑体验](../yaml-dsl/editor.md) / [集成AI环境](../yaml-dsl/agent-skill.md) / [可视化工具](../viz/scalim-viz.md) / [基准测试](../benchmark/index.md)
 - 需要调参时再看: [并行模式(seq/adaptive)](../architecture/parallel-modes.md)
 - 宽表 Excel 峰值 / 列式 HOLD vs WINDOW: [Excel 列式写出策略](excel-column-residency.md)
-- **升级到 0.10.0**：先看 [版本亮点 · 0.10.0 重点特性](../releases/0.10.0.md)（默认行为 / opt-in / 对拍专页）
+- **升级到 0.10.0**：先看 [版本亮点 · 0.10.0 重点特性](../releases/0.10.0/)（默认行为 / opt-in / 对拍专页）
 - 想贡献代码: [仓库开发约定](../dev/repo-guide.md) → [如何阅读本项目](reading-guide.md)

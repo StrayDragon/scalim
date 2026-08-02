@@ -16,8 +16,12 @@
 | 失败 | `fast_fail` → 报错 + sink discard |
 | 观测 | `FIELD_COMPUTE` 带 `meta.scalim_compute_phase` = `operator` \| `write_precompute` |
 
-架构语义：[`arch.md` §5.3](../architecture/arch.md#53-write-precompute-只用于写出的派生字段延后到写出前算)。  
-版本亮点总览：[0.10.0 重点特性](0.10.0.md)。
+架构语义：[`arch.md` §5.3](../architecture/arch.md#53-write-precompute)。  
+版本亮点总览：[0.10.0 重点特性](0.10.0/)。
+
+??? info "0.10.0 重点特性 · 版本总览(折叠)"
+
+    > 单一事实来源为独立章节 [0.10.0 重点特性](0.10.0/)，此处折叠预览。
 
 姊妹能力（同 deps 行内融合）：[rowwise-fusion-0.10](rowwise-fusion-0.10.md)。  
 姊妹能力（同 LoadRef 分片并行）：[lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md)。
@@ -26,7 +30,6 @@
 <span id="wp10-host-note" class="wp10-note"></span>
 
 数据文件（可复用）：[`assets/data/write-precompute-0.10.json`](../assets/data/write-precompute-0.10.json)。
-
 ---
 
 ## 1. 一图看懂：早算 vs 晚算
@@ -185,15 +188,17 @@ flowchart TD
 
 - 订阅 `FIELD_COMPUTE`：用 `meta["scalim_compute_phase"]` 区分 `operator` 与 `write_precompute`。
 - 勿假设「Compute 段结束后上下文已有全部写出派生」。
-- Excel / `openpyxl` 主路径不是本版主优化；宽表列峰值另见 [Excel 列式写出策略](excel-column-residency.md)。
+- Excel / `openpyxl` 主路径不是本版主优化；宽表列峰值另见 [Excel 列式写出策略](../getting-started/excel-column-residency.md)。
 
 ---
 
 ## 7. 复现与证据索引
 
+复现脚本（已入库）：[`docs/doc/releases/repro/c10-workload-shapes/run_ab.py`](repro/c10-workload-shapes/run_ab.py) / [`c20-workload-shapes/run_ab.py`](repro/c20-workload-shapes/run_ab.py)（本页 workload 同款 A/B）。
+
 ```bash
-# workload A/B（生成图表同款数字）
-uv run python .tmp/repro/c10-workload-shapes/run_ab.py --runs 3
+# workload A/B（生成图表同款数字；仓库根目录运行）
+uv run python docs/doc/releases/repro/c10-workload-shapes/run_ab.py --runs 3
 
 # 微扫参
 uv run python llmanspec/changes/archive/2026-08-01-c10-write-precompute-derived-fields/mvp/repro_row_late_vs_eager.py \

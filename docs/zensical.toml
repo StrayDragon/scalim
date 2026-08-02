@@ -41,10 +41,12 @@ nav = [
   ] },
   { "版本亮点" = [
     "releases/index.md",
-    { "0.10.0 重点特性" = "releases/0.10.0.md" },
-    { "0.10.0 write-precompute" = "releases/write-precompute-0.10.md" },
-    { "0.10.0 row-wise fusion" = "releases/rowwise-fusion-0.10.md" },
-    { "0.10.0 lookup chunk 并行" = "releases/lookup-chunk-parallel-0.10.md" },
+    { "0.10.0 重点特性" = [
+      "releases/0.10.0/index.md",
+      { "0.10.0 write-precompute" = "releases/write-precompute-0.10.md" },
+      { "0.10.0 row-wise fusion" = "releases/rowwise-fusion-0.10.md" },
+      { "0.10.0 lookup chunk 并行" = "releases/lookup-chunk-parallel-0.10.md" },
+    ] },
   ] },
   { "工具与排查" = [
     "tools/index.md",
@@ -77,6 +79,7 @@ markdown_extensions = [
   { "pymdownx.details" = {} },
   { "pymdownx.highlight" = {} },
   { "pymdownx.inlinehilite" = {} },
+
   { "pymdownx.superfences" = { custom_fences = [{ name = "mermaid", class = "language-mermaid" }] } },
   { "toc" = { permalink = true } },
 ]

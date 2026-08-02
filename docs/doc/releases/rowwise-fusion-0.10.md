@@ -18,8 +18,13 @@
 | 观测订阅 `FIELD_COMPUTE` / `OPERATOR_SPAN` | **不融合** |
 | EXP `call_by` memo 命中组内字段 | **整组不融合** |
 
-架构：[`arch.md` §5.4](../architecture/arch.md#54-row-wise-fusion-同-deps-派生字段按行融合减-nm-框架税)。  
-版本亮点总览：[0.10.0 重点特性](0.10.0.md)。  
+架构：[`arch.md` §5.4](../architecture/arch.md#54-row-wise-fusion-deps-nm)。  
+版本亮点总览：[0.10.0 重点特性](0.10.0/)。
+
+??? info "0.10.0 重点特性 · 版本总览(折叠)"
+
+    > 单一事实来源为独立章节 [0.10.0 重点特性](0.10.0/)，此处折普览。
+
 姊妹能力（写出前晚算）：[write-precompute-0.10](write-precompute-0.10.md)。  
 姊妹能力（同 LoadRef 分片并行）：[lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md)。
 
@@ -27,7 +32,6 @@
 <span id="rf10-host-note" class="rf10-note"></span>
 
 数据：[`assets/data/rowwise-fusion-0.10.json`](../assets/data/rowwise-fusion-0.10.json)。
-
 ---
 
 ## 1. 一图看懂：field-major vs row-wise
@@ -122,11 +126,13 @@ uv run python llmanspec/changes/archive/2026-08-02-c20-compute-expr-rowwise-fusi
   --rows 4000 --wide-fields 40 --runs 3
 ```
 
-本页同款 workload：
+本页同款 workload（仓库根目录运行）：
 
 ```bash
-uv run python .tmp/repro/c20-workload-shapes/run_ab.py --runs 3
+uv run python docs/doc/releases/repro/c20-workload-shapes/run_ab.py --runs 3
 ```
+
+复现脚本（已入库）：[`docs/doc/releases/repro/c20-workload-shapes/run_ab.py`](repro/c20-workload-shapes/run_ab.py)。
 
 ---
 
@@ -159,4 +165,5 @@ flowchart TD
 
 - Spec：`llmanspec/specs/execution-compute-rowwise-fusion/`
 - 归档 change：`llmanspec/changes/archive/2026-08-02-c20-compute-expr-rowwise-fusion/`
-- 大形状 RSS（≤10%）：`.tmp/evidence/c20-rowwise-fusion-rss/`（可再生，不入库）
+- 大形状 RSS（≤10%）：`.tmp/evidence/c20-rowwise-fusion-rss/`（可再生成，不入库）
+- 复现脚本（已入库）：[`docs/doc/releases/repro/c20-workload-shapes/run_ab.py`](repro/c20-workload-shapes/run_ab.py)

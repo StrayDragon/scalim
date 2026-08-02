@@ -1290,7 +1290,7 @@ sources:
 - 若要让同一 LoadRef 的多个 chunk 重叠等待,必须在 Python 运行入口显式 opt-in
   (`DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True)`),
   并接受它对外部系统 QPS 的放大;护栏见 [执行并行模式 §3.6](../architecture/parallel-modes.md)；
-  升级说明与对拍见 [0.10.0 重点特性](../releases/0.10.0.md) / [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md).
+  升级说明与对拍见 [0.10.0 重点特性](../releases/0.10.0/) / [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md).
   失败路径注意:并行下已在途的其它 chunk 可能仍会跑完,loader 调用次数可能高于串行;成功路径次数一致.
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
@@ -1394,7 +1394,7 @@ base_module_path = derive_base_module_path("path/to/config.yaml")
 
 运行时/服务端集成的故障处理(包括上述 `base_module_path` 推导报错)见:
 
-- [`agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](#code=agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md)
+- [`agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md`](repo:agentdev/skills/scalim-yaml-dsl/references/task-runtime-troubleshooting.md?ref)
 
 ---
 

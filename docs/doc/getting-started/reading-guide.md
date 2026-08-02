@@ -23,12 +23,12 @@
 
 ## 1. 先读哪些文档(避免迷路)
 
-- [`AGENTS.md`](#code=AGENTS.md): 仓库协作约定与硬边界(唯一准则)
+- [`AGENTS.md`](repo:AGENTS.md?ref): 仓库协作约定与硬边界(唯一准则)
 - [架构详解](../architecture/arch.md): 架构分层与主要流程图;实现细节与行为约束会指向 `llmanspec/`
 - [llmanspec 规范](../specs/index.md): 更接近“规范/约束”的描述,适合在改行为前先对齐预期
 - [SSOT / 生成物 / 门禁地图](../dev/ssot-map.md): 统一查表“改哪里/跑哪个生成入口/哪个门禁会拦”
 - [Excel 列式写出策略(HOLD/WINDOW)](excel-column-residency.md): 宽表 Excel 峰值与 `StreamingColumnExcelSink` 选型(与 YAML books 行式写出区分)
-- [版本亮点 · 0.10.0](../releases/0.10.0.md): 默认 write-precompute / fusion 与 opt-in chunk 并行（对拍专页入口）
+- [版本亮点 · 0.10.0](../releases/0.10.0/): 默认 write-precompute / fusion 与 opt-in chunk 并行（对拍专页入口）
 - [主线教程: demo_big_data_report](demo-big-data-report.md): 从一个稳定 demo 入口跑起来/对拍/排错(面向 CI 与日常开发)
 
 站点文档更偏“用法与入口”,适合把经常问的问题沉淀成可维护的索引页.
@@ -46,22 +46,22 @@
 
 建议从这个入口开始读:
 
-- [`src/scalim/dsl/yaml_dsl/runtime/entrypoints.py::run`](#code=src/scalim/dsl/yaml_dsl/runtime/entrypoints.py::run)
+- [`src/scalim/dsl/yaml_dsl/runtime/entrypoints.py::run`](repo:src/scalim/dsl/yaml_dsl/runtime/entrypoints.py::run)
 
 顺着调用链往下看,基本是这几段:
 
 1. **读取与校验**
-   - schema/语义校验: [`src/scalim/dsl/yaml_dsl/_internal/config_parsing/`](#code=src/scalim/dsl/yaml_dsl/_internal/config_parsing/)
-   - CLI 入口: [`packages/scalim-cli/src/scalim_cli/yaml_dsl.py`](#code=packages/scalim-cli/src/scalim_cli/yaml_dsl.py)
+   - schema/语义校验: [`src/scalim/dsl/yaml_dsl/_internal/config_parsing/`](repo:src/scalim/dsl/yaml_dsl/_internal/config_parsing/)
+   - CLI 入口: [`packages/scalim-cli/src/scalim_cli/yaml_dsl.py`](repo:packages/scalim-cli/src/scalim_cli/yaml_dsl.py)
 2. **配置 → IR**
-   - 编译编排(run/compile): [`src/scalim/dsl/yaml_dsl/runtime/compiler.py`](#code=src/scalim/dsl/yaml_dsl/runtime/compiler.py)
-   - 静态前端(不 import/适合 LSP): [`src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py`](#code=src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py)
-   - 运行时链接(RuntimeBindings): [`src/scalim/dsl/yaml_dsl/runtime/runtime_linking.py`](#code=src/scalim/dsl/yaml_dsl/runtime/runtime_linking.py)
-   - 结构模型(schema 生成用): [`src/scalim/dsl/yaml_dsl/schema_dsl/models/`](#code=src/scalim/dsl/yaml_dsl/schema_dsl/models/)
+   - 编译编排(run/compile): [`src/scalim/dsl/yaml_dsl/runtime/compiler.py`](repo:src/scalim/dsl/yaml_dsl/runtime/compiler.py)
+   - 静态前端(不 import/适合 LSP): [`src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py`](repo:src/scalim/dsl/yaml_dsl/compiler_frontend/compiler.py)
+   - 运行时链接(RuntimeBindings): [`src/scalim/dsl/yaml_dsl/runtime/runtime_linking.py`](repo:src/scalim/dsl/yaml_dsl/runtime/runtime_linking.py)
+   - 结构模型(schema 生成用): [`src/scalim/dsl/yaml_dsl/schema_dsl/models/`](repo:src/scalim/dsl/yaml_dsl/schema_dsl/models/)
 3. **IR → plan → 执行**
-   - 执行编排: [`src/scalim/execution/run_ir.py::run_ir`](#code=src/scalim/execution/run_ir.py::run_ir)
-   - 规划层: [`src/scalim/planning/`](#code=src/scalim/planning/)(`PlanBuilder`, `ExecutionPlan`)
-   - 引擎与流水线: [`src/scalim/execution/engine.py`](#code=src/scalim/execution/engine.py), [`src/scalim/execution/pipeline/`](#code=src/scalim/execution/pipeline/)
+   - 执行编排: [`src/scalim/execution/run_ir.py::run_ir`](repo:src/scalim/execution/run_ir.py::run_ir)
+   - 规划层: [`src/scalim/planning/`](repo:src/scalim/planning/)(`PlanBuilder`, `ExecutionPlan`)
+   - 引擎与流水线: [`src/scalim/execution/engine.py`](repo:src/scalim/execution/engine.py), [`src/scalim/execution/pipeline/`](repo:src/scalim/execution/pipeline/)
 
 如果你在找“某个 YAML 字段最终影响了哪里”,通常会先在 yaml_dsl 的 **静态编译** 阶段把配置翻译成 `DemandIr`/`SourceIr`/`FieldIr`(纯数据),
 再在 **runtime_linking** 阶段解析引用/编译表达式得到 `RuntimeBindings`,最后进入规划与执行.
@@ -70,8 +70,8 @@
 
 如果你已经有 `DemandIr` 或在写更底层的集成,从这里开始读更顺:
 
-- [`src/scalim/execution/run_ir.py::run_ir`](#code=src/scalim/execution/run_ir.py::run_ir)
-- [`src/scalim/execution/engine.py::ScalimEngine`](#code=src/scalim/execution/engine.py::ScalimEngine)
+- [`src/scalim/execution/run_ir.py::run_ir`](repo:src/scalim/execution/run_ir.py::run_ir)
+- [`src/scalim/execution/engine.py::ScalimEngine`](repo:src/scalim/execution/engine.py::ScalimEngine)
 
 `run_ir` 负责:
 
@@ -83,17 +83,17 @@
 
 执行主干在:
 
-- [`src/scalim/execution/pipeline/base/pipeline.py::SeqPipeline.run`](#code=src/scalim/execution/pipeline/base/pipeline.py::SeqPipeline.run)
-- [`src/scalim/execution/executor/batch/executor.py::BatchExecutor.execute_operators`](#code=src/scalim/execution/executor/batch/executor.py::BatchExecutor.execute_operators)
+- [`src/scalim/execution/pipeline/base/pipeline.py::SeqPipeline.run`](repo:src/scalim/execution/pipeline/base/pipeline.py::SeqPipeline.run)
+- [`src/scalim/execution/executor/batch/executor.py::BatchExecutor.execute_operators`](repo:src/scalim/execution/executor/batch/executor.py::BatchExecutor.execute_operators)
 
 你会看到一个稳定的结构:
 
 - `Pipeline` 负责分批、sink 分类(行/列/文件)、GC 节奏、可观测性事件
 - `BatchExecutor` 负责按 `ExecutionPlan.operators` 执行算子
 - 每种算子有自己的 executor:
-  - `Load`: [`src/scalim/execution/executor/operators/load/`](#code=src/scalim/execution/executor/operators/load/)
-  - `LoadRef`: [`src/scalim/execution/executor/operators/load_ref/`](#code=src/scalim/execution/executor/operators/load_ref/)
-  - `Compute`: [`src/scalim/execution/executor/operators/compute/`](#code=src/scalim/execution/executor/operators/compute/)
+  - `Load`: [`src/scalim/execution/executor/operators/load.py`](repo:src/scalim/execution/executor/operators/load.py)
+  - `LoadRef`: [`src/scalim/execution/executor/operators/load_ref/`](repo:src/scalim/execution/executor/operators/load_ref/)
+  - `Compute`: [`src/scalim/execution/executor/operators/compute/`](repo:src/scalim/execution/executor/operators/compute/)
 
 并行模式(`seq`/`adaptive`)只影响 `LoadRef` 段的执行方式,详见:
 
@@ -101,12 +101,12 @@
 
 ## 4. 例子与回归从哪里找
 
-- YAML 示例(带 anchors): [`tests/fixtures/order_report.yaml`](#code=tests/fixtures/order_report.yaml)
-- 运行示例与 demo: [`notebooks/`](#code=notebooks/)(marimo)与 [`packages/scalim-misc/src/scalim_misc/`](#code=packages/scalim-misc/src/scalim_misc/)
+- YAML 示例(带 anchors): [`tests/fixtures/order_report.yaml`](repo:tests/fixtures/order_report.yaml)
+- 运行示例与 demo: [`notebooks/`](repo:notebooks/)(marimo)与 [`packages/scalim-misc/src/scalim_misc/`](repo:packages/scalim-misc/src/scalim_misc/)
   - 本地启动 marimo server(推荐): `uv run marimo edit notebooks/marimo/`
   - headless 回归入口(与 CI 一致): `just examples`（入口实现位于 `justfile` 的 `examples:` recipe）
   - 覆盖报告(按需): `just report-notebooks-coverage`（CSV）; 门禁: `just check-notebooks-coverage`
-- 规划/执行相关 fixture: [`tests/fixtures/planning_fixtures.py`](#code=tests/fixtures/planning_fixtures.py), [`tests/fixtures/executor_operator_fixtures.py`](#code=tests/fixtures/executor_operator_fixtures.py)
+- 规划/执行相关 fixture: [`tests/fixtures/planning_fixtures.py`](repo:tests/fixtures/planning_fixtures.py), [`tests/fixtures/executor_operator_fixtures.py`](repo:tests/fixtures/executor_operator_fixtures.py)
 
 要改 DSL 行为或 schema,尽量先补一个能覆盖你场景的 fixture/测试,不然很难防止“文档写对了,实现悄悄漂”.
 

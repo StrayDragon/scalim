@@ -6,15 +6,15 @@
 
 **相对 `v0.9.x`：YAML authoring 主线无强制迁移。**  
 本版三项性能相关能力：**两项默认开启（零新 YAML）**，**一项 Python opt-in**。  
-对拍与图表见下方专页；运行期护栏正文见 [并行模式](../architecture/parallel-modes.md) / [架构](../architecture/arch.md)。
+对拍与图表见下方专页；运行期护栏正文见 [并行模式](../../architecture/parallel-modes.md) / [架构](../../architecture/arch.md)。
 
 ## 一览
 
 | 能力 | 默认 | YAML 要改吗 | 专页 |
 |------|------|-------------|------|
-| write-precompute（写出前晚算） | **开** | 否 | [write-precompute-0.10](write-precompute-0.10.md) |
-| row-wise fusion（同 deps 行内融合） | **开**（安全外壳内） | 否 | [rowwise-fusion-0.10](rowwise-fusion-0.10.md) |
-| lookup chunk 并行 | **关** | 否（开关只在 Python） | [lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md) |
+| write-precompute（写出前晚算） | **开** | 否 | [write-precompute-0.10(../write-precompute-0.10.md) |
+| row-wise fusion（同 deps 行内融合） | **开**（安全外壳内） | 否 | [rowwise-fusion-0.10(../rowwise-fusion-0.10.md) |
+| lookup chunk 并行 | **关** | 否（开关只在 Python） | [lookup-chunk-parallel-0.10(../lookup-chunk-parallel-0.10.md) |
 
 ```mermaid
 flowchart TD
@@ -51,7 +51,7 @@ flowchart TD
 
 ### 4. 与 YAML breaking 的关系
 
-本页**不**替代 [upgrades 索引](../yaml-dsl/upgrades/index.md)。若配置仍含已删字段（如 `write_defaults` / `budget` / `xlsx_file`），先按对应 upgrade 批次改 YAML。
+本页**不**替代 [upgrades 索引../../yaml-dsl/upgrades/index.md)。若配置仍含已删字段（如 `write_defaults` / `budget` / `xlsx_file`），先按对应 upgrade 批次改 YAML。
 
 ## 发版引用（可贴 Release）
 
@@ -63,7 +63,7 @@ flowchart TD
   docs/doc/releases/rowwise-fusion-0.10.md
 - lookup chunk 并行（opt-in）：adaptive + parallelize_lookup_chunks；lookup_chunk_size ≠ 开关。
   docs/doc/releases/lookup-chunk-parallel-0.10.md
-总览：docs/doc/releases/0.10.0.md
+总览：docs/doc/releases/0.10.0/index.md
 ```
 
 ## Agent skill

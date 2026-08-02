@@ -286,8 +286,8 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
         "本仓库将“public API”定义为:用户在 Python 侧可稳定导入、并被回归门禁覆盖的一组 `scalim.*` 模块与符号。",
         "核心约束来自三处(约定优先):",
         "",
-        "- `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](#code=scripts/check-api-surface-governance.py)",
-        "- 用户材料导入边界(文档/示例/skills): [`scripts/check-user-material-import-boundaries.py`](#code=scripts/check-user-material-import-boundaries.py)",
+        "- `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](repo:scripts/check-api-surface-governance.py)",
+        "- 用户材料导入边界(文档/示例/skills): [`scripts/check-user-material-import-boundaries.py`](repo:scripts/check-user-material-import-boundaries.py)",
         "- 示例覆盖(可交互/可对拍): `notebooks/marimo/example_public_api_suite/`(见 [主线教程](demo-big-data-report.md))",
         "",
         "## 1) 推荐导入（Tier 1:稳定入口）",
@@ -568,6 +568,11 @@ def _extract_markdown_section(text: str, heading: str) -> str:
     return " ".join(buffer)
 
 
+def _repo_link(rel: str) -> str:
+    """仓库文件引用; `.md` 目标追加 `?ref`,避免 z 当页面为校验."""
+    return "repo:{}?ref".format(rel) if rel.endswith(".md") else "repo:{}".format(rel)
+
+
 def _render_llmanspec_index(repo_root: Path) -> str:
     specs_root = repo_root / "llmanspec" / "specs"
     spec_paths = sorted(p for p in specs_root.glob("*/spec.md") if p.is_file())
@@ -611,7 +616,7 @@ def _render_llmanspec_index(repo_root: Path) -> str:
                 "",
                 "### `{}`".format(slug),
                 "- Title: {}".format(title),
-                "- Source: [spec.md](#code={})".format(rel),
+                "- Source: [spec.md]({})".format(_repo_link(rel)),
             ]
         )
         if summary:
@@ -631,7 +636,7 @@ def _render_yaml_dsl_upgrades_index(repo_root: Path) -> str:
         if path.name == "index.md":
             continue
         rel = (UPGRADES_SSOT_DIR_REL / path.name).as_posix()
-        docs.append("- [{}](#code={})".format(title, rel))
+        docs.append("- [{}]({})".format(title, _repo_link(rel)))
 
     if not docs:
         docs.append("- (未发现升级文档)")

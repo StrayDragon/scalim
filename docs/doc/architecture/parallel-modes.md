@@ -309,7 +309,7 @@ fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,�
 并携带 `chunk_offset`(keys 切片起点). 并行下事件按**完成序**发出,框架不做排序缓冲;
 若需要稳定顺序,请订阅方自行按 `chunk_offset` 排序.
 
-人类可读对拍专页(命名变更 / sleep-RTT 证据 / D3 图): [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md)（版本亮点入口: [0.10.0](../releases/0.10.0.md)）.
+人类可读对拍专页(命名变更 / sleep-RTT 证据 / D3 图): [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md)（版本亮点入口: [0.10.0](../releases/0.10.0/)）.
 
 !!! warning "订阅方必须线程安全"
 

@@ -8,10 +8,10 @@
 
 ## 1) 关键入口(SSOT)
 
-- marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](#code=notebooks/marimo/demo_big_data_report/demo_main.py)
-- public API 覆盖套件入口(交互式): [`notebooks/marimo/example_public_api_suite/demo_main.py`](#code=notebooks/marimo/example_public_api_suite/demo_main.py)
-- `just examples` 集成对拍入口(headless/CI): `just examples`（入口实现位于 [`justfile`](#code=justfile) 的 `examples:` recipe）
-- YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`](#code=notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml)
+- marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](repo:notebooks/marimo/demo_big_data_report/demo_main.py)
+- public API 覆盖套件入口(交互式): [`notebooks/marimo/example_public_api_suite/demo_main.py`](repo:notebooks/marimo/example_public_api_suite/demo_main.py)
+- `just examples` 集成对拍入口(headless/CI): `just examples`（入口实现位于 [`justfile`](repo:justfile) 的 `examples:` recipe）
+- YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml)
 
 这些入口是“稳定入口”: 文档与回归门禁会围绕它们组织。
 

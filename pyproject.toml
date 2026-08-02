@@ -150,6 +150,7 @@ exclude = [
     "site-packages",
     "venv",
     "**/*.ipynb",
+    "docs/**/*.py",
     "src/scalim/vendor/dataclassesx/_backport.py",
     "src/scalim/vendor/yamlx/**",
 ]

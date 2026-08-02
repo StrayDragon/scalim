@@ -399,11 +399,12 @@
     if (!a) return;
 
     const href = a.getAttribute("href") || "";
-    const marker = "#code=";
+    // 仓库文件链接约定: `repo:<repo-relative-path>`（正文显示路径，打开动作由注解菜单完成）。
+    const marker = "repo:";
     const idx = href.indexOf(marker);
     if (idx < 0) return;
 
-    const rawRef = decodeURIComponent(href.slice(idx + marker.length));
+    const rawRef = decodeURIComponent(href.slice(idx + marker.length)).replace(/\?ref$/, "");
     const codeRef = parseCodeRef(rawRef);
     if (!codeRef.raw) return;
 

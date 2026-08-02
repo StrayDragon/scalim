@@ -18,15 +18,19 @@
 | 峰值 RSS（分进程对拍） | ≤ **+10%** |
 | 观测 | `loader_call.chunk_offset`；完成序；回调可能在 worker 线程 |
 
-架构 / 护栏：[`parallel-modes.md` §3.6](../architecture/parallel-modes.md#36-opt-in-lookup_chunk_size-分片并行仅-adaptive)。  
-版本亮点总览：[0.10.0 重点特性](0.10.0.md)。  
+架构 / 护栏：[`parallel-modes.md` §3.6](../architecture/parallel-modes.md#36-opt-in-lookup_chunk_size-adaptive)。  
+版本亮点总览：[0.10.0 重点特性](0.10.0/)。
+
+??? info "0.10.0 重点特性 · 版本总览(折叠)"
+
+    > 单一事实来源为独立章节 [0.10.0 重点特性](0.10.0/)，此处折叠预览。
+
 姊妹能力：[write-precompute-0.10](write-precompute-0.10.md) · [rowwise-fusion-0.10](rowwise-fusion-0.10.md)。
 
 测量摘要日期：<span id="lcp10-measured-at"></span>。  
 <span id="lcp10-host-note" class="lcp10-note"></span>
 
 数据：[`assets/data/lookup-chunk-parallel-0.10.json`](../assets/data/lookup-chunk-parallel-0.10.json)。
-
 ---
 
 ## 1. 命名与公开面（相对 ≤0.9）
@@ -122,10 +126,10 @@ flowchart LR
 复现：
 
 ```bash
-uv run python .tmp/repro/chunk-parallel/run_ab.py \
+uv run python docs/doc/releases/repro/chunk-parallel/run_ab.py \
   --keys 20000 --chunk-size 100 --rtt-ms 5 --max-workers 8
 # 大键集：
-uv run python .tmp/repro/chunk-parallel/run_ab.py \
+uv run python docs/doc/releases/repro/chunk-parallel/run_ab.py \
   --keys 100000 --chunk-size 500 --rtt-ms 5 --max-workers 8 \
   --out .tmp/evidence/c30-chunk-parallel/ab_100k.json
 ```
@@ -168,4 +172,4 @@ flowchart TD
 
 - Spec：`llmanspec/specs/execution-refloader-chunk-parallelism/`
 - 归档 change：`llmanspec/changes/archive/2026-08-02-c30-refloader-chunk-parallelism/`
-- 可再生证据（不入库）：`.tmp/evidence/c30-chunk-parallel/` · `.tmp/repro/chunk-parallel/run_ab.py`
+- 复现脚本（已入库）：[`docs/doc/releases/repro/chunk-parallel/run_ab.py`](repro/chunk-parallel/run_ab.py)；输出证据（可再生成，不入库）：`.tmp/evidence/c30-chunk-parallel/`

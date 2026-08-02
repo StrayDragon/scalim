@@ -15,4 +15,7 @@
 
 ## 已发布
 
-- [0.10.0 重点特性](0.10.0.md) — write-precompute / row-wise fusion / lookup chunk 并行
+- [0.10.0 重点特性](0.10.0/) — SSOT 总览（默认行为 / opt-in / 最短迁移清单；三个专页共用本章）
+  - [write-precompute-0.10](write-precompute-0.10.md) — 默认开启
+  - [rowwise-fusion-0.10](rowwise-fusion-0.10.md) — 默认开启（安全外壳）
+  - [lookup-chunk-parallel-0.10](lookup-chunk-parallel-0.10.md) — Python opt-in

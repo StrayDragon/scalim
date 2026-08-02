@@ -20,8 +20,8 @@ Sources:
 本仓库将“public API”定义为:用户在 Python 侧可稳定导入、并被回归门禁覆盖的一组 `scalim.*` 模块与符号。
 核心约束来自三处(约定优先):
 
-- `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](#code=scripts/check-api-surface-governance.py)
-- 用户材料导入边界(文档/示例/skills): [`scripts/check-user-material-import-boundaries.py`](#code=scripts/check-user-material-import-boundaries.py)
+- `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](repo:scripts/check-api-surface-governance.py)
+- 用户材料导入边界(文档/示例/skills): [`scripts/check-user-material-import-boundaries.py`](repo:scripts/check-user-material-import-boundaries.py)
 - 示例覆盖(可交互/可对拍): `notebooks/marimo/example_public_api_suite/`(见 [主线教程](demo-big-data-report.md))
 
 ## 1) 推荐导入（Tier 1:稳定入口）
