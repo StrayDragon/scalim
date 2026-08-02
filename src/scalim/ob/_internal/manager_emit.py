@@ -211,7 +211,9 @@ class ObserverManagerEmitMixin(ABC):
         cache_status: Optional[str] = None,
         cache_scope: Optional[str] = None,
         lookup_key_count: Optional[int] = None,
+        skipped_none_rows: Optional[int] = None,
         field_keys: Optional[List[str]] = None,
+        chunk_offset: Optional[int] = None,
     ) -> None:
         if not self._should_emit_event_type(EventType.LOADER_CALL):
             return
@@ -237,7 +239,9 @@ class ObserverManagerEmitMixin(ABC):
             cache_status=cache_status,
             cache_scope=cache_scope,
             lookup_key_count=lookup_key_count,
+            skipped_none_rows=skipped_none_rows,
             field_keys=field_keys,
+            chunk_offset=chunk_offset,
         )
         _ = self.emit_event(EventType.LOADER_CALL, event_payload)
 

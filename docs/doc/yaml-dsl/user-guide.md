@@ -1290,6 +1290,7 @@ sources:
 - 若要让同一 LoadRef 的多个 chunk 重叠等待,必须在 Python 运行入口显式 opt-in
   (`DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True)`),
   并接受它对外部系统 QPS 的放大;详见 [执行并行模式 §3.6](../architecture/parallel-modes.md).
+  失败路径注意:并行下已在途的其它 chunk 可能仍会跑完,loader 调用次数可能高于串行;成功路径次数一致.
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
 

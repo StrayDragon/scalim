@@ -106,3 +106,23 @@ def test_loader_event_payload_sample_sequence_fallbacks() -> None:
 
     assert event.result["type"] == "_BadSequence"
     assert event.result["size"] == 2
+
+
+def test_observer_manager_emit_loader_call_forwards_chunk_offset() -> None:
+    observer = _CaptureObserver()
+    manager = ObserverManager(observers=[observer], loader_result_policy=LoaderResultPolicy.FULL)
+    manager.emit_loader_call(
+        "demo",
+        {"p": 1},
+        {"a": 1},
+        0.1,
+        lookup_key_count=3,
+        skipped_none_rows=1,
+        chunk_offset=40,
+    )
+
+    assert len(observer.events) == 1
+    event = observer.events[0]
+    assert event.chunk_offset == 40
+    assert event.lookup_key_count == 3
+    assert event.skipped_none_rows == 1

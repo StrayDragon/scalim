@@ -163,6 +163,7 @@ class VizObserverHandlerMixin(ABC):
             "cache_scope": event.cache_scope,
             "lookup_key_count": event.lookup_key_count,
             "field_keys": event.field_keys,
+            "chunk_offset": event.chunk_offset,
         }
         if display_loader_name and canonical_loader_name and display_loader_name != canonical_loader_name:
             summary["loader_display_name"] = display_loader_name

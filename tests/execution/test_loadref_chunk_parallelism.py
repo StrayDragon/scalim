@@ -396,6 +396,42 @@ def test_chunk_failure_propagates_and_skips_cache_write() -> None:
     assert parallel.runtime.load_ref_cache == {}
 
 
+def test_chunk_failure_parallel_may_invoke_more_loaders_than_serial() -> None:
+    """错误路径:并行已在途 chunk MAY 仍跑完,调用次数 MAY > 串行;无半份 cache 不变."""
+
+    def _make_counting_loader(counter: Dict[str, int]):
+        def _loader(ids: List[int]) -> Dict[int, Dict[str, Any]]:
+            counter["calls"] += 1
+            if 3 in ids:
+                msg = "chunk boom"
+                raise ValueError(msg)
+            return {key: {"name": "Name{}".format(key)} for key in ids}
+
+        return _loader
+
+    serial_counter = {"calls": 0}
+    serial = _build_scenario(loader=_make_counting_loader(serial_counter), parallel_mode="seq", chunk_size=2, row_count=6)
+    with pytest.raises(ValueError, match="chunk boom"):
+        serial.execute()
+
+    parallel_counter = {"calls": 0}
+    parallel = _build_scenario(
+        loader=_make_counting_loader(parallel_counter),
+        parallel_mode="adaptive",
+        parallelize_lookup_chunks=True,
+        max_workers=3,
+        chunk_size=2,
+        row_count=6,
+    )
+    with pytest.raises(ValueError, match="chunk boom"):
+        parallel.execute()
+
+    assert serial.runtime.load_ref_cache == {}
+    assert parallel.runtime.load_ref_cache == {}
+    assert serial_counter["calls"] >= 1
+    assert parallel_counter["calls"] >= serial_counter["calls"]
+
+
 def test_preload_hit_skips_ref_loader_with_chunk_opt_in() -> None:
     def _loader(ids: List[int]) -> Dict[int, Dict[str, Any]]:
         msg = "ref loader must not be called when preload cache hits"

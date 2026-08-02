@@ -841,6 +841,31 @@ def test_viz_node_ref_normalization_and_loader_display_name(tmp_path: Path) -> N
     assert compute_events[0]["node_ref"]["id"] == "field:profit_value"
 
 
+def test_viz_loader_call_summary_includes_chunk_offset(tmp_path: Path) -> None:
+    events_path = tmp_path / "viz_events.jsonl"
+    config = VizObserverConfig(output_path=str(events_path), payload_policy="summary")
+    observer = VizObserver(config=config, snapshot={"meta": {}})
+    observer.run_id = "run_chunk_offset"
+    observer.on_pipeline_start(PipelineStartEvent(targets=["profit"], batch_size=1))
+    observer.on_loader_call(
+        LoaderCallEvent(
+            loader_name="orders",
+            params={},
+            result={"1": {"name": "a"}},
+            duration=0.01,
+            lookup_key_count=2,
+            chunk_offset=40,
+        )
+    )
+    observer.on_pipeline_end(PipelineEndEvent(total_batches=1, total_duration=0.1))
+
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    loader_events = [evt for evt in events if evt["event_type"] == "loader_called"]
+    assert loader_events
+    assert loader_events[0]["payload"]["chunk_offset"] == 40
+    assert loader_events[0]["payload"]["lookup_key_count"] == 2
+
+
 def test_viz_payload_policy_none_and_full(tmp_path: Path) -> None:
     events_path = tmp_path / "events_none.jsonl"
     config = VizObserverConfig(output_path=str(events_path), payload_policy="none")

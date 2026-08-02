@@ -292,7 +292,8 @@ fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,�
 - **不是第三种 `parallel_mode`**:它是运行级的附加许可,`parallel_mode` 仍只有 `seq` / `adaptive`.
 - **`lookup_chunk_size` 不是并行开关**:只设置它不会产生任何并发.
 - 合并结果与顺序分片**完全一致**:按 chunk 在 keys 列表上的 offset 升序合并,同 key 冲突时先写入者胜.
-- 失败/超时跟随父 `LoadRef` 任务(含 `AdaptiveTuning.task_timeout_s`),不新增 chunk 级 timeout;失败时不会写入半份合并结果.
+- 失败/超时跟随父 `LoadRef` 任务(含 `AdaptiveTuning.task_timeout_s`),不新增 chunk 级 timeout;失败时不会写入半份合并结果 / 半份 `load_ref_cache`.
+  注意:并行路径在失败时**已提交且仍在跑**的其它 chunk MAY 仍会执行完,因此错误路径上的 loader 调用次数可能高于串行(串行在首个失败处即停);成功路径调用次数与串行一致.
 - `bind.use_rows`(`rows` 模式)强制不分片,因此也不会出现分片并行.
 
 限流(必须理解的护栏):

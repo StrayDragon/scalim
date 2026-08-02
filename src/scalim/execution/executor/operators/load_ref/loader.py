@@ -280,6 +280,38 @@ class _ChunkPlan:
     loader_context: LoaderCallContextIr
 
 
+def _chunk_count(n_keys: int, chunk_size: int) -> int:
+    if n_keys <= 0:
+        return 0
+    return (n_keys + chunk_size - 1) // chunk_size
+
+
+def _build_one_chunk_plan(
+    *,
+    exec_ctx: LoadRefExecutionContext,
+    source: LookupSourceRefIrBase,
+    event_field_keys: Tuple[str, ...],
+    lookup_keys_list: LookupKeyList,
+    batch_rows: Optional[List[RowData]],
+    chunk_size: int,
+    offset: int,
+) -> _ChunkPlan:
+    chunk_list = lookup_keys_list[offset : offset + chunk_size]
+    chunk_set = set(chunk_list)
+    return _ChunkPlan(
+        offset=offset,
+        lookup_key_count=len(chunk_set),
+        loader_context=build_ref_loader_context(
+            exec_ctx,
+            source.source_id,
+            event_field_keys,
+            batch_rows,
+            chunk_set,
+            chunk_list,
+        ),
+    )
+
+
 def _build_chunk_plans(
     *,
     exec_ctx: LoadRefExecutionContext,
@@ -289,22 +321,18 @@ def _build_chunk_plans(
     batch_rows: Optional[List[RowData]],
     chunk_size: int,
 ) -> List[_ChunkPlan]:
+    """仅并行路径使用:提交 futures 前需要全部 plan 已构造."""
     plans: List[_ChunkPlan] = []
     for offset in range(0, len(lookup_keys_list), chunk_size):
-        chunk_list = lookup_keys_list[offset : offset + chunk_size]
-        chunk_set = set(chunk_list)
         plans.append(
-            _ChunkPlan(
+            _build_one_chunk_plan(
+                exec_ctx=exec_ctx,
+                source=source,
+                event_field_keys=event_field_keys,
+                lookup_keys_list=lookup_keys_list,
+                batch_rows=batch_rows,
+                chunk_size=chunk_size,
                 offset=offset,
-                lookup_key_count=len(chunk_set),
-                loader_context=build_ref_loader_context(
-                    exec_ctx,
-                    source.source_id,
-                    event_field_keys,
-                    batch_rows,
-                    chunk_set,
-                    chunk_list,
-                ),
             )
         )
     return plans
@@ -340,14 +368,27 @@ def _merge_chunk_result(merged: LoaderResultMap, result: LoaderResultMapping) ->
 
 def _load_chunks_serially(
     *,
+    exec_ctx: LoadRefExecutionContext,
     runtime: ExecutionRuntime,
     source: LookupSourceRefIrBase,
     binding: Optional[BindingIr],
     event_field_keys: Tuple[str, ...],
-    plans: List[_ChunkPlan],
+    lookup_keys_list: LookupKeyList,
+    batch_rows: Optional[List[RowData]],
+    chunk_size: int,
 ) -> LoaderResultMap:
+    """默认/未扇出路径:按 offset 懒建单个 plan,避免一次性物化全部分片上下文."""
     merged: LoaderResultMap = {}
-    for plan in plans:
+    for offset in range(0, len(lookup_keys_list), chunk_size):
+        plan = _build_one_chunk_plan(
+            exec_ctx=exec_ctx,
+            source=source,
+            event_field_keys=event_field_keys,
+            lookup_keys_list=lookup_keys_list,
+            batch_rows=batch_rows,
+            chunk_size=chunk_size,
+            offset=offset,
+        )
         result = _load_one_chunk(
             runtime=runtime,
             source=source,
@@ -369,7 +410,7 @@ def _load_chunks_in_parallel(
     fanout: int,
 ) -> LoaderResultMap:
     """`opt-in` 分片并行:独立小池扇出 + 全局在途帽;合并顺序仍按 `offset` 升序."""
-    results_by_offset: Dict[int, LoaderResultMapping] = {}
+    merged: LoaderResultMap = {}
     executor = ThreadPoolExecutor(max_workers=fanout)
     try:
         futures: List[Tuple[_ChunkPlan, "Future[LoaderResultMapping]"]] = [
@@ -387,19 +428,17 @@ def _load_chunks_in_parallel(
             for plan in plans
         ]
         try:
-            # 按 `offset` 升序取结果: 失败时抛出的是「串行会最先遇到」的那个分片异常.
-            for plan, future in futures:
-                results_by_offset[plan.offset] = future.result()
+            # 按 `offset` 升序取结果并即时 merge:失败时抛出「串行会最先遇到」的异常,
+            # 且不把全部 chunk dict 同时挂在 `results_by_offset` 上抬高峰值.
+            for _plan, future in futures:
+                result = future.result()
+                _merge_chunk_result(merged, result)
         finally:
             # 尽力取消未开始的分片(已在跑的线程无法强杀,与 `adaptive` 池 `shutdown` 语义一致).
             for _plan, pending in futures:
                 _ = pending.cancel()
     finally:
         executor.shutdown(wait=True)
-
-    merged: LoaderResultMap = {}
-    for plan in plans:
-        _merge_chunk_result(merged, results_by_offset[plan.offset])
     return merged
 
 
@@ -415,17 +454,17 @@ def _load_ref_chunked(
     chunk_size: int,
     cache_key: Optional[LoadRefCacheKey],
 ) -> LoaderResultMap:
-    plans = _build_chunk_plans(
-        exec_ctx=exec_ctx,
-        source=source,
-        event_field_keys=event_field_keys,
-        lookup_keys_list=lookup_keys_list,
-        batch_rows=batch_rows,
-        chunk_size=chunk_size,
-    )
-
-    fanout = runtime.resolve_chunk_fanout(len(plans))
+    fanout = runtime.resolve_chunk_fanout(_chunk_count(len(lookup_keys_list), chunk_size))
     if fanout > 1:
+        # 仅并行路径一次性构造全部 plan(提交 futures 需要);串行保持懒建.
+        plans = _build_chunk_plans(
+            exec_ctx=exec_ctx,
+            source=source,
+            event_field_keys=event_field_keys,
+            lookup_keys_list=lookup_keys_list,
+            batch_rows=batch_rows,
+            chunk_size=chunk_size,
+        )
         merged = _load_chunks_in_parallel(
             runtime=runtime,
             source=source,
@@ -436,11 +475,14 @@ def _load_ref_chunked(
         )
     else:
         merged = _load_chunks_serially(
+            exec_ctx=exec_ctx,
             runtime=runtime,
             source=source,
             binding=binding,
             event_field_keys=event_field_keys,
-            plans=plans,
+            lookup_keys_list=lookup_keys_list,
+            batch_rows=batch_rows,
+            chunk_size=chunk_size,
         )
 
     # 分片期间不写 `load_ref_cache`;全部合并完成后至多写一次(异常时不写半份).
@@ -450,7 +492,6 @@ def _load_ref_chunked(
             batch_rows=batch_rows,
         )
     return merged
-
 
 def load_step_data(
     *,
