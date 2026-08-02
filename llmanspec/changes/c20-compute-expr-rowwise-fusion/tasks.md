@@ -38,8 +38,8 @@
 ## 4. 证据与回归
 
 - [x] 4.1 本 change 内 MVP：`mvp/repro_nxm_framework_tax.py`（说明见 `mvp/README.md`）；融合实现后在同目录加 engine A/B（fused on/off）
-- [ ] 4.2 可选补充 `.tmp/repro/rowwise-fusion/` 大形状；RSS ≤10%
-- [ ] 4.3 `just bench-compare`；py3.6 smoke
+- [x] 4.2 可选补充 `.tmp/repro/rowwise-fusion/` 大形状；RSS ≤10%
+- [x] 4.3 `just bench-compare`；py3.6 smoke
 
 ## 5. 维护性收尾
 
