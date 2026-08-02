@@ -61,6 +61,7 @@
 ## Pointers (keep this file small)
 - Project/code reading map: `docs/doc/getting-started/reading-guide.md`
 - Docs governance workflow: `docs/doc/dev/doc-governance.md`
+- Complexity QA harness (cognitive/cyclomatic): `docs/doc/dev/complexity-qa-harness.md`
 - Pre-release calibration (last tag → HEAD, docs/API/breaking): `docs/doc/dev/pre-release-checklist.md`
 - Docs site config + content root: `docs/zensical.toml`, `docs/doc/`
 - Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
