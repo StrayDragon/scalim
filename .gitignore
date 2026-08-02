@@ -263,8 +263,9 @@ go.work
 go.sum
 
 ### Project (scalim) ###
-# Bench / profiling outputs (dev-only)
-.benchmarks/memray/
+# Bench / profiling outputs (dev-only; machine-local — do not track)
+# Baselines are not comparable across hosts; keep under local `.benchmarks/` only.
+.benchmarks/
 
 # Local artifacts / CI uploads (not committed)
 .tmp/
