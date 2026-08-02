@@ -156,9 +156,9 @@ class ExecutionPlan:
     """
 
     compute_fusion_groups: Tuple[ComputeFusionGroup, ...] = field(default_factory=tuple)
-    """同一 compute 段内可 row-wise 融合的字段组(size>=2).
+    """同一 `compute` 段内可行内融合的字段组(`size>=2`).
 
-    计划期仅按 deps/段/候选规则识别;运行时再过安全外壳与 `runtime.late_fields` 过滤.
+    计划期仅按 `deps`/段/候选规则识别;运行时再过安全外壳与 `runtime.late_fields` 过滤.
     """
 
     def to_viz_graph_snapshot(

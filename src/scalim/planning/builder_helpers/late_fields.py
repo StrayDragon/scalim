@@ -103,7 +103,7 @@ def _shrink_to_fixed_point(
     pending = set(candidates)
     while pending:
         field_key = pending.pop()
-        if field_key not in candidates:
+        if field_key not in candidates:  # pragma: no cover  # pragma: allow-no-cover invariant: re-enqueue guarded by membership
             continue
         if not _is_rejected(
             field_key,

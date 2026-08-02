@@ -18,7 +18,7 @@ def test_batch_executor_still_calls_after_operator_when_executor_is_missing() ->
     operator = SimpleNamespace(operator_type="unknown")
 
     executor = BatchExecutor.__new__(BatchExecutor)
-    executor.plan = SimpleNamespace(operators=[operator])  # type: ignore[assignment]
+    executor.plan = SimpleNamespace(operators=[operator], compute_fusion_groups=())  # type: ignore[assignment]
     executor._executors = {}  # type: ignore[attr-defined]
     executor._overrides = PipelineOverrides()  # type: ignore[attr-defined]
 

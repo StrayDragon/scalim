@@ -37,7 +37,7 @@ Sources:
 | `scalim.dsl.yaml_dsl.workflow_paths` | 1 | workflow 路径解析(稳定导入路径) | 解析 workflow 引用的 demand 路径 |
 | `scalim.spec.ir` | 41 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
-| `scalim.planning` | 9 | 规划层入口 | 规划/编排/可视化分析 |
+| `scalim.planning` | 10 | 规划层入口 | 规划/编排/可视化分析 |
 | `scalim.execution` | 8 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
 | `scalim.ob` | 5 | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 44 | 事件envelope+EventType+公开payload+事件目录 | 写 Observer/Hook;按 EventType 订阅/过滤 |
@@ -283,10 +283,11 @@ from scalim.workflow.loaders import (
 
 #### `scalim.planning`
 
-- Export count: `9`
+- Export count: `10`
 
 ```python
 from scalim.planning import (
+    ComputeFusionGroup,
     ComputeOperatorIr,
     ExecutionPlan,
     LoadOperatorIr,

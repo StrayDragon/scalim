@@ -10,7 +10,7 @@ from concurrent.futures import Executor
 from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
 
 from ....events import EventType
-from ....planning.builder_helpers.fusion_groups import ComputeFusionGroup
+from ....planning.builder_helpers.fusion_groups import MIN_FUSION_GROUP_SIZE, ComputeFusionGroup
 from ....planning.operators import ComputeOperatorIr, OperatorType, SupportedOperatorIr
 from ....planning.operators import LoadRefOperatorIr as LoadRefOp
 from ....planning.plan import ExecutionPlan
@@ -33,6 +33,55 @@ from ._internal.stage_spans import init_stage_span_tracking
 from ._main_prefill import prefill_main_source_fields
 
 # endregion
+
+
+def _try_execute_fused_compute(
+    *,
+    field_key: str,
+    fusion_by_field: Dict[str, ComputeFusionGroup],
+    fused_done: Set[str],
+    context: BatchContext,
+    batch_row_nth: List[Hashable],
+    runtime: ExecutionRuntime,
+    wants_stage_spans: bool,
+    stage_map: Dict[str, str],
+    stage_durations: Dict[str, float],
+    stage_perf_counter_fn: Optional[Callable[[], float]],
+) -> bool:
+    """若 `field_key` 是可融合组的首字段则执行融合并返回 `True`."""
+    if field_key in fused_done:
+        return True
+    group = fusion_by_field.get(field_key)
+    if group is None:
+        return False
+    active = active_fusion_members(group, runtime.late_fields)
+    if len(active) < MIN_FUSION_GROUP_SIZE or field_key != active[0]:
+        return False
+    if fusion_disabled_reason(runtime, group, active) is not None:
+        return False
+
+    stage = stage_map.get(OperatorType.COMPUTE.value)
+    if wants_stage_spans and stage:
+        perf_counter = stage_perf_counter_fn or time.perf_counter
+        start = perf_counter()
+        execute_fused_compute_group(
+            group=group,
+            field_keys=active,
+            context=context,
+            batch_row_nth=batch_row_nth,
+            runtime=runtime,
+        )
+        stage_durations[stage] += max(0.0, perf_counter() - start)
+    else:
+        execute_fused_compute_group(
+            group=group,
+            field_keys=active,
+            context=context,
+            batch_row_nth=batch_row_nth,
+            runtime=runtime,
+        )
+    fused_done.update(active)
+    return True
 
 
 class BatchExecutor:
@@ -117,7 +166,7 @@ class BatchExecutor:
 
         return self._extract_results(context, batch_row_nth)
 
-    def execute_operators(
+    def execute_operators(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c20-fusion-dispatch
         self,
         context: BatchContext,
         batch_row_nth: List[Hashable],
@@ -134,7 +183,7 @@ class BatchExecutor:
         if runtime.parallel_mode == "adaptive":
             _, _, resolved_workers = resolve_adaptive_policy_tuning_and_workers(runtime=runtime, overrides=self._overrides)
 
-        # field_key -> fusion group; 同组后续字段在已融合时跳过.
+        # `field_key` -> 融合组; 同组后续字段在已融合时跳过.
         fusion_by_field: Dict[str, ComputeFusionGroup] = {}
         for group in self.plan.compute_fusion_groups:
             for field_key in group.field_keys:
@@ -179,42 +228,21 @@ class BatchExecutor:
             if operator.operator_type == OperatorType.COMPUTE.value:
                 compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
                 field_key = str(compute_op.field_key)
-                if field_key in fused_done:
+                if _try_execute_fused_compute(
+                    field_key=field_key,
+                    fusion_by_field=fusion_by_field,
+                    fused_done=fused_done,
+                    context=context,
+                    batch_row_nth=batch_row_nth,
+                    runtime=runtime,
+                    wants_stage_spans=wants_stage_spans,
+                    stage_map=stage_map,
+                    stage_durations=stage_durations,
+                    stage_perf_counter_fn=self._overrides.stage_perf_counter_fn,
+                ):
                     if after_operator is not None:
                         after_operator(operator)
                     continue
-                group = fusion_by_field.get(field_key)
-                if group is not None:
-                    active = active_fusion_members(group, runtime.late_fields)
-                    if (
-                        len(active) >= 2
-                        and field_key == active[0]
-                        and fusion_disabled_reason(runtime, group, active) is None
-                    ):
-                        stage = stage_map.get(OperatorType.COMPUTE.value)
-                        if wants_stage_spans and stage:
-                            perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
-                            start = perf_counter()
-                            execute_fused_compute_group(
-                                group=group,
-                                field_keys=active,
-                                context=context,
-                                batch_row_nth=batch_row_nth,
-                                runtime=runtime,
-                            )
-                            stage_durations[stage] += max(0.0, perf_counter() - start)
-                        else:
-                            execute_fused_compute_group(
-                                group=group,
-                                field_keys=active,
-                                context=context,
-                                batch_row_nth=batch_row_nth,
-                                runtime=runtime,
-                            )
-                        fused_done.update(active)
-                        if after_operator is not None:
-                            after_operator(operator)
-                        continue
 
             executor = self._executors.get(operator.operator_type)
 

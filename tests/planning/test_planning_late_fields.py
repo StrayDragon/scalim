@@ -3,9 +3,10 @@
 对应 specs: `execution-hotpath-fastpaths` r950 / r951.
 """
 
-from typing import Any, List
+from typing import Any, Dict, List, Tuple
 
 from scalim.planning import PlanBuilder
+from scalim.planning.builder_helpers.late_fields import derive_late_fields
 from scalim.spec.ir import (
     CallBySpecIr,
     CallByValueIr,
@@ -167,6 +168,45 @@ def test_order_by_key_is_not_late() -> None:
     plan = PlanBuilder(demand).build(targets=["order_id", "amount", "sort_key"])
 
     assert plan.late_fields == ()
+
+
+def test_undeclared_dependency_stays_available_at_write() -> None:
+    """未声明规格的依赖走主行透传提取,与主源字段同批预填充,不阻止 `late`."""
+    spec = DerivedFieldIr(field_id="tag", name="标记", dependencies=("ghost",), compute_expr="ghost")
+
+    late = derive_late_fields(
+        field_specs={"tag": spec},
+        field_dependencies={"tag": ("ghost",)},
+        target_fields=["tag"],
+        key_fields=set(),
+        protected_fields=set(),
+        main_source_id="orders",
+    )
+
+    assert late == ("tag",)
+
+
+def test_rejected_candidate_requeues_its_late_consumers() -> None:
+    """候选被踢出后必须复查它的候选消费者(工作表收缩到不动点)."""
+    field_specs: Dict[str, Any] = {
+        # 别源直取字段: 写出点不可得,导致 `blocked` 退回早算.
+        "ext": FieldIr(field_id="ext", name="外部字段", source=make_source("regions")),
+        "blocked": DerivedFieldIr(field_id="blocked", name="blocked", dependencies=("ext",), compute_expr="ext"),
+        "chained": DerivedFieldIr(field_id="chained", name="chained", dependencies=("blocked",), compute_expr="blocked + 1"),
+    }
+    field_dependencies: Dict[str, Tuple[str, ...]] = {"ext": (), "blocked": ("ext",), "chained": ("blocked",)}
+
+    late = derive_late_fields(
+        field_specs=field_specs,
+        field_dependencies=field_dependencies,
+        target_fields=["blocked", "chained"],
+        key_fields=set(),
+        protected_fields=set(),
+        main_source_id="orders",
+    )
+
+    # `blocked` 退回早算后仍是写出目标,因此 `chained` 依旧可以 `late`.
+    assert late == ("chained",)
 
 
 def test_constant_compute_is_not_late() -> None:

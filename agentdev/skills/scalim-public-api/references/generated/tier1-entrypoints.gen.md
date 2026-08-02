@@ -180,7 +180,8 @@
 - scenario: 规划/编排/可视化分析
 - marker: `src/scalim/planning/__init__.py:6`
 - source: `src/scalim/planning/__init__.py:12`
-- exports (`__all__`, tuple, count=9):
+- exports (`__all__`, tuple, count=10):
+  - `ComputeFusionGroup`
   - `ComputeOperatorIr`
   - `ExecutionPlan`
   - `LoadOperatorIr`

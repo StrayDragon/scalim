@@ -144,6 +144,30 @@ def test_field_compute_subscription_disables_fusion_but_keeps_values() -> None:
     assert hook.count == fused_path["n_rows"] * fused_path["n_derived"]
 
 
+def test_fused_values_survive_batch_result_extraction() -> None:
+    """融合写出必须同步维护稠密 `present_count`,否则行释放会把整列当成空存储回收."""
+    demand, targets = _build_demand(3)
+    plan = PlanBuilder(demand).build(targets=targets)
+    plan.late_fields = ()
+    assert plan.compute_fusion_groups
+
+    calcs = {"d{}".format(i): (lambda a, b, i=i: float(a or 0) + float(b or 0) + float(i)) for i in range(3)}
+    data = [{"id": i, "v0": float(i), "v1": float(i % 7)} for i in range(4)]
+    engine = ScalimEngine(
+        demand=demand,
+        plan=plan,
+        runtime_bindings=RuntimeBindings(derived_calculators=calcs),
+        parallel_mode="seq",
+        batch_size=4,
+        guardrails=GuardrailsPolicy.disabled(),
+    )
+
+    rows = list(engine.run(main_rows=data))
+
+    assert [row["d0"] for row in rows] == [float(i) + float(i % 7) for i in range(4)]
+    assert [row["d2"] for row in rows] == [float(i) + float(i % 7) + 2.0 for i in range(4)]
+
+
 def test_exp_memo_disables_whole_group(monkeypatch: pytest.MonkeyPatch) -> None:
     from scalim.execution.executor.operators.compute.fusion import fusion_disabled_reason
     from scalim.planning.builder_helpers.fusion_groups import ComputeFusionGroup

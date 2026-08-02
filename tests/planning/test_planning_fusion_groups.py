@@ -1,8 +1,10 @@
 """`ExecutionPlan.compute_fusion_groups` 推导契约 (c20 / r960)."""
 
-from typing import Any, List
+from typing import Any, Dict, List, Tuple
 
 from scalim.planning import PlanBuilder
+from scalim.planning.builder_helpers.fusion_groups import derive_compute_fusion_groups
+from scalim.planning.operators import ComputeOperatorIr, OperatorType
 from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, RuntimeHandleIdIr
 
 from tests.fixtures.planning_fixtures import make_main_source
@@ -70,6 +72,33 @@ def test_ctx_call_by_excluded_from_fusion_group() -> None:
 
     member_keys = {fk for g in plan.compute_fusion_groups for fk in g.field_keys}
     assert "with_ctx" not in member_keys
+
+
+def _compute_op(field_key: str) -> ComputeOperatorIr:
+    return ComputeOperatorIr(
+        operator_id="compute:{}".format(field_key),
+        operator_type=OperatorType.COMPUTE.value,
+        field_key=field_key,
+        input_fields=(),
+    )
+
+
+def test_non_derived_compute_member_breaks_the_group() -> None:
+    main = make_main_source("orders")
+    field_specs: Dict[str, Any] = {
+        "amount": FieldIr(field_id="amount", name="金额", source=main),
+        "d0": DerivedFieldIr(field_id="d0", name="d0", dependencies=("amount",), call_by=_call_by("d0", ["amount"])),
+        "d1": DerivedFieldIr(field_id="d1", name="d1", dependencies=("amount",), call_by=_call_by("d1", ["amount"])),
+    }
+    field_dependencies: Dict[str, Tuple[str, ...]] = {"amount": (), "d0": ("amount",), "d1": ("amount",)}
+
+    groups = derive_compute_fusion_groups(
+        operators=[_compute_op("d0"), _compute_op("amount"), _compute_op("d1")],
+        field_specs=field_specs,
+        field_dependencies=field_dependencies,
+    )
+
+    assert groups == ()
 
 
 def test_interdependent_fields_not_in_same_group() -> None:
