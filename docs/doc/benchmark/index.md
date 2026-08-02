@@ -10,5 +10,6 @@
 
 - 先了解运行时行为边界(尤其是 `adaptive`): [并行模式(seq/adaptive)](../architecture/parallel-modes.md)
 - **0.10.0** write-precompute 人类可读性能专页（图表 / 规模矩阵）: [write-precompute-0.10](../getting-started/write-precompute-0.10.md)
+- **0.10.0** row-wise fusion 对拍专页: [rowwise-fusion-0.10](../getting-started/rowwise-fusion-0.10.md)
 - 跑基准与保存基线: [Guide](guide.md)
 - 阅读对比报告: [Compare Report](compare-report.md)

@@ -1,0 +1,131 @@
+{
+  "version": "0.10.0",
+  "feature": "rowwise-fusion",
+  "measured_at": "2026-08-02",
+  "host_note": "合成 workload；本机；清 late_fields 以隔离 compute 段融合；内存 sink + 全表黄金",
+  "contracts": {
+    "calc_calls": "equal N×M",
+    "values": "golden_ok",
+    "authoring": "no new YAML / no master switch"
+  },
+  "workload": [
+    {
+      "id": "wide_same_deps_row",
+      "label": "宽表同 deps·行",
+      "why": "主卖点：大量薄 call_by 共享 (v0,v1)",
+      "sink": "row",
+      "rows": 10000,
+      "n_derived": 80,
+      "major_s": 1.248,
+      "fused_s": 0.9903,
+      "speedup": 1.26,
+      "calc_calls": 800000,
+      "expected_calc_calls": 800000,
+      "fusion_groups": 1,
+      "golden_ok": true,
+      "calc_calls_equal": true
+    },
+    {
+      "id": "report_same_deps_row",
+      "label": "报表宽派生·行",
+      "why": "报表量级行写出 + 同 deps 簇",
+      "sink": "row",
+      "rows": 20000,
+      "n_derived": 48,
+      "major_s": 1.4469,
+      "fused_s": 1.2608,
+      "speedup": 1.148,
+      "calc_calls": 960000,
+      "expected_calc_calls": 960000,
+      "fusion_groups": 1,
+      "golden_ok": true,
+      "calc_calls_equal": true
+    },
+    {
+      "id": "dense_rows_moderate_row",
+      "label": "大行数中等宽·行",
+      "why": "行数主导时框架税占比",
+      "sink": "row",
+      "rows": 50000,
+      "n_derived": 32,
+      "major_s": 2.523,
+      "fused_s": 2.1807,
+      "speedup": 1.157,
+      "calc_calls": 1600000,
+      "expected_calc_calls": 1600000,
+      "fusion_groups": 1,
+      "golden_ok": true,
+      "calc_calls_equal": true
+    },
+    {
+      "id": "engine_proxy_flat_row",
+      "label": "引擎代理宽表·行",
+      "why": "更宽 M，接近规模矩阵 engine 宽度",
+      "sink": "row",
+      "rows": 8000,
+      "n_derived": 120,
+      "major_s": 1.3199,
+      "fused_s": 1.1841,
+      "speedup": 1.115,
+      "calc_calls": 960000,
+      "expected_calc_calls": 960000,
+      "fusion_groups": 1,
+      "golden_ok": true,
+      "calc_calls_equal": true
+    },
+    {
+      "id": "wide_same_deps_column",
+      "label": "宽表同 deps·列（外壳关闭）",
+      "why": "列 sink 安全外壳：不融合，对拍仍绿",
+      "sink": "column",
+      "rows": 10000,
+      "n_derived": 80,
+      "major_s": 0.9127,
+      "fused_s": 0.9351,
+      "speedup": 0.976,
+      "calc_calls": 800000,
+      "expected_calc_calls": 800000,
+      "fusion_groups": 1,
+      "golden_ok": true,
+      "calc_calls_equal": true
+    },
+    {
+      "id": "narrow_same_deps_row",
+      "label": "窄表同 deps·行",
+      "why": "M 小：加速比通常更温和",
+      "sink": "row",
+      "rows": 40000,
+      "n_derived": 4,
+      "major_s": 0.5377,
+      "fused_s": 0.5137,
+      "speedup": 1.047,
+      "calc_calls": 160000,
+      "expected_calc_calls": 160000,
+      "fusion_groups": 1,
+      "golden_ok": true,
+      "calc_calls_equal": true
+    }
+  ],
+  "shell_notes": [
+    {
+      "id": "column_sink",
+      "effect": "不融合；对拍仍绿"
+    },
+    {
+      "id": "wants_FIELD_COMPUTE",
+      "effect": "不融合"
+    },
+    {
+      "id": "wants_OPERATOR_SPAN",
+      "effect": "不融合"
+    },
+    {
+      "id": "guardrails_fast_fail_enabled",
+      "effect": "不融合"
+    },
+    {
+      "id": "exp_call_by_memo",
+      "effect": "整组不融合"
+    }
+  ]
+}

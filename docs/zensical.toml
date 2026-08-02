@@ -9,6 +9,7 @@ extra_javascript = [
   "assets/javascripts/mermaid-init.js",
   "assets/javascripts/code-links.js",
   "assets/javascripts/write-precompute-0.10-charts.js",
+  "assets/javascripts/rowwise-fusion-0.10-charts.js",
 ]
 nav = [
   { "首页" = "index.md" },
@@ -37,6 +38,7 @@ nav = [
     { "并行模式(seq/adaptive)" = "architecture/parallel-modes.md" },
     { "Excel 列式写出策略(HOLD/WINDOW)" = "getting-started/excel-column-residency.md" },
     { "0.10.0 write-precompute 性能" = "getting-started/write-precompute-0.10.md" },
+    { "0.10.0 row-wise fusion 性能" = "getting-started/rowwise-fusion-0.10.md" },
   ] },
   { "工具与排查" = [
     "tools/index.md",

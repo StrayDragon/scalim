@@ -18,7 +18,9 @@
 
 架构语义：[`arch.md` §5.3](../architecture/arch.md#53-write-precompute-只用于写出的派生字段延后到写出前算)。
 
-测量摘要日期：<span id="wp10-measured-at"></span>。  
+姊妹能力（同 deps 行内融合）：[rowwise-fusion-0.10](rowwise-fusion-0.10.md)。
+
+测量摘要日期：<span id="wp10-measured-at"></span>。
 <span id="wp10-host-note" class="wp10-note"></span>
 
 数据文件（可复用）：[`assets/data/write-precompute-0.10.json`](../assets/data/write-precompute-0.10.json)。

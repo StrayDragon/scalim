@@ -246,6 +246,8 @@ flowchart TD
 
 ### 5.4 row-wise fusion: 同 deps 派生字段按行融合(减 N×M 框架税)
 
+**0.10.0** 人类可读对拍专页（workload 表、Mermaid、D3）: [rowwise-fusion-0.10](../getting-started/rowwise-fusion-0.10.md)。
+
 规划期识别 `ExecutionPlan.compute_fusion_groups`(同一 pre/post-ref 段、deps 完全相同、互不依赖、无 `$ctx` / 非常量)。运行时在安全外壳内改为 **按行读一次依赖 → 依次算组内字段**;每字段每行仍调用一次 calculator(**不**减少 `calc_calls`)。
 
 安全外壳外回退 field-major:

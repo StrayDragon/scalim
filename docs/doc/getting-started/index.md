@@ -12,4 +12,5 @@
 - 需要调参时再看: [并行模式(seq/adaptive)](../architecture/parallel-modes.md)
 - 宽表 Excel 峰值 / 列式 HOLD vs WINDOW: [Excel 列式写出策略](excel-column-residency.md)
 - **0.10.0** 写出前延迟物化（默认更快 / 更省驻留）: [write-precompute 性能](write-precompute-0.10.md)
+- **0.10.0** 同 deps 行内融合（减 N×M 框架税）: [row-wise fusion 性能](rowwise-fusion-0.10.md)
 - 想贡献代码: [仓库开发约定](../dev/repo-guide.md) → [如何阅读本项目](reading-guide.md)
