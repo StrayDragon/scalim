@@ -54,4 +54,8 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - 若任务是写/改 YAML DSL,优先用 `agentdev/skills/scalim-yaml-dsl/SKILL.md`（`scalim-yaml-dsl`）。
 - 若下游同时升级 YAML DSL 与 EventType: YAML 走 `scalim-yaml-dsl`;Observer/Hook 走本 skill 的 `task-event-type-adaptation.md`。
 - 若任务涉及宽表 Excel 峰值 / `StreamingColumnExcelSink` 选型:读 `references/streaming-column-excel.md`（并交叉 `scalim-yaml-dsl` 的 `references/streaming-column-excel-guidance.md`）。
+- **0.10.0 性能亮点**(write-precompute / fusion / chunk 并行;YAML 无强制迁移):`scalim-yaml-dsl/references/0.10-release-highlights.md` + 人类总览 `docs/doc/releases/0.10.0/`。
+  - 订阅 `FIELD_COMPUTE` / `OPERATOR_SPAN` 或 `VizObserverConfig(trace_enabled=True)` → **关掉** row-wise fusion(安全外壳)。
+  - `lookup_chunk_size` ≠ 并行开关;片间并行仅 Python `parallelize_lookup_chunks` + `adaptive`。
+  - `FIELD_COMPUTE` 的 `meta.scalim_compute_phase` 仅在 `Event.meta`;typed `on_field_compute(payload)` 默认看不到——需要 phase 时覆写 `on_event` 读 `event.meta`,或等后续 meta→typed 契约变更。
 - YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType 批次属于 Python public API**,不进 YAML upgrades 索引。

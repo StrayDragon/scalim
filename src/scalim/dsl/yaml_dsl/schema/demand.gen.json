@@ -511,8 +511,8 @@
               "type": "null"
             }
           ],
-          "description": "keys 模式 lookup_keys 分片大小.",
-          "markdownDescription": "#### sources.*.lookup_chunk_size\n\nkeys 模式 lookup_keys 分片大小.\n- 省略 / `0` / `null`: **不分片**(单次 loader 调用;通常延迟最优)\n- 仅在下游有 **payload / SQL IN 长度上限** 时设置"
+          "description": "keys 模式 lookup_keys 分片大小(**不是并行开关**;片间并行须 Python `parallel_mode=\"adaptive\"` + `parallelize_lookup_chunks=True`,YAML 无对应键).",
+          "markdownDescription": "#### sources.*.lookup_chunk_size\n\nkeys 模式 lookup_keys 分片大小(**不是并行开关**;片间并行须 Python `parallel_mode=\"adaptive\"` + `parallelize_lookup_chunks=True`,YAML 无对应键).\n- 省略 / `0` / `null`: **不分片**(单次 loader 调用;通常延迟最优)\n- 仅在下游有 **payload / SQL IN 长度上限** 时设置;需要分片时取最大安全值;默认顺序分片(wall ≈ calls x RTT);勿习惯性设很小的 chunk"
         },
         "normalize": {
           "type": "object",

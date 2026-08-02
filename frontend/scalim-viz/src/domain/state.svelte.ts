@@ -863,8 +863,14 @@ export const getEventMessage = (evt: VizEvent | null) => {
   }
   if (evt.event_type === "loader_called") {
     const result = payload.result_count ?? payload.result_size ?? payload.row_count;
+    const chunkOffset = (payload as any)?.chunk_offset;
+    const chunkPart =
+      chunkOffset !== undefined && chunkOffset !== null && chunkOffset !== "" ? ` chunk@${chunkOffset}` : "";
     if (result !== undefined) {
-      return `load ${payload.loader_name ?? ""} (${result})`;
+      return `load ${payload.loader_name ?? ""} (${result})${chunkPart}`;
+    }
+    if (chunkPart) {
+      return `load ${payload.loader_name ?? ""}${chunkPart}`;
     }
   }
   if (evt.event_type === "field_computed") {
@@ -1186,6 +1192,7 @@ export const getEventSummaryItems = (evt: VizEvent | null) => {
     push("缓存", payload.cache_status);
     push("keys", payload.lookup_key_count);
     push("字段", payload.field_keys);
+    push("chunk_offset", (payload as any)?.chunk_offset);
     push("耗时", payload.duration_ms !== undefined ? `${payload.duration_ms}ms` : null);
     push("batch", payload.batch_num);
   } else if (evt.event_type === "field_computed") {

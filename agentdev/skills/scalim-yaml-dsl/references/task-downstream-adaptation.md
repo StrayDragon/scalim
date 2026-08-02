@@ -6,6 +6,7 @@
 - 你希望“先做调研与风险评估”,等上游/依赖版本稳定后再批量升级下游
 - 你需要在不泄露路径明细的前提下,输出可行动的下游改造清单
 - 若 breaking 是 **EventType / Observer / Hook**(非 YAML):改读 `agentdev/skills/scalim-public-api/references/task-event-type-adaptation.md`
+- **0.10.0 性能三项不是 YAML breaking**:write-precompute / fusion 默认开、chunk 并行 Python opt-in;`lookup_chunk_size` 语义不变。下游盘点以「观测订阅是否关掉 fusion / 是否误开并行」为主,不必扫 YAML 字段迁移。入口:`references/0.10-release-highlights.md`。
 
 ## 隐私与输出约束
 

@@ -201,6 +201,9 @@ flowchart TD
 ```bash
 # workload A/B（生成图表同款数字；仓库根目录运行）
 uv run python docs/doc/releases/repro/c10-workload-shapes/run_ab.py --runs 3
+# Python 3.6 运行时边界：
+PYTHONPATH=src .tmp/venvs/py36-scalim/bin/python \
+  docs/doc/releases/repro/c10-workload-shapes/run_ab.py --runs 1
 
 # 微扫参
 uv run python llmanspec/changes/archive/2026-08-01-c10-write-precompute-derived-fields/mvp/repro_row_late_vs_eager.py \

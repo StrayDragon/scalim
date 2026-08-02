@@ -25,3 +25,7 @@ ExecutionRequest(
 ```
 
 `WINDOW` + `output_composition` / `streaming=True` → fail-fast。
+
+## 与 0.10 row-wise fusion
+
+列式 Excel sink(含 `WINDOW` / `HOLD` 的 column path)属于 fusion **安全外壳排除项**:该路径下不会做同 deps 行内融合。选型 WINDOW 时不要期望 fusion 墙钟收益;fusion 对拍见 `docs/doc/releases/rowwise-fusion-0.10.md`。

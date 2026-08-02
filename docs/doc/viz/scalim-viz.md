@@ -122,6 +122,14 @@ run(
 - `viz_events.jsonl` 始终输出编排级/低频事件,适合默认回放与理解执行流程
 - `trace_enabled=true` 时会额外输出 `viz_trace.jsonl` 的高频 trace(字段/行级/lookup 等),建议在 UI 中按需加载并配合过滤/步进使用
 
+### 与 0.10 性能特性的交互
+
+- **`trace_enabled=true` 会关掉 row-wise fusion**(安全外壳):`VizObserver` 订阅 `FIELD_COMPUTE` / 相关高频事件时,运行时 MUST NOT 融合同 deps 行内字段(否则 trace 语义失真)。对拍 fusion 收益时请保持 `trace_enabled=False`,或另开无 FIELD_COMPUTE 订阅的观测配置。
+- **`loader_called` 的 `chunk_offset`**:分片路径(含 opt-in 片间并行)会在 payload 里带 keys 切片起点;UI 摘要会展示该字段。并行下事件为**完成序**,框架不做排序缓冲。
+- write-precompute 的 `meta.scalim_compute_phase` 目前挂在 `Event.meta`,typed `on_field_compute` / viz summary **尚不展示**(见 observer 适配说明)。
+
+人类专页:[0.10.0 重点特性](../releases/0.10.0/) · [row-wise fusion](../releases/rowwise-fusion-0.10.md) · [lookup chunk 并行](../releases/lookup-chunk-parallel-0.10.md)。
+
 当 `VizObserverConfig` 提供 `output_dir`/`output_path`/`snapshot_path`/`use_default_output_dir=True` 等有效输出路径时,viz 会被启用并落盘对应产物.
 
 ### workflow 多 runs 建议

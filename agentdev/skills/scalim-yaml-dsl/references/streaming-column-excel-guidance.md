@@ -35,6 +35,10 @@ from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, ExcelColumnResidency
 DemandRunRuntimeOptions(excel_column_residency=ExcelColumnResidency.WINDOW)
 ```
 
+### 与 0.10 row-wise fusion
+
+列 sink 路径(含 `HOLD`/`WINDOW`)在 fusion 安全外壳内 **不融合**。宽表峰值用 WINDOW 砍 RSS 与 fusion 墙钟收益是正交问题;不要混谈。总览:`references/0.10-release-highlights.md`。
+
 ### 不要建议 `WINDOW` 当
 
 - 用户走 YAML `resources.books`（已是行写出；假开关会 fail-fast）
