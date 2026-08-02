@@ -81,7 +81,7 @@ flowchart TD
 
 ### 2.1 加速比（D3）
 
-宽表行路径约 **1.11×–1.26×**；列路径接近 **1.0×**（外壳关闭，噪声带）。
+宽表行路径约 **1.02×–1.17×**（Python 3.6.15）；列路径接近 **1.0×**（外壳关闭，噪声带）。
 
 <div id="rf10-chart-speedup" class="rf10-chart" style="width:100%;min-height:260px;margin:1rem 0;"></div>
 
@@ -91,14 +91,16 @@ flowchart TD
 
 ### 2.3 明细表（对拍）
 
+测量环境：Python **3.6.15**，`runs=1`。数据：[`assets/data/rowwise-fusion-0.10.json`](../assets/data/rowwise-fusion-0.10.json)。
+
 | Shape | N / M / sink | field-major (s) | fused (s) | 加速 | 组数 | 黄金 / calc_calls |
 |-------|--------------|----------------:|----------:|-----:|-----:|:-----------------:|
-| 宽表同 deps·行 | 10k / 80 / row | 1.248 | 0.990 | **1.26×** | 1 | ✓ / 相等 |
-| 报表宽派生·行 | 20k / 48 / row | 1.447 | 1.261 | **1.15×** | 1 | ✓ / 相等 |
-| 大行数中等宽·行 | 50k / 32 / row | 2.523 | 2.181 | **1.16×** | 1 | ✓ / 相等 |
-| 引擎代理宽表·行 | 8k / 120 / row | 1.320 | 1.184 | **1.11×** | 1 | ✓ / 相等 |
-| 宽表同 deps·列 | 10k / 80 / column | 0.913 | 0.935 | **0.98×** | 1* | ✓ / 相等 |
-| 窄表同 deps·行 | 40k / 4 / row | 0.538 | 0.514 | **1.05×** | 1 | ✓ / 相等 |
+| 宽表同 deps·行 | 10k / 80 / row | 1.705 | 1.455 | **1.17×** | 1 | ✓ / 相等 |
+| 报表宽派生·行 | 20k / 48 / row | 2.205 | 1.927 | **1.14×** | 1 | ✓ / 相等 |
+| 大行数中等宽·行 | 50k / 32 / row | 4.086 | 3.549 | **1.15×** | 1 | ✓ / 相等 |
+| 引擎代理宽表·行 | 8k / 120 / row | 1.962 | 1.676 | **1.17×** | 1 | ✓ / 相等 |
+| 宽表同 deps·列 | 10k / 80 / column | 1.242 | 1.204 | **1.03×** | 1* | ✓ / 相等 |
+| 窄表同 deps·行 | 40k / 4 / row | 1.093 | 1.074 | **1.02×** | 1 | ✓ / 相等 |
 
 \*列路径计划期仍能识别组，但运行时安全外壳禁用融合；墙钟接近噪声。
 
@@ -130,6 +132,9 @@ uv run python llmanspec/changes/archive/2026-08-02-c20-compute-expr-rowwise-fusi
 
 ```bash
 uv run python docs/doc/releases/repro/c20-workload-shapes/run_ab.py --runs 3
+# Python 3.6：
+PYTHONPATH=src .tmp/venvs/py36-scalim/bin/python \
+  docs/doc/releases/repro/c20-workload-shapes/run_ab.py --runs 1
 ```
 
 复现脚本（已入库）：[`docs/doc/releases/repro/c20-workload-shapes/run_ab.py`](repro/c20-workload-shapes/run_ab.py)。

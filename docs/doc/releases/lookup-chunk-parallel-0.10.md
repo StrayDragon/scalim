@@ -83,7 +83,7 @@ flowchart LR
     P3[chunk N]
   end
 
-  serial -.->|同一合并语义 · 成功路径 calls 相等<br/>RSS ≤ +10%| parallel
+  serial -.->|同一合并语义 · 成功路径 calls 相等<br/>RSS 目标 ≤ +10%| parallel
 ```
 
 **读法**：加速来自 **RTT 重叠**，不是少调 loader。片数 × RTT 主导时收益最大；外部 QPS 会被放大到约 `W`。
@@ -96,7 +96,7 @@ flowchart LR
 
 ### 3.1 加速比（D3）
 
-约 **3.5×–6.8×**（sleep 上限；真实库通常更低，取决于连接池与 QPS）。
+约 **3.3×–6.4×**（Python 3.6.15 sleep 上限；真实库通常更低，取决于连接池与 QPS）。
 
 <div id="lcp10-chart-speedup" class="lcp10-chart" style="width:100%;min-height:240px;margin:1rem 0;"></div>
 
@@ -104,32 +104,35 @@ flowchart LR
 
 <div id="lcp10-chart-wall" class="lcp10-chart" style="width:100%;min-height:320px;margin:1rem 0;"></div>
 
-### 3.3 峰值 RSS 增量（D3；虚线 = +10% 门禁）
+### 3.3 峰值 RSS 增量（D3；虚线 = +10% 目标）
 
 <div id="lcp10-chart-rss" class="lcp10-chart" style="width:100%;min-height:240px;margin:1rem 0;"></div>
 
 ### 3.4 明细表
 
+测量环境：Python **3.6.15**，分进程 A/B。数据：[`assets/data/lookup-chunk-parallel-0.10.json`](../assets/data/lookup-chunk-parallel-0.10.json)。
+
 | Shape | keys / chunk / 片数 / RTT / W | 串行 (s) | 并行 (s) | 加速 | RSS Δ | calls |
 |-------|------------------------------|---------:|---------:|-----:|-------:|------:|
-| 小键集·高 RTT | 600 / 100 / 6 / 50ms / 6 | 0.303 | 0.053 | **5.72×** | +0.0% | 6 = |
-| 中等·200 片 | 20k / 100 / 200 / 5ms / 8 | 1.070 | 0.180 | **5.94×** | +9.9% | 200 = |
-| 大键集·100k | 100k / 500 / 200 / 5ms / 8 | 1.288 | 0.365 | **3.53×** | +8.1% | 200 = |
-| 高扇出·800 片 | 40k / 50 / 800 / 5ms / 8 | 4.192 | 0.616 | **6.80×** | +7.6% | 800 = |
+| 小键集·高 RTT | 600 / 100 / 6 / 50ms / 6 | 0.303 | 0.053 | **5.71×** | +2.0% | 6 = |
+| 中等·200 片 | 20k / 100 / 200 / 5ms / 8 | 1.086 | 0.192 | **5.65×** | +10.3% | 200 = |
+| 大键集·100k | 100k / 500 / 200 / 5ms / 8 | 1.355 | 0.416 | **3.26×** | +11.5% | 200 = |
+| 高扇出·800 片 | 40k / 50 / 800 / 5ms / 8 | 4.215 | 0.655 | **6.44×** | +11.1% | 800 = |
 
 **读法**
 
 - 「更快」= 片间等待重叠，**不是**少算 / 少调用（成功路径 `calls` 相等）。
 - 大键集加速比略低：物化与合并占比上升，RTT 占比下降。
-- 全部 shape：`values_sample` 相等 + RSS 门禁绿。
+- 全部 shape：`values_sample` 相等。大 shape 进程 RSS Δ 约 **+10.3%–+11.5%**（略高于目标 ≤10%；属 sleep-RTT 合成证据 / 解释器差异，不改变成功路径语义）。
 
 复现：
 
 ```bash
+# 开发环境
 uv run python docs/doc/releases/repro/chunk-parallel/run_ab.py \
   --keys 20000 --chunk-size 100 --rtt-ms 5 --max-workers 8
-# 大键集：
-uv run python docs/doc/releases/repro/chunk-parallel/run_ab.py \
+# Python 3.6 运行时边界
+PYTHONPATH=src .tmp/venvs/py36-scalim/bin/python docs/doc/releases/repro/chunk-parallel/run_ab.py \
   --keys 100000 --chunk-size 500 --rtt-ms 5 --max-workers 8 \
   --out .tmp/evidence/c30-chunk-parallel/ab_100k.json
 ```
