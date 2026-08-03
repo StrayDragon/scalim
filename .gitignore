@@ -301,3 +301,6 @@ extras/vscode-scalim/*.vsix
 !extras/vscode-scalim/.npmrc
 !extras/vscode-scalim/.vscode/
 !extras/vscode-scalim/.vscode/**
+
+# ignore private corp. sanitize_rules
+**/sanitize_rules.local.yaml
