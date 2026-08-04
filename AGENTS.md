@@ -67,3 +67,4 @@
 - Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
 - Architecture overview: `ARCH.md` and `docs/doc/architecture/arch.md`
 - YAML DSL review checklist: `docs/doc/yaml-dsl/review-checklist.md`
+- README validated examples SSOT: `notebooks/marimo/example_readme_suite/`（`just examples` + `just gen-readme-examples`；合约 `governance-readme-examples` + `examples-marimo` r989）

@@ -99,11 +99,17 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
 
 def main() -> int:
     root = _repo_root()
+    # `README` 示例注入治理：`SSOT` 在 `notebooks/marimo/example_readme_suite`（需仓库根在 `sys.path`）。
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from notebooks.marimo.example_readme_suite.support.inject import check_readme_examples_governance
+
     errors: list[str] = []
     errors.extend(_check_claude_redirect(root))
     errors.extend(_check_repo_guide_single_link(root))
     errors.extend(_check_yaml_dsl_upgrades_ssot(root))
     errors.extend(check_yaml_dsl_cli_snippet_governance(root))
+    errors.extend(check_readme_examples_governance(root))
 
     if errors:
         sys.stderr.write("文档治理一致性检查失败:\n")

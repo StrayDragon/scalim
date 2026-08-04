@@ -11,64 +11,32 @@
 
 # 简介
 
-**Scalim** 是一个基于字段依赖和数据源加载关系的数据编排框架, 通过统一的方式控制内存占用和资源调度方案, 简化性能优化门槛和开发难度.
+**Scalim** 是一个基于字段依赖和数据源加载关系的数据编排框架，通过统一的方式控制内存占用和资源调度，简化性能优化和开发。
+
+它更适合反复生成的业务报表：从多个数据源取数，按关系组合，计算派生字段，再写成 CSV 或 XLSX。源表很宽、内存又容易吃紧时，它通常更有用。
+
+如果只是临时改一份小 CSV，pandas 往往更直接。Scalim 是在规则开始变多、报表要反复跑时才值得引入的。报表可以写成 YAML，也可以直接在 Python 里定义。
 
 - 可以用 Python 编写需求
 
-```python
-from scalim.execution.engine import ScalimEngine
-from scalim.execution.runtime_bindings import RuntimeBindings
-from scalim.planning import PlanBuilder
-from scalim.sinks.memory import InMemoryRowDataSink
-from scalim.spec.ir import CallBySpecIr, CallByValueIr, DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
+<details>
+<summary>查看 Python 示例</summary>
 
+<!-- BEGIN AUTOGEN:readme-min-python -->
+- 代码：[`notebooks/marimo/example_readme_suite/support/min_python.py`](./notebooks/marimo/example_readme_suite/support/min_python.py)
+- 章节：`notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py`；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+<!-- END AUTOGEN:readme-min-python -->
 
-def load_orders(**_kwargs):
-    raise NotImplementedError
-
-
-def calc_amount_x2(amount):
-    return amount * 2
-
-
-orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
-
-demand = DemandIr.from_irs(
-    sources=[],
-    main_source=orders,
-    fields=(
-        FieldIr(field_id="order_id", name="订单ID", source=orders),
-        FieldIr(field_id="amount", name="金额", source=orders),
-        DerivedFieldIr(
-            field_id="amount_x2",
-            name="金额*2",
-            dependencies=("amount",),
-            call_by=CallBySpecIr(
-                reference=RuntimeHandleIdIr(handle_id="amount_x2.calculator"),
-                kwargs=(("amount", CallByValueIr(kind="field", value="amount")),),
-                field_names=("amount",),
-            ),
-        ),
-    ),
-    name="orders_report",
-)
-
-plan = PlanBuilder(demand).build()
-runtime_bindings = RuntimeBindings(
-    main_source_loaders={"orders": load_orders},
-    derived_calculators={"amount_x2": calc_amount_x2},
-)
-engine = ScalimEngine(demand=demand, plan=plan, runtime_bindings=runtime_bindings, batch_size=1000, parallel_mode="seq")
-
-sink = InMemoryRowDataSink()
-engine.run(sink=sink)
-rows = sink.get_data()
-```
+</details>
 
 - 也可以用 YAML DSL 配置需求
 
+<details>
+<summary>查看 YAML 示例</summary>
+
+<!-- BEGIN AUTOGEN:readme-min-yaml -->
 ```yaml
-name: orders_report
+name: readme_min_yaml_report
 
 main_source:
   source_id: orders
@@ -76,12 +44,8 @@ main_source:
   fields:
     order_id:
       name: 订单ID
-
-    # 主源字段，用于派生计算
     amount:
       name: 金额
-
-    # 关联键字段
     pay_id:
       name: 支付ID
 
@@ -121,6 +85,14 @@ resources:
         path: ./output
 ```
 
+> 把 `myapp.loaders` 换成你的加载函数所在模块。这份示例会在仓库里自动运行。
+
+- 完整配置：[`support/min_yaml_example.yaml`](./notebooks/marimo/example_readme_suite/support/min_yaml_example.yaml)
+- 示例数据和运行脚本：[`support/min_yaml_loaders.py`](./notebooks/marimo/example_readme_suite/support/min_yaml_loaders.py) · [`support/min_yaml.py`](./notebooks/marimo/example_readme_suite/support/min_yaml.py)
+<!-- END AUTOGEN:readme-min-yaml -->
+
+</details>
+
 ## 快速上手
 
 ```bash
@@ -134,42 +106,61 @@ uv pip install scalim
 ```
 
 ```bash
-# 交互式教程
+# 交互式教程（需要先 clone 仓库）
 just notebook
 ```
 
+运行库支持 Python 3.6 及以上版本。仓库中的交互式教程和文档工具需要 Python 3.10 及以上版本。
+
 ## 主要特性
 
-- **可配置自适应并发执行**:  大部分情况无需手动优化 — 运行时自动为你找到最优执行路径
-  - 自动识别并发机会:基于依赖图的拓扑分析
-  - Fan-out/Fan-in 编排:独立任务并行执行,依赖任务串行化
-  - 资源感知调度:根据任务数量、数据量、CPU 资源动态调整
-  - 快速失败回退:并发失败自动降级到串行模式
-- **生产级可观测性**: 16+ 种事件类型 + 4 种预设 Observer
-  - PerformanceObserver:吞吐量、延迟统计
-  - MemoryOptimizationObserver:内存释放追踪
-  - RelationObserver:关系查找命中率
-  - ExecutionTraceObserver:完整执行链路追踪
-- **运行时防护机制**: 内置 Guardrails 系统,提供策略模式错误处理(quiet / fast_fail),可自定义 Loader 级别的错误策略,实现细粒度容错控制
-- **低内存模式**: 内置字段剪枝、字段释放和行级释放,尽量只保留当前批次真正还要用的数据,减少上下文占用(内存占用)
-- **多种编写方式**: 支持直接用 `Python` 描述计算逻辑,也支持用 `YAML DSL` 写配置,配套 JSON Schema 补全/校验 + `scalim-cli` 语义校验 + LSP/IDE 集成,写配置时更容易补全、检查和落地
-- **多种写入支持**: 支持批量执行、流式输出和行式/列式 sink,方便在吞吐、内存和输出形式之间做取舍
-- **方便集成AI开发环境**: 支持 [agent skill](./agentdev/skills/) 集成
-- **可视化在线工具**: 有可视化在线工具做回放和排查,执行计划、事件流和 trace 都能接起来看
+- **多数据源报表**：在一份 YAML 中写清楚数据从哪里来、怎样关联、要计算哪些字段、最后写到哪个文件。可以从 [电商报表示例](./docs/doc/getting-started/demo-big-data-report.md) 看一份完整配置。
 
-更多见 [参考文档](./docs/doc/index.md)
+- **宽表只取需要的列**：报表只要订单号、金额和支付方式时，Scalim 不会先复制不相关的列。下面的比较把“先读完整张假表再处理”设为 1.0。
+
+图里的数字是同一台机器上一次运行前后进程 RSS 的变化，不是运行中的最高内存，也不能直接和别人的电脑比较。
+
+<!-- BEGIN AUTOGEN:readme-memory-chart -->
+![本地内存变化对比：naive 和 Scalim](docs/assets/readme/memory-compare.svg)
+
+![不同数据大小下的本地内存变化](docs/assets/readme/memory-compare-scenarios.svg)
+<!-- END AUTOGEN:readme-memory-chart -->
+
+<details>
+<summary>查看内存比较的代码、数据和重跑方法</summary>
+
+- 默认测试数据在 [`support/knobs.py`](./notebooks/marimo/example_readme_suite/support/knobs.py)：1,500 行、48 个字段，每批 150 行。
+- 图表内容来自 [`chart_snapshot.json`](./notebooks/marimo/example_readme_suite/support/chart_snapshot.json)。仓库会确认示例能运行，但不会要求某个固定的内存比例。
+- 想自己重跑，可以在仓库中执行 `SCALIM_EXAMPLES_SUITES=example_readme_suite just examples`，然后执行 `just gen-readme-examples` 更新图表。
+
+<!-- BEGIN AUTOGEN:readme-naive-baseline -->
+- 代码：[`notebooks/marimo/example_readme_suite/support/naive_baseline.py`](./notebooks/marimo/example_readme_suite/support/naive_baseline.py)
+- 对比章节：`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+<!-- END AUTOGEN:readme-naive-baseline -->
+
+<!-- BEGIN AUTOGEN:readme-scalim-path -->
+- 代码：[`notebooks/marimo/example_readme_suite/support/scalim_path.py`](./notebooks/marimo/example_readme_suite/support/scalim_path.py)
+- 对比章节：`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+<!-- END AUTOGEN:readme-scalim-path -->
+
+</details>
+
+- **最后才用到的字段，不必提前算**：一个派生字段只用于最终写出，而且没有被其他字段或数据加载使用时，Scalim 会在写出前计算它。配置里不用多写开关；有下游依赖的字段仍按正常顺序计算。
+
+- **输出和接入方式不止一种**：可以写 CSV、XLSX，也可以把多个报表放进一个 workflow。需要在运行前后接入日志、审计或自己的动作时，可以使用事件和 hooks；示例在 [这里](./notebooks/marimo/example_hooks_events_scenarios/demo_main.py)。
+
+更多见 [参考文档](./docs/doc/index.md)。
 
 ## 质量保证
 
-- 100% 核心测试覆盖率 (低于 100% 强制 CI 失败)
-- 基于 pyright 的类型检查
-- `src/scalim/` 默认走更严格的 `basedpyright` 规则,已启用 `Phase 1` + `Phase 2` 核心规则;`notebooks` 与 `packages/scalim-cli` 等边界区域按分层策略定向放宽
-- `Python 3.6` 兼容除语法检查外,还额外验证隔离环境中的 `typing-extensions==4.1.1`
-- Ruff 全量规则通过
+- 100% 核心测试覆盖率，低于这个值时 CI 会失败。
+- 使用 `basedpyright` 做类型检查。
+- `Python 3.6` 除了语法检查外，还会在 `typing-extensions==4.1.1` 的隔离环境中验证。
+- 使用 Ruff 检查和格式化代码。
+- README 中的示例、链接和图表来自 [`example_readme_suite`](./notebooks/marimo/example_readme_suite/demo_main.py)，会和实际运行结果一起检查。
 
 ## 设计哲学
 
-1. Core First:核心运行时与方言/CLI 解耦
-2. Type Safety:完整的类型注解,支持静态分析
-3. Observable:默认可观测,而非事后补丁
-4. Extensible:通过 Hook/Observer/Policy 三大扩展点支持自定义
+1. 核心运行时与 YAML、CLI 等外围工具分开维护。
+2. 类型注解要能帮助静态检查，而不是只让编辑器好看。
+3. 运行过程可以观察；需要扩展时，可用 Hook、Observer 和 Policy。

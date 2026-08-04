@@ -1,0 +1,47 @@
+name: readme_min_yaml_report
+
+main_source:
+  source_id: orders
+  loader: "notebooks.marimo.example_readme_suite.support.min_yaml_loaders:load_orders"
+  fields:
+    order_id:
+      name: 订单ID
+    amount:
+      name: 金额
+    pay_id:
+      name: 支付ID
+
+sources:
+  payments:
+    loader: "notebooks.marimo.example_readme_suite.support.min_yaml_loaders:load_payments"
+    key: id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      method:
+        name: 支付方式
+        extract: payment_method
+        relation: orders_to_payments
+
+relations:
+  orders_to_payments:
+    steps:
+      - from: orders.pay_id
+        to: payments.id
+
+fields:
+  total_amount:
+    name: 总金额
+    compute: "amount * 2"
+
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
+    fields: [order_id, method, total_amount]
+
+resources:
+  files:
+    detail_csv:
+      csv_file:
+        path: ./output

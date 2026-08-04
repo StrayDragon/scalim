@@ -1,0 +1,48 @@
+{
+  "measurement": "Before/after local RSS delta proxy; not a sampled peak.",
+  "note": "Illustrative relative local RSS deltas from local runs; CI does not hard-gate these numbers.",
+  "scenarios": [
+    {
+      "id": "baseline",
+      "title": "默认门禁 scale",
+      "knobs": {
+        "N_ROWS": 1500,
+        "N_FIELDS": 48,
+        "BATCH_SIZE": 150,
+        "PAYLOAD_CHARS": 64
+      },
+      "ratios": {
+        "naive_rel": 1.0,
+        "scalim_rel": 0.1739
+      }
+    },
+    {
+      "id": "more_fields",
+      "title": "字段翻倍 (96)",
+      "knobs": {
+        "N_ROWS": 1500,
+        "N_FIELDS": 96,
+        "BATCH_SIZE": 150,
+        "PAYLOAD_CHARS": 64
+      },
+      "ratios": {
+        "naive_rel": 1.0,
+        "scalim_rel": 0.1247
+      }
+    },
+    {
+      "id": "more_rows",
+      "title": "行数加大 (4000)",
+      "knobs": {
+        "N_ROWS": 4000,
+        "N_FIELDS": 48,
+        "BATCH_SIZE": 200,
+        "PAYLOAD_CHARS": 64
+      },
+      "ratios": {
+        "naive_rel": 1.0,
+        "scalim_rel": 0.0674
+      }
+    }
+  ]
+}

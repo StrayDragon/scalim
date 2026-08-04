@@ -334,16 +334,34 @@ gen-public-api-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py
 
 
+# 生成: README 受控示例注入 + memory-compare SVG
+gen-readme-examples:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ justfile_directory() }}"
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python scripts/gen-readme-examples.py
+
+# 检查: README 注入/图资产 drift（跑通由 just examples 覆盖 example_readme_suite）
+readme-examples:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ justfile_directory() }}"
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python scripts/gen-readme-examples.py --check
+
 # 生成: 文档站点受控生成物(含 injected blocks)
-gen-docs:
+gen-docs: gen-readme-examples
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py
 
 # 检查: docs 生成物是否有 drift
 docs-drift-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ justfile_directory() }}"
+    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python scripts/gen-readme-examples.py --check
     uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
-gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-skill gen-viz-data gen-viz-schedule-plan gen-docs
+gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-skill gen-viz-data gen-viz-schedule-plan gen-readme-examples gen-docs
 
 # 报告: 各 notebook 对 Tier1 公开 API 入口的覆盖(CSV 格式)
 report-notebooks-coverage:
@@ -1047,6 +1065,7 @@ alias quick-qa := quick-check
 check-only-py: quick-check-only-py-no-test-gate test-gate-core-coverage py36-compat-check py36-typingext-check
 
 # QA: 所有完整的检查(最全面入口; MUST 覆盖全部质量门禁)
+# README 跑通：`examples`（含 example_readme_suite）；README 注入/图 drift：`docs-drift-check`（经 generated-artifacts-drift-check）
 check: check-only-py frontend-check examples check-notebooks-coverage
 
 alias qa := check

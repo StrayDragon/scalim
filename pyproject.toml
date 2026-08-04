@@ -197,6 +197,7 @@ max-args = 16
 "{tests,bench}/*.py" = ["ALL"]
 "tests/**/*.py" = ["ALL"]
 "docs/snippets/*.py" = ["ALL"]
+"notebooks/marimo/example_readme_suite/**/*.py" = ["ALL"]
 "scripts/*.py" = ["ALL"]
 "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py" = ["ALL"]
 "packages/scalim-misc/src/scalim_misc/demo_big_data_report/loaders.py" = [

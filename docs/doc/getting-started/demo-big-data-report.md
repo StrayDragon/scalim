@@ -10,6 +10,7 @@
 
 - marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](repo:notebooks/marimo/demo_big_data_report/demo_main.py)
 - public API 覆盖套件入口(交互式): [`notebooks/marimo/example_public_api_suite/demo_main.py`](repo:notebooks/marimo/example_public_api_suite/demo_main.py)
+- README 假数据示例套件(交互式 + `just examples`): [`notebooks/marimo/example_readme_suite/demo_main.py`](repo:notebooks/marimo/example_readme_suite/demo_main.py)
 - `just examples` 集成对拍入口(headless/CI): `just examples`（入口实现位于 [`justfile`](repo:justfile) 的 `examples:` recipe）
 - YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml)
 
