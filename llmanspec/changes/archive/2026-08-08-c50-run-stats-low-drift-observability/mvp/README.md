@@ -32,6 +32,8 @@ uv run python llmanspec/changes/archive/2026-08-08-c50-run-stats-low-drift-obser
 | `workload/` | 合成 workflow YAML |
 | `evidence/` | 已钉住的 slim JSON（无 `batches[]` 膨胀；路径已 scrub） |
 
+> 注：仓库根 `.gitignore` 含全局 `debug/`（Rust）。`evidence/**/profiles/debug/` 已用 `evidence/.gitignore` 反选；若再加同类目录可用 `git add -f`。
+
 ## 读数约定
 
 - workflow 真相：`run_stats.nodes`（勿读共享 Perf 末态）
