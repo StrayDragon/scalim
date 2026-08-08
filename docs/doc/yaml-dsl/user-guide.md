@@ -942,6 +942,7 @@ resources:
 
 - `components=[Observer()/Hook()]`: 挂接内置 presets 或自定义 hook/observer
 - `overrides=RunOverrides(viz_config=VizObserverConfig(...))`: 启用/配置 Viz 产物导出
+- **低漂移 run_stats / profiles / write 归因**: 见 [Run Stats](../viz/run-stats.md)；Agent 侧用 `agentdev/skills/scalim-run-stats/`
 
 CLI 校验入口 `scalim-cli yaml-dsl validate ...` 会在 validate 阶段发出上述 warning(不阻断),便于在 CI/本地尽早发现 legacy keys。
 

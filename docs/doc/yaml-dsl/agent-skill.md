@@ -12,6 +12,11 @@
 
 仓库里维护了一套 **Scalim YAML DSL 的 Agent Skill**: 把任务分流、最小命令入口、校验入口、生成的 catalog、迁移 playbook 放在同一个目录里,方便直接交给智能助手用,少踩坑。
 
+另有一套 **低漂移自我观测** skill（run_stats / profiles / write 归因），与 YAML skill 正交：
+
+- 入口:[`agentdev/skills/scalim-run-stats/SKILL.md`](repo:agentdev/skills/scalim-run-stats/SKILL.md?ref)
+- 人类文档:[Run Stats](../viz/run-stats.md)
+
 ## 1. 产物在哪里(直接用)
 
 - 技能入口:[`agentdev/skills/scalim-yaml-dsl/SKILL.md`](repo:agentdev/skills/scalim-yaml-dsl/SKILL.md?ref)

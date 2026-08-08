@@ -19,6 +19,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 - **0.10.0 版本亮点**（默认 write-precompute / row-wise fusion；opt-in lookup chunk 并行；YAML 无强制迁移）: 读 [references/0.10-release-highlights.md](references/0.10-release-highlights.md)（人类总览: `docs/doc/releases/0.10.0/index.md`）
 - **0.10.1**（相对 0.10.0；YAML 无强制迁移；Python typed handlers 收 `Event`）: [references/0.10.1-release-highlights.md](references/0.10.1-release-highlights.md) + `docs/doc/releases/0.10.1/`；Observer/Hook 迁移走 `scalim-public-api`
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
+- **低漂移自我观测**（run_stats / profiles / write 归因；非 YAML authoring）: 改读 `agentdev/skills/scalim-run-stats/SKILL.md` + `docs/doc/viz/run-stats.md`
 - 需要按批次快速定位 breaking/migration: 读 [references/generated/yaml-dsl-upgrades.gen.md](references/generated/yaml-dsl-upgrades.gen.md)
 - 需要阅读完整升级指南(SSOT): 读 `references/upgrades/*.md`(book write: `2026-07-12-book-write-policy-python-ssot.md`；book budget 移除: `2026-07-28-remove-book-budget-policy.md`；Dedup/TwoStage IR 移除: `2026-07-28-remove-dedup-and-two-stage-derived.md`)
 - 需要全量语法/API: 读 [references/syntax-catalog.gen.md](references/syntax-catalog.gen.md) 和 [references/generated/cli-lsp-reference.gen.md](references/generated/cli-lsp-reference.gen.md)

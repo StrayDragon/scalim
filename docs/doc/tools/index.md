@@ -12,4 +12,5 @@
 你可以从这里开始:
 
 - 先看执行结构/产物: [可视化工具](../viz/scalim-viz.md)
+- 低漂移自我观测 / run_stats: [Run Stats](../viz/run-stats.md)
 - 想做性能对比/回归: [基准测试](../benchmark/index.md) → [指南](../benchmark/guide.md)
