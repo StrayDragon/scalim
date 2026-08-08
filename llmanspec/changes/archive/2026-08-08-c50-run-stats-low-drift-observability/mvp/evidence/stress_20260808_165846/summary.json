@@ -1,0 +1,180 @@
+{
+  "results": [
+    {
+      "profile": "baseline",
+      "wall": {
+        "profile": "baseline",
+        "elapsed_s": 142.3243,
+        "rss_mb_end": 243.51953125,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 17:03:28",
+        "rss_mb_before": 211.296875,
+        "rss_mb_after": 243.51953125,
+        "rss_delta_mb": 32.22,
+        "error": null
+      },
+      "covered_fields": [
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline/work/workload/out/report/versions/wf_816d93c2f149459da52cc96fad7a9b6e/books/report.xlsx",
+            "exists": true,
+            "size": 49478393,
+            "sha256_head": "0596585ad9b14731f32caaa205c90181e77ffa99e3712fac869440bf4654bc97",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline/work/workload/out/detail_csv/versions/wf_816d93c2f149459da52cc96fad7a9b6e/files/detail_csv.csv",
+            "exists": true,
+            "size": 34570656,
+            "sha256_head": "7e90127a2b4444fd8bf867cd41779a6e966ff42d4eda52182ceec82e3eba5e4e",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline/work/workload/out/metrics_csv/versions/wf_816d93c2f149459da52cc96fad7a9b6e/files/metrics_csv.csv",
+            "exists": true,
+            "size": 15081,
+            "sha256_head": "a9531717460c4c846def12d73c2cedd2ddf6614d6b97c716c0a772174c7004f1",
+            "hashed_bytes": 15081
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_816d93c2f149459da52cc96fad7a9b6e"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_obs_demo_run_stats/v0",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/baseline"
+    },
+    {
+      "profile": "bench",
+      "wall": {
+        "profile": "bench",
+        "elapsed_s": 141.7279,
+        "rss_mb_end": 620.8203125,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 17:05:50",
+        "rss_mb_before": 221.70703125,
+        "rss_mb_after": 620.8203125,
+        "rss_delta_mb": 399.11,
+        "error": null
+      },
+      "covered_fields": [
+        "pipeline.total_duration_s",
+        "pipeline.total_rows_in",
+        "pipeline.node_count",
+        "stages_total",
+        "loaders",
+        "batches[]",
+        "outputs[]",
+        "nodes[]",
+        "memory.peak_mb",
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench/work/workload/out/report/versions/wf_e2d146679c8e42b599a2d968710ba4b5/books/report.xlsx",
+            "exists": true,
+            "size": 49478393,
+            "sha256_head": "c987c0332681d8f486eef017edd38954ae74ab5f15729d1b6937dbaad95fb59c",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench/work/workload/out/detail_csv/versions/wf_e2d146679c8e42b599a2d968710ba4b5/files/detail_csv.csv",
+            "exists": true,
+            "size": 34570656,
+            "sha256_head": "7e90127a2b4444fd8bf867cd41779a6e966ff42d4eda52182ceec82e3eba5e4e",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench/work/workload/out/metrics_csv/versions/wf_e2d146679c8e42b599a2d968710ba4b5/files/metrics_csv.csv",
+            "exists": true,
+            "size": 15081,
+            "sha256_head": "a9531717460c4c846def12d73c2cedd2ddf6614d6b97c716c0a772174c7004f1",
+            "hashed_bytes": 15081
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_e2d146679c8e42b599a2d968710ba4b5"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_run_stats/v1",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/stress_20260808_165846/runs/bench"
+    }
+  ],
+  "matrix": {
+    "schema": "scalim_obs_demo_sampling_matrix/v0",
+    "scale": "stress",
+    "shape": {
+      "name": "stress",
+      "fact_rows": 1000000,
+      "dim_rows": 100000,
+      "region_rows": 500,
+      "batch_size": 5000,
+      "parallel_mode": "seq",
+      "mem_soft_cap_bytes": 39426361344,
+      "mem_soft_cap_gb": 36.72,
+      "notes": "capped for practical Excel write time; soft cap=90% avail RAM at start"
+    },
+    "usable_bytes": 39426361344,
+    "usable_gb": 36.72,
+    "profiles": [
+      {
+        "profile": "baseline",
+        "elapsed_s": 142.3243,
+        "rss_delta_mb": 32.22,
+        "rss_mb_after": 243.51953125,
+        "exit_code": 0,
+        "covered_fields": [
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": 0.0,
+        "output_equiv_vs_baseline": null,
+        "output_mismatches": null
+      },
+      {
+        "profile": "bench",
+        "elapsed_s": 141.7279,
+        "rss_delta_mb": 399.11,
+        "rss_mb_after": 620.8203125,
+        "exit_code": 0,
+        "covered_fields": [
+          "pipeline.total_duration_s",
+          "pipeline.total_rows_in",
+          "pipeline.node_count",
+          "stages_total",
+          "loaders",
+          "batches[]",
+          "outputs[]",
+          "nodes[]",
+          "memory.peak_mb",
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": -0.42,
+        "output_equiv_vs_baseline": true,
+        "output_mismatches": 0
+      }
+    ],
+    "notes": [
+      "Observers must not change sink bytes (output_equiv_vs_baseline).",
+      "Memory profiles require psutil (no silent fallback).",
+      "JSON artifacts are intended for later viz ingestion."
+    ]
+  }
+}

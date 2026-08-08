@@ -37,9 +37,17 @@
 - [ ] 若开了 debug：文案含观测税警告与 bench 替代
 - [ ] 未把完整 run_stats 写入 viz snapshot
 
-## 合成矩阵参考（本机 `.tmp/obs-demo`，非 SLA）
+## 合成矩阵参考（本机，非 SLA）
 
-- mid 200k：bench **+2.1%**，bench_plus **+3.3%**，debug **+41%**，CSV equiv 全绿，双节点 `write>0`
-- stress 1M：bench ≈ baseline（噪声内），`write≈7s`，CSV equiv 绿
+| scale | bench tax | bench_plus | debug tax | CSV equiv | write |
+|-------|-----------|------------|-----------|-----------|-------|
+| mid 200k | **+2.1%** | **+3.3%** | **+41%** | OK | 双节点 `write>0` |
+| stress 1M | ~**0% ± 噪声** | （通常跳过） | （通常跳过） | OK | `stages_total.write≈7s` |
 
-复现：`.tmp/obs-demo/README.md`。
+**判断启发式**：bench 个位数税可日常开；debug ~**+40%** 只短窗；stress 上 bench 税可能淹没在噪声里，仍应用 CSV equiv 证明无业务漂移。
+
+复现 / 钉住 evidence：
+
+`llmanspec/changes/archive/2026-08-08-c50-run-stats-low-drift-observability/mvp/`
+
+本地再跑 JSON（viz 向）：默认 `.tmp/obs-demo/runs/`（仅结果，不入库）。

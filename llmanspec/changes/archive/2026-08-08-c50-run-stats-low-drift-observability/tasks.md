@@ -16,7 +16,7 @@
 - [x] 3.1 Public seam: dual-demand workflow + shared observers → `run_stats.nodes` length ≥ 2; detail node retains loader (and relation snapshot if debug) non-empty after metrics finishes
 - [x] 3.2 Public seam: baseline vs bench → CSV row count / content hash equal
 - [x] 3.3 Public seam: enabling relation/debug emits warning
-- [x] 3.4 Keep `.tmp/obs-demo` as evidence harness pointer (not required in package)
+- [x] 3.4 Pin reproducible harness under archive `mvp/`；`.tmp/obs-demo` JSON-only for viz
 
 ## 4. Docs
 

@@ -1,0 +1,441 @@
+{
+  "results": [
+    {
+      "profile": "baseline",
+      "wall": {
+        "profile": "baseline",
+        "elapsed_s": 26.4772,
+        "rss_mb_end": 148.34375,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 16:56:37",
+        "rss_mb_before": 142.80859375,
+        "rss_mb_after": 148.34375,
+        "rss_delta_mb": 5.54,
+        "error": null
+      },
+      "covered_fields": [
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline/work/workload/out/report/versions/wf_05e06b48b31042929c2545deb4d013c8/books/report.xlsx",
+            "exists": true,
+            "size": 9891193,
+            "sha256_head": "e66860830fb5b5637b14102af214ed02b7f80b4c83e2bad079358b5348d89190",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline/work/workload/out/detail_csv/versions/wf_05e06b48b31042929c2545deb4d013c8/files/detail_csv.csv",
+            "exists": true,
+            "size": 6825247,
+            "sha256_head": "814926b1c2d2cd7c62007611bc31b258dbf5873f0b82fcee7ba373f868f218b0",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline/work/workload/out/metrics_csv/versions/wf_05e06b48b31042929c2545deb4d013c8/files/metrics_csv.csv",
+            "exists": true,
+            "size": 5963,
+            "sha256_head": "3d3553e6b78f47b1dced303f0bf2e3fde77e7cd5572d3ff2496e2ad6569e0c0f",
+            "hashed_bytes": 5963
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_05e06b48b31042929c2545deb4d013c8"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_obs_demo_run_stats/v0",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/baseline"
+    },
+    {
+      "profile": "bench",
+      "wall": {
+        "profile": "bench",
+        "elapsed_s": 27.0451,
+        "rss_mb_end": 215.953125,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 16:57:04",
+        "rss_mb_before": 144.390625,
+        "rss_mb_after": 215.953125,
+        "rss_delta_mb": 71.56,
+        "error": null
+      },
+      "covered_fields": [
+        "pipeline.total_duration_s",
+        "pipeline.total_rows_in",
+        "pipeline.node_count",
+        "stages_total",
+        "loaders",
+        "batches[]",
+        "outputs[]",
+        "nodes[]",
+        "memory.peak_mb",
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench/work/workload/out/report/versions/wf_5327d0477e8a4daeb12d784c60da4b97/books/report.xlsx",
+            "exists": true,
+            "size": 9891194,
+            "sha256_head": "6e7752d907b9e689248f4863a5c859286ca57d1ce26697e0c50af4def6c03532",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench/work/workload/out/detail_csv/versions/wf_5327d0477e8a4daeb12d784c60da4b97/files/detail_csv.csv",
+            "exists": true,
+            "size": 6825247,
+            "sha256_head": "814926b1c2d2cd7c62007611bc31b258dbf5873f0b82fcee7ba373f868f218b0",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench/work/workload/out/metrics_csv/versions/wf_5327d0477e8a4daeb12d784c60da4b97/files/metrics_csv.csv",
+            "exists": true,
+            "size": 5963,
+            "sha256_head": "3d3553e6b78f47b1dced303f0bf2e3fde77e7cd5572d3ff2496e2ad6569e0c0f",
+            "hashed_bytes": 5963
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_5327d0477e8a4daeb12d784c60da4b97"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_run_stats/v1",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench"
+    },
+    {
+      "profile": "bench_plus",
+      "wall": {
+        "profile": "bench_plus",
+        "elapsed_s": 27.3621,
+        "rss_mb_end": 219.12109375,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 16:57:32",
+        "rss_mb_before": 151.6875,
+        "rss_mb_after": 219.12109375,
+        "rss_delta_mb": 67.43,
+        "error": null
+      },
+      "covered_fields": [
+        "pipeline.total_duration_s",
+        "pipeline.total_rows_in",
+        "pipeline.node_count",
+        "stages_total",
+        "loaders",
+        "batches[]",
+        "outputs[]",
+        "nodes[]",
+        "memory.peak_mb",
+        "stage_memory.samples",
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus/work/workload/out/report/versions/wf_bd887ff2195b4e479e5a228e8ae54733/books/report.xlsx",
+            "exists": true,
+            "size": 9891193,
+            "sha256_head": "d735bbb71e6c354170c1d8740726b2cf60277f726e24ad0fdf32f97459f434be",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus/work/workload/out/detail_csv/versions/wf_bd887ff2195b4e479e5a228e8ae54733/files/detail_csv.csv",
+            "exists": true,
+            "size": 6825247,
+            "sha256_head": "814926b1c2d2cd7c62007611bc31b258dbf5873f0b82fcee7ba373f868f218b0",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus/work/workload/out/metrics_csv/versions/wf_bd887ff2195b4e479e5a228e8ae54733/files/metrics_csv.csv",
+            "exists": true,
+            "size": 5963,
+            "sha256_head": "3d3553e6b78f47b1dced303f0bf2e3fde77e7cd5572d3ff2496e2ad6569e0c0f",
+            "hashed_bytes": 5963
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_bd887ff2195b4e479e5a228e8ae54733"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_run_stats/v1",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/bench_plus"
+    },
+    {
+      "profile": "debug",
+      "wall": {
+        "profile": "debug",
+        "elapsed_s": 37.344,
+        "rss_mb_end": 283.890625,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 16:58:09",
+        "rss_mb_before": 159.79296875,
+        "rss_mb_after": 283.890625,
+        "rss_delta_mb": 124.1,
+        "error": null
+      },
+      "covered_fields": [
+        "pipeline.total_duration_s",
+        "pipeline.total_rows_in",
+        "pipeline.node_count",
+        "stages_total",
+        "loaders",
+        "batches[]",
+        "outputs[]",
+        "nodes[]",
+        "memory.peak_mb",
+        "stage_memory.samples",
+        "viz",
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/report/versions/wf_c033b34ed5194319a571a2dad7d3a1ce/books/report.xlsx",
+            "exists": true,
+            "size": 9891194,
+            "sha256_head": "634571d39faf209a5d6b5bb9b712614287d298e7ca44d15519b21addcf9f0ae1",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/detail_csv/versions/wf_c033b34ed5194319a571a2dad7d3a1ce/files/detail_csv.csv",
+            "exists": true,
+            "size": 6825247,
+            "sha256_head": "814926b1c2d2cd7c62007611bc31b258dbf5873f0b82fcee7ba373f868f218b0",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/metrics_csv/versions/wf_c033b34ed5194319a571a2dad7d3a1ce/files/metrics_csv.csv",
+            "exists": true,
+            "size": 5963,
+            "sha256_head": "3d3553e6b78f47b1dced303f0bf2e3fde77e7cd5572d3ff2496e2ad6569e0c0f",
+            "hashed_bytes": 5963
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_c033b34ed5194319a571a2dad7d3a1ce"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_run_stats/v1",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug"
+    },
+    {
+      "profile": "probe",
+      "wall": {
+        "profile": "probe",
+        "elapsed_s": 28.0019,
+        "rss_mb_end": 226.390625,
+        "exit_code": 0,
+        "finished_at": "2026-08-08 16:58:37",
+        "rss_mb_before": 194.48046875,
+        "rss_mb_after": 226.390625,
+        "rss_delta_mb": 31.91,
+        "error": null
+      },
+      "covered_fields": [
+        "pipeline.total_duration_s",
+        "pipeline.total_rows_in",
+        "pipeline.node_count",
+        "stages_total",
+        "loaders",
+        "batches[]",
+        "outputs[]",
+        "nodes[]",
+        "memory.peak_mb",
+        "artifacts"
+      ],
+      "artifacts": {
+        "books": {
+          "report": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe/work/workload/out/report/versions/wf_4c75219d4c1a492aa38456b819714117/books/report.xlsx",
+            "exists": true,
+            "size": 9891193,
+            "sha256_head": "f7482fed9a11c873081bc8e5259987fd92f5bf38bf78f712da54e1a438b80ae0",
+            "hashed_bytes": 2097152
+          }
+        },
+        "files": {
+          "detail_csv.detail_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe/work/workload/out/detail_csv/versions/wf_4c75219d4c1a492aa38456b819714117/files/detail_csv.csv",
+            "exists": true,
+            "size": 6825247,
+            "sha256_head": "814926b1c2d2cd7c62007611bc31b258dbf5873f0b82fcee7ba373f868f218b0",
+            "hashed_bytes": 2097152
+          },
+          "metrics_csv.metrics_csv": {
+            "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe/work/workload/out/metrics_csv/versions/wf_4c75219d4c1a492aa38456b819714117/files/metrics_csv.csv",
+            "exists": true,
+            "size": 5963,
+            "sha256_head": "3d3553e6b78f47b1dced303f0bf2e3fde77e7cd5572d3ff2496e2ad6569e0c0f",
+            "hashed_bytes": 5963
+          }
+        },
+        "errors": [],
+        "roots_tried": [
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe/work/workload/out/report",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe/work/workload/out/detail_csv",
+          "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe/work/workload/out/metrics_csv"
+        ],
+        "run_id": "wf_4c75219d4c1a492aa38456b819714117"
+      },
+      "exit_code": 0,
+      "run_stats_schema": "scalim_run_stats/v1",
+      "profile_dir": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/probe"
+    }
+  ],
+  "matrix": {
+    "schema": "scalim_obs_demo_sampling_matrix/v0",
+    "scale": "mid",
+    "shape": {
+      "name": "mid",
+      "fact_rows": 200000,
+      "dim_rows": 20000,
+      "region_rows": 200,
+      "batch_size": 2000,
+      "parallel_mode": "seq",
+      "mem_soft_cap_bytes": 39426361344,
+      "mem_soft_cap_gb": 36.72,
+      "notes": "stage/loader layering visible"
+    },
+    "usable_bytes": 39426361344,
+    "usable_gb": 36.72,
+    "profiles": [
+      {
+        "profile": "baseline",
+        "elapsed_s": 26.4772,
+        "rss_delta_mb": 5.54,
+        "rss_mb_after": 148.34375,
+        "exit_code": 0,
+        "covered_fields": [
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": 0.0,
+        "output_equiv_vs_baseline": null,
+        "output_mismatches": null
+      },
+      {
+        "profile": "bench",
+        "elapsed_s": 27.0451,
+        "rss_delta_mb": 71.56,
+        "rss_mb_after": 215.953125,
+        "exit_code": 0,
+        "covered_fields": [
+          "pipeline.total_duration_s",
+          "pipeline.total_rows_in",
+          "pipeline.node_count",
+          "stages_total",
+          "loaders",
+          "batches[]",
+          "outputs[]",
+          "nodes[]",
+          "memory.peak_mb",
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": 2.14,
+        "output_equiv_vs_baseline": true,
+        "output_mismatches": 0
+      },
+      {
+        "profile": "bench_plus",
+        "elapsed_s": 27.3621,
+        "rss_delta_mb": 67.43,
+        "rss_mb_after": 219.12109375,
+        "exit_code": 0,
+        "covered_fields": [
+          "pipeline.total_duration_s",
+          "pipeline.total_rows_in",
+          "pipeline.node_count",
+          "stages_total",
+          "loaders",
+          "batches[]",
+          "outputs[]",
+          "nodes[]",
+          "memory.peak_mb",
+          "stage_memory.samples",
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": 3.34,
+        "output_equiv_vs_baseline": true,
+        "output_mismatches": 0
+      },
+      {
+        "profile": "debug",
+        "elapsed_s": 37.344,
+        "rss_delta_mb": 124.1,
+        "rss_mb_after": 283.890625,
+        "exit_code": 0,
+        "covered_fields": [
+          "pipeline.total_duration_s",
+          "pipeline.total_rows_in",
+          "pipeline.node_count",
+          "stages_total",
+          "loaders",
+          "batches[]",
+          "outputs[]",
+          "nodes[]",
+          "memory.peak_mb",
+          "stage_memory.samples",
+          "viz",
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": 41.04,
+        "output_equiv_vs_baseline": true,
+        "output_mismatches": 0
+      },
+      {
+        "profile": "probe",
+        "elapsed_s": 28.0019,
+        "rss_delta_mb": 31.91,
+        "rss_mb_after": 226.390625,
+        "exit_code": 0,
+        "covered_fields": [
+          "pipeline.total_duration_s",
+          "pipeline.total_rows_in",
+          "pipeline.node_count",
+          "stages_total",
+          "loaders",
+          "batches[]",
+          "outputs[]",
+          "nodes[]",
+          "memory.peak_mb",
+          "artifacts"
+        ],
+        "obs_tax_pct_vs_baseline": 5.76,
+        "output_equiv_vs_baseline": true,
+        "output_mismatches": 0
+      }
+    ],
+    "notes": [
+      "Observers must not change sink bytes (output_equiv_vs_baseline).",
+      "Memory profiles require psutil (no silent fallback).",
+      "JSON artifacts are intended for later viz ingestion."
+    ]
+  }
+}

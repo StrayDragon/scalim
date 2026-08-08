@@ -1,0 +1,59 @@
+{
+  "schema": "scalim_obs_demo_sampling_matrix/v0",
+  "scale": "stress",
+  "shape": {
+    "name": "stress",
+    "fact_rows": 1000000,
+    "dim_rows": 100000,
+    "region_rows": 500,
+    "batch_size": 5000,
+    "parallel_mode": "seq",
+    "mem_soft_cap_bytes": 39426361344,
+    "mem_soft_cap_gb": 36.72,
+    "notes": "capped for practical Excel write time; soft cap=90% avail RAM at start"
+  },
+  "usable_bytes": 39426361344,
+  "usable_gb": 36.72,
+  "profiles": [
+    {
+      "profile": "baseline",
+      "elapsed_s": 142.3243,
+      "rss_delta_mb": 32.22,
+      "rss_mb_after": 243.51953125,
+      "exit_code": 0,
+      "covered_fields": [
+        "artifacts"
+      ],
+      "obs_tax_pct_vs_baseline": 0.0,
+      "output_equiv_vs_baseline": null,
+      "output_mismatches": null
+    },
+    {
+      "profile": "bench",
+      "elapsed_s": 141.7279,
+      "rss_delta_mb": 399.11,
+      "rss_mb_after": 620.8203125,
+      "exit_code": 0,
+      "covered_fields": [
+        "pipeline.total_duration_s",
+        "pipeline.total_rows_in",
+        "pipeline.node_count",
+        "stages_total",
+        "loaders",
+        "batches[]",
+        "outputs[]",
+        "nodes[]",
+        "memory.peak_mb",
+        "artifacts"
+      ],
+      "obs_tax_pct_vs_baseline": -0.42,
+      "output_equiv_vs_baseline": true,
+      "output_mismatches": 0
+    }
+  ],
+  "notes": [
+    "Observers must not change sink bytes (output_equiv_vs_baseline).",
+    "Memory profiles require psutil (no silent fallback).",
+    "JSON artifacts are intended for later viz ingestion."
+  ]
+}

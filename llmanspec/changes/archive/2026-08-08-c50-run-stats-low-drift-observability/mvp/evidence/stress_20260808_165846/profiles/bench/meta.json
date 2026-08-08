@@ -1,0 +1,29 @@
+{
+  "scale": "stress",
+  "profile": "bench",
+  "shape": {
+    "name": "stress",
+    "fact_rows": 1000000,
+    "dim_rows": 100000,
+    "region_rows": 500,
+    "batch_size": 5000,
+    "parallel_mode": "seq",
+    "mem_soft_cap_bytes": 39426361344,
+    "mem_soft_cap_gb": 36.72,
+    "notes": "capped for practical Excel write time; soft cap=90% avail RAM at start"
+  },
+  "events_expected": [
+    "PIPELINE_START",
+    "PIPELINE_END",
+    "BATCH_START",
+    "BATCH_END",
+    "STAGE_SPAN",
+    "LOADER_CALL",
+    "OUTPUT_TARGET_END"
+  ],
+  "collectors": [
+    "WorkflowStatsAccumulator",
+    "PerformanceObserver"
+  ],
+  "usable_bytes": 39426361344
+}

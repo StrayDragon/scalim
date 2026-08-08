@@ -42,5 +42,6 @@ write_run_stats_sibling("/path/to/viz-or-evidence-dir", stats)
 ## 输出给用户时
 
 - 写清用了哪个 profile、是否含观测税、结论来自 `nodes[]` 还是单 pipeline 末态。
-- 若建议开 debug：同时警告税与替代（bench）；引用 best-practices 表中的量级时标明「本机合成、非 SLA」。
+- 若建议开 debug：同时警告税与替代（bench）；引用 best-practices 表中的量级时标明「本机合成、非 SLA」（mid debug ~+40%）。
+- 需要溯源/复现矩阵时指向 archive mvp：`llmanspec/changes/archive/2026-08-08-c50-run-stats-low-drift-observability/mvp/`。
 - 脱敏：不要引用下游业务路径/库名到公开文档或 commit。

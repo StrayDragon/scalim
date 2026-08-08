@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
+
+name: obs_demo_metrics
+description: |
+  Metrics demand: reads shared workbook Detail sheet via book_sheet_rows,
+  aggregates by region, writes Metrics sheet + CSV.
+
+main_source:
+  source_id: detail_rows
+  loader: "scalim.workflow.loaders:book_sheet_rows"
+  params:
+    ref:
+      node: detail
+      book: report
+      sheet: Detail
+  fields:
+    region_name_display: {name: RegionDisplay}
+    weighted_amount: {name: WeightedAmount, value_cast: decimal}
+    line_amount: {name: LineAmount, value_cast: decimal}
+
+sources:
+  preload_marker:
+    loader: "obs_demo_pkg.loaders:load_preload_marker"
+    key: id
+    cache_mode: preload_forever
+
+resources:
+  files:
+    metrics_csv:
+      csv_file:
+        path: ./out/metrics_csv
+
+outputs:
+  - name: metrics_sheet
+    to:
+      book: report
+      sheet: Metrics
+    write:
+      header_fields_output_by: field_id
+    aggregate: &metrics_agg
+      group_by: [region_name_display]
+      fields:
+        row_cnt: {count: {}}
+        sum_weighted: {sum: {field: weighted_amount}}
+        sum_line: {sum: {field: line_amount}}
+
+  - name: metrics_csv
+    to:
+      file: metrics_csv
+    write:
+      header_fields_output_by: field_id
+      include_header: true
+    aggregate: *metrics_agg

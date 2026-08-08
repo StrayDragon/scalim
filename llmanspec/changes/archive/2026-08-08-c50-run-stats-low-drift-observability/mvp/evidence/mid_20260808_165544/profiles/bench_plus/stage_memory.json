@@ -1,0 +1,438 @@
+{
+  "samples": [
+    {
+      "batch_num": 10,
+      "stage": "stream",
+      "duration_s": 5.5238000641111284e-05,
+      "rss_mb": 154.7734375,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 10,
+      "stage": "loader",
+      "duration_s": 0.018136352999135852,
+      "rss_mb": 154.7734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 10,
+      "stage": "compute",
+      "duration_s": 0.04777697399549652,
+      "rss_mb": 154.7734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 10,
+      "stage": "write",
+      "duration_s": 0.006614894005906535,
+      "rss_mb": 154.7734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 20,
+      "stage": "stream",
+      "duration_s": 5.238300218479708e-05,
+      "rss_mb": 154.7734375,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 20,
+      "stage": "loader",
+      "duration_s": 0.017740442999638617,
+      "rss_mb": 154.7734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 20,
+      "stage": "compute",
+      "duration_s": 0.047169707064313116,
+      "rss_mb": 154.7734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 20,
+      "stage": "write",
+      "duration_s": 0.006479052939539542,
+      "rss_mb": 154.7734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 30,
+      "stage": "stream",
+      "duration_s": 4.745200203615241e-05,
+      "rss_mb": 157.37109375,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 30,
+      "stage": "loader",
+      "duration_s": 0.01738462899811566,
+      "rss_mb": 158.234375,
+      "delta_mb": 0.86328125
+    },
+    {
+      "batch_num": 30,
+      "stage": "compute",
+      "duration_s": 0.04640769007164636,
+      "rss_mb": 158.234375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 30,
+      "stage": "write",
+      "duration_s": 0.006485267927928362,
+      "rss_mb": 158.234375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 40,
+      "stage": "stream",
+      "duration_s": 4.517799970926717e-05,
+      "rss_mb": 166.47265625,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 40,
+      "stage": "loader",
+      "duration_s": 0.017226010000740644,
+      "rss_mb": 167.34375,
+      "delta_mb": 0.87109375
+    },
+    {
+      "batch_num": 40,
+      "stage": "compute",
+      "duration_s": 0.04622180904698325,
+      "rss_mb": 167.34375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 40,
+      "stage": "write",
+      "duration_s": 0.006504924949695123,
+      "rss_mb": 167.34375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 50,
+      "stage": "stream",
+      "duration_s": 4.362500112620182e-05,
+      "rss_mb": 175.6640625,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 50,
+      "stage": "loader",
+      "duration_s": 0.01721944800010533,
+      "rss_mb": 176.52734375,
+      "delta_mb": 0.86328125
+    },
+    {
+      "batch_num": 50,
+      "stage": "compute",
+      "duration_s": 0.04625175399633008,
+      "rss_mb": 176.52734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 50,
+      "stage": "write",
+      "duration_s": 0.00640081300662132,
+      "rss_mb": 176.52734375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 60,
+      "stage": "stream",
+      "duration_s": 4.614999852492474e-05,
+      "rss_mb": 186.78515625,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 60,
+      "stage": "loader",
+      "duration_s": 0.017507979999209056,
+      "rss_mb": 187.65234375,
+      "delta_mb": 0.8671875
+    },
+    {
+      "batch_num": 60,
+      "stage": "compute",
+      "duration_s": 0.04644267399635282,
+      "rss_mb": 187.65234375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 60,
+      "stage": "write",
+      "duration_s": 0.0064848210095078684,
+      "rss_mb": 187.65234375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 70,
+      "stage": "stream",
+      "duration_s": 4.31139997090213e-05,
+      "rss_mb": 195.359375,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 70,
+      "stage": "loader",
+      "duration_s": 0.017434115001378814,
+      "rss_mb": 196.23046875,
+      "delta_mb": 0.87109375
+    },
+    {
+      "batch_num": 70,
+      "stage": "compute",
+      "duration_s": 0.046785944992734585,
+      "rss_mb": 196.23046875,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 70,
+      "stage": "write",
+      "duration_s": 0.006574092007213039,
+      "rss_mb": 196.23046875,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 80,
+      "stage": "stream",
+      "duration_s": 4.309400173951872e-05,
+      "rss_mb": 203.9296875,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 80,
+      "stage": "loader",
+      "duration_s": 0.01741882599890232,
+      "rss_mb": 204.78125,
+      "delta_mb": 0.8515625
+    },
+    {
+      "batch_num": 80,
+      "stage": "compute",
+      "duration_s": 0.04663145304948557,
+      "rss_mb": 204.78125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 80,
+      "stage": "write",
+      "duration_s": 0.006503666951175546,
+      "rss_mb": 204.78125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 90,
+      "stage": "stream",
+      "duration_s": 4.3595002352958545e-05,
+      "rss_mb": 212.484375,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 90,
+      "stage": "loader",
+      "duration_s": 0.01755535200209124,
+      "rss_mb": 213.35546875,
+      "delta_mb": 0.87109375
+    },
+    {
+      "batch_num": 90,
+      "stage": "compute",
+      "duration_s": 0.046526920079486445,
+      "rss_mb": 213.35546875,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 90,
+      "stage": "write",
+      "duration_s": 0.0064644419217074756,
+      "rss_mb": 213.35546875,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 100,
+      "stage": "stream",
+      "duration_s": 6.141899939393625e-05,
+      "rss_mb": 221.09765625,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 100,
+      "stage": "loader",
+      "duration_s": 0.01811888000156614,
+      "rss_mb": 221.9609375,
+      "delta_mb": 0.86328125
+    },
+    {
+      "batch_num": 100,
+      "stage": "compute",
+      "duration_s": 0.04745476090465672,
+      "rss_mb": 221.9609375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 100,
+      "stage": "write",
+      "duration_s": 0.006635009100136813,
+      "rss_mb": 221.9609375,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 100,
+      "stage": "write",
+      "duration_s": 7.734099926892668e-05,
+      "rss_mb": 221.9609375,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 10,
+      "stage": "stream",
+      "duration_s": 0.0024500440013071056,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 10,
+      "stage": "write",
+      "duration_s": 0.007199905918241711,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 20,
+      "stage": "stream",
+      "duration_s": 0.002546089999668766,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 20,
+      "stage": "write",
+      "duration_s": 0.007261699127411703,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 30,
+      "stage": "stream",
+      "duration_s": 0.0025512009997328278,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 30,
+      "stage": "write",
+      "duration_s": 0.007373176125838654,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 40,
+      "stage": "stream",
+      "duration_s": 0.0024229709997598547,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 40,
+      "stage": "write",
+      "duration_s": 0.007356668957072543,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 50,
+      "stage": "stream",
+      "duration_s": 0.002489049998985138,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 50,
+      "stage": "write",
+      "duration_s": 0.00741723605824518,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 60,
+      "stage": "stream",
+      "duration_s": 0.0023562200003652833,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 60,
+      "stage": "write",
+      "duration_s": 0.007512448995839804,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 70,
+      "stage": "stream",
+      "duration_s": 0.0025811280029301997,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 70,
+      "stage": "write",
+      "duration_s": 0.007583996968605788,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 80,
+      "stage": "stream",
+      "duration_s": 0.002407669999229256,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 80,
+      "stage": "write",
+      "duration_s": 0.007439430028171046,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 90,
+      "stage": "stream",
+      "duration_s": 0.0022485610024887137,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 90,
+      "stage": "write",
+      "duration_s": 0.007339705007325392,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 100,
+      "stage": "stream",
+      "duration_s": 0.002238310997199733,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    },
+    {
+      "batch_num": 100,
+      "stage": "write",
+      "duration_s": 0.007224633067380637,
+      "rss_mb": 253.7578125,
+      "delta_mb": 0.0
+    },
+    {
+      "batch_num": 100,
+      "stage": "write",
+      "duration_s": 0.0010279830021318048,
+      "rss_mb": 253.7578125,
+      "delta_mb": null
+    }
+  ]
+}

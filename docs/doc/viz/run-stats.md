@@ -33,14 +33,14 @@
 | 落盘 / viz | `write_run_stats_sibling(run_dir, stats)` → 旁路 `run_stats.json`，**勿**塞进 `viz_snapshot.json` |
 | 看写出成本 | 订阅 `STAGE_SPAN` 后读 `stages.write` / `stage_metrics.write_duration` |
 
-合成矩阵经验量级（本机 `.tmp/obs-demo`、**非 SLA**）：
+合成矩阵经验量级（本机、**非 SLA**）：
 
-| scale | bench tax | debug tax | write 归因 |
-|-------|-----------|-----------|------------|
-| mid 200k | ~**+2%** | ~**+41%** | 双节点 `write>0`；CSV equiv OK |
-| stress 1M | ~**0% ± 噪声** | （通常跳过） | `stages_total.write≈7s`；CSV equiv OK |
+| scale | bench tax | bench_plus | debug tax | write 归因 |
+|-------|-----------|------------|-----------|------------|
+| mid 200k | ~**+2%** | ~**+3%** | ~**+41%** | 双节点 `write>0`；CSV equiv OK |
+| stress 1M | ~**0% ± 噪声** | （通常跳过） | （通常跳过） | `stages_total.write≈7s`；CSV equiv OK |
 
-`bench_plus` mid ~**+3%**（含 stage_memory）。复现见仓库内 `.tmp/obs-demo/README.md`（dev-only，不入库）。
+可复现 harness + 钉住 evidence：[`llmanspec/.../c50-.../mvp/`](repo:llmanspec/changes/archive/2026-08-08-c50-run-stats-low-drift-observability/mvp/README.md?ref)。本地再跑 JSON 默认落在 `.tmp/obs-demo/runs/`（不入库，后续可给 scalim-viz 观测）。
 
 ## 最佳实践（摘要）
 

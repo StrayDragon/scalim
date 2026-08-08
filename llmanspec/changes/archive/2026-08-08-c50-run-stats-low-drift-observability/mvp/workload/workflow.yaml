@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../../../src/scalim/dsl/yaml_dsl/schema/workflow.gen.json
+
+workflow:
+  resources:
+    books:
+      report:
+        xlsx:
+          path: ./out/report
+          allow_formulas: false
+      # pathless in-memory bus book (shared across demands if needed)
+      scratch:
+        xlsx:
+          allow_formulas: false
+
+  runs:
+    - id: detail
+      demand: demand_detail.yaml
+
+    - id: metrics
+      demand: demand_metrics.yaml
+      depends_on: [detail]

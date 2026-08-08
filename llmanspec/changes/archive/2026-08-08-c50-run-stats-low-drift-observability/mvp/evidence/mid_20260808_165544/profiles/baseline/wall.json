@@ -1,0 +1,11 @@
+{
+  "profile": "baseline",
+  "elapsed_s": 26.4772,
+  "rss_mb_end": 148.34375,
+  "exit_code": 0,
+  "finished_at": "2026-08-08 16:56:37",
+  "rss_mb_before": 142.80859375,
+  "rss_mb_after": 148.34375,
+  "rss_delta_mb": 5.54,
+  "error": null
+}

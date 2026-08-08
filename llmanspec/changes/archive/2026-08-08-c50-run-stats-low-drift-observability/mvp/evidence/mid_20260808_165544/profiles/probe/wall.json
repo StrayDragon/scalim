@@ -1,0 +1,11 @@
+{
+  "profile": "probe",
+  "elapsed_s": 28.0019,
+  "rss_mb_end": 226.390625,
+  "exit_code": 0,
+  "finished_at": "2026-08-08 16:58:37",
+  "rss_mb_before": 194.48046875,
+  "rss_mb_after": 226.390625,
+  "rss_delta_mb": 31.91,
+  "error": null
+}

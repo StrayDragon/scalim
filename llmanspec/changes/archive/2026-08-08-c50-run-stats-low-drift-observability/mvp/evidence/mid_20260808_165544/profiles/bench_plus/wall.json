@@ -1,0 +1,11 @@
+{
+  "profile": "bench_plus",
+  "elapsed_s": 27.3621,
+  "rss_mb_end": 219.12109375,
+  "exit_code": 0,
+  "finished_at": "2026-08-08 16:57:32",
+  "rss_mb_before": 151.6875,
+  "rss_mb_after": 219.12109375,
+  "rss_delta_mb": 67.43,
+  "error": null
+}

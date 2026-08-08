@@ -60,4 +60,4 @@ write_run_stats_sibling(".tmp/evidence/run_stats", stats)
 - Viz：`docs/doc/viz/scalim-viz.md`
 - YAML 可观测边界：`docs/doc/yaml-dsl/user-guide.md` §3.7
 - 下游升级卡：`agentdev/skills/scalim-public-api/references/upgrades/2026-08-08-run-stats-low-drift-and-write-attribution.md`
-- 本地合成矩阵（可选）：`.tmp/obs-demo/README.md`
+- 合成矩阵 / 复现 harness：`llmanspec/changes/archive/2026-08-08-c50-run-stats-low-drift-observability/mvp/`
