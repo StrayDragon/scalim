@@ -1,7 +1,10 @@
 ---
 depends_on: []
 blocks:
-  - c55-stage-write-attribution
+- c55-stage-write-attribution
+branch: sdd/c50-run-stats-low-drift-observability
+base_sha: 8982be89879228f589d050b47c1f4ad34bdb5f71
+checkpointed: false
 ---
 
 # 低漂移 run_stats / bench 自我观测底座
