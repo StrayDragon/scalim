@@ -40,7 +40,8 @@ export const buildRunsFromFiles = (files: File[]) => {
       filename !== "viz_snapshot.json" &&
       filename !== "viz_events.jsonl" &&
       filename !== "viz_trace.jsonl" &&
-      filename !== "viz_schedule_plan.json"
+      filename !== "viz_schedule_plan.json" &&
+      filename !== "run_stats.json"
     ) {
       continue;
     }
@@ -77,6 +78,8 @@ export const buildRunsFromFiles = (files: File[]) => {
       entry.traceFile = file;
     } else if (filename === "viz_schedule_plan.json") {
       entry.schedulePlanFile = file;
+    } else if (filename === "run_stats.json") {
+      entry.runStatsFile = file;
     }
 
     entry.lastModified = Math.max(entry.lastModified ?? 0, file.lastModified ?? 0);

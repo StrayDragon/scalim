@@ -3,6 +3,7 @@ import type { Edge, Node } from "@xyflow/svelte";
 import type { RunSource, VizEvent, VizGraphSnapshot, VizSchedulePlan } from "$domain/types";
 import { formatTimestamp, parseJsonl } from "$domain/events/parse";
 import { layoutSnapshot, summarizeSnapshot } from "$domain/graph/layout";
+import { parseRunStatsJson, type RunStatsV1 } from "$domain/runStats";
 import { VIZ_REPLAY_ROUTE } from "../generated/project_constants";
 import {
   applyTimelineLayout,
@@ -48,6 +49,10 @@ export const state = $state({
   baseEdges: [] as Edge[],
   snapshot: null as VizGraphSnapshot | null,
   schedulePlan: null as VizSchedulePlan | null,
+  runStats: null as RunStatsV1 | null,
+  runStatsStatus: "idle" as "idle" | "loaded" | "invalid" | "absent",
+  runStatsOpen: false,
+  runStatsOffset: { x: 0, y: 0 },
   events: [] as VizEvent[],
   eventsAll: [] as VizEvent[],
   baseEventsAll: [] as VizEvent[],
@@ -131,7 +136,7 @@ export const state = $state({
   workflowNav: null as WorkflowNavReturn | null,
   planLensFollowTimeline: true,
   panelDrag: null as {
-    panel: "inspector" | "planLens" | "playback";
+    panel: "inspector" | "planLens" | "playback" | "runStats";
     startX: number;
     startY: number;
     baseX: number;
@@ -189,6 +194,7 @@ export const collapseAllPanels = () => {
   state.dataPanelOpen = false;
   state.inspectorOpen = false;
   state.planLensOpen = false;
+  state.runStatsOpen = false;
   state.playbackCompact = true;
   state.toolbarCollapsed = true;
 };
@@ -382,6 +388,8 @@ export const applyDecorations = () => {
 export const resetGraphState = () => {
   state.snapshot = null;
   state.schedulePlan = null;
+  state.runStats = null;
+  state.runStatsStatus = "idle";
   state.nodes = [];
   state.edges = [];
   state.baseEdges = [];
@@ -1086,7 +1094,7 @@ const isInteractiveTarget = (target: EventTarget | null) => {
 };
 
 export const startPanelDrag = (
-  panel: "inspector" | "planLens" | "playback",
+  panel: "inspector" | "planLens" | "playback" | "runStats",
   event: PointerEvent,
   root?: HTMLElement | null
 ) => {
@@ -1108,7 +1116,9 @@ export const startPanelDrag = (
       ? state.inspectorOffset
       : panel === "planLens"
         ? state.planLensOffset
-        : state.playbackOffset;
+        : panel === "runStats"
+          ? state.runStatsOffset
+          : state.playbackOffset;
   state.panelDrag = {
     panel,
     startX: event.clientX,
@@ -1130,6 +1140,11 @@ export const handlePanelMove = (event: PointerEvent) => {
   }
   if (state.panelDrag.panel === "planLens") {
     state.planLensOffset = { x: state.panelDrag.baseX + dx, y: state.panelDrag.baseY + dy };
+    if (state.valueDialogOpen && state.valueDialogAnchorEl) repositionValueDialog();
+    return;
+  }
+  if (state.panelDrag.panel === "runStats") {
+    state.runStatsOffset = { x: state.panelDrag.baseX + dx, y: state.panelDrag.baseY + dy };
     if (state.valueDialogOpen && state.valueDialogAnchorEl) repositionValueDialog();
     return;
   }
@@ -1646,14 +1661,15 @@ export const autoloadReplayFromQuery = async () => {
       const runDir = typeof item?.path === "string" ? String(item.path).replace(/^\/+/, "").trim() : "";
       if (!runId || !runDir) continue;
 
-      const [snapshotText, eventsText, scheduleText, traceText] = await Promise.all([
+      const [snapshotText, eventsText, scheduleText, traceText, runStatsText] = await Promise.all([
         fetchReplayFileText(`${runDir}/viz_snapshot.json`),
         fetchReplayFileText(`${runDir}/viz_events.jsonl`),
         fetchReplayFileText(`${runDir}/viz_schedule_plan.json`),
-        fetchReplayFileText(`${runDir}/viz_trace.jsonl`)
+        fetchReplayFileText(`${runDir}/viz_trace.jsonl`),
+        fetchReplayFileText(`${runDir}/run_stats.json`)
       ]);
 
-      if (!snapshotText && !eventsText && !scheduleText) {
+      if (!snapshotText && !eventsText && !scheduleText && !runStatsText) {
         continue;
       }
 
@@ -1666,6 +1682,9 @@ export const autoloadReplayFromQuery = async () => {
           ? new File([scheduleText], "viz_schedule_plan.json", { type: "application/json", lastModified: now })
           : undefined,
         traceFile: traceText ? new File([traceText], "viz_trace.jsonl", { type: "application/x-ndjson", lastModified: now }) : undefined,
+        runStatsFile: runStatsText
+          ? new File([runStatsText], "run_stats.json", { type: "application/json", lastModified: now })
+          : undefined,
         lastModified: now
       });
     }
@@ -1698,14 +1717,15 @@ export const autoloadReplayFromQuery = async () => {
   const directoryLabel = replayParts.length > 1 ? replayParts.slice(0, -1).join("/") : replayDir;
   const now = Date.now();
 
-  const [snapshotText, eventsText, scheduleText, traceText] = await Promise.all([
+  const [snapshotText, eventsText, scheduleText, traceText, runStatsText] = await Promise.all([
     fetchReplayFileText(`${replayDir}/viz_snapshot.json`),
     fetchReplayFileText(`${replayDir}/viz_events.jsonl`),
     fetchReplayFileText(`${replayDir}/viz_schedule_plan.json`),
-    fetchReplayFileText(`${replayDir}/viz_trace.jsonl`)
+    fetchReplayFileText(`${replayDir}/viz_trace.jsonl`),
+    fetchReplayFileText(`${replayDir}/run_stats.json`)
   ]);
 
-  if (!snapshotText && !eventsText && !scheduleText) {
+  if (!snapshotText && !eventsText && !scheduleText && !runStatsText) {
     state.status = "回放路径未找到";
     return;
   }
@@ -1719,6 +1739,9 @@ export const autoloadReplayFromQuery = async () => {
       ? new File([scheduleText], "viz_schedule_plan.json", { type: "application/json", lastModified: now })
       : undefined,
     traceFile: traceText ? new File([traceText], "viz_trace.jsonl", { type: "application/x-ndjson", lastModified: now }) : undefined,
+    runStatsFile: runStatsText
+      ? new File([runStatsText], "run_stats.json", { type: "application/json", lastModified: now })
+      : undefined,
     lastModified: now
   };
 
@@ -1753,6 +1776,8 @@ const activateRun = async (run: RunSource) => {
   state.baseEventsAll = [];
   state.traceEventsAll = [];
   state.schedulePlan = null;
+  state.runStats = null;
+  state.runStatsStatus = "idle";
   state.planHighlightNodeIds = [];
   state.planSelectedLayerIndex = null;
   state.planSelectedTaskId = "";
@@ -1765,6 +1790,7 @@ const activateRun = async (run: RunSource) => {
   let snapshotText: string | null = null;
   let eventsText: string | null = null;
   let schedulePlanText: string | null = null;
+  let runStatsText: string | null = null;
   try {
     if (run.snapshotFile) {
       snapshotText = await readFile(run.snapshotFile);
@@ -1774,6 +1800,9 @@ const activateRun = async (run: RunSource) => {
     }
     if (run.schedulePlanFile) {
       schedulePlanText = await readFile(run.schedulePlanFile);
+    }
+    if (run.runStatsFile) {
+      runStatsText = await readFile(run.runStatsFile);
     }
   } catch (err) {
     console.error("read viz files failed", err);
@@ -1816,6 +1845,20 @@ const activateRun = async (run: RunSource) => {
       console.error("schedule plan 解析失败", err);
       state.schedulePlan = null;
     }
+  }
+
+  if (runStatsText) {
+    const parsedStats = parseRunStatsJson(runStatsText);
+    if (parsedStats) {
+      state.runStats = parsedStats;
+      state.runStatsStatus = "loaded";
+    } else {
+      state.runStats = null;
+      state.runStatsStatus = "invalid";
+    }
+  } else {
+    state.runStats = null;
+    state.runStatsStatus = "absent";
   }
 
   const wantsTrace = state.eventSourceMode === "events+trace";

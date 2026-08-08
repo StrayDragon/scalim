@@ -124,6 +124,44 @@ def test_write_run_stats_sibling_not_embedded(tmp_path: Path):
     assert SCHEMA_RUN_STATS in Path(out).read_text(encoding="utf-8")
 
 
+def test_auto_write_run_stats_beside_viz_when_accum_and_viz_coexist(tmp_path: Path):
+    from scalim.ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
+    from scalim.ob.presets.viz import VizObserver, VizObserverConfig
+
+    run_root = tmp_path / "viz-out"
+    run_root.mkdir(parents=True)
+    accum = WorkflowStatsAccumulator(sample_rss=False)
+    _drive_pipeline(accum, loaders=["facts"])
+    viz = VizObserver(
+        config=VizObserverConfig(output_dir=str(run_root), run_id="auto_sib", append=False),
+        snapshot={"nodes": [], "edges": [], "meta": {"schema_version": "vizgraph/v1"}},
+    )
+    # Force path resolution the same way live runs do after first emit/write.
+    viz.run_id = "auto_sib"
+    viz._apply_run_output_dir()  # noqa: SLF001
+    viz._write_snapshot_if_needed()  # noqa: SLF001
+
+    written = maybe_auto_write_run_stats_beside_viz([accum, viz], meta={"profile": "bench"})
+    assert len(written) == 1
+    out = Path(written[0])
+    assert out.name == "run_stats.json"
+    assert out.is_file()
+    assert SCHEMA_RUN_STATS in out.read_text(encoding="utf-8")
+    snap = (out.parent / "viz_snapshot.json").read_text(encoding="utf-8")
+    assert "scalim_run_stats" not in snap
+
+
+def test_auto_write_skipped_without_nodes_or_viz(tmp_path: Path):
+    from scalim.ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
+    from scalim.ob.presets.viz import VizObserver, VizObserverConfig
+
+    accum = WorkflowStatsAccumulator(sample_rss=False)
+    assert maybe_auto_write_run_stats_beside_viz([accum]) == []
+    viz = VizObserver(config=VizObserverConfig(output_dir=str(tmp_path), run_id="x"))
+    assert maybe_auto_write_run_stats_beside_viz([viz]) == []
+    _drive_pipeline(accum, loaders=["facts"])
+    assert maybe_auto_write_run_stats_beside_viz([accum]) == []
+
 def test_bench_does_not_mutate_synthetic_csv_bytes(tmp_path: Path):
     """Sanity: collecting run_stats is side-effect free w.r.t. a CSV artifact."""
     csv_path = tmp_path / "out.csv"

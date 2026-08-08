@@ -45,6 +45,7 @@ pnpm dev
   - (可选) `/path/to/run-root/scalim-viz/<run_id>/viz_trace.jsonl` (`trace_enabled=true`)
   - (可选旁路) `run_stats.json` — 见 [Run Stats](run-stats.md)；**勿**嵌入 `viz_snapshot.json`
   - Agent 装配: `agentdev/skills/scalim-run-stats/`
+  - scalim-viz：同目录可选加载 sibling `run_stats.json`，打开 **Run Stats** 面板（仅 `scalim_run_stats/v1`）
 - 若配置 `output_dir=/path/to/scalim-viz`,则直接使用该目录:
   - `/path/to/scalim-viz/<run_id>/viz_snapshot.json`
   - `/path/to/scalim-viz/<run_id>/viz_events.jsonl`

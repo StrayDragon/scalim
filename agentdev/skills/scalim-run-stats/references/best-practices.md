@@ -23,7 +23,7 @@
 
 1. **一份 `built`，共享 `components` 实例**挂到 workflow 各 demand（经 `DemandRunRuntimeOptions`），才能跨 demand 累加 `nodes[]`。
 2. **对拍最小集**：`BASELINE` + `BENCH`，同输入，记录 `(bench_wall/baseline_wall)-1` 与 CSV digest。
-3. **落盘**：`write_run_stats_sibling(dir, stats)`；可与 viz run 目录同旁路。**禁止**嵌入 `viz_snapshot.json`。
+3. **落盘**：`write_run_stats_sibling(dir, stats)`；可与 viz run 目录同旁路。**禁止**嵌入 `viz_snapshot.json`。若同一 run 上同时挂了 accum + Viz，runtime **MAY** 自动写出 sibling（仍可手动调用）。
 4. **memory**：需要 peak 才 `include_memory=True` / `BENCH_PLUS`；无 psutil 应 fail-fast，不要吞掉。
 5. **高影响面**：程序化开 relation / field_compute top-N / viz_trace|full 会 warn——Agent 应在回复里复述警告并建议改 bench。
 6. **meta**：`build_run_stats(meta=built["meta"])` 带上 `profile`，避免事后分不清税从哪来。

@@ -348,13 +348,68 @@ def write_run_stats_sibling(run_dir, payload, filename="run_stats.json"):
     return atomic_write_run_stats_json(path, payload)
 
 
+def resolve_viz_run_dir(observer):
+    # type: (Any) -> Optional[str]
+    """Best-effort run directory for a VizObserver / WorkflowVizObserver."""
+    config = getattr(observer, "config", None)
+    if config is None or not hasattr(config, "resolve_output_paths"):
+        return None
+    try:
+        events_path, snapshot_path, _trace_path = config.resolve_output_paths()
+    except Exception:  # noqa: BLE001
+        return None
+    for path in (snapshot_path, events_path):
+        if path:
+            parent = os.path.dirname(str(path))
+            if parent:
+                return parent
+    output_dir = getattr(config, "output_dir", None)
+    if output_dir:
+        return str(output_dir)
+    return None
+
+
+def maybe_auto_write_run_stats_beside_viz(observers, meta=None):
+    # type: (Any, Optional[Dict[str, Any]]) -> List[str]
+    """When Viz + WorkflowStatsAccumulator coexist, write sibling ``run_stats.json``.
+
+    Does nothing if either side is missing or the accumulator has no ``nodes`` yet.
+    Never embeds into ``viz_snapshot.json``.
+    """
+    obs_list = list(observers or [])
+    accum = None  # type: Optional[WorkflowStatsAccumulator]
+    run_dirs = []  # type: List[str]
+    for obs in obs_list:
+        if accum is None and isinstance(obs, WorkflowStatsAccumulator):
+            accum = obs
+        run_dir = resolve_viz_run_dir(obs)
+        if run_dir:
+            run_dirs.append(run_dir)
+    if accum is None or not run_dirs:
+        return []
+    if not list(getattr(accum, "nodes", None) or []):
+        return []
+    payload = accum.build_run_stats(meta=meta)
+    written = []  # type: List[str]
+    seen = set()  # type: set
+    for run_dir in run_dirs:
+        key = os.path.abspath(str(run_dir))
+        if key in seen:
+            continue
+        seen.add(key)
+        written.append(write_run_stats_sibling(run_dir, payload))
+    return written
+
+
 __all__ = (
     "SCHEMA_RUN_STATS",
     "HIGH_IMPACT_OBS_WARNING",
     "RunStatsMeta",
     "WorkflowStatsAccumulator",
     "atomic_write_run_stats_json",
+    "maybe_auto_write_run_stats_beside_viz",
     "require_psutil_for_memory",
+    "resolve_viz_run_dir",
     "warn_high_impact_observability",
     "write_run_stats_sibling",
 )

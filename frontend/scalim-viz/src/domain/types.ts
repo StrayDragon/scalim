@@ -51,5 +51,7 @@ export type RunSource = {
   eventsFile?: File;
   traceFile?: File;
   schedulePlanFile?: File;
+  /** Optional sibling next to viz_* files; see docs/doc/viz/run-stats.md */
+  runStatsFile?: File;
   lastModified?: number;
 };

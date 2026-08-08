@@ -19,6 +19,7 @@
   import GraphCanvas from "$panels/GraphCanvas.svelte";
   import DataPanel from "$panels/DataPanel.svelte";
   import PlanLensPanel from "$panels/PlanLensPanel.svelte";
+  import RunStatsPanel from "$panels/RunStatsPanel.svelte";
   import InspectorPanel from "$panels/InspectorPanel.svelte";
   import PlaybackPanel from "$panels/PlaybackPanel.svelte";
   import TopBar from "$panels/TopBar.svelte";
@@ -122,6 +123,7 @@
   <div class="absolute right-4 top-24 z-20 flex flex-col items-end gap-2">
     <DataPanel />
     <PlanLensPanel />
+    <RunStatsPanel />
     <InspectorPanel />
   </div>
 

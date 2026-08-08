@@ -27,6 +27,7 @@ from ..ob.hub import InstrumentationHub
 from ..ob.manager import ObserverManager
 from ..ob.observability import Observability
 from ..ob.observer import Observer
+from ..ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
 from ..ob.presets.viz import (
     VizObserverConfig,
     WorkflowVizObserver,
@@ -671,6 +672,24 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
     )
 
 
+def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> None:
+    """Write sibling run_stats beside workflow + demand viz dirs when accum coexisted."""
+    observers = []  # type: List[Any]
+    manager = prepared.workflow_observer_manager
+    if manager is not None:
+        observers.extend(list(getattr(manager, "observers", None) or []))
+    for component in prepared.workflow_components:
+        if component is not None and component not in observers:
+            observers.append(component)
+    for viz in (prepared.captured_demand_viz_observer_by_node_id or {}).values():
+        if viz is not None:
+            observers.append(viz)
+    maybe_auto_write_run_stats_beside_viz(
+        observers,
+        meta={"source": "workflow_auto_sibling", "workflow_exec_id": prepared.workflow_exec_id},
+    )
+
+
 def _cleanup_workflow_finally(prepared: _PreparedWorkflowRun, *, resources_finalized: bool) -> None:
     prepared.resource_lifecycle.cleanup_finally(resources_finalized=bool(resources_finalized))
     with contextlib.suppress(Exception):
@@ -731,6 +750,8 @@ def run_workflow_ir(
             _report_workflow_viz_finished(prepared)
             with contextlib.suppress(Exception):
                 _replay_captured_workflow_observability(prepared)
+            with contextlib.suppress(Exception):
+                _auto_write_workflow_run_stats_siblings(prepared)
             _cleanup_workflow_finally(prepared, resources_finalized=resources_finalized)
 
 

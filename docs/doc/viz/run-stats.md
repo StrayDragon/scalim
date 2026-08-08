@@ -31,6 +31,7 @@
 | 内存趋势 | `BENCH_PLUS` 或 `include_memory=True`（需 psutil；缺失 fail-fast） |
 | 短窗深挖 | `DEBUG`（会 warn）；不要当默认生产配置 |
 | 落盘 / viz | `write_run_stats_sibling(run_dir, stats)` → 旁路 `run_stats.json`，**勿**塞进 `viz_snapshot.json` |
+| 自动旁路 | 同一 observer 集合上同时有 accum + Viz 时，`run_ir` / workflow 收尾 **MAY** 自动写出 sibling |
 | 看写出成本 | 订阅 `STAGE_SPAN` 后读 `stages.write` / `stage_metrics.write_duration` |
 
 合成矩阵经验量级（本机、**非 SLA**）：
@@ -189,6 +190,8 @@ engine = ScalimEngine(
 ## Viz
 
 `run_stats.json` 可与 `viz_snapshot.json` **同目录旁路**存放；**禁止**把完整 run_stats 嵌入 snapshot 图契约。见 [可视化工具](scalim-viz.md)。
+
+scalim-viz 会在导入目录/回放时**可选**读取 sibling `run_stats.json`（schema 必须为 `scalim_run_stats/v1`），用左侧 **Run Stats** 面板展示 `meta.profile` / `stages_total` / `nodes[]` / loaders；未知 schema 软忽略。
 
 ## Agent Skill
 

@@ -11,6 +11,7 @@ from ..hooks import HookManager
 from ..ob.components import split_components
 from ..ob.hub import InstrumentationHub
 from ..ob.observability import Observability, ObservabilityOptions
+from ..ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
 from ..ob.presets.viz import VizObserver, VizObserverConfig
 from ..ob.structured_logging import log_context, maybe_install_jsonl_logging_from_env
 from ..planning.builder import PlanBuilder
@@ -863,6 +864,8 @@ def _run_ir_with_plan_and_managers(
             try:
                 engine_sink.close()
             finally:
+                with contextlib.suppress(Exception):
+                    maybe_auto_write_run_stats_beside_viz(getattr(observer_manager, "observers", None) or [])
                 with contextlib.suppress(Exception):
                     observer_manager.close()
         else:
