@@ -98,3 +98,4 @@ write_run_stats_sibling("/path/to/evidence-or-viz-run", stats)
 4. 打开 debug/relation：应看到指向 bench 的警告。
 
 更完整粘贴片段见 `docs/doc/viz/run-stats.md` 与 `agentdev/skills/scalim-run-stats/references/task-assemble-and-compare.md`。
+最佳实践与本机合成矩阵量级见 `agentdev/skills/scalim-run-stats/references/best-practices.md`。
