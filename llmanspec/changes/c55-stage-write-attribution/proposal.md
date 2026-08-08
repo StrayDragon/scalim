@@ -1,6 +1,7 @@
 ---
-depends_on:
-  - c50-run-stats-low-drift-observability
+branch: sdd/c55-stage-write-attribution
+base_sha: 8982be89879228f589d050b47c1f4ad34bdb5f71
+checkpointed: false
 ---
 
 # 修正 write stage 归因（消除阶段误判）

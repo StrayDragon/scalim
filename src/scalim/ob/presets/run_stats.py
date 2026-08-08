@@ -321,8 +321,9 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             "outputs": outputs,
             "nodes": list(self.nodes),
             "notes": {
-                "write_stage_attribution": "incomplete_until_c55",
+                "write_stage_attribution": "sink_path_timed",
                 "shared_observer_reset": "use_nodes_not_last_pipeline_only",
+                "sink_close_bucket": "write",
             },
         }
 

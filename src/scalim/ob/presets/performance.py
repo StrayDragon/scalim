@@ -268,6 +268,14 @@ class PerformanceObserver(EventDispatchObserver):
         self.metrics.total_duration = payload.total_duration
         self.metrics.batch_count = payload.total_batches
 
+        # Fold any STAGE_SPAN received after the last BATCH_END (e.g. sink.close write).
+        for stage_entry in self._batch_stage_durations.values():
+            self.metrics.stage_metrics.stream_duration += float(stage_entry.get("stream", 0.0) or 0.0)
+            self.metrics.stage_metrics.loader_duration += float(stage_entry.get("loader", 0.0) or 0.0)
+            self.metrics.stage_metrics.compute_duration += float(stage_entry.get("compute", 0.0) or 0.0)
+            self.metrics.stage_metrics.write_duration += float(stage_entry.get("write", 0.0) or 0.0)
+        self._batch_stage_durations.clear()
+
         mem_mb = self._get_memory_mb()
         if mem_mb is not None:
             self.metrics.end_memory_mb = mem_mb

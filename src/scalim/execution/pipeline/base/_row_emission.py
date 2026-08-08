@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Sequence, Set
 from ....sinks import IRowSink
 from ....sinks._internal.base import SupportsWriteRowAligned
 from ...context import BatchContext, DenseBatchContext
+from ...executor.batch._internal.stage_spans import get_write_clock
 from ...executor.runtime.runtime import ExecutionRuntime
 from ...write_precompute import LateFieldMaterializer, LateRowWriteLayout
 
@@ -170,13 +171,22 @@ class RowEmissionCoordinator:
             self._write_row_with_late_fields(row_id=row_id, row_index=row_index, late_materializer=late_materializer)
             return
 
+        clock = get_write_clock(self._runtime)
         if isinstance(self._sink, SupportsWriteRowAligned):
             values: List["FieldValue"] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
-            self._sink.write_row_aligned(self._target_fields, values)
+            if clock is not None and clock.enabled:
+                with clock.time_write():
+                    self._sink.write_row_aligned(self._target_fields, values)
+            else:
+                self._sink.write_row_aligned(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
             row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)
-            self._sink.write_row(row)
+            if clock is not None and clock.enabled:
+                with clock.time_write():
+                    self._sink.write_row(row)
+            else:
+                self._sink.write_row(row)
             field_count = len(row)
         self._runtime.instrumentation.emit_row_write(
             row_id=row_id,
@@ -199,14 +209,23 @@ class RowEmissionCoordinator:
             self._late_layout = layout
         values: List["FieldValue"] = late_materializer.fill_row_values(layout, self._context, row_id)
 
+        clock = get_write_clock(self._runtime)
         if isinstance(self._sink, SupportsWriteRowAligned):
-            self._sink.write_row_aligned(self._target_fields, values)
+            if clock is not None and clock.enabled:
+                with clock.time_write():
+                    self._sink.write_row_aligned(self._target_fields, values)
+            else:
+                self._sink.write_row_aligned(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
             row: "RowData" = {}
             for idx, field_key in enumerate(self._target_fields):
                 row[field_key] = values[idx]
-            self._sink.write_row(row)
+            if clock is not None and clock.enabled:
+                with clock.time_write():
+                    self._sink.write_row(row)
+            else:
+                self._sink.write_row(row)
             field_count = len(row)
         self._runtime.instrumentation.emit_row_write(
             row_id=row_id,

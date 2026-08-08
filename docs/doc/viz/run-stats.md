@@ -10,7 +10,7 @@
 - **bench 低漂移**：只订 lite 事件；墙钟税通常为个位数百分比量级（以本机合成矩阵为准）。
 - **debug 显式且警告**：relation / field_compute top-N / viz 等高影响面会 `UserWarning`，并提示改用 bench。
 - **workflow 用 `nodes[]`**：共享 observer 会在下一 `PIPELINE_START` reset；完整结论读 `run_stats.nodes`，不要只读 `PerformanceObserver` 末态。
-- **write 归因**：现代 sink 路径的 `stages.write` 完整归因见后续 write-attribution 变更；在完成前勿用 `write==0` 下「写出很快」的结论。
+- **write 归因**：现代 sink 路径（column / streaming flush / `sink.close()`）在订阅 `STAGE_SPAN` 时计入 `stages.write`；若写出嵌在 loader/compute 计时窗内会扣回外层，避免双计。
 
 ## Profiles
 
@@ -34,6 +34,12 @@ write_run_stats_sibling("/path/to/viz-run-dir", stats)  # sibling, not embedded 
 | `ObservabilityProfile.DEBUG` | 深挖（有警告） |
 
 Memory 采样需要可选依赖 `psutil`；缺失时 **fail-fast**（不静默空 peak）。
+
+## Write stage 口径
+
+- 订阅 `STAGE_SPAN` 时，column / streaming 的真实 sink I/O 计入 `write`。
+- `sink.close()` / workbook save 也计入 **write**（非单独 finalize 桶）；该片段可能在最后一次 `BATCH_END` 之后发出，`PerformanceObserver` 会在 `PIPELINE_END` 折叠进 `stage_metrics`。
+- 若写出嵌在 loader/compute 计时窗内（如 LOAD_REF 段内列写出），会从外层扣回，避免双计。
 
 ## Viz
 

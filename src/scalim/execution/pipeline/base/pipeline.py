@@ -30,6 +30,12 @@ from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowD
 from ....utils.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
 from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext, create_batch_context_for_rows
+from ...executor.batch._internal.stage_spans import (
+    StageWriteClock,
+    attach_write_clock,
+    get_write_clock,
+    init_stage_span_tracking,
+)
 from ...executor.batch.executor import BatchExecutor
 from ...executor.runtime.runtime import ExecutionRuntime
 from ...loader_call_params import build_loader_call_params
@@ -569,7 +575,27 @@ class SeqPipeline(Pipeline):
     ) -> List[RowData]:
         return_value: List[RowData]
         if sink:
-            sink.close()
+            wants, durations, _stage_map = init_stage_span_tracking(self.runtime)
+            write_delta = 0.0
+            if wants:
+                perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
+                clock = get_write_clock(self.runtime)
+                owns = False
+                if clock is None:
+                    clock = StageWriteClock(enabled=True, stage_durations=durations, perf_counter=perf_counter)
+                    attach_write_clock(self.runtime, clock)
+                    owns = True
+                before = float(clock.stage_durations.get("write", 0.0) or 0.0)
+                with clock.time_write():
+                    sink.close()
+                write_delta = max(0.0, float(clock.stage_durations.get("write", 0.0) or 0.0) - before)
+                if owns:
+                    attach_write_clock(self.runtime, None)
+            else:
+                sink.close()
+            if write_delta > 0:
+                # sink.close()/save counted as write; emit after BATCH_END and fold on pipeline_end.
+                self.runtime.instrumentation.emit_stage_span("write", max(1, int(batch_count)), write_delta)
             return_value = []
         else:
             return_value = results
@@ -610,34 +636,47 @@ class SeqPipeline(Pipeline):
         write_row_ids = self._sort_row_ids_for_write(row_ids, context)
         column_sink.set_row_ids(cast("SinkRowKeySeq", list(write_row_ids)))  # pragma: allow-cast sink row ids typed narrowing
 
-        self._write_main_source_columns(write_row_ids, context, column_sink, batch_num)
-
-        def after_operator(operator: Any) -> None:
-            if isinstance(operator, LoadOperatorIr):
-                for fk in operator.field_keys:
-                    self._write_column_if_target(fk, write_row_ids, context, column_sink, batch_num, late_columns=late_columns)
-            elif isinstance(operator, (LoadRefOperatorIr, ComputeOperatorIr)):
-                self._write_column_if_target(
-                    operator.field_key,
-                    write_row_ids,
-                    context,
-                    column_sink,
-                    batch_num,
-                    late_columns=late_columns,
-                )
-
-        stage_durations = self.executor.execute_operators(
-            context,
-            row_ids,
-            runtime=self.runtime,
-            required_fields=self._required_fields,
-            adaptive_pool=adaptive_pool,
-            after_operator=after_operator,
+        wants_spans, stage_durations, _stage_map = init_stage_span_tracking(self.runtime)
+        perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
+        clock = StageWriteClock(
+            enabled=bool(wants_spans),
+            stage_durations=stage_durations,
+            perf_counter=perf_counter,
         )
-        if stage_durations is not None:
-            for stage_name, duration in stage_durations.items():
-                if duration > 0:
-                    self.runtime.instrumentation.emit_stage_span(stage_name, batch_num, duration)
+        attach_write_clock(self.runtime, clock)
+        try:
+            self._write_main_source_columns(write_row_ids, context, column_sink, batch_num)
+
+            def after_operator(operator: Any) -> None:
+                if isinstance(operator, LoadOperatorIr):
+                    for fk in operator.field_keys:
+                        self._write_column_if_target(fk, write_row_ids, context, column_sink, batch_num, late_columns=late_columns)
+                elif isinstance(operator, (LoadRefOperatorIr, ComputeOperatorIr)):
+                    self._write_column_if_target(
+                        operator.field_key,
+                        write_row_ids,
+                        context,
+                        column_sink,
+                        batch_num,
+                        late_columns=late_columns,
+                    )
+
+            returned = self.executor.execute_operators(
+                context,
+                row_ids,
+                runtime=self.runtime,
+                required_fields=self._required_fields,
+                adaptive_pool=adaptive_pool,
+                after_operator=after_operator,
+            )
+            # Prefer shared clock durations (includes main-source + nested writes).
+            emit_durations = clock.stage_durations if wants_spans else returned
+            if emit_durations is not None:
+                for stage_name, duration in emit_durations.items():
+                    if duration > 0:
+                        self.runtime.instrumentation.emit_stage_span(stage_name, batch_num, duration)
+        finally:
+            attach_write_clock(self.runtime, None)
 
         context.clear()
         return []
@@ -685,13 +724,22 @@ class SeqPipeline(Pipeline):
         write_column_aligned = None
         if isinstance(column_sink, SupportsWriteColumnAligned):
             write_column_aligned = column_sink.write_column_aligned
+        clock = get_write_clock(self.runtime)
         if write_column_aligned is not None:
             aligned_row_ids = cast("SinkRowKeySeq", row_ids)  # pragma: allow-cast sink row ids typed narrowing
-            write_column_aligned(field_key, aligned_row_ids, values)
+            if clock is not None and clock.enabled:
+                with clock.time_write():
+                    write_column_aligned(field_key, aligned_row_ids, values)
+            else:
+                write_column_aligned(field_key, aligned_row_ids, values)
             row_count = len(values)
         else:
             col_data: Dict[Hashable, FieldValue] = dict(zip(row_ids, values))
-            column_sink.write_column(field_key, col_data)
+            if clock is not None and clock.enabled:
+                with clock.time_write():
+                    column_sink.write_column(field_key, col_data)
+            else:
+                column_sink.write_column(field_key, col_data)
             row_count = len(col_data)
 
         if is_late and late_columns is not None:
@@ -785,38 +833,51 @@ class SeqPipeline(Pipeline):
         self.executor.prefill_main_source_fields(context, row_ids, batch_rows, required_fields=self._required_fields)
         write_row_ids = self._sort_row_ids_for_write(row_ids, context)
         coordinator.set_write_order(write_row_ids)
-        coordinator.flush_ready_rows()
 
-        active_row_ids = list(row_ids)
-
-        def after_operator(operator: Any) -> None:
-            if isinstance(operator, LoadRefOperatorIr):
-                if operator.operator_id in rows_binding_ops:
-                    rows_binding_ops.discard(operator.operator_id)
-                relation_key = build_relation_signature(operator.lookup_steps)
-                if relation_key in rows_binding_relations and relation_key in self.runtime.load_ref_group_executed:
-                    rows_binding_relations.discard(relation_key)
-                if not rows_binding_ops and not rows_binding_relations:
-                    coordinator.enable_release()
-
-            to_remove = coordinator.drain_rows_to_remove()
-            if to_remove:
-                active_row_ids[:] = [rid for rid in active_row_ids if rid not in to_remove]
-
-        stage_durations = self.executor.execute_operators(
-            context,
-            active_row_ids,
-            runtime=self.runtime,
-            required_fields=self._required_fields,
-            adaptive_pool=adaptive_pool,
-            after_operator=after_operator,
+        wants_spans, stage_durations, _stage_map = init_stage_span_tracking(self.runtime)
+        perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
+        clock = StageWriteClock(
+            enabled=bool(wants_spans),
+            stage_durations=stage_durations,
+            perf_counter=perf_counter,
         )
-        if stage_durations is not None:
-            for stage_name, duration in stage_durations.items():
-                if duration > 0:
-                    self.runtime.instrumentation.emit_stage_span(stage_name, batch_num, duration)
+        attach_write_clock(self.runtime, clock)
+        try:
+            coordinator.flush_ready_rows()
 
-        coordinator.finalize()
+            active_row_ids = list(row_ids)
+
+            def after_operator(operator: Any) -> None:
+                if isinstance(operator, LoadRefOperatorIr):
+                    if operator.operator_id in rows_binding_ops:
+                        rows_binding_ops.discard(operator.operator_id)
+                    relation_key = build_relation_signature(operator.lookup_steps)
+                    if relation_key in rows_binding_relations and relation_key in self.runtime.load_ref_group_executed:
+                        rows_binding_relations.discard(relation_key)
+                    if not rows_binding_ops and not rows_binding_relations:
+                        coordinator.enable_release()
+
+                to_remove = coordinator.drain_rows_to_remove()
+                if to_remove:
+                    active_row_ids[:] = [rid for rid in active_row_ids if rid not in to_remove]
+
+            returned = self.executor.execute_operators(
+                context,
+                active_row_ids,
+                runtime=self.runtime,
+                required_fields=self._required_fields,
+                adaptive_pool=adaptive_pool,
+                after_operator=after_operator,
+            )
+            coordinator.finalize()
+            emit_durations = clock.stage_durations if wants_spans else returned
+            if emit_durations is not None:
+                for stage_name, duration in emit_durations.items():
+                    if duration > 0:
+                        self.runtime.instrumentation.emit_stage_span(stage_name, batch_num, duration)
+        finally:
+            attach_write_clock(self.runtime, None)
+
         context.clear()
         return []
 

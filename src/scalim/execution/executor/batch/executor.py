@@ -29,7 +29,12 @@ from ..operators.release import ReleaseOperatorExecutor
 from ..operators.write import WriteColumnOperatorExecutor, WriteRowOperatorExecutor
 from ..runtime.runtime import ExecutionRuntime
 from ._internal.segments import iter_operator_segments
-from ._internal.stage_spans import init_stage_span_tracking
+from ._internal.stage_spans import (
+    StageWriteClock,
+    attach_write_clock,
+    get_write_clock,
+    init_stage_span_tracking,
+)
 from ._main_prefill import prefill_main_source_fields
 
 # endregion
@@ -63,15 +68,23 @@ def _try_execute_fused_compute(
     stage = stage_map.get(OperatorType.COMPUTE.value)
     if wants_stage_spans and stage:
         perf_counter = stage_perf_counter_fn or time.perf_counter
+        clock = get_write_clock(runtime)
+        if clock is not None:
+            clock.enter_stage(stage)
         start = perf_counter()
-        execute_fused_compute_group(
-            group=group,
-            field_keys=active,
-            context=context,
-            batch_row_nth=batch_row_nth,
-            runtime=runtime,
-        )
-        stage_durations[stage] += max(0.0, perf_counter() - start)
+        nested_write = 0.0
+        try:
+            execute_fused_compute_group(
+                group=group,
+                field_keys=active,
+                context=context,
+                batch_row_nth=batch_row_nth,
+                runtime=runtime,
+            )
+        finally:
+            if clock is not None:
+                nested_write = clock.exit_stage(stage)
+        stage_durations[stage] += max(0.0, perf_counter() - start - nested_write)
     else:
         execute_fused_compute_group(
             group=group,
@@ -178,6 +191,21 @@ class BatchExecutor:
     ) -> Optional[Dict[str, float]]:
         wants_stage_spans, stage_durations, stage_map = init_stage_span_tracking(runtime)
         wants_operator_spans = runtime.instrumentation.wants(EventType.OPERATOR_SPAN)
+        perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
+
+        owns_clock = False
+        clock = get_write_clock(runtime)
+        if clock is None:
+            clock = StageWriteClock(
+                enabled=bool(wants_stage_spans),
+                stage_durations=stage_durations,
+                perf_counter=perf_counter,
+            )
+            attach_write_clock(runtime, clock)
+            owns_clock = True
+        elif wants_stage_spans and clock.stage_durations is not stage_durations:
+            # Reuse pre-attached clock durations (e.g. pipeline timed main-source writes first).
+            stage_durations = clock.stage_durations
 
         resolved_workers = 1
         if runtime.parallel_mode == "adaptive":
@@ -190,87 +218,104 @@ class BatchExecutor:
                 fusion_by_field[field_key] = group
         fused_done: Set[str] = set()
 
-        for is_loadref, segment in iter_operator_segments(
-            cast("Sequence[SupportedOperatorIr]", self.plan.operators)  # pragma: allow-cast plan operators typed narrowing
-        ):
-            if is_loadref:
-                loadref_ops = cast("List[LoadRefOp]", segment)  # pragma: allow-cast segment typed narrowing
-                stage = stage_map.get(OperatorType.LOAD_REF.value)
-                if wants_stage_spans and stage:
-                    perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
-                    start = perf_counter()
-                    self._execute_loadref_segment(
-                        loadref_ops,
-                        context=context,
-                        batch_row_nth=batch_row_nth,
-                        runtime=runtime,
-                        required_fields=required_fields,
-                        adaptive_pool=adaptive_pool,
-                        max_workers=resolved_workers,
-                        after_operator=after_operator,
-                    )
-                    stage_durations[stage] += max(0.0, perf_counter() - start)
-                else:
-                    self._execute_loadref_segment(
-                        loadref_ops,
-                        context=context,
-                        batch_row_nth=batch_row_nth,
-                        runtime=runtime,
-                        required_fields=required_fields,
-                        adaptive_pool=adaptive_pool,
-                        max_workers=resolved_workers,
-                        after_operator=after_operator,
-                    )
-                continue
-
-            operator = cast("SupportedOperatorIr", segment)  # pragma: allow-cast segment typed narrowing
-
-            if operator.operator_type == OperatorType.COMPUTE.value:
-                compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
-                field_key = str(compute_op.field_key)
-                if _try_execute_fused_compute(
-                    field_key=field_key,
-                    fusion_by_field=fusion_by_field,
-                    fused_done=fused_done,
-                    context=context,
-                    batch_row_nth=batch_row_nth,
-                    runtime=runtime,
-                    wants_stage_spans=wants_stage_spans,
-                    stage_map=stage_map,
-                    stage_durations=stage_durations,
-                    stage_perf_counter_fn=self._overrides.stage_perf_counter_fn,
-                ):
-                    if after_operator is not None:
-                        after_operator(operator)
+        try:
+            for is_loadref, segment in iter_operator_segments(
+                cast("Sequence[SupportedOperatorIr]", self.plan.operators)  # pragma: allow-cast plan operators typed narrowing
+            ):
+                if is_loadref:
+                    loadref_ops = cast("List[LoadRefOp]", segment)  # pragma: allow-cast segment typed narrowing
+                    stage = stage_map.get(OperatorType.LOAD_REF.value)
+                    if wants_stage_spans and stage:
+                        if clock is not None:
+                            clock.enter_stage(stage)
+                        start = perf_counter()
+                        nested_write = 0.0
+                        try:
+                            self._execute_loadref_segment(
+                                loadref_ops,
+                                context=context,
+                                batch_row_nth=batch_row_nth,
+                                runtime=runtime,
+                                required_fields=required_fields,
+                                adaptive_pool=adaptive_pool,
+                                max_workers=resolved_workers,
+                                after_operator=after_operator,
+                            )
+                        finally:
+                            if clock is not None:
+                                nested_write = clock.exit_stage(stage)
+                        stage_durations[stage] += max(0.0, perf_counter() - start - nested_write)
+                    else:
+                        self._execute_loadref_segment(
+                            loadref_ops,
+                            context=context,
+                            batch_row_nth=batch_row_nth,
+                            runtime=runtime,
+                            required_fields=required_fields,
+                            adaptive_pool=adaptive_pool,
+                            max_workers=resolved_workers,
+                            after_operator=after_operator,
+                        )
                     continue
 
-            executor = self._executors.get(operator.operator_type)
+                operator = cast("SupportedOperatorIr", segment)  # pragma: allow-cast segment typed narrowing
 
-            if executor:
-                stage = stage_map.get(operator.operator_type)
-                wants_compute_span = wants_operator_spans and operator.operator_type == OperatorType.COMPUTE.value
-                if (wants_stage_spans and stage) or wants_compute_span:
-                    perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
-                    start = perf_counter()
-                    executor.execute(operator, context, batch_row_nth, runtime)
-                    duration = max(0.0, perf_counter() - start)
-                    if wants_stage_spans and stage:
-                        stage_durations[stage] += duration
-                    if wants_compute_span:
-                        compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
-                        runtime.instrumentation.emit_operator_span(
-                            operator_type=OperatorType.COMPUTE.value,
-                            field_key=str(compute_op.field_key),
-                            batch_num=int(runtime.batch_num),
-                            duration=float(duration),
-                        )
-                else:
-                    executor.execute(operator, context, batch_row_nth, runtime)
+                if operator.operator_type == OperatorType.COMPUTE.value:
+                    compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
+                    field_key = str(compute_op.field_key)
+                    if _try_execute_fused_compute(
+                        field_key=field_key,
+                        fusion_by_field=fusion_by_field,
+                        fused_done=fused_done,
+                        context=context,
+                        batch_row_nth=batch_row_nth,
+                        runtime=runtime,
+                        wants_stage_spans=wants_stage_spans,
+                        stage_map=stage_map,
+                        stage_durations=stage_durations,
+                        stage_perf_counter_fn=self._overrides.stage_perf_counter_fn,
+                    ):
+                        if after_operator is not None:
+                            after_operator(operator)
+                        continue
 
-            if after_operator is not None:
-                after_operator(operator)
+                executor = self._executors.get(operator.operator_type)
 
-        return stage_durations if wants_stage_spans else None
+                if executor:
+                    stage = stage_map.get(operator.operator_type)
+                    wants_compute_span = wants_operator_spans and operator.operator_type == OperatorType.COMPUTE.value
+                    if (wants_stage_spans and stage) or wants_compute_span:
+                        start = perf_counter()
+                        nested_write = 0.0
+                        if wants_stage_spans and stage and clock is not None:
+                            clock.enter_stage(stage)
+                        try:
+                            executor.execute(operator, context, batch_row_nth, runtime)
+                        finally:
+                            if wants_stage_spans and stage and clock is not None:
+                                nested_write = clock.exit_stage(stage)
+                        wall = max(0.0, perf_counter() - start)
+                        duration = max(0.0, wall - nested_write)
+                        if wants_stage_spans and stage:
+                            stage_durations[stage] += duration
+                        if wants_compute_span:
+                            compute_op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast compute operator narrowing
+                            runtime.instrumentation.emit_operator_span(
+                                operator_type=OperatorType.COMPUTE.value,
+                                field_key=str(compute_op.field_key),
+                                batch_num=int(runtime.batch_num),
+                                duration=float(wall),
+                            )
+                    else:
+                        executor.execute(operator, context, batch_row_nth, runtime)
+
+                if after_operator is not None:
+                    after_operator(operator)
+
+            return stage_durations if wants_stage_spans else None
+        finally:
+            if owns_clock:
+                attach_write_clock(runtime, None)
 
     def _execute_loadref_segment(
         self,

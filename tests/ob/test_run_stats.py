@@ -152,7 +152,8 @@ def test_notes_document_write_and_shared_reset():
     accum = WorkflowStatsAccumulator()
     _drive_pipeline(accum, loaders=["facts"])
     notes = accum.build_run_stats()["notes"]
-    assert notes["write_stage_attribution"] == "incomplete_until_c55"
+    assert notes["write_stage_attribution"] == "sink_path_timed"
+    assert notes["sink_close_bucket"] == "write"
     assert "nodes" in notes["shared_observer_reset"]
 
 
