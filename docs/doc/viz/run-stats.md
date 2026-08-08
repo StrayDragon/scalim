@@ -33,7 +33,22 @@
 | 落盘 / viz | `write_run_stats_sibling(run_dir, stats)` → 旁路 `run_stats.json`，**勿**塞进 `viz_snapshot.json` |
 | 看写出成本 | 订阅 `STAGE_SPAN` 后读 `stages.write` / `stage_metrics.write_duration` |
 
-合成矩阵经验量级（本机、非承诺）：**bench 墙钟税约个位数 %**；**debug 可到 +30–50%**。以你们环境 matrix 为准。
+合成矩阵经验量级（本机 `.tmp/obs-demo`、**非 SLA**）：
+
+| scale | bench tax | debug tax | write 归因 |
+|-------|-----------|-----------|------------|
+| mid 200k | ~**+2%** | ~**+41%** | 双节点 `write>0`；CSV equiv OK |
+| stress 1M | ~**0% ± 噪声** | （通常跳过） | `stages_total.write≈7s`；CSV equiv OK |
+
+`bench_plus` mid ~**+3%**（含 stage_memory）。复现见仓库内 `.tmp/obs-demo/README.md`（dev-only，不入库）。
+
+## 最佳实践（摘要）
+
+1. 日常只开 **bench**；debug 仅短窗，并接受警告与高税。
+2. workflow 永远读 **`nodes[]`**，不要读共享 Perf 末态。
+3. 对拍用 **CSV 哈希** + 墙钟税；不要用 xlsx 字节相等当业务等价。
+4. `stage_sum` 用于相对热点；**墙钟**用于观测税；二者不必相等。
+5. 落盘用 sibling `run_stats.json`；Agent 细则见 `agentdev/skills/scalim-run-stats/references/best-practices.md`。
 
 ## Profiles
 

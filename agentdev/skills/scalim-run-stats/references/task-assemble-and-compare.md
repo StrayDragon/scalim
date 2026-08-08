@@ -39,10 +39,12 @@ write_run_stats_sibling(".tmp/evidence/run_stats", stats)
 ## 对拍清单
 
 1. 同输入跑 `BASELINE` 与 `BENCH`（或同 demand 开关 components）。
-2. **输出等价**：CSV/行内容哈希相等（业务内容）。
-3. **墙钟税**：`(bench_wall / baseline_wall) - 1`；记录环境（勿把单次跑当 SLA）。
+2. **输出等价**：CSV/行内容哈希相等（业务内容）；xlsx 仅作存在性/size 参考。
+3. **墙钟税**：`(bench_wall / baseline_wall) - 1`；记录环境（勿把单次跑当 SLA）；大作业上税可能落入噪声。
 4. **证据面**：`stats["schema"] == "scalim_run_stats/v1"`；workflow 看 `len(nodes)` 与各节点 `loaders`/`stages_total`。
-5. **write**：有真实写出且订阅了 stage span 时，`stages_total.write`（或 Perf `write_duration`）应 `> 0`；勿再假设「write 未实现」。
+5. **write**：有真实写出且订阅了 stage span 时，`stages_total.write`（或 Perf `write_duration`）应 `> 0`；检查 `notes.write_stage_attribution == "sink_path_timed"`。
+
+更完整的默认选择与交付清单：见 [best-practices.md](best-practices.md)。
 
 ## 禁止事项
 
@@ -54,6 +56,8 @@ write_run_stats_sibling(".tmp/evidence/run_stats", stats)
 ## 交叉文档
 
 - 人类：`docs/doc/viz/run-stats.md`
+- 最佳实践：`references/best-practices.md`
 - Viz：`docs/doc/viz/scalim-viz.md`
 - YAML 可观测边界：`docs/doc/yaml-dsl/user-guide.md` §3.7
 - 下游升级卡：`agentdev/skills/scalim-public-api/references/upgrades/2026-08-08-run-stats-low-drift-and-write-attribution.md`
+- 本地合成矩阵（可选）：`.tmp/obs-demo/README.md`

@@ -61,4 +61,5 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - **0.10.1**(相对 0.10.0): typed `on_*` 收完整 `Event`（breaking；YAML 无强制迁移）— `scalim-yaml-dsl/references/0.10.1-release-highlights.md` + `docs/doc/releases/0.10.1/` + `2026-08-02-typed-handlers-receive-event.md`。经 `event.payload` / `event.meta`（含 `scalim_compute_phase`）。
 - YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType / typed Event 批次属于 Python public API**,不进 YAML upgrades 索引。
 - **低漂移 run_stats / write 归因**(装配 profiles、`nodes[]`、baseline↔bench 对拍): `agentdev/skills/scalim-run-stats/SKILL.md` + 人类文档 `docs/doc/viz/run-stats.md`。
+  - 最佳实践: `agentdev/skills/scalim-run-stats/references/best-practices.md`
   - 下游升级卡: `references/upgrades/2026-08-08-run-stats-low-drift-and-write-attribution.md`
