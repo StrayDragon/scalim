@@ -17,6 +17,7 @@ from ...vendor.dataclassesx import asdict, dataclass, field
 from .._internal.console_report import emit_info, emit_warning, format_percent
 from ..observer import EventDispatchObserver
 from ..structured_logging import emit_structured, is_jsonl_logging_installed
+from .run_stats import warn_high_impact_observability
 
 # endregion
 
@@ -126,6 +127,8 @@ class RelationObserver(EventDispatchObserver):
         if config is None:
             config = RelationConfig.default()
         self.config = config
+        if self.config.enabled:
+            warn_high_impact_observability("relation_lookup_diagnostics")
         self.metrics = RelationMetrics()
         self._reported = False
 

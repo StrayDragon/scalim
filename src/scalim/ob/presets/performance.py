@@ -15,6 +15,7 @@ from ..observer import EventDispatchObserver
 from ..perf_metrics import AdaptiveSchedulerMetrics, CpuSample, MemorySample, PerformanceMetrics
 from ..structured_logging import emit_structured, is_jsonl_logging_installed
 from .performance_presentation import PerformancePresentationLayer
+from .run_stats import warn_high_impact_observability
 
 # endregion
 
@@ -86,6 +87,13 @@ class PerformanceConfig:
 
 
 class PerformanceObserver(EventDispatchObserver):
+    """Per-pipeline performance metrics; resets on ``PIPELINE_START``.
+
+    For multi-demand workflows, do not treat in-memory ``metrics`` after the last
+    pipeline as the full-run conclusion — use ``WorkflowStatsAccumulator`` /
+    ``run_stats.nodes`` instead (see ``docs/doc/viz/run-stats.md``).
+    """
+
     config: PerformanceConfig
     event_types: Optional[Set[EventType]]
     metrics: PerformanceMetrics
@@ -116,6 +124,9 @@ class PerformanceObserver(EventDispatchObserver):
             self.event_types.add(EventType.ADAPTIVE_SCHEDULER_DECISION)
         if int(config.include_field_compute_top_n) > 0:
             self.event_types.add(EventType.OPERATOR_SPAN)
+            warn_high_impact_observability("operator_span_field_compute_top_n")
+        if bool(config.include_batch_lines):
+            warn_high_impact_observability("include_batch_lines")
         self.metrics = PerformanceMetrics()
         self._on_threshold_exceeded = on_threshold_exceeded
         self._presentation = config.presentation or PerformancePresentationLayer()

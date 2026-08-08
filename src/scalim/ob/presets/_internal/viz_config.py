@@ -6,6 +6,7 @@ from typing import Any, Optional, Tuple
 
 from ...._project_constants import VIZ_DIR_NAME
 from ....vendor.dataclassesx import dataclass, field
+from ..run_stats import warn_high_impact_observability
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +84,13 @@ class VizObserverConfig:
 
     logger: logging.Logger = field(default=_LOGGER)
     """用于输出告警/异常日志的 `logging.Logger`."""
+
+    def __post_init__(self) -> None:
+        if self.trace_enabled_effective():
+            warn_high_impact_observability("viz_trace")
+        policy = (self.payload_policy or "summary").strip().lower()
+        if policy == "full":
+            warn_high_impact_observability("viz_payload_policy_full")
 
     def is_enabled(self) -> bool:
         events_path, snapshot_path, trace_path = self.resolve_output_paths()

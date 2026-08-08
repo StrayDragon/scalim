@@ -43,10 +43,12 @@ pnpm dev
   - `/path/to/run-root/scalim-viz/<run_id>/viz_snapshot.json`
   - `/path/to/run-root/scalim-viz/<run_id>/viz_events.jsonl`
   - (可选) `/path/to/run-root/scalim-viz/<run_id>/viz_trace.jsonl` (`trace_enabled=true`)
+  - (可选旁路) `run_stats.json` — 见 [Run Stats](run-stats.md)；**勿**嵌入 `viz_snapshot.json`
 - 若配置 `output_dir=/path/to/scalim-viz`,则直接使用该目录:
   - `/path/to/scalim-viz/<run_id>/viz_snapshot.json`
   - `/path/to/scalim-viz/<run_id>/viz_events.jsonl`
   - (可选) `/path/to/scalim-viz/<run_id>/viz_trace.jsonl` (`trace_enabled=true`)
+  - (可选旁路) `run_stats.json` — 见 [Run Stats](run-stats.md)
 - 若显式配置 `output_path` / `snapshot_path` / `trace_path`,则直接写入指定文件(不创建 run 子目录).
   - 默认会覆盖 JSONL 文件以保证单 run 输出;如需跨 run 追加,请显式设置 `append=true`
 

@@ -52,6 +52,7 @@ nav = [
   { "工具与排查" = [
     "tools/index.md",
     { "可视化工具(Scalim Viz)" = "viz/scalim-viz.md" },
+    { "Run Stats（低漂移观测）" = "viz/run-stats.md" },
     { "基准测试" = "benchmark/index.md" },
     { "指南" = "benchmark/guide.md" },
     { "对比报告" = "benchmark/compare-report.md" },
