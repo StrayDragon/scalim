@@ -22,6 +22,8 @@ export type RunStatsOutput = {
   duration_s?: number;
   path?: string;
   sheet_name?: string | null;
+  error_count?: number;
+  disabled?: boolean;
 };
 
 export type RunStatsNode = {
@@ -31,10 +33,17 @@ export type RunStatsNode = {
   stages_total?: RunStatsStages;
   loaders?: RunStatsLoader[];
   outputs?: RunStatsOutput[];
+  memory?: {
+    peak_mb?: number | null;
+    start_mb?: number | null;
+    end_mb?: number | null;
+    increase_mb?: number | null;
+  };
   pipeline?: {
     total_duration_s?: number;
     total_rows_in?: number;
     total_batches?: number;
+    batch_size?: number;
   };
 };
 

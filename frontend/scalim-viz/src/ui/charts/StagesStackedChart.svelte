@@ -8,10 +8,11 @@
   type Props = {
     stagesTotal?: RunStatsStages | null;
     nodes?: RunStatsNode[];
+    includeTotal?: boolean;
     onRowClick?: (payload: { kind: "total" | "node"; nodeIndex: number | null; label: string }) => void;
   };
 
-  let { stagesTotal = null, nodes = [], onRowClick }: Props = $props();
+  let { stagesTotal = null, nodes = [], includeTotal = true, onRowClick }: Props = $props();
 
   const STAGE_KEYS = ["loader", "compute", "write", "stream"] as const;
   const STAGE_COLORS = ["#0f766e", "#1d4ed8", "#b45309", "#64748b"];
@@ -25,7 +26,9 @@
       }
       out.push(row);
     };
-    pushRow("Σ", stagesTotal);
+    if (includeTotal) {
+      pushRow("Σ", stagesTotal);
+    }
     (nodes ?? []).forEach((node, idx) => {
       pushRow(runStatsNodeLabel(node, idx), node?.stages_total);
     });
@@ -54,6 +57,7 @@
     const idx = (nodes ?? []).findIndex((node, i) => runStatsNodeLabel(node, i) === rowLabel);
     onRowClick({ kind: "node", nodeIndex: idx >= 0 ? idx : null, label: rowLabel });
   };
+  const chartHeight = $derived(Math.max(48, rows.length * 28 + 12));
 </script>
 
 <div class="flex flex-col gap-1">
@@ -66,7 +70,7 @@
     {/each}
   </div>
 
-  <div class="relative h-[132px] w-full">
+  <div class="relative w-full" style={`height:${chartHeight}px`}>
     {#key JSON.stringify(rows)}
       <LayerCake
         padding={{ top: 4, right: 8, bottom: 4, left: 56 }}
