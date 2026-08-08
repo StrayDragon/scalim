@@ -1,7 +1,8 @@
 ---
 branch: sdd/c55-stage-write-attribution
 base_sha: 8982be89879228f589d050b47c1f4ad34bdb5f71
-checkpointed: false
+checkpointed: true
+checkpoint_sha: 8982be89879228f589d050b47c1f4ad34bdb5f71
 ---
 
 # 修正 write stage 归因（消除阶段误判）
