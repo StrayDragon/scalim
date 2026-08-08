@@ -1,0 +1,3 @@
+# Root .gitignore has a broad `debug/` rule (Rust). Keep ObservabilityProfile.DEBUG evidence.
+!**/profiles/debug/
+!**/profiles/debug/**

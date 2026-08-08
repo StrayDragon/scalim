@@ -1,0 +1,34 @@
+{
+  "books": {
+    "report": {
+      "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/report/versions/wf_c033b34ed5194319a571a2dad7d3a1ce/books/report.xlsx",
+      "exists": true,
+      "size": 9891194,
+      "sha256_head": "634571d39faf209a5d6b5bb9b712614287d298e7ca44d15519b21addcf9f0ae1",
+      "hashed_bytes": 2097152
+    }
+  },
+  "files": {
+    "detail_csv.detail_csv": {
+      "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/detail_csv/versions/wf_c033b34ed5194319a571a2dad7d3a1ce/files/detail_csv.csv",
+      "exists": true,
+      "size": 6825247,
+      "sha256_head": "814926b1c2d2cd7c62007611bc31b258dbf5873f0b82fcee7ba373f868f218b0",
+      "hashed_bytes": 2097152
+    },
+    "metrics_csv.metrics_csv": {
+      "path": "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/metrics_csv/versions/wf_c033b34ed5194319a571a2dad7d3a1ce/files/metrics_csv.csv",
+      "exists": true,
+      "size": 5963,
+      "sha256_head": "3d3553e6b78f47b1dced303f0bf2e3fde77e7cd5572d3ff2496e2ad6569e0c0f",
+      "hashed_bytes": 5963
+    }
+  },
+  "errors": [],
+  "roots_tried": [
+    "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/report",
+    "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/detail_csv",
+    "<repo>/.tmp/obs-demo/runs/mid_20260808_165544/runs/debug/work/workload/out/metrics_csv"
+  ],
+  "run_id": "wf_c033b34ed5194319a571a2dad7d3a1ce"
+}
