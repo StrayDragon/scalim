@@ -673,20 +673,43 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
 
 
 def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> None:
-    """Write sibling run_stats beside workflow + demand viz dirs when accum coexisted."""
+    """Write sibling run_stats beside workflow + demand viz dirs when accum coexisted.
+
+    Covers seq workflows where accum lives on demand ``request.components`` (not
+    ``workflow_components``), by retaining demand requests and reading their
+    VizObserverConfig / accumulator instances at teardown.
+    """
+    from ..ob.presets.run_stats import WorkflowStatsAccumulator, resolve_viz_run_dir
+
     observers = []  # type: List[Any]
+    extra_dirs = []  # type: List[str]
     manager = prepared.workflow_observer_manager
     if manager is not None:
         observers.extend(list(getattr(manager, "observers", None) or []))
     for component in prepared.workflow_components:
         if component is not None and component not in observers:
             observers.append(component)
+    if prepared.workflow_viz_observer is not None and prepared.workflow_viz_observer not in observers:
+        observers.append(prepared.workflow_viz_observer)
     for viz in (prepared.captured_demand_viz_observer_by_node_id or {}).values():
         if viz is not None:
             observers.append(viz)
+
+    for request in (prepared.captured_demand_request_by_node_id or {}).values():
+        for component in list(getattr(request, "components", None) or []):
+            if isinstance(component, WorkflowStatsAccumulator) and component not in observers:
+                observers.append(component)
+        observability = getattr(request, "observability", None)
+        viz_config = getattr(observability, "viz_config", None) if observability is not None else None
+        if viz_config is not None:
+            run_dir = resolve_viz_run_dir(viz_config)
+            if run_dir:
+                extra_dirs.append(run_dir)
+
     maybe_auto_write_run_stats_beside_viz(
         observers,
         meta={"source": "workflow_auto_sibling", "workflow_exec_id": prepared.workflow_exec_id},
+        extra_run_dirs=extra_dirs,
     )
 
 

@@ -28,13 +28,14 @@ from scalim.ob.presets.run_stats import (
 from tests.support.event_envelope import event_envelope
 
 
-def _drive_pipeline(obs, *, loaders, rows=10, batches=2):
-    obs.on_pipeline_start(event_envelope(PipelineStartEvent(batch_size=5, targets=["t"])))
+def _drive_pipeline(obs, *, loaders, rows=10, batches=2, run_id="run", demand_id=None):
+    meta = {"demand_id": demand_id} if demand_id else None
+    obs.on_pipeline_start(event_envelope(PipelineStartEvent(batch_size=5, targets=["t"]), run_id=run_id, meta=meta))
     for b in range(1, batches + 1):
         row_ids = list(range((b - 1) * 5, b * 5))
-        obs.on_batch_start(event_envelope(BatchStartEvent(batch_num=b, row_ids=row_ids)))
-        obs.on_stage_span(event_envelope(StageSpanEvent(batch_num=b, stage="loader", duration=0.01)))
-        obs.on_stage_span(event_envelope(StageSpanEvent(batch_num=b, stage="compute", duration=0.02)))
+        obs.on_batch_start(event_envelope(BatchStartEvent(batch_num=b, row_ids=row_ids), run_id=run_id))
+        obs.on_stage_span(event_envelope(StageSpanEvent(batch_num=b, stage="loader", duration=0.01), run_id=run_id))
+        obs.on_stage_span(event_envelope(StageSpanEvent(batch_num=b, stage="compute", duration=0.02), run_id=run_id))
         for name in loaders:
             obs.on_loader_call(
                 event_envelope(
@@ -45,7 +46,8 @@ def _drive_pipeline(obs, *, loaders, rows=10, batches=2):
                         result=[{"id": 1}] * rows,
                         cache_status="miss",
                         batch_num=b,
-                    )
+                    ),
+                    run_id=run_id,
                 )
             )
         obs.on_output_target_end(
@@ -58,24 +60,37 @@ def _drive_pipeline(obs, *, loaders, rows=10, batches=2):
                     sheet_name=None,
                     error_count=0,
                     disabled=False,
-                )
+                ),
+                run_id=run_id,
             )
         )
-        obs.on_batch_end(event_envelope(BatchEndEvent(batch_num=b, duration=0.05)))
-    obs.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=batches, total_duration=0.1)))
+        obs.on_batch_end(event_envelope(BatchEndEvent(batch_num=b, duration=0.05), run_id=run_id))
+    obs.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=batches, total_duration=0.1), run_id=run_id, meta=meta))
 
 
 def test_accumulator_nodes_survive_second_pipeline():
     accum = WorkflowStatsAccumulator(sample_rss=False)
-    _drive_pipeline(accum, loaders=["facts", "dims"])
-    _drive_pipeline(accum, loaders=["detail_rows"])
+    _drive_pipeline(accum, loaders=["facts", "dims"], run_id="detail")
+    _drive_pipeline(accum, loaders=["detail_rows"], run_id="metrics")
     stats = accum.build_run_stats(meta={"profile": "bench"})
     assert stats["schema"] == SCHEMA_RUN_STATS
     assert stats["pipeline"]["node_count"] == 2
     assert len(stats["nodes"]) == 2
+    assert stats["nodes"][0]["demand_id"] == "detail"
+    assert stats["nodes"][0]["name"] == "detail"
+    assert stats["nodes"][1]["demand_id"] == "metrics"
     assert any(l["name"] == "facts" for l in stats["nodes"][0]["loaders"])
     assert any(l["name"] == "detail_rows" for l in stats["nodes"][1]["loaders"])
     assert any(l["name"] == "facts" for l in stats["loaders"])
+
+
+def test_accumulator_prefers_meta_demand_id():
+    accum = WorkflowStatsAccumulator(sample_rss=False)
+    _drive_pipeline(accum, loaders=["facts"], run_id="run_abc", demand_id="detail")
+    node = accum.build_run_stats()["nodes"][0]
+    assert node["demand_id"] == "detail"
+    assert node["run_id"] == "run_abc"
+    assert node["name"] == "detail"
 
 
 def test_baseline_profile_empty_components():
@@ -151,6 +166,18 @@ def test_auto_write_run_stats_beside_viz_when_accum_and_viz_coexist(tmp_path: Pa
     assert "scalim_run_stats" not in snap
 
 
+def test_auto_write_extra_run_dirs(tmp_path: Path):
+    from scalim.ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
+
+    accum = WorkflowStatsAccumulator(sample_rss=False)
+    _drive_pipeline(accum, loaders=["facts"])
+    extra = tmp_path / "workflow-overview"
+    extra.mkdir(parents=True)
+    written = maybe_auto_write_run_stats_beside_viz([accum], extra_run_dirs=[str(extra)])
+    assert len(written) == 1
+    assert (extra / "run_stats.json").is_file()
+
+
 def test_auto_write_skipped_without_nodes_or_viz(tmp_path: Path):
     from scalim.ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
     from scalim.ob.presets.viz import VizObserver, VizObserverConfig
@@ -161,6 +188,7 @@ def test_auto_write_skipped_without_nodes_or_viz(tmp_path: Path):
     assert maybe_auto_write_run_stats_beside_viz([viz]) == []
     _drive_pipeline(accum, loaders=["facts"])
     assert maybe_auto_write_run_stats_beside_viz([accum]) == []
+
 
 def test_bench_does_not_mutate_synthetic_csv_bytes(tmp_path: Path):
     """Sanity: collecting run_stats is side-effect free w.r.t. a CSV artifact."""

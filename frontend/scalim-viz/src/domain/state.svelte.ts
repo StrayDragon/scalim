@@ -2027,6 +2027,26 @@ export const selectNodeById = (nodeId?: string | null) => {
   }
 };
 
+export const revealNodesByIds = (nodeIds: string[]) => {
+  const wanted = new Set((nodeIds ?? []).map(String).filter(Boolean));
+  if (!wanted.size) return;
+  const matched = state.nodes.filter((node) => wanted.has(String(node.id)));
+  if (!matched.length) return;
+  if (state.focusMode !== "none") {
+    state.focusMode = "none";
+    state.focusNodeId = "";
+  }
+  selectNode(matched[0]);
+  try {
+    if (flowApi?.fitView) {
+      // @ts-ignore fitView accepts nodes list in SvelteFlow.
+      void flowApi.fitView({ padding: 0.28, duration: motionDuration(260), nodes: matched });
+    }
+  } catch {
+    // ignore viewport errors
+  }
+};
+
 export const openDemandFromWorkflow = async (opts: { demandRunId: string; sourceWorkflowNodeId?: string }) => {
   const demandRunId = String(opts?.demandRunId ?? "").trim();
   if (!demandRunId) return;

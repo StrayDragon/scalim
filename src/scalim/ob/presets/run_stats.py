@@ -94,12 +94,25 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         self._outputs = []  # type: List[Dict[str, Any]]
         self._total_rows_in = 0
         self._batch_size = None  # type: Optional[int]
+        self._current_run_id = None  # type: Optional[str]
+        self._current_demand_id = None  # type: Optional[str]
 
     def on_pipeline_start(self, event):
         # type: (Event) -> None
         self._reset_current()
         payload = event.payload
         self._batch_size = getattr(payload, "batch_size", None)
+        run_id = str(getattr(event, "run_id", "") or "").strip() or None
+        meta = getattr(event, "meta", None) or {}
+        demand_id = None
+        if isinstance(meta, dict):
+            for key in ("demand_id", "workflow_node_id", "node_id"):
+                raw = meta.get(key)
+                if raw is not None and str(raw).strip():
+                    demand_id = str(raw).strip()
+                    break
+        self._current_run_id = run_id
+        self._current_demand_id = demand_id or run_id
 
     def on_batch_start(self, event):
         # type: (Event) -> None
@@ -222,7 +235,21 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             peak_vals.append(float(end_rss))
         if self._pipeline_start_rss is not None:
             peak_vals.append(float(self._pipeline_start_rss))
+        demand_id = self._current_demand_id
+        end_meta = getattr(event, "meta", None) or {}
+        if isinstance(end_meta, dict):
+            for key in ("demand_id", "workflow_node_id", "node_id"):
+                raw = end_meta.get(key)
+                if raw is not None and str(raw).strip():
+                    demand_id = str(raw).strip()
+                    break
+        run_id = str(getattr(event, "run_id", "") or "").strip() or self._current_run_id
+        if not demand_id:
+            demand_id = run_id
         node = {
+            "demand_id": demand_id,
+            "run_id": run_id,
+            "name": demand_id or run_id,
             "pipeline": {
                 "batch_size": self._batch_size,
                 "total_batches": int(getattr(payload, "total_batches", len(self._batch_index)) or len(self._batch_index)),
@@ -348,10 +375,12 @@ def write_run_stats_sibling(run_dir, payload, filename="run_stats.json"):
     return atomic_write_run_stats_json(path, payload)
 
 
-def resolve_viz_run_dir(observer):
+def resolve_viz_run_dir(observer_or_config):
     # type: (Any) -> Optional[str]
-    """Best-effort run directory for a VizObserver / WorkflowVizObserver."""
-    config = getattr(observer, "config", None)
+    """Best-effort run directory for a VizObserver / WorkflowVizObserver / VizObserverConfig."""
+    config = observer_or_config
+    if not hasattr(config, "resolve_output_paths"):
+        config = getattr(observer_or_config, "config", None)
     if config is None or not hasattr(config, "resolve_output_paths"):
         return None
     try:
@@ -369,22 +398,29 @@ def resolve_viz_run_dir(observer):
     return None
 
 
-def maybe_auto_write_run_stats_beside_viz(observers, meta=None):
-    # type: (Any, Optional[Dict[str, Any]]) -> List[str]
+def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=None):
+    # type: (Any, Optional[Dict[str, Any]], Optional[Any]) -> List[str]
     """When Viz + WorkflowStatsAccumulator coexist, write sibling ``run_stats.json``.
 
     Does nothing if either side is missing or the accumulator has no ``nodes`` yet.
     Never embeds into ``viz_snapshot.json``.
+
+    ``extra_run_dirs`` MAY list additional directories (e.g. workflow/ overview) to receive
+    the same payload once an accumulator is found among ``observers``.
     """
     obs_list = list(observers or [])
     accum = None  # type: Optional[WorkflowStatsAccumulator]
     run_dirs = []  # type: List[str]
     for obs in obs_list:
-        if accum is None and isinstance(obs, WorkflowStatsAccumulator):
-            accum = obs
+        if isinstance(obs, WorkflowStatsAccumulator):
+            if accum is None or len(getattr(obs, "nodes", None) or []) >= len(getattr(accum, "nodes", None) or []):
+                accum = obs
         run_dir = resolve_viz_run_dir(obs)
         if run_dir:
             run_dirs.append(run_dir)
+    for extra in list(extra_run_dirs or []):
+        if extra:
+            run_dirs.append(str(extra))
     if accum is None or not run_dirs:
         return []
     if not list(getattr(accum, "nodes", None) or []):

@@ -527,12 +527,14 @@ class WorkflowRunController:
 
             if isinstance(node, WorkflowNodeIr):
                 core = cast("ExecutionResult", result_obj)  # pragma: allow-cast future result typed narrowing
+                if request is not None:
+                    # Always retain demand request so seq workflows can discover shared
+                    # WorkflowStatsAccumulator / mutated viz_config.output_dir at teardown.
+                    self._state.captured_demand_request_by_node_id[str(node_id)] = request
                 if capture_obj is not None:
                     self._state.captured_demand_events_by_node_id[str(node_id)] = list(capture_obj.captured_events)
                     self._state.captured_demand_hook_events_by_node_id[str(node_id)] = list(capture_obj.captured_hook_events)
                     self._state.captured_demand_viz_observer_by_node_id[str(node_id)] = capture_obj.viz_observer
-                    if request is not None:
-                        self._state.captured_demand_request_by_node_id[str(node_id)] = request
 
                 demand_yaml_path = str(demand_path or "")
                 self._artifacts_dir.publish(str(node_id), "output_path", core.output_path)
