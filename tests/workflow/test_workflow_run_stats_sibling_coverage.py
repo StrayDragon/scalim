@@ -36,12 +36,17 @@ def test_auto_write_workflow_run_stats_siblings_aggregates_demand_components(tmp
         components=[accum],
         observability=SimpleNamespace(viz_config=demand_viz.config),
     )
+    # viz_config 存在但 resolve 为空 → 714->701 假分支
+    request_empty_viz = SimpleNamespace(
+        components=[],
+        observability=SimpleNamespace(viz_config=SimpleNamespace(resolve_output_paths=lambda: (None, None, None), output_dir=None)),
+    )
     prepared = SimpleNamespace(
         workflow_observer_manager=None,
         workflow_components=(),
         workflow_viz_observer=viz,
         captured_demand_viz_observer_by_node_id={"n1": demand_viz},
-        captured_demand_request_by_node_id={"n1": request},
+        captured_demand_request_by_node_id={"n1": request, "n2": request_empty_viz},
         workflow_exec_id="wf_exec",
     )
     workflow_execute_mod._auto_write_workflow_run_stats_siblings(prepared)  # noqa: SLF001

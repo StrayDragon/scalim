@@ -444,3 +444,71 @@ def test_rss_mb_returns_none_on_import_failure(monkeypatch):
 
     monkeypatch.setattr(rs, "import_module", boom)
     assert rs._rss_mb() is None
+
+
+def test_run_stats_branch_edges_for_stage_loader_and_viz(tmp_path: Path):
+    accum = WorkflowStatsAccumulator(sample_rss=False)
+    accum.on_batch_start(event_envelope(BatchStartEvent(batch_num=1, row_ids=[0]), run_id="r"))
+    # 未知 stage → 168 假分支
+    accum.on_stage_span(event_envelope(StageSpanEvent(batch_num=1, stage="other", duration=0.01), run_id="r"))
+    # cache_status 非 hit/miss + batch_num None
+    accum.on_loader_call(
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="facts",
+                params={},
+                duration=0.01,
+                result=[{"id": 1}],
+                cache_status="skip",
+                batch_num=None,
+            ),
+            run_id="r",
+        )
+    )
+    # batch_num 有值但 entry 缺失
+    accum.on_loader_call(
+        event_envelope(
+            LoaderCallEvent(
+                loader_name="facts",
+                params={},
+                duration=0.01,
+                result=None,
+                cache_status="hit",
+                batch_num=99,
+            ),
+            run_id="r",
+        )
+    )
+
+    class _EmptyParentPaths:
+        def resolve_output_paths(self):
+            return "/tmp/events.jsonl", "", None
+
+        output_dir = None
+
+    assert resolve_viz_run_dir(_EmptyParentPaths()) == "/tmp"
+
+    class _BlankPath:
+        def resolve_output_paths(self):
+            return "", "", None
+
+        output_dir = None
+
+    assert resolve_viz_run_dir(_BlankPath()) is None
+
+    a1 = WorkflowStatsAccumulator(sample_rss=False)
+    a2 = WorkflowStatsAccumulator(sample_rss=False)
+    _drive_pipeline(a1, loaders=["x"], run_id="one", batches=1)
+    _drive_pipeline(a2, loaders=["y"], run_id="two", batches=1)
+    _drive_pipeline(a2, loaders=["z"], run_id="three", batches=1)
+    out_dir = tmp_path / "stats-out"
+    out_dir.mkdir()
+    written = maybe_auto_write_run_stats_beside_viz(
+        [a1, a2],
+        extra_run_dirs=["", None, str(out_dir)],  # type: ignore[list-item]
+    )
+    assert len(written) == 1
+    assert (out_dir / "run_stats.json").is_file()
+    # 选中 nodes 更多的 a2
+    payload = (out_dir / "run_stats.json").read_text(encoding="utf-8")
+    assert "two" in payload or "three" in payload

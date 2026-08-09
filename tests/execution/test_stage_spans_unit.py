@@ -47,7 +47,17 @@ def test_stage_write_clock_disabled_and_mismatched_exit() -> None:
     assert durations["write"] == 0.0
 
 
-def test_attach_and_get_write_clock() -> None:
+def test_stage_write_clock_ignores_nested_when_stage_not_loader_compute() -> None:
+    durations = {"write": 0.0}
+    times = [1.0, 2.0]
+    clock = StageWriteClock(True, durations, perf_counter=lambda: times.pop(0))
+    clock.enter_stage("stream")
+    with clock.time_write():
+        pass
+    assert durations["write"] == 1.0
+    # stream 不累计嵌套 write
+    assert clock._active_stages[-1][1] == 0.0  # noqa: SLF001
+
     runtime = SimpleNamespace()
     attach_write_clock(runtime, None)
     assert get_write_clock(runtime) is None

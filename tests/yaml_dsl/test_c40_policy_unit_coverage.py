@@ -63,17 +63,42 @@ def test_demand_run_runtime_options_policy_mapping_normalize() -> None:
         _ = DemandRunRuntimeOptions(lookup_chunking={"s": object()})  # type: ignore[dict-item]
 
 
-def test_resolve_chunk_parallelism_takes_min_workers() -> None:
+def test_resolve_chunk_parallelism_keeps_tighter_top_level_workers() -> None:
     enabled, workers = resolve_chunk_parallelism_from_runtime(
-        parallelize_lookup_chunks=False,
-        max_chunk_workers=8,
-        lookup_chunking={
-            "a": LookupChunking.sized(10, parallel=True, max_chunk_workers=4),
-            "b": LookupChunking.sized(10, parallel=True, max_chunk_workers=None),
-        },
+        parallelize_lookup_chunks=True,
+        max_chunk_workers=2,
+        lookup_chunking={"a": LookupChunking.sized(10, parallel=True, max_chunk_workers=8)},
     )
     assert enabled is True
-    assert workers == 4
+    assert workers == 2
+
+
+def test_apply_policies_noop_when_values_already_match() -> None:
+    rows_bind = BindingIr(
+        key_field="customer_id",
+        params_builder_ref=RuntimeHandleIdIr(handle_id="customers.params"),
+        param_name="rows",
+        mode="rows",
+        cache_mode="none",
+    )
+    orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+    source = SourceIr(
+        source_id="customers",
+        key=KeyIr(key="customer_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader")),
+        cache_mode=SourceSpecIrCacheMode.NONE,
+        lookup_chunk_size=10,
+        lookup_chunk_parallel=False,
+        bind=rows_bind,
+    )
+    demand = DemandIr.from_irs(sources=[source], fields=[], main_source=orders)
+    same = apply_source_runtime_policies(
+        demand,
+        lookup_chunking={"customers": LookupChunking.sized(10)},
+        source_cache={"customers": SourceCache.none()},
+        rows_reuse={"customers": RowsReuse.none()},
+    )
+    assert same is demand
 
 
 def _demand_with_source(*, bind=None, bindings=None) -> DemandIr:  # type: ignore[no-untyped-def]

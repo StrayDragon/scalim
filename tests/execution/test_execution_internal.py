@@ -1147,6 +1147,41 @@ def test_pipeline_column_mode_emits_column_events() -> None:
     assert len(hook.field_slims) == 1
 
 
+def test_pipeline_finalize_reuses_existing_write_clock() -> None:
+    from scalim.events import EventType
+    from scalim.execution.executor.batch._internal.stage_spans import StageWriteClock, attach_write_clock
+    from scalim.sinks.memory import InMemoryRowDataSink
+
+    main_source = _make_main_source()
+    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
+    plan = _make_plan({"id": field_spec}, ["id"])
+    pipeline = _make_pipeline(plan, demand, main_source)
+
+    class _Wants:
+        def wants(self, event_type):  # type: ignore[no-untyped-def]
+            return event_type == EventType.STAGE_SPAN
+
+        def emit_stage_span(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            _ = (args, kwargs)
+
+        def emit_pipeline_end(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            _ = (args, kwargs)
+
+    pipeline.runtime.instrumentation = _Wants()  # type: ignore[assignment]
+    times = [1.0, 2.0]
+    clock = StageWriteClock(True, {"loader": 0.0, "compute": 0.0, "write": 0.0}, perf_counter=lambda: times.pop(0))
+    attach_write_clock(pipeline.runtime, clock)
+    sink = InMemoryRowDataSink()
+    out = pipeline._finalize_run(sink, results=[{"id": 1}], batch_count=1, start_time=0.0)
+    assert out == []
+    # 复用已有 clock,不在收尾时卸下
+    from scalim.execution.executor.batch._internal.stage_spans import get_write_clock
+
+    assert get_write_clock(pipeline.runtime) is clock
+    assert clock.stage_durations["write"] > 0.0
+
+
 def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
     class _NoAlignedColumnSink(IColumnSink):
         def __init__(self) -> None:
