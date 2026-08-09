@@ -355,9 +355,7 @@ def test_accumulator_edge_branches_and_rss(monkeypatch):
             run_id="r1",
         )
     )
-    accum.on_pipeline_end(
-        event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.2), run_id="r1", meta={"node_id": "n1"})
-    )
+    accum.on_pipeline_end(event_envelope(PipelineEndEvent(total_batches=1, total_duration=0.2), run_id="r1", meta={"node_id": "n1"}))
     node = accum.nodes[0]
     assert node["demand_id"] == "n1"
     assert node["memory"]["peak_mb"] is not None
