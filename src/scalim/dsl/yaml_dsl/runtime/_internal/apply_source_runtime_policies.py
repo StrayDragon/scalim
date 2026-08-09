@@ -42,7 +42,13 @@ def resolve_chunk_parallelism_from_runtime(
     max_chunk_workers: Optional[int],
     lookup_chunking: Mapping[str, LookupChunking],
 ) -> Tuple[bool, Optional[int]]:
-    """合并旧平铺布尔与 `LookupChunking.sized(parallel=...)`."""
+    """合并旧平铺布尔与 `LookupChunking.sized(parallel=...)`.
+
+    返回 `(enabled, workers)`:
+    - `enabled`: 任一 sized(parallel=True) 或遗留 `parallelize_lookup_chunks=True`
+    - `workers`: 取顶层 `max_chunk_workers` 与各 sized 策略中非 None 值的**最小值**(更紧的帽优先);
+      若全部为 None 则保持 None(由 runtime 另按 max_workers 解析)
+    """
     any_parallel = any(policy.wants_parallel() for policy in lookup_chunking.values())
     enabled = bool(parallelize_lookup_chunks) or any_parallel
 

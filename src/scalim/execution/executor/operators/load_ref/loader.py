@@ -454,7 +454,7 @@ def _load_ref_chunked(
     cache_key: Optional[LoadRefCacheKey],
 ) -> LoaderResultMap:
     fanout = runtime.resolve_chunk_fanout(_chunk_count(len(lookup_keys_list), chunk_size))
-    source_parallel = getattr(source, "lookup_chunk_parallel", None)
+    source_parallel = source.lookup_chunk_parallel
     if source_parallel is False:
         fanout = 1
     if fanout > 1:

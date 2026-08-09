@@ -193,4 +193,14 @@ class SourceSpecIrCacheMode(StrEnum):
         return self != SourceSpecIrCacheMode.NONE
 
 
+class RowsReuseMode(StrEnum):
+    """`$rows.cache_mode` / `RowsReuse` 批次内 relation 复用策略闭集."""
+
+    BATCH = "batch"
+    """批次内复用同 relation 的加载结果."""
+
+    NONE = "none"
+    """禁用批次内复用."""
+
+
 __all__ = ()

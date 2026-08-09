@@ -170,6 +170,76 @@ def test_run_overrides_csv_file_encoding_default_is_utf8(tmp_path: Path) -> None
     assert file_override.encoding == "utf-8"
 
 
+def test_yaml_csv_file_omitted_encoding_defaults_utf8() -> None:
+    config = YamlDemandLoader().load_string(
+        """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+  fields:
+    order_id:
+      extract: order_id
+sources: {}
+resources:
+  files:
+    detail_csv: {csv_file: {path: ./out}}
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    fields: [order_id]
+""".lstrip()
+    )
+    assert config.resources is not None
+    assert config.resources.files["detail_csv"].encoding == "utf-8"
+
+
+def test_source_cache_python_preload_beats_yaml_none(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        _minimal_demand_yaml(customers_extra="    cache_mode: none"),
+        encoding="utf-8",
+    )
+
+    compilation = compile(
+        str(yaml_path),
+        options=DemandRunOptions(
+            security=_security(),
+            runtime=DemandRunRuntimeOptions(
+                source_cache={"customers": SourceCache.preload_forever()},
+            ),
+        ),
+    )
+
+    assert compilation.config.sources["customers"].cache_mode == "none"
+    assert compilation.demand_ir.sources["customers"].cache_mode == SourceSpecIrCacheMode.PRELOAD_FOREVER
+
+
+def test_rows_reuse_python_batch_beats_yaml_none(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(
+        _minimal_demand_yaml(
+            customers_params="      rows:\n        $rows:\n          cache_mode: none",
+        ),
+        encoding="utf-8",
+    )
+
+    compilation = compile(
+        str(yaml_path),
+        options=DemandRunOptions(
+            security=_security(),
+            runtime=DemandRunRuntimeOptions(
+                rows_reuse={"customers": RowsReuse.batch()},
+            ),
+        ),
+    )
+
+    binding = compilation.demand_ir.sources["customers"].bind
+    assert binding is not None
+    assert binding.mode == "rows"
+    assert binding.cache_mode == "batch"
+
+
 def test_lookup_chunking_sized_parallel_sets_source_and_request_parallel(tmp_path: Path) -> None:
     yaml_path = tmp_path / "demand.yaml"
     yaml_path.write_text(_minimal_demand_yaml(), encoding="utf-8")
@@ -179,6 +249,8 @@ def test_lookup_chunking_sized_parallel_sets_source_and_request_parallel(tmp_pat
         options=DemandRunOptions(
             security=_security(),
             runtime=DemandRunRuntimeOptions(
+                parallel_mode="adaptive",
+                max_workers=3,
                 lookup_chunking={"customers": LookupChunking.sized(5, parallel=True)},
             ),
         ),
@@ -188,3 +260,10 @@ def test_lookup_chunking_sized_parallel_sets_source_and_request_parallel(tmp_pat
     assert source.lookup_chunk_size == 5
     assert source.lookup_chunk_parallel is True
     assert compilation.request.parallelize_lookup_chunks is True
+
+
+def test_lookup_chunking_post_init_rejects_invalid_max_chunk_workers() -> None:
+    with pytest.raises(ValueError, match="max_chunk_workers"):
+        _ = LookupChunking(size=2, parallel=False, max_chunk_workers=0, _kind="sized")
+    with pytest.raises(TypeError, match="max_chunk_workers"):
+        _ = LookupChunking(size=2, parallel=False, max_chunk_workers=True, _kind="sized")  # type: ignore[arg-type]

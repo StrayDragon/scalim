@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Uni
 
 from ...exceptions import ScalimYamlError
 from ...spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
-from ...typedefs import LoaderCallKwargs, RuntimeValue
+from ...typedefs import LoaderCallKwargs, RowsReuseMode, RuntimeValue
 from ...vendor.compact.typing_extensionsx import TypeGuard, override
 from ...vendor.dataclassesx import dataclass
 
@@ -561,8 +561,8 @@ def _parse_rows_options(options_raw: Any, *, path: str) -> str:
         path=path,
         directive=_DIRECTIVE_ROWS,
         option_key="cache_mode",
-        default_value="batch",
-        allowed_values=("batch", "none"),
+        default_value=RowsReuseMode.BATCH.value,
+        allowed_values=tuple(mode.value for mode in RowsReuseMode),
     )
 
 

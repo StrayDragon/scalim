@@ -64,7 +64,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         cleaned = dict(config)
         cleaned = self._strip_removed_demand_runtime_policy_top_level(cleaned, issues)
         cleaned = self._strip_removed_demand_runtime_policy_main_source_retry(cleaned, issues)
-        return self._strip_removed_demand_runtime_policy_sources_retry_and_lookup_chunk(cleaned, issues)
+        return self._strip_removed_source_runtime_policy_keys(cleaned, issues)
 
     def _error_and_strip_removed_output_extras_fields(
         self,
@@ -545,7 +545,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         return cleaned
 
     @staticmethod
-    def _strip_removed_demand_runtime_policy_sources_retry_and_lookup_chunk(
+    def _strip_removed_source_runtime_policy_keys(
         cleaned: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:

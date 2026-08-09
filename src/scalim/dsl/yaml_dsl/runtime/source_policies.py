@@ -4,7 +4,7 @@
 覆盖优先级:显式 Python > YAML 声明 > builtin 默认.
 """
 
-from ....typedefs import SourceSpecIrCacheMode
+from ....typedefs import RowsReuseMode, SourceSpecIrCacheMode
 from ....vendor.dataclassesx import dataclass
 
 
@@ -30,33 +30,28 @@ class SourceCache:
     def to_ir_mode(self) -> SourceSpecIrCacheMode:
         return self._mode
 
-    def to_yaml_value(self) -> str:
-        return str(self._mode.value)
-
 
 @dataclass(frozen=True)
 class RowsReuse:
     """`params` 内 `$rows.cache_mode` 的 Python 覆盖策略(批次内 relation 复用)."""
 
-    _mode: str = "batch"
+    _mode: RowsReuseMode = RowsReuseMode.BATCH
 
     @classmethod
     def batch(cls) -> "RowsReuse":
-        return cls(_mode="batch")
+        return cls(_mode=RowsReuseMode.BATCH)
 
     @classmethod
     def none(cls) -> "RowsReuse":
-        return cls(_mode="none")
+        return cls(_mode=RowsReuseMode.NONE)
 
     def __post_init__(self) -> None:
-        mode = str(self._mode or "").strip()
-        if mode not in ("batch", "none"):
-            msg = "RowsReuse mode must be 'batch' or 'none'"
-            raise ValueError(msg)
-        object.__setattr__(self, "_mode", mode)
+        if not isinstance(self._mode, RowsReuseMode):
+            msg = "RowsReuse._mode must be a RowsReuseMode"
+            raise TypeError(msg)
 
     def to_binding_cache_mode(self) -> str:
-        return self._mode
+        return str(self._mode.value)
 
 
 __all__ = ("RowsReuse", "SourceCache")

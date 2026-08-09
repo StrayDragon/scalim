@@ -6,7 +6,7 @@ from ....execution.excel_column_residency import ExcelColumnResidency
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
-from ....execution.lookup_chunking import LookupChunking
+from ....execution.lookup_chunking import LookupChunking, normalize_optional_max_chunk_workers
 from ....execution.run_ir import ExecutionResult
 from ....hooks import IExecutionHook
 from ....ob.observer import Observer
@@ -599,7 +599,7 @@ class DemandRunRuntimeOptions:
             raise ValueError(msg)
         object.__setattr__(self, "max_workers", int(max_workers))
 
-        self._validate_chunk_parallelism()
+        self._normalize_runtime_source_policies()
 
         object.__setattr__(self, "key_normalization", normalize_key_normalization(self.key_normalization))
 
@@ -615,20 +615,20 @@ class DemandRunRuntimeOptions:
             msg = "DemandRunRuntimeOptions.batch_size must be >= 1 when provided"
             raise ValueError(msg)
 
-    def _validate_chunk_parallelism(self) -> None:
+    def _normalize_runtime_source_policies(self) -> None:
+        """校验片间并行护栏,并规范化 typed source 策略映射."""
         if not isinstance(self.parallelize_lookup_chunks, bool):
             msg = "DemandRunRuntimeOptions.parallelize_lookup_chunks must be a boolean"
             raise TypeError(msg)
 
-        max_chunk_workers = self.max_chunk_workers
-        if max_chunk_workers is not None:
-            if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
-                msg = "DemandRunRuntimeOptions.max_chunk_workers must be an int or None"
-                raise TypeError(msg)
-            if int(max_chunk_workers) < 1:
-                msg = "DemandRunRuntimeOptions.max_chunk_workers must be >= 1 when provided"
-                raise ValueError(msg)
-            object.__setattr__(self, "max_chunk_workers", int(max_chunk_workers))
+        object.__setattr__(
+            self,
+            "max_chunk_workers",
+            normalize_optional_max_chunk_workers(
+                self.max_chunk_workers,
+                label="DemandRunRuntimeOptions.max_chunk_workers",
+            ),
+        )
 
         object.__setattr__(
             self,

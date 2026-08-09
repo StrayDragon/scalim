@@ -79,6 +79,7 @@ def _build_scenario(
     *,
     loader,  # type: ignore[no-untyped-def]
     chunk_size: Optional[int] = 2,
+    lookup_chunk_parallel: Optional[bool] = None,
     row_count: int = 6,
     parallel_mode: str = "seq",
     parallelize_lookup_chunks: bool = False,
@@ -99,6 +100,7 @@ def _build_scenario(
         key=KeyIr(key="target_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:targets")),
         lookup_chunk_size=chunk_size,
+        lookup_chunk_parallel=lookup_chunk_parallel,
     )
     field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
     binding = BindingIr(
@@ -193,6 +195,37 @@ def test_sized_without_parallel_is_not_a_parallel_switch() -> None:
 
     assert len(loader.calls) == 3
     assert set(loader.threads) == {threading.current_thread().name}
+
+
+def test_sized_parallel_true_enables_chunk_parallelism_without_legacy_bool() -> None:
+    """`LookupChunking.sized(..., parallel=True)` stamps IR + enables request parallel (no legacy bool)."""
+    from scalim.dsl.yaml_dsl.runtime._internal.apply_source_runtime_policies import (  # noqa: PLC0415
+        resolve_chunk_parallelism_from_runtime,
+    )
+    from scalim.execution.lookup_chunking import LookupChunking  # noqa: PLC0415
+
+    policy = LookupChunking.sized(2, parallel=True)
+    enabled, _workers = resolve_chunk_parallelism_from_runtime(
+        parallelize_lookup_chunks=False,
+        max_chunk_workers=None,
+        lookup_chunking={"targets": policy},
+    )
+    assert enabled is True
+
+    loader = _RecordingLoader()
+    scenario = _build_scenario(
+        loader=loader,
+        chunk_size=policy.effective_chunk_size(),
+        lookup_chunk_parallel=True,
+        parallel_mode="adaptive",
+        parallelize_lookup_chunks=enabled,
+        max_workers=3,
+    )
+    assert scenario.runtime.is_chunk_parallelism_enabled() is True
+    scenario.execute()
+
+    assert len(loader.calls) == 3
+    assert loader.threads != [threading.current_thread().name] * 3
 
 
 def test_adaptive_opt_in_merge_equals_serial() -> None:
