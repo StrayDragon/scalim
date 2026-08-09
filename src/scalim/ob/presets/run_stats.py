@@ -5,7 +5,7 @@ import os
 import warnings
 from typing import Any, Dict, List, Optional, Set
 
-from ...events import EventType
+from ...events import Event, EventType
 from ...vendor.dataclassesx import dataclass, field
 from ..observer import EventDispatchObserver
 
