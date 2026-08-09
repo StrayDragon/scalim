@@ -67,20 +67,34 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
     Subscribes only to lite EventTypes (no RELATION_LOOKUP / ROW_WRITE / FIELD_COMPUTE).
     """
 
-    event_types = {
-        EventType.PIPELINE_START,
-        EventType.PIPELINE_END,
-        EventType.BATCH_START,
-        EventType.BATCH_END,
-        EventType.STAGE_SPAN,
-        EventType.LOADER_CALL,
-        EventType.OUTPUT_TARGET_END,
-    }  # type: Set[EventType]
+    event_types: Optional[Set[EventType]]
+    sample_rss: bool
+    persist_batches: bool
+    nodes: List[Dict[str, Any]]
+    _batch_persist_warned: bool
+    _pipeline_start_rss: Optional[float]
+    _batches: List[Dict[str, Any]]
+    _batch_index: Dict[int, Dict[str, Any]]
+    _loaders: Dict[str, Dict[str, Any]]
+    _outputs: List[Dict[str, Any]]
+    _total_rows_in: int
+    _batch_size: Optional[int]
+    _current_run_id: Optional[str]
+    _current_demand_id: Optional[str]
 
     def __init__(self, sample_rss=False, persist_batches=True):
         # type: (bool, bool) -> None
         self.sample_rss = bool(sample_rss)
         self.persist_batches = bool(persist_batches)
+        self.event_types = {
+            EventType.PIPELINE_START,
+            EventType.PIPELINE_END,
+            EventType.BATCH_START,
+            EventType.BATCH_END,
+            EventType.STAGE_SPAN,
+            EventType.LOADER_CALL,
+            EventType.OUTPUT_TARGET_END,
+        }
         self.nodes = []  # type: List[Dict[str, Any]]
         self._batch_persist_warned = False
         self._reset_current()
@@ -102,15 +116,14 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         self._reset_current()
         payload = event.payload
         self._batch_size = getattr(payload, "batch_size", None)
-        run_id = str(getattr(event, "run_id", "") or "").strip() or None
-        meta = getattr(event, "meta", None) or {}
-        demand_id = None
-        if isinstance(meta, dict):
-            for key in ("demand_id", "workflow_node_id", "node_id"):
-                raw = meta.get(key)
-                if raw is not None and str(raw).strip():
-                    demand_id = str(raw).strip()
-                    break
+        run_id = str(event.run_id or "").strip() or None
+        meta = event.meta  # type: Dict[str, Any]
+        demand_id = None  # type: Optional[str]
+        for key in ("demand_id", "workflow_node_id", "node_id"):
+            raw = meta.get(key)
+            if raw is not None and str(raw).strip():
+                demand_id = str(raw).strip()
+                break
         self._current_run_id = run_id
         self._current_demand_id = demand_id or run_id
 
@@ -129,7 +142,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             "stages": {k: 0.0 for k in _STAGES},
             "rss_mb": _rss_mb() if self.sample_rss else None,
             "loaders": [],
-        }
+        }  # type: Dict[str, Any]
         self._batch_index[int(payload.batch_num)] = entry
         if self.persist_batches:
             self._batches.append(entry)
@@ -154,8 +167,9 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         if entry is None:
             return
         stage = str(payload.stage)
-        if stage in entry["stages"]:
-            entry["stages"][stage] += max(0.0, float(payload.duration))
+        stages = entry["stages"]  # type: Dict[str, float]
+        if stage in stages:
+            stages[stage] += max(0.0, float(payload.duration))
 
     def on_loader_call(self, event):
         # type: (Event) -> None
@@ -166,8 +180,8 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         except TypeError:
             rows = 0
         duration = float(payload.duration)
-        agg = self._loaders.get(name)
-        if agg is None:
+        existing = self._loaders.get(name)
+        if existing is None:
             agg = {
                 "name": name,
                 "calls": 0,
@@ -175,19 +189,22 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
                 "records": 0,
                 "cache_hits": 0,
                 "cache_misses": 0,
-            }
+            }  # type: Dict[str, Any]
             self._loaders[name] = agg
-        agg["calls"] += 1
-        agg["total_s"] += duration
-        agg["records"] += rows
+        else:
+            agg = existing
+        agg["calls"] = int(agg.get("calls") or 0) + 1
+        agg["total_s"] = float(agg.get("total_s") or 0.0) + duration
+        agg["records"] = int(agg.get("records") or 0) + rows
         if payload.cache_status == "hit":
-            agg["cache_hits"] += 1
+            agg["cache_hits"] = int(agg.get("cache_hits") or 0) + 1
         elif payload.cache_status == "miss":
-            agg["cache_misses"] += 1
+            agg["cache_misses"] = int(agg.get("cache_misses") or 0) + 1
         if payload.batch_num is not None:
             entry = self._batch_index.get(int(payload.batch_num))
             if entry is not None:
-                entry["loaders"].append(
+                loaders = entry["loaders"]  # type: List[Dict[str, Any]]
+                loaders.append(
                     {
                         "name": name,
                         "duration_s": duration,
@@ -215,19 +232,21 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         # type: (Event) -> None
         payload = event.payload
         end_rss = _rss_mb() if self.sample_rss else None
-        stages_total = {k: 0.0 for k in _STAGES}
+        stages_total = {k: 0.0 for k in _STAGES}  # type: Dict[str, float]
         for batch in self._batches:
+            batch_stages = batch["stages"]  # type: Dict[str, float]
             for key in _STAGES:
-                stages_total[key] += float(batch["stages"].get(key, 0.0))
+                stages_total[key] += float(batch_stages.get(key, 0.0))
         if not self._batches:
             for entry in self._batch_index.values():
+                entry_stages = entry["stages"]  # type: Dict[str, float]
                 for key in _STAGES:
-                    stages_total[key] += float(entry["stages"].get(key, 0.0))
-        loaders = []
+                    stages_total[key] += float(entry_stages.get(key, 0.0))
+        loaders = []  # type: List[Dict[str, Any]]
         for name in sorted(self._loaders):
-            item = dict(self._loaders[name])
-            denom = item["cache_hits"] + item["cache_misses"]
-            item["cache_hit_rate"] = (item["cache_hits"] / float(denom)) if denom else 0.0
+            item = dict(self._loaders[name])  # type: Dict[str, Any]
+            denom = int(item["cache_hits"]) + int(item["cache_misses"])
+            item["cache_hit_rate"] = (int(item["cache_hits"]) / float(denom)) if denom else 0.0
             item["total_s"] = round(float(item["total_s"]), 4)
             loaders.append(item)
         peak_vals = [float(b["rss_mb"]) for b in self._batches if b.get("rss_mb") is not None]
@@ -236,14 +255,13 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         if self._pipeline_start_rss is not None:
             peak_vals.append(float(self._pipeline_start_rss))
         demand_id = self._current_demand_id
-        end_meta = getattr(event, "meta", None) or {}
-        if isinstance(end_meta, dict):
-            for key in ("demand_id", "workflow_node_id", "node_id"):
-                raw = end_meta.get(key)
-                if raw is not None and str(raw).strip():
-                    demand_id = str(raw).strip()
-                    break
-        run_id = str(getattr(event, "run_id", "") or "").strip() or self._current_run_id
+        end_meta = event.meta  # type: Dict[str, Any]
+        for key in ("demand_id", "workflow_node_id", "node_id"):
+            raw = end_meta.get(key)
+            if raw is not None and str(raw).strip():
+                demand_id = str(raw).strip()
+                break
+        run_id = str(event.run_id or "").strip() or self._current_run_id
         if not demand_id:
             demand_id = run_id
         node = {
@@ -266,12 +284,12 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             "batches": list(self._batches) if self.persist_batches else [],
             "loaders": loaders,
             "outputs": list(self._outputs),
-        }
+        }  # type: Dict[str, Any]
         self.nodes.append(node)
 
     def build_run_stats(self, meta=None):
         # type: (Optional[Dict[str, Any]]) -> Dict[str, Any]
-        stages_total = {k: 0.0 for k in _STAGES}
+        stages_total = {k: 0.0 for k in _STAGES}  # type: Dict[str, float]
         loaders_map = {}  # type: Dict[str, Dict[str, Any]]
         outputs = []  # type: List[Dict[str, Any]]
         batches = []  # type: List[Dict[str, Any]]
@@ -283,16 +301,18 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         end_mb = None  # type: Optional[float]
 
         for node in self.nodes:
-            pipe = node.get("pipeline") or {}
+            pipe = node.get("pipeline") or {}  # type: Dict[str, Any]
             total_rows += int(pipe.get("total_rows_in") or 0)
             total_duration += float(pipe.get("total_duration_s") or 0.0)
             total_batches += int(pipe.get("total_batches") or 0)
+            node_stages = node.get("stages_total") or {}  # type: Dict[str, Any]
             for k in _STAGES:
-                stages_total[k] += float((node.get("stages_total") or {}).get(k) or 0.0)
-            for loader in node.get("loaders") or []:
-                name = loader.get("name") or ""
-                agg = loaders_map.get(name)
-                if agg is None:
+                stages_total[k] += float(node_stages.get(k) or 0.0)
+            node_loaders = node.get("loaders") or []  # type: List[Dict[str, Any]]
+            for loader in node_loaders:
+                name = str(loader.get("name") or "")
+                existing = loaders_map.get(name)
+                if existing is None:
                     agg = {
                         "name": name,
                         "calls": 0,
@@ -300,31 +320,42 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
                         "records": 0,
                         "cache_hits": 0,
                         "cache_misses": 0,
-                    }
+                    }  # type: Dict[str, Any]
                     loaders_map[name] = agg
-                agg["calls"] += int(loader.get("calls") or 0)
-                agg["total_s"] += float(loader.get("total_s") or 0.0)
-                agg["records"] += int(loader.get("records") or 0)
-                agg["cache_hits"] += int(loader.get("cache_hits") or 0)
-                agg["cache_misses"] += int(loader.get("cache_misses") or 0)
+                else:
+                    agg = existing
+                agg["calls"] = int(agg.get("calls") or 0) + int(loader.get("calls") or 0)
+                agg["total_s"] = float(agg.get("total_s") or 0.0) + float(loader.get("total_s") or 0.0)
+                agg["records"] = int(agg.get("records") or 0) + int(loader.get("records") or 0)
+                agg["cache_hits"] = int(agg.get("cache_hits") or 0) + int(loader.get("cache_hits") or 0)
+                agg["cache_misses"] = int(agg.get("cache_misses") or 0) + int(loader.get("cache_misses") or 0)
             outputs.extend(list(node.get("outputs") or []))
             batches.extend(list(node.get("batches") or []))
-            mem = node.get("memory") or {}
-            if mem.get("peak_mb") is not None:
-                peak_mb = float(mem["peak_mb"]) if peak_mb is None else max(peak_mb, float(mem["peak_mb"]))
-            if start_mb is None and mem.get("start_mb") is not None:
-                start_mb = float(mem["start_mb"])
-            if mem.get("end_mb") is not None:
-                end_mb = float(mem["end_mb"])
+            mem = node.get("memory") or {}  # type: Dict[str, Any]
+            peak_raw = mem.get("peak_mb")
+            if peak_raw is not None:
+                peak_val = float(peak_raw)
+                peak_mb = peak_val if peak_mb is None else max(peak_mb, peak_val)
+            start_raw = mem.get("start_mb")
+            if start_mb is None and start_raw is not None:
+                start_mb = float(start_raw)
+            end_raw = mem.get("end_mb")
+            if end_raw is not None:
+                end_mb = float(end_raw)
 
-        loaders = []
+        loaders = []  # type: List[Dict[str, Any]]
         for name in sorted(loaders_map):
-            item = dict(loaders_map[name])
-            denom = item["cache_hits"] + item["cache_misses"]
-            item["cache_hit_rate"] = (item["cache_hits"] / float(denom)) if denom else 0.0
+            item = dict(loaders_map[name])  # type: Dict[str, Any]
+            denom = int(item["cache_hits"]) + int(item["cache_misses"])
+            item["cache_hit_rate"] = (int(item["cache_hits"]) / float(denom)) if denom else 0.0
             item["total_s"] = round(float(item["total_s"]), 4)
             loaders.append(item)
-        loaders.sort(key=lambda x: -float(x.get("total_s") or 0.0))
+
+        def _loader_sort_key(x):
+            # type: (Dict[str, Any]) -> float
+            return -float(x.get("total_s") or 0.0)
+
+        loaders.sort(key=_loader_sort_key)
 
         return {
             "schema": SCHEMA_RUN_STATS,
@@ -427,7 +458,7 @@ def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=N
         return []
     payload = accum.build_run_stats(meta=meta)
     written = []  # type: List[str]
-    seen = set()  # type: set
+    seen = set()  # type: Set[str]
     for run_dir in run_dirs:
         key = os.path.abspath(str(run_dir))
         if key in seen:

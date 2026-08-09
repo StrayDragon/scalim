@@ -4,6 +4,8 @@ from typing import Dict, Mapping, Optional, Tuple
 
 from .....execution.lookup_chunking import LookupChunking
 from .....spec.ir import DemandIr, SourceIr
+from .....spec.ir.aliases import NormalizedLookupKeySpec
+from .....spec.ir.binding import BindingIr
 from .....vendor.dataclassesx import replace
 from ..source_policies import RowsReuse, SourceCache
 
@@ -104,7 +106,7 @@ def _apply_rows_reuse(source: SourceIr, policy: RowsReuse) -> SourceIr:
     if bind is not None and bind.mode == "rows" and bind.cache_mode != mode:
         next_bind = replace(bind, cache_mode=mode)
 
-    next_bindings: Dict = {}
+    next_bindings: Dict[NormalizedLookupKeySpec, BindingIr] = {}
     bindings_changed = False
     for key, binding in source.bindings.items():
         if binding.mode == "rows" and binding.cache_mode != mode:

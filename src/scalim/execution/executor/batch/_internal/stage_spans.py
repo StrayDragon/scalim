@@ -89,7 +89,10 @@ def attach_write_clock(runtime, clock):
 
 def get_write_clock(runtime):
     # type: (ExecutionRuntime) -> Optional[StageWriteClock]
-    return getattr(runtime, "write_stage_clock", None)
+    clock = runtime.write_stage_clock
+    if clock is None:
+        return None
+    return clock  # type: StageWriteClock
 
 
 __all__ = (

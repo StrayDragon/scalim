@@ -34,6 +34,18 @@ if TYPE_CHECKING:
     from ....spec.ir import DemandIr
 
 
+def _empty_lookup_chunking() -> Dict[str, LookupChunking]:
+    return {}
+
+
+def _empty_source_cache() -> Dict[str, SourceCache]:
+    return {}
+
+
+def _empty_rows_reuse() -> Dict[str, RowsReuse]:
+    return {}
+
+
 class _UnsetType:
     __slots__: Tuple[str, ...] = ()
 
@@ -558,13 +570,13 @@ class DemandRunRuntimeOptions:
     max_chunk_workers: Optional[int] = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
 
-    lookup_chunking: Mapping[str, LookupChunking] = dataclass_field(default_factory=dict)
+    lookup_chunking: Mapping[str, LookupChunking] = dataclass_field(default_factory=_empty_lookup_chunking)
     """per-source keys 分片策略(`LookupChunking.off|sized`);未配置的 source 默认不分片."""
 
-    source_cache: Mapping[str, SourceCache] = dataclass_field(default_factory=dict)
+    source_cache: Mapping[str, SourceCache] = dataclass_field(default_factory=_empty_source_cache)
     """per-source `SourceCache` 覆盖(Python > YAML `cache_mode` > `none`)."""
 
-    rows_reuse: Mapping[str, RowsReuse] = dataclass_field(default_factory=dict)
+    rows_reuse: Mapping[str, RowsReuse] = dataclass_field(default_factory=_empty_rows_reuse)
     """per-source `RowsReuse` 覆盖(Python > YAML `$rows.cache_mode` > `batch`)."""
 
     key_normalization: KeyNormalizationMode = "raw"
@@ -665,8 +677,9 @@ def _normalize_source_policy_mapping(raw: Any, *, field_name: str, expected_type
     if not isinstance(raw, Mapping):
         msg = "{} must be a Mapping[str, {}]".format(field_name, expected_type.__name__)
         raise TypeError(msg)
+    mapping = cast(Mapping[Any, Any], raw)
     normalized: Dict[str, Any] = {}
-    for raw_sid, policy in raw.items():
+    for raw_sid, policy in mapping.items():
         sid = str(raw_sid).strip()
         if not sid:
             msg = "{} keys must be non-empty source ids".format(field_name)

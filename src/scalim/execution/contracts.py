@@ -106,7 +106,7 @@ def _validate_execution_request_chunk_parallelism(parallelize_lookup_chunks: Run
     if not isinstance(parallelize_lookup_chunks, bool):
         msg = "ExecutionRequest.parallelize_lookup_chunks must be a boolean"
         raise TypeError(msg)
-    normalize_optional_max_chunk_workers(
+    _ = normalize_optional_max_chunk_workers(
         max_chunk_workers,
         label="ExecutionRequest.max_chunk_workers",
     )

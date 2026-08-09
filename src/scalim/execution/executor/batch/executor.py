@@ -226,8 +226,7 @@ class BatchExecutor:
                     loadref_ops = cast("List[LoadRefOp]", segment)  # pragma: allow-cast segment typed narrowing
                     stage = stage_map.get(OperatorType.LOAD_REF.value)
                     if wants_stage_spans and stage:
-                        if clock is not None:
-                            clock.enter_stage(stage)
+                        clock.enter_stage(stage)
                         start = perf_counter()
                         nested_write = 0.0
                         try:
@@ -242,8 +241,7 @@ class BatchExecutor:
                                 after_operator=after_operator,
                             )
                         finally:
-                            if clock is not None:
-                                nested_write = clock.exit_stage(stage)
+                            nested_write = clock.exit_stage(stage)
                         stage_durations[stage] += max(0.0, perf_counter() - start - nested_write)
                     else:
                         self._execute_loadref_segment(
@@ -287,12 +285,12 @@ class BatchExecutor:
                     if (wants_stage_spans and stage) or wants_compute_span:
                         start = perf_counter()
                         nested_write = 0.0
-                        if wants_stage_spans and stage and clock is not None:
+                        if wants_stage_spans and stage:
                             clock.enter_stage(stage)
                         try:
                             executor.execute(operator, context, batch_row_nth, runtime)
                         finally:
-                            if wants_stage_spans and stage and clock is not None:
+                            if wants_stage_spans and stage:
                                 nested_write = clock.exit_stage(stage)
                         wall = max(0.0, perf_counter() - start)
                         duration = max(0.0, wall - nested_write)

@@ -93,6 +93,8 @@ class ExecutionRuntime:
     runtime_bindings: RuntimeBindings
     call_by_dep_cardinality: Optional[CallByDepCardinalityCollector]
     call_by_memoization: Optional[CallByMemoizationController]
+    # Set by batch stage_spans attach_write_clock (StageWriteClock | None); Any avoids circular import.
+    write_stage_clock: Optional[Any]
 
     def __init__(
         self,
@@ -160,6 +162,7 @@ class ExecutionRuntime:
         self.relation_guardrail_stats = {}
         self.call_by_dep_cardinality = build_call_by_dep_cardinality_collector()
         self.call_by_memoization = build_call_by_memoization_controller()
+        self.write_stage_clock = None
 
     def is_chunk_parallelism_enabled(self) -> bool:
         """是否允许分片并行:仅运行级 `adaptive` + 显式 `opt-in`."""
