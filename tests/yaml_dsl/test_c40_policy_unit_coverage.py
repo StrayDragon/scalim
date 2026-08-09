@@ -63,6 +63,19 @@ def test_demand_run_runtime_options_policy_mapping_normalize() -> None:
         _ = DemandRunRuntimeOptions(lookup_chunking={"s": object()})  # type: ignore[dict-item]
 
 
+def test_resolve_chunk_parallelism_takes_min_workers() -> None:
+    enabled, workers = resolve_chunk_parallelism_from_runtime(
+        parallelize_lookup_chunks=False,
+        max_chunk_workers=8,
+        lookup_chunking={
+            "a": LookupChunking.sized(10, parallel=True, max_chunk_workers=4),
+            "b": LookupChunking.sized(10, parallel=True, max_chunk_workers=None),
+        },
+    )
+    assert enabled is True
+    assert workers == 4
+
+
 def test_resolve_chunk_parallelism_keeps_tighter_top_level_workers() -> None:
     enabled, workers = resolve_chunk_parallelism_from_runtime(
         parallelize_lookup_chunks=True,
