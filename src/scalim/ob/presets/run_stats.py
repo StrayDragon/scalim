@@ -1,3 +1,4 @@
+# pragma: allow-dynattr-file optional-interface: run_stats observes heterogeneous Event payloads and Viz observer configs
 # region imports
 
 import json

@@ -865,7 +865,9 @@ def _run_ir_with_plan_and_managers(
                 engine_sink.close()
             finally:
                 with contextlib.suppress(Exception):
-                    maybe_auto_write_run_stats_beside_viz(getattr(observer_manager, "observers", None) or [])
+                    maybe_auto_write_run_stats_beside_viz(
+                        getattr(observer_manager, "observers", None) or []  # pragma: allow-dynattr optional-interface: ObserverManager.observers
+                    )
                 with contextlib.suppress(Exception):
                     observer_manager.close()
         else:
