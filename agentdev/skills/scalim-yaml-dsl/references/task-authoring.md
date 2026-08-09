@@ -77,7 +77,7 @@ resources:
   - `scalim.dsl.yaml_dsl.run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(batch_size=..., loader_retry=..., guardrails=..., demand_failure_policy=...))))`
 - workflow 下如需“不同 run 使用不同运行期策略”,请在调用侧使用 `WorkflowRunOptions(patches_by_run_id=...)` 按 `workflow.runs[*].id` 注入 `WorkflowNodePatch`(不支持 dict patch)。
 - book 写入策略已迁出 YAML: 用 `DemandRunOptions.resources_policy` / `WorkflowRunOptions.resources_policy`(`ResourcesPolicy`/`BookWritePolicy`);YAML 不得再写 `write_defaults`(见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`)。book cell/sheet `budget` / `BookBudgetPolicy` **已移除**（残留字段删即可，见 `references/upgrades/2026-07-28-remove-book-budget-policy.md`）。book identity 唯一分支 `xlsx`（见 `references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`）。
-- **0.10.0 默认行为**（无新 YAML）: write-precompute / row-wise fusion 默认开启；`lookup_chunk_size` 仍只表分片大小。同 LoadRef 片间并行须 Python opt-in `parallelize_lookup_chunks` + `parallel_mode=adaptive`（见 `references/0.10-release-highlights.md`）。
+- **0.10.0 默认行为**（创建新 YAML）: write-precompute / row-wise fusion 默认开启；keys 分片用 Python `LookupChunking.sized(...)`（YAML `lookup_chunk_size` 已迁出）。片间并行嵌在 `sized(..., parallel=True)` 且须 `parallel_mode=adaptive`（见 `references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`）。
 
 ## 关键规则
 

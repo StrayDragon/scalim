@@ -7,6 +7,7 @@ from scalim.dsl.yaml_dsl import (
     DemandRunRuntimeOptions,
     DemandRunSecurityOptions,
     DemandRunTemplateOptions,
+    LookupChunking,
     WorkflowRunOptions,
     run_workflow,
 )
@@ -53,7 +54,13 @@ def test_demo_big_data_report_workflow_demo_smoke(tmp_path: Path, monkeypatch: p
                 allowed_yaml_roots=(str(repo_root),),
             ),
             template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
-            runtime=DemandRunRuntimeOptions(batch_size=30),
+            runtime=DemandRunRuntimeOptions(
+                batch_size=30,
+                lookup_chunking={
+                    "customers": LookupChunking.sized(5),
+                    "products": LookupChunking.sized(5),
+                },
+            ),
         )
         options = WorkflowRunOptions(
             demand=demand_options,

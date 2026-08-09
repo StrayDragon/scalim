@@ -20,7 +20,8 @@ options = DemandRunOptions(
             # "customers": LookupChunking.sized(800, parallel=True),  # 片间并行（须 parallel_mode=adaptive）
             # "customers": LookupChunking.off(),
         },
-        # 推荐：并行挂在 sized 上；旧 parallelize_lookup_chunks 仍兼容但不再是推荐 SSOT
+        # 推荐：并行挂在 sized 上。旧 parallelize_lookup_chunks 仅在未经 LookupChunking
+        # 写入 per-source parallel 标志的 IR 路径仍可继承；已用 sized(...) 时请写 parallel=True。
         parallel_mode="adaptive",
     ),
 )

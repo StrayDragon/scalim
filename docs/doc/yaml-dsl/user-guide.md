@@ -1291,7 +1291,7 @@ runtime = DemandRunRuntimeOptions(
 - 仅在下游有硬限制时设置(例如 SQL `IN (...)` 长度、HTTP payload、供应商 API 批次上限).
 - 需要分片时:**取下游限制允许的最大安全值**(例如上限的 50–80%),避免习惯性写 `50`/`100`.
 - `LookupChunking.sized(size=...)` **alone 不是并行开关**;片间并行须嵌在 `sized(..., parallel=True)` 且 `parallel_mode=adaptive`.
-- 旧平铺 `parallelize_lookup_chunks=True` 仍兼容,但推荐迁到 sized 的 `parallel=`.
+- 旧平铺 `parallelize_lookup_chunks=True`：仅在 **未**经 `LookupChunking` 写入 `SourceIr.lookup_chunk_parallel` 的 IR（`None` 继承）路径仍生效；若已用 `LookupChunking.sized(...)`，并行请写 `sized(..., parallel=True)`，不要指望平铺布尔覆盖 sized 的显式串行。
 - 护栏见 [执行并行模式 §3.6](../architecture/parallel-modes.md)；迁移卡见 skill upgrade `2026-08-09-lookup-chunking-python-ssot`.
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.

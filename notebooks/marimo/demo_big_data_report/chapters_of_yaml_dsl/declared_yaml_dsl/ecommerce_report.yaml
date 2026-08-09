@@ -224,7 +224,6 @@ sources:
   customers:
     loader: scalim_misc.demo_big_data_report.loaders:load_customers
     key: customer_id
-    lookup_chunk_size: 5
     params:
       ids: {$keys: {as: list}}
     fields:

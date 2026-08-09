@@ -13,6 +13,7 @@ from scalim.dsl.yaml_dsl import (
     DemandRunRuntimeOptions,
     DemandRunSecurityOptions,
     DemandRunTemplateOptions,
+    LookupChunking,
     WorkflowRunOptions,
     run_workflow,
 )
@@ -127,7 +128,13 @@ def run_workflow_demo_big_data_report(
                             allowed_yaml_roots=(str(repo_root),),
                         ),
                         template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
-                        runtime=DemandRunRuntimeOptions(batch_size=30),
+                        runtime=DemandRunRuntimeOptions(
+                            batch_size=30,
+                            lookup_chunking={
+                                "customers": LookupChunking.sized(5),
+                                "products": LookupChunking.sized(5),
+                            },
+                        ),
                     )
                     result = run_workflow(
                         str(wf_copy),

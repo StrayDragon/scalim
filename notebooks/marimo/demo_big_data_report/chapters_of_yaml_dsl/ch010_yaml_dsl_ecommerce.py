@@ -8,8 +8,10 @@ from scalim.dsl.yaml_dsl import (
     CaptureRows,
     DemandRunOptions,
     DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
     DemandRunSecurityOptions,
     DemandRunTemplateOptions,
+    LookupChunking,
     compile as compile_yaml,
     run as run_yaml,
 )
@@ -54,9 +56,12 @@ def run_yaml_dsl_ecommerce(
         try:
             security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
             template = DemandRunTemplateOptions(init_vars=init_vars)
+            runtime = DemandRunRuntimeOptions(
+                lookup_chunking={"customers": LookupChunking.sized(5)},
+            )
             compilation = compile_yaml(
                 str(yaml_path),
-                options=DemandRunOptions(security=security, template=template),
+                options=DemandRunOptions(security=security, template=template, runtime=runtime),
             )
         except Exception as exc:
             summary = "compile failed: {}".format(exc)
@@ -77,6 +82,7 @@ def run_yaml_dsl_ecommerce(
             options=DemandRunOptions(
                 security=security,
                 template=template,
+                runtime=runtime,
                 outputs=DemandRunOutputOptions(capture=CaptureRows()),
             ),
         )
