@@ -30,7 +30,6 @@ class _FieldNames:
     CACHE_MODE: str = SOURCE_KEYS["cache_mode"]
     BIND: str = "bind"
     LOOKUP_CAST: str = SOURCE_KEYS["lookup_cast"]
-    LOOKUP_CHUNK_SIZE: str = SOURCE_KEYS["lookup_chunk_size"]
     NORMALIZE: str = SOURCE_KEYS["normalize"]
     PARAMS: str = SOURCE_KEYS["params"]
     NORMALIZE_KIND: str = NORMALIZE_KEYS["kind"]

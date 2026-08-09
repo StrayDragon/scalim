@@ -239,7 +239,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
             loader_spec=loader_ir,
             fk_fields=fk_fields,
             cache_mode=cache_mode,
-            lookup_chunk_size=source_config.lookup_chunk_size,
+            lookup_chunk_size=None,
             bindings={},
             bind=bind_ir,
             normalize=normalize_ir,

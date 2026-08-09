@@ -129,7 +129,6 @@ class ParserSourcesMixin:
             source_id = str(source_id_raw)
             key = self._parse_key(source_data)
             lookup_cast = self._parse_lookup_cast(source_data.get(SOURCE_KEYS["lookup_cast"]))
-            lookup_chunk_size = self._parse_lookup_chunk_size(source_data.get(SOURCE_KEYS["lookup_chunk_size"]))
             normalize = self._parse_normalize(source_data.get(SOURCE_KEYS["normalize"]))
             params = self._parse_params(source_data)
 
@@ -138,7 +137,6 @@ class ParserSourcesMixin:
                 loader=str(source_data.get(SOURCE_KEYS["loader"], "")),
                 key=key,
                 lookup_cast=lookup_cast,
-                lookup_chunk_size=lookup_chunk_size,
                 normalize=normalize,
                 cache_mode=str(source_data.get(SOURCE_KEYS["cache_mode"], DEFAULT_CACHE_MODE)),
                 params=params,
@@ -171,25 +169,12 @@ class ParserSourcesMixin:
                 loader=source_config.loader,
                 key=source_config.key,
                 lookup_cast=source_config.lookup_cast,
-                lookup_chunk_size=source_config.lookup_chunk_size,
                 normalize=source_config.normalize,
                 cache_mode=source_config.cache_mode,
                 fields=fields_by_source.get(source_id, {}),
                 params=source_config.params,
             )
         return updated
-
-    def _parse_lookup_chunk_size(self, raw_value: Any) -> Optional[int]:
-        if raw_value is None:
-            return None
-        if isinstance(raw_value, bool):
-            return None
-        if not isinstance(raw_value, (int, float, str)):
-            return None
-        try:
-            return int(raw_value)
-        except (TypeError, ValueError):
-            return None
 
     def _parse_lookup_cast(self, raw_lookup: Any) -> Optional[LookupCastConfig]:
         lookup_dict = mapping_or_none(raw_lookup)

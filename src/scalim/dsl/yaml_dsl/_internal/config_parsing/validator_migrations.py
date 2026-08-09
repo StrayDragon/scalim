@@ -64,7 +64,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         cleaned = dict(config)
         cleaned = self._strip_removed_demand_runtime_policy_top_level(cleaned, issues)
         cleaned = self._strip_removed_demand_runtime_policy_main_source_retry(cleaned, issues)
-        return self._strip_removed_demand_runtime_policy_sources_retry(cleaned, issues)
+        return self._strip_removed_demand_runtime_policy_sources_retry_and_lookup_chunk(cleaned, issues)
 
     def _error_and_strip_removed_output_extras_fields(
         self,
@@ -545,7 +545,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         return cleaned
 
     @staticmethod
-    def _strip_removed_demand_runtime_policy_sources_retry(
+    def _strip_removed_demand_runtime_policy_sources_retry_and_lookup_chunk(
         cleaned: Dict[str, Any],
         issues: List["ValidationIssue"],
     ) -> Dict[str, Any]:
@@ -556,24 +556,48 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         next_sources: Optional[Dict[str, Any]] = None
         for source_id, source_cfg_raw in sources.items():
             source_cfg = as_mapping(source_cfg_raw, path="sources.{}".format(str(source_id)))
-            if source_cfg is None or "retry" not in source_cfg:
+            if source_cfg is None:
+                continue
+
+            remove_keys: List[Tuple[str, str]] = []
+            if "retry" in source_cfg:
+                remove_keys.append(
+                    (
+                        "retry",
+                        (
+                            "YAML key 'sources.*.retry' was moved out of YAML mainline (runtime policy boundary). "
+                            "Hint: configure loader retry via runtime entrypoints: "
+                            "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
+                            "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
+                        ),
+                    )
+                )
+            if "lookup_chunk_size" in source_cfg:
+                remove_keys.append(
+                    (
+                        "lookup_chunk_size",
+                        (
+                            "sources.{}.lookup_chunk_size was moved out of YAML authoring. "
+                            "Configure LookupChunking via DemandRunOptions.runtime "
+                            "(DemandRunRuntimeOptions.lookup_chunking={{...: LookupChunking.sized(...)}}); "
+                            "see upgrade notes."
+                        ).format(str(source_id)),
+                    )
+                )
+            if not remove_keys:
                 continue
 
             if next_sources is None:
                 next_sources = dict(sources)
 
-            ValidatorMigrationsMixin._append_removed_runtime_policy_error(
-                issues,
-                path="sources.{}.retry".format(str(source_id)),
-                msg=(
-                    "YAML key 'sources.*.retry' was moved out of YAML mainline (runtime policy boundary). "
-                    "Hint: configure loader retry via runtime entrypoints: "
-                    "scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions("
-                    "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
-                ),
-            )
             next_cfg: Dict[str, Any] = dict(source_cfg)
-            next_cfg.pop("retry", None)
+            for key, msg in remove_keys:
+                ValidatorMigrationsMixin._append_removed_runtime_policy_error(
+                    issues,
+                    path="sources.{}.{}".format(str(source_id), key),
+                    msg=msg,
+                )
+                next_cfg.pop(key, None)
             next_sources[str(source_id)] = next_cfg
 
         if next_sources is not None:

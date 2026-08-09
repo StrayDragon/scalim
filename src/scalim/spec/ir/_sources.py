@@ -183,6 +183,13 @@ class SourceIr:
     lookup_chunk_size: Optional[int] = None
     """
     在 `keys` 模式下,引用加载的 `lookup_keys` 分片大小;`None`/`0` 表示不分片.
+
+    来源:`DemandRunRuntimeOptions.lookup_chunking` / `LookupChunking`(YAML `lookup_chunk_size` 已迁出).
+    """
+
+    lookup_chunk_parallel: Optional[bool] = None
+    """
+    本 source 片间并行许可(`None`=继承运行级全局 opt-in;`True`/`False`=由 `LookupChunking.sized` 显式指定).
     """
 
     bindings: Mapping[NormalizedLookupKeySpec, BindingIr] = field(default_factory=_default_bindings, compare=False, hash=False)

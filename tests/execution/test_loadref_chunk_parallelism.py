@@ -1,4 +1,8 @@
-"""LoadRef `lookup_chunk_size` 分片并行(c30: opt-in + adaptive-only)测试."""
+"""LoadRef `SourceIr.lookup_chunk_size` 分片并行(c30: opt-in + adaptive-only)测试.
+
+YAML `sources.*.lookup_chunk_size` 已迁出;本文件直接构造 IR/`parallelize_lookup_chunks`.
+分片大小 alone 不是并行开关(`LookupChunking.sized(..., parallel=False)` / IR size + 全局未 opt-in).
+"""
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -180,7 +184,8 @@ def test_adaptive_without_opt_in_stays_serial() -> None:
     assert set(loader.threads) == {threading.current_thread().name}
 
 
-def test_lookup_chunk_size_alone_is_not_a_parallel_switch() -> None:
+def test_sized_without_parallel_is_not_a_parallel_switch() -> None:
+    """IR `lookup_chunk_size` / sized(without parallel) alone does not enable chunk parallelism."""
     loader = _RecordingLoader()
     scenario = _build_scenario(loader=loader, chunk_size=2, parallel_mode="adaptive", max_workers=4)
 

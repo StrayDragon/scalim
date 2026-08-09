@@ -1,34 +1,38 @@
 # YAML vs Python runtime policy boundary（agent）
 
-c40 **重开盘点中**：换环境就会改的配置 **目标收口 Python**；YAML 保留可移植编排与内容。本页只给判定启发式与易混钉死；**去留与示例片段以 `evidence-notes.md` 为准**，不要引用旧「暂不迁」结论。
+c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof；YAML 保留可移植编排与内容/资源身份。细则见 upgrade 卡与 design。
 
 ## 何时读取
 
 - 用户问「这个旋钮该写 YAML 还是 Python」
-- 涉及 `lookup_chunk_size`、`cache_mode`、或已迁出键回流
+- 涉及 keys 分片、`cache_mode`、或已迁出键回流
 - 混淆 `sources.*.cache_mode` 与 `$rows.cache_mode`
 
 ## 三栏启发式（工作用）
 
 | 栏 | 含义 | 例子 |
 |----|------|------|
-| **宜留在 YAML** | 换环境仍应相同的图、字段、loader 协议 | `runs`/deps、`fields`/`relations`、`params`（`$keys`/`$rows`）、资源 path |
-| **宜收口到 Python** | 换部署/配额/入口就会改 | 已迁出的 `batch_size`/`retry`/`guardrails`；候选 `lookup_chunk_size`、`sources.*.cache_mode`；并行 `parallelize_lookup_chunks` |
-| **尚待证据** | 未决；常见已有 overrides | `allow_formulas`、`encoding`、`outputs.write.*`、部分 `normalize.*` |
+| **宜留在 YAML** | 换环境仍应相同的图、字段、loader 协议 | `runs`/deps、`fields`/`relations`、`params`（`$keys`/`$rows`）、资源 path；`sources.*.cache_mode` / `$rows.cache_mode`（可被 Python 覆盖） |
+| **宜收口到 Python** | 换部署/配额/入口就会改 | 已迁出的 `batch_size`/`retry`/`guardrails`；**`Lookup_chunk_size` → `LookupChunking`**；片间并行嵌在 `sized(..., parallel=True)` |
+| **默认已钉死 + overrides** | 省略走 builtin；Python `RunOverrides` 可改 | `encoding`≡utf-8、`allow_formulas`≡true、`include_header`≡true、`header_fields_output_by`≡name |
 
-禁止：未读 `evidence-notes.md` 就删键；回流 `budget`/`write_defaults`；静默忽略 YAML。
+禁止：回流 `budget`/`write_defaults`；静默忽略 YAML；新增 YAML 并行键。
 
-## 易混钉死（语义事实，不是去留决议）
+## 易混钉死
 
 | 写法 | 含义 | 不是 |
 |------|------|------|
-| `sources.<id>.lookup_chunk_size` | keys 分片**大小** | 并行开关 → `parallelize_lookup_chunks` + `parallel_mode=adaptive` |
-| `sources.<id>.cache_mode` | `none` / `preload_forever` | `$rows.cache_mode` |
-| `$rows.cache_mode` | `batch` / `none`（批次内复用） | source 级 `cache_mode` |
+| ~~`sources.<id>.lookup_chunk_size`~~ | **已迁出** → `DemandRunRuntimeOptions.lookup_chunking` / `LookupChunking` | 再写 YAML 会 fail-fast |
+| `LookupChunking.sized(size=N)` | keys 分片大小 |  alone 不是并行开关 |
+| `LookupChunking.sized(..., parallel=True)` | 片间并行（须 `parallel_mode=adaptive`） | 不可挂在 `off()` 上 |
+| `sources.<id>.cache_mode` | `none` / `preload_forever`（Python：`SourceCache`） | `$rows.cache_mode` |
+| `$rows.cache_mode` | `batch` / `none`（Python：`RowsReuse`） | source 级 `cache_mode` |
+
+覆盖优先级：**显式 Python > YAML > builtin**。
 
 ## 指针
 
-- 开放盘点 SSOT（含真实片段）：`llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`（+ `design.md` 第一刀草案）
-- 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`、`index.md`
-- 0.10 性能三项：`references/0.10-release-highlights.md`
-- Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary/`、`governance-mainline-principles`
+- Upgrade：`references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
+- Design / evidence：`llmanspec/changes/c40-yaml-runtime-policy-boundary/`
+- Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary/`（r1003–r1005）
+- 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`

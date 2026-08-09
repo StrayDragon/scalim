@@ -12,7 +12,7 @@
 - Python IR 勿再引用 `DedupBy*` / `TwoStageGroupBy*`（已移除；loader 去重 / workflow 两段 demand）
 - Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`2026-07-28-remove-book-budget-policy.md`、`2026-07-28-remove-dedup-and-two-stage-derived.md`
 - 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。进程内 book cell/sheet 预算护栏已移除（见 `2026-07-28-remove-book-budget-policy`）
-- **边界盘点（开放）**：运行可变 / 环境敏感 knobs **目标收口 Python**；YAML 保留可移植编排与内容语义。盘点+证据（含示例片段）：`llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`（**非终局去留**）；切片草案：`design.md`。语义钉死：`lookup_chunk_size`≠并行；`sources.*.cache_mode`≠`$rows.cache_mode`。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
+- **边界（c40 已落地）**：运行可变 knobs 收口 Python typed oneof（`LookupChunking` / `SourceCache` / `RowsReuse`）；YAML 保留编排与内容。YAML `lookup_chunk_size` 再写 fail-fast。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`；upgrade：`.../upgrades/2026-08-09-lookup-chunking-python-ssot.md`。
 ## 0) 必须遵守的主线原则(硬约束)
 
 - **禁止并行版本**: 不引入 `dsl_version`;不通过 CLI/schema/modeline 选择并行 DSL 版本。

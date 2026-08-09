@@ -49,9 +49,9 @@
 | `sources.*.loader` | `SourceIr.loader_spec.callable_ref` / `RuntimeBindings.source_loaders[source_id]` | 静态前端不 import;在“运行时链接”阶段做 allowlist 校验并解析引用(安全边界) | - |
 | `sources.*.key` | `SourceIr.key` (`KeyIr.key`) | 支持单键或复合键(tuple/list) | - |
 | `sources.*.lookup_cast` | `SourceIr.key.cast` | 仅提供预置 cast(见 schema choices) | 更复杂归一化用 `normalize.call_by` 或 loader 内处理 |
-| `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | keys 分片大小;省略/`0`/`None`=不分片;**不是并行开关**。边界盘点中（可能作 runtime 覆盖/迁出，见 `llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`） | 下游有 payload/IN 上限时使用;片间并行见 Python `parallelize_lookup_chunks`（[0.10.0](../releases/0.10.0/)） |
+| `sources.*.lookup_chunk_size`（已迁出） | `SourceIr.lookup_chunk_size` via `LookupChunking` | YAML 主线已移除;再写 fail-fast | `DemandRunRuntimeOptions(lookup_chunking={...: LookupChunking.sized(N[, parallel=True])})`；见 upgrade `2026-08-09-lookup-chunking-python-ssot` |
 | `sources.*.normalize` | `SourceIr.normalize` (`SourceNormalizeIr`) | 仅提供受控 kind + 可选 `call_by` 扩展点 | 若需要任意 reshape,放到 loader 中处理 |
-| `sources.*.cache_mode` | `SourceIr.cache_mode` | 仅 `none/preload_forever`;**不是** `$rows.cache_mode`。边界盘点中（可能作 runtime 覆盖/迁出，见同 evidence-notes） | 更细粒度缓存策略需 Python 层;勿与 params 内 `$rows.cache_mode` 混称 |
+| `sources.*.cache_mode` | `SourceIr.cache_mode` | 仅 `none/preload_forever`;**不是** `$rows.cache_mode`；Python 可用 `SourceCache` 覆盖（显式 Python > YAML > `none`） | 勿与 params 内 `$rows.cache_mode` / `RowsReuse` 混称 |
 | `sources.*.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(loader_retry=...)))` 配置 |
 | `sources.*.params` | `SourceIr.bind` (由 params template 推导) | legacy `bind/to_bind` 已移除;用 `$keys/$rows` 指令节点表达 | 需要特殊调用协议时,用自定义 loader 或 Python-only `BindingIr` |
 | `sources.*.fields.*` | `FieldIr` (source=that source) | 仅源字段;禁止 `compute/call_by` | 复杂派生逻辑放 `fields.*`(derived) |
@@ -100,7 +100,8 @@
 | allowlist | `SecurePythonReferenceResolver` | 安全边界(运行环境/组织策略差异大) | `scalim.dsl.yaml_dsl.run(..., options=DemandRunOptions(security=DemandRunSecurityOptions(allowed_modules=..., allowed_functions=...)))` 或 CLI flags |
 | `init_vars` | `DemandRunTemplateOptions.init_vars` | 运行时输入,不应写死在共享 YAML | `run(..., options=DemandRunOptions(..., template=DemandRunTemplateOptions(init_vars={...})))` |
 | 并行模式/并发数 | `ExecutionRequest.parallel_mode/max_workers` | 与环境/资源相关,容易导致不可复现 | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(parallel_mode=\"seq|adaptive\", max_workers=...)))` |
-| lookup chunk 并行（0.10） | `DemandRunRuntimeOptions.parallelize_lookup_chunks` / `max_chunk_workers` | 运行期 opt-in；`lookup_chunk_size` 仍只表示分片大小 | `DemandRunRuntimeOptions(parallel_mode=\"adaptive\", parallelize_lookup_chunks=True)`；详见 [0.10.0 重点特性](../releases/0.10.0/) / [§3.6](../architecture/parallel-modes.md) |
+| lookup chunking / 片间并行（c40） | `DemandRunRuntimeOptions.lookup_chunking` / `LookupChunking` | 分片大小与并行属 runtime policy；YAML `lookup_chunk_size` 已迁出 | `LookupChunking.sized(N)` / `sized(N, parallel=True)` + `parallel_mode=adaptive`；旧 `parallelize_lookup_chunks` 兼容但非推荐 SSOT；见 upgrade `2026-08-09-lookup-chunking-python-ssot` |
+| source cache / rows reuse 覆盖 | `SourceCache` / `RowsReuse` on `DemandRunRuntimeOptions` | 可覆盖 YAML；优先级 Python > YAML > builtin | `source_cache={...}` / `rows_reuse={...}`（类型名拆开） |
 | 自定义 sink | `ExecutionRequest.sink` | sink 往往是运行环境能力(文件系统/内存/对象存储) | DSL `run` 不再接受 `sink`;捕获行数据用 `DemandRunOutputOptions(capture=CaptureRows())`;完全自定义 sink 走 execution 层入口 |
 | 完全自定义 outputs | `ExecutionRequest.output_composition` | 组合输出属于执行装配层,复杂度高 | 使用 execution 层入口 `scalim.execution.run_ir(...)` 自行构造 `ExecutionRequest(output_composition=...)` |
 | 自定义 hooks/observers | `ExecutionRequest.components` | 运行期组件需要 Python 对象 | `run(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(components=[Observer(), Hook()])))` |

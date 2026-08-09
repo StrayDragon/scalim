@@ -257,15 +257,24 @@ def test_parse_steps_handles_invalid_inputs() -> None:
     assert loader._parse_steps(["bad"]) == ()
 
 
-def test_parse_lookup_chunk_size_guardrails() -> None:
+def test_load_string_rejects_lookup_chunk_size_with_lookup_chunking_hint() -> None:
     loader = YamlDemandLoader()
+    with pytest.raises(ScalimYamlValidationError) as excinfo:
+        _ = loader.load_string(
+            """
+name: demo
+main_source:
+  source_id: orders
+  loader: tests.fixtures.mock_loaders.mock_loader
+sources:
+  customers:
+    loader: tests.fixtures.mock_loaders.mock_loader
+    key: customer_id
+    lookup_chunk_size: 10
+""".lstrip()
+        )
 
-    assert loader._parse_lookup_chunk_size(None) is None
-    assert loader._parse_lookup_chunk_size(True) is None
-    assert loader._parse_lookup_chunk_size(False) is None
-    assert loader._parse_lookup_chunk_size([]) is None
-    assert loader._parse_lookup_chunk_size({}) is None
-    assert loader._parse_lookup_chunk_size("bad") is None
-    assert loader._parse_lookup_chunk_size("3") == 3
-    assert loader._parse_lookup_chunk_size(2.8) == 2
-    assert loader._parse_lookup_chunk_size(4) == 4
+    msg = "\n".join(env.message for env in excinfo.value.errors)
+    assert "lookup_chunk_size" in msg
+    assert "LookupChunking" in msg
+    assert any(env.path == "sources.customers.lookup_chunk_size" for env in excinfo.value.errors)

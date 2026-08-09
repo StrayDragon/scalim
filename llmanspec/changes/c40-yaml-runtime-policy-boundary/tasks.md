@@ -18,29 +18,29 @@
 
 ### C1. 措施 I — `lookup_chunk_size`
 
-- [ ] C1.1 `LookupChunking.off|sized(size, parallel=...)` + `DemandRunRuntimeOptions.lookup_chunking`  
-- [ ] C1.2 收拢旧 `parallelize_lookup_chunks`（兼容或友好迁移提示）  
-- [ ] C1.3 YAML `lookup_chunk_size` → fail-fast 友好文案  
-- [ ] C1.4 测试 + docs/skill/upgrade  
+- [x] C1.1 `LookupChunking.off|sized(size, parallel=...)` + `DemandRunRuntimeOptions.lookup_chunking`  
+- [x] C1.2 收拢旧 `parallelize_lookup_chunks`（兼容或友好迁移提示）  
+- [x] C1.3 YAML `lookup_chunk_size` → fail-fast 友好文案  
+- [x] C1.4 测试 + docs/skill/upgrade  
 
 ### C2. 措施 II — SourceCache / RowsReuse
 
-- [ ] C2.1 `SourceCache` + `source_cache` 覆盖（Python > YAML > none）  
-- [ ] C2.2 `RowsReuse` + `rows_reuse` 覆盖（同挂 RuntimeOptions）  
-- [ ] C2.3 测试与文档（两套拆名 + cache_pool 边界）  
+- [x] C2.1 `SourceCache` + `source_cache` 覆盖（Python > YAML > none）  
+- [x] C2.2 `RowsReuse` + `rows_reuse` 覆盖（同挂 RuntimeOptions）  
+- [x] C2.3 测试与文档（两套拆名 + cache_pool 边界）  
 
 ### C3. 措施 III — 默认与工厂
 
-- [ ] C3.1 省略 encoding ≡ utf-8 测试  
-- [ ] C3.2 allow_formulas 默认 true + pathless 拒绝  
-- [ ] C3.3 工厂 `header_fields_output_by` 默认改为 `name` + 回归  
+- [x] C3.1 省略 encoding ≡ utf-8 测试  
+- [x] C3.2 allow_formulas 默认 true + pathless 拒绝  
+- [x] C3.3 工厂 `header_fields_output_by` 默认改为 `name` + 回归  
 
 ## D. 入口
 
 - [x] D.1 New knob gate  
-- [ ] D.2 apply 后文档与 design 一致  
+- [x] D.2 apply 后文档与 design 一致  
 
 ## 门禁
 
-- [ ] B.6 后：相关 pytest + `just llmanspec-check`  
-- [ ] `llman sdd validate c40-... --strict`  
+- [x] B.6 后：相关 pytest + `just llmanspec-check`  
+- [x] `llman sdd validate c40-... --strict`  

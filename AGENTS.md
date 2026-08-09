@@ -26,8 +26,8 @@
   - Book cell/sheet **budget** was **removed** (`BookBudgetPolicy` gone); YAML / `RunOverrides` residual `budget` still fail-fast — delete the field; memory risk is host limits (cgroup / OOM / job quota). Do **not** reintroduce YAML `write_defaults` / `budget`.
   - Python IR **DedupBy** / **TwoStageGroupBy** derived assembly was **removed**; migrate via loader/upstream dedupe or two-demand workflow (`.../2026-07-28-remove-dedup-and-two-stage-derived.md`).
   - Agent-facing migration: `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md`；统一 book identity 见 `.../2026-07-13-unified-xlsx-book-kind.md`；IR pathful/pathless 见 `.../2026-07-13-normalize-xlsx-book-ir-path-presence.md`；硬删旧 YAML 别名见 `.../2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`（仅 `resources.books.<id>.xlsx` 可选 `path`；`xlsx_file`/`xlsx_memory` 已移除）；移除 book budget 见 `.../2026-07-28-remove-book-budget-policy.md`；移除 Dedup/TwoStage 见 `.../2026-07-28-remove-dedup-and-two-stage-derived.md`。
-  - `allow_formulas` / `encoding`：是否 YAML 静态或 runtime 覆盖见 c40 开放盘点（勿在未盘点时回流策略键）。
-  - **边界盘点（开放）**：`llmanspec/changes/c40-yaml-runtime-policy-boundary/`（`evidence-notes.md` + `design.md`）；agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`。
+  - `allow_formulas` / `encoding` / output header：YAML 可省略（默认 `true` / `utf-8` / `name`）；Python `RunOverrides` 可覆盖。`RunOverrides` 工厂 `header_fields_output_by` 默认已对齐 `name`（c40）。
+  - **YAML vs Python 边界（c40）**：`lookup_chunk_size` → `LookupChunking`（YAML 再写 fail-fast）；`cache_mode`/`$rows.cache_mode` 可留 YAML + `SourceCache`/`RowsReuse` 覆盖。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`；upgrade：`.../upgrades/2026-08-09-lookup-chunking-python-ssot.md`。
   - **New knob gate（新增配置必过）**：提案/实现任何**新** demand/workflow 配置前，MUST 先判定落点（默认偏 Python 若存疑）：
     1. **换环境/部署/入口是否必须改值？** 是 → **Python**（`DemandRunOptions` / `WorkflowRunOptions` / overrides / patches）；否 → 再往下。
     2. **是否编排图 / 资源身份 / 字段与关联语义 / loader 调用协议？** 是 → **YAML** 可考虑；否则倾向 Python。

@@ -224,8 +224,19 @@ def test_validator_strips_removed_output_write_workbook_fields_multiple_outputs_
 def test_validator_strips_removed_sources_retry_multiple_sources_reuses_next_sources() -> None:
     issues = []
     cleaned = {"sources": {"s1": {"retry": {"should_retry": "x"}}, "s2": {"retry": {"should_retry": "y"}}}}
-    out = ConfigValidator._strip_removed_demand_runtime_policy_sources_retry(cleaned, issues)  # noqa: SLF001
+    out = ConfigValidator._strip_removed_demand_runtime_policy_sources_retry_and_lookup_chunk(cleaned, issues)  # noqa: SLF001
 
     assert "retry" not in out["sources"]["s1"]  # type: ignore[index]
     assert "retry" not in out["sources"]["s2"]  # type: ignore[index]
     assert len(issues) == 2
+
+
+def test_validator_strips_removed_sources_lookup_chunk_size() -> None:
+    issues = []
+    cleaned = {"sources": {"customers": {"lookup_chunk_size": 10, "loader": "x"}}}
+    out = ConfigValidator._strip_removed_demand_runtime_policy_sources_retry_and_lookup_chunk(cleaned, issues)  # noqa: SLF001
+
+    assert "lookup_chunk_size" not in out["sources"]["customers"]  # type: ignore[index]
+    assert out["sources"]["customers"]["loader"] == "x"  # type: ignore[index]
+    assert len(issues) == 1
+    assert "LookupChunking" in issues[0].message

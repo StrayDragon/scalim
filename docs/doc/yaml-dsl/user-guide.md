@@ -1266,33 +1266,33 @@ sources:
 - `preload_forever` 场景允许声明 `params`.当 `params` 非空时,预加载调用会透传 kwargs;为空则保持零参 preload.
 - `preload_forever` 场景禁止在 `params` 中使用 `$keys/$rows`.
 
-### 4.4.3 lookup_chunk_size: keys 分片(可选)
+### 4.4.3 LookupChunking: keys 分片(Python runtime)
 
-`lookup_chunk_size` 只影响 **keys 模式** LoadRef:把一次 lookup 的 keys 拆成多次 loader 调用再合并.
+keys 模式 LoadRef 的分片大小与片间并行已从 YAML 迁出到 Python typed oneof（**再写 `sources.*.lookup_chunk_size` 会 fail-fast**）。
 
-```yaml
-sources:
-  customers:
-    key: customer_id
-    lookup_chunk_size: 800   # 仅当下游有 IN/payload 上限时才设
-    params:
-      ids: {$keys: {as: list}}
+```python
+from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, LookupChunking
+
+runtime = DemandRunRuntimeOptions(
+    lookup_chunking={
+        "customers": LookupChunking.sized(800),                   # 串行分片
+        # "customers": LookupChunking.sized(800, parallel=True), # 片间并行（须 parallel_mode=adaptive）
+    },
+    parallel_mode="adaptive",  # 仅当 sized(..., parallel=True) 时需要
+)
 ```
 
 选用规则:
 
-- **省略 / `0` / `null` = 不分片**(单次 loader 调用).这是运行时默认,也是延迟上通常最优的选择.
+- **未配置 / `LookupChunking.off()` = 不分片**(单次 loader 调用).这是默认,也是延迟上通常最优的选择.
 - **不要**把 chunk 当成“越小越省内存”的旋钮.顺序分片下:
   - `loader_calls ≈ ceil(unique_keys / chunk_size)`
   - wall time ≈ `loader_calls × RTT`(外加固定开销)
 - 仅在下游有硬限制时设置(例如 SQL `IN (...)` 长度、HTTP payload、供应商 API 批次上限).
 - 需要分片时:**取下游限制允许的最大安全值**(例如上限的 50–80%),避免习惯性写 `50`/`100`.
-- `lookup_chunk_size` **不是并行开关**:它只表示分片大小.同一 source 的 chunk 调用默认仍顺序执行.
-- 若要让同一 LoadRef 的多个 chunk 重叠等待,必须在 Python 运行入口显式 opt-in
-  (`DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True)`),
-  并接受它对外部系统 QPS 的放大;护栏见 [执行并行模式 §3.6](../architecture/parallel-modes.md)；
-  升级说明与对拍见 [0.10.0 重点特性](../releases/0.10.0/) / [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md).
-  失败路径注意:并行下已在途的其它 chunk 可能仍会跑完,loader 调用次数可能高于串行;成功路径次数一致.
+- `LookupChunking.sized(size=...)` **alone 不是并行开关**;片间并行须嵌在 `sized(..., parallel=True)` 且 `parallel_mode=adaptive`.
+- 旧平铺 `parallelize_lookup_chunks=True` 仍兼容,但推荐迁到 sized 的 `parallel=`.
+- 护栏见 [执行并行模式 §3.6](../architecture/parallel-modes.md)；迁移卡见 skill upgrade `2026-08-09-lookup-chunking-python-ssot`.
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
 

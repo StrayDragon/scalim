@@ -18,8 +18,6 @@ from ..constants import (
     DESC_LOADER_RETRY_MD,
     DESC_LOOKUP_CAST,
     DESC_LOOKUP_CAST_MD,
-    DESC_LOOKUP_CHUNK_SIZE,
-    DESC_LOOKUP_CHUNK_SIZE_MD,
     DESC_MAIN_SOURCE_ORDER_BY,
     DESC_MAIN_SOURCE_ORDER_BY_MD,
     DESC_PARAMS,
@@ -32,7 +30,6 @@ from ..constants import (
     HARD_CAP_LOADER_RETRY_MAX_ELAPSED_SECONDS,
     LOADER_RETRY_BACKOFF_ENUM,
     LOOKUP_CAST_SCHEMA,
-    LOOKUP_CHUNK_SIZE_SCHEMA,
     NORMALIZE_SCHEMA,
     SOURCE_ID_STRING_SCHEMA,
     schema_meta,
@@ -285,16 +282,6 @@ class SourceConfig:
         metadata=schema_meta(schema=LOOKUP_CAST_SCHEMA, desc=DESC_LOOKUP_CAST, md=DESC_LOOKUP_CAST_MD),
     )
     """可选:查找键归一化配置."""
-
-    lookup_chunk_size: Optional[int] = dataclass_field(
-        default=None,
-        metadata=schema_meta(
-            schema=LOOKUP_CHUNK_SIZE_SCHEMA,
-            desc=DESC_LOOKUP_CHUNK_SIZE,
-            md=DESC_LOOKUP_CHUNK_SIZE_MD,
-        ),
-    )
-    """可选:查找键分块大小(默认不分片)."""
 
     normalize: Optional[NormalizeConfig] = dataclass_field(
         default=None,

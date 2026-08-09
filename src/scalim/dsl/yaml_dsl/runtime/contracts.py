@@ -6,6 +6,7 @@ from ....execution.excel_column_residency import ExcelColumnResidency
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
+from ....execution.lookup_chunking import LookupChunking
 from ....execution.run_ir import ExecutionResult
 from ....hooks import IExecutionHook
 from ....ob.observer import Observer
@@ -21,6 +22,7 @@ from ..init_var_nodes import OptionalPathNode
 from ..schema_dsl.models import DemandConfig
 from .allowlist_policy import ResolverTrustedMode
 from .errors import ALLOWLIST_REQUIRED_MSG, ScalimAllowlistRequiredError
+from .source_policies import RowsReuse, SourceCache
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -124,7 +126,7 @@ class RunOverrides:
         file_id: str = "detail_csv",
         encoding: str = "utf-8",
         include_header: bool = True,
-        header_fields_output_by: str = "field_id",
+        header_fields_output_by: str = "name",
     ) -> "RunOverrides":
         output_root_str = str(os.fspath(output_root)).strip()
         resources = ResourcesOverride(
@@ -149,7 +151,7 @@ class RunOverrides:
         book_id: str = "report",
         allow_formulas: bool = True,
         include_header: bool = True,
-        header_fields_output_by: str = "field_id",
+        header_fields_output_by: str = "name",
     ) -> "RunOverrides":
         output_root_str = str(os.fspath(output_root)).strip()
         defaults = OutputsDefaultsOverride(to=OutputDefaultsToOverride(book=str(book_id)))
@@ -544,17 +546,26 @@ class DemandRunRuntimeOptions:
     """
 
     parallelize_lookup_chunks: bool = False
-    """是否允许 `lookup_chunk_size` 分片并行(默认关闭).
+    """是否允许 keys 分片并行(默认关闭;兼容窗保留).
 
     注意:
+    - 推荐改用 `lookup_chunking` 中 `LookupChunking.sized(..., parallel=True)`.
     - 仅当 `parallel_mode="adaptive"` 时生效;`seq` 永不分片并行.
-    - `lookup_chunk_size`(`YAML` `authoring`)本身**不是**并行开关,它只表示分片大小.
     - 开启后会放大对外部系统(数据库/接口)的瞬时并发;全局在途 `ref-loader` 帽 = 解析后的 `workers` `W`.
     - `loader_call` 回调可能直接发生在分片工作线程上(非主线程回放),订阅方须自行保证线程安全.
     """
 
     max_chunk_workers: Optional[int] = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
+
+    lookup_chunking: Mapping[str, LookupChunking] = dataclass_field(default_factory=dict)
+    """per-source keys 分片策略(`LookupChunking.off|sized`);未配置的 source 默认不分片."""
+
+    source_cache: Mapping[str, SourceCache] = dataclass_field(default_factory=dict)
+    """per-source `SourceCache` 覆盖(Python > YAML `cache_mode` > `none`)."""
+
+    rows_reuse: Mapping[str, RowsReuse] = dataclass_field(default_factory=dict)
+    """per-source `RowsReuse` 覆盖(Python > YAML `$rows.cache_mode` > `batch`)."""
 
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""
@@ -610,15 +621,61 @@ class DemandRunRuntimeOptions:
             raise TypeError(msg)
 
         max_chunk_workers = self.max_chunk_workers
-        if max_chunk_workers is None:
-            return
-        if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
-            msg = "DemandRunRuntimeOptions.max_chunk_workers must be an int or None"
-            raise TypeError(msg)
-        if int(max_chunk_workers) < 1:
-            msg = "DemandRunRuntimeOptions.max_chunk_workers must be >= 1 when provided"
+        if max_chunk_workers is not None:
+            if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
+                msg = "DemandRunRuntimeOptions.max_chunk_workers must be an int or None"
+                raise TypeError(msg)
+            if int(max_chunk_workers) < 1:
+                msg = "DemandRunRuntimeOptions.max_chunk_workers must be >= 1 when provided"
+                raise ValueError(msg)
+            object.__setattr__(self, "max_chunk_workers", int(max_chunk_workers))
+
+        object.__setattr__(
+            self,
+            "lookup_chunking",
+            _normalize_source_policy_mapping(
+                self.lookup_chunking,
+                field_name="DemandRunRuntimeOptions.lookup_chunking",
+                expected_type=LookupChunking,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "source_cache",
+            _normalize_source_policy_mapping(
+                self.source_cache,
+                field_name="DemandRunRuntimeOptions.source_cache",
+                expected_type=SourceCache,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "rows_reuse",
+            _normalize_source_policy_mapping(
+                self.rows_reuse,
+                field_name="DemandRunRuntimeOptions.rows_reuse",
+                expected_type=RowsReuse,
+            ),
+        )
+
+
+def _normalize_source_policy_mapping(raw: Any, *, field_name: str, expected_type: type) -> Dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        msg = "{} must be a Mapping[str, {}]".format(field_name, expected_type.__name__)
+        raise TypeError(msg)
+    normalized: Dict[str, Any] = {}
+    for raw_sid, policy in raw.items():
+        sid = str(raw_sid).strip()
+        if not sid:
+            msg = "{} keys must be non-empty source ids".format(field_name)
             raise ValueError(msg)
-        object.__setattr__(self, "max_chunk_workers", int(max_chunk_workers))
+        if not isinstance(policy, expected_type):
+            msg = "{}[{!r}] must be a {}".format(field_name, sid, expected_type.__name__)
+            raise TypeError(msg)
+        normalized[sid] = policy
+    return normalized
 
 
 @dataclass(frozen=True)
@@ -755,7 +812,10 @@ __all__ = (
     "DemandRunRuntimeOptions",
     "DemandRunSecurityOptions",
     "DemandRunTemplateOptions",
+    "LookupChunking",
     "ResolverTrustedMode",
+    "RowsReuse",
     "RunOverrides",
+    "SourceCache",
     "UnsetType",
 )

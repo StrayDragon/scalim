@@ -27,6 +27,10 @@ from ..schema_dsl.models import (
     DemandConfig,
     OutputTargetConfig,
 )
+from ._internal.apply_source_runtime_policies import (
+    apply_source_runtime_policies,
+    resolve_chunk_parallelism_from_runtime,
+)
 from ._internal.callable_preflight import validate_signature_accepts_any_candidate
 from .builtin_callables import parse_builtin_callable_id
 from .contracts import (
@@ -534,6 +538,12 @@ def build_request(
     loader_retry = _compile_loader_retry_policies(effective_config, overrides=options.runtime.loader_retry)
     batch_size = effective_config.batch_size if isinstance(options.runtime.batch_size, UnsetType) else options.runtime.batch_size
 
+    parallelize_lookup_chunks, max_chunk_workers = resolve_chunk_parallelism_from_runtime(
+        parallelize_lookup_chunks=options.runtime.parallelize_lookup_chunks,
+        max_chunk_workers=options.runtime.max_chunk_workers,
+        lookup_chunking=options.runtime.lookup_chunking,
+    )
+
     return ExecutionRequest(
         export_layout=export_layout,
         output=output_spec,
@@ -546,8 +556,8 @@ def build_request(
         batch_size=batch_size,
         parallel_mode=options.runtime.parallel_mode,
         max_workers=options.runtime.max_workers,
-        parallelize_lookup_chunks=options.runtime.parallelize_lookup_chunks,
-        max_chunk_workers=options.runtime.max_chunk_workers,
+        parallelize_lookup_chunks=parallelize_lookup_chunks,
+        max_chunk_workers=max_chunk_workers,
         key_normalization=options.runtime.key_normalization,
         runtime_bindings=runtime_bindings,
         capture_in_memory_rows=isinstance(options.outputs.capture, CaptureRows),
@@ -582,6 +592,12 @@ def compile(  # noqa: A001
         public_builtin_callable_ids=options.security.public_builtin_callable_ids,
     )
     demand_ir = compile_ir(config, init_vars=options.template.init_vars)
+    demand_ir = apply_source_runtime_policies(
+        demand_ir,
+        lookup_chunking=options.runtime.lookup_chunking,
+        source_cache=options.runtime.source_cache,
+        rows_reuse=options.runtime.rows_reuse,
+    )
     runtime_bindings = resolve_runtime_bindings(
         demand_ir,
         resolver=resolver,

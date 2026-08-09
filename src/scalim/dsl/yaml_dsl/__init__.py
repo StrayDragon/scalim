@@ -40,6 +40,7 @@ from .runtime.contracts import (
     DemandRunSecurityOptions,
     DemandRunTemplateOptions,
     FileResourceOverride,
+    LookupChunking,
     OutputDefaultsToOverride,
     OutputExtraSheetOverride,
     OutputExtrasOverride,
@@ -49,7 +50,9 @@ from .runtime.contracts import (
     OutputWriteOverride,
     ResolverTrustedMode,
     ResourcesOverride,
+    RowsReuse,
     RunOverrides,
+    SourceCache,
 )
 from .workflow_types import WorkflowRunOptions
 
@@ -105,6 +108,7 @@ __all__ = (
     "DemandRunTemplateOptions",
     "ExcelColumnResidency",
     "FileResourceOverride",
+    "LookupChunking",
     "OutputDefaultsToOverride",
     "OutputExtraSheetOverride",
     "OutputExtrasOverride",
@@ -115,7 +119,9 @@ __all__ = (
     "ResolverTrustedMode",
     "ResourcesOverride",
     "ResourcesPolicy",
+    "RowsReuse",
     "RunOverrides",
+    "SourceCache",
     "WorkflowRunOptions",
     "compile",
     "run",

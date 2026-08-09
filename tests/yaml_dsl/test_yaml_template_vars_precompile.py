@@ -91,7 +91,7 @@ sources:
   customers:
     loader: tests.fixtures.mock_loaders.mock_loader
     key: customer_id
-    lookup_chunk_size: {{ chunk_size }}
+    cache_mode: {{ cache_mode }}
 """.lstrip(),
         encoding="utf-8",
     )
@@ -116,10 +116,10 @@ sources:
         str(demand),
         options=DemandRunOptions(
             security=DemandRunSecurityOptions(allowed_modules=frozenset(["tests.fixtures"])),
-            template=DemandRunTemplateOptions(template_vars={"chunk_size": 10}),
+            template=DemandRunTemplateOptions(template_vars={"cache_mode": "preload_forever"}),
         ),
     )
-    assert compilation.config.sources["customers"].lookup_chunk_size == 10
+    assert compilation.config.sources["customers"].cache_mode == "preload_forever"
 
 
 def test_template_vars_missing_var_in_demand_fails_fast_with_file_context(tmp_path) -> None:
@@ -167,8 +167,7 @@ def test_template_vars_missing_var_in_import_fragment_includes_import_trace(tmp_
 sources:
   customers:
     loader: tests.fixtures.mock_loaders.mock_loader
-    key: customer_id
-    lookup_chunk_size: {{ missing }}
+    key: {{ missing }}
 """.lstrip(),
         encoding="utf-8",
     )
@@ -662,7 +661,7 @@ sources:
   customers:
     loader: tests.fixtures.mock_loaders.mock_loader
     key: customer_id
-    lookup_chunk_size: 10
+    cache_mode: preload_forever
 pad: "{{ big }}"
 """.lstrip(),
         encoding="utf-8",

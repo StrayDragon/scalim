@@ -454,6 +454,9 @@ def _load_ref_chunked(
     cache_key: Optional[LoadRefCacheKey],
 ) -> LoaderResultMap:
     fanout = runtime.resolve_chunk_fanout(_chunk_count(len(lookup_keys_list), chunk_size))
+    source_parallel = getattr(source, "lookup_chunk_parallel", None)
+    if source_parallel is False:
+        fanout = 1
     if fanout > 1:
         # 仅并行路径一次性构造全部 `plan`(提交 `futures` 需要);串行保持懒建.
         plans = _build_chunk_plans(

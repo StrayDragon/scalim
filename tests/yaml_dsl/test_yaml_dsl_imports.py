@@ -77,14 +77,14 @@ main_source:
 sources:
   $import: common.sources
   customers:
-    lookup_chunk_size: 10
+    cache_mode: preload_forever
 """.lstrip(),
         encoding="utf-8",
     )
 
     config = YamlDemandLoader().load(demand)
     assert "customers" in config.sources
-    assert config.sources["customers"].lookup_chunk_size == 10
+    assert config.sources["customers"].cache_mode == "preload_forever"
 
 
 def test_imports_list_order_is_deterministic(tmp_path) -> None:
@@ -95,7 +95,7 @@ sources:
   customers:
     loader: tests.fixtures.mock_loaders.mock_loader
     key: customer_id
-    lookup_chunk_size: 1
+    cache_mode: none
 """.lstrip(),
         encoding="utf-8",
     )
@@ -106,7 +106,7 @@ sources:
   customers:
     loader: tests.fixtures.mock_loaders.mock_loader
     key: customer_id
-    lookup_chunk_size: 2
+    cache_mode: preload_forever
 """.lstrip(),
         encoding="utf-8",
     )
@@ -129,7 +129,7 @@ sources:
     )
 
     config = YamlDemandLoader().load(demand)
-    assert config.sources["customers"].lookup_chunk_size == 2
+    assert config.sources["customers"].cache_mode == "preload_forever"
 
 
 def test_imports_list_replace(tmp_path) -> None:
