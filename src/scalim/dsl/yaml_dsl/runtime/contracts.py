@@ -677,7 +677,7 @@ def _normalize_source_policy_mapping(raw: Any, *, field_name: str, expected_type
     if not isinstance(raw, Mapping):
         msg = "{} must be a Mapping[str, {}]".format(field_name, expected_type.__name__)
         raise TypeError(msg)
-    mapping = cast("Mapping[Any, Any]", raw)
+    mapping = cast("Mapping[Any, Any]", raw)  # pragma: allow-cast policy map normalize boundary
     normalized: Dict[str, Any] = {}
     for raw_sid, policy in mapping.items():
         sid = str(raw_sid).strip()
