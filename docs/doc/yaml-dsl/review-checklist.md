@@ -12,6 +12,7 @@
 - Python IR 勿再引用 `DedupBy*` / `TwoStageGroupBy*`（已移除；loader 去重 / workflow 两段 demand）
 - Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`2026-07-28-remove-book-budget-policy.md`、`2026-07-28-remove-dedup-and-two-stage-derived.md`
 - 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。进程内 book cell/sheet 预算护栏已移除（见 `2026-07-28-remove-book-budget-policy`）
+- **灰区（暂不迁，勿当「再砍一轮 YAML」）**：`sources.*.lookup_chunk_size`（分片大小≠并行；并行见 Python `parallelize_lookup_chunks`）；`sources.*.cache_mode`（仅 `none`/`preload_forever`，细策略扩 Python）；勿与 `$rows.cache_mode`（`batch`/`none`，内容协议）混称。键分类调研 SSOT：`llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`；agent 判定页：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
 ## 0) 必须遵守的主线原则(硬约束)
 
 - **禁止并行版本**: 不引入 `dsl_version`;不通过 CLI/schema/modeline 选择并行 DSL 版本。
@@ -68,6 +69,8 @@
 - 与集成系统强绑定的策略
 
 这类能力优先落到 Python/CLI entrypoints,而不是扩大 YAML authoring surface。
+
+**灰区例外（0.10.* 仍留 YAML，禁止未盘点删键）**：与 demand 可移植声明绑定的提示键（见上方速记与 `llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`）。评审时区分「环境调优」与「需求侧上限/粗缓存声明」。
 
 ## 4) workflow 相关变更护栏
 

@@ -8,6 +8,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 先识别任务类型,只读取最少的 reference:
 
 - 新写或改写 YAML: 读 [references/task-authoring.md](references/task-authoring.md)
+- **YAML vs Python 边界**（灰区 / 已迁出 / 勿混 cache_mode）: 读 [references/yaml-runtime-policy-boundary.md](references/yaml-runtime-policy-boundary.md)（调研: `llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`）
 - 新写或改写 workflow YAML(编排多 demand / `workflow.resources.books` / outputs→book 绑定 / `resources_policy`): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)
