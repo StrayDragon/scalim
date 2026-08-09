@@ -496,6 +496,15 @@ def test_run_stats_branch_edges_for_stage_loader_and_viz(tmp_path: Path):
 
     assert resolve_viz_run_dir(_BlankPath()) is None
 
+    class _BasenameOnlyPaths:
+        def resolve_output_paths(self):
+            # dirname("") 假 → 421->418 后落到 output_dir
+            return "events.jsonl", "snapshot.json", None
+
+        output_dir = str(tmp_path / "from-output-dir")
+
+    assert resolve_viz_run_dir(_BasenameOnlyPaths()) == str(tmp_path / "from-output-dir")
+
     a1 = WorkflowStatsAccumulator(sample_rss=False)
     a2 = WorkflowStatsAccumulator(sample_rss=False)
     _drive_pipeline(a1, loaders=["x"], run_id="one", batches=1)
@@ -512,3 +521,11 @@ def test_run_stats_branch_edges_for_stage_loader_and_viz(tmp_path: Path):
     # 选中 nodes 更多的 a2
     payload = (out_dir / "run_stats.json").read_text(encoding="utf-8")
     assert "two" in payload or "three" in payload
+
+    # 先遇到多 nodes,再遇到少 nodes → 保留多的(443 假分支)
+    out2 = tmp_path / "stats-out-2"
+    out2.mkdir()
+    written2 = maybe_auto_write_run_stats_beside_viz([a2, a1], extra_run_dirs=[str(out2)])
+    assert len(written2) == 1
+    text2 = (out2 / "run_stats.json").read_text(encoding="utf-8")
+    assert '"node_count": 2' in text2 or text2.count('"demand_id"') >= 2
