@@ -70,7 +70,7 @@
 4. 若 YAML 与 Python 双存在 → MUST 文档化覆盖优先级（通常 Python 显式 > YAML > 默认）；禁止静默忽略
 5. 闭环：capability-matrix + 本清单；闭集策略走 `StrEnum` Policy SSOT
 
-开放盘点与证据：`llmanspec/changes/c40-yaml-runtime-policy-boundary/{evidence-notes,design}.md`。
+归档设计/证据：`llmanspec/changes/archive/*-c40-yaml-runtime-policy-boundary/{evidence-notes,design}.md`。
 
 ## 4) workflow 相关变更护栏
 
