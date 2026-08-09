@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Workload shape presets (counts only; no business strings)."""
+
 from __future__ import print_function
 
 import os
@@ -23,7 +24,7 @@ def shape_for(scale):
     # type: (str) -> Dict[str, Any]
     scale = str(scale or "smoke").strip().lower()
     usable = usable_bytes()
-    usable_gb = round(usable / (1024.0 ** 3), 2)
+    usable_gb = round(usable / (1024.0**3), 2)
 
     if scale == "smoke":
         return {

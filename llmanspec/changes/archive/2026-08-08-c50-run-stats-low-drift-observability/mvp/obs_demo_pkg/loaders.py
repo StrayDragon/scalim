@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Deterministic synthetic loaders (no business vocabulary)."""
+
 from __future__ import print_function
 
 from typing import Any, Dict, List, Optional, Sequence

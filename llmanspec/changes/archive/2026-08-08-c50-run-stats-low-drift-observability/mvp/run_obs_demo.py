@@ -9,6 +9,7 @@ Usage (from repo root):
 Default outputs under .tmp/obs-demo/runs/<scale>_<ts>/ (JSON for viz; work/ removed after fingerprints).
 Pinned slim evidence lives next to this harness under evidence/.
 """
+
 from __future__ import print_function
 
 import argparse
@@ -191,9 +192,7 @@ def _run_one(scale, shape, profile_name, run_root):
             batch_size=int(shape["batch_size"]),
             parallel_mode=str(shape.get("parallel_mode") or "seq"),
         ),
-        outputs=DemandRunOutputOptions(
-            overrides=RunOverrides(viz_config=built["viz_config"]) if built.get("viz_config") else None
-        ),
+        outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=built["viz_config"]) if built.get("viz_config") else None),
     )
     resources_policy = ResourcesPolicy(
         books={
@@ -454,15 +453,11 @@ def main(argv=None):
 
     shape = shape_for(args.scale)
     profiles = (
-        [p.strip() for p in str(args.profiles).split(",") if p.strip()]
-        if args.profiles
-        else list(DEFAULT_PROFILES_BY_SCALE[args.scale])
+        [p.strip() for p in str(args.profiles).split(",") if p.strip()] if args.profiles else list(DEFAULT_PROFILES_BY_SCALE[args.scale])
     )
 
     ts = time.strftime("%Y%m%d_%H%M%S")
-    run_root = args.out_root or os.path.join(
-        REPO_ROOT, ".tmp", "obs-demo", "runs", "{}_{}".format(args.scale, ts)
-    )
+    run_root = args.out_root or os.path.join(REPO_ROOT, ".tmp", "obs-demo", "runs", "{}_{}".format(args.scale, ts))
     os.makedirs(run_root, exist_ok=True)
     atomic_write_json(os.path.join(run_root, "shape.json"), shape)
 

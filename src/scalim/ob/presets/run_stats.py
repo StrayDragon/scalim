@@ -5,7 +5,7 @@ import os
 import warnings
 from typing import Any, Dict, List, Optional, Set
 
-from ...events import Event, EventType
+from ...events import EventType
 from ...vendor.dataclassesx import dataclass, field
 from ..observer import EventDispatchObserver
 
@@ -139,7 +139,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             "n": int(payload.batch_num),
             "duration_s": 0.0,
             "rows_in": n_rows,
-            "stages": {k: 0.0 for k in _STAGES},
+            "stages": dict.fromkeys(_STAGES, 0.0),
             "rss_mb": _rss_mb() if self.sample_rss else None,
             "loaders": [],
         }  # type: Dict[str, Any]
@@ -232,7 +232,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         # type: (Event) -> None
         payload = event.payload
         end_rss = _rss_mb() if self.sample_rss else None
-        stages_total = {k: 0.0 for k in _STAGES}  # type: Dict[str, float]
+        stages_total = dict.fromkeys(_STAGES, 0.0)  # type: Dict[str, float]
         for batch in self._batches:
             batch_stages = batch["stages"]  # type: Dict[str, float]
             for key in _STAGES:
@@ -289,7 +289,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
 
     def build_run_stats(self, meta=None):
         # type: (Optional[Dict[str, Any]]) -> Dict[str, Any]
-        stages_total = {k: 0.0 for k in _STAGES}  # type: Dict[str, float]
+        stages_total = dict.fromkeys(_STAGES, 0.0)  # type: Dict[str, float]
         loaders_map = {}  # type: Dict[str, Dict[str, Any]]
         outputs = []  # type: List[Dict[str, Any]]
         batches = []  # type: List[Dict[str, Any]]
@@ -469,8 +469,8 @@ def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=N
 
 
 __all__ = (
-    "SCHEMA_RUN_STATS",
     "HIGH_IMPACT_OBS_WARNING",
+    "SCHEMA_RUN_STATS",
     "RunStatsMeta",
     "WorkflowStatsAccumulator",
     "atomic_write_run_stats_json",

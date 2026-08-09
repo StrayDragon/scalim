@@ -43,6 +43,7 @@ class LookupChunkParallelismPolicy:
                 label="LookupChunkParallelismPolicy.max_chunk_workers",
             ),
         )
+
     @classmethod
     def disabled(cls) -> "LookupChunkParallelismPolicy":
         return cls()

@@ -4,6 +4,7 @@
 Workflow-aware: shared observers reset per demand pipeline; we snapshot on
 each PIPELINE_END into nodes[] so detail stats are not lost to metrics.
 """
+
 from __future__ import print_function
 
 import hashlib
@@ -199,11 +200,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
                 "start_mb": _r2(self._pipeline_start_rss),
                 "end_mb": _r2(end_rss),
                 "peak_mb": _r2(max(peak_vals) if peak_vals else None),
-                "increase_mb": _r2(
-                    None
-                    if end_rss is None or self._pipeline_start_rss is None
-                    else (end_rss - self._pipeline_start_rss)
-                ),
+                "increase_mb": _r2(None if end_rss is None or self._pipeline_start_rss is None else (end_rss - self._pipeline_start_rss)),
             },
             "stages_total": {k: round(v, 4) for k, v in stages_total.items()},
             "batches": list(self._batches),

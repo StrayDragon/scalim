@@ -85,9 +85,7 @@ def main(argv=None):
             uniq.append(row)
         payload["schemas"][name] = {"path_count": len(uniq), "paths": uniq}
         slim = {"path_count": len(uniq), "paths": [r["path"] for r in uniq]}
-        (out_dir / (name.replace(".gen.json", "") + ".paths.json")).write_text(
-            json.dumps(slim, indent=2, ensure_ascii=False) + "\n"
-        )
+        (out_dir / (name.replace(".gen.json", "") + ".paths.json")).write_text(json.dumps(slim, indent=2, ensure_ascii=False) + "\n")
         print("{}: {} paths".format(name, len(uniq)))
 
     (out_dir / "all.json").write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
