@@ -39,7 +39,7 @@ def _coerce_profile(name):
     try:
         return ObservabilityProfile(raw)
     except ValueError:
-        raise ValueError("unknown observability profile {!r}".format(name))
+        raise ValueError("未知可观测性 profile: {!r}".format(name))
 
 
 def build_observability_profile(

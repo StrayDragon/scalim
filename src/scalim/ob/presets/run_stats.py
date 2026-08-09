@@ -48,7 +48,7 @@ def require_psutil_for_memory(reason):
         import_module("psutil")
     except Exception as exc:
         raise RuntimeError(
-            "memory sampling requested ({}) but psutil is not available; install optional psutil or use duration-only bench".format(reason)
+            "请求了内存采样({})但 `psutil` 不可用;请安装可选依赖 `psutil`,或使用仅 duration 的 bench".format(reason)
         ) from exc
 
 
