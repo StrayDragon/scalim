@@ -1,5 +1,8 @@
 ---
 depends_on: []
+branch: sdd/c40-yaml-runtime-policy-boundary
+base_sha: 8982be89879228f589d050b47c1f4ad34bdb5f71
+checkpointed: false
 ---
 
 # YAML 编排 vs Python runtime policy：边界收口（重开）
