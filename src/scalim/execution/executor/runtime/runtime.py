@@ -93,7 +93,7 @@ class ExecutionRuntime:
     runtime_bindings: RuntimeBindings
     call_by_dep_cardinality: Optional[CallByDepCardinalityCollector]
     call_by_memoization: Optional[CallByMemoizationController]
-    # Set by batch stage_spans attach_write_clock (StageWriteClock | None); Any avoids circular import.
+    # 由 `batch` `stage_spans` 的 `attach_write_clock` 设置(`StageWriteClock` | `None`);用 `Any` 避免循环导入.
     write_stage_clock: Optional[Any]
 
     def __init__(

@@ -1,4 +1,4 @@
-"""Keys 模式 LoadRef 分片策略(typed oneof;`Python` `SSOT`).
+"""`Keys` 模式 `LoadRef` 分片策略(`typed` `oneof`;`Python` `SSOT`).
 
 YAML `sources.*.lookup_chunk_size` 已迁出:通过 `DemandRunRuntimeOptions.lookup_chunking` 配置.
 片间并行仅允许挂在 `sized(...)` 上,且仍须 `parallel_mode=adaptive` 等既有护栏.
@@ -10,7 +10,7 @@ from ..vendor.dataclassesx import dataclass
 
 
 def normalize_optional_max_chunk_workers(workers: Optional[int], *, label: str) -> Optional[int]:
-    """校验并规范化可选的 `max_chunk_workers`(>=1 的 int,或 None)."""
+    """校验并规范化可选的 `max_chunk_workers`(>=1 的 `int`,或 `None`)."""
     if workers is None:
         return None
     if isinstance(workers, bool) or not isinstance(workers, int):
@@ -24,12 +24,12 @@ def normalize_optional_max_chunk_workers(workers: Optional[int], *, label: str) 
 
 @dataclass(frozen=True)
 class LookupChunking:
-    """Keys 分片策略.
+    """`Keys` 分片策略.
 
     使用工厂构造:
     - `LookupChunking.off()`: 不分片
-    - `LookupChunking.sized(size=..., parallel=..., max_chunk_workers=...)`: 按 size 分片;
-      `parallel=True` 时允许片间并行(仅 sized 可表达)
+    - `LookupChunking.sized(size=..., parallel=..., max_chunk_workers=...)`: 按 `size` 分片;
+      `parallel=True` 时允许片间并行(仅 `sized` 可表达)
     """
 
     size: Optional[int] = None

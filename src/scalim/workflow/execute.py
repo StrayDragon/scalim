@@ -677,14 +677,12 @@ def _replay_captured_workflow_observability(prepared: _PreparedWorkflowRun) -> N
 
 
 def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> None:
-    """Write sibling run_stats beside workflow + demand viz dirs when accum coexisted.
+    """在 `workflow` + `demand` `viz` 目录旁写兄弟 `run_stats`(当累计器并存时).
 
-    Covers seq workflows where accum lives on demand ``request.components`` (not
-    ``workflow_components``), by retaining demand requests and reading their
-    VizObserverConfig / accumulator instances at teardown.
+    覆盖 `seq` `workflows`:`accum` 挂在 `demand` `request.components`(而非
+    `workflow_components`),通过保留 `demand` `request` 并在 `teardown` 读取其
+    `VizObserverConfig` / 累计器实例完成.
     """
-    from ..ob.presets.run_stats import WorkflowStatsAccumulator, resolve_viz_run_dir
-
     observers = []  # type: List[Any]
     extra_dirs = []  # type: List[str]
     manager = prepared.workflow_observer_manager

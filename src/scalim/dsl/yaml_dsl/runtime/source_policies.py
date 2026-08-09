@@ -1,7 +1,7 @@
-"""Source 缓存与 rows 复用策略(typed;`Python` 可覆盖 YAML).
+"""`Source` 缓存与 `rows` 复用策略(`typed`;`Python` 可覆盖 YAML).
 
 与 `sources.*.cache_mode` / `$rows.cache_mode` 拆名拆类型,禁止共用一个平铺 `cache_mode` API 字段.
-覆盖优先级:显式 Python > YAML 声明 > builtin 默认.
+覆盖优先级:显式 `Python` > YAML 声明 > `builtin` 默认.
 """
 
 from ....typedefs import RowsReuseMode, SourceSpecIrCacheMode
@@ -10,7 +10,7 @@ from ....vendor.dataclassesx import dataclass
 
 @dataclass(frozen=True)
 class SourceCache:
-    """`sources.*.cache_mode` 的 Python 覆盖策略."""
+    """`sources.*.cache_mode` 的 `Python` 覆盖策略."""
 
     _mode: SourceSpecIrCacheMode = SourceSpecIrCacheMode.NONE
 
@@ -33,7 +33,7 @@ class SourceCache:
 
 @dataclass(frozen=True)
 class RowsReuse:
-    """`params` 内 `$rows.cache_mode` 的 Python 覆盖策略(批次内 relation 复用)."""
+    """`params` 内 `$rows.cache_mode` 的 `Python` 覆盖策略(批次内 `relation` 复用)."""
 
     _mode: RowsReuseMode = RowsReuseMode.BATCH
 

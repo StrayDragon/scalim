@@ -27,10 +27,10 @@ def init_stage_span_tracking(
 
 
 class StageWriteClock(object):
-    """Accumulate sink write time; track nested write inside loader/compute windows.
+    """累计 `sink` `write` 耗时;跟踪 `loader`/`compute` 窗口内的嵌套 `write`.
 
-    Callers MUST attribute outer stage wall as ``max(0, wall - exit_stage())`` so nested
-    write is not double-counted into loader/compute.
+    调用方 `MUST` 将外层 `stage` 墙钟记为 `max(0, wall - exit_stage())`,
+    以免嵌套 `write` 被双重计入 `loader`/`compute`.
     """
 
     def __init__(self, enabled, stage_durations, perf_counter):
@@ -38,7 +38,7 @@ class StageWriteClock(object):
         self.enabled = bool(enabled)
         self.stage_durations = stage_durations
         self._perf_counter = perf_counter
-        # (stage_name, nested_write_s_during_window)
+        # (`stage_name`, `nested_write_s_during_window`)
         self._active_stages = []  # type: List[Tuple[str, float]]
 
     def enter_stage(self, stage):
@@ -49,7 +49,7 @@ class StageWriteClock(object):
 
     def exit_stage(self, stage):
         # type: (str) -> float
-        """Pop stage window and return nested write seconds attributed during it."""
+        """弹出 `stage` 窗口,返回该窗口内归因的嵌套 `write` 秒数."""
         if not self.enabled:
             return 0.0
         stage_s = str(stage)
@@ -95,9 +95,4 @@ def get_write_clock(runtime):
     return clock  # type: StageWriteClock
 
 
-__all__ = (
-    "StageWriteClock",
-    "attach_write_clock",
-    "get_write_clock",
-    "init_stage_span_tracking",
-)
+__all__ = ()

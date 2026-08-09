@@ -189,7 +189,7 @@ class SourceIr:
 
     lookup_chunk_parallel: Optional[bool] = None
     """
-    本 source 片间并行许可(`None`=继承运行级全局 opt-in;`True`/`False`=由 `LookupChunking.sized` 显式指定).
+    本 `source` 片间并行许可(`None`=继承运行级全局 `opt-in`;`True`/`False`=由 `LookupChunking.sized` 显式指定).
     """
 
     bindings: Mapping[NormalizedLookupKeySpec, BindingIr] = field(default_factory=_default_bindings, compare=False, hash=False)

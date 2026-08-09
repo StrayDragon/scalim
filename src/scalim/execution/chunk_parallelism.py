@@ -1,4 +1,4 @@
-"""LoadRef keys 分片并行的运行级策略(`Python` 策略面).
+"""`LoadRef` `keys` 分片并行的运行级策略(`Python` 策略面).
 
 分层心智:
 
@@ -6,7 +6,7 @@
 - 分片并行(本模块): 同一个 `LoadRef(keys)` 步骤内,分片产生的**多片**之间重叠等待.
 - `parallel_mode="seq"` 或未 `opt-in`: 全部串行(默认).
 
-分片大小与并行 SSOT 优先 `LookupChunking.sized(..., parallel=True)`(YAML `lookup_chunk_size` 已迁出).
+分片大小与并行 `SSOT` 优先 `LookupChunking.sized(..., parallel=True)`(YAML `lookup_chunk_size` 已迁出).
 遗留平铺 `parallelize_lookup_chunks=True` 仍可作为兼容开关,但不是推荐写法.
 分片并行不是第三种 `parallel_mode`,而是运行级的**附加许可**.
 """

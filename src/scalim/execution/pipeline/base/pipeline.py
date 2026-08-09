@@ -594,7 +594,7 @@ class SeqPipeline(Pipeline):
             else:
                 sink.close()
             if write_delta > 0:
-                # sink.close()/save counted as write; emit after BATCH_END and fold on pipeline_end.
+                # `sink.close()`/`save` 计入 `write`;在 `BATCH_END` 之后 `emit`,并于 `pipeline_end` `fold`.
                 self.runtime.instrumentation.emit_stage_span("write", max(1, int(batch_count)), write_delta)
             return_value = []
         else:
@@ -669,7 +669,7 @@ class SeqPipeline(Pipeline):
                 adaptive_pool=adaptive_pool,
                 after_operator=after_operator,
             )
-            # Prefer shared clock durations (includes main-source + nested writes).
+            # 优先用共享 `clock` 时长(含 `main-source` + 嵌套 `writes`).
             emit_durations = clock.stage_durations if wants_spans else returned
             if emit_durations is not None:
                 for stage_name, duration in emit_durations.items():

@@ -87,11 +87,10 @@ class PerformanceConfig:
 
 
 class PerformanceObserver(EventDispatchObserver):
-    """Per-pipeline performance metrics; resets on ``PIPELINE_START``.
+    """按 `pipeline` 采集 `performance` 指标;在 `PIPELINE_START` 时重置.
 
-    For multi-demand workflows, do not treat in-memory ``metrics`` after the last
-    pipeline as the full-run conclusion — use ``WorkflowStatsAccumulator`` /
-    ``run_stats.nodes`` instead (see ``docs/doc/viz/run-stats.md``).
+    多 `demand` `workflows` 不要把最后一次 `pipeline` 后的内存 `metrics` 当作整次运行结论 —
+    请改用 `WorkflowStatsAccumulator` / `run_stats.nodes`(见 `docs/doc/viz/run-stats.md`).
     """
 
     config: PerformanceConfig
@@ -268,7 +267,7 @@ class PerformanceObserver(EventDispatchObserver):
         self.metrics.total_duration = payload.total_duration
         self.metrics.batch_count = payload.total_batches
 
-        # Fold any STAGE_SPAN received after the last BATCH_END (e.g. sink.close write).
+        # 折叠最后一次 `BATCH_END` 之后收到的任何 `STAGE_SPAN`(例如 `sink.close` 的 `write`).
         for stage_entry in self._batch_stage_durations.values():
             self.metrics.stage_metrics.stream_duration += float(stage_entry.get("stream", 0.0) or 0.0)
             self.metrics.stage_metrics.loader_duration += float(stage_entry.get("loader", 0.0) or 0.0)

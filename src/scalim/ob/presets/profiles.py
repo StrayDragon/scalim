@@ -24,7 +24,7 @@ class ObservabilityProfile(StrEnum):
     DEBUG = "debug"
 
 
-# Stable string aliases for wire/meta (builtin str values).
+# `wire`/`meta` 用的稳定字符串别名(`builtin` `str` 值).
 PROFILE_BASELINE = ObservabilityProfile.BASELINE.value
 PROFILE_BENCH = ObservabilityProfile.BENCH.value
 PROFILE_BENCH_PLUS = ObservabilityProfile.BENCH_PLUS.value
@@ -50,10 +50,10 @@ def build_observability_profile(
     persist_batches=True,  # type: bool
 ):
     # type: (...) -> Dict[str, Any]
-    """Build observer components for a named low-drift profile.
+    """按具名低漂移 `profile` 组装 `observer` 组件.
 
-    Returns dict with keys: name, components, handles, viz_config, meta.
-    ``name`` accepts ``ObservabilityProfile`` or builtin str (normalized via Enum SSOT).
+    返回含键 `name`/`components`/`handles`/`viz_config`/`meta` 的 `dict`.
+    `name` 接受 `ObservabilityProfile` 或 `builtin` `str`(经 `Enum` `SSOT` 归一).
     """
     profile = _coerce_profile(name)
     name_s = profile.value
@@ -76,7 +76,7 @@ def build_observability_profile(
             "meta": meta,
         }
 
-    # bench_plus always samples memory; debug/bench only when include_memory=True
+    # `bench_plus` 始终采样 `memory`;`debug`/`bench` 仅当 `include_memory=True`
     sample_rss = bool(include_memory) or profile == ObservabilityProfile.BENCH_PLUS
     if sample_rss:
         require_psutil_for_memory("profile={}".format(name_s))
@@ -147,7 +147,7 @@ def build_observability_profile(
         components.extend([perf, sm])
         handles["perf"] = perf
         handles["stage_memory"] = sm
-    else:  # bench
+    else:  # `bench`
         metrics = {"duration", "memory"} if include_memory else {"duration"}
         if "memory" in metrics:
             require_psutil_for_memory("bench.include_memory")

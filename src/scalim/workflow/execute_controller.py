@@ -528,8 +528,8 @@ class WorkflowRunController:
             if isinstance(node, WorkflowNodeIr):
                 core = cast("ExecutionResult", result_obj)  # pragma: allow-cast future result typed narrowing
                 if request is not None:
-                    # Always retain demand request so seq workflows can discover shared
-                    # WorkflowStatsAccumulator / mutated viz_config.output_dir at teardown.
+                    # 始终保留 `demand` `request`,以便 `seq` `workflows` 在 `teardown` 发现共享
+                    # `WorkflowStatsAccumulator` / 已变更的 `viz_config.output_dir`.
                     self._state.captured_demand_request_by_node_id[str(node_id)] = request
                 if capture_obj is not None:
                     self._state.captured_demand_events_by_node_id[str(node_id)] = list(capture_obj.captured_events)

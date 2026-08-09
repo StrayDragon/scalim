@@ -204,7 +204,7 @@ class BatchExecutor:
             attach_write_clock(runtime, clock)
             owns_clock = True
         elif wants_stage_spans and clock.stage_durations is not stage_durations:
-            # Reuse pre-attached clock durations (e.g. pipeline timed main-source writes first).
+            # 复用已挂载的 `clock` 时长(例如 `pipeline` 已先计时 `main-source` `writes`).
             stage_durations = clock.stage_durations
 
         resolved_workers = 1

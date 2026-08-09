@@ -60,9 +60,9 @@ class RunStatsMeta:
 
 
 class WorkflowStatsAccumulator(EventDispatchObserver):
-    """Accumulate per-pipeline snapshots so workflow shared reset cannot erase evidence.
+    """累计 `per-pipeline` 快照,避免 `workflow` 共享 `reset` 抹掉证据.
 
-    Subscribes only to lite EventTypes (no RELATION_LOOKUP / ROW_WRITE / FIELD_COMPUTE).
+    仅订阅轻量 `EventTypes`(不含 `RELATION_LOOKUP` / `ROW_WRITE` / `FIELD_COMPUTE`).
     """
 
     event_types: Optional[Set[EventType]]
@@ -399,14 +399,14 @@ def atomic_write_run_stats_json(path, payload):
 
 def write_run_stats_sibling(run_dir, payload, filename="run_stats.json"):
     # type: (str, Dict[str, Any], str) -> str
-    """Write run_stats next to a viz/run artifact directory (sibling file, not embedded)."""
+    """在 `viz`/`run` 产物目录旁写入 `run_stats` 兄弟文件(非嵌入)."""
     path = os.path.join(str(run_dir), str(filename))
     return atomic_write_run_stats_json(path, payload)
 
 
 def resolve_viz_run_dir(observer_or_config):
     # type: (Any) -> Optional[str]
-    """Best-effort run directory for a VizObserver / WorkflowVizObserver / VizObserverConfig."""
+    """尽力解析 `VizObserver` / `WorkflowVizObserver` / `VizObserverConfig` 的 `run` 目录."""
     config = observer_or_config
     if not hasattr(config, "resolve_output_paths"):
         config = getattr(observer_or_config, "config", None)
@@ -429,13 +429,12 @@ def resolve_viz_run_dir(observer_or_config):
 
 def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=None):
     # type: (Any, Optional[Dict[str, Any]], Optional[Any]) -> List[str]
-    """When Viz + WorkflowStatsAccumulator coexist, write sibling ``run_stats.json``.
+    """当 `Viz` 与 `WorkflowStatsAccumulator` 并存时,写兄弟 `run_stats.json`.
 
-    Does nothing if either side is missing or the accumulator has no ``nodes`` yet.
-    Never embeds into ``viz_snapshot.json``.
+    任一侧缺失,或累计器尚无 `nodes` 时不做任何事.
+    永不嵌入 `viz_snapshot.json`.
 
-    ``extra_run_dirs`` MAY list additional directories (e.g. workflow/ overview) to receive
-    the same payload once an accumulator is found among ``observers``.
+    `extra_run_dirs` `MAY` 列出额外目录(例如 `workflow`/`overview`)以在找到累计器后接收同一载荷.
     """
     obs_list = list(observers or [])
     accum = None  # type: Optional[WorkflowStatsAccumulator]

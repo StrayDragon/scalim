@@ -558,7 +558,7 @@ class DemandRunRuntimeOptions:
     """
 
     parallelize_lookup_chunks: bool = False
-    """是否允许 keys 分片并行(默认关闭;兼容窗保留).
+    """是否允许 `keys` 分片并行(默认关闭;兼容窗保留).
 
     注意:
     - 推荐改用 `lookup_chunking` 中 `LookupChunking.sized(..., parallel=True)`.
@@ -571,13 +571,13 @@ class DemandRunRuntimeOptions:
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
 
     lookup_chunking: Mapping[str, LookupChunking] = dataclass_field(default_factory=_empty_lookup_chunking)
-    """per-source keys 分片策略(`LookupChunking.off|sized`);未配置的 source 默认不分片."""
+    """`per-source` `keys` 分片策略(`LookupChunking.off|sized`);未配置的 `source` 默认不分片."""
 
     source_cache: Mapping[str, SourceCache] = dataclass_field(default_factory=_empty_source_cache)
-    """per-source `SourceCache` 覆盖(Python > YAML `cache_mode` > `none`)."""
+    """`per-source` `SourceCache` 覆盖(`Python` > YAML `cache_mode` > `none`)."""
 
     rows_reuse: Mapping[str, RowsReuse] = dataclass_field(default_factory=_empty_rows_reuse)
-    """per-source `RowsReuse` 覆盖(Python > YAML `$rows.cache_mode` > `batch`)."""
+    """`per-source` `RowsReuse` 覆盖(`Python` > YAML `$rows.cache_mode` > `batch`)."""
 
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""
@@ -628,7 +628,7 @@ class DemandRunRuntimeOptions:
             raise ValueError(msg)
 
     def _normalize_runtime_source_policies(self) -> None:
-        """校验片间并行护栏,并规范化 typed source 策略映射."""
+        """校验片间并行护栏,并规范化 `typed` `source` 策略映射."""
         if not isinstance(self.parallelize_lookup_chunks, bool):
             msg = "DemandRunRuntimeOptions.parallelize_lookup_chunks must be a boolean"
             raise TypeError(msg)
