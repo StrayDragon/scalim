@@ -21,8 +21,8 @@ flowchart TD
   U[升级到 0.10.0] --> Y{validate 仍绿?}
   Y -->|有报错| Br[先走 YAML breaking 升级指南]
   Y -->|绿| D[默认: late 写出 + 行内融合]
-  D --> O{单 LoadRef 大键集 + lookup_chunk_size<br/>且 RTT 主导?}
-  O -->|是且外部扛得住 W| Opt[Python opt-in parallelize_lookup_chunks]
+  D --> O{单 LoadRef 大键集已分片<br/>且 RTT 主导?}
+  O -->|是且外部扛得住 W| Opt[Python LookupChunking.sized(..., parallel=True)]
   O -->|否| Done[可只读专页证据,不必改配置]
 ```
 
@@ -43,8 +43,8 @@ flowchart TD
 
 ### 3. lookup chunk 并行（opt-in）
 
-- **`lookup_chunk_size` 不是并行开关**（语义不变）。
-- 开启：`DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True)`（或 `PipelineOverrides` / `ExecutionRequest`）。
+- 0.10.0：**分片大小 alone 不是并行开关**；开启用 `parallelize_lookup_chunks` + `adaptive`。
+- **c40（0.10.*）后**：YAML `lookup_chunk_size` 已迁出 → `LookupChunking.sized(N[, parallel=True])`；见 `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`。
 - `seq` 即使 opt-in 也串行分片；全局在途 ≤ adaptive workers `W`。
 - 订阅 `loader_call`：并行下为完成序 + `chunk_offset`；单 LoadRef 退化层时回调 **MAY** 在 worker 线程（须线程安全）。
 - 失败路径：已在途 chunk MAY 仍跑完（调用次数 MAY > 串行）；成功路径 calls 与串行相等。
@@ -61,7 +61,7 @@ flowchart TD
   docs/doc/releases/write-precompute-0.10.md
 - row-wise fusion（默认）：同 deps 行内融合减框架税；calc_calls 不变。
   docs/doc/releases/rowwise-fusion-0.10.md
-- lookup chunk 并行（opt-in）：adaptive + parallelize_lookup_chunks；lookup_chunk_size ≠ 开关。
+- lookup chunk 并行（opt-in）：adaptive + LookupChunking.sized(..., parallel=True)（c40 后 YAML lookup_chunk_size 已迁出）。
   docs/doc/releases/lookup-chunk-parallel-0.10.md
 总览：docs/doc/releases/0.10.0/index.md
 ```

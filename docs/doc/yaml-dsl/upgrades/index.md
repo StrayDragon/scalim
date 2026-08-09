@@ -38,4 +38,5 @@
 - [2026-07-24: remove-score-by-rank-builtin](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-24-remove-score-by-rank-builtin.md?ref)
 - [2026-07-28: remove-book-budget-policy](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-28-remove-book-budget-policy.md?ref)
 - [2026-07-28: remove-dedup-and-two-stage-derived](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-28-remove-dedup-and-two-stage-derived.md?ref)
+- [2026-08-09 — YAML `lookup_chunk_size` → Python `LookupChunking`（c40）](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md?ref)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

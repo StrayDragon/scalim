@@ -30,7 +30,7 @@ Sources:
 
 | 模块 | `__all__` 导出数 | 说明 | 常见场景 |
 | --- | ---: | --- | --- |
-| `scalim.dsl.yaml_dsl` | 39 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
+| `scalim.dsl.yaml_dsl` | 42 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
 | `scalim.dsl.yaml_dsl.tools` | 3 | YAML DSL 辅助工具(输出配置/路径推导) | 工具链集成/排错 |
 | `scalim.dsl.yaml_dsl.workflow` | 10 | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
 | `scalim.dsl.yaml_dsl.workflow_types` | 22 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
@@ -102,7 +102,7 @@ from scalim.sinks.pandas import PandasRowSink
 
 #### `scalim.dsl.yaml_dsl`
 
-- Export count: `39`
+- Export count: `42`
 
 ```python
 from scalim.dsl.yaml_dsl import (
@@ -130,6 +130,7 @@ from scalim.dsl.yaml_dsl import (
     DemandRunTemplateOptions,
     ExcelColumnResidency,
     FileResourceOverride,
+    LookupChunking,
     OutputDefaultsToOverride,
     OutputExtraSheetOverride,
     OutputExtrasOverride,
@@ -140,7 +141,9 @@ from scalim.dsl.yaml_dsl import (
     ResolverTrustedMode,
     ResourcesOverride,
     ResourcesPolicy,
+    RowsReuse,
     RunOverrides,
+    SourceCache,
     WorkflowRunOptions,
     compile,
     run,

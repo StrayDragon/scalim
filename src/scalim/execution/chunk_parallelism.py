@@ -1,13 +1,14 @@
-"""`lookup_chunk_size` 分片并行的运行级策略(`Python` 策略面,无 `YAML` 键).
+"""LoadRef keys 分片并行的运行级策略(`Python` 策略面).
 
 分层心智:
 
 - `parallel_mode="adaptive"`: 同一批次内多个**独立** `LoadRef` 之间重叠等待.
-- 分片并行(本模块): 同一个 `LoadRef(keys)` 步骤内,`lookup_chunk_size` 产生的**多片**之间重叠等待.
+- 分片并行(本模块): 同一个 `LoadRef(keys)` 步骤内,分片产生的**多片**之间重叠等待.
 - `parallel_mode="seq"` 或未 `opt-in`: 全部串行(默认).
 
-分片并行不是第三种 `parallel_mode`,而是运行级的**附加许可**:仅当运行级 `parallel_mode="adaptive"`
-且显式 `opt-in`(`parallelize_lookup_chunks=True`)时启用.
+分片大小与并行 SSOT 优先 `LookupChunking.sized(..., parallel=True)`(YAML `lookup_chunk_size` 已迁出).
+遗留平铺 `parallelize_lookup_chunks=True` 仍可作为兼容开关,但不是推荐写法.
+分片并行不是第三种 `parallel_mode`,而是运行级的**附加许可**.
 """
 
 import threading
@@ -16,6 +17,7 @@ from typing import Optional
 from ..typedefs import ParallelMode
 from ..vendor.dataclassesx import dataclass
 from .adaptive._internal.loadref_scheduler_support import resolve_adaptive_max_workers
+from .lookup_chunking import normalize_optional_max_chunk_workers
 
 
 @dataclass(frozen=True)
@@ -23,7 +25,7 @@ class LookupChunkParallelismPolicy:
     """分片并行策略(运行级;`adaptive` 工作线程子运行时会继承同一实例)."""
 
     parallelize_lookup_chunks: bool = False
-    """是否允许同一 `LoadRef(keys)` 步骤内的多个 `lookup_chunk_size` 分片并行(默认关闭)."""
+    """是否允许同一 `LoadRef(keys)` 步骤内的多个分片并行(默认关闭)."""
 
     max_chunk_workers: Optional[int] = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
@@ -33,17 +35,14 @@ class LookupChunkParallelismPolicy:
             msg = "LookupChunkParallelismPolicy.parallelize_lookup_chunks must be a boolean"
             raise TypeError(msg)
 
-        max_chunk_workers = self.max_chunk_workers
-        if max_chunk_workers is None:
-            return
-        if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
-            msg = "LookupChunkParallelismPolicy.max_chunk_workers must be an int or None"
-            raise TypeError(msg)
-        if int(max_chunk_workers) < 1:
-            msg = "LookupChunkParallelismPolicy.max_chunk_workers must be >= 1 when provided"
-            raise ValueError(msg)
-        object.__setattr__(self, "max_chunk_workers", int(max_chunk_workers))
-
+        object.__setattr__(
+            self,
+            "max_chunk_workers",
+            normalize_optional_max_chunk_workers(
+                self.max_chunk_workers,
+                label="LookupChunkParallelismPolicy.max_chunk_workers",
+            ),
+        )
     @classmethod
     def disabled(cls) -> "LookupChunkParallelismPolicy":
         return cls()

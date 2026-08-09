@@ -1,24 +1,30 @@
 # 0.10.0：lookup chunk 并行（opt-in）
 
+!!! note "c40 之后的 authoring（0.10.*）"
+    YAML `sources.*.lookup_chunk_size` **已迁出** → Python `LookupChunking`（再写 fail-fast）。
+    本页保留 **0.10.0 发布时**的命名/对拍叙事；现行写法见
+    `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
+    与 [`parallel-modes.md` §3.6](../architecture/parallel-modes.md#36-opt-in-keys-adaptive)。
+
 ??? note "适用读者"
-    - 关心 **0.10.0** 单 `LoadRef` 大键集 + `lookup_chunk_size` 等待重叠的使用方
+    - 关心 **0.10.0** 单 `LoadRef` 大键集 + 分片等待重叠的使用方
     - 需要讲清「命名变更 / 何时加速 / 何时不变 / QPS 风险」的维护者
     - 想看前后对拍数字与图的同学
 
 **版本锚定：Scalim 0.10.0。**  
-同一 `LoadRef(keys)` 被 `lookup_chunk_size` 拆成多片后，片间默认仍**串行**。  
-0.10 新增 Python **opt-in**：在 `parallel_mode="adaptive"` 下允许片间并行，重叠 RTT 等待——**无新 YAML 键**；`lookup_chunk_size` 仍只表示分片大小。
+同一 `LoadRef(keys)` 被分片后，片间默认仍**串行**。  
+0.10 新增 Python **opt-in**：在 `parallel_mode="adaptive"` 下允许片间并行，重叠 RTT 等待——**当时无新 YAML 并行键**；分片大小 alone 不是并行开关。
 
 | 契约 | 0.10.0 行为 |
 |------|-------------|
-| Authoring YAML | **无新键**；`lookup_chunk_size` 语义不变 |
+| Authoring YAML | **无新并行键**；当时仍可用 YAML `lookup_chunk_size` 表示分片大小（**c40 后已迁出**） |
 | 默认 | **关闭**；未 opt-in ≡ 今日串行分片 |
 | `parallel_mode=seq` | **永不分片并行**（即使 opt-in） |
 | 合并 / 成功路径调用次数 | ≡ 串行（first-wins by `chunk_offset`） |
 | 峰值 RSS（分进程对拍） | ≤ **+10%** |
 | 观测 | `loader_call.chunk_offset`；完成序；回调可能在 worker 线程 |
 
-架构 / 护栏：[`parallel-modes.md` §3.6](../architecture/parallel-modes.md#36-opt-in-lookup_chunk_size-adaptive)。  
+架构 / 护栏：[`parallel-modes.md` §3.6](../architecture/parallel-modes.md#36-opt-in-keys-adaptive)。  
 版本亮点总览：[0.10.0 重点特性](0.10.0/)。
 
 ??? info "0.10.0 重点特性 · 版本总览(折叠)"

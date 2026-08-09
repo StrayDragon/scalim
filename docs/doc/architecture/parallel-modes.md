@@ -274,23 +274,37 @@ YAML 文件本身不声明 `parallel_mode`. 需要在调用 YAML 运行入口时
 fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,可能各调一次 loader(这是既有语义,不是分片并行引入的).
 热维表请用 `cache_mode: preload_forever`;分片并行与该缓存层正交.
 
-### 3.6 opt-in: `lookup_chunk_size` 分片并行(仅 `adaptive`)
+### 3.6 opt-in: keys 分片并行(仅 `adaptive`)
 
-`adaptive` 重叠的是**不同** `LoadRef` 任务之间的等待;而 `lookup_chunk_size` 把一次 `LoadRef(keys)` 拆成多片后,
+`adaptive` 重叠的是**不同** `LoadRef` 任务之间的等待;而 keys 分片把一次 `LoadRef(keys)` 拆成多片后,
 这些片默认仍然**顺序**调用 loader. 在 RTT 主导(DB/远程接口)时,片数会线性放大固定等待.
 
-可以显式许可「同一 `LoadRef` 内的多片并行」:
+**分片大小与并行 SSOT(c40)**：Python `DemandRunRuntimeOptions.lookup_chunking` / `LookupChunking`。
+YAML `sources.*.lookup_chunk_size` **已迁出**(再写 fail-fast)。推荐：
 
-- `DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True, max_chunk_workers=None)`(YAML DSL 运行入口)
-- `ExecutionRequest(parallel_mode="adaptive", parallelize_lookup_chunks=True, ...)`(IR 入口)
-- `ScalimEngine(parallel_mode="adaptive", pipeline_overrides=PipelineOverrides(parallelize_lookup_chunks=True))`(Engine 入口)
+```python
+from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, LookupChunking
+
+DemandRunRuntimeOptions(
+    parallel_mode="adaptive",
+    max_workers=8,
+    lookup_chunking={"customers": LookupChunking.sized(800, parallel=True)},
+)
+```
+
+遗留兼容(仍可用,非推荐 SSOT):
+
+- `DemandRunRuntimeOptions(parallel_mode="adaptive", parallelize_lookup_chunks=True, ...)`
+- `ExecutionRequest(..., parallelize_lookup_chunks=True, ...)`
+- `ScalimEngine(..., pipeline_overrides=PipelineOverrides(parallelize_lookup_chunks=True))`
 
 语义边界:
 
 - **默认关闭**;未 opt-in 时与改前完全一致(顺序分片、调用次数不变).
 - **`seq` 永不分片并行**:`parallel_mode="seq"` 即使 opt-in 也保持顺序分片.
 - **不是第三种 `parallel_mode`**:它是运行级的附加许可,`parallel_mode` 仍只有 `seq` / `adaptive`.
-- **`lookup_chunk_size` 不是并行开关**:只设置它不会产生任何并发.
+- **`LookupChunking.sized(size=...)` alone 不是并行开关**:须 `sized(..., parallel=True)`(或遗留平铺布尔且 IR `lookup_chunk_parallel is None`).
+- 若已用 `LookupChunking.sized(...)` 写入 IR,并行请写 `parallel=True`;不要指望平铺布尔覆盖 sized 的显式串行.
 - 合并结果与顺序分片**完全一致**:按 chunk 在 keys 列表上的 offset 升序合并,同 key 冲突时先写入者胜.
 - 失败/超时跟随父 `LoadRef` 任务(含 `AdaptiveTuning.task_timeout_s`),不新增 chunk 级 timeout;失败时不会写入半份合并结果 / 半份 `load_ref_cache`.
   注意:并行路径在失败时**已提交且仍在跑**的其它 chunk MAY 仍会执行完,因此错误路径上的 loader 调用次数可能高于串行(串行在首个失败处即停);成功路径调用次数与串行一致.
@@ -309,7 +323,8 @@ fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,�
 并携带 `chunk_offset`(keys 切片起点). 并行下事件按**完成序**发出,框架不做排序缓冲;
 若需要稳定顺序,请订阅方自行按 `chunk_offset` 排序.
 
-人类可读对拍专页(命名变更 / sleep-RTT 证据 / D3 图): [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md)（版本亮点入口: [0.10.0](../releases/0.10.0/)）.
+人类可读对拍专页(0.10.0 命名/证据;现行 authoring 以 c40 upgrade 为准): [lookup-chunk-parallel-0.10](../releases/lookup-chunk-parallel-0.10.md)（版本亮点入口: [0.10.0](../releases/0.10.0/)）.
+Agent upgrade:`agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`.
 
 !!! warning "订阅方必须线程安全"
 
@@ -351,7 +366,7 @@ fan-in 时不回写主 runtime. 因此多条 relation 打同一个 source 时,�
     - 你能接受并发带来的外部压力,并愿意用 `max_workers` 做上限
 
 - 再考虑 `adaptive` + 分片并行 opt-in(§3.6)
-    - 单个 `LoadRef` 的键集很大且被 `lookup_chunk_size` 拆成多片
+    - 单个 `LoadRef` 的键集很大且已被 `LookupChunking.sized(...)` 拆成多片
     - 片数 × RTT 已经成为主要耗时,而外部系统能承受 `W` 个并发查询
     - 你不需要「顺序观感」的 `loader_call` 事件流(并行下为完成序 + `chunk_offset`)
 

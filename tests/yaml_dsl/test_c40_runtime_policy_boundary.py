@@ -144,6 +144,30 @@ def test_rows_reuse_python_override_beats_yaml_rows_cache_mode(tmp_path: Path) -
     assert binding.cache_mode == "none"
 
 
+def test_compile_without_lookup_chunking_leaves_source_unchunked(tmp_path: Path) -> None:
+    yaml_path = tmp_path / "demand.yaml"
+    yaml_path.write_text(_minimal_demand_yaml(), encoding="utf-8")
+
+    compilation = compile(
+        str(yaml_path),
+        options=DemandRunOptions(security=_security()),
+    )
+
+    source = compilation.demand_ir.sources["customers"]
+    assert source.lookup_chunk_size is None
+    assert source.lookup_chunk_parallel is None
+    assert compilation.request.parallelize_lookup_chunks is False
+
+
+def test_run_overrides_csv_write_header_defaults_when_fields_only(tmp_path: Path) -> None:
+    overrides = RunOverrides.csv_file(output_root=tmp_path / "csv", fields=("order_id",))
+    assert overrides.outputs is not None
+    write = overrides.outputs[0].write
+    assert write is not None
+    assert write.include_header is True
+    assert write.header_fields_output_by == "name"
+
+
 def test_run_overrides_csv_and_xlsx_default_header_fields_output_by_name(tmp_path: Path) -> None:
     csv = RunOverrides.csv_file(output_root=tmp_path / "csv", fields=("order_id",))
     assert csv.outputs is not None

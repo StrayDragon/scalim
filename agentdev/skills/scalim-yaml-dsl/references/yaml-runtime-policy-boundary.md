@@ -33,6 +33,6 @@ c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof
 ## 指针
 
 - Upgrade：`references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
-- Design / evidence：`llmanspec/changes/c40-yaml-runtime-policy-boundary/`
+- Design / evidence（归档后）：`llmanspec/changes/archive/*-c40-yaml-runtime-policy-boundary/`
 - Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary/`（r1003–r1005）
-- 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`
+- 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`、`user-guide.md` §4.4.3

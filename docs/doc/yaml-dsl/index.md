@@ -14,13 +14,13 @@ YAML DSL 的主线演进遵循以下上位原则(后续提案/变更默认不得
 - **KV-first**: 需要稳定 ID/引用/复用的结构优先 mapping;仅顺序具业务语义时用 list
 - **workflow 小而声明式**: workflow 不扩张为 imports/片段组合系统
 
-**YAML vs Python 边界速查**（盘点开放中：动态 knobs 目标收口 Python）:
+**YAML vs Python 边界速查**（c40 已落地：动态 knobs 收口 Python typed oneof）:
 
 - 评审速记: [提案审核清单](review-checklist.md)
-- 全量键盘点+证据: `llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`
-- 目标与第一刀草案: `llmanspec/changes/c40-yaml-runtime-policy-boundary/design.md`
 - 能力表: [YAML→IR 能力矩阵](capability-matrix.md)
-- Agent: `agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
+- Agent 边界: `agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
+- Upgrade（`lookup_chunk_size` → `LookupChunking`）: `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
+- 归档设计/证据: `llmanspec/changes/archive/*-c40-yaml-runtime-policy-boundary/`
 
 提案/评审清单见: [YAML DSL 提案审核清单](review-checklist.md)
 

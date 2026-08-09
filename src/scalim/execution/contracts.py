@@ -14,6 +14,7 @@ from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, RuntimeValue
 from ..vendor.dataclassesx import dataclass
 from ..vendor.dataclassesx import field as dataclass_field
 from .excel_column_residency import ExcelColumnResidency
+from .lookup_chunking import normalize_optional_max_chunk_workers
 from .output_contracts import ExportLayout, OutputSpec
 
 if TYPE_CHECKING:
@@ -105,14 +106,10 @@ def _validate_execution_request_chunk_parallelism(parallelize_lookup_chunks: Run
     if not isinstance(parallelize_lookup_chunks, bool):
         msg = "ExecutionRequest.parallelize_lookup_chunks must be a boolean"
         raise TypeError(msg)
-    if max_chunk_workers is None:
-        return
-    if isinstance(max_chunk_workers, bool) or not isinstance(max_chunk_workers, int):
-        msg = "ExecutionRequest.max_chunk_workers must be an int or None"
-        raise TypeError(msg)
-    if int(max_chunk_workers) < 1:
-        msg = "ExecutionRequest.max_chunk_workers must be >= 1 when provided"
-        raise ValueError(msg)
+    normalize_optional_max_chunk_workers(
+        max_chunk_workers,
+        label="ExecutionRequest.max_chunk_workers",
+    )
 
 
 def _validate_execution_request_capture_in_memory_rows(capture_in_memory_rows: RuntimeValue) -> None:
