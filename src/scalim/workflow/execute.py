@@ -685,7 +685,9 @@ def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> N
     extra_dirs = []  # type: List[str]
     manager = prepared.workflow_observer_manager
     if manager is not None:
-        observers.extend(list(getattr(manager, "observers", None) or []))  # pragma: allow-dynattr optional-interface: ObserverManager.observers
+        observers.extend(
+            list(getattr(manager, "observers", None) or [])
+        )  # pragma: allow-dynattr optional-interface: ObserverManager.observers
     for component in prepared.workflow_components:
         if component is not None and component not in observers:
             observers.append(component)
@@ -696,7 +698,9 @@ def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> N
             observers.append(viz)
 
     for request in (prepared.captured_demand_request_by_node_id or {}).values():
-        for component in list(getattr(request, "components", None) or []):  # pragma: allow-dynattr optional-interface: ExecutionRequest.components
+        for component in list(
+            getattr(request, "components", None) or []
+        ):  # pragma: allow-dynattr optional-interface: ExecutionRequest.components
             if isinstance(component, WorkflowStatsAccumulator) and component not in observers:
                 observers.append(component)
         observability = getattr(request, "observability", None)  # pragma: allow-dynattr optional-interface: ExecutionRequest.observability
