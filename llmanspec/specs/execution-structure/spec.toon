@@ -68,7 +68,7 @@ scenarios[50]{req_id,id,given,when,then,feature}:
   r252,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r252,"request-未启用-retry-时行为不变","",`ExecutionRequest` 未配置 loader retry policy(或 `enabled=false`),任一 loader 异常 MUST 直接传播并终止执行(与当前版本一致),true
   r259,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
-  r259,"load-ref-分片调用按-invocation-重试",`lookup_chunk_size=100` 导致一次 load_ref 被拆为多次 loader 调用,其中一片调用抛出瞬态异常且 `should_retry` 返回 true,系统 MUST 对该片调用执行重试(不要求回滚其它已成功片段),true
+  r259,"load-ref-分片调用按-invocation-重试",`LookupChunking.sized(size=100)` 导致一次 load_ref 被拆为多次 loader 调用,其中一片调用抛出瞬态异常且 `should_retry` 返回 true,系统 MUST 对该片调用执行重试(不要求回滚其它已成功片段),true
   r266,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r266,"scheduler-拆分后协作单元边界清晰","",维护者重构 `AdaptiveLoadRefScheduler` 的内部结构,策略解析、任务提交与结果聚合 MUST 可独立测试,true
   r377,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true

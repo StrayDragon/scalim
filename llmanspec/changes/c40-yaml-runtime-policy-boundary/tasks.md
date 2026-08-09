@@ -12,7 +12,7 @@
 - [x] B.1–B.4 措施 I/II/III + oneof 原则  
 - [x] B.5 细项 **1A + 2A + 3A**  
 - [x] B.6a `change start` → 分支 `sdd/c40-yaml-runtime-policy-boundary`  
-- [ ] B.6b specs landing：改 `yaml-dsl-runtime-policy-boundary`（及必要时 governance）合约后单独 commit  
+- [x] B.6b specs landing：改 `yaml-dsl-runtime-policy-boundary`（及交叉 specs）合约后单独 commit  
 
 ## C. 实现（specs landing 且 readyToImplement 后）
 

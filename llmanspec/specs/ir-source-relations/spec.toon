@@ -9,7 +9,7 @@ requirements[11]{req_id,title,statement}:
   r520,`$rows` preserves rows barrier semantics for relations,"系统 MUST 将 `$rows` 指令视为 rows 模式绑定,并保留 rows barrier 语义(例如 adaptive 下该层串行)以及 `cache_mode` 语义."
   r596,preload_forever sources reject `$keys/$rows` directives,"系统 MUST 禁止在 `cache_mode: preload_forever` 的 source 的 preload 调用路径中使用 `$keys/$rows` 指令节点(因为 preload 不具备 ref 上下文)."
   r650,"legacy `to_bind` is rejected with a copy-pastable migration hint","系统 MUST 将 step 级 `to_bind` 视为 legacy 写法并在校验阶段 fail-fast. 错误信息 MUST 明确指出应将绑定迁移到“目标 source 的 `params` 模板”,并给出可直接照抄的替换建议片段(至少覆盖常见 `use_keys.param` 形态)。"
-  r694,批次内 LoadRef 复用与分片语义,"系统 MUST 在同一批次内对 relation signature 完全一致的 LoadRef 字段进行 group 合并并一次执行;signature 由 steps 中的 to_source/from_fields/to_key/lookup_cast/binding 组成. 系统 MUST 基于 group 内字段构建 lookup_keys 并集并写回所有字段;若 relation 不一致则不得合并. 系统 MUST 复用同 relation/row_id/from_field 的 lookup key 归一化结果;不同 relation 不复用,且诊断事件仅在首次归一化时触发. rows 模式默认复用,若目标 source 的 `params` 模板中使用 `$rows: {cache_mode: none}`,系统 MUST 显式禁用该 relation 的批次内复用. 当 rows 模式复用启用时,系统 MUST NOT 在长生命周期缓存中保留完整 `batch_rows` 列表;如需用于观测,系统 MAY 仅保留有界采样或在 cache hit 观测中省略 `batch_rows`. keys 模式支持 `lookup_chunk_size` 分片加载并合并结果;分片语义与一次性加载一致。当启用 `execution-refloader-chunk-parallelism` 的 opt-in 并行分片时,合并结果 MUST 仍与本条串行分片语义等价(先 wins / 按 chunk offset)。"
+  r694,批次内 LoadRef 复用与分片语义,"系统 MUST 在同一批次内对 relation signature 完全一致的 LoadRef 字段进行 group 合并并一次执行;signature 由 steps 中的 to_source/from_fields/to_key/lookup_cast/binding 组成. 系统 MUST 基于 group 内字段构建 lookup_keys 并集并写回所有字段;若 relation 不一致则不得合并. 系统 MUST 复用同 relation/row_id/from_field 的 lookup key 归一化结果;不同 relation 不复用,且诊断事件仅在首次归一化时触发. rows 模式默认复用,若目标 source 的 `params` 模板中使用 `$rows: {cache_mode: none}`,系统 MUST 显式禁用该 relation 的批次内复用. 当 rows 模式复用启用时,系统 MUST NOT 在长生命周期缓存中保留完整 `batch_rows` 列表;如需用于观测,系统 MAY 仅保留有界采样或在 cache hit 观测中省略 `batch_rows`. keys 模式支持 Python `LookupChunking.sized` 分片加载并合并结果;分片语义与一次性加载一致（YAML `lookup_chunk_size` 已迁出，见 `yaml-dsl-runtime-policy-boundary` r1003）。当启用 `execution-refloader-chunk-parallelism` 的 sized(parallel=True) 时,合并结果 MUST 仍与本条串行分片语义等价(先 wins / 按 chunk offset)。"
   r732,ref loader 依赖信号驱动稳定排序,"系统 MUST 基于 relation/lookup steps 推断 ref loader 依赖信号并构建 `ref_loader_sequence`. 当依赖信号不足时 MUST 使用稳定回退顺序并输出可观测降级告警,不得静默退化. 依赖推断函数 MUST 为纯函数并覆盖关键 edge cases(空 steps、自身依赖、重复依赖、非 ref 字段依赖)."
   r764,关联诊断基于样本值并支持复合键对比,"系统 SHALL 基于样本值(而非样本 key)执行类型兼容检查;仅在存在完整样本时输出类型告警. 复合键诊断 MUST 按字段顺序逐一比较并输出可读对比结果;缺失值样本标记为 missing. 当类型不匹配且未配置 cast 时,诊断 SHOULD 给出 `lookup_cast` 建议."
   r145,关联路径与比较输出可读且稳定,"系统 SHALL 输出包含 step 序号、`source.field`、`[KEY]/[LOOKUP_KEY]` 与 cast 信息的路径文本. 对比表格输出列结构应稳定;无样本时返回明确空结果提示(如 `No comparison data`)."
@@ -38,7 +38,7 @@ scenarios[33]{req_id,id,given,when,then,feature}:
   r694,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r694,"同-relation-多字段只执行一次","fields `f1/f2/f3` 指向同一 `source`,且 relation signature 完全一致",批次执行 LoadRef,该 group 在该批次仅触发一次逻辑加载,true
   r694,"rows-cache-mode-none-禁用复用","","relation 目标 source 的 `params` 模板使用 `$rows: {cache_mode: none}`",系统不得对该 relation 做 group 合并,true
-  r694,"lookup-chunk-size-分片加载","",lookup_keys 数量为 25 且 lookup_chunk_size=10,loader 应被调用 3 次且合并结果一致,true
+  r694,"lookup-chunking-sized-分片加载","",lookup_keys 数量为 25 且 LookupChunking.sized(size=10),loader 应被调用 3 次且合并结果一致,true
   r732,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
   r732,"多级-relation-排序正确","","关系链存在 `A -> B -> C` 且 `B/C` 都是 ref loader",排序结果 MUST 保证 `B` 在 `C` 之前,true
   r764,baseline,"","TODO: describe the trigger","TODO: describe the expected result",true
