@@ -186,6 +186,23 @@ def test_adaptive_without_opt_in_stays_serial() -> None:
     assert set(loader.threads) == {threading.current_thread().name}
 
 
+def test_sized_parallel_false_forces_serial_even_when_runtime_opt_in() -> None:
+    """`SourceIr.lookup_chunk_parallel=False` 强制 fanout=1,即使全局已 opt-in."""
+    loader = _RecordingLoader()
+    scenario = _build_scenario(
+        loader=loader,
+        chunk_size=2,
+        lookup_chunk_parallel=False,
+        parallel_mode="adaptive",
+        parallelize_lookup_chunks=True,
+        max_workers=4,
+    )
+    assert scenario.runtime.is_chunk_parallelism_enabled() is True
+    scenario.execute()
+    assert len(loader.calls) == 3
+    assert set(loader.threads) == {threading.current_thread().name}
+
+
 def test_sized_without_parallel_is_not_a_parallel_switch() -> None:
     """IR `lookup_chunk_size` / sized(without parallel) alone does not enable chunk parallelism."""
     loader = _RecordingLoader()

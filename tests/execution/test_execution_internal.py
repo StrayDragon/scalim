@@ -975,8 +975,13 @@ def test_row_emission_coordinator_falls_back_when_write_row_aligned_missing() ->
         def close(self) -> None:
             return
 
+    from scalim.execution.executor.batch._internal.stage_spans import StageWriteClock, attach_write_clock
+
     plan = _make_plan({}, ["a"])
     runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
+    times = [1.0, 2.0]
+    clock = StageWriteClock(True, {"write": 0.0}, perf_counter=lambda: times.pop(0))
+    attach_write_clock(runtime, clock)
     sink = _NoAlignedRowSink()
     coordinator = RowEmissionCoordinator(
         runtime=runtime,
@@ -994,6 +999,7 @@ def test_row_emission_coordinator_falls_back_when_write_row_aligned_missing() ->
     coordinator.on_field_set("a", 0)
 
     assert sink.rows == [{"a": 1}]
+    assert clock.stage_durations["write"] == 1.0
 
 
 def test_row_emission_coordinator_prefers_write_row_aligned_when_supported() -> None:
@@ -1164,11 +1170,16 @@ def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
             self.row_ids = []
             self.columns = {}
 
+    from scalim.execution.executor.batch._internal.stage_spans import StageWriteClock, attach_write_clock
+
     main_source = _make_main_source()
     field_spec = FieldIr(field_id="id", name="ID", source=main_source)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"id": field_spec}, ["id"])
     pipeline = _make_pipeline(plan, demand, main_source)
+    times = [5.0, 6.5]
+    clock = StageWriteClock(True, {"write": 0.0}, perf_counter=lambda: times.pop(0))
+    attach_write_clock(pipeline.runtime, clock)
 
     ctx = BatchContext()
     ctx.set_field_value("id", 0, 1)
@@ -1177,6 +1188,7 @@ def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
     pipeline._write_column_if_target("id", [0], ctx, sink, batch_num=1)
 
     assert sink.columns == {"id": {0: 1}}
+    assert clock.stage_durations["write"] == 1.5
 
 
 def test_pipeline_column_write_prefers_aligned_when_supported() -> None:
