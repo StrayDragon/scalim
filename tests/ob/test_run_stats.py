@@ -522,10 +522,13 @@ def test_run_stats_branch_edges_for_stage_loader_and_viz(tmp_path: Path):
     payload = (out_dir / "run_stats.json").read_text(encoding="utf-8")
     assert "two" in payload or "three" in payload
 
-    # 先遇到多 nodes,再遇到少 nodes → 保留多的(443 假分支)
+    # 先遇到多 nodes,再遇到少 nodes → 保留多的(443 假分支);夹杂非 accum(442 假分支)
     out2 = tmp_path / "stats-out-2"
     out2.mkdir()
-    written2 = maybe_auto_write_run_stats_beside_viz([a2, a1], extra_run_dirs=[str(out2)])
+    written2 = maybe_auto_write_run_stats_beside_viz(
+        [a2, object(), a1],
+        extra_run_dirs=[str(out2)],
+    )
     assert len(written2) == 1
     text2 = (out2 / "run_stats.json").read_text(encoding="utf-8")
     assert '"node_count": 2' in text2 or text2.count('"demand_id"') >= 2
