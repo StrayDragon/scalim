@@ -84,12 +84,12 @@ class StageWriteClock(object):
 
 def attach_write_clock(runtime, clock):
     # type: (ExecutionRuntime, Optional[StageWriteClock]) -> None
-    runtime.write_stage_clock = clock
+    runtime.write_stage_clock = clock  # pragma: allow-dynattr optional-interface: ExecutionRuntime.write_stage_clock
 
 
 def get_write_clock(runtime):
     # type: (ExecutionRuntime) -> Optional[StageWriteClock]
-    clock = runtime.write_stage_clock
+    clock = getattr(runtime, "write_stage_clock", None)  # pragma: allow-dynattr optional-interface: ExecutionRuntime.write_stage_clock
     if clock is None:
         return None
     return clock  # type: StageWriteClock

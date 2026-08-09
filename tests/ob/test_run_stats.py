@@ -229,7 +229,7 @@ def test_memory_without_psutil_fails(monkeypatch):
             raise ImportError("missing")
         raise AssertionError("unexpected import: {}".format(name))
 
-    monkeypatch.setattr("scalim.vendor.compact.importlibx.import_module", fail_import)
+    monkeypatch.setattr("scalim.ob.presets.run_stats.import_module", fail_import)
     with pytest.raises(RuntimeError, match="psutil"):
         from scalim.ob.presets.run_stats import require_psutil_for_memory
 
