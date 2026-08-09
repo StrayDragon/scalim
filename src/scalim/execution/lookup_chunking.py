@@ -55,9 +55,6 @@ class LookupChunking:
         if int(size) < 1:
             msg = "LookupChunking.sized(size=...) must be >= 1"
             raise ValueError(msg)
-        if not isinstance(parallel, bool):
-            msg = "LookupChunking.sized(parallel=...) must be a boolean"
-            raise TypeError(msg)
         workers = normalize_optional_max_chunk_workers(
             max_chunk_workers,
             label="LookupChunking.sized(max_chunk_workers=...)",

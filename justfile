@@ -377,7 +377,7 @@ check-notebooks-coverage-threshold threshold:
 
 # 检查: 类型检查
 type-check:
-    uv {{ UV_OPTIONS }} run basedpyright src/scalim/ # --level error
+    uv {{ UV_OPTIONS }} run basedpyright src/scalim/ --level error
 
 # 检查: Docker 可用性
 is-docker-available:
