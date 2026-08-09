@@ -65,17 +65,6 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
     仅订阅轻量 `EventTypes`(不含 `RELATION_LOOKUP` / `ROW_WRITE` / `FIELD_COMPUTE`).
     """
 
-    event_types = frozenset(
-        {
-            EventType.PIPELINE_START,
-            EventType.PIPELINE_END,
-            EventType.BATCH_START,
-            EventType.BATCH_END,
-            EventType.STAGE_SPAN,
-            EventType.LOADER_CALL,
-            EventType.OUTPUT_TARGET_END,
-        }
-    )
     sample_rss: bool
     persist_batches: bool
     nodes: List[Dict[str, Any]]
@@ -92,6 +81,15 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
 
     def __init__(self, sample_rss=False, persist_batches=True):
         # type: (bool, bool) -> None
+        self.event_types = {
+            EventType.PIPELINE_START,
+            EventType.PIPELINE_END,
+            EventType.BATCH_START,
+            EventType.BATCH_END,
+            EventType.STAGE_SPAN,
+            EventType.LOADER_CALL,
+            EventType.OUTPUT_TARGET_END,
+        }
         self.sample_rss = bool(sample_rss)
         self.persist_batches = bool(persist_batches)
         self.nodes = []  # type: List[Dict[str, Any]]

@@ -230,7 +230,7 @@ def test_accumulator_event_types_are_lite_only():
         EventType.FIELD_COMPUTE,
         EventType.RELATION_LOOKUP,
     }
-    assert WorkflowStatsAccumulator.event_types.isdisjoint(forbidden)
+    assert WorkflowStatsAccumulator().event_types.isdisjoint(forbidden)
 
 
 def test_notes_document_write_and_shared_reset():
