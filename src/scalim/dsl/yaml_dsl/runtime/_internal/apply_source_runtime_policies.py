@@ -124,7 +124,4 @@ def _apply_rows_reuse(source: SourceIr, policy: RowsReuse) -> SourceIr:
     )
 
 
-__all__ = (
-    "apply_source_runtime_policies",
-    "resolve_chunk_parallelism_from_runtime",
-)
+__all__ = ()
