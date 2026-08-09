@@ -7,6 +7,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Set
 
 from ...events import Event, EventType
+from ...vendor.compact.importlibx import import_module
 from ...vendor.dataclassesx import dataclass, field
 from ..observer import EventDispatchObserver
 
@@ -30,8 +31,6 @@ def warn_high_impact_observability(kind):
 def _rss_mb():
     # type: () -> Optional[float]
     try:
-        from ...vendor.compact.importlibx import import_module
-
         psutil = import_module("psutil")
         return float(psutil.Process().memory_info().rss) / (1024.0 * 1024.0)
     except Exception:
@@ -46,8 +45,6 @@ def _r2(value):
 def require_psutil_for_memory(reason):
     # type: (str) -> None
     try:
-        from ...vendor.compact.importlibx import import_module
-
         import_module("psutil")
     except Exception as exc:
         raise RuntimeError(

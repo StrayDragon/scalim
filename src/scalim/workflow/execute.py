@@ -27,7 +27,11 @@ from ..ob.hub import InstrumentationHub
 from ..ob.manager import ObserverManager
 from ..ob.observability import Observability
 from ..ob.observer import Observer
-from ..ob.presets.run_stats import maybe_auto_write_run_stats_beside_viz
+from ..ob.presets.run_stats import (
+    WorkflowStatsAccumulator,
+    maybe_auto_write_run_stats_beside_viz,
+    resolve_viz_run_dir,
+)
 from ..ob.presets.viz import (
     VizObserverConfig,
     WorkflowVizObserver,
