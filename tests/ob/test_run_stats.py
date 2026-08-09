@@ -498,12 +498,12 @@ def test_run_stats_branch_edges_for_stage_loader_and_viz(tmp_path: Path):
 
     class _BasenameOnlyPaths:
         def resolve_output_paths(self):
-            # dirname("") 假 → 421->418 后落到 output_dir
-            return "events.jsonl", "snapshot.json", None
+            # snapshot 仅 basename → parent 假 → 421->418 续迭代;events 有目录则返回
+            return "/tmp/real/events.jsonl", "snapshot.json", None
 
         output_dir = str(tmp_path / "from-output-dir")
 
-    assert resolve_viz_run_dir(_BasenameOnlyPaths()) == str(tmp_path / "from-output-dir")
+    assert resolve_viz_run_dir(_BasenameOnlyPaths()) == "/tmp/real"
 
     a1 = WorkflowStatsAccumulator(sample_rss=False)
     a2 = WorkflowStatsAccumulator(sample_rss=False)
