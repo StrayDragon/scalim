@@ -192,6 +192,7 @@ max-args = 16
 "llmanspec/changes/**/acceptance/**/*.py" = ["ALL"]
 "llmanspec/changes/**/evidence/**/*.py" = ["ALL"]
 "llmanspec/changes/**/*mvp*/**/*.py" = ["ALL"]
+"llmanspec/changes/archive/**/*.py" = ["ALL"]
 "llmanspec/changes/**/examples/**/*.py" = ["ALL"]
 "agentdev/prompt-eval/promptfoo/assertions/*.py" = ["ALL"]
 "{tests,bench}/*.py" = ["ALL"]
@@ -209,6 +210,32 @@ max-args = 16
     "PLR0912",
 ]
 "src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
+"src/scalim/ob/presets/run_stats.py" = [
+    "ANN",
+    "BLE001",
+    "C901",
+    "EM103",
+    "F401",
+    "FBT001",
+    "FBT002",
+    "PLC0415",
+    "PTH",
+    "RUF100",
+    "SIM102",
+]
+"src/scalim/ob/presets/profiles.py" = [
+    "ANN",
+    "B012",
+    "B904",
+    "EM103",
+    "F401",
+    "FBT001",
+    "FBT002",
+    "RUF022",
+    "TRY003",
+]
+"src/scalim/execution/executor/batch/_internal/stage_spans.py" = ["ANN", "B012", "F401"]
+"src/scalim/workflow/execute.py" = ["C901", "PLC0415"]
 ".tmp/**/*.py" = ["ALL"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]

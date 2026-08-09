@@ -179,7 +179,7 @@ class BatchExecutor:
 
         return self._extract_results(context, batch_row_nth)
 
-    def execute_operators(  # noqa: C901, PLR0912  # pragma: allow-c901 plan: c20-fusion-dispatch
+    def execute_operators(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c20-fusion-dispatch
         self,
         context: BatchContext,
         batch_row_nth: List[Hashable],

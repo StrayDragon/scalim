@@ -4,8 +4,8 @@ from typing import Dict, Mapping, Optional, Tuple
 
 from .....execution.lookup_chunking import LookupChunking
 from .....spec.ir import DemandIr, SourceIr
-from .....spec.ir.aliases import NormalizedLookupKeySpec
-from .....spec.ir.binding import BindingIr
+from .....spec.ir.aliases import NormalizedLookupKeySpec  # noqa: TC001 — used in runtime Dict annotations (py36)
+from .....spec.ir.binding import BindingIr  # noqa: TC001 — used in runtime Dict annotations (py36)
 from .....vendor.dataclassesx import replace
 from ..source_policies import RowsReuse, SourceCache
 
