@@ -33,7 +33,7 @@ Active changes 命名规范(仅对 `llmanspec/changes/` 下未归档变更生效
 当你在 `llmanspec/changes/` 下创建/评审 YAML DSL 相关变更时,默认遵循这些上位原则(完整 SSOT 以 `llmanspec/specs/governance-mainline-principles/spec.toon` 为准):
 - 单主线原地演进: 不引入 `dsl_version`、不维护并行 parser/validator/schema, 版本管理只依赖pypi包版本
 - `YAML = authoring`, `Python/CLI = runtime policy`
-- 灰区键盘点（暂不迁）与术语：`llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`；agent 判定：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
+- 边界盘点（开放）：`llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`（动态/环境 knobs 目标收口 Python；勿把旧「暂不迁」当终局）；agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
 - KV-first: 需要稳定 ID/引用/复用的结构优先 mapping
 - workflow 小而声明式,并拒绝 workflow imports expansion
 - books: YAML 仅声明资源 identity（唯一分支 `xlsx`，可选 `path`→pathful / 无 path→pathless）；`xlsx_file`/`xlsx_memory` 已硬删（见 `.../2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds/`）；`write_defaults` 以 Python `BookWritePolicy` 为 SSOT(勿回流 YAML)；book cell/sheet `budget` / `BookBudgetPolicy` **已移除**（残留 YAML/`RunOverrides` 仍 fail-fast，删字段即可；内存交宿主限制；见 upgrade `2026-07-28-remove-book-budget-policy`）；Python IR `DedupBy*` / `TwoStageGroupBy*` **已移除**（见 upgrade `2026-07-28-remove-dedup-and-two-stage-derived`）；归档见 `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/` 与 `.../2026-07-12-c30-workflow-shared-book-memory/`

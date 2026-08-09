@@ -1,57 +1,50 @@
 # Design: YAML vs Python policy boundary（c40）
 
-## 范围
+## 目标态（一步到位方向）
 
-本 change：**盘点 + 原则 + follow-up 列表**。不改 `src/scalim` schema，不 `change start` 除非升格 Full。
+把 YAML authoring 收敛为 **可移植的编排 + 资源身份 + 内容/数据流语义**；把 **部署/环境/入口可变** 的策略与调优 knobs **收口到 Python typed options**（可覆盖、可按 run patch），并在同一次变更集内对齐：schema fail-fast 或覆盖语义、runtime、docs、skill、upgrade。
 
-交付物：
+本 design **不**固化「某键永久留 YAML」名单；去留以 `inventory.md` 开放轴 + 证据迭代，落地前再锁迁移切片。
 
-- `inventory.md`（R1，含统一术语）
-- 本节 R2 原则
-- 下方 R3：文档对齐走 **quick**（不另开 change）
+## 与既往调研的关系
 
-## 与 c30 / 0.10 的关系
+早期 R1–R3 曾倾向「灰区暂不迁」。该结论 **作废**，不再作为决策依据。保留其有用部分：
 
-- c30 **保留** `sources.*.lookup_chunk_size`（keys 分片大小）。
-- c30 **不**新增 YAML 并行键；并行 = Python opt-in（0.10.0：`parallelize_lookup_chunks`）。
-- 本调研 **确认** 该键中长期仍属 YAML「需求侧上限提示」，**不**开迁出 follow-up。
-- 0.10.* 主线叙事：YAML **无强制迁移**；边界收口靠文档/skill 统一理解，不靠再删键。
+- 已迁出/已删除表（§0）仍是边界证据  
+- 「大小 ≠ 并行」「两套 cache_mode 勿混」仍是语义事实  
+- 错误做法：未盘点删键；回流 `write_defaults`/`budget`
 
-## R2 边界原则（文档级；合约仍以 live specs 为准）
+## 判定启发式（工作用，非合约）
 
-术语见 `inventory.md`「术语」表。
+| 更像 A / C（YAML） | 更像 R（Python） |
+|--------------------|------------------|
+| 换环境仍应相同的图与字段语义 | 换机房/配额/DB IN 上限就会改 |
+| loader 调用协议、关联路径 | 并发、重试、缓存寿命、分片大小、诊断 |
+| 资源 identity / 输出形状 | book 写策略、staging、observers |
 
-1. **MUST 留 YAML**：数据流图与资源身份——`runs`/deps、`main_source`/`sources` 身份与 loader 引用、`fields`/`relations`、`resources.*.id+path`、`outputs.to`/`fields`/`where`/`aggregate`、内容字段与 `params` 指令节点（含 `$rows.cache_mode`）。
-2. **MUST 仅 Python（已落地）**：并发与 worker、loader retry、guardrails、demand/workflow failure diagnostics（含 `validate_unique_field_names`）、book **write strategy**（`BookWritePolicy`）、workflow `cache_pool` / `resources_wait`、observers/viz、security allowlist、`init_vars`、ExcelColumnResidency。
-3. **SHOULD 仅 Python**：与宿主/环境强相关、写入后难复现的调优（batch_size、max_workers、parallelize_*）。已迁出的不得回流 YAML。
-4. **灰区（YAML 可选提示 + Python 覆盖/扩展）**：`lookup_chunk_size`；`sources.*.cache_mode` 粗枚举；`allow_formulas` / 静态 `encoding`；`outputs.*.write` 仅 header 局部。Python 不得靠「静默忽略 YAML」改语义而不文档化。
-5. **禁止**：未完成 inventory 就删 YAML 键；把编排/内容键误迁 Python；复活 budget / Dedup / TwoStage / `write_defaults`；把 `sources.*.cache_mode` 与 `$rows.cache_mode` 混称；把 `lookup_chunk_size` 当成并行开关。
-6. **第一刀默认**：文档 + agent/skill 对齐（见 R3 quick 清单）；不做 breaking deprecation，除非独立 propose 带兼容窗。
+**优先按 R 评估的现网候选**（仍开放）：`sources.*.lookup_chunk_size`、`sources.*.cache_mode`；其次 `encoding` / `allow_formulas` / `outputs.write.*`（证据不足则保持 `?`）。
 
-对照：`AGENTS.md` Hard Rules、capability-matrix、live `yaml-dsl-runtime-policy-boundary`、c30 例外、0.10 release highlights。
+## 一步到位交付面（落地时）
 
-## R3 文档对齐（`llman-sdd-quick`，无独立 change）
+1. **Inventory 闭合**：`inventory.md` 无未标轴顶层 knob；`?` 有证据或显式延期理由  
+2. **Python surface**：凡定为 R 的键，有 `DemandRunOptions` / overrides / workflow patch 对等能力（或明确「删除能力」）  
+3. **YAML**：迁出则 fail-fast + 迁移文案；若保留默认 + Python 覆盖，文档必须写清优先级（禁止静默忽略）  
+4. **Docs/skill**：与 inventory 同向；禁止残留「暂不迁终局」话术  
+5. **测试**：迁出/覆盖优先级/混称诊断各至少一条  
 
-不改 MUST/SHALL、不迁键、不改 schema → **quick path**。本 inventory 为调研 SSOT；入口页只做速记 + 链接，避免双写。
+未 `change start` / 未绑分支前：**不改** live specs、不改 schema 行为。
 
-| # | 落点 | 改什么 |
-|---|------|--------|
-| Q1 | `docs/doc/yaml-dsl/review-checklist.md` | Authoring 边界速记补灰区 + 链本 `inventory.md` |
-| Q2 | `docs/doc/yaml-dsl/index.md` | 主线原则下「边界速查」链 |
-| Q3 | `docs/doc/yaml-dsl/capability-matrix.md` | `lookup_chunk_size` / `cache_mode` 行补灰区短注 |
-| Q4 | `agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`（新） | 三栏判定 + 两套 cache_mode + chunk≠parallel |
-| Q5 | `SKILL.md` / `task-authoring.md` | 路由指针 |
-| Q6 | 根 `AGENTS.md` / `llmanspec/AGENTS.md` | Hard Rules / 主线摘要末尾短指针 |
+## 非目标（当前阶段）
 
-| # | 其它 | 建议 |
-|---|------|------|
-| （可选） | Python 细缓存扩展 | 有产品需求再开独立 propose；**不删** YAML `none/preload_forever` |
-| （明确不做） | 迁出 `lookup_chunk_size` | 与 c30 / 0.10 冲突 |
+- 在调研文档里宣布最终去留名单  
+- 复活 budget / Dedup / TwoStage / `write_defaults`  
+- 把 `$rows.cache_mode` 与 `sources.*.cache_mode` 混成同一迁移包而不拆语义  
 
-曾草案过独立 docs change，已弃用（文档-only 不进 `llmanspec/changes/`）。
+## 依赖与顺序
 
-## 非目标
+1. 闭合 inventory（本目录）  
+2. 选定 R 切片 + Python API 草图（仍本目录 / 或后续 tasks）  
+3. `change start` → specs（若改 MUST）→ apply  
+4. 文档/skill 与代码同发  
 
-- 实现迁移或 deprecation 警告（除非另开子 change）。
-- 与已归档 c10/c20/c30 实现纠缠。
-- 本目录改 live `llmanspec/specs/**`（无 Branch binding）。
+可选后续（非本目标阻塞）：更细缓存策略扩展（只扩 Python）。

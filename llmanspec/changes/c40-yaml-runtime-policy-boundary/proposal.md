@@ -2,39 +2,41 @@
 depends_on: []
 ---
 
-# Draft change: YAML 编排 vs Python runtime policy 边界收紧
+# YAML 编排 vs Python runtime policy：边界收口（重开）
 
-> **状态**：调研 R1–R3 已完成并补强术语/缺口键（见 `inventory.md` / `design.md`）。**尚未** `change start`；**不**改 schema。  
-> **结论**：**暂不迁**灰区键；大头已在既有 change 迁出。文档对齐走 **`llman-sdd-quick`**（不另开 docs change）。
+> **状态**：调研重开。早期「灰区暂不迁」**作废**。目标：一步到位把 **运行可变 knobs 收口 Python**，YAML 保留可移植编排/内容；以全量 inventory 为 SSOT，**本文不写死某键去留**。  
+> 未 `change start`；未改 schema。
 
 ## Why
 
-仓库硬规则：YAML = 编排 + 资源身份；Python = 写策略 / runtime policy。c30 dig 触发「YAML 里是否还该留调优键」的疑问。0.10.* 需要**同一套可维护心智模型**，避免 inventory / checklist / skill / release 各说各话。
+主线原则是 `YAML = authoring`、`Python = runtime policy`，但 YAML 仍残留可能随部署/入口变化的配置（典型候选：分片大小、粗缓存模式等）。把它们写死在 YAML 会降低可移植性，并迫使「同 demand、不同环境」靠改文件。需要全量清点后，一次性收口到可维护、理解统一的边界。
 
-## What（已交付调研）
+## What Changes（当前阶段：规划与盘点）
 
-- **R1** `inventory.md`：键分类 + 统一术语 + 迁移成本 + 建议；补 `validate_unique_field_names`、`allow_formulas`/`encoding`；钉死两套 `cache_mode`
-- **R2** `design.md`：MUST/SHOULD / 灰区 / 禁止项（对齐 0.10 无 YAML breaking）
-- **R3**：0 个迁键 change；文档对齐清单见 `design.md` R3（quick path）；明确不做迁出 `lookup_chunk_size`
+- 重写 `inventory.md`：schema 全量清点 + 开放轴（A/C/R/M/X/?），不作终局建议列  
+- 重写 `design.md`：目标态 = 动态/环境 knobs → Python；一步到位交付面  
+- 废止「暂不迁」叙事；docs/skill 入口改为指向开放盘点，避免定论话术  
+- **尚未**：schema 迁出、Python API 扩展、live specs 条款（待 inventory 闭合 + start）
 
 ## Capabilities
 
-本阶段不进 live specs。合约仍以既有 `yaml-dsl-runtime-policy-boundary` / `governance-mainline-principles` 为准。文档叙事由 quick 改入口页收口（无独立 docs change）。
+落地时可能触及（待定，不在此锁）：
+
+- `yaml-dsl-runtime-policy-boundary` / `governance-mainline-principles`  
+- 相关 schema / runtime options / docs / skills  
 
 ## Impact
 
-- 调研期：零代码、零 schema。  
-- 后续文档对齐：默认不 breaking；有产品需求再扩展 Python 缓存，而非删 YAML 粗枚举。
+- 调研重开：以文档与盘点为主  
+- 落地后：对定为 R 的 YAML 键可能 breaking（需兼容窗/升级卡）；具体范围以闭合后的迁移切片为准  
 
 ## Ethics
 
-- `ethics.risk_level`: low（调研收口）  
-- `ethics.prohibited_actions`: 未盘点删键；误迁编排键；复活 budget/`write_defaults`；混称两套 cache_mode  
-- `ethics.required_evidence`: inventory + R2 + R3（已齐）  
-- `ethics.refusal_contract`: 无库存清单不得删键（已满足）
+- `ethics.risk_level`: medium（方向重开；落地或 breaking）  
+- `ethics.prohibited_actions`: 未盘点删键；在 inventory 写死终局去留；回流 budget/`write_defaults`；静默忽略 YAML  
+- `ethics.required_evidence`: 全量 path 索引；每条 R 候选的「为何动态」笔记；Python 覆盖草图  
+- `ethics.refusal_contract`: 无闭合 inventory 不得改 schema  
 
-## Open Questions（关闭）
+## Open Questions
 
-1. `cache_mode` / `params` → inventory 已归类；params/`$rows.cache_mode` 留 YAML；`sources.*.cache_mode` 暂留灰区。  
-2. workflow vs demand → 同一套原则；workflow 运行期已 Python-only。  
-3. 第一刀 → **文档收口（quick），不 breaking**。
+见 `inventory.md` §8；由 tasks 推进闭合，不在 proposal 填答案。

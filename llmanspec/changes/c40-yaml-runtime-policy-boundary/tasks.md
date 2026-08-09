@@ -1,28 +1,30 @@
 # Tasks: c40-yaml-runtime-policy-boundary
 
-> **调研草稿**；未 `change start`。R1–R3 已完成；术语/缺口已补强。文档对齐 → **quick**（见 `design.md` R3），不另开 change。
+> 重开。目标：全量盘点 → 闭合 R 切片 →（其后）`change start` 一步到位落地。  
+> **禁止**在 inventory/design 写死「永久留 YAML」终局句。
 
-## R1 盘点
+## A. 盘点（进行中）
 
-- [x] R1.1 从 capability-matrix + schema 列出 YAML 键清单
-- [x] R1.2 标注 编排/身份 | 策略/调优 | 内容/映射
-- [x] R1.3 标注是否已有 Python options 覆盖；迁移成本低/中/高
-- [x] R1.4 写入 `inventory.md`
-- [x] R1.5 补强：统一术语表；`validate_unique_field_names`；`allow_formulas`/`encoding`；两套 `cache_mode`；schema source 键对拍
+- [x] A.1 从 demand/workflow schema 导出全量 path（见 inventory §7）
+- [x] A.2 对拍已迁出 fail-fast + Python-only 面（inventory §0）
+- [x] A.3 重写 inventory/design/proposal：废止「暂不迁」；开放轴 A/C/R/M/X/?
+- [ ] A.4 为每个 `R/?` 行补「为何可能动态」证据笔记（下游/部署/入口）
+- [ ] A.5 核对 params 指令节点（`$keys`/`$rows.cache_mode` 等）无漏标
+- [ ] A.6 机器可读全 path 导出脚本（可选，输出 `.tmp/`，不入库）
 
-## R2 原则
+## B. 目标切片（盘点闭合后）
 
-- [x] R2.1 起草 MUST/SHOULD（`design.md`）
-- [x] R2.2 对照 AGENTS / book write policy / c30 / 0.10 例外
-- [x] R2.3 明确「禁止未盘点删键」与混称禁令
+- [ ] B.1 列出拟定为 R 的键 + 拟议 Python API（覆盖 vs 硬迁出）
+- [ ] B.2 兼容策略草图（fail-fast 窗 / 默认+覆盖优先级）
+- [ ] B.3 文档/skill/upgrade 同发清单
+- [ ] B.4 确认是否改 live MUST → 若是则 `change start` + specs landing
 
-## R3 follow-up
+## C. 入口去定论（与盘点同步）
 
-- [x] R3.1 结论：**暂不迁**；不做迁出 `lookup_chunk_size`
-- [x] R3.2 文档对齐改走 **quick**；弃用独立 docs change（不进仓库）
-- [x] R3.3 （quick）按 `design.md` R3 Q1–Q6 改入口文档/skill
+- [x] C.1 回调 AGENTS / yaml-dsl docs / skill「暂不迁/灰区终局」措辞 → 指向开放 inventory
+- [x] C.2 自检：仓库内无「c40 结论：lookup_chunk_size 中长期留 YAML」类定论（入口已改；inventory 本身禁止写死）
 
 ## 门禁
 
-- [x] 本调研阶段不改 live `llmanspec/specs/**`
-- [x] `just llmanspec-sanitize` 可扫过本目录
+- [x] 未 start 前不改 live `llmanspec/specs/**`、不改 schema 行为
+- [ ] `just llmanspec-check` 在文档回调后通过

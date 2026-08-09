@@ -49,9 +49,9 @@
 | `sources.*.loader` | `SourceIr.loader_spec.callable_ref` / `RuntimeBindings.source_loaders[source_id]` | 静态前端不 import;在“运行时链接”阶段做 allowlist 校验并解析引用(安全边界) | - |
 | `sources.*.key` | `SourceIr.key` (`KeyIr.key`) | 支持单键或复合键(tuple/list) | - |
 | `sources.*.lookup_cast` | `SourceIr.key.cast` | 仅提供预置 cast(见 schema choices) | 更复杂归一化用 `normalize.call_by` 或 loader 内处理 |
-| `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | **灰区（暂留 YAML）**;仅 keys 模式有效;省略/`0`/`None`=不分片(延迟通常最优);过小会线性放大 loader 调用次数;**不是并行开关**（调研: `llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`） | 仅在下游有 payload/IN 上限时设置,并取最大安全值;片间并行见 Python `parallelize_lookup_chunks`（[0.10.0](../releases/0.10.0/)） |
+| `sources.*.lookup_chunk_size` | `SourceIr.lookup_chunk_size` | keys 分片大小;省略/`0`/`None`=不分片;**不是并行开关**。边界盘点中（可能作 runtime 覆盖/迁出，见 `llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`） | 下游有 payload/IN 上限时使用;片间并行见 Python `parallelize_lookup_chunks`（[0.10.0](../releases/0.10.0/)） |
 | `sources.*.normalize` | `SourceIr.normalize` (`SourceNormalizeIr`) | 仅提供受控 kind + 可选 `call_by` 扩展点 | 若需要任意 reshape,放到 loader 中处理 |
-| `sources.*.cache_mode` | `SourceIr.cache_mode` | **灰区（暂留 YAML）**;仅 `none/preload_forever`;**不是** `$rows.cache_mode`（`batch`/`none`，params 内容协议）；调研见同 inventory | 更细粒度缓存策略需 Python 层扩展;勿先删粗枚举 |
+| `sources.*.cache_mode` | `SourceIr.cache_mode` | 仅 `none/preload_forever`;**不是** `$rows.cache_mode`。边界盘点中（可能作 runtime 覆盖/迁出，见同 inventory） | 更细粒度缓存策略需 Python 层;勿与 params 内 `$rows.cache_mode` 混称 |
 | `sources.*.retry`（已迁出） | `ExecutionRequest.loader_retry` | YAML 主线已移除(属于 runtime policy boundary);`validate/compile` 会 fail-fast | 用 `scalim.dsl.yaml_dsl.run/compile(..., options=DemandRunOptions(..., runtime=DemandRunRuntimeOptions(loader_retry=...)))` 配置 |
 | `sources.*.params` | `SourceIr.bind` (由 params template 推导) | legacy `bind/to_bind` 已移除;用 `$keys/$rows` 指令节点表达 | 需要特殊调用协议时,用自定义 loader 或 Python-only `BindingIr` |
 | `sources.*.fields.*` | `FieldIr` (source=that source) | 仅源字段;禁止 `compute/call_by` | 复杂派生逻辑放 `fields.*`(derived) |
