@@ -1,6 +1,6 @@
 # YAML vs Python runtime policy boundary（agent）
 
-c40 **重开盘点中**：运行可变 / 环境敏感 knobs **目标收口 Python**；YAML 保留可移植编排与内容语义。本页只给判定启发式与易混钉死；**去留以开放 inventory 为准，不要引用旧「暂不迁」结论**。
+c40 **重开盘点中**：换环境就会改的配置 **目标收口 Python**；YAML 保留可移植编排与内容。本页只给判定启发式与易混钉死；**去留与示例片段以 `evidence-notes.md` 为准**，不要引用旧「暂不迁」结论。
 
 ## 何时读取
 
@@ -10,13 +10,13 @@ c40 **重开盘点中**：运行可变 / 环境敏感 knobs **目标收口 Pytho
 
 ## 三栏启发式（工作用）
 
-| 栏 | 倾向 | 例子 |
+| 栏 | 含义 | 例子 |
 |----|------|------|
-| **A / C → YAML** | 换环境仍应相同的图、字段、loader 协议 | `runs`/deps、`fields`/`relations`、`params`（`$keys`/`$rows`）、资源 path |
-| **R → Python（目标）** | 换部署/配额/入口就会改 | 已迁出的 `batch_size`/`retry`/`guardrails`；**候选** `lookup_chunk_size`、`sources.*.cache_mode`；并行 `parallelize_lookup_chunks` |
-| **?** | 证据不足 | `allow_formulas`、`encoding`、`outputs.write.*`、部分 `normalize.*` |
+| **宜留在 YAML** | 换环境仍应相同的图、字段、loader 协议 | `runs`/deps、`fields`/`relations`、`params`（`$keys`/`$rows`）、资源 path |
+| **宜收口到 Python** | 换部署/配额/入口就会改 | 已迁出的 `batch_size`/`retry`/`guardrails`；候选 `lookup_chunk_size`、`sources.*.cache_mode`；并行 `parallelize_lookup_chunks` |
+| **尚待证据** | 未决；常见已有 overrides | `allow_formulas`、`encoding`、`outputs.write.*`、部分 `normalize.*` |
 
-禁止：未读 inventory 就删键；回流 `budget`/`write_defaults`；静默忽略 YAML。
+禁止：未读 `evidence-notes.md` 就删键；回流 `budget`/`write_defaults`；静默忽略 YAML。
 
 ## 易混钉死（语义事实，不是去留决议）
 
@@ -28,7 +28,7 @@ c40 **重开盘点中**：运行可变 / 环境敏感 knobs **目标收口 Pytho
 
 ## 指针
 
-- 开放盘点 SSOT：`llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`（+ `design.md`）
+- 开放盘点 SSOT（含真实片段）：`llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`（+ `design.md` 第一刀草案）
 - 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`、`index.md`
 - 0.10 性能三项：`references/0.10-release-highlights.md`
 - Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary/`、`governance-mainline-principles`

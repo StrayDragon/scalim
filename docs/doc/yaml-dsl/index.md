@@ -17,7 +17,8 @@ YAML DSL 的主线演进遵循以下上位原则(后续提案/变更默认不得
 **YAML vs Python 边界速查**（盘点开放中：动态 knobs 目标收口 Python）:
 
 - 评审速记: [提案审核清单](review-checklist.md)
-- 全量键盘点: `llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`
+- 全量键盘点+证据: `llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`
+- 目标与第一刀草案: `llmanspec/changes/c40-yaml-runtime-policy-boundary/design.md`
 - 能力表: [YAML→IR 能力矩阵](capability-matrix.md)
 - Agent: `agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
 

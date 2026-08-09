@@ -12,7 +12,7 @@
 - Python IR 勿再引用 `DedupBy*` / `TwoStageGroupBy*`（已移除；loader 去重 / workflow 两段 demand）
 - Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`2026-07-28-remove-book-budget-policy.md`、`2026-07-28-remove-dedup-and-two-stage-derived.md`
 - 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。进程内 book cell/sheet 预算护栏已移除（见 `2026-07-28-remove-book-budget-policy`）
-- **边界盘点（开放）**：运行可变 / 环境敏感 knobs **目标收口 Python**；YAML 保留可移植编排与内容语义。全量键表：`llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`（轴 A/C/R/M/X/?，**非终局去留**）。语义钉死：`lookup_chunk_size`≠并行；`sources.*.cache_mode`≠`$rows.cache_mode`。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
+- **边界盘点（开放）**：运行可变 / 环境敏感 knobs **目标收口 Python**；YAML 保留可移植编排与内容语义。盘点+证据（含示例片段）：`llmanspec/changes/c40-yaml-runtime-policy-boundary/evidence-notes.md`（**非终局去留**）；切片草案：`design.md`。语义钉死：`lookup_chunk_size`≠并行；`sources.*.cache_mode`≠`$rows.cache_mode`。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
 ## 0) 必须遵守的主线原则(硬约束)
 
 - **禁止并行版本**: 不引入 `dsl_version`;不通过 CLI/schema/modeline 选择并行 DSL 版本。
@@ -60,17 +60,17 @@
 - docs: `docs/doc/yaml-dsl/**`(如涉及 `.gen.*` 或注入区块,只通过 `just gen-docs` 刷新)
 - skills: `agentdev/skills/scalim-yaml-dsl/**`(如变更影响 authoring/校验入口)
 
-## 3) “是否需要进 YAML”的判定提示
+## 3) “是否需要进 YAML”的判定提示（新配置必过）
 
-当某个字段/旋钮具有明显环境/运行入口差异时,默认应归类为 runtime policy:
+根规则 SSOT：`AGENTS.md` Hard Rules → **New knob gate**。摘要：
 
-- observability / diagnostics / staging
-- retry / guardrails / performance knobs
-- 与集成系统强绑定的策略
+1. 换环境/部署/入口就必须改值？ → **Python**
+2. 编排图 / 资源身份 / 字段·关联语义 / loader 调用协议？ → 可考虑 **YAML**
+3. 性能、并发、重试、缓存寿命、诊断、allowlist、写策略？ → **Python**（禁止新进 YAML）
+4. 若 YAML 与 Python 双存在 → MUST 文档化覆盖优先级（通常 Python 显式 > YAML > 默认）；禁止静默忽略
+5. 闭环：capability-matrix + 本清单；闭集策略走 `StrEnum` Policy SSOT
 
-这类能力优先落到 Python/CLI entrypoints,而不是扩大 YAML authoring surface。
-
-**开放盘点（非终局）**：部署/入口可变 knobs 按 R 轴评估收口 Python；详见 `llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md`。评审时区分「环境调优」与「可移植内容/编排」。
+开放盘点与证据：`llmanspec/changes/c40-yaml-runtime-policy-boundary/{evidence-notes,design}.md`。
 
 ## 4) workflow 相关变更护栏
 

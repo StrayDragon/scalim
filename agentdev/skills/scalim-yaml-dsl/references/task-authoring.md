@@ -6,7 +6,7 @@
 - 用户要把一段业务逻辑改写成 YAML DSL
 - 用户要在现有 YAML 上增删 source / relation / outputs / observability
 
-边界判定（旋钮进 YAML 还是 Python、两套 `cache_mode`、chunk≠并行）读 [yaml-runtime-policy-boundary.md](yaml-runtime-policy-boundary.md)。去留以 c40 **开放** inventory 为准，勿沿用旧「暂不迁」话术。
+边界判定（旋钮进 YAML 还是 Python、两套 `cache_mode`、chunk≠并行）读 [yaml-runtime-policy-boundary.md](yaml-runtime-policy-boundary.md)。去留以 c40 `evidence-notes.md` 为准，勿沿用旧「暂不迁」话术。
 
 ## 工作顺序
 

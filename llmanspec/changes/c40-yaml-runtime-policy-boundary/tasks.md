@@ -1,30 +1,45 @@
 # Tasks: c40-yaml-runtime-policy-boundary
 
-> 重开。目标：全量盘点 → 闭合 R 切片 →（其后）`change start` 一步到位落地。  
-> **禁止**在 inventory/design 写死「永久留 YAML」终局句。
+> 细项已锁：**1A**（并行嵌 sized）+ **2A**（RowsReuse→RuntimeOptions）+ **3A**（工厂 header 默认→`name`）。  
+> 测试边界（seams）：`scalim.dsl.yaml_dsl.run` / `run_workflow` / `validate`（或 `scalim-cli yaml-dsl validate`）；复用现有 `tests/yaml_dsl/**`。
 
-## A. 盘点（进行中）
+## A. 盘点
 
-- [x] A.1 从 demand/workflow schema 导出全量 path（见 inventory §7）
-- [x] A.2 对拍已迁出 fail-fast + Python-only 面（inventory §0）
-- [x] A.3 重写 inventory/design/proposal：废止「暂不迁」；开放轴 A/C/R/M/X/?
-- [ ] A.4 为每个 `R/?` 行补「为何可能动态」证据笔记（下游/部署/入口）
-- [ ] A.5 核对 params 指令节点（`$keys`/`$rows.cache_mode` 等）无漏标
-- [ ] A.6 机器可读全 path 导出脚本（可选，输出 `.tmp/`，不入库）
+- [x] A.1–A.7 evidence / 合并 / 导出
 
-## B. 目标切片（盘点闭合后）
+## B. 设计收口
 
-- [ ] B.1 列出拟定为 R 的键 + 拟议 Python API（覆盖 vs 硬迁出）
-- [ ] B.2 兼容策略草图（fail-fast 窗 / 默认+覆盖优先级）
-- [ ] B.3 文档/skill/upgrade 同发清单
-- [ ] B.4 确认是否改 live MUST → 若是则 `change start` + specs landing
+- [x] B.1–B.4 措施 I/II/III + oneof 原则  
+- [x] B.5 细项 **1A + 2A + 3A**  
+- [ ] B.6 `change start` + specs landing（I 迁出 + II 覆盖优先级 + III 工厂默认 MUST/文档口径）
 
-## C. 入口去定论（与盘点同步）
+## C. 实现（specs landing 且 readyToImplement 后）
 
-- [x] C.1 回调 AGENTS / yaml-dsl docs / skill「暂不迁/灰区终局」措辞 → 指向开放 inventory
-- [x] C.2 自检：仓库内无「c40 结论：lookup_chunk_size 中长期留 YAML」类定论（入口已改；inventory 本身禁止写死）
+### C1. 措施 I — `lookup_chunk_size`
+
+- [ ] C1.1 `LookupChunking.off|sized(size, parallel=...)` + `DemandRunRuntimeOptions.lookup_chunking`  
+- [ ] C1.2 收拢旧 `parallelize_lookup_chunks`（兼容或友好迁移提示）  
+- [ ] C1.3 YAML `lookup_chunk_size` → fail-fast 友好文案  
+- [ ] C1.4 测试 + docs/skill/upgrade  
+
+### C2. 措施 II — SourceCache / RowsReuse
+
+- [ ] C2.1 `SourceCache` + `source_cache` 覆盖（Python > YAML > none）  
+- [ ] C2.2 `RowsReuse` + `rows_reuse` 覆盖（同挂 RuntimeOptions）  
+- [ ] C2.3 测试与文档（两套拆名 + cache_pool 边界）  
+
+### C3. 措施 III — 默认与工厂
+
+- [ ] C3.1 省略 encoding ≡ utf-8 测试  
+- [ ] C3.2 allow_formulas 默认 true + pathless 拒绝  
+- [ ] C3.3 工厂 `header_fields_output_by` 默认改为 `name` + 回归  
+
+## D. 入口
+
+- [x] D.1 New knob gate  
+- [ ] D.2 apply 后文档与 design 一致  
 
 ## 门禁
 
-- [x] 未 start 前不改 live `llmanspec/specs/**`、不改 schema 行为
-- [ ] `just llmanspec-check` 在文档回调后通过
+- [ ] B.6 后：相关 pytest + `just llmanspec-check`  
+- [ ] `llman sdd validate c40-... --strict`  

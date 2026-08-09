@@ -27,7 +27,13 @@
   - Python IR **DedupBy** / **TwoStageGroupBy** derived assembly was **removed**; migrate via loader/upstream dedupe or two-demand workflow (`.../2026-07-28-remove-dedup-and-two-stage-derived.md`).
   - Agent-facing migration: `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-07-12-book-write-policy-python-ssot.md`；统一 book identity 见 `.../2026-07-13-unified-xlsx-book-kind.md`；IR pathful/pathless 见 `.../2026-07-13-normalize-xlsx-book-ir-path-presence.md`；硬删旧 YAML 别名见 `.../2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`（仅 `resources.books.<id>.xlsx` 可选 `path`；`xlsx_file`/`xlsx_memory` 已移除）；移除 book budget 见 `.../2026-07-28-remove-book-budget-policy.md`；移除 Dedup/TwoStage 见 `.../2026-07-28-remove-dedup-and-two-stage-derived.md`。
   - `allow_formulas` / `encoding`：是否 YAML 静态或 runtime 覆盖见 c40 开放盘点（勿在未盘点时回流策略键）。
-  - **边界盘点（开放，非终局）**：`llmanspec/changes/c40-yaml-runtime-policy-boundary/inventory.md` — 运行可变 knobs **目标收口 Python**；YAML 保留可移植编排/内容。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`。
+  - **边界盘点（开放）**：`llmanspec/changes/c40-yaml-runtime-policy-boundary/`（`evidence-notes.md` + `design.md`）；agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`。
+  - **New knob gate（新增配置必过）**：提案/实现任何**新** demand/workflow 配置前，MUST 先判定落点（默认偏 Python 若存疑）：
+    1. **换环境/部署/入口是否必须改值？** 是 → **Python**（`DemandRunOptions` / `WorkflowRunOptions` / overrides / patches）；否 → 再往下。
+    2. **是否编排图 / 资源身份 / 字段与关联语义 / loader 调用协议？** 是 → **YAML** 可考虑；否则倾向 Python。
+    3. **是否性能、并发、重试、缓存寿命、诊断、安全 allowlist、写策略？** 是 → **Python**（禁止新进 YAML）。
+    4. **能否被静默忽略？** 禁止；若 YAML 与 Python 双存在，MUST 文档化覆盖优先级（通常 Python 显式 > YAML > 默认）。
+    5. 闭环：更新 capability-matrix + review-checklist 对应行；闭集策略走 Policy SSOT（`StrEnum`）。分类用语见 c40 `evidence-notes.md`（宜留 YAML / 宜收口 Python / 内容调用协议 / 尚待证据）。
   - Archived track: `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`、`.../2026-07-13-c15-decide-xlsx-memory-book-role/`、`.../2026-07-13-c20-add-unified-xlsx-book-kind/`、`.../2026-07-13-c25-normalize-xlsx-book-ir-path-presence/`、`.../2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds/`；后续 shared-book 优化见 `llmanspec/futures/xlsx-file-numeric-type-loss/future.md`。
 - **Python runtime boundary**: code under `src/scalim/` MUST remain compatible with Python 3.6 (dev tooling is typically Python 3.10+; see `pyproject.toml`).
 - **Formatting**: Python-only; 4-space indent; line length 140; double quotes (ruff formatter). Use ruff as the source of truth for formatting and linting.
