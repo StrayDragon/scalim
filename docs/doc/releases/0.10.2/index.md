@@ -54,7 +54,8 @@ flowchart TD
 ## 发版引用（可贴 Release）
 
 ```text
-## Highlights (0.10.2)
+## 亮点（相对 0.10.1）
+
 - Breaking（YAML）：sources.*.lookup_chunk_size 迁出；改 DemandRunRuntimeOptions.lookup_chunking=LookupChunking...
   agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md
 - Opt-in：scalim_run_stats/v1 + ObservabilityProfile；生产默认可静默；viz 可读 sibling run_stats.json
@@ -63,8 +64,49 @@ flowchart TD
 总览：docs/doc/releases/0.10.2/index.md
 ```
 
+## 升级提示（复制到下游代理 / 聊天中）
+
+请将以下代码块粘贴到已打开的**下游**仓库编码代理中。目标：**扫描 + 按需迁移**（除非你明确要求编辑，否则先出报告）。
+
+````markdown
+# 任务：升级 / 扫描此仓库，检查 Scalim v0.10.2 适配点（基准 0.10.1）
+
+你正在处理一个依赖于 `scalim` 的**下游**项目。目标版本：**0.10.2**（相对 **0.10.1**）。
+
+## 结论先行
+- **YAML Breaking**：`sources.*.lookup_chunk_size` 已迁出；继续写会 fail-fast。删字段，改用 `DemandRunRuntimeOptions.lookup_chunking` + `LookupChunking.sized(...)` / `.off()`。
+- **观测为 opt-in**：生产 / 正式非 DEBUG 可保持 `components=[]`；不要默认挂 memory / DEBUG。
+- typed Observer/Hook 仍收完整 `Event`（0.10.1 契约不变）。
+- 0.10.0 的 write-precompute / fusion / chunk 并行默认与开关不变（并行请挂在 `LookupChunking.sized(n, parallel=True)` + `parallel_mode="adaptive"`）。
+
+## SSOT
+- 总览：https://github.com/StrayDragon/scalim/blob/v0.10.2/docs/doc/releases/0.10.2/index.md
+- Lookup 升级卡：https://github.com/StrayDragon/scalim/blob/v0.10.2/agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md
+- Agent 指引：https://github.com/StrayDragon/scalim/blob/v0.10.2/agentdev/skills/scalim-yaml-dsl/references/0.10.2-release-highlights.md
+- Run stats：https://github.com/StrayDragon/scalim/blob/v0.10.2/docs/doc/viz/run-stats.md
+- 生产静默门控：https://github.com/StrayDragon/scalim/blob/v0.10.2/agentdev/skills/scalim-run-stats/references/task-downstream-env-gating.md
+
+## 步骤
+1. 记录当前 `scalim` 固定版本（`pyproject.toml` / requirements / lock / vendored `libs/scalim`）。
+2. 扫描（仓库根目录；跳过 `.git` / `.venv` / `node_modules`）：
+
+```bash
+rg -n --hidden -g '!**/.git/**' -g '!**/node_modules/**' -g '!**/.venv/**' -g '!**/__pycache__/**' \
+  'lookup_chunk_size' .
+
+rg -n --hidden -g '!**/.git/**' -g '!**/.venv/**' \
+  'LookupChunking|parallelize_lookup_chunks|ObservabilityProfile|build_observability_profile|WorkflowStatsAccumulator|write_run_stats_sibling|et_scalim_run_stats' .
+```
+
+3. 对每个命中分类：`HIT-LOOKUP-CHUNK` | `HIT-OBS-MIGRATE` | `OK` | `FALSE-POSITIVE`
+4. 若有 `HIT-LOOKUP-CHUNK`：删 YAML 字段；按升级卡改 `lookup_chunking={...: LookupChunking.sized(...)}`；跑一条最小 demand/workflow。
+5. 若下游自研 stats / StageMemory：优先迁到内置 profiles + `scalim_run_stats/v1`；生产非 DEBUG 保持静默。
+6. 输出简短 Markdown 报告：仓库 / 分支 / scalim 版本 / 结论（`no impact` / `needs lookup_chunking migration` / `needs obs migration` / `uncertain`）。
+````
+
 ## Agent skill
 
+- 本版 agent 摘要：`agentdev/skills/scalim-yaml-dsl/references/0.10.2-release-highlights.md`
 - Lookup 分片迁移：`agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
 - Run stats 装配：`agentdev/skills/scalim-run-stats/SKILL.md`
 - 生产静默 vs 开发服：`agentdev/skills/scalim-run-stats/references/task-downstream-env-gating.md`
