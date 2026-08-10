@@ -23,13 +23,11 @@ HIGH_IMPACT_OBS_WARNING = (
 )
 
 
-def warn_high_impact_observability(kind):
-    # type: (str) -> None
+def warn_high_impact_observability(kind: str) -> None:
     warnings.warn(HIGH_IMPACT_OBS_WARNING.format(kind=str(kind)), UserWarning, stacklevel=2)
 
 
-def _rss_mb():
-    # type: () -> Optional[float]
+def _rss_mb() -> Optional[float]:
     try:
         psutil = import_module("psutil")
         return float(psutil.Process().memory_info().rss) / (1024.0 * 1024.0)
@@ -37,15 +35,13 @@ def _rss_mb():
         return None
 
 
-def _r2(value):
-    # type: (Optional[float]) -> Optional[float]
+def _r2(value: Optional[float]) -> Optional[float]:
     return None if value is None else round(float(value), 2)
 
 
-def require_psutil_for_memory(reason):
-    # type: (str) -> None
+def require_psutil_for_memory(reason: str) -> None:
     try:
-        import_module("psutil")
+        _ = import_module("psutil")
     except Exception as exc:
         raise RuntimeError(
             "请求了内存采样({})但 `psutil` 不可用;请安装可选依赖 `psutil`,或使用仅 `duration` 的 `bench`".format(reason)
@@ -65,6 +61,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
     仅订阅轻量 `EventTypes`(不含 `RELATION_LOOKUP` / `ROW_WRITE` / `FIELD_COMPUTE`).
     """
 
+    event_types: Optional[Set[EventType]]
     sample_rss: bool
     persist_batches: bool
     nodes: List[Dict[str, Any]]
@@ -79,8 +76,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
     _current_run_id: Optional[str]
     _current_demand_id: Optional[str]
 
-    def __init__(self, sample_rss=False, persist_batches=True):
-        # type: (bool, bool) -> None
+    def __init__(self, sample_rss: bool = False, persist_batches: bool = True) -> None:
         self.event_types = {
             EventType.PIPELINE_START,
             EventType.PIPELINE_END,
@@ -92,30 +88,28 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         }
         self.sample_rss = bool(sample_rss)
         self.persist_batches = bool(persist_batches)
-        self.nodes = []  # type: List[Dict[str, Any]]
+        self.nodes = []
         self._batch_persist_warned = False
         self._reset_current()
 
-    def _reset_current(self):
-        # type: () -> None
+    def _reset_current(self) -> None:
         self._pipeline_start_rss = _rss_mb() if self.sample_rss else None
-        self._batches = []  # type: List[Dict[str, Any]]
-        self._batch_index = {}  # type: Dict[int, Dict[str, Any]]
-        self._loaders = {}  # type: Dict[str, Dict[str, Any]]
-        self._outputs = []  # type: List[Dict[str, Any]]
+        self._batches = []
+        self._batch_index = {}
+        self._loaders = {}
+        self._outputs = []
         self._total_rows_in = 0
-        self._batch_size = None  # type: Optional[int]
-        self._current_run_id = None  # type: Optional[str]
-        self._current_demand_id = None  # type: Optional[str]
+        self._batch_size = None
+        self._current_run_id = None
+        self._current_demand_id = None
 
-    def on_pipeline_start(self, event):
-        # type: (Event) -> None
+    def on_pipeline_start(self, event: Event) -> None:
         self._reset_current()
         payload = event.payload
         self._batch_size = getattr(payload, "batch_size", None)
         run_id = str(event.run_id or "").strip() or None
-        meta = event.meta  # type: Dict[str, Any]
-        demand_id = None  # type: Optional[str]
+        meta: Dict[str, Any] = event.meta
+        demand_id: Optional[str] = None
         for key in ("demand_id", "workflow_node_id", "node_id"):
             raw = meta.get(key)
             if raw is not None and str(raw).strip():
@@ -124,22 +118,21 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         self._current_run_id = run_id
         self._current_demand_id = demand_id or run_id
 
-    def on_batch_start(self, event):
-        # type: (Event) -> None
+    def on_batch_start(self, event: Event) -> None:
         payload = event.payload
         try:
             n_rows = len(payload.row_ids or [])
         except TypeError:
             n_rows = 0
         self._total_rows_in += n_rows
-        entry = {
+        entry: Dict[str, Any] = {
             "n": int(payload.batch_num),
             "duration_s": 0.0,
             "rows_in": n_rows,
             "stages": dict.fromkeys(_STAGES, 0.0),
             "rss_mb": _rss_mb() if self.sample_rss else None,
             "loaders": [],
-        }  # type: Dict[str, Any]
+        }
         self._batch_index[int(payload.batch_num)] = entry
         if self.persist_batches:
             self._batches.append(entry)
@@ -147,8 +140,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
                 self._batch_persist_warned = True
                 warn_high_impact_observability("persist_batches_large")
 
-    def on_batch_end(self, event):
-        # type: (Event) -> None
+    def on_batch_end(self, event: Event) -> None:
         payload = event.payload
         entry = self._batch_index.get(int(payload.batch_num))
         if entry is None:
@@ -157,19 +149,17 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         if self.sample_rss:
             entry["rss_mb"] = _rss_mb()
 
-    def on_stage_span(self, event):
-        # type: (Event) -> None
+    def on_stage_span(self, event: Event) -> None:
         payload = event.payload
         entry = self._batch_index.get(int(payload.batch_num))
         if entry is None:
             return
         stage = str(payload.stage)
-        stages = entry["stages"]  # type: Dict[str, float]
+        stages: Dict[str, float] = entry["stages"]
         if stage in stages:
             stages[stage] += max(0.0, float(payload.duration))
 
-    def on_loader_call(self, event):
-        # type: (Event) -> None
+    def on_loader_call(self, event: Event) -> None:
         payload = event.payload
         name = str(payload.loader_name)
         try:
@@ -179,14 +169,14 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         duration = float(payload.duration)
         existing = self._loaders.get(name)
         if existing is None:
-            agg = {
+            agg: Dict[str, Any] = {
                 "name": name,
                 "calls": 0,
                 "total_s": 0.0,
                 "records": 0,
                 "cache_hits": 0,
                 "cache_misses": 0,
-            }  # type: Dict[str, Any]
+            }
             self._loaders[name] = agg
         else:
             agg = existing
@@ -200,7 +190,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         if payload.batch_num is not None:
             entry = self._batch_index.get(int(payload.batch_num))
             if entry is not None:
-                loaders = entry["loaders"]  # type: List[Dict[str, Any]]
+                loaders: List[Dict[str, Any]] = entry["loaders"]
                 loaders.append(
                     {
                         "name": name,
@@ -210,8 +200,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
                     }
                 )
 
-    def on_output_target_end(self, event):
-        # type: (Event) -> None
+    def on_output_target_end(self, event: Event) -> None:
         payload = event.payload
         self._outputs.append(
             {
@@ -225,23 +214,22 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             }
         )
 
-    def on_pipeline_end(self, event):
-        # type: (Event) -> None
+    def on_pipeline_end(self, event: Event) -> None:
         payload = event.payload
         end_rss = _rss_mb() if self.sample_rss else None
-        stages_total = dict.fromkeys(_STAGES, 0.0)  # type: Dict[str, float]
+        stages_total: Dict[str, float] = dict.fromkeys(_STAGES, 0.0)
         for batch in self._batches:
-            batch_stages = batch["stages"]  # type: Dict[str, float]
+            batch_stages: Dict[str, float] = batch["stages"]
             for key in _STAGES:
                 stages_total[key] += float(batch_stages.get(key, 0.0))
         if not self._batches:
             for entry in self._batch_index.values():
-                entry_stages = entry["stages"]  # type: Dict[str, float]
+                entry_stages: Dict[str, float] = entry["stages"]
                 for key in _STAGES:
                     stages_total[key] += float(entry_stages.get(key, 0.0))
-        loaders = []  # type: List[Dict[str, Any]]
+        loaders: List[Dict[str, Any]] = []
         for name in sorted(self._loaders):
-            item = dict(self._loaders[name])  # type: Dict[str, Any]
+            item: Dict[str, Any] = dict(self._loaders[name])
             denom = int(item["cache_hits"]) + int(item["cache_misses"])
             item["cache_hit_rate"] = (int(item["cache_hits"]) / float(denom)) if denom else 0.0
             item["total_s"] = round(float(item["total_s"]), 4)
@@ -252,7 +240,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         if self._pipeline_start_rss is not None:
             peak_vals.append(float(self._pipeline_start_rss))
         demand_id = self._current_demand_id
-        end_meta = event.meta  # type: Dict[str, Any]
+        end_meta: Dict[str, Any] = event.meta
         for key in ("demand_id", "workflow_node_id", "node_id"):
             raw = end_meta.get(key)
             if raw is not None and str(raw).strip():
@@ -261,7 +249,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         run_id = str(event.run_id or "").strip() or self._current_run_id
         if not demand_id:
             demand_id = run_id
-        node = {
+        node: Dict[str, Any] = {
             "demand_id": demand_id,
             "run_id": run_id,
             "name": demand_id or run_id,
@@ -281,43 +269,42 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             "batches": list(self._batches) if self.persist_batches else [],
             "loaders": loaders,
             "outputs": list(self._outputs),
-        }  # type: Dict[str, Any]
+        }
         self.nodes.append(node)
 
-    def build_run_stats(self, meta=None):
-        # type: (Optional[Dict[str, Any]]) -> Dict[str, Any]
-        stages_total = dict.fromkeys(_STAGES, 0.0)  # type: Dict[str, float]
-        loaders_map = {}  # type: Dict[str, Dict[str, Any]]
-        outputs = []  # type: List[Dict[str, Any]]
-        batches = []  # type: List[Dict[str, Any]]
+    def build_run_stats(self, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        stages_total: Dict[str, float] = dict.fromkeys(_STAGES, 0.0)
+        loaders_map: Dict[str, Dict[str, Any]] = {}
+        outputs: List[Dict[str, Any]] = []
+        batches: List[Dict[str, Any]] = []
         total_rows = 0
         total_duration = 0.0
         total_batches = 0
-        peak_mb = None  # type: Optional[float]
-        start_mb = None  # type: Optional[float]
-        end_mb = None  # type: Optional[float]
+        peak_mb: Optional[float] = None
+        start_mb: Optional[float] = None
+        end_mb: Optional[float] = None
 
         for node in self.nodes:
-            pipe = node.get("pipeline") or {}  # type: Dict[str, Any]
+            pipe: Dict[str, Any] = node.get("pipeline") or {}
             total_rows += int(pipe.get("total_rows_in") or 0)
             total_duration += float(pipe.get("total_duration_s") or 0.0)
             total_batches += int(pipe.get("total_batches") or 0)
-            node_stages = node.get("stages_total") or {}  # type: Dict[str, Any]
+            node_stages: Dict[str, Any] = node.get("stages_total") or {}
             for k in _STAGES:
                 stages_total[k] += float(node_stages.get(k) or 0.0)
-            node_loaders = node.get("loaders") or []  # type: List[Dict[str, Any]]
+            node_loaders: List[Dict[str, Any]] = node.get("loaders") or []
             for loader in node_loaders:
                 name = str(loader.get("name") or "")
                 existing = loaders_map.get(name)
                 if existing is None:
-                    agg = {
+                    agg: Dict[str, Any] = {
                         "name": name,
                         "calls": 0,
                         "total_s": 0.0,
                         "records": 0,
                         "cache_hits": 0,
                         "cache_misses": 0,
-                    }  # type: Dict[str, Any]
+                    }
                     loaders_map[name] = agg
                 else:
                     agg = existing
@@ -328,7 +315,7 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
                 agg["cache_misses"] = int(agg.get("cache_misses") or 0) + int(loader.get("cache_misses") or 0)
             outputs.extend(list(node.get("outputs") or []))
             batches.extend(list(node.get("batches") or []))
-            mem = node.get("memory") or {}  # type: Dict[str, Any]
+            mem: Dict[str, Any] = node.get("memory") or {}
             peak_raw = mem.get("peak_mb")
             if peak_raw is not None:
                 peak_val = float(peak_raw)
@@ -340,16 +327,15 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
             if end_raw is not None:
                 end_mb = float(end_raw)
 
-        loaders = []  # type: List[Dict[str, Any]]
+        loaders: List[Dict[str, Any]] = []
         for name in sorted(loaders_map):
-            item = dict(loaders_map[name])  # type: Dict[str, Any]
+            item: Dict[str, Any] = dict(loaders_map[name])
             denom = int(item["cache_hits"]) + int(item["cache_misses"])
             item["cache_hit_rate"] = (int(item["cache_hits"]) / float(denom)) if denom else 0.0
             item["total_s"] = round(float(item["total_s"]), 4)
             loaders.append(item)
 
-        def _loader_sort_key(x):
-            # type: (Dict[str, Any]) -> float
+        def _loader_sort_key(x: Dict[str, Any]) -> float:
             return -float(x.get("total_s") or 0.0)
 
         loaders.sort(key=_loader_sort_key)
@@ -383,28 +369,25 @@ class WorkflowStatsAccumulator(EventDispatchObserver):
         }
 
 
-def atomic_write_run_stats_json(path, payload):
-    # type: (str, Dict[str, Any]) -> str
+def atomic_write_run_stats_json(path: str, payload: Dict[str, Any]) -> str:
     parent = os.path.dirname(path)
     if parent and not os.path.isdir(parent):
         os.makedirs(parent)
     tmp = "{}.tmp.{}".format(path, os.getpid())
     with open(tmp, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, default=str)
-        handle.write("\n")
+        _ = handle.write("\n")
     os.replace(tmp, path)
     return path
 
 
-def write_run_stats_sibling(run_dir, payload, filename="run_stats.json"):
-    # type: (str, Dict[str, Any], str) -> str
+def write_run_stats_sibling(run_dir: str, payload: Dict[str, Any], filename: str = "run_stats.json") -> str:
     """在 `viz`/`run` 产物目录旁写入 `run_stats` 兄弟文件(非嵌入)."""
     path = os.path.join(str(run_dir), str(filename))
     return atomic_write_run_stats_json(path, payload)
 
 
-def resolve_viz_run_dir(observer_or_config):
-    # type: (Any) -> Optional[str]
+def resolve_viz_run_dir(observer_or_config: Any) -> Optional[str]:
     """尽力解析 `VizObserver` / `WorkflowVizObserver` / `VizObserverConfig` 的 `run` 目录."""
     config = observer_or_config
     if not hasattr(config, "resolve_output_paths"):
@@ -426,8 +409,11 @@ def resolve_viz_run_dir(observer_or_config):
     return None
 
 
-def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=None):
-    # type: (Any, Optional[Dict[str, Any]], Optional[Any]) -> List[str]
+def maybe_auto_write_run_stats_beside_viz(
+    observers: Any,
+    meta: Optional[Dict[str, Any]] = None,
+    extra_run_dirs: Optional[Any] = None,
+) -> List[str]:
     """当 `Viz` 与 `WorkflowStatsAccumulator` 并存时,写兄弟 `run_stats.json`.
 
     任一侧缺失,或累计器尚无 `nodes` 时不做任何事.
@@ -436,8 +422,8 @@ def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=N
     `extra_run_dirs` `MAY` 列出额外目录(例如 `workflow`/`overview`)以在找到累计器后接收同一载荷.
     """
     obs_list = list(observers or [])
-    accum = None  # type: Optional[WorkflowStatsAccumulator]
-    run_dirs = []  # type: List[str]
+    accum: Optional[WorkflowStatsAccumulator] = None
+    run_dirs: List[str] = []
     for obs in obs_list:
         if isinstance(obs, WorkflowStatsAccumulator):
             if accum is None or len(getattr(obs, "nodes", None) or []) >= len(getattr(accum, "nodes", None) or []):
@@ -453,8 +439,8 @@ def maybe_auto_write_run_stats_beside_viz(observers, meta=None, extra_run_dirs=N
     if not list(getattr(accum, "nodes", None) or []):
         return []
     payload = accum.build_run_stats(meta=meta)
-    written = []  # type: List[str]
-    seen = set()  # type: Set[str]
+    written: List[str] = []
+    seen: Set[str] = set()
     for run_dir in run_dirs:
         key = os.path.abspath(str(run_dir))
         if key in seen:

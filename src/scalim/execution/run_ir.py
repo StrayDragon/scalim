@@ -868,7 +868,7 @@ def _run_ir_with_plan_and_managers(
                     _observers = getattr(
                         observer_manager, "observers", None
                     )  # pragma: allow-dynattr optional-interface: ObserverManager.observers
-                    maybe_auto_write_run_stats_beside_viz(_observers or [])
+                    _ = maybe_auto_write_run_stats_beside_viz(_observers or [])
                 with contextlib.suppress(Exception):
                     observer_manager.close()
         else:

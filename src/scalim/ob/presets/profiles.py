@@ -31,8 +31,7 @@ PROFILE_BENCH_PLUS = ObservabilityProfile.BENCH_PLUS.value
 PROFILE_DEBUG = ObservabilityProfile.DEBUG.value
 
 
-def _coerce_profile(name):
-    # type: (Union[ObservabilityProfile, str, None]) -> ObservabilityProfile
+def _coerce_profile(name: Union[ObservabilityProfile, str, None]) -> ObservabilityProfile:
     if isinstance(name, ObservabilityProfile):
         return name
     raw = str(name or ObservabilityProfile.BASELINE).strip().lower()
@@ -43,13 +42,12 @@ def _coerce_profile(name):
 
 
 def build_observability_profile(
-    name,  # type: Union[ObservabilityProfile, str]
-    sampling_interval=1,  # type: int
-    include_memory=False,  # type: bool
-    viz_output_dir=None,  # type: Optional[str]
-    persist_batches=True,  # type: bool
-):
-    # type: (...) -> Dict[str, Any]
+    name: Union[ObservabilityProfile, str],
+    sampling_interval: int = 1,
+    include_memory: bool = False,
+    viz_output_dir: Optional[str] = None,
+    persist_batches: bool = True,
+) -> Dict[str, Any]:
     """按具名低漂移 `profile` 组装 `observer` 组件.
 
     返回含键 `name`/`components`/`handles`/`viz_config`/`meta` 的 `dict`.
@@ -57,14 +55,14 @@ def build_observability_profile(
     """
     profile = _coerce_profile(name)
     name_s = profile.value
-    components = []  # type: List[Any]
-    handles = {
+    components: List[Any] = []
+    handles: Dict[str, Any] = {
         "accum": None,
         "perf": None,
         "stage_memory": None,
         "relation": None,
-    }  # type: Dict[str, Any]
-    viz_config = None  # type: Optional[VizObserverConfig]
+    }
+    viz_config: Optional[VizObserverConfig] = None
     meta = {"profile": name_s, "sampling_interval": int(sampling_interval)}
 
     if profile == ObservabilityProfile.BASELINE:

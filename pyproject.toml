@@ -234,7 +234,7 @@ max-args = 16
     "RUF022",
     "TRY003",
 ]
-"src/scalim/execution/executor/batch/_internal/stage_spans.py" = ["ANN", "B012", "F401"]
+"src/scalim/execution/executor/batch/_internal/stage_spans.py" = ["ANN", "B012", "F401", "FBT001"]
 "src/scalim/workflow/execute.py" = ["C901", "PLC0415"]
 ".tmp/**/*.py" = ["ALL"]
 

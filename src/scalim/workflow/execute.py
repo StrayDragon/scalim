@@ -683,12 +683,11 @@ def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> N
     `workflow_components`),通过保留 `demand` `request` 并在 `teardown` 读取其
     `VizObserverConfig` / 累计器实例完成.
     """
-    observers = []  # type: List[Any]
-    extra_dirs = []  # type: List[str]
+    observers: List[Any] = []
+    extra_dirs: List[str] = []
     manager = prepared.workflow_observer_manager
-    if manager is not None:
-        _manager_observers = getattr(manager, "observers", None)  # pragma: allow-dynattr optional-interface: ObserverManager.observers
-        observers.extend(list(_manager_observers or []))
+    _manager_observers = getattr(manager, "observers", None)  # pragma: allow-dynattr optional-interface: ObserverManager.observers
+    observers.extend(list(_manager_observers or []))
     for component in prepared.workflow_components:
         if component is not None and component not in observers:
             observers.append(component)
@@ -714,7 +713,7 @@ def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> N
             if run_dir:
                 extra_dirs.append(run_dir)
 
-    maybe_auto_write_run_stats_beside_viz(
+    _ = maybe_auto_write_run_stats_beside_viz(
         observers,
         meta={"source": "workflow_auto_sibling", "workflow_exec_id": prepared.workflow_exec_id},
         extra_run_dirs=extra_dirs,
