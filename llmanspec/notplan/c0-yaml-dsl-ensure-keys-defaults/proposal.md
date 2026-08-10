@@ -1,4 +1,7 @@
-> 一句话描述: 为 YAML DSL 引入两个声明式原语——字段级 relation miss 缺省（`default`/`default_by`）与聚合输出的维度键空间补全（`outputs[*].ensure_keys`）。
+> 一句话描述: 为 YAML DSL 引入两个声明式原语——字段级 relation miss 缺省（`default`）与聚合输出的维度键空间补全（`outputs[*].ensure_keys`）。
+
+> **状态（2026-08-11）**：**部分转正** —— `default`（field-defaults）已由 `2026-04-18-c0-yaml-dsl-ref-miss-default-cases`（冻结于 `freezed_changes.7z.archived`，commit `da948ba8`）落地实现；`ensure_keys` 仍未实现，本提案仅剩该部分有效。
+> 语法偏差说明：实现将 `default`/`default_by` 合并为 `default` ordered cases（`when: relation_miss` + `literal`/`call_by` 二选一）；内置词汇表 `^defaults/zero_of_value_cast` 改名 `^defaults/default()`（旧名出现即 fail-fast 提示迁移）。
 
 ## Why
 

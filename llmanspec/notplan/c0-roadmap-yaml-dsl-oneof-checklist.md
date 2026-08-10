@@ -39,54 +39,9 @@ rg -n '\"kind\"' src/scalim/dsl/yaml_dsl/schema/*.gen.json
 
 ### 1.1 `resources.books.*` (xlsx_file / xlsx_memory)
 
-- [ ] 候选: 将 `resources.books.<book_id>` 从 `kind` discriminator 升级为 oneOf 分支对象
+- [x] **已完成**（不再作为候选）: `kind` discriminator 已移除，统一为 `xlsx:` 分支写法（`anyOf: [$import | xlsx]`；`xlsx_file`/`xlsx_memory` 别名出现即 fail-fast）。由 `2026-07-13-c20-add-unified-xlsx-book-kind` / `2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds` 完成（冻结于 `freezed_changes.7z.archived`）。
 
-**现状(authoring):**
-
-```yaml
-resources:
-  books:
-    report:
-      kind: xlsx_file
-      path: ./out
-      allow_formulas: false
-      write_defaults:
-        mode: sheet
-```
-
-**可能的 oneOf 形态(示意):**
-
-```yaml
-resources:
-  books:
-    report:
-      xlsx_file:
-        path: ./out
-        allow_formulas: false
-      write_defaults:
-        mode: sheet
-```
-
-**注意点(调研要点):**
-
-- `write_defaults` 是“跨分支通用字段”，可考虑与分支并存(类似 `sources.*.normalize.call_by` 与分支并存的做法)。
-- demand YAML 的 `resources.books.*` 目前支持 `$import`(workflow YAML 不支持)：
-  - oneOf 方案需要确认 `$import` 应放在分支外、分支内，或允许“仅 `$import`”再在展开后补全分支。
-- 需要统一 demand/workflow 两个 schema 的 authoring surface(至少语义一致，是否都支持 `$import` 取决于现有边界)。
-
-**触及面(落地时的主要改动点):**
-
-- Schema SSOT:
-  - `src/scalim/dsl/yaml_dsl/schema_dsl/models/resources.py`
-  - 生成物: `src/scalim/dsl/yaml_dsl/schema/demand.gen.json`, `src/scalim/dsl/yaml_dsl/schema/workflow.gen.json`
-- 解析/校验:
-  - `src/scalim/dsl/yaml_dsl/_internal/config_parsing/loader.py`
-  - `src/scalim/dsl/yaml_dsl/_internal/config_parsing/validator.py`
-  - workflow parser: `src/scalim/dsl/yaml_dsl/workflow_config/_parse.py`
-- 文档/示例(按需):
-  - `docs/doc/yaml-dsl/user-guide.md`
-  - `agentdev/skills/scalim-yaml-dsl/references/**`
-  - notebooks 示例 YAML
+> 旧草案中的“现状/可能的 oneOf 形态/注意点/触及面”已过时（`write_defaults` 也已收口 Python `BookWritePolicy`），详见冻结 change 文档，不再在本清单保留。
 
 ### 1.2 `resources.files.*` (csv_file)
 
@@ -117,11 +72,12 @@ resources:
 **注意点(调研要点):**
 
 - 当前仅一个 kind(`csv_file`)，迁移价值主要在“风格统一 + 未来扩展 kind 时更自然”，需要权衡是否值得引入 breaking change。
-- demand YAML 同样存在 `$import` 语义，需要与 `resources.books.*` 一并考虑。
+- demand YAML 同样存在 `$import` 语义，可参考已完成的 `resources.books.*`（`xlsx:` 分支 + `anyOf: [$import | xlsx]`）做法。
 
 **触及面(落地时的主要改动点):**
 
-- 同 1.1 的 schema/解析/校验触及面(资源解析逻辑通常共用同一批文件)。
+- Schema SSOT: `src/scalim/dsl/yaml_dsl/schema_dsl/models/resources.py`（`FileConfig`），生成物 `demand.gen.json` / `workflow.gen.json`
+- 解析/校验: `_internal/config_parsing/loader.py`、`validator.py`、workflow parser
 
 ## 2. 非候选 / 已经是分支风格的节点(避免重复劳动)
 

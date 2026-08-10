@@ -1,3 +1,5 @@
+> **状态（2026-08-11）**：`default` 相关任务已由 `2026-04-18-c0-yaml-dsl-ref-miss-default-cases` 完成；剩余任务仅针对 `ensure_keys`。
+
 ## 1. Schema SSOT & Authoring Surface
 
 - [ ] 1.1 Add `default`/`default_by` to `SourceFieldConfig` SSOT (`src/scalim/dsl/yaml_dsl/schema_dsl/models/field.py`) (DoD: schema-only validate accepts keys; strict validator not yet required)

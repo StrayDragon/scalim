@@ -1,3 +1,5 @@
+> **状态（2026-08-11）**：`default`（field-defaults）已由 `2026-04-18-c0-yaml-dsl-ref-miss-default-cases` 落地（语法合并为 `default` ordered cases，见 proposal 头部）；本 design 中 `default`/`default_by` 决策仅作 ensure_keys 实现的语义参考。
+
 ## Context
 
 本变更落在两条现有主链路之上：

@@ -24,4 +24,9 @@
 | `c0-write-precompute-derived-fields` | `c10-write-precompute-derived-fields` |
 | `c0-compute-rowwise-fusion` | `c20-compute-expr-rowwise-fusion`（范围已含安全外壳下无 `$ctx` 的 `call_by`） |
 | `c0-perf-refloader-chunk-parallelism` | `c30-refloader-chunk-parallelism` |
+| `c1-streaming-xlsx-output` | `c0-streaming-column-excel-sink`（`StreamingColumnExcelSink` 已实现；冻结于 `freezed_changes.7z.archived`） |
+| `c0-add-field-value-datetime` | `2026-07-18-c0-add-field-value-datetime`（已实现，commit `d5aa943c`） |
+| `c0-shortcuts-public-api-consolidation` | `2026-04-14-c60-output-discovery-facade`（v1 `scalim.shortcuts.resources.outputs` 已实现；v2/v3 另案） |
+| `c0-trusted-mode-defense-in-depth` | `2026-04-28-c3-security-hardening-yaml-dsl`（核心已实现；审计日志另案） |
+| `c0-yaml-dsl-ensure-keys-defaults` | **部分转正**：`default` 由 `2026-04-18-c0-yaml-dsl-ref-miss-default-cases` 落地；`ensure_keys` 仍开放（见其 proposal 头部状态块） |
 
