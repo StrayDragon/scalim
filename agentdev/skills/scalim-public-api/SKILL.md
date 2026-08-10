@@ -9,6 +9,9 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 
 也用于 **Event / Observer / Hook 二开适配**:进程内事件身份已收敛为 `EventType`(breaking)。
 
+自定义观测 / 钩子扩展（继承 + 组合）：`references/task-observer-hook-extension.md`。  
+生产静默 vs 开发服 psutil 门控：`agentdev/skills/scalim-run-stats/references/task-downstream-env-gating.md`。
+
 ## SSOT / Rules
 
 - Tier1 curated entrypoints (SSOT): `src/scalim/**/__init__.py` 的 markers
@@ -47,6 +50,7 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 ### Hand-authored (适配 / 升级)
 
 - EventType 下游适配任务卡: `references/task-event-type-adaptation.md`
+- **Observer / Hook 二开扩展（继承 + 组合）**: `references/task-observer-hook-extension.md`
 - EventType Enum 身份升级批次: `references/upgrades/2026-07-19-event-type-enum-identity.md`
 - typed handlers 收 `Event`（可读 `meta`）: `references/upgrades/2026-08-02-typed-handlers-receive-event.md`
 - 宽表 Excel: `references/streaming-column-excel.md`

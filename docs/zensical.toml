@@ -41,6 +41,7 @@ nav = [
   ] },
   { "版本亮点" = [
     "releases/index.md",
+    { "0.10.2 重点特性" = "releases/0.10.2/index.md" },
     { "0.10.1 重点特性" = "releases/0.10.1/index.md" },
     { "0.10.0 重点特性" = [
       "releases/0.10.0/index.md",

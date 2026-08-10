@@ -2293,7 +2293,7 @@
             }
           },
           "description": "files 资源映射(文件输出资源; key 为 `file_id`).",
-          "markdownDescription": "#### resources.files\n\nfiles 资源映射(文件输出资源; key 为 `file_id`).\n- v1 稳定支持: `kind=csv_file`\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录",
+          "markdownDescription": "#### resources.files\n\nfiles 资源映射(文件输出资源; key 为 `file_id`).\n- v1 稳定支持: oneOf 分支 `csv_file: {path, encoding?}` (旧 `kind: csv_file` 出现即 fail-fast)\n- 相对路径解析基准: 声明该资源的 YAML 文件所在目录",
           "additionalProperties": {
             "$ref": "#/definitions/file"
           },

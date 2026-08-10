@@ -308,7 +308,7 @@ class ResourcesConfig:
             desc="files 资源映射(文件输出资源; key 为 file_id)",
             md=(
                 "files 资源映射(文件输出资源; key 为 `file_id`).\n\n"
-                "- v1 稳定支持: `kind=csv_file`\n"
+                "- v1 稳定支持: oneOf 分支 `csv_file: {path, encoding?}` (旧 `kind: csv_file` 出现即 fail-fast)\n"
                 "- 相对路径解析基准: 声明该资源的 YAML 文件所在目录\n"
                 "- `outputs[*].to.file` 引用该 mapping 的 key"
             ),

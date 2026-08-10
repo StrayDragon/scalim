@@ -9,22 +9,24 @@ description: "装配 Scalim 低漂移自我观测：run_stats v1、Observability
 
 - **最佳实践（默认先读）**：[references/best-practices.md](references/best-practices.md)
 - 装配 profile / 对拍清单：[references/task-assemble-and-compare.md](references/task-assemble-and-compare.md)
+- **下游环境门控（生产静默 / 开发服 psutil）**：[references/task-downstream-env-gating.md](references/task-downstream-env-gating.md)
 - 人类完整说明（Why / ROI / 风险 / 粘贴片段）：`docs/doc/viz/run-stats.md`
 - Viz 产物契约：`docs/doc/viz/scalim-viz.md`
 - 下游升级卡：`agentdev/skills/scalim-public-api/references/upgrades/2026-08-08-run-stats-low-drift-and-write-attribution.md`
 - 若任务是写/改 YAML DSL：改用 `agentdev/skills/scalim-yaml-dsl`
-- 若任务是 EventType / Observer / Hook 二开适配：改用 `agentdev/skills/scalim-public-api`
+- 若任务是 EventType / Observer / Hook 二开适配：改用 `agentdev/skills/scalim-public-api`（扩展卡：`references/task-observer-hook-extension.md`）
 
 ## 硬规则
 
-1. **默认静默**：生产可不装配；`components=[]` / 不传 observers。
+1. **默认静默**：生产 / 正式非 DEBUG 可不装配；`components=[]` / 不传 observers。**禁止**生产默认挂 memory / debug / relation。
 2. **日常用 bench**：`ObservabilityProfile.BENCH`；debug / relation / field_compute top-N / viz_trace|full 会 warn，且观测税更高（本机 mid debug ~+40%）。
 3. **workflow 结论读 `run_stats.nodes`**：禁止把共享 `PerformanceObserver`/`RelationObserver` 末态当成全 workflow 真相（它们会在 `PIPELINE_START` reset）。
 4. **同一 lite 事件平面**：run_stats 只订已有 `EventType`；不要另开热路径 instrumentation。
 5. **viz sibling**：`write_run_stats_sibling` → `run_stats.json`；**禁止**把完整 run_stats 嵌入 `viz_snapshot.json`。
 6. **write 归因**：订阅 `STAGE_SPAN` 时现代 sink I/O（含 `sink.close()`）计入 `write`；嵌在 loader/compute 窗内会扣回。`notes.write_stage_attribution` 应为 `sink_path_timed`。
-7. **memory**：显式请求 memory / `BENCH_PLUS` 时无 psutil → **fail-fast**，禁止静默空 peak。
+7. **memory**：显式请求 memory / `BENCH_PLUS` 时无 psutil → **fail-fast**，禁止静默空 peak。开发服 / bench **SHOULD** 装 `psutil`；生产非 DEBUG 不装配则无需为观测装它。
 8. **对拍**：baseline vs bench 业务输出（CSV 行/内容哈希）MUST 不变；可变的是墙钟与 metrics。xlsx 字节不可靠。
+9. **扩展**：优先 `components = profile + [MyObs()]`；继承用 `EventDispatchObserver` / `BaseHook`。细节见 public-api 扩展卡。
 
 ## 最小入口
 

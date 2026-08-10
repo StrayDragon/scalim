@@ -16,11 +16,12 @@
 
 ## 原则
 
-- **默认静默**：生产可不装配任何 observer（`components=[]`）。
+- **默认静默**：生产 / 正式非 DEBUG 可不装配任何 observer（`components=[]`）。**不要**在生产默认挂 memory / debug / relation。
 - **bench 低漂移**：只订 lite 事件；墙钟税通常为个位数百分比量级（以本机合成矩阵为准）。
 - **debug 显式且警告**：relation / field_compute top-N / viz 等高影响面会 `UserWarning`，并提示改用 bench。
 - **workflow 用 `nodes[]`**：共享 observer 会在下一 `PIPELINE_START` reset；完整结论读 `run_stats.nodes`，不要只读 `PerformanceObserver` 末态。
 - **write 归因**：现代 sink 路径（column / streaming flush / `sink.close()`）在订阅 `STAGE_SPAN` 时计入 `stages.write`；若写出嵌在 loader/compute 计时窗内会扣回外层，避免双计。
+- **开发服 vs 生产**：开发 / bench 可假定已装可选依赖 `psutil`（memory / `BENCH_PLUS` / 内置 stage memory）；生产非 DEBUG 不装配则**无需**为观测装 psutil。门控细节见 Agent skill 下方链接。
 
 ## ROI（怎么用）
 
@@ -50,6 +51,18 @@
 3. 对拍用 **CSV 哈希** + 墙钟税；不要用 xlsx 字节相等当业务等价。
 4. `stage_sum` 用于相对热点；**墙钟**用于观测税；二者不必相等。
 5. 落盘用 sibling `run_stats.json`；Agent 细则见 `agentdev/skills/scalim-run-stats/references/best-practices.md`。
+6. **定制**：优先 `components = profile 组件 + [MyObs()]`；继承用 `EventDispatchObserver` / `BaseHook`，不要复制上游 preset 分叉。
+
+## 环境门控与扩展（下游）
+
+| 环境 | 做法 |
+|------|------|
+| 正式 / 生产（非 DEBUG） | `components=[]`；零观测税；不为观测装 psutil |
+| 开发服 / CI bench / `SCALIM_DEBUG=1` | `build_observability_profile(...)`；可装 `psutil` 开 memory / 内置 stage memory |
+| 业务定制日志或策略 | 组合内置 profile + 自研 Observer/Hook；见下方 Agent 扩展卡 |
+
+Agent 装配门控卡：[`task-downstream-env-gating.md`](repo:agentdev/skills/scalim-run-stats/references/task-downstream-env-gating.md?ref)。  
+Observer/Hook 二开卡：[`task-observer-hook-extension.md`](repo:agentdev/skills/scalim-public-api/references/task-observer-hook-extension.md?ref)。
 
 ## Profiles
 
@@ -180,12 +193,13 @@ engine = ScalimEngine(
 ## 风险与边界
 
 - **观测税**：debug / relation / field_compute top-N / viz_trace|full / 超大批次 `batches[]` 会抬墙钟；已强制 `UserWarning` 并指向 bench。
-- **默认仍静默**：生产可继续不装 observer；启用才有税。
+- **默认仍静默**：生产 / 正式非 DEBUG 可继续不装 observer；启用才有税。开发服开 DEBUG/bench 时再装 `psutil` 做 memory。
 - **读错面**：只看共享 observer 末态会再次「假空」——必须以 `run_stats.nodes` 为全 workflow 结论。
 - **close 口径**：`sink.close()`/save 计入 write，可能在最后 `BATCH_END` 之后发出，由 `PIPELINE_END` 折叠。
 - **嵌套写出**：LOAD_REF / streaming flush 在 loader·compute 窗内会扣回外层；stage 之和 ≈ 墙钟（容差内），不是严格相等。
 - **兼容面**：业务 sink 输出内容不应因观测改变；数字（归因）会变更——这是预期。
-- **依赖**：memory 路径需要可选 `psutil`；无则拒绝该配置，不静默空 peak。
+- **依赖**：memory 路径需要可选 `psutil`；无则拒绝该配置，不静默空 peak。生产非 DEBUG 不装配则不依赖该包。
+- **扩展**：用 `EventDispatchObserver` / `BaseHook` 组合进 `components`；不要复制 preset 分叉（见 Agent 扩展卡）。
 
 ## Viz
 
@@ -196,5 +210,12 @@ scalim-viz 会在导入目录/回放时**可选**读取 sibling `run_stats.json`
 ## Agent Skill
 
 下游 / Agent 装配请优先加载：[`agentdev/skills/scalim-run-stats/SKILL.md`](repo:agentdev/skills/scalim-run-stats/SKILL.md?ref)。
+
+相关 reference（按需）：
+
+- 最佳实践：[best-practices.md](repo:agentdev/skills/scalim-run-stats/references/best-practices.md?ref)
+- 装配 / 对拍清单：[task-assemble-and-compare.md](repo:agentdev/skills/scalim-run-stats/references/task-assemble-and-compare.md?ref)
+- **生产静默 vs 开发服 psutil**：[task-downstream-env-gating.md](repo:agentdev/skills/scalim-run-stats/references/task-downstream-env-gating.md?ref)
+- **Observer / Hook 二开（继承 + 组合）**：[task-observer-hook-extension.md](repo:agentdev/skills/scalim-public-api/references/task-observer-hook-extension.md?ref)
 
 下游升级卡（Before/After）：[`agentdev/skills/scalim-public-api/references/upgrades/2026-08-08-run-stats-low-drift-and-write-attribution.md`](repo:agentdev/skills/scalim-public-api/references/upgrades/2026-08-08-run-stats-low-drift-and-write-attribution.md?ref)。
