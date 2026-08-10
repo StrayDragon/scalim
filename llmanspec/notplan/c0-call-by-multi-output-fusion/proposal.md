@@ -1,5 +1,7 @@
 > 一句话描述: 在保持 row-mode 用户函数形态不变的前提下，通过 multi-output（一次调用返回多个字段）与 fusion（多字段共享一次调用结果）减少派生字段的 Python 调用次数。
 
+> **边界（勿与已落地能力混淆）**：`c20` compute-expr rowwise fusion 与 `c10` write-precompute **已在主路径**（见 `notplan/README.md`「已落地」）。本提案只覆盖 **显式** multi-output / call group（多次 `call_by` 合并为一次 row-mode 调用），不是那些能力的缺口补丁。
+
 ## Why
 
 在“字段很多但逻辑很薄”的报表 workload 中，性能瓶颈常常不是单次函数体执行，而是 **Python 调用次数 = 行数 × 字段数** 的固定开销。
@@ -13,7 +15,7 @@
 
 ## What Changes
 
-> 说明：本提案放在 `openspec/notplan-changes/`，仅用于沉淀候选方向，尚未进入 active change 工作流；不保证近期交付。
+> 说明：本提案在 `llmanspec/notplan/`，仅沉淀候选方向，尚未进入 active change；不保证近期交付。
 
 探索并引入“多字段共享一次调用”的可选 DSL / IR 能力（推荐显式、可治理的 group 语义，避免隐式改变副作用次数）：
 

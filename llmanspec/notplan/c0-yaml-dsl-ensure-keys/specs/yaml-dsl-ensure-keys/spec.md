@@ -1,5 +1,8 @@
 # yaml-dsl-ensure-keys (Delta Spec)
 
+> notplan 草案；转正后经 Branch binding 落入 live `llmanspec/specs/**`。  
+> field-level `default` **不在本 spec**（已由 `2026-04-18-c0-yaml-dsl-ref-miss-default-cases` 落地）。
+
 ## ADDED Requirements
 
 ### Requirement: Derived outputs MAY declare `ensure_keys` to fill missing aggregate groups
@@ -77,13 +80,13 @@ identity 推导 MUST 至少覆盖：
 ### Requirement: ensure_keys MUST reuse `preload_forever` cache for dimension keys when available
 键空间补全常用维度 roster（全量 keys），因此系统 MUST 避免对同一维度源重复加载。
 
-- **GIVEN** `ensure_keys.from` 指向的维度 source 配置了 `cache_mode: preload_forever`
+- **GIVEN** `ensure_keys.from` 指向的维度 source 为 preload_forever（YAML `cache_mode: preload_forever` **或** Python `SourceCache.preload_forever()` 覆盖）
 - **WHEN** 同一 run 中该 source 已通过 preload cache 加载过（例如既用于 lookup，又用于 ensure_keys）
 - **THEN** ensure_keys MUST 复用 preload cache 中的 mapping/keys
 - **AND** MUST NOT 为 ensure_keys 再触发一次 loader IO（避免重复加载）
 
 #### Scenario: preload cache prevents double-load
-- **GIVEN** `employees` source 为 `cache_mode: preload_forever`
+- **GIVEN** `employees` source 为 preload_forever（YAML 或 Python `SourceCache`）
 - **AND** 某 output 配置 `ensure_keys.from: employees`
 - **WHEN** 该 run 中 `employees` 既参与 relation lookup，又参与 ensure_keys
 - **THEN** `employees` 的 loader MUST 仅被调用一次（可通过计数型 loader 测试验证）

@@ -15,18 +15,44 @@
 3. 运行 `just llmanspec-check` 与 `just qa`，确保 sanitize/validate 与 repo 门禁全部通过。
 4. 完成实施后按流程 `llman sdd archive run <id>` 归档。
 
-## 已转正（superseded）短指针
+## 已落地（勿再当 notplan 缺口）
 
-转正后 **删除 notplan 长文**，只留本表或各目录下 `SUPERSEDED` 短页，避免与 `llmanspec/changes/` 双源漂移：
+下列方向 **已在主路径实现并归档**；notplan 长文已删。评审 ROI 时不要把它们当成待做项：
 
-| notplan 目录 | 替代 active change |
-|--------------|-------------------|
-| `c0-write-precompute-derived-fields` | `c10-write-precompute-derived-fields` |
-| `c0-compute-rowwise-fusion` | `c20-compute-expr-rowwise-fusion`（范围已含安全外壳下无 `$ctx` 的 `call_by`） |
-| `c0-perf-refloader-chunk-parallelism` | `c30-refloader-chunk-parallelism` |
-| `c1-streaming-xlsx-output` | `c0-streaming-column-excel-sink`（`StreamingColumnExcelSink` 已实现；冻结于 `freezed_changes.7z.archived`） |
-| `c0-add-field-value-datetime` | `2026-07-18-c0-add-field-value-datetime`（已实现，commit `d5aa943c`） |
-| `c0-shortcuts-public-api-consolidation` | `2026-04-14-c60-output-discovery-facade`（v1 `scalim.shortcuts.resources.outputs` 已实现；v2/v3 另案） |
-| `c0-trusted-mode-defense-in-depth` | `2026-04-28-c3-security-hardening-yaml-dsl`（核心已实现；审计日志另案） |
-| `c0-yaml-dsl-ensure-keys-defaults` | **部分转正**：`default` 由 `2026-04-18-c0-yaml-dsl-ref-miss-default-cases` 落地；`ensure_keys` 仍开放（见其 proposal 头部状态块） |
+| 主题 | 归档 change | 主路径证据（摘要） |
+|------|-------------|-------------------|
+| write-precompute | `archive/2026-08-01-c10-write-precompute-derived-fields` | `execution/write_precompute.py`；pipeline / batch 写出前物化 late 字段 |
+| compute expr / 无 `$ctx` call_by rowwise fusion | `archive/2026-08-02-c20-compute-expr-rowwise-fusion` | `planning/.../fusion_groups` + `executor/operators/compute/fusion.py` |
+| refloader chunk parallelism | `archive/2026-08-02-c30-refloader-chunk-parallelism` | （见归档） |
+| streaming column excel sink | `archive/2026-07-12-c0-streaming-column-excel-sink`（及相关 multi-batch） | `StreamingColumnExcelSink` |
+| `FieldValue` datetime 族 | `2026-07-18-c0-add-field-value-datetime`（冻结于 `freezed_changes.7z.archived`） | `typedefs.FieldValue` |
+| books / files oneOf | books: `archive/...-c20-add-unified-xlsx-book-kind` + `...-c999-remove-deprecated-xlsx-file-memory-kinds`；files: `csv_file:` 分支 + `kind` fail-fast（loader/validator） | schema `FileConfig` / `BookConfig` |
 
+**勿混淆**：`c0-call-by-multi-output-fusion`（仍 notplan）是 **显式** multi-output / call group（一次用户函数返回多字段），**不是** 已落地的 automatic compute fusion（c20）。
+
+## 已转正 / 部分转正短指针
+
+| notplan 目录 | 状态 |
+|--------------|------|
+| `c0-shortcuts-public-api-consolidation` | 已转正 → `2026-04-14-c60-output-discovery-facade`（v1；v2/v3 另案）；目录已删 |
+| `c0-trusted-mode-defense-in-depth` | 已转正 → `2026-04-28-c3-security-hardening-yaml-dsl`；目录已删 |
+| `c0-yaml-dsl-ensure-keys`（原 `c0-yaml-dsl-ensure-keys-defaults`） | **ensure_keys only**：field `default` 已落地并移出范围；见其 proposal 状态块 |
+
+## 已移出候选池（目录已删，2026-08-10）
+
+不再保留草案正文，避免与「可转正候选」混淆：
+
+| 原目录 | 原因 |
+|--------|------|
+| `c0-output-write-path-allowlist` | 暂无威胁驱动；接入面大 |
+| `c5-workflow-temp-file-permissions` | 优先序低；不进近期池 |
+| `c1-compute-eval-dos-mitigation` | 威胁模型/误伤面未收敛 |
+| `c0-roadmap-yaml-dsl-oneof-checklist.md` | books/files oneOf 均已完成，清单无开放项 |
+| `c5-lockless-cache-and-viz` | viz 单写者路径已落地；cache 去锁无 contention 证据 |
+| `c999-hook-event-bridge` | 无进程外投递消费者；属产品扩展非近缺口 |
+
+## 范围已裁剪的候选
+
+| 目录 | 说明 |
+|------|------|
+| `c2-batch-call-by`（原 `c2-call-count-reduction-and-parallelism`） | 仅保留 **batch call_by** 短页；memo/fusion/并行已拆出或已落地（见其 proposal） |
