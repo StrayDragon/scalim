@@ -1,5 +1,7 @@
 # c100: Viz DX Rewrite (viz-protocol + VSCode-first)
 
+> 一句话描述: 将 `scalim-viz` 从离线回放工具重排为开发期 DX 默认入口：未启用零成本、静态预览优先（Tier 0）、VSCode-first 的 viz-protocol 重写。
+
 本提案将 `frontend/scalim-viz/` 的能力从“离线回放工具”重排为“开发期 DX 的默认入口”,并引入新能力来解决真实痛点：
 
 - **快速梳理数据流动**：某个 output/字段到底从哪来、经过哪些变换/依赖

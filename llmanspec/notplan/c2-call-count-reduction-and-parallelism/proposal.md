@@ -1,5 +1,7 @@
 ## Status (2026-04-30)
 
+> 一句话描述: 探索在调用次数仍主导瓶颈时的可选杠杆（batch call、有界缓存、并行化），作为 `c0` 验收后的备选路径（multi-output/fusion 已拆出）。
+
 - 本提案已降级为 not-plan 草案：先落地并验收 `c0-execution-hotpath-fastpaths`，仅当 `c0` 后仍存在“调用次数主导”的瓶颈时再推进。
 - `multi-output / fusion` 已拆为独立方向以降低本提案改动面：见 `openspec/notplan-changes/c0-call-by-multi-output-fusion/`。
 

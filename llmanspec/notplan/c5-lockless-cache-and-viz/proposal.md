@@ -1,5 +1,7 @@
 ## Why
 
+> 一句话描述: 收敛 PreloadCache / workflow cache_pool 与 viz 写出路径的锁热点——更小临界区、锁外回调、单写者写出与原子性保障。
+
 在服务端/高并发场景下，除了 workflow 输出发布（B/D）之外，运行时仍有两类“锁热点”会显著增加推理成本与尾延迟风险：
 
 - **组 A**：缓存/池（`PreloadCache`、`workflow cache_pool`）的并发协调依赖 `threading.Lock` 与 inflight 等待，锁粒度与状态机复杂，容易放大 contention。

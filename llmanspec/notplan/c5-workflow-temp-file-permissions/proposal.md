@@ -1,5 +1,7 @@
 # Proposal: workflow-temp-file-permissions
 
+> 一句话描述: 统一 workflow publish 临时文件策略为私有 `0o700` 子目录（复用 sinks 的 `create_temp_path`），消除共享目录下的 symlink/race 风险。
+
 ## 与 c20/c30 关系
 
 - **不被取代**。本 change 加固 publish 临时文件权限（`resources_base` staging），与 c20 policy 边界正交；与 c30 内存释放可并行，注意同一文件合并冲突即可。

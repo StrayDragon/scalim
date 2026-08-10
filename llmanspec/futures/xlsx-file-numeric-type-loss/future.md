@@ -20,10 +20,11 @@
 
 ### later — 按 consumer 显式派生 CSV
 
-- **必要？** **有条件必要**。合约缺口仍在（ROWS-only + CSV consumer → 缺 artifact）；匿名侧尚无双消费证据。
+- **状态**: **显式派生机制已落地**——`MANAGED_ARTIFACT_KIND_CSV/ROWS` 闭集 + `_collect_managed_artifact_outputs`（`execution/run_ir.py`）对 ROWS 计划不急切复制 CSV；剩余缺口仅为「ROWS-only 输出 + CSV consumer」自动升格。
+- **必要？** **有条件必要**。合约缺口仍在（ROWS-only + CSV consumer → `Missing workflow-managed in-memory CSV artifact`，`workflow/input_artifacts.py`）；匿名侧尚无双消费证据。
 - **触发**: 真实「单 output → xlsx + csv」或报告 `Missing workflow-managed in-memory CSV artifact`。
 - **落地**: `add-managed-artifact-consumer-driven-csv`
-- **约束**: 禁止恢复无条件 `to_csv_artifact()`；派生须显式、与 ROWS 同释放。
+- **约束**: 禁止恢复无条件 `to_csv_artifact()`；派生须显式、与 ROWS 同释放（现状已满足）。
 
 ### later — 合并 workbook / sheetbook **实现**模块
 
@@ -39,9 +40,9 @@
 - **落地**: `shared-book-spill-commit`；禁止默认边写 openpyxl。
 - **前置**: c20/c25 正规化后更易做；完整模块合并为软前置。
 
-### done / active — `FieldValue` 纳入 openpyxl 时间类型
+### done — `FieldValue` 纳入 openpyxl 时间类型
 
-- **状态**: **已转正** → active change `c0-add-field-value-datetime`（`llmanspec/changes/c0-add-field-value-datetime/`）。
+- **状态**: **已实现并归档**（commit `d5aa943c`；change `2026-07-18-c0-add-field-value-datetime`，2026-07-28 冻结于 `freezed_changes.7z.archived`）。`FieldValue` 现含 `datetime`/`date`/`time`/`timedelta`（`src/scalim/typedefs.py`）。
 - **定案**: 含 `datetime`/`date`/`time`/`timedelta`；撤中间态 `str()`；**不去 tz**（与 openpyxl 同源报错）。
 - **勿重复**: notplan 同名目录仅为指针 stub；勿再开平行 change。
 
@@ -88,5 +89,5 @@
 | Source | archive `c5-xlsx-file-numeric-type-loss` |
 | Active authoring (archived) | `archive/2026-07-13-c20-add-unified-xlsx-book-kind` |
 | IR path-presence (archived) | `archive/2026-07-13-c25-normalize-xlsx-book-ir-path-presence` |
-| BREAKING remove aliases (draft) | `c999-remove-deprecated-xlsx-file-memory-kinds` |
+| BREAKING remove aliases (implemented, frozen) | `archive/2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds`（commit `2db49202`；冻结于 `freezed_changes.7z.archived`） |
 | Spec anchors | shared-output r24；managed-temp r1；intermediate-store r2/r7 |

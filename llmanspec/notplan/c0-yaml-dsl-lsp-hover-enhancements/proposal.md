@@ -1,3 +1,5 @@
+> 一句话描述: 为 YAML DSL LSP 提供可配置、Markdown 结构化的 hover cards（`scalim.yaml yaml_dsl.lsp.hover` 控制展示字段与顺序）。
+
 ## Why
 
 当前 `scalim-yaml-dsl-lsp` 的 hover 输出以纯文本为主且信息密度偏低（尤其是 relation steps 的 `source.field_id`、`call_by` 参数中的字段 token 等场景），用户需要更“像卡片”的结构化信息来快速理解引用含义、定位声明与排障。与此同时，YAML LSP + JSON Schema 已能提供字段 schema 级描述，因此 DSL hover 更应聚焦“引用语义 + 上下文”，并支持按项目配置调节展示粒度。

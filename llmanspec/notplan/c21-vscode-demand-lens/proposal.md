@@ -1,5 +1,7 @@
 ## Why
 
+> 一句话描述: 为 VSCode 增加侧边栏常驻的 Demand/Workflow 可视化透镜（锚点列表 + Mermaid 局部关系图），并重命名 LSP 命令 `scalim.dumpPlanDeps` → `scalim.dumpDemandSnapshots`。
+
 当前 `frontend/scalim-viz` 适合做深挖（静态图 + 运行态事件/trace 时间线回放），但对 VSCode 用户而言，“改 YAML → 切到另一个工具看关系 → 再切回编辑器”的成本偏高，尤其是在 `outputs` / 关联链 / 派生字段迭代阶段。
 
 另一方面，LSP 侧已经具备“静态关系”能力（plan/deps 快照），但缺少一个面向编辑路径的、可点击跳转的轻量透镜输出；同时 `scalim.dumpPlanDeps` 的命名与其语义不匹配（仅对 demand 生效的静态快照），不利于长期作为稳定接口被复用。

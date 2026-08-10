@@ -1,3 +1,5 @@
+> 一句话描述: 为 YAML DSL 引入两个声明式原语——字段级 relation miss 缺省（`default`/`default_by`）与聚合输出的维度键空间补全（`outputs[*].ensure_keys`）。
+
 ## Why
 
 当前 Scalim YAML DSL 在“缺失数据”场景下缺少声明式原语：

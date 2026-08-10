@@ -1,5 +1,7 @@
 # Proposal: output-write-path-allowlist
 
+> 一句话描述: 为输出写入路径引入可选的 `allowed_output_roots` 白名单，堵住相对路径逃逸 YAML 目录的路径穿越风险（默认 `None`，向后兼容）。
+
 ## 与 c20/c30 关系
 
 - **不被取代**。本 change 管输出 path 白名单（`allowed_output_roots`），与 `c20`（write_defaults/budget → Python）主题不同。

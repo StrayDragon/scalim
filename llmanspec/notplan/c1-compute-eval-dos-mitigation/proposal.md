@@ -1,5 +1,7 @@
 # Proposal: compute-eval-dos-mitigation
 
+> 一句话描述: 为 `SecureComputeEngine` 的高风险内置函数（`sum`/`sorted`/`map` 等）增加运行时迭代长度守卫（`ComputeLimits.max_iterable_len`），并评估移除 `repr`/`format`。
+
 ## Why
 
 `SecureComputeEngine` 的 AST 沙箱对**表达式本身**有严格的节点数/深度/字面量限制，但允许的内置函数（`sum`、`sorted`、`filter`、`map`、`list`、`reversed`）对**运行时字段值**操作无界限。

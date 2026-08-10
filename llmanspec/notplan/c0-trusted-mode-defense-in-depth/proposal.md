@@ -1,5 +1,7 @@
 # Proposal: trusted-mode-defense-in-depth
 
+> 一句话描述: 在 resolver trusted mode（`trusted_allow_all_modules`）下保留 `DANGEROUS_MODULES` denylist 作为最后一层防线，并补充运行时审计日志与风险文档。
+
 ## Why
 
 当 `resolver_trusted_mode=trusted_allow_all_modules` + `SCALIM_ALLOW_TRUSTED_ALL_MODULES=1` 时，`SecurePythonReferenceResolver` 的 `DANGEROUS_MODULES` denylist 被完全绕过（因为 `allowed_modules=frozenset(['*'])` 使 `ResolverPolicy.check()` 全部通过）。这意味着 YAML 可解析并调用 `os.system`、`subprocess.check_output` 等任意危险模块，等同于 RCE。

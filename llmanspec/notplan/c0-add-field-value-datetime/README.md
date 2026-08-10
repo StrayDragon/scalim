@@ -1,6 +1,6 @@
 # notplan stub: c0-add-field-value-datetime
 
-> **已转正** → [`llmanspec/changes/c0-add-field-value-datetime/`](../../changes/c0-add-field-value-datetime/)  
+> **已转正** → `llmanspec/changes/archive/2026-07-18-c0-add-field-value-datetime/`（2026-07-28 冻结于 `freezed_changes.7z.archived`；实现 commit `d5aa943c`）  
 > 本目录仅保留指针，**禁止**再按下方旧策略开第二份 change。
 
 ## 被本转正提案承接 / 替代的内容

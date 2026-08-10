@@ -1,5 +1,7 @@
 # SUPERSEDED（已转正）
 
+> 一句话描述: 自动识别仅被最终写出消费的派生字段为 late 集合、延迟到写出阶段物化以降低内存峰值；已转正至 `c10-write-precompute-derived-fields` 并实现。
+
 本 notplan 草案 **不再作为讨论/实现 SSOT**。
 
 | 项 | 值 |

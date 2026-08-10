@@ -1,5 +1,7 @@
 # SUPERSEDED（已转正）
 
+> 一句话描述: 对 compute_expr（及安全外壳下无 `$ctx` 的 `call_by`）派生字段做逐行融合计算以消除 N×M 热点；已转正至 `c20-compute-expr-rowwise-fusion` 并实现。
+
 本 notplan 草案 **不再作为讨论/实现 SSOT**。
 
 | 项 | 值 |

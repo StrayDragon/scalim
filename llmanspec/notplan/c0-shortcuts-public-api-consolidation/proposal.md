@@ -1,3 +1,5 @@
+> 一句话描述: 将用户最常用且需稳定的能力收敛到 `scalim.shortcuts.*`（资源领域统一入口 `scalim.shortcuts.resources`），提供受 public API 治理约束的稳定 facade。
+
 ## Why
 
 当前 `scalim` 的对外用户 API 分散在多个入口模块中（`dsl.yaml_dsl` / `workflow` / `sinks` / 若干内部落盘协议等），对框架用户而言常见任务的认知与实现成本偏高：

@@ -1,5 +1,7 @@
 # Proposal: preloaded-cache-safety-check
 
+> 一句话描述: 对并发场景下误传普通 `dict` 作为 `preloaded_cache` 的情况发出 `UserWarning`，并强化线程安全 `PreloadCache` 的推荐。
+
 ## Why
 
 `ScalimEngine` 的 `preloaded_cache` 参数接受 `MutableMapping[str, LoaderResultMapping]`，文档警告"若要跨多个并发 runs 共享缓存，不要共享普通 dict"，但运行时不做任何检查。用户可能意外共享普通 `dict` 导致数据竞争。

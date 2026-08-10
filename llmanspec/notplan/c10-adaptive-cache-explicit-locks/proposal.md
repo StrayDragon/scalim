@@ -1,5 +1,7 @@
 # Proposal: adaptive-cache-explicit-locks
 
+> 一句话描述: 为 adaptive 并行模式下共享可变缓存结构引入显式锁与 free-threaded 检测，摆脱对 CPython GIL 的依赖并消除 check-then-act 竞态。
+
 ## Why
 
 `parallel_mode="adaptive"` 下，`ExecutionRuntime` 中 6+ 个可变 dict/set（`load_ref_cache`、`key_normalize_cache`、`load_ref_group_executed`、`guardrail_logged`、`rows_cache_logged`、`relation_guardrail_stats`）在多个工作线程间无锁共享。

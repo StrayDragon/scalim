@@ -1,3 +1,5 @@
+> 一句话描述: 建立 YAML→Python 引用同步机制（引用索引、一致性诊断与 CLI 入口），把 loader/`call_by` 等 Python 引用破坏问题前移到编辑期与 CI。
+
 ## Why
 
 YAML DSL 通过 `loader:` / `call_by:` 等字段以字符串形式引用 Python 可调用对象；当 Python 侧重命名/移动实现时，这些引用会静默破坏，且 Python LSP/静态分析无法感知“在 YAML 中被使用”，导致重构与清理成本显著上升。

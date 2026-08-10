@@ -1,5 +1,7 @@
 ## Status (2026-04-30)
 
+> 一句话描述: 引入可解释的运行时性能档位（`memory`/`balanced`/`speed`），把零散性能开关收敛为统一 profile 以显式表达时间/内存/观测取舍。
+
 - 本提案已从 `openspec/changes/` 移至 `openspec/notplan-changes/`，等待 `c0-execution-hotpath-fastpaths` 合入并通过真实基准验收后再评估是否需要推进。
 - 若 `c0` 默认路径已能覆盖主要瓶颈，则 `c1` 不转正；仅当需要对“更激进/可选策略”（例如并行、缓存、materialize 等）做统一治理与上界裁剪时再进入正式变更流程。
 

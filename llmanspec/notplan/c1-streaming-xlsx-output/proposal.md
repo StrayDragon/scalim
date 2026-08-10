@@ -1,5 +1,7 @@
 # notplan: streaming-xlsx-output（已收窄升格）
 
+> 一句话描述: 通过流式列式写入降低宽表 Excel 输出的内存峰值与首字节延迟；已收窄升格为 active change `c0-streaming-column-excel-sink`（`StreamingColumnExcelSink`）并实现。
+
 > **状态（2026-07-12）**: 本 notplan **不再整包激活**。  
 > 宽表 close 峰已由 `write_only` 归档消化；列驻留 mid-close 释放经证据定为文档-only（A）。  
 > **升格收窄**: active change [`c0-streaming-column-excel-sink`](../../changes/c0-streaming-column-excel-sink/proposal.md) —— 仅 Python opt-in sibling sink，禁止 YAML streaming knobs。  

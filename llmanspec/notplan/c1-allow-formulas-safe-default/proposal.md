@@ -1,5 +1,7 @@
 # Proposal: allow-formulas-safe-default
 
+> 一句话描述: 将 CSV/Excel sink 与 YAML schema 的 `allow_formulas` 默认值由 `true` 反转为 `false` 以降低公式注入风险（BREAKING）。
+
 ## 与 c20/c30 关系
 
 - **不被取代**。`c20` 明确 **暂留 `allow_formulas` 在 YAML**（通常不动态改）；本 change 只翻转默认值 true→false，不把该字段迁出 YAML。

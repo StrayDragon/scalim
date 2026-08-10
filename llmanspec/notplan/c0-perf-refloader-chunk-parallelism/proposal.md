@@ -1,5 +1,7 @@
 # SUPERSEDED（已转正）
 
+> 一句话描述: 为 ref loader 分片加载引入默认串行、opt-in 并行的加速能力；已转正至 `c30-refloader-chunk-parallelism` 并实现。
+
 本 notplan 草案 **不再作为讨论/实现 SSOT**。
 
 | 项 | 值 |
