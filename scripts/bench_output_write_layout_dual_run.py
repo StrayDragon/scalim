@@ -105,7 +105,7 @@ def _run_one(layout: str, path: Path, rows: int, cols: int, batch: int) -> Dict[
 def _estimate_hold_rss_gb(rows: int, cols: int) -> float:
     # From c30 param probe: ~130 B/cell for short strings
     cells = rows * (cols + 1)
-    return (cells * 130.0) / (1024.0 ** 3)
+    return (cells * 130.0) / (1024.0**3)
 
 
 def main() -> int:

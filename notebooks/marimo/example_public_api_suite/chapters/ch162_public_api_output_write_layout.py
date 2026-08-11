@@ -102,9 +102,7 @@ def run_public_api_output_write_layout(tmp_dir: Optional[Path] = None) -> Exampl
         example_id=_EXAMPLE_ID,
         passed=passed,
         kind=EXAMPLE_KIND_ORACLE,
-        summary="hold_rows={} window_rows={} factory_ok={}".format(
-            hold_result.total_rows, win_result.total_rows, factory_ok
-        ),
+        summary="hold_rows={} window_rows={} factory_ok={}".format(hold_result.total_rows, win_result.total_rows, factory_ok),
         details=details,
     )
 
