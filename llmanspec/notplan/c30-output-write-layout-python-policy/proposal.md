@@ -2,7 +2,7 @@
 
 > 一句话描述: 用闭集 Python 策略（`OutputWriteLayout` 或等价）统一解释「行流式 / 列 HOLD / 列 WINDOW」，工厂单一入口校验互斥；不进 YAML；默认保守。
 
-> **状态（2026-08-11）**：设计稿；依赖 D1 决策矩阵口径；转正前须过 New knob gate（默认偏 Python）。
+> **状态（2026-08-11）**：已转正为 active SDD `llmanspec/changes/c30-output-write-layout-python-policy/`（Branch binding + Specs landing）；本 notplan 副本仅作指针，以 active change 为准。
 
 ## Why
 

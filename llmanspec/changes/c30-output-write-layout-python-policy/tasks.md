@@ -2,9 +2,9 @@
 
 ## 1. Specs landing
 
-- [ ] 1.1 新增 `llmanspec/specs/runtime-output-write-layout/spec.toon`（闭集 Enum、优先级、互斥 fail-fast、工厂映射、手写 sink 绕过）
-- [ ] 1.2 修订 `yaml-dsl-runtime-policy-boundary`：layout 仅 Python；composition 与非 `row_stream` fail-fast；保留/交叉引用 r176
-- [ ] 1.3 修订 `streaming-output` 或 `output-sink-fastpath`：文件 sink 工厂按 effective layout 选择（指针级，不重复实现细节）
+- [x] 1.1 新增 `llmanspec/specs/runtime-output-write-layout/spec.toon`（闭集 Enum、优先级、互斥 fail-fast、工厂映射、手写 sink 绕过）
+- [x] 1.2 修订 `yaml-dsl-runtime-policy-boundary`：layout 仅 Python；composition 与非 `row_stream` fail-fast；保留/交叉引用 r176
+- [x] 1.3 修订 `streaming-output`：文件 sink 工厂按 effective layout 选择（指针级 r1108）
 - [ ] 1.4 更新 docs capability-matrix / yaml-dsl review-checklist 对应行；excel-column-residency 指向 `OutputWriteLayout`
 
 ## 2. Enum + options 面

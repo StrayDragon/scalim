@@ -80,5 +80,5 @@
 |------|------|
 | `c10-output-write-path-decision-matrix` | D1 文档矩阵（站点 §3 已写；壳保留） |
 | `c20-streaming-column-excel-write-column-aligned` | D2 WINDOW sink 补 aligned（**主路径已实现**；壳保留动机） |
-| `c30-output-write-layout-python-policy` | D3 闭集 Python 布局策略面（设计稿） |
+| `c30-output-write-layout-python-policy` | D3 闭集 Python 布局策略面（active SDD：`llmanspec/changes/c30-output-write-layout-python-policy/`） |
 | `c40-output-write-layout-advisory` | D4 run_stats 建议、禁止静默 auto（设计稿） |
