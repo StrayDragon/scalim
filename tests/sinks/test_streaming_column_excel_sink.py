@@ -40,6 +40,37 @@ def test_streaming_column_excel_matches_column_excel_with_row_windows(tmp_path: 
     assert stream._flushed_rows == 20
 
 
+def test_streaming_column_excel_write_column_aligned_matches_write_column(tmp_path: Path) -> None:
+    field_names = ["id", "name", "score"]
+    row_ids = list(range(10))
+    via_dict = tmp_path / "dict.xlsx"
+    via_aligned = tmp_path / "aligned.xlsx"
+
+    sink_a = StreamingColumnExcelSink(str(via_dict), field_names=field_names)
+    sink_a.set_row_ids(row_ids)
+    for name in field_names:
+        sink_a.write_column(name, {r: "{}-{}".format(name, r) for r in row_ids})
+    sink_a.close()
+
+    sink_b = StreamingColumnExcelSink(str(via_aligned), field_names=field_names)
+    sink_b.set_row_ids(row_ids)
+    for name in field_names:
+        values = ["{}-{}".format(name, r) for r in row_ids]
+        sink_b.write_column_aligned(name, row_ids, values)
+    sink_b.close()
+
+    assert _read_matrix(via_dict) == _read_matrix(via_aligned)
+    assert sink_b._flushed_rows == 10
+
+
+def test_streaming_column_excel_write_column_aligned_len_mismatch(tmp_path: Path) -> None:
+    sink = StreamingColumnExcelSink(str(tmp_path / "x.xlsx"), field_names=["a"])
+    sink.set_row_ids([1, 2])
+    with pytest.raises(ValueError, match="长度不一致"):
+        sink.write_column_aligned("a", [1, 2], [10])
+    sink.discard()
+
+
 def test_streaming_column_excel_multi_batch_set_row_ids(tmp_path: Path) -> None:
     """对齐 pipeline 列模式:每 batch set_row_ids(本批) → 写满全部列."""
     field_names = ["id", "name", "score"]

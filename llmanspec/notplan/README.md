@@ -73,3 +73,12 @@
 | 目录 | 说明 |
 |------|------|
 | `c2-batch-call-by`（原 `c2-call-count-reduction-and-parallelism`） | 仅 **batch call_by**；转正门控 **不再** 依赖 EXP memo（见其 proposal + 判断链路） |
+
+## 写出策略 draft 序列（2026-08-11）
+
+| 目录 | 角色 |
+|------|------|
+| `c10-output-write-path-decision-matrix` | D1 文档矩阵（站点 §3 已写；壳保留） |
+| `c20-streaming-column-excel-write-column-aligned` | D2 WINDOW sink 补 aligned（**主路径已实现**；壳保留动机） |
+| `c30-output-write-layout-python-policy` | D3 闭集 Python 布局策略面（设计稿） |
+| `c40-output-write-layout-advisory` | D4 run_stats 建议、禁止静默 auto（设计稿） |

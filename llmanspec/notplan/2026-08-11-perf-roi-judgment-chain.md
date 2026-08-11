@@ -133,3 +133,25 @@ shape：30k×80 call_by，discard sink，无 memo。
 1. **绕开 / 推迟 `_extract_results` 行 dict**：对齐已有 `write_row_aligned` 路径，避免 batch 末再组 `Dict`（预期降分配与 GC，不增峰）。
 2. **Dense storage / fusion 临时 list 复用**：有界复用缓冲区（批生命周期），禁止跨批缓存。
 3. multi-output 仍按 E5 门控，与减分配正交。
+
+## 9. 写出策略（有手动、无自动）— draft 路线 D1–D4
+
+人类文档 SSOT 增补：`docs/doc/getting-started/excel-column-residency.md` §3。
+
+| 事实 | 说明 |
+|------|------|
+| YAML books | 强制行流式；**无** streaming/residency authoring |
+| `DemandRunRuntimeOptions.excel_column_residency` | Python 可设；仅 IR `excel`+`streaming=False` 生效 |
+| `WorkflowRunOptions.demand` | 嵌套同一 runtime；无独立字段 |
+| 自动选型 | **无**；禁止静默行↔列 / HOLD↔WINDOW |
+
+**Draft change 序列（notplan → propose）**：
+
+| ID | 主题 | 行为？ |
+|----|------|--------|
+| D1 `c10-output-write-path-decision-matrix` | 决策矩阵文档（本轮已写入站点 + 本链路） | 无 |
+| D2 `c20-streaming-column-excel-write-column-aligned` | WINDOW sink 补 `write_column_aligned` | **已实现**（`streaming_column_excel.py`） |
+| D3 `c30-output-write-layout-python-policy` | 闭集 Python 写出布局策略面 | 设计稿 |
+| D4 `c40-output-write-layout-advisory` | run_stats 建议，默认不改行为 | 设计稿 |
+
+原则：YAML 简单默认；Python 显式；自主先做 advisory，禁止静默 auto。

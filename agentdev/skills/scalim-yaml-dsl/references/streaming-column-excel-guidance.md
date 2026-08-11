@@ -15,6 +15,9 @@
 工厂: `src/scalim/execution/run_ir.py` → `_create_file_sink`。  
 Enum: `scalim.execution.ExcelColumnResidency` / `scalim.dsl.yaml_dsl.ExcelColumnResidency`。
 
+**入口矩阵（有手动、无自动）**：人类文档 `docs/doc/getting-started/excel-column-residency.md` §3；  
+`DemandRunRuntimeOptions.excel_column_residency` 对 YAML books/`output_composition` **无效且会 fail-fast**；workflow 经 `WorkflowRunOptions.demand.runtime` 嵌套同一字段。
+
 ## 何时启用哪种策略（给用户的建议）
 
 ### 用 `HOLD`（默认）当

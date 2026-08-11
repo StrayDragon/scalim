@@ -85,15 +85,73 @@ from scalim.sinks import StreamingColumnExcelSink
 按 batch：`set_row_ids(本批)` → 写满全部列 → `close()`。  
 显式传入 `ExecutionRequest.sink=...` 时优先于工厂选择。
 
-## 3. 与 YAML 的关系（重要）
+## 3. `run_demand` / workflow 能设什么？（有手动、无自动）
+
+**现状：有 Python 手动开关，没有按宽表/长表自动选 sink。**
+
+| 入口 | 能否指定 | 实际效果 |
+|------|----------|----------|
+| YAML `resources.books` / `outputs` | **不能**写 streaming / residency | 组合层强制 **行式** `streaming=True` → `ExcelSink` / `CSVSink` + `write_row_aligned` |
+| `DemandRunOptions.runtime.excel_column_residency` | **能** | 仅当 IR 文件 sink 为 `format=excel` 且 `streaming=False` 时生效；与 `output_composition`（YAML books）同开 → **fail-fast** |
+| `WorkflowRunOptions.demand` | 嵌套同一套 `DemandRunOptions.runtime` | 同上；workflow **没有**单独的 residency 字段 |
+| 纯 IR `ExecutionRequest(output=..., excel_column_residency=...)` | 完整可控 | `streaming=True` 行式；`False`+HOLD→`ColumnExcelSink`；`False`+WINDOW→`StreamingColumnExcelSink` |
+| 手写 `ExecutionRequest.sink=...` | 最高自主 | 绕过工厂；pipeline 按 `IColumnSink` / 行 sink 二选一 |
+
+工厂选择见 `src/scalim/execution/run_ir.py` → `_create_file_sink`。
+
+```mermaid
+flowchart TD
+  entry[run_demand_or_workflow_or_IR]
+  entry --> hasComp{output_composition_YAML_books?}
+  hasComp -->|yes| rowForced[force_row_streaming]
+  hasComp -->|no| irOut[OutputSpec_format_and_streaming]
+  rowForced --> rowAligned[write_row_aligned]
+  irOut --> streamQ{streaming?}
+  streamQ -->|true| rowFile[ExcelSink_or_CSVSink]
+  streamQ -->|false_csv| colCsv[ColumnCSVSink]
+  streamQ -->|false_excel| resQ{ExcelColumnResidency}
+  resQ -->|HOLD| colHold[ColumnExcelSink]
+  resQ -->|WINDOW| colWin[StreamingColumnExcelSink]
+  rowFile --> rowAligned
+```
+
+### 数据形状 × 策略（人工选型，非自动）
+
+| 形状 | 推荐 | 原因 |
+|------|------|------|
+| 日常 YAML 报表（中等行列） | 默认行流式 | 已 aligned；零配置 |
+| 大量行、列不多、落盘 CSV/xlsx | 行流式 | 峰低；写出税多在 IO / openpyxl |
+| 大宽表 Excel、IR、峰不可接受 | `streaming=False` + `WINDOW` | HOLD→WINDOW 可大幅降峰（见上文证据） |
+| 宽表但要历史列缓存语义 | 列式 HOLD | 峰高；行为兼容 |
+| 二次处理全表 `List[dict]` | `sink=None` / capture | **最吃内存**；勿当主路径 |
+| YAML books + 想 WINDOW | **不可** | fail-fast；改 IR 列式或接受行式 |
+
+### 常见误区
+
+在 YAML books 路径上设置：
+
+```python
+DemandRunOptions(
+    security=...,
+    runtime=DemandRunRuntimeOptions(
+        excel_column_residency=ExcelColumnResidency.WINDOW,
+    ),
+)
+```
+
+**不会**把 books 变成列式 WINDOW；与 `output_composition` 同开会 **fail-fast**（有意禁止假开关）。  
+WINDOW 只对「无 composition 的 IR 列式 Excel（`streaming=False`）」生效。
+
+## 4. 与 YAML 的关系（重要）
 
 - YAML authoring **没有** `excel_column_residency` / `write.streaming` 字段
 - books 路径保持行组合；宽表 YAML 峰值问题请先排查 shared-book / 执行上下文，而不是找本开关
 - Python `ResourcesPolicy` / `BookWritePolicy` 只管 book 容器语义，**不要**把列式 residency 挂到 books 上
 
-## 4. 相关链接
+## 5. 相关链接
 
 - 公共 API：`scalim.execution.ExcelColumnResidency`、`scalim.dsl.yaml_dsl.ExcelColumnResidency`、`scalim.sinks.StreamingColumnExcelSink`
 - Agent skill 指引：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`
 - 并行调参：[`parallel-modes.md`](../architecture/parallel-modes.md)
+- Perf 判断链路（写出策略草案）：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`
 - 归档证据：`llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`

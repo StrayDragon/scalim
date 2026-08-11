@@ -152,6 +152,22 @@ class StreamingColumnExcelSink(IColumnSink):
             self._next_flush_index += 1
             self._flushed_rows += 1
 
+    def _write_field_at_row(self, field: str, fidx: int, ridx: int, raw_value: CellValue) -> None:
+        pending = self._pending[ridx]
+        row_vals = self._values[ridx]
+        if pending is None or row_vals is None:
+            return
+        value = raw_value
+        if self._type_precheck is SinkTypePrecheck.ON:
+            value = ensure_sink_accepted_cell(
+                value,
+                field_id=field,
+                sink_name="StreamingColumnExcelSink",
+                accepted=is_excel_accepted_cell,
+            )
+        row_vals[fidx] = value
+        pending.discard(field)
+
     @override
     def write_column(self, field_key: str, values: ColumnValues) -> None:
         if self._closed:
@@ -169,20 +185,32 @@ class StreamingColumnExcelSink(IColumnSink):
             ridx = self._row_index.get(pk)
             if ridx is None:
                 continue
-            pending = self._pending[ridx]
-            row_vals = self._values[ridx]
-            if pending is None or row_vals is None:
+            self._write_field_at_row(field, fidx, ridx, raw_value)
+
+        self._flush_ready_prefix()
+
+    def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[CellValue]) -> None:
+        """按 `row_ids`/`values` 对齐写列,避免调用方先 `dict(zip)`。"""
+        if self._closed:
+            msg = "Sink 已关闭"
+            raise RuntimeError(msg)
+        if not self._row_ids:
+            msg = "必须先调用 `set_row_ids`"
+            raise RuntimeError(msg)
+        if len(row_ids) != len(values):
+            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            raise ValueError(msg)
+
+        field = str(field_key)
+        if field not in self._field_index:
+            raise KeyError(field)
+
+        fidx = self._field_index[field]
+        for pk, raw_value in zip(row_ids, values):
+            ridx = self._row_index.get(pk)
+            if ridx is None:
                 continue
-            value = raw_value
-            if self._type_precheck is SinkTypePrecheck.ON:
-                value = ensure_sink_accepted_cell(
-                    value,
-                    field_id=field,
-                    sink_name="StreamingColumnExcelSink",
-                    accepted=is_excel_accepted_cell,
-                )
-            row_vals[fidx] = value
-            pending.discard(field)
+            self._write_field_at_row(field, fidx, ridx, raw_value)
 
         self._flush_ready_prefix()
 
