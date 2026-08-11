@@ -2,7 +2,7 @@
 
 > 一句话描述: 在 `run_stats` / bench 观测中输出写出布局 **建议**（如宽表可试 IR 列式 WINDOW），默认不改写出行为；opt-in 自动切换另案且须 RSS 门控。
 
-> **状态（2026-08-11）**：设计稿；D3 `OutputWriteLayout` 已落地（c30）；禁止静默 auto。skills/upgrade/ch162 已指向本草案。
+> **状态（2026-08-11）**：已迁入草案 change [`c40-output-write-layout-advisory`](../../changes/c40-output-write-layout-advisory/proposal.md)（含 research HTML）。本 notplan 保留为索引；正式化走 `/llman-sdd-propose`。D3 `OutputWriteLayout` 已落地（c30）；禁止静默 auto。
 
 ## Why
 

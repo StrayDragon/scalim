@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research: Output write layout advisory（c40）</title>
+  <style>
+    :root {
+      --bg: #f7f6f3;
+      --fg: #1c1b19;
+      --muted: #5c574f;
+      --card: #ffffff;
+      --line: #ddd8ce;
+      --accent: #0b5fff;
+      --ok: #1b7f4a;
+      --warn: #9a6700;
+      --danger: #b42318;
+      --hold: #9a6700;
+      --window: #1b7f4a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.55 "IBM Plex Sans", "Noto Sans SC", system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 8px; }
+    h2 { font-size: 1.2rem; margin: 36px 0 12px; }
+    h3 { font-size: 1rem; margin: 0 0 8px; }
+    p, li { color: var(--fg); }
+    .muted { color: var(--muted); }
+    .lead { font-size: 1.05rem; color: var(--muted); margin: 0 0 20px; }
+    .callout {
+      border: 1px solid var(--line);
+      background: var(--card);
+      padding: 14px 16px;
+      margin: 16px 0;
+    }
+    .callout.ok { border-left: 4px solid var(--ok); }
+    .callout.warn { border-left: 4px solid var(--warn); }
+    .callout.info { border-left: 4px solid var(--accent); }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 720px) { .grid3 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 14px;
+    }
+    .pill {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+    }
+    .pill.hold { color: var(--hold); border-color: #e6d3a3; }
+    .pill.window { color: var(--window); border-color: #b7dfc7; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #efeee9; font-weight: 600; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 20px; }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 14px;
+    }
+    .stat .v { font-size: 1.5rem; font-weight: 650; }
+    .stat .l { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .chart {
+      background: var(--card);
+      border: 1px solid var(--line);
+      padding: 16px;
+      margin: 12px 0;
+    }
+    .chart-title { font-weight: 600; margin-bottom: 12px; }
+    .bar-row { display: grid; grid-template-columns: 110px 1fr 52px; gap: 10px; align-items: center; margin: 8px 0; }
+    .bar-track { height: 18px; background: #eceae4; position: relative; }
+    .bar-fill { height: 100%; background: var(--accent); }
+    .bar-fill.ok { background: var(--ok); }
+    pre {
+      margin: 0;
+      padding: 12px;
+      background: #1c1b19;
+      color: #f3f0e8;
+      overflow: auto;
+      font: 12.5px/1.45 "IBM Plex Mono", ui-monospace, monospace;
+    }
+    code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.92em; }
+    .arrow { color: var(--muted); padding: 0 8px; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>写出布局：建议而不自动改</h1>
+  <p class="lead">
+    Change <code>c40-output-write-layout-advisory</code> 研究页（由 Cursor canvas 转静态 HTML）。
+    证据：<code>scripts/bench_output_write_layout_dual_run.py --preset medium</code>（2026-08-11）。
+  </p>
+
+  <div class="callout info">
+    <strong>一句话</strong>：宽表 Excel 用 WINDOW 往往更省内存；默认不能偷偷改写出方式。
+    系统只「告诉你」，你再显式设 <code>OutputWriteLayout.COLUMN_WINDOW</code>。
+  </div>
+
+  <h2>1. 三种装车方式</h2>
+  <div class="grid3">
+    <div class="card">
+      <h3><span class="pill">row_stream</span> 一行一行写</h3>
+      <p class="muted">YAML books / 多表组合只能走这条。不是列式 WINDOW 的优化对象。</p>
+    </div>
+    <div class="card">
+      <h3><span class="pill hold">column_hold</span> 整列先攒齐</h3>
+      <p class="muted">默认列式 Excel：每列整表先在内存，宽表峰值高。</p>
+    </div>
+    <div class="card">
+      <h3><span class="pill window">column_window</span> 按窗刷列</h3>
+      <p class="muted">列式 Excel 按行窗推进；峰值通常更低，墙钟往往差不多。</p>
+    </div>
+  </div>
+
+  <h2>2. 为什么这样做</h2>
+  <ul>
+    <li><strong>问题</strong>：宽表 + HOLD 顶内存；WINDOW 更省，但改路径影响峰值时机与可复现性。</li>
+    <li><strong>错误做法</strong>：运行时静默 HOLD↔WINDOW。</li>
+    <li><strong>梯子</strong>：L0 显式 Enum（c30 已落地）→ L1 建议（本 change）→ L2 opt-in auto（另案）→ L3 默认 auto（不做）。</li>
+  </ul>
+  <div class="callout warn">
+    <strong>原则</strong>：信息够做「建议」，不够做「默认自动」。错切比少建议更贵。
+  </div>
+
+  <h2>3. 若改成 WINDOW，正确性有问题吗？</h2>
+  <div class="callout ok">
+    <strong>短答</strong>：在<strong>合法 IR 列式路径</strong>下，业务格子（行×列取值）与 HOLD
+    <strong>等价</strong>；不是 xlsx 文件字节相等。非法组合会 <strong>fail-fast</strong>，不会静默写出假开关结果。
+  </div>
+  <table>
+    <thead>
+      <tr><th>维度</th><th>结论</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>业务格子 / 行数</td>
+        <td>应等价</td>
+        <td>测试：HOLD vs WINDOW 矩阵对拍；双跑断言 <code>rows_equal</code>。</td>
+      </tr>
+      <tr>
+        <td>xlsx 字节</td>
+        <td>不必相等</td>
+        <td>write_only / 压缩 / 元数据不同；对拍用业务列，勿比文件 hash。</td>
+      </tr>
+      <tr>
+        <td>YAML books / composition</td>
+        <td>不能靠 WINDOW「修」</td>
+        <td>组合层强制行流；与 WINDOW 同开 → fail-fast。要 WINDOW 须迁 IR 列式。</td>
+      </tr>
+      <tr>
+        <td>行式 <code>streaming=True</code></td>
+        <td>非法</td>
+        <td>WINDOW 仅列式 excel + 非 streaming；否则 fail-fast。</td>
+      </tr>
+      <tr>
+        <td>调用契约差异</td>
+        <td>更严</td>
+        <td>WINDOW：每窗 <code>set_row_ids</code> 后须写满列；未齐备 → close 报错（防半截表）。</td>
+      </tr>
+      <tr>
+        <td>一次 set 全量行</td>
+        <td>仍「正确」但省内存差</td>
+        <td>会预分配大壳；峰值收益差——应 batch 追加 <code>set_row_ids</code>。</td>
+      </tr>
+      <tr>
+        <td>公式 / 样式等高级 Excel</td>
+        <td>非本开关承诺</td>
+        <td>列式 sink 路径以单元格值为准；勿假设与某 GUI 模板字节级一致。</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted">
+    因此：advisory 在 <code>safe=true</code> 时推荐的「显式改 WINDOW」是<strong>性能旋钮</strong>，不是正确性赌博；
+    <code>safe=false</code>（如 composition）只提示迁路径，禁止写「设 WINDOW 就好」。
+  </p>
+
+  <h2>4. 代码例子</h2>
+  <div class="grid3" style="grid-template-columns: 1fr 1fr;">
+    <div class="card">
+      <h3>默认（不设）</h3>
+      <pre># 不设 output_write_layout
+# excel + streaming=False + HOLD
+# → effective = column_hold</pre>
+    </div>
+    <div class="card">
+      <h3>显式 WINDOW</h3>
+      <pre>from scalim.dsl.yaml_dsl import (
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    OutputWriteLayout,
+    run,
+)
+
+run(
+    "demand.yaml",
+    options=DemandRunOptions(
+        runtime=DemandRunRuntimeOptions(
+            output_write_layout=
+              OutputWriteLayout.COLUMN_WINDOW,
+        ),
+    ),
+)</pre>
+    </div>
+  </div>
+
+  <h2>5. medium 双跑效果</h2>
+  <div class="stats">
+    <div class="stat"><div class="v">2.5–4.9×</div><div class="l">HOLD 峰值相对 WINDOW</div></div>
+    <div class="stat"><div class="v">~+2%</div><div class="l">WINDOW 墙钟相对 HOLD</div></div>
+    <div class="stat"><div class="v">3/3</div><div class="l">形状建议试 WINDOW</div></div>
+  </div>
+
+  <div class="chart">
+    <div class="chart-title">峰值 RSS 比：HOLD / WINDOW（越大越该考虑 WINDOW）</div>
+    <div class="bar-row"><span>m_20k_50</span><div class="bar-track"><div class="bar-fill ok" style="width:50.5%"></div></div><span>2.46×</span></div>
+    <div class="bar-row"><span>m_50k_50</span><div class="bar-track"><div class="bar-fill ok" style="width:100%"></div></div><span>4.87×</span></div>
+    <div class="bar-row"><span>m_20k_100</span><div class="bar-track"><div class="bar-fill ok" style="width:72.7%"></div></div><span>3.54×</span></div>
+    <p class="muted" style="margin:8px 0 0;font-size:12px;">Source: .tmp/evidence/c40-write-layout-dual-run/dual_run.json · medium · median</p>
+  </div>
+
+  <div class="chart">
+    <div class="chart-title">墙钟比：WINDOW / HOLD（≈1 表示几乎不慢）</div>
+    <div class="bar-row"><span>m_20k_50</span><div class="bar-track"><div class="bar-fill" style="width:96%"></div></div><span>1.019×</span></div>
+    <div class="bar-row"><span>m_50k_50</span><div class="bar-track"><div class="bar-fill" style="width:97%"></div></div><span>1.025×</span></div>
+    <div class="bar-row"><span>m_20k_100</span><div class="bar-track"><div class="bar-fill" style="width:97%"></div></div><span>1.022×</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>形状</th><th>规模</th><th>RSS H/W</th><th>墙钟 W/H</th><th>结论</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>m_20k_50</td><td>2万×50（~102 万格）</td><td>2.46×</td><td>1.019×</td><td>建议试 WINDOW</td></tr>
+      <tr><td>m_50k_50</td><td>5万×50（~255 万格）</td><td>4.87×</td><td>1.025×</td><td>建议试 WINDOW</td></tr>
+      <tr><td>m_20k_100</td><td>2万×100（~202 万格）</td><td>3.54×</td><td>1.022×</td><td>建议试 WINDOW</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. L1 生效后你会看到什么（假想）</h2>
+  <div class="card">
+    <p>
+      <span class="pill">current</span> <code>column_hold</code>
+      <span class="arrow">→</span>
+      <span class="pill window">suggested</span> <code>column_window</code>
+      &nbsp; <span class="pill">safe=true</span>
+      &nbsp; <span class="pill">wide_excel_peak_risk</span>
+    </p>
+    <pre>{
+  "suggested": "column_window",
+  "current_effective": "column_hold",
+  "reason_code": "wide_excel_peak_risk",
+  "reason_detail": "n_fields*n_rows exceeds threshold",
+  "action": "set DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW)",
+  "safe": true
+}</pre>
+    <p class="muted">这次写出不变；下次你复制 action 显式改 options 才变。</p>
+  </div>
+
+  <h2>7. 挂点草案（研究）</h2>
+  <table>
+    <thead>
+      <tr><th>挂点</th><th>现状</th><th>建议</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>run_stats</code> hints / notes</td>
+        <td><code>build_run_stats</code> 已有 <code>notes</code></td>
+        <td>首选 typed <code>hints.write_layout</code>；bench / opt-in</td>
+      </tr>
+      <tr>
+        <td><code>include_advisor_hints</code></td>
+        <td>performance 阶段占比文本 hints</td>
+        <td>复用「默认关」哲学；write-layout 用 structured JSON</td>
+      </tr>
+      <tr>
+        <td>baseline 默认</td>
+        <td>—</td>
+        <td>关闭；零行为变化</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>8. 初稿阈值候选</h2>
+  <p>
+    <code>wide_excel_peak_risk</code>：IR excel + effective <code>column_hold</code> +
+    <code>n_fields * n_rows &gt;= 1_000_000</code> → 建议 <code>column_window</code>，<code>safe=true</code>。
+    （来自 medium 双跑：百万格量级已出现 2.5×+ RSS 差；propose 时可改为「格数 + peak_mb」双条件。）
+  </p>
+
+  <footer>
+    Generated for llmanspec change research · mirrors canvas
+    <code>output-write-layout-advisory-explainer.canvas.tsx</code> · do not treat as live contract.
+  </footer>
+</main>
+</body>
+</html>
