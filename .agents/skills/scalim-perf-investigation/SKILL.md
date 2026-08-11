@@ -85,19 +85,25 @@ ROI 草案应随 proposal 放入 `llmanspec/changes/<change-id>/`。
 |---|---|---|
 | A: main_rows(list) consume-clear | 内存杠杆高，RSS 随 batch 递减 | `pipeline.py:_maybe_consume_clear_main_rows_list` |
 | B: RowRelease hotpath 减少 keys 拷贝 | ~16% release 子阶段加速 | `context.py:delete_row_from_all_fields` 延迟删除空字段 |
+| ExcelSink write_row_aligned 索引缓存 | 已合入；真 A/B 增量 ~2%（2026-08-11） | `sinks/_internal/excel.py`（`527c106f`） |
 
-### ❌ 已否决
+### ❌ 已否决 / 不推进
 
 | 调研 | 原因 |
 |---|---|
 | call_by kwargs → positionalize | 上限 ~1%，用户签名多为 pos-or-kw |
+| `call_by` memo 产品化 | **内存优先**：uniq>cache 时变慢且 RSS↑；不作默认/DSL 路线（判断链路 2026-08-11） |
+| 跨批 overlap load_ref 缓存 | 与批次边界释放冲突；notplan 已删 |
 
-### 🔍 探索中
+### 🔍 探索中（内存友好）
 
-| 调研 | 状态 | 对应 change |
+| 调研 | 状态 | 指针 |
 |---|---|---|
-| ExcelSink write_row_aligned 内置优化 | 合成复现 2-3% 提升，需真实数据验证 | `c10-excel-sink-write-row-aligned` |
-| dep tuple cardinality 探针 | 框架内已有低开销统计点位（`call_by_dep_cardinality.py`），由 spec `execution-call-by-memoization` 跟踪 | N/A |
+| 显式 multi-output / call group | notplan；行内减调用、默认不增峰 | `llmanspec/notplan/c0-call-by-multi-output-fusion/` |
+| 热路径减临时对象 | 待 memray；禁止引入缓存 | 判断链路 §5 P2 |
+| batch call_by（opt-in） | notplan；门控已去 memo 前置 | `llmanspec/notplan/c2-batch-call-by/` |
+
+完整判断链路：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`
 
 ## Gotchas
 

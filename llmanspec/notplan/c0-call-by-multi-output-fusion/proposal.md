@@ -1,6 +1,8 @@
 > 一句话描述: 在保持 row-mode 用户函数形态不变的前提下，通过 multi-output（一次调用返回多个字段）与 fusion（多字段共享一次调用结果）减少派生字段的 Python 调用次数。
 
 > **边界（勿与已落地能力混淆）**：`c20` compute-expr rowwise fusion 与 `c10` write-precompute **已在主路径**（见 `notplan/README.md`「已落地」）。本提案只覆盖 **显式** multi-output / call group（多次 `call_by` 合并为一次 row-mode 调用），不是那些能力的缺口补丁。
+>
+> **状态（2026-08-11）**：在「内存优先、避开 memo」路线下，本草案为 **perf notplan 首选**（行内减调用、默认不增峰）。完整判断链路见 `../2026-08-11-perf-roi-judgment-chain.md`。
 
 ## Why
 

@@ -38,9 +38,26 @@
 | `c0-trusted-mode-defense-in-depth` | 已转正 → `2026-04-28-c3-security-hardening-yaml-dsl`；目录已删 |
 | `c0-yaml-dsl-ensure-keys`（原 `c0-yaml-dsl-ensure-keys-defaults`） | **ensure_keys only**：field `default` 已落地并移出范围；见其 proposal 状态块 |
 
-## 已移出候选池（目录已删，2026-08-10）
+## Perf ROI 判断链路（必读）
+
+内存优先 + 2026-08-11 采样结论的完整决策记录：
+
+- [`2026-08-11-perf-roi-judgment-chain.md`](./2026-08-11-perf-roi-judgment-chain.md)
+
+**立场摘要**：不产品化 `call_by` memo；不推进跨批隐式 overlap cache；优先 multi-output / 减分配 / 更早释放。
+
+## 已移出候选池（目录已删）
 
 不再保留草案正文，避免与「可转正候选」混淆：
+
+### 2026-08-11（perf / 内存优先）
+
+| 原目录 | 原因 |
+|--------|------|
+| `c999-overlap-optimization` | 跨批缓存与内存优先冲突；无「不增峰」证据（见判断链路 §3） |
+| `c1-runtime-performance-profiles` | 等待条件已被主路径覆盖；`speed` 档与内存优先相悖 |
+
+### 2026-08-10
 
 | 原目录 | 原因 |
 |--------|------|
@@ -55,4 +72,4 @@
 
 | 目录 | 说明 |
 |------|------|
-| `c2-batch-call-by`（原 `c2-call-count-reduction-and-parallelism`） | 仅保留 **batch call_by** 短页；memo/fusion/并行已拆出或已落地（见其 proposal） |
+| `c2-batch-call-by`（原 `c2-call-count-reduction-and-parallelism`） | 仅 **batch call_by**；转正门控 **不再** 依赖 EXP memo（见其 proposal + 判断链路） |
