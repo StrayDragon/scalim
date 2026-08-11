@@ -99,8 +99,9 @@ ROI 草案应随 proposal 放入 `llmanspec/changes/<change-id>/`。
 
 | 调研 | 状态 | 指针 |
 |---|---|---|
-| 显式 multi-output / call group | notplan；行内减调用、默认不增峰 | `llmanspec/notplan/c0-call-by-multi-output-fusion/` |
-| 热路径减临时对象 | 待 memray；禁止引入缓存 | 判断链路 §5 P2 |
+| 显式 multi-output / call group | 有边界：共享重算 ~12.5×；薄逻辑可更慢（E5） | `llmanspec/notplan/c0-call-by-multi-output-fusion/` + 判断链路 §8 |
+| 绕开 `_extract_results` 行 dict / aligned write | memray #1 热点 ~117MB 累计（E6） | `batch/executor.py:399`；判断链路 §8 |
+| Dense/fusion 临时缓冲复用 | memray #3/#4 | `fusion.py` / `context._DenseFieldStorage` |
 | batch call_by（opt-in） | notplan；门控已去 memo 前置 | `llmanspec/notplan/c2-batch-call-by/` |
 
 完整判断链路：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`

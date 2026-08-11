@@ -94,3 +94,42 @@
 - Skill：`.claude/skills/scalim-perf-investigation/SKILL.md`（索引已按本次结论更新）
 - notplan 索引：`llmanspec/notplan/README.md`
 - 已落地 perf：`c10-write-precompute` / `c20-rowwise-fusion` / `c30-refloader-chunk-parallelism` / consume-clear / row-release
+
+## 8. 续采（2026-08-11，P1 multi-output + P2 memray）
+
+### E5 — multi-output ROI 边界
+
+路径：`.tmp/evidence/multi_output_call_group/20260811_114514/`  
+脚本：`.tmp/repro/multi_output_call_group/repro-multi-output-call-group.py`
+
+| 子实验 | 结论 |
+|--------|------|
+| 薄逻辑 micro（50k×40）：separate vs multi tuple/dict | **multi 更慢**（tuple ~0.87×，dict ~0.31×）— 打包/解包压过调用节省 |
+| 共享重算 micro（20k×40，body×20）：dup-heavy vs multi once | **~12.5×**；RSS Δ≈0；`checksum_ok` |
+| Engine 现网（50k×40 call_by，fusion_groups=1） | **2M calls / 7.4s**；RSS Δ ~176MB（含 InMemory sink）；**c20 不减 call_by 次数** |
+
+**判断**：multi-output **只**在「同行多字段共享昂贵中间结果」时有墙钟 ROI；薄字段纯减调用不够。转正门控应要求 **共享体重算 shape** 证据，而非仅调用次数。
+
+### E6 — wide compute memray（减分配方向）
+
+路径：`.tmp/evidence/wide_compute_alloc/20260811_114549/`（`memray.bin` / `flamegraph.html` / `table.html`）  
+shape：30k×80 call_by，discard sink，无 memo。
+
+| 指标 | 值 |
+|------|-----|
+| wall | ~8.4s；calls 2.4M |
+| RSS Δ | ~12.6 MB |
+| memray peak | ~38 MB；累计分配 ~231 MB / 114k allocs |
+
+**Top alloc by size（框架内）**：
+
+1. `batch/executor.py:_extract_results` ~117 MB — 每行新建 `dict` 装全 target 字段（即使用 discard sink，batch 路径仍 materialize `List[RowData]`）
+2. `dataclasses._create_fn` ~38 MB — 导入/dataclass 构造噪声（次要）
+3. `compute/fusion.py:_execute_fused_dense` ~22 MB — 融合路径上的临时 `args_list`/`dep_args` 等
+4. `context._DenseFieldStorage.__init__` ~20 MB — 每字段 `values=[None]*n` + `bytearray`
+
+**判断（P2 优先杠杆，内存友好）**：
+
+1. **绕开 / 推迟 `_extract_results` 行 dict**：对齐已有 `write_row_aligned` 路径，避免 batch 末再组 `Dict`（预期降分配与 GC，不增峰）。
+2. **Dense storage / fusion 临时 list 复用**：有界复用缓冲区（批生命周期），禁止跨批缓存。
+3. multi-output 仍按 E5 门控，与减分配正交。
