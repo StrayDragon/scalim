@@ -2,7 +2,8 @@
 depends_on: []
 branch: sdd/c30-output-write-layout-python-policy
 base_sha: b3336a82238bea802ac481c71413a0c9a5b92730
-checkpointed: false
+checkpointed: true
+checkpoint_sha: b3336a82238bea802ac481c71413a0c9a5b92730
 ---
 
 # Output write layout Python policy
