@@ -24,11 +24,16 @@ Enum: `scalim.execution.OutputWriteLayout`（推荐）以及迁移窗 `ExcelColu
 |------|--------------------------|------|
 | YAML books / composition | （不设；强制行流） | 设 `COLUMN_*` → fail-fast |
 | 大量行、列不多、CSV/xlsx 行文件 | 默认 / `ROW_STREAM` | 峰本就低 |
-| 宽表列式 IR Excel、peak 不可接受 | `COLUMN_WINDOW` | 证据：HOLD→WINDOW 可大幅降 RSS |
+| 宽表列式 IR Excel、peak 不可接受 | `COLUMN_WINDOW` | 证据：HOLD→WINDOW 可大幅降 RSS（见下表） |
 | 宽表但要列缓存语义 | `COLUMN_HOLD` | 峰高；兼容历史 |
 | 二次 `List[dict]` / `sink=None` | n/a | 最吃内存；勿当主路径 |
 
-运行时信息**够做建议、不够默认 auto**——见 notplan `c40-output-write-layout-advisory`。
+**启发式**：`n_fields × n_rows ≳ 1e6` 且仍是列式 HOLD → 建议显式 `COLUMN_WINDOW`。  
+运行时信息**够做人工建议、不够默认 auto**；**无 run_stats 自动 hint**（L1 搁置）——见 notplan `c40-output-write-layout-advisory`。
+
+## 正确性
+
+合法 IR 列式路径下 HOLD↔WINDOW **业务格子等价**；xlsx 字节不必相等；books/composition 与 WINDOW 同开 → fail-fast。详表见 upgrade `2026-08-11-output-write-layout.md`。
 
 ## 何时启用哪种策略（给用户的建议）
 
@@ -41,7 +46,7 @@ Enum: `scalim.execution.OutputWriteLayout`（推荐）以及迁移窗 `ExcelColu
 ### 用 `WINDOW` 当（须同时满足）
 
 1. `OutputSpec.format=excel` 且 `streaming=False`（列式 IR 文件 sink）
-2. 宽表/高行导致 `pre_close`/peak 不可接受（经验：百列 × 数万行起更明显）
+2. 宽表/高行导致 `pre_close`/peak 不可接受（经验：约百万格起更明显；或实测峰不可接受）
 3. **无** `output_composition`（非 YAML books 组合）
 
 ```python
@@ -69,13 +74,20 @@ DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW)
 
 ## Agent 硬边界
 
-1. **MUST NOT** 发明 YAML `write.streaming` / residency 字段
+1. **MUST NOT** 发明 YAML `write.streaming` / residency / layout 字段
 2. YAML Excel 峰值 ≠ 缺 WINDOW；先说明行 sink 路径
 3. 推荐 WINDOW 前确认是列式 IR（`streaming=False`）
 4. shared-book **不能**插 StreamingColumn
+5. **MUST NOT** 假装有 auto / run_stats hint；只给显式 Python options
 
 ## 证据口径
 
-| shape | hold peak | multibatch WINDOW peak |
-|---|---:|---:|
-| 100k×300 | ~3.59GB | **~0.12GB**（~97%） |
+| shape | hold peak / 比 | WINDOW | 备注 |
+|---|---:|---:|---|
+| 100k×300（归档） | ~3.59GB | **~0.12GB**（~97%） | 多 batch WINDOW |
+| m_20k_50（medium 双跑） | RSS H/W **2.46×** | — | 墙钟 W/H ≈1.02；行数相等 |
+| m_50k_50 | **4.87×** | — | 同上 |
+| m_20k_100 | **3.54×** | — | 同上 |
+
+校准入口：`uv run python scripts/bench_output_write_layout_dual_run.py --preset medium`（产物在 `.tmp/`，勿提交）。  
+通俗页：`llmanspec/notplan/c40-output-write-layout-advisory/research/write-layout-advisory-explainer.html`。

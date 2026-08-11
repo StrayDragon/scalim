@@ -20,7 +20,9 @@
 | **C. IR 列式 WINDOW（opt-in）** | 同上 + `ExcelColumnResidency.WINDOW` | `StreamingColumnExcelSink` | 按行窗刷盘释放；宽表 peak 可大幅下降 |
 
 证据口径（列 HOLD vs 多 batch WINDOW，100k×300）：hold peak ≈ **3.59GB** → window peak ≈ **0.12GB**（约 97%）。  
-产物在本地 `.tmp/evidence/`（勿提交）。
+medium 双跑（约 2万–5万行 × 50–100 列）：峰值 RSS 比 HOLD/WINDOW ≈ **2.5–4.9×**，墙钟差约 **2%**，业务行数一致。  
+产物在本地 `.tmp/evidence/`（勿提交）；脚本：`scripts/bench_output_write_layout_dual_run.py`。  
+通俗说明：`llmanspec/notplan/c40-output-write-layout-advisory/research/write-layout-advisory-explainer.html`。
 
 ## 2. 策略怎么选
 
@@ -28,15 +30,17 @@
 
 - 列数/行数不大，或机器内存充足
 - 需要与历史 `ColumnExcelSink` 行为完全一致
-- **不要改默认**；未设置 residency 时即为 `HOLD`
+- **不要改默认**；未设置 residency / layout 时即为 `HOLD` / `column_hold`
 
 ### 何时启用：`WINDOW`
 
 同时满足：
 
 1. 使用 **列式** Excel：`format=excel` 且 `streaming=False`（或框架工厂走该分支）
-2. 宽表 / 高行数导致 `pre_close` / peak RSS 不可接受
+2. 宽表 / 高行数导致 `pre_close` / peak RSS 不可接受（启发式：约 **`n_fields × n_rows ≳ 1e6`** 时可优先考虑）
 3. **没有** `output_composition`（不是 YAML books 多输出行组合）
+
+**没有自动切换，也没有默认 `run_stats` 布局 hint**——由调用方显式设 `OutputWriteLayout.COLUMN_WINDOW`（或迁移窗 `ExcelColumnResidency.WINDOW`）。
 
 调用示例：
 
@@ -67,6 +71,14 @@ req = ExecutionRequest(
 
 pipeline 列模式会每批 `set_row_ids(本批)` 再写满列——与 WINDOW sink 的多 batch 语义对齐。
 
+### 正确性：改 WINDOW 会不会写错？
+
+| 维度 | 结论 |
+|---|---|
+| 合法 IR 列式路径 | HOLD↔WINDOW **业务格子等价**（对拍用业务列，勿比 xlsx 字节） |
+| YAML books / composition、行式 `streaming=True` | 与 WINDOW 同开 → **fail-fast** |
+| 某窗列未写齐 | WINDOW `close` **更严**报错 |
+
 ### 何时不要用 `WINDOW`
 
 | 场景 | 原因 |
@@ -90,7 +102,7 @@ from scalim.sinks import StreamingColumnExcelSink
 
 ## 3. `run_demand` / workflow 能设什么？（有手动、无自动）
 
-**现状：有 Python 手动开关，没有按宽表/长表自动选 sink。**
+**现状：有 Python 手动开关，没有按宽表/长表自动选 sink，也没有默认写出布局 hint。**
 
 | 入口 | 能否指定 | 实际效果 |
 |------|----------|----------|
@@ -156,6 +168,8 @@ WINDOW 只对「无 composition 的 IR 列式 Excel（`streaming=False`）」生
 - 公共 API：`scalim.execution.OutputWriteLayout`、`ExcelColumnResidency`、`scalim.dsl.yaml_dsl` 同名导出、`scalim.sinks.StreamingColumnExcelSink`
 - Spec：`llmanspec/specs/runtime-output-write-layout/`
 - Agent skill 指引：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`
+- Upgrade 卡：`agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-11-output-write-layout.md`
 - 并行调参：[`parallel-modes.md`](../architecture/parallel-modes.md)
 - Perf 判断链路：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`
+- Advisory 研究（搁置实现）：`llmanspec/notplan/c40-output-write-layout-advisory/`
 - 归档证据：`llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`
