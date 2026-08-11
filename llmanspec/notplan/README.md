@@ -81,4 +81,4 @@
 | `c10-output-write-path-decision-matrix` | D1 文档矩阵（站点 §3 已写；壳保留） |
 | `c20-streaming-column-excel-write-column-aligned` | D2 WINDOW sink 补 aligned（**主路径已实现**；壳保留动机） |
 | `c30-output-write-layout-python-policy` | D3 闭集 Python 布局策略面（**已归档** `changes/archive/2026-08-11-c30-...`） |
-| `c40-output-write-layout-advisory` | D4 run_stats 建议、禁止静默 auto（**草案 change** + research HTML；阈值+挂点已写入 proposal） |
+| `c40-output-write-layout-advisory` | D4 run_stats 建议 **搁置**；调优走 docs/skills；research HTML 留在 notplan |

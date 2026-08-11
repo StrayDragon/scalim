@@ -152,6 +152,6 @@ shape：30k×80 call_by，discard sink，无 memo。
 | D1 `c10-output-write-path-decision-matrix` | 决策矩阵文档（本轮已写入站点 + 本链路） | 无 |
 | D2 `c20-streaming-column-excel-write-column-aligned` | WINDOW sink 补 `write_column_aligned` | **已实现**（`streaming_column_excel.py`） |
 | D3 `c30-output-write-layout-python-policy` | 闭集 Python 写出布局策略面 | **已归档** `archive/2026-08-11-c30-...` |
-| D4 `c40-output-write-layout-advisory` | run_stats 建议，默认不改行为 | **草案 change**（阈值校准 + 挂点 + research HTML） |
+| D4 `c40-output-write-layout-advisory` | run_stats 建议，默认不改行为 | **搁置实现**；调优知识 → docs/skills；research HTML 在 notplan |
 
 原则：YAML 简单默认；Python 显式；自主先做 advisory，禁止静默 auto。

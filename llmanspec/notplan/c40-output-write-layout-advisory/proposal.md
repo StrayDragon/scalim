@@ -2,12 +2,14 @@
 
 > 一句话描述: 在 `run_stats` / bench 观测中输出写出布局 **建议**（如宽表可试 IR 列式 WINDOW），默认不改写出行为；opt-in 自动切换另案且须 RSS 门控。
 
-> **状态（2026-08-11）**：已迁入草案 change [`c40-output-write-layout-advisory`](../../changes/c40-output-write-layout-advisory/proposal.md)（含 research HTML）。本 notplan 保留为索引；正式化走 `/llman-sdd-propose`。D3 `OutputWriteLayout` 已落地（c30）；禁止静默 auto。
+> **状态（2026-08-11）**：**搁置实现**。L1 `run_stats` hint / auto **不做**；调优知识改走 **docs + `agentdev/skills`**（quick）。草案 change 已撤回。研究页仍保留：[`research/write-layout-advisory-explainer.html`](research/write-layout-advisory-explainer.html)。D3 `OutputWriteLayout` 已落地（c30）。
 
 ## Why
 
 内存优先下「自主」不应等于静默改 sink：误切 HOLD↔WINDOW / 行↔列会改变峰与语义可解释性。  
 需要先有 **可观测建议**，让运维/集成方自己决定是否改 `DemandRunRuntimeOptions.output_write_layout` / IR。
+
+**现行交付偏好**：用文档/skills 让人与 agent **显式选型**，暂不接 run_stats 机器 hint。
 
 ## 信息完备性（额外探索结论）
 
@@ -20,9 +22,9 @@
 
 **结论**：信息够 L1 **advisory**，不够默认 **auto**。错切代价不对称；YAML books 无 WINDOW 位（最多建议迁 IR）。
 
-梯子：L0 显式 Enum（c30）→ L1 建议（本草案）→ L2 opt-in auto（另案+门控）→ L3 默认 auto（不做）。
+梯子：L0 显式 Enum（c30）→ L1 建议（本草案，**搁置**）→ L2 opt-in auto（另案+门控）→ L3 默认 auto（不做）。
 
-## What Changes（设计方向）
+## What Changes（设计方向 — 搁置）
 
 ### L1 建议字段 schema（草案）
 
@@ -52,36 +54,19 @@
 
 **绝不**在默认路径改 sink。
 
-启发式（初稿，须校准）：
-- IR excel + effective `column_hold` + `n_fields * n_rows` 超阈值 → `suggested=column_window`，`safe=true`
-- composition/books → `suggested=null`，`reason_code=composition_row_only`，`action` 指向迁 IR，`safe=false`
-- 已是 `column_window` 或显式 layout → `already_optimal`
-- 行数未知且无 peak 观测 → `insufficient_shape`（可只在 bench 双跑后升级）
+启发式（初稿，须校准；现作文档阈值参考）：
+- IR excel + effective `column_hold` + `n_fields * n_rows` 超约 **百万格** → 可建议 `column_window`
+- composition/books → 勿建议 WINDOW；引导迁 IR
+- 已是 `column_window` 或显式 layout → 已最优
+- 行数未知且无 peak 观测 → 信息不足
 
 ### 小样本双跑实验（不进主路径）
 
-目的：用硬证据校准启发式阈值，而不是在热路径猜。
-
 | 项 | 约定 |
 |----|------|
-| 入口 | 离线脚本 `scripts/bench_output_write_layout_dual_run.py`（`uv run python ... --preset small|medium`）；**禁止**默认 `run_ir` 双写出 |
-| 样本 | 同 IR：`COLUMN_HOLD` vs `COLUMN_WINDOW`；rows/cols 取自探针矩阵（≤10GB） |
-| 指标 | median 墙钟、peak RSS、行数相等、xlsx 业务列对拍（非字节） |
-| 产出 | `.tmp/evidence/c40-write-layout-dual-run/*.json` + 建议阈值候选 |
-| 通过标准 | WINDOW RSS 显著更优且行数一致 → 强化 `wide_excel_peak_risk`；否则提高阈值或改 reason |
-
-伪流程：
-
-```text
-for shape in shapes:
-  run(layout=HOLD)  → wall_h, rss_h, rows_h
-  run(layout=WINDOW)→ wall_w, rss_w, rows_w
-  assert rows_h == rows_w
-  record ratio rss_h/rss_w, wall_w/wall_h
-calibrate threshold for L1 hint
-```
-
-日后 L2 auto（不在本草案）：用户 opt-in + RSS 不劣于基线 + 值等价 + 可回滚。
+| 入口 | 离线脚本 `scripts/bench_output_write_layout_dual_run.py`（`--preset small|medium`） |
+| 产出 | `.tmp/evidence/c40-write-layout-dual-run/*.json`（不入库） |
+| medium 摘要 | RSS H/W ≈ 2.5–4.9×；墙钟 W/H ≈ 1.02；业务行数相等 |
 
 ## 非目标
 
@@ -89,25 +74,12 @@ calibrate threshold for L1 hint
 - YAML 配置阈值
 - 与 memo / overlap cache 绑定
 - 在主路径为 advisory 双跑写出
+- **（现行）实现 L1 run_stats hint** — 搁置
 
-## Capabilities
+## 正确性（文档应强调）
 
-### New Capabilities
+合法 IR 列式路径下 HOLD↔WINDOW **业务格子等价**；xlsx 字节不必相等；非法组合 fail-fast。详见 research HTML。
 
-- `observability-output-write-layout-advisory`：建议 schema 与「不改行为」契约
+## Research
 
-### Modified Capabilities
-
-- `performance-observability` / run_stats：可选 hints 字段
-
-## Impact
-
-- 自主性：人/agent 可读建议后显式改 `OutputWriteLayout`
-- 平衡：零默认行为变化；观测税须在 mid shape 上可接受（对齐 c50 税门控精神）
-- 转正门控：composition 路径不得建议无效 WINDOW；snapshot 测试；双跑证据校准阈值
-
-## 依赖
-
-- D1 决策矩阵（已文档化）
-- D3 `OutputWriteLayout`（c30，已落地）
-- skills/upgrade：`2026-08-11-output-write-layout.md`；notebook ch162
+- [`research/write-layout-advisory-explainer.html`](research/write-layout-advisory-explainer.html)
