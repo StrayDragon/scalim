@@ -18,10 +18,10 @@ _run_ir_mod = importlib.import_module("scalim.execution.run_ir")
 
 
 def run_public_api_output_write_layout(tmp_dir: Optional[Path] = None) -> ExampleResult:
-    """演示 `OutputWriteLayout`：工厂选型 + 小 IR 写出（HOLD vs WINDOW）。
+    """演示 `OutputWriteLayout`：工厂选型 + 小 `IR` 写出（`HOLD` vs `WINDOW`）。
 
-    按数据形状由调用方显式调优；默认不设 layout 时行为与历史一致。
-    YAML books / composition 不能设列布局。
+    按数据形状由调用方显式调优；默认不设 `layout` 时行为与历史一致。
+    `YAML` `books` / `composition` 不能设列布局。
     """
     base = tmp_dir if tmp_dir is not None else Path(".tmp/examples/ch162_output_write_layout")
     base.mkdir(parents=True, exist_ok=True)
@@ -45,7 +45,7 @@ def run_public_api_output_write_layout(tmp_dir: Optional[Path] = None) -> Exampl
     )
     factory_ok = isinstance(hold_sink, ColumnExcelSink) and isinstance(win_sink, StreamingColumnExcelSink)
     hold_sink.close()
-    # unused WINDOW sink: abandon without close (close requires set_row_ids)
+    # 未使用的 `WINDOW` `sink`：不调用 `close`（`close` 需要先 `set_row_ids`）
 
     hold_out = base / "run_hold.xlsx"
     win_out = base / "run_window.xlsx"

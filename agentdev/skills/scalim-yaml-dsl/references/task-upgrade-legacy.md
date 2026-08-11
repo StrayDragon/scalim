@@ -119,6 +119,8 @@
   - llmanspec: `llmanspec/changes/archive/2026-07-28-c10-remove-dedup-and-two-stage-derived/`
 - 2026-08-09 — YAML `lookup_chunk_size` → Python `LookupChunking`（c40）
   - SSOT: `references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
+- Upgrade: OutputWriteLayout（Python 写出布局 SSOT）
+  - SSOT: `references/upgrades/2026-08-11-output-write-layout.md`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`

@@ -587,7 +587,7 @@ class DemandRunRuntimeOptions:
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `HOLD`)."""
 
     output_write_layout: Optional[OutputWriteLayout] = None
-    """可选:显式文件写出布局(`None`=按 streaming/residency 推导;仅接受 `OutputWriteLayout`)."""
+    """可选:显式文件写出布局(`None`=按 `streaming`/`residency` 推导;仅接受 `OutputWriteLayout`)."""
 
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
     """写出前按 `sink` `accept set` 预检(默认 `OFF`;`Python` `SSOT`,禁止 `YAML`)."""

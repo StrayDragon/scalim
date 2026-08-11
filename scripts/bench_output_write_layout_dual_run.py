@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""Offline HOLD vs WINDOW dual-run for write-layout advisory calibration (c40).
+"""离线 `HOLD` vs `WINDOW` 双跑,用于写出布局建议阈值校准 (`c40`).
 
-Does NOT change default run_ir behavior. Writes evidence under
-`.tmp/evidence/c40-write-layout-dual-run/` (gitignored).
+不改变默认 `run_ir` 行为.证据写入 `.tmp/evidence/c40-write-layout-dual-run/`(不入库).
 
-Usage:
-  uv run python scripts/bench_output_write_layout_dual_run.py
-  uv run python scripts/bench_output_write_layout_dual_run.py --preset medium
-  uv run python scripts/bench_output_write_layout_dual_run.py --rows 20000 --cols 50 --n 3
+用法:
+  `uv run python scripts/bench_output_write_layout_dual_run.py`
+  `uv run python scripts/bench_output_write_layout_dual_run.py --preset medium`
+  `uv run python scripts/bench_output_write_layout_dual_run.py --rows 20000 --cols 50 --n 3`
 
-Cap: skip shapes whose HOLD probe would likely exceed --max-rss-gb (default 10).
+上限:若估算 `HOLD` 峰值可能超过 `--max-rss-gb`(默认 10)则跳过该形状.
 """
 
 from __future__ import annotations
@@ -73,7 +72,7 @@ print(json.dumps({
 )
 
 PRESETS: Dict[str, List[Tuple[str, int, int, int]]] = {
-    # name, rows, cols, batch
+    # 名称, 行数, 列数, 批大小
     "small": [
         ("s_5k_30", 5000, 30, 500),
         ("s_10k_50", 10000, 50, 500),
@@ -103,7 +102,7 @@ def _run_one(layout: str, path: Path, rows: int, cols: int, batch: int) -> Dict[
 
 
 def _estimate_hold_rss_gb(rows: int, cols: int) -> float:
-    # From c30 param probe: ~130 B/cell for short strings
+    # 来自 `c30` 参数探针:短字符串约 `130` 字节/格
     cells = rows * (cols + 1)
     return (cells * 130.0) / (1024.0**3)
 
@@ -114,7 +113,7 @@ def main() -> int:
     parser.add_argument("--rows", type=int, default=None)
     parser.add_argument("--cols", type=int, default=None)
     parser.add_argument("--batch", type=int, default=1000)
-    parser.add_argument("--n", type=int, default=3, help="repeats per layout (median)")
+    parser.add_argument("--n", type=int, default=3, help="每种 `layout` 重复次数(取中位数)")
     parser.add_argument("--max-rss-gb", type=float, default=10.0)
     parser.add_argument("--out-dir", type=Path, default=OUT_DEFAULT)
     args = parser.parse_args()
@@ -131,11 +130,11 @@ def main() -> int:
     for name, rows, cols, batch in shapes:
         est = _estimate_hold_rss_gb(rows, cols)
         if est > args.max_rss_gb:
-            print("SKIP {} est_hold_rss≈{:.2f}GB > cap".format(name, est), flush=True)
+            print("跳过 {} 估算_hold_rss≈{:.2f}GB > 上限".format(name, est), flush=True)
             results.append({"name": name, "skipped": True, "est_hold_rss_gb": est})
             continue
 
-        print("SHAPE {} rows={} cols={} batch={} n={}".format(name, rows, cols, batch, args.n), flush=True)
+        print("形状 {} 行={} 列={} 批={} n={}".format(name, rows, cols, batch, args.n), flush=True)
         hold_walls: List[float] = []
         hold_rss: List[int] = []
         win_walls: List[float] = []
@@ -158,7 +157,7 @@ def main() -> int:
                 else:
                     rows_win = data["rows_out"]
                 print(
-                    "  {}#{} wall={:.3f}s rss_kb={}".format(layout, i, data["wall_s"], data["rss_kb"]),
+                    "  {}#{} 墙钟={:.3f}s rss_kb={}".format(layout, i, data["wall_s"], data["rss_kb"]),
                     flush=True,
                 )
 
@@ -182,7 +181,7 @@ def main() -> int:
         }
         results.append(row)
         print(
-            "  → rss_ratio H/W={:.2f} wall_ratio W/H={:.2f} suggest_window={}".format(
+            "  → rss比 H/W={:.2f} 墙钟比 W/H={:.2f} 建议_window={}".format(
                 row["rss_ratio_hold_over_window"],
                 row["wall_ratio_window_over_hold"],
                 row["suggest_column_window"],
@@ -199,7 +198,7 @@ def main() -> int:
     }
     out_path = out_dir / "dual_run.json"
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    print("wrote", out_path)
+    print("已写入", out_path)
     return 0
 
 

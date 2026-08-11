@@ -30,7 +30,7 @@ Sources:
 
 | 模块 | `__all__` 导出数 | 说明 | 常见场景 |
 | --- | ---: | --- | --- |
-| `scalim.dsl.yaml_dsl` | 42 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
+| `scalim.dsl.yaml_dsl` | 43 | YAML DSL 官方运行入口 + 运行期契约 | 运行 demand/workflow YAML |
 | `scalim.dsl.yaml_dsl.tools` | 3 | YAML DSL 辅助工具(输出配置/路径推导) | 工具链集成/排错 |
 | `scalim.dsl.yaml_dsl.workflow` | 10 | workflow 配置(稳定导入路径) | 解析/校验 workflow YAML |
 | `scalim.dsl.yaml_dsl.workflow_types` | 22 | workflow 类型(拆分给 typing/依赖方用) | 仅用类型,或避免重导入 |
@@ -38,7 +38,7 @@ Sources:
 | `scalim.spec.ir` | 41 | IR(中间表示)数据结构(稳定导入路径) | 写自定义组件/扩展点/高级调试 |
 | `scalim.workflow.loaders` | 2 | workflow 内置 loader 的上下文与实现 | 在自定义 loader/运行器中复用 |
 | `scalim.planning` | 10 | 规划层入口 | 规划/编排/可视化分析 |
-| `scalim.execution` | 8 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
+| `scalim.execution` | 10 | execution facade(run_ir + contracts) | DSL-agnostic 执行入口 + request/result 契约 |
 | `scalim.ob` | 5 | 可观测性入口 | 构建 observer manager / 采集事件 |
 | `scalim.events` | 44 | 事件envelope+EventType+公开payload+事件目录 | 写 Observer/Hook;按 EventType 订阅/过滤 |
 | `scalim.events.type_groups` | 15 | 事件类型分组视图 | 按主题探索 EventType(不引入新值) |
@@ -102,7 +102,7 @@ from scalim.sinks.pandas import PandasRowSink
 
 #### `scalim.dsl.yaml_dsl`
 
-- Export count: `42`
+- Export count: `43`
 
 ```python
 from scalim.dsl.yaml_dsl import (
@@ -136,6 +136,7 @@ from scalim.dsl.yaml_dsl import (
     OutputExtrasOverride,
     OutputOverride,
     OutputToOverride,
+    OutputWriteLayout,
     OutputWriteOverride,
     OutputsDefaultsOverride,
     ResolverTrustedMode,
@@ -305,7 +306,7 @@ from scalim.planning import (
 
 #### `scalim.execution`
 
-- Export count: `8`
+- Export count: `10`
 
 ```python
 from scalim.execution import (
@@ -315,7 +316,9 @@ from scalim.execution import (
     ExportLayout,
     ObservabilitySpec,
     OutputSpec,
+    OutputWriteLayout,
     export_layout_from_demand_ir,
+    resolve_output_write_layout,
     run_ir,
 )
 ```

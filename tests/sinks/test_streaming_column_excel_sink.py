@@ -71,6 +71,23 @@ def test_streaming_column_excel_write_column_aligned_len_mismatch(tmp_path: Path
     sink.discard()
 
 
+def test_streaming_column_excel_write_column_aligned_guards(tmp_path: Path) -> None:
+    path = tmp_path / "aligned_guards.xlsx"
+    sink = StreamingColumnExcelSink(str(path), field_names=["a", "b"])
+    with pytest.raises(RuntimeError, match="set_row_ids"):
+        sink.write_column_aligned("a", [1], [10])
+    sink.set_row_ids([1])
+    with pytest.raises(KeyError):
+        sink.write_column_aligned("missing", [1], [10])
+    # 未知 row_id 跳过;已知 id 仍写入并可刷齐
+    sink.write_column_aligned("a", [1, 999], [10, 99])
+    sink.write_column_aligned("b", [1], [20])
+    sink.close()
+    assert path.exists()
+    with pytest.raises(RuntimeError, match="已关闭"):
+        sink.write_column_aligned("a", [1], [1])
+
+
 def test_streaming_column_excel_multi_batch_set_row_ids(tmp_path: Path) -> None:
     """对齐 pipeline 列模式:每 batch set_row_ids(本批) → 写满全部列."""
     field_names = ["id", "name", "score"]

@@ -61,6 +61,17 @@ def test_explicit_layout_wins() -> None:
     assert got is OutputWriteLayout.COLUMN_HOLD
 
 
+def test_resolve_rejects_non_enum_layout() -> None:
+    with pytest.raises(TypeError, match="output_write_layout must be an OutputWriteLayout"):
+        resolve_output_write_layout(
+            output_write_layout="column_hold",  # type: ignore[arg-type]
+            streaming=False,
+            output_format="excel",
+            excel_column_residency=ExcelColumnResidency.HOLD,
+            has_output_composition=False,
+        )
+
+
 def test_options_reject_string_layout() -> None:
     with pytest.raises(TypeError, match="OutputWriteLayout"):
         _ = DemandRunRuntimeOptions(output_write_layout="row_stream")  # type: ignore[arg-type]

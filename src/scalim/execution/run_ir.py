@@ -701,7 +701,7 @@ def _assemble_outputs(
 ) -> _OutputAssembly:
     composition_spec = request.output_composition
     if composition_spec is not None:
-        # composition 目标强制行流;显式列布局 / WINDOW residency 一律 fail-fast.
+        # `composition` 目标强制行流;显式列布局 / `WINDOW` `residency` 一律 `fail-fast`.
         explicit = request.output_write_layout
         effective = resolve_output_write_layout(
             output_write_layout=explicit,
