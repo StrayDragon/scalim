@@ -135,7 +135,8 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 - 缺依赖时要明确指出“YAML 已校验,运行依赖未满足”
 - 用户抱怨宽表 Excel **峰值 RSS** 时:先读 `references/streaming-column-excel-guidance.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`
   - YAML books 路径已是 **行 sink**,不能靠 YAML 开关切到 `WINDOW`
-  - 仅 Python IR 列式(`streaming=False`)才建议 `ExcelColumnResidency.WINDOW`（或手写 `StreamingColumnExcelSink`）
+  - 仅 Python IR 列式(`streaming=False`)才建议 `OutputWriteLayout.COLUMN_WINDOW`（迁移窗：`ExcelColumnResidency.WINDOW`；或手写 `StreamingColumnExcelSink`）
+  - **无自动选型**：按数据形状显式设 options；不要发明 YAML knobs
 
 ## 交付时必须写清楚
 

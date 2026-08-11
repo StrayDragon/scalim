@@ -7,6 +7,7 @@ from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
 from ....execution.loader_retry import LoaderRetryPoliciesSpec
 from ....execution.lookup_chunking import LookupChunking, normalize_optional_max_chunk_workers
+from ....execution.output_write_layout import OutputWriteLayout
 from ....execution.run_ir import ExecutionResult
 from ....hooks import IExecutionHook
 from ....ob.observer import Observer
@@ -585,8 +586,22 @@ class DemandRunRuntimeOptions:
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `HOLD`)."""
 
+    output_write_layout: Optional[OutputWriteLayout] = None
+    """可选:显式文件写出布局(`None`=按 streaming/residency 推导;仅接受 `OutputWriteLayout`)."""
+
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
     """写出前按 `sink` `accept set` 预检(默认 `OFF`;`Python` `SSOT`,禁止 `YAML`)."""
+
+    def _validate_write_layout_fields(self) -> None:
+        if not isinstance(self.excel_column_residency, ExcelColumnResidency):
+            msg = "DemandRunRuntimeOptions.excel_column_residency must be an ExcelColumnResidency"
+            raise TypeError(msg)
+        if self.output_write_layout is not None and not isinstance(self.output_write_layout, OutputWriteLayout):
+            msg = "DemandRunRuntimeOptions.output_write_layout must be an OutputWriteLayout or None"
+            raise TypeError(msg)
+        if not isinstance(self.sink_type_precheck, SinkTypePrecheck):
+            msg = "DemandRunRuntimeOptions.sink_type_precheck must be a SinkTypePrecheck"
+            raise TypeError(msg)
 
     def __post_init__(self) -> None:
         parallel_mode = self.parallel_mode
@@ -594,13 +609,7 @@ class DemandRunRuntimeOptions:
             msg = "DemandRunRuntimeOptions.parallel_mode must be 'seq' or 'adaptive'"
             raise ValueError(msg)
 
-        if not isinstance(self.excel_column_residency, ExcelColumnResidency):
-            msg = "DemandRunRuntimeOptions.excel_column_residency must be an ExcelColumnResidency"
-            raise TypeError(msg)
-
-        if not isinstance(self.sink_type_precheck, SinkTypePrecheck):
-            msg = "DemandRunRuntimeOptions.sink_type_precheck must be a SinkTypePrecheck"
-            raise TypeError(msg)
+        self._validate_write_layout_fields()
 
         max_workers = self.max_workers
         if isinstance(max_workers, bool) or not isinstance(max_workers, int):

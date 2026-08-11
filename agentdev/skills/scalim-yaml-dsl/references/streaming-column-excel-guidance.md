@@ -10,13 +10,25 @@
 |---|---|---|---|
 | **YAML / workflow books** | 行 `ExcelSink` / workbook sheet | 行流式 | **无效**；`WINDOW`+composition → **fail-fast** |
 | **IR 列式 `HOLD`（默认）** | `ColumnExcelSink` | 列缓存到 `close` | 默认，勿改除非有证据 |
-| **IR 列式 `WINDOW`（opt-in）** | `StreamingColumnExcelSink` | 行窗刷盘；宽表可大幅降峰 | `ExcelColumnResidency.WINDOW` |
+| **IR 列式 `WINDOW`（opt-in）** | `StreamingColumnExcelSink` | 行窗刷盘；宽表可大幅降峰 | **`OutputWriteLayout.COLUMN_WINDOW`**（迁移窗：`ExcelColumnResidency.WINDOW`） |
 
-工厂: `src/scalim/execution/run_ir.py` → `_create_file_sink`。  
-Enum: `scalim.execution.ExcelColumnResidency` / `scalim.dsl.yaml_dsl.ExcelColumnResidency`。
+工厂: `src/scalim/execution/run_ir.py` → `_create_file_sink`（按 effective `OutputWriteLayout`）。  
+Enum: `scalim.execution.OutputWriteLayout`（推荐）以及迁移窗 `ExcelColumnResidency`；均可从 `scalim.dsl.yaml_dsl` 导入。
 
 **入口矩阵（有手动、无自动）**：人类文档 `docs/doc/getting-started/excel-column-residency.md` §3；  
-`DemandRunRuntimeOptions.excel_column_residency` 对 YAML books/`output_composition` **无效且会 fail-fast**；workflow 经 `WorkflowRunOptions.demand.runtime` 嵌套同一字段。
+`DemandRunRuntimeOptions.output_write_layout` / `excel_column_residency` 对 YAML books/`output_composition`：**列布局 / WINDOW → fail-fast**；workflow 经 `WorkflowRunOptions.demand.runtime` 嵌套同一字段。
+
+## 按数据形状选型（人工；无自动）
+
+| 形状 | 建议 `OutputWriteLayout` | 说明 |
+|------|--------------------------|------|
+| YAML books / composition | （不设；强制行流） | 设 `COLUMN_*` → fail-fast |
+| 大量行、列不多、CSV/xlsx 行文件 | 默认 / `ROW_STREAM` | 峰本就低 |
+| 宽表列式 IR Excel、peak 不可接受 | `COLUMN_WINDOW` | 证据：HOLD→WINDOW 可大幅降 RSS |
+| 宽表但要列缓存语义 | `COLUMN_HOLD` | 峰高；兼容历史 |
+| 二次 `List[dict]` / `sink=None` | n/a | 最吃内存；勿当主路径 |
+
+运行时信息**够做建议、不够默认 auto**——见 notplan `c40-output-write-layout-advisory`。
 
 ## 何时启用哪种策略（给用户的建议）
 
@@ -33,9 +45,10 @@ Enum: `scalim.execution.ExcelColumnResidency` / `scalim.dsl.yaml_dsl.ExcelColumn
 3. **无** `output_composition`（非 YAML books 组合）
 
 ```python
-from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, ExcelColumnResidency
+from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, ExcelColumnResidency, OutputWriteLayout
 
-DemandRunRuntimeOptions(excel_column_residency=ExcelColumnResidency.WINDOW)
+DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW)
+# 迁移窗等价: excel_column_residency=ExcelColumnResidency.WINDOW
 ```
 
 ### 与 0.10 row-wise fusion

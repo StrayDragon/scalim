@@ -7,7 +7,9 @@
 
 本文说明三条**不同**的 Excel 写出路径，以及何时启用 `ExcelColumnResidency`。
 
-更严的契约以 `llmanspec/specs/output-sink-contracts/` 与 `yaml-dsl-runtime-policy-boundary` 为准。
+统一布局面（推荐新代码）：闭集 `OutputWriteLayout`（`row_stream` / `column_hold` / `column_window`）挂在 `DemandRunRuntimeOptions` / `ExecutionRequest`；**禁止 YAML authoring**。未设时由 `streaming` + `excel_column_residency` 推导，默认路径与下表一致。见 `llmanspec/specs/runtime-output-write-layout/` 与 change `c30-output-write-layout-python-policy`。
+
+更严的契约以 `llmanspec/specs/output-sink-contracts/`、`runtime-output-write-layout` 与 `yaml-dsl-runtime-policy-boundary` 为准。
 
 ## 1. 先分清三条路径
 
@@ -39,11 +41,12 @@
 调用示例：
 
 ```python
-from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, ExcelColumnResidency
-# 也可: from scalim.execution import ExcelColumnResidency
+from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunRuntimeOptions, ExcelColumnResidency, OutputWriteLayout
+# 也可: from scalim.execution import ExcelColumnResidency, OutputWriteLayout
 
 options = DemandRunOptions(
     runtime=DemandRunRuntimeOptions(
+        # 等价推荐：output_write_layout=OutputWriteLayout.COLUMN_WINDOW
         excel_column_residency=ExcelColumnResidency.WINDOW,
     ),
     # security=...
@@ -150,8 +153,9 @@ WINDOW 只对「无 composition 的 IR 列式 Excel（`streaming=False`）」生
 
 ## 5. 相关链接
 
-- 公共 API：`scalim.execution.ExcelColumnResidency`、`scalim.dsl.yaml_dsl.ExcelColumnResidency`、`scalim.sinks.StreamingColumnExcelSink`
+- 公共 API：`scalim.execution.OutputWriteLayout`、`ExcelColumnResidency`、`scalim.dsl.yaml_dsl` 同名导出、`scalim.sinks.StreamingColumnExcelSink`
+- Spec：`llmanspec/specs/runtime-output-write-layout/`
 - Agent skill 指引：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`
 - 并行调参：[`parallel-modes.md`](../architecture/parallel-modes.md)
-- Perf 判断链路（写出策略草案）：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`
+- Perf 判断链路：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`
 - 归档证据：`llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`

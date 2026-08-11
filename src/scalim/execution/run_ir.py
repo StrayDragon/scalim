@@ -47,6 +47,11 @@ from .key_normalization import normalize_key_normalization
 from .managed_artifacts import MANAGED_ARTIFACT_KIND_ROWS
 from .output_composition import build_output_composition, required_demand_fields
 from .output_contracts import ExportLayout, OutputSpec
+from .output_write_layout import (
+    OutputWriteLayout,
+    resolve_output_write_layout,
+    validate_output_write_layout_combos,
+)
 from .pipeline.overrides import PipelineOverrides
 
 if TYPE_CHECKING:
@@ -342,7 +347,9 @@ def _create_file_sink(
     layout: ExportLayout,
     *,
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+    output_write_layout: Optional[OutputWriteLayout] = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
+    has_output_composition: bool = False,
 ) -> Optional[ISink]:
     if not output.path:
         return None
@@ -355,8 +362,24 @@ def _create_file_sink(
     field_names = list(layout.field_ids)
     header_names = list(layout.header_names) if layout.header_names is not None else field_names
 
+    write_layout = resolve_output_write_layout(
+        output_write_layout=output_write_layout,
+        streaming=bool(output.streaming),
+        output_format=fmt,
+        excel_column_residency=excel_column_residency,
+        has_output_composition=has_output_composition,
+    )
+    validate_output_write_layout_combos(
+        layout=write_layout,
+        output_format=fmt,
+        streaming=bool(output.streaming),
+        excel_column_residency=excel_column_residency,
+        has_output_composition=has_output_composition,
+        layout_explicit=output_write_layout is not None,
+    )
+
     if fmt == "csv":
-        if output.streaming:
+        if write_layout is OutputWriteLayout.ROW_STREAM:
             return CSVSink(
                 output_path=str(output.path),
                 encoding=output.encoding,
@@ -374,14 +397,7 @@ def _create_file_sink(
         )
 
     if fmt == "excel":
-        if excel_column_residency is ExcelColumnResidency.WINDOW and output.streaming:
-            msg = (
-                "`ExcelColumnResidency.WINDOW` 仅适用于列式 Excel 文件 sink"
-                "(`OutputSpec.format=excel` 且 `streaming=False`)."
-                " 当前为行式写出(`streaming=True`);请改用 `HOLD`,或关闭 streaming 后再设 `WINDOW`."
-            )
-            raise ValueError(msg)
-        if output.streaming:
+        if write_layout is OutputWriteLayout.ROW_STREAM:
             return ExcelSink(
                 output_path=str(output.path),
                 field_names=field_names,
@@ -391,7 +407,7 @@ def _create_file_sink(
                 allow_formulas=bool(output.excel_allow_formulas),
                 type_precheck=sink_type_precheck,
             )
-        if excel_column_residency is ExcelColumnResidency.WINDOW:
+        if write_layout is OutputWriteLayout.COLUMN_WINDOW:
             return StreamingColumnExcelSink(
                 output_path=str(output.path),
                 field_names=field_names,
@@ -438,13 +454,16 @@ def _create_output_plan(
     sink: Optional[ISink],
     *,
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+    output_write_layout: Optional[OutputWriteLayout] = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> _OutputPlan:
     file_sink = _create_file_sink(
         output,
         layout,
         excel_column_residency=excel_column_residency,
+        output_write_layout=output_write_layout,
         sink_type_precheck=sink_type_precheck,
+        has_output_composition=False,
     )
     output_path: Optional[str] = output.path or None
 
@@ -681,20 +700,31 @@ def _assemble_outputs(
     stats: InternalStatsCollector,
 ) -> _OutputAssembly:
     composition_spec = request.output_composition
-    if composition_spec is not None and request.excel_column_residency is ExcelColumnResidency.WINDOW:
-        msg = (
-            "`ExcelColumnResidency.WINDOW` 与 `output_composition`(YAML books/多输出行组合)互斥."
-            " 组合层仅为行流式写出;WINDOW 只适用于列式 IR 文件 sink"
-            "(`format=excel` 且 `streaming=False`)."
-            " 请改用 `HOLD`,或改用手写 `StreamingColumnExcelSink` / 非 composition 列式路径."
+    if composition_spec is not None:
+        # composition 目标强制行流;显式列布局 / WINDOW residency 一律 fail-fast.
+        explicit = request.output_write_layout
+        effective = resolve_output_write_layout(
+            output_write_layout=explicit,
+            streaming=True,
+            output_format="excel",
+            excel_column_residency=request.excel_column_residency,
+            has_output_composition=True,
         )
-        raise ValueError(msg)
+        validate_output_write_layout_combos(
+            layout=effective,
+            output_format="excel",
+            streaming=True,
+            excel_column_residency=request.excel_column_residency,
+            has_output_composition=True,
+            layout_explicit=explicit is not None,
+        )
     if composition_spec is None:
         output_plan = _create_output_plan(
             request.output,
             request.export_layout,
             request.sink,
             excel_column_residency=request.excel_column_residency,
+            output_write_layout=request.output_write_layout,
             sink_type_precheck=request.sink_type_precheck,
         )
         counting_sink = _wrap_sink_for_row_count(output_plan.sink, stats)

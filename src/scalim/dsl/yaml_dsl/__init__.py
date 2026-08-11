@@ -12,6 +12,7 @@
 from typing import TYPE_CHECKING
 
 from ...execution.excel_column_residency import ExcelColumnResidency
+from ...execution.output_write_layout import OutputWriteLayout
 from ...vendor.compact.importlibx import import_module
 from .book_resource_policy import (
     BookResourcePolicy,
@@ -114,6 +115,7 @@ __all__ = (
     "OutputExtrasOverride",
     "OutputOverride",
     "OutputToOverride",
+    "OutputWriteLayout",
     "OutputWriteOverride",
     "OutputsDefaultsOverride",
     "ResolverTrustedMode",

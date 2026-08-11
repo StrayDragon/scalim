@@ -485,6 +485,19 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             + "include_full_error_message=True)), ...))."
         )
 
+        output_write_layout_msg = (
+            "YAML key 'output_write_layout' is not part of YAML authoring (runtime policy boundary). "
+            "Hint: configure via Python DemandRunOptions.runtime="
+            "DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.ROW_STREAM|COLUMN_HOLD|COLUMN_WINDOW). "
+            "See upgrade 2026-08-11-output-write-layout."
+        )
+        excel_column_residency_msg = (
+            "YAML key 'excel_column_residency' is not part of YAML authoring (runtime policy boundary). "
+            "Hint: prefer DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW) "
+            "(migration window: excel_column_residency=ExcelColumnResidency.WINDOW). "
+            "See docs/doc/getting-started/excel-column-residency.md."
+        )
+
         removed: Tuple[Tuple[str, str], ...] = (
             (
                 "guardrails",
@@ -509,6 +522,14 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             (
                 "include_full_error_message",
                 include_full_error_message_msg,
+            ),
+            (
+                "output_write_layout",
+                output_write_layout_msg,
+            ),
+            (
+                "excel_column_residency",
+                excel_column_residency_msg,
             ),
         )
 

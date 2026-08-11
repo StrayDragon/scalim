@@ -240,3 +240,14 @@ def test_validator_strips_removed_sources_lookup_chunk_size() -> None:
     assert out["sources"]["customers"]["loader"] == "x"  # type: ignore[index]
     assert len(issues) == 1
     assert "LookupChunking" in issues[0].message
+
+
+def test_validator_strips_removed_output_write_layout_top_level() -> None:
+    issues = []
+    cleaned = {"name": "demo", "output_write_layout": "column_window", "excel_column_residency": "window"}
+    out = ConfigValidator._strip_removed_demand_runtime_policy_top_level(cleaned, issues)  # noqa: SLF001
+
+    assert "output_write_layout" not in out
+    assert "excel_column_residency" not in out
+    assert len(issues) == 2
+    assert any("OutputWriteLayout" in i.message for i in issues)

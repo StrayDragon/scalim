@@ -16,8 +16,9 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 - 校验、订正、排错 workflow YAML: 读 [references/task-workflow-validate-debug.md](references/task-workflow-validate-debug.md)
 - 服务端并发输出/版本化输出(D-2)/outputs facade 定位写法: 读 [references/task-workflow-versioned-outputs.md](references/task-workflow-versioned-outputs.md)
 - 旧报表脚本渐进迁移方案: 读 [references/task-report-migration-playbook.md](references/task-report-migration-playbook.md)
-- 宽表 Excel 峰值 / `StreamingColumnExcelSink` / `ExcelColumnResidency` 选型: 读 [references/streaming-column-excel-guidance.md](references/streaming-column-excel-guidance.md)（人类文档: `docs/doc/getting-started/excel-column-residency.md`）
+- 宽表 Excel 峰值 / `StreamingColumnExcelSink` / **`OutputWriteLayout`**（迁移窗仍见 `ExcelColumnResidency`）选型: 读 [references/streaming-column-excel-guidance.md](references/streaming-column-excel-guidance.md)（人类文档: `docs/doc/getting-started/excel-column-residency.md`）
 - **0.10.0 版本亮点**（默认 write-precompute / row-wise fusion；opt-in lookup chunk 并行；YAML 无强制迁移）: 读 [references/0.10-release-highlights.md](references/0.10-release-highlights.md)（人类总览: `docs/doc/releases/0.10.0/index.md`）
+- **写出布局 OutputWriteLayout（c30）**: upgrade [references/upgrades/2026-08-11-output-write-layout.md](references/upgrades/2026-08-11-output-write-layout.md)
 - **0.10.1**（相对 0.10.0；YAML 无强制迁移；Python typed handlers 收 `Event`）: [references/0.10.1-release-highlights.md](references/0.10.1-release-highlights.md) + `docs/doc/releases/0.10.1/`；Observer/Hook 迁移走 `scalim-public-api`
 - 下游适配盘点与同步: 读 [references/task-downstream-adaptation.md](references/task-downstream-adaptation.md)
 - **低漂移自我观测**（run_stats / profiles / write 归因；非 YAML authoring）: 改读 `agentdev/skills/scalim-run-stats/SKILL.md` + `docs/doc/viz/run-stats.md`
@@ -88,7 +89,7 @@ run_workflow(
 - 迁移/升级优先看自动索引的 upgrades(从 `references/task-upgrade-legacy.md` 进入,或读取生成的 upgrades 摘要)
 - 未明确要求兼容时,旧 DSL 写法直接升级到当前结构,不要保留兼容层
 - YAML `resources.books` 只声明 identity（唯一分支 `xlsx`：有 `path`=落盘，无 `path`=内存总线；`xlsx_file`/`xlsx_memory` 已硬删）;`write_defaults` 已迁出 → 用 `WorkflowRunOptions`/`DemandRunOptions.resources_policy`(`BookWritePolicy`,StrEnum 严格 in)；`budget` / `BookBudgetPolicy` **已移除**（YAML/`RunOverrides` 残留仍 fail-fast，删字段；内存交宿主限制）；Python IR `DedupBy*` / `TwoStageGroupBy*` **已移除**（loader 去重 / workflow 两段 demand）；详见 `references/upgrades/2026-07-12-book-write-policy-python-ssot.md`、`references/upgrades/2026-07-28-remove-book-budget-policy.md`、`references/upgrades/2026-07-28-remove-dedup-and-two-stage-derived.md`、`references/upgrades/2026-07-13-unified-xlsx-book-kind.md`、`references/upgrades/2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`references/upgrades/2026-07-20-remove-deprecated-xlsx-file-memory-kinds.md`
-- **MUST NOT** 为降低 Excel 峰值在 YAML 发明 `write.streaming` / books streaming knobs;YAML Excel 组合层已是行 sink。列式 HOLD→WINDOW 用 Python `ExcelColumnResidency`(见 `references/streaming-column-excel-guidance.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`)
+- **MUST NOT** 为降低 Excel 峰值在 YAML 发明 `write.streaming` / books streaming knobs / `output_write_layout`;YAML Excel 组合层已是行 sink。列式调优用 Python **`OutputWriteLayout.COLUMN_WINDOW`**（迁移窗：`ExcelColumnResidency.WINDOW`；见 `references/streaming-column-excel-guidance.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`）
 - `path` 是输出 root 目录:相对路径相对 **声明该路径的 YAML 文件目录**(不是进程 cwd);环境相关 root 用绝对路径、`{$init_var: ...}` 或 `BookResourceOverride`(IO-only overlay,不再含 write/budget)。唯一写法 `resources.books.*.xlsx.path`（旧 `export_xlsx.path` / `xlsx_file` 已硬删）。
 - workflow YAML 校验优先用 `yaml-dsl validate --type workflow`(递归校验引用的 demands,并检查 outputs→book 绑定等跨文件一致性);需要更快时再用 `schema validate --schema .../workflow.gen.json`
 - 交付时必须说明: 跑了哪些校验,缺了哪些依赖,哪些内容仍未在真实环境验证

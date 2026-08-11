@@ -49,11 +49,11 @@
 - pytest chapters (1): `ch130_public_api_dsl_by_yaml`
 
 ### `scalim.planning`
-- examples chapters (2): `ch150_public_api_planning`, `ch160_public_api_execution`
+- examples chapters (3): `ch150_public_api_planning`, `ch160_public_api_execution`, `ch162_public_api_output_write_layout`
 - pytest chapters (2): `ch150_public_api_planning`, `ch160_public_api_execution`
 
 ### `scalim.execution`
-- examples chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
+- examples chapters (3): `ch160_public_api_execution`, `ch162_public_api_output_write_layout`, `ch180_public_api_hooks_events`
 - pytest chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
 
 ### `scalim.ob`
@@ -69,7 +69,7 @@
 - pytest chapters (1): `ch182_public_api_event_type_groups`
 
 ### `scalim.sinks`
-- examples chapters (3): `ch160_public_api_execution`, `ch180_public_api_hooks_events`, `ch184_public_api_sinks_pandas`
+- examples chapters (4): `ch160_public_api_execution`, `ch162_public_api_output_write_layout`, `ch180_public_api_hooks_events`, `ch184_public_api_sinks_pandas`
 - pytest chapters (3): `ch160_public_api_execution`, `ch180_public_api_hooks_events`, `ch184_public_api_sinks_pandas`
 
 ### `scalim.sinks.memory`

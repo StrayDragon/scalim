@@ -118,11 +118,11 @@ main_source:
 - 多目标共享同一 workbook 时,为每个 output 显式设置 `to.book/to.sheet`;并发写同一 output root 依赖“版本目录隔离”(通过 `scalim.shortcuts.resources.outputs` 定位最新产物,或显式指定版本目录)
 - 只有在需要复杂格式/样式/跨 sheet 自定义公式等能力时,才保留薄 Python 组装层
 
-### 宽表峰值与 StreamingColumnExcelSink / ExcelColumnResidency
+### 宽表峰值与 OutputWriteLayout / StreamingColumnExcelSink
 
 - 选型与“何时启用 HOLD/WINDOW”:站点 `docs/doc/getting-started/excel-column-residency.md`；agent 摘要见 `references/streaming-column-excel-guidance.md`。
 - YAML/workflow Excel **不会**自动使用 `StreamingColumnExcelSink`(组合层是行 sink)。
-- 若迁移目标是“砍列 hold 的 pre_close 峰”,用 Python `ExcelColumnResidency.WINDOW` 或手写 sink;不要在 YAML 加 streaming knobs。
+- 若迁移目标是“砍列 hold 的 pre_close 峰”,用 Python **`OutputWriteLayout.COLUMN_WINDOW`**（迁移窗：`ExcelColumnResidency.WINDOW`）或手写 sink;不要在 YAML 加 streaming / layout knobs。
 - shared-book 物化峰值是另一条线(futures spill),与本 sink 解耦。
 
 ## 方案阶段输出要求

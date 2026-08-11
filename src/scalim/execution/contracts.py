@@ -16,6 +16,7 @@ from ..vendor.dataclassesx import field as dataclass_field
 from .excel_column_residency import ExcelColumnResidency
 from .lookup_chunking import normalize_optional_max_chunk_workers
 from .output_contracts import ExportLayout, OutputSpec
+from .output_write_layout import OutputWriteLayout
 
 if TYPE_CHECKING:
     from ..hooks import IExecutionHook
@@ -130,6 +131,14 @@ def _validate_execution_request_excel_column_residency(excel_column_residency: R
         raise TypeError(msg)
 
 
+def _validate_execution_request_output_write_layout(output_write_layout: RuntimeValue) -> None:
+    if output_write_layout is None:
+        return
+    if not isinstance(output_write_layout, OutputWriteLayout):
+        msg = "ExecutionRequest.output_write_layout must be an OutputWriteLayout or None"
+        raise TypeError(msg)
+
+
 def _validate_execution_request_sink_type_precheck(sink_type_precheck: RuntimeValue) -> None:
     if not isinstance(sink_type_precheck, SinkTypePrecheck):
         msg = "ExecutionRequest.sink_type_precheck must be a SinkTypePrecheck"
@@ -214,6 +223,9 @@ class ExecutionRequest:
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `format=excel` 且 `streaming=False` 时生效)."""
 
+    output_write_layout: Optional[OutputWriteLayout] = None
+    """可选:显式文件写出布局(`None`=按 streaming/residency 推导;仅接受 `OutputWriteLayout`)."""
+
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
     """写出前按 `sink` `accept set` 预检(默认 `OFF`)."""
 
@@ -228,6 +240,7 @@ class ExecutionRequest:
         _validate_execution_request_capture_in_memory_rows(self.capture_in_memory_rows)
         _validate_execution_request_key_normalization(self.key_normalization)
         _validate_execution_request_excel_column_residency(self.excel_column_residency)
+        _validate_execution_request_output_write_layout(self.output_write_layout)
         _validate_execution_request_sink_type_precheck(self.sink_type_precheck)
 
 

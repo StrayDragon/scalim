@@ -3,6 +3,7 @@
 # pragma: scalim-public-api tier1:90:scalim.execution|execution facade(run_ir + contracts)|DSL-agnostic 执行入口 + request/result 契约
 
 from .excel_column_residency import ExcelColumnResidency
+from .output_write_layout import OutputWriteLayout, resolve_output_write_layout
 from .run_ir import (
     ExecutionRequest,
     ExecutionResult,
@@ -20,6 +21,8 @@ __all__ = (
     "ExportLayout",
     "ObservabilitySpec",
     "OutputSpec",
+    "OutputWriteLayout",
     "export_layout_from_demand_ir",
+    "resolve_output_write_layout",
     "run_ir",
 )

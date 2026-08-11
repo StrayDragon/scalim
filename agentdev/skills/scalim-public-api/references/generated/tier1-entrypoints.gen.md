@@ -12,8 +12,8 @@
 - desc: YAML DSL 官方运行入口 + 运行期契约
 - scenario: 运行 demand/workflow YAML
 - marker: `src/scalim/dsl/yaml_dsl/__init__.py:6`
-- source: `src/scalim/dsl/yaml_dsl/__init__.py:86`
-- exports (`__all__`, tuple, count=42):
+- source: `src/scalim/dsl/yaml_dsl/__init__.py:87`
+- exports (`__all__`, tuple, count=43):
   - `UNSET`
   - `BookExportXlsxOverride`
   - `BookResourceOverride`
@@ -44,6 +44,7 @@
   - `OutputExtrasOverride`
   - `OutputOverride`
   - `OutputToOverride`
+  - `OutputWriteLayout`
   - `OutputWriteOverride`
   - `OutputsDefaultsOverride`
   - `ResolverTrustedMode`
@@ -199,15 +200,17 @@
 - desc: execution facade(run_ir + contracts)
 - scenario: DSL-agnostic 执行入口 + request/result 契约
 - marker: `src/scalim/execution/__init__.py:3`
-- source: `src/scalim/execution/__init__.py:16`
-- exports (`__all__`, tuple, count=8):
+- source: `src/scalim/execution/__init__.py:17`
+- exports (`__all__`, tuple, count=10):
   - `ExcelColumnResidency`
   - `ExecutionRequest`
   - `ExecutionResult`
   - `ExportLayout`
   - `ObservabilitySpec`
   - `OutputSpec`
+  - `OutputWriteLayout`
   - `export_layout_from_demand_ir`
+  - `resolve_output_write_layout`
   - `run_ir`
 
 ### `scalim.ob` (order=100)

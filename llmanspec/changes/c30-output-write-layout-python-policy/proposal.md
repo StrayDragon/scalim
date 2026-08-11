@@ -40,12 +40,13 @@ checkpointed: false
 
 - 自定义：一个 Enum 表达三种意图
 - 默认路径无行为漂移（未设 layout 时推导 ≡ 今日）
-- Breaking：仅非法组合从「模糊」变为统一 fail-fast 文案；CSV+WINDOW 显式拒绝
+- Breaking：仅非法组合从「模糊」变为统一 fail-fast 文案；**显式** `column_window`+CSV 拒绝（未设 layout 时 CSV 仍忽略 residency，与今日一致）
+- **性能门禁（速度/内存）**：未设 `output_write_layout` 的默认写出路径，相对本 change 前基线，墙钟与 peak RSS 的 **median 回归 ≤ ~5%**；须 **≥5 次** 重复采样（同机、同场景、warm 弃首次可选）；证据写入 `.tmp/evidence/c30-output-write-layout/`（不入库）。超阈则修实现或升格为 blocker，禁止用「仅加一层 Enum」搪塞。
 
 ## Ethics
 
 - `ethics.risk_level`: medium
-- `ethics.prohibited_actions`: YAML 发明 layout；静默忽略冲突；默认 auto 切 layout；memo 绑布局
-- `ethics.required_evidence`: 推导表单测 + composition/CSV WINDOW fail-fast + 未设 layout 行为对拍
-- `ethics.refusal_contract`: 无推导表与互斥矩阵不得 apply
-- `ethics.escalation_policy`: 若需默认改成 WINDOW 或 YAML 旋钮，必须另开 change
+- `ethics.prohibited_actions`: YAML 发明 layout；静默忽略冲突；默认 auto 切 layout；memo 绑布局；默认路径为 layout 解析引入可测的热路径开销（超出门禁）
+- `ethics.required_evidence`: 推导表单测 + composition/显式 CSV WINDOW fail-fast + 未设 layout 行为对拍 + **≥5 跑 median ≤5%** 墙钟/RSS 记录
+- `ethics.refusal_contract`: 无推导表与互斥矩阵、或无多跑性能证据不得宣称 apply 完成
+- `ethics.escalation_policy`: 若需默认改成 WINDOW、YAML 旋钮、或放宽 >5% 回归预算，必须另开 change / 用户确认
