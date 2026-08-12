@@ -1,8 +1,8 @@
 # StreamingColumnExcelSink / OutputWriteLayout
 
-完整选型与边界见:
+完整选型与边界见人类页 SSOT：
 
-- 人类文档: `docs/doc/getting-started/excel-column-residency.md`
+- `docs/doc/getting-started/excel-column-residency.md`
 - yaml-dsl skill: `agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`
 
 ## 策略速查（推荐新 API）
@@ -25,16 +25,12 @@ ExecutionRequest(
     output=OutputSpec(format="excel", path="out.xlsx", streaming=False),
     output_write_layout=OutputWriteLayout.COLUMN_WINDOW,
 )
-
-# Demand YAML 入口:
-# DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW)
 ```
 
 迁移窗：`excel_column_residency=ExcelColumnResidency.WINDOW` 在**未设** layout 时仍推导为 `column_window`。
 
-`COLUMN_WINDOW` / 旧 `WINDOW` + `output_composition` → fail-fast；CSV + `COLUMN_WINDOW` → fail-fast。
-
-**无自动切换**：按数据形状由调用方显式选；观测建议见 notplan `c40-output-write-layout-advisory`。
+`COLUMN_WINDOW` / 旧 `WINDOW` + `output_composition` → fail-fast；CSV + `COLUMN_WINDOW` → fail-fast。  
+无 auto / 启发式 / 业务格子等价 → 人类页，勿在此展开。
 
 ## 与 0.10 row-wise fusion
 

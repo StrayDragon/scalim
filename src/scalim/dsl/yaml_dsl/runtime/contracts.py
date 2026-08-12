@@ -592,7 +592,7 @@ class DemandRunRuntimeOptions:
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
     """写出前按 `sink` `accept set` 预检(默认 `OFF`;`Python` `SSOT`,禁止 `YAML`)."""
 
-    def _validate_write_layout_fields(self) -> None:
+    def _validate_runtime_enum_fields(self) -> None:
         if not isinstance(self.excel_column_residency, ExcelColumnResidency):
             msg = "DemandRunRuntimeOptions.excel_column_residency must be an ExcelColumnResidency"
             raise TypeError(msg)
@@ -609,7 +609,7 @@ class DemandRunRuntimeOptions:
             msg = "DemandRunRuntimeOptions.parallel_mode must be 'seq' or 'adaptive'"
             raise ValueError(msg)
 
-        self._validate_write_layout_fields()
+        self._validate_runtime_enum_fields()
 
         max_workers = self.max_workers
         if isinstance(max_workers, bool) or not isinstance(max_workers, int):

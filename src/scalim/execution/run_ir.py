@@ -349,7 +349,6 @@ def _create_file_sink(
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
     output_write_layout: Optional[OutputWriteLayout] = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
-    has_output_composition: bool = False,
 ) -> Optional[ISink]:
     if not output.path:
         return None
@@ -367,14 +366,14 @@ def _create_file_sink(
         streaming=bool(output.streaming),
         output_format=fmt,
         excel_column_residency=excel_column_residency,
-        has_output_composition=has_output_composition,
+        has_output_composition=False,
     )
     validate_output_write_layout_combos(
         layout=write_layout,
         output_format=fmt,
         streaming=bool(output.streaming),
         excel_column_residency=excel_column_residency,
-        has_output_composition=has_output_composition,
+        has_output_composition=False,
         layout_explicit=output_write_layout is not None,
     )
 
@@ -463,7 +462,6 @@ def _create_output_plan(
         excel_column_residency=excel_column_residency,
         output_write_layout=output_write_layout,
         sink_type_precheck=sink_type_precheck,
-        has_output_composition=False,
     )
     output_path: Optional[str] = output.path or None
 
@@ -703,15 +701,14 @@ def _assemble_outputs(
     if composition_spec is not None:
         # `composition` 目标强制行流;显式列布局 / `WINDOW` `residency` 一律 `fail-fast`.
         explicit = request.output_write_layout
-        effective = resolve_output_write_layout(
-            output_write_layout=explicit,
-            streaming=True,
-            output_format="excel",
-            excel_column_residency=request.excel_column_residency,
-            has_output_composition=True,
-        )
         validate_output_write_layout_combos(
-            layout=effective,
+            layout=resolve_output_write_layout(
+                output_write_layout=explicit,
+                streaming=True,
+                output_format="excel",
+                excel_column_residency=request.excel_column_residency,
+                has_output_composition=True,
+            ),
             output_format="excel",
             streaming=True,
             excel_column_residency=request.excel_column_residency,

@@ -5,6 +5,7 @@ from pathlib import Path
 import importlib
 
 import pytest
+from openpyxl import load_workbook
 
 from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, OutputWriteLayout
 from scalim.execution import ExcelColumnResidency, ExecutionRequest, ExportLayout, OutputSpec
@@ -147,13 +148,26 @@ def test_composition_plus_explicit_column_layout_fails_fast(tmp_path: Path) -> N
 
 
 def test_explicit_column_window_selects_streaming_column_excel(tmp_path: Path) -> None:
-    layout = ExportLayout(field_ids=("id",))
+    layout = ExportLayout(field_ids=("id", "name"))
+    path = tmp_path / "w.xlsx"
     sink = run_ir_mod._create_file_sink(
-        OutputSpec(format="excel", path=str(tmp_path / "w.xlsx"), streaming=True),
+        OutputSpec(format="excel", path=str(path), streaming=False),
         layout,
         excel_column_residency=ExcelColumnResidency.HOLD,
         output_write_layout=OutputWriteLayout.COLUMN_WINDOW,
     )
     assert isinstance(sink, StreamingColumnExcelSink)
-    with pytest.raises(RuntimeError, match="set_row_ids"):
-        sink.close()
+    assert sink is not None
+    row_ids = [1, 2, 3]
+    sink.set_row_ids(row_ids)
+    sink.write_column("id", {1: 1, 2: 2, 3: 3})
+    sink.write_column("name", {1: "a", 2: "b", 3: "c"})
+    sink.close()
+
+    wb = load_workbook(str(path), read_only=True, data_only=True)
+    try:
+        rows = [list(r) for r in wb.active.iter_rows(values_only=True)]
+    finally:
+        wb.close()
+    assert rows == [["id", "name"], [1, "a"], [2, "b"], [3, "c"]]
+    assert sink._flushed_rows == 3

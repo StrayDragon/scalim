@@ -103,7 +103,9 @@ def test_yaml_excel_column_residency_rejected_with_python_hint(tmp_path: Path) -
 
     msg = "\n".join(env.message for env in excinfo.value.errors)
     assert "excel_column_residency" in msg
-    assert "OutputWriteLayout" in msg or "COLUMN_WINDOW" in msg
+    assert "OutputWriteLayout" in msg
+    assert "COLUMN_WINDOW" in msg
+    assert any(env.path == "excel_column_residency" for env in excinfo.value.errors)
 
 
 def test_compile_lookup_chunking_sized_applies_source_ir_chunk_size(tmp_path: Path) -> None:

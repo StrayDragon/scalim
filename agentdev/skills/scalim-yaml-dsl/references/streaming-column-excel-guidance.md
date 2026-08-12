@@ -1,84 +1,41 @@
 # StreamingColumnExcelSink：框架路径边界与建议
 
 > 给 agent / 维护者的排错与选型指南。  
-> 人类文档（策略何时启用）: `docs/doc/getting-started/excel-column-residency.md`  
-> 证据: `llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`。
+> **选型 / 正确性 / 无 auto / 启发式 SSOT（人类页）**: `docs/doc/getting-started/excel-column-residency.md`  
+> Upgrade 卡: `references/upgrades/2026-08-11-output-write-layout.md`  
+> 证据归档: `llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`。
 
-## 先分清三条路径
+本文只保留 **agent 硬边界、工厂锚点、证据表**；何时启用 HOLD/WINDOW、入口矩阵、业务格子等价、百万格启发式 → **只读人类页**，勿在此复述。
 
-| 路径 | 实际 sink | 峰值 | 与 WINDOW |
-|---|---|---|---|
-| **YAML / workflow books** | 行 `ExcelSink` / workbook sheet | 行流式 | **无效**；`WINDOW`+composition → **fail-fast** |
-| **IR 列式 `HOLD`（默认）** | `ColumnExcelSink` | 列缓存到 `close` | 默认，勿改除非有证据 |
-| **IR 列式 `WINDOW`（opt-in）** | `StreamingColumnExcelSink` | 行窗刷盘；宽表可大幅降峰 | **`OutputWriteLayout.COLUMN_WINDOW`**（迁移窗：`ExcelColumnResidency.WINDOW`） |
+## 三条路径（速查）
+
+| 路径 | 实际 sink | 与 `COLUMN_WINDOW` |
+|---|---|---|
+| **YAML / workflow books** | 行 `ExcelSink` / workbook sheet | **无效**；列布局 + composition → **fail-fast** |
+| **IR 列式 `COLUMN_HOLD`（默认）** | `ColumnExcelSink` | 默认，勿改除非有证据 |
+| **IR 列式 `COLUMN_WINDOW`（opt-in）** | `StreamingColumnExcelSink` | 推荐 API；迁移窗：`ExcelColumnResidency.WINDOW` |
 
 工厂: `src/scalim/execution/run_ir.py` → `_create_file_sink`（按 effective `OutputWriteLayout`）。  
-Enum: `scalim.execution.OutputWriteLayout`（推荐）以及迁移窗 `ExcelColumnResidency`；均可从 `scalim.dsl.yaml_dsl` 导入。
-
-**入口矩阵（有手动、无自动）**：人类文档 `docs/doc/getting-started/excel-column-residency.md` §3；  
-`DemandRunRuntimeOptions.output_write_layout` / `excel_column_residency` 对 YAML books/`output_composition`：**列布局 / WINDOW → fail-fast**；workflow 经 `WorkflowRunOptions.demand.runtime` 嵌套同一字段。
-
-## 按数据形状选型（人工；无自动）
-
-| 形状 | 建议 `OutputWriteLayout` | 说明 |
-|------|--------------------------|------|
-| YAML books / composition | （不设；强制行流） | 设 `COLUMN_*` → fail-fast |
-| 大量行、列不多、CSV/xlsx 行文件 | 默认 / `ROW_STREAM` | 峰本就低 |
-| 宽表列式 IR Excel、peak 不可接受 | `COLUMN_WINDOW` | 证据：HOLD→WINDOW 可大幅降 RSS（见下表） |
-| 宽表但要列缓存语义 | `COLUMN_HOLD` | 峰高；兼容历史 |
-| 二次 `List[dict]` / `sink=None` | n/a | 最吃内存；勿当主路径 |
-
-**启发式**：`n_fields × n_rows ≳ 1e6` 且仍是列式 HOLD → 建议显式 `COLUMN_WINDOW`。  
-运行时信息**够做人工建议、不够默认 auto**；**无 run_stats 自动 hint**（L1 搁置）——见 notplan `c40-output-write-layout-advisory`。
-
-## 正确性
-
-合法 IR 列式路径下 HOLD↔WINDOW **业务格子等价**；xlsx 字节不必相等；books/composition 与 WINDOW 同开 → fail-fast。详表见 upgrade `2026-08-11-output-write-layout.md`。
-
-## 何时启用哪种策略（给用户的建议）
-
-### 用 `HOLD`（默认）当
-
-- 列/行规模不大，或峰值可接受
-- 需要与历史 `ColumnExcelSink` 行为一致
-- 不确定时：**保持默认**
-
-### 用 `WINDOW` 当（须同时满足）
-
-1. `OutputSpec.format=excel` 且 `streaming=False`（列式 IR 文件 sink）
-2. 宽表/高行导致 `pre_close`/peak 不可接受（经验：约百万格起更明显；或实测峰不可接受）
-3. **无** `output_composition`（非 YAML books 组合）
+Enum: `scalim.execution.OutputWriteLayout`（推荐）；迁移窗 `ExcelColumnResidency`；均可从 `scalim.dsl.yaml_dsl` 导入。
 
 ```python
-from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, ExcelColumnResidency, OutputWriteLayout
+from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, OutputWriteLayout
 
 DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW)
-# 迁移窗等价: excel_column_residency=ExcelColumnResidency.WINDOW
+# 迁移窗等价（未设 layout）: excel_column_residency=ExcelColumnResidency.WINDOW
 ```
 
-### 与 0.10 row-wise fusion
+## 与 0.10 row-wise fusion
 
 列 sink 路径(含 `HOLD`/`WINDOW`)在 fusion 安全外壳内 **不融合**。宽表峰值用 WINDOW 砍 RSS 与 fusion 墙钟收益是正交问题;不要混谈。总览:`references/0.10-release-highlights.md`。
-
-### 不要建议 `WINDOW` 当
-
-- 用户走 YAML `resources.books`（已是行写出；假开关会 fail-fast）
-- 用户想在 YAML 写 streaming knobs（**禁止**）
-- 痛点是 shared-book 物化峰值（转介 futures spill，不是本 Enum）
-- 调用方一次 `set_row_ids(全量)` 再按列写（应改为按 batch 追加）
-
-### 手写 `StreamingColumnExcelSink` 当
-
-- 完全自管写出 / 自定义 batch 窗
-- 或不走 `_create_file_sink` 工厂
 
 ## Agent 硬边界
 
 1. **MUST NOT** 发明 YAML `write.streaming` / residency / layout 字段
 2. YAML Excel 峰值 ≠ 缺 WINDOW；先说明行 sink 路径
-3. 推荐 WINDOW 前确认是列式 IR（`streaming=False`）
+3. 推荐 `COLUMN_WINDOW` 前确认是列式 IR（`streaming=False`、无 composition）——细则见人类页 §2
 4. shared-book **不能**插 StreamingColumn
-5. **MUST NOT** 假装有 auto / run_stats hint；只给显式 Python options
+5. **MUST NOT** 假装有 auto / run_stats hint；只给显式 Python options（人类页 §3）
 
 ## 证据口径
 

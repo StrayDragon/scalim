@@ -120,11 +120,9 @@ main_source:
 
 ### 宽表峰值与 OutputWriteLayout / StreamingColumnExcelSink
 
-- 选型与“何时启用 HOLD/WINDOW”:站点 `docs/doc/getting-started/excel-column-residency.md`；agent 摘要见 `references/streaming-column-excel-guidance.md`；upgrade 卡 `references/upgrades/2026-08-11-output-write-layout.md`。
+- **SSOT**：站点 `docs/doc/getting-started/excel-column-residency.md`（选型 / 正确性 / 无 auto）；agent 边界见 `references/streaming-column-excel-guidance.md`；upgrade 卡 `references/upgrades/2026-08-11-output-write-layout.md`。
 - YAML/workflow Excel **不会**自动使用 `StreamingColumnExcelSink`(组合层是行 sink)。
-- 若迁移目标是“砍列 hold 的 pre_close 峰”,用 Python **`OutputWriteLayout.COLUMN_WINDOW`**（迁移窗：`ExcelColumnResidency.WINDOW`）或手写 sink;不要在 YAML 加 streaming / layout knobs。
-- **正确性**：合法 IR 列式路径下 HOLD↔WINDOW 业务格子等价；xlsx 字节不必相等；books+WINDOW → fail-fast。
-- **无 auto**：不要等系统切换；约百万格宽表可主动建议显式 WINDOW。
+- 砍列 hold 的 `pre_close` 峰 → Python **`OutputWriteLayout.COLUMN_WINDOW`**（或手写 sink）；不要在 YAML 加 streaming / layout knobs。
 - shared-book 物化峰值是另一条线(futures spill),与本 sink 解耦。
 
 ## 方案阶段输出要求

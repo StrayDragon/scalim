@@ -133,11 +133,10 @@ uv run scalim-cli yaml-dsl upsert-lsp-comment --type demand --comment-style all 
 
 - `format: excel` 需要 `openpyxl`
 - 缺依赖时要明确指出“YAML 已校验,运行依赖未满足”
-- 用户抱怨宽表 Excel **峰值 RSS** 时:先读 `references/streaming-column-excel-guidance.md`、upgrade `references/upgrades/2026-08-11-output-write-layout.md` 与站点 `docs/doc/getting-started/excel-column-residency.md`
-  - YAML books 路径已是 **行 sink**,不能靠 YAML 开关切到 `WINDOW`（同开 → fail-fast，不是缺字段）
-  - 仅 Python IR 列式(`streaming=False`)才建议 `OutputWriteLayout.COLUMN_WINDOW`（迁移窗：`ExcelColumnResidency.WINDOW`；或手写 `StreamingColumnExcelSink`）
-  - 合法列式路径下 HOLD↔WINDOW **业务格子等价**；对拍勿比 xlsx 字节
-  - **无自动选型 / 无 run_stats 布局 hint**：按数据形状显式设 options；约百万格可优先建议 WINDOW
+- 用户抱怨宽表 Excel **峰值 RSS** 时:先读站点 `docs/doc/getting-started/excel-column-residency.md`（选型 SSOT），再看 `references/streaming-column-excel-guidance.md` 与 upgrade `references/upgrades/2026-08-11-output-write-layout.md`
+  - YAML books 路径已是 **行 sink**,不能靠 YAML 开关切到 WINDOW（同开 → fail-fast，不是缺字段）
+  - 仅 Python IR 列式(`streaming=False`)才建议 `OutputWriteLayout.COLUMN_WINDOW`（或手写 `StreamingColumnExcelSink`）
+  - 细则（业务格子等价 / 无 auto / 启发式）只以人类页为准，勿在此复述
 
 ## 交付时必须写清楚
 
