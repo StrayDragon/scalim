@@ -73,7 +73,8 @@ Hook 与 Observer 都进同一 `components` 列表；不要从 YAML `observabili
 2. **优先组合内置 profile**，再 `+ [MyObs()]`；避免 subclass 内部改 `PerformanceObserver` 私有状态。
 3. **workflow**：共享同一 `components` 实例才能让 `WorkflowStatsAccumulator.nodes[]` 跨 demand；per-demand 额外组件用 `WorkflowNodePatch` / `ComponentsExtend`。
 4. **高影响订阅**（`FIELD_COMPUTE` / `RELATION_LOOKUP` / viz trace|full）会抬观测税并可能触发 `UserWarning`；Agent 须明示税与 bench 替代。
-5. 可选 `close()` 做 flush；旁路 JSON 优先 `write_run_stats_sibling`，不要塞进 `viz_snapshot.json`。
+5. keys 分片自证订阅 `LOADER_CALL`（`chunk_offset` / `lookup_key_count`）；并行完成序 + 可能在 worker 线程。见 `scalim-yaml-dsl/references/lookup-chunking-guidance.md` 与 `ch164_public_api_lookup_chunking`。
+6. 可选 `close()` 做 flush；旁路 JSON 优先 `write_run_stats_sibling`，不要塞进 `viz_snapshot.json`。
 
 ## 不推荐
 

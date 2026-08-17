@@ -61,7 +61,7 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - 若任务涉及宽表 Excel 峰值 / `StreamingColumnExcelSink` 选型:读 `references/streaming-column-excel.md`（并交叉 `scalim-yaml-dsl` 的 `references/streaming-column-excel-guidance.md`）。
 - **0.10.0 性能亮点**(write-precompute / fusion / chunk 并行;YAML 无强制迁移):`scalim-yaml-dsl/references/0.10-release-highlights.md` + 人类总览 `docs/doc/releases/0.10.0/`。
   - 订阅 `FIELD_COMPUTE` / `OPERATOR_SPAN` 或 `VizObserverConfig(trace_enabled=True)` → **关掉** row-wise fusion(安全外壳)。
-  - keys 分片 / 片间并行：Python `LookupChunking.sized(N[, parallel=True])` + `adaptive`（YAML `lookup_chunk_size` 已迁出；遗留 `parallelize_lookup_chunks` 仅兼容）。
+  - keys 分片 / 片间并行：Python `LookupChunking.sized(N[, parallel=True])` + `adaptive`（YAML `lookup_chunk_size` 已迁出；遗留 `parallelize_lookup_chunks` 仅兼容）。何时用/事件自证：`scalim-yaml-dsl/references/lookup-chunking-guidance.md`；oracle：`ch164_public_api_lookup_chunking`。
 - **0.10.1**(相对 0.10.0): typed `on_*` 收完整 `Event`（breaking；YAML 无强制迁移）— `scalim-yaml-dsl/references/0.10.1-release-highlights.md` + `docs/doc/releases/0.10.1/` + `2026-08-02-typed-handlers-receive-event.md`。经 `event.payload` / `event.meta`（含 `scalim_compute_phase`）。
 - YAML DSL breaking 升级索引仍在 `scalim-yaml-dsl/references/task-upgrade-legacy.md`;**本 EventType / typed Event 批次属于 Python public API**,不进 YAML upgrades 索引。
 - **低漂移 run_stats / write 归因**(装配 profiles、`nodes[]`、baseline↔bench 对拍): `agentdev/skills/scalim-run-stats/SKILL.md` + 人类文档 `docs/doc/viz/run-stats.md`。

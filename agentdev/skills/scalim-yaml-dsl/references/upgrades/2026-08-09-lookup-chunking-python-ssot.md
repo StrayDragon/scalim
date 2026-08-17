@@ -34,5 +34,7 @@ options = DemandRunOptions(
 
 ## 指针
 
+- 何时用 / Observer·Hook 自证：`references/lookup-chunking-guidance.md`
+- 可运行 oracle：`notebooks/marimo/example_public_api_suite/chapters/ch164_public_api_lookup_chunking.py`（pytest 主线 `ch164`）
 - Design：`llmanspec/changes/c40-yaml-runtime-policy-boundary/design.md`
 - Spec：`llmanspec/specs/yaml-dsl-runtime-policy-boundary`（r1003/r1004/r1005）

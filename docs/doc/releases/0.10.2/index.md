@@ -37,6 +37,7 @@ flowchart TD
 - **命中条件**：demand/workflow YAML 的 `sources.*` 仍写 `lookup_chunk_size`。
 - **调整**：删 YAML 字段；在 `DemandRunRuntimeOptions.lookup_chunking` 用 `LookupChunking.sized(...)` / `.off()`。
 - 片间并行：`LookupChunking.sized(n, parallel=True)` + `parallel_mode="adaptive"`。
+- 何时用 / 用 `LOADER_CALL` 自证：见 user-guide §4.4.3 与 `ch164_public_api_lookup_chunking`。
 - Before/After：见 yaml-dsl upgrade 卡（上表）。
 
 ### 2. 低漂移 run_stats（opt-in）

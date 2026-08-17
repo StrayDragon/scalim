@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 from scalim.dsl.yaml_dsl import (
     DemandRunOptions,
@@ -18,6 +18,9 @@ from scalim.dsl.yaml_dsl import (
     run_workflow,
 )
 from scalim.dsl.yaml_dsl.workflow_types import WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRuntimeOptions
+from scalim.events import Event, EventType
+from scalim.hooks import BaseHook
+from scalim.ob.observer import Observer
 from scalim.shortcuts.resources import outputs as outputs_api
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import (
@@ -35,6 +38,47 @@ from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "demo_big_data_report/workflow_demo_big_data_report"
+_LOOKUP_CHUNK = 5
+
+
+class _KeysChunkObserver(Observer):
+    def __init__(self) -> None:
+        self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
+        self.by_source: Dict[str, List[Optional[int]]] = {"customers": [], "products": []}
+        self.miss_offsets: Dict[str, List[int]] = {"customers": [], "products": []}
+        self.hit_offsets: Dict[str, List[Optional[int]]] = {"customers": [], "products": []}
+        self.unchunked_misses: Dict[str, int] = {"customers": 0, "products": 0}
+
+    def on_event(self, event: Event) -> None:
+        if event.event_type is not EventType.LOADER_CALL:
+            return
+        payload = event.payload
+        name = str(getattr(payload, "loader_name", "") or "")
+        if name not in self.by_source:
+            return
+        offset = getattr(payload, "chunk_offset", None)
+        parsed = None if offset is None else int(offset)
+        self.by_source[name].append(parsed)
+        cache_status = str(getattr(payload, "cache_status", "") or "")
+        if cache_status == "hit":
+            self.hit_offsets[name].append(parsed)
+            return
+        if parsed is None:
+            self.unchunked_misses[name] += 1
+            return
+        self.miss_offsets[name].append(parsed)
+
+
+class _KeysChunkHook(BaseHook):
+    def __init__(self) -> None:
+        self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
+        self.by_source: Dict[str, int] = {"customers": 0, "products": 0}
+
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload
+        name = str(getattr(payload, "loader_name", "") or "")
+        if name in self.by_source:
+            self.by_source[name] += 1
 
 
 def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
@@ -122,6 +166,8 @@ def run_workflow_demo_big_data_report(
                         execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
                         cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
                     )
+                    observer = _KeysChunkObserver()
+                    hook = _KeysChunkHook()
                     demand_options = DemandRunOptions(
                         security=DemandRunSecurityOptions(
                             allowed_modules=allowed_modules,
@@ -131,9 +177,10 @@ def run_workflow_demo_big_data_report(
                         runtime=DemandRunRuntimeOptions(
                             batch_size=30,
                             lookup_chunking={
-                                "customers": LookupChunking.sized(5),
-                                "products": LookupChunking.sized(5),
+                                "customers": LookupChunking.sized(_LOOKUP_CHUNK),
+                                "products": LookupChunking.sized(_LOOKUP_CHUNK),
                             },
+                            components=[observer, hook],
                         ),
                     )
                     result = run_workflow(
@@ -206,13 +253,30 @@ def run_workflow_demo_big_data_report(
                 )
 
             artifacts_ok = bool(detail_csv.exists() and metrics_csv.exists() and report_xlsx.exists())
-            passed = bool(not errors and preload_calls == 1 and artifacts_ok and verification.passed and metrics_ok)
+            customer_offsets = list(range(0, int(cfg.customer_count), _LOOKUP_CHUNK))
+            product_offsets = list(range(0, int(cfg.product_count), _LOOKUP_CHUNK))
+            # products 还是 `orders_to_categories` 的中间 hop:第二次 LoadRef 会 `cache_status=hit`
+            # 且 `chunk_offset is None`(命中路径不分片).分片自证只看 miss.
+            customer_miss_ok = observer.miss_offsets["customers"] == customer_offsets
+            product_miss_ok = set(observer.miss_offsets["products"]) == set(product_offsets)
+            no_unchunked_miss = observer.unchunked_misses["customers"] == 0 and observer.unchunked_misses["products"] == 0
+            hits_unchunked = all(offset is None for offsets in observer.hit_offsets.values() for offset in offsets)
+            hook_ok = bool(
+                hook.by_source["customers"] == len(observer.by_source["customers"])
+                and hook.by_source["products"] == len(observer.by_source["products"])
+            )
+            chunk_ok = bool(customer_miss_ok and product_miss_ok and no_unchunked_miss and hits_unchunked and hook_ok)
+            passed = bool(
+                not errors and preload_calls == 1 and artifacts_ok and verification.passed and metrics_ok and chunk_ok
+            )
 
-            summary = "errors={} preload_calls={} artifacts_ok={} verify={}".format(
+            summary = "errors={} preload_calls={} artifacts_ok={} verify={} customers_chunks={} products_chunks={}".format(
                 len(errors),
                 preload_calls,
                 artifacts_ok,
                 verification.passed,
+                observer.by_source["customers"],
+                observer.by_source["products"],
             )
             if errors:
                 summary = summary + "\nfirst_error: {} {}".format(errors[0].exc_type, errors[0].message)
@@ -220,6 +284,13 @@ def run_workflow_demo_big_data_report(
                 summary = summary + "\n" + verification.summary
             if not metrics_ok:
                 summary = summary + "\nmetrics: " + metrics_summary
+            if not chunk_ok:
+                summary = summary + "\nlookup chunk oracle failed hook={} miss={} hits={} unchunked_miss={}".format(
+                    hook.by_source,
+                    observer.miss_offsets,
+                    observer.hit_offsets,
+                    observer.unchunked_misses,
+                )
 
             details: Dict[str, Any] = {
                 "output_dir": str(out_dir),
@@ -233,6 +304,9 @@ def run_workflow_demo_big_data_report(
                 "metrics": {"passed": metrics_ok, "summary": metrics_summary},
                 "errors": errors,
                 "outcomes": result.outcomes,
+                "customers_chunk_offsets": list(observer.by_source["customers"]),
+                "products_chunk_offsets": list(observer.by_source["products"]),
+                "chunk_hook_calls": dict(hook.by_source),
             }
             return ExampleResult(
                 example_id=_EXAMPLE_ID,

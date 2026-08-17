@@ -60,6 +60,7 @@ just qa
 - [Workflow](../yaml-dsl/workflow.md)
 - [配置补全与编辑体验](../yaml-dsl/editor.md)
 - [升级指南](../yaml-dsl/upgrades/index.md)
+- keys lookup 分片：YAML 主线 `ch010` / `ch050` 用 Observer + Hook 订阅 `LOADER_CALL` 核对 `chunk_offset`；选型见 [用户指南 §4.4.3](../yaml-dsl/user-guide.md#443-lookupchunking-keys-分片python-runtime) 与 public API `ch164_public_api_lookup_chunking`
 
 ## 4) doc governance 边界(避免手改生成物)
 

@@ -16,7 +16,10 @@ class DemandIr:
 
     sources: Mapping[str, SourceIr]
     """
-    数据源字典(内部使用:`source_id` -> `SourceIr`).
+    数据源目录(`source_id` -> `SourceIr`);`SourceIr` 的 SSOT.
+
+    运行时策略(`LookupChunking` / `SourceCache` / `RowsReuse`)只覆盖本目录.
+    `FieldIr.source` / `LookupStepIr.to_source` 是图句柄,按 `source_id` 回这里解析.
     运行时为 `MappingProxyType` — 浅不可变.
     """
 

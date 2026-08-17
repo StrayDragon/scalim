@@ -1290,9 +1290,12 @@ runtime = DemandRunRuntimeOptions(
   - wall time ≈ `loader_calls × RTT`(外加固定开销)
 - 仅在下游有硬限制时设置(例如 SQL `IN (...)` 长度、HTTP payload、供应商 API 批次上限).
 - 需要分片时:**取下游限制允许的最大安全值**(例如上限的 50–80%),避免习惯性写 `50`/`100`.
+- `sized(N)` 仅当 `N < unique_keys` 才真正切分;`N >= unique_keys` 观测上等价于 `off`(`LOADER_CALL.chunk_offset is None`).
+- `batch_size` 切的是主行;`LookupChunking` 切的是单次 keys LoadRef.两者正交,不要互相代替.
 - `LookupChunking.sized(size=...)` **alone 不是并行开关**;片间并行须嵌在 `sized(..., parallel=True)` 且 `parallel_mode=adaptive`.
 - 旧平铺 `parallelize_lookup_chunks=True`：仅在 **未**经 `LookupChunking` 写入 `SourceIr.lookup_chunk_parallel` 的 IR（`None` 继承）路径仍生效；若已用 `LookupChunking.sized(...)`，并行请写 `sized(..., parallel=True)`，不要指望平铺布尔覆盖 sized 的显式串行。
 - 护栏见 [执行并行模式 §3.6](../architecture/parallel-modes.md)；迁移卡见 skill upgrade `2026-08-09-lookup-chunking-python-ssot`.
+- 何时用 / 用 `LOADER_CALL` 自证：agent 卡 `agentdev/skills/scalim-yaml-dsl/references/lookup-chunking-guidance.md`；可运行 oracle：`notebooks/marimo/example_public_api_suite/chapters/ch164_public_api_lookup_chunking.py`（Observer + Hook 核对 `chunk_offset` / `lookup_key_count`）.
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
 

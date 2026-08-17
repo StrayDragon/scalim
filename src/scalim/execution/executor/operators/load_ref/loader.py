@@ -506,8 +506,8 @@ def load_step_data(
     is_final_step: bool,
     group_field_keys: Tuple[str, ...],
 ) -> LoaderResultMapping:
-    source = step.to_source
     runtime = exec_ctx.runtime
+    source = runtime.resolve_lookup_source(step)
 
     if runtime.is_source_cached(source.source_id):
         return runtime.get_cached_source_mapping(step)

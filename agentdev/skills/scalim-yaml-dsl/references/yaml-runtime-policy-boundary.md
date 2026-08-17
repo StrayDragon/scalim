@@ -6,6 +6,7 @@ c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof
 
 - 用户问「这个旋钮该写 YAML 还是 Python」
 - 涉及 keys 分片、`cache_mode`、或已迁出键回流
+- 问「要不要设 LookupChunking / chunk 会不会更快」→ 改读 `references/lookup-chunking-guidance.md`
 - 混淆 `sources.*.cache_mode` 与 `$rows.cache_mode`
 
 ## 三栏启发式（工作用）
@@ -36,3 +37,5 @@ c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof
 - Design / evidence（归档后）：`llmanspec/changes/archive/*-c40-yaml-runtime-policy-boundary/`
 - Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary/`（r1003–r1005）
 - 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`、`user-guide.md` §4.4.3
+- 何时用 / 事件自证：`references/lookup-chunking-guidance.md`
+- 可运行 oracle：`notebooks/marimo/example_public_api_suite/chapters/ch164_public_api_lookup_chunking.py`

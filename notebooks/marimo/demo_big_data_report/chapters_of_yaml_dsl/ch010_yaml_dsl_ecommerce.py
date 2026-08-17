@@ -2,7 +2,7 @@ import marimo
 
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 from scalim.dsl.yaml_dsl import (
     CaptureRows,
@@ -15,6 +15,9 @@ from scalim.dsl.yaml_dsl import (
     compile as compile_yaml,
     run as run_yaml,
 )
+from scalim.events import Event, EventType
+from scalim.hooks import BaseHook
+from scalim.ob.observer import Observer
 from scalim.typedefs import RowData
 from scalim_misc.demo_big_data_report.cases import build_test_config_small
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
@@ -25,6 +28,36 @@ from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
 _EXAMPLE_ID = "demo_big_data_report/yaml_dsl_ecommerce"
+_CUSTOMER_CHUNK = 5
+
+
+class _CustomerChunkObserver(Observer):
+    def __init__(self) -> None:
+        self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
+        self.offsets: List[Optional[int]] = []
+        self.counts: List[Optional[int]] = []
+
+    def on_event(self, event: Event) -> None:
+        if event.event_type is not EventType.LOADER_CALL:
+            return
+        payload = event.payload
+        if str(getattr(payload, "loader_name", "") or "") != "customers":
+            return
+        offset = getattr(payload, "chunk_offset", None)
+        count = getattr(payload, "lookup_key_count", None)
+        self.offsets.append(None if offset is None else int(offset))
+        self.counts.append(None if count is None else int(count))
+
+
+class _CustomerChunkHook(BaseHook):
+    def __init__(self) -> None:
+        self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
+        self.call_count = 0
+
+    def on_loader_call(self, event: Event) -> None:
+        payload = event.payload
+        if str(getattr(payload, "loader_name", "") or "") == "customers":
+            self.call_count += 1
 
 
 def _extract_verifiable_fields(rows: Sequence[RowData]) -> List[str]:
@@ -57,7 +90,7 @@ def run_yaml_dsl_ecommerce(
             security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
             template = DemandRunTemplateOptions(init_vars=init_vars)
             runtime = DemandRunRuntimeOptions(
-                lookup_chunking={"customers": LookupChunking.sized(5)},
+                lookup_chunking={"customers": LookupChunking.sized(_CUSTOMER_CHUNK)},
             )
             compilation = compile_yaml(
                 str(yaml_path),
@@ -74,6 +107,12 @@ def run_yaml_dsl_ecommerce(
             )
 
         demand_config = compilation.config
+        observer = _CustomerChunkObserver()
+        hook = _CustomerChunkHook()
+        run_runtime = DemandRunRuntimeOptions(
+            lookup_chunking={"customers": LookupChunking.sized(_CUSTOMER_CHUNK)},
+            components=[observer, hook],
+        )
 
         # 2) `run`: 显式启用 `CaptureRows`,在内存中拿到行数据
         start = time.time()
@@ -82,7 +121,7 @@ def run_yaml_dsl_ecommerce(
             options=DemandRunOptions(
                 security=security,
                 template=template,
-                runtime=runtime,
+                runtime=run_runtime,
                 outputs=DemandRunOutputOptions(capture=CaptureRows()),
             ),
         )
@@ -113,7 +152,23 @@ def run_yaml_dsl_ecommerce(
         verification: VerificationResult = verify_scalim_output(rows, fields_to_check=fields_to_check)
 
         passed = bool(verification.passed and mismatch == 0)
-        summary = "rows={} elapsed={:.3f}s verify={} rows_match_failures={}".format(len(rows), elapsed, verification.passed, mismatch)
+        unique_customers = int(cfg.customer_count)
+        expected_calls = (unique_customers + _CUSTOMER_CHUNK - 1) // _CUSTOMER_CHUNK
+        expected_offsets = list(range(0, unique_customers, _CUSTOMER_CHUNK))
+        expected_counts = [min(_CUSTOMER_CHUNK, unique_customers - offset) for offset in expected_offsets]
+        chunk_ok = bool(
+            observer.offsets == expected_offsets
+            and observer.counts == expected_counts
+            and hook.call_count == expected_calls
+        )
+        passed = bool(passed and chunk_ok)
+        summary = "rows={} elapsed={:.3f}s verify={} rows_match_failures={} customers_chunks={}".format(
+            len(rows), elapsed, verification.passed, mismatch, observer.offsets
+        )
+        if not chunk_ok:
+            summary = summary + "\ncustomers chunk oracle failed: offsets={} counts={} hook={}".format(
+                observer.offsets, observer.counts, hook.call_count
+            )
         if mismatch:
             summary = summary + "\nrows match fields failed on {} rows".format(mismatch)
         if not verification.passed:
@@ -128,6 +183,9 @@ def run_yaml_dsl_ecommerce(
             "verification": verification,
             "fields_checked": fields_to_check,
             "rows_match_failures": mismatch,
+            "customers_chunk_offsets": list(observer.offsets),
+            "customers_chunk_counts": list(observer.counts),
+            "customers_hook_calls": hook.call_count,
         }
         return ExampleResult(
             example_id=_EXAMPLE_ID,

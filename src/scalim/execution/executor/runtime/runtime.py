@@ -13,6 +13,7 @@ from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks import ISink
 from ....spec.ir import LookupStepIr, MainSourceIr, SourceIr, SupportedFieldIr
+from ....spec.ir._source_contracts import LookupSourceRefIrBase
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LoaderResultValue, LookupKey, ParallelMode, RowData, RuntimeValue
 from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
@@ -211,6 +212,19 @@ class ExecutionRuntime:
         if controller is None:
             return
         controller.maybe_log_summary()
+
+    def resolve_lookup_source(self, step: LookupStepIr) -> LookupSourceRefIrBase:
+        """按 `source_id` 从本 run 的 source 目录取 live `SourceIr`.
+
+        `LookupStepIr.to_source` 只是编译期图句柄. `LookupChunking` / `SourceCache` /
+        `RowsReuse` 写在 `DemandIr.sources`,并复制进 `ExecutionRuntime.sources`.
+        目录未收录时回退到句柄(直接构造 IR 的测试路径).
+        """
+        fallback = step.to_source
+        live = self.sources.get(str(fallback.source_id))
+        if live is not None:
+            return live
+        return fallback
 
     def get_cached_source_mapping(self, step: LookupStepIr) -> LoaderResultMapping:
         source_id = str(step.to_source.source_id)

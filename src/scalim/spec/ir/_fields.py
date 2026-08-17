@@ -169,7 +169,9 @@ class FieldIr:
 
     source: SourceRefIr
     """
-    数据源对象引用 (类型安全)
+    数据源图句柄(类型安全).
+
+    与 `LookupStepIr.to_source` 相同:身份解析以 `DemandIr.sources[source_id]` 为 SSOT.
     """
 
     data_key: str = ""

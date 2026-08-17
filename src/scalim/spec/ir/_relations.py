@@ -247,7 +247,10 @@ class LookupStepIr:
 
     to_source: LookupSourceRefIrBase
     """
-    目标数据源对象,明确指定要关联到哪个源
+    目标数据源图句柄(身份 + key 形态).
+
+    策略字段(`lookup_chunk_size` / `cache_mode` / bind 复用)以 `DemandIr.sources[source_id]`
+    为 SSOT;执行层必须按 `source_id` 回目录解析,不要把本句柄当成 live `SourceIr`.
     """
 
     to_field: Optional[LookupKeySpec] = None

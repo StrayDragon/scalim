@@ -10,7 +10,7 @@ from scalim.spec.ir.binding import LoaderIr
 from scalim.spec.ir.lookup_casts import lookup_cast_id
 
 
-def _make_runtime(*, key_normalization: str) -> ExecutionRuntime:
+def _make_runtime(*, key_normalization: str, sources=None) -> ExecutionRuntime:
     plan = ExecutionPlan(field_specs={})
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": lambda: []})
     int_cast = LookupCastSpecIr(name="int")
@@ -20,7 +20,7 @@ def _make_runtime(*, key_normalization: str) -> ExecutionRuntime:
         HookManager(),
         ObserverManager(),
         main_source=MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader")),
-        sources={},
+        sources={} if sources is None else sources,
         runtime_bindings=runtime_bindings,
         key_normalization=key_normalization,  # type: ignore[arg-type]
     )
@@ -107,3 +107,33 @@ def test_execution_runtime_get_cached_source_mapping_collision_fails_fast_when_v
         _ = runtime.get_cached_source_mapping(step)
 
     assert "123" not in str(excinfo.value)
+
+
+def test_resolve_lookup_source_prefers_catalog_over_nested_handle() -> None:
+    nested = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
+        lookup_chunk_size=None,
+    )
+    catalog = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
+        lookup_chunk_size=3,
+        lookup_chunk_parallel=True,
+    )
+    step = LookupStepIr(from_field="fk", to_source=nested)
+    runtime = _make_runtime(key_normalization="raw", sources={"targets": catalog})
+
+    live = runtime.resolve_lookup_source(step)
+    assert live is catalog
+    assert live.lookup_chunk_size == 3
+    assert live.lookup_chunk_parallel is True
+    assert nested.lookup_chunk_size is None
+
+
+def test_resolve_lookup_source_falls_back_to_nested_handle_when_catalog_empty() -> None:
+    step = _make_step()
+    runtime = _make_runtime(key_normalization="raw")
+    assert runtime.resolve_lookup_source(step) is step.to_source
