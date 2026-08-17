@@ -2,6 +2,7 @@
 
 仅当 `OutputSpec.format=excel` 且 `streaming=False` 时生效.
 `YAML` `books` / `output_composition` 为行写出,不得用本枚举假装切换.
+未设 `OutputWriteLayout` 时:`BUFFERED` 推导 `column_buffered`,`CHUNKED` 推导 `column_chunked`.
 """
 
 from ..vendor.compact import StrEnum
@@ -10,8 +11,8 @@ from ..vendor.compact import StrEnum
 class ExcelColumnResidency(StrEnum):
     """列式 `Excel` 文件 `sink` 驻留策略."""
 
-    HOLD = "hold"
-    WINDOW = "window"
+    BUFFERED = "buffered"
+    CHUNKED = "chunked"
 
 
 __all__ = ("ExcelColumnResidency",)

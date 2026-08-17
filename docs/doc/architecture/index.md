@@ -12,7 +12,7 @@
 
 - [如何阅读本项目](../getting-started/reading-guide.md)
 - [并行模式(seq/adaptive)](parallel-modes.md)
-- [Excel 列式写出策略(HOLD/WINDOW)](../getting-started/excel-column-residency.md)
+- [文件写出布局(row_stream / buffered / chunked)](../getting-started/excel-column-residency.md)
 
 ## 1. 一图看懂: 从需求到输出
 

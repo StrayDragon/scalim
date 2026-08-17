@@ -190,7 +190,7 @@ flowchart TD
 
 - 订阅 `FIELD_COMPUTE`：用 `meta["scalim_compute_phase"]` 区分 `operator` 与 `write_precompute`。
 - 勿假设「Compute 段结束后上下文已有全部写出派生」。
-- Excel / `openpyxl` 主路径不是本版主优化；宽表列峰值另见 [Excel 列式写出策略](../getting-started/excel-column-residency.md)。
+- Excel / `openpyxl` 主路径不是本版主优化；宽表列峰值另见 [文件写出布局](../getting-started/excel-column-residency.md)。
 
 ---
 

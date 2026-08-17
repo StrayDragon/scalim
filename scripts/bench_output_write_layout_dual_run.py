@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""离线 `HOLD` vs `WINDOW` 双跑,用于写出布局建议阈值校准 (`c40`).
+"""离线 `column_buffered` vs `column_chunked` 双跑,用于写出布局建议阈值校准 (`c40`).
 
 不改变默认 `run_ir` 行为.证据写入 `.tmp/evidence/c40-write-layout-dual-run/`(不入库).
 
@@ -8,7 +8,7 @@
   `uv run python scripts/bench_output_write_layout_dual_run.py --preset medium`
   `uv run python scripts/bench_output_write_layout_dual_run.py --rows 20000 --cols 50 --n 3`
 
-上限:若估算 `HOLD` 峰值可能超过 `--max-rss-gb`(默认 10)则跳过该形状.
+上限:若估算 `column_buffered` 峰值可能超过 `--max-rss-gb`(默认 10)则跳过该形状.
 """
 
 from __future__ import annotations
@@ -142,8 +142,8 @@ def main() -> int:
         rows_hold = rows_win = None
         for i in range(args.n):
             for layout, walls, rss_list in (
-                ("column_hold", hold_walls, hold_rss),
-                ("column_window", win_walls, win_rss),
+                ("column_buffered", hold_walls, hold_rss),
+                ("column_chunked", win_walls, win_rss),
             ):
                 path = out_dir / name / layout / ("r%d.xlsx" % i)
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,7 +152,7 @@ def main() -> int:
                 data = _run_one(layout, path, rows, cols, batch)
                 walls.append(float(data["wall_s"]))
                 rss_list.append(int(data["rss_kb"]))
-                if layout == "column_hold":
+                if layout == "column_buffered":
                     rows_hold = data["rows_out"]
                 else:
                     rows_win = data["rows_out"]
@@ -177,14 +177,14 @@ def main() -> int:
             "rss_ratio_hold_over_window": (med_hr / med_wr) if med_wr else None,
             "wall_ratio_window_over_hold": (med_ww / med_hw) if med_hw else None,
             "rows_equal": True,
-            "suggest_column_window": bool(med_hr > med_wr * 1.5),
+            "suggest_column_chunked": bool(med_hr > med_wr * 1.5),
         }
         results.append(row)
         print(
             "  → rss比 H/W={:.2f} 墙钟比 W/H={:.2f} 建议_window={}".format(
                 row["rss_ratio_hold_over_window"],
                 row["wall_ratio_window_over_hold"],
-                row["suggest_column_window"],
+                row["suggest_column_chunked"],
             ),
             flush=True,
         )

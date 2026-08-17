@@ -81,7 +81,7 @@ def test_yaml_lookup_chunk_size_rejected_with_lookup_chunking_hint(tmp_path: Pat
 
 def test_yaml_output_write_layout_rejected_with_python_hint(tmp_path: Path) -> None:
     yaml_path = tmp_path / "demand.yaml"
-    body = _minimal_demand_yaml() + "\noutput_write_layout: column_window\n"
+    body = _minimal_demand_yaml() + "\noutput_write_layout: column_chunked\n"
     yaml_path.write_text(body, encoding="utf-8")
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
@@ -95,7 +95,7 @@ def test_yaml_output_write_layout_rejected_with_python_hint(tmp_path: Path) -> N
 
 def test_yaml_excel_column_residency_rejected_with_python_hint(tmp_path: Path) -> None:
     yaml_path = tmp_path / "demand.yaml"
-    body = _minimal_demand_yaml() + "\nexcel_column_residency: window\n"
+    body = _minimal_demand_yaml() + "\nexcel_column_residency: chunked\n"
     yaml_path.write_text(body, encoding="utf-8")
 
     with pytest.raises(ScalimYamlValidationError) as excinfo:
@@ -104,7 +104,7 @@ def test_yaml_excel_column_residency_rejected_with_python_hint(tmp_path: Path) -
     msg = "\n".join(env.message for env in excinfo.value.errors)
     assert "excel_column_residency" in msg
     assert "OutputWriteLayout" in msg
-    assert "COLUMN_WINDOW" in msg
+    assert "COLUMN_CHUNKED" in msg
     assert any(env.path == "excel_column_residency" for env in excinfo.value.errors)
 
 

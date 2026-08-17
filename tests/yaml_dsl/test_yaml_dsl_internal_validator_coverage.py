@@ -244,7 +244,7 @@ def test_validator_strips_removed_sources_lookup_chunk_size() -> None:
 
 def test_validator_strips_removed_output_write_layout_top_level() -> None:
     issues = []
-    cleaned = {"name": "demo", "output_write_layout": "column_window", "excel_column_residency": "window"}
+    cleaned = {"name": "demo", "output_write_layout": "column_chunked", "excel_column_residency": "chunked"}
     out = ConfigValidator._strip_removed_demand_runtime_policy_top_level(cleaned, issues)  # noqa: SLF001
 
     assert "output_write_layout" not in out

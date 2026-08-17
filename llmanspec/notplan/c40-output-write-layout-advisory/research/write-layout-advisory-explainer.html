@@ -113,7 +113,7 @@
 
   <div class="callout info">
     <strong>一句话</strong>：宽表 Excel 用 WINDOW 往往更省内存；默认不能偷偷改写出方式。
-    系统只「告诉你」，你再显式设 <code>OutputWriteLayout.COLUMN_WINDOW</code>。
+    系统只「告诉你」，你再显式设 <code>OutputWriteLayout.COLUMN_CHUNKED</code>。
   </div>
 
   <h2>1. 三种装车方式</h2>
@@ -123,11 +123,11 @@
       <p class="muted">YAML books / 多表组合只能走这条。不是列式 WINDOW 的优化对象。</p>
     </div>
     <div class="card">
-      <h3><span class="pill hold">column_hold</span> 整列先攒齐</h3>
+      <h3><span class="pill hold">column_buffered</span> 整列先攒齐</h3>
       <p class="muted">默认列式 Excel：每列整表先在内存，宽表峰值高。</p>
     </div>
     <div class="card">
-      <h3><span class="pill window">column_window</span> 按窗刷列</h3>
+      <h3><span class="pill window">column_chunked</span> 按窗刷列</h3>
       <p class="muted">列式 Excel 按行窗推进；峰值通常更低，墙钟往往差不多。</p>
     </div>
   </div>
@@ -200,7 +200,7 @@
       <h3>默认（不设）</h3>
       <pre># 不设 output_write_layout
 # excel + streaming=False + HOLD
-# → effective = column_hold</pre>
+# → effective = column_buffered</pre>
     </div>
     <div class="card">
       <h3>显式 WINDOW</h3>
@@ -216,7 +216,7 @@ run(
     options=DemandRunOptions(
         runtime=DemandRunRuntimeOptions(
             output_write_layout=
-              OutputWriteLayout.COLUMN_WINDOW,
+              OutputWriteLayout.COLUMN_CHUNKED,
         ),
     ),
 )</pre>
@@ -259,18 +259,18 @@ run(
   <h2>6. L1 生效后你会看到什么（假想）</h2>
   <div class="card">
     <p>
-      <span class="pill">current</span> <code>column_hold</code>
+      <span class="pill">current</span> <code>column_buffered</code>
       <span class="arrow">→</span>
-      <span class="pill window">suggested</span> <code>column_window</code>
+      <span class="pill window">suggested</span> <code>column_chunked</code>
       &nbsp; <span class="pill">safe=true</span>
       &nbsp; <span class="pill">wide_excel_peak_risk</span>
     </p>
     <pre>{
-  "suggested": "column_window",
-  "current_effective": "column_hold",
+  "suggested": "column_chunked",
+  "current_effective": "column_buffered",
   "reason_code": "wide_excel_peak_risk",
   "reason_detail": "n_fields*n_rows exceeds threshold",
-  "action": "set DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_WINDOW)",
+  "action": "set DemandRunRuntimeOptions(output_write_layout=OutputWriteLayout.COLUMN_CHUNKED)",
   "safe": true
 }</pre>
     <p class="muted">这次写出不变；下次你复制 action 显式改 options 才变。</p>
@@ -302,8 +302,8 @@ run(
 
   <h2>8. 初稿阈值候选</h2>
   <p>
-    <code>wide_excel_peak_risk</code>：IR excel + effective <code>column_hold</code> +
-    <code>n_fields * n_rows &gt;= 1_000_000</code> → 建议 <code>column_window</code>，<code>safe=true</code>。
+    <code>wide_excel_peak_risk</code>：IR excel + effective <code>column_buffered</code> +
+    <code>n_fields * n_rows &gt;= 1_000_000</code> → 建议 <code>column_chunked</code>，<code>safe=true</code>。
     （来自 medium 双跑：百万格量级已出现 2.5×+ RSS 差；propose 时可改为「格数 + peak_mb」双条件。）
   </p>
 

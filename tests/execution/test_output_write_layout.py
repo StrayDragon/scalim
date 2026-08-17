@@ -18,15 +18,21 @@ from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 run_ir_mod = importlib.import_module("scalim.execution.run_ir")
 
 
+def test_layout_enum_closed_set_has_no_removed_names() -> None:
+    assert not hasattr(OutputWriteLayout, "COLUMN_HOLD")
+    assert not hasattr(OutputWriteLayout, "COLUMN_WINDOW")
+    assert {member.value for member in OutputWriteLayout} == {"row_stream", "column_buffered", "column_chunked"}
+
+
 @pytest.mark.parametrize(
     "streaming,fmt,residency,expected",
     [
-        (True, "csv", ExcelColumnResidency.HOLD, OutputWriteLayout.ROW_STREAM),
-        (True, "excel", ExcelColumnResidency.HOLD, OutputWriteLayout.ROW_STREAM),
-        (False, "csv", ExcelColumnResidency.HOLD, OutputWriteLayout.COLUMN_HOLD),
-        (False, "csv", ExcelColumnResidency.WINDOW, OutputWriteLayout.COLUMN_HOLD),
-        (False, "excel", ExcelColumnResidency.HOLD, OutputWriteLayout.COLUMN_HOLD),
-        (False, "excel", ExcelColumnResidency.WINDOW, OutputWriteLayout.COLUMN_WINDOW),
+        (True, "csv", ExcelColumnResidency.BUFFERED, OutputWriteLayout.ROW_STREAM),
+        (True, "excel", ExcelColumnResidency.BUFFERED, OutputWriteLayout.ROW_STREAM),
+        (False, "csv", ExcelColumnResidency.BUFFERED, OutputWriteLayout.COLUMN_BUFFERED),
+        (False, "csv", ExcelColumnResidency.CHUNKED, OutputWriteLayout.COLUMN_BUFFERED),
+        (False, "excel", ExcelColumnResidency.BUFFERED, OutputWriteLayout.COLUMN_BUFFERED),
+        (False, "excel", ExcelColumnResidency.CHUNKED, OutputWriteLayout.COLUMN_CHUNKED),
     ],
 )
 def test_resolve_derives_legacy_table(streaming, fmt, residency, expected) -> None:
@@ -45,7 +51,7 @@ def test_resolve_composition_forces_row_stream() -> None:
         output_write_layout=None,
         streaming=False,
         output_format="excel",
-        excel_column_residency=ExcelColumnResidency.HOLD,
+        excel_column_residency=ExcelColumnResidency.BUFFERED,
         has_output_composition=True,
     )
     assert got is OutputWriteLayout.ROW_STREAM
@@ -53,22 +59,22 @@ def test_resolve_composition_forces_row_stream() -> None:
 
 def test_explicit_layout_wins() -> None:
     got = resolve_output_write_layout(
-        output_write_layout=OutputWriteLayout.COLUMN_HOLD,
+        output_write_layout=OutputWriteLayout.COLUMN_BUFFERED,
         streaming=True,
         output_format="excel",
-        excel_column_residency=ExcelColumnResidency.WINDOW,
+        excel_column_residency=ExcelColumnResidency.CHUNKED,
         has_output_composition=False,
     )
-    assert got is OutputWriteLayout.COLUMN_HOLD
+    assert got is OutputWriteLayout.COLUMN_BUFFERED
 
 
 def test_resolve_rejects_non_enum_layout() -> None:
     with pytest.raises(TypeError, match="output_write_layout must be an OutputWriteLayout"):
         resolve_output_write_layout(
-            output_write_layout="column_hold",  # type: ignore[arg-type]
+            output_write_layout="column_buffered",  # type: ignore[arg-type]
             streaming=False,
             output_format="excel",
-            excel_column_residency=ExcelColumnResidency.HOLD,
+            excel_column_residency=ExcelColumnResidency.BUFFERED,
             has_output_composition=False,
         )
 
@@ -79,19 +85,19 @@ def test_options_reject_string_layout() -> None:
     with pytest.raises(TypeError, match="OutputWriteLayout"):
         _ = ExecutionRequest(
             export_layout=ExportLayout(field_ids=("a",)),
-            output_write_layout="column_hold",  # type: ignore[arg-type]
+            output_write_layout="column_buffered",  # type: ignore[arg-type]
         )
 
 
 @pytest.mark.parametrize(
     "streaming,fmt,residency,sink_type",
     [
-        (True, "csv", ExcelColumnResidency.HOLD, CSVSink),
-        (False, "csv", ExcelColumnResidency.HOLD, ColumnCSVSink),
-        (False, "csv", ExcelColumnResidency.WINDOW, ColumnCSVSink),
-        (True, "excel", ExcelColumnResidency.HOLD, ExcelSink),
-        (False, "excel", ExcelColumnResidency.HOLD, ColumnExcelSink),
-        (False, "excel", ExcelColumnResidency.WINDOW, StreamingColumnExcelSink),
+        (True, "csv", ExcelColumnResidency.BUFFERED, CSVSink),
+        (False, "csv", ExcelColumnResidency.BUFFERED, ColumnCSVSink),
+        (False, "csv", ExcelColumnResidency.CHUNKED, ColumnCSVSink),
+        (True, "excel", ExcelColumnResidency.BUFFERED, ExcelSink),
+        (False, "excel", ExcelColumnResidency.BUFFERED, ColumnExcelSink),
+        (False, "excel", ExcelColumnResidency.CHUNKED, StreamingColumnExcelSink),
     ],
 )
 def test_unset_layout_preserves_legacy_sink_types(tmp_path: Path, streaming, fmt, residency, sink_type) -> None:
@@ -111,12 +117,12 @@ def test_unset_layout_preserves_legacy_sink_types(tmp_path: Path, streaming, fmt
         sink.close()
 
 
-def test_explicit_csv_column_window_fails_fast(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="column_window"):
+def test_explicit_csv_column_chunked_fails_fast(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="column_chunked"):
         _ = run_ir_mod._create_file_sink(
             OutputSpec(format="csv", path=str(tmp_path / "x.csv"), streaming=False),
             ExportLayout(field_ids=("id",)),
-            output_write_layout=OutputWriteLayout.COLUMN_WINDOW,
+            output_write_layout=OutputWriteLayout.COLUMN_CHUNKED,
         )
 
 
@@ -141,20 +147,20 @@ def test_composition_plus_explicit_column_layout_fails_fast(tmp_path: Path) -> N
         export_layout=ExportLayout(field_ids=("id",)),
         output_composition=composition,
         runtime_bindings=runtime_bindings,
-        output_write_layout=OutputWriteLayout.COLUMN_HOLD,
+        output_write_layout=OutputWriteLayout.COLUMN_BUFFERED,
     )
     with pytest.raises(ValueError, match="output_composition"):
         _ = run_ir_mod.run_ir(demand_ir, req)
 
 
-def test_explicit_column_window_selects_streaming_column_excel(tmp_path: Path) -> None:
+def test_explicit_column_chunked_selects_streaming_column_excel(tmp_path: Path) -> None:
     layout = ExportLayout(field_ids=("id", "name"))
     path = tmp_path / "w.xlsx"
     sink = run_ir_mod._create_file_sink(
         OutputSpec(format="excel", path=str(path), streaming=False),
         layout,
-        excel_column_residency=ExcelColumnResidency.HOLD,
-        output_write_layout=OutputWriteLayout.COLUMN_WINDOW,
+        excel_column_residency=ExcelColumnResidency.BUFFERED,
+        output_write_layout=OutputWriteLayout.COLUMN_CHUNKED,
     )
     assert isinstance(sink, StreamingColumnExcelSink)
     assert sink is not None

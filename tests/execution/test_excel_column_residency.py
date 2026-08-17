@@ -17,11 +17,11 @@ run_ir_mod = importlib.import_module("scalim.execution.run_ir")
 
 def test_excel_column_residency_enum_strict() -> None:
     with pytest.raises(TypeError, match="ExcelColumnResidency"):
-        _ = DemandRunRuntimeOptions(excel_column_residency="window")  # type: ignore[arg-type]
+        _ = DemandRunRuntimeOptions(excel_column_residency="chunked")  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="ExcelColumnResidency"):
         _ = ExecutionRequest(
             export_layout=ExportLayout(field_ids=("a",)),
-            excel_column_residency="hold",  # type: ignore[arg-type]
+            excel_column_residency="buffered",  # type: ignore[arg-type]
         )
 
 
@@ -32,12 +32,12 @@ def test_create_file_sink_hold_and_window(tmp_path: Path) -> None:
     hold = run_ir_mod._create_file_sink(
         OutputSpec(format="excel", path=str(hold_path), streaming=False),
         layout,
-        excel_column_residency=ExcelColumnResidency.HOLD,
+        excel_column_residency=ExcelColumnResidency.BUFFERED,
     )
     win = run_ir_mod._create_file_sink(
         OutputSpec(format="excel", path=str(win_path), streaming=False),
         layout,
-        excel_column_residency=ExcelColumnResidency.WINDOW,
+        excel_column_residency=ExcelColumnResidency.CHUNKED,
     )
     assert isinstance(hold, ColumnExcelSink)
     assert isinstance(win, StreamingColumnExcelSink)
@@ -49,11 +49,11 @@ def test_create_file_sink_hold_and_window(tmp_path: Path) -> None:
 
 def test_window_rejects_streaming_excel(tmp_path: Path) -> None:
     layout = ExportLayout(field_ids=("id",))
-    with pytest.raises(ValueError, match="WINDOW"):
+    with pytest.raises(ValueError, match="CHUNKED"):
         _ = run_ir_mod._create_file_sink(
             OutputSpec(format="excel", path=str(tmp_path / "x.xlsx"), streaming=True),
             layout,
-            excel_column_residency=ExcelColumnResidency.WINDOW,
+            excel_column_residency=ExcelColumnResidency.CHUNKED,
         )
 
 
@@ -80,7 +80,7 @@ def test_window_with_output_composition_fails_fast(tmp_path: Path) -> None:
         export_layout=ExportLayout(field_ids=("id",)),
         output_composition=composition,
         runtime_bindings=runtime_bindings,
-        excel_column_residency=ExcelColumnResidency.WINDOW,
+        excel_column_residency=ExcelColumnResidency.CHUNKED,
     )
     with pytest.raises(ValueError, match="output_composition"):
         _ = run_ir_mod.run_ir(demand_ir, req)
@@ -106,10 +106,13 @@ def test_run_ir_window_writes_streaming_column_excel(tmp_path: Path) -> None:
         export_layout=ExportLayout(field_ids=("id", "name"), header_names=("ID", "Name")),
         output=OutputSpec(format="excel", path=str(out), streaming=False, include_header=True),
         runtime_bindings=runtime_bindings,
-        excel_column_residency=ExcelColumnResidency.WINDOW,
+        excel_column_residency=ExcelColumnResidency.CHUNKED,
         batch_size=1,
     )
     result = run_ir_mod.run_ir(demand_ir, req)
     assert result.total_rows == 2
     assert out.exists()
-    assert residency_mod.ExcelColumnResidency.WINDOW.value == "window"
+    assert residency_mod.ExcelColumnResidency.CHUNKED.value == "chunked"
+    assert not hasattr(residency_mod.ExcelColumnResidency, "HOLD")
+    assert not hasattr(residency_mod.ExcelColumnResidency, "WINDOW")
+    assert {member.value for member in residency_mod.ExcelColumnResidency} == {"buffered", "chunked"}

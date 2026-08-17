@@ -220,7 +220,7 @@ class ExecutionRequest:
     capture_in_memory_rows: bool = False
     """可选:捕获本次运行输出的 `InMemoryRows`(表格总线细胞为 `object`;默认关闭)."""
 
-    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `format=excel` 且 `streaming=False` 时生效)."""
 
     output_write_layout: Optional[OutputWriteLayout] = None

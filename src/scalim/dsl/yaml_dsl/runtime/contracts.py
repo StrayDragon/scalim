@@ -583,8 +583,8 @@ class DemandRunRuntimeOptions:
     key_normalization: KeyNormalizationMode = "raw"
     """可选: `key` 规范化模式(实验性)."""
 
-    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD
-    """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `HOLD`)."""
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED
+    """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `BUFFERED`)."""
 
     output_write_layout: Optional[OutputWriteLayout] = None
     """可选:显式文件写出布局(`None`=按 `streaming`/`residency` 推导;仅接受 `OutputWriteLayout`)."""

@@ -346,7 +346,7 @@ def _create_file_sink(
     output: OutputSpec,
     layout: ExportLayout,
     *,
-    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED,
     output_write_layout: Optional[OutputWriteLayout] = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> Optional[ISink]:
@@ -406,7 +406,7 @@ def _create_file_sink(
                 allow_formulas=bool(output.excel_allow_formulas),
                 type_precheck=sink_type_precheck,
             )
-        if write_layout is OutputWriteLayout.COLUMN_WINDOW:
+        if write_layout is OutputWriteLayout.COLUMN_CHUNKED:
             return StreamingColumnExcelSink(
                 output_path=str(output.path),
                 field_names=field_names,
@@ -452,7 +452,7 @@ def _create_output_plan(
     layout: ExportLayout,
     sink: Optional[ISink],
     *,
-    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.HOLD,
+    excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED,
     output_write_layout: Optional[OutputWriteLayout] = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> _OutputPlan:
@@ -699,7 +699,7 @@ def _assemble_outputs(
 ) -> _OutputAssembly:
     composition_spec = request.output_composition
     if composition_spec is not None:
-        # `composition` 目标强制行流;显式列布局 / `WINDOW` `residency` 一律 `fail-fast`.
+        # `composition` 目标强制行流;显式列布局 / `CHUNKED` `residency` 一律 `fail-fast`.
         explicit = request.output_write_layout
         validate_output_write_layout_combos(
             layout=resolve_output_write_layout(

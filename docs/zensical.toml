@@ -11,6 +11,7 @@ extra_javascript = [
   "assets/javascripts/write-precompute-0.10-charts.js",
   "assets/javascripts/rowwise-fusion-0.10-charts.js",
   "assets/javascripts/lookup-chunk-parallel-0.10-charts.js",
+  "assets/javascripts/output-write-layout-explainer.js",
 ]
 nav = [
   { "首页" = "index.md" },
@@ -37,7 +38,7 @@ nav = [
   ] },
   { "运行与调参" = [
     { "并行模式(seq/adaptive)" = "architecture/parallel-modes.md" },
-    { "Excel 列式写出策略(HOLD/WINDOW)" = "getting-started/excel-column-residency.md" },
+    { "文件写出布局(row_stream/buffered/chunked)" = "getting-started/excel-column-residency.md" },
   ] },
   { "版本亮点" = [
     "releases/index.md",

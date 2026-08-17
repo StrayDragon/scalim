@@ -10,7 +10,7 @@
 - [如何阅读本项目](../getting-started/reading-guide.md)
 - [YAML DSL](../yaml-dsl/index.md)
 - [并行模式(seq/adaptive)](parallel-modes.md)
-- [Excel 列式写出策略(HOLD/WINDOW)](../getting-started/excel-column-residency.md)
+- [文件写出布局(row_stream / buffered / chunked)](../getting-started/excel-column-residency.md)
 
 ??? note "维护提示"
     本页内容通常会在以下变更后需要同步检查:
@@ -19,7 +19,7 @@
     - ExecutionPlan 的算子序列或批次执行边界调整
     - 并行模式与 `LoadRef` 调度语义调整
     - hooks/ob/events 的分发与回放策略调整
-    - 稳定 sinks / 写出策略新增（例如列式 Excel HOLD vs WINDOW）
+    - 稳定 sinks / 写出策略新增（例如列式 Excel `column_buffered` vs `column_chunked`）
 
 更严格的语义/约束以 `llmanspec/specs/` 为准.
 
@@ -287,7 +287,7 @@ flowchart LR
 - `IRowSink`: 行式流式写出
 - `IColumnSink`: 列式写出(更适合宽表,可配合运行时瘦身)
 
-列式 Excel 默认 `ColumnExcelSink`（HOLD）；宽表峰值可 opt-in `StreamingColumnExcelSink` / `ExcelColumnResidency.WINDOW`，见 [Excel 列式写出策略](../getting-started/excel-column-residency.md)。YAML `resources.books` 组合层仍是行式写出，不提供 streaming knobs。
+列式 Excel 默认 `ColumnExcelSink`（`column_buffered`）；宽表峰值可 opt-in `StreamingColumnExcelSink` / `OutputWriteLayout.COLUMN_CHUNKED`，见 [文件写出布局](../getting-started/excel-column-residency.md)。YAML `resources.books` 组合层仍是行式写出，不提供 streaming knobs。
 
 ```mermaid
 flowchart TD

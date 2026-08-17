@@ -27,7 +27,7 @@
 - [架构详解](../architecture/arch.md): 架构分层与主要流程图;实现细节与行为约束会指向 `llmanspec/`
 - [llmanspec 规范](../specs/index.md): 更接近“规范/约束”的描述,适合在改行为前先对齐预期
 - [SSOT / 生成物 / 门禁地图](../dev/ssot-map.md): 统一查表“改哪里/跑哪个生成入口/哪个门禁会拦”
-- [Excel 列式写出策略(HOLD/WINDOW)](excel-column-residency.md): 宽表 Excel 峰值与 `StreamingColumnExcelSink` 选型(与 YAML books 行式写出区分)
+- [文件写出布局(row_stream / buffered / chunked)](excel-column-residency.md): 宽表 Excel 峰值与 `StreamingColumnExcelSink` 选型(与 YAML books 行式写出区分)
 - [版本亮点 · 0.10.0](../releases/0.10.0/): 默认 write-precompute / fusion 与 opt-in chunk 并行（对拍专页入口）
 - [主线教程: demo_big_data_report](demo-big-data-report.md): 从一个稳定 demo 入口跑起来/对拍/排错(面向 CI 与日常开发)
 

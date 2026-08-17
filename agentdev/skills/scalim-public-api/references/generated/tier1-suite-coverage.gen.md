@@ -21,7 +21,7 @@
 ## Tier1 Modules Coverage (17)
 
 ### `scalim.dsl.yaml_dsl`
-- examples chapters (3): `ch130_public_api_dsl_by_yaml`, `ch135_public_api_key_normalization`, `ch165_public_api_resources`
+- examples chapters (4): `ch130_public_api_dsl_by_yaml`, `ch135_public_api_key_normalization`, `ch163_public_api_output_write_layout_books`, `ch165_public_api_resources`
 - pytest chapters (2): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`
 
 ### `scalim.dsl.yaml_dsl.tools`
@@ -57,11 +57,11 @@
 - pytest chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
 
 ### `scalim.ob`
-- examples chapters (3): `ch130_public_api_dsl_by_yaml`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
+- examples chapters (5): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
 - pytest chapters (3): `ch130_public_api_dsl_by_yaml`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
 
 ### `scalim.events`
-- examples chapters (4): `ch130_public_api_dsl_by_yaml`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
+- examples chapters (6): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
 - pytest chapters (4): `ch130_public_api_dsl_by_yaml`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
 
 ### `scalim.events.type_groups`

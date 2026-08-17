@@ -13,7 +13,7 @@ c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof
 | 栏 | 含义 | 例子 |
 |----|------|------|
 | **宜留在 YAML** | 换环境仍应相同的图、字段、loader 协议 | `runs`/deps、`fields`/`relations`、`params`（`$keys`/`$rows`）、资源 path；`sources.*.cache_mode` / `$rows.cache_mode`（可被 Python 覆盖） |
-| **宜收口到 Python** | 换部署/配额/入口就会改 | 已迁出的 `batch_size`/`retry`/`guardrails`；**`Lookup_chunk_size` → `LookupChunking`**；片间并行嵌在 `sized(..., parallel=True)`；**写出布局 `OutputWriteLayout`**（行流/列 HOLD/列 WINDOW） |
+| **宜收口到 Python** | 换部署/配额/入口就会改 | 已迁出的 `batch_size`/`retry`/`guardrails`；**`Lookup_chunk_size` → `LookupChunking`**；片间并行嵌在 `sized(..., parallel=True)`；**写出布局 `OutputWriteLayout`**（`row_stream` / `column_buffered` / `column_chunked`） |
 | **默认已钉死 + overrides** | 省略走 builtin；Python `RunOverrides` 可改 | `encoding`≡utf-8、`allow_formulas`≡true、`include_header`≡true、`header_fields_output_by`≡name |
 
 禁止：回流 `budget`/`write_defaults`；静默忽略 YAML；新增 YAML 并行键。
