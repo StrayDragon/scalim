@@ -46,6 +46,10 @@
 
 **立场摘要**：不产品化 `call_by` memo；不推进跨批隐式 overlap cache；优先 multi-output / 减分配 / 更早释放。
 
+## 进行中手递（未转正）
+
+- [`source-catalog-ssot/_HANDOFF.md`](./source-catalog-ssot/_HANDOFF.md)：LookupChunking 目录 SSOT 已落地（`9c23d3f1`）；下一步 RowsReuse 回目录 / 轻句柄档位未选。
+
 ## 已移出候选池（目录已删）
 
 不再保留草案正文，避免与「可转正候选」混淆：
