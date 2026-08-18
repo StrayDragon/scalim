@@ -37,6 +37,7 @@
 | `c0-shortcuts-public-api-consolidation` | 已转正 → `2026-04-14-c60-output-discovery-facade`（v1；v2/v3 另案）；目录已删 |
 | `c0-trusted-mode-defense-in-depth` | 已转正 → `2026-04-28-c3-security-hardening-yaml-dsl`；目录已删 |
 | `c0-yaml-dsl-ensure-keys`（原 `c0-yaml-dsl-ensure-keys-defaults`） | **ensure_keys only**：field `default` 已落地并移出范围；见其 proposal 状态块 |
+| `source-catalog-ssot` | 已转正 → `c50-source-id-graph-refs`；目录已删（LookupChunking 落地 `8273aa5b`） |
 
 ## Perf ROI 判断链路（必读）
 
@@ -45,10 +46,6 @@
 - [`2026-08-11-perf-roi-judgment-chain.md`](./2026-08-11-perf-roi-judgment-chain.md)
 
 **立场摘要**：不产品化 `call_by` memo；不推进跨批隐式 overlap cache；优先 multi-output / 减分配 / 更早释放。
-
-## 进行中手递（未转正）
-
-- [`source-catalog-ssot/_HANDOFF.md`](./source-catalog-ssot/_HANDOFF.md)：LookupChunking 目录 SSOT 已落地（`9c23d3f1`）；下一步 RowsReuse 回目录 / 轻句柄档位未选。
 
 ## 已移出候选池（目录已删）
 
