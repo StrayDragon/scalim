@@ -5,19 +5,19 @@
     - 写 YAML books 报表、误以为有 streaming knobs 的集成方
     - 需要给调用方选型建议的 agent / 维护者
 
-本文是 **写出布局选型 SSOT**（人类页）。闭集 `OutputWriteLayout`（`row_stream` / `column_buffered` / `column_chunked`）挂在 `DemandRunRuntimeOptions` / `ExecutionRequest`；**禁止 YAML authoring**。未设时由 `streaming` + `excel_column_residency` 推导，默认路径与下表一致。
+本文是写出布局选型的 **SSOT**（人类阅读页）。闭集 `OutputWriteLayout`（`row_stream` / `column_buffered` / `column_chunked`）只挂在 Python 侧（`DemandRunRuntimeOptions` / `ExecutionRequest`），**YAML authoring 禁止使用**。未设置时由 `streaming` + `excel_column_residency` 推导，默认结果与下表一致。
 
 更严的契约以 `llmanspec/specs/runtime-output-write-layout/`、`output-sink-contracts` 与 `yaml-dsl-runtime-policy-boundary` 为准。  
 Agent 入口：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`；迁移卡：`.../upgrades/2026-08-11-output-write-layout.md`。
 
-## 0. 交互理解
+## 0. 交互演示
 
-下面四块需要 JavaScript（站点已加载）。无脚本时仍可读后文表格与 mermaid。
+页面已加载脚本，下面四块可以点开看；没有脚本也不影响阅读后文的表格与 mermaid。
 
-- **写出时间线**：三种 layout 切换，逐步看格子进内存 / 刷盘
-- **选型树**：YAML books / csv / excel / 峰值 → 推荐值或 fail-fast
+- **写出时间线**：切换三种 layout，看格子如何进内存、刷盘
+- **选型树**：按 YAML books / csv / excel / 峰值选路，得到推荐值或 fail-fast
 - **峰值对照**：宽表证据条
-- **工厂映射**：layout → 具体 sink
+- **工厂映射**：layout 对应的具体 sink
 
 <div id="owl-root" class="owl-root"></div>
 
@@ -26,13 +26,15 @@ Agent 入口：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-exce
 | 路径 | 典型入口 | 实际实现 | 峰值特征 |
 |---|---|---|---|
 | **A. YAML / workflow books** | `resources.books` + `outputs.to` | 组合层强制行写出 → `ExcelSink` / workbook sheet | 行流式；**不是**列式 sink |
-| **B. IR 列式 buffered（默认）** | `OutputSpec(format="excel", streaming=False)` | `ColumnExcelSink`（layout=`column_buffered`） | 列缓存到 `close`；宽表 `pre_close` 可很高 |
+| **B. IR 列式 buffered（默认）** | `OutputSpec(format="excel", streaming=False)` | `ColumnExcelSink`（layout=`column_buffered`） | 列缓存到 `close`；宽表在 `close` 前（`pre_close`）驻留可很高 |
 | **C. IR 列式 chunked（opt-in）** | 同上 + `OutputWriteLayout.COLUMN_CHUNKED` | `StreamingColumnExcelSink` | 按行窗刷盘释放；宽表 peak 可大幅下降 |
 
-证据口径（列 buffered vs 多 batch chunked，100k×300）：buffered peak ≈ **3.59GB** → chunked peak ≈ **0.12GB**（约 97%）。  
-medium 双跑（约 2万–5万行 × 50–100 列）：峰值 RSS 比 buffered/chunked ≈ **2.5–4.9×**，墙钟差约 **2%**，业务行数一致。  
-产物在本地 `.tmp/evidence/`（勿提交）；脚本：`scripts/bench_output_write_layout_dual_run.py`。  
-通俗说明：`llmanspec/notplan/c40-output-write-layout-advisory/research/write-layout-advisory-explainer.html`。
+证据来自双跑对拍。100k×300 的宽表：buffered 峰值 RSS ≈ **3.59GB**，多 batch chunked ≈ **0.12GB**，降幅约 **97%**。中量级（约 2万–5万行 × 50–100 列）：buffered 的峰值 RSS 约为 chunked 的 **2.5–4.9 倍**，墙钟耗时相差约 **2%**，两者写出的行数一致。
+
+产物在本地 `.tmp/evidence/`（不入库），复现脚本 `scripts/bench_output_write_layout_dual_run.py`；通俗说明见 `llmanspec/notplan/c40-output-write-layout-advisory/research/write-layout-advisory-explainer.html`。
+
+??? note "两处内存：pipeline 提早释放 ≠ sink 提早释放"
+    pipeline 的"边写边算、写完即放"（列式删字段、行式删行）删除的是 **`BatchContext` 那份**值；sink 从 `write_column` 拿到的是**副本**。`column_buffered` 下 `ColumnExcelSink` 把副本缓存到 `close()` 才写盘释放——端到端峰值由 sink 主导，pipeline 侧省下的内存救不了 buffered 的峰值；要真降峰得用 `column_chunked`。
 
 ## 2. 策略怎么选
 
@@ -50,7 +52,7 @@ medium 双跑（约 2万–5万行 × 50–100 列）：峰值 RSS 比 buffered/
 2. 宽表 / 高行数导致 `pre_close` / peak RSS 不可接受（启发式：约 **`n_fields × n_rows ≳ 1e6`** 时可优先考虑）
 3. **没有** `output_composition`（不是 YAML books 多输出行组合）
 
-**没有自动切换，也没有默认 `run_stats` 布局 hint**——由调用方显式设 `OutputWriteLayout.COLUMN_CHUNKED`。迁移窗仍可用 `ExcelColumnResidency.CHUNKED`（仅当未设 layout 时等价推导）。
+**不会自动切换，也没有默认的 `run_stats` 布局 hint**：要生效必须由调用方显式设置 `OutputWriteLayout.COLUMN_CHUNKED`。迁移期仍可用 `ExcelColumnResidency.CHUNKED`，但它只在未设 layout 时参与推导。
 
 调用示例（推荐）：
 
@@ -90,14 +92,15 @@ req = ExecutionRequest(
 )
 ```
 
-pipeline 列模式会每批 `set_row_ids(本批)` 再写满列——与 chunked sink 的多 batch 语义对齐。
+pipeline 的列模式按 batch 调用 `set_row_ids(本批)` 再写满全部列，与 chunked sink 的多 batch 语义一致。
 
 ### 正确性：改 chunked 会不会写错？
 
 | 维度 | 结论 |
 |---|---|
 | 合法 IR 列式路径 | buffered↔chunked **业务格子等价**（对拍用业务列，勿比 xlsx 字节） |
-| YAML books / composition、行式 `streaming=True` | 与 chunked / `COLUMN_*` 同开 → **fail-fast** |
+| YAML books / composition | 与 `COLUMN_*` / `CHUNKED` 同开 → **fail-fast** |
+| IR 行式 `streaming=True` | 显式 layout 会**覆盖** `streaming` 生效；仅「未设 layout + `CHUNKED`」的推导路径 **fail-fast** |
 | 某窗列未写齐 | chunked `close` **更严**报错 |
 
 ### 何时不要用 `column_chunked`
@@ -105,10 +108,10 @@ pipeline 列模式会每批 `set_row_ids(本批)` 再写满列——与 chunked 
 | 场景 | 原因 |
 |---|---|
 | YAML / workflow `resources.books` Excel | 已是行 sink；设 `COLUMN_CHUNKED` + composition → **fail-fast**（禁止假开关） |
-| `streaming=True` 行式 Excel | chunked 仅对列式生效；会 **fail-fast** |
+| `streaming=True` 行式 Excel | 不适用：显式 `COLUMN_CHUNKED` 会忽略 `streaming` 直接生效；推导路径（未设 layout + `CHUNKED`）才 **fail-fast** |
 | 指望 YAML 里写 streaming / layout knobs | **禁止**；runtime policy 只在 Python |
 | shared-book 物化峰值 | 另案（spill 等）；不是本 Enum |
-| 一次 `set_row_ids(全量行)` 再按列写 | 仍会预分配全表壳；peak 收益差很多——应 **按 batch 追加** `set_row_ids` |
+| 一次 `set_row_ids(全量行)` 再按列写 | 仍会预分配整张表的行壳（行索引 + 空值占位），peak 收益有限；应 **按 batch 追加** `set_row_ids` |
 
 ### 手写 sink
 
@@ -119,7 +122,7 @@ from scalim.sinks import StreamingColumnExcelSink
 ```
 
 按 batch：`set_row_ids(本批)` → 写满全部列 → `close()`。  
-显式传入 `ExecutionRequest.sink=...` 时优先于工厂选择。
+传入 `ExecutionRequest.sink=...` 时，若同时设了输出路径，工厂文件 sink 仍会创建，与你的 sink 以 tee 方式并行写入；只想用自管 sink 就别设输出路径。
 
 ## 3. `run_demand` / workflow 能设什么？（有手动、无自动）
 
@@ -194,4 +197,4 @@ chunked 只对「无 composition 的 IR 列式 Excel（`streaming=False`）」�
 - 并行调参：[`parallel-modes.md`](../architecture/parallel-modes.md)
 - Perf 判断链路：`llmanspec/notplan/2026-08-11-perf-roi-judgment-chain.md`
 - Advisory 研究（搁置实现）：`llmanspec/notplan/c40-output-write-layout-advisory/`
-- 归档证据：`llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`
+- 历史证据：原 `2026-07-12-c0-*` 变更目录已冻结，见 `llmanspec/changes/archive/freezed_changes.7z.archived`（含 `c0-streaming-column-excel-sink`、`c0-streaming-column-excel-multi-batch`、`c0-column-excel-sink-column-residency`）

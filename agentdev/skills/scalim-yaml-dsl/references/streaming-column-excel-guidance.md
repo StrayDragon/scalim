@@ -3,7 +3,7 @@
 > 给 agent / 维护者的排错与选型指南。  
 > **选型 / 正确性 / 无 auto / 启发式 SSOT（人类页）**: `docs/doc/getting-started/excel-column-residency.md`  
 > Upgrade 卡: `references/upgrades/2026-08-11-output-write-layout.md`  
-> 证据归档: `llmanspec/changes/archive/2026-07-12-c0-streaming-column-excel-sink/`、`.../c0-streaming-column-excel-multi-batch/`、`.../c0-excel-column-residency-opt-in/`。
+> 证据归档: 原 `2026-07-12-c0-*` 目录已冻结,见 `llmanspec/changes/archive/freezed_changes.7z.archived`(含 `c0-streaming-column-excel-sink`、`c0-streaming-column-excel-multi-batch`、`c0-column-excel-sink-column-residency`)。
 
 本文只保留 **agent 硬边界、工厂锚点、证据表**；何时启用 `column_buffered` / `column_chunked`、入口矩阵、业务格子等价、百万格启发式 → **只读人类页**，勿在此复述。
 
