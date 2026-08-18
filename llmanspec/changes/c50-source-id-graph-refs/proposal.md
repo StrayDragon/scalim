@@ -2,7 +2,8 @@
 depends_on: []
 branch: sdd/c50-source-id-graph-refs
 base_sha: ebb37794d5b6415bcd1669560d3b2c5495221165
-checkpointed: false
+checkpointed: true
+checkpoint_sha: 8864c42f86e2759bdd257b20e8b701166c24dc39
 ---
 
 # 字段图只存 source_id，策略只住目录
