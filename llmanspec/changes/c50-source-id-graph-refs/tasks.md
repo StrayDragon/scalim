@@ -6,10 +6,10 @@ Seam（已确认）：YAML `DemandRunOptions` + run；`DemandIr.from_irs`；ch16
 
 ## 0. Specs landing（propose / 绑定分支，apply 前）
 
-- [ ] 0.1 `change start` 后改 `ir-source-relations` r694：signature 用 `to_source_id` + catalog binding；图 MUST NOT 嵌 live `SourceIr`
-- [ ] 0.2 同一 spec 或新 `ir-source-catalog`：overlay 只写 `DemandIr.sources`；新 overlay 不得进 `LookupStepIr`/`FieldIr`
-- [ ] 0.3 `yaml-dsl-runtime-policy-boundary` r1004：不改优先级句子；场景继续要求 Python `RowsReuse.none()` 禁用批次内复用（执行兑现由 task 2）
-- [ ] 0.4 commit specs（Specs landing）。DoD: `llman sdd show c50-source-id-graph-refs --json` → `readyToImplement=true`
+- [x] 0.1 `change start` 后改 `ir-source-relations` r694：signature 用 `to_source_id` + catalog binding；图 MUST NOT 嵌 live `SourceIr`
+- [x] 0.2 同一 spec 或新 `ir-source-catalog`：overlay 只写 `DemandIr.sources`；新 overlay 不得进 `LookupStepIr`/`FieldIr`（落地为 r1110，未单开 spec）
+- [x] 0.3 `yaml-dsl-runtime-policy-boundary` r1004：不改优先级句子；补「分组/signature 读目录」
+- [ ] 0.4 commit specs（Specs landing）。DoD: `llman sdd show c50-source-id-graph-refs --output json --type change` → `readyToImplement=true`
 
 ## 1. 失败黑盒先挂上（当前 API 即可）
 

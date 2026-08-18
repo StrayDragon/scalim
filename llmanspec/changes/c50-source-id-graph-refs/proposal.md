@@ -1,5 +1,8 @@
 ---
 depends_on: []
+branch: sdd/c50-source-id-graph-refs
+base_sha: ebb37794d5b6415bcd1669560d3b2c5495221165
+checkpointed: false
 ---
 
 # 字段图只存 source_id，策略只住目录
@@ -81,7 +84,7 @@ depends_on: []
 
 `llman sdd context` 因 `LLMAN_SDD_INDEX_CHAT_MODEL` unset 不可用；以上为 `list --specs` + grep。
 
-## What Changes（propose 阶段再拆 tasks）
+## What Changes
 
 1. IR：`LookupStepIr.to_source_id`、`FieldIr.source_id`；`LookupSourceRefIrBase` 去掉 overlay 字段（或不再作为 step 字段类型）。
 2. intern：`DemandIr.from_irs` / YAML compile 把传入的 `SourceIr` 放入 `sources`，图边只存 id。
