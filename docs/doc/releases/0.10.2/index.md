@@ -12,8 +12,8 @@ typed `Event` 契约与 0.10.1 相同，不重复展开；见 [0.10.1 重点特�
 
 | 变更 | 默认影响 | YAML 要改吗 | 适配 SSOT |
 |------|----------|-------------|-----------|
-| `sources.*.lookup_chunk_size` 迁出 | **Breaking**（仍写则 fail-fast） | **是**（删字段） | [2026-08-09-lookup-chunking-python-ssot](../../../agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md) |
-| `LookupChunking` / `SourceCache` / `RowsReuse` | Python 运行策略；cache YAML 可留 | 否（cache） | 同上 + [yaml-runtime-policy-boundary](../../../agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md) |
+| `sources.*.lookup_chunk_size` 迁出 | **Breaking**（仍写则 fail-fast） | **是**（删字段） | [2026-08-09-lookup-chunking-python-ssot](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md?ref) |
+| `LookupChunking` / `SourceCache` / `RowsReuse` | Python 运行策略；cache YAML 可留 | 否（cache） | 同上 + [yaml-runtime-policy-boundary](repo:agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md?ref) |
 | `ObservabilityProfile` + `WorkflowStatsAccumulator` | **opt-in**；生产默认可 `components=[]` | 否 | [run-stats.md](../../viz/run-stats.md) + `agentdev/skills/scalim-run-stats/` |
 | run_stats sibling + scalim-viz 面板 | 落盘旁路；不改业务 sink | 否 | 同上 |
 | `RunOverrides` header 工厂默认 `name` | 仅旧工厂默认依赖者 | 否 | lookup upgrade 卡「相关覆盖」 |

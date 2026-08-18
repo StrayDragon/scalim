@@ -12,7 +12,7 @@
 
 | 变更 | 默认影响 | YAML 要改吗 | 适配 SSOT |
 |------|----------|-------------|-----------|
-| typed Observer/Hook `on_*` 收 `Event` | **Breaking**（仅自定义 typed handler） | 否 | [2026-08-02-typed-handlers-receive-event](../../../agentdev/skills/scalim-public-api/references/upgrades/2026-08-02-typed-handlers-receive-event.md) |
+| typed Observer/Hook `on_*` 收 `Event` | **Breaking**（仅自定义 typed handler） | 否 | [2026-08-02-typed-handlers-receive-event](repo:agentdev/skills/scalim-public-api/references/upgrades/2026-08-02-typed-handlers-receive-event.md?ref) |
 | `meta.scalim_compute_phase` 在 typed 路径可读 | 能力补齐（0.10.0 已有 meta，0.10.1 起不必绕 `on_event`） | 否 | 同上 + [write-precompute-0.10](../write-precompute-0.10.md) |
 | 仓内 presets / viz / notebooks | 已随版本迁移 | 否 | — |
 
