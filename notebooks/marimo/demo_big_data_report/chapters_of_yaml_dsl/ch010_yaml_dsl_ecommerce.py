@@ -156,11 +156,7 @@ def run_yaml_dsl_ecommerce(
         expected_calls = (unique_customers + _CUSTOMER_CHUNK - 1) // _CUSTOMER_CHUNK
         expected_offsets = list(range(0, unique_customers, _CUSTOMER_CHUNK))
         expected_counts = [min(_CUSTOMER_CHUNK, unique_customers - offset) for offset in expected_offsets]
-        chunk_ok = bool(
-            observer.offsets == expected_offsets
-            and observer.counts == expected_counts
-            and hook.call_count == expected_calls
-        )
+        chunk_ok = bool(observer.offsets == expected_offsets and observer.counts == expected_counts and hook.call_count == expected_calls)
         passed = bool(passed and chunk_ok)
         summary = "rows={} elapsed={:.3f}s verify={} rows_match_failures={} customers_chunks={}".format(
             len(rows), elapsed, verification.passed, mismatch, observer.offsets

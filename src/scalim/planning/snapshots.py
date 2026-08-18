@@ -52,12 +52,11 @@ def _binding_snapshot(binding: Optional[BindingIr]) -> Optional[Dict[str, Any]]:
 
 def _lookup_step_snapshot(step: LookupStepIr) -> Dict[str, Any]:
     from_field = step.from_field
-    to_source = step.to_source
     to_field = step.to_field
     lookup_cast = step.lookup_cast
     bind = step.bind
 
-    to_source_id = to_source.source_id
+    to_source_id = step.to_source_id
 
     from_field_snapshot: Any = from_field
     if isinstance(from_field, tuple):

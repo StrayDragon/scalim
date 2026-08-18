@@ -269,38 +269,38 @@ def build_minimal_ir_case() -> MinimalIrCase:
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="Order ID", source=main_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="Customer ID", source=main_source),
-        FieldIr(field_id="pay_id", name="Pay ID", source=main_source),
-        FieldIr(field_id="region_id", name="Region ID", source=main_source),
-        FieldIr(field_id="institution_id", name="Institution ID", source=main_source),
-        FieldIr(field_id="order_type_id", name="Order Type ID", source=main_source),
-        FieldIr(field_id="amount", name="Amount", source=main_source),
-        FieldIr(field_id="cost", name="Cost", source=main_source),
-        FieldIr(field_id="source_code", name="Source Code", source=main_source),
+        FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="Customer ID", source_id=main_source.source_id),
+        FieldIr(field_id="pay_id", name="Pay ID", source_id=main_source.source_id),
+        FieldIr(field_id="region_id", name="Region ID", source_id=main_source.source_id),
+        FieldIr(field_id="institution_id", name="Institution ID", source_id=main_source.source_id),
+        FieldIr(field_id="order_type_id", name="Order Type ID", source_id=main_source.source_id),
+        FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id),
+        FieldIr(field_id="cost", name="Cost", source_id=main_source.source_id),
+        FieldIr(field_id="source_code", name="Source Code", source_id=main_source.source_id),
         FieldIr(
             field_id="order_source",
             name="Order Source",
-            source=main_source,
+            source_id=main_source.source_id,
             data_key="source_code",
             value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="orders.order_source.transform")),),
         ),
         FieldIr(
             field_id="customer_name",
             name="Customer Name",
-            source=customers,
+            source_id=customers.source_id,
             relation=main_source["customer_id"].join(customers["customer_id"]),
         ),
         FieldIr(
             field_id="country_name",
             name="Country Name",
-            source=countries,
+            source_id=countries.source_id,
             relation=main_source["pay_id"].join(pays["pay_id"]).and_(pays["country_id"].join(countries["country_id"])),
         ),
         FieldIr(
             field_id="mapping_name",
             name="Mapping Name",
-            source=mapping,
+            source_id=mapping.source_id,
             relation=main_source["region_id"]
             .join(mapping["region_id"])
             .and_(main_source["institution_id"].join(mapping["institution_id"])),
@@ -308,7 +308,7 @@ def build_minimal_ir_case() -> MinimalIrCase:
         FieldIr(
             field_id="order_type_name",
             name="Order Type Name",
-            source=order_types,
+            source_id=order_types.source_id,
             data_key="type_name",
             relation=main_source["order_type_id"].join(order_types["type_id"]),
         ),

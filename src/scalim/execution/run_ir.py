@@ -569,7 +569,7 @@ def _build_field_fingerprints_for_meta(demand_ir: DemandIr) -> List[Tuple[str, s
     for field_id in sorted(demand_ir.fields.keys()):
         spec = demand_ir.fields[field_id]
         if isinstance(spec, FieldIr):
-            field_fingerprints.append((spec.field_id, "field", str(spec.source.source_id), str(spec.data_key)))
+            field_fingerprints.append((spec.field_id, "field", str(spec.source_id), str(spec.data_key)))
         elif isinstance(spec, DerivedFieldIr):
             field_fingerprints.append((spec.field_id, "derived", "", ",".join(spec.dependencies)))
         else:

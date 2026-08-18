@@ -40,11 +40,12 @@ def _maybe_emit_key_normalization_key_space_mismatch_warning(
     if runtime.key_normalization != "auto_str":
         return
 
-    has_explicit_cast = step.lookup_cast is not None or step.to_source.key.cast is not None
+    source = runtime.resolve_lookup_source(step)
+    has_explicit_cast = step.lookup_cast is not None or source.key.cast is not None
     if not has_explicit_cast:
         return
 
-    mismatch_key = (relation_signature, str(step.to_source.source_id))
+    mismatch_key = (relation_signature, str(source.source_id))
     if mismatch_key in runtime.key_space_mismatch_logged:
         return
 
@@ -64,7 +65,7 @@ def _maybe_emit_key_normalization_key_space_mismatch_warning(
                     "Consider removing the explicit cast, switching to key_normalization='force_str', "
                     "or updating the loader to return keys in the casted key space."
                 ),
-                source_id=step.to_source.source_id,
+                source_id=source.source_id,
                 field_id=field_id,
                 lookup_key=None,
                 row_id="(redacted)",
@@ -107,8 +108,8 @@ class LoadRefOperatorExecutor(OperatorExecutor):
         if not steps or not runtime.main_source:
             return
 
-        relation_key = build_relation_signature(steps)
-        group_enabled = can_group_by_relation(steps)
+        relation_key = build_relation_signature(steps, runtime.sources)
+        group_enabled = can_group_by_relation(steps, runtime.sources)
         if group_enabled and relation_key in runtime.load_ref_group_executed:
             return
         wants_relation_lookup = runtime.instrumentation.wants(EventType.RELATION_LOOKUP)
@@ -151,13 +152,14 @@ class LoadRefOperatorExecutor(OperatorExecutor):
                 )
 
                 # 热路径 `wants-gated`: 当无人订阅 `relation_lookup` 时,跳过逐行 `hit/miss` 分类诊断.
+                live_source = runtime.resolve_lookup_source(step)
                 if wants_relation_lookup:
                     for row_id, fk_value in current_mapping.items():
                         lookup_result = "hit" if fk_value in intermediate_result else "miss"
-                        exec_ctx.record_lookup(row_id, fk_value, fk_value, step.to_source, lookup_result)
+                        exec_ctx.record_lookup(row_id, fk_value, fk_value, live_source, lookup_result)
 
                 if step_idx == len(steps) - 1:
-                    write_final_step(exec_ctx, current_mapping, intermediate_result, step.to_source, group_field_keys)
+                    write_final_step(exec_ctx, current_mapping, intermediate_result, live_source, group_field_keys)
                 else:
                     current_mapping = build_next_mapping(
                         exec_ctx,

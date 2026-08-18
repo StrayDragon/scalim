@@ -32,8 +32,8 @@ def _call_by(handle_suffix: str, dep_fields: List[str]) -> CallBySpecIr:
 def test_output_only_derived_is_late() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="doubled", name="双倍", dependencies=("amount",), compute_expr="amount * 2"),
     ]
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=main)
@@ -46,8 +46,8 @@ def test_output_only_derived_is_late() -> None:
 def test_derived_consumed_by_another_eager_derived_is_not_late() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="base", name="基数", dependencies=("amount",), compute_expr="amount * 2"),
         # 含 `$ctx` 的 `call_by` 永远早算,因此其依赖 `base` 也存在“子图外消费者”.
         DerivedFieldIr(
@@ -70,8 +70,8 @@ def test_derived_consumed_by_load_ref_from_field_is_not_late() -> None:
     regions = make_source("regions", key_field="region_key")
 
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders, is_primary=True),
-        FieldIr(field_id="region_code", name="地区码", source=orders),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id, is_primary=True),
+        FieldIr(field_id="region_code", name="地区码", source_id=orders.source_id),
         DerivedFieldIr(
             field_id="region_key",
             name="地区键",
@@ -81,7 +81,7 @@ def test_derived_consumed_by_load_ref_from_field_is_not_late() -> None:
         FieldIr(
             field_id="region_name",
             name="地区名",
-            source=regions,
+            source_id=regions.source_id,
             data_key="region_name",
             relation=orders["region_key"].join(regions["region_key"]),
         ),
@@ -96,8 +96,8 @@ def test_derived_consumed_by_load_ref_from_field_is_not_late() -> None:
 def test_ctx_call_by_is_never_late() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(
             field_id="tagged",
             name="带标记",
@@ -123,8 +123,8 @@ def test_ctx_call_by_is_never_late() -> None:
 def test_late_chain_is_topologically_ordered() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="c0", name="c0", dependencies=("amount",), compute_expr="amount + 1"),
         DerivedFieldIr(field_id="c1", name="c1", dependencies=("c0",), compute_expr="c0 + 1"),
         DerivedFieldIr(field_id="c2", name="c2", dependencies=("c1",), compute_expr="c1 + 1"),
@@ -139,8 +139,8 @@ def test_late_chain_is_topologically_ordered() -> None:
 def test_intermediate_derived_outside_targets_blocks_late() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="c0", name="c0", dependencies=("amount",), compute_expr="amount + 1"),
         DerivedFieldIr(field_id="c1", name="c1", dependencies=("c0",), compute_expr="c0 + 1"),
     ]
@@ -159,8 +159,8 @@ def test_order_by_key_is_not_late() -> None:
         order_by=(OrderByKeyIr(field_key="sort_key", direction="asc"),),
     )
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="sort_key", name="排序键", dependencies=("amount",), compute_expr="amount * -1"),
     ]
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=main)
@@ -190,7 +190,7 @@ def test_rejected_candidate_requeues_its_late_consumers() -> None:
     """候选被踢出后必须复查它的候选消费者(工作表收缩到不动点)."""
     field_specs: Dict[str, Any] = {
         # 别源直取字段: 写出点不可得,导致 `blocked` 退回早算.
-        "ext": FieldIr(field_id="ext", name="外部字段", source=make_source("regions")),
+        "ext": FieldIr(field_id="ext", name="外部字段", source_id=make_source("regions").source_id),
         "blocked": DerivedFieldIr(field_id="blocked", name="blocked", dependencies=("ext",), compute_expr="ext"),
         "chained": DerivedFieldIr(field_id="chained", name="chained", dependencies=("blocked",), compute_expr="blocked + 1"),
     }
@@ -212,7 +212,7 @@ def test_rejected_candidate_requeues_its_late_consumers() -> None:
 def test_constant_compute_is_not_late() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
         DerivedFieldIr(
             field_id="const",
             name="常量",

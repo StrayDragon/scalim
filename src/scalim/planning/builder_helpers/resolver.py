@@ -29,16 +29,17 @@ class LookupStepsResolver:
         main_source: SourceRefIr,
         *,
         field_key: Optional[str] = None,
+        to_source: Optional[SourceIr] = None,
     ) -> Optional[Tuple[LookupStepIr, ...]]:
         cache_key = field_key or field_spec.field_id
         if field_spec.lookup_steps:
             self._cache[cache_key] = field_spec.lookup_steps
             return field_spec.lookup_steps
 
-        if field_spec.relation and isinstance(field_spec.source, SourceIr):
+        if field_spec.relation and to_source is not None:
             if cache_key in self._cache:
                 return self._cache[cache_key]
-            steps = self._infer_lookup_steps(field_spec.relation, main_source, field_spec.source)
+            steps = self._infer_lookup_steps(field_spec.relation, main_source, to_source)
             self._cache[cache_key] = steps
             return steps
 
@@ -54,7 +55,7 @@ def extract_relation_dependency_keys(
 ) -> List[str]:
     """提取 `FieldIr` 的依赖字段键(来自 `lookup_steps` 或 `relation`)."""
     if field_spec.lookup_steps:
-        steps = resolver.resolve(field_spec, field_spec.source, field_key=field_key)
+        steps = resolver.resolve(field_spec, demand.main_source, field_key=field_key, to_source=demand.sources.get(field_spec.source_id))
         return list(extract_from_fields(steps)) if steps else []
 
     if not field_spec.relation:
@@ -64,10 +65,11 @@ def extract_relation_dependency_keys(
     if not main_source:
         return []
 
-    if not isinstance(field_spec.source, SourceIr):
+    to_source = demand.sources.get(field_spec.source_id)
+    if to_source is None:
         return []
 
-    steps = resolver.resolve(field_spec, main_source, field_key=field_key)
+    steps = resolver.resolve(field_spec, main_source, field_key=field_key, to_source=to_source)
     if not steps:
         return []
 

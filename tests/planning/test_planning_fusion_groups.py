@@ -21,8 +21,8 @@ def _call_by(handle_suffix: str, dep_fields: List[str]) -> CallBySpecIr:
 def test_identical_deps_form_one_fusion_group() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="d0", name="d0", dependencies=("amount",), call_by=_call_by("d0", ["amount"])),
         DerivedFieldIr(field_id="d1", name="d1", dependencies=("amount",), call_by=_call_by("d1", ["amount"])),
         DerivedFieldIr(field_id="d2", name="d2", dependencies=("amount",), call_by=_call_by("d2", ["amount"])),
@@ -40,9 +40,9 @@ def test_identical_deps_form_one_fusion_group() -> None:
 def test_unequal_deps_not_fused() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="a", name="a", source=main),
-        FieldIr(field_id="b", name="b", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="a", name="a", source_id=main.source_id),
+        FieldIr(field_id="b", name="b", source_id=main.source_id),
         DerivedFieldIr(field_id="d0", name="d0", dependencies=("a",), call_by=_call_by("d0", ["a"])),
         DerivedFieldIr(field_id="d1", name="d1", dependencies=("a", "b"), call_by=_call_by("d1", ["a", "b"])),
     ]
@@ -55,8 +55,8 @@ def test_unequal_deps_not_fused() -> None:
 def test_ctx_call_by_excluded_from_fusion_group() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="d0", name="d0", dependencies=("amount",), call_by=_call_by("d0", ["amount"])),
         DerivedFieldIr(
             field_id="with_ctx",
@@ -86,7 +86,7 @@ def _compute_op(field_key: str) -> ComputeOperatorIr:
 def test_non_derived_compute_member_breaks_the_group() -> None:
     main = make_main_source("orders")
     field_specs: Dict[str, Any] = {
-        "amount": FieldIr(field_id="amount", name="金额", source=main),
+        "amount": FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         "d0": DerivedFieldIr(field_id="d0", name="d0", dependencies=("amount",), call_by=_call_by("d0", ["amount"])),
         "d1": DerivedFieldIr(field_id="d1", name="d1", dependencies=("amount",), call_by=_call_by("d1", ["amount"])),
     }
@@ -104,8 +104,8 @@ def test_non_derived_compute_member_breaks_the_group() -> None:
 def test_interdependent_fields_not_in_same_group() -> None:
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
         DerivedFieldIr(field_id="base", name="base", dependencies=("amount",), compute_expr="amount * 2"),
         DerivedFieldIr(field_id="next", name="next", dependencies=("base",), compute_expr="base + 1"),
     ]

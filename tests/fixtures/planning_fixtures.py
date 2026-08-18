@@ -54,9 +54,9 @@ def build_simple_model() -> DemandIr:
     source = make_main_source("orders")
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=source, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=source),
-        FieldIr(field_id="cost", name="成本", source=source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=source.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=source.source_id),
+        FieldIr(field_id="cost", name="成本", source_id=source.source_id),
     ]
 
     return DemandIr.from_irs(
@@ -71,9 +71,9 @@ def build_derived_model() -> DemandIr:
     source = make_main_source("orders")
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=source, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=source),
-        FieldIr(field_id="cost", name="成本", source=source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=source.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=source.source_id),
+        FieldIr(field_id="cost", name="成本", source_id=source.source_id),
         DerivedFieldIr(
             field_id="profit",
             name="利润",
@@ -104,12 +104,12 @@ def build_relation_model() -> DemandIr:
     orders_to_customers = orders_source["customer_id"].join(customers_source["customer_id"])
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=orders_source.source_id),
         FieldIr(
             field_id="customer_name",
             name="客户名称",
-            source=customers_source,
+            source_id=customers_source.source_id,
             data_key="customer_name",
             relation=orders_to_customers,
         ),
@@ -133,11 +133,11 @@ def build_multi_level_model() -> DemandIr:
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
         FieldIr(
             field_id="country_name",
             name="国家名称",
-            source=countries_source,
+            source_id=countries_source.source_id,
             data_key="country_name",
             relation=orders_to_countries,
         ),
@@ -174,10 +174,16 @@ def build_multi_field_model() -> DemandIr:
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="mapping_name", name="映射名称", source=mapping_source, data_key="mapping_name", relation=orders_to_mapping),
-        FieldIr(field_id="region_id", name="地区ID", source=orders_source),
-        FieldIr(field_id="institution_id", name="机构ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(
+            field_id="mapping_name",
+            name="映射名称",
+            source_id=mapping_source.source_id,
+            data_key="mapping_name",
+            relation=orders_to_mapping,
+        ),
+        FieldIr(field_id="region_id", name="地区ID", source_id=orders_source.source_id),
+        FieldIr(field_id="institution_id", name="机构ID", source_id=orders_source.source_id),
     ]
 
     return DemandIr.from_irs(

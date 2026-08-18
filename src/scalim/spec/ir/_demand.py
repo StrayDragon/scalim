@@ -2,8 +2,9 @@ from collections.abc import Mapping as MappingABC
 from types import MappingProxyType
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from ...vendor.dataclassesx import dataclass
+from ...vendor.dataclassesx import dataclass, replace
 from ._fields import FieldIr, SupportedFieldIr
+from ._helpers import infer_lookup_steps
 from ._sources import MainSourceIr, SourceIr
 from .presentation import ExportProfileIr
 
@@ -16,10 +17,10 @@ class DemandIr:
 
     sources: Mapping[str, SourceIr]
     """
-    数据源目录(`source_id` -> `SourceIr`);`SourceIr` 的 SSOT.
+    数据源目录(`source_id` -> `SourceIr`);`SourceIr` 的 `SSOT`.
 
     运行时策略(`LookupChunking` / `SourceCache` / `RowsReuse`)只覆盖本目录.
-    `FieldIr.source` / `LookupStepIr.to_source` 是图句柄,按 `source_id` 回这里解析.
+    `FieldIr.source_id` / `LookupStepIr.to_source_id` 是图边身份,按 `id` 回这里解析.
     运行时为 `MappingProxyType` — 浅不可变.
     """
 
@@ -71,17 +72,7 @@ class DemandIr:
         if not isinstance(fields_raw, MappingProxyType):
             object.__setattr__(self, "fields", MappingProxyType(dict(self.fields)))
 
-        if self.main_source.source_id in self.sources:
-            msg = f"主数据源 {self.main_source.source_id!r} 不应出现在 sources 中"
-            raise ValueError(msg)
-
-        # 验证字段引用的数据源存在
-        for field_key, field_spec in self.fields.items():
-            if isinstance(field_spec, FieldIr):
-                source_id = field_spec.source.source_id
-                if source_id != self.main_source.source_id and source_id not in self.sources:
-                    msg = f"字段 {field_key!r} 引用的数据源 {source_id!r} 不存在"
-                    raise ValueError(msg)
+        self._validate_source_graph_ids()
 
     def __getstate__(self) -> Dict[str, Any]:
         state = dict(self.__dict__)
@@ -97,6 +88,23 @@ class DemandIr:
         for key, value in state.items():
             object.__setattr__(self, key, value)
         self.__post_init__()
+
+    def _validate_source_graph_ids(self) -> None:
+        main_id = self.main_source.source_id
+        if main_id in self.sources:
+            msg = "主数据源 {!r} 不应出现在 sources 中".format(main_id)
+            raise ValueError(msg)
+        for field_key, field_spec in self.fields.items():
+            if not isinstance(field_spec, FieldIr):
+                continue
+            source_id = field_spec.source_id
+            if source_id != main_id and source_id not in self.sources:
+                msg = "字段 {!r} 引用的数据源 {!r} 不存在".format(field_key, source_id)
+                raise ValueError(msg)
+            for step in field_spec.lookup_steps or ():
+                if step.to_source_id not in self.sources:
+                    msg = "字段 {!r} 的 lookup 引用数据源 {!r} 不存在".format(field_key, step.to_source_id)
+                    raise ValueError(msg)
 
     @classmethod
     def from_irs(
@@ -128,13 +136,14 @@ class DemandIr:
                 raise ValueError(msg)
             sources_dict[source_key] = source
 
-        # 转换 `fields` 为字典并检测重名
+        # 转换 `fields` 为字典并检测重名;图边 `intern` 为 `source_id`
         fields_dict: Dict[str, SupportedFieldIr] = {}
         for field_spec in fields:
-            if field_spec.field_id in fields_dict:
-                msg = f"字段键名重复: {field_spec.field_id!r}"
+            interned = _intern_field(field_spec, sources_dict, main_source)
+            if interned.field_id in fields_dict:
+                msg = f"字段键名重复: {interned.field_id!r}"
                 raise ValueError(msg)
-            fields_dict[field_spec.field_id] = field_spec
+            fields_dict[interned.field_id] = interned
 
         return cls(
             sources=sources_dict,
@@ -151,6 +160,24 @@ class DemandIr:
             if isinstance(field_spec, FieldIr) and field_spec.is_primary:
                 return field_spec
         return None
+
+
+def _intern_field(
+    field_spec: SupportedFieldIr,
+    sources_dict: Dict[str, SourceIr],
+    main_source: MainSourceIr,
+) -> SupportedFieldIr:
+    if not isinstance(field_spec, FieldIr):
+        return field_spec
+    steps = field_spec.lookup_steps
+    if steps is None and field_spec.relation is not None:
+        to_source = sources_dict.get(field_spec.source_id)
+        if to_source is not None:
+            steps = infer_lookup_steps(field_spec.relation, main_source, to_source)
+    if steps is field_spec.lookup_steps:
+        return field_spec
+    interned_steps = tuple(steps) if steps is not None else None
+    return replace(field_spec, lookup_steps=interned_steps)
 
 
 __all__ = ()

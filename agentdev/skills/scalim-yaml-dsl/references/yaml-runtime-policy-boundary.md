@@ -31,9 +31,18 @@ c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof
 
 覆盖优先级：**显式 Python > YAML > builtin**。
 
+## 图边 vs 目录（c50）
+
+- 存盘图：`FieldIr.source_id` / `LookupStepIr.to_source_id` 只存 `str`
+- live `SourceIr`（含 `LookupChunking` / `SourceCache` / `RowsReuse` overlay）只住 `DemandIr.sources`
+- 新 overlay 只 `replace()` 目录；**禁止**写进 `LookupStepIr` / `FieldIr`
+- 作者态 `infer_lookup_path(..., to_source=活对象)` 仍合法；`DemandIr.from_irs` / YAML compile 出口 intern 成 id
+- 指针：`references/upgrades/2026-08-18-source-id-graph-refs.md`；change `llmanspec/changes/c50-source-id-graph-refs/`
+
 ## 指针
 
 - Upgrade：`references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
+- 图边 vs 目录：`references/upgrades/2026-08-18-source-id-graph-refs.md`
 - Design / evidence（归档后）：`llmanspec/changes/archive/*-c40-yaml-runtime-policy-boundary/`
 - Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary/`（r1003–r1005）
 - 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`、`user-guide.md` §4.4.3

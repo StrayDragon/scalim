@@ -698,7 +698,7 @@ class SeqPipeline(Pipeline):
             if field_spec is None:
                 self._write_column_if_target(field_key, row_ids, context, column_sink, batch_num)
                 continue
-            if isinstance(field_spec, FieldIr) and field_spec.source.source_id == main_source_id:
+            if isinstance(field_spec, FieldIr) and field_spec.source_id == main_source_id:
                 self._write_column_if_target(field_key, row_ids, context, column_sink, batch_num)
 
     def _write_column_if_target(
@@ -770,7 +770,7 @@ class SeqPipeline(Pipeline):
             if field_spec is None:
                 global_ready_target_fields.add(field_key)
                 continue
-            if main_source_id and isinstance(field_spec, FieldIr) and field_spec.source.source_id == main_source_id:
+            if main_source_id and isinstance(field_spec, FieldIr) and field_spec.source_id == main_source_id:
                 global_ready_target_fields.add(field_key)
         return global_ready_target_fields
 
@@ -783,10 +783,10 @@ class SeqPipeline(Pipeline):
         for operator in self.plan.operators:
             if not isinstance(operator, LoadRefOperatorIr):
                 continue
-            if not has_rows_binding(operator.lookup_steps):
+            if not has_rows_binding(operator.lookup_steps, self.runtime.sources):
                 continue
-            if can_group_by_relation(operator.lookup_steps):
-                rows_binding_relations.add(build_relation_signature(operator.lookup_steps))
+            if can_group_by_relation(operator.lookup_steps, self.runtime.sources):
+                rows_binding_relations.add(build_relation_signature(operator.lookup_steps, self.runtime.sources))
             else:
                 rows_binding_ops.add(operator.operator_id)
 
@@ -851,7 +851,7 @@ class SeqPipeline(Pipeline):
                 if isinstance(operator, LoadRefOperatorIr):
                     if operator.operator_id in rows_binding_ops:
                         rows_binding_ops.discard(operator.operator_id)
-                    relation_key = build_relation_signature(operator.lookup_steps)
+                    relation_key = build_relation_signature(operator.lookup_steps, self.runtime.sources)
                     if relation_key in rows_binding_relations and relation_key in self.runtime.load_ref_group_executed:
                         rows_binding_relations.discard(relation_key)
                     if not rows_binding_ops and not rows_binding_relations:

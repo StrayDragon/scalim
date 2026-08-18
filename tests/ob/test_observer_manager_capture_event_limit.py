@@ -172,18 +172,18 @@ def _build_two_ref_plan() -> DemandIr:
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="客户",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=orders["customer_id"].join(customers["customer_id"]),
         ),
         FieldIr(
             field_id="product_name",
             name="商品",
-            source=products,
+            source_id=products.source_id,
             data_key="product_name",
             relation=orders["product_id"].join(products["product_id"]),
         ),
@@ -239,7 +239,7 @@ def test_adaptive_capture_replay_replays_observer_events_on_main_thread_in_plan_
     for op in plan.operators:
         if getattr(op, "operator_type", None) != "load_ref":
             continue
-        expected.append(op.lookup_steps[0].to_source.source_id)
+        expected.append(op.lookup_steps[0].to_source_id)
     assert len(expected) == 2
 
     observer = _LoaderCallObserver()

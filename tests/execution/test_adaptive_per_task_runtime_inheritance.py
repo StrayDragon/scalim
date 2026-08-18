@@ -51,7 +51,7 @@ def _make_loadref_op(*, field_key: str, to_source: SourceIr) -> LoadRefOperatorI
         operator_type=OperatorType.LOAD_REF.value,
         source_id=to_source.source_id,
         field_key=field_key,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=to_source),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=to_source.source_id),),
     )
 
 
@@ -60,7 +60,7 @@ def _build_plan(ops: Tuple[LoadRefOperatorIr, ...]) -> ExecutionPlan:
     for op in ops:
         if not op.lookup_steps:
             continue
-        field_specs[op.field_key] = FieldIr(field_id=op.field_key, name=op.field_key, source=op.lookup_steps[-1].to_source)
+        field_specs[op.field_key] = FieldIr(field_id=op.field_key, name=op.field_key, source_id=op.lookup_steps[-1].to_source_id)
     return ExecutionPlan(
         operators=ops,
         field_specs=field_specs,

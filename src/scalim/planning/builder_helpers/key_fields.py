@@ -18,7 +18,12 @@ def compute_key_fields(
         for field_key in required_fields:
             field = demand.fields.get(field_key)
             if isinstance(field, FieldIr):
-                steps = resolver.resolve(field, main_source, field_key=field_key)
+                steps = resolver.resolve(
+                    field,
+                    main_source,
+                    field_key=field_key,
+                    to_source=demand.sources.get(field.source_id),
+                )
                 if steps:
                     for step in steps:
                         key_fields.update(step.get_from_fields())

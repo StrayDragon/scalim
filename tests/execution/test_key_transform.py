@@ -264,12 +264,12 @@ def test_key_cast_single_field_str_to_int(mock_loader_with_types: MockDataLoader
     relation = orders_source["customer_id"].join(customers_source["customer_id"])
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="customer_name",
             name="客户名称",
-            source=customers_source,
+            source_id=customers_source.source_id,
             data_key="customer_name",
             relation=relation,
         ),
@@ -309,9 +309,11 @@ def test_key_cast_missing_causes_lookup_miss(mock_loader_with_types: MockDataLoa
     relation = orders_source["customer_id"].join(customers_source["customer_id"])
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=orders_source),
-        FieldIr(field_id="customer_name", name="客户名称", source=customers_source, data_key="customer_name", relation=relation),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=orders_source.source_id),
+        FieldIr(
+            field_id="customer_name", name="客户名称", source_id=customers_source.source_id, data_key="customer_name", relation=relation
+        ),
     ]
 
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=orders_source)
@@ -343,15 +345,15 @@ def test_lookup_cast_auto_float_emits_diagnostic_warning(mock_float_key_loader: 
 
     auto_cast = LookupCastSpecIr(name="auto")
     _bind_lookup_cast(runtime_bindings, auto_cast, is_multi=False, fn=auto_normalize_key)
-    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=auto_cast),)
+    lookup_steps = (LookupStepIr(from_field="customer_id", to_source_id=customers_source.source_id, lookup_cast=auto_cast),)
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="customer_name",
             name="客户名称",
-            source=customers_source,
+            source_id=customers_source.source_id,
             data_key="customer_name",
             lookup_steps=lookup_steps,
         ),
@@ -396,15 +398,15 @@ def test_lookup_cast_auto_non_float_has_no_warning(mock_loader_with_types: MockD
 
     auto_cast = LookupCastSpecIr(name="auto")
     _bind_lookup_cast(runtime_bindings, auto_cast, is_multi=False, fn=auto_normalize_key)
-    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=auto_cast),)
+    lookup_steps = (LookupStepIr(from_field="customer_id", to_source_id=customers_source.source_id, lookup_cast=auto_cast),)
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="customer_name",
             name="客户名称",
-            source=customers_source,
+            source_id=customers_source.source_id,
             data_key="customer_name",
             lookup_steps=lookup_steps,
         ),
@@ -452,19 +454,19 @@ def test_lookup_cast_auto_multi_field_float_warns(mock_loader_with_types: MockDa
     lookup_steps = (
         LookupStepIr(
             from_field=("region_id", "institution_id"),
-            to_source=mapping_source,
+            to_source_id=mapping_source.source_id,
             lookup_cast=auto_cast,
         ),
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="region_id", name="地区ID", source=orders_source),
-        FieldIr(field_id="institution_id", name="机构ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="region_id", name="地区ID", source_id=orders_source.source_id),
+        FieldIr(field_id="institution_id", name="机构ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="mapping_name",
             name="映射名",
-            source=mapping_source,
+            source_id=mapping_source.source_id,
             data_key="mapping_name",
             lookup_steps=lookup_steps,
         ),
@@ -513,16 +515,16 @@ def test_multi_field_key_cast(mock_loader_with_types: MockDataLoaderWithTypes) -
         ),
     )
 
-    lookup_steps = (LookupStepIr(from_field=("region_id", "institution_id"), to_source=mapping_source),)
+    lookup_steps = (LookupStepIr(from_field=("region_id", "institution_id"), to_source_id=mapping_source.source_id),)
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="region_id", name="区域ID", source=orders_source),
-        FieldIr(field_id="institution_id", name="机构ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="region_id", name="区域ID", source_id=orders_source.source_id),
+        FieldIr(field_id="institution_id", name="机构ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="mapping_name",
             name="映射名称",
-            source=mapping_source,
+            source_id=mapping_source.source_id,
             data_key="mapping_name",
             lookup_steps=lookup_steps,
         ),
@@ -579,17 +581,17 @@ def test_multi_level_key_cast(mock_multi_level_loader: MockMultiLevelLoader) -> 
     )
 
     lookup_steps = (
-        LookupStepIr(from_field="pay_id", to_source=pays_source),
-        LookupStepIr(from_field="country_id", to_source=countries_source),
+        LookupStepIr(from_field="pay_id", to_source_id=pays_source.source_id),
+        LookupStepIr(from_field="country_id", to_source_id=countries_source.source_id),
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="pay_id", name="支付ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="pay_id", name="支付ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="country_name",
             name="国家名称",
-            source=countries_source,
+            source_id=countries_source.source_id,
             data_key="country_name",
             lookup_steps=lookup_steps,
         ),
@@ -633,15 +635,15 @@ def test_lookup_cast_overrides_key_cast(mock_loader_with_types: MockDataLoaderWi
 
     to_int_cast = LookupCastSpecIr(name="must_to_int")
     _bind_lookup_cast(runtime_bindings, to_int_cast, is_multi=False, fn=must_to_int)
-    lookup_steps = (LookupStepIr(from_field="customer_id", to_source=customers_source, lookup_cast=to_int_cast),)
+    lookup_steps = (LookupStepIr(from_field="customer_id", to_source_id=customers_source.source_id, lookup_cast=to_int_cast),)
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="customer_name",
             name="客户名称",
-            source=customers_source,
+            source_id=customers_source.source_id,
             data_key="customer_name",
             lookup_steps=lookup_steps,
         ),
@@ -682,15 +684,15 @@ def test_lookup_cast_csv_first(mock_csv_loader: MockCSVFieldLoader) -> None:
 
     csv_first = LookupCastSpecIr(name="sep_first")
     _bind_lookup_cast(runtime_bindings, csv_first, is_multi=False, fn=must_get_seps_values_first_int)
-    lookup_steps = (LookupStepIr(from_field="group_ids", to_source=groups_source, lookup_cast=csv_first),)
+    lookup_steps = (LookupStepIr(from_field="group_ids", to_source_id=groups_source.source_id, lookup_cast=csv_first),)
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="group_ids", name="组ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="group_ids", name="组ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="group_name",
             name="组名",
-            source=groups_source,
+            source_id=groups_source.source_id,
             data_key="group_name",
             lookup_steps=lookup_steps,
         ),

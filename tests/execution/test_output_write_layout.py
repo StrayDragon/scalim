@@ -131,7 +131,7 @@ def test_composition_plus_explicit_column_layout_fails_fast(tmp_path: Path) -> N
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"id": 1}])})
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="id", name="ID", source=main_source)],
+        fields=[FieldIr(field_id="id", name="ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
     composition = OutputCompositionSpec(

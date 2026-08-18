@@ -45,7 +45,7 @@ def test_run_ir_explicit_none_batch_size_disables_chunking() -> None:
     )
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
 
@@ -94,7 +94,7 @@ def test_tee_row_sink_write_batch_writes_to_both_sinks() -> None:
 def test_export_layout_from_demand_ir_skips_unknown_fields_when_building_name_map() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
 
     layout = export_layout_from_demand_ir(demand_ir, ["order_id", "missing"], header_fields_output_by="name")
@@ -141,7 +141,7 @@ def test_run_ir_registers_viz_observer_and_writes_artifacts(tmp_path: Path) -> N
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
 
     events_path = tmp_path / "viz_events.jsonl"
@@ -166,7 +166,7 @@ def test_run_ir_total_rows_counts_even_without_output_or_sink() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}, {"order_id": 2}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
@@ -183,7 +183,7 @@ def test_run_ir_includes_partial_event_meta_defaults_in_log_context(tmp_path: Pa
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     sink = InMemoryRowDataSink()
     request = ExecutionRequest(
@@ -200,7 +200,7 @@ def test_run_ir_capture_events_covers_optional_meta_defaults() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     sink = InMemoryRowDataSink()
     request = ExecutionRequest(
@@ -228,7 +228,7 @@ def test_run_ir_rejects_missing_runtime_bindings() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
     request = ExecutionRequest(
@@ -249,7 +249,7 @@ def test_run_ir_passes_main_rows_to_engine_and_bypasses_loader() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": _load_main_should_not_be_called})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     sink = InMemoryRowDataSink()
     request = ExecutionRequest(
@@ -268,7 +268,7 @@ def test_run_ir_can_capture_in_memory_rows_without_output_or_sink() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}, {"order_id": 2}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
@@ -288,7 +288,7 @@ def test_run_ir_capture_in_memory_rows_uses_plan_target_fields_when_output_compo
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}, {"order_id": 2}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
 
     output_composition = OutputCompositionSpec(
@@ -412,7 +412,7 @@ def test_run_ir_rejects_unknown_key_normalization() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
@@ -437,7 +437,7 @@ def test_run_ir_emits_experimental_warning_when_key_normalization_enabled() -> N
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     observer = _CaptureWarningObserver()
     request = ExecutionRequest(
@@ -465,7 +465,7 @@ def test_run_ir_experimental_warning_is_visible_by_default_when_key_normalizatio
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     request = ExecutionRequest(
         export_layout=ExportLayout(field_ids=("order_id",), header_names=None),
@@ -505,7 +505,7 @@ def test_run_ir_closes_sink_on_exception() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     sink = _ExplodingSink()
     request = ExecutionRequest(
@@ -539,7 +539,7 @@ def test_run_ir_raises_when_sink_close_fails_after_successful_run() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     sink = _CloseExplodingSink()
     request = ExecutionRequest(
@@ -578,7 +578,7 @@ def test_run_ir_suppresses_sink_close_error_when_engine_run_fails() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
     sink = _ExplodingSink()
     request = ExecutionRequest(
@@ -694,7 +694,7 @@ def test_run_ir_discards_sink_and_closes_observers_when_engine_init_fails() -> N
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
 
     sink = _CloseTrackingSink()
@@ -727,7 +727,7 @@ def test_run_ir_forwards_chunk_parallelism_opt_in_as_pipeline_overrides() -> Non
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": (lambda: [{"order_id": 1}])})
     demand_ir = DemandIr.from_irs(
-        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)], main_source=main_source
+        sources=[], fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)], main_source=main_source
     )
 
     def _run(**request_kwargs: Any) -> None:

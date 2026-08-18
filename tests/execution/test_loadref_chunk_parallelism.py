@@ -102,13 +102,13 @@ def _build_scenario(
         lookup_chunk_size=chunk_size,
         lookup_chunk_parallel=lookup_chunk_parallel,
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = BindingIr(
         key_field="target_id",
         params_builder_ref=RuntimeHandleIdIr("params_builder:targets:target_id"),
         **resolved_binding_kwargs,
     )
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -121,6 +121,7 @@ def _build_scenario(
         plan,
         _make_main_source(),
         observer_manager=observer_manager,
+        sources={str(target_source.source_id): target_source},
         runtime_bindings=runtime_bindings,
         parallel_mode=parallel_mode,
         max_workers=max_workers,
@@ -576,9 +577,10 @@ def _build_two_source_plan(
     *,
     chunked_loader,  # type: ignore[no-untyped-def]
     plain_loader,  # type: ignore[no-untyped-def]
-) -> Tuple[ExecutionPlan, LoadRefOperatorIr, LoadRefOperatorIr]:
+) -> Tuple[ExecutionPlan, LoadRefOperatorIr, LoadRefOperatorIr, Dict[str, SourceIr]]:
     operators: List[LoadRefOperatorIr] = []
     field_specs: Dict[str, FieldIr] = {}
+    sources: Dict[str, SourceIr] = {}
     for source_id, field_key, loader, chunk_size in (
         ("chunked", "chunked_name", chunked_loader, 2),
         ("plain", "plain_name", plain_loader, None),
@@ -591,22 +593,23 @@ def _build_two_source_plan(
             loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:{}".format(source_id))),
             lookup_chunk_size=chunk_size,
         )
+        sources[source_id] = source
         binding = BindingIr(
             key_field="target_id",
             params_builder_ref=RuntimeHandleIdIr("params_builder:{}:target_id".format(source_id)),
         )
-        field_specs[field_key] = FieldIr(field_id=field_key, name=field_key, source=source, data_key="name")
+        field_specs[field_key] = FieldIr(field_id=field_key, name=field_key, source_id=source.source_id, data_key="name")
         operators.append(
             LoadRefOperatorIr(
                 operator_id="load_ref_{}".format(field_key),
                 operator_type=OperatorType.LOAD_REF.value,
                 source_id=source_id,
                 field_key=field_key,
-                lookup_steps=(LookupStepIr(from_field="fk_id", to_source=source, bind=binding),),
+                lookup_steps=(LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding),),
             )
         )
     plan = ExecutionPlan(field_specs=field_specs, operators=tuple(operators))
-    return plan, operators[0], operators[1]
+    return plan, operators[0], operators[1], sources
 
 
 def test_chunks_parallelize_inside_adaptive_worker_task_without_pool_deadlock() -> None:
@@ -632,7 +635,7 @@ def test_chunks_parallelize_inside_adaptive_worker_task_without_pool_deadlock() 
         return {key: {"name": "Plain{}".format(key)} for key in ids}
 
     runtime_bindings = RuntimeBindings()
-    plan, chunked_op, plain_op = _build_two_source_plan(
+    plan, chunked_op, plain_op, sources = _build_two_source_plan(
         runtime_bindings,
         chunked_loader=_chunked_loader,
         plain_loader=_plain_loader,
@@ -640,6 +643,7 @@ def test_chunks_parallelize_inside_adaptive_worker_task_without_pool_deadlock() 
     runtime = _make_runtime(
         plan,
         _make_main_source(),
+        sources=sources,
         runtime_bindings=runtime_bindings,
         parallel_mode="adaptive",
         max_workers=2,

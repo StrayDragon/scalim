@@ -53,7 +53,7 @@ class AdaptivePolicy:
     def choose_task_pool(self, *, op: LoadRefOperatorIr, tuning: AdaptiveTuning) -> str:
         pools: Set[str] = set()
         for step in op.lookup_steps:
-            pools.add(tuning.pool_for_source(step.to_source.source_id))
+            pools.add(tuning.pool_for_source(step.to_source_id))
         if len(pools) == 1:
             return next(iter(pools))
         # 多来源链默认使用默认任务池,以保持“每个任务一个池”,并避免多令牌死锁.

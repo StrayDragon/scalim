@@ -82,19 +82,23 @@ def build_viz_schedule_plan(
     deps = _build_ref_deps(plan)
     layers = _build_layers(field_keys, deps=deps)
 
+    sources: Dict[str, SourceIr] = {}
+    for src, _items in plan.ref_loader_sequence:
+        sources[str(src.source_id)] = src
+
     layer_items: List[Dict[str, Any]] = []
     for layer_index, layer_field_keys in enumerate(layers):
         layer_ops: List[LoadRefOperatorIr] = []
         for key in layer_field_keys:
             layer_ops.append(op_by_field_key[key])
 
-        rows_barrier = any(has_rows_binding(op.lookup_steps) for op in layer_ops)
+        rows_barrier = any(has_rows_binding(op.lookup_steps, sources) for op in layer_ops)
 
         groups: Dict[RelationSignature, _VizTask] = {}
         group_order: List[RelationSignature] = []
 
         for op in layer_ops:
-            sig = build_relation_signature(op.lookup_steps)
+            sig = build_relation_signature(op.lookup_steps, sources)
             item = groups.get(sig)
             if item is None:
                 chain = [step[0] for step in sig]
@@ -102,7 +106,7 @@ def build_viz_schedule_plan(
                     "task_id": "t{}".format(len(group_order)),
                     "chain": chain,
                     "fields": [],
-                    "rows_binding": bool(has_rows_binding(op.lookup_steps)),
+                    "rows_binding": bool(has_rows_binding(op.lookup_steps, sources)),
                 }
                 groups[sig] = new_item
                 group_order.append(sig)

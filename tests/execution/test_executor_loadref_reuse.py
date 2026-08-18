@@ -74,13 +74,12 @@ def _make_runtime_with_ops(
     hook_manager: HookManager,
     runtime_bindings: RuntimeBindings,
     observer_manager: Optional[ObserverManager] = None,
+    sources: Optional[Dict[str, SourceIr]] = None,
 ) -> ExecutionRuntime:
     plan = ExecutionPlan(operators=tuple(operators), field_specs=field_specs)
     observer_manager = observer_manager or ObserverManager()
-    sources: Dict[str, SourceIr] = {}
-    for op in operators:
-        for step in op.lookup_steps:
-            sources[str(step.to_source.source_id)] = step.to_source
+    if sources is None:
+        sources = {}
     return ExecutionRuntime(
         plan,
         hook_manager,
@@ -114,9 +113,9 @@ def test_loadref_reuse_and_group_field_keys() -> None:
         params_builders={("payments", "order_id"): _params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step,))
-    field_extra = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_amount = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, lookup_steps=(step,))
+    field_extra = FieldIr(field_id="extra", name="Extra", source_id=source.source_id, lookup_steps=(step,))
 
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_0",
@@ -139,6 +138,7 @@ def test_loadref_reuse_and_group_field_keys() -> None:
         {"amount": field_amount, "extra": field_extra},
         hook_manager,
         runtime_bindings=runtime_bindings,
+        sources={source.source_id: source},
     )
     runtime.batch_num = 1
     context = BatchContext()
@@ -177,9 +177,9 @@ def test_loadref_cache_status_events() -> None:
         params_builders={("payments", "order_id"): _params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step,))
-    field_extra = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_amount = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, lookup_steps=(step,))
+    field_extra = FieldIr(field_id="extra", name="Extra", source_id=source.source_id, lookup_steps=(step,))
 
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_0",
@@ -204,6 +204,7 @@ def test_loadref_cache_status_events() -> None:
         {"amount": field_amount, "extra": field_extra},
         hook_manager,
         runtime_bindings=runtime_bindings,
+        sources={source.source_id: source},
     )
     runtime.batch_num = 3
     context = BatchContext()
@@ -248,10 +249,10 @@ def test_loadref_no_reuse_for_different_relation_signature() -> None:
         },
     )
 
-    step_a = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_a)
-    step_b = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_b)
-    field_a = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step_a,))
-    field_b = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step_b,))
+    step_a = LookupStepIr(from_field="order_id", to_source_id=source.source_id, lookup_cast=cast_a)
+    step_b = LookupStepIr(from_field="order_id", to_source_id=source.source_id, lookup_cast=cast_b)
+    field_a = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, lookup_steps=(step_a,))
+    field_b = FieldIr(field_id="extra", name="Extra", source_id=source.source_id, lookup_steps=(step_b,))
 
     op_a = LoadRefOperatorIr(
         operator_id="load_ref_a",
@@ -274,6 +275,7 @@ def test_loadref_no_reuse_for_different_relation_signature() -> None:
         {"amount": field_a, "extra": field_b},
         hook_manager,
         runtime_bindings=runtime_bindings,
+        sources={source.source_id: source},
     )
     runtime.batch_num = 1
     context = BatchContext()
@@ -308,8 +310,8 @@ def test_loadref_skip_repeated_execution_for_same_relation_group() -> None:
         params_builders={("payments", "order_id"): _params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_amount = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, lookup_steps=(step,))
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_0",
         operator_type=OperatorType.LOAD_REF.value,
@@ -319,7 +321,9 @@ def test_loadref_skip_repeated_execution_for_same_relation_group() -> None:
     )
 
     hook_manager = HookManager()
-    runtime = _make_runtime_with_ops([op_amount], {"amount": field_amount}, hook_manager, runtime_bindings=runtime_bindings)
+    runtime = _make_runtime_with_ops(
+        [op_amount], {"amount": field_amount}, hook_manager, runtime_bindings=runtime_bindings, sources={source.source_id: source}
+    )
     runtime.batch_num = 1
     context = BatchContext()
     context.set_field_value("order_id", 1, 1)
@@ -365,9 +369,9 @@ def test_rows_loadref_default_batch_reuse() -> None:
         params_builders={("customers", "order_id"): _rows_params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_name = FieldIr(field_id="name", name="Name", source=source, lookup_steps=(step,))
-    field_level = FieldIr(field_id="level", name="Level", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_name = FieldIr(field_id="name", name="Name", source_id=source.source_id, lookup_steps=(step,))
+    field_level = FieldIr(field_id="level", name="Level", source_id=source.source_id, lookup_steps=(step,))
 
     op_name = LoadRefOperatorIr(
         operator_id="load_ref_name",
@@ -390,6 +394,7 @@ def test_rows_loadref_default_batch_reuse() -> None:
         {"name": field_name, "level": field_level},
         hook_manager,
         runtime_bindings=runtime_bindings,
+        sources={source.source_id: source},
     )
     runtime.batch_num = 1
     context = BatchContext()
@@ -415,9 +420,9 @@ def test_rows_loadref_cache_mode_none_disables_reuse() -> None:
         params_builders={("customers", "order_id"): _rows_params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_name = FieldIr(field_id="name", name="Name", source=source, lookup_steps=(step,))
-    field_level = FieldIr(field_id="level", name="Level", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_name = FieldIr(field_id="name", name="Name", source_id=source.source_id, lookup_steps=(step,))
+    field_level = FieldIr(field_id="level", name="Level", source_id=source.source_id, lookup_steps=(step,))
 
     op_name = LoadRefOperatorIr(
         operator_id="load_ref_name",
@@ -440,6 +445,7 @@ def test_rows_loadref_cache_mode_none_disables_reuse() -> None:
         {"name": field_name, "level": field_level},
         hook_manager,
         runtime_bindings=runtime_bindings,
+        sources={source.source_id: source},
     )
     runtime.batch_num = 2
     context = BatchContext()
@@ -463,9 +469,9 @@ def test_rows_loadref_cache_uses_first_batch_rows_snapshot() -> None:
         params_builders={("customers", "order_id"): _rows_params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_name = FieldIr(field_id="name", name="Name", source=source, lookup_steps=(step,))
-    field_level = FieldIr(field_id="level", name="Level", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_name = FieldIr(field_id="name", name="Name", source_id=source.source_id, lookup_steps=(step,))
+    field_level = FieldIr(field_id="level", name="Level", source_id=source.source_id, lookup_steps=(step,))
 
     op_name = LoadRefOperatorIr(
         operator_id="load_ref_name",
@@ -490,6 +496,7 @@ def test_rows_loadref_cache_uses_first_batch_rows_snapshot() -> None:
         {"name": field_name, "level": field_level},
         hook_manager,
         runtime_bindings=runtime_bindings,
+        sources={source.source_id: source},
     )
     runtime.batch_num = 5
     context = BatchContext()
@@ -519,8 +526,8 @@ def test_loadref_cached_rows_hit_reuses_cached_batch_rows() -> None:
         params_builders={("customers", "order_id"): _rows_params_builder},
     )
 
-    step = LookupStepIr(from_field="order_id", to_source=source)
-    field_name = FieldIr(field_id="name", name="Name", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id)
+    field_name = FieldIr(field_id="name", name="Name", source_id=source.source_id, lookup_steps=(step,))
 
     op_name = LoadRefOperatorIr(
         operator_id="load_ref_name",
@@ -533,7 +540,9 @@ def test_loadref_cached_rows_hit_reuses_cached_batch_rows() -> None:
     capture = _LoaderEventCapture()
     hook_manager = HookManager()
     hook_manager.register(capture)
-    runtime = _make_runtime_with_ops([op_name], {"name": field_name}, hook_manager, runtime_bindings=runtime_bindings)
+    runtime = _make_runtime_with_ops(
+        [op_name], {"name": field_name}, hook_manager, runtime_bindings=runtime_bindings, sources={source.source_id: source}
+    )
     runtime.batch_num = 6
     context = BatchContext()
     context.set_field_value("order_id", 1, 1)
@@ -551,3 +560,115 @@ def test_loadref_cached_rows_hit_reuses_cached_batch_rows() -> None:
     assert len(capture.events) == 2
     assert capture.events[0].cache_status == "miss"
     assert capture.events[1].cache_status == "hit"
+
+
+def test_rows_reuse_catalog_none_disables_group_when_nested_snapshot_is_batch() -> None:
+    """r1004: Python RowsReuse.none() overlay 必须禁用分组,即使图句柄仍是 YAML batch 快照."""
+    from scalim.vendor.dataclassesx import replace
+
+    loader = _RowsLoader()
+    snapshot_bind = _make_rows_binding(cache_mode="batch")
+    loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"))
+    nested = SourceIr(source_id="customers", key=KeyIr(key="order_id"), loader_spec=loader_spec, bind=snapshot_bind)
+    catalog = replace(nested, bind=replace(snapshot_bind, cache_mode="none"))
+    runtime_bindings = RuntimeBindings(
+        source_loaders={"customers": loader},
+        params_builders={("customers", "order_id"): _rows_params_builder},
+    )
+
+    step = LookupStepIr(from_field="order_id", to_source_id=nested.source_id)
+    field_name = FieldIr(field_id="name", name="Name", source_id=nested.source_id, lookup_steps=(step,))
+    field_level = FieldIr(field_id="level", name="Level", source_id=nested.source_id, lookup_steps=(step,))
+    op_name = LoadRefOperatorIr(
+        operator_id="load_ref_name",
+        operator_type=OperatorType.LOAD_REF.value,
+        source_id=nested.source_id,
+        field_key="name",
+        lookup_steps=(step,),
+    )
+    op_level = LoadRefOperatorIr(
+        operator_id="load_ref_level",
+        operator_type=OperatorType.LOAD_REF.value,
+        source_id=nested.source_id,
+        field_key="level",
+        lookup_steps=(step,),
+    )
+
+    hook_manager = HookManager()
+    runtime = _make_runtime_with_ops(
+        [op_name, op_level],
+        {"name": field_name, "level": field_level},
+        hook_manager,
+        runtime_bindings=runtime_bindings,
+        sources={"customers": catalog},
+    )
+    runtime.batch_num = 1
+    context = BatchContext()
+    context.set_field_value("order_id", 1, 1)
+    context.set_field_value("order_id", 2, 2)
+
+    executor = LoadRefOperatorExecutor()
+    executor.execute(op_name, context, [1, 2], runtime)
+    executor.execute(op_level, context, [1, 2], runtime)
+
+    assert catalog.bind is not None
+    assert catalog.bind.cache_mode == "none"
+    assert nested.bind is not None
+    assert nested.bind.cache_mode == "batch"
+    assert loader.calls == 2
+
+
+def test_rows_reuse_catalog_batch_enables_group_when_nested_snapshot_is_none() -> None:
+    """r1004: Python RowsReuse.batch() overlay 必须启用分组,即使图句柄仍是 YAML none 快照."""
+    from scalim.vendor.dataclassesx import replace
+
+    loader = _RowsLoader()
+    snapshot_bind = _make_rows_binding(cache_mode="none")
+    loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader"))
+    nested = SourceIr(source_id="customers", key=KeyIr(key="order_id"), loader_spec=loader_spec, bind=snapshot_bind)
+    catalog = replace(nested, bind=replace(snapshot_bind, cache_mode="batch"))
+    runtime_bindings = RuntimeBindings(
+        source_loaders={"customers": loader},
+        params_builders={("customers", "order_id"): _rows_params_builder},
+    )
+
+    step = LookupStepIr(from_field="order_id", to_source_id=nested.source_id)
+    field_name = FieldIr(field_id="name", name="Name", source_id=nested.source_id, lookup_steps=(step,))
+    field_level = FieldIr(field_id="level", name="Level", source_id=nested.source_id, lookup_steps=(step,))
+    op_name = LoadRefOperatorIr(
+        operator_id="load_ref_name",
+        operator_type=OperatorType.LOAD_REF.value,
+        source_id=nested.source_id,
+        field_key="name",
+        lookup_steps=(step,),
+    )
+    op_level = LoadRefOperatorIr(
+        operator_id="load_ref_level",
+        operator_type=OperatorType.LOAD_REF.value,
+        source_id=nested.source_id,
+        field_key="level",
+        lookup_steps=(step,),
+    )
+
+    hook_manager = HookManager()
+    runtime = _make_runtime_with_ops(
+        [op_name, op_level],
+        {"name": field_name, "level": field_level},
+        hook_manager,
+        runtime_bindings=runtime_bindings,
+        sources={"customers": catalog},
+    )
+    runtime.batch_num = 1
+    context = BatchContext()
+    context.set_field_value("order_id", 1, 1)
+    context.set_field_value("order_id", 2, 2)
+
+    executor = LoadRefOperatorExecutor()
+    executor.execute(op_name, context, [1, 2], runtime)
+    executor.execute(op_level, context, [1, 2], runtime)
+
+    assert catalog.bind is not None
+    assert catalog.bind.cache_mode == "batch"
+    assert nested.bind is not None
+    assert nested.bind.cache_mode == "none"
+    assert loader.calls == 1

@@ -95,7 +95,7 @@ def test_fusion_disabled_reason_skips_members_without_memoizable_call_by(monkeyp
     main = _make_main_source()
     specs: Dict[str, Any] = {
         # 非派生字段: 记忆化判定直接跳过.
-        "raw": FieldIr(field_id="raw", name="raw", source=main),
+        "raw": FieldIr(field_id="raw", name="raw", source_id=main.source_id),
         # `compute_expr`(无 `call_by`)与含 `$ctx` 的 `call_by` 都不参与记忆化.
         "expr": DerivedFieldIr(field_id="expr", name="expr", dependencies=("raw",), compute_expr="raw + 1"),
         "ctx": DerivedFieldIr(
@@ -307,7 +307,7 @@ def test_execute_fused_dense_reports_unexpected_error() -> None:
 def test_execute_fused_compute_group_bails_out_on_non_derived_member() -> None:
     main = _make_main_source()
     specs: Dict[str, Any] = {
-        "raw": FieldIr(field_id="raw", name="raw", source=main),
+        "raw": FieldIr(field_id="raw", name="raw", source_id=main.source_id),
         "d0": _derived("d0", ("a",)),
     }
     runtime = _runtime(specs, {"d0": (lambda a: a)})

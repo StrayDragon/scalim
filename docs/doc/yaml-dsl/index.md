@@ -20,6 +20,7 @@ YAML DSL 的主线演进遵循以下上位原则(后续提案/变更默认不得
 - 能力表: [YAML→IR 能力矩阵](capability-matrix.md)
 - Agent 边界: `agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`
 - Upgrade（`lookup_chunk_size` → `LookupChunking`）: `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`
+- 图边 vs 目录（c50：`to_source_id` / overlay 只写 `DemandIr.sources`）: `agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-18-source-id-graph-refs.md`
 - 何时用 / 事件自证: `agentdev/skills/scalim-yaml-dsl/references/lookup-chunking-guidance.md`；oracle `ch164_public_api_lookup_chunking`
 - 归档设计/证据: `llmanspec/changes/archive/*-c40-yaml-runtime-policy-boundary/`
 

@@ -512,7 +512,7 @@ def load_step_data(
     if runtime.is_source_cached(source.source_id):
         return runtime.get_cached_source_mapping(step)
 
-    to_key = step.get_to_key_or_source_key()
+    to_key = step.get_to_key_or_source_key(source)
     binding_key = normalize_key_field(to_key)
 
     lookup_keys_list = build_stable_lookup_key_list(lookup_keys)
@@ -537,7 +537,7 @@ def load_step_data(
     cache_key = None
     if cache_enabled:
         lookup_keys_fingerprint = frozenset(lookup_keys_set)
-        cache_key = (build_step_signature(step), lookup_keys_fingerprint)
+        cache_key = (build_step_signature(step, runtime.sources), lookup_keys_fingerprint)
         cached = _get_cached_ref_result(
             runtime=runtime,
             cache_key=cache_key,

@@ -64,13 +64,14 @@ def extract_from_fields(
 
     示例:
         - 单级单字段:
-          `steps = (LookupStepIr(from_field=\"customer_id\", to_source=...),)`
+          `steps = (LookupStepIr(from_field=\"customer_id\", to_source_id=\"customers\"),)`
           `extract_from_fields(steps)`  # -> `(\"customer_id\",)`
         - 多级:
-          `steps = (LookupStepIr(from_field=\"pay_id\", to_source=pays), LookupStepIr(from_field=\"country_id\", to_source=countries))`
+          `steps = (LookupStepIr(from_field=\"pay_id\", to_source_id=\"pays\"),`
+          `LookupStepIr(from_field=\"country_id\", to_source_id=\"countries\"))`
           `extract_from_fields(steps)`  # -> `(\"pay_id\", \"country_id\")`
         - 多字段:
-          `steps = (LookupStepIr(from_field=(\"region_id\", \"institution_id\"), to_source=...),)`
+          `steps = (LookupStepIr(from_field=(\"region_id\", \"institution_id\"), to_source_id=\"mapping\"),)`
           `extract_from_fields(steps)`  # -> `(\"region_id\", \"institution_id\")`
     """
     result: List[str] = []

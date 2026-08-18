@@ -35,7 +35,7 @@ def build_metadata(
     for field_key in required_fields:
         field = demand.fields.get(field_key)
         if isinstance(field, FieldIr):
-            sources_used.add(field.source.source_id)
+            sources_used.add(field.source_id)
 
     cached_sources: List[str] = []
     for source in demand.sources.values():

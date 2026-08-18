@@ -124,7 +124,7 @@ def test_batch_executor_prefill_noop(has_other_field: bool, main_rows, required_
     target_fields = []
     if has_other_field:
         other_source = _make_source("other")
-        other_field = FieldIr(field_id="other", name="Other", source=other_source)
+        other_field = FieldIr(field_id="other", name="Other", source_id=other_source.source_id)
         field_specs = {"other": other_field}
         target_fields = ["other"]
 
@@ -167,7 +167,7 @@ def test_batch_executor_seq_loadref_segment_returns_when_executor_missing() -> N
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    op = _make_loadref_op(field_key="x", source=source, step=LookupStepIr(from_field="id", to_source=source, bind=binding))
+    op = _make_loadref_op(field_key="x", source=source, step=LookupStepIr(from_field="id", to_source_id=source.source_id, bind=binding))
 
     plan = ExecutionPlan(operators=(op,))
     runtime = ExecutionRuntime(
@@ -204,7 +204,7 @@ def test_batch_executor_adaptive_loadref_segment_falls_back_to_serial_when_no_po
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    step = LookupStepIr(from_field="id", to_source=source, bind=binding)
+    step = LookupStepIr(from_field="id", to_source_id=source.source_id, bind=binding)
     op1 = _make_loadref_op(field_key="a", source=source, step=step)
     op2 = _make_loadref_op(field_key="b", source=source, step=step)
 
@@ -255,7 +255,7 @@ def test_batch_executor_adaptive_loadref_segment_returns_when_executor_missing()
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    op = _make_loadref_op(field_key="x", source=source, step=LookupStepIr(from_field="id", to_source=source, bind=binding))
+    op = _make_loadref_op(field_key="x", source=source, step=LookupStepIr(from_field="id", to_source_id=source.source_id, bind=binding))
 
     plan = ExecutionPlan(operators=(op,))
     runtime = ExecutionRuntime(
@@ -445,7 +445,7 @@ def test_pipeline_write_column_if_target_skips_non_target() -> None:
 def test_pipeline_execute_batch_column_mode_handles_load_operator() -> None:
     main_source = _make_main_source()
     customers_source = _make_source("customers")
-    customer_field = FieldIr(field_id="customer_name", name="Customer", source=customers_source)
+    customer_field = FieldIr(field_id="customer_name", name="Customer", source_id=customers_source.source_id)
     demand = DemandIr.from_irs(sources=[customers_source], fields=[customer_field], main_source=main_source)
 
     load_op = LoadOperatorIr(
@@ -492,7 +492,7 @@ def test_pipeline_execute_batch_column_mode_after_operator_ignores_unknown_opera
 def test_pipeline_execute_batch_streaming_mode_writes_load_operator_fields() -> None:
     main_source = _make_main_source()
     customers_source = _make_source("customers")
-    customer_field = FieldIr(field_id="customer_name", name="Customer", source=customers_source)
+    customer_field = FieldIr(field_id="customer_name", name="Customer", source_id=customers_source.source_id)
     demand = DemandIr.from_irs(sources=[customers_source], fields=[customer_field], main_source=main_source)
 
     load_op = LoadOperatorIr(
@@ -548,11 +548,11 @@ def test_pipeline_true_row_streaming_writes_null_fk_row_before_ref_loader_call()
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True),
+        FieldIr(field_id="order_id", name="Order", source_id=main_source.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="Customer",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=main_source["customer_id"].join(customers["customer_id"]),
         ),
@@ -590,7 +590,7 @@ def test_pipeline_true_row_streaming_releases_written_rows_before_next_compute_r
         return a * 10
 
     main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
-    id_field = FieldIr(field_id="id", name="ID", source=main_source, is_primary=True)
+    id_field = FieldIr(field_id="id", name="ID", source_id=main_source.source_id, is_primary=True)
     a_field = DerivedFieldIr(
         field_id="a",
         name="A",
@@ -661,7 +661,7 @@ def test_pipeline_collect_streaming_rows_binding_barriers_skips_steps_without_bi
         FieldIr(
             field_id="customer_name",
             name="Customer",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=main_source["customer_id"].join(customers["customer_id"]),
         )
@@ -726,18 +726,18 @@ def test_pipeline_streaming_rows_binding_barrier_defers_row_release_until_after_
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True),
+        FieldIr(field_id="order_id", name="Order", source_id=main_source.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="Customer",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=main_source["customer_id"].join(customers["customer_id"]),
         ),
         FieldIr(
             field_id="customer_level",
             name="Level",
-            source=customers,
+            source_id=customers.source_id,
             data_key="level",
             relation=main_source["customer_id"].join(customers["customer_id"]),
         ),
@@ -1043,7 +1043,7 @@ def test_pipeline_streaming_order_by_sorts_rows_and_stable() -> None:
         loader_ref=RuntimeHandleIdIr(handle_id="main.loader"),
         order_by=(OrderByKeyIr(field_key="order_id", direction="asc"),),
     )
-    field_spec = FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True)
+    field_spec = FieldIr(field_id="order_id", name="Order", source_id=main_source.source_id, is_primary=True)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"order_id": field_spec}, ["order_id"])
     pipeline = _make_pipeline(plan, demand, main_source)
@@ -1067,7 +1067,7 @@ def test_pipeline_streaming_order_by_desc_nulls_last() -> None:
         loader_ref=RuntimeHandleIdIr(handle_id="main.loader"),
         order_by=(OrderByKeyIr(field_key="score", direction="desc"),),
     )
-    field_spec = FieldIr(field_id="score", name="Score", source=main_source, is_primary=True)
+    field_spec = FieldIr(field_id="score", name="Score", source_id=main_source.source_id, is_primary=True)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"score": field_spec}, ["score"])
     pipeline = _make_pipeline(plan, demand, main_source)
@@ -1087,7 +1087,7 @@ def test_pipeline_column_order_by_sets_row_ids() -> None:
         loader_ref=RuntimeHandleIdIr(handle_id="main.loader"),
         order_by=(OrderByKeyIr(field_key="order_id", direction="asc"),),
     )
-    field_spec = FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True)
+    field_spec = FieldIr(field_id="order_id", name="Order", source_id=main_source.source_id, is_primary=True)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"order_id": field_spec}, ["order_id"])
     pipeline = _make_pipeline(plan, demand, main_source)
@@ -1103,7 +1103,7 @@ def test_pipeline_column_order_by_sets_row_ids() -> None:
 
 def test_pipeline_streaming_mode_emits_row_events() -> None:
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    field_spec = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"id": field_spec}, ["id"])
 
@@ -1126,7 +1126,7 @@ def test_pipeline_streaming_mode_emits_row_events() -> None:
 
 def test_pipeline_column_mode_emits_column_events() -> None:
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    field_spec = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"id": field_spec}, ["id"])
 
@@ -1153,7 +1153,7 @@ def test_pipeline_finalize_reuses_existing_write_clock() -> None:
     from scalim.sinks.memory import InMemoryRowDataSink
 
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    field_spec = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"id": field_spec}, ["id"])
     pipeline = _make_pipeline(plan, demand, main_source)
@@ -1208,7 +1208,7 @@ def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
     from scalim.execution.executor.batch._internal.stage_spans import StageWriteClock, attach_write_clock
 
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    field_spec = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"id": field_spec}, ["id"])
     pipeline = _make_pipeline(plan, demand, main_source)
@@ -1251,7 +1251,7 @@ def test_pipeline_column_write_prefers_aligned_when_supported() -> None:
             self.calls = []
 
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="id", name="ID", source=main_source)
+    field_spec = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr.from_irs(sources=[], fields=[field_spec], main_source=main_source)
     plan = _make_plan({"id": field_spec}, ["id"])
     pipeline = _make_pipeline(plan, demand, main_source)

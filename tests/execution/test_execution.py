@@ -107,13 +107,13 @@ def simple_model(mock_loader: MockDataLoader) -> DemandIr:
         FieldIr(
             field_id="order_id",
             name="订单ID",
-            source=orders_source,
+            source_id=orders_source.source_id,
             is_primary=True,
         ),
         FieldIr(
             field_id="amount",
             name="金额",
-            source=orders_source,
+            source_id=orders_source.source_id,
         ),
     ]
 
@@ -136,18 +136,18 @@ def derived_model(mock_loader: MockDataLoader) -> DemandIr:
         FieldIr(
             field_id="order_id",
             name="订单ID",
-            source=orders_source,
+            source_id=orders_source.source_id,
             is_primary=True,
         ),
         FieldIr(
             field_id="amount",
             name="金额",
-            source=orders_source,
+            source_id=orders_source.source_id,
         ),
         FieldIr(
             field_id="cost",
             name="成本",
-            source=orders_source,
+            source_id=orders_source.source_id,
         ),
         DerivedFieldIr(
             field_id="profit",
@@ -201,18 +201,18 @@ def relation_model(mock_loader: MockDataLoader) -> DemandIr:
         FieldIr(
             field_id="order_id",
             name="订单ID",
-            source=orders_source,
+            source_id=orders_source.source_id,
             is_primary=True,
         ),
         FieldIr(
             field_id="amount",
             name="金额",
-            source=orders_source,
+            source_id=orders_source.source_id,
         ),
         FieldIr(
             field_id="customer_name",
             name="客户名称",
-            source=customers_source,
+            source_id=customers_source.source_id,
             data_key="customer_name",
             relation=orders_to_customers,
         ),
@@ -246,13 +246,13 @@ def chained_derived_model(mock_loader: MockDataLoader) -> DemandIr:
         FieldIr(
             field_id="order_id",
             name="订单ID",
-            source=orders_source,
+            source_id=orders_source.source_id,
             is_primary=True,
         ),
         FieldIr(
             field_id="amount",
             name="金额",
-            source=orders_source,
+            source_id=orders_source.source_id,
         ),
         DerivedFieldIr(
             field_id="b_double_amount",
@@ -527,18 +527,18 @@ class TestRelationDependencyDirection:
             FieldIr(
                 field_id="order_id",
                 name="订单ID",
-                source=orders_source,
+                source_id=orders_source.source_id,
                 is_primary=True,
             ),
             FieldIr(
                 field_id="customer_id",
                 name="客户ID",
-                source=orders_source,
+                source_id=orders_source.source_id,
             ),
             FieldIr(
                 field_id="customer_name",
                 name="客户名称",
-                source=customers_source,
+                source_id=customers_source.source_id,
                 data_key="customer_name",
                 relation=reversed_relation,
             ),

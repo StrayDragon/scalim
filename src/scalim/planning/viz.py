@@ -1,12 +1,52 @@
 # region imports
 
 import time
-from typing import Any, Dict, List, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Sequence, Set, Tuple, Union
 
-from ..spec.ir import DerivedFieldIr, FieldIr, MainSourceIr, SourceIr, SupportedFieldIr
+from ..spec.ir import DerivedFieldIr, FieldIr, SourceIr, SupportedFieldIr
+from ..vendor.compact.typing_extensionsx import Protocol
 from ..vendor.dataclassesx import asdict
 
 # endregion
+
+_AddNode = Callable[[str, str, Dict[str, Any]], None]
+_AddEdge = Callable[[str, str, str], None]
+_RefLoaderDep = Union[str, Tuple[str, ...]]
+_RefLoaderField = Tuple[str, _RefLoaderDep]
+
+
+class _VizStageLike(Protocol):
+    @property
+    def stage_id(self) -> str: ...
+
+    @property
+    def level(self) -> int: ...
+
+    @property
+    def field_keys(self) -> Sequence[str]: ...
+
+
+class _VizPlanLike(Protocol):
+    @property
+    def loader_sequence(self) -> Sequence[Tuple[SourceIr, Sequence[str]]]: ...
+
+    @property
+    def ref_loader_sequence(self) -> Sequence[Tuple[SourceIr, Sequence[_RefLoaderField]]]: ...
+
+    @property
+    def field_specs(self) -> Mapping[str, SupportedFieldIr]: ...
+
+    @property
+    def field_dependencies(self) -> Mapping[str, Tuple[str, ...]]: ...
+
+    @property
+    def stages(self) -> Sequence[_VizStageLike]: ...
+
+    @property
+    def metadata(self) -> Any: ...
+
+    @property
+    def target_fields(self) -> Sequence[str]: ...
 
 
 def _viz_add_node(
@@ -66,11 +106,18 @@ def _viz_sort_edges(edges: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _viz_collect_fields(
-    field_specs: Dict[str, SupportedFieldIr],
-    add_node: Any,
-) -> Tuple[Dict[str, Union[SourceIr, MainSourceIr]], Dict[str, List[str]]]:
-    sources: Dict[str, Union[SourceIr, MainSourceIr]] = {}
+    plan: _VizPlanLike,
+    add_node: _AddNode,
+) -> Tuple[Dict[str, bool], Dict[str, List[str]]]:
+    catalog_ids: Set[str] = set()
+    for src, _fields in plan.loader_sequence:
+        catalog_ids.add(str(src.source_id))
+    for src, _fields in plan.ref_loader_sequence:
+        catalog_ids.add(str(src.source_id))
+
+    source_is_main: Dict[str, bool] = {}
     fields_by_source: Dict[str, List[str]] = {}
+    field_specs = plan.field_specs
     for field_key, field_spec in field_specs.items():
         node_id = "field:{}".format(field_key)
         if isinstance(field_spec, DerivedFieldIr):
@@ -85,9 +132,8 @@ def _viz_collect_fields(
             )
             continue
         if isinstance(field_spec, FieldIr):
-            source = field_spec.source
-            source_id = source.source_id
-            sources[source_id] = source
+            source_id = field_spec.source_id
+            source_is_main[source_id] = source_id not in catalog_ids
             fields_by_source.setdefault(source_id, []).append(field_key)
             add_node(
                 node_id,
@@ -101,30 +147,30 @@ def _viz_collect_fields(
             )
             continue
         add_node(node_id, "field", {"label": field_key, "field_key": field_key})
-    return sources, fields_by_source
+    return source_is_main, fields_by_source
 
 
 def _viz_add_source_nodes(
-    sources: Dict[str, Union[SourceIr, MainSourceIr]],
-    add_node: Any,
+    source_is_main: Dict[str, bool],
+    add_node: _AddNode,
 ) -> None:
-    for source_id, source in sources.items():
+    for source_id, is_main in source_is_main.items():
         add_node(
             "source:{}".format(source_id),
             "source",
             {
                 "label": source_id,
                 "source_id": source_id,
-                "is_main": isinstance(source, MainSourceIr),
+                "is_main": is_main,
             },
         )
 
 
 def _viz_add_loader_nodes(
-    sources: Dict[str, Union[SourceIr, MainSourceIr]],
-    add_node: Any,
+    source_is_main: Dict[str, bool],
+    add_node: _AddNode,
 ) -> None:
-    for source_id in sources:
+    for source_id in source_is_main:
         add_node(
             "loader:{}".format(source_id),
             "loader",
@@ -136,8 +182,8 @@ def _viz_add_loader_nodes(
 
 
 def _viz_add_dependency_edges(
-    field_dependencies: Dict[str, Tuple[str, ...]],
-    add_edge: Any,
+    field_dependencies: Mapping[str, Tuple[str, ...]],
+    add_edge: _AddEdge,
 ) -> None:
     for field_key, deps in field_dependencies.items():
         for dep in deps:
@@ -146,11 +192,11 @@ def _viz_add_dependency_edges(
 
 def _viz_add_source_edges(
     fields_by_source: Dict[str, List[str]],
-    field_specs: Dict[str, SupportedFieldIr],
+    field_specs: Mapping[str, SupportedFieldIr],
     *,
     include_source_nodes: bool,
     include_loader_nodes: bool,
-    add_edge: Any,
+    add_edge: _AddEdge,
 ) -> None:
     for source_id, field_keys in fields_by_source.items():
         source_node = "source:{}".format(source_id)
@@ -169,7 +215,7 @@ def _viz_add_source_edges(
                 add_edge(source_node, "field:{}".format(field_key), edge_type)
 
 
-def _viz_stage_records(stages: List[Any]) -> List[Dict[str, Any]]:
+def _viz_stage_records(stages: Sequence[_VizStageLike]) -> List[Dict[str, Any]]:
     return [
         {
             "stage_id": stage.stage_id,
@@ -180,7 +226,7 @@ def _viz_stage_records(stages: List[Any]) -> List[Dict[str, Any]]:
     ]
 
 
-def _viz_add_stage_nodes(stages: List[Any], add_node: Any, add_edge: Any) -> None:
+def _viz_add_stage_nodes(stages: Sequence[_VizStageLike], add_node: _AddNode, add_edge: _AddEdge) -> None:
     for stage in stages:
         stage_id = "stage:{}".format(stage.stage_id)
         add_node(
@@ -196,7 +242,7 @@ def _viz_add_stage_nodes(stages: List[Any], add_node: Any, add_edge: Any) -> Non
             add_edge(stage_id, "field:{}".format(field_key), "in_stage")
 
 
-def _viz_build_meta(metadata: Any, target_fields: List[str], schema_version: str) -> Dict[str, Any]:
+def _viz_build_meta(metadata: Any, target_fields: Sequence[str], schema_version: str) -> Dict[str, Any]:
     return {
         "schema_version": schema_version,
         "created_at": time.time(),
@@ -206,7 +252,7 @@ def _viz_build_meta(metadata: Any, target_fields: List[str], schema_version: str
 
 
 def build_viz_graph_snapshot(
-    plan: Any,
+    plan: _VizPlanLike,
     *,
     schema_version: str = "vizgraph/v1",
     include_stage_nodes: bool = True,
@@ -229,11 +275,11 @@ def build_viz_graph_snapshot(
     def add_edge(source: str, target: str, edge_type: str) -> None:
         _viz_add_edge(edges, edge_counter, source, target, edge_type)
 
-    sources, fields_by_source = _viz_collect_fields(plan.field_specs, add_node)
+    source_is_main, fields_by_source = _viz_collect_fields(plan, add_node)
     if include_source_nodes:
-        _viz_add_source_nodes(sources, add_node)
+        _viz_add_source_nodes(source_is_main, add_node)
     if include_loader_nodes:
-        _viz_add_loader_nodes(sources, add_node)
+        _viz_add_loader_nodes(source_is_main, add_node)
 
     _viz_add_dependency_edges(plan.field_dependencies, add_edge)
     _viz_add_source_edges(

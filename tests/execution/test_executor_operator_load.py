@@ -100,7 +100,7 @@ def test_load_operator_uses_extractor_and_missing_field_spec() -> None:
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=source,
+        source_id=source.source_id,
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="value_transform:amount")),),
     )
 
@@ -145,14 +145,33 @@ def test_execution_runtime_helpers_cover_cache_and_transforms() -> None:
         key=KeyIr(key="id", cast=key_cast_error),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:src")),
     )
+    none_transform_source = SourceIr(
+        source_id="none",
+        key=KeyIr(key="id", cast=key_cast_none),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:none")),
+    )
+    plain_source = SourceIr(
+        source_id="plain",
+        key=KeyIr(key="id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:plain")),
+    )
     plan = ExecutionPlan(field_specs={})
-    runtime = _make_runtime(plan, _make_main_source(), runtime_bindings=runtime_bindings)
+    runtime = _make_runtime(
+        plan,
+        _make_main_source(),
+        sources={
+            str(source.source_id): source,
+            str(none_transform_source.source_id): none_transform_source,
+            str(plain_source.source_id): plain_source,
+        },
+        runtime_bindings=runtime_bindings,
+    )
 
     assert runtime.get_from_cache("missing", "1") is None
     runtime.preloaded_cache["src"] = {"key": "value"}
     assert runtime.get_from_cache("src", "key") == "value"
 
-    step_with_lookup_error = LookupStepIr(from_field="fk_id", to_source=source, lookup_cast=lookup_cast_error)
+    step_with_lookup_error = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, lookup_cast=lookup_cast_error)
     normalized, status, message = runtime.normalize_lookup_key_with_status("1", step_with_lookup_error)
     assert normalized is None
     assert status == "type_error"
@@ -162,30 +181,20 @@ def test_execution_runtime_helpers_cover_cache_and_transforms() -> None:
     assert normalized is None
     assert status == "null_key"
 
-    none_transform_source = SourceIr(
-        source_id="none",
-        key=KeyIr(key="id", cast=key_cast_none),
-        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:none")),
-    )
-    step_with_none_cast = LookupStepIr(from_field="fk_id", to_source=none_transform_source)
+    step_with_none_cast = LookupStepIr(from_field="fk_id", to_source_id=none_transform_source.source_id)
     normalized, status, message = runtime.normalize_lookup_key_with_status("1", step_with_none_cast)
     assert normalized is None
     assert status == "type_error"
     assert message == "key.cast returned None"
 
-    step_returns_none = LookupStepIr(from_field="fk_id", to_source=source, lookup_cast=lookup_cast_none)
+    step_returns_none = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, lookup_cast=lookup_cast_none)
     normalized, status, message = runtime.normalize_lookup_key_with_status("1", step_returns_none)
     assert normalized is None
     assert status == "type_error"
     assert message == "lookup_cast returned None"
     assert runtime.normalize_lookup_key("1", step_returns_none) is None
 
-    plain_source = SourceIr(
-        source_id="plain",
-        key=KeyIr(key="id"),
-        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:plain")),
-    )
-    plain_step = LookupStepIr(from_field="fk_id", to_source=plain_source)
+    plain_step = LookupStepIr(from_field="fk_id", to_source_id=plain_source.source_id)
     normalized, status, _ = runtime.normalize_lookup_key_with_status("ok", plain_step)
     assert normalized == "ok"
     assert status == "ok"
@@ -253,7 +262,7 @@ def test_load_operator_applies_source_normalize_index_by_key() -> None:
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="order_id"),
     )
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
     runtime = _make_runtime(
         plan,
@@ -303,7 +312,7 @@ def test_load_operator_emits_loader_call_skipped_none_rows_for_index_by_key_on_n
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
         normalize=SourceNormalizeIr(kind="index_by_key", key_field="order_id", on_none="skip"),
     )
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
     runtime = _make_runtime(
         plan,
@@ -345,7 +354,7 @@ def test_load_operator_object_missing_attribute_returns_none() -> None:
         key=KeyIr(key="order_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
     )
-    field_spec = FieldIr(field_id="missing", name="Missing", source=source)
+    field_spec = FieldIr(field_id="missing", name="Missing", source_id=source.source_id)
     plan = ExecutionPlan(field_specs={"missing": field_spec}, target_fields=["missing"])
     runtime = _make_runtime(
         plan,
@@ -374,7 +383,7 @@ def test_load_operator_execute_returns_early_for_non_load_operator() -> None:
         key=KeyIr(key="order_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
     )
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=source.source_id)
     runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
     operator = LoadRefOperatorIr(
         operator_id="load_ref_amount",
@@ -393,7 +402,7 @@ def test_load_operator_executor_ignores_non_load_operator() -> None:
         key=KeyIr(key="order_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="source_loader:orders")),
     )
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=source.source_id)
     runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
     context = BatchContext()
 

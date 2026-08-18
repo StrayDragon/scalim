@@ -43,8 +43,8 @@ layout_s, path, rows, cols, batch = sys.argv[1:6]
 rows = int(rows); cols = int(cols); batch = int(batch)
 layout = OutputWriteLayout(layout_s)
 main = MainSourceIr(source_id="m", loader_ref=RuntimeHandleIdIr(handle_id="m.loader"))
-fields = [FieldIr(field_id="id", name="ID", source=main)] + [
-    FieldIr(field_id="c%d" % i, name="C%d" % i, source=main) for i in range(cols)
+fields = [FieldIr(field_id="id", name="ID", source_id=main.source_id)] + [
+    FieldIr(field_id="c%d" % i, name="C%d" % i, source_id=main.source_id) for i in range(cols)
 ]
 demand_ir = DemandIr.from_irs(sources=[], fields=fields, main_source=main)
 keys = ["id"] + ["c%d" % i for i in range(cols)]

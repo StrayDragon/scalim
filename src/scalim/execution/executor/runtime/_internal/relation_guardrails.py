@@ -32,7 +32,7 @@ def _emit_or_raise_relation_guardrail(
 ) -> None:
     guardrails = runtime.guardrails
     action_mode = guardrails.mode
-    once_key = build_guardrail_once_key(code, step.to_source.source_id, step_key)
+    once_key = build_guardrail_once_key(code, step.to_source_id, step_key)
 
     if action_mode == "quiet":
         record_guardrail(
@@ -76,13 +76,14 @@ def maybe_enforce_relation_guardrails(
     null_key_rate = stats.null_key / attempts
     type_error_rate = stats.type_error / attempts
 
+    source = runtime.resolve_lookup_source(step)
     null_key_max_rate = guardrails.relations.null_key_max_rate
     if null_key_max_rate is not None and null_key_rate > null_key_max_rate:
         payload = {
-            "source_id": step.to_source.source_id,
+            "source_id": source.source_id,
             "batch_num": runtime.batch_num,
             "from_fields": step.get_from_fields(),
-            "to_key": step.get_to_key_or_source_key(),
+            "to_key": step.get_to_key_or_source_key(source),
             "attempts": attempts,
             "null_key": stats.null_key,
             "type_error": stats.type_error,
@@ -103,10 +104,10 @@ def maybe_enforce_relation_guardrails(
     type_error_max_rate = guardrails.relations.type_error_max_rate
     if type_error_max_rate is not None and type_error_rate > type_error_max_rate:
         payload = {
-            "source_id": step.to_source.source_id,
+            "source_id": source.source_id,
             "batch_num": runtime.batch_num,
             "from_fields": step.get_from_fields(),
-            "to_key": step.get_to_key_or_source_key(),
+            "to_key": step.get_to_key_or_source_key(source),
             "attempts": attempts,
             "null_key": stats.null_key,
             "type_error": stats.type_error,

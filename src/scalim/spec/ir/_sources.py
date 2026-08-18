@@ -152,7 +152,10 @@ class SourceNormalizeIr:
 @dataclass(frozen=True)
 class SourceIr:
     """
-    数据源(IR): 定义一个数据源的完整信息,包括主键、外键、加载器和绑定
+    数据源(IR): 定义一个数据源的完整信息,包括主键、外键、加载器和绑定.
+
+    运行时对象只住 `DemandIr.sources` / `ExecutionRuntime.sources`;
+    图边用 `source_id` 回目录,见 `from_catalog`.
     """
 
     source_id: str
@@ -210,6 +213,18 @@ class SourceIr:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "bindings", MappingProxyType(dict(self.bindings)))
+
+    @classmethod
+    def from_catalog(cls, sources: Mapping[str, "SourceIr"], source_id: str) -> "SourceIr":
+        """从 `source` 目录取运行时 `SourceIr`;缺 `id` 时立即失败,禁止回退图句柄."""
+        source = sources.get(source_id)
+        if source is None:
+            msg = "DemandIr.sources missing source_id {!r}; overlay policy cannot be resolved from graph handles".format(source_id)
+            raise KeyError(msg)
+        if not isinstance(source, cls):
+            msg = "DemandIr.sources[{!r}] must be SourceIr, got {}".format(source_id, type(source).__name__)
+            raise TypeError(msg)
+        return source
 
     def __getstate__(self) -> Dict[str, Any]:
         state = dict(self.__dict__)

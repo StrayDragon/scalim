@@ -326,49 +326,55 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
 
     fields: List[Any] = [
         # 主键
-        FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True),
         # 基础字段
-        FieldIr(field_id="quantity", name="数量", source=main_source),
-        FieldIr(field_id="unit_price", name="单价", source=main_source),
-        FieldIr(field_id="discount_rate", name="折扣率", source=main_source),
-        FieldIr(field_id="order_date", name="订单日期", source=main_source),
+        FieldIr(field_id="quantity", name="数量", source_id=main_source.source_id),
+        FieldIr(field_id="unit_price", name="单价", source_id=main_source.source_id),
+        FieldIr(field_id="discount_rate", name="折扣率", source_id=main_source.source_id),
+        FieldIr(field_id="order_date", name="订单日期", source_id=main_source.source_id),
         # 单级关联 - 客户
-        FieldIr(field_id="customer_name", name="客户姓名", source=customers_source, relation=rel_to_customers),
-        FieldIr(field_id="customer_level", name="会员等级", source=customers_source, relation=rel_to_customers),
-        FieldIr(field_id="customer_phone", name="客户电话", source=customers_source, relation=rel_to_customers),
+        FieldIr(field_id="customer_name", name="客户姓名", source_id=customers_source.source_id, relation=rel_to_customers),
+        FieldIr(field_id="customer_level", name="会员等级", source_id=customers_source.source_id, relation=rel_to_customers),
+        FieldIr(field_id="customer_phone", name="客户电话", source_id=customers_source.source_id, relation=rel_to_customers),
         # 单级关联 - 产品
-        FieldIr(field_id="product_name", name="产品名称", source=products_source, relation=rel_to_products),
-        FieldIr(field_id="product_brand", name="产品品牌", source=products_source, relation=rel_to_products),
-        FieldIr(field_id="product_cost", name="产品成本", source=products_source, relation=rel_to_products),
+        FieldIr(field_id="product_name", name="产品名称", source_id=products_source.source_id, relation=rel_to_products),
+        FieldIr(field_id="product_brand", name="产品品牌", source_id=products_source.source_id, relation=rel_to_products),
+        FieldIr(field_id="product_cost", name="产品成本", source_id=products_source.source_id, relation=rel_to_products),
         FieldIr(
             field_id="product_category_id",
             name="产品分类ID",
-            source=products_source,
+            source_id=products_source.source_id,
             data_key="category_id",
             relation=rel_to_products,
         ),
         # 单级关联 - 促销(可能为空)
-        FieldIr(field_id="promotion_name", name="促销名称", source=promotions_source, relation=rel_to_promotions),
-        FieldIr(field_id="promotion_discount", name="促销折扣", source=promotions_source, relation=rel_to_promotions),
+        FieldIr(field_id="promotion_name", name="促销名称", source_id=promotions_source.source_id, relation=rel_to_promotions),
+        FieldIr(field_id="promotion_discount", name="促销折扣", source_id=promotions_source.source_id, relation=rel_to_promotions),
         # 单级关联 - 支付方式
-        FieldIr(field_id="payment_method_name", name="支付方式", source=payment_methods_source, relation=rel_to_payment),
+        FieldIr(field_id="payment_method_name", name="支付方式", source_id=payment_methods_source.source_id, relation=rel_to_payment),
         # 单级关联 - 物流
-        FieldIr(field_id="logistics_name", name="物流公司", source=logistics_source, relation=rel_to_logistics),
-        FieldIr(field_id="logistics_speed", name="配送时效", source=logistics_source, relation=rel_to_logistics),
+        FieldIr(field_id="logistics_name", name="物流公司", source_id=logistics_source.source_id, relation=rel_to_logistics),
+        FieldIr(field_id="logistics_speed", name="配送时效", source_id=logistics_source.source_id, relation=rel_to_logistics),
         # 多级关联 - 分类
-        FieldIr(field_id="category_name", name="产品分类", source=categories_source, relation=rel_to_categories),
+        FieldIr(field_id="category_name", name="产品分类", source_id=categories_source.source_id, relation=rel_to_categories),
         # 多级关联 - 仓库
-        FieldIr(field_id="warehouse_name", name="仓库名称", source=warehouses_source, relation=rel_to_warehouses),
+        FieldIr(field_id="warehouse_name", name="仓库名称", source_id=warehouses_source.source_id, relation=rel_to_warehouses),
         # 多级关联 - 区域
-        FieldIr(field_id="region_name", name="区域名称", source=regions_source, relation=rel_to_regions),
+        FieldIr(field_id="region_name", name="区域名称", source_id=regions_source.source_id, relation=rel_to_regions),
         FieldIr(
-            field_id="region_name_display", name="区域名称(展示)", source=regions_source, data_key="region_name", relation=rel_to_regions
+            field_id="region_name_display",
+            name="区域名称(展示)",
+            source_id=regions_source.source_id,
+            data_key="region_name",
+            relation=rel_to_regions,
         ),
-        FieldIr(field_id="region_manager", name="区域经理", source=regions_source, relation=rel_to_regions),
+        FieldIr(field_id="region_manager", name="区域经理", source_id=regions_source.source_id, relation=rel_to_regions),
         # 复合键关联 - 区域定价
-        FieldIr(field_id="price_adjustment", name="价格调整系数", source=region_pricing_source, relation=rel_to_region_pricing),
-        FieldIr(field_id="shipping_fee", name="运费", source=region_pricing_source, relation=rel_to_region_pricing),
-        FieldIr(field_id="tax_rate", name="税率", source=region_pricing_source, relation=rel_to_region_pricing),
+        FieldIr(
+            field_id="price_adjustment", name="价格调整系数", source_id=region_pricing_source.source_id, relation=rel_to_region_pricing
+        ),
+        FieldIr(field_id="shipping_fee", name="运费", source_id=region_pricing_source.source_id, relation=rel_to_region_pricing),
+        FieldIr(field_id="tax_rate", name="税率", source_id=region_pricing_source.source_id, relation=rel_to_region_pricing),
         # 派生字段
         DerivedFieldIr(
             field_id="order_amount",

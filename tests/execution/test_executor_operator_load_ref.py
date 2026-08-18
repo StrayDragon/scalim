@@ -27,6 +27,7 @@ from scalim.spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from scalim.spec.ir.callable_refs import RuntimeHandleIdIr
 
 from tests.fixtures.executor_operator_fixtures import (
+    TEST_SOURCE_CATALOG,
     _FailLoader,
     _SampleLoader,
     _Target,
@@ -35,6 +36,19 @@ from tests.fixtures.executor_operator_fixtures import (
     _raise_type_error,
     _raise_value_error,
 )
+
+
+def _S(**kwargs):  # type: ignore[no-untyped-def]
+    source = SourceIr(**kwargs)
+    TEST_SOURCE_CATALOG[str(source.source_id)] = source
+    return source
+
+
+@pytest.fixture(autouse=True)
+def _clear_test_source_catalog() -> None:
+    TEST_SOURCE_CATALOG.clear()
+    yield
+    TEST_SOURCE_CATALOG.clear()
 
 
 def test_load_ref_trigger_loader_call_handles_missing_binding() -> None:
@@ -150,13 +164,16 @@ def test_load_ref_key_normalization_space_mismatch_warning_continues_loop() -> N
             self.key_space_mismatch_logged = set()
             self.instrumentation = _NoEmitInstrumentation()
 
-    runtime = _RuntimeStub()
-    target_source = SourceIr(
+        def resolve_lookup_source(self, step):  # type: ignore[no-untyped-def]
+            return target_source
+
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:targets")),
     )
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, lookup_cast=LookupCastSpecIr(name="sep_first"))
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, lookup_cast=LookupCastSpecIr(name="sep_first"))
+    runtime = _RuntimeStub()
 
     _maybe_emit_key_normalization_key_space_mismatch_warning(
         runtime=runtime,  # type: ignore[arg-type]
@@ -203,11 +220,11 @@ def _bind_lookup_cast(runtime_bindings: RuntimeBindings, spec: LookupCastSpecIr,
             (
                 LookupStepIr(
                     from_field="fk_id",
-                    to_source=SourceIr(
+                    to_source_id=_S(
                         source_id="customers",
                         key=KeyIr(key="customer_id"),
                         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:customers")),
-                    ),
+                    ).source_id,
                 ),
             ),
         ),
@@ -219,12 +236,12 @@ def _bind_lookup_cast(runtime_bindings: RuntimeBindings, spec: LookupCastSpecIr,
 )
 def test_load_ref_returns_early_variants(main_source, lookup_steps) -> None:  # type: ignore[no-untyped-def]
     runtime_bindings = RuntimeBindings()
-    source = SourceIr(
+    source = _S(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "customers", lambda: {}),
     )
-    field_spec = FieldIr(field_id="customer_name", name="Name", source=source)
+    field_spec = FieldIr(field_id="customer_name", name="Name", source_id=source.source_id)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -256,14 +273,14 @@ def test_load_ref_relation_lookup_diagnostics_are_wants_gated(monkeypatch: pytes
         return {key: {"name": "Name{}".format(key)} for key in target_ids}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -311,14 +328,14 @@ def test_load_ref_relation_lookup_diagnostics_still_work_when_wanted(monkeypatch
         return {key: {"name": "Name{}".format(key)} for key in target_ids}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -369,14 +386,14 @@ def test_load_ref_builds_batch_rows_with_row_binding() -> None:
         return {1: {"name": "Alpha"}}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -411,14 +428,14 @@ def test_load_ref_rows_cache_does_not_retain_batch_rows_in_cache() -> None:
         return {1: {"name": "Alpha"}}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows", cache_mode="batch")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -506,15 +523,15 @@ def test_load_ref_lookup_chunking_splits_calls() -> None:
         return {key: {"name": "Name{}".format(key)} for key in order_ids}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
         lookup_chunk_size=2,
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -555,14 +572,14 @@ def test_load_ref_lookup_chunking_disabled_by_default() -> None:
         return {key: {"name": "Name{}".format(key)} for key in order_ids}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -589,13 +606,13 @@ def test_load_ref_skips_missing_multi_field_fk() -> None:
     runtime_bindings = RuntimeBindings()
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
-    steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source),)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id)
+    steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source_id=target_source.source_id),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -622,12 +639,12 @@ def test_load_ref_multi_field_next_step_and_object_result() -> None:
     runtime_bindings.value_transforms["target_name"] = lambda value: value.upper() if value else value  # type: ignore[no-any-return]
 
     main_source = _make_main_source()
-    mapping_source = SourceIr(
+    mapping_source = _S(
         source_id="mapping",
         key=KeyIr(key="fk_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
     )
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id")),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
@@ -635,13 +652,13 @@ def test_load_ref_multi_field_next_step_and_object_result() -> None:
     field_spec = FieldIr(
         field_id="target_name",
         name="Target",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="name",
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr("value_transform:target_name")),),
     )
     steps = (
-        LookupStepIr(from_field="fk_id", to_source=mapping_source),
-        LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source),
+        LookupStepIr(from_field="fk_id", to_source_id=mapping_source.source_id),
+        LookupStepIr(from_field=("region_id", "store_id"), to_source_id=target_source.source_id),
     )
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
@@ -680,16 +697,16 @@ def test_load_ref_multi_field_next_step_and_object_result() -> None:
 def test_load_ref_handles_list_to_field_binding_key() -> None:
     runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id")),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id)
     steps = (
         LookupStepIr(
             from_field=("region_id", "store_id"),
-            to_source=target_source,
+            to_source_id=target_source.source_id,
             to_field=["region_id", "store_id"],
         ),
     )
@@ -719,20 +736,20 @@ def test_load_ref_handles_list_to_field_binding_key() -> None:
 def test_load_ref_breaks_when_lookup_keys_empty() -> None:
     runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
-    mapping_source = SourceIr(
+    mapping_source = _S(
         source_id="mapping",
         key=KeyIr(key="fk_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
     )
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id)
     steps = (
-        LookupStepIr(from_field="fk_id", to_source=mapping_source),
-        LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source),
+        LookupStepIr(from_field="fk_id", to_source_id=mapping_source.source_id),
+        LookupStepIr(from_field=("region_id", "store_id"), to_source_id=target_source.source_id),
     )
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
@@ -775,10 +792,10 @@ def test_load_ref_write_final_step_missing_field_spec() -> None:
     runtime_bindings.source_loaders["values"] = _loader
     binding = _bind_params_builder(runtime_bindings, "values", "value_id", _params_builder)
     loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:values"), bindings={"value_id": binding})
-    target_source = SourceIr(source_id="values", key=KeyIr(key="value_id"), loader_spec=loader_spec)
-    field_spec = FieldIr(field_id="value", name="Value", source=target_source)
+    target_source = _S(source_id="values", key=KeyIr(key="value_id"), loader_spec=loader_spec)
+    field_spec = FieldIr(field_id="value", name="Value", source_id=target_source.source_id)
 
-    step = LookupStepIr(from_field="value_id", to_source=target_source)
+    step = LookupStepIr(from_field="value_id", to_source_id=target_source.source_id)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -819,11 +836,11 @@ def test_load_ref_normalize_cache_reuses_lookup_cast_per_relation() -> None:
     runtime_bindings.source_loaders["payments"] = loader.get_orders
     binding = _bind_params_builder(runtime_bindings, "payments", "order_id", _params_builder)
     loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:payments"), bindings={"order_id": binding})
-    source = SourceIr(source_id="payments", key=KeyIr(key="order_id"), loader_spec=loader_spec)
+    source = _S(source_id="payments", key=KeyIr(key="order_id"), loader_spec=loader_spec)
 
-    step = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_spec)
-    field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step,))
-    field_extra = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="order_id", to_source_id=source.source_id, lookup_cast=cast_spec)
+    field_amount = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, lookup_steps=(step,))
+    field_extra = FieldIr(field_id="extra", name="Extra", source_id=source.source_id, lookup_steps=(step,))
 
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_0",
@@ -881,12 +898,12 @@ def test_load_ref_normalize_cache_skips_different_relation() -> None:
     runtime_bindings.source_loaders["payments"] = loader.get_orders
     binding = _bind_params_builder(runtime_bindings, "payments", "order_id", _params_builder)
     loader_spec = LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:payments"), bindings={"order_id": binding})
-    source = SourceIr(source_id="payments", key=KeyIr(key="order_id"), loader_spec=loader_spec)
+    source = _S(source_id="payments", key=KeyIr(key="order_id"), loader_spec=loader_spec)
 
-    step_a = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_spec_a)
-    step_b = LookupStepIr(from_field="order_id", to_source=source, lookup_cast=cast_spec_b)
-    field_amount = FieldIr(field_id="amount", name="Amount", source=source, lookup_steps=(step_a,))
-    field_extra = FieldIr(field_id="extra", name="Extra", source=source, lookup_steps=(step_b,))
+    step_a = LookupStepIr(from_field="order_id", to_source_id=source.source_id, lookup_cast=cast_spec_a)
+    step_b = LookupStepIr(from_field="order_id", to_source_id=source.source_id, lookup_cast=cast_spec_b)
+    field_amount = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, lookup_steps=(step_a,))
+    field_extra = FieldIr(field_id="extra", name="Extra", source_id=source.source_id, lookup_steps=(step_b,))
 
     op_amount = LoadRefOperatorIr(
         operator_id="load_ref_a",
@@ -923,14 +940,14 @@ def test_load_ref_normalize_cache_dedupes_diagnostics() -> None:
     main_source = _make_main_source()
     cast_spec = LookupCastSpecIr(name="raise_value_error")
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_raise_value_error)
-    target_source = SourceIr(
+    target_source = _S(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "customers", _FailLoader()),
     )
-    step = LookupStepIr(from_field="customer_id", to_source=target_source, lookup_cast=cast_spec)
-    field_a = FieldIr(field_id="name_a", name="NameA", source=target_source, lookup_steps=(step,))
-    field_b = FieldIr(field_id="name_b", name="NameB", source=target_source, lookup_steps=(step,))
+    step = LookupStepIr(from_field="customer_id", to_source_id=target_source.source_id, lookup_cast=cast_spec)
+    field_a = FieldIr(field_id="name_a", name="NameA", source_id=target_source.source_id, lookup_steps=(step,))
+    field_b = FieldIr(field_id="name_b", name="NameB", source_id=target_source.source_id, lookup_steps=(step,))
 
     op_a = LoadRefOperatorIr(
         operator_id="load_ref_a",
@@ -974,13 +991,13 @@ def test_load_ref_records_relation_observability() -> None:
         return {100: {"name": "Alice"}}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "customers", _load_customers),
     )
-    field_spec = FieldIr(field_id="customer_name", name="Name", source=target_source, data_key="name")
-    steps = (LookupStepIr(from_field="customer_id", to_source=target_source),)
+    field_spec = FieldIr(field_id="customer_name", name="Name", source_id=target_source.source_id, data_key="name")
+    steps = (LookupStepIr(from_field="customer_id", to_source_id=target_source.source_id),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1020,13 +1037,13 @@ def test_load_ref_records_relation_type_error() -> None:
     main_source = _make_main_source()
     cast_spec = LookupCastSpecIr(name="raise_value_error")
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_raise_value_error)
-    target_source = SourceIr(
+    target_source = _S(
         source_id="customers",
         key=KeyIr(key="customer_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "customers", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="customer_name", name="Name", source=target_source)
-    steps = (LookupStepIr(from_field="customer_id", to_source=target_source, lookup_cast=cast_spec),)
+    field_spec = FieldIr(field_id="customer_name", name="Name", source_id=target_source.source_id)
+    steps = (LookupStepIr(from_field="customer_id", to_source_id=target_source.source_id, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1059,13 +1076,13 @@ def test_load_ref_multi_field_first_step_type_error() -> None:
     main_source = _make_main_source()
     cast_spec = LookupCastSpecIr(name="raise_value_error")
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=True, fn=_raise_value_error)
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id")),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
-    steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source, lookup_cast=cast_spec),)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id)
+    steps = (LookupStepIr(from_field=("region_id", "store_id"), to_source_id=target_source.source_id, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1091,22 +1108,22 @@ def test_load_ref_next_step_single_field_errors() -> None:
     runtime_bindings = RuntimeBindings()
 
     main_source = _make_main_source()
-    mapping_source = SourceIr(
+    mapping_source = _S(
         source_id="mapping",
         key=KeyIr(key="map_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
     )
     cast_spec = LookupCastSpecIr(name="raise_value_error")
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=_raise_value_error)
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id", cast=cast_spec),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id)
     steps = (
-        LookupStepIr(from_field="map_id", to_source=mapping_source),
-        LookupStepIr(from_field="target_id", to_source=target_source),
+        LookupStepIr(from_field="map_id", to_source_id=mapping_source.source_id),
+        LookupStepIr(from_field="target_id", to_source_id=target_source.source_id),
     )
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
@@ -1140,22 +1157,22 @@ def test_load_ref_next_step_multi_field_type_error() -> None:
     runtime_bindings = RuntimeBindings()
 
     main_source = _make_main_source()
-    mapping_source = SourceIr(
+    mapping_source = _S(
         source_id="mapping",
         key=KeyIr(key="map_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "mapping", _FailLoader()),
     )
     cast_spec = LookupCastSpecIr(name="raise_value_error")
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=True, fn=_raise_value_error)
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key=("region_id", "store_id"), cast=cast_spec),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _FailLoader()),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id)
     steps = (
-        LookupStepIr(from_field="map_id", to_source=mapping_source),
-        LookupStepIr(from_field=("region_id", "store_id"), to_source=target_source),
+        LookupStepIr(from_field="map_id", to_source_id=mapping_source.source_id),
+        LookupStepIr(from_field=("region_id", "store_id"), to_source_id=target_source.source_id),
     )
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
@@ -1189,7 +1206,7 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
     main_source = _make_main_source()
 
     mapping_loader = _FailLoader()
-    mapping_source = SourceIr(
+    mapping_source = _S(
         source_id="mapping",
         key=KeyIr(key=("region_id", "store_id")),
         loader_spec=_bind_source_loader(runtime_bindings, "mapping", mapping_loader),
@@ -1200,7 +1217,7 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
     def _country_extract(pk, result):  # type: ignore[no-untyped-def]
         return {"country_name": result[pk]["name"]}
 
-    countries_source = SourceIr(
+    countries_source = _S(
         source_id="countries",
         key=KeyIr(key="country_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "countries", country_loader),
@@ -1210,13 +1227,13 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
     field_spec = FieldIr(
         field_id="country_name",
         name="Country",
-        source=countries_source,
+        source_id=countries_source.source_id,
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr("value_transform:country_name")),),
     )
 
     steps = (
-        LookupStepIr(from_field=("region_id", "store_id"), to_source=mapping_source),
-        LookupStepIr(from_field="country_id", to_source=countries_source),
+        LookupStepIr(from_field=("region_id", "store_id"), to_source_id=mapping_source.source_id),
+        LookupStepIr(from_field="country_id", to_source_id=countries_source.source_id),
     )
 
     operator = LoadRefOperatorIr(
@@ -1255,7 +1272,7 @@ def test_load_ref_uses_cached_sources_and_multi_field() -> None:
 
 
 def test_load_ref_execute_returns_early_for_non_load_ref_operator() -> None:
-    source = SourceIr(
+    source = _S(
         source_id="orders",
         key=KeyIr(key="order_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:orders")),
@@ -1273,12 +1290,12 @@ def test_load_ref_execute_returns_early_for_non_load_ref_operator() -> None:
 
 
 def test_load_ref_executor_ignores_non_load_ref_operator() -> None:
-    source = SourceIr(
+    source = _S(
         source_id="orders",
         key=KeyIr(key="order_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("source_loader:orders")),
     )
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=source.source_id)
     runtime = _make_runtime(ExecutionPlan(field_specs={"amount": field_spec}), _make_main_source())
     context = BatchContext()
 
@@ -1305,14 +1322,14 @@ def test_load_ref_key_normalization_auto_str_unifies_key_types_for_matching() ->
         return {str(key): {"name": "Name{}".format(key)} for key in target_ids}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1350,14 +1367,14 @@ def test_load_ref_key_normalization_force_str_normalizes_even_when_lookup_cast_i
         return {key: {"name": "Name{}".format(key)} for key in target_ids}
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=cast_spec),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1390,13 +1407,13 @@ def test_load_ref_cached_mapping_key_normalization_hits_preloaded_int_key() -> N
     runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     fail_loader = _FailLoader()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1424,13 +1441,13 @@ def test_load_ref_cached_mapping_key_normalization_hits_preloaded_multi_field_ke
     runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     fail_loader = _FailLoader()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key=("a", "b")),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    steps = (LookupStepIr(from_field=["a", "b"], to_source=target_source),)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
+    steps = (LookupStepIr(from_field=["a", "b"], to_source_id=target_source.source_id),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1459,13 +1476,13 @@ def test_load_ref_cached_mapping_key_normalization_collision_fail_fast() -> None
     runtime_bindings = RuntimeBindings()
     main_source = _make_main_source()
     fail_loader = _FailLoader()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1505,13 +1522,13 @@ def test_load_ref_cached_mapping_key_normalization_collision_merges_when_values_
     main_source = _make_main_source()
     runtime_bindings = RuntimeBindings()
     fail_loader = _FailLoader()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", fail_loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source),)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1570,14 +1587,14 @@ def test_load_ref_key_normalization_auto_str_with_explicit_cast_mismatch_warns_r
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=int)
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows", cache_mode="none")
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding, lookup_cast=cast_spec),)
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding, lookup_cast=cast_spec),)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -1637,17 +1654,17 @@ def test_load_ref_key_normalization_auto_str_with_explicit_cast_unnormalizable_k
     _bind_lookup_cast(runtime_bindings, cast_spec, is_multi=False, fn=(lambda _value: _WeirdKey()))
 
     main_source = _make_main_source()
-    target_source = SourceIr(
+    target_source = _S(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=_bind_source_loader(runtime_bindings, "targets", _loader),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder, mode="rows", cache_mode="none")
     steps = (
         LookupStepIr(
             from_field="fk_id",
-            to_source=target_source,
+            to_source_id=target_source.source_id,
             bind=binding,
             lookup_cast=cast_spec,
         ),

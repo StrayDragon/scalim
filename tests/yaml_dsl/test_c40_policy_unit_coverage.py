@@ -153,7 +153,7 @@ def test_apply_rows_reuse_patches_bindings_and_noop_when_already_matching() -> N
 
 
 def test_apply_policies_updates_catalog_not_nested_field_handles() -> None:
-    """策略只改 `DemandIr.sources`;嵌套 `LookupStepIr.to_source` 保持编译期句柄."""
+    """策略只改 `DemandIr.sources`;嵌套 `LookupStepIr.to_source_id` 保持编译期句柄."""
     from scalim.spec.ir import FieldIr, LookupStepIr
 
     orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
@@ -165,9 +165,9 @@ def test_apply_policies_updates_catalog_not_nested_field_handles() -> None:
     field = FieldIr(
         field_id="customer_name",
         name="Customer",
-        source=source,
+        source_id=source.source_id,
         data_key="customer_name",
-        lookup_steps=(LookupStepIr(from_field="customer_id", to_source=source),),
+        lookup_steps=(LookupStepIr(from_field="customer_id", to_source_id=source.source_id),),
     )
     demand = DemandIr.from_irs(sources=[source], fields=[field], main_source=orders)
     patched = apply_source_runtime_policies(
@@ -177,7 +177,7 @@ def test_apply_policies_updates_catalog_not_nested_field_handles() -> None:
         rows_reuse={},
     )
     catalog = patched.sources["customers"]
-    nested = patched.fields["customer_name"].lookup_steps[0].to_source  # type: ignore[union-attr]
+    step = patched.fields["customer_name"].lookup_steps[0]  # type: ignore[union-attr]
     assert catalog.lookup_chunk_size == 3
-    assert nested is not catalog
-    assert getattr(nested, "lookup_chunk_size", None) is None
+    assert step.to_source_id == "customers"
+    assert not hasattr(step, "to_source")

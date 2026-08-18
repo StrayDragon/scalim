@@ -306,7 +306,7 @@ def test_run_ir_engine_failure_discards_excel_without_final_file(tmp_path: Path)
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
     request = ExecutionRequest(

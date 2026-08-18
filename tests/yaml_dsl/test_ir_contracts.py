@@ -41,7 +41,7 @@ def test_key_ir_rejects_composite_key_string() -> None:
 
 def test_field_ir_data_key_defaults_to_field_id() -> None:
     orders = _make_source("orders", pk_key="order_id")
-    field = FieldIr(field_id="order_id", name="订单ID", source=orders)
+    field = FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id)
     assert field.data_key == "order_id"
 
 
@@ -156,35 +156,35 @@ def test_lookup_step_validation_and_fields() -> None:
     source = _make_source("orders", pk_key=("a", "b"))
 
     with pytest.raises(ValueError, match="both be single"):
-        LookupStepIr(from_field=("a", "b"), to_source=source, to_field="a")
+        LookupStepIr(from_field=("a", "b"), to_source_id=source.source_id, to_field="a")
 
     with pytest.raises(ValueError, match="same length"):
-        LookupStepIr(from_field=("a", "b"), to_source=source, to_field=("a",))
+        LookupStepIr(from_field=("a", "b"), to_source_id=source.source_id, to_field=("a",))
 
-    step = LookupStepIr(from_field="a", to_source=source)
-    assert step.get_to_fields_or_source_key() == ("a", "b")
-    assert step.get_to_key_or_source_key() == ("a", "b")
+    step = LookupStepIr(from_field="a", to_source_id=source.source_id)
+    assert step.get_to_fields_or_source_key(source) == ("a", "b")
+    assert step.get_to_key_or_source_key(source) == ("a", "b")
 
     other_source = _make_source("other", pk_key="id")
-    step2 = LookupStepIr(from_field=("id", "id2"), to_source=other_source, to_field=["x", "y"])
-    assert step2.get_to_fields_or_source_key() == ("x", "y")
-    assert step2.get_to_key_or_source_key() == ["x", "y"]
+    step2 = LookupStepIr(from_field=("id", "id2"), to_source_id=other_source.source_id, to_field=["x", "y"])
+    assert step2.get_to_fields_or_source_key(source) == ("x", "y")
+    assert step2.get_to_key_or_source_key(source) == ["x", "y"]
 
 
 def test_lookup_step_to_field_and_pk_single() -> None:
     source = _make_source("orders", pk_key="order_id")
 
-    step = LookupStepIr(from_field="a", to_source=source, to_field="id")
-    assert step.get_to_fields_or_source_key() == ("id",)
+    step = LookupStepIr(from_field="a", to_source_id=source.source_id, to_field="id")
+    assert step.get_to_fields_or_source_key(source) == ("id",)
 
-    step_pk = LookupStepIr(from_field="a", to_source=source)
-    assert step_pk.get_to_fields_or_source_key() == ("order_id",)
+    step_pk = LookupStepIr(from_field="a", to_source_id=source.source_id)
+    assert step_pk.get_to_fields_or_source_key(source) == ("order_id",)
 
 
 def test_field_and_derived_field_value_ops_and_call_by_contracts() -> None:
     source = _make_source("orders", pk_key="order_id")
 
-    field = FieldIr(field_id="amount", name="Amount", source=source, value_ops=(ValueOpIr(kind="cast", to="decimal"),))
+    field = FieldIr(field_id="amount", name="Amount", source_id=source.source_id, value_ops=(ValueOpIr(kind="cast", to="decimal"),))
     assert field.value_ops[0].kind == "cast"
 
     with pytest.raises(ValueError, match="requires non-empty to"):
@@ -238,29 +238,29 @@ def test_field_get_dependencies_from_relations() -> None:
     right = _make_source("right", pk_key="right_id")
 
     join = left["left_fk"].join(right["right_id"])
-    field = FieldIr(field_id="left_fk", name="Left FK", source=right, relation=join)
+    field = FieldIr(field_id="left_fk", name="Left FK", source_id=right.source_id, relation=join)
     assert set(field.get_dependencies()) == {"left_fk"}
 
     relation = join.and_(left["other_fk"].join(right["other_id"]))
-    field_multi = FieldIr(field_id="other_fk", name="Other FK", source=right, relation=relation)
+    field_multi = FieldIr(field_id="other_fk", name="Other FK", source_id=right.source_id, relation=relation)
     assert set(field_multi.get_dependencies()) == {"left_fk", "other_fk"}
 
 
 def test_field_get_dependencies_prefers_lookup_steps_and_supports_empty() -> None:
     source = _make_source("customers", pk_key="customer_id")
     steps = (
-        LookupStepIr(from_field="customer_id", to_source=source, to_field="customer_id"),
-        LookupStepIr(from_field="region_id", to_source=source, to_field="region_id"),
+        LookupStepIr(from_field="customer_id", to_source_id=source.source_id, to_field="customer_id"),
+        LookupStepIr(from_field="region_id", to_source_id=source.source_id, to_field="region_id"),
     )
     field = FieldIr(
         field_id="customer_name",
         name="Customer Name",
-        source=source,
+        source_id=source.source_id,
         lookup_steps=steps,
     )
     assert set(field.get_dependencies()) == {"customer_id", "region_id"}
 
-    no_deps = FieldIr(field_id="order_id", name="Order ID", source=source)
+    no_deps = FieldIr(field_id="order_id", name="Order ID", source_id=source.source_id)
     assert no_deps.get_dependencies() == ()
 
 
@@ -268,7 +268,7 @@ def test_demand_ir_validation_and_duplicates() -> None:
     main_source = _make_main_source("orders")
     source = _make_source("customers", pk_key="customer_id")
     bad_source = _make_source("missing", pk_key="id")
-    field = FieldIr(field_id="order_id", name="Order", source=main_source, is_primary=True)
+    field = FieldIr(field_id="order_id", name="Order", source_id=main_source.source_id, is_primary=True)
 
     with pytest.raises(ValueError, match="主数据源"):
         DemandIr(
@@ -280,7 +280,21 @@ def test_demand_ir_validation_and_duplicates() -> None:
     with pytest.raises(ValueError, match="字段 'order_id' 引用的数据源"):
         DemandIr(
             sources={"customers": source},
-            fields={"order_id": FieldIr(field_id="order_id", name="Order", source=bad_source)},
+            fields={"order_id": FieldIr(field_id="order_id", name="Order", source_id=bad_source.source_id)},
+            main_source=main_source,
+        )
+
+    with pytest.raises(ValueError, match="lookup 引用数据源"):
+        DemandIr(
+            sources={"customers": source},
+            fields={
+                "customer_name": FieldIr(
+                    field_id="customer_name",
+                    name="Customer",
+                    source_id=source.source_id,
+                    lookup_steps=(LookupStepIr(from_field="customer_id", to_source_id="missing"),),
+                )
+            },
             main_source=main_source,
         )
 
@@ -295,7 +309,7 @@ def test_demand_ir_validation_and_duplicates() -> None:
 
     demand_no_primary = DemandIr.from_irs(
         sources=[source],
-        fields=[FieldIr(field_id="amount", name="Amount", source=main_source)],
+        fields=[FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id)],
         main_source=main_source,
     )
     assert demand_no_primary.get_primary_field() is None

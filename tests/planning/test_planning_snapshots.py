@@ -51,15 +51,17 @@ def test_operator_snapshot_for_all_core_operator_types() -> None:
     steps = (
         LookupStepIr(
             from_field=("customer_id", "tenant_id"),
-            to_source=customer_source,
+            to_source_id=customer_source.source_id,
             to_field=("customer_id", "tenant_id"),
             lookup_cast=lookup_cast,
         ),
-        LookupStepIr(from_field="customer_id", to_source=customer_source, to_field="customer_id", lookup_cast=lookup_cast_without_sep),
-        LookupStepIr(from_field="customer_id", to_source=customer_source, lookup_cast=lookup_cast, bind=binding_template),
-        LookupStepIr(from_field="customer_id", to_source=customer_source, bind=binding_template_without_callable_keys),
-        LookupStepIr(from_field="customer_id", to_source=customer_source, bind=binding_builder),
-        LookupStepIr(from_field="customer_id", to_source=customer_source),
+        LookupStepIr(
+            from_field="customer_id", to_source_id=customer_source.source_id, to_field="customer_id", lookup_cast=lookup_cast_without_sep
+        ),
+        LookupStepIr(from_field="customer_id", to_source_id=customer_source.source_id, lookup_cast=lookup_cast, bind=binding_template),
+        LookupStepIr(from_field="customer_id", to_source_id=customer_source.source_id, bind=binding_template_without_callable_keys),
+        LookupStepIr(from_field="customer_id", to_source_id=customer_source.source_id, bind=binding_builder),
+        LookupStepIr(from_field="customer_id", to_source_id=customer_source.source_id),
     )
     load_ref = LoadRefOperatorIr(
         operator_id="load_ref.customer_name",

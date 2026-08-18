@@ -9,6 +9,7 @@ description: "编写、重构、升级、校验和排错 Scalim YAML DSL(demand/
 
 - 新写或改写 YAML: 读 [references/task-authoring.md](references/task-authoring.md)
 - **YAML vs Python 边界**（c40 已落地；动态 knobs 收口 Python）: 读 [references/yaml-runtime-policy-boundary.md](references/yaml-runtime-policy-boundary.md)；upgrade：`references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`；何时用/如何用事件自证：`references/lookup-chunking-guidance.md`
+- **图边只存 source_id（c50）**: overlay 只写 `DemandIr.sources`；手写 IR 用 `to_source_id`/`source_id` + 显式目录。upgrade：`references/upgrades/2026-08-18-source-id-graph-refs.md`
 - 新写或改写 workflow YAML(编排多 demand / `workflow.resources.books` / outputs→book 绑定 / `resources_policy`): 读 [references/task-workflow-authoring.md](references/task-workflow-authoring.md)
 - 旧写法直接升级到当前结构: 读 [references/task-upgrade-legacy.md](references/task-upgrade-legacy.md)
 - 校验、订正、排错: 读 [references/task-validate-debug.md](references/task-validate-debug.md)

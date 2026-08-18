@@ -167,8 +167,8 @@ def test_guardrails_validate_result_contract_fast_fails_for_load_and_load_ref() 
         return [{"name": "Alpha"}]
 
     ref_source, ref_binding = _make_targets_source(loader=_bad_ref_loader, lookup_chunk_size=1)
-    ref_field_spec = FieldIr(field_id="target_name", name="Target", source=ref_source, data_key="name")
-    step = LookupStepIr(from_field="fk_id", to_source=ref_source, bind=ref_binding)
+    ref_field_spec = FieldIr(field_id="target_name", name="Target", source_id=ref_source.source_id, data_key="name")
+    step = LookupStepIr(from_field="fk_id", to_source_id=ref_source.source_id, bind=ref_binding)
     ref_operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -248,7 +248,7 @@ def test_guardrails_load_operator_required_fields_missing_row_and_value() -> Non
         return {1: {"amount": None}}
 
     source = _make_orders_source(loader=_none_value_loader)
-    field_spec = FieldIr(field_id="amount", name="Amount", source=source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=source.source_id)
     operator = LoadOperatorIr(
         operator_id="load_orders",
         operator_type=OperatorType.LOAD.value,
@@ -340,7 +340,7 @@ def test_guardrails_load_operator_extractor_and_transform_error_modes() -> None:
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=source,
+        source_id=source.source_id,
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="fields.amount.transform")),),
     )
     operator = LoadOperatorIr(
@@ -392,7 +392,7 @@ def _make_load_ref_operator(
     extractor: Optional[Any] = None,
 ) -> Tuple[LoadRefOperatorIr, ExecutionPlan, BindingIr]:
     source, binding = _make_targets_source(loader=loader, extractor=extractor)
-    step = LookupStepIr(from_field="fk_id", to_source=source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -417,8 +417,8 @@ def test_guardrails_load_ref_required_field_missing_variants() -> None:
         source_loaders={"targets": _missing_lookup_key_loader},
         params_builders={("targets", "target_id"): _targets_params_builder},
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=source, data_key="name")
-    step = LookupStepIr(from_field="fk_id", to_source=source, bind=binding)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=source.source_id, data_key="name")
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -465,8 +465,8 @@ def test_guardrails_load_ref_required_field_missing_variants() -> None:
         source_loaders={"targets": _missing_field_value_loader},
         params_builders={("targets", "target_id"): _targets_params_builder},
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=source, data_key="name")
-    step = LookupStepIr(from_field="fk_id", to_source=source, bind=binding)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=source.source_id, data_key="name")
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -511,8 +511,8 @@ def test_guardrails_load_ref_required_field_missing_variants() -> None:
         source_loaders={"targets": _missing_field_spec_loader},
         params_builders={("targets", "target_id"): _targets_params_builder},
     )
-    value_spec = FieldIr(field_id="value", name="Value", source=source)
-    step = LookupStepIr(from_field="fk_id", to_source=source, bind=binding)
+    value_spec = FieldIr(field_id="value", name="Value", source_id=source.source_id)
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -561,8 +561,8 @@ def test_guardrails_load_ref_extractor_and_transform_error_modes() -> None:
         raise ValueError("boom")
 
     source, binding = _make_targets_source(loader=_loader, extractor=_extract)
-    field_spec = FieldIr(field_id="target_name", name="Target", source=source, data_key="name")
-    step = LookupStepIr(from_field="fk_id", to_source=source, bind=binding)
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=source.source_id, data_key="name")
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -614,11 +614,11 @@ def test_guardrails_load_ref_extractor_and_transform_error_modes() -> None:
     field_spec = FieldIr(
         field_id="target_name",
         name="Target",
-        source=source,
+        source_id=source.source_id,
         data_key="name",
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="fields.target_name.transform")),),
     )
-    step = LookupStepIr(from_field="fk_id", to_source=source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding)
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
@@ -647,7 +647,7 @@ def test_guardrails_relations_quiet_records_rate_violations_without_raising() ->
         key=KeyIr(key="id", cast=int_cast),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
     )
-    step = LookupStepIr(from_field="fk_id", to_source=source)
+    step = LookupStepIr(from_field="fk_id", to_source_id=source.source_id)
 
     plan = ExecutionPlan(field_specs={}, target_fields=[])
     runtime_bindings = RuntimeBindings(lookup_key_casts={lookup_cast_id(int_cast, is_multi=False): int})
@@ -656,7 +656,13 @@ def test_guardrails_relations_quiet_records_rate_violations_without_raising() ->
         mode="quiet",
         relations=GuardrailsRelationsPolicy(null_key_max_rate=0.0, type_error_max_rate=0.0),
     )
-    runtime = _make_runtime(plan, main_source=_make_main_source(), runtime_bindings=runtime_bindings, guardrails=guardrails)
+    runtime = _make_runtime(
+        plan,
+        main_source=_make_main_source(),
+        sources={"targets": source},
+        runtime_bindings=runtime_bindings,
+        guardrails=guardrails,
+    )
 
     _, status, _ = runtime.normalize_lookup_key_with_status(None, step)
     assert status == "null_key"
@@ -672,7 +678,7 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=main_source,
+        source_id=main_source.source_id,
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="fields.amount.transform")),),
     )
     runtime_bindings = RuntimeBindings(value_transforms={"amount": _raise_value_error})
@@ -705,7 +711,7 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
     with pytest.raises(ValueError, match="bad"):
         BatchExecutor(plan, runtime).prefill_main_source_fields(context, batch_row_nth, main_rows, required_fields={"amount"})
 
-    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
     missing_required = GuardrailsPolicy(enabled=True, mode="fast_fail", loader=GuardrailsLoaderPolicy(required_fields=("amount",)))
     runtime = _make_runtime(plan, main_source=main_source, guardrails=missing_required)
@@ -733,7 +739,7 @@ def test_guardrails_batch_prefill_main_source_fields_variants() -> None:
 
 def test_prefill_dense_context_falls_back_to_generic_when_rows_disabled() -> None:
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
     runtime = _make_runtime(plan, main_source=main_source)
     executor = BatchExecutor(plan, runtime)
@@ -751,7 +757,7 @@ def test_prefill_dense_context_falls_back_to_generic_when_rows_disabled() -> Non
 
 def test_prefill_dense_context_row_count_zero_short_circuits() -> None:
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount"])
     runtime = _make_runtime(plan, main_source=main_source)
     executor = BatchExecutor(plan, runtime)
@@ -764,7 +770,7 @@ def test_prefill_dense_context_row_count_zero_short_circuits() -> None:
 
 def test_prefill_dense_context_falls_back_when_passthrough_prepare_rejected() -> None:
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount", "extra"])
     runtime = _make_runtime(plan, main_source=main_source)
     executor = BatchExecutor(plan, runtime)
@@ -786,7 +792,7 @@ def test_prefill_dense_context_falls_back_when_passthrough_prepare_rejected() ->
 
 def test_prefill_dense_context_emits_on_field_set_and_enforces_passthrough_required() -> None:
     main_source = _make_main_source()
-    field_spec = FieldIr(field_id="amount", name="Amount", source=main_source)
+    field_spec = FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id)
     plan = ExecutionPlan(field_specs={"amount": field_spec}, target_fields=["amount", "extra"])
 
     guardrails = GuardrailsPolicy(enabled=True, mode="quiet", loader=GuardrailsLoaderPolicy(required_fields=("extra",)))

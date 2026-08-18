@@ -233,7 +233,7 @@ def test_bind_field_runtime_bindings_binds_ref_default_call_by_calculator() -> N
     field = FieldIr(
         field_id="ref_value",
         name="Ref",
-        source=source,
+        source_id=source.source_id,
         default_cases=(
             FieldDefaultCaseIr(
                 when="relation_miss",
@@ -273,7 +273,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_default_for_str() -> None:
     field = FieldIr(
         field_id="text",
         name="Text",
-        source=source,
+        source_id=source.source_id,
         value_ops=(ValueOpIr(kind="cast", to="str"),),
         default_cases=(
             FieldDefaultCaseIr(
@@ -312,7 +312,7 @@ def test_bind_field_runtime_bindings_inlines_defaults_default_for_int() -> None:
     field = FieldIr(
         field_id="n",
         name="N",
-        source=source,
+        source_id=source.source_id,
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(
             FieldDefaultCaseIr(
@@ -351,7 +351,7 @@ def test_bind_field_runtime_bindings_rejects_defaults_default_without_value_cast
     field = FieldIr(
         field_id="x",
         name="X",
-        source=source,
+        source_id=source.source_id,
         default_cases=(
             FieldDefaultCaseIr(
                 when="relation_miss",
@@ -384,7 +384,7 @@ def test_bind_field_runtime_bindings_rejects_defaults_default_without_cast_op() 
     field = FieldIr(
         field_id="x",
         name="X",
-        source=source,
+        source_id=source.source_id,
         value_ops=(
             ValueOpIr(
                 kind="format",
@@ -423,7 +423,7 @@ def test_bind_field_runtime_bindings_rejects_defaults_default_unknown_value_cast
     field = FieldIr(
         field_id="x",
         name="X",
-        source=source,
+        source_id=source.source_id,
         value_ops=(ValueOpIr(kind="cast", to="bad_cast"),),
         default_cases=(
             FieldDefaultCaseIr(
@@ -457,7 +457,7 @@ def test_bind_field_runtime_bindings_skips_ref_default_case_when_not_call_by() -
     field = FieldIr(
         field_id="x",
         name="X",
-        source=source,
+        source_id=source.source_id,
         default_cases=(FieldDefaultCaseIr(when="relation_miss", kind="literal", literal=1),),
     )
     demand_ir = DemandIr.from_irs(
@@ -489,7 +489,7 @@ def test_bind_field_runtime_bindings_skips_ref_default_case_when_call_by_is_not_
     field = FieldIr(
         field_id="x",
         name="X",
-        source=source,
+        source_id=source.source_id,
         default_cases=(_BadCase(),),  # type: ignore[arg-type] internal tests: corrupted case instance
     )
     demand_ir = DemandIr.from_irs(
@@ -525,7 +525,7 @@ def test_bind_field_runtime_bindings_wraps_ref_default_call_by_preflight_errors(
     field = FieldIr(
         field_id="ref_value",
         name="Ref",
-        source=source,
+        source_id=source.source_id,
         default_cases=(
             FieldDefaultCaseIr(
                 when="relation_miss",

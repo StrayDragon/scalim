@@ -1268,7 +1268,7 @@ sources:
 
 ### 4.4.3 LookupChunking: keys 分片(Python runtime)
 
-keys 模式 LoadRef 的分片大小与片间并行已从 YAML 迁出到 Python typed oneof（**再写 `sources.*.lookup_chunk_size` 会 fail-fast**）。
+keys 模式 LoadRef 的分片大小与片间并行已从 YAML 迁出到 Python typed oneof（**再写 `sources.*.lookup_chunk_size` 会 fail-fast**）。这些旋钮写在 **source 目录**（`DemandIr.sources[id]`）；关联图边只存 `source_id`，不会嵌一份独立的 `SourceIr` 快照。
 
 ```python
 from scalim.dsl.yaml_dsl import DemandRunRuntimeOptions, LookupChunking

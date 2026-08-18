@@ -24,7 +24,7 @@ _DOWNSTREAM_MAX_BATCH = 4
 
 
 class _LoaderCallTrace:
-    """Observer / Hook 共用的 `LOADER_CALL` 记录(并行路径须加锁)."""
+    """`Observer` / `Hook` 共用的 `LOADER_CALL` 记录(并行路径须加锁)."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -106,12 +106,8 @@ def _keys_demand_yaml(*, max_batch: Optional[int] = None, lookup_chunk_size: Opt
         "sources:\n"
         "  customers:\n"
         '    loader: "scalim_misc.examples.public_api._fixtures:load_customers_by_ids"\n'
-        "    key: customer_id\n"
-        + extra_source
-        + "    params:\n"
-        "      ids: {$keys: {as: list}}\n"
-        + extra_param
-        + "    fields:\n"
+        "    key: customer_id\n" + extra_source + "    params:\n"
+        "      ids: {$keys: {as: list}}\n" + extra_param + "    fields:\n"
         "      customer_name:\n"
         "        name: Customer Name\n"
         "        relation: orders_to_customers\n"
@@ -227,7 +223,7 @@ def _check_serial_chunked(calls: Sequence[Mapping[str, Any]], *, n_keys: int, si
 
 
 def run_public_api_lookup_chunking() -> ExampleResult:
-    """黑盒核对 `LookupChunking`: YAML keys lookup + Observer/Hook `LOADER_CALL`."""
+    """黑盒核对 `LookupChunking`: YAML `keys` 关联 + `Observer`/`Hook` `LOADER_CALL`."""
 
     with tempfile.TemporaryDirectory(prefix="scalim-public-api-lookup-chunking-") as tmpdir:
         tmp = Path(tmpdir)
@@ -360,8 +356,7 @@ def run_public_api_lookup_chunking() -> ExampleResult:
             and seq_parallel_result is not None
         )
         summary = (
-            "off={} serial={} parallel={} oversized={} batched={} "
-            "yaml_reject={} limited_off_fail={} limited_ok={} rows_eq={}"
+            "off={} serial={} parallel={} oversized={} batched={} yaml_reject={} limited_off_fail={} limited_ok={} rows_eq={}"
         ).format(
             len(off_calls),
             len(serial_calls),

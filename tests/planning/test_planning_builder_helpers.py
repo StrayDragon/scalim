@@ -14,10 +14,10 @@ from tests.fixtures.planning_fixtures import make_main_source, make_source
 def test_build_dependency_graph_includes_unknown_field() -> None:
     main_source = make_main_source("orders")
     fields: list = [
-        FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main_source.source_id),
     ]
-    unknown_field = FieldIr(field_id="unknown", name="unknown", source=main_source)
+    unknown_field = FieldIr(field_id="unknown", name="unknown", source_id=main_source.source_id)
     fields.append(unknown_field)
     demand = DemandIr.from_irs(sources=[], fields=fields, main_source=main_source)
 
@@ -30,7 +30,7 @@ def test_build_dependency_graph_includes_unknown_field() -> None:
     [
         (
             lambda demand, main_source, customers: (
-                FieldIr(field_id="amount", name="金额", source=main_source),
+                FieldIr(field_id="amount", name="金额", source_id=main_source.source_id),
                 "amount",
             ),
             [],
@@ -40,7 +40,7 @@ def test_build_dependency_graph_includes_unknown_field() -> None:
                 FieldIr(
                     field_id="customer_name",
                     name="客户名",
-                    source=customers,
+                    source_id=customers.source_id,
                     relation=main_source["customer_id"].join(customers["customer_id"]),
                 ),
                 "customer_name",
@@ -56,7 +56,7 @@ def test_extract_relation_dependency_keys_basic(field_factory, expected: List[st
 
     demand = DemandIr.from_irs(
         sources=[customers],
-        fields=[FieldIr(field_id="customer_id", name="客户ID", source=main_source)],
+        fields=[FieldIr(field_id="customer_id", name="客户ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
 
@@ -71,7 +71,7 @@ def test_extract_relation_dependency_keys_handles_empty_paths() -> None:
     customers = make_source("customers", key_field="customer_id")
     relation = main_source["customer_id"].join(customers["customer_id"])
 
-    field = FieldIr(field_id="customer_name", name="客户名", source=customers, relation=relation)
+    field = FieldIr(field_id="customer_name", name="客户名", source_id=customers.source_id, relation=relation)
     demand = DemandIr.from_irs(sources=[customers], fields=[field], main_source=main_source)
 
     object.__setattr__(demand, "main_source", None)
@@ -88,7 +88,7 @@ def test_extract_relation_dependency_keys_skips_non_source_ir_fields() -> None:
     real_source = make_source("customers", key_field="customer_id")
     relation = main_source["order_id"].join(real_source["customer_id"])
 
-    field = FieldIr(field_id="fake_field", name="Fake", source=_FakeSource("customers"), relation=relation)
+    field = FieldIr(field_id="fake_field", name="Fake", source_id=main_source.source_id, relation=relation)
     demand = DemandIr.from_irs(sources=[real_source], fields=[field], main_source=main_source)
 
     deps = extract_relation_dependency_keys(demand=demand, field_spec=field, resolver=LookupStepsResolver(), field_key="fake_field")
@@ -114,7 +114,7 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     )
     demand = DemandIr.from_irs(
         sources=[source],
-        fields=[FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True), derived],
+        fields=[FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True), derived],
         main_source=main_source,
     )
 
@@ -133,12 +133,13 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     relation_field = FieldIr(
         field_id="ref",
         name="Ref",
-        source=source,
+        source_id=source.source_id,
+        lookup_steps=(),
         relation=main_source["order_id"].join(source["id"]),
     )
     demand_with_ref = DemandIr.from_irs(
         sources=[source],
-        fields=[FieldIr(field_id="order_id", name="订単ID", source=main_source, is_primary=True), derived, relation_field],
+        fields=[FieldIr(field_id="order_id", name="订単ID", source_id=main_source.source_id, is_primary=True), derived, relation_field],
         main_source=main_source,
     )
     object.__setattr__(demand_with_ref, "main_source", None)
@@ -155,7 +156,7 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     # 3) no inferred steps -> skipped
     demand_with_ref = DemandIr.from_irs(
         sources=[source],
-        fields=[FieldIr(field_id="order_id", name="訂単ID", source=main_source, is_primary=True), derived, relation_field],
+        fields=[FieldIr(field_id="order_id", name="訂単ID", source_id=main_source.source_id, is_primary=True), derived, relation_field],
         main_source=main_source,
     )
     resolver = LookupStepsResolver(infer_lookup_steps_fn=_no_steps)
@@ -177,12 +178,16 @@ def test_build_plan_operators_skips_invalid_ref_loader_fields() -> None:
     fake_relation_field = FieldIr(
         field_id="fake_ref",
         name="FakeRef",
-        source=_FakeSource("dummy"),
+        source_id=main_source.source_id,
         relation=main_source["order_id"].join(source["id"]),
     )
     demand_with_fake = DemandIr.from_irs(
         sources=[source],
-        fields=[FieldIr(field_id="order_id", name="訂単ID", source=main_source, is_primary=True), derived, fake_relation_field],
+        fields=[
+            FieldIr(field_id="order_id", name="訂単ID", source_id=main_source.source_id, is_primary=True),
+            derived,
+            fake_relation_field,
+        ],
         main_source=main_source,
     )
     ops = build_plan_operators(
@@ -200,7 +205,7 @@ def test_compute_key_fields_returns_empty_when_main_source_missing() -> None:
     main_source = make_main_source("orders")
     customers = make_source("customers", key_field="customer_id")
     relation = main_source["customer_id"].join(customers["customer_id"])
-    field = FieldIr(field_id="customer_name", name="客户名", source=customers, relation=relation)
+    field = FieldIr(field_id="customer_name", name="客户名", source_id=customers.source_id, relation=relation)
     demand = DemandIr.from_irs(sources=[customers], fields=[field], main_source=main_source)
 
     object.__setattr__(demand, "main_source", None)
@@ -210,7 +215,7 @@ def test_compute_key_fields_returns_empty_when_main_source_missing() -> None:
 
 def test_build_plan_operators_skips_compute_when_field_not_required() -> None:
     main_source = make_main_source("orders")
-    order_id = FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True)
+    order_id = FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True)
     derived = DerivedFieldIr(
         field_id="derived",
         name="Derived",
@@ -237,8 +242,8 @@ def test_build_plan_operators_skips_compute_when_field_not_required() -> None:
 def test_build_plan_operators_load_operator_primary_detection_covers_branches() -> None:
     main_source = make_main_source("orders")
     loader_source = make_source("orders_loader")
-    order_id = FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True)
-    amount = FieldIr(field_id="amount", name="金额", source=main_source)
+    order_id = FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True)
+    amount = FieldIr(field_id="amount", name="金额", source_id=main_source.source_id)
 
     demand = DemandIr.from_irs(sources=[loader_source], fields=[order_id, amount], main_source=main_source)
     ops = build_plan_operators(

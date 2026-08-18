@@ -180,18 +180,18 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="客户",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=orders["customer_id"].join(customers["customer_id"]),
         ),
         FieldIr(
             field_id="product_name",
             name="商品",
-            source=products,
+            source_id=products.source_id,
             data_key="product_name",
             relation=orders["product_id"].join(products["product_id"]),
         ),
@@ -204,7 +204,7 @@ def test_adaptive_loadref_parallelism_replays_in_plan_order_on_main_thread() -> 
     for op in plan.operators:
         if not isinstance(op, LoadRefOperatorIr):
             continue
-        expected.append(op.lookup_steps[0].to_source.source_id)
+        expected.append(op.lookup_steps[0].to_source_id)
     assert len(expected) == 2
     slow_name = expected[0]
     fast_name = expected[1]
@@ -326,18 +326,18 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="客户",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=orders["customer_id"].join(customers["customer_id"]),
         ),
         FieldIr(
             field_id="product_name",
             name="商品",
-            source=products,
+            source_id=products.source_id,
             data_key="product_name",
             relation=orders["product_id"].join(products["product_id"]),
         ),
@@ -350,7 +350,7 @@ def test_adaptive_loadref_parallelism_replays_on_event_in_plan_order_on_main_thr
     for op in plan.operators:
         if not isinstance(op, LoadRefOperatorIr):
             continue
-        expected.append(op.lookup_steps[0].to_source.source_id)
+        expected.append(op.lookup_steps[0].to_source_id)
     assert len(expected) == 2
     slow_name = expected[0]
     fast_name = expected[1]

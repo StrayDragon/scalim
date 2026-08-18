@@ -71,7 +71,7 @@ def _materializer(
 def test_non_derived_late_field_has_no_plan() -> None:
     main = _make_main_source()
     materializer = _materializer(
-        {"raw": FieldIr(field_id="raw", name="raw", source=main)},
+        {"raw": FieldIr(field_id="raw", name="raw", source_id=main.source_id)},
         {},
         ["raw"],
     )
@@ -82,7 +82,7 @@ def test_non_derived_late_field_has_no_plan() -> None:
 def test_materialize_column_falls_back_to_context_for_unplanned_field() -> None:
     main = _make_main_source()
     materializer = _materializer(
-        {"raw": FieldIr(field_id="raw", name="raw", source=main)},
+        {"raw": FieldIr(field_id="raw", name="raw", source_id=main.source_id)},
         {},
         ["raw"],
     )

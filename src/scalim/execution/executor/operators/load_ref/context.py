@@ -65,14 +65,15 @@ class LoadRefExecutionContext:
         )
 
     def maybe_warn_float_lookup_key(self, row_id: Hashable, raw_key: RuntimeValue, step: LookupStepIr) -> None:
-        effective_cast = step.lookup_cast if step.lookup_cast is not None else step.to_source.key.cast
+        live_source = self.runtime.resolve_lookup_source(step)
+        effective_cast = step.lookup_cast if step.lookup_cast is not None else live_source.key.cast
         if not is_auto_lookup_cast(effective_cast):
             return
         if not contains_float(raw_key):
             return
         self.runtime.instrumentation.emit_diagnostic_warning(
             message=DIAGNOSTIC_WARNING_FLOAT_LOOKUP_KEY,
-            source_id=step.to_source.source_id,
+            source_id=live_source.source_id,
             field_id=self.field_key,
             lookup_key=raw_key,
             row_id=row_id,
@@ -113,7 +114,7 @@ class LoadRefExecutionContext:
             fields_cache[row_id] = normalized
             return normalized
         lookup_result = "null_key" if status == "null_key" else "type_error"
-        self.record_lookup(row_id, raw_key, normalized, step.to_source, lookup_result, error_message)
+        self.record_lookup(row_id, raw_key, normalized, self.runtime.resolve_lookup_source(step), lookup_result, error_message)
         fields_cache[row_id] = None
         return None
 

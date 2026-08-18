@@ -78,6 +78,9 @@ def _raise_type_error(_value):  # type: ignore[no-untyped-def]
     raise TypeError("bad")
 
 
+TEST_SOURCE_CATALOG: Dict[str, object] = {}
+
+
 def _make_runtime(
     plan: ExecutionPlan,
     main_source: Optional[MainSourceIr],
@@ -98,7 +101,8 @@ def _make_runtime(
     if main_source is not None and str(main_source.source_id) not in runtime_bindings.main_source_loaders:
         runtime_bindings.main_source_loaders[str(main_source.source_id)] = lambda: []
 
-    typed_sources = sources or {}
+    typed_sources = dict(TEST_SOURCE_CATALOG)
+    typed_sources.update(sources or {})
     return ExecutionRuntime(
         plan=plan,
         hook_manager=hook_manager,

@@ -266,9 +266,7 @@ def run_workflow_demo_big_data_report(
                 and hook.by_source["products"] == len(observer.by_source["products"])
             )
             chunk_ok = bool(customer_miss_ok and product_miss_ok and no_unchunked_miss and hits_unchunked and hook_ok)
-            passed = bool(
-                not errors and preload_calls == 1 and artifacts_ok and verification.passed and metrics_ok and chunk_ok
-            )
+            passed = bool(not errors and preload_calls == 1 and artifacts_ok and verification.passed and metrics_ok and chunk_ok)
 
             summary = "errors={} preload_calls={} artifacts_ok={} verify={} customers_chunks={} products_chunks={}".format(
                 len(errors),

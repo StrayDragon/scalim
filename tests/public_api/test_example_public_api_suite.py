@@ -9,6 +9,7 @@ def test_public_api_mainline_chapters_pass() -> None:
             "ch150_public_api_planning",
             "ch160_public_api_execution",
             "ch164_public_api_lookup_chunking",
+            "ch166_public_api_source_catalog_workflow",
             "ch165_public_api_resources",
             "ch170_public_api_ob",
             "ch180_public_api_hooks_events",

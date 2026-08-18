@@ -64,7 +64,7 @@ def _load_empty_orders() -> List[dict]:
 def _build_demand() -> DemandIr:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     fields = [
-        FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True),
+        FieldIr(field_id="order_id", name="order_id", source_id=main_source.source_id, is_primary=True),
         DerivedFieldIr(
             field_id="work",
             name="work",

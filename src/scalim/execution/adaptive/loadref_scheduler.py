@@ -112,7 +112,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
                 continue
 
             # 行绑定是层级屏障: 为保持 `batch_rows` 语义并避免隐式依赖,此层按串行执行.
-            if any(has_rows_binding(op.lookup_steps) for op in executable_ops):
+            if any(has_rows_binding(op.lookup_steps, runtime.sources) for op in executable_ops):
                 if wants_scheduler_decisions:
                     self._emit_scheduler_decision(
                         runtime=runtime,
@@ -155,7 +155,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
                 continue
 
             # 在安全情况下按关联签名对任务去重(保持“关联复用”语义).
-            task_order, task_specs, op_task_key = self._build_task_specs(executable_ops)
+            task_order, task_specs, op_task_key = self._build_task_specs(executable_ops, sources=runtime.sources)
             task_ops = [task_specs[task_key].op for task_key in task_order]
 
             layer_lookup_keys: Optional[Dict[str, int]] = None

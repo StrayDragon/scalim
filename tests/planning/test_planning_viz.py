@@ -29,8 +29,8 @@ def _build_plan_with_stages() -> ExecutionPlan:
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader")),
     )
 
-    field_order_id = FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True)
-    field_customer_id = FieldIr(field_id="customer_id", name="客户ID", source=main_source)
+    field_order_id = FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True)
+    field_customer_id = FieldIr(field_id="customer_id", name="客户ID", source_id=main_source.source_id)
     derived_profit = DerivedFieldIr(
         field_id="profit",
         name="利润",
@@ -73,7 +73,7 @@ def _build_plan_with_stages() -> ExecutionPlan:
 
 def _build_simple_plan() -> ExecutionPlan:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
-    field_order_id = FieldIr(field_id="order_id", name="Order ID", source=main_source, is_primary=True)
+    field_order_id = FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id, is_primary=True)
     metadata = PlanMetadata(total_fields=1, total_sources=1, total_loaders=1)
     stages = [Stage(stage_id="stage0", field_keys=["order_id"], level=0)]
     return ExecutionPlan(
@@ -315,7 +315,12 @@ def test_viz_plan_helpers_cover_branches() -> None:
     class DummyField:
         pass
 
-    _viz_collect_fields({"unknown": DummyField()}, add_node)
+    class _UnknownFieldPlan:
+        loader_sequence = []
+        ref_loader_sequence = []
+        field_specs = {"unknown": DummyField()}
+
+    _viz_collect_fields(_UnknownFieldPlan(), add_node)
     assert any(node["id"] == "field:unknown" for node in nodes)
 
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
@@ -324,11 +329,19 @@ def test_viz_plan_helpers_cover_branches() -> None:
         key=KeyIr("customer_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="customers.loader")),
     )
-    lookup_step = LookupStepIr(from_field="customer_id", to_source=ref_source)
+    lookup_step = LookupStepIr(from_field="customer_id", to_source_id=ref_source.source_id)
+
+    class _LoaderSeqPlan:
+        loader_sequence = [(ref_source, ["customer_id"])]
+        ref_loader_sequence = [(ref_source, [("customer_name", "customer_id")])]
+        field_specs = {}
+
+    _viz_collect_fields(_LoaderSeqPlan(), add_node)
+
     ref_field = FieldIr(
         field_id="customer_name",
         name="Customer Name",
-        source=main_source,
+        source_id=main_source.source_id,
         lookup_steps=(lookup_step,),
     )
     edges = []

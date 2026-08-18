@@ -71,9 +71,9 @@ def _build_demand(
     """构造 “主源直取 + 平坦 late 派生 + 链式 late 派生” 的最小需求."""
     main = make_main_source("orders")
     fields: List[Any] = [
-        FieldIr(field_id="order_id", name="订单ID", source=main, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=main),
-        FieldIr(field_id="cost", name="成本", source=main),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=main.source_id),
+        FieldIr(field_id="cost", name="成本", source_id=main.source_id),
     ]
     targets = ["order_id", "amount", "cost"]
     calculators: Dict[str, Callable[..., Any]] = {}

@@ -46,7 +46,7 @@ def test_relation_from_allows_constant_derived_join_key_and_executes_before_load
     demand = DemandIr.from_irs(
         sources=[customers_source],
         fields=[
-            FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
+            FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
             DerivedFieldIr(
                 field_id="broadcast_key",
                 name="Broadcast Key",
@@ -57,7 +57,7 @@ def test_relation_from_allows_constant_derived_join_key_and_executes_before_load
             FieldIr(
                 field_id="customer_name",
                 name="客户名称",
-                source=customers_source,
+                source_id=customers_source.source_id,
                 data_key="customer_name",
                 relation=orders_to_customers,
             ),
@@ -111,11 +111,11 @@ def test_plan_builder_cycle_error_mentions_pre_relation_hint_for_derived_ref_cyc
     demand = DemandIr.from_irs(
         sources=[customers_source],
         fields=[
-            FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
+            FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
             FieldIr(
                 field_id="customer_name",
                 name="客户名称",
-                source=customers_source,
+                source_id=customers_source.source_id,
                 data_key="customer_name",
                 relation=orders_to_customers,
             ),
@@ -162,8 +162,10 @@ def test_plan_builder_rejects_non_pre_ref_derived_join_key_with_blocking_chain()
     demand = DemandIr.from_irs(
         sources=[customers_source],
         fields=[
-            FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-            FieldIr(field_id="ref_value", name="Ref Value", source=customers_source, data_key="ref_value", relation=ref_by_order_id),
+            FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+            FieldIr(
+                field_id="ref_value", name="Ref Value", source_id=customers_source.source_id, data_key="ref_value", relation=ref_by_order_id
+            ),
             DerivedFieldIr(
                 field_id="broadcast_key",
                 name="Broadcast Key",
@@ -180,7 +182,7 @@ def test_plan_builder_rejects_non_pre_ref_derived_join_key_with_blocking_chain()
             FieldIr(
                 field_id="customer_name",
                 name="客户名称",
-                source=customers_source,
+                source_id=customers_source.source_id,
                 data_key="customer_name",
                 relation=ref_by_broadcast_key,
             ),
@@ -197,8 +199,8 @@ def test_derive_pre_ref_available_field_keys_excludes_main_source_ref_fields() -
     demand = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-            FieldIr(field_id="ref_like", name="RefLike", source=orders_source, relation="x"),  # type: ignore[arg-type]
+            FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+            FieldIr(field_id="ref_like", name="RefLike", source_id=orders_source.source_id, relation="x"),  # type: ignore[arg-type]
         ],
         main_source=orders_source,
     )
@@ -212,7 +214,7 @@ def test_derive_pre_ref_available_field_keys_returns_empty_when_main_source_id_e
     orders_source = MainSourceIr(source_id="", loader_ref=RuntimeHandleIdIr(handle_id="orders.main_loader"))
     demand = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True)],
+        fields=[FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True)],
         main_source=orders_source,
     )
     assert derive_pre_ref_available_field_keys(demand=demand) == set()
@@ -228,7 +230,7 @@ def test_plan_builder_find_pre_ref_blocking_chain_branches() -> None:
     demand = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
+            FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
             DerivedFieldIr(
                 field_id="const",
                 name="Const",

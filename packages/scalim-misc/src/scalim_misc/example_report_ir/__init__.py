@@ -611,7 +611,7 @@ def build_order_report_model() -> DemandIr:
     order_id_field = FieldIr(
         field_id="order_id",
         name="订单ID",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="order_id",
         is_primary=True,
     )
@@ -620,28 +620,28 @@ def build_order_report_model() -> DemandIr:
     amount_field = FieldIr(
         field_id="amount",
         name="金额",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="amount",
     )
 
     cost_field = FieldIr(
         field_id="cost",
         name="成本",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="cost",
     )
 
     customer_id_field = FieldIr(
         field_id="customer_id",
         name="客户ID",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="customer_id",
     )
 
     pay_id_field = FieldIr(
         field_id="pay_id",
         name="支付ID",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="pay_id",
     )
 
@@ -664,7 +664,7 @@ def build_order_report_model() -> DemandIr:
     customer_name_field = FieldIr(
         field_id="customer_name",
         name="客户名称",
-        source=customers_source,
+        source_id=customers_source.source_id,
         data_key="customer_name",
         relation=orders_to_customers,
     )
@@ -673,7 +673,7 @@ def build_order_report_model() -> DemandIr:
     pay_method_field = FieldIr(
         field_id="pay_method",
         name="支付方式",
-        source=pays_source,
+        source_id=pays_source.source_id,
         data_key="pay_name",
         relation=orders_to_pays,
     )
@@ -681,7 +681,7 @@ def build_order_report_model() -> DemandIr:
     order_source_field = FieldIr(
         field_id="order_source",
         name="订单来源",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="order_source",
         value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="transform.order_source")),),
     )
@@ -690,7 +690,7 @@ def build_order_report_model() -> DemandIr:
     country_name_field = FieldIr(
         field_id="country_name",
         name="国家名称",
-        source=countries_source,
+        source_id=countries_source.source_id,
         data_key="country_name",
         relation=orders_to_countries,
     )
@@ -699,7 +699,7 @@ def build_order_report_model() -> DemandIr:
     mapping_name_field = FieldIr(
         field_id="mapping_name",
         name="区域机构映射",
-        source=region_institution_mapping_source,
+        source_id=region_institution_mapping_source.source_id,
         data_key="mapping_name",
         relation=orders_to_mapping,
     )
@@ -708,7 +708,7 @@ def build_order_report_model() -> DemandIr:
     order_type_id_field = FieldIr(
         field_id="order_type_id",
         name="订单类型ID",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="order_type_id",
     )
 
@@ -716,7 +716,7 @@ def build_order_report_model() -> DemandIr:
     order_type_name_field = FieldIr(
         field_id="order_type_name",
         name="订单类型名称",
-        source=order_types_source,
+        source_id=order_types_source.source_id,
         data_key="type_name",
         relation=orders_to_order_types,
     )
@@ -725,7 +725,7 @@ def build_order_report_model() -> DemandIr:
     small_group_ids_field = FieldIr(
         field_id="small_group_ids",
         name="小组ID列表",
-        source=orders_source,
+        source_id=orders_source.source_id,
         data_key="small_group_ids",
     )
 
@@ -736,12 +736,12 @@ def build_order_report_model() -> DemandIr:
     small_group_name_field = FieldIr(
         field_id="small_group_name",
         name="小组名称",
-        source=small_groups_source,
+        source_id=small_groups_source.source_id,
         data_key="small_group_name",
         lookup_steps=(
             LookupStepIr(
                 from_field="small_group_ids",
-                to_source=small_groups_source,
+                to_source_id=small_groups_source.source_id,
                 lookup_cast=csv_first_int_cast,
             ),
         ),
@@ -753,17 +753,17 @@ def build_order_report_model() -> DemandIr:
     big_group_name_field = FieldIr(
         field_id="big_group_name",
         name="大组名称",
-        source=big_groups_source,
+        source_id=big_groups_source.source_id,
         data_key="big_group_name",
         lookup_steps=(
             LookupStepIr(
                 from_field="small_group_ids",
-                to_source=small_groups_source,
+                to_source_id=small_groups_source.source_id,
                 lookup_cast=csv_first_int_cast,
             ),
             LookupStepIr(
                 from_field="big_group_id",
-                to_source=big_groups_source,
+                to_source_id=big_groups_source.source_id,
             ),
         ),
     )

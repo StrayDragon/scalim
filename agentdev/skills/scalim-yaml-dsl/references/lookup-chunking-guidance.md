@@ -33,4 +33,4 @@
 
 ## 目录 SSOT（实现）
 
-运行时策略写在 `DemandIr.sources[id]`。`LookupStepIr.to_source` 只是图句柄。LoadRef 经 `ExecutionRuntime.resolve_lookup_source(step)` 按 `source_id` 回目录，禁止把嵌套快照当 live 策略。
+运行时策略写在 `DemandIr.sources[id]`。图边只存 `LookupStepIr.to_source_id` / `FieldIr.source_id`（`str`），不含 live `SourceIr`。LoadRef 经 `ExecutionRuntime.resolve_lookup_source(step)` 按 id 回目录；缺 id fail-fast，禁止嵌套句柄回退。见 `llmanspec/changes/c50-source-id-graph-refs/`。

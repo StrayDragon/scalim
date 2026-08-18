@@ -130,14 +130,14 @@ def _(
     rel_to_ref = main_source["ref_id"].join(ref_source["id"])
 
     fields = [
-        FieldIr(field_id="ref_id", name="ref_id", source=main_source),
+        FieldIr(field_id="ref_id", name="ref_id", source_id=main_source.source_id),
         FieldIr(
             field_id="a",
             name="a",
-            source=main_source,
+            source_id=main_source.source_id,
             value_ops=(ValueOpIr(kind="transform", callable_ref=RuntimeHandleIdIr(handle_id="field.a.transform")),),
         ),
-        FieldIr(field_id="b", name="b", source=main_source),
+        FieldIr(field_id="b", name="b", source_id=main_source.source_id),
         DerivedFieldIr(
             field_id="ratio",
             name="ratio",
@@ -148,7 +148,7 @@ def _(
                 field_names=("a", "b"),
             ),
         ),
-        FieldIr(field_id="ref_value", name="ref_value", source=ref_source, data_key="value", relation=rel_to_ref),
+        FieldIr(field_id="ref_value", name="ref_value", source_id=ref_source.source_id, data_key="value", relation=rel_to_ref),
     ]
 
     demand = DemandIr.from_irs(

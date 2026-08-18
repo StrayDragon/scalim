@@ -88,7 +88,7 @@ def derive_pre_ref_available_field_keys(*, demand: DemandIr) -> Set[str]:
     for field_key, field_spec in demand.fields.items():
         if not isinstance(field_spec, FieldIr):
             continue
-        source_id = str(field_spec.source.source_id or "")
+        source_id = str(field_spec.source_id or "")
         if source_id != main_source_id:
             continue
         if field_spec.lookup_steps or field_spec.relation:
@@ -168,10 +168,10 @@ def _append_ref_load_operators(
             if not main_source:
                 continue
 
-            if not isinstance(field_spec.source, SourceIr):
+            if field_spec.source_id not in demand.sources:
                 continue
 
-            steps = resolver.resolve(field_spec, main_source, field_key=field_key)
+            steps = resolver.resolve(field_spec, main_source, field_key=field_key, to_source=source)
             if not steps:
                 continue
 

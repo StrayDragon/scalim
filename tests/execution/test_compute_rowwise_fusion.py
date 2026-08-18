@@ -24,9 +24,9 @@ def _call_by(fid: str, deps: List[str]) -> CallBySpecIr:
 def _build_demand(n_derived: int = 3):
     main = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     fields: List[Any] = [
-        FieldIr(field_id="id", name="id", source=main, is_primary=True),
-        FieldIr(field_id="v0", name="v0", source=main),
-        FieldIr(field_id="v1", name="v1", source=main),
+        FieldIr(field_id="id", name="id", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="v0", name="v0", source_id=main.source_id),
+        FieldIr(field_id="v1", name="v1", source_id=main.source_id),
     ]
     targets = ["id", "v0", "v1"]
     for i in range(n_derived):

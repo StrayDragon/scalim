@@ -1,6 +1,6 @@
-from typing import FrozenSet, Optional, Tuple
+from typing import FrozenSet, Mapping, Optional, Tuple
 
-from ..spec.ir import LookupStepIr
+from ..spec.ir import LookupStepIr, SourceIr
 from ..spec.ir.aliases import LookupKeySpec, NormalizedLookupKeySpec
 from ..spec.ir.binding import BindingIr
 from ..spec.ir.callable_refs import describe_callable_ref
@@ -50,15 +50,27 @@ def build_binding_signature(binding: Optional[BindingIr]) -> Optional[BindingSig
     return ("binding", binding.mode, binding.as_, binding.cache_mode, binding.key_field, marker)
 
 
-def resolve_step_binding(step: LookupStepIr) -> Optional[BindingIr]:
-    to_key = step.get_to_key_or_source_key()
+def _step_source_id(step: LookupStepIr) -> str:
+    return str(step.to_source_id)
+
+
+def live_source_for_step(step: LookupStepIr, sources: Mapping[str, SourceIr]) -> SourceIr:
+    return SourceIr.from_catalog(sources, _step_source_id(step))
+
+
+def resolve_step_binding(step: LookupStepIr, sources: Mapping[str, SourceIr]) -> Optional[BindingIr]:
+    source = live_source_for_step(step, sources)
+    if step.to_field is not None:
+        to_key = step.to_field
+    else:
+        to_key = source.key.key
     binding_key = normalize_key_field(to_key)
-    return step.bind or step.to_source.get_binding(binding_key)
+    return step.bind or source.get_binding(binding_key)
 
 
-def has_rows_binding(steps: Tuple[LookupStepIr, ...]) -> bool:
+def has_rows_binding(steps: Tuple[LookupStepIr, ...], sources: Mapping[str, SourceIr]) -> bool:
     for step in steps:
-        binding = resolve_step_binding(step)
+        binding = resolve_step_binding(step, sources)
         if binding is None:
             continue
         if binding.mode != "keys":
@@ -66,9 +78,9 @@ def has_rows_binding(steps: Tuple[LookupStepIr, ...]) -> bool:
     return False
 
 
-def can_group_by_relation(steps: Tuple[LookupStepIr, ...]) -> bool:
+def can_group_by_relation(steps: Tuple[LookupStepIr, ...], sources: Mapping[str, SourceIr]) -> bool:
     for step in steps:
-        binding = resolve_step_binding(step)
+        binding = resolve_step_binding(step, sources)
         if binding is None:
             continue
         if binding.mode == "rows" and binding.cache_mode == "none":
@@ -76,13 +88,17 @@ def can_group_by_relation(steps: Tuple[LookupStepIr, ...]) -> bool:
     return True
 
 
-def build_step_signature(step: LookupStepIr) -> StepSignature:
-    to_key = normalize_key_field(step.get_to_key_or_source_key())
-    effective_cast = step.lookup_cast if step.lookup_cast is not None else step.to_source.key.cast
+def build_step_signature(step: LookupStepIr, sources: Mapping[str, SourceIr]) -> StepSignature:
+    source = live_source_for_step(step, sources)
+    if step.to_field is not None:
+        to_key = normalize_key_field(step.to_field)
+    else:
+        to_key = normalize_key_field(source.key.key)
+    effective_cast = step.lookup_cast if step.lookup_cast is not None else source.key.cast
     lookup_cast_sig = lookup_cast_signature(effective_cast, is_multi=step.is_multi_field())
-    binding_signature = build_binding_signature(resolve_step_binding(step))
+    binding_signature = build_binding_signature(resolve_step_binding(step, sources))
     return (
-        step.to_source.source_id,
+        source.source_id,
         step.get_from_fields(),
         to_key,
         lookup_cast_sig,
@@ -90,8 +106,16 @@ def build_step_signature(step: LookupStepIr) -> StepSignature:
     )
 
 
-def build_relation_signature(steps: Tuple[LookupStepIr, ...]) -> RelationSignature:
-    return tuple(build_step_signature(step) for step in steps)
+def build_relation_signature(
+    steps: Tuple[LookupStepIr, ...],
+    sources: Optional[Mapping[str, SourceIr]] = None,
+) -> RelationSignature:
+    if not steps:
+        return ()
+    if sources is None:
+        msg = "build_relation_signature() missing required argument: 'sources'"
+        raise TypeError(msg)
+    return tuple(build_step_signature(step, sources) for step in steps)
 
 
 __all__ = (
@@ -105,6 +129,7 @@ __all__ = (
     "can_group_by_relation",
     "has_rows_binding",
     "is_auto_lookup_cast",
+    "live_source_for_step",
     "lookup_cast_signature",
     "normalize_key_field",
     "resolve_step_binding",

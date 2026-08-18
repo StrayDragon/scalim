@@ -119,9 +119,9 @@ def _build_and_run(rows, n_derived, sink_kind, fuse, runs):
 
     main = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     fields = [
-        FieldIr(field_id="id", name="id", source=main, is_primary=True),
-        FieldIr(field_id="v0", name="v0", source=main),
-        FieldIr(field_id="v1", name="v1", source=main),
+        FieldIr(field_id="id", name="id", source_id=main.source_id, is_primary=True),
+        FieldIr(field_id="v0", name="v0", source_id=main.source_id),
+        FieldIr(field_id="v1", name="v1", source_id=main.source_id),
     ]  # type: List[Any]
     calcs = {}  # type: Dict[str, Callable[..., Any]]
     targets = ["id", "v0", "v1"]  # type: List[str]

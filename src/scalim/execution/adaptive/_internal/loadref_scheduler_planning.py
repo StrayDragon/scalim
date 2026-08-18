@@ -101,8 +101,10 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
     def _build_task_specs(
         self,
         ops: Sequence[LoadRefOperatorIr],
+        *,
+        sources: Dict[str, Any],
     ) -> Tuple[List[AdaptiveTaskKey], Dict[AdaptiveTaskKey, _TaskSpec], Dict[str, AdaptiveTaskKey]]:
-        return _build_task_specs_unit(ops, resolve_task_pool=self._resolve_task_pool)
+        return _build_task_specs_unit(ops, resolve_task_pool=self._resolve_task_pool, sources=sources)
 
     def _commit_layer_results(
         self,

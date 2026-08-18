@@ -70,7 +70,7 @@ def test_yaml_params_builder_use_keys_as_list_uses_batch_row_nth_for_non_ref_loa
 
 def test_plan_builder_field_specs_and_dependencies_follow_field_order() -> None:
     main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
-    id_field = FieldIr(field_id="id", name="ID", source=main_source, is_primary=True)
+    id_field = FieldIr(field_id="id", name="ID", source_id=main_source.source_id, is_primary=True)
     a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), compute_expr="id")
     b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("id",), compute_expr="id")
 
@@ -107,7 +107,7 @@ from scalim.spec.ir import MainSourceIr
 from scalim.spec.ir import RuntimeHandleIdIr
 
 main = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
-id_field = FieldIr(field_id="id", name="ID", source=main, is_primary=True)
+id_field = FieldIr(field_id="id", name="ID", source_id=main.source_id, is_primary=True)
 a_field = DerivedFieldIr(field_id="a", name="A", dependencies=("id",), compute_expr="id")
 b_field = DerivedFieldIr(field_id="b", name="B", dependencies=("id",), compute_expr="id")
 

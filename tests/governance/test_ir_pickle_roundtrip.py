@@ -47,7 +47,7 @@ def test_demand_ir_pickle_roundtrip_restores_mappingproxy_sources_and_fields() -
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    field = FieldIr(field_id="id", name="ID", source=main_source)
+    field = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr(sources={"s1": source}, fields={"id": field}, main_source=main_source)
     assert isinstance(demand.sources, MappingProxyType)
     assert isinstance(demand.fields, MappingProxyType)
@@ -67,7 +67,7 @@ def test_demand_ir_getstate_does_not_force_convert_when_sources_and_fields_not_m
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    field = FieldIr(field_id="id", name="ID", source=main_source)
+    field = FieldIr(field_id="id", name="ID", source_id=main_source.source_id)
     demand = DemandIr(sources={"s1": source}, fields={"id": field}, main_source=main_source)
     object.__setattr__(demand, "sources", {"s1": source})
     object.__setattr__(demand, "fields", {"id": field})

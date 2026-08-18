@@ -318,8 +318,8 @@ def test_hub_typed_helpers_return_when_unwanted() -> None:
 
 def _build_single_compute_plan() -> ExecutionPlan:
     main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.main_loader"))
-    field_a = FieldIr(field_id="a", name="A", source=main_source)
-    field_b = FieldIr(field_id="b", name="B", source=main_source)
+    field_a = FieldIr(field_id="a", name="A", source_id=main_source.source_id)
+    field_b = FieldIr(field_id="b", name="B", source_id=main_source.source_id)
     derived_sum = DerivedFieldIr(
         field_id="sum",
         name="Sum",

@@ -129,12 +129,12 @@ def test_compile_lookup_chunking_sized_applies_source_ir_chunk_size(tmp_path: Pa
     customer_name = compilation.demand_ir.fields["customer_name"]
     assert isinstance(customer_name, FieldIr)
     assert customer_name.lookup_steps
-    nested = customer_name.lookup_steps[0].to_source
-    catalog = compilation.demand_ir.sources[str(nested.source_id)]
+    step = customer_name.lookup_steps[0]
+    catalog = compilation.demand_ir.sources[str(step.to_source_id)]
     assert catalog is source
     assert catalog.lookup_chunk_size == 10
-    # overlay 发生在字段图捕获之后:嵌套句柄不是 live 目录对象.
-    assert nested is not catalog
+    assert step.to_source_id == "customers"
+    assert not hasattr(step, "to_source")
 
 
 def test_source_cache_python_override_beats_yaml_cache_mode(tmp_path: Path) -> None:

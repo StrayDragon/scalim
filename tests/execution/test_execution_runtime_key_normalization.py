@@ -15,12 +15,20 @@ def _make_runtime(*, key_normalization: str, sources=None) -> ExecutionRuntime:
     runtime_bindings = RuntimeBindings(main_source_loaders={"orders": lambda: []})
     int_cast = LookupCastSpecIr(name="int")
     runtime_bindings.lookup_key_casts[lookup_cast_id(int_cast, is_multi=False)] = lambda value: int(value) if value is not None else None
+    default_targets = SourceIr(
+        source_id="targets",
+        key=KeyIr(key="target_id"),
+        loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
+    )
+    merged = {"targets": default_targets}
+    if sources:
+        merged.update(sources)
     return ExecutionRuntime(
         plan,
         HookManager(),
         ObserverManager(),
         main_source=MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader")),
-        sources={} if sources is None else sources,
+        sources=merged,
         runtime_bindings=runtime_bindings,
         key_normalization=key_normalization,  # type: ignore[arg-type]
     )
@@ -32,7 +40,7 @@ def _make_step(*, lookup_cast: "LookupCastSpecIr | None" = None) -> LookupStepIr
         key=KeyIr(key="target_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
     )
-    return LookupStepIr(from_field="fk", to_source=source, lookup_cast=lookup_cast)
+    return LookupStepIr(from_field="fk", to_source_id=source.source_id, lookup_cast=lookup_cast)
 
 
 def test_execution_runtime_normalize_lookup_key_status_auto_str_ok_type_error_and_null_key() -> None:
@@ -123,7 +131,7 @@ def test_resolve_lookup_source_prefers_catalog_over_nested_handle() -> None:
         lookup_chunk_size=3,
         lookup_chunk_parallel=True,
     )
-    step = LookupStepIr(from_field="fk", to_source=nested)
+    step = LookupStepIr(from_field="fk", to_source_id=nested.source_id)
     runtime = _make_runtime(key_normalization="raw", sources={"targets": catalog})
 
     live = runtime.resolve_lookup_source(step)
@@ -133,7 +141,13 @@ def test_resolve_lookup_source_prefers_catalog_over_nested_handle() -> None:
     assert nested.lookup_chunk_size is None
 
 
-def test_resolve_lookup_source_falls_back_to_nested_handle_when_catalog_empty() -> None:
-    step = _make_step()
+def test_resolve_lookup_source_missing_catalog_fails_fast() -> None:
+    step = LookupStepIr(from_field="fk", to_source_id="missing")
     runtime = _make_runtime(key_normalization="raw")
-    assert runtime.resolve_lookup_source(step) is step.to_source
+    with pytest.raises(KeyError, match="missing source_id"):
+        runtime.resolve_lookup_source(step)
+
+
+def test_source_ir_from_catalog_rejects_non_source() -> None:
+    with pytest.raises(TypeError, match="must be SourceIr"):
+        SourceIr.from_catalog({"targets": "not-a-source"}, "targets")

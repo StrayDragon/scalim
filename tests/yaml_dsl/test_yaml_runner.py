@@ -509,8 +509,8 @@ def test_export_layout_uses_field_ids_when_header_by_field_id() -> None:
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="order_id", name="Order ID", source=main_source),
-            FieldIr(field_id="amount", name="Amount", source=main_source),
+            FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id),
+            FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id),
         ],
         main_source=main_source,
     )
@@ -524,8 +524,8 @@ def test_export_layout_uses_field_names_when_header_by_name() -> None:
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="order_id", name="Order ID", source=main_source),
-            FieldIr(field_id="amount", name="Amount", source=main_source),
+            FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id),
+            FieldIr(field_id="amount", name="Amount", source_id=main_source.source_id),
         ],
         main_source=main_source,
     )
@@ -538,7 +538,7 @@ def test_export_layout_header_names_none_when_no_mapping() -> None:
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="order_id", name="order_id", source=main_source),
+            FieldIr(field_id="order_id", name="order_id", source_id=main_source.source_id),
         ],
         main_source=main_source,
     )

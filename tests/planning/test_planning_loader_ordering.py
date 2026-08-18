@@ -1,4 +1,5 @@
 import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -93,46 +94,46 @@ def test_build_ref_field_ordering_deps_handles_edge_cases() -> None:
     src_fake = make_source("fake")
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
         # 1) no steps -> early return
-        FieldIr(field_id="empty_steps", name="Empty", source=src_a, lookup_steps=()),
+        FieldIr(field_id="empty_steps", name="Empty", source_id=src_a.source_id, lookup_steps=()),
         # 2) self dep -> skipped
         FieldIr(
             field_id="self_dep",
             name="Self",
-            source=src_a,
-            lookup_steps=(LookupStepIr(from_field="self_dep", to_source=src_a),),
+            source_id=src_a.source_id,
+            lookup_steps=(LookupStepIr(from_field="self_dep", to_source_id=src_a.source_id),),
         ),
         # 3) dep source not SourceIr -> skipped
-        FieldIr(field_id="dep_fake", name="DepFake", source=_FakeSource("fake")),
+        FieldIr(field_id="dep_fake", name="DepFake", source_id=_FakeSource("fake").source_id),
         FieldIr(
             field_id="uses_fake",
             name="UsesFake",
-            source=src_a,
-            lookup_steps=(LookupStepIr(from_field="dep_fake", to_source=src_a),),
+            source_id=src_a.source_id,
+            lookup_steps=(LookupStepIr(from_field="dep_fake", to_source_id=src_a.source_id),),
         ),
         # 4) dep is not a ref field -> skipped
-        FieldIr(field_id="dep_non_ref", name="DepNonRef", source=src_b),
+        FieldIr(field_id="dep_non_ref", name="DepNonRef", source_id=src_b.source_id),
         FieldIr(
             field_id="uses_non_ref",
             name="UsesNonRef",
-            source=src_a,
-            lookup_steps=(LookupStepIr(from_field="dep_non_ref", to_source=src_a),),
+            source_id=src_a.source_id,
+            lookup_steps=(LookupStepIr(from_field="dep_non_ref", to_source_id=src_a.source_id),),
         ),
         # 5) duplicate dep -> dedupe
         FieldIr(
             field_id="dep_ref",
             name="DepRef",
-            source=src_b,
-            lookup_steps=(LookupStepIr(from_field="order_id", to_source=src_b),),
+            source_id=src_b.source_id,
+            lookup_steps=(LookupStepIr(from_field="order_id", to_source_id=src_b.source_id),),
         ),
         FieldIr(
             field_id="dupe_dep",
             name="DupeDep",
-            source=src_a,
+            source_id=src_a.source_id,
             lookup_steps=(
-                LookupStepIr(from_field="dep_ref", to_source=src_a),
-                LookupStepIr(from_field="dep_ref", to_source=src_a),
+                LookupStepIr(from_field="dep_ref", to_source_id=src_a.source_id),
+                LookupStepIr(from_field="dep_ref", to_source_id=src_a.source_id),
             ),
         ),
     ]
@@ -148,3 +149,40 @@ def test_build_ref_field_ordering_deps_handles_edge_cases() -> None:
     assert build_ref_field_ordering_deps(demand, "uses_fake", demand.fields["uses_fake"]) == ()
     assert build_ref_field_ordering_deps(demand, "uses_non_ref", demand.fields["uses_non_ref"]) == ()
     assert build_ref_field_ordering_deps(demand, "dupe_dep", demand.fields["dupe_dep"]) == ("dep_ref",)
+
+
+def test_build_ref_field_ordering_deps_skips_dep_outside_catalog() -> None:
+    orders_source = make_main_source("orders")
+    src_a = make_source("src_a")
+    field = FieldIr(
+        field_id="uses_ghost",
+        name="UsesGhost",
+        source_id=src_a.source_id,
+        lookup_steps=(LookupStepIr(from_field="ghost_id", to_source_id=src_a.source_id),),
+    )
+    ghost = FieldIr(field_id="ghost_id", name="Ghost", source_id="ghost")
+    demand = SimpleNamespace(
+        main_source=orders_source,
+        sources={src_a.source_id: src_a},
+        fields={"uses_ghost": field, "ghost_id": ghost},
+    )
+    assert build_ref_field_ordering_deps(demand, "uses_ghost", field) == ()
+
+
+def test_build_ref_field_ordering_deps_skips_infer_when_relation_target_missing() -> None:
+    orders_source = make_main_source("orders")
+    customers = make_source("customers", key_field="customer_id")
+    relation = orders_source["customer_id"].join(customers["customer_id"])
+    field = FieldIr(
+        field_id="customer_name",
+        name="Customer",
+        source_id=orders_source.source_id,
+        relation=relation,
+    )
+    demand = DemandIr(
+        sources={},
+        fields={"customer_name": field},
+        main_source=orders_source,
+    )
+    assert field.lookup_steps is None
+    assert build_ref_field_ordering_deps(demand, "customer_name", field) == ()

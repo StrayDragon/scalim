@@ -70,12 +70,12 @@ def test_load_ref_relation_miss_applies_default_literal_and_value_cast() -> None
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(FieldDefaultCaseIr(when="relation_miss", kind="literal", literal="0"),),
@@ -114,12 +114,12 @@ def test_load_ref_relation_miss_applies_default_call_by() -> None:
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(
@@ -161,12 +161,12 @@ def test_load_ref_relation_hit_does_not_apply_default_even_if_value_is_none() ->
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(FieldDefaultCaseIr(when="relation_miss", kind="literal", literal=0),),
@@ -201,12 +201,12 @@ def test_load_ref_null_fk_applies_default_without_calling_loader() -> None:
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(FieldDefaultCaseIr(when="relation_miss", kind="literal", literal=0),),
@@ -242,12 +242,12 @@ def test_load_ref_relation_miss_call_by_default_requires_bound_calculator() -> N
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(
@@ -296,12 +296,12 @@ def test_load_ref_relation_miss_call_by_default_passes_dependencies() -> None:
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(
@@ -361,12 +361,12 @@ def test_load_ref_relation_miss_call_by_default_passes_ctx_values_when_requested
     )
     _bind_source_loader(runtime_bindings, "targets", _loader)
     binding = _bind_params_builder(runtime_bindings, "targets", "target_id", _params_builder)
-    step = LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding)
+    step = LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding)
 
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         data_key="amount",
         value_ops=(ValueOpIr(kind="cast", to="int"),),
         default_cases=(
@@ -417,11 +417,11 @@ def test_flow_resolve_default_skips_unsupported_when() -> None:
                 "x": FieldIr(
                     field_id="x",
                     name="X",
-                    source=SourceIr(
+                    source_id=SourceIr(
                         source_id="s1",
                         key=KeyIr(key="id"),
                         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("loader:s1")),
-                    ),
+                    ).source_id,
                     default_cases=(FieldDefaultCaseIr(when="hit_null", kind="literal", literal=1),),
                 )
             },
@@ -449,11 +449,11 @@ def test_flow_resolve_default_handles_corrupted_call_by_case() -> None:
     field = FieldIr(
         field_id="x",
         name="X",
-        source=SourceIr(
+        source_id=SourceIr(
             source_id="s1",
             key=KeyIr(key="id"),
             loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("loader:s1")),
-        ),
+        ).source_id,
         default_cases=(_BadCase(),),  # type: ignore[arg-type] internal tests: corrupted case instance
     )
     runtime = _make_runtime(ExecutionPlan(field_specs={"x": field}, operators=()), _make_main_source(), sources={})
@@ -477,11 +477,11 @@ def test_flow_resolve_default_handles_corrupted_kind_case() -> None:
     field = FieldIr(
         field_id="x",
         name="X",
-        source=SourceIr(
+        source_id=SourceIr(
             source_id="s1",
             key=KeyIr(key="id"),
             loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr("loader:s1")),
-        ),
+        ).source_id,
         default_cases=(_BadCase(),),  # type: ignore[arg-type] internal tests: corrupted case instance
     )
     runtime = _make_runtime(ExecutionPlan(field_specs={"x": field}, operators=()), _make_main_source(), sources={})
@@ -509,7 +509,7 @@ def test_flow_write_relation_miss_field_value_handles_transform_errors_when_guar
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         default_cases=(FieldDefaultCaseIr(when="relation_miss", kind="literal", literal=1),),
     )
     runtime_bindings.value_transforms["amount"] = _raise
@@ -558,7 +558,7 @@ def test_flow_write_relation_miss_field_value_raises_transform_errors_when_guard
     field_spec = FieldIr(
         field_id="amount",
         name="Amount",
-        source=target_source,
+        source_id=target_source.source_id,
         default_cases=(FieldDefaultCaseIr(when="relation_miss", kind="literal", literal=1),),
     )
     runtime_bindings.value_transforms["amount"] = _raise

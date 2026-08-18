@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Tuple
 
 import pytest
 
@@ -54,21 +54,22 @@ class _NoopRelationLookupObserver(EventDispatchObserver):
         return
 
 
-def _make_operator() -> LoadRefOperatorIr:
+def _make_operator() -> Tuple[LoadRefOperatorIr, SourceIr]:
     target_source = SourceIr(
         source_id="targets",
         key=KeyIr(key="target_id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="targets.loader")),
     )
     binding = BindingIr(key_field="target_id", params_builder_ref=RuntimeHandleIdIr(handle_id="targets.target_id.params_builder"))
-    steps = (LookupStepIr(from_field="fk_id", to_source=target_source, bind=binding),)
-    return LoadRefOperatorIr(
+    steps = (LookupStepIr(from_field="fk_id", to_source_id=target_source.source_id, bind=binding),)
+    operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
         source_id=target_source.source_id,
         field_key="target_name",
         lookup_steps=steps,
     )
+    return operator, target_source
 
 
 @pytest.mark.bench
@@ -85,8 +86,7 @@ def test_bench_loadref_relation_lookup_wants_gated(benchmark, wanted: bool) -> N
     def _loader(target_ids: Sequence[int]) -> Dict[int, Dict[str, object]]:
         return {key: {"name": "Name{}".format(key)} for key in target_ids}
 
-    operator = _make_operator()
-    target_source = operator.lookup_steps[0].to_source
+    operator, target_source = _make_operator()
     runtime_bindings = RuntimeBindings(
         main_source_loaders={"main": lambda: []},
         source_loaders={"targets": _loader},
@@ -96,7 +96,7 @@ def test_bench_loadref_relation_lookup_wants_gated(benchmark, wanted: bool) -> N
     )
     plan = ExecutionPlan(
         operators=(operator,),
-        field_specs={"target_name": FieldIr(field_id="target_name", name="Target", source=target_source, data_key="name")},
+        field_specs={"target_name": FieldIr(field_id="target_name", name="Target", source_id=target_source.source_id, data_key="name")},
         target_fields=["target_name"],
     )
     runtime = ExecutionRuntime(

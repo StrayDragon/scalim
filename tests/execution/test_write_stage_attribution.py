@@ -56,11 +56,11 @@ def _make_case():
         ),
     )
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="客户",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=orders["customer_id"].join(customers["customer_id"]),
         ),

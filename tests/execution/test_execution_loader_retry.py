@@ -41,7 +41,7 @@ def test_run_ir_retries_main_source_and_emits_loader_retry_event() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
 
@@ -93,7 +93,7 @@ def test_run_ir_retry_give_up_emits_single_error_event() -> None:
     main_source = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="order_id", name="Order ID", source=main_source)],
+        fields=[FieldIr(field_id="order_id", name="Order ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
 

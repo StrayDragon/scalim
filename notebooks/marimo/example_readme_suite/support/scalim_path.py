@@ -21,8 +21,8 @@ def build_demand() -> DemandIr:
         sources=[],
         main_source=orders,
         fields=(
-            FieldIr(field_id="order_id", name="订单ID", source=orders),
-            FieldIr(field_id="amount", name="金额", source=orders),
+            FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id),
+            FieldIr(field_id="amount", name="金额", source_id=orders.source_id),
             DerivedFieldIr(
                 field_id="amount_x2",
                 name="金额*2",

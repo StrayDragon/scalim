@@ -61,7 +61,7 @@ def _is_available_at_write(
         return False
     if dep_spec.lookup_steps or dep_spec.relation:
         return False
-    return bool(main_source_id) and dep_spec.source.source_id == main_source_id
+    return bool(main_source_id) and dep_spec.source_id == main_source_id
 
 
 def _is_rejected(

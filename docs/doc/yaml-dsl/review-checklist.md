@@ -13,6 +13,7 @@
 - Skill upgrades：`2026-07-12-book-write-policy-python-ssot.md`、`2026-07-13-unified-xlsx-book-kind.md`、`2026-07-13-normalize-xlsx-book-ir-path-presence.md`、`2026-07-28-remove-book-budget-policy.md`、`2026-07-28-remove-dedup-and-two-stage-derived.md`
 - 共享 book 峰值主要来自 **plan 全量物化**（非 openpyxl 并发）；写后可尽早释放 demand artifact；plan segments 在 `commit_all`/`discard_all` 后释放。进程内 book cell/sheet 预算护栏已移除（见 `2026-07-28-remove-book-budget-policy`）
 - **边界（c40 已落地）**：运行可变 knobs 收口 Python typed oneof（`LookupChunking` / `SourceCache` / `RowsReuse`）；YAML 保留编排与内容。YAML `lookup_chunk_size` 再写 fail-fast。agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`；upgrade：`.../upgrades/2026-08-09-lookup-chunking-python-ssot.md`。
+- **图边 vs 目录（c50）**：`FieldIr.source_id` / `LookupStepIr.to_source_id` 只存 id；overlay 只写 `DemandIr.sources`；禁止嵌套 live `SourceIr` 当策略句柄。upgrade：`.../upgrades/2026-08-18-source-id-graph-refs.md`。
 ## 0) 必须遵守的主线原则(硬约束)
 
 - **禁止并行版本**: 不引入 `dsl_version`;不通过 CLI/schema/modeline 选择并行 DSL 版本。

@@ -56,8 +56,7 @@ def load_orders_lookup_chunk_demo() -> List[Dict[str, object]]:
     """
 
     return [
-        {"order_id": order_id, "customer_id": order_id, "amount": (order_id + 1) * 10}
-        for order_id in range(LOOKUP_CHUNK_DEMO_ORDER_COUNT)
+        {"order_id": order_id, "customer_id": order_id, "amount": (order_id + 1) * 10} for order_id in range(LOOKUP_CHUNK_DEMO_ORDER_COUNT)
     ]
 
 
@@ -84,6 +83,40 @@ def load_customers_by_ids(
     }
 
 
+WORKFLOW_CATALOG_ALPHA_ORDER_COUNT = 6
+WORKFLOW_CATALOG_BETA_ORDER_COUNT = 4
+
+
+def load_orders_catalog_alpha() -> List[Dict[str, object]]:
+    """workflow 同名 `source_id` 隔离演示: alpha 主源(6 行,键 1..6)."""
+
+    return [{"order_id": order_id, "customer_id": order_id} for order_id in range(1, WORKFLOW_CATALOG_ALPHA_ORDER_COUNT + 1)]
+
+
+def load_orders_catalog_beta() -> List[Dict[str, object]]:
+    """workflow 同名 `source_id` 隔离演示: beta 主源(4 行,键 1..4,与 alpha 重叠)."""
+
+    return [{"order_id": order_id, "customer_id": order_id} for order_id in range(1, WORKFLOW_CATALOG_BETA_ORDER_COUNT + 1)]
+
+
+def load_customers_catalog_alpha_by_ids(ids: Optional[Iterable[object]] = None) -> Dict[int, Dict[str, object]]:
+    """alpha 维表: 名称前缀 `Alpha-`;与 beta 共用 `source_id=customers` 时必须仍走本 loader."""
+
+    return {
+        customer_id: {"customer_id": customer_id, "customer_name": "Alpha-{}".format(customer_id)}
+        for customer_id in ([] if ids is None else [int(item) for item in ids])
+    }
+
+
+def load_customers_catalog_beta_by_ids(ids: Optional[Iterable[object]] = None) -> Dict[int, Dict[str, object]]:
+    """beta 维表: 名称前缀 `Beta-`;键与 alpha 重叠时若串目录会拿到 `Alpha-*`."""
+
+    return {
+        customer_id: {"customer_id": customer_id, "customer_name": "Beta-{}".format(customer_id)}
+        for customer_id in ([] if ids is None else [int(item) for item in ids])
+    }
+
+
 def load_dims_key_normalization_demo_int_keys() -> Mapping[int, Dict[str, object]]:
     """用于演示 `key_normalization` 的最小维表映射.
 
@@ -98,8 +131,8 @@ def load_dims_key_normalization_demo_int_keys() -> Mapping[int, Dict[str, object
 def build_minimal_public_api_ir() -> DemandIr:
     main = MainSourceIr(source_id="items", loader_ref=RuntimeHandleIdIr(handle_id="items.main_loader"))
     fields = [
-        FieldIr(field_id="item_id", name="item_id", source=main, extract_expr="item_id"),
-        FieldIr(field_id="dim_id", name="dim_id", source=main, extract_expr="dim_id"),
+        FieldIr(field_id="item_id", name="item_id", source_id=main.source_id, extract_expr="item_id"),
+        FieldIr(field_id="dim_id", name="dim_id", source_id=main.source_id, extract_expr="dim_id"),
         DerivedFieldIr(
             field_id="value_plus_one",
             name="value_plus_one",

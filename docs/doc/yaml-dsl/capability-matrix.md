@@ -68,6 +68,7 @@
 | `*.fields.*.relation` | `FieldIr.lookup_steps`(解析结果) | 只支持等值关联链(steps);路径必须从 main_source 可达 | 在 `relations` 中沉淀命名链路并用 string ref 复用 |
 | `relations.*` | 间接影响 `FieldIr.lookup_steps` | relation 本身不进入 IR;作为“链路模板”供字段引用 | 需要完全自定义 lookup 逻辑时,用 Python-only IR 构建 |
 | `relations.*.steps[].lookup_cast` | `LookupStepIr.lookup_cast` | 仅预置 cast | 同上 |
+| （IR 图边，非 YAML 新键） | `FieldIr.source_id` / `LookupStepIr.to_source_id` | 图边只存 id；live `SourceIr` 只在 `DemandIr.sources`；overlay 不得写进 step/field；缺 catalog id fail-fast | 手写 IR：`source_id=` / `to_source_id=` + 显式 `sources=`；见 `c50-source-id-graph-refs` |
 
 ## 4) Demand YAML:输出(outputs/meta/audit)
 

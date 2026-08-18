@@ -105,7 +105,7 @@ class ConfigToIRConversionRelationMixin:
 
         step_ir = LookupStepIr(
             from_field=tuple(from_fields) if len(from_fields) > 1 else from_fields[0],
-            to_source=to_source,
+            to_source_id=to_source_id,
             to_field=to_field,
             lookup_cast=lookup_cast_spec,
             bind=bind_ir,

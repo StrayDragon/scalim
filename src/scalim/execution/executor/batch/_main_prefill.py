@@ -22,7 +22,7 @@ def collect_main_source_fields(
         if field_spec is None:
             passthrough_fields.append(field_key)
             continue
-        if isinstance(field_spec, FieldIr) and field_spec.source.source_id == main_source_id:
+        if isinstance(field_spec, FieldIr) and field_spec.source_id == main_source_id:
             main_field_specs.append((field_key, field_spec))
 
     return main_field_specs, passthrough_fields

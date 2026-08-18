@@ -18,18 +18,15 @@ def build_loader_sequences(
         field = demand.fields.get(field_key)
         if not isinstance(field, FieldIr):
             continue
-        if field.source.source_id == main_source_id:
+        if field.source_id == main_source_id:
             continue
-        if not isinstance(field.source, SourceIr):
+        catalog_source = demand.sources.get(field.source_id)
+        if catalog_source is None:
             continue
 
-        source_name = field.source.source_id
-        catalog_source = demand.sources.get(source_name)
+        source_name = field.source_id
         if source_name not in source_map:
-            if isinstance(catalog_source, SourceIr):
-                source_map[source_name] = catalog_source
-            else:
-                source_map[source_name] = field.source
+            source_map[source_name] = catalog_source
 
         if field.is_primary:
             normal_loaders.setdefault(source_name, []).append(field_key)

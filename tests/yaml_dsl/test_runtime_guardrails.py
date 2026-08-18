@@ -112,7 +112,7 @@ def _build_relation_demand(
     customer_field = FieldIr(
         field_id="customer_name",
         name="Customer Name",
-        source=customers_source,
+        source_id=customers_source.source_id,
         data_key="customer_name",
         relation=orders_to_customers,
         value_ops=(
@@ -125,7 +125,7 @@ def _build_relation_demand(
     demand = DemandIr.from_irs(
         sources=[customers_source],
         fields=[
-            FieldIr(field_id="order_id", name="Order ID", source=orders_source, is_primary=True),
+            FieldIr(field_id="order_id", name="Order ID", source_id=orders_source.source_id, is_primary=True),
             customer_field,
         ],
         main_source=orders_source,
@@ -256,7 +256,7 @@ def test_guardrails_compute_fast_fail_aborts() -> None:
     demand = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="x", name="x", source=main_source, is_primary=True),
+            FieldIr(field_id="x", name="x", source_id=main_source.source_id, is_primary=True),
             DerivedFieldIr(field_id="boom", name="boom", dependencies=("x",), compute_expr="x / 0"),
         ],
         main_source=main_source,

@@ -64,7 +64,7 @@ def test_window_with_output_composition_fails_fast(tmp_path: Path) -> None:
     )
     demand_ir = DemandIr.from_irs(
         sources=[],
-        fields=[FieldIr(field_id="id", name="ID", source=main_source)],
+        fields=[FieldIr(field_id="id", name="ID", source_id=main_source.source_id)],
         main_source=main_source,
     )
     composition = OutputCompositionSpec(
@@ -97,8 +97,8 @@ def test_run_ir_window_writes_streaming_column_excel(tmp_path: Path) -> None:
     demand_ir = DemandIr.from_irs(
         sources=[],
         fields=[
-            FieldIr(field_id="id", name="ID", source=main_source),
-            FieldIr(field_id="name", name="Name", source=main_source),
+            FieldIr(field_id="id", name="ID", source_id=main_source.source_id),
+            FieldIr(field_id="name", name="Name", source_id=main_source.source_id),
         ],
         main_source=main_source,
     )

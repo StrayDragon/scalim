@@ -103,7 +103,7 @@ def _write_relation_miss_field_value(
     source_id = "(unknown)"
     data_key = "(default)"
     if isinstance(field_spec, FieldIr):
-        source_id = str(field_spec.source.source_id or "")
+        source_id = str(field_spec.source_id or "")
         data_key = str(field_spec.extract_expr or field_spec.data_key or data_key)
 
     value, default_applied = _resolve_ref_default_value_on_relation_miss(exec_ctx, row_id, field_key=field_key)

@@ -54,7 +54,7 @@ def test_cyclic_dependency_raises() -> None:
     source = make_main_source("test")
 
     fields = [
-        FieldIr(field_id="id", name="ID", source=source, is_primary=True),
+        FieldIr(field_id="id", name="ID", source_id=source.source_id, is_primary=True),
         DerivedFieldIr(
             field_id="a",
             name="A",
@@ -91,7 +91,7 @@ def test_relation_without_main_source_dependencies() -> None:
     relation = left_source["left_id"].join(right_source["right_id"])
     demand = DemandIr.from_irs(
         sources=[left_source, right_source],
-        fields=[FieldIr(field_id="left_id", name="Left", source=left_source, relation=relation)],
+        fields=[FieldIr(field_id="left_id", name="Left", source_id=left_source.source_id, relation=relation)],
         main_source=main_source,
     )
 

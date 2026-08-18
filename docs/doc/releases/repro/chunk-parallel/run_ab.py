@@ -93,13 +93,13 @@ def _build(
         key_field="target_id",
         params_builder_ref=RuntimeHandleIdIr("params_builder:targets:target_id"),
     )
-    field_spec = FieldIr(field_id="target_name", name="Target", source=source, data_key="name")
+    field_spec = FieldIr(field_id="target_name", name="Target", source_id=source.source_id, data_key="name")
     operator = LoadRefOperatorIr(
         operator_id="load_ref",
         operator_type=OperatorType.LOAD_REF.value,
         source_id="targets",
         field_key="target_name",
-        lookup_steps=(LookupStepIr(from_field="fk_id", to_source=source, bind=binding),),
+        lookup_steps=(LookupStepIr(from_field="fk_id", to_source_id=source.source_id, bind=binding),),
     )
     plan = ExecutionPlan(field_specs={"target_name": field_spec}, operators=(operator,))
     runtime = ExecutionRuntime(

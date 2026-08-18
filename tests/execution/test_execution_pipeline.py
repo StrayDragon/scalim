@@ -105,7 +105,7 @@ def test_pipeline_consume_clears_internal_main_rows_list() -> None:
     main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     demand = DemandIr(
         sources={},
-        fields={"order_id": FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True)},
+        fields={"order_id": FieldIr(field_id="order_id", name="order_id", source_id=main_source.source_id, is_primary=True)},
         main_source=main_source,
     )
     plan = PlanBuilder(demand).build(targets=["order_id"])
@@ -125,7 +125,7 @@ def test_pipeline_consume_clear_helper_guard_clauses() -> None:
     main_source = MainSourceIr(source_id="main", loader_ref=RuntimeHandleIdIr(handle_id="main.loader"))
     demand = DemandIr(
         sources={},
-        fields={"order_id": FieldIr(field_id="order_id", name="order_id", source=main_source, is_primary=True)},
+        fields={"order_id": FieldIr(field_id="order_id", name="order_id", source_id=main_source.source_id, is_primary=True)},
         main_source=main_source,
     )
     plan = PlanBuilder(demand).build(targets=["order_id"])
@@ -364,9 +364,9 @@ def test_adaptive_scheduler_rejects_invalid_backend() -> None:
         operator_type=OperatorType.LOAD_REF.value,
         source_id=s1.source_id,
         field_key="a",
-        lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
+        lookup_steps=(LookupStepIr(from_field="fk1", to_source_id=s1.source_id),),
     )
-    field_spec = FieldIr(field_id="a", name="a", source=s1)
+    field_spec = FieldIr(field_id="a", name="a", source_id=s1.source_id)
     plan = ExecutionPlan(operators=(op_a,), field_specs={"a": field_spec}, ref_loader_sequence=[(s1, [("a", ())])])
     runtime_bindings = RuntimeBindings(
         main_source_loaders={"main": _picklable_test_main_loader}, source_loaders={"s1": _picklable_test_load_s1}
@@ -413,9 +413,9 @@ def test_adaptive_scheduler_rejects_pruned_backend_selected_in_runtime(backend: 
         operator_type=OperatorType.LOAD_REF.value,
         source_id=s1.source_id,
         field_key="a",
-        lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
+        lookup_steps=(LookupStepIr(from_field="fk1", to_source_id=s1.source_id),),
     )
-    field_spec = FieldIr(field_id="a", name="a", source=s1)
+    field_spec = FieldIr(field_id="a", name="a", source_id=s1.source_id)
     plan = ExecutionPlan(operators=(op_a,), field_specs={"a": field_spec}, ref_loader_sequence=[(s1, [("a", ())])])
     runtime_bindings = RuntimeBindings(
         main_source_loaders={"main": _picklable_test_main_loader}, source_loaders={"s1": _picklable_test_load_s1}
@@ -477,18 +477,18 @@ def test_adaptive_scheduler_uses_runtime_backend_selected_by_pool() -> None:
         operator_type=OperatorType.LOAD_REF.value,
         source_id=s1.source_id,
         field_key="a",
-        lookup_steps=(LookupStepIr(from_field="fk1", to_source=s1),),
+        lookup_steps=(LookupStepIr(from_field="fk1", to_source_id=s1.source_id),),
     )
     op_b = LoadRefOperatorIr(
         operator_id="load_ref_b",
         operator_type=OperatorType.LOAD_REF.value,
         source_id=s2.source_id,
         field_key="b",
-        lookup_steps=(LookupStepIr(from_field="fk2", to_source=s2),),
+        lookup_steps=(LookupStepIr(from_field="fk2", to_source_id=s2.source_id),),
     )
 
-    field_a = FieldIr(field_id="a", name="a", source=s1)
-    field_b = FieldIr(field_id="b", name="b", source=s2)
+    field_a = FieldIr(field_id="a", name="a", source_id=s1.source_id)
+    field_b = FieldIr(field_id="b", name="b", source_id=s2.source_id)
     plan = ExecutionPlan(
         operators=(op_a, op_b),
         field_specs={"a": field_a, "b": field_b},
@@ -611,11 +611,11 @@ def _make_simple_demand_and_plan():
     )
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders, is_primary=True),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id, is_primary=True),
         FieldIr(
             field_id="customer_name",
             name="客户",
-            source=customers,
+            source_id=customers.source_id,
             data_key="customer_name",
             relation=orders["customer_id"].join(customers["customer_id"]),
         ),

@@ -37,8 +37,8 @@ def test_metadata_max_depth_multi_layer_derived_dependencies() -> None:
     source = make_main_source("orders")
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=source, is_primary=True),
-        FieldIr(field_id="amount", name="金额", source=source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=source.source_id, is_primary=True),
+        FieldIr(field_id="amount", name="金额", source_id=source.source_id),
         DerivedFieldIr(
             field_id="inc",
             name="Inc",

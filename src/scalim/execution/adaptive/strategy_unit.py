@@ -1,6 +1,7 @@
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from ...planning.operators import LoadRefOperatorIr
+from ...spec.ir import SourceIr
 from ...utils.relation_signature import RelationSignature, build_relation_signature, can_group_by_relation
 from ...vendor.dataclassesx import dataclass
 from ..executor.runtime.runtime import ExecutionRuntime
@@ -26,8 +27,8 @@ def collect_layer_executable_ops(
     executable_ops: List[LoadRefOperatorIr] = []
 
     for op in layer_ops:
-        relation_key = build_relation_signature(op.lookup_steps)
-        group_enabled = can_group_by_relation(op.lookup_steps)
+        relation_key = build_relation_signature(op.lookup_steps, runtime.sources)
+        group_enabled = can_group_by_relation(op.lookup_steps, runtime.sources)
         if group_enabled and relation_key in runtime.load_ref_group_executed:
             skipped_field_keys.add(op.field_key)
             if after_operator is not None:
@@ -42,14 +43,15 @@ def build_task_specs(
     ops: Sequence[LoadRefOperatorIr],
     *,
     resolve_task_pool: Callable[[LoadRefOperatorIr], str],
+    sources: Dict[str, SourceIr],
 ) -> Tuple[List[AdaptiveTaskKey], Dict[AdaptiveTaskKey, TaskSpec], Dict[str, AdaptiveTaskKey]]:
     task_specs: Dict[AdaptiveTaskKey, TaskSpec] = {}
     op_task_key: Dict[str, AdaptiveTaskKey] = {}
     task_order: List[AdaptiveTaskKey] = []
 
     for op in ops:
-        relation_key = build_relation_signature(op.lookup_steps)
-        group_enabled = True
+        relation_key = build_relation_signature(op.lookup_steps, sources)
+        group_enabled = can_group_by_relation(op.lookup_steps, sources)
         task_key: AdaptiveTaskKey = ("relation", relation_key)
 
         op_task_key[op.field_key] = task_key

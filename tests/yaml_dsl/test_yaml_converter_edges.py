@@ -201,7 +201,7 @@ def test_converter_lookup_steps_return_none_for_main_source_target() -> None:
 
 def test_converter_infer_unique_path_edges() -> None:
     converter = ConfigToIRConverter()
-    dummy_step = LookupStepIr(from_field="id", to_source=_dummy_source_ir("orders"))
+    dummy_step = LookupStepIr(from_field="id", to_source_id=_dummy_source_ir("orders").source_id)
     converter._relation_steps = {
         "loop": [("orders", "orders", dummy_step)],
     }

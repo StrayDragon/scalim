@@ -13,7 +13,6 @@ from ....planning.operators import LoadRefOperatorIr
 from ....planning.plan import ExecutionPlan
 from ....sinks import ISink
 from ....spec.ir import LookupStepIr, MainSourceIr, SourceIr, SupportedFieldIr
-from ....spec.ir._source_contracts import LookupSourceRefIrBase
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LoaderResultValue, LookupKey, ParallelMode, RowData, RuntimeValue
 from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
@@ -213,27 +212,24 @@ class ExecutionRuntime:
             return
         controller.maybe_log_summary()
 
-    def resolve_lookup_source(self, step: LookupStepIr) -> LookupSourceRefIrBase:
-        """按 `source_id` 从本 run 的 source 目录取 live `SourceIr`.
+    def resolve_lookup_source(self, step: LookupStepIr) -> SourceIr:
+        """按 `source_id` 从本 `run` 的 `source` 目录取运行时 `SourceIr`.
 
-        `LookupStepIr.to_source` 只是编译期图句柄. `LookupChunking` / `SourceCache` /
+        `LookupStepIr.to_source_id` 只是图边身份. `LookupChunking` / `SourceCache` /
         `RowsReuse` 写在 `DemandIr.sources`,并复制进 `ExecutionRuntime.sources`.
-        目录未收录时回退到句柄(直接构造 IR 的测试路径).
+        目录未收录时立即失败,不得回退图句柄.
         """
-        fallback = step.to_source
-        live = self.sources.get(str(fallback.source_id))
-        if live is not None:
-            return live
-        return fallback
+        return SourceIr.from_catalog(self.sources, str(step.to_source_id))
 
     def get_cached_source_mapping(self, step: LookupStepIr) -> LoaderResultMapping:
-        source_id = str(step.to_source.source_id)
+        source = self.resolve_lookup_source(step)
+        source_id = str(source.source_id)
         mapping = self.preloaded_cache.get(source_id)
         if mapping is None:
             msg = "Unknown cached source '{}'".format(source_id)
             raise KeyError(msg)
 
-        has_explicit_cast = step.lookup_cast is not None or step.to_source.key.cast is not None
+        has_explicit_cast = step.lookup_cast is not None or source.key.cast is not None
         if not should_apply_str_key_normalization(self.key_normalization, has_explicit_cast=has_explicit_cast):
             return mapping
 
@@ -312,7 +308,7 @@ class ExecutionRuntime:
         for operator in plan.operators:
             if not isinstance(operator, LoadRefOperatorIr):
                 continue
-            relation_key = build_relation_signature(operator.lookup_steps)
+            relation_key = build_relation_signature(operator.lookup_steps, self.sources)
             groups.setdefault(relation_key, set()).add(operator.field_key)
         return {key: tuple(sorted(fields)) for key, fields in groups.items()}
 
@@ -358,7 +354,8 @@ class ExecutionRuntime:
         if raw_key is None:
             return None, "null_key", None
 
-        has_explicit_cast = step.lookup_cast is not None or step.to_source.key.cast is not None
+        source = self.resolve_lookup_source(step)
+        has_explicit_cast = step.lookup_cast is not None or source.key.cast is not None
 
         if step.lookup_cast is not None:
             candidate, status, error_message = self._apply_lookup_cast(
@@ -367,9 +364,9 @@ class ExecutionRuntime:
                 is_multi=step.is_multi_field(),
                 none_message="lookup_cast returned None",
             )
-        elif step.to_source.key.cast is not None:
+        elif source.key.cast is not None:
             candidate, status, error_message = self._apply_lookup_cast(
-                step.to_source.key.cast,
+                source.key.cast,
                 raw_key,
                 is_multi=step.is_multi_field(),
                 none_message="key.cast returned None",

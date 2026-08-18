@@ -5,7 +5,6 @@ from ...typedefs import FieldValue
 from ...vendor.dataclassesx import dataclass
 from ._helpers import extract_from_fields
 from ._relations import JoinConditionIr, LookupStepIr, RelationIr
-from ._sources import SourceRefIr
 from .callable_refs import CallableRefIr
 from .presentation import FieldPresentationIr
 
@@ -167,11 +166,12 @@ class FieldIr:
     字段显示名称 (用于输出表头)
     """
 
-    source: SourceRefIr
+    source_id: str
     """
-    数据源图句柄(类型安全).
+    数据源 `id`(图边只存身份).
 
-    与 `LookupStepIr.to_source` 相同:身份解析以 `DemandIr.sources[source_id]` 为 SSOT.
+    主源字段的 `source_id` 等于 `DemandIr.main_source.source_id`;
+    关联字段回 `DemandIr.sources[source_id]` 取运行时 `SourceIr`.
     """
 
     data_key: str = ""

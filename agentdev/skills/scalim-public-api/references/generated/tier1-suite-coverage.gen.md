@@ -8,12 +8,13 @@
 - Run pytest public_api suite: `pytest -q tests/public_api/ --no-cov`
 - Full gate: `just qa`
 
-## Pytest Selected Chapters (9):
+## Pytest Selected Chapters (10):
 - `ch130_public_api_dsl_by_yaml`
 - `ch150_public_api_planning`
 - `ch160_public_api_execution`
 - `ch164_public_api_lookup_chunking`
 - `ch165_public_api_resources`
+- `ch166_public_api_source_catalog_workflow`
 - `ch170_public_api_ob`
 - `ch180_public_api_hooks_events`
 - `ch182_public_api_event_type_groups`
@@ -22,8 +23,8 @@
 ## Tier1 Modules Coverage (17)
 
 ### `scalim.dsl.yaml_dsl`
-- examples chapters (5): `ch130_public_api_dsl_by_yaml`, `ch135_public_api_key_normalization`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`
-- pytest chapters (3): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`
+- examples chapters (6): `ch130_public_api_dsl_by_yaml`, `ch135_public_api_key_normalization`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
+- pytest chapters (4): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
 
 ### `scalim.dsl.yaml_dsl.tools`
 - examples chapters (1): `ch130_public_api_dsl_by_yaml`
@@ -34,16 +35,16 @@
 - pytest chapters (1): `ch130_public_api_dsl_by_yaml`
 
 ### `scalim.dsl.yaml_dsl.workflow_types`
-- examples chapters (1): `ch130_public_api_dsl_by_yaml`
-- pytest chapters (1): `ch130_public_api_dsl_by_yaml`
+- examples chapters (2): `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
+- pytest chapters (2): `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
 
 ### `scalim.dsl.yaml_dsl.workflow_paths`
 - examples chapters (1): `ch130_public_api_dsl_by_yaml`
 - pytest chapters (1): `ch130_public_api_dsl_by_yaml`
 
 ### `scalim.spec.ir`
-- examples chapters (1): `ch130_public_api_dsl_by_yaml`
-- pytest chapters (1): `ch130_public_api_dsl_by_yaml`
+- examples chapters (2): `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
+- pytest chapters (2): `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
 
 ### `scalim.workflow.loaders`
 - examples chapters (1): `ch130_public_api_dsl_by_yaml`
@@ -58,12 +59,12 @@
 - pytest chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
 
 ### `scalim.ob`
-- examples chapters (6): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
-- pytest chapters (4): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
+- examples chapters (7): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
+- pytest chapters (5): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
 
 ### `scalim.events`
-- examples chapters (7): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
-- pytest chapters (5): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
+- examples chapters (8): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
+- pytest chapters (6): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
 
 ### `scalim.events.type_groups`
 - examples chapters (1): `ch182_public_api_event_type_groups`
@@ -82,9 +83,9 @@
 - pytest chapters (1): `ch184_public_api_sinks_pandas`
 
 ### `scalim.shortcuts.resources`
-- examples chapters (2): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`
-- pytest chapters (2): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`
+- examples chapters (3): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
+- pytest chapters (3): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
 
 ### `scalim.shortcuts.resources.outputs`
-- examples chapters (2): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`
-- pytest chapters (2): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`
+- examples chapters (3): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
+- pytest chapters (3): `ch130_public_api_dsl_by_yaml`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`

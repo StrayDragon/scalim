@@ -606,7 +606,7 @@ class ConfigToIRConversionSourceMixin(ConfigToIRConversionBindingMixin, ConfigTo
         return FieldIr(
             field_id=field_config.field_id,
             name=field_config.name or field_config.field_id,
-            source=source_ir,
+            source_id=source_ir.source_id,
             data_key=data_key,
             extract_expr=extract_expr,
             extract_segments=extract_segments,

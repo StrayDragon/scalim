@@ -1,8 +1,8 @@
 """将 `DemandRunRuntimeOptions` 的 `typed` 覆盖应用到 `DemandIr.sources` 目录.
 
-`DemandIr.sources` 是 `SourceIr` 的 SSOT(含 `LookupChunking` / `SourceCache` / `RowsReuse`).
-`FieldIr.source` / `LookupStepIr.to_source` 只是编译期图句柄(身份 + key 形态);
-执行与规划按 `source_id` 回目录解析,不得把嵌套快照当成策略真源.
+`DemandIr.sources` 是 `SourceIr` 的 `SSOT`(含 `LookupChunking` / `SourceCache` / `RowsReuse`).
+`FieldIr.source_id` / `LookupStepIr.to_source_id` 只是图边身份;
+执行与规划按 `id` 回目录解析,不得把嵌套快照当成策略真源.
 """
 
 from typing import Dict, Mapping, Optional, Tuple
@@ -22,7 +22,7 @@ def apply_source_runtime_policies(
     source_cache: Mapping[str, SourceCache],
     rows_reuse: Mapping[str, RowsReuse],
 ) -> DemandIr:
-    """按优先级覆盖 **source 目录** 上的缓存/分片与 `rows` 复用策略."""
+    """按优先级覆盖 **`source` 目录** 上的缓存/分片与 `rows` 复用策略."""
     if not lookup_chunking and not source_cache and not rows_reuse:
         return demand_ir
 

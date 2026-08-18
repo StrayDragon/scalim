@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Any, Hashable, List, Tuple, cast
+from typing import Any, Dict, Hashable, List, Tuple, cast
 
 import pytest
 
@@ -59,12 +59,16 @@ def _make_source(source_id: str) -> SourceIr:
     )
 
 
+_SOURCE_REGISTRY: Dict[str, SourceIr] = {}
+
+
 def _make_loadref_op(
     *,
     field_key: str,
     to_source: SourceIr,
     lookup_steps: Tuple[LookupStepIr, ...],
 ) -> LoadRefOperatorIr:
+    _SOURCE_REGISTRY[str(to_source.source_id)] = to_source
     return LoadRefOperatorIr(
         operator_id="load_ref_{}".format(field_key),
         operator_type=OperatorType.LOAD_REF.value,
@@ -85,6 +89,16 @@ def _make_runtime(
     parallel_mode: str = "seq",
     max_workers: int = 0,
 ) -> ExecutionRuntime:
+    if sources is None:
+        collected = {}
+        for op in plan.operators:
+            if not isinstance(op, LoadRefOperatorIr):
+                continue
+            for step in op.lookup_steps:
+                live = _SOURCE_REGISTRY.get(str(step.to_source_id))
+                if live is not None:
+                    collected[str(step.to_source_id)] = live
+        sources = collected
     return ExecutionRuntime(
         plan,
         hook_manager or HookManager(),
@@ -153,7 +167,9 @@ def test_adaptive_policy_decisions_and_pool_selection() -> None:
     runtime = _make_runtime(plan, main_source=None)
 
     op = _make_loadref_op(
-        field_key="a", to_source=_make_source("s1"), lookup_steps=(LookupStepIr(from_field="id", to_source=_make_source("s1")),)
+        field_key="a",
+        to_source=_make_source("s1"),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=_make_source("s1").source_id),),
     )
 
     tuning = AdaptiveTuning(min_parallel_tasks_per_layer=3)
@@ -245,11 +261,16 @@ def test_adaptive_policy_decisions_and_pool_selection() -> None:
 
     source_a = _make_source("a")
     source_b = _make_source("b")
-    op_single = _make_loadref_op(field_key="single", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
+    op_single = _make_loadref_op(
+        field_key="single", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
     op_multi = _make_loadref_op(
         field_key="multi",
         to_source=source_a,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source_a), LookupStepIr(from_field="id", to_source=source_b)),
+        lookup_steps=(
+            LookupStepIr(from_field="id", to_source_id=source_a.source_id),
+            LookupStepIr(from_field="id", to_source_id=source_b.source_id),
+        ),
     )
     tuning = AdaptiveTuning(pools={"db": 2}, source_pools={"a": "db", "b": "db"})
     assert policy.choose_task_pool(op=op_single, tuning=tuning) == "db"
@@ -263,9 +284,15 @@ def test_adaptive_scheduler_enforces_pool_limits() -> None:
     source_b = _make_source("s2")
     source_c = _make_source("s3")
 
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
-    op_c = _make_loadref_op(field_key="c", to_source=source_c, lookup_steps=(LookupStepIr(from_field="id", to_source=source_c),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
+    op_c = _make_loadref_op(
+        field_key="c", to_source=source_c, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_c.source_id),)
+    )
 
     plan = ExecutionPlan(operators=(op_a, op_b, op_c))
     tuning = AdaptiveTuning(pools={"db": 2}, source_pools={"s1": "db", "s2": "db", "s3": "db"})
@@ -339,8 +366,12 @@ def test_adaptive_scheduler_threshold_lookup_keys_falls_back_to_serial() -> None
     source_a = _make_source("s1")
     source_b = _make_source("s2")
 
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
 
     plan = ExecutionPlan(operators=(op_a, op_b))
     tuning = AdaptiveTuning(min_lookup_keys_per_task=3, min_parallel_tasks_per_layer=2)
@@ -391,8 +422,12 @@ def test_adaptive_scheduler_policy_override_forces_serial() -> None:
 
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_a, op_b))
 
     calls: List[str] = []
@@ -425,7 +460,7 @@ def test_adaptive_scheduler_unknown_pool_from_policy_raises() -> None:
             return "missing"
 
     source = _make_source("s1")
-    op = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source),))
+    op = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),))
     plan = ExecutionPlan(operators=(op,))
 
     overrides = PipelineOverrides(adaptive_policy=_BadPoolPolicy())
@@ -448,8 +483,12 @@ def test_adaptive_scheduler_unknown_pool_from_policy_raises() -> None:
 def test_adaptive_scheduler_decision_events_are_wants_gated() -> None:
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_a, op_b))
 
     tuning = AdaptiveTuning(pools={"db": 1}, source_pools={"s1": "db", "s2": "db"})
@@ -502,8 +541,12 @@ def test_adaptive_scheduler_decision_events_reach_hooks_on_event() -> None:
 
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_a, op_b))
 
     tuning = AdaptiveTuning(pools={"db": 1}, source_pools={"s1": "db", "s2": "db"})
@@ -538,9 +581,15 @@ def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -
     source_b = _make_source("s2")
     source_c = _make_source("s3")
 
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
-    op_c = _make_loadref_op(field_key="c", to_source=source_c, lookup_steps=(LookupStepIr(from_field="id", to_source=source_c),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
+    op_c = _make_loadref_op(
+        field_key="c", to_source=source_c, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_c.source_id),)
+    )
 
     plan = ExecutionPlan(operators=(op_a, op_b, op_c))
     tuning = AdaptiveTuning(pools={"db": 2}, source_pools={"s1": "db", "s2": "db", "s3": "db"})
@@ -633,8 +682,12 @@ def test_adaptive_scheduler_emits_pool_wait_stats_when_subscribed(monkeypatch) -
 
 def test_estimate_first_step_lookup_key_count_handles_unhashable_values() -> None:
     source = _make_source("s1")
-    op_single = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source),))
-    op_multi = _make_loadref_op(field_key="m", to_source=source, lookup_steps=(LookupStepIr(from_field=("a", "b"), to_source=source),))
+    op_single = _make_loadref_op(
+        field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),)
+    )
+    op_multi = _make_loadref_op(
+        field_key="m", to_source=source, lookup_steps=(LookupStepIr(from_field=("a", "b"), to_source_id=source.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_single, op_multi))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
 
@@ -651,8 +704,12 @@ def test_estimate_first_step_lookup_key_count_handles_unhashable_values() -> Non
 def test_estimate_first_step_lookup_key_count_handles_empty_steps_and_missing_values() -> None:
     source = _make_source("s1")
     op_empty = _make_loadref_op(field_key="empty", to_source=source, lookup_steps=())
-    op_single = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source),))
-    op_multi = _make_loadref_op(field_key="m", to_source=source, lookup_steps=(LookupStepIr(from_field=("a", "b"), to_source=source),))
+    op_single = _make_loadref_op(
+        field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),)
+    )
+    op_multi = _make_loadref_op(
+        field_key="m", to_source=source, lookup_steps=(LookupStepIr(from_field=("a", "b"), to_source_id=source.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_empty, op_single, op_multi))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
 
@@ -677,8 +734,12 @@ def test_adaptive_scheduler_submit_task_failure_releases_tokens_and_propagates()
 
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_a, op_b))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
     runtime = _make_runtime(plan, main_source=None)
@@ -701,8 +762,12 @@ def test_commit_layer_results_skips_field_keys_in_commit_loop() -> None:
 
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_skip = _make_loadref_op(field_key="skip", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_exec = _make_loadref_op(field_key="exec", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_skip = _make_loadref_op(
+        field_key="skip", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_exec = _make_loadref_op(
+        field_key="exec", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_skip, op_exec))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
     runtime = _make_runtime(plan, main_source=None)
@@ -740,8 +805,12 @@ def test_commit_layer_results_dedupes_task_keys_and_still_calls_after_operator()
 
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_a, op_b))
     scheduler = AdaptiveLoadRefScheduler(plan, overrides=PipelineOverrides())
     runtime = _make_runtime(plan, main_source=None)
@@ -786,9 +855,11 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
         mode="rows",
     )
     op_rows = _make_loadref_op(
-        field_key="rows", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source, bind=rows_binding),)
+        field_key="rows", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id, bind=rows_binding),)
     )
-    op_keys = _make_loadref_op(field_key="keys", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source),))
+    op_keys = _make_loadref_op(
+        field_key="keys", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_rows, op_keys))
 
     perf = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none", include_scheduler_decisions=True))
@@ -848,8 +919,12 @@ def test_adaptive_scheduler_emits_serial_decisions_when_subscribed() -> None:
 def test_adaptive_scheduler_emits_threshold_serial_reason_when_subscribed() -> None:
     source_a = _make_source("s1")
     source_b = _make_source("s2")
-    op_a = _make_loadref_op(field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source=source_a),))
-    op_b = _make_loadref_op(field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source=source_b),))
+    op_a = _make_loadref_op(
+        field_key="a", to_source=source_a, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_a.source_id),)
+    )
+    op_b = _make_loadref_op(
+        field_key="b", to_source=source_b, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_b.source_id),)
+    )
     plan = ExecutionPlan(operators=(op_a, op_b))
 
     perf = PerformanceObserver(config=PerformanceConfig(metrics={"duration"}, report_format="none", include_scheduler_decisions=True))

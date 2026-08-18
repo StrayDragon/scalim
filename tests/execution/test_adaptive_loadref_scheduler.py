@@ -1,6 +1,6 @@
 from concurrent.futures import Future
 import warnings
-from typing import List, Tuple, cast
+from typing import Dict, List, Tuple, cast
 
 import pytest
 
@@ -56,12 +56,16 @@ def test_build_layers_splits_layers_and_falls_back_on_cycle() -> None:
     assert layers == [["a", "b"]]
 
 
+_SOURCE_REGISTRY: Dict[str, SourceIr] = {}
+
+
 def _make_loadref_op(
     *,
     field_key: str,
     to_source: SourceIr,
     lookup_steps: Tuple[LookupStepIr, ...],
 ) -> LoadRefOperatorIr:
+    _SOURCE_REGISTRY[str(to_source.source_id)] = to_source
     return LoadRefOperatorIr(
         operator_id="load_ref_{}".format(field_key),
         operator_type=OperatorType.LOAD_REF.value,
@@ -72,6 +76,16 @@ def _make_loadref_op(
 
 
 def _make_runtime(plan: ExecutionPlan, *, main_source=None, sources=None, runtime_bindings: RuntimeBindings = None) -> ExecutionRuntime:  # type: ignore[assignment]
+    if sources is None:
+        collected = {}
+        for op in plan.operators:
+            if not isinstance(op, LoadRefOperatorIr):
+                continue
+            for step in op.lookup_steps:
+                live = _SOURCE_REGISTRY.get(str(step.to_source_id))
+                if live is not None:
+                    collected[str(step.to_source_id)] = live
+        sources = collected
     return ExecutionRuntime(
         plan,
         HookManager(),
@@ -104,12 +118,18 @@ def test_has_rows_binding_handles_missing_and_rows() -> None:
         field_key="x",
         to_source=rows_binding_source,
         lookup_steps=(
-            LookupStepIr(from_field="id", to_source=no_binding_source),
-            LookupStepIr(from_field="id", to_source=rows_binding_source, bind=rows_binding),
+            LookupStepIr(from_field="id", to_source_id=no_binding_source.source_id),
+            LookupStepIr(from_field="id", to_source_id=rows_binding_source.source_id, bind=rows_binding),
         ),
     )
 
-    assert has_rows_binding(op.lookup_steps) is True
+    assert (
+        has_rows_binding(
+            op.lookup_steps,
+            {"s0": no_binding_source, "s1": rows_binding_source},
+        )
+        is True
+    )
 
 
 def test_collect_layer_executable_ops_skips_executed_group_and_calls_after_operator() -> None:
@@ -118,10 +138,10 @@ def test_collect_layer_executable_ops_skips_executed_group_and_calls_after_opera
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    op = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source=source),))
+    op = _make_loadref_op(field_key="a", to_source=source, lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),))
     plan = ExecutionPlan()
-    runtime = _make_runtime(plan, main_source=None)
-    runtime.load_ref_group_executed.add(build_relation_signature(op.lookup_steps))
+    runtime = _make_runtime(plan, main_source=None, sources={source.source_id: source})
+    runtime.load_ref_group_executed.add(build_relation_signature(op.lookup_steps, {source.source_id: source}))
 
     after_calls: List[str] = []
 
@@ -171,12 +191,12 @@ def test_adaptive_scheduler_rows_barrier_serializes_and_calls_after_operator() -
     op_rows = _make_loadref_op(
         field_key="rows",
         to_source=source,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source, bind=rows_binding),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id, bind=rows_binding),),
     )
     op_keys = _make_loadref_op(
         field_key="keys",
         to_source=source,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),),
     )
 
     plan = ExecutionPlan(
@@ -220,12 +240,12 @@ def test_adaptive_scheduler_serial_fallback_executes_and_calls_after_operator() 
     op1 = _make_loadref_op(
         field_key="a",
         to_source=source,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),),
     )
     op2 = _make_loadref_op(
         field_key="b",
         to_source=source,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=source.source_id),),
     )
 
     plan = ExecutionPlan(
@@ -290,12 +310,12 @@ def test_adaptive_scheduler_exception_propagates_and_cancels_futures_best_effort
     op1 = _make_loadref_op(
         field_key="ok",
         to_source=source_ok,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source_ok),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_ok.source_id),),
     )
     op2 = _make_loadref_op(
         field_key="boom",
         to_source=source_boom,
-        lookup_steps=(LookupStepIr(from_field="id", to_source=source_boom),),
+        lookup_steps=(LookupStepIr(from_field="id", to_source_id=source_boom.source_id),),
     )
 
     plan = ExecutionPlan(
@@ -346,7 +366,7 @@ def test_adaptive_scheduler_skips_relation_already_executed_but_calls_after_oper
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    steps = (LookupStepIr(from_field="id", to_source=source),)
+    steps = (LookupStepIr(from_field="id", to_source_id=source.source_id),)
     op1 = _make_loadref_op(field_key="a", to_source=source, lookup_steps=steps)
     op2 = _make_loadref_op(field_key="b", to_source=source, lookup_steps=steps)
 
@@ -355,7 +375,7 @@ def test_adaptive_scheduler_skips_relation_already_executed_but_calls_after_oper
         ref_loader_sequence=[(source, [("a", ()), ("b", ())])],
     )
     runtime = _make_runtime(plan, main_source=None)
-    runtime.load_ref_group_executed.add(loadref_scheduler.build_relation_signature(steps))
+    runtime.load_ref_group_executed.add(loadref_scheduler.build_relation_signature(steps, {source.source_id: source}))
 
     after_calls: List[str] = []
 
@@ -390,8 +410,8 @@ def test_adaptive_scheduler_skips_some_ops_in_layer_commit_loop() -> None:
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="exec.loader")),
     )
 
-    steps_skipped = (LookupStepIr(from_field="id", to_source=source_skipped),)
-    steps_exec = (LookupStepIr(from_field="id", to_source=source_exec),)
+    steps_skipped = (LookupStepIr(from_field="id", to_source_id=source_skipped.source_id),)
+    steps_exec = (LookupStepIr(from_field="id", to_source_id=source_exec.source_id),)
 
     op_skipped = _make_loadref_op(field_key="skip", to_source=source_skipped, lookup_steps=steps_skipped)
     op1 = _make_loadref_op(field_key="a", to_source=source_exec, lookup_steps=steps_exec)
@@ -405,7 +425,9 @@ def test_adaptive_scheduler_skips_some_ops_in_layer_commit_loop() -> None:
         ],
     )
     runtime = _make_runtime(plan, main_source=None)
-    runtime.load_ref_group_executed.add(loadref_scheduler.build_relation_signature(steps_skipped))
+    runtime.load_ref_group_executed.add(
+        loadref_scheduler.build_relation_signature(steps_skipped, {source_skipped.source_id: source_skipped})
+    )
 
     after_calls: List[str] = []
 
@@ -442,7 +464,7 @@ def test_adaptive_scheduler_relation_tasks_write_all_group_fields() -> None:
         key=KeyIr(key="id"),
         loader_spec=LoaderIr(callable_ref=RuntimeHandleIdIr(handle_id="s1.loader")),
     )
-    steps = (LookupStepIr(from_field="id", to_source=source),)
+    steps = (LookupStepIr(from_field="id", to_source_id=source.source_id),)
     op1 = _make_loadref_op(field_key="a", to_source=source, lookup_steps=steps)
     op2 = _make_loadref_op(field_key="b", to_source=source, lookup_steps=steps)
 

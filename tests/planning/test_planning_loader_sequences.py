@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import List
 
 from scalim.planning import PlanBuilder
@@ -30,25 +31,25 @@ def test_ref_loader_sequence_cross_source_dependency_ordering() -> None:
     countries_source = make_source("aa_countries", key_field="country_id")
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=orders_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=orders_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=orders_source.source_id),
         FieldIr(
             field_id="region_id",
             name="地区ID",
-            source=customers_source,
-            lookup_steps=(LookupStepIr(from_field="customer_id", to_source=customers_source),),
+            source_id=customers_source.source_id,
+            lookup_steps=(LookupStepIr(from_field="customer_id", to_source_id=customers_source.source_id),),
         ),
         FieldIr(
             field_id="country_id",
             name="国家ID",
-            source=regions_source,
-            lookup_steps=(LookupStepIr(from_field="region_id", to_source=regions_source),),
+            source_id=regions_source.source_id,
+            lookup_steps=(LookupStepIr(from_field="region_id", to_source_id=regions_source.source_id),),
         ),
         FieldIr(
             field_id="country_name",
             name="国家名称",
-            source=countries_source,
-            lookup_steps=(LookupStepIr(from_field="country_id", to_source=countries_source),),
+            source_id=countries_source.source_id,
+            lookup_steps=(LookupStepIr(from_field="country_id", to_source_id=countries_source.source_id),),
         ),
     ]
 
@@ -74,9 +75,9 @@ def test_loader_sequences_group_primary_and_non_relation_fields() -> None:
     customers_source = make_source("customers", key_field="customer_id")
 
     fields = [
-        FieldIr(field_id="order_id", name="订单ID", source=main_source, is_primary=True),
-        FieldIr(field_id="customer_id", name="客户ID", source=customers_source, is_primary=True),
-        FieldIr(field_id="status", name="状态", source=customers_source),
+        FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True),
+        FieldIr(field_id="customer_id", name="客户ID", source_id=customers_source.source_id, is_primary=True),
+        FieldIr(field_id="status", name="状态", source_id=customers_source.source_id),
     ]
     demand = DemandIr.from_irs(sources=[customers_source], fields=fields, main_source=main_source)
 
@@ -108,7 +109,7 @@ def test_skips_non_source_ir_fields_in_sequences() -> None:
 
     demand = DemandIr.from_irs(
         sources=[real_source],
-        fields=[FieldIr(field_id="fake_field", name="Fake", source=fake_source, relation=relation)],
+        fields=[FieldIr(field_id="fake_field", name="Fake", source_id=main_source.source_id, relation=relation)],
         main_source=main_source,
     )
 
@@ -119,3 +120,16 @@ def test_skips_non_source_ir_fields_in_sequences() -> None:
     plan = PlanBuilder(demand).build(targets=["fake_field"])
     assert plan.key_fields == frozenset()
     assert plan.operators == ()
+
+
+def test_build_loader_sequences_skips_field_missing_catalog_source() -> None:
+    main_source = make_main_source("orders")
+    ghost = FieldIr(field_id="ghost_name", name="Ghost", source_id="ghost")
+    demand = SimpleNamespace(
+        main_source=main_source,
+        sources={},
+        fields={"ghost_name": ghost},
+    )
+    loader_sequence, ref_loader_sequence = build_loader_sequences(demand, required_fields={"ghost_name"})
+    assert loader_sequence == []
+    assert ref_loader_sequence == []

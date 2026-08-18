@@ -37,7 +37,7 @@ def _make_demand_ir(*, field_name_by_id=None) -> DemandIr:  # type: ignore[no-un
     field_irs = []
     if field_name_by_id:
         for field_id, name in field_name_by_id.items():
-            field_irs.append(FieldIr(field_id=field_id, name=name, source=main))
+            field_irs.append(FieldIr(field_id=field_id, name=name, source_id=main.source_id))
     return DemandIr.from_irs(sources=[], fields=field_irs, main_source=main, name="demo")
 
 

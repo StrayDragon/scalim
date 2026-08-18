@@ -163,9 +163,9 @@ class RelationIr:
                 raise TypeError(msg)
             lookup_source = cast("LookupSourceRefIrBase", next_source)  # pragma: allow-cast lookup source typed narrowing
             if to_field == lookup_source.key.key:
-                steps.append(LookupStepIr(from_field=from_field, to_source=lookup_source))
+                steps.append(LookupStepIr(from_field=from_field, to_source_id=lookup_source.source_id))
             else:
-                steps.append(LookupStepIr(from_field=from_field, to_source=lookup_source, to_field=to_field))
+                steps.append(LookupStepIr(from_field=from_field, to_source_id=lookup_source.source_id, to_field=to_field))
         return tuple(steps)
 
     def infer_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "Tuple[LookupStepIr, ...]":
@@ -216,14 +216,14 @@ class RelationIr:
             # 多字段关联
             from_fields = tuple(f for f, _ in direct_conditions)
             to_fields = tuple(t for _, t in direct_conditions)
-            return (LookupStepIr(from_field=from_fields, to_source=to_source, to_field=to_fields),)
+            return (LookupStepIr(from_field=from_fields, to_source_id=to_source.source_id, to_field=to_fields),)
 
         if len(direct_conditions) == 1:
             # 单字段关联
             from_field, to_field = direct_conditions[0]
             if to_field == to_source.key.key:
-                return (LookupStepIr(from_field=from_field, to_source=to_source),)
-            return (LookupStepIr(from_field=from_field, to_source=to_source, to_field=to_field),)
+                return (LookupStepIr(from_field=from_field, to_source_id=to_source.source_id),)
+            return (LookupStepIr(from_field=from_field, to_source_id=to_source.source_id, to_field=to_field),)
 
         # 没有直接关联,使用普通路径推断
         return self.infer_lookup_path(from_source, to_source)
@@ -235,9 +235,9 @@ class LookupStepIr:
     关联步骤(IR): 描述从一个或多个字段到另一个数据源的关联关系, 这是多级关联链的基本单元, 表达完全无歧义地指定关联路径
 
     示例:
-        - 单字段关联: `LookupStepIr(from_field="pay_id", to_source=pays_source)`
+        - 单字段关联: `LookupStepIr(from_field="pay_id", to_source_id="pays")`
         - 多字段关联:
-          `LookupStepIr(from_field=["region_id", "institution_id"], to_source=mapping_source, to_field=["region_id", "institution_id"])`
+          `LookupStepIr(from_field=["region_id", "institution_id"], to_source_id="mapping", to_field=["region_id", "institution_id"])`
     """
 
     from_field: LookupKeySpec
@@ -245,17 +245,17 @@ class LookupStepIr:
     源字段名或字段名列表,从当前数据中取值
     """
 
-    to_source: LookupSourceRefIrBase
+    to_source_id: str
     """
-    目标数据源图句柄(身份 + key 形态).
+    目标数据源 `id`(图边只存身份).
 
-    策略字段(`lookup_chunk_size` / `cache_mode` / bind 复用)以 `DemandIr.sources[source_id]`
-    为 SSOT;执行层必须按 `source_id` 回目录解析,不要把本句柄当成 live `SourceIr`.
+    策略字段(`lookup_chunk_size` / `cache_mode` / `bind` 复用)与默认 `join` 键
+    以 `DemandIr.sources[to_source_id]` 为 `SSOT`;执行层按 `id` 回目录解析.
     """
 
     to_field: Optional[LookupKeySpec] = None
     """
-    目标字段名或字段名列表(可选,默认使用 `to_source` 的键)
+    目标字段名或字段名列表(可选,默认使用目录源的键)
     """
 
     lookup_cast: Optional[LookupCastSpecIr] = None
@@ -301,25 +301,24 @@ class LookupStepIr:
         """
         return self._normalize_fields(self.from_field)
 
-    def get_to_fields_or_source_key(self) -> Tuple[str, ...]:
+    def get_to_fields_or_source_key(self, source: LookupSourceRefIrBase) -> Tuple[str, ...]:
         """
-        获取目标字段列表: 如果未指定 `to_field`,则使用 `to_source` 的键
+        获取目标字段列表: 如果未指定 `to_field`,则使用目录中运行时 `SourceIr` 的键
         """
         if self.to_field is not None:
             return self._normalize_fields(self.to_field)
-        # 默认使用数据源键
-        key = self.to_source.key.key
+        key = source.key.key
         if isinstance(key, (list, tuple)):
             return tuple(key)
         return (key,)
 
-    def get_to_key_or_source_key(self) -> LookupKeySpec:
+    def get_to_key_or_source_key(self, source: LookupSourceRefIrBase) -> LookupKeySpec:
         """
-        获取目标键: 如果未指定 `to_field`,则使用 `to_source` 的键
+        获取目标键: 如果未指定 `to_field`,则使用目录中运行时 `SourceIr` 的键
         """
         if self.to_field is not None:
             return self.to_field
-        return self.to_source.key.key
+        return source.key.key
 
 
 __all__ = ()

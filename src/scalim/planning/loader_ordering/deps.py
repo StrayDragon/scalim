@@ -2,7 +2,7 @@ import logging
 from collections import OrderedDict
 from typing import TYPE_CHECKING, List, Tuple
 
-from ...spec.ir import FieldIr, SourceIr
+from ...spec.ir import FieldIr
 from ...spec.ir._helpers import extract_from_fields, infer_lookup_steps
 
 _logger = logging.getLogger(__name__)
@@ -15,8 +15,10 @@ def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: Fie
     可映射回其他引用加载器.该信号用于规划阶段的排序(不是运行时的 `lookup_keys`).
     """
     steps = field.lookup_steps
-    if steps is None and field.relation and demand.main_source and isinstance(field.source, SourceIr):
-        steps = infer_lookup_steps(field.relation, demand.main_source, field.source)
+    if steps is None and field.relation and demand.main_source:
+        to_source = demand.sources.get(field.source_id)
+        if to_source is not None:
+            steps = infer_lookup_steps(field.relation, demand.main_source, to_source)
 
     if not steps:
         return ()
@@ -31,9 +33,9 @@ def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: Fie
         dep_field = demand.fields.get(dep_key)
         if not isinstance(dep_field, FieldIr):
             continue
-        if dep_field.source.source_id == main_source_id:
+        if dep_field.source_id == main_source_id:
             continue
-        if not isinstance(dep_field.source, SourceIr):
+        if dep_field.source_id not in demand.sources:
             continue
         if not (dep_field.lookup_steps or dep_field.relation):
             continue
