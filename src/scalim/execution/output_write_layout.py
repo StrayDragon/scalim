@@ -34,7 +34,7 @@ def resolve_output_write_layout(
     """
     if output_write_layout is not None:
         if not isinstance(output_write_layout, OutputWriteLayout):
-            msg = "output_write_layout must be an OutputWriteLayout"
+            msg = "output_write_layout must be an OutputWriteLayout"  # pyright: ignore[reportUnreachable]
             raise TypeError(msg)
         return output_write_layout
 
