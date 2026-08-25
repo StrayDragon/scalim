@@ -2,7 +2,7 @@
 
 本页用于评审/编写 YAML DSL 相关 llmanspec 变更时的统一 checklist,避免反复在各个专题提案中重复解释主线原则与边界。
 
-上位原则 SSOT: `llmanspec/specs/governance-mainline-principles/spec.toon`。
+上位原则 SSOT: `llmanspec/specs/governance-mainline-principles/governance-mainline-principles.feature`。
 
 **Authoring 边界速记**（`c20`/`c30`/`c15`/`c20-unified`/`c25`/`c999` 已归档；`remove-book-budget-policy` / `remove-dedup-and-two-stage-derived` 已归档）:
 - YAML `resources.books`：仅 identity；唯一分支 `xlsx`（有 `path`=落盘，无 `path`=内存总线）；`xlsx_file` / `xlsx_memory` 已硬删；暂留 `allow_formulas`

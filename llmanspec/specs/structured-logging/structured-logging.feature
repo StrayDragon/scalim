@@ -1,0 +1,86 @@
+# language: zh-CN
+# capability: structured-logging
+# purpose: 定义结构化日志的 JSONL 输出格式、字段元信息、归因上下文自动注入及 CLI 渲染能力，确保日志可被机器解析与人类友好展示。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: structured-logging
+
+  @req:r76 @human
+  场景: when enabled, `scalim.*` logs MUST be emitted as JSONL (one JSON object per line
+    - 当启用结构化日志时，系统 MUST 将所有 `scalim.*` logger 的可见输出统一为 JSONL： - 每条日志 MUST 是 **单行** JSON object（JSON Lines） - MUST 可写入 `stdout/stderr`（由配置决定） - MUST 保持 line-oriented（便于 `tail -f`/流式处理/管道） 说明：该 requirement 约束的是“启用 structured-logging 时”的输出形态；未启用时系统仍可保持库默认行为（不主动配置 root logging）。
+
+  @req:r320 @human
+  场景: JSONL record MUST include a minimal stable base set of fields
+    - 每条 JSONL record MUST 至少包含以下“基础字段”（字段名可能因 profile 不同而不同，见后续 requirement）： - `timestamp`（或缩写）：事件时间（epoch seconds） - `level`（或缩写）：日志等级（等价于 stdlib logging level） - `logger`（或缩写）：logger name（例如 `scalim.performance`） - `message`（或缩写）：消息文本（作为兜底可读字段） 系统 MAY 追加： - `kind`（用于结构化分类/渲染） - `context`（上下文归因） - `fields`（业务字段/指标） - `error`（异常信息）
+
+  @req:r443 @human
+  场景: the system MUST provide key metadata with full name + unique abbreviation, and s
+    - 系统 MUST 维护一份字段元信息（SSOT），用于保证 key 的可治理性与可演进性： - 每个字段 MUST 同时定义： - 全称 key（full） - 唯一缩写 key（abbr，必须全局唯一） - 系统 MUST 支持至少两种输出 profile： - `compact`：输出缩写 key（更省体积/token） - `verbose`：输出全称 key（更自解释） - 在一次运行中，系统 SHOULD 只选择一种 profile 输出（避免同一文件里混用导致难维护） - `scalim-cli` MUST 能同时解析两种 profile 的输入，并映射到统一内部模型
+
+  @req:r532 @human
+  场景: structured logging MUST NOT require schema_version as a parsing gate
+    - 系统 MUST NOT 要求每条记录包含 `schema_version`（或等价强门禁字段）才能被解析。 说明：我们处于快速迭代期，CLI 的策略应以“容错解析 + 渐进兼容”为主，而不是把版本字段当 blocker。
+
+  @req:r606 @human
+  场景: joinable attribution context MUST be injected automatically when available
+    - 系统 MUST 支持自动注入可 join 的归因上下文（在可获取时）： - `run_id`（或等价内部稳定运行标识） - workflow 场景：`workflow_exec_id`、`workflow_node_id`、（可选）`workflow_node_decl_order` - demand 归因：`demand`、（可选）`demand_path` 并满足： - 该注入 MUST 不要求每次 `logger.info(...)` 调用手动传入（应由运行时上下文机制自动附带） - 不同 subsystem（例如 `performance/relations/pipeline`）输出 MUST 能通过这些字段 join
+
+  @req:r659 @human
+  场景: enabling structured logging MUST be configurable via env and explicit Python API
+    - 系统 MUST 提供多种启用方式（至少包含）： - 环境变量开关（适合脚本/批处理/容器环境） - 显式 Python API（适合集成到服务或上层框架） 系统 SHOULD 支持额外配置项（例如输出 stream、level、profile）。
+
+  @req:r701 @human
+  场景: the system MUST be single-write when structured logging is enabled (no legacy kv
+    - 当启用 structured-logging 时，系统 MUST 保持 single-write： - 系统 MUST 不再输出旧的 `k=v`/自由文本“console report 行”（避免双栈维护与重复输出） - `scalim-cli` 成为官方的“人类可读/LLM 友好”渲染入口
+
+  @req:r737 @human
+  场景: `scalim-cli` SHALL provide human-friendly and llm-friendly renderers for structu
+    - `scalim-cli` SHALL 提供结构化日志渲染能力： - human-friendly：分组/折叠/截断长字段/突出告警与错误 - llm-friendly：在预算内做聚合/Top-N/去噪，输出可直接喂给 agent 的摘要 并且 MUST 支持对“原始混合日志”的容错读取： - 忽略非 JSON 行 - 支持多行 JSON 自动拼接（直到可解析）
+  @req:r76 @human
+  场景: mixed-raw-log-can-be-parsed-by-scanning-json-objects
+    - 必须成立：假如 一个混合日志文件（包含 stdout 文本、warnings、以及结构化日志 JSON）；当 `scalim-cli` 逐行扫描并仅解析 JSON object；那么 结构化日志记录 MUST 可被稳定提取（不依赖 `k=v` 或正则猜测）
+    假如 一个混合日志文件（包含 stdout 文本、warnings、以及结构化日志 JSON）
+    当 `scalim-cli` 逐行扫描并仅解析 JSON object
+    那么 结构化日志记录 MUST 可被稳定提取（不依赖 `k=v` 或正则猜测）
+  @req:r320 @human
+  场景: every-jsonl-record-has-stable-base-fields
+    - 必须成立：假如 structured logging 已启用；当 任意 `scalim.*` logger 产生一条日志记录；那么 输出 JSON object MUST 至少包含 `timestamp/level/logger/message`（或 compact profile 的对应缩写）
+    假如 structured logging 已启用
+    当 任意 `scalim.*` logger 产生一条日志记录
+    那么 输出 JSON object MUST 至少包含 `timestamp/level/logger/message`（或 compact profile 的对应缩写）
+  @req:r443 @human
+  场景: cli-can-normalize-compact-keys-to-full-keys
+    - 必须成立：假如 输入日志为 compact profile（使用缩写 key）；当 `scalim-cli log ...` 解析并标准化 key；那么 解析结果 MUST 可映射到全称 key 的统一内部模型（例如 `run_id` 而非 `rid`）
+    假如 输入日志为 compact profile（使用缩写 key）
+    当 `scalim-cli log ...` 解析并标准化 key
+    那么 解析结果 MUST 可映射到全称 key 的统一内部模型（例如 `run_id` 而非 `rid`）
+  @req:r532 @human
+  场景: records-without-schema-version-are-still-valid-inputs
+    - 必须成立：假如 一条结构化日志记录不包含 `schema_version`；当 `scalim-cli` 解析该记录；那么 该记录 MUST 被视为有效输入并可被渲染/聚合
+    假如 一条结构化日志记录不包含 `schema_version`
+    当 `scalim-cli` 解析该记录
+    那么 该记录 MUST 被视为有效输入并可被渲染/聚合
+  @req:r606 @human
+  场景: context-is-injected-without-passing-extra-fields-to-logger-c
+    - 必须成立：假如 runtime 在执行边界设置了当前 run/workflow/demand 上下文；当 任意 subsystem（例如 `performance`）输出一条结构化记录；那么 该记录 MUST 自动携带可 join 的 `run_id/workflow_node_id/demand` 等上下文（当这些字段可获取时）
+    假如 runtime 在执行边界设置了当前 run/workflow/demand 上下文
+    当 任意 subsystem（例如 `performance`）输出一条结构化记录
+    那么 该记录 MUST 自动携带可 join 的 `run_id/workflow_node_id/demand` 等上下文（当这些字段可获取时）
+  @req:r659 @human
+  场景: structured-logging-can-be-enabled-via-env-and-via-explicit-a
+    - 必须成立：假如 用户通过环境变量启用 structured logging；当 运行一次 demand/workflow 执行；那么 `scalim.*` 的输出 MUST 为 JSONL
+    假如 用户通过环境变量启用 structured logging
+    当 运行一次 demand/workflow 执行
+    那么 `scalim.*` 的输出 MUST 为 JSONL
+  @req:r701 @human
+  场景: legacy-kv-console-report-lines-are-not-emitted-when-jsonl-is
+    - 必须成立：假如 structured logging 已启用；当 pipeline 运行并触发 performance/relations 的 report 输出；那么 输出 MUST 只包含 JSONL records（single-write）
+    假如 structured logging 已启用
+    当 pipeline 运行并触发 performance/relations 的 report 输出
+    那么 输出 MUST 只包含 JSONL records（single-write）
+  @req:r737 @human
+  场景: cli-can-format-and-summarize-structured-logs-from-a-mixed-fi
+    - 必须成立：假如 输入为一份混合日志文件（JSONL records + 非 JSON 行）；当 用户运行 `scalim-cli log fmt <file>` 与 `scalim-cli log summarize <file> --budget-chars=<n>`；那么 CLI MUST 忽略非 JSON 行并输出 human-friendly 格式
+    假如 输入为一份混合日志文件（JSONL records + 非 JSON 行）
+    当 用户运行 `scalim-cli log fmt <file>` 与 `scalim-cli log summarize <file> --budget-chars=<n>`
+    那么 CLI MUST 忽略非 JSON 行并输出 human-friendly 格式

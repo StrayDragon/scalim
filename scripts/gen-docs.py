@@ -549,25 +549,6 @@ def _extract_markdown_h1(text: str) -> str:
     return ""
 
 
-def _extract_markdown_section(text: str, heading: str) -> str:
-    lines = text.splitlines()
-    collecting = False
-    buffer = []
-    for line in lines:
-        if line.startswith(heading):
-            collecting = True
-            continue
-        if collecting and line.startswith("## "):
-            break
-        if not collecting:
-            continue
-        stripped = line.strip()
-        if not stripped:
-            continue
-        buffer.append(stripped)
-    return " ".join(buffer)
-
-
 def _repo_link(rel: str) -> str:
     """仓库文件引用; `.md` 目标追加 `?ref`,避免 z 当页面为校验."""
     return "repo:{}?ref".format(rel) if rel.endswith(".md") else "repo:{}".format(rel)
@@ -575,23 +556,24 @@ def _repo_link(rel: str) -> str:
 
 def _render_llmanspec_index(repo_root: Path) -> str:
     specs_root = repo_root / "llmanspec" / "specs"
-    spec_paths = sorted(p for p in specs_root.glob("*/spec.md") if p.is_file())
+    spec_paths = sorted(p for p in specs_root.glob("*/*.feature") if p.is_file())
     entries = []
     for path in spec_paths:
         rel = path.relative_to(repo_root).as_posix()
         slug = path.parent.name
         text = _read_text(path)
-        title = _extract_markdown_h1(text) or slug
-        purpose = _collapse_text(_extract_markdown_section(text, "## Purpose")) or ""
-        status_line = ""
+        title = slug
+        purpose = ""
         for line in text.splitlines()[:10]:
-            if line.strip().startswith("**状态:"):
-                status_line = _collapse_text(line.strip())
+            stripped = line.strip()
+            if stripped.startswith("# purpose:"):
+                purpose = _collapse_text(stripped.split(":", 1)[1]) or ""
                 break
+        status_line = ""
         entries.append((slug, title, status_line, purpose, rel))
 
     lines = [
-        _autogen_md_header(sources=["`llmanspec/specs/*/spec.md`"]).rstrip("\n"),
+        _autogen_md_header(sources=["`llmanspec/specs/*/*.feature`"]).rstrip("\n"),
         "",
         '??? warning "自动生成文件"',
         "    本文件由 `scripts/gen-docs.py` 自动生成，请勿手动编辑。如需修改，请编辑源文件或生成脚本。",
@@ -616,7 +598,7 @@ def _render_llmanspec_index(repo_root: Path) -> str:
                 "",
                 "### `{}`".format(slug),
                 "- Title: {}".format(title),
-                "- Source: [spec.md]({})".format(_repo_link(rel)),
+                "- Source: [{}.feature]({})".format(slug, _repo_link(rel)),
             ]
         )
         if summary:

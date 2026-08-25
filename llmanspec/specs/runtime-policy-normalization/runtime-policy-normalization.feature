@@ -1,0 +1,41 @@
+# language: zh-CN
+# capability: runtime-policy-normalization
+# purpose: 定义运行期 policy 值的归一化契约：以 Enum 为封闭集合的 SSOT，state/serialization 边界编/解码为 builtin `str`，允许值集合从 Enum 单一派生。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: runtime-policy-normalization
+
+  @req:r73 @human
+  场景: policy values MUST normalize to builtin str literals at state/serialization boun
+    - 对外可配置的 policy-like 值(封闭集合) MUST 在进入任何 state/serialization 边界时被编码为稳定的内置 `str` 字面量值,并满足: - 允许值集合 MUST 为封闭集合,且其 SSOT MUST 为单一 Enum 定义(禁止手工维护 Enum + Literal 双份允许值列表) - 编码后的值 MUST 为 builtin `str`(而不是 Enum 实例或 `str` 子类) - 解码 MUST 从 builtin `str` fail-fast 解析/验证为对应 Enum 成员(用于归一化与校验),并最终产出 canonical builtin `str` value 用于运行时存储；错误信息中 MUST 列出允许值 - 公开 API MUST 只接受 Enum 作为输入(严进);配置/反序列化边界 MAY 接受 builtin `str` 并通过 parse 恢复(宽进) - 运行期对象图 MAY 持有 Enum 实例,但任何参与序列化/pickling 的 state 表示（例如 `__getstate__` 输出）MUST 不包含 enum 实例
+
+  @req:r317 @human
+  场景: normalize functions MUST be reused as SSOT
+    - 系统 MUST 为每个 policy-like 值提供 SSOT 的 parse/format 实现,并要求所有入口/派生逻辑复用该实现: - `parse_<policy>(...)`/等价入口: 从 builtin `str` 恢复 Enum（允许大小写/连字符等归一化） - `format_<policy>(...)`/等价出口: 从 Enum 生成稳定 builtin `str`
+
+  @req:r440 @human
+  场景: policy allowed values MUST be defined once (DRY) and derived for diagnostics
+    - 系统 MUST 对每组 policy 只维护一次“允许值集合”的 SSOT 定义(以 Enum 为准),并要求: - 允许值列表（用于错误信息、文档、验证）MUST 从 Enum 派生,不得出现手工重复列表 - 错误信息中 MUST 列出允许值集合,并保持顺序稳定
+  @req:r73 @human
+  场景: manager-state-serializes-policy-values-as-builtin-str-and-re
+    - 必须成立：假如 系统构造 `HookManager`/`ObserverManager` 且其 policy 字段通过 Enum 输入并落到 canonical builtin `str` 存储；当 系统进入其可序列化状态边界(例如 `__getstate__`/pickle/state dict)；那么 输出的 state 中相关 policy 字段 MUST 为内置 `str` 值(而非 enum 实例)
+    假如 系统构造 `HookManager`/`ObserverManager` 且其 policy 字段通过 Enum 输入并落到 canonical builtin `str` 存储
+    当 系统进入其可序列化状态边界(例如 `__getstate__`/pickle/state dict)
+    那么 输出的 state 中相关 policy 字段 MUST 为内置 `str` 值(而非 enum 实例)
+
+  @req:r73 @human
+  场景: public-api-rejects-string-literals-while-config-state-parsin
+    - 必须成立：当 调用方通过公开构造器/Options 传入字符串字面量作为 policy；那么 系统 MUST fail-fast（TypeError/ValueError 均可，但错误信息 MUST 指向 “期望 Enum”）
+    当 调用方通过公开构造器/Options 传入字符串字面量作为 policy
+    那么 系统 MUST fail-fast（TypeError/ValueError 均可，但错误信息 MUST 指向 “期望 Enum”）
+  @req:r317 @human
+  场景: different-entrypoints-converge-to-the-same-enum-and-the-same
+    - 必须成立：假如 调用方以不同大小写或连字符形式传入 policy 值(例如 `"drop-oldest"`/`"DROP_OLDEST"`)；当 系统在任意入口解析该值；那么 parse MUST 产生同一个 Enum 成员
+    假如 调用方以不同大小写或连字符形式传入 policy 值(例如 `"drop-oldest"`/`"DROP_OLDEST"`)
+    当 系统在任意入口解析该值
+    那么 parse MUST 产生同一个 Enum 成员
+  @req:r440 @human
+  场景: diagnostics-list-allowed-values-derived-from-enum
+    - 必须成立：当 policy 解析遇到未知值；那么 抛出的异常消息 MUST 包含从 Enum 派生的允许值列表
+    当 policy 解析遇到未知值
+    那么 抛出的异常消息 MUST 包含从 Enum 派生的允许值列表

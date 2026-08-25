@@ -1,0 +1,207 @@
+# language: zh-CN
+# capability: yaml-dsl-agent-guidance
+# purpose: 定义 `scalim-yaml-dsl` 手工维护 skill 的任务驱动组织方式,确保 agent 能基于最小入口、明确命令和按需 references 一次完成 YAML 编写、升级、校验、订正与渐进迁移方案设计. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: yaml-dsl-agent-guidance
+
+  @req:r103 @human
+  场景: Task-Driven Manual Skill Entry
+    - 系统 MUST 提供手工维护的 YAML DSL skill 本体,用于把 agent 引导到正确的任务路径,而不是把 skill 退化为单个 schema 摘要页. 手工维护的 `SKILL.md` MUST 明确覆盖至少以下任务类型: - 新建或修改 YAML DSL 配置(demand YAML) - 编排多条 demand 的 workflow YAML 配置(workflow YAML) - 将旧写法直接升级到当前结构 - 对现有 YAML 做 schema/full validate 与订正(demand YAML) - 对 workflow YAML 做 schema validate 与排错(workflow YAML) - 为某类 legacy 批量报表脚本设计渐进迁移方案 `SKILL.md` MUST 指示 agent 先识别任务类型,再按需读取最少的 references,而不是默认加载全部参考资料. `SKILL.md` MUST 保持 routing-first: 只保留任务分流、最小命令入口与对一层直达 references 的链接; 详细场景预设、迁移 heuristics 与完整语法目录 MUST 放在被直接链接的 references 中.
+
+  @req:r345 @human
+  场景: CLI and LSP Guidance Is Explicit
+    - 手工维护的 skill MUST 直接提供可复制的 CLI/LSP 指引,覆盖仓库内与脱离仓库两种使用方式。 同时，为避免命令文案随实现演进而漂移，该指引中的“可复制命令片段” MUST 通过 injected blocks 受控注入，并以 CLI parser 为 SSOT： - SSOT: CLI yaml_dsl 模块 - skill 生成入口: agent skill 生成命令（注入 marker 内部内容；禁止手改区块内部） - docs-site 入口: 文档生成命令（对应 docs 页同样使用 injected blocks） 指引 MUST 明确包含: - `uv run PROJECT_CLI_NAME yaml-dsl validate <file.yaml>` - `uv run PROJECT_CLI_NAME yaml-dsl schema validate <file.yaml>` - `uvx PROJECT_CLI_NAME yaml-dsl validate <file.yaml>` - `uvx PROJECT_CLI_NAME yaml-dsl schema validate <file.yaml>` - `uv run PROJECT_CLI_NAME yaml-dsl schema path` - `uvx PROJECT_CLI_NAME yaml-dsl schema path` - `uv run PROJECT_CLI_NAME yaml-dsl lint <paths...>` - `uvx PROJECT_CLI_NAME yaml-dsl lint <paths...>` - `uv run PROJECT_CLI_NAME yaml-dsl format <paths...>` - `uvx PROJECT_CLI_NAME yaml-dsl format <paths...>` - `# yaml-language-server: $schema=...` 的 header 参考 skill MUST 明确指出 schema path 可通过 `PROJECT_CLI_NAME yaml-dsl schema path` 查询,并提供 header 模板。 skill MUST 明确指出 canonical example 不应固化本机 `.venv/...`、`site-packages/...` 或仓库私有相对路径头部。
+
+  @req:r467 @human
+  场景: `scalim-yaml-dsl` skill MUST recommend plain scalars and multiline `call_by` aut
+    - 当 skill/agent 输出或改写 YAML DSL 时，系统 MUST 将“可读性优先 + 工具保证一致性”作为默认风格： - 对 `loader/call_by/compute/retry.should_retry` 这类 string 值： - 在语义等价且不会触发 YAML 隐式类型的前提下，MUST 优先使用 plain scalar（不写无意义引号） - 当 `call_by` 很长或需要注释时，MUST 推荐使用 YAML block scalar（`|`）并按多行函数调用排版 - skill MUST 明确指出：团队可通过 `PROJECT_CLI_NAME yaml-dsl format` 统一风格，并避免手工维护差异
+
+  @req:r552 @human
+  场景: Skill Provides Sanitized Migration Playbook
+    - 手工维护的 skill MUST 包含脱敏后的“legacy 批量报表脚本渐进迁移到 YAML DSL” playbook,用于指导 agent 在不暴露业务私有路径、系统名或实现细节的前提下完成调研与方案设计. 该 playbook MUST 指导 agent: - 分析原始入口脚本及其直接依赖 - 识别主数据链路、宽表结构、聚合逻辑、分 sheet 导出逻辑 - 判断是否属于“大宽表 + 分组拆多 sheet”场景 - 判断当前 YAML DSL 不支持或不擅长的能力,例如多 sheet 输出、跨行聚合、多轮 runtime state 依赖 - 判断哪些 loader 可直接引用下游 BLL/服务方法,哪些必须保留最薄 Python 适配层 - 使用脱敏后的占位路径、占位 marker 与占位模块名描述迁移路由,而不是复用真实业务字面量
+
+  @req:r619 @human
+  场景: Skill Encodes Gradual Migration Heuristics
+    - skill MUST 为这类报表迁移任务提供清晰的职责切分准则,让 agent 自动判断哪些逻辑下沉到 YAML、哪些逻辑暂留 Python. 默认准则 MUST 包含: - 主数据源定义、字段映射、sources/relations/output 编排优先进入 YAML - 宽表生成完成后的多 sheet 分发、runtime context/state map、compare 路由可暂留 Python - 对外入口签名与输出接口稳定性优先于“一次性全量重写” - 在未明确要求兼容时,旧 DSL 写法直接升级到新写法
+
+  @req:r668 @human
+  场景: `scalim-yaml-dsl` skill 提示相对模块引用与 allowlist 配置
+    - 系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其在解释 YAML DSL 的 Python 引用(loader / `call_by` / retry 回调)时覆盖相对模块引用语法: - 允许 `.` / `..` 前缀的 module path,且其基准为 YAML 文件所在目录 - 相对引用在运行期会先归一化为绝对引用,并继续受 allowlist(`allowed_modules`/`allowed_functions`)约束 - 当 allowlist 不包含归一化后的模块前缀时,应提示如何调整 allowlist 或改用绝对引用
+
+  @req:r709 @human
+  场景: `scalim-yaml-dsl` skill documents `$keys/$rows` inline params directives
+    - 系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**` 使其覆盖新的 params 模板指令写法,并将其作为首选方案用于解决 nested params 绑定问题. skill 文档 MUST 至少包含: - `$keys` 与 `$rows` 的最小示例 - `$rows` 会触发 rows barrier 的提示 - composite key 在 `$keys` 下保持 tuple 结构的说明 - `bind/to_bind` 到模板指令的迁移规则与常见错误诊断
+
+  @req:r743 @human
+  场景: `scalim-yaml-dsl` skill guides field-level `extract` usage
+    - 系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其在“loader 返回嵌套 row value”场景下优先推荐字段级 `extract`,而不是先建议编写 Python wrapper。 skill 文档 MUST 至少说明: - `extract` 相对当前 key 对应的 row value 解析 - `extract` 是唯一字段取值写法(包含 rename 与 nested path) - bracket 语法示例: `\"[1].x\"`、`'[\"a.b\"]'` - 只有需要整理整体结果形状时才应考虑源代码级 `normalize` 或包装函数
+
+  @req:r771 @human
+  场景: Full Syntax and API Catalog Remains Discoverable
+    - skill MUST 提供对完整 YAML DSL 语法与相关 CLI API 的可发现入口,但这些全量信息 MUST 放在按需读取的 references 中. 至少 MUST 可发现: - 顶层字段与 definitions - enum/default/examples 或等价约束信息 - 互斥关系、必填关系与旧写法升级约束 - `yaml-dsl` 相关 CLI 命令与关键参数
+
+  @req:r150 @human
+  场景: Skill-Creator Progressive Disclosure Is Enforced
+    - skill MUST 遵循 `skill-creator` 风格的渐进披露约束: `SKILL.md` 保持精简,详细任务预设、排错说明与完整 catalog 通过 first-level references 按需加载. 至少 MUST 满足: - `SKILL.md` 不内联完整 schema dump 或完整 playbook 正文 - task-specific manual references 与 generated references 都由 `SKILL.md` 直接链接 - 不依赖多层索引文档才能触达关键 guidance
+
+  @req:r171 @human
+  场景: Validation-First Delivery Guidance
+    - skill MUST 指导 agent 在交付 YAML 或迁移方案时优先完成可执行的校验与边界说明. 至少 MUST 包含: - schema validate - full validate - 缺失依赖或环境前提时的显式说明 - 对“已验证什么、未验证什么”的交付要求
+
+  @req:r190 @human
+  场景: `scalim-yaml-dsl` skill explains when to use `normalize`
+    - 系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其能区分: - 需要先把整个 source 返回值 reshape 成 `key -> row` 的场景: 优先使用 `normalize` - 只是当前 row value 内部字段嵌套: 优先使用字段级 `extract`
+
+  @req:r208 @human
+  场景: Workflow CLI and LSP Guidance Is Explicit
+    - 系统 MUST 更新 `agentdev/skills/scalim-yaml-dsl/**`,使其在 workflow YAML 场景下也能提供明确、可复制的校验与 LSP 指引,并与当前实现边界保持一致: - workflow YAML 仅支持 schema-only 校验（`yaml-dsl schema validate`）；不得引导用户对 workflow YAML 运行 `yaml-dsl validate` 作为“语义校验入口”. - workflow YAML 的仓库内 schema-only 校验 MUST 提供显式 `--schema` 写法（schema 位置以仓库内 `workflow.gen.json` 为准）。 - workflow YAML 的本地编辑体验 MUST 提供 schema modeline 指引,并使用 `--type workflow` 与 `--comment-style {all,jetbrains,redhat}` 生成适配编辑器/LSP 的 header(不依赖内置 schema server)。
+  @req:r103 @human
+  场景: 新建-yaml-任务走-authoring-路径
+    - 必须成立：当 用户请求编写或重构 YAML DSL 配置；那么 skill 必须引导 agent 先读取 authoring 相关 references
+    当 用户请求编写或重构 YAML DSL 配置
+    那么 skill 必须引导 agent 先读取 authoring 相关 references
+
+  @req:r103 @human
+  场景: workflow-编排任务走-workflow-authoring-路径
+    - 必须成立：当 用户请求编写或重构 workflow YAML 配置；那么 skill 必须引导 agent 优先读取 workflow authoring 相关 references
+    当 用户请求编写或重构 workflow YAML 配置
+    那么 skill 必须引导 agent 优先读取 workflow authoring 相关 references
+
+  @req:r103 @human
+  场景: 旧写法升级任务直接按新结构处理
+    - 必须成立：当 用户请求把旧 YAML DSL 写法升级为当前写法；那么 skill 必须引导 agent 直接迁移到当前结构
+    当 用户请求把旧 YAML DSL 写法升级为当前写法
+    那么 skill 必须引导 agent 直接迁移到当前结构
+
+  @req:r103 @human
+  场景: 详细预设通过一层直达-references-提供
+    - 必须成立：当 用户请求报表迁移 playbook、validate/debug 细则或完整语法目录；那么 `SKILL.md` 必须直接链接到对应 reference
+    当 用户请求报表迁移 playbook、validate/debug 细则或完整语法目录
+    那么 `SKILL.md` 必须直接链接到对应 reference
+  @req:r345 @human
+  场景: 仓库内用户获取校验指引
+    - 必须成立：当 用户在仓库内工作并请求校验 YAML；那么 skill 必须提供 `uv run PROJECT_CLI_NAME ...` 形式的命令
+    当 用户在仓库内工作并请求校验 YAML
+    那么 skill 必须提供 `uv run PROJECT_CLI_NAME ...` 形式的命令
+
+  @req:r345 @human
+  场景: 脱离仓库用户获取-cli-指引
+    - 必须成立：当 用户不在仓库内但需要运行 CLI 校验；那么 skill 必须提供 `uvx PROJECT_CLI_NAME ...` 形式的命令
+    当 用户不在仓库内但需要运行 CLI 校验
+    那么 skill 必须提供 `uvx PROJECT_CLI_NAME ...` 形式的命令
+
+  @req:r345 @human
+  场景: 用户需要配置-yaml-lsp
+    - 必须成立：当 用户请求编辑器补全或 schema 头部示例；那么 skill 必须提供 `$schema` header 示例与 schema path 获取方式
+    当 用户请求编辑器补全或 schema 头部示例
+    那么 skill 必须提供 `$schema` header 示例与 schema path 获取方式
+
+  @req:r345 @human
+  场景: hand-written-snippets-outside-injected-blocks-are-rejected
+    - 必须成立：当 维护者在 `agentdev/skills/scalim-yaml-dsl/SKILL.md` 的 injected block marker 外手写可复制命令片段；那么 `just qa` MUST 失败并提示通过 `just gen-agent-skill` 修复
+    当 维护者在 `agentdev/skills/scalim-yaml-dsl/SKILL.md` 的 injected block marker 外手写可复制命令片段
+    那么 `just qa` MUST 失败并提示通过 `just gen-agent-skill` 修复
+  @req:r467 @human
+  场景: skill-prefers-plain-scalar-for-simple-compute-and-block-scal
+    - 必须成立：当 用户请求生成/重构包含 `compute` 与长 `call_by` 的 YAML；那么 skill MUST 输出 `compute: order_id` 这类 plain scalar 写法
+    当 用户请求生成/重构包含 `compute` 与长 `call_by` 的 YAML
+    那么 skill MUST 输出 `compute: order_id` 这类 plain scalar 写法
+  @req:r552 @human
+  场景: 多-sheet-宽表场景被识别
+    - 必须成立：当 目标脚本本质上是同一份宽表按规则拆分成多个 sheet；那么 playbook 必须引导 agent 优先把宽表构建放到 YAML DSL
+    当 目标脚本本质上是同一份宽表按规则拆分成多个 sheet
+    那么 playbook 必须引导 agent 优先把宽表构建放到 YAML DSL
+
+  @req:r552 @human
+  场景: 运行时状态超出-dsl-当前能力
+    - 必须成立：当 目标逻辑依赖多轮 runtime state、compare 路由或其它当前 DSL 不擅长的能力；那么 playbook 必须引导 agent 保留这些逻辑在 Python
+    当 目标逻辑依赖多轮 runtime state、compare 路由或其它当前 DSL 不擅长的能力
+    那么 playbook 必须引导 agent 保留这些逻辑在 Python
+
+  @req:r552 @human
+  场景: 可直接引用下游-loader
+    - 必须成立：当 原场景使用的下游 BLL/服务方法符合 YAML DSL loader contract；那么 playbook 必须引导 agent 优先直接引用这些方法
+    当 原场景使用的下游 BLL/服务方法符合 YAML DSL loader contract
+    那么 playbook 必须引导 agent 优先直接引用这些方法
+
+  @req:r552 @human
+  场景: 迁移示例使用脱敏占位
+    - 必须成立：当 playbook 需要展示入口路由、marker 或模块路径示例；那么 文案必须使用脱敏占位写法
+    当 playbook 需要展示入口路由、marker 或模块路径示例
+    那么 文案必须使用脱敏占位写法
+  @req:r619 @human
+  场景: 需要-compare-friendly-渐进路由
+    - 必须成立：当 迁移任务要求保留 legacy/new 双路由用于 compare 或回滚观察；那么 skill 必须引导 agent 仅保留最小 legacy 路由边界
+    当 迁移任务要求保留 legacy/new 双路由用于 compare 或回滚观察
+    那么 skill 必须引导 agent 仅保留最小 legacy 路由边界
+
+  @req:r619 @human
+  场景: 目标是后续模板化复用
+    - 必须成立：当 用户强调后续还会迁移同类脚本；那么 skill 必须引导 agent 优先选择单 YAML + 单入口的精简结构
+    当 用户强调后续还会迁移同类脚本
+    那么 skill 必须引导 agent 优先选择单 YAML + 单入口的精简结构
+  @req:r668 @human
+  场景: 用户询问如何组织-loaders-与-yaml
+    - 必须成立：当 用户希望将 YAML 与 loaders 放在同一目录/包,并减少 `myapp.xxx` 这类绝对路径重复；那么 skill guidance MUST 提示可使用相对引用(例如 `.loaders:load_orders`)
+    当 用户希望将 YAML 与 loaders 放在同一目录/包,并减少 `myapp.xxx` 这类绝对路径重复
+    那么 skill guidance MUST 提示可使用相对引用(例如 `.loaders:load_orders`)
+  @req:r709 @human
+  场景: authoring-示例包含-keys
+    - 必须成立：当 用户请求编写一个 ref loader,需要把 lookup keys 注入到 `kwargs["params"]["..."]` 的嵌套位置；那么 skill guidance MUST 给出 `$keys` 内联模板示例(而非建议编写 Python wrapper)
+    当 用户请求编写一个 ref loader,需要把 lookup keys 注入到 `kwargs["params"]["..."]` 的嵌套位置
+    那么 skill guidance MUST 给出 `$keys` 内联模板示例(而非建议编写 Python wrapper)
+
+  @req:r709 @human
+  场景: upgrade-guidance-指导从-bind-迁移到模板指令
+    - 必须成立：当 用户请求将旧写法 `bind.use_keys.param` 升级为更直觉的 nested params 写法；那么 skill guidance MUST 给出迁移后的 `$keys/$rows` 模板写法与校验命令
+    当 用户请求将旧写法 `bind.use_keys.param` 升级为更直觉的 nested params 写法
+    那么 skill guidance MUST 给出迁移后的 `$keys/$rows` 模板写法与校验命令
+
+  @req:r709 @human
+  场景: old-bind-to-bind-不再被建议
+    - 必须成立：当 用户请求为 ref loader 生成 YAML；那么 skill guidance MUST 不再输出 `bind/to_bind` 写法
+    当 用户请求为 ref loader 生成 YAML
+    那么 skill guidance MUST 不再输出 `bind/to_bind` 写法
+  @req:r743 @human
+  场景: 嵌套-row-value-场景优先推荐-extract
+    - 必须成立：当 用户给出的 source loader 已经能返回按 key 索引的 row value,只是字段值藏在嵌套 dict / 对象内；那么 skill MUST 优先给出 `extract` 写法
+    当 用户给出的 source loader 已经能返回按 key 索引的 row value,只是字段值藏在嵌套 dict / 对象内
+    那么 skill MUST 优先给出 `extract` 写法
+  @req:r771 @human
+  场景: 用户请求完整语法目录
+    - 必须成立：当 用户请求查看 YAML DSL 全量语法或 API；那么 skill 必须把 agent 引导到 generated catalog
+    当 用户请求查看 YAML DSL 全量语法或 API
+    那么 skill 必须把 agent 引导到 generated catalog
+  @req:r150 @human
+  场景: skill-md-不退化为-schema-dump
+    - 必须成立：当 维护者更新手工 skill；那么 `SKILL.md` 必须仍以任务路由和命令入口为主
+    当 维护者更新手工 skill
+    那么 `SKILL.md` 必须仍以任务路由和命令入口为主
+  @req:r171 @human
+  场景: 环境不完整时仍需说明验证边界
+    - 必须成立：当 当前环境无法跑通真实数据库或下游系统；那么 skill 必须要求 agent 明确说明缺少什么依赖
+    当 当前环境无法跑通真实数据库或下游系统
+    那么 skill 必须要求 agent 明确说明缺少什么依赖
+  @req:r190 @human
+  场景: list-returning-loader-优先推荐-normalize
+    - 必须成立：当 用户给出的 lookup source loader 返回 `list[row]`,而不是 `key -> row` 映射；那么 skill MUST 优先给出 `normalize.index_by_key` 的方案
+    当 用户给出的 lookup source loader 返回 `list[row]`,而不是 `key -> row` 映射
+    那么 skill MUST 优先给出 `normalize.index_by_key` 的方案
+
+  @req:r190 @human
+  场景: 仅字段嵌套时不误导到-normalize
+    - 必须成立：当 用户的 source loader 已经返回 `key -> row`,只是 row 内部字段有嵌套；那么 skill MUST 优先推荐字段级 `extract`
+    当 用户的 source loader 已经返回 `key -> row`,只是 row 内部字段有嵌套
+    那么 skill MUST 优先推荐字段级 `extract`
+  @req:r208 @human
+  场景: workflow-schema-only-校验指引
+    - 必须成立：当 用户请求校验 workflow YAML；那么 skill 必须提供 `uv run PROJECT_CLI_NAME yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>` 形式的命令
+    当 用户请求校验 workflow YAML
+    那么 skill 必须提供 `uv run PROJECT_CLI_NAME yaml-dsl schema validate --schema src/scalim/dsl/yaml_dsl/schema/workflow.gen.json <workflow.yaml>` 形式的命令
+
+  @req:r208 @human
+  场景: workflow-lsp-modeline-指引
+    - 必须成立：当 用户请求让编辑器对 workflow YAML 提供补全/hover；那么 skill 必须给出 upsert 命令,至少包含: `uv run PROJECT_CLI_NAME yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`
+    当 用户请求让编辑器对 workflow YAML 提供补全/hover
+    那么 skill 必须给出 upsert 命令,至少包含: `uv run PROJECT_CLI_NAME yaml-dsl upsert-lsp-comment --type workflow --comment-style all <paths...>`

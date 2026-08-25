@@ -30,7 +30,7 @@ Active changes 命名规范(仅对 `llmanspec/changes/` 下未归档变更生效
 - 当在其它提案/文档中引用某个 change 时,仅使用其 `<kebab-case>` 名称(不带 `c<priority>-` 前缀),避免优先级调整导致跨文档引用漂移
 
 ### YAML DSL 主线原则(摘要)
-当你在 `llmanspec/changes/` 下创建/评审 YAML DSL 相关变更时,默认遵循这些上位原则(完整 SSOT 以 `llmanspec/specs/governance-mainline-principles/spec.toon` 为准):
+当你在 `llmanspec/changes/` 下创建/评审 YAML DSL 相关变更时,默认遵循这些上位原则(完整 SSOT 以 `llmanspec/specs/governance-mainline-principles/governance-mainline-principles.feature` 为准):
 - 单主线原地演进: 不引入 `dsl_version`、不维护并行 parser/validator/schema, 版本管理只依赖pypi包版本
 - `YAML = authoring`, `Python/CLI = runtime policy`
 - 边界盘点（开放）：`llmanspec/changes/c40-yaml-runtime-policy-boundary/`；agent：`agentdev/skills/scalim-yaml-dsl/references/yaml-runtime-policy-boundary.md`

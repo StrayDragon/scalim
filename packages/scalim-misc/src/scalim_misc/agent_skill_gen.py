@@ -96,24 +96,24 @@ UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->"
 UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
 
 SYNTAX_SPEC_RELS = (
-    Path("llmanspec") / "specs" / "yaml-dsl-schema" / "spec.toon",
-    Path("llmanspec") / "specs" / "demand-dsl" / "spec.toon",
-    Path("llmanspec") / "specs" / "yaml-dsl-workflow" / "spec.toon",
-    Path("llmanspec") / "specs" / "yaml-dsl-books-resources" / "spec.toon",
-    Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "spec.toon",
-    Path("llmanspec") / "specs" / "ir-source-relations" / "spec.toon",
-    Path("llmanspec") / "specs" / "ir-field-compute" / "spec.toon",
-    Path("llmanspec") / "specs" / "execution-preload-cache" / "spec.toon",
-    Path("llmanspec") / "specs" / "workflow-cache-pool" / "spec.toon",
-    Path("llmanspec") / "specs" / "workflow-observability-bridge" / "spec.toon",
-    Path("llmanspec") / "specs" / "runtime-pruning" / "spec.toon",
-    Path("llmanspec") / "specs" / "execution-loader-retry" / "spec.toon",
-    Path("llmanspec") / "specs" / "runtime-guardrails" / "spec.toon",
-    Path("llmanspec") / "specs" / "performance-observability" / "spec.toon",
-    Path("llmanspec") / "specs" / "output-mode-api" / "spec.toon",
+    Path("llmanspec") / "specs" / "yaml-dsl-schema" / "yaml-dsl-schema.feature",
+    Path("llmanspec") / "specs" / "demand-dsl" / "demand-dsl.feature",
+    Path("llmanspec") / "specs" / "yaml-dsl-workflow" / "yaml-dsl-workflow.feature",
+    Path("llmanspec") / "specs" / "yaml-dsl-books-resources" / "yaml-dsl-books-resources.feature",
+    Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "yaml-dsl-output-overrides.feature",
+    Path("llmanspec") / "specs" / "ir-source-relations" / "ir-source-relations.feature",
+    Path("llmanspec") / "specs" / "ir-field-compute" / "ir-field-compute.feature",
+    Path("llmanspec") / "specs" / "execution-preload-cache" / "execution-preload-cache.feature",
+    Path("llmanspec") / "specs" / "workflow-cache-pool" / "workflow-cache-pool.feature",
+    Path("llmanspec") / "specs" / "workflow-observability-bridge" / "workflow-observability-bridge.feature",
+    Path("llmanspec") / "specs" / "runtime-pruning" / "runtime-pruning.feature",
+    Path("llmanspec") / "specs" / "execution-loader-retry" / "execution-loader-retry.feature",
+    Path("llmanspec") / "specs" / "runtime-guardrails" / "runtime-guardrails.feature",
+    Path("llmanspec") / "specs" / "performance-observability" / "performance-observability.feature",
+    Path("llmanspec") / "specs" / "output-mode-api" / "output-mode-api.feature",
 )
 
-CLI_SPEC_RELS = (Path("llmanspec") / "specs" / "yaml-dsl-cli-validation" / "spec.toon",)
+CLI_SPEC_RELS = (Path("llmanspec") / "specs" / "yaml-dsl-cli-validation" / "yaml-dsl-cli-validation.feature",)
 
 
 class GenerationError(RuntimeError):
@@ -1023,79 +1023,34 @@ def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dic
 
 
 def _parse_spec_content(text: str) -> Tuple[str, List[str]]:
-    """Parse spec from toon format or legacy markdown format."""
+    """Parse single-track feature-as-spec: purpose header + requirement statement scenarios."""
     import re as _re
 
-    toon_body = ""  # type: str
-    fenced_match = _re.search(r"```toon\s*\n(.*?)```", text, _re.DOTALL)
-    if fenced_match:
-        toon_body = fenced_match.group(1)
-    elif _re.search(r"^kind:\s*llman\.sdd\.spec\s*$", text, _re.MULTILINE) or _re.search(r"^requirements\[", text, _re.MULTILINE):
-        # 独立 `.toon` 文件(无 markdown fence): 整个文本即为 toon 体。
-        toon_body = text
+    purpose = ""
+    purpose_m = _re.search(r"^# purpose:\s*(.+?)\s*$", text, _re.MULTILINE)
+    if purpose_m:
+        purpose = purpose_m.group(1).strip()
 
-    if toon_body:
-        purpose = ""
-        purpose_m = _re.search(r"^purpose:\s*(.+?)\s*$", toon_body, _re.MULTILINE)
-        if purpose_m:
-            raw_purpose = purpose_m.group(1)
-            if len(raw_purpose) >= 2 and raw_purpose.startswith('"') and raw_purpose.endswith('"'):
-                purpose = raw_purpose[1:-1].replace('\\"', '"')
-            else:
-                purpose = raw_purpose
-
-        requirements = []  # type: List[str]
-        in_reqs = False
-        for line in toon_body.splitlines():
-            if _re.match(r"^requirements\[", line):
-                in_reqs = True
-                continue
-            if in_reqs:
-                if not line.startswith("  "):
-                    in_reqs = False
-                    continue
-                parts = _parse_toon_row(line.strip())
-                if len(parts) >= 2:
-                    requirements.append(parts[1])
-        return purpose, requirements
-
-    purpose = extract_markdown_section(text, "## Purpose")
     requirements = []  # type: List[str]
-    for line in text.splitlines():
-        if line.startswith("### Requirement:"):
-            requirements.append(line.split(":", 1)[1].strip())
-    return purpose, requirements
-
-
-def _parse_toon_row(row: str) -> List[str]:
-    """Parse a toon tabular row respecting quoted values."""
-    parts = []  # type: List[str]
-    current = []  # type: List[str]
-    in_quote = False
+    lines = text.splitlines()
     i = 0
-    while i < len(row):
-        ch = row[i]
-        if ch == '"' and not in_quote:
-            in_quote = True
-            i += 1
-            continue
-        if ch == '"' and in_quote:
-            if i + 1 < len(row) and row[i + 1] == '"':
-                current.append('"')
-                i += 2
+    while i < len(lines):
+        line = lines[i]
+        if line.strip().startswith("@") and "@req:" in line and i + 1 < len(lines):
+            name_line = lines[i + 1].strip()
+            if name_line.startswith("场景:") or name_line.startswith("Scenario:"):
+                j = i + 2
+                body = []  # type: List[str]
+                while j < len(lines) and not lines[j].strip().startswith("@"):
+                    body.append(lines[j])
+                    j += 1
+                # 约束陈述场景以 "- " 描述行开头;GWT 验收场景由步骤关键字构成。
+                if body and body[0].strip().startswith("- "):
+                    requirements.append(name_line.split(":", 1)[1].strip())
+                i = j
                 continue
-            in_quote = False
-            i += 1
-            continue
-        if ch == "," and not in_quote:
-            parts.append("".join(current))
-            current = []
-            i += 1
-            continue
-        current.append(ch)
         i += 1
-    parts.append("".join(current))
-    return parts
+    return purpose, requirements
 
 
 def sanitize_spec_summary_text(text: str) -> str:
@@ -1103,25 +1058,6 @@ def sanitize_spec_summary_text(text: str) -> str:
     for old, new in SPEC_SUMMARY_REPLACEMENTS:
         sanitized = sanitized.replace(old, new)
     return sanitized
-
-
-def extract_markdown_section(text: str, heading: str) -> str:
-    lines = text.splitlines()
-    collecting = False
-    buffer = []
-    for line in lines:
-        if line.startswith(heading):
-            collecting = True
-            continue
-        if collecting and line.startswith("## "):
-            break
-        if not collecting:
-            continue
-        stripped = line.strip()
-        if not stripped:
-            continue
-        buffer.append(stripped)
-    return " ".join(buffer)
 
 
 def sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> None:

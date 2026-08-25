@@ -1,0 +1,97 @@
+# language: zh-CN
+# capability: yaml-dsl-output-overrides
+# purpose: 为下游”UI 动态选字段/动态输出”场景提供单一标准做法：demand YAML 保持可复用（通常不声明 `outputs`），调用侧在 `run/compile` 时通过 typed `RunOverrides` 显式指定输出编排与 IO 覆盖。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: yaml-dsl-output-overrides
+
+  @req:r122 @human
+  场景: RunOverrides factory methods MUST stay stable including xlsx_file_single_sheet
+    - 系统 MUST 在 RunOverrides 上提供标准 @classmethod 工厂方法,以覆盖最常见的下游集成场景: - 单表 - 单 sheet - 字段动态(由调用方指定 field_id 列表) - 输出 root 动态(由调用方指定输出 root 目录;版本化输出 D-2)。工厂方法 MUST 只构造 detail output 的最小子集，并同时覆盖 resources.* 与 outputs_defaults 的必要拼装。特别地，RunOverrides.xlsx_file_single_sheet 的公开名称与调用签名 MUST 保持稳定；其实现 MUST 构造与 pathful xlsx.path 等价的 book identity，MUST NOT 依赖已移除的 YAML xlsx_file/xlsx_memory 别名解析路径。标准工厂（含 `csv_file` / `xlsx_file_single_sheet` 等）的 `header_fields_output_by` 参数默认 MUST 为 `name`（与 YAML 省略 / `DEFAULT_OUTPUT_HEADER_BY` / `yaml-dsl-runtime-policy-boundary` r1005 一致）。
+
+  @req:r364 @human
+  场景: legacy YAML-shaped overrides inputs MUST be rejected with actionable migration h
+    - 系统 MUST 将以下旧形态视为不再支持的 legacy 输入,并在编译期 fail-fast: - `RunOverrides.outputs` 为 `list[dict]` - `RunOverrides.resources` / `RunOverrides.outputs_defaults` 为 `dict` 错误信息 MUST: - 明确指出 legacy 形态已移除 - 指向稳定逻辑路径(例如 `RunOverrides.outputs`) - 提供可复制的迁移示例(typed dataclasses / 工厂方法)
+
+  @req:r485 @human
+  场景: `RunOverrides.outputs` MUST take precedence over YAML `outputs`
+    - 系统 MUST 将 `RunOverrides.outputs` 视为最高优先级的输出编排来源。 `RunOverrides.outputs` 提供时 MUST 为非空序列; 空序列 MUST fail-fast(避免静默“不导出任何东西”)。
+
+  @req:r566 @human
+  场景: `RunOverrides.outputs` MUST compile through the same outputs pipeline
+    - 系统 MUST 使用与 YAML `outputs` 相同的解析/校验/编译链路来处理 `RunOverrides.outputs`,以避免维护两套输出语义并保证错误信息一致性。
+
+  @req:r628 @human
+  场景: YAML DSL runtime MUST accept typed `RunOverrides.outputs` (dataclasses)
+    - 系统 MUST 在 YAML DSL runtime 的 `RunOverrides` 中提供 `outputs` 覆盖字段,用于在不修改 demand YAML 的前提下运行期指定输出编排。 与旧的 YAML-shaped `list[dict]` 不同，`RunOverrides.outputs` MUST 为 typed dataclasses 序列，并且 MUST 可从 YAML DSL runtime 模块稳定导入。 本 spec 仅承诺明细输出(detail)的最小子集,至少包含: - `name` - `fields`(有序 field_id list) - `to`(book/sheet 绑定) 或 `to.file`(csv 文件输出) 二选一 - `write`(可选;仅在 book 绑定输出时允许) `RunOverrides.outputs[*]` MUST NOT 支持以下 keys/语义(未来如需支持应另开 change 增量扩展): - `where` - `from` - `aggregate`
+
+  @req:r675 @human
+  场景: RunOverrides.resources MUST remain IO-only for path identity; write uses policy API; budget removed
+    - 系统 MUST 在 RunOverrides 中提供 IO-only 覆盖能力用于 resources/outputs_defaults path 等 identity/IO 声明: - overlay MUST 允许覆盖 books.*.path/allow_formulas 与 files.*.path/encoding 等 IO 字段 - overlay MUST NOT 再把 write_defaults 作为主 SSOT 补丁路径（MUST 走 Python BookWritePolicy） - overlay MUST NOT 再接受 budget（能力已移除；传入 MUST fail-fast 并提示删除） - 若仍传入 write_defaults/budget overlay，系统 MUST fail-fast - overlay MUST NOT 以 xlsx_file/xlsx_memory 分支名作为稳定补丁 SSOT - overlay MUST NOT 覆盖输出定义层字段
+
+  @req:r715 @human
+  场景: demand compile and workflow compile MUST share the same overrides compilation pi
+    - 系统 MUST 仅保留一套 overrides 解析/校验实现(SSOT),并同时服务于: - 单 demand runtime compile (`compile/run`) - workflow compile (`compile_workflow` 等) 系统 MUST NOT 维护两份“语义等价但实现不同”的 overrides parser/validator,以避免规则漂移与修复遗漏。
+
+  @req:r748 @human
+  场景: invalid overrides MUST raise ScalimWorkflowConfigError with stable path
+    - 当 overrides/resources/outputs_defaults/output_extras 的输入非法时,系统 MUST 抛出 `ScalimWorkflowConfigError` 并提供稳定可定位的 `path=`。
+
+  @req:r122 @human
+  场景: xlsx-file-single-sheet-factory-name-remains-stable
+    - 必须成立：当 调用方继续使用 RunOverrides.xlsx_file_single_sheet(output_root=..., fields=[...], sheet=...)；那么 返回的 overrides MUST 可直接用于 run/compile，并产生与 xlsx.path 声明等价的 pathful 导出行为
+    当 调用方继续使用 RunOverrides.xlsx_file_single_sheet(output_root=..., fields=[...], sheet=...)
+    那么 返回的 overrides MUST 可直接用于 run/compile，并产生与 xlsx.path 声明等价的 pathful 导出行为
+
+  @req:r122 @human
+  场景: factory-header-fields-output-by-defaults-to-name
+    - 必须成立：当 调用 RunOverrides.csv_file 或 xlsx_file_single_sheet 且不传 header_fields_output_by；那么 构造结果中 header_fields_output_by MUST 默认为 name
+    当 调用 RunOverrides.csv_file 或 xlsx_file_single_sheet 且不传 header_fields_output_by
+    那么 构造结果中 header_fields_output_by MUST 默认为 name
+  @req:r364 @human
+  场景: legacy-dict-overrides-fail-fast
+    - 必须成立：当 调用方传入 legacy YAML-shaped overrides；那么 编译 MUST fail-fast
+    当 调用方传入 legacy YAML-shaped overrides
+    那么 编译 MUST fail-fast
+  @req:r485 @human
+  场景: overrides-outputs-wins-over-yaml-outputs
+    - 必须成立：假如 demand YAML 声明了 `outputs` 且包含字段列表 `["a"]`；当 调用方提供 `RunOverrides.outputs` 且包含字段列表 `["b"]`；那么 effective outputs MUST 使用 `["b"]` 而不是 `["a"]`
+    假如 demand YAML 声明了 `outputs` 且包含字段列表 `["a"]`
+    当 调用方提供 `RunOverrides.outputs` 且包含字段列表 `["b"]`
+    那么 effective outputs MUST 使用 `["b"]` 而不是 `["a"]`
+  @req:r566 @human
+  场景: invalid-typed-overrides-outputs-fails-fast-with-a-diagnosabl
+    - 必须成立：当 调用方提供的 typed `RunOverrides.outputs` 结构非法(例如缺少 `name/fields`,或 `to` 互斥关系非法)；那么 编译 MUST fail-fast
+    当 调用方提供的 typed `RunOverrides.outputs` 结构非法(例如缺少 `name/fields`,或 `to` 互斥关系非法)
+    那么 编译 MUST fail-fast
+  @req:r628 @human
+  场景: overrides-provides-a-single-book-output
+    - 必须成立：假如 demand YAML 未声明 `outputs`；当 调用方在 `run/compile` 中提供 `RunOverrides(outputs=(OutputOverride(...),))`,且该 output 包含 `to.sheet` 与 `fields`；那么 本次运行 MUST 以该 `RunOverrides.outputs` 作为 effective outputs
+    假如 demand YAML 未声明 `outputs`
+    当 调用方在 `run/compile` 中提供 `RunOverrides(outputs=(OutputOverride(...),))`,且该 output 包含 `to.sheet` 与 `fields`
+    那么 本次运行 MUST 以该 `RunOverrides.outputs` 作为 effective outputs
+
+  @req:r628 @human
+  场景: overrides-provides-a-single-csv-output
+    - 必须成立：假如 demand YAML 未声明 `outputs`；当 调用方在 `run/compile` 中提供 `RunOverrides.outputs` 且该 output 使用 `to.file` 与 `fields`；那么 本次运行 MUST 写出 CSV 输出
+    假如 demand YAML 未声明 `outputs`
+    当 调用方在 `run/compile` 中提供 `RunOverrides.outputs` 且该 output 使用 `to.file` 与 `fields`
+    那么 本次运行 MUST 写出 CSV 输出
+
+  @req:r675 @human
+  场景: book-path-overlay-without-deprecated-kind-branch
+    - 必须成立：假如 调用方通过 RunOverrides.resources.books 覆盖 path 等 IO 字段；当 compile/run；那么 系统 MUST 接受 pathful/pathless IO 覆盖且 MUST NOT 要求调用方提供 xlsx_file/xlsx_memory 分支名
+    假如 调用方通过 RunOverrides.resources.books 覆盖 path 等 IO 字段
+    当 compile/run
+    那么 系统 MUST 接受 pathful/pathless IO 覆盖且 MUST NOT 要求调用方提供 xlsx_file/xlsx_memory 分支名
+  @req:r715 @human
+  场景: override-validation-behavior-stays-consistent-across-entrypo
+    - 必须成立：假如 某个非法的 `RunOverrides.outputs`(例如 to.file 与 to.book/to.sheet 互斥冲突)；当 调用方分别在 demand compile 与 workflow compile 路径触发该校验；那么 两条路径 MUST 都 fail-fast
+    假如 某个非法的 `RunOverrides.outputs`(例如 to.file 与 to.book/to.sheet 互斥冲突)
+    当 调用方分别在 demand compile 与 workflow compile 路径触发该校验
+    那么 两条路径 MUST 都 fail-fast
+  @req:r748 @human
+  场景: invalid-typed-overrides-fails-with-scalimworkflowconfigerror
+    - 必须成立：当 调用方提供非法的 typed overrides；那么 系统 MUST 抛 `ScalimWorkflowConfigError`
+    当 调用方提供非法的 typed overrides
+    那么 系统 MUST 抛 `ScalimWorkflowConfigError`

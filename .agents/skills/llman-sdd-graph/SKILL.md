@@ -2,7 +2,7 @@
 name: "llman-sdd-graph"
 description: "以 mermaid 图可视化 llman SDD 变更间的依赖关系（depends_on/blocks）。辅助工具，任意阶段可用，不属于主实现 pipeline。"
 metadata:
-  version: "0.0.66"
+  version: "0.0.68"
   llman_sdd:
     bdd_mode: "off"
     skill_set: "default"
@@ -94,42 +94,30 @@ blocks:
 - `llman sdd graph [CHANGE] [--format mermaid] [--scope active|archived|all] [--depth N]`（生成变更依赖图）
 - `llman sdd project migrate --kind spec-md2toon`（`.md`+fence → 独立 `.toon`；`partitioned` 已移除）
 
-常见校验修复（TOON 独立文件 spec）：
+校验修复（单轨 feature-as-spec）：
 
-1) 缺少校验作用域（`Spec valid_scope must not be empty`）：
-Main spec 必须在 `.toon` 文档内携带非空的 `valid_scope`。
-`llmanspec/specs/<feature-id>/spec.toon`：
-```toon
-kind: llman.sdd.spec
-name: sample
-purpose: "One-line overview."
-valid_scope[1]: src
-requirements[1]{req_id,title,statement}:
-  r1,Title,System MUST do something.
-scenarios[1]{req_id,id,given,when,then}:
-  r1,happy,"",a trigger happens,the outcome is observed
+1）缺少头注释（`missing # capability: header comment`）：
+每个 `llmanspec/specs/<capability>/<capability>.feature` 必须以以下注释开头：
+```
+# language: zh-CN
+# capability: <capability>
+# purpose: 一句话概述
+# scope: src/
 ```
 
-2) 表格化行引号错误（"Expected N tabular row values, but got M"）：
-值包含**空格**、逗号、冒号或方括号时，必须用双引号包裹。
-```toon
-# 错误：未加引号的空格值会被拆成多个值
-r1,happy,"",a trigger happens,the outcome is observed
+2）tag 语法（`@human constraint scenario must carry an @req:<req_id> tag` / `orphan acceptance scenario`）：
+- 规则：`@req:<id> @human` —— statement 放场景描述（须含 MUST/SHALL）。
+- 验收：`@executable` 且至少一个 `@req:<id>` 挂到规则。
+- `@manual` 须与 `@human` 同用；禁止 `@human` 与 `@executable` 同场景。
 
-# 正确：多词值加引号
-r1,happy,"","a trigger happens","the outcome is observed"
-```
+3）遗留 `spec.toon`（`legacy spec.toon found ... run ... toon2features`）：
+运行 `llman sdd project migrate --kind toon2features --yes`，审阅 diff 后提交。
 
-3) Git-native 护栏（配置了 `bdd:` 时采用 Partitioned SSOT）：
-`spec.toon`=约束/不可执行场景；`*.feature`=可执行 GWT（`@req`）。
-- **Branch binding** → **Specs landing**：先 `change start` / `attach`，再在绑定的非默认分支编辑 live 文件并 commit。规划壳可短暂在默认分支；**禁止**在默认分支改 live specs；**禁止**写 `changes/<id>/specs/`。
-- apply 前须 `readyToImplement=true`（或 `skip_specs_landing`）。收尾（verify 后）优先 `change finalize`，勿在 propose/apply 中途 finalize。
-- 勿使用 `change delta` / solidify / `*.feature.delta.toon`。配置了 `bdd:` 且空 requirements 又无 `.feature` = ERROR。
-
-备注：
-- 每个 spec 是一个独立的 `.toon` 文件；没有 Markdown 外壳，也没有 ```toon fence。
-- `null` 表示可选字段缺失。
-- 从旧版 `.md`+fence 迁移请使用 `llman sdd migrate`。
+Git-native 护栏：
+- **Branch binding** → **Specs landing**：先 `change start` / `attach`，再在绑定的非默认分支编辑 live `.feature` 并 commit。
+- 锁定规则：修改/删除既有 `@human` 场景会触发门禁，除非 proposal frontmatter 带 `rules_edit_acked: true`。
+- apply 前须 `readyToImplement=true`（或 `skip_specs_landing`）。收尾优先 `change finalize`。
+- 勿使用 `change delta` / solidify / `*.feature.delta.toon`。
 
 ## Ethics Governance
 - `ethics.risk_level`：按 `low|medium|high|critical` 标注风险等级。

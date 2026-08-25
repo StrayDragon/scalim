@@ -2,7 +2,7 @@
 name: "llman-sdd-explore"
 description: "进入 llman SDD 探索模式：理清思路、调查需求、分析问题。仅思考，禁止写代码。用于意图不明确或需要分析后再行动的场景。"
 metadata:
-  version: "0.0.66"
+  version: "0.0.68"
   llman_sdd:
     bdd_mode: "off"
     skill_set: "default"
@@ -59,8 +59,8 @@ flowchart LR
 2. 澄清目标与约束（问 1–3 个问题）。
 3. **逐问深挖分支（可选，仅当用户显式触发时进入）**：触发词为「深挖」「grill」「逐个问」「彻底理清」。进入后一问一答走清决策：
    - **一次只问一个问题**，并附你的推荐答案，等用户反馈后再继续下一个。
-   - **事实 vs 决策分离**：能通过读 `spec.toon`/代码/运行命令查证的事实，自行查证，**不问**用户；只有**决策**（取舍、偏好、范围边界）才交给用户。
-   - **术语校准**：遇到术语冲突或模糊词时立即指出（「你的 spec.toon 定义 'X' 为 A，但你刚说成 B——哪个对？」）；解决后：若 change 已 Branch binding 且在绑定分支上，可更新 live `spec.toon`（Specs landing）；否则只记入 `proposal.md`，**禁止**在默认分支改 live specs。MUST NOT 另建 `CONTEXT.md` 词表作为第二权威。
+   - **事实 vs 决策分离**：能通过读 capability `.feature`/代码/运行命令查证的事实，自行查证，**不问**用户；只有**决策**（取舍、偏好、范围边界）才交给用户。
+   - **术语校准**：遇到术语冲突或模糊词时立即指出（「你的 spec 定义 'X' 为 A，但你刚说成 B——哪个对？」）；解决后：若 change 已 Branch binding 且在绑定分支上，可更新 live `.feature`（Specs landing）；否则只记入 `proposal.md`，**禁止**在默认分支改 live specs。MUST NOT 另建 `CONTEXT.md` 词表作为第二权威。
    - **决策回写**：已解决的决策回写到该 change 的 `proposal.md`「Open Questions」段（规划壳；可短暂在默认分支）。
    - **完成判据**：每个待定决策都已解决或被显式推迟。未触发时保持默认（问 1–3 个问题）行为不变。
 4. 如果某个 change id 相关，阅读 `llmanspec/changes/<id>/` 下的 artifacts。
@@ -69,9 +69,9 @@ flowchart LR
 6. 判断变更规模（triage），确定是否需要走完整 SDD 流程。
 7. 当结论逐渐清晰时，建议用户把它记录下来（不要自动写入）：
    - 范围变化 / 设计决策 / 工作项 → 规划壳（`proposal.md` / `design.md` / `tasks.md`）
-   - 约束 / 可执行 harness → **仅建议**写入 live `llmanspec/specs/**`（`spec.toon` / `*.feature`）；实际编辑须先 Branch binding，再 Specs landing。探索模式未 binding 时只记到 proposal，勿直接改 live specs。
+   - 约束 / 可执行 harness → **仅建议**写入 live `llmanspec/specs/**`（每 capability 一个 `.feature`）；实际编辑须先 Branch binding，再 Specs landing。探索模式未 binding 时只记到 proposal，勿直接改 live specs。
 
-> Git-native：先 `change start`/`attach`（Branch binding）进入 Full，再在绑定分支编辑 live `.feature`/`spec.toon`（Specs landing）；无 `change delta` / solidify / feature_delta。
+> Git-native：先 `change start`/`attach`（Branch binding）进入 Full，再在绑定分支编辑 live `.feature`（Specs landing）；无 `change delta` / solidify / feature_delta。
 
 ## 退出探索模式
 当用户准备开始实现时，根据变更规模选择路径：

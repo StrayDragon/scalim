@@ -2,7 +2,7 @@
 name: "llman-sdd-draft"
 description: "快速把一个 change 想法记成草案提案（仅 proposal.md，经 `change new --from`）。不强制 tasks/design/specs/attach。用于随手记 idea 或未来需求；准备好后用 propose 正式化。"
 metadata:
-  version: "0.0.66"
+  version: "0.0.68"
   llman_sdd:
     bdd_mode: "off"
     skill_set: "default"

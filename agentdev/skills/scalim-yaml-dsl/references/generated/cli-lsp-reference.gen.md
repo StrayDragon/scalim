@@ -60,7 +60,7 @@
 
 ## llmanspec Requirement Map
 ### `yaml-dsl-cli-validation`
-- Source: `llmanspec/specs/yaml-dsl-cli-validation/spec.toon`
+- Source: `llmanspec/specs/yaml-dsl-cli-validation/yaml-dsl-cli-validation.feature`
 - Purpose: 定义 CLI 校验工具的行为契约，包括校验分层、诊断输出格式与错误定位，确保 CLI 结果可用于 IDE 跳转、CI 报告与脚本化消费。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 - Requirements:
   - CLI 与 runtime core 职责分离
@@ -76,6 +76,31 @@
   - Format 命令
   - demand `schema validate` MUST support `--workflow` context for outputs→resources
   - demand `validate` MUST support the same `--workflow` context behavior as `schema
+  - runtime-可独立使用
+  - cli-复用统一校验逻辑
+  - 非法输入在各入口一致失败
+  - validate-不依赖-jsonschema
+  - schema-validate-收集完整错误
+  - 未知字段诊断不重复
+  - fail-late-情况早期捕获
+  - json-输出结构
+  - 错误包含源码位置
+  - bracket-path-归一化
+  - 使用-linter-风格输出
+  - schema-查看
+  - schema-路径查看
+  - 插入两种-header
+  - 仅保留特定-header
+  - fix-移除不必要引号
+  - json-输出结构化
+  - format-幂等且安全
+  - format-保留必要引号
+  - schema-validate-accepts-a-workflow-declared-book-id
+  - schema-validate-accepts-a-workflow-declared-file-id
+  - schema-validate-fails-fast-when-workflow-context-cannot-be-l
+  - schema-validate-still-rejects-unknown-ids-even-with-workflow
+  - validate-accepts-a-workflow-declared-resource-id
+  - validate-accepts-a-workflow-declared-file-id
 
 ## Command Details
 ### `yaml-dsl validate`

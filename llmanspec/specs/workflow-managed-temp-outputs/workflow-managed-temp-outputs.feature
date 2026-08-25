@@ -1,0 +1,24 @@
+# language: zh-CN
+# capability: workflow-managed-temp-outputs
+# purpose: 允许 workflow 托管仅供写入节点消费的中间态 outputs，使用内存 artifact 而非强制落盘，并确保 typed artifact 在 pathless/pathful xlsx 写节点路径保留值域。 [scope-review-2026-07-20-c999]
+# scope: src/scalim/
+
+功能: workflow-managed-temp-outputs
+
+  @req:r90 @human
+  场景: workflow MAY manage temp tabular outputs for write-node consumption
+    - 当 demand outputs 仅用于 workflow 写入节点消费时,workflow MAY 托管这些 outputs 的中间态；当 workflow 选择托管时,系统 MUST 允许以实现细节选择合适的内存 artifact,而不是强制落盘。 - workflow-managed 中间态 MUST NOT 通过 demand YAML authoring surface 暴露(例如 path: "" 触发);该类配置 MUST 被视为非法并 fail-fast - workflow MAY 将上游输出物化为可供写入节点消费的内存 artifact,而不是强制落盘 - 当下游 consumer 为 pathful 或 pathless xlsx 写节点时,系统 MUST 为对应 output 提供按 output 粒度的 typed in-memory artifact (InMemoryRows) - 对 pathful / pathless xlsx consumer 路径,系统 MUST 保留 FieldValue 值域,MUST NOT 强制经过 CSV 等价字符串化再做后置恢复 - 若同一 output 同时被 CSV 等价 consumer 消费,系统 MAY 从 typed artifact 显式派生字符串 artifact,但 typed artifact MUST 是 xlsx spreadsheet book 路径的 SSOT - 该 artifact MUST 作为写入节点的上游输出参与 workflow 执行,并在最终写入 consumer 完成后释放 - workflow 失败或取消时,未释放的 workflow-managed artifacts MUST 被统一丢弃；系统 MUST NOT 依赖 managed temp dir 清理来完成该能力
+
+  @req:r90 @human
+  场景: pathful-xlsx-bound-managed-output-is-typed-rows
+    - 必须成立：假如 workflow 执行某个 run 并需要将其输出写入共享 pathful xlsx book；当 workflow 物化写入节点并执行该 run；那么 系统 MUST 为该 output 提供可供写入节点消费的 typed InMemoryRows artifact
+    假如 workflow 执行某个 run 并需要将其输出写入共享 pathful xlsx book
+    当 workflow 物化写入节点并执行该 run
+    那么 系统 MUST 为该 output 提供可供写入节点消费的 typed InMemoryRows artifact
+
+  @req:r90 @human
+  场景: pathless-xlsx-bound-managed-output-is-typed-rows
+    - 必须成立：假如 workflow 执行某个 run 并需要将其输出写入共享 pathless xlsx book；当 workflow 物化写入节点并执行该 run；那么 系统 MUST 为该 output 提供可供写入节点消费的 typed InMemoryRows artifact
+    假如 workflow 执行某个 run 并需要将其输出写入共享 pathless xlsx book
+    当 workflow 物化写入节点并执行该 run
+    那么 系统 MUST 为该 output 提供可供写入节点消费的 typed InMemoryRows artifact

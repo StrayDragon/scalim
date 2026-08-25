@@ -1,0 +1,355 @@
+# language: zh-CN
+# capability: yaml-dsl-schema
+# purpose: 通过 dataclass 元数据生成 YAML DSL JSON Schema，作为校验与编辑器提示的唯一来源。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: yaml-dsl-schema
+
+  @req:r127 @human
+  场景: YAML DSL JSON Schema generator MUST live in dev tooling and consume core SSOT
+    - 系统 MUST 将 YAML DSL JSON Schema 的**结构/描述 SSOT** 与**生成器实现**分层： - 结构/描述 SSOT MUST 位于 schema 元数据模块（dataclass + metadata、枚举/默认值、字段描述文本等）。 - JSON Schema 的生成器实现（builder/writer/docs standardization pipeline）MUST 位于 dev tooling packages。 - 生成器 MUST 以 core SSOT 为唯一来源构建 schema，不得在 dev 包中复制字段枚举/默认值/描述文案的另一份真相。 - runtime core MUST NOT 导入 dev tooling packages，包括 optional hook / 动态导入方式。
+
+  @req:r369 @human
+  场景: schema generation entrypoint MUST remain single and output location MUST remain
+    - 系统 MUST 保持 schema 生成入口与生成物位置为稳定契约： - 唯一生成入口 MUST 为 schema 生成脚本 - 生成物 MUST 写入 schema 输出目录 - 生成物为 `.gen.` 文件，MUST NOT 手工编辑（只能通过生成入口刷新）
+
+  @req:r489 @human
+  场景: enums and defaults MUST be sourced from schema_dsl SSOT
+    - 系统 MUST 将 YAML DSL 的枚举/默认值/描述文本收敛到 schema_dsl 作为单点 SSOT. 约束: - runtime validator/parser MUST 引用 schema_dsl 的导出，不得复制同一份枚举/默认值常量 - 系统 MUST 提供一致性自检（测试或脚本），确保 schema 接受的枚举与 runtime 接受的枚举一致
+
+  @req:r569 @human
+  场景: schema 生成器 MUST 支持文档标准化与 hover 指引
+    - 系统 SHALL 使用 schema 元数据模块生成 JSON Schema 并将其视为唯一 canonical schema，并提供完整的文档支持： - schema 顶层不包含 `dsl_version` - schema 顶层仅保留 `relations`（排除 `relations_sql_like`/`relations_graph`） - `relations.steps.from/to` 支持 `source.field` 字符串或同源字符串列表 - 数组字段 `items_choices` 映射为 `items.enum` - schema 提供 steps/fields/sources/params 的中文 hover 描述与示例 - 对枚举/choices 字段提供简洁 hover 说明（逐项解释语义）并附带示例 - schema hover MUST 提供常见错误与迁移提示（包括但不限于 field_id/data_key 区分、float key 策略、legacy 字段迁移） - schema hover MUST 说明特殊指令节点（包括但不限于 `$keys/$rows`、`$init_var`、相对模块引用）的用法与限制
+
+  @req:r631 @human
+  场景: demand JSON Schema MUST validate source identifiers and reject empty loader/key
+    - 系统 MUST 在生成的 YAML DSL JSON Schema 中表达并拒绝以下形态，以与 runtime 语义保持一致： - `main_source.source_id` MUST 匹配标识符 pattern - `sources` mapping keys MUST 匹配同一 pattern（通过 `propertyNames`；且为保持 `$import` 在编辑器侧可用，`propertyNames` MUST 同时允许 key 为 `$import`） - `main_source.loader` / `sources.*.loader` MUST 为非空字符串 - `sources.*.key` 的 string（或 array items） MUST 为合法 `field_id`（拒绝空字符串）
+
+  @req:r677 @human
+  场景: YAML DSL JSON Schemas MUST allow YAML merge key (`<<`) where propertyNames is us
+    - 系统 MUST 对齐 schema-only 校验与 runtime 的 YAML merge key 支持： - 对任何使用 `propertyNames` 约束 mapping key 的 object 节点，生成的 schema MUST 显式允许 key 为 `<<`。 - 除 `<<` 之外，原有 `propertyNames` 规则 MUST 保持不变（不得放宽既有命名约束）。 说明： - 该要求的目标是消除 editor/YAML Language Server 对 merge key 的假阳性，避免用户被迫关闭 schema 或放弃 `<<` 复用。 - runtime 仍是最终语义裁决与严格校验来源；schema-only 的放宽仅用于提升 authoring 体验。
+
+  @req:r717 @human
+  场景: outputs 字段 hover 指引明确可选与 overrides 推荐写法
+    - 系统 MUST 在生成的 YAML DSL JSON Schema 中，为顶层 `outputs` 字段提供清晰的 `markdownDescription`，并明确： - 顶层 `outputs` 为可选字段（用于保持 demand YAML 可复用） - 当把 demand YAML 当作"需求本体模板"复用时，推荐在 Python 调用侧使用 `overrides.outputs` 运行期指定输出编排
+
+  @req:r750 @human
+  场景: schema MUST expose the unified output target surface and reject legacy surfaces
+    - 系统 MUST 生成反映统一输出模型的 YAML DSL schema： - MUST 暴露 `resources.files` - MUST 暴露 `outputs[*].to.file` - MUST 在 `outputs[*].write` 中暴露通用 header 字段 - MUST NOT 再接受已移除的 legacy surfaces（包括但不限于 `outputs[*].container`、workflow `writes`、workflow `workbooks`/`csvs`/`sheetbooks`）
+
+  @req:r777 @human
+  场景: demand JSON Schema MUST encode composed outputs invariants
+    - 系统 MUST 在 demand JSON Schema 中表达 outputs 的关键不变量，避免 schema validate 放行但 parser 失败： - `outputs[*].container.streaming` 若显式提供，则 MUST 为 `true` - 当 output 未声明 `aggregate` 时（明细输出），系统 MUST 要求存在字段来源： - 显式提供非空 `fields`，或 - 通过 `from` 继承字段集合 - 为保持 `$import` 在编辑器侧可用，该约束 MUST 不阻断仅声明 `$import` 的 output_target
+
+  @req:r156 @human
+  场景: `header_fields_output_by` default is `name`
+    - 系统 MUST 将统一写入模型下的 `header_fields_output_by` schema 默认值设为 `name`（破坏性变更）。 约束： - `outputs[*].write.header_fields_output_by.default` MUST 等于 `name` - `resources.books.write_defaults` MUST NOT 暴露 `header_fields_output_by`
+
+  @req:r177 @human
+  场景: 顶层 schema 字段(guardrails)
+    - 系统 SHALL 在 YAML DSL schema 顶层新增可选对象 `guardrails` 用于运行时护栏配置。 `guardrails.mode` 仅允许 `quiet|fast_fail`；`loader.on_transform_error` 与 `compute.on_error` 仅允许 `quiet|fast_fail`； `loader.validate_result` 为布尔值（可选）；`loader.required_fields` 为数组（可选），条目允许为 `field_id` 字符串或对象（alias）； `relations.null_key_max_rate` 与 `relations.type_error_max_rate` 为 0-1 的浮点数（可选）； 不提供 `relations.fields` 范围选择器（关联阈值护栏默认对全部关联 lookup step 生效）。
+
+  @req:r195 @human
+  场景: 字段声明位置与 compute 约束
+    - 系统 SHALL 支持在 `main_source.fields` 与 `sources.*.fields` 内声明源字段，顶层 `fields` 仅用于派生字段且必须包含 `compute`。 顶层 `fields` 可缺省或为空映射；schema 允许字段对象包含额外键，但严格校验脚本可报告未知字段。
+
+  @req:r213 @human
+  场景: schema documents `extract` as current-row-relative field extraction
+    - 系统 MUST 在 YAML DSL JSON Schema 的源字段定义中新增 `extract` 字段，并在 `description` / `markdownDescription` 中明确说明： - `extract` 相对当前 key 对应的 row value 解析 - 系统只隐式省略最外层 `lookup_key -> value` 包装 - row value 内部的包裹层不会被自动跳过 schema 示例 MUST 包含常见 extract 模式（包括嵌套访问、数组索引、特殊键名等）。
+
+  @req:r226 @human
+  场景: schema removes legacy `field` and provides migration guidance
+    - 系统 MUST 从源字段 schema 中移除 `field`，并在 hover/文档中明确说明： - 源字段取值唯一入口是 `extract` - rename 也用 `extract: <key_name>` - 若出现历史 `field: ...`，应按迁移错误处理并提示改为 `extract: ...`
+
+  @req:r239 @human
+  场景: relation steps-only 约束
+    - 系统 SHALL 将 `fields.*.relation` 限制为 steps 对象（允许 YAML alias 复用），禁止 relation_id 字符串引用。
+
+  @req:r249 @human
+  场景: output.fields 解析与 schema 指引
+    - 系统 SHALL 仅接受 `output.fields` 条目为对象（dict/alias），并支持以下解析方式；拒绝字符串、单键映射与签名匹配形式。 支持的条目类型： - **Alias 条目**：条目为字段定义处 dict 的直接 YAML alias（同一对象），系统 MUST 通过对象身份反查到对应字段定义并解析其 `field_id`。 - **显式选择器条目**：条目为 dict，系统 MUST 按以下规则解析： - 若条目包含 `field_id`，系统 MUST 将其作为选择器按 `field_id` 定位字段定义；可选 `source` 用于跨 source 重名时消歧义。 - 若条目不包含 `field_id` 但包含 `field`，系统 MUST 将其作为选择器按 loader data_key 定位**源字段（kind=source）**；可选 `source` 用于消歧义。 - 对歧义场景系统 MUST 报错并提示补充 `source` 或改用 alias/`field_id`。 显式条目的覆写项为除选择器键之外的其它键，用于覆写字段定义（例如 `name`/`relation`/`value_cast` 等）。 schema 的 `description`/`markdownDescription`/示例 MUST 展示 alias 复用与显式选择器的用法，并明确说明 YAML merge（`<<`）会丢失对象身份，merge 产物需要选择器键才能解析。
+
+  @req:r257 @human
+  场景: 字段 ID 唯一性与解析规则
+    - 系统 SHALL 要求源字段 `field_id` 在单个 source 内唯一；派生字段 `field_id` 全局唯一且不得与任何源字段同名。 系统 SHALL 允许源字段 `field_id` 采用 `<source_id>.<field_id>` 命名约定并视为普通字符串；同一 source 内多个字段可引用相同 `data_key`（例如多个字段的 `extract` 为同一个顶层 key），但 `field_id` 不同。 当 `output.fields` 缺省且存在跨 source 同名 `field_id` 时，校验必须失败并提示必须显式指定 `output.fields`。
+
+  @req:r264 @human
+  场景: 派生字段支持 call_by Schema
+    - Schema 生成器 SHALL 在派生字段定义中加入 `call_by` 字段，类型为字符串，并在 schema hover 中说明 `reference(args...)` 语法、kwargs 示例、Python 字面量示例与 `$ctx.*` 可用属性。 schema hover MUST 明确 `reference` 的 module path 同时支持绝对引用与相对引用（以 `.` / `..` 开头，相对 YAML 文件所在目录）。 Schema SHALL 对派生字段声明 `compute` 与 `call_by` 做互斥约束（oneOf），并确保源字段/主源字段不允许出现 `call_by`。
+
+  @req:r271 @human
+  场景: schema meta key 参考文档与推荐写法
+    - 系统 MUST 提供一份可发现的 schema meta key 参考，用于约束与指导 `_schema_meta(...)` 的使用。 该参考 MUST 至少包含： - 支持的 shorthand keys/别名与其对应的 JSONSchema 字段 - 推荐的 canonical 写法 - 可复制的示例（至少覆盖常见 meta key）
+
+  @req:r381 @human
+  场景: schema meta 中 schema dict 不得吞掉 desc/md
+    - 系统 MUST 在生成 YAML DSL JSON Schema 时保留 `_schema_meta(...)` 中除 `schema` 之外的 meta 信息（例如 `desc`/`md`/`examples` 等），以避免 LSP hover 缺失。
+
+  @req:r387 @human
+  场景: schema 明确 batch_size 的 null-or-int 语义
+    - Schema 生成器 MUST 将顶层 `batch_size` 定义为 `oneOf`： - `type: "null"`（语义：禁用分批） - `type: "integer"` 且 `minimum: 1`（语义：固定分批） schema hover/markdownDescription MUST 明确区分三种状态： - 未声明：沿用默认分批策略。 - 显式 `null`：no-chunking（单批执行）。 - 显式整数：按固定批大小分批。
+
+  @req:r391 @human
+  场景: retry 字段纳入 JSON Schema 与 hover 指引
+    - 系统 SHALL 在生成的 YAML DSL JSON Schema 中新增 retry 字段支持： - 顶层可选对象 `retry` - `main_source` 下的可选对象 `retry` - `sources.*` 下的可选对象 `retry` - `_templates.retry` 对象映射（template_name -> retry policy 对象） Schema MUST 为 retry policy 字段提供： - 类型约束（bool/int/number/enum） - 范围约束（至少包含硬上限） - 简短 hover 指引，说明安全默认值与"默认不启用"的语义 约束： - `_templates` 的其它内容保持 freeform（不要求 schema 穷举/校验），但 `_templates.retry.*` MUST 按 retry policy 规则校验 - `retry.should_retry` MUST 为非空字符串（当显式提供时）
+
+  @req:r394 @human
+  场景: demand JSON Schema MUST encode `lookup_cast` as a one-of cast-branch object
+    - 系统 MUST 在生成的 demand JSON Schema 中将 `lookup_cast` 表达为 one-of 分支对象,以实现 authoring 阶段 fail-fast: - `lookup_cast` MUST 为 object - `lookup_cast` MUST 通过 `oneOf` 限定为以下四种之一（且只能选其一）: - `{auto: {}}` - `{int: {}}` - `{str: {}}` - `{sep_first: {sep?: <string>}}` - `auto/int/str` 分支的 value object MUST NOT 接受任何额外字段 - `sep_first` 分支的 value object MUST 仅允许可选字段 `sep`(string),且 MUST NOT 接受任何额外字段 - schema MUST NOT 再接受 legacy 形态 `lookup_cast: {name: ...}`
+
+  @req:r395 @human
+  场景: schema 说明源代码级 `normalize` 及其执行顺序
+    - 系统 MUST 在 YAML DSL JSON Schema 的 `sources.*` 定义中新增 `normalize` 字段，并在 `description` / `markdownDescription` 中明确说明： - `normalize` 是源代码级整体结果归一化 - `normalize` 先于字段级 `extract` 执行 - `normalize.index_by_key` 的输入输出形状示例 约束： - `main_source` MUST NOT 暴露 `normalize` 字段 - `sources.*.normalize` MUST 以分支 one-of 结构表达，并且必须且只能选择一个 normalize 分支： - `index_by_key` / `take_first` / `project_fields` / `map_values` - `normalize` MAY 额外声明公共字段 `call_by` - `sources.*.normalize.index_by_key.on_none` MUST 为 `raise|skip` - 仅当 `sources.*.normalize` 选择 `index_by_key` 分支时允许出现 `on_none` - 当 `sources.*.normalize` 为其它分支且出现 `on_none` 时，系统 MUST 拒绝该配置
+
+  @req:r396 @human
+  场景: `outputs.*.fields` 支持 YAML alias 与 object 条目
+    - 系统 MUST 允许 `outputs[*].fields` 的每一项为以下两种之一： - `field_id` 字符串（已弃用，推荐使用显式对象） - YAML alias（object）条目：条目为某个"已定义字段对象"的 alias（展开后为 dict），系统 MUST 将其解析为该字段对象对应的 `field_id` 字段对象的来源包括： - `main_source.fields.*` - `sources.*.fields.*` - 顶层派生字段 `fields.*` schema MUST 在生成的 YAML DSL JSON Schema 中允许 `outputs[*].fields.items` 为 `string | object`，以避免 schema-only 校验与编辑器提示拦截 alias 写法。 当 object 条目无法通过"对象身份"（identity）反查到字段对象时，系统 SHALL 允许基于内容相等做兜底匹配，但仅当匹配结果唯一时才允许成功解析。
+
+  @req:r397 @human
+  场景: schema MUST support `{$init_var: <name>}` for resource paths
+    - 系统 MUST 在 YAML DSL JSON Schema 中对资源路径字段支持 `{$init_var: <name>}` 指令节点注入输出路径（对象节点，不是字符串插值）： - 路径字段 MUST 支持非空静态字符串路径或 `{$init_var: <name>}` 指令节点 - 路径字段为空字符串 MUST 被拒绝 说明： - `.xlsx` 输出路径注入通过 books 资源与 export_xlsx 路径字段。
+
+  @req:r398 @human
+  场景: kind-based `if/then` constraints MUST NOT trigger when `kind` is missing
+    - 系统 MUST 生成 JSON schema，使得所有基于 `kind` 分支的 `if/then` 约束在 `kind` 缺失时不触发。 动机： - 编辑器侧的 YAML schema 校验不会展开 `$import`，因此允许存在 `{ $import: ... }` 形态的 mapping（此时 `kind` 通常在 fragment 内声明）。 - JSON schema 的 `properties.kind.const` 在 `kind` 缺失时不会失败，若不额外约束会导致 `then` 被错误触发，产生假阳性。 约束： - 当 `if` 用于匹配 `properties.kind.const`（或等价模式）时，`if` MUST 同时包含 `required: ["kind"]`。 - 此要求 MUST 覆盖所有使用 kind-variant 生成模式的定义。
+
+  @req:r128 @human
+  场景: workflow `resources` schema MUST expose only runtime-supported keys
+    - workflow `resources` 的 schema 与静态校验面 MUST 以 runtime parser / compiler 实际支持的结构为准: - `workflow.resources` MUST NOT 暴露 runtime 不支持的 keys - `workflow.resources` MUST NOT 支持 imports expansion 或 `$import` - 当用户写入被移除的旧 key 时,系统 MUST 提供可执行的 migration hint
+
+  @req:r370 @human
+  场景: generated numeric constraints MUST declare numeric types
+    - 凡是生成到 JSON Schema 的 numeric constraints,若使用了 `minimum`、`maximum`、`exclusiveMinimum` 或 `exclusiveMaximum`,对应 schema 节点 MUST 同时显式声明 `type: number` 或 `type: integer`。
+
+  @req:r490 @human
+  场景: schema/workflow drift gate MUST protect the highest-risk surfaces first
+    - 仓库 MUST 提供针对高风险 drift 的自动化 gate,至少覆盖: - `workflow.resources` allowed keys 集合 - numeric constraints typing 完整性
+
+  @req:r28 @human
+  场景: schema MUST NOT expose runtime policy fields
+    - 某些字段属于 runtime policy（可能包含敏感信息或仅为运行时配置），系统 MUST 不将其作为 demand YAML stable authoring 字段暴露在 schema 中。 包括但不限于： - `include_full_error_message`
+  @req:r127 @human
+  场景: changing-a-field-description-only-touches-core-ssot
+    - 必须成立：当 维护者更新某个 YAML 字段的描述性信息；那么 变更 MUST 只发生在 schema 元数据模块
+    当 维护者更新某个 YAML 字段的描述性信息
+    那么 变更 MUST 只发生在 schema 元数据模块
+
+  @req:r127 @human
+  场景: missing-dev-package-does-not-break-runtime-imports
+    - 必须成立：假如 用户环境未安装 dev tooling 包；当 用户仅使用 runtime 能力或 import 主包；那么 import 与运行 MUST 成功
+    假如 用户环境未安装 dev tooling 包
+    当 用户仅使用 runtime 能力或 import 主包
+    那么 import 与运行 MUST 成功
+  @req:r369 @human
+  场景: drift-gate-points-to-the-single-generator-entrypoint
+    - 必须成立：当 生成物与生成器输出不一致（drift）；那么 gate MUST fail-fast
+    当 生成物与生成器输出不一致（drift）
+    那么 gate MUST fail-fast
+  @req:r489 @human
+  场景: enum-drift-is-detected
+    - 必须成立：当 维护者修改 schema_dsl 中某个 enum/默认值；那么 一致性自检 MUST fail-fast 并指出不一致字段
+    当 维护者修改 schema_dsl 中某个 enum/默认值
+    那么 一致性自检 MUST fail-fast 并指出不一致字段
+  @req:r569 @human
+  场景: 生成器产出正确的-schema-结构
+    - 必须成立：当 执行 schema 生成脚本；那么 生成 schema MUST 包含正确的顶层结构（不含 dsl_version，保留 relations）
+    当 执行 schema 生成脚本
+    那么 生成 schema MUST 包含正确的顶层结构（不含 dsl_version，保留 relations）
+
+  @req:r569 @human
+  场景: schema-hover-包含字段说明与示例
+    - 必须成立：当 生成 schema；那么 关键字段的 `markdownDescription` MUST 包含选项语义说明且具备示例值
+    当 生成 schema
+    那么 关键字段的 `markdownDescription` MUST 包含选项语义说明且具备示例值
+  @req:r631 @human
+  场景: schema-rejects-invalid-sources-configuration
+    - 必须成立：当 demand YAML 的 `sources` 出现空 key、非法 key、空 loader 或空 key；那么 schema-only 校验 MUST 失败
+    当 demand YAML 的 `sources` 出现空 key、非法 key、空 loader 或空 key
+    那么 schema-only 校验 MUST 失败
+  @req:r677 @human
+  场景: schema-validation-accepts-merge-key-in-map-like-objects
+    - 必须成立：假如 用户的 demand YAML 在 `fields`/`sources`/`imports` 等 mapping 节点使用 YAML merge key；当 编辑器使用生成的 schema 做 schema-only 校验；那么 MUST NOT 报告 `propertyNames` pattern mismatch for key `<<`
+    假如 用户的 demand YAML 在 `fields`/`sources`/`imports` 等 mapping 节点使用 YAML merge key
+    当 编辑器使用生成的 schema 做 schema-only 校验
+    那么 MUST NOT 报告 `propertyNames` pattern mismatch for key `<<`
+  @req:r717 @human
+  场景: schema-中包含-outputs-可选与-overrides-outputs-提示
+    - 必须成立：当 生成 demand JSON Schema；那么 `properties.outputs.markdownDescription` MUST 提及 `outputs` 可选
+    当 生成 demand JSON Schema
+    那么 `properties.outputs.markdownDescription` MUST 提及 `outputs` 可选
+  @req:r750 @human
+  场景: schema-exposes-unified-output-surfaces
+    - 必须成立：当 生成 demand JSON Schema；那么 schema MUST 暴露统一输出模型的相关定义
+    当 生成 demand JSON Schema
+    那么 schema MUST 暴露统一输出模型的相关定义
+
+  @req:r750 @human
+  场景: schema-rejects-legacy-output-surfaces
+    - 必须成立：当 用户使用 legacy 输出 surface（包括 container、writes 等）；那么 schema-only 校验 MUST 失败
+    当 用户使用 legacy 输出 surface（包括 container、writes 等）
+    那么 schema-only 校验 MUST 失败
+  @req:r777 @human
+  场景: schema-rejects-invalid-composed-outputs-configuration
+    - 必须成立：当 output 配置违反不变量（如 streaming=false 或明细输出缺少字段来源）；那么 schema-only 校验 MUST 失败
+    当 output 配置违反不变量（如 streaming=false 或明细输出缺少字段来源）
+    那么 schema-only 校验 MUST 失败
+  @req:r156 @human
+  场景: schema-default-for-header-fields-output-by-is-name
+    - 必须成立：当 生成 demand JSON Schema；那么 `definitions.output_write.properties.header_fields_output_by.default` MUST 等于 `name`
+    当 生成 demand JSON Schema
+    那么 `definitions.output_write.properties.header_fields_output_by.default` MUST 等于 `name`
+  @req:r177 @human
+  场景: guardrails-schema-校验
+    - 必须成立：当 condition is met；那么 schema 校验 MUST 按预期通过或失败并指出错误
+    当 condition is met
+    那么 schema 校验 MUST 按预期通过或失败并指出错误
+  @req:r195 @human
+  场景: 顶层-fields-出现源字段
+    - 必须成立：当 顶层 `fields` 中声明无 `compute` 的字段；那么 校验必须失败并提示仅允许派生字段
+    当 顶层 `fields` 中声明无 `compute` 的字段
+    那么 校验必须失败并提示仅允许派生字段
+  @req:r213 @human
+  场景: schema-hover-包含-current-row-relative-说明
+    - 必须成立：当 生成 demand JSON Schema；那么 源字段定义中的 `extract` MUST 具备 `description` 或 `markdownDescription`
+    当 生成 demand JSON Schema
+    那么 源字段定义中的 `extract` MUST 具备 `description` 或 `markdownDescription`
+  @req:r226 @human
+  场景: schema-不再暴露-field
+    - 必须成立：当 生成 demand JSON Schema；那么 源字段定义 MUST NOT 包含可用的 `field` 属性（应通过 schema/validator 拒绝）
+    当 生成 demand JSON Schema
+    那么 源字段定义 MUST NOT 包含可用的 `field` 属性（应通过 schema/validator 拒绝）
+  @req:r239 @human
+  场景: relation-id-字符串被拒绝
+    - 必须成立：当 `fields.*.relation` 使用字符串引用；那么 校验必须失败并提示仅支持 steps 对象
+    当 `fields.*.relation` 使用字符串引用
+    那么 校验必须失败并提示仅支持 steps 对象
+  @req:r249 @human
+  场景: output-fields-解析支持显式选择器
+    - 必须成立：当 `output.fields` 包含显式 `field_id` 对象或 `{field: <data_key>, source?: ...}` 选择器；那么 解析器 MUST 正确解析并应用覆写
+    当 `output.fields` 包含显式 `field_id` 对象或 `{field: <data_key>, source?: ...}` 选择器
+    那么 解析器 MUST 正确解析并应用覆写
+
+  @req:r249 @human
+  场景: output-fields-拒绝字符串与-merge-产物
+    - 必须成立：当 `output.fields` 包含字符串或 merge 产物（缺少选择器键）；那么 校验必须失败并提示改用显式对象条目
+    当 `output.fields` 包含字符串或 merge 产物（缺少选择器键）
+    那么 校验必须失败并提示改用显式对象条目
+  @req:r257 @human
+  场景: 派生-源同名-field-id
+    - 必须成立：当 顶层 `fields` 与 `main_source.fields`/`sources.*.fields` 使用相同 `field_id`；那么 校验必须失败并提示派生/源同名不允许
+    当 顶层 `fields` 与 `main_source.fields`/`sources.*.fields` 使用相同 `field_id`
+    那么 校验必须失败并提示派生/源同名不允许
+  @req:r264 @human
+  场景: call-by-仅允许派生字段且与-compute-互斥
+    - 必须成立：当 源字段中出现 `call_by` 或同一派生字段同时声明 `compute` 与 `call_by`；那么 schema 校验失败并提示约束错误
+    当 源字段中出现 `call_by` 或同一派生字段同时声明 `compute` 与 `call_by`
+    那么 schema 校验失败并提示约束错误
+
+  @req:r264 @human
+  场景: call-by-语法说明可见且包含相对引用
+    - 必须成立：当 在 LSP/Schema hover 查看 `call_by`；那么 显示函数引用格式、kwargs 示例与 `$ctx.*` 可用属性说明
+    当 在 LSP/Schema hover 查看 `call_by`
+    那么 显示函数引用格式、kwargs 示例与 `$ctx.*` 可用属性说明
+  @req:r271 @human
+  场景: 新同事查阅-schema-meta-key
+    - 必须成立：当 用户需要为 YAML DSL schema 增加 hover 描述/枚举/示例并使用 `_schema_meta(...)`；那么 系统应提供一份集中参考，列出可用 key 与推荐写法，并包含可复制示例
+    当 用户需要为 YAML DSL schema 增加 hover 描述/枚举/示例并使用 `_schema_meta(...)`
+    那么 系统应提供一份集中参考，列出可用 key 与推荐写法，并包含可复制示例
+  @req:r381 @human
+  场景: main-source-order-by-hover-可见
+    - 必须成立：当 生成 demand JSON Schema；那么 `definitions.main_source.properties.order_by` MUST 包含 `description` 或 `markdownDescription`（至少其一）以支持编辑器 hover
+    当 生成 demand JSON Schema
+    那么 `definitions.main_source.properties.order_by` MUST 包含 `description` 或 `markdownDescription`（至少其一）以支持编辑器 hover
+  @req:r387 @human
+  场景: schema-batch-size-校验
+    - 必须成立：当 配置 `batch_size` 为合法值（null 或正整数）或非法值（0、负数、浮点数、布尔值、非数字字符串）；那么 schema 校验 MUST 按预期通过或失败
+    当 配置 `batch_size` 为合法值（null 或正整数）或非法值（0、负数、浮点数、布尔值、非数字字符串）
+    那么 schema 校验 MUST 按预期通过或失败
+  @req:r391 @human
+  场景: retry-schema-校验
+    - 必须成立：当 retry 配置缺失、包含非法枚举值或超过硬上限；那么 schema 校验 MUST 按预期通过或失败并指出错误
+    当 retry 配置缺失、包含非法枚举值或超过硬上限
+    那么 schema 校验 MUST 按预期通过或失败并指出错误
+  @req:r394 @human
+  场景: schema-rejects-legacy-lookup-cast-shape-with-name
+    - 必须成立：假如 用户编写 `lookup_cast: {name: int}`；当 编辑器或 schema-only 校验使用 demand JSON Schema 校验该 YAML；那么 校验 MUST 失败并指出 `lookup_cast` 结构不匹配
+    假如 用户编写 `lookup_cast: {name: int}`
+    当 编辑器或 schema-only 校验使用 demand JSON Schema 校验该 YAML
+    那么 校验 MUST 失败并指出 `lookup_cast` 结构不匹配
+
+  @req:r394 @human
+  场景: schema-rejects-sep-under-non-sep-first-branches
+    - 必须成立：假如 用户编写 `lookup_cast: {int: {sep: ","}}`；当 编辑器或 schema-only 校验使用 demand JSON Schema 校验该 YAML；那么 校验 MUST 失败并指出 `lookup_cast.int` 不允许字段 `sep`
+    假如 用户编写 `lookup_cast: {int: {sep: ","}}`
+    当 编辑器或 schema-only 校验使用 demand JSON Schema 校验该 YAML
+    那么 校验 MUST 失败并指出 `lookup_cast.int` 不允许字段 `sep`
+
+  @req:r394 @human
+  场景: schema-rejects-multiple-lookup-cast-branches
+    - 必须成立：假如 用户编写 `lookup_cast: {int: {}, sep_first: {sep: ","}}`；当 编辑器或 schema-only 校验使用 demand JSON Schema 校验该 YAML；那么 校验 MUST 失败并指出 `lookup_cast` 必须且只能选择一个分支
+    假如 用户编写 `lookup_cast: {int: {}, sep_first: {sep: ","}}`
+    当 编辑器或 schema-only 校验使用 demand JSON Schema 校验该 YAML
+    那么 校验 MUST 失败并指出 `lookup_cast` 必须且只能选择一个分支
+  @req:r395 @human
+  场景: schema-hover-包含-normalize-说明
+    - 必须成立：当 生成 demand JSON Schema；那么 `sources.*.normalize` 的文案 MUST 展示形状示例
+    当 生成 demand JSON Schema
+    那么 `sources.*.normalize` 的文案 MUST 展示形状示例
+
+  @req:r395 @human
+  场景: normalize-约束校验
+    - 必须成立：当 `main_source` 包含 `normalize`，或 `sources.*.normalize` 为非 `index_by_key` 分支但仍声明 `on_none`；那么 schema/运行时校验 MUST 失败并指出错误
+    当 `main_source` 包含 `normalize`，或 `sources.*.normalize` 为非 `index_by_key` 分支但仍声明 `on_none`
+    那么 schema/运行时校验 MUST 失败并指出错误
+  @req:r396 @human
+  场景: outputs-fields-使用-alias-解析
+    - 必须成立：假如 字段对象已定义；当 `outputs[0].fields` 包含该字段的 alias；那么 校验 MUST 通过且解析后的 `outputs[0].fields` MUST 包含对应 `field_id`
+    假如 字段对象已定义
+    当 `outputs[0].fields` 包含该字段的 alias
+    那么 校验 MUST 通过且解析后的 `outputs[0].fields` MUST 包含对应 `field_id`
+
+  @req:r396 @human
+  场景: alias-identity-失败时-content-match-兜底
+    - 必须成立：假如 `outputs[0].fields[*]` 无法通过对象身份反查；当 系统尝试基于内容相等匹配；那么 唯一匹配 MUST 成功，歧义或找不到 MUST fail-fast 并提示
+    假如 `outputs[0].fields[*]` 无法通过对象身份反查
+    当 系统尝试基于内容相等匹配
+    那么 唯一匹配 MUST 成功，歧义或找不到 MUST fail-fast 并提示
+
+  @req:r396 @human
+  场景: schema-validate-不因-object-条目直接失败
+    - 必须成立：假如 `outputs[0].fields` 包含 YAML alias（object）条目；当 执行 schema-only 校验；那么 校验 MUST NOT 因 `outputs[0].fields[*]` 的类型为 object 而失败
+    假如 `outputs[0].fields` 包含 YAML alias（object）条目
+    当 执行 schema-only 校验
+    那么 校验 MUST NOT 因 `outputs[0].fields[*]` 的类型为 object 而失败
+  @req:r397 @human
+  场景: schema-validate-accepts-string-or-init-var-object-for-file-p
+    - 必须成立：当 执行 demand schema-only 校验且文件路径使用静态字符串或 `{$init_var: <name>}` 语法；那么 校验 MUST 通过
+    当 执行 demand schema-only 校验且文件路径使用静态字符串或 `{$init_var: <name>}` 语法
+    那么 校验 MUST 通过
+  @req:r398 @human
+  场景: schema-validates-import-based-mapping-without-false-positive
+    - 必须成立：假如 demand YAML 中资源使用 `{ $import: <fragment> }` 且 fragment 内声明 `kind`；当 VSCode YAML schema（不展开 `$import`）对主 YAML 进行校验；那么 MUST NOT 报告假阳性错误
+    假如 demand YAML 中资源使用 `{ $import: <fragment> }` 且 fragment 内声明 `kind`
+    当 VSCode YAML schema（不展开 `$import`）对主 YAML 进行校验
+    那么 MUST NOT 报告假阳性错误
+  @req:r28 @human
+  场景: schema-no-longer-exposes-runtime-policy-fields
+    - 必须成立：当 生成 demand JSON Schema；那么 schema MUST NOT 暴露 runtime policy 专用字段
+    当 生成 demand JSON Schema
+    那么 schema MUST NOT 暴露 runtime policy 专用字段
+  @req:r128 @human
+  场景: workflow-resource-import-syntax-is-rejected-before-runtime
+    - 必须成立：假如 某个 workflow YAML 在 `workflow.resources.books.<id>` 下写入 `$import`；当 用户执行 schema 校验或 workflow validate；那么 系统 MUST 将其识别为不受支持的结构
+    假如 某个 workflow YAML 在 `workflow.resources.books.<id>` 下写入 `$import`
+    当 用户执行 schema 校验或 workflow validate
+    那么 系统 MUST 将其识别为不受支持的结构
+  @req:r370 @human
+  场景: schema-generation-fails-on-a-clearly-invalid-numeric-constra
+    - 必须成立：当 schema generation 遇到某个节点声明 minimum 但未声明数值类型；那么 生成流程 MUST fail-fast
+    当 schema generation 遇到某个节点声明 minimum 但未声明数值类型
+    那么 生成流程 MUST fail-fast
+  @req:r490 @human
+  场景: a-drift-regression-is-caught-by-the-gate
+    - 必须成立：当 某次改动让 workflow schema 暴露了 runtime 不支持的 key 或重新引入 numeric typing hole；那么 自动化 gate MUST 在提交前或 CI 中失败
+    当 某次改动让 workflow schema 暴露了 runtime 不支持的 key 或重新引入 numeric typing hole
+    那么 自动化 gate MUST 在提交前或 CI 中失败

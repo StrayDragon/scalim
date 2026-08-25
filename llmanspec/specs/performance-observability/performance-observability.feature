@@ -1,0 +1,142 @@
+# language: zh-CN
+# capability: performance-observability
+# purpose: PerformanceObserver 在 pipeline/batch/loader 事件上收集耗时、loader 统计与吞吐量,并可选采样内存/CPU(psutil 可选);RelationObserver 收集关联命中率与类型不匹配诊断. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: performance-observability
+
+  @req:r68 @human
+  场景: 性能指标采集与结构化输出
+    - 系统 SHALL 提供可观测插件以收集总耗时/批次耗时/吞吐量/loader 统计与可选资源采样(psutil 可选). 系统 SHALL 提供结构化的 `PerformanceMetrics`(或等价结构),至少包含 `total_duration`、`batch_count`、`total_rows`、`batch_durations`、`stage_metrics`、`loader_stats` 与可选 `memory_samples`/`cpu_samples`. 系统 MUST 明确 `PerformanceMetrics.total_rows` 的统计口径为输入 `row_ids` 数量(例如 `sum(len(BatchStartEvent.row_ids))`),用于吞吐估算并避免 per-row 写出事件带来的额外开销. 系统 SHOULD 在文档/类型注释中提示: 若需要"实际写出/产出(emit)行数",应以 `ExecutionResult.total_rows` 为准. 系统 SHALL 通过更明确的阶段边界(例如 batch 内 loader/compute/write 的 begin/end)计算 `stage_metrics`,以减少基于事件间隔估算的误差.
+
+  @req:r312 @human
+  场景: duration 统计使用单调时钟
+    - 系统 MUST 使用单调时钟(例如 `time.perf_counter()`)计算耗时指标(total/batch/stage/loader durations 或等价字段),以避免 `time.time()` 受系统时间回拨/校正影响导致的异常波动. 对于 observability presets/observers 中展示或派生 duration 的逻辑(例如 pretty logging 的批次耗时展示),实现 MUST 复用事件自带的 duration 字段(例如 `BatchEndEvent.duration`)或使用单调时钟计算;实现 MUST NOT 通过 `time.time()` 差值计算 duration.
+
+  @req:r435 @human
+  场景: 资源采样与报告输出
+    - 系统 SHALL 在启用 memory/cpu 指标时尝试使用 psutil 采样;sampling_interval 为批次数间隔(默认 1),memory_increase 由 pipeline start/end 的内存差计算. 系统 SHALL 支持 `console`/`json`/`csv`/`none` 四种报告格式;`json` 在 output_path 缺省时直接输出到 logger,`csv` 必须提供 output_path 否则记录警告. 系统 SHALL 支持阈值告警(如 `thresholds.batch_duration_warn` 与 `thresholds.memory_increase_warn`)并在超过阈值时记录警告日志.
+
+  @req:r528 @human
+  场景: runtime entrypoints 装配与独立开关
+    - 系统 SHALL 支持通过 runtime entrypoints 装配 `PerformanceObserver` 与 `RelationObserver`(Observer presets),并允许两者独立启用/禁用: - 运行入口通过 `components=[...]` 接受 observers - YAML DSL MUST NOT 将 `observability.*` 作为稳定 authoring surface(legacy key 可 warning + ignore 作为迁移过渡)
+
+  @req:r602 @human
+  场景: RelationObserver 统计与报告
+    - 系统 SHALL 提供关联观测插件,收集 total/hit/miss/null_key/type_error 计数、per_source_stats,并支持 `sampling_rate` 与 `log_type_mismatch` 控制样本记录. 系统 SHALL 支持 `console`/`json`/`none` 报告格式.
+
+  @req:r656 @human
+  场景: adaptive 调度决策可观测性
+    - 系统 SHALL 在 `parallel_mode=adaptive` 下提供可观测性信号用于解释调度决策(例如:命中阈值而退化串行、pool 限流导致排队、backend 选择与回退原因). 该可观测性信号 MUST 满足: - wants-gated:遵循 wants-gated/payload lazy 语义,未订阅时不得产生额外开销; - 可结构化:能够被 `PerformanceObserver`(或等价观测插件)收集并输出到报告结构中. 当前实现中,调度决策指标开关通过程序化配置(例如构造 `PerformanceObserver(..., include_scheduler_decisions=True)`)启用;YAML DSL 暂未暴露该显式开关.
+
+  @req:r998 @human
+  场景: 共享 observer 与 workflow 结论边界
+    - 当 `PerformanceObserver` 或 `RelationObserver` 在 workflow 多 demand 间共享且于 `PIPELINE_START` reset 时,系统 MUST NOT 将单次 pipeline 结束后的内存态指标表述为整个 workflow 的完整结论。跨节点完整结论 MUST 使用 `observability-run-stats` 的 `nodes[]` 快照(或等价累加器)。
+
+  @req:r999 @human
+  场景: 高影响 Relation/Perf 扩展警告
+    - 当程序化启用会显著抬高观测税的选项(例如 RelationObserver 全量诊断、PerformanceObserver 的 field_compute top-N / include_batch_lines 在大 batch 下)时,系统 MUST 发出警告并指向低漂移 bench profile;强制警告契约以 `observability-run-stats` r994 为准。
+
+  @req:r1001 @human
+  场景: write stage 真实 sink 归因
+    - 当订阅 `STAGE_SPAN` 时,系统 MUST 将现代 sink 路径上的真实写出耗时计入 stage `write`(含 column 写出与 streaming row flush/finalize;MAY 含 `sink.close()`/workbook save)。系统 MUST NOT 仅依赖计划层 `WRITE_*`/`RELEASE` 算子作为 write 的唯一归因。归因 MUST 使用单调时钟。启用观测不得改变 sink 业务输出内容。
+
+  @req:r1002 @human
+  场景: write 与 loader/compute 双计规则
+    - 若写出 I/O 发生在 loader 或 compute 的计时窗口内(例如 LOAD_REF 段内的 after_operator 列写出、streaming `on_field_set` flush),系统 MUST 将该写出片段计入 `write`,并从外层 loader/compute 扣回同等时长(或等价暂停外层时钟),以避免双计抬高 loader/compute。
+  @req:r68 @human
+  场景: 基础耗时监控
+    - 必须成立：当 用户启用性能观测插件并配置 metrics={"duration"}；那么 pipeline 结束时应可获取耗时与 loader 统计数据
+    当 用户启用性能观测插件并配置 metrics={"duration"}
+    那么 pipeline 结束时应可获取耗时与 loader 统计数据
+
+  @req:r68 @human
+  场景: 阶段耗时可重复
+    - 必须成立：当 在相同输入与相同执行计划下重复运行；那么 `stage_metrics` 的统计口径应保持稳定且可解释(loader/compute/write 明确对应执行阶段)
+    当 在相同输入与相同执行计划下重复运行
+    那么 `stage_metrics` 的统计口径应保持稳定且可解释(loader/compute/write 明确对应执行阶段)
+  @req:r312 @human
+  场景: duration-非负且稳定
+    - 必须成立：当 执行一次 pipeline 并产出 performance metrics(或等价结构)；那么 `total_duration` 与所有 batch/stage/loader durations MUST 为非负数
+    当 执行一次 pipeline 并产出 performance metrics(或等价结构)
+    那么 `total_duration` 与所有 batch/stage/loader durations MUST 为非负数
+
+  @req:r312 @human
+  场景: pretty-logging-uses-event-duration
+    - 必须成立：当 `PrettyLoggingObserver` 处理一个 `BatchEndEvent(duration=1.23)`；那么 输出中展示的批次耗时 MUST 反映该事件的 `duration` 值(按渲染格式四舍五入)
+    当 `PrettyLoggingObserver` 处理一个 `BatchEndEvent(duration=1.23)`
+    那么 输出中展示的批次耗时 MUST 反映该事件的 `duration` 值(按渲染格式四舍五入)
+  @req:r435 @human
+  场景: 内存监控-无-psutil
+    - 必须成立：当 用户配置 metrics 包含 memory/cpu 且环境未安装 psutil；那么 系统应发出警告并禁用对应采样
+    当 用户配置 metrics 包含 memory/cpu 且环境未安装 psutil
+    那么 系统应发出警告并禁用对应采样
+
+  @req:r435 @human
+  场景: csv-输出缺少路径
+    - 必须成立：当 `report.format=csv` 且未提供 `report.output`；那么 系统应记录警告而不中断执行
+    当 `report.format=csv` 且未提供 `report.output`
+    那么 系统应记录警告而不中断执行
+
+  @req:r435 @human
+  场景: 批次耗时超阈值
+    - 必须成立：当 配置 `thresholds.batch_duration_warn: 10.0` 且某批次耗时超过 10 秒；那么 系统应记录警告日志
+    当 配置 `thresholds.batch_duration_warn: 10.0` 且某批次耗时超过 10 秒
+    那么 系统应记录警告日志
+  @req:r528 @human
+  场景: 仅启用关联可观测性
+    - 必须成立：当 用户仅装配 `RelationObserver(...)` 且未装配 `PerformanceObserver(...)`；那么 系统仅启用关联观测
+    当 用户仅装配 `RelationObserver(...)` 且未装配 `PerformanceObserver(...)`
+    那么 系统仅启用关联观测
+  @req:r602 @human
+  场景: 关联命中率
+    - 必须成立：当 pipeline 执行完成；那么 `hit_rate` 应等于 `hit_count / (hit_count + miss_count)`
+    当 pipeline 执行完成
+    那么 `hit_rate` 应等于 `hit_count / (hit_count + miss_count)`
+  @req:r656 @human
+  场景: 未启用观测时无额外开销
+    - 必须成立：当 用户未启用性能观测且未订阅调度决策相关事件；那么 `adaptive` 调度 MUST 不产生额外的事件构造与记录开销
+    当 用户未启用性能观测且未订阅调度决策相关事件
+    那么 `adaptive` 调度 MUST 不产生额外的事件构造与记录开销
+
+  @req:r656 @human
+  场景: 程序化启用后可解释调度决策
+    - 必须成立：当 用户通过代码启用性能观测并显式请求包含调度决策指标；那么 报告中 MUST 包含串行退化原因、pool 等待统计或等价信息
+    当 用户通过代码启用性能观测并显式请求包含调度决策指标
+    那么 报告中 MUST 包含串行退化原因、pool 等待统计或等价信息
+
+  @req:r998 @human
+  场景: shared-reset-not-full-workflow
+    - 必须成立：当 共享 PerformanceObserver 连续服务两个 pipeline 且中间发生 reset；那么 API/文档 MUST 指示使用 nodes[]/run_stats 而非末态 metrics 作为全 workflow 结论
+    当 共享 PerformanceObserver 连续服务两个 pipeline 且中间发生 reset
+    那么 API/文档 MUST 指示使用 nodes[]/run_stats 而非末态 metrics 作为全 workflow 结论
+
+  @req:r999 @human
+  场景: heavy-option-points-to-bench
+    - 必须成立：当 启用 field_compute top-N 或全量 relation 诊断；那么 系统 SHOULD 警告并提及 bench 低漂移替代
+    当 启用 field_compute top-N 或全量 relation 诊断
+    那么 系统 SHOULD 警告并提及 bench 低漂移替代
+
+  @req:r1001 @human
+  场景: column-or-streaming-write-positive
+    - 必须成立：当 对合成 CSV(或等价)成功写出且订阅 STAGE_SPAN；那么 stage write(或 stages_total.write) MUST > 0
+    当 对合成 CSV(或等价)成功写出且订阅 STAGE_SPAN
+    那么 stage write(或 stages_total.write) MUST > 0
+
+  @req:r1001 @human
+  场景: write-attribution-output-unchanged
+    - 必须成立：当 同一输入分别在无 STAGE_SPAN 与有 STAGE_SPAN 下写出；那么 CSV 内容哈希 MUST 相等
+    当 同一输入分别在无 STAGE_SPAN 与有 STAGE_SPAN 下写出
+    那么 CSV 内容哈希 MUST 相等
+
+  @req:r1002 @human
+  场景: nested-write-not-double-counted
+    - 必须成立：当 写出发生在 loader/compute 计时窗内；那么 loader+compute+write MUST 不超过 batch 墙钟(约定容差内)且不得把同一 I/O 片段同时完整计入外层与 write
+    当 写出发生在 loader/compute 计时窗内
+    那么 loader+compute+write MUST 不超过 batch 墙钟(约定容差内)且不得把同一 I/O 片段同时完整计入外层与 write
+
+  @req:r1001 @human
+  场景: close-save-bucket-documented
+    - 必须成立：当 若将 sink.close()/save 计入 write；那么 文档 MUST 标明口径且该耗时 MUST 能进入 metrics(不得在 BATCH_END 后孤儿丢失而不说明)
+    当 若将 sink.close()/save 计入 write
+    那么 文档 MUST 标明口径且该耗时 MUST 能进入 metrics(不得在 BATCH_END 后孤儿丢失而不说明)

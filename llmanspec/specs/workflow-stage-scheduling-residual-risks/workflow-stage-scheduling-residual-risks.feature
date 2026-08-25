@@ -1,0 +1,44 @@
+# language: zh-CN
+# capability: workflow-stage-scheduling-residual-risks
+# purpose: 将 `workflow stage scheduling`（`pipeline` / `stage_barrier`）相关的“残留风险”收敛为稳定、可检索、可复核的 risk register，并明确在后续迭代/验收中必须检查的边界与可观测性约束。 本 spec 不引入新的 runtime 行为；其目标是把“真实项目里可能遇到的解释偏差、下游消费破坏或性能印象落差”显式化，作为后续变更的 chec [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# scope: src/scalim/
+
+功能: workflow-stage-scheduling-residual-risks
+
+  @req:r100 @human
+  场景: workflow stage scheduling residual risks MUST be tracked as a stable risk regist
+    - 系统 MUST 提供一份稳定可发现的 risk register，用于记录 `workflow stage scheduling` 的残留风险、触发条件与缓解建议，并避免风险仅存在于： - 临时讨论记录 - commit message - 单次 change proposal（归档后难以被后续变更发现） risk register MUST 至少覆盖以下风险条目（ID 稳定，便于引用）： - **R1**：`stage_barrier` 可能导致吞吐下降或 wall time 放大 - **R2**：内部 write nodes 的 `stage` 折叠可能隐藏执行细节（诊断视角的“少一层”感受） - **R3**：可观测字段扩展的兼容性风险（`viz snapshot` vs workflow node event payload） - **R4**：术语漂移导致概念分叉（`wave` vs `stage`） - **R5**：性能“印象”评估容易被误当作严谨 benchmark risk register 的每个条目 MUST 至少包含： - **Risk**：风险描述（面向维护者/使用方） - **Signals**：触发信号/观测证据（从哪里看、怎么看） - **Mitigations**：建议缓解措施（含默认策略/边界） - **Touchpoints**：相关的 spec / 代码位置（用于快速定位）
+
+  @req:r342 @human
+  场景: recommended defaults and semantic boundaries MUST be explicitly stated
+    - risk register MUST 明确写清楚以下默认值与边界（避免在后续变更中被“顺手改掉”或发生概念分叉）： - 默认调度 preset MUST 为 `pipeline`；`stage_barrier` MUST 为显式 opt-in（并明确其 trade-off） - 对外公开概念 MUST 统一为 `stage`（不得引入 `wave` 等同义概念作为公共表面） - 对内部 write nodes：对外暴露的 `stage` MUST 折叠到其输入 demand 的 `stage`（避免把内部写入步骤误解为新的业务阶段）
+
+  @req:r464 @human
+  场景: observability extensions MUST prefer viz snapshot first, event payload second
+    - 当为 `workflow stage scheduling` 增加新的诊断字段时，系统 MUST 优先通过 `viz snapshot` 扩展字段： - `viz snapshot` 更接近“可视化/诊断用途”，字段稳定性约束可控 - workflow node 事件 payload 可能被下游强 schema 消费（解析器/存储/告警规则），扩展成本更高 只有当字段被证实需要“事件流强消费”时，系统才 SHOULD 扩展 workflow node 事件 payload，并 MUST 明确字段稳定性与版本策略。
+
+  @req:r549 @human
+  场景: performance impression artifacts MUST be labeled as non-benchmark
+    - 当仓库提供用于对比 `pipeline` 与 `stage_barrier` 的性能材料（notebook/demo/report）时，系统 MUST 明确区分： - **Impression / Trend**：用于直观对比、排障复现 - **Benchmark**：需要固定数据集、隔离环境、可重复的基准套件 并且 MUST 在材料中写清楚样本规模、环境与局限性，避免结论被误读为严谨 benchmark。
+  @req:r100 @human
+  场景: maintainers-can-use-the-risk-register-as-a-release-acceptanc
+    - 必须成立：假如 维护者计划修改 `workflow` 的 scheduler preset、`stage` 归因或相关可观测字段；当 维护者准备实现或验收该变更；那么 维护者 MUST 对照 risk register 逐条确认影响与缓解
+    假如 维护者计划修改 `workflow` 的 scheduler preset、`stage` 归因或相关可观测字段
+    当 维护者准备实现或验收该变更
+    那么 维护者 MUST 对照 risk register 逐条确认影响与缓解
+  @req:r342 @human
+  场景: default-and-boundary-statements-are-discoverable-without-rea
+    - 必须成立：当 维护者仅阅读 spec（不打开源码）；那么 MUST 能明确知道 `pipeline` 是默认值、`stage_barrier` 是 opt-in
+    当 维护者仅阅读 spec（不打开源码）
+    那么 MUST 能明确知道 `pipeline` 是默认值、`stage_barrier` 是 opt-in
+  @req:r464 @human
+  场景: new-stage-scheduling-diagnostics-land-in-snapshot-before-eve
+    - 必须成立：假如 维护者需要新增一个与 `stage_barrier` 相关的诊断字段（例如 stage 间等待解释）；当 维护者落盘该字段；那么 该字段 MUST 首先出现在 `viz snapshot`
+    假如 维护者需要新增一个与 `stage_barrier` 相关的诊断字段（例如 stage 间等待解释）
+    当 维护者落盘该字段
+    那么 该字段 MUST 首先出现在 `viz snapshot`
+  @req:r549 @human
+  场景: maintainers-can-tell-impression-vs-benchmark-at-a-glance
+    - 必须成立：当 维护者打开性能对比材料；那么 MUST 能在开头看到“非 benchmark”的声明与局限性说明
+    当 维护者打开性能对比材料
+    那么 MUST 能在开头看到“非 benchmark”的声明与局限性说明
