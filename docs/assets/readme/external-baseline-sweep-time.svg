@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="18" y="30" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111">总耗时（越短越好）</text>
+  <text x="18" y="46" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#555">同一组实验的时间轴：csv 场景 polars/pandas 快，Scalim 用时间换内存</text>
+  <line x1="62" y1="282.1099539872976" x2="512" y2="282.1099539872976" stroke="#e5e7eb"/>
+  <text x="53" y="286.1099539872976" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">0.02s</text>
+  <line x1="62" y1="235.9266973418016" x2="512" y2="235.9266973418016" stroke="#e5e7eb"/>
+  <text x="53" y="239.9266973418016" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">0.10s</text>
+  <line x1="62" y1="169.8533946836032" x2="512" y2="169.8533946836032" stroke="#e5e7eb"/>
+  <text x="53" y="173.8533946836032" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">1.0s</text>
+  <line x1="62" y1="103.78009202540477" x2="512" y2="103.78009202540477" stroke="#e5e7eb"/>
+  <text x="53" y="107.78009202540477" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">10s</text>
+  <line x1="62.0" y1="64" x2="62.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="62.0" y1="302" x2="62.0" y2="307" stroke="#9ca3af"/>
+  <text x="62.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">1k</text>
+  <line x1="107.15449934959719" y1="64" x2="107.15449934959719" y2="302" stroke="#f3f4f6"/>
+  <line x1="166.8455006504028" y1="64" x2="166.8455006504028" y2="302" stroke="#f3f4f6"/>
+  <line x1="212.0" y1="64" x2="212.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="212.0" y1="302" x2="212.0" y2="307" stroke="#9ca3af"/>
+  <text x="212.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">10k</text>
+  <line x1="257.1544993495972" y1="64" x2="257.1544993495972" y2="302" stroke="#f3f4f6"/>
+  <line x1="316.8455006504028" y1="64" x2="316.8455006504028" y2="302" stroke="#f3f4f6"/>
+  <line x1="362.0" y1="64" x2="362.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="362.0" y1="302" x2="362.0" y2="307" stroke="#9ca3af"/>
+  <text x="362.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">100k</text>
+  <line x1="407.1544993495972" y1="64" x2="407.1544993495972" y2="302" stroke="#f3f4f6"/>
+  <line x1="466.8455006504028" y1="64" x2="466.8455006504028" y2="302" stroke="#f3f4f6"/>
+  <line x1="512.0" y1="64" x2="512.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="512.0" y1="302" x2="512.0" y2="307" stroke="#9ca3af"/>
+  <text x="512.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">1M</text>
+  <text x="287.0" y="344" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#333">行数（对数轴）</text>
+  <text x="16" y="183.0" text-anchor="middle" transform="rotate(-90 16 183.0)" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#333">总耗时（秒，对数轴）</text>
+  <polyline points="62.0,303.2 107.2,286.8 166.8,263.0 212.0,245.6 257.2,225.7 316.8,200.7 362.0,180.8 407.2,160.8 466.8,135.2 512.0,115.5" fill="none" stroke="#b45309" stroke-width="2.5"/>
+  <circle cx="512.0" cy="115.5" r="4" fill="#b45309"/>
+  <text x="519.0" y="119.5" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="bold" fill="#b45309">pandas 6.7s</text>
+  <polyline points="62.0,286.4 107.2,284.5 166.8,282.2 212.0,275.6 257.2,270.7 316.8,256.9 362.0,244.3 407.2,229.4 466.8,206.8 512.0,188.4" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+  <circle cx="512.0" cy="188.4" r="4" fill="#7c3aed"/>
+  <text x="519.0" y="192.4" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="bold" fill="#7c3aed">polars 0.52s</text>
+  <polyline points="62.0,276.4 107.2,259.3 166.8,232.9 212.0,213.3 257.2,192.9 316.8,167.1 362.0,147.1 407.2,127.0 466.8,101.2 512.0,81.1" fill="none" stroke="#0f766e" stroke-width="2.5"/>
+  <circle cx="512.0" cy="81.1" r="4" fill="#0f766e"/>
+  <text x="519.0" y="85.1" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="bold" fill="#0f766e">Scalim 22s</text>
+</svg>

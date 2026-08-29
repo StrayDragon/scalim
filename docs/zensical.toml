@@ -11,6 +11,7 @@ extra_javascript = [
   "assets/javascripts/write-precompute-0.10-charts.js",
   "assets/javascripts/rowwise-fusion-0.10-charts.js",
   "assets/javascripts/lookup-chunk-parallel-0.10-charts.js",
+  "assets/javascripts/external-baseline-charts.js",
   "assets/javascripts/output-write-layout-explainer.js",
 ]
 nav = [
@@ -57,7 +58,8 @@ nav = [
     { "Run Stats（低漂移观测）" = "viz/run-stats.md" },
     { "基准测试" = "benchmark/index.md" },
     { "指南" = "benchmark/guide.md" },
-    { "对比报告" = "benchmark/compare-report.md" },
+    { "外部基线对比" = "benchmark/external-baseline.md" },
+    { "对比报告(历史)" = "benchmark/compare-report.md" },
   ] },
   { "进阶阅读" = [
     "architecture/index.md",

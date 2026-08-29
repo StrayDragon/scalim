@@ -134,20 +134,41 @@ just notebook
 
 - **低内存模式**: 内置字段剪枝、字段释放和行级释放,尽量只保留当前批次真正还要用的数据,减少上下文占用(内存占用)
 
-图里的数字是同一台机器上一次运行前后进程 RSS 的变化，不是运行中的最高内存，也不能直接和别人的电脑比较。
+## 性能
+
+与 pandas / polars 惯用法（DataFrame 全量物化 + 向量化派生 + 库内写出）的同任务端到端对比，覆盖七种典型表（报表宽表 / 大宽表 csv+xlsx / 大长表 / 超多列宽表 / 链式边界 / 多源关联）：
 
 <!-- BEGIN AUTOGEN:readme-memory-chart -->
-![本地内存变化对比：naive 和 Scalim](docs/assets/readme/memory-compare.svg)
+**① 行数扫参**（1k → 1M · 20 派生列 · csv，折线看趋势）：
 
-![不同数据大小下的本地内存变化](docs/assets/readme/memory-compare-scenarios.svg)
+| 内存 | 耗时 |
+|------|------|
+| ![峰值内存随行数变化：Scalim 保持约 30 MiB 平线](docs/assets/readme/external-baseline-sweep.svg?v=3) | ![总耗时随行数变化](docs/assets/readme/external-baseline-sweep-time.svg?v=3) |
+
+复现：`just bench-external-probes --runs 3` · 脚本 [run_probes.py](./docs/doc/releases/repro/external-baseline/run_probes.py) · 数据 [external-baseline-0.10.probes.json](./docs/doc/assets/data/external-baseline-0.10.probes.json)
+
+**② 七种典型表**（倍数 = 相对 pandas 的比值，1.0× 虚线为持平，条尾含绝对值）：
+
+| 内存 | 耗时 |
+|------|------|
+| ![七种典型表的峰值内存对比](docs/assets/readme/external-baseline-matrix.svg?v=3) | ![七种典型表的总耗时对比](docs/assets/readme/external-baseline-matrix-time.svg?v=3) |
+
+复现：`just bench-external --runs 3` · 脚本 [run_ab.py](./docs/doc/releases/repro/external-baseline/run_ab.py) · 数据 [external-baseline-0.10.json](./docs/doc/assets/data/external-baseline-0.10.json) · 完整表格与交互图表：[外部基线对比](./docs/doc/benchmark/external-baseline.md)
 <!-- END AUTOGEN:readme-memory-chart -->
 
-<details>
-<summary>查看内存比较的代码、数据复现方法</summary>
+- **内存（scalim 主定位）**：全部形状峰值 RSS 保持 **30–56 MiB 平台**，与表面积无关；对照 pandas 为 1/4–1/35，对照 polars 为 1/7–1/37。polars 内存并不总是更低——csv 大导出与关联场景其峰值反高于 pandas。
+- **时间（分场景取舍）**：xlsx 报表场景优于 pandas（0.61–0.65×）、约为 polars 的 1.6×；csv 大导出时间让给 pandas/polars（2–96×），换峰值内存 1/9–1/37；关联查询（本机 SQLite 真实 IO）时间 7.2×、内存 1/4。
+- **adaptive ≈ seq**：单数据流报表 demand 无并行机会，自适应并发不劣化也无收益；其收益场景是多任务编排。
 
-- 默认测试数据在 [`support/knobs.py`](./notebooks/marimo/example_readme_suite/support/knobs.py)：1,500 行、48 个字段，每批 150 行。
+以上数字的条件与边界（务必同读）：scalim **0.10.3** vs pandas **2.3.3** vs polars **1.42.1**、Python 3.10.18、单机合成数据（关联 shape 为本机 SQLite 真实 IO）、每场景 **3/5 次**取 median、读回 golden 校验（108/108 通过）、薄算术派生函数；**不构成通用加速、真实业务基准或跨机器 SLA**。完整表格、形状明细、复现命令与数据 JSON 见 [外部基线对比](./docs/doc/benchmark/external-baseline.md)；扫参曲线、派生函数复杂度、慢源分片并行与 Python 3.6 最低兼容边界的交互图表也在该页。
+
+<details>
+<summary>naive vs Scalim 内存代理图（小规模相对增量口径）的代码、数据与重跑方法</summary>
+
+- 测量口径：**相对 RSS 增量代理**（naive = 1.0）——同一台机器上一次运行前后进程 RSS 的变化，不是运行中的最高内存；不能跨机器比较绝对值，也不构成 SLA 承诺。代理图资产：[`memory-compare.svg`](./docs/assets/readme/memory-compare.svg) · [`memory-compare-scenarios.svg`](./docs/assets/readme/memory-compare-scenarios.svg)。
+- 默认测试数据在 [`support/knobs.py`](./notebooks/marimo/example_readme_suite/support/knobs.py)：1,500 行、48 个字段，每批 150 行（CI 固定小 scale 保证秒级）。
 - 图表内容来自 [`chart_snapshot.json`](./notebooks/marimo/example_readme_suite/support/chart_snapshot.json)。仓库会确认示例能运行，但不会要求某个固定的内存比例。
-- 想自己重跑，可以在仓库中执行 `SCALIM_EXAMPLES_SUITES=example_readme_suite just examples`，然后执行 `just gen-readme-examples` 更新图表。
+- 重跑：`SCALIM_EXAMPLES_SUITES=example_readme_suite just examples`，然后 `just gen-readme-examples` 更新图表。
 
 <!-- BEGIN AUTOGEN:readme-naive-baseline -->
 - 代码：[`notebooks/marimo/example_readme_suite/support/naive_baseline.py`](./notebooks/marimo/example_readme_suite/support/naive_baseline.py)

@@ -53,9 +53,28 @@ def _pointer_block(*, rel_path: str, note: str) -> str:
 
 def _chart_block() -> str:
     lines = [
-        "![本地内存变化对比：naive 和 Scalim]({})".format(ASSET_COMPARE.as_posix()),
+        "**① 行数扫参**（1k → 1M · 20 派生列 · csv，折线看趋势）：",
         "",
-        "![不同数据大小下的本地内存变化]({})".format(ASSET_SCENARIOS.as_posix()),
+        "| 内存 | 耗时 |",
+        "|------|------|",
+        "| ![峰值内存随行数变化：Scalim 保持约 30 MiB 平线](docs/assets/readme/external-baseline-sweep.svg?v=3) |"
+        " ![总耗时随行数变化](docs/assets/readme/external-baseline-sweep-time.svg?v=3) |",
+        "",
+        "复现：`just bench-external-probes --runs 3` · "
+        "脚本 [run_probes.py](./docs/doc/releases/repro/external-baseline/run_probes.py) · "
+        "数据 [external-baseline-0.10.probes.json](./docs/doc/assets/data/external-baseline-0.10.probes.json)",
+        "",
+        "**② 七种典型表**（倍数 = 相对 pandas 的比值，1.0× 虚线为持平，条尾含绝对值）：",
+        "",
+        "| 内存 | 耗时 |",
+        "|------|------|",
+        "| ![七种典型表的峰值内存对比](docs/assets/readme/external-baseline-matrix.svg?v=3) |"
+        " ![七种典型表的总耗时对比](docs/assets/readme/external-baseline-matrix-time.svg?v=3) |",
+        "",
+        "复现：`just bench-external --runs 3` · "
+        "脚本 [run_ab.py](./docs/doc/releases/repro/external-baseline/run_ab.py) · "
+        "数据 [external-baseline-0.10.json](./docs/doc/assets/data/external-baseline-0.10.json) · "
+        "完整表格与交互图表：[外部基线对比](./docs/doc/benchmark/external-baseline.md)",
         "",
     ]
     return "\n".join(lines)

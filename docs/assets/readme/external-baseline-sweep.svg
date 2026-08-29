@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="18" y="30" font-family="DejaVu Sans, sans-serif" font-size="17" fill="#111">峰值内存（越低越好）</text>
+  <text x="18" y="46" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#555">行数 1k → 1M · 20 派生列 · csv · 3 次取中位数</text>
+  <line x1="62" y1="289.89108380276735" x2="512" y2="289.89108380276735" stroke="#e5e7eb"/>
+  <text x="53" y="293.89108380276735" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">30</text>
+  <line x1="62" y1="209.9290318781791" x2="512" y2="209.9290318781791" stroke="#e5e7eb"/>
+  <text x="53" y="213.9290318781791" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">100</text>
+  <line x1="62" y1="136.96451593908952" x2="512" y2="136.96451593908952" stroke="#e5e7eb"/>
+  <text x="53" y="140.96451593908952" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">300</text>
+  <line x1="62" y1="64.0" x2="512" y2="64.0" stroke="#e5e7eb"/>
+  <text x="53" y="68.0" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">900</text>
+  <line x1="62.0" y1="64" x2="62.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="62.0" y1="302" x2="62.0" y2="307" stroke="#9ca3af"/>
+  <text x="62.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">1k</text>
+  <line x1="107.15449934959719" y1="64" x2="107.15449934959719" y2="302" stroke="#f3f4f6"/>
+  <line x1="166.8455006504028" y1="64" x2="166.8455006504028" y2="302" stroke="#f3f4f6"/>
+  <line x1="212.0" y1="64" x2="212.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="212.0" y1="302" x2="212.0" y2="307" stroke="#9ca3af"/>
+  <text x="212.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">10k</text>
+  <line x1="257.1544993495972" y1="64" x2="257.1544993495972" y2="302" stroke="#f3f4f6"/>
+  <line x1="316.8455006504028" y1="64" x2="316.8455006504028" y2="302" stroke="#f3f4f6"/>
+  <line x1="362.0" y1="64" x2="362.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="362.0" y1="302" x2="362.0" y2="307" stroke="#9ca3af"/>
+  <text x="362.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">100k</text>
+  <line x1="407.1544993495972" y1="64" x2="407.1544993495972" y2="302" stroke="#f3f4f6"/>
+  <line x1="466.8455006504028" y1="64" x2="466.8455006504028" y2="302" stroke="#f3f4f6"/>
+  <line x1="512.0" y1="64" x2="512.0" y2="302" stroke="#f3f4f6"/>
+  <line x1="512.0" y1="302" x2="512.0" y2="307" stroke="#9ca3af"/>
+  <text x="512.0" y="326" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#444">1M</text>
+  <text x="287.0" y="344" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#333">行数（对数轴）</text>
+  <text x="16" y="183.0" text-anchor="middle" transform="rotate(-90 16 183.0)" font-family="DejaVu Sans, sans-serif" font-size="12.5" fill="#333">峰值常驻内存 RSS（MiB）</text>
+  <polyline points="62.0,202.7 107.2,202.2 166.8,200.0 212.0,199.0 257.2,197.0 316.8,191.5 362.0,182.9 407.2,169.0 466.8,136.3 512.0,103.2" fill="none" stroke="#b45309" stroke-width="2.5"/>
+  <circle cx="512.0" cy="103.2" r="4" fill="#b45309"/>
+  <text x="519.0" y="107.2" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="bold" fill="#b45309">pandas 499 MiB</text>
+  <polyline points="62.0,127.8 107.2,126.3 166.8,123.3 212.0,116.9 257.2,117.0 316.8,116.2 362.0,113.8 407.2,108.8 466.8,93.7 512.0,73.5" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+  <circle cx="512.0" cy="73.5" r="4" fill="#7c3aed"/>
+  <text x="519.0" y="77.5" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="bold" fill="#7c3aed">polars 781 MiB</text>
+  <polyline points="62.0,290.3 107.2,289.6 166.8,289.7 212.0,289.6 257.2,289.9 316.8,289.8 362.0,289.8 407.2,289.8 466.8,290.0 512.0,289.6" fill="none" stroke="#0f766e" stroke-width="2.5"/>
+  <circle cx="512.0" cy="289.6" r="4" fill="#0f766e"/>
+  <text x="519.0" y="293.6" font-family="DejaVu Sans, sans-serif" font-size="13" font-weight="bold" fill="#0f766e">Scalim 30 MiB</text>
+</svg>

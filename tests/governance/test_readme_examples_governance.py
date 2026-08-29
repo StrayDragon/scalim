@@ -7,7 +7,15 @@ from notebooks.marimo.example_readme_suite.support.inject import (
     check_no_handwritten_controlled_fences,
     check_readme_examples_governance,
 )
-from notebooks.marimo.example_readme_suite.support.render_chart import ASSET_COMPARE, ASSET_SCENARIOS, expected_assets
+from notebooks.marimo.example_readme_suite.support.render_chart import (
+    ASSET_COMPARE,
+    ASSET_EB_MATRIX,
+    ASSET_EB_MATRIX_TIME,
+    ASSET_EB_SWEEP,
+    ASSET_EB_SWEEP_TIME,
+    ASSET_SCENARIOS,
+    expected_assets,
+)
 
 
 def _write(path: Path, text: str) -> None:
@@ -57,7 +65,7 @@ def test_yaml_quickstart_is_a_generated_user_loader_projection() -> None:
 def test_readme_chart_assets_use_local_rss_terms() -> None:
     assets = {path: body for path, body in expected_assets()}
 
-    assert set(assets) == {ASSET_COMPARE, ASSET_SCENARIOS}
+    assert set(assets) == {ASSET_COMPARE, ASSET_SCENARIOS, ASSET_EB_SWEEP, ASSET_EB_SWEEP_TIME, ASSET_EB_MATRIX, ASSET_EB_MATRIX_TIME}
     assert "本地内存变化" in assets[ASSET_COMPARE]
     assert "RSS" in assets[ASSET_COMPARE]
     for body in assets.values():

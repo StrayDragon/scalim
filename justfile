@@ -530,6 +530,19 @@ bench-memray-most MOST:
     mkdir -p .benchmarks/memray
     uv {{ UV_OPTIONS }} run pytest tests/bench -v -m bench --benchmark-only -n 0 --no-cov -o addopts="" --memray --memray-bin-path .benchmarks/memray --most-allocations {{ MOST }}
 
+# 外部基线矩阵官方重测（SSOT: docs/doc/releases/repro/external-baseline/run_ab.py）
+# 数字资产: docs/doc/assets/data/external-baseline-0.10.json；产物落 .tmp/ 不入库。
+# 约定: minor 版本发布前重测一次并同步更新数据 JSON / benchmark 页 / README 性能小节。
+# 典型: just bench-external --runs 3            # 完整官方测量(约 25-40 分钟)
+#       just bench-external --runs 1 --rows-scale 0.05   # 冒烟
+bench-external *ARGS:
+    uv {{ UV_OPTIONS }} run --with polars --with xlsxwriter python docs/doc/releases/repro/external-baseline/run_ab.py {{ ARGS }}
+
+# 外部基线扩展探针官方重测（扫参/函数复杂度/慢源分片并行/py36 边界；SSOT: run_probes.py）
+# 数据资产: docs/doc/assets/data/external-baseline-0.10.probes.json；产物落 .tmp/ 不入库。
+bench-external-probes *ARGS:
+    uv {{ UV_OPTIONS }} run --with polars python docs/doc/releases/repro/external-baseline/run_probes.py {{ ARGS }}
+
 # Profiling: execution hotspots (dev-only)
 profile-cpu SCALE="stress" TARGETS="relations" BATCH_SIZE="100":
     mkdir -p .tmp/artifacts/perf
