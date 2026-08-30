@@ -2,10 +2,7 @@
 name: "llman-sdd-explore"
 description: "进入 llman SDD 探索模式：理清思路、调查需求、分析问题。仅思考，禁止写代码。用于意图不明确或需要分析后再行动的场景。"
 metadata:
-  version: "0.0.68"
-  llman_sdd:
-    bdd_mode: "off"
-    skill_set: "default"
+  version: "0.0.72"
 ---
 
 # LLMAN SDD Explore
@@ -82,60 +79,32 @@ flowchart LR
 
 > 💡 探索完成 → 下一步 `llman-sdd-propose`（提案）或 `llman-sdd-quick`（快速路径）
 
-行动前先阅读 `llmanspec/config.yaml`，并遵循其中的 `context` 与 `rules`（若有）。
-
-常用命令：
-- `llman sdd context --task "<描述>" --paths "<文件>"`（找相关 specs）。使用 pageindex agentic tree 后端（需 `LLMAN_SDD_INDEX_CHAT_MODEL`）。可用 `LLMAN_SDD_INDEX_BACKEND` 预设。
-- `llman sdd list`（列出变更）
-- `llman sdd list --specs`（列出 specs 及 purpose/scope 元数据）
-- `llman sdd show <id>`（展示 change/spec；`--type change --output json` 含 `stage` / `specsLanded` / `skipSpecsLanding` / `readyToImplement`——apply 门禁看 `readyToImplement`，勿凭「完整工件」）
-- `llman sdd validate <id>`（校验 change 或 spec）
-- `llman sdd validate --all`（批量校验）
-- `llman sdd index rebuild`（重建 pageindex 树索引——不需要模型）
-- `llman sdd index check`（检查索引新鲜度）
-- `llman sdd change new <id>`（仅创建规划壳草稿 `changes/<id>/proposal.md`；不写 live specs）
-- `llman sdd change start <id> [--worktree]`（Designed→Full：干净树且在默认分支 → 创建 `sdd/<id>` 分支 + attach；仅 Branch binding，不等于 Specs landing，不等于可 apply）
-- `llman sdd change attach <id> [--force]`（绑定已有非默认 feature 分支 + base SHA；拒绝绑到默认分支）
-- `llman sdd change finalize <id> [--no-check]`（**推荐单 commit 收尾**——verify 之后；不要求干净树；门禁 + 自动 ff-merge + 文档改名）
-- `llman sdd change checkpoint <id> [--no-check]`（干净工作区 + 归档前门禁；严格 sha = HEAD；finalize 的 fallback）
-- `llman sdd change diff <id> [--export-patch <path>]`（只读 `base...HEAD` 审查/导出）
-- `llman sdd change archive <id>`（封存：自动 ff-merge 到默认分支，再改名到 `changes/archive/`；单 commit 收尾优先 `finalize`）
-- `llman sdd archive freeze [--before YYYY-MM-DD] [--keep-recent N] [--dry-run]`（冻结已归档目录）
-- `llman sdd archive thaw [--change <id> ...] [--dest <path>]`（从冷备份恢复）
-- `llman sdd graph [CHANGE] [--format mermaid] [--scope active|archived|all] [--depth N]`（生成变更依赖图）
-- `llman sdd project migrate --kind spec-md2toon`（`.md`+fence → 独立 `.toon`；`partitioned` 已移除）
+> 命令细节用 `llman sdd <cmd> --help` 查看；命令参考以 CLI 为准，skill 不内嵌命令表（r139）。
 
 ## Context
-- 执行前先确认当前 change/spec 状态。
-- 优先使用 `llman sdd context --task --paths` 获取相关 specs，而非全量读取或猜测。
+- 先查状态再动手：change/spec 状态以 `llman sdd show/list/validate` 输出为准。
+- 读 spec 全文前先用 `llman sdd context --task --paths` 定位相关 specs。
 
 ## Goal
-- 明确本次命令/skill 要达成的可验证结果。
+- 本节命令达成一个可验证结果；结果路径与校验状态随报告输出。
 
 ## Constraints
-- 变更保持最小化且范围明确。
-- 标识符或意图不明确时禁止猜测。
-- 在读取 spec 全文前，先使用 `llman sdd context --task --paths` 获取相关 specs。
-- 判断变更规模后选择路径：行为合约变更走完整 SDD（Branch binding → Specs landing → `readyToImplement` → apply）；实现变更走快速路径（live specs 仍须绑定分支）。
-- 勿混淆 Skill 导航与 Git-native 生命周期；勿在默认分支编辑 live `llmanspec/specs/**`。
+- 遵守正文「硬约束/硬规则」，本节不复读。先判断变更规模选路径（triage）：行为合约变更走完整 SDD，实现层走 quick；不确定选完整 SDD（保守）。
+- 改动保持最小；已知校验错误禁止强行继续。
 
 ## Workflow
-- 以 `llman sdd` 命令结果为事实来源。
-- 涉及文件/规范变更时执行校验。
-- 首选 `llman sdd context` 获取相关 specs，而非全量读取或猜测。
-- 当 context 不可用时，按错误提示处理（重建 index 或降级到 `list --specs --json`）。
+- 每步以 `llman sdd` 命令结果为事实来源；改动工件后必跑 `llman sdd validate`。
+- 命令细节见下方生成式命令参考或 `llman sdd <cmd> --help`。
 
 ## Decision Policy
-- 高影响歧义必须先澄清。
-- 已知校验错误下禁止强行继续。
+- 高影响歧义先澄清再继续；事实自己查证，只有决策问用户。
 
 ## Output Contract
-- 汇总已执行动作。
-- 给出结果路径与校验状态。
+- 报告先给人读摘要（结论 / 风险 / 待决策），机器细节随后。
 
 ## Ethics Governance
-- `ethics.risk_level`：按 `low|medium|high|critical` 标注风险等级。
-- `ethics.prohibited_actions`：列出绝对禁止执行的动作。
-- `ethics.required_evidence`：列出高影响输出前必须具备的证据。
-- `ethics.refusal_contract`：定义何时拒答以及安全替代响应方式。
-- `ethics.escalation_policy`：定义何时必须升级为用户确认/人工复核。
+- `ethics.risk_level`：low——仅读写本仓库与 `llmanspec/`，无外发动作；正文另有声明时从其声明。
+- `ethics.prohibited_actions`：违反正文「硬约束」的动作；未经用户明确要求的 push / PR / 外部上传。
+- `ethics.required_evidence`：结论须有命令输出或文件路径佐证；门禁状态以 `llman sdd validate` 为准。
+- `ethics.refusal_contract`：门禁 CRITICAL 未清零 → 拒绝进入下一阶段；自修复达上限 → 报告 blocker。
+- `ethics.escalation_policy`：改动 SDD 合约/模板或执行不可逆动作前，暂停并请用户确认。
