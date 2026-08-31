@@ -1,6 +1,8 @@
-<p align="center">
-  <img src="docs/assets/logo.svg" alt="logo" width="100%">
-</p>
+<div align="center">
+  <img src="docs/assets/logo.svg" alt="logo" width="60%">
+
+  # Scalim
+</div>
 
 | - | - |
 | --- | --- |
@@ -8,6 +10,7 @@
 | 文档生成器 | [![Zensical](https://img.shields.io/badge/docs-Zensical-526CFE?style=flat-square)](https://zensical.org/docs/) |
 | 项目工具 | [![uv](https://img.shields.io/badge/uv-managed-6A2C70?logo=uv&logoColor=white&style=flat-square)](https://github.com/astral-sh/uv) [![ruff](https://img.shields.io/badge/ruff-linted-D7FF64?logo=ruff&logoColor=111111&style=flat-square)](https://github.com/astral-sh/ruff) [![basedpyright](https://img.shields.io/badge/basedpyright-checked-3B82F6?style=flat-square)](https://github.com/DetachHead/basedpyright) [![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white&style=flat-square)](https://pnpm.io/) |
 | 配套前端 | [![Svelte](https://img.shields.io/badge/Svelte-frontend-FF3E00?logo=svelte&logoColor=white&style=flat-square)](https://svelte.dev/) [![Vite](https://img.shields.io/badge/Vite-built-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vite.dev/) |
+
 
 # 简介
 
@@ -106,6 +109,10 @@ just notebook
 ```
 
 运行库支持 Python 3.6 及以上版本。仓库中的交互式教程和文档工具需要 Python 3.10 及以上版本。
+
+<p align="center">
+  <img src="docs/assets/meme.webp" alt="meme" width="100%">
+</p>
 
 ## 主要特性
 
