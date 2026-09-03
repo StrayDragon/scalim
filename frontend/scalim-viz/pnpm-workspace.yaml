@@ -1,2 +1,10 @@
 onlyBuiltDependencies:
   - esbuild@0.25.12
+
+overrides:
+  browserslist: '>=4.28.7'
+  devalue: '>=5.8.1'
+  nanoid: '>=3.3.17'
+  picomatch@2.3.1: 2.3.2
+  picomatch@4.0.3: 4.0.4
+  rollup: ^4.59.0
