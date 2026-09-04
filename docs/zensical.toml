@@ -1,5 +1,6 @@
 [project]
 site_name = "Scalim Docs"
+site_url = "https://straydragon.github.io/scalim/"
 docs_dir = "doc"
 site_dir = "site"
 plugins = ["search"]
