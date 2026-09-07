@@ -57,6 +57,6 @@ Seam（已确认）：pytest 全量 + `just check-only-py` / `just qa` / `just e
 
 ## 7. 全量门禁收尾 — commit（如需）`qa: stage-a final gate fixes`
 
-- [ ] 7.1 `just check-only-py` → `just qa`（含 examples / notebooks coverage / frontend-check）
-- [ ] 7.2 `llman sdd validate --all --strict --no-interactive`
-- [ ] 7.3 0.20.0 Breaking 清单初稿追加到 change 目录（release notes 汇总用）。DoD: qa 全绿，进入 `llman-sdd-verify`
+- [x] 7.1 `just check-only-py` → `just qa`（含 examples / notebooks coverage / frontend-check）
+- [x] 7.2 `llman sdd validate --all --strict --no-interactive`
+- [x] 7.3 0.20.0 Breaking 清单初稿追加到 change 目录（release notes 汇总用）。DoD: qa 全绿，进入 `llman-sdd-verify`
