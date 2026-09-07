@@ -12,9 +12,7 @@ authors = [
 dependencies = [
     "scalim",
     "scalim-cli",
-    # pandas: 1.1.5 是最后支持 3.6 的版本, 1.2.0+ 需要 >=3.7.1
-    "pandas>=1.0.0,<1.2;python_version<'3.7'",
-    "pandas>=2.0.3;python_version>='3.7'",
+    "pandas>=2.1",
 ]
 
 [build-system]

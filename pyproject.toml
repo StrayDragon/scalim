@@ -31,8 +31,10 @@ scalim = { workspace = true }
 
 [project.optional-dependencies]
 pandas = [
-    "numpy>=1.24.4",
-    "pandas>=2.0.3",
+    # 下界 = 声明支持的最老维护线(numpy 1.26 起有 cp312 wheel 且兼容 pandas 2.1+);
+    # 多 Python 版本由 requires-python 元数据自动解析(3.10→numpy 2.2.x, 3.14→2.5.x),不加锁上界。
+    "numpy>=1.26",
+    "pandas>=2.1",
 ]
 excel = [
     "openpyxl>=3.1.5",
@@ -45,21 +47,14 @@ dev = { requires-python = ">=3.10" }
 dev = [
     "pytest",
     "pytest-cov",
-    "pyzmq>=27.1.0",
     "pytest-xdist",
     "pytest-benchmark>=4.0.0",
     "rich",
     "pymdown-extensions",
     "pandas-stubs",
     "basedpyright",
-    "com2ann",
-    "sqlalchemy",
-    "pymysql",
-    "python-dotenv",
     "marimo[recommended]",
-    "types-dataclasses>=0.6.6",
-    "memray>=1.19.2",           # 3.7+
-    "memory-profiler>=0.61.0",  # 3.6+
+    "memray>=1.19.2",
     "matplotlib>=3.10.8",
     "psutil>=5.9.0",
     "py-spy>=0.4.0",
@@ -67,15 +62,15 @@ dev = [
     "scalim-cli",
     "scalim-misc",
     "scalim-yaml-dsl-lsp",
-    "pandas>=2.0.3",
+    "pandas>=2.1",
     "openpyxl>=3.1.5",
     "pytest-memray>=1.8.0",
-    "zensical>=0.0.23",
-    "tomli>=2.0.0",
+    "zensical>=0.0.51",
+    "tomli>=2.0.0;python_version<'3.11'",
 ]
 
 [build-system]
-requires = ["uv_build>=0.10.7,<0.11.0"]
+requires = ["uv_build>=0.10.7,<0.13"]
 build-backend = "uv_build"
 
 [tool.scalim.identity]
