@@ -23,8 +23,8 @@
 **可以用 Python 编写需求**
 
 <!-- BEGIN AUTOGEN:readme-min-python -->
-- 代码：[`notebooks/marimo/example_readme_suite/support/min_python.py`](./notebooks/marimo/example_readme_suite/support/min_python.py)
-- 章节：`notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py`；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+- 代码：[`notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py`](./notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py)
+- 最小 Python 示例核心（IR 装配/运行/对拍）就在此 notebook cells 内；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-min-python -->
 
 **也可以用 YAML DSL 配置需求**
@@ -178,13 +178,13 @@ just notebook
 - 重跑：`SCALIM_EXAMPLES_SUITES=example_readme_suite just examples`，然后 `just gen-readme-examples` 更新图表。
 
 <!-- BEGIN AUTOGEN:readme-naive-baseline -->
-- 代码：[`notebooks/marimo/example_readme_suite/support/naive_baseline.py`](./notebooks/marimo/example_readme_suite/support/naive_baseline.py)
-- 对比章节：`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+- 代码：[`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`](./notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py)
+- 对比章节（naive 基线管线在 cells 内）；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-naive-baseline -->
 
 <!-- BEGIN AUTOGEN:readme-scalim-path -->
-- 代码：[`notebooks/marimo/example_readme_suite/support/scalim_path.py`](./notebooks/marimo/example_readme_suite/support/scalim_path.py)
-- 对比章节：`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+- 代码：[`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`](./notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py)
+- 对比章节（scalim 窄字段管线在 cells 内）；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-scalim-path -->
 
 </details>

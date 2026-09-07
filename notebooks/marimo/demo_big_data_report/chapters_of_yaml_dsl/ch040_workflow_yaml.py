@@ -183,10 +183,15 @@ def _(checks, errors, make_chapter_result, preload_calls, result, run_ids):
     if errors:
         summary = summary + "\nfirst_error: {} {}".format(errors[0].exc_type, errors[0].message)
 
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"errors": 0, "preload_calls": 1, "run_ids": ["r1", "r2"]}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "run_ids": run_ids,
             "preload_calls": preload_calls,
             "errors": errors,

@@ -104,17 +104,17 @@ def _snippet_blocks() -> Dict[str, str]:
     gate = "在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开"
     return {
         "min_python": _pointer_block(
-            rel_path="{}/support/min_python.py".format(_SUITE),
-            note="章节：`{}/chapters/ch010_min_python.py`；{}".format(_SUITE, gate),
+            rel_path="{}/chapters/ch010_min_python.py".format(_SUITE),
+            note="最小 Python 示例核心（IR 装配/运行/对拍）就在此 notebook cells 内；{}".format(gate),
         ),
         "min_yaml": _yaml_quickstart_block(),
         "naive": _pointer_block(
-            rel_path="{}/support/naive_baseline.py".format(_SUITE),
-            note="对比章节：`{}/chapters/ch030_memory_compare.py`；{}".format(_SUITE, gate),
+            rel_path="{}/chapters/ch030_memory_compare.py".format(_SUITE),
+            note="对比章节（naive 基线管线在 cells 内）；{}".format(gate),
         ),
         "scalim": _pointer_block(
-            rel_path="{}/support/scalim_path.py".format(_SUITE),
-            note="对比章节：`{}/chapters/ch030_memory_compare.py`；{}".format(_SUITE, gate),
+            rel_path="{}/chapters/ch030_memory_compare.py".format(_SUITE),
+            note="对比章节（scalim 窄字段管线在 cells 内）；{}".format(gate),
         ),
         "chart": _chart_block(),
     }

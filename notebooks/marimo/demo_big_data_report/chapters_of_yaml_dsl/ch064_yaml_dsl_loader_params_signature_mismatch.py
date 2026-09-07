@@ -205,10 +205,15 @@ def _(missing_failed, render_checks, unknown_failed):
 def _(bad_missing_yaml, bad_unknown_yaml, checks, make_chapter_result, missing_failed, missing_msg, unknown_failed, unknown_msg):
     passed = bool(all(checks.values()))
     summary = "unknown_failed={} missing_failed={}".format(unknown_failed, missing_failed)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"unknown_params_fast_fail": True, "missing_required_param_fast_fail": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "bad_unknown_yaml_path": str(bad_unknown_yaml),
             "bad_unknown_exc_message": unknown_msg,
             "bad_missing_yaml_path": str(bad_missing_yaml),

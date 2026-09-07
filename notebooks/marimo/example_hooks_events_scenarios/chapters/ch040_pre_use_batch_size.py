@@ -258,10 +258,23 @@ def _(checks, demand_hook, demand_probe, make_chapter_result, override_batch_siz
         workflow_hook.calls,
         workflow_probe.batch_sizes,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "demand_rows": 3,
+        "demand_hook_calls": 1,
+        "demand_hook_history_len": 1,
+        "workflow_runs_ok": True,
+        "workflow_hook_calls": 1,
+        "hook_writes_override_value": True,
+        "pipeline_effective_value_matches_override": True,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "override_batch_size": int(override_batch_size.value),
             "demand": {
                 "hook_calls": demand_hook.calls,

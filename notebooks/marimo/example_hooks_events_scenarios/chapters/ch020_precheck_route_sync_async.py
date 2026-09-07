@@ -320,10 +320,23 @@ def _(async_demand, async_files, async_queue, async_workflow, checks, make_chapt
         len(server.state.dispatches),
         len(async_files),
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "sync_demand_rows": 3,
+        "sync_workflow_rows": 3,
+        "async_enqueued_not_ran": True,
+        "async_queue_len": 2,
+        "async_files": 0,
+        "server_dispatches_gte": 4,
+        "dispatched_job_ids": ["sync-demand", "sync-workflow", "async-demand", "async-workflow"],
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "sync_demand": sync_demand,
             "sync_workflow": sync_workflow,
             "async_demand": async_demand,

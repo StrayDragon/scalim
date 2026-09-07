@@ -78,10 +78,15 @@ def _(EventType, events, render_checks):
 def _(checks, make_chapter_result, symbols, events):
     passed = bool(all(checks.values()))
     summary = "events={} types={}".format(len(events), ",".join(e.event_type for e in events))
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"event_sequence": ["PIPELINE_START", "PIPELINE_END"]}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "event_types": [e.event_type for e in events],
             "symbols_count": len(symbols),
             "checks": {k: bool(v) for k, v in checks.items()},

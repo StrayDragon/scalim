@@ -178,10 +178,15 @@ def _(checks, core, make_chapter_result, ok_oracle, oracle_details, oracle_summa
     summary = "oracle={} rows={} outputs={} | {}".format(
         ok_oracle, len(rows), sorted(core.outputs.keys()) if core.outputs else None, oracle_summary
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"oracle_passed": True, "rows_nonempty": True, "outputs_nonempty": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_path": str(yaml_path),
             "rank_csv": str(out_rank),
             "rows": len(rows),

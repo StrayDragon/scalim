@@ -101,10 +101,15 @@ def _(EventType, pairs_ok, render_checks, values):
 def _(checks, expected_pairs, make_chapter_result, pairs_ok, values):
     passed = bool(all(checks.values()))
     summary = "values={} unique={} pairs_ok={}".format(len(values), len(set(values)), pairs_ok)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"groups_nonempty": True, "all_event_type_enum": True, "no_unknown_values": True, "key_pairs_consistent": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "pairs": [{"id": k, "value": str(left), "expected": str(right), "ok": left == right} for k, left, right in expected_pairs],
             "unique_values": sorted({str(v) for v in values}),
             "checks": {k: bool(v) for k, v in checks.items()},

@@ -54,12 +54,9 @@ notebooks/marimo/example_public_api_suite/chapters/ch184_public_api_sinks_pandas
 notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py
 notebooks/marimo/example_readme_suite/chapters/ch020_min_yaml.py
 notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py
-notebooks/marimo/example_readme_suite/support/compare.py
 notebooks/marimo/example_readme_suite/support/counting_sink.py
 notebooks/marimo/example_readme_suite/support/knobs.py
 notebooks/marimo/example_readme_suite/support/measure.py
 notebooks/marimo/example_readme_suite/support/min_yaml_loaders.py
-notebooks/marimo/example_readme_suite/support/naive_baseline.py
-notebooks/marimo/example_readme_suite/support/scalim_path.py
 notebooks/marimo/example_stage_scheduling_perf/chapters/ch010_scheduler_comparison.py
 scripts/report-notebooks-coverage.py

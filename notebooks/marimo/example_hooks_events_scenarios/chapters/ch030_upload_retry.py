@@ -234,10 +234,15 @@ def _(checks, make_chapter_result, obs, result, server):
         len(obs.uploaded),
         obs.errors,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"rows": 3, "uploaded": 1, "errors": 0, "attempt_statuses": [503, 503, 200], "retry_attempts": 3, "server_got_payload": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "attempts": list(obs.attempts),
             "uploaded": list(obs.uploaded),
             "server_uploads": list(server.state.uploads),

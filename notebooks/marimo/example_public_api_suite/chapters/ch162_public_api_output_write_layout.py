@@ -333,10 +333,23 @@ def _(
         column_events_ok,
         row_events_ok,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "factory_ok": True,
+        "rows_per_layout": 3,
+        "buffered_equals_chunked": True,
+        "derived_layout": "COLUMN_CHUNKED",
+        "column_events_ok": True,
+        "row_events_ok": True,
+        "no_legacy_enums": True,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "factory_buffered": type(buffered_sink).__name__,
             "factory_chunked": type(chunked_sink).__name__,
             "factory_row": type(row_sink).__name__,

@@ -284,10 +284,15 @@ def _(
 ):
     passed = bool(all(checks.values()))
     summary = "no_pin={} pin={} release_is_pinned={}".format(ok_no_pin, ok_pin, ok_release_flag)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"no_pin_refcount_zero_evict": True, "pin_released_only_at_workflow_end": True, "release_unpinned_flag_ok": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "workflow_yaml_no_pin": str(workflow_yaml_no_pin),
             "workflow_yaml_pin": str(workflow_yaml_pin),
             "viz_dirs": {"no_pin": str(viz_no_pin), "pin": str(viz_pin)},

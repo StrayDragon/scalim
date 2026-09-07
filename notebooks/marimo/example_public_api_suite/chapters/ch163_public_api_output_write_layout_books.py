@@ -253,10 +253,20 @@ def _(buffered_err, buffered_obs, checks, chunked_err, chunked_obs, make_chapter
         "output_composition" in residency_err,
         "output_write_layout" in yaml_field_err,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "column_chunked_fail_fast": True,
+        "column_buffered_fail_fast": True,
+        "residency_fail_fast": True,
+        "yaml_entry_rejected": True,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "chunked_err": chunked_err,
             "buffered_err": buffered_err,
             "residency_err": residency_err,

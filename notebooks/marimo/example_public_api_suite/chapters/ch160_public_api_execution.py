@@ -100,10 +100,15 @@ def _(render_checks, rows):
 def _(checks, make_chapter_result, rows, symbols):
     passed = bool(all(checks.values()))
     summary = "rows={}".format(len(rows))
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"rows": 3, "first_value_plus_one": 2}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "first_row": rows[0] if rows else None,
             "symbols_count": len(symbols),
             "checks": {k: bool(v) for k, v in checks.items()},

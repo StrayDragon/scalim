@@ -170,10 +170,15 @@ def _(first_dim_name, norm_rows, raw_rows, render_checks):
 def _(checks, make_chapter_result, norm_dim_name, norm_rows, raw_dim_name, raw_rows):
     passed = bool(all(checks.values()))
     summary = "raw_dim_name={} normalized_dim_name={}".format(raw_dim_name, norm_dim_name)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"raw_dim_name_is_none": True, "norm_dim_name": "One", "both_outputs_nonempty": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "raw_dim_name": raw_dim_name,
             "normalized_dim_name": norm_dim_name,
             "raw_rows": raw_rows,

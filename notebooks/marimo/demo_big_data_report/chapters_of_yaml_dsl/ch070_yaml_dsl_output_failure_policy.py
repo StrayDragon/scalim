@@ -496,10 +496,15 @@ def _(
         )
     else:
         summary = "unexpected: redacted_ok={} full_ok={} all_fail_ok={} | {}".format(redacted_ok, full_ok, all_fail_ok, all_fail_summary)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"redacted_scenario_ok": True, "full_scenario_ok": True, "all_fail_raises": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_redacted": str(yaml_redacted_path),
             "yaml_full": str(yaml_full_path),
             "yaml_all_fail": str(yaml_all_fail_path),

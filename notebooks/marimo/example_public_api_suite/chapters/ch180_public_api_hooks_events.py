@@ -199,10 +199,22 @@ def _(checks, hook, make_chapter_result, observer, rows):
         len(hook.stats.loader_calls),
         len(observer.seen_event_types),
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "rows": 3,
+        "first_value_plus_one": 2,
+        "hook_pipeline_start": 1,
+        "hook_pipeline_end": 1,
+        "hook_loader_calls": ["items"],
+        "observer_events_each_once": True,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "event_types": [str(x) for x in observer.seen_event_types],
             "hook": {
                 "pipeline_start": hook.stats.pipeline_start,

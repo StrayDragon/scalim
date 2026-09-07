@@ -1014,6 +1014,16 @@ check-monkeypatch-policy:
     fi
     uv {{ UV_OPTIONS }} run python scripts/check-monkeypatch-policy.py --check $quiet_flag
 
+# 检查: 章节 notebook cells-native gate (r1113 run_* 主路径委托 / r1114 details expected* 键)
+check-notebook-cells-native:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    quiet_flag=""
+    if [ -z "{{ QA_VERBOSE }}" ]; then
+        quiet_flag="--quiet"
+    fi
+    uv {{ UV_OPTIONS }} run python scripts/check-notebook-cells-native.py --check $quiet_flag
+
 # 报告: `object` 类型标注基线
 report-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py
@@ -1029,7 +1039,7 @@ check-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check $quiet_flag
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
-quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-object-type check-complexity check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check
+quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-object-type check-complexity check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy check-notebook-cells-native py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check
 
 # QA: 仅py轻量的检查
 quick-check-only-py: quick-check-only-py-no-test-gate test-gate

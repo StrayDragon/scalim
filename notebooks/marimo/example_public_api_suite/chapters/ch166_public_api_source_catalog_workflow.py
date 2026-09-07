@@ -550,10 +550,24 @@ def _(
         overlap_not_leaked,
         pair_ok,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected_chapter = {
+        "catalogs_isolated": True,
+        "graph_uses_id_ref": True,
+        "overlay_chunk_size": 2,
+        "observer_hook_match": True,
+        "alpha_chunked_ok": True,
+        "beta_chunked_ok": True,
+        "overlap_not_leaked": True,
+        "workflow_equals_solo": True,
+    }
+    print("expected_chapter:", expected_chapter)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected_chapter": expected_chapter,
             "alpha_lookup_chunk_size": alpha_live.lookup_chunk_size,
             "beta_lookup_chunk_size": beta_live.lookup_chunk_size,
             "alpha_source_id": alpha_field.source_id,

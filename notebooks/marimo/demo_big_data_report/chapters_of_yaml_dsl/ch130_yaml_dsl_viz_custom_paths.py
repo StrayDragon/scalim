@@ -247,10 +247,23 @@ def _(
         env_ok,
         sorted(core.outputs.keys()) if core.outputs else None,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "rows": 5,
+        "viz_events_nonempty": True,
+        "viz_snapshot_nonempty": True,
+        "viz_trace_nonempty": True,
+        "snapshot_run_name_ok": True,
+        "snapshot_env_ok": True,
+        "outputs_nonempty": True,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_path": str(yaml_path),
             "out_root_detail": str(out_root_detail),
             "detail_csv": str(detail_csv_path),

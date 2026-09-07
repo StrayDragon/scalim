@@ -169,10 +169,15 @@ def _(expected_failed, render_checks):
 def _(bad_yaml, checks, exc_type, expected_failed, make_chapter_result, message):
     passed = bool(all(checks.values()))
     summary = "expected failure captured: {}: {}".format(exc_type, message[:120])
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"compile_fast_fail": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "bad_yaml_path": str(bad_yaml),
             "hint": "Fix by changing `where` to reference declared field_id(s) only.",
             "exc_type": exc_type,

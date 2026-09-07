@@ -185,10 +185,15 @@ def _(checks, detail_csv, latest, make_chapter_result, report_xlsx, rows, touche
         sorted(latest.books.keys()),
         sorted(latest.files.keys()),
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"latest_run_id_present": True, "report_xlsx_exists": True, "detail_csv_exists": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "run_id": latest.run_id,
             "report_xlsx": str(report_xlsx),
             "detail_csv": str(detail_csv),

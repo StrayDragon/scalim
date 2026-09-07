@@ -31,6 +31,14 @@
   场景: 交互控件始终展示且 script 模式同源
     - 章节 notebook 的交互 UI 控件（slider/number/checkbox 等）MUST 始终创建并展示；headless/script 模式 MUST 使用控件默认值自动执行完整流程，MUST NOT 用 `if script_mode` 包裹全部 UI 或让交互模式与对拍模式执行不同主路径。 消耗较大的运行 MAY 使用 `run_button`/`mo.stop` 手动触发，但默认值路径 MUST 保持确定性可对拍。
 
+  @req:r1113 @human
+  场景: 章节主路径禁委托外部 run_*() 且有机械检查
+    - 章节 notebook 的 cells MUST NOT 通过调用来自受限模块（`notebooks.*.support.*`、`scalim_misc.demo_*`、`scalim_misc.examples.*`）的模块级 `run_*()` 函数来执行章节主路径；SSOT 入口 `run_chapter()` 自身 MUST 豁免；共享 fixture 装配（`build_*` 等，见 r1111 零件边界）不在此列。 系统 MUST 提供机械化检查 gate（AST 扫描章节 notebook）检测该委托：检出违规 MUST fail-fast 并输出违规文件与被调名；gate MUST 支持文件级显式白名单（如 `# pragma: allow-cells-native-run-delegation`）兜底误报。
+
+  @req:r1114 @human
+  场景: 对拍期望值在章节 cells 内可见
+    - 含对拍断言的章节 notebook MUST 让期望结果对读者可见： - cells 内 MUST 展示期望数据（期望字面量，或经零件期望访问器渲染为表格/文本） - 章节 `chapter_result` 的 details MUST 至少携带一个 `expected` 前缀键留存期望快照，供 headless runner 与 pytest 定位 期望比对机制（参考实现/diff 函数）MAY 保留在零件模块，不因本条内联进 cells。
+
   @req:r576 @human
   场景: headless runner 作为示例对拍入口
     - 系统 MUST 提供一个 headless runner 作为示例 gate 的单一入口，并保证 runner 不依赖 marimo UI。 runner MUST 输出可定位的 PASS/FAIL 与章节级 summary，并以非零退出码表示存在失败。
@@ -132,6 +140,21 @@
     - 必须成立：当 开发者以 headless/script 模式运行章节 notebook 或其对拍入口；那么 流程 MUST 以控件默认值自动执行且结果与交互模式同源
     当 开发者以 headless/script 模式运行章节 notebook 或其对拍入口
     那么 流程 MUST 以控件默认值自动执行且结果与交互模式同源
+  @req:r1113 @human
+  场景: cells-委托受限模块-run-被执行检查拒绝
+    - 必须成立：当 章节 notebook 的 cell 调用来自受限 support/scenario 模块的 run_*() 函数执行章节主路径；那么 机械检查 gate MUST fail-fast 并指出违规文件与被调名
+    当 章节 notebook 的 cell 调用来自受限 support/scenario 模块的 run_*() 函数执行章节主路径
+    那么 机械检查 gate MUST fail-fast 并指出违规文件与被调名
+  @req:r1113 @human
+  场景: run-chapter-入口与显式白名单豁免
+    - 必须成立：当 检查器扫描含 SSOT 入口 run_chapter 定义或带显式白名单 pragma 的章节 notebook；那么 检查器 MUST NOT 误报
+    当 检查器扫描含 SSOT 入口 run_chapter 定义或带显式白名单 pragma 的章节 notebook
+    那么 检查器 MUST NOT 误报
+  @req:r1114 @human
+  场景: 对拍章节-期望值-可定位
+    - 必须成立：当 读者打开任一对拍章节 notebook 或读取其 chapter_result；那么 cells 内可见期望数据展示且 details 含 expected 前缀键
+    当 读者打开任一对拍章节 notebook 或读取其 chapter_result
+    那么 cells 内可见期望数据展示且 details 含 expected 前缀键
   @req:r576 @human
   场景: examples-gate-可在-ci-中稳定运行
     - 必须成立：当 开发者运行 examples gate（或等价入口）；那么 headless runner MUST 执行示例套件并输出章节级 PASS/FAIL 与 summary

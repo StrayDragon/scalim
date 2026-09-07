@@ -169,14 +169,21 @@ def _(result, render_checks):
 
 
 # Cell 11 — 汇总 chapter_result（CI 提取点；契约 {"passed","summary","details"}）
+# 合约 r1114: details MUST 携带 `expected` 前缀键（对拍期望字面量，教学 payload），
+# 并在 cells 内展示（print/mo.ui.table），供读者对照期望与实际。
 
 
 @app.cell
 def _(checks, make_chapter_result):
+    expected = {"示例断言 A": True, "示例断言 B": True}
+    print("expected:", expected)
     chapter_result = make_chapter_result(
         passed=all(checks.values()),
         summary="示例 summary",
-        details={"checks": {k: bool(v) for k, v in checks.items()}},
+        details={
+            "expected": expected,
+            "checks": {k: bool(v) for k, v in checks.items()},
+        },
     )
     return (chapter_result,)
 

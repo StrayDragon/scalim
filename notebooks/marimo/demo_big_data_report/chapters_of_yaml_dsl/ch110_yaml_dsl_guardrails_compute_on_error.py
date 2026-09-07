@@ -231,10 +231,15 @@ def _(
         any_non_blank,
         sorted(core.outputs.keys()) if core.outputs else None,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"rows": 5, "compute_error_signal": True, "row_1001_blank": True, "other_rows_nonblank": True, "outputs_nonempty": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_path": str(yaml_path),
             "out_root_detail": str(out_root_detail),
             "detail_csv": str(detail_csv_path),

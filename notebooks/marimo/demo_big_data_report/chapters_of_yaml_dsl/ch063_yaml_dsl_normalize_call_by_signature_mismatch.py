@@ -151,10 +151,15 @@ def _(bad_fast_failed, render_checks):
 def _(bad_exc_msg, bad_fast_failed, bad_yaml, checks, make_chapter_result):
     passed = bool(all(checks.values()))
     summary = "bad_fast_failed={}".format(bad_fast_failed)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"bad_compile_fast_fail": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "bad_yaml_path": str(bad_yaml),
             "bad_exc_message": bad_exc_msg,
             "checks": {k: bool(v) for k, v in checks.items()},

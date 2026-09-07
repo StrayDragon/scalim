@@ -222,10 +222,15 @@ def _(
         ok_2002,
         sorted(core.outputs.keys()) if core.outputs else None,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"rows": 3, "type_error_guardrail_signal": True, "row_2001_team_a": True, "row_2002_blank": True, "outputs_nonempty": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_path": str(yaml_path),
             "out_root_detail": str(out_root_detail),
             "detail_csv": str(detail_csv_path),

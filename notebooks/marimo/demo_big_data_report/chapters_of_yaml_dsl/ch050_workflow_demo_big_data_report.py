@@ -498,10 +498,22 @@ def _(
             observer.unchunked_misses,
         )
 
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "errors": 0,
+        "preload_calls": 1,
+        "artifacts_complete": True,
+        "detail_oracle_passed": True,
+        "metrics_oracle_passed": True,
+        "chunk_oracle_ok": True,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "output_dir": str(out_root),
             "out_root": str(out_root),
             "version_id": version_id,

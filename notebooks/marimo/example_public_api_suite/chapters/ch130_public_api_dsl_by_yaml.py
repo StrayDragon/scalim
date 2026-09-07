@@ -436,10 +436,23 @@ def _(
             duplicate_patch_errors[0].message,
         )
 
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "workflow_errors": 0,
+        "preload_calls": 1,
+        "r1_batch_size": 5,
+        "r2_batch_size": 2,
+        "first_item_id": 1,
+        "duplicate_headers_ok": True,
+        "outcomes_run_ids": ["r1", "r2"],
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "rows": len(rows),
             "run_total_rows": int(run_result.total_rows),
             "workflow_outcomes": wf.outcomes,

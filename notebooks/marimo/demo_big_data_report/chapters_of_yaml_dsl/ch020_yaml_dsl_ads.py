@@ -269,10 +269,15 @@ def _(
         sorted(run_result.core.outputs.keys()) if run_result.core.outputs else None,
         oracle_summary,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"oracle_passed": True, "retry_calls": 2, "outputs_nonempty": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_path": str(yaml_path),
             "outputs": run_result.core.outputs,
             "out_root": str(out_root),

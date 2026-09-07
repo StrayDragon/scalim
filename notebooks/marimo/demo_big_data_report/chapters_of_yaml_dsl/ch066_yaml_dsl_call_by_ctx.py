@@ -223,10 +223,15 @@ def _(ok, render_checks):
 def _(checks, detail_path, make_chapter_result, ok, outputs, out_root, rows, yaml_file):
     passed = bool(all(checks.values()))
     summary = "rows={} outputs={} exc=none".format(len(rows), outputs)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"run_ok_rows_nonempty": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "yaml_path": str(yaml_file),
             "out_root": str(out_root),
             "detail_csv": str(detail_path) if detail_path else None,

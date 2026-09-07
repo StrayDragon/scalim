@@ -429,10 +429,15 @@ def _(
     if errors:
         summary = summary + "\nfirst_error: {} {}".format(errors[0].exc_type, errors[0].message)
 
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"errors": 0, "xlsx_artifacts": 4, "workbook_rows_ok": True, "sheetbook_rows_ok": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "output_dir": str(out_dir),
             "workflow_yaml_path": str(workflow_yaml_path),
             "output_roots": {

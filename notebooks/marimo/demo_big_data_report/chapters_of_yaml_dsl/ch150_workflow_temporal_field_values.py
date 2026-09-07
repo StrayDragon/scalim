@@ -172,10 +172,15 @@ def _(errors, render_checks, report_xlsx, verify_temporal_field_values_example):
 def _(checks, make_chapter_result, oracle_result):
     passed = bool(all(checks.values()))
     summary = str(oracle_result.summary)
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"oracle_passed": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "oracle": oracle_result.details,
             "checks": {k: bool(v) for k, v in checks.items()},
         },

@@ -370,10 +370,15 @@ def _(
     if not verification.passed:
         summary = summary + "\n" + verification.summary
 
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"oracle_passed": True, "rows_match_failures": 0, "customers_chunk_ok": True}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "duration_seconds": elapsed,
             "rows": len(rows),
             "result": result,

@@ -95,10 +95,15 @@ def _(normalize_rows, render_checks, sink):
 def _(checks, df, make_chapter_result, rows):
     passed = bool(all(checks.values()))
     summary = "rows={} columns={}".format(len(rows), ",".join([str(c) for c in df.columns]))
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"pandas_available": True, "rows": [{"id": 1, "value": 10}, {"id": 2, "value": 20}], "columns": ["id", "value"]}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "rows": rows,
             "checks": {k: bool(v) for k, v in checks.items()},
         },

@@ -236,10 +236,22 @@ def _(checks, make_chapter_result, marker, viz_events):
         len(viz_events),
         marker.seen,
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {
+        "workflow_runs_ok": True,
+        "started": 1,
+        "finished": 1,
+        "finished_status": "ok",
+        "seen": ["workflow_started", "workflow_finished"],
+        "viz_events_gte": 1,
+    }
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "seen": list(marker.seen),
             "finished_status": marker.last_finished_status,
             "viz_events": [str(p) for p in viz_events],

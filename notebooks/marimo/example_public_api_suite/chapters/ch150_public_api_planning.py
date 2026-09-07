@@ -78,10 +78,15 @@ def _(plan, render_checks):
 def _(checks, make_chapter_result, plan, symbols):
     passed = bool(all(checks.values()))
     summary = "targets={} field_order={}".format(plan.target_fields, ",".join(plan.field_order))
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected = {"target_fields": ["value_plus_one"], "field_order_last": "value_plus_one"}
+    print("expected:", expected)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected": expected,
             "field_order": plan.field_order,
             "stages": plan.stages,
             "metadata": plan.metadata,

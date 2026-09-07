@@ -597,10 +597,15 @@ def _(
         limited_off_result is None,
         len(limited_ok_calls),
     )
+    # 对拍期望（教学 payload；headless 可经 details 键定位）
+    expected_chapter = {"all_runs_no_error": True, "observer_hook_agree_groups": 8}
+    print("expected_chapter:", expected_chapter)
+
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,
         details={
+            "expected_chapter": expected_chapter,
             "off": off_calls,
             "default": default_calls,
             "serial": serial_calls,

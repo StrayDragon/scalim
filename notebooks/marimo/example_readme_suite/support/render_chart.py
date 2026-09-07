@@ -7,8 +7,6 @@ import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from notebooks.marimo.example_readme_suite.support.compare import load_snapshot
-
 ASSET_DIR_REL = Path("docs") / "assets" / "readme"
 ASSET_COMPARE = ASSET_DIR_REL / "memory-compare.svg"
 ASSET_SCENARIOS = ASSET_DIR_REL / "memory-compare-scenarios.svg"
@@ -25,6 +23,44 @@ _LEGACY_ASSETS = (
 
 # 兼容旧名
 ASSET_REL = ASSET_COMPARE
+
+# `chart_snapshot.json`（`README` 记忆对比图数据；原 `compare.py` 的快照助手迁入本模块）
+SNAPSHOT_NAME = "chart_snapshot.json"
+
+
+def snapshot_path() -> Path:
+    return Path(__file__).resolve().parent / SNAPSHOT_NAME
+
+
+def load_snapshot() -> Dict[str, Any]:
+    path = snapshot_path()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise TypeError("chart_snapshot.json must be an object")
+    return payload
+
+
+def relative_ratio(naive_delta: int, scalim_delta: int) -> Dict[str, float]:
+    naive_v = float(max(1, int(naive_delta)))
+    scalim_v = float(max(0, int(scalim_delta)))
+    return {
+        "naive_rel": 1.0,
+        "scalim_rel": round(scalim_v / naive_v, 4),
+    }
+
+
+def write_snapshot_from_live(compare: Dict[str, Any]) -> Path:
+    """本地可选：用本机运行前后 RSS 增量比重写 `snapshot`（不进 CI 硬闸）。"""
+    payload = {
+        "knobs": compare["knobs"],
+        "ratios": compare["ratios"],
+        "measurement": "Before/after local RSS delta proxy; not a sampled peak.",
+        "note": "Illustrative relative local RSS deltas from a local run; CI does not hard-gate these numbers.",
+    }
+    path = snapshot_path()
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
 
 _EB_COLORS = {"pandas": "#b45309", "polars": "#7c3aed", "scalim": "#0f766e"}
 _EB_SIDE_LABELS = {
