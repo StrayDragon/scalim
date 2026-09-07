@@ -1,6 +1,9 @@
 ---
 depends_on: []
 rules_edit_acked: true
+branch: sdd/c52-modernize-py310-baseline
+base_sha: d1b5cb4565ccc0f5c9c0414c6cd984c00484ef63
+checkpointed: false
 ---
 
 # 0.20.x Stage A — 现代基线：Python floor 3.10，删除 3.6 兼容层
