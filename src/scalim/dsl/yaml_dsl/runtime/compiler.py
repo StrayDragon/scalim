@@ -7,8 +7,10 @@
 - 运行时请求(`ExecutionRequest`)
 """
 
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from ....events import generate_run_id
 from ....execution.guardrails import GuardrailsPolicy
@@ -16,7 +18,6 @@ from ....execution.loader_retry import LoaderRetryPolicies, LoaderRetryPoliciesS
 from ....execution.run_ir import ExecutionRequest, ObservabilitySpec, OutputSpec, export_layout_from_demand_ir
 from ....spec.ir import DemandIr
 from ....typedefs import parse_failure_policy
-from ....vendor.dataclassesx import replace
 from .._internal import resource_override as _resource_override_ssot
 from .._internal.config_parsing.loader import YamlDemandLoader
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
@@ -55,8 +56,8 @@ if TYPE_CHECKING:
 
 
 def _ensure_allowlist(
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]],
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None,
 ) -> None:
     if not allowed_modules and not allowed_functions:
         # 安全审计:仅允许从 `allowlist` 中指定的模块/函数加载,避免 `YAML` 触发任意导入执行.
@@ -65,21 +66,21 @@ def _ensure_allowlist(
 
 def validate_allowlist(
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]],
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None,
 ) -> None:
     _ensure_allowlist(allowed_modules, allowed_functions)
 
 
-def _parse_overrides_outputs_defaults_book_id(defaults: Optional[Any], *, path: str) -> Optional[str]:
+def _parse_overrides_outputs_defaults_book_id(defaults: Any | None, *, path: str) -> str | None:
     return _resource_override_ssot.parse_outputs_defaults_book_id(defaults, path=str(path))
 
 
 def _apply_default_book_binding_to_outputs(
-    outputs: Tuple[OutputTargetConfig, ...],
+    outputs: tuple[OutputTargetConfig, ...],
     *,
     default_book_id: str,
-) -> Tuple[OutputTargetConfig, ...]:
+) -> tuple[OutputTargetConfig, ...]:
     return _resource_override_ssot.apply_default_book_binding_to_outputs(outputs, default_book_id=str(default_book_id))
 
 
@@ -130,10 +131,10 @@ def _parse_overrides_outputs_targets(
     demand_ir: DemandIr,
     *,
     path: str,
-    default_book_id: Optional[str],
+    default_book_id: str | None,
     default_book_ref: str,
-) -> Tuple[OutputTargetConfig, ...]:
-    known_field_ids: Set[str] = {str(fid) for fid in demand_ir.fields}
+) -> tuple[OutputTargetConfig, ...]:
+    known_field_ids: set[str] = {str(fid) for fid in demand_ir.fields}
     return _resource_override_ssot.parse_overrides_outputs_targets(
         overrides,
         path=str(path),
@@ -143,14 +144,14 @@ def _parse_overrides_outputs_targets(
     )
 
 
-def _should_validate_unique_effective_field_display_names(config: DemandConfig, outputs: Tuple[OutputTargetConfig, ...]) -> bool:
+def _should_validate_unique_effective_field_display_names(config: DemandConfig, outputs: tuple[OutputTargetConfig, ...]) -> bool:
     if not bool(config.validate_unique_field_names):
         return False
     return outputs_require_unique_effective_field_display_names(config, outputs=outputs, resources_override=None)
 
 
 def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
-    conflicts: Dict[str, List[str]] = {}
+    conflicts: dict[str, list[str]] = {}
     for field_id, field_ir in demand_ir.fields.items():
         name = str(field_ir.name or "").strip()
         effective = name or str(field_id)
@@ -164,7 +165,7 @@ def _validate_unique_effective_field_display_names(demand_ir: DemandIr) -> None:
     raise ValueError(msg)
 
 
-def _merge_retry_specs(base: LoaderRetryPolicySpec, override: Optional[LoaderRetryPolicySpec]) -> LoaderRetryPolicySpec:
+def _merge_retry_specs(base: LoaderRetryPolicySpec, override: LoaderRetryPolicySpec | None) -> LoaderRetryPolicySpec:
     if override is None:
         return base
     return LoaderRetryPolicySpec(
@@ -182,7 +183,7 @@ def _merge_retry_specs(base: LoaderRetryPolicySpec, override: Optional[LoaderRet
 def _finalize_retry_policy(
     spec: LoaderRetryPolicySpec,
     *,
-    base: Optional[LoaderRetryPolicy] = None,
+    base: LoaderRetryPolicy | None = None,
     location: str,
 ) -> LoaderRetryPolicy:
     base_policy = base or LoaderRetryPolicy.disabled()
@@ -203,7 +204,7 @@ def _finalize_retry_policy(
         # 编译期签名预检查: 避免运行期 `_safe_should_retry` 将 `TypeError` 静默降级为 `False`.
         placeholder_exc = object()
         placeholder_ctx = object()
-        empty_kwargs: Dict[str, Any] = {}
+        empty_kwargs: dict[str, Any] = {}
         candidates = (("should_retry(exc, ctx)", (placeholder_exc, placeholder_ctx), empty_kwargs),)
         ref = repr(should_retry)
         try:
@@ -212,9 +213,9 @@ def _finalize_retry_policy(
         except AttributeError:
             pass
         else:
-            ref = "{}:{}".format(module, name)
+            ref = f"{module}:{name}"
         validate_signature_accepts_any_candidate(
-            location="{}.should_retry".format(str(location)),
+            location=f"{location!s}.should_retry",
             reference=ref,
             fn=should_retry,
             candidates=candidates,
@@ -236,8 +237,8 @@ def _finalize_retry_policy(
 def _compile_loader_retry_policies(
     config: DemandConfig,
     *,
-    overrides: Optional[LoaderRetryPoliciesSpec],
-) -> Optional[LoaderRetryPolicies]:
+    overrides: LoaderRetryPoliciesSpec | None,
+) -> LoaderRetryPolicies | None:
     if overrides is None:
         return None
     base_policy = LoaderRetryPolicy.disabled()
@@ -252,19 +253,19 @@ def _compile_loader_retry_policies(
             msg = "Unknown loader_retry.by_loader keys: {}".format(", ".join(sorted(unknown)))
             raise ValueError(msg)
 
-    by_loader: Dict[str, LoaderRetryPolicy] = {}
+    by_loader: dict[str, LoaderRetryPolicy] = {}
 
     main_source_id = config.main_source.source_id
     main_driver = overrides.by_loader.get(main_source_id)
     main_spec = _merge_retry_specs(global_spec, main_driver)
-    main_policy = _finalize_retry_policy(main_spec, base=base_policy, location="loader_retry.by_loader.{}".format(main_source_id))
+    main_policy = _finalize_retry_policy(main_spec, base=base_policy, location=f"loader_retry.by_loader.{main_source_id}")
     if main_policy != global_policy:
         by_loader[main_source_id] = main_policy
 
     for source_id in config.sources:
         src_driver = overrides.by_loader.get(source_id)
         src_spec = _merge_retry_specs(global_spec, src_driver)
-        src_policy = _finalize_retry_policy(src_spec, base=base_policy, location="loader_retry.by_loader.{}".format(source_id))
+        src_policy = _finalize_retry_policy(src_spec, base=base_policy, location=f"loader_retry.by_loader.{source_id}")
         if src_policy != global_policy:
             by_loader[source_id] = src_policy
 
@@ -277,10 +278,10 @@ def _compile_loader_retry_policies(
 def load_config(
     yaml_path: str,
     *,
-    template_vars: Optional[Mapping[str, Any]] = None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-    allowed_yaml_roots: Optional[Sequence[str]] = None,
+    allowed_yaml_roots: Sequence[str] | None = None,
 ) -> DemandConfig:
     loader = YamlDemandLoader()
     return loader.load(
@@ -295,15 +296,15 @@ def load_config(
 def _normalize_builtin_callable_id(id_raw: Any, *, label: str) -> str:
     builtin_id = str(id_raw or "").strip()
     if not builtin_id:
-        msg = "{}: <id> must not be empty".format(label)
+        msg = f"{label}: <id> must not be empty"
         raise ValueError(msg)
     if builtin_id.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
-        msg = "{}: <id> must not include prefix '{}': {!r}".format(label, BUILTIN_CALLABLE_REFERENCE_PREFIX, builtin_id)
+        msg = f"{label}: <id> must not include prefix '{BUILTIN_CALLABLE_REFERENCE_PREFIX}': {builtin_id!r}"
         raise ValueError(msg)
     try:
         _ = parse_builtin_callable_id(BUILTIN_CALLABLE_REFERENCE_PREFIX + builtin_id)
     except ScalimResolverError as exc:
-        msg = "{}: invalid <id> {!r}: {}".format(label, builtin_id, exc)
+        msg = f"{label}: invalid <id> {builtin_id!r}: {exc}"
         raise ValueError(msg) from exc
     return builtin_id
 
@@ -320,31 +321,31 @@ def _compile_builtin_callable_vocab_value(
     if isinstance(value_raw, str):
         reference = value_raw.strip()
         if not reference:
-            msg = "builtin_callables[{!r}]: value must not be empty".format(builtin_id)
+            msg = f"builtin_callables[{builtin_id!r}]: value must not be empty"
             raise ValueError(msg)
         if reference.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
-            msg = "builtin_callables[{!r}]: value must be a Python reference, not builtin '^<id>': {!r}".format(builtin_id, value_raw)
+            msg = f"builtin_callables[{builtin_id!r}]: value must be a Python reference, not builtin '^<id>': {value_raw!r}"
             raise ValueError(msg)
         try:
             return trusted_resolver.resolve(reference)
         except ScalimResolverError as exc:
-            msg = "builtin_callables[{!r}]: failed to resolve Python reference {!r}: {}".format(builtin_id, reference, exc)
+            msg = f"builtin_callables[{builtin_id!r}]: failed to resolve Python reference {reference!r}: {exc}"
             raise ValueError(msg) from exc
 
-    msg = "builtin_callables[{!r}]: expected a callable or Python reference string, got: {}".format(builtin_id, type(value_raw).__name__)
+    msg = f"builtin_callables[{builtin_id!r}]: expected a callable or Python reference string, got: {type(value_raw).__name__}"
     raise TypeError(msg)
 
 
 def _compile_builtin_callables_vocab(
-    builtin_callables: Optional[Mapping[str, Any]],
+    builtin_callables: Mapping[str, Any] | None,
     *,
-    allowed_modules: Optional[FrozenSet[str]] = None,
-    allowed_functions: Optional[FrozenSet[str]] = None,
-) -> Optional[Dict[str, Callable[..., Any]]]:
+    allowed_modules: frozenset[str] | None = None,
+    allowed_functions: frozenset[str] | None = None,
+) -> dict[str, Callable[..., Any]] | None:
     if builtin_callables is None:
         return None
 
-    compiled: Dict[str, Callable[..., Any]] = {}
+    compiled: dict[str, Callable[..., Any]] = {}
     trusted_resolver = SecurePythonReferenceResolver(
         allowed_modules=allowed_modules,
         allowed_functions=allowed_functions,
@@ -362,11 +363,11 @@ def _compile_builtin_callables_vocab(
     return compiled
 
 
-def _validate_public_builtin_callable_ids(public_ids: Optional[Sequence[str]]) -> Optional[Tuple[str, ...]]:
+def _validate_public_builtin_callable_ids(public_ids: Sequence[str] | None) -> tuple[str, ...] | None:
     if public_ids is None:
         return None
 
-    validated: List[str] = []
+    validated: list[str] = []
     for raw in public_ids:
         validated.append(_normalize_builtin_callable_id(raw, label="public_builtin_callable_ids"))
     return tuple(validated)
@@ -374,12 +375,12 @@ def _validate_public_builtin_callable_ids(public_ids: Optional[Sequence[str]]) -
 
 def create_reference_resolver(
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]],
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None,
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
-    base_module_path: Optional[str] = None,
-    builtin_callables: Optional[Mapping[str, Any]] = None,
-    public_builtin_callable_ids: Optional[Sequence[str]] = None,
+    base_module_path: str | None = None,
+    builtin_callables: Mapping[str, Any] | None = None,
+    public_builtin_callable_ids: Sequence[str] | None = None,
 ) -> SecurePythonReferenceResolver:
     compiled_builtin_callables = _compile_builtin_callables_vocab(
         builtin_callables,
@@ -400,7 +401,7 @@ def create_reference_resolver(
 def compile_ir(
     config: DemandConfig,
     *,
-    init_vars: Optional[Dict[str, Any]] = None,
+    init_vars: dict[str, Any] | None = None,
 ) -> DemandIr:
     converter = ConfigToIRConverter(init_vars=init_vars)
     return converter.convert(config)
@@ -411,7 +412,7 @@ def _resolve_effective_outputs_and_path(
     demand_ir: DemandIr,
     *,
     options: DemandRunOptions,
-) -> Tuple[Tuple[OutputTargetConfig, ...], str]:
+) -> tuple[tuple[OutputTargetConfig, ...], str]:
     overrides = options.outputs.overrides
     overrides_outputs = overrides.outputs if overrides is not None else None
     default_book_id = _parse_overrides_outputs_defaults_book_id(
@@ -458,7 +459,7 @@ def _compile_output_composition_for_outputs(
     config: DemandConfig,
     demand_ir: DemandIr,
     *,
-    effective_outputs: Tuple[OutputTargetConfig, ...],
+    effective_outputs: tuple[OutputTargetConfig, ...],
     outputs_path: str,
     yaml_base_dir: str,
     options: DemandRunOptions,
@@ -524,7 +525,7 @@ def build_request(
             header_fields_output_by="field_id",
         )
 
-    observability: Optional[ObservabilitySpec] = None
+    observability: ObservabilitySpec | None = None
     components = list(options.runtime.components or [])
 
     if options.outputs.overrides is not None:
@@ -629,7 +630,7 @@ __all__ = (
 )
 
 
-def _is_relative_reference(value: Optional[str]) -> bool:
+def _is_relative_reference(value: str | None) -> bool:
     raw = str(value or "").strip()
     return bool(raw) and raw.startswith(".")
 

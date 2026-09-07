@@ -9,13 +9,14 @@
 import json
 import re
 import time
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, cast
+from typing import Any, cast
 
 from .._internal.utils.json_like import JsonLike
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..typedefs import RuntimeValue
-from ..vendor.dataclassesx import dataclass
 
 _SAFE_VERSION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 
@@ -41,7 +42,7 @@ class ParsedVersionedOutputPath:
 def validate_version_id(version_id: str) -> str:
     vid = str(version_id or "").strip()
     if not vid or _SAFE_VERSION_ID_RE.match(vid) is None:
-        msg = "version_id must be a safe path segment: {!r}".format(vid)
+        msg = f"version_id must be a safe path segment: {vid!r}"
         raise ValueError(msg)
     return str(vid)
 
@@ -49,7 +50,7 @@ def validate_version_id(version_id: str) -> str:
 def _validate_output_id(value: str, *, kind: str) -> str:
     raw = str(value or "").strip()
     if not raw or _SAFE_VERSION_ID_RE.match(raw) is None:
-        msg = "{} must be a safe path segment: {!r}".format(str(kind), raw)
+        msg = f"{kind!s} must be a safe path segment: {raw!r}"
         raise ValueError(msg)
     return str(raw)
 
@@ -71,7 +72,7 @@ def ensure_version_dir(layout: OutputRootLayout, *, version_id: str) -> Path:
     try:
         version_dir.mkdir(parents=False, exist_ok=False)
     except FileExistsError as exc:
-        msg = "Version directory already exists (possible concurrent writers or reused version_id): {!r}".format(str(version_dir))
+        msg = f"Version directory already exists (possible concurrent writers or reused version_id): {str(version_dir)!r}"
         raise FileExistsError(msg) from exc
     return version_dir
 
@@ -91,17 +92,17 @@ def version_manifest_path(layout: OutputRootLayout, *, version_id: str) -> Path:
 
 def version_manifest_relpath(*, version_id: str) -> str:
     vid = validate_version_id(version_id)
-    return "{}/{}".format("versions", "{}/manifest.json".format(str(vid)))
+    return "{}/{}".format("versions", f"{vid!s}/manifest.json")
 
 
 def file_output_relpath(*, file_id: str) -> str:
     fid = _validate_output_id(str(file_id), kind="file_id")
-    return "files/{}.csv".format(fid)
+    return f"files/{fid}.csv"
 
 
 def book_output_relpath(*, book_id: str) -> str:
     bid = _validate_output_id(str(book_id), kind="book_id")
-    return "books/{}.xlsx".format(bid)
+    return f"books/{bid}.xlsx"
 
 
 def file_output_path(layout: OutputRootLayout, *, version_id: str, file_id: str) -> Path:
@@ -134,14 +135,14 @@ def write_version_manifest(
     layout: OutputRootLayout,
     *,
     version_id: str,
-    created_at_unix_s: Optional[int] = None,
-    books: Optional[Mapping[str, str]] = None,
-    files: Optional[Mapping[str, str]] = None,
+    created_at_unix_s: int | None = None,
+    books: Mapping[str, str] | None = None,
+    files: Mapping[str, str] | None = None,
 ) -> Path:
     """写入 `<root>/versions/<version_id>/manifest.json` (原子替换)."""
     vid = validate_version_id(version_id)
     manifest_path = version_manifest_path(layout, version_id=str(vid))
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "version_id": str(vid),
         "created_at_unix_s": int(time.time()) if created_at_unix_s is None else int(created_at_unix_s),
         "books": dict(books or {}),
@@ -176,19 +177,19 @@ def parse_versioned_output_path(path: Path) -> ParsedVersionedOutputPath:
     p = Path(str(path))
     parts = p.parts
 
-    versions_idx: Optional[int] = None
+    versions_idx: int | None = None
     for i in range(len(parts) - 1, -1, -1):
         if parts[i] == "versions":
             versions_idx = i
             break
 
     if versions_idx is None:
-        msg = "Not a versioned output path (missing 'versions' segment): {!r}".format(str(p))
+        msg = f"Not a versioned output path (missing 'versions' segment): {str(p)!r}"
         raise ValueError(msg)
 
     # 形状要求: `<root>/versions/<version_id>/<kind>/<filename>`
     if len(parts) < versions_idx + 4:
-        msg = "Invalid versioned output path shape: {!r}".format(str(p))
+        msg = f"Invalid versioned output path shape: {str(p)!r}"
         raise ValueError(msg)
 
     root_parts = parts[:versions_idx]
@@ -200,7 +201,7 @@ def parse_versioned_output_path(path: Path) -> ParsedVersionedOutputPath:
 
     if kind == "books":
         if not filename.endswith(".xlsx"):
-            msg = "Invalid versioned book output filename: {!r}".format(filename)
+            msg = f"Invalid versioned book output filename: {filename!r}"
             raise ValueError(msg)
         artifact_id = filename[: -len(".xlsx")]
         rel = book_output_relpath(book_id=artifact_id)
@@ -214,7 +215,7 @@ def parse_versioned_output_path(path: Path) -> ParsedVersionedOutputPath:
 
     if kind == "files":
         if not filename.endswith(".csv"):
-            msg = "Invalid versioned file output filename: {!r}".format(filename)
+            msg = f"Invalid versioned file output filename: {filename!r}"
             raise ValueError(msg)
         artifact_id = filename[: -len(".csv")]
         rel = file_output_relpath(file_id=artifact_id)
@@ -226,18 +227,18 @@ def parse_versioned_output_path(path: Path) -> ParsedVersionedOutputPath:
             artifact_relpath=rel,
         )
 
-    msg = "Unknown versioned output kind: {!r} (path={!r})".format(kind, str(p))
+    msg = f"Unknown versioned output kind: {kind!r} (path={str(p)!r})"
     raise ValueError(msg)
 
 
-def read_latest(root: Path) -> Dict[str, JsonLike]:
+def read_latest(root: Path) -> dict[str, JsonLike]:
     p = Path(str(root)) / "manifest" / "latest.json"
-    return cast("Dict[str, JsonLike]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
+    return cast("dict[str, JsonLike]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
 
 
-def read_version_manifest(root: Path, *, version_id: str) -> Dict[str, JsonLike]:
+def read_version_manifest(root: Path, *, version_id: str) -> dict[str, JsonLike]:
     p = Path(str(root)) / "versions" / str(validate_version_id(version_id)) / "manifest.json"
-    return cast("Dict[str, JsonLike]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
+    return cast("dict[str, JsonLike]", json.loads(p.read_text("utf-8")))  # pragma: allow-cast json load runtime boundary
 
 
 __all__ = (

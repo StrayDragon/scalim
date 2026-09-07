@@ -1,9 +1,10 @@
 import contextlib
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, cast
 
 from .....events import EventType
 from .....spec.ir import LookupStepIr
@@ -12,8 +13,6 @@ from .....spec.ir._source_contracts import LookupSourceRefIrBase
 from .....spec.ir.binding import BindingIr, LoaderCallContextIr, build_stable_lookup_key_list
 from .....typedefs import LoaderCallKwargs, LoaderResultMap, LoaderResultMapping, LookupKeyList, LookupKeySet, RowData, RuntimeValue
 from .....utils.relation_signature import LoadRefCacheKey, build_step_signature, normalize_key_field
-from .....vendor.compact.typing_extensionsx import Protocol
-from .....vendor.dataclassesx import dataclass
 from ....loader_call_params import build_loader_call_params
 from ....loader_retry import CALLSITE_LOAD_REF, call_with_loader_retry
 from ...guardrails import build_loader_result_guardrail_payload, fail_guardrail
@@ -34,8 +33,8 @@ class _LoaderResultWithNormalizeStats(Protocol):
 def build_ref_loader_context(
     exec_ctx: LoadRefExecutionContext,
     source_id: str,
-    event_field_keys: Tuple[str, ...],
-    batch_rows: Optional[List[RowData]],
+    event_field_keys: tuple[str, ...],
+    batch_rows: list[RowData] | None,
     lookup_keys_set: LookupKeySet,
     lookup_keys_list: LookupKeyList,
 ) -> LoaderCallContextIr:
@@ -53,16 +52,16 @@ def build_ref_loader_context(
 def _trigger_ref_loader_call(
     runtime: ExecutionRuntime,
     source_id: str,
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     loader_context: LoaderCallContextIr,
     result: RuntimeValue,
     duration: float,
     *,
     cache_enabled: bool,
     lookup_key_count: int,
-    event_field_keys: Tuple[str, ...],
-    cache_status: Optional[str],
-    chunk_offset: Optional[int] = None,
+    event_field_keys: tuple[str, ...],
+    cache_status: str | None,
+    chunk_offset: int | None = None,
 ) -> None:
     if not runtime.instrumentation.wants(EventType.LOADER_CALL):
         return
@@ -74,7 +73,7 @@ def _trigger_ref_loader_call(
             runtime_bindings=runtime.runtime_bindings,
         )
     result_obj: RuntimeValue = result
-    skipped_none_rows: Optional[int] = None
+    skipped_none_rows: int | None = None
     with contextlib.suppress(AttributeError):
         skipped_none_rows = cast(
             "_LoaderResultWithNormalizeStats", result_obj
@@ -115,13 +114,13 @@ def _call_ref_loader(
     *,
     runtime: ExecutionRuntime,
     source: LookupSourceRefIrBase,
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     loader_context: LoaderCallContextIr,
     cache_enabled: bool,
     lookup_key_count: int,
-    event_field_keys: Tuple[str, ...],
+    event_field_keys: tuple[str, ...],
     cache_status: str,
-    chunk_offset: Optional[int] = None,
+    chunk_offset: int | None = None,
 ) -> LoaderResultMapping:
     loader_fn = runtime.runtime_bindings.require_source_loader(source.source_id)
 
@@ -183,12 +182,12 @@ def _call_ref_loader(
 def _get_cached_ref_result(
     runtime: ExecutionRuntime,
     cache_key: LoadRefCacheKey,
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     loader_context: LoaderCallContextIr,
     lookup_key_count: int,
-    event_field_keys: Tuple[str, ...],
+    event_field_keys: tuple[str, ...],
     source_id: str,
-) -> Optional[LoaderResultMapping]:
+) -> LoaderResultMapping | None:
     cached_entry = runtime.load_ref_cache.get(cache_key)
     if cached_entry is None:
         return None
@@ -223,8 +222,8 @@ def _resolve_lookup_chunk_size(
     *,
     cache_enabled: bool,
     lookup_key_count: int,
-    binding: Optional[BindingIr],
-) -> Optional[int]:
+    binding: BindingIr | None,
+) -> int | None:
     if not cache_enabled:
         return None
     if binding is not None and binding.mode == "rows":
@@ -238,13 +237,13 @@ def _resolve_lookup_chunk_size(
 def _load_ref_once(
     runtime: ExecutionRuntime,
     source: LookupSourceRefIrBase,
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     loader_context: LoaderCallContextIr,
     *,
     cache_enabled: bool,
     lookup_key_count: int,
-    event_field_keys: Tuple[str, ...],
-    cache_key: Optional[LoadRefCacheKey],
+    event_field_keys: tuple[str, ...],
+    cache_key: LoadRefCacheKey | None,
 ) -> LoaderResultMapping:
     result = _call_ref_loader(
         runtime=runtime,
@@ -289,9 +288,9 @@ def _build_one_chunk_plan(
     *,
     exec_ctx: LoadRefExecutionContext,
     source: LookupSourceRefIrBase,
-    event_field_keys: Tuple[str, ...],
+    event_field_keys: tuple[str, ...],
     lookup_keys_list: LookupKeyList,
-    batch_rows: Optional[List[RowData]],
+    batch_rows: list[RowData] | None,
     chunk_size: int,
     offset: int,
 ) -> _ChunkPlan:
@@ -315,13 +314,13 @@ def _build_chunk_plans(
     *,
     exec_ctx: LoadRefExecutionContext,
     source: LookupSourceRefIrBase,
-    event_field_keys: Tuple[str, ...],
+    event_field_keys: tuple[str, ...],
     lookup_keys_list: LookupKeyList,
-    batch_rows: Optional[List[RowData]],
+    batch_rows: list[RowData] | None,
     chunk_size: int,
-) -> List[_ChunkPlan]:
+) -> list[_ChunkPlan]:
     """仅并行路径使用:提交 `futures` 前需要全部 `plan` 已构造."""
-    plans: List[_ChunkPlan] = []
+    plans: list[_ChunkPlan] = []
     for offset in range(0, len(lookup_keys_list), chunk_size):
         plans.append(
             _build_one_chunk_plan(
@@ -341,8 +340,8 @@ def _load_one_chunk(
     *,
     runtime: ExecutionRuntime,
     source: LookupSourceRefIrBase,
-    binding: Optional[BindingIr],
-    event_field_keys: Tuple[str, ...],
+    binding: BindingIr | None,
+    event_field_keys: tuple[str, ...],
     plan: _ChunkPlan,
 ) -> LoaderResultMapping:
     return _call_ref_loader(
@@ -370,10 +369,10 @@ def _load_chunks_serially(
     exec_ctx: LoadRefExecutionContext,
     runtime: ExecutionRuntime,
     source: LookupSourceRefIrBase,
-    binding: Optional[BindingIr],
-    event_field_keys: Tuple[str, ...],
+    binding: BindingIr | None,
+    event_field_keys: tuple[str, ...],
     lookup_keys_list: LookupKeyList,
-    batch_rows: Optional[List[RowData]],
+    batch_rows: list[RowData] | None,
     chunk_size: int,
 ) -> LoaderResultMap:
     """默认/未扇出路径:按 `offset` 懒建单个 `plan`,避免一次性物化全部分片上下文."""
@@ -403,16 +402,16 @@ def _load_chunks_in_parallel(
     *,
     runtime: ExecutionRuntime,
     source: LookupSourceRefIrBase,
-    binding: Optional[BindingIr],
-    event_field_keys: Tuple[str, ...],
-    plans: List[_ChunkPlan],
+    binding: BindingIr | None,
+    event_field_keys: tuple[str, ...],
+    plans: list[_ChunkPlan],
     fanout: int,
 ) -> LoaderResultMap:
     """`opt-in` 分片并行:独立小池扇出 + 全局在途帽;合并顺序仍按 `offset` 升序."""
     merged: LoaderResultMap = {}
     executor = ThreadPoolExecutor(max_workers=fanout)
     try:
-        futures: List[Tuple[_ChunkPlan, "Future[LoaderResultMapping]"]] = [
+        futures: list[tuple[_ChunkPlan, Future[LoaderResultMapping]]] = [
             (
                 plan,
                 executor.submit(
@@ -445,13 +444,13 @@ def _load_ref_chunked(
     *,
     exec_ctx: LoadRefExecutionContext,
     source: LookupSourceRefIrBase,
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     runtime: ExecutionRuntime,
-    event_field_keys: Tuple[str, ...],
+    event_field_keys: tuple[str, ...],
     lookup_keys_list: LookupKeyList,
-    batch_rows: Optional[List[RowData]],
+    batch_rows: list[RowData] | None,
     chunk_size: int,
-    cache_key: Optional[LoadRefCacheKey],
+    cache_key: LoadRefCacheKey | None,
 ) -> LoaderResultMap:
     fanout = runtime.resolve_chunk_fanout(_chunk_count(len(lookup_keys_list), chunk_size))
     source_parallel = getattr(
@@ -504,7 +503,7 @@ def load_step_data(
     step: LookupStepIr,
     lookup_keys: LookupKeySet,
     is_final_step: bool,
-    group_field_keys: Tuple[str, ...],
+    group_field_keys: tuple[str, ...],
 ) -> LoaderResultMapping:
     runtime = exec_ctx.runtime
     source = runtime.resolve_lookup_source(step)
@@ -523,7 +522,7 @@ def load_step_data(
     if binding is not None and (binding.mode == "keys" or (binding.mode == "rows" and binding.cache_mode == "batch")):
         cache_enabled = True
 
-    batch_rows: Optional[List[RowData]] = None
+    batch_rows: list[RowData] | None = None
     event_field_keys = group_field_keys if is_final_step else (exec_ctx.field_key,)
     loader_context = build_ref_loader_context(
         exec_ctx,

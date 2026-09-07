@@ -1,6 +1,6 @@
 # region imports
 
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from ....planning.plan import ExecutionPlan
 from ...observer import EventDispatchObserver
@@ -17,20 +17,20 @@ class VizObserver(VizObserverNodeMixin, VizObserverOutputMixin, VizObserverHandl
     """可视化事件观察者."""
 
     config: VizObserverConfig
-    snapshot: Optional[Dict[str, Any]]
-    run_id: Optional[str]
-    _events_emitter: Optional[VizEventEmitter]
-    _trace_emitter: Optional[VizEventEmitter]
-    _known_node_ids: Optional[Set[str]]
-    _node_id_cache: Optional[Dict[str, str]]
+    snapshot: dict[str, Any] | None
+    run_id: str | None
+    _events_emitter: VizEventEmitter | None
+    _trace_emitter: VizEventEmitter | None
+    _known_node_ids: set[str] | None
+    _node_id_cache: dict[str, str] | None
     _snapshot_written: bool
     _run_dir_applied: bool
 
     def __init__(
         self,
         *,
-        config: Optional[VizObserverConfig] = None,
-        snapshot: Optional[Dict[str, Any]] = None,
+        config: VizObserverConfig | None = None,
+        snapshot: dict[str, Any] | None = None,
     ) -> None:
         self.config = config or VizObserverConfig()
         self.snapshot = snapshot
@@ -44,7 +44,7 @@ class VizObserver(VizObserverNodeMixin, VizObserverOutputMixin, VizObserverHandl
         self._attach_viz_metadata()
 
     @classmethod
-    def from_plan(cls, plan: ExecutionPlan, config: VizObserverConfig, *, output_composition: Optional[Any] = None) -> "VizObserver":
+    def from_plan(cls, plan: ExecutionPlan, config: VizObserverConfig, *, output_composition: Any | None = None) -> "VizObserver":
         snapshot = plan.to_viz_graph_snapshot()
         if output_composition is not None:
             snapshot = augment_viz_graph_snapshot_for_output_composition(snapshot, output_composition=output_composition)

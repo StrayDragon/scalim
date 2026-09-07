@@ -6,7 +6,7 @@ from typing import Sequence
 
 from scalim.sinks import BaseRowSink
 from scalim.typedefs import RowData
-from scalim.vendor.compact.typing_extensionsx import override
+from typing_extensions import override
 
 
 class CountingRowSink(BaseRowSink):

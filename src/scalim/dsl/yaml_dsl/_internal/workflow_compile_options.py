@@ -10,7 +10,7 @@
 """
 
 import math
-from typing import Any, Optional
+from typing import Any
 
 from ....spec.ir._workflow import (
     WorkflowCachePoolBudgetIr,
@@ -67,7 +67,7 @@ def _normalize_and_validate_workflow_execution_options(raw: Any) -> WorkflowExec
     )
 
 
-def _build_workflow_cache_pool_ir_from_runtime(raw: Any) -> Optional[WorkflowCachePoolIr]:
+def _build_workflow_cache_pool_ir_from_runtime(raw: Any) -> WorkflowCachePoolIr | None:
     if not isinstance(raw, WorkflowCachePoolPreset):
         msg = "workflow_runtime_options.cache_pool must be a WorkflowCachePoolPreset"
         raise TypeError(msg)
@@ -102,7 +102,7 @@ def _build_workflow_cache_pool_ir_from_runtime(raw: Any) -> Optional[WorkflowCac
             pin=tuple(WorkflowCachePoolPinIr(kind=str(p.kind), source_id=str(p.source_id)) for p in (raw.pin or ())),
         )
 
-    msg = "Unsupported workflow_runtime_options.cache_pool preset: {!r}".format(type(raw).__name__)
+    msg = f"Unsupported workflow_runtime_options.cache_pool preset: {type(raw).__name__!r}"
     raise TypeError(msg)
 
 
@@ -144,10 +144,10 @@ def _parse_workflow_option_finite_number(raw: Any, *, path: str, positive: bool)
         msg = "{} must be a finite {}number".format(path, "positive " if positive else "")
         raise ValueError(msg)
     if positive and value <= 0:
-        msg = "{} must be a finite positive number".format(path)
+        msg = f"{path} must be a finite positive number"
         raise ValueError(msg)
     if not positive and value < 0:
-        msg = "{} must be a finite non-negative number".format(path)
+        msg = f"{path} must be a finite non-negative number"
         raise ValueError(msg)
     return float(value)
 
@@ -260,7 +260,7 @@ def normalize_and_validate_workflow_execution_options(raw: Any) -> WorkflowExecu
     return _normalize_and_validate_workflow_execution_options(raw)
 
 
-def build_workflow_cache_pool_ir_from_runtime(raw: Any) -> Optional[WorkflowCachePoolIr]:
+def build_workflow_cache_pool_ir_from_runtime(raw: Any) -> WorkflowCachePoolIr | None:
     return _build_workflow_cache_pool_ir_from_runtime(raw)
 
 

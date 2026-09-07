@@ -5,15 +5,16 @@ import json
 import logging
 import random
 import time
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+
+from typing_extensions import override
 
 from ..._internal.loggingx import get_logger, prefix
 from ...events import Event, EventType
 from ...events._events import RelationLookupEvent
 from ...typedefs import RelationLookupResult, RelationReportFormat
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import asdict, dataclass, field
 from .._internal.console_report import emit_info, emit_warning, format_percent
 from ..observer import EventDispatchObserver
 from ..structured_logging import emit_structured, is_jsonl_logging_installed
@@ -32,9 +33,9 @@ class RelationSample:
     target_source: str
     result: RelationLookupResult
     timestamp: float = field(default_factory=time.time)
-    fk_type: Optional[str] = None
-    expected_type: Optional[str] = None
-    error_message: Optional[str] = None
+    fk_type: str | None = None
+    expected_type: str | None = None
+    error_message: str | None = None
 
 
 @dataclass
@@ -62,9 +63,9 @@ class RelationMetrics:
     miss_count: int = 0
     null_key_count: int = 0
     type_mismatch_count: int = 0
-    per_source_stats: Dict[str, RelationSourceStats] = field(default_factory=dict)
-    samples: List[RelationSample] = field(default_factory=list)
-    type_mismatch_samples: List[RelationSample] = field(default_factory=list)
+    per_source_stats: dict[str, RelationSourceStats] = field(default_factory=dict)
+    samples: list[RelationSample] = field(default_factory=list)
+    type_mismatch_samples: list[RelationSample] = field(default_factory=list)
 
     @property
     def hit_rate(self) -> float:
@@ -78,7 +79,7 @@ class RelationMetrics:
             self.per_source_stats[source_id] = RelationSourceStats()
         return self.per_source_stats[source_id]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "summary": {
                 "total_lookups": self.total_lookups,
@@ -106,7 +107,7 @@ class RelationConfig:
     log_type_mismatch: bool = True
     max_samples: int = 1000
     report_format: RelationReportFormat = "console"
-    output_path: Optional[str] = None
+    output_path: str | None = None
     include_details: bool = False
     logger: logging.Logger = field(default=_LOGGER)
 
@@ -122,7 +123,7 @@ class RelationObserver(EventDispatchObserver):
 
     def __init__(
         self,
-        config: Optional[RelationConfig] = None,
+        config: RelationConfig | None = None,
     ) -> None:
         if config is None:
             config = RelationConfig.default()
@@ -206,9 +207,9 @@ class RelationObserver(EventDispatchObserver):
         fk_normalized: Any,
         target_source: str,
         result: RelationLookupResult,
-        fk_type: Optional[str] = None,
-        expected_type: Optional[str] = None,
-        error_message: Optional[str] = None,
+        fk_type: str | None = None,
+        expected_type: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         payload = RelationLookupEvent(
             field_key="",
@@ -368,7 +369,7 @@ class RelationObserver(EventDispatchObserver):
         except OSError as e:
             self.config.logger.warning("%s写入报告失败: %s", prefix("relations"), e)
 
-    def _build_report_dict(self) -> Dict[str, Any]:
+    def _build_report_dict(self) -> dict[str, Any]:
         return self.metrics.to_dict()
 
     def _output_report(self) -> None:

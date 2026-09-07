@@ -1,7 +1,7 @@
-from typing import ClassVar, Dict, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DEFAULT_BATCH_SIZE,
     DESC_MAIN_SOURCE,
@@ -40,13 +40,13 @@ class DemandConfig:
     description: str = dataclass_field(default="", metadata=schema_meta(desc="配置描述", md="配置描述(可选)."))
     """配置说明(可选)."""
 
-    batch_size: Optional[int] = dataclass_field(
+    batch_size: int | None = dataclass_field(
         default=DEFAULT_BATCH_SIZE,
         metadata=schema_omit(),
     )
     """运行期批处理大小;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
-    retry: Optional[LoaderRetryConfig] = dataclass_field(
+    retry: LoaderRetryConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
@@ -58,7 +58,7 @@ class DemandConfig:
     )
     """主数据源配置."""
 
-    sources: Dict[str, SourceConfig] = dataclass_field(
+    sources: dict[str, SourceConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             desc="数据源配置映射, key 为 source_id",
@@ -75,16 +75,16 @@ class DemandConfig:
     )
     """额外数据源配置映射,键为 `source_id`."""
 
-    source_fields: Dict[str, SourceFieldConfig] = dataclass_field(default_factory=dict, metadata=schema_omit())
+    source_fields: dict[str, SourceFieldConfig] = dataclass_field(default_factory=dict, metadata=schema_omit())
     """解析后汇总的源字段配置映射(内部字段)."""
 
-    derived_fields: Dict[str, DerivedFieldConfig] = dataclass_field(default_factory=dict, metadata=schema_omit())
+    derived_fields: dict[str, DerivedFieldConfig] = dataclass_field(default_factory=dict, metadata=schema_omit())
     """解析后汇总的派生字段配置映射(内部字段)."""
 
-    source_field_id_map: Dict[str, Dict[str, str]] = dataclass_field(default_factory=dict, metadata=schema_omit())
+    source_field_id_map: dict[str, dict[str, str]] = dataclass_field(default_factory=dict, metadata=schema_omit())
     """按数据源分组的字段标识映射(内部字段)."""
 
-    relations: Dict[str, RelationConfig] = dataclass_field(
+    relations: dict[str, RelationConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             desc="命名关联关系映射(steps 模板),供字段通过 string ref/alias 复用",
@@ -100,13 +100,13 @@ class DemandConfig:
     )
     """命名关联关系映射,供字段通过别名复用."""
 
-    guardrails: Optional[GuardrailsConfig] = dataclass_field(
+    guardrails: GuardrailsConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
     """运行期护栏配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
-    resources: Optional[ResourcesConfig] = dataclass_field(
+    resources: ResourcesConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             ref="resources",
@@ -116,7 +116,7 @@ class DemandConfig:
     )
     """可选:`IO` 资源声明."""
 
-    outputs: Tuple[OutputTargetConfig, ...] = dataclass_field(
+    outputs: tuple[OutputTargetConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             desc="输出目标列表(多 sheet 分发 + 派生汇总; 可选)",
@@ -161,13 +161,13 @@ class DemandConfig:
     )
     """运行期诊断策略:是否包含完整错误信息(可能包含敏感信息;从 `YAML` 主线迁出)."""
 
-    meta: Optional[OutputExtraSheetConfig] = dataclass_field(
+    meta: OutputExtraSheetConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
     """运行期输出附加工作表:`meta`;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
-    audit: Optional[OutputExtraSheetConfig] = dataclass_field(
+    audit: OutputExtraSheetConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )

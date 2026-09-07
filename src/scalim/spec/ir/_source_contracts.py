@@ -1,7 +1,6 @@
-from typing import Any, Optional
+from typing import Any, Protocol, runtime_checkable
 
 from ...typedefs import LoaderResultMapping, RuntimeValue
-from ...vendor.compact.typing_extensionsx import Protocol, runtime_checkable
 from .aliases import LookupKeySpec, NormalizedLookupKeySpec
 from .binding import BindingIr, LoaderIr
 from .callable_refs import CallableRefIr
@@ -16,7 +15,7 @@ class SourceKeyIrBase(Protocol):
     def key(self) -> LookupKeySpec: ...
 
     @property
-    def cast(self) -> Optional[LookupCastSpecIr]: ...
+    def cast(self) -> LookupCastSpecIr | None: ...
 
 
 @runtime_checkable
@@ -31,7 +30,7 @@ class SourceRefIrBase(Protocol):
 class SourceNormalizeIrBase(Protocol):
     """数据源 `normalize` 契约: 供 `execution` 模块使用的最小接口."""
 
-    def apply(self, result: RuntimeValue, *, source_id: str, call_by: Optional[Any] = None) -> LoaderResultMapping: ...
+    def apply(self, result: RuntimeValue, *, source_id: str, call_by: Any | None = None) -> LoaderResultMapping: ...
 
 
 @runtime_checkable
@@ -45,15 +44,15 @@ class LookupSourceRefIrBase(SourceRefIrBase, Protocol):
     def loader_spec(self) -> LoaderIr: ...
 
     @property
-    def lookup_chunk_size(self) -> Optional[int]: ...
+    def lookup_chunk_size(self) -> int | None: ...
 
     @property
-    def lookup_chunk_parallel(self) -> Optional[bool]: ...
+    def lookup_chunk_parallel(self) -> bool | None: ...
 
     @property
-    def normalize(self) -> Optional[SourceNormalizeIrBase]: ...
+    def normalize(self) -> SourceNormalizeIrBase | None: ...
 
-    def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]: ...
+    def get_binding(self, key_field: NormalizedLookupKeySpec) -> BindingIr | None: ...
 
 
 @runtime_checkable

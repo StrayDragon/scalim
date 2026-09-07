@@ -1,10 +1,11 @@
 from collections import deque
-from typing import Dict, FrozenSet, List, Optional, Set, Tuple, cast, overload
+from dataclasses import dataclass
+from typing import cast, overload
+
+from typing_extensions import override
 
 from ...exceptions import ScalimError
 from ...typedefs import RuntimeValue
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
 from ._source_contracts import LookupSourceRefIrBase, MainSourceRefIrBase, SourceRefIrBase
 from .aliases import LookupKeySpec
 from .binding import BindingIr
@@ -97,7 +98,7 @@ class JoinConditionIr:
             return RelationIr(conditions=(self, other))
         if isinstance(other, RelationIr):
             return RelationIr(conditions=(self, *other.conditions))
-        msg = "and_() requires JoinConditionIr or RelationIr, got {}".format(type(other).__name__)
+        msg = f"and_() requires JoinConditionIr or RelationIr, got {type(other).__name__}"
         raise TypeError(msg)
 
 
@@ -114,7 +115,7 @@ class RelationIr:
           `orders["pay_id"].join(pays["pay_id"]).and_(pays["country_id"].join(countries["country_id"]))`
     """
 
-    conditions: Tuple[JoinConditionIr, ...]
+    conditions: tuple[JoinConditionIr, ...]
     """
     若干关联条件
     """
@@ -131,18 +132,18 @@ class RelationIr:
             return RelationIr(conditions=(*self.conditions, other))
         if isinstance(other, RelationIr):
             return RelationIr(conditions=(*self.conditions, *other.conditions))
-        msg = "and_() requires JoinConditionIr or RelationIr, got {}".format(type(other).__name__)
+        msg = f"and_() requires JoinConditionIr or RelationIr, got {type(other).__name__}"
         raise TypeError(msg)
 
-    def get_involved_sources(self) -> FrozenSet[SourceRefIrBase]:
-        sources: Set[SourceRefIrBase] = set()
+    def get_involved_sources(self) -> frozenset[SourceRefIrBase]:
+        sources: set[SourceRefIrBase] = set()
         for condition in self.conditions:
             sources.add(condition.left.source)
             sources.add(condition.right.source)
         return frozenset(sources)
 
-    def _build_adjacency(self) -> Dict[str, List[Tuple[str, SourceRefIrBase, str]]]:
-        adjacency: Dict[str, List[Tuple[str, SourceRefIrBase, str]]] = {}
+    def _build_adjacency(self) -> dict[str, list[tuple[str, SourceRefIrBase, str]]]:
+        adjacency: dict[str, list[tuple[str, SourceRefIrBase, str]]] = {}
 
         for condition in self.conditions:
             left_src = condition.left.source
@@ -155,8 +156,8 @@ class RelationIr:
 
         return adjacency
 
-    def _build_lookup_steps(self, path: List[Tuple[str, SourceRefIrBase, str]]) -> "Tuple[LookupStepIr, ...]":
-        steps: List[LookupStepIr] = []
+    def _build_lookup_steps(self, path: list[tuple[str, SourceRefIrBase, str]]) -> "tuple[LookupStepIr, ...]":
+        steps: list[LookupStepIr] = []
         for from_field, next_source, to_field in path:
             if isinstance(next_source, MainSourceRefIrBase):
                 msg = "主数据源不支持作为关联查找目标"
@@ -168,7 +169,7 @@ class RelationIr:
                 steps.append(LookupStepIr(from_field=from_field, to_source_id=lookup_source.source_id, to_field=to_field))
         return tuple(steps)
 
-    def infer_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "Tuple[LookupStepIr, ...]":
+    def infer_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "tuple[LookupStepIr, ...]":
         """
         推断从 `from_source` 到 `to_source` 的查找路径, 返回 `LookupStepIr` 序列
         """
@@ -180,8 +181,8 @@ class RelationIr:
             msg = f"起始数据源 {from_source.source_id!r} 不在关联关系中"
             raise ScalimRelationInferenceError(msg)
 
-        queue: "deque[Tuple[SourceRefIrBase, List[Tuple[str, SourceRefIrBase, str]]]]" = deque([(from_source, [])])
-        visited: Set[str] = {from_source.source_id}
+        queue: deque[tuple[SourceRefIrBase, list[tuple[str, SourceRefIrBase, str]]]] = deque([(from_source, [])])
+        visited: set[str] = {from_source.source_id}
 
         while queue:
             current_source, path = queue.popleft()
@@ -200,12 +201,12 @@ class RelationIr:
         msg = f"无法从 {from_source.source_id!r} 到达 {to_source.source_id!r}"
         raise ScalimRelationInferenceError(msg)
 
-    def infer_multi_field_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "Tuple[LookupStepIr, ...]":
+    def infer_multi_field_lookup_path(self, from_source: SourceRefIrBase, to_source: LookupSourceRefIrBase) -> "tuple[LookupStepIr, ...]":
         """
         推断多字段关联路径: 处理复合主键场景,将多个单字段条件合并为一个多字段 `LookupStepIr`
         """
         # 收集 `from_source` -> `to_source` 的所有直接条件
-        direct_conditions: List[Tuple[str, str]] = []
+        direct_conditions: list[tuple[str, str]] = []
         for condition in self.conditions:
             if condition.left.source == from_source and condition.right.source == to_source:
                 direct_conditions.append((condition.left.field_name, condition.right.field_name))
@@ -253,17 +254,17 @@ class LookupStepIr:
     以 `DemandIr.sources[to_source_id]` 为 `SSOT`;执行层按 `id` 回目录解析.
     """
 
-    to_field: Optional[LookupKeySpec] = None
+    to_field: LookupKeySpec | None = None
     """
     目标字段名或字段名列表(可选,默认使用目录源的键)
     """
 
-    lookup_cast: Optional[LookupCastSpecIr] = None
+    lookup_cast: LookupCastSpecIr | None = None
     """
     关联键归一化转换(仅当前步骤)
     """
 
-    bind: Optional[BindingIr] = None
+    bind: BindingIr | None = None
     """
     下游加载参数绑定(仅当前步骤)
     """
@@ -290,18 +291,18 @@ class LookupStepIr:
         return isinstance(self.from_field, (list, tuple))
 
     @staticmethod
-    def _normalize_fields(fields: LookupKeySpec) -> Tuple[str, ...]:
+    def _normalize_fields(fields: LookupKeySpec) -> tuple[str, ...]:
         if isinstance(fields, (list, tuple)):
             return tuple(fields)
         return (fields,)
 
-    def get_from_fields(self) -> Tuple[str, ...]:
+    def get_from_fields(self) -> tuple[str, ...]:
         """
         获取源字段列表
         """
         return self._normalize_fields(self.from_field)
 
-    def get_to_fields_or_source_key(self, source: LookupSourceRefIrBase) -> Tuple[str, ...]:
+    def get_to_fields_or_source_key(self, source: LookupSourceRefIrBase) -> tuple[str, ...]:
         """
         获取目标字段列表: 如果未指定 `to_field`,则使用目录中运行时 `SourceIr` 的键
         """

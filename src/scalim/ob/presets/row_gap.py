@@ -1,7 +1,8 @@
 # region imports
 
 import logging
-from typing import Any, Dict, Hashable, Iterable, List, Optional, Set, Sized, cast
+from collections.abc import Hashable, Iterable, Sized
+from typing import Any, cast
 
 from ..._internal.loggingx import get_logger, prefix
 from ...events import Event
@@ -20,11 +21,11 @@ class RowGapObserver(EventDispatchObserver):
     """记录主数据源行数与批次加载的行缺口统计."""
 
     primary_loader_name: str
-    data_loader_names: Set[str]
+    data_loader_names: set[str]
     sample_limit: int
     logger: logging.Logger
 
-    _primary_count: Optional[int]
+    _primary_count: int | None
     _total_expected: int
     _total_actual: int
     _total_missing: int
@@ -32,9 +33,9 @@ class RowGapObserver(EventDispatchObserver):
     def __init__(
         self,
         primary_loader_name: str = "primary_keys",
-        data_loader_names: Optional[Iterable[str]] = None,
+        data_loader_names: Iterable[str] | None = None,
         sample_limit: int = 5,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         self.primary_loader_name = primary_loader_name
         self.data_loader_names = set(data_loader_names or ["base_info"])
@@ -72,9 +73,9 @@ class RowGapObserver(EventDispatchObserver):
             self._total_actual += actual_len
             self._total_missing += missing
 
-        sample_missing: List[Hashable] = []
+        sample_missing: list[Hashable] = []
         if expected_keys is not None and isinstance(payload.result, dict) and self.sample_limit > 0:
-            result_dict = cast("Dict[Hashable, Any]", payload.result)  # pragma: allow-cast loader result typed narrowing
+            result_dict = cast("dict[Hashable, Any]", payload.result)  # pragma: allow-cast loader result typed narrowing
             for key in expected_keys:
                 try:
                     if key not in result_dict:
@@ -123,7 +124,7 @@ class RowGapObserver(EventDispatchObserver):
         return 0
 
     @staticmethod
-    def _extract_expected_keys(params: Dict[str, Any]) -> Optional[List[Hashable]]:
+    def _extract_expected_keys(params: dict[str, Any]) -> list[Hashable] | None:
         if not params:
             return None
         for key in ("user_ids", "batch_row_nth", "batch_keys", "user_id_list", "keys", "ids"):
@@ -132,7 +133,7 @@ class RowGapObserver(EventDispatchObserver):
                 if value is None:
                     return None
                 if isinstance(value, dict):
-                    value_dict = cast("Dict[Hashable, Any]", value)  # pragma: allow-cast params typed narrowing
+                    value_dict = cast("dict[Hashable, Any]", value)  # pragma: allow-cast params typed narrowing
                     return list(value_dict.keys())
                 if isinstance(value, (list, tuple, set)):
                     value_iter = cast("Iterable[Hashable]", value)  # pragma: allow-cast params typed narrowing

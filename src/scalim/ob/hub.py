@@ -1,7 +1,8 @@
 # region imports
 
 import threading
-from typing import Any, Callable, Dict, Hashable, List, Optional, TypeVar, Union
+from collections.abc import Callable, Hashable
+from typing import Any, TypeVar
 
 from ..events import Event, EventType
 from ..events._events import (
@@ -47,32 +48,32 @@ class InstrumentationHub:
 
     def __init__(
         self,
-        hook_manager: Optional[HookManager] = None,
-        observer_manager: Optional[ObserverManager] = None,
+        hook_manager: HookManager | None = None,
+        observer_manager: ObserverManager | None = None,
     ) -> None:
         self.hook_manager = hook_manager or HookManager()
         self.observer_manager = observer_manager or ObserverManager()
         self._lock = threading.RLock()
         self._diagnostic_warning_emitted = False
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         state = dict(self.__dict__)
         state.pop("_lock", None)
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         self._lock = threading.RLock()
         self._diagnostic_warning_emitted = bool(state.get("_diagnostic_warning_emitted", False))
 
-    def register(self, subscriber: Union[Observer, IExecutionHook]) -> None:
+    def register(self, subscriber: Observer | IExecutionHook) -> None:
         observers, hooks = split_components([subscriber])
         if observers:
             self.observer_manager.register(observers[0])
             return
         self.hook_manager.register(hooks[0])
 
-    def unregister(self, subscriber: Union[Observer, IExecutionHook]) -> bool:
+    def unregister(self, subscriber: Observer | IExecutionHook) -> bool:
         observers, hooks = split_components([subscriber])
         if observers:
             return self.observer_manager.unregister(observers[0])
@@ -90,8 +91,8 @@ class InstrumentationHub:
         self,
         event_type: EventType,
         payload: Any,
-        meta: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Event]:
+        meta: dict[str, Any] | None = None,
+    ) -> Event | None:
         # 类型化 / `observer` / `on_event` 共用同一 `Event` 信封(`r217`);顺序: 类型化 → `observer` → `on_event`.
         event = self.observer_manager.build_event(event_type, payload, meta=meta)
         self.hook_manager.emit_typed(event_type, event)
@@ -108,8 +109,8 @@ class InstrumentationHub:
         self,
         event_type: EventType,
         payload_factory: Callable[[], _PayloadT],
-        meta: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Event]:
+        meta: dict[str, Any] | None = None,
+    ) -> Event | None:
         if not self.wants(event_type):
             return None
         payload = payload_factory()
@@ -119,8 +120,8 @@ class InstrumentationHub:
         self,
         event_type: EventType,
         payload: Any,
-        meta: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Event]:
+        meta: dict[str, Any] | None = None,
+    ) -> Event | None:
         """向类型化钩子、观测器以及订阅了 `hook.on_event(Event)` 的监听方发送事件.
 
         当事件会被发送到观测器/`on_event` 路径时,返回构建好的 `Event` 包装;否则返回 `None`.
@@ -137,7 +138,7 @@ class InstrumentationHub:
 
     # ---- 类型化辅助方法(执行热路径优先使用) ----
 
-    def emit_pipeline_start(self, targets: List[str], batch_size: Optional[int]) -> None:
+    def emit_pipeline_start(self, targets: list[str], batch_size: int | None) -> None:
         if not self.wants(EventType.PIPELINE_START):
             return
         _ = self._emit_assume_wanted(EventType.PIPELINE_START, PipelineStartEvent(targets, batch_size))
@@ -147,7 +148,7 @@ class InstrumentationHub:
             return
         _ = self._emit_assume_wanted(EventType.PIPELINE_END, PipelineEndEvent(total_batches, total_duration))
 
-    def emit_batch_start(self, batch_num: int, row_ids: List[Any]) -> None:
+    def emit_batch_start(self, batch_num: int, row_ids: list[Any]) -> None:
         if not self.wants(EventType.BATCH_START):
             return
         _ = self._emit_assume_wanted(EventType.BATCH_START, BatchStartEvent(batch_num, row_ids))
@@ -160,18 +161,18 @@ class InstrumentationHub:
     def emit_loader_call(
         self,
         loader_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         result: Any,
         duration: float,
         *,
-        batch_num: Optional[int] = None,
-        cache_status: Optional[str] = None,
-        cache_scope: Optional[str] = None,
-        lookup_key_count: Optional[int] = None,
-        field_keys: Optional[List[str]] = None,
-        skipped_none_rows: Optional[int] = None,
-        chunk_offset: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        batch_num: int | None = None,
+        cache_status: str | None = None,
+        cache_scope: str | None = None,
+        lookup_key_count: int | None = None,
+        field_keys: list[str] | None = None,
+        skipped_none_rows: int | None = None,
+        chunk_offset: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         # 类型化钩子的 `loader_result_policy` 可能与观测器/事件路径不同.
         if self.hook_manager.wants_typed(EventType.LOADER_CALL):
@@ -229,9 +230,9 @@ class InstrumentationHub:
         elapsed_seconds: float,
         sleep_seconds: float,
         error_type: str,
-        error_message: Optional[str],
-        batch_num: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        error_message: str | None,
+        batch_num: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.LOADER_RETRY):
             return
@@ -255,15 +256,15 @@ class InstrumentationHub:
         self,
         field_key: str,
         row_id: Hashable,
-        dependencies: Dict[str, Any],
+        dependencies: dict[str, Any],
         result: Any,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.FIELD_COMPUTE):
             return
         _ = self._emit_assume_wanted(EventType.FIELD_COMPUTE, FieldComputeEvent(field_key, row_id, dependencies, result), meta=meta)
 
-    def emit_error(self, error: Exception, context: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> None:
+    def emit_error(self, error: Exception, context: dict[str, Any], meta: dict[str, Any] | None = None) -> None:
         if not self.wants(EventType.ERROR):
             return
         _ = self._emit_assume_wanted(EventType.ERROR, ErrorEvent(error, context), meta=meta)
@@ -277,7 +278,7 @@ class InstrumentationHub:
         row_id: Hashable,
         *,
         sample_once: bool = False,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if sample_once:
             with self._lock:
@@ -326,7 +327,7 @@ class InstrumentationHub:
         reason: str,
         batch_num: int,
         remaining_fields: int,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.FIELD_SLIM):
             return
@@ -342,7 +343,7 @@ class InstrumentationHub:
         field_count: int,
         batch_num: int,
         row_index: int,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.ROW_WRITE):
             return
@@ -351,10 +352,10 @@ class InstrumentationHub:
     def emit_row_release(
         self,
         row_id: Hashable,
-        released_fields: List[str],
-        retained_fields: List[str],
+        released_fields: list[str],
+        retained_fields: list[str],
         batch_num: int,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.ROW_RELEASE):
             return
@@ -368,9 +369,9 @@ class InstrumentationHub:
         self,
         loader_name: str,
         original_keys: int,
-        extracted_fields: List[str],
+        extracted_fields: list[str],
         batch_num: int,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.LOADER_SLIM):
             return
@@ -385,7 +386,7 @@ class InstrumentationHub:
         field_key: str,
         row_count: int,
         batch_num: int,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.COLUMN_WRITE):
             return
@@ -399,10 +400,10 @@ class InstrumentationHub:
         fk_normalized: Any,
         target_source: str,
         result: RelationLookupResult,
-        fk_type: Optional[str] = None,
-        expected_type: Optional[str] = None,
-        error_message: Optional[str] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        fk_type: str | None = None,
+        expected_type: str | None = None,
+        error_message: str | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.RELATION_LOOKUP):
             return
@@ -419,7 +420,7 @@ class InstrumentationHub:
         )
         _ = self._emit_assume_wanted(EventType.RELATION_LOOKUP, payload, meta=meta)
 
-    def emit_stage_span(self, stage: str, batch_num: int, duration: float, meta: Optional[Dict[str, Any]] = None) -> None:
+    def emit_stage_span(self, stage: str, batch_num: int, duration: float, meta: dict[str, Any] | None = None) -> None:
         if not self.wants(EventType.STAGE_SPAN):
             return
         _ = self._emit_assume_wanted(EventType.STAGE_SPAN, StageSpanEvent(stage=stage, batch_num=batch_num, duration=duration), meta=meta)
@@ -428,10 +429,10 @@ class InstrumentationHub:
         self,
         operator_type: str,
         *,
-        field_key: Optional[str],
+        field_key: str | None,
         batch_num: int,
         duration: float,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self.wants(EventType.OPERATOR_SPAN):
             return

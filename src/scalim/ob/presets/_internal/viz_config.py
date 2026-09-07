@@ -1,11 +1,11 @@
 import logging
 import os
 import platform
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 from ...._project_constants import VIZ_DIR_NAME
-from ....vendor.dataclassesx import dataclass, field
 from ..run_stats import warn_high_impact_observability
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,23 +33,23 @@ def normalize_output_dir(base_dir: str) -> str:
 
 @dataclass
 class VizObserverConfig:
-    run_id: Optional[str] = None
+    run_id: str | None = None
     """可选:运行标识(用于推导 `output_dir/<run_id>` 与写入事件 `run_id` 字段).
 
     - 当未提供时, `VizObserver` 会在首次写入时生成一个时间戳 `run_id`.
     - 该字段主要用于工作流 `bundle` 等需要稳定运行目录名称的场景.
     """
 
-    output_path: Optional[str] = None
+    output_path: str | None = None
     """事件输出文件路径(优先级高于 `output_dir`)."""
 
-    output_dir: Optional[str] = None
+    output_dir: str | None = None
     """输出目录;在未显式提供 `output_path`/`snapshot_path`/`trace_path` 时用于推导各输出文件路径."""
 
-    snapshot_path: Optional[str] = None
+    snapshot_path: str | None = None
     """快照输出文件路径(写入 `viz_snapshot.json`)."""
 
-    trace_path: Optional[str] = None
+    trace_path: str | None = None
     """追踪输出文件路径(写入 `viz_trace.jsonl`,需 `trace_enabled=True`)."""
 
     events_filename: str = "viz_events.jsonl"
@@ -76,10 +76,10 @@ class VizObserverConfig:
     sample_size: int = 5
     """当负载策略包含 `sample` 时,样本截断大小."""
 
-    run_name: Optional[str] = None
+    run_name: str | None = None
     """可选的运行名称(写入 `snapshot.meta.viz.run_name`)."""
 
-    env: Optional[str] = None
+    env: str | None = None
     """可选的环境标识(写入 `snapshot.meta.viz.env`)."""
 
     logger: logging.Logger = field(default=_LOGGER)
@@ -102,7 +102,7 @@ class VizObserverConfig:
     def has_explicit_paths(self) -> bool:
         return bool(self.output_path or self.snapshot_path or self.trace_path)
 
-    def _resolve_output_dir(self) -> Optional[str]:
+    def _resolve_output_dir(self) -> str | None:
         output_dir = self.output_dir
         if output_dir is None and self.use_default_output_dir:
             output_dir = default_viz_dir()
@@ -111,7 +111,7 @@ class VizObserverConfig:
         return None
 
     @staticmethod
-    def _expand_user_path(path: Optional[str]) -> Optional[str]:
+    def _expand_user_path(path: str | None) -> str | None:
         if not path:
             return path
         return str(Path(path).expanduser())
@@ -119,10 +119,10 @@ class VizObserverConfig:
     def _fill_paths_from_output_dir(
         self,
         output_dir: str,
-        events_path: Optional[str],
-        snapshot_path: Optional[str],
-        trace_path: Optional[str],
-    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        events_path: str | None,
+        snapshot_path: str | None,
+        trace_path: str | None,
+    ) -> tuple[str | None, str | None, str | None]:
         base = Path(output_dir)
         if events_path is None:
             events_path = str(base / self.events_filename)
@@ -134,13 +134,13 @@ class VizObserverConfig:
 
     def _infer_trace_path(
         self,
-        trace_path: Optional[str],
-        events_path: Optional[str],
-        snapshot_path: Optional[str],
-    ) -> Optional[str]:
+        trace_path: str | None,
+        events_path: str | None,
+        snapshot_path: str | None,
+    ) -> str | None:
         if trace_path is not None:
             return trace_path
-        base_dir: Optional[Path] = None
+        base_dir: Path | None = None
         if events_path:
             base_dir = Path(events_path).parent
         elif snapshot_path:
@@ -149,7 +149,7 @@ class VizObserverConfig:
             return None
         return str(base_dir / self.trace_filename)
 
-    def resolve_output_paths(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    def resolve_output_paths(self) -> tuple[str | None, str | None, str | None]:
         output_dir = self._resolve_output_dir()
         events_path = self._expand_user_path(self.output_path)
         snapshot_path = self._expand_user_path(self.snapshot_path)

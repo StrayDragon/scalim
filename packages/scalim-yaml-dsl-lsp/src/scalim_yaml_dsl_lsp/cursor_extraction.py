@@ -1,6 +1,7 @@
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
@@ -49,13 +50,13 @@ class YamlCursorExtractionResult:
     yaml_path: str = ""
     kind: str = ""
     reference: str = ""
-    range: Optional[EditorRange] = None
+    range: EditorRange | None = None
     value: str = ""
-    value_range: Optional[EditorRange] = None
-    warnings: Tuple[str, ...] = ()
+    value_range: EditorRange | None = None
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "yaml_path": str(self.yaml_path or ""),
             "kind": str(self.kind or ""),
             "reference": str(self.reference or ""),
@@ -76,8 +77,8 @@ class _BlockScalarView:
     content_start_line0: int
     content_end_line0: int
     content_indent: int
-    first_nonempty_line0: Optional[int]
-    content_lines: Tuple[str, ...]
+    first_nonempty_line0: int | None
+    content_lines: tuple[str, ...]
 
 
 def extract_yaml_dsl_python_reference_by_cursor(
@@ -131,7 +132,7 @@ def extract_yaml_dsl_import_reference_by_cursor(
 def _fallback_extract_import_ref_value_by_cursor(
     yaml_text: str,
     position: EditorPosition,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     """Fallback for `$import: <empty>` where YAML parser marks null values on the next line.
 
     Similar to imports.* fallback, but `$import` can appear anywhere (not only under `imports:`).
@@ -240,7 +241,7 @@ def extract_yaml_dsl_workflow_demand_path_reference_by_cursor(
 def _fallback_extract_workflow_demand_path_value_by_cursor(  # noqa: PLR0911
     yaml_text: str,
     position: EditorPosition,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     """Fallback for `workflow.runs[*].demand: <empty>` where YAML parser may shift null nodes.
 
     We do a conservative, line-based detection to keep editor behavior stable in partially-valid YAML.
@@ -291,7 +292,7 @@ def _fallback_extract_workflow_demand_path_value_by_cursor(  # noqa: PLR0911
 def _fallback_extract_imports_path_value_by_cursor(  # noqa: PLR0911
     yaml_text: str,
     position: EditorPosition,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     """Fallback for `imports.*: <empty>` where YAML parser marks null values on the next line.
 
     We do a conservative, line-based detection:
@@ -343,7 +344,7 @@ def _fallback_extract_imports_path_value_by_cursor(  # noqa: PLR0911
         )
 
     return YamlCursorExtractionResult(
-        yaml_path="imports.{}".format(str(key)),
+        yaml_path=f"imports.{key!s}",
         kind="imports_path",
         reference=str(prefix).strip(),
         range=rng,
@@ -352,7 +353,7 @@ def _fallback_extract_imports_path_value_by_cursor(  # noqa: PLR0911
     )
 
 
-def _is_under_imports_block(lines: List[str], line_idx0: int, indent: int) -> bool:
+def _is_under_imports_block(lines: list[str], line_idx0: int, indent: int) -> bool:
     """Returns True if the line at `line_idx0` is in a mapping directly under a parent `imports:` key."""
     idx = int(line_idx0) - 1
     while idx >= 0:
@@ -369,7 +370,7 @@ def _is_under_imports_block(lines: List[str], line_idx0: int, indent: int) -> bo
     return False
 
 
-def _is_under_workflow_runs_block(lines: List[str], line_idx0: int, indent: int) -> bool:
+def _is_under_workflow_runs_block(lines: list[str], line_idx0: int, indent: int) -> bool:
     """Best-effort check whether a key line is nested under `workflow: ... runs:`."""
 
     found_runs = False
@@ -469,12 +470,12 @@ def extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(
     - 失败时降级为空结果 + warnings,不得 crash
     """
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     try:
         root = _compose_yaml_node(yaml_text)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"YAML parse failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if root is None:
@@ -491,7 +492,7 @@ def extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(
             warnings=warnings,
         )
     except Exception as exc:  # noqa: BLE001
-        warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"cursor extraction failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if result is None:
@@ -511,11 +512,11 @@ def extract_yaml_dsl_call_by_kwargs_value_field_reference_by_cursor(
 def _extract_call_by_kwargs_value_token_from_node(  # noqa: PLR0911
     node: object,
     *,
-    lines: List[str],
-    path: List[str],
+    lines: list[str],
+    path: list[str],
     position: EditorPosition,
-    warnings: List[str],
-) -> Optional[YamlCursorExtractionResult]:
+    warnings: list[str],
+) -> YamlCursorExtractionResult | None:
     node_id = str(getattr(node, "id", ""))
 
     if node_id == "scalar":
@@ -564,7 +565,7 @@ def _extract_call_by_kwargs_value_token_from_node(  # noqa: PLR0911
     return None
 
 
-def _is_call_by_kwargs_value_callsite(path: List[str]) -> bool:
+def _is_call_by_kwargs_value_callsite(path: list[str]) -> bool:
     if not path or str(path[-1]) != "call_by":
         return False
 
@@ -595,11 +596,11 @@ def _is_call_by_kwargs_value_callsite(path: List[str]) -> bool:
 def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911, PLR0912
     node: object,
     *,
-    lines: List[str],
+    lines: list[str],
     yaml_path: str,
     position: EditorPosition,
-    warnings: List[str],
-) -> Optional[YamlCursorExtractionResult]:
+    warnings: list[str],
+) -> YamlCursorExtractionResult | None:
     reference_raw = str(getattr(node, "value", "") or "")
     bounds = _scalar_content_bounds(node, lines)
     if bounds is None:
@@ -631,7 +632,7 @@ def _extract_call_by_kwargs_value_token_from_scalar(  # noqa: C901, PLR0911, PLR
 
     close_idx = _find_matching_paren(reference_raw, open_idx)
     if close_idx is None:
-        warnings.append("call_by missing closing ')': {}".format(str(yaml_path)))
+        warnings.append(f"call_by missing closing ')': {yaml_path!s}")
         close_idx = len(reference_raw)
 
     if int(cursor_offset) > int(close_idx):
@@ -694,8 +695,8 @@ def _extract_call_by_kwargs_value_token_from_block_scalar(  # noqa: C901, PLR091
     *,
     yaml_path: str,
     position: EditorPosition,
-    warnings: List[str],
-) -> Optional[YamlCursorExtractionResult]:
+    warnings: list[str],
+) -> YamlCursorExtractionResult | None:
     cursor_line0 = int(position.line) - 1
     if not (int(block_view.content_start_line0) <= int(cursor_line0) <= int(block_view.content_end_line0)):
         return None
@@ -715,7 +716,7 @@ def _extract_call_by_kwargs_value_token_from_block_scalar(  # noqa: C901, PLR091
     value_lines = list(block_view.content_lines)
     reference_raw = "\n".join(value_lines)
 
-    line_offsets: List[int] = []
+    line_offsets: list[int] = []
     offset = 0
     for line_text in value_lines:
         line_offsets.append(int(offset))
@@ -733,7 +734,7 @@ def _extract_call_by_kwargs_value_token_from_block_scalar(  # noqa: C901, PLR091
 
     close_idx = _find_matching_paren(reference_raw, open_idx)
     if close_idx is None:
-        warnings.append("call_by missing closing ')': {}".format(str(yaml_path)))
+        warnings.append(f"call_by missing closing ')': {yaml_path!s}")
         close_idx = len(reference_raw)
 
     if int(cursor_offset) > int(close_idx):
@@ -794,7 +795,7 @@ def _extract_call_by_kwargs_value_token_from_block_scalar(  # noqa: C901, PLR091
     return None
 
 
-def _find_matching_paren(text: str, open_idx: int) -> Optional[int]:  # noqa: C901
+def _find_matching_paren(text: str, open_idx: int) -> int | None:  # noqa: C901
     depth = 0
     in_str = False
     quote = ""
@@ -844,7 +845,7 @@ def _call_by_top_level_segment_bounds(  # noqa: C901, PLR0912
     cursor_offset: int,
     start: int,
     end: int,
-) -> Tuple[Optional[int], Optional[int]]:
+) -> tuple[int | None, int | None]:
     in_str = False
     quote = ""
     escaped = False
@@ -908,7 +909,7 @@ def _call_by_top_level_segment_bounds(  # noqa: C901, PLR0912
     return seg_start, seg_end
 
 
-def _call_by_top_level_equals(text: str, *, start: int, end: int) -> Optional[int]:  # noqa: C901, PLR0912
+def _call_by_top_level_equals(text: str, *, start: int, end: int) -> int | None:  # noqa: C901, PLR0912
     in_str = False
     quote = ""
     escaped = False
@@ -979,7 +980,7 @@ def _identifier_token_at(
     cursor_offset: int,
     start: int,
     end: int,
-) -> Optional[Tuple[str, int, int]]:
+) -> tuple[str, int, int] | None:
     for m in _EXPR_IDENTIFIER_RE.finditer(text, pos=int(start), endpos=int(end)):
         if int(m.start()) <= int(cursor_offset) <= int(m.end()):
             token = m.group(0)
@@ -998,7 +999,7 @@ def extract_yaml_dsl_yaml_alias_reference_by_cursor(
     - YAML parser 会把 `*alias` 解析为引用节点,通常无法保留 alias token 的源码 range。
     - editor 侧仅依赖文本扫描定位 token range,并在 core 中做 anchor 定位与解释.
     """
-    warnings: List[str] = []
+    warnings: list[str] = []
     lines = str(yaml_text or "").splitlines()
     line_idx0 = int(position.line) - 1
     if not (0 <= line_idx0 < len(lines)):
@@ -1045,12 +1046,12 @@ def extract_yaml_dsl_expression_token_by_cursor(
     - v1 仅覆盖单行 scalar,且仅返回 token 的精确 range
     """
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     try:
         root = _compose_yaml_node(yaml_text)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"YAML parse failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if root is None:
@@ -1061,7 +1062,7 @@ def extract_yaml_dsl_expression_token_by_cursor(
     try:
         result = _extract_expression_token_from_node(root, lines=lines, path=[], position=position)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"cursor extraction failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if result is None:
@@ -1080,10 +1081,10 @@ def extract_yaml_dsl_expression_token_by_cursor(
 def _extract_expression_token_from_node(
     node: object,
     *,
-    lines: List[str],
-    path: List[str],
+    lines: list[str],
+    path: list[str],
     position: EditorPosition,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     node_id = str(getattr(node, "id", ""))
 
     if node_id == "scalar":
@@ -1128,7 +1129,7 @@ def _extract_expression_token_from_node(
     return None
 
 
-def _expression_kind_for_path(path: List[str]) -> str:
+def _expression_kind_for_path(path: list[str]) -> str:
     if len(path) >= _EXPR_FIELDS_COMPUTE_PATH_MIN_LEN and str(path[0]) == "fields" and str(path[-1]) == "compute":
         return "expression_fields_compute"
 
@@ -1156,11 +1157,11 @@ def _expression_kind_for_path(path: List[str]) -> str:
 def _extract_from_expression_scalar_value(
     node: object,
     *,
-    lines: List[str],
+    lines: list[str],
     yaml_path: str,
-    path: List[str],
+    path: list[str],
     position: EditorPosition,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     kind = _expression_kind_for_path(path)
     if not kind:
         return None
@@ -1228,12 +1229,12 @@ def extract_yaml_dsl_entity_reference_by_cursor(
     - 支持复合引用 `source_id.field_id` 的子 token range
     """
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     try:
         root = _compose_yaml_node(yaml_text)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"YAML parse failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if root is None:
@@ -1245,7 +1246,7 @@ def extract_yaml_dsl_entity_reference_by_cursor(
     try:
         result = _extract_entity_from_node(root, lines=lines, path=[], position=position, warnings=warnings)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"cursor extraction failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if result is None:
@@ -1264,11 +1265,11 @@ def extract_yaml_dsl_entity_reference_by_cursor(
 def _extract_entity_from_node(
     node: object,
     *,
-    lines: List[str],
-    path: List[str],
+    lines: list[str],
+    path: list[str],
     position: EditorPosition,
-    warnings: List[str],
-) -> Optional[YamlCursorExtractionResult]:
+    warnings: list[str],
+) -> YamlCursorExtractionResult | None:
     node_id = str(getattr(node, "id", ""))
 
     if node_id == "scalar":
@@ -1318,11 +1319,11 @@ def _extract_entity_from_node(
 def _extract_from_entity_scalar_value(
     node: object,
     *,
-    lines: List[str],
+    lines: list[str],
     yaml_path: str,
-    path: List[str],
+    path: list[str],
     position: EditorPosition,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     base_kind = _entity_reference_kind(path)
     if not base_kind:
         return None
@@ -1360,7 +1361,7 @@ def _extract_entity_reference_and_ranges(
     line: int,
     content_start_col0: int,
     yaml_path: str,
-) -> Optional[YamlCursorExtractionResult]:
+) -> YamlCursorExtractionResult | None:
     trimmed, start_offset, end_offset = _trim_value(raw_value)
     if base_kind != "relation_step" and not trimmed:
         return None
@@ -1426,7 +1427,7 @@ def _is_int_str(text: str) -> bool:
     return bool(raw and raw.isdigit())
 
 
-def _is_relation_step_reference_parent_path(parent_path: List[str]) -> bool:
+def _is_relation_step_reference_parent_path(parent_path: list[str]) -> bool:
     if not parent_path:
         return False
     if str(parent_path[0]) == "relations":
@@ -1438,7 +1439,7 @@ def _is_relation_step_reference_parent_path(parent_path: List[str]) -> bool:
     )
 
 
-def _relation_step_reference_kind(path: List[str]) -> str:
+def _relation_step_reference_kind(path: list[str]) -> str:
     # scalar: ... steps.<idx>.from/to
     if (
         path
@@ -1464,7 +1465,7 @@ def _relation_step_reference_kind(path: List[str]) -> str:
     return ""
 
 
-def _entity_reference_kind(path: List[str]) -> str:
+def _entity_reference_kind(path: list[str]) -> str:
     kind = ""
     if not path:
         return kind
@@ -1488,7 +1489,7 @@ def _entity_reference_kind(path: List[str]) -> str:
     return kind
 
 
-def _workflow_run_reference_kind(path: List[str]) -> str:
+def _workflow_run_reference_kind(path: list[str]) -> str:
     if len(path) < _WORKFLOW_PATH_PREFIX_MIN_LEN:
         return ""
     if str(path[0]) != "workflow" or str(path[1]) != "runs":
@@ -1505,14 +1506,14 @@ def _extract_yaml_dsl_reference_by_cursor(
     yaml_text: str,
     position: EditorPosition,
     *,
-    allowed_kinds: Tuple[str, ...],
+    allowed_kinds: tuple[str, ...],
 ) -> YamlCursorExtractionResult:
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     try:
         root = _compose_yaml_node(yaml_text)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"YAML parse failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if root is None:
@@ -1524,7 +1525,7 @@ def _extract_yaml_dsl_reference_by_cursor(
     try:
         result = _extract_from_node(root, lines=lines, path=[], position=position, warnings=warnings, allowed_kinds=allowed_kinds)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("cursor extraction failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"cursor extraction failed: {type(exc).__name__}: {exc}")
         return YamlCursorExtractionResult(warnings=tuple(warnings))
 
     if result is None:
@@ -1537,7 +1538,7 @@ def _extract_yaml_dsl_reference_by_cursor(
     )
 
 
-def _compose_yaml_node(yaml_text: str) -> Optional[object]:
+def _compose_yaml_node(yaml_text: str) -> object | None:
     yaml_safe = YAML(typ="safe")
     yaml_safe.version = (1, 2)
     return yaml_safe.compose(yaml_text)
@@ -1546,12 +1547,12 @@ def _compose_yaml_node(yaml_text: str) -> Optional[object]:
 def _extract_from_node(
     node: object,
     *,
-    lines: List[str],
-    path: List[str],
+    lines: list[str],
+    path: list[str],
     position: EditorPosition,
-    warnings: List[str],
-    allowed_kinds: Tuple[str, ...],
-) -> Optional[YamlCursorExtractionResult]:
+    warnings: list[str],
+    allowed_kinds: tuple[str, ...],
+) -> YamlCursorExtractionResult | None:
     node_id = str(getattr(node, "id", ""))
 
     if node_id == "scalar":
@@ -1609,12 +1610,12 @@ def cast_value(node: object) -> Any:
 def _extract_from_scalar_value(  # noqa: C901, PLR0911, PLR0912
     node: object,
     *,
-    lines: List[str],
+    lines: list[str],
     yaml_path: str,
-    path: List[str],
+    path: list[str],
     position: EditorPosition,
-    allowed_kinds: Tuple[str, ...],
-) -> Optional[YamlCursorExtractionResult]:
+    allowed_kinds: tuple[str, ...],
+) -> YamlCursorExtractionResult | None:
     if not _is_supported_reference_path(path, allowed_kinds=allowed_kinds):
         return None
 
@@ -1707,7 +1708,7 @@ def _extract_from_scalar_value(  # noqa: C901, PLR0911, PLR0912
     return cursor_result
 
 
-def _scalar_content_bounds(node: object, lines: List[str]) -> Optional[Tuple[int, int, int]]:  # noqa: PLR0911
+def _scalar_content_bounds(node: object, lines: list[str]) -> tuple[int, int, int] | None:  # noqa: PLR0911
     start_mark = getattr(node, "start_mark", None)
     end_mark = getattr(node, "end_mark", None)
     start_line0 = getattr(start_mark, "line", None)
@@ -1740,7 +1741,7 @@ def _scalar_content_bounds(node: object, lines: List[str]) -> Optional[Tuple[int
     return line_index + 1, content_start0, content_end0
 
 
-def _block_scalar_view(node: object, *, lines: List[str]) -> Optional[_BlockScalarView]:
+def _block_scalar_view(node: object, *, lines: list[str]) -> _BlockScalarView | None:
     style = getattr(node, "style", None)
     if style not in ("|", ">"):
         return None
@@ -1762,7 +1763,7 @@ def _block_scalar_view(node: object, *, lines: List[str]) -> Optional[_BlockScal
         return None
 
     content_indent = 0
-    first_nonempty_line0: Optional[int] = None
+    first_nonempty_line0: int | None = None
     for idx in range(int(content_start_line0), int(content_end_line0) + 1):
         line_text = str(lines[idx])
         if not line_text.strip():
@@ -1771,7 +1772,7 @@ def _block_scalar_view(node: object, *, lines: List[str]) -> Optional[_BlockScal
         content_indent = len(line_text) - len(line_text.lstrip(" "))
         break
 
-    content_lines: List[str] = []
+    content_lines: list[str] = []
     for idx in range(int(content_start_line0), int(content_end_line0) + 1):
         line_text = str(lines[idx])
         if len(line_text) >= int(content_indent):
@@ -1789,7 +1790,7 @@ def _block_scalar_view(node: object, *, lines: List[str]) -> Optional[_BlockScal
     )
 
 
-def _strip_scalar_quotes(line_text: str, token_start0: int, token_end0: int) -> Tuple[int, int]:
+def _strip_scalar_quotes(line_text: str, token_start0: int, token_end0: int) -> tuple[int, int]:
     token = line_text[token_start0:token_end0]
     if len(token) >= _MIN_QUOTED_TOKEN_LEN and token[0] in ("'", '"') and token[-1] == token[0]:
         return token_start0 + 1, token_end0 - 1
@@ -1819,8 +1820,8 @@ def _extract_reference_and_range(
     line: int,
     content_start_col0: int,
     yaml_path: str,
-    path: List[str],
-) -> Optional[YamlCursorExtractionResult]:
+    path: list[str],
+) -> YamlCursorExtractionResult | None:
     kind = _reference_kind(path)
     if kind == "call_by":
         head, start_offset, end_offset = _parse_call_by_head(raw_value)
@@ -1897,7 +1898,7 @@ def _is_only_ws_or_py_comments(text: str, *, start: int, end: int) -> bool:
     return True
 
 
-def _trim_value(raw: str) -> Tuple[str, int, int]:
+def _trim_value(raw: str) -> tuple[str, int, int]:
     left_trimmed = str(raw).lstrip()
     start_offset = len(raw) - len(left_trimmed)
     right_trimmed = left_trimmed.rstrip()
@@ -1906,7 +1907,7 @@ def _trim_value(raw: str) -> Tuple[str, int, int]:
     return value, start_offset, end_offset
 
 
-def _parse_call_by_head(raw: str) -> Tuple[str, int, int]:
+def _parse_call_by_head(raw: str) -> tuple[str, int, int]:
     prefix = str(raw)
     paren_idx = prefix.find("(")
     if paren_idx != -1:
@@ -1914,7 +1915,7 @@ def _parse_call_by_head(raw: str) -> Tuple[str, int, int]:
     return _trim_value(prefix)
 
 
-def _reference_kind(path: List[str]) -> str:
+def _reference_kind(path: list[str]) -> str:
     if not path:
         return ""
 
@@ -1945,7 +1946,7 @@ def _reference_kind(path: List[str]) -> str:
     return kind
 
 
-def _is_output_aggregate_field_ref_path(path: List[str]) -> bool:
+def _is_output_aggregate_field_ref_path(path: list[str]) -> bool:
     """Returns True if `path` points to a scalar/list-item field reference under `outputs[*].aggregate`."""
 
     if len(path) < _OUTPUTS_AGGREGATE_REF_PATH_MIN_LEN:
@@ -1963,32 +1964,32 @@ def _is_output_aggregate_field_ref_path(path: List[str]) -> bool:
     )
 
 
-def _is_output_aggregate_group_by_ref_path(path: List[str]) -> bool:
+def _is_output_aggregate_group_by_ref_path(path: list[str]) -> bool:
     if str(path[3]) != "group_by":
         return False
     # group_by scalar (permissive) or list items (including composite key `group_by[*][*]`)
     return str(path[-1]) == "group_by" or _is_int_str(str(path[-1]))
 
 
-def _is_output_aggregate_fields_ref_prefix(path: List[str]) -> bool:
+def _is_output_aggregate_fields_ref_prefix(path: list[str]) -> bool:
     return str(path[3]) == "fields"
 
 
-def _is_output_aggregate_metric_field_ref_path(path: List[str]) -> bool:
+def _is_output_aggregate_metric_field_ref_path(path: list[str]) -> bool:
     if not _is_output_aggregate_fields_ref_prefix(path):
         return False
     # outputs.<i>.aggregate.fields.<out_field_id>.<metric_kind>.field
     return str(path[-1]) == "field" and len(path) >= _OUTPUTS_AGGREGATE_FIELDS_FIELD_PATH_MIN_LEN
 
 
-def _is_output_aggregate_metric_fields_item_ref_path(path: List[str]) -> bool:
+def _is_output_aggregate_metric_fields_item_ref_path(path: list[str]) -> bool:
     if not _is_output_aggregate_fields_ref_prefix(path):
         return False
     # outputs.<i>.aggregate.fields.<out_field_id>.<metric_kind>.fields[*]
     return _is_int_str(str(path[-1])) and len(path) >= _OUTPUTS_AGGREGATE_FIELDS_FIELDS_ITEM_PATH_MIN_LEN and str(path[-2]) == "fields"
 
 
-def _is_output_aggregate_rank_ref_path(path: List[str]) -> bool:
+def _is_output_aggregate_rank_ref_path(path: list[str]) -> bool:
     if not _is_output_aggregate_fields_ref_prefix(path):
         return False
 
@@ -2003,7 +2004,7 @@ def _is_output_aggregate_rank_ref_path(path: List[str]) -> bool:
     return False
 
 
-def _is_workflow_run_demand_path(path: List[str]) -> bool:
+def _is_workflow_run_demand_path(path: list[str]) -> bool:
     if len(path) != _WORKFLOW_RUN_DEMAND_PATH_MIN_LEN:
         return False
     if str(path[0]) != "workflow" or str(path[1]) != "runs":
@@ -2013,6 +2014,6 @@ def _is_workflow_run_demand_path(path: List[str]) -> bool:
     return str(path[3]) == "demand"
 
 
-def _is_supported_reference_path(path: List[str], *, allowed_kinds: Tuple[str, ...]) -> bool:
+def _is_supported_reference_path(path: list[str], *, allowed_kinds: tuple[str, ...]) -> bool:
     kind = _reference_kind(path)
     return bool(kind and kind in allowed_kinds)

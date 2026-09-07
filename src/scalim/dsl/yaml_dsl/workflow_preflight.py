@@ -9,10 +9,10 @@
 - 必须基于每个 `run` 的有效运行期策略/覆盖项(由调用侧准备好 `DemandRunOptions`)进行判断
 """
 
-from typing import Dict, List, Sequence, Tuple
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Protocol
 
-from ...vendor.compact.typing_extensionsx import Protocol
-from ...vendor.dataclassesx import dataclass
 from .diagnostics import format_duplicate_effective_field_display_names_message
 from .runtime.contracts import DemandRunOptions
 from .runtime.effective_outputs import options_require_unique_effective_field_display_names
@@ -52,8 +52,8 @@ def run_workflow_preflight(
             check.run(ctx, run)
 
 
-def _collect_duplicate_effective_field_display_names(config: DemandConfig) -> Dict[str, List[str]]:
-    conflicts: Dict[str, List[str]] = {}
+def _collect_duplicate_effective_field_display_names(config: DemandConfig) -> dict[str, list[str]]:
+    conflicts: dict[str, list[str]] = {}
 
     for field_id, field_cfg in config.source_fields.items():
         name = str(field_cfg.name or "").strip()
@@ -88,12 +88,12 @@ class ValidateUniqueFieldNamesPreflightCheck:
             return
 
         msg = format_duplicate_effective_field_display_names_message(duplicates)
-        full = "Workflow preflight failed: run_id={!r}, demand_path={!r}: {}".format(str(run.run_id), str(run.demand_path), msg)
-        path = "workflow.runs.{}.demand".format(int(run.decl_order))
+        full = f"Workflow preflight failed: run_id={str(run.run_id)!r}, demand_path={str(run.demand_path)!r}: {msg}"
+        path = f"workflow.runs.{int(run.decl_order)}.demand"
         raise ScalimWorkflowConfigError(full, path=path)
 
 
-WORKFLOW_PREFLIGHT_CHECKS: Tuple[WorkflowPreflightCheck, ...] = (ValidateUniqueFieldNamesPreflightCheck(),)
+WORKFLOW_PREFLIGHT_CHECKS: tuple[WorkflowPreflightCheck, ...] = (ValidateUniqueFieldNamesPreflightCheck(),)
 
 
 __all__ = (

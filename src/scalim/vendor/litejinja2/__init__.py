@@ -1,4 +1,4 @@
-# ruff: noqa: C901, EM101, EM103, FBT002, PLR0911, PLR0912, PLR0915, TRY003, TRY301
+# ruff: noqa: C901, EM101, FBT002, PLR0911, PLR0912, PLR0915, TRY003, TRY301
 
 """`LiteJinja2` - 简化的 `Jinja2` 兼容子集.
 
@@ -28,9 +28,11 @@
 # region imports
 
 import re
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from collections.abc import Callable
+from typing import Any, TypeGuard, cast
 
-from ..compact.typing_extensionsx import TypeGuard, override
+from typing_extensions import override
+
 from .typedefs import (
     ExpressionResult,
     FilterFunc,
@@ -77,7 +79,7 @@ class Undefined:
 
     @override
     def __repr__(self) -> str:  # pragma: no cover
-        return "Undefined({})".format(self.name)
+        return f"Undefined({self.name})"
 
 
 class StrictUndefined(Undefined):
@@ -88,7 +90,8 @@ class StrictUndefined(Undefined):
     """
 
     def _raise(self) -> None:
-        raise TemplateError("未定义变量: {}".format(self.name))
+        msg = f"未定义变量: {self.name}"
+        raise TemplateError(msg)
 
     @override
     def __str__(self) -> str:  # pragma: no cover
@@ -192,7 +195,7 @@ def _filter_trim(value: VariableValue) -> str:
 # 默认过滤器字典
 # 注意: 目前我们刻意不提供 `tojson`/`toyaml` 这类过滤器. 若后续 `YAML` 模板需要“安全序列化”能力,
 # 请新增明确且经过安全审视的过滤器,不要依赖隐式的 `str(obj)` 格式化.
-DEFAULT_FILTERS: Dict[str, Callable[..., Any]] = {
+DEFAULT_FILTERS: dict[str, Callable[..., Any]] = {
     "length": _filter_length,
     "default": _filter_default,
     "upper": _filter_upper,
@@ -201,10 +204,10 @@ DEFAULT_FILTERS: Dict[str, Callable[..., Any]] = {
 }
 
 
-def _is_str_key_dict(value: object) -> TypeGuard[Dict[str, object]]:
+def _is_str_key_dict(value: object) -> TypeGuard[dict[str, object]]:
     if not isinstance(value, dict):
         return False
-    value_dict = cast("Dict[object, object]", value)
+    value_dict = cast("dict[object, object]", value)
     return all(isinstance(key, str) for key in value_dict)
 
 
@@ -212,13 +215,13 @@ class Template:
     """模板类 - 解析和渲染模板字符串"""
 
     template_string: str
-    nodes: List[TemplateNode]
-    filters: Dict[str, FilterFunc]
-    macros: Dict[str, MacroDef]
+    nodes: list[TemplateNode]
+    filters: dict[str, FilterFunc]
+    macros: dict[str, MacroDef]
     _template_sandbox: str
     undefined: Any
 
-    def __init__(self, template_string: str, filters: Optional[Dict[str, FilterFunc]] = None, *, undefined: Any = Undefined) -> None:
+    def __init__(self, template_string: str, filters: dict[str, FilterFunc] | None = None, *, undefined: Any = Undefined) -> None:
         """初始化模板.
 
         参数:
@@ -237,9 +240,9 @@ class Template:
         self.macros = {}
         self.nodes = self._parse()
 
-    def _parse(self) -> List[TemplateNode]:
+    def _parse(self) -> list[TemplateNode]:
         """解析模板字符串为节点列表"""
-        nodes: List[TemplateNode] = []
+        nodes: list[TemplateNode] = []
         pos = 0
 
         while pos < len(self.template_string):
@@ -287,7 +290,7 @@ class Template:
 
     def render(
         self,
-        context: Optional[RenderContext] = None,
+        context: RenderContext | None = None,
         *,
         template_sandbox: str = "safe",
         strict_undefined: bool = False,
@@ -311,7 +314,8 @@ class Template:
                     "迁移: 删除 `template_sandbox` 参数或显式设置 `template_sandbox='safe'`."
                 )
                 raise ValueError(msg)
-            raise ValueError("`template_sandbox` 必须是 `safe`; 收到={!r}".format(sandbox))
+            msg_0 = f"`template_sandbox` 必须是 `safe`; 收到={sandbox!r}"
+            raise ValueError(msg_0)
         if undefined_behavior not in {"error", "empty"}:
             raise ValueError("`undefined_behavior` 必须是以下值之一: `error`, `empty`")
         if empty_string_behavior not in {"keep", "error"}:
@@ -336,14 +340,14 @@ class Template:
         except TemplateError:
             raise
         except Exception as e:
-            error_msg = "模板渲染失败: {}".format(e)
+            error_msg = f"模板渲染失败: {e}"
             raise TemplateError(error_msg) from e
         finally:
             self._template_sandbox = previous_sandbox
 
     def _render_nodes(
         self,
-        nodes: List[TemplateNode],
+        nodes: list[TemplateNode],
         context: RenderContext,
         *,
         strict_undefined: bool,
@@ -351,7 +355,7 @@ class Template:
         empty_string_behavior: str,
     ) -> str:
         """渲染节点列表"""
-        output: List[str] = []
+        output: list[str] = []
         i = 0
 
         while i < len(nodes):
@@ -371,9 +375,11 @@ class Template:
                     if undefined_behavior == "empty":
                         value = ""
                     else:
-                        raise TemplateError("未定义变量: {}".format(value.name))
+                        msg = f"未定义变量: {value.name}"
+                        raise TemplateError(msg)
                 if empty_string_behavior == "error" and isinstance(value, str) and value == "":
-                    raise TemplateError("空字符串值: {}".format(expr))
+                    msg = f"空字符串值: {expr}"
+                    raise TemplateError(msg)
                 output.append(str(value))
             elif node["type"] == "control":
                 # 处理控制结构
@@ -398,14 +404,14 @@ class Template:
     def _handle_control(
         self,
         node: TemplateNode,
-        nodes: List[TemplateNode],
+        nodes: list[TemplateNode],
         pos: int,
         context: RenderContext,
         *,
         strict_undefined: bool,
         undefined_behavior: str,
         empty_string_behavior: str,
-    ) -> Tuple[Optional[str], int]:
+    ) -> tuple[str | None, int]:
         """处理控制结构"""
         content = node["content"]
 
@@ -436,14 +442,14 @@ class Template:
 
     def _handle_if(
         self,
-        nodes: List[TemplateNode],
+        nodes: list[TemplateNode],
         pos: int,
         context: RenderContext,
         *,
         strict_undefined: bool,
         undefined_behavior: str,
         empty_string_behavior: str,
-    ) -> Tuple[str, int]:
+    ) -> tuple[str, int]:
         """处理 `if` 条件结构."""
         condition = nodes[pos]["content"][3:].strip()
         condition_result = self._evaluate_condition(
@@ -481,7 +487,7 @@ class Template:
 
         return result, end_pos - pos + 1
 
-    def _find_if_end(self, nodes: List[TemplateNode], pos: int) -> Tuple[Optional[int], int]:
+    def _find_if_end(self, nodes: list[TemplateNode], pos: int) -> tuple[int | None, int]:
         """查找 `if` 语句的结束位置."""
         else_pos = None
         depth = 1
@@ -505,14 +511,14 @@ class Template:
 
     def _handle_for(
         self,
-        nodes: List[TemplateNode],
+        nodes: list[TemplateNode],
         pos: int,
         context: RenderContext,
         *,
         strict_undefined: bool,
         undefined_behavior: str,
         empty_string_behavior: str,
-    ) -> Tuple[str, int]:
+    ) -> tuple[str, int]:
         """处理 `for` 循环结构"""
         # 解析 `for` 循环
         for_content = nodes[pos]["content"][4:].strip()
@@ -533,7 +539,8 @@ class Template:
             if undefined_behavior == "empty":
                 iterable = []
             else:
-                raise TemplateError("未定义变量: {}".format(iterable.name))
+                msg = f"未定义变量: {iterable.name}"
+                raise TemplateError(msg)
         # 检查是否可迭代
         if not isinstance(iterable, (list, tuple, dict, str)) and not hasattr(iterable, "__iter__"):
             msg = f"'{iter_expr}' 不可迭代"
@@ -570,11 +577,11 @@ class Template:
 
         # 渲染循环内容
         loop_nodes = nodes[pos + 1 : end_pos]
-        output_parts: List[str] = []
+        output_parts: list[str] = []
 
         for index, item in enumerate(iterable):
             # 创建循环上下文
-            loop_ctx: Dict[str, Union[VariableValue, LoopContext]] = {
+            loop_ctx: dict[str, VariableValue | LoopContext] = {
                 "loop": {
                     "index": index + 1,
                     "index0": index,
@@ -618,7 +625,7 @@ class Template:
 
         return "".join(output_parts), end_pos - pos + 1
 
-    def _handle_set(self, content: str, context: RenderContext, *, strict_undefined: bool, undefined_behavior: str) -> Tuple[None, int]:
+    def _handle_set(self, content: str, context: RenderContext, *, strict_undefined: bool, undefined_behavior: str) -> tuple[None, int]:
         """处理 `set` 语句.
 
         支持语法示例:
@@ -646,7 +653,8 @@ class Template:
             if undefined_behavior == "empty":
                 value = ""
             else:
-                raise TemplateError("未定义变量: {}".format(value.name))
+                msg = f"未定义变量: {value.name}"
+                raise TemplateError(msg)
 
         # 设置变量到上下文
         context[var_name] = value
@@ -688,7 +696,7 @@ class Template:
         # 3. 字符串拼接: 支持 `"a" + b` / `a + "b"` / `a + b` 等形式
         if "+" in expr:
             parts = expr.split("+")
-            result_parts: List[str] = []
+            result_parts: list[str] = []
             for _part in parts:
                 part = _part.strip()
                 # 递归评估每个部分
@@ -702,7 +710,8 @@ class Template:
                     if undefined_behavior == "empty":
                         part_value = ""
                     else:
-                        raise TemplateError("未定义变量: {}".format(part_value.name))
+                        msg = f"未定义变量: {part_value.name}"
+                        raise TemplateError(msg)
                 result_parts.append(str(part_value))
             return "".join(result_parts)
 
@@ -749,7 +758,7 @@ class Template:
                 args_str = filter_expr[filter_expr.index("(") + 1 : filter_expr.rindex(")")].strip()
 
                 # 解析参数
-                args: List[Union[str, VariableValue]] = []
+                args: list[str | VariableValue] = []
                 if args_str:
                     for _arg in args_str.split(","):
                         arg = _arg.strip()
@@ -774,7 +783,8 @@ class Template:
                                 if undefined_behavior == "empty":
                                     arg_value = ""
                                 else:
-                                    raise TemplateError("未定义变量: {}".format(arg_value.name))
+                                    msg = f"未定义变量: {arg_value.name}"
+                                    raise TemplateError(msg)
                             args.append(arg_value)
             else:
                 # 无参数的过滤器
@@ -789,7 +799,8 @@ class Template:
                         if undefined_behavior == "empty":
                             value = ""
                         else:
-                            raise TemplateError("未定义变量: {}".format(value.name))
+                            msg = f"未定义变量: {value.name}"
+                            raise TemplateError(msg)
                     value = filter_func(value, *args)
                 except Exception as e:
                     error_msg = f"过滤器 '{filter_name}' 执行失败: {e}"
@@ -881,11 +892,14 @@ class Template:
             if part.endswith("()"):
                 method_name = part[:-2]
                 if method_name.startswith("_"):
-                    raise TemplateError("`template_sandbox` 禁止访问以下划线开头属性: `{}`".format(method_name))
-                raise TemplateError("`template_sandbox=safe` 禁止无参方法调用: `{}()`".format(method_name))
+                    msg = f"`template_sandbox` 禁止访问以下划线开头属性: `{method_name}`"
+                    raise TemplateError(msg)
+                msg = f"`template_sandbox=safe` 禁止无参方法调用: `{method_name}()`"
+                raise TemplateError(msg)
             # 普通属性访问
             if part.startswith("_"):
-                raise TemplateError("`template_sandbox` 禁止访问以下划线开头属性: `{}`".format(part))
+                msg = f"`template_sandbox` 禁止访问以下划线开头属性: `{part}`"
+                raise TemplateError(msg)
             if _is_str_key_dict(value):
                 if part in value:
                     value = value[part]
@@ -980,7 +994,8 @@ class Template:
         if strict_undefined and isinstance(value, Undefined):
             if undefined_behavior == "empty":
                 return False
-            raise TemplateError("未定义变量: {}".format(value.name))
+            msg = f"未定义变量: {value.name}"
+            raise TemplateError(msg)
         if value != "":
             return bool(value)
 
@@ -991,11 +1006,11 @@ class Template:
 class Environment:
     """模板环境管理器"""
 
-    _cache: Dict[str, Template]
+    _cache: dict[str, Template]
     undefined: Any
-    filters: Dict[str, FilterFunc]
+    filters: dict[str, FilterFunc]
 
-    def __init__(self, *, undefined: Any = Undefined, filters: Optional[Dict[str, FilterFunc]] = None) -> None:
+    def __init__(self, *, undefined: Any = Undefined, filters: dict[str, FilterFunc] | None = None) -> None:
         self._cache = {}
         if not isinstance(undefined, type) or not issubclass(undefined, Undefined):
             raise TypeError("`undefined` 必须是 `Undefined` 的子类")

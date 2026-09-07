@@ -1,19 +1,21 @@
 # pragma: allow-c901-file plan: c60
+from collections.abc import Mapping
 from collections.abc import Mapping as MappingABC
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, TypeGuard, cast
+
+from typing_extensions import override
 
 from ..dsl.yaml_dsl.runtime._internal.conversion_lookup import LookupCastRegistry
 from ..spec.ir import FieldRefIr, JoinConditionIr, RelationIr, SourceIr
 from ..spec.ir.lookup_casts import LookupCastSpecIr
 from ..typedefs import RuntimeValue
-from ..vendor.compact.typing_extensionsx import TypeGuard, override
 
 
 def _is_mapping(value: RuntimeValue) -> TypeGuard[Mapping[str, Any]]:
     return isinstance(value, MappingABC)
 
 
-def _is_tuple(value: RuntimeValue) -> TypeGuard[Tuple[Any, ...]]:
+def _is_tuple(value: RuntimeValue) -> TypeGuard[tuple[Any, ...]]:
     return isinstance(value, tuple)
 
 
@@ -40,7 +42,7 @@ class TypeMismatchWarning:
 
     @override
     def __repr__(self) -> str:
-        return "TypeMismatchWarning({}.{} <-> {}.{}: {})".format(self.source_a, self.field_a, self.source_b, self.field_b, self.message)
+        return f"TypeMismatchWarning({self.source_a}.{self.field_a} <-> {self.source_b}.{self.field_b}: {self.message})"
 
 
 class RelationDiagnostics:
@@ -54,8 +56,8 @@ class RelationDiagnostics:
             return None
 
     @staticmethod
-    def _collect_field_values(data: Any, fields: Tuple[str, ...]) -> Tuple[Tuple[Any, ...], bool]:
-        values: List[Any] = []
+    def _collect_field_values(data: Any, fields: tuple[str, ...]) -> tuple[tuple[Any, ...], bool]:
+        values: list[Any] = []
         missing = False
         for field_name in fields:
             value = RelationDiagnostics._extract_field_value(data, field_name)
@@ -65,13 +67,13 @@ class RelationDiagnostics:
         return tuple(values), missing
 
     @staticmethod
-    def _format_value_type(value: Any) -> Union[str, Tuple[str, ...]]:
+    def _format_value_type(value: Any) -> str | tuple[str, ...]:
         if _is_tuple(value):
             return tuple(type(item).__name__ if item is not None else "None" for item in value)
         return type(value).__name__ if value is not None else "None"
 
     @staticmethod
-    def _format_field_ref(field_ref: FieldRefIr) -> Tuple[str, str]:
+    def _format_field_ref(field_ref: FieldRefIr) -> tuple[str, str]:
         key_info = ""
         transform_info = ""
 
@@ -97,15 +99,15 @@ class RelationDiagnostics:
                 if cast_name == "sep_first":
                     transform_info = " (cast: {} sep={!r})".format(cast_name, sep or ",")
                 else:
-                    transform_info = " (cast: {})".format(cast_name)
+                    transform_info = f" (cast: {cast_name})"
 
         return key_info, transform_info
 
     @staticmethod
     def _first_complete_key_value(
-        sample_data: Dict[Any, Any],
-        key_fields: Tuple[str, ...],
-    ) -> Optional[Union[Any, Tuple[Any, ...]]]:
+        sample_data: dict[Any, Any],
+        key_fields: tuple[str, ...],
+    ) -> Any | tuple[Any, ...] | None:
         for row in sample_data.values():
             values, missing = RelationDiagnostics._collect_field_values(row, key_fields)
             if missing:
@@ -114,7 +116,7 @@ class RelationDiagnostics:
         return None
 
     @staticmethod
-    def _format_key_fields(key: Union[str, Tuple[str, ...]]) -> Tuple[Tuple[str, ...], str]:
+    def _format_key_fields(key: str | tuple[str, ...]) -> tuple[tuple[str, ...], str]:
         key_fields = (key,) if isinstance(key, str) else tuple(key)
         if len(key_fields) == 0:
             return key_fields, str(key)
@@ -123,7 +125,7 @@ class RelationDiagnostics:
         return key_fields, ",".join(key_fields)
 
     @staticmethod
-    def _as_tuple(value: Union[Any, Tuple[Any, ...]]) -> Tuple[Any, ...]:
+    def _as_tuple(value: Any | tuple[Any, ...]) -> tuple[Any, ...]:
         if _is_tuple(value):
             return value
         return (value,)
@@ -132,10 +134,10 @@ class RelationDiagnostics:
     def check_type_compatibility(
         source_a: SourceIr,
         source_b: SourceIr,
-        sample_data_a: Optional[Dict[Any, Any]] = None,
-        sample_data_b: Optional[Dict[Any, Any]] = None,
-    ) -> List[TypeMismatchWarning]:
-        warnings: List[TypeMismatchWarning] = []
+        sample_data_a: dict[Any, Any] | None = None,
+        sample_data_b: dict[Any, Any] | None = None,
+    ) -> list[TypeMismatchWarning]:
+        warnings: list[TypeMismatchWarning] = []
 
         key_a = source_a.key.key
         key_b = source_b.key.key
@@ -157,7 +159,7 @@ class RelationDiagnostics:
         values_b = RelationDiagnostics._as_tuple(sample_value_b)
 
         mismatch_found = False
-        for idx, (val_a, val_b) in enumerate(zip(values_a, values_b)):
+        for idx, (val_a, val_b) in enumerate(zip(values_a, values_b, strict=False)):
             type_a = type(val_a).__name__
             type_b = type(val_b).__name__
             if type_a == type_b:
@@ -171,7 +173,7 @@ class RelationDiagnostics:
                     field_a=str(field_a),
                     source_b=source_b.source_id,
                     field_b=str(field_b),
-                    message="Key type mismatch: {} vs {}".format(type_a, type_b),
+                    message=f"Key type mismatch: {type_a} vs {type_b}",
                 )
             )
 
@@ -189,8 +191,8 @@ class RelationDiagnostics:
         return warnings
 
     @staticmethod
-    def visualize_path(relation: Union[JoinConditionIr, RelationIr]) -> str:
-        lines: List[str] = []
+    def visualize_path(relation: JoinConditionIr | RelationIr) -> str:
+        lines: list[str] = []
         lines.append("Relation Path:")
         lines.append("-" * 40)
 
@@ -207,17 +209,8 @@ class RelationDiagnostics:
             right_key_info, right_transform = RelationDiagnostics._format_field_ref(right)
 
             lines.append(
-                "  Step {}: {}.{}{}{} == {}.{}{}{}".format(
-                    i + 1,
-                    left.source.source_id,
-                    left.field_name,
-                    left_key_info,
-                    left_transform,
-                    right.source.source_id,
-                    right.field_name,
-                    right_key_info,
-                    right_transform,
-                )
+                f"  Step {i + 1}: {left.source.source_id}.{left.field_name}{left_key_info}{left_transform} == "
+                f"{right.source.source_id}.{right.field_name}{right_key_info}{right_transform}"
             )
 
         lines.append("-" * 40)
@@ -225,12 +218,12 @@ class RelationDiagnostics:
 
     @staticmethod
     def sample_comparison(  # noqa: C901, PLR0912
-        relation: Union[JoinConditionIr, RelationIr],
-        data_a: Dict[Any, Any],
-        data_b: Dict[Any, Any],
+        relation: JoinConditionIr | RelationIr,
+        data_a: dict[Any, Any],
+        data_b: dict[Any, Any],
         sample_size: int = 10,
-    ) -> List[Dict[str, Any]]:
-        results: List[Dict[str, Any]] = []
+    ) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
 
         if isinstance(relation, JoinConditionIr):
             conditions = [relation]
@@ -242,8 +235,8 @@ class RelationDiagnostics:
 
         left_source = conditions[0].left.source
         right_source = conditions[0].right.source
-        left_fields: List[str] = []
-        right_fields: List[str] = []
+        left_fields: list[str] = []
+        right_fields: list[str] = []
 
         for cond in conditions:
             if cond.left.source == left_source and cond.right.source == right_source:
@@ -260,10 +253,10 @@ class RelationDiagnostics:
                 break
 
             fk_values, missing = RelationDiagnostics._collect_field_values(row, left_fields_tuple)
-            fk_raw: Union[Any, Tuple[Any, ...]] = fk_values[0] if len(fk_values) == 1 else fk_values
+            fk_raw: Any | tuple[Any, ...] = fk_values[0] if len(fk_values) == 1 else fk_values
             fk_raw_obj: Any = fk_raw
 
-            normalized_fk: Optional[Any] = None
+            normalized_fk: Any | None = None
             if not missing:
                 normalized_fk = fk_raw
                 if isinstance(right_source, SourceIr) and right_source.key.cast is not None:
@@ -274,7 +267,7 @@ class RelationDiagnostics:
                             normalized_fk = cast_fn(fk_raw_obj)
                         elif callable(cast_spec):
                             if _is_tuple(fk_raw_obj):
-                                parts: List[Any] = []
+                                parts: list[Any] = []
                                 for item in fk_raw_obj:
                                     casted = cast_spec(item)
                                     if casted is None:
@@ -307,11 +300,11 @@ class RelationDiagnostics:
         return results
 
     @staticmethod
-    def format_comparison_table(comparisons: List[Dict[str, Any]]) -> str:
+    def format_comparison_table(comparisons: list[dict[str, Any]]) -> str:
         if not comparisons:
             return "No comparison data"
 
-        lines: List[str] = []
+        lines: list[str] = []
         lines.append("Sample Comparison:")
         lines.append("-" * 80)
         lines.append(

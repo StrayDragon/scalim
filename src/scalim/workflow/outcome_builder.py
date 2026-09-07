@@ -1,7 +1,5 @@
 """从异常或成功负载纯函数构建 `WorkflowRunOutcome`(无控制器/执行器实例状态)."""
 
-from typing import List, Optional
-
 from ..exceptions import safe_error_message as _safe_error_message
 from ..exceptions import safe_error_type as _safe_error_type
 from ..typedefs import RuntimeValue
@@ -17,7 +15,7 @@ def safe_error_message(exc: BaseException) -> str:
     return str(_safe_error_message(exc) or "")
 
 
-def _workflow_error_diff(exc: BaseException) -> Optional[List[str]]:
+def _workflow_error_diff(exc: BaseException) -> list[str] | None:
     if isinstance(exc, ScalimWorkflowWriteError):
         return exc.diff
     return None

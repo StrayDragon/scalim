@@ -1,7 +1,7 @@
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextlib import ExitStack
 from types import TracebackType
-from typing import Any, Optional, Type
+from typing import Any
 
 from ....planning.plan import ExecutionPlan
 from ...adaptive.config import resolve_adaptive_policy_tuning_and_workers
@@ -18,7 +18,7 @@ def maybe_create_adaptive_pool(
     stack: ExitStack,
     sys_module: Any,
     warnings_module: Any,
-) -> Optional[Executor]:
+) -> Executor | None:
     if runtime.parallel_mode != "adaptive":
         return None
 
@@ -30,7 +30,7 @@ def maybe_create_adaptive_pool(
     _ = warnings_module
     backend = policy.choose_backend(plan=plan, runtime=runtime, tuning=tuning)
     if backend != ADAPTIVE_BACKEND_THREAD:
-        msg = "adaptive backend '{}' is not supported; only 'thread' is currently available".format(backend)
+        msg = f"adaptive backend '{backend}' is not supported; only 'thread' is currently available"
         raise ValueError(msg)
 
     runtime.adaptive_backend = backend
@@ -40,9 +40,9 @@ def maybe_create_adaptive_pool(
     executor = executor_cls(max_workers=resolved_workers)
 
     def _shutdown_executor(
-        exc_type: Optional[Type[BaseException]],
-        _exc: Optional[BaseException],
-        _tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: TracebackType | None,
     ) -> bool:
         # 说明:
         # - 正常路径: `wait=True` 保障线程池资源收敛.

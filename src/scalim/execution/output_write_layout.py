@@ -5,9 +5,7 @@
 `YAML` 编写面不得声明本枚举或等价字段.
 """
 
-from typing import Optional
-
-from ..vendor.compact import StrEnum
+from .._internal.strenum import StrEnum
 from .excel_column_residency import ExcelColumnResidency
 
 
@@ -21,7 +19,7 @@ class OutputWriteLayout(StrEnum):
 
 def resolve_output_write_layout(
     *,
-    output_write_layout: Optional[OutputWriteLayout],
+    output_write_layout: OutputWriteLayout | None,
     streaming: bool,
     output_format: str,
     excel_column_residency: ExcelColumnResidency,
@@ -68,10 +66,10 @@ def validate_output_write_layout_combos(
 
     if has_output_composition and layout is not OutputWriteLayout.ROW_STREAM:
         msg = (
-            "`OutputWriteLayout.{}` 与 `output_composition`(`YAML` books/多输出行组合)互斥."
+            f"`OutputWriteLayout.{layout.value}` 与 `output_composition`(`YAML` books/多输出行组合)互斥."
             " 组合层仅为行流式写出;列布局只适用于非 `composition` 的列式 `IR` 文件 `sink`."
             " 请改用 `row_stream`,或改用手写列式 `sink` / 非 `composition` 路径."
-        ).format(layout.value)
+        )
         raise ValueError(msg)
 
     if has_output_composition and excel_column_residency is ExcelColumnResidency.CHUNKED:
@@ -86,9 +84,9 @@ def validate_output_write_layout_combos(
     if layout is OutputWriteLayout.COLUMN_CHUNKED and fmt != "excel":
         msg = (
             "`OutputWriteLayout.column_chunked` 仅适用于 `format=excel` 列式文件 `sink`;"
-            " 当前 format={!r}. `CSV` 无 `column_chunked` 实现;请改用 `column_buffered`/`row_stream`,"
+            f" 当前 format={fmt!r}. `CSV` 无 `column_chunked` 实现;请改用 `column_buffered`/`row_stream`,"
             " 或改用 `excel`."
-        ).format(fmt)
+        )
         raise ValueError(msg)
 
     # 未设 `layout` 时保留历史:`excel` `CHUNKED` 不得与行式 `streaming` 并存.

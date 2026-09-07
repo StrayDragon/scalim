@@ -12,10 +12,9 @@
 """
 
 import threading
-from typing import Optional
+from dataclasses import dataclass
 
 from ..typedefs import ParallelMode
-from ..vendor.dataclassesx import dataclass
 from .adaptive._internal.loadref_scheduler_support import resolve_adaptive_max_workers
 from .lookup_chunking import normalize_optional_max_chunk_workers
 
@@ -27,7 +26,7 @@ class LookupChunkParallelismPolicy:
     parallelize_lookup_chunks: bool = False
     """是否允许同一 `LoadRef(keys)` 步骤内的多个分片并行(默认关闭)."""
 
-    max_chunk_workers: Optional[int] = None
+    max_chunk_workers: int | None = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
 
     def __post_init__(self) -> None:

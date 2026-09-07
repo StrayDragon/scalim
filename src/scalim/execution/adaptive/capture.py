@@ -1,12 +1,13 @@
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
+
+from typing_extensions import override
 
 from ..._internal.utils.loader_result import LoaderResultPolicy, parse_loader_result_policy
 from ...events import Event, EventType, parse_event_type
 from ...events._event import now_ts
 from ...events._events import LoaderCallEvent
 from ...hooks import HookManager
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ class HookCaptureManager(HookManager):
       属于不受支持用法(尤其在 `parallel_mode="adaptive"` 下,并发任务会各自创建捕获管理器).
     """
 
-    _recorded_events: List[HookRecordedEvent]
+    _recorded_events: list[HookRecordedEvent]
 
     def __init__(self, source: HookManager) -> None:
         normalized_loader_result_policy = parse_loader_result_policy(str(source.loader_result_policy))
@@ -41,7 +42,7 @@ class HookCaptureManager(HookManager):
         self._rebuild_subscription_cache()
         self._recorded_events = []
 
-    def drain_events(self) -> List[HookRecordedEvent]:
+    def drain_events(self) -> list[HookRecordedEvent]:
         if not self._recorded_events:
             return []
         events = list(self._recorded_events)
@@ -74,18 +75,18 @@ class HookCaptureManager(HookManager):
     def trigger_loader_call(
         self,
         loader_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         result: Any,
         duration: float,
         *,
-        batch_num: Optional[int] = None,
-        cache_status: Optional[str] = None,
-        cache_scope: Optional[str] = None,
-        lookup_key_count: Optional[int] = None,
-        field_keys: Optional[List[str]] = None,
-        skipped_none_rows: Optional[int] = None,
-        chunk_offset: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        batch_num: int | None = None,
+        cache_status: str | None = None,
+        cache_scope: str | None = None,
+        lookup_key_count: int | None = None,
+        field_keys: list[str] | None = None,
+        skipped_none_rows: int | None = None,
+        chunk_offset: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         if not self._has_hooks:
             return

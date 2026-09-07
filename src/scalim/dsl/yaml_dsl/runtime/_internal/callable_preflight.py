@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence, Tuple
+from collections.abc import Callable, Iterable, Sequence
+from typing import Any
 
 from ..errors import ScalimConversionError
 
@@ -14,14 +15,14 @@ class ScalimCallablePreflightError(ScalimConversionError):
     """
 
 
-_SignatureBindArgs = Tuple[object, ...]
-_SignatureBindKwargs = Dict[str, object]
-_SignatureBindCandidate = Tuple[str, _SignatureBindArgs, _SignatureBindKwargs]
+_SignatureBindArgs = tuple[object, ...]
+_SignatureBindKwargs = dict[str, object]
+_SignatureBindCandidate = tuple[str, _SignatureBindArgs, _SignatureBindKwargs]
 
 _MAX_CANDIDATE_DISPLAY_LEN = 400
 
 
-def try_get_signature(fn: Callable[..., Any]) -> Optional[inspect.Signature]:
+def try_get_signature(fn: Callable[..., Any]) -> inspect.Signature | None:
     try:
         return inspect.signature(fn)
     except (TypeError, ValueError):
@@ -37,7 +38,7 @@ def _format_candidate_display(candidates: Sequence[_SignatureBindCandidate]) -> 
     return joined[:_MAX_CANDIDATE_DISPLAY_LEN] if len(joined) > _MAX_CANDIDATE_DISPLAY_LEN else joined
 
 
-def _try_bind_signature(sig: inspect.Signature, args: _SignatureBindArgs, kwargs: _SignatureBindKwargs) -> Optional[TypeError]:
+def _try_bind_signature(sig: inspect.Signature, args: _SignatureBindArgs, kwargs: _SignatureBindKwargs) -> TypeError | None:
     try:
         _ = sig.bind(*args, **kwargs)
     except TypeError as exc:
@@ -52,24 +53,18 @@ def format_signature_bind_mismatch_message(
     signature: inspect.Signature,
     bind_error: TypeError,
     candidates: Sequence[_SignatureBindCandidate],
-    hint: Optional[str] = None,
-    extra: Optional[str] = None,
+    hint: str | None = None,
+    extra: str | None = None,
 ) -> str:
     call_display = _format_candidate_display(candidates)
     msg = (
-        "{location} callable preflight 失败: 函数签名不匹配 "
-        "(ref={reference!r}, call=`{call_display}`, reason=`{reason}`, signature=`{signature}`)"
-    ).format(
-        location=str(location),
-        reference=str(reference),
-        call_display=str(call_display),
-        reason=str(bind_error),
-        signature=str(signature),
+        f"{location!s} callable preflight 失败: 函数签名不匹配 "
+        f"(ref={str(reference)!r}, call=`{call_display!s}`, reason=`{bind_error!s}`, signature=`{signature!s}`)"
     )
     if hint:
-        msg = "{}. 建议: {}".format(msg, str(hint))
+        msg = f"{msg}. 建议: {hint!s}"
     if extra:
-        msg = "{} ({})".format(msg, str(extra))
+        msg = f"{msg} ({extra!s})"
     return msg
 
 
@@ -79,8 +74,8 @@ def validate_signature_accepts_any_candidate(
     reference: str,
     fn: Callable[..., Any],
     candidates: Sequence[_SignatureBindCandidate],
-    hint: Optional[str] = None,
-    extra: Optional[str] = None,
+    hint: str | None = None,
+    extra: str | None = None,
 ) -> None:
     """检查 `fn` 的签名是否支持任一候选调用形态.
 
@@ -92,7 +87,7 @@ def validate_signature_accepts_any_candidate(
     if sig is None:
         return
 
-    last_exc: Optional[TypeError] = None
+    last_exc: TypeError | None = None
     for _display, args, kwargs in candidates:
         bind_exc = _try_bind_signature(sig, args=args, kwargs=kwargs)
         if bind_exc is None:
@@ -121,8 +116,8 @@ def validate_signature_binds_kwargs_keys(
     reference: str,
     fn: Callable[..., Any],
     kwargs_keys: Iterable[str],
-    hint: Optional[str] = None,
-    extra: Optional[str] = None,
+    hint: str | None = None,
+    extra: str | None = None,
 ) -> None:
     """仅基于 `kwargs` 键做可推理的签名绑定预检查.
 
@@ -136,7 +131,7 @@ def validate_signature_binds_kwargs_keys(
 
     placeholder = object()
     kwargs = dict.fromkeys(keys, placeholder)
-    candidates: Tuple[_SignatureBindCandidate, ...] = (("**{" + ", ".join(keys) + "}", (), kwargs),)
+    candidates: tuple[_SignatureBindCandidate, ...] = (("**{" + ", ".join(keys) + "}", (), kwargs),)
     validate_signature_accepts_any_candidate(
         location=location,
         reference=reference,

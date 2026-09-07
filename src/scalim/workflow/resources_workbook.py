@@ -6,8 +6,12 @@
 """
 
 from abc import ABC
+from collections.abc import Iterator
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, Type, cast
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
+
+from typing_extensions import override
 
 from .._internal.utils.excel import escape_excel_formula
 from .._internal.utils.openpyxl_helpers import (
@@ -18,8 +22,6 @@ from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
 from ..typedefs import CellValue
 from ..vendor.compact.importlibx import require_optional_dependency
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass, field
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 from .resources_csv import build_alignment_mapping, describe_header_diff
 from .tabular_artifacts import WorkflowTabularInput, materialize_aligned_tabular_rows, read_tabular_header
@@ -31,7 +33,7 @@ if TYPE_CHECKING:
     from openpyxl import Workbook
 
 
-def _get_openpyxl_workbook_class() -> "Type[Workbook]":
+def _get_openpyxl_workbook_class() -> "type[Workbook]":
     openpyxl_mod = require_optional_dependency("openpyxl", context="scalim.workflow.resources")
     return cast("Any", openpyxl_mod).Workbook  # pragma: allow-cast openpyxl module runtime boundary
 
@@ -40,15 +42,15 @@ def _save_openpyxl_workbook_atomic(workbook: "Workbook", *, output_path: str) ->
     try:
         _save_openpyxl_workbook_atomic_impl(workbook, output_path=output_path)
     except Exception as exc:
-        msg = "Workbook commit failed: {}: {}".format(type(exc).__name__, exc)
+        msg = f"Workbook commit failed: {type(exc).__name__}: {exc}"
         raise ScalimWorkflowWriteError(msg) from exc
 
 
-def _sorted_workbook_segments(segments: List["_WorkbookSegment"]) -> List["_WorkbookSegment"]:
+def _sorted_workbook_segments(segments: list["_WorkbookSegment"]) -> list["_WorkbookSegment"]:
     return sorted(segments, key=lambda seg: (int(seg.decl_order), str(seg.producer_node_id)))
 
 
-def _workbook_find_cutoff_index(segments: List["_WorkbookSegment"], *, producer_node_id: str) -> Optional[int]:
+def _workbook_find_cutoff_index(segments: list["_WorkbookSegment"], *, producer_node_id: str) -> int | None:
     needle = str(producer_node_id)
     for idx, seg in enumerate(segments):
         if str(seg.producer_node_id) == needle:
@@ -57,15 +59,15 @@ def _workbook_find_cutoff_index(segments: List["_WorkbookSegment"], *, producer_
 
 
 def _workbook_collect_visible_segments(
-    segments: List["_WorkbookSegment"],
+    segments: list["_WorkbookSegment"],
     *,
     cutoff_idx: int,
     producer_node_id: str,
-    visible_producer_node_ids: FrozenSet[str],
-) -> List[Tuple[str, List[List[CellValue]]]]:
+    visible_producer_node_ids: frozenset[str],
+) -> list[tuple[str, list[list[CellValue]]]]:
     producer = str(producer_node_id)
     visible = frozenset(str(x) for x in visible_producer_node_ids)
-    out: List[Tuple[str, List[List[CellValue]]]] = []
+    out: list[tuple[str, list[list[CellValue]]]] = []
     for seg in segments[: int(cutoff_idx) + 1]:
         seg_producer = str(seg.producer_node_id)
         if seg_producer != producer and seg_producer not in visible:
@@ -75,18 +77,18 @@ def _workbook_collect_visible_segments(
 
 
 def _iter_workbook_row_dicts(
-    baseline_header: List[str],
-    segments: List[Tuple[str, List[List[CellValue]]]],
-) -> Iterator[Dict[str, CellValue]]:
+    baseline_header: list[str],
+    segments: list[tuple[str, list[list[CellValue]]]],
+) -> Iterator[dict[str, CellValue]]:
     for _seg_producer, seg_rows in segments:
         for row_values in seg_rows:
-            row: Dict[str, CellValue] = {}
+            row: dict[str, CellValue] = {}
             for idx, key in enumerate(baseline_header):
                 row[str(key)] = row_values[idx] if idx >= 0 and idx < len(row_values) else ""
             yield row
 
 
-def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool) -> Iterator[List[CellValue]]:
+def _iter_workbook_sheet_rows(sheet_plan: "_SheetPlan", *, allow_formulas: bool) -> Iterator[list[CellValue]]:
     """将 `sheet_plan` 的自有类型化 `segments` 物化为待写入行(不依赖 `openpyxl`)."""
 
     header_written = False
@@ -119,16 +121,16 @@ def _write_workbook_plan_to_openpyxl_workbook(workbook: "Workbook", plan: "_Work
 class _WorkbookSegment:
     producer_node_id: str
     decl_order: int
-    rows: List[List[CellValue]]
+    rows: list[list[CellValue]]
     header_policy: str
 
 
 @dataclass
 class _SheetPlan:
     sheet: str
-    baseline_header: List[str]
-    export_header: Optional[List[str]] = None
-    segments: List[_WorkbookSegment] = field(default_factory=list)
+    baseline_header: list[str]
+    export_header: list[str] | None = None
+    segments: list[_WorkbookSegment] = field(default_factory=list)
 
 
 @dataclass
@@ -136,10 +138,10 @@ class _WorkbookPlan:
     resource_id: str
     path: str
     allow_formulas: bool
-    sheet_decl_order: Dict[str, int]
-    sheet_order: List[str]
-    sheets: Dict[str, _SheetPlan]
-    last_workflow_node_id: Optional[str] = None
+    sheet_decl_order: dict[str, int]
+    sheet_order: list[str]
+    sheets: dict[str, _SheetPlan]
+    last_workflow_node_id: str | None = None
 
 
 class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
@@ -149,7 +151,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         def _create() -> _WorkbookPlan:
             raw_path = self._workbook_defs.get(key)
             if raw_path is None:
-                msg = "Unknown workbook resource id: {!r}".format(key)
+                msg = f"Unknown workbook resource id: {key!r}"
                 raise ScalimWorkflowWriteError(msg)
             return _WorkbookPlan(
                 resource_id=key,
@@ -189,7 +191,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         input_output_id: str,
         input_csv: WorkflowTabularInput,
         on_conflict: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
@@ -214,7 +216,7 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
                 )
                 return
             if on_conflict == "error":
-                msg = "Sheet conflict (workbook_sheet): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
+                msg = f"Sheet conflict (workbook_sheet): workbook={str(workbook_id)!r}, sheet={sheet_name!r}"
                 raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
             if on_conflict == "overwrite":
                 action = "overwrite"
@@ -266,14 +268,14 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         align_by: str,
         header_policy: str,
         on_mismatch: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         plan = self._get_or_create_workbook(workbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
         input_header = read_tabular_header(input_csv)
 
-        pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, Any]] = None
+        pending_warning: DiagnosticWarningEvent | None = None
+        pending_warning_meta: dict[str, Any] | None = None
         pending_skip = False
 
         sheet_plan = plan.sheets.get(sheet_name)
@@ -303,11 +305,11 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         if list(input_header) != expected:
             diff = _describe_header_diff(expected, input_header)
             if on_mismatch == "error":
-                msg = "Field alignment mismatch (workbook_append): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name)
+                msg = f"Field alignment mismatch (workbook_append): workbook={str(workbook_id)!r}, sheet={sheet_name!r}"
                 raise ScalimWorkflowWriteError(msg, diff=diff)
             if on_mismatch == "warn":
                 pending_warning = DiagnosticWarningEvent(
-                    message="Field alignment mismatch (warn): workbook={!r}, sheet={!r}".format(str(workbook_id), sheet_name),
+                    message=f"Field alignment mismatch (warn): workbook={str(workbook_id)!r}, sheet={sheet_name!r}",
                     source_id=None,
                     field_id=None,
                     lookup_key={"expected": expected, "actual": list(input_header)},
@@ -364,11 +366,11 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         consumer_node_id: str,
-        visible_producer_node_ids: FrozenSet[str],
+        visible_producer_node_ids: frozenset[str],
         producer_node_id: str,
         workbook_id: str,
         sheet: str,
-    ) -> Iterator[Dict[str, CellValue]]:
+    ) -> Iterator[dict[str, CellValue]]:
         """读取 `workbook` 的行快照(按 `ref.node` 截断;按依赖可见性过滤)."""
 
         _ = str(consumer_node_id)
@@ -377,19 +379,19 @@ class _WorkflowWorkbookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet_name = str(sheet)
         visible = frozenset(str(x) for x in visible_producer_node_ids)
 
-        plan = cast("Optional[_WorkbookPlan]", self._workbooks.get(wb_id))  # pragma: allow-cast workbook plan typed narrowing
+        plan = cast("_WorkbookPlan | None", self._workbooks.get(wb_id))  # pragma: allow-cast workbook plan typed narrowing
         if plan is None:
-            msg = "Unknown workbook resource id: {!r}".format(wb_id)
+            msg = f"Unknown workbook resource id: {wb_id!r}"
             raise ValueError(msg)
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:
-            msg = "Unknown workbook sheet: workbook={!r}, sheet={!r}".format(wb_id, sheet_name)
+            msg = f"Unknown workbook sheet: workbook={wb_id!r}, sheet={sheet_name!r}"
             raise ValueError(msg)
 
         ordered_segments = _sorted_workbook_segments(list(sheet_plan.segments))
         cutoff_idx = _workbook_find_cutoff_index(ordered_segments, producer_node_id=producer)
         if cutoff_idx is None:
-            msg = "Unknown workbook ref node for sheet: node={!r}, workbook={!r}, sheet={!r}".format(producer, wb_id, sheet_name)
+            msg = f"Unknown workbook ref node for sheet: node={producer!r}, workbook={wb_id!r}, sheet={sheet_name!r}"
             raise ValueError(msg)
 
         baseline_header = list(sheet_plan.baseline_header)

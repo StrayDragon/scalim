@@ -1,4 +1,4 @@
-from ....vendor.compact import StrEnum
+from ...._internal.strenum import StrEnum
 
 
 class ResolverTrustedMode(StrEnum):

@@ -6,10 +6,9 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
 
 from ..typedefs import RuntimeValue
-from ..vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)
@@ -18,23 +17,23 @@ class WorkflowRunError:
     demand_path: str
     exc_type: str
     message: str
-    diff: Optional[List[str]] = None
+    diff: list[str] | None = None
 
 
 @dataclass(frozen=True)
 class WorkflowRunOutcome:
     run_id: str
     demand_path: str
-    result: Optional[RuntimeValue] = None
-    error: Optional[WorkflowRunError] = None
+    result: RuntimeValue | None = None
+    error: WorkflowRunError | None = None
 
 
 @dataclass(frozen=True)
 class WorkflowResult:
-    outcomes: Tuple[WorkflowRunOutcome, ...]
+    outcomes: tuple[WorkflowRunOutcome, ...]
 
-    def errors(self) -> List[WorkflowRunError]:
-        rows: List[WorkflowRunError] = []
+    def errors(self) -> list[WorkflowRunError]:
+        rows: list[WorkflowRunError] = []
         for item in self.outcomes:
             if item.error is not None:
                 rows.append(item.error)

@@ -1,6 +1,6 @@
 import statistics
 import threading
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 try:
     import psutil  # type: ignore[import-not-found]
@@ -9,7 +9,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 class _BenchmarkFixture:
-    extra_info: Dict[str, object]
+    extra_info: dict[str, object]
 
     def __call__(self, func: Callable[..., object], *args: object, **kwargs: object) -> object:
         raise NotImplementedError
@@ -19,7 +19,7 @@ class ResourceSampler:
     def __init__(self, interval: float = 0.05) -> None:
         self._interval = interval
         self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._rss_samples: list = []
         self._cpu_samples: list = []
         self._proc = None
@@ -48,7 +48,7 @@ class ResourceSampler:
         if self._thread is not None:
             self._thread.join(timeout=1.0)
 
-    def summary(self) -> Dict[str, Optional[float]]:
+    def summary(self) -> dict[str, float | None]:
         rss_peak = max(self._rss_samples) if self._rss_samples else None
         rss_avg = statistics.mean(self._rss_samples) if self._rss_samples else None
         cpu_avg = statistics.mean(self._cpu_samples) if self._cpu_samples else None
@@ -64,7 +64,7 @@ class BenchmarkRunner:
         self._benchmark = benchmark
         self._interval = interval
 
-    def run(self, func: Callable[..., object], *args: object, extra_info: Optional[Dict[str, object]] = None, **kwargs: object) -> object:
+    def run(self, func: Callable[..., object], *args: object, extra_info: dict[str, object] | None = None, **kwargs: object) -> object:
         sampler = ResourceSampler(interval=self._interval)
         sampler.start()
         try:
@@ -84,7 +84,7 @@ def run_benchmark(benchmark: _BenchmarkFixture, func: Callable[..., object], *ar
     return runner.run(func, *args, **kwargs)
 
 
-def _bytes_to_mb(value: Optional[float]) -> Optional[float]:
+def _bytes_to_mb(value: float | None) -> float | None:
     if value is None:
         return None
     return value / (1024.0 * 1024.0)

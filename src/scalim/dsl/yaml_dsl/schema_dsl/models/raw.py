@@ -1,6 +1,4 @@
-from typing import Any, List, Union
-
-from .....vendor.compact.typing_extensionsx import TypedDict
+from typing import Any, TypedDict
 
 
 class PerformanceReportRaw(TypedDict, total=False):
@@ -16,7 +14,7 @@ class PerformanceThresholdsRaw(TypedDict, total=False):
 
 class PerformanceRaw(TypedDict, total=False):
     enabled: bool
-    metrics: Union[List[str], str]
+    metrics: list[str] | str
     sampling_interval: int
     report: PerformanceReportRaw
     thresholds: PerformanceThresholdsRaw
@@ -47,7 +45,7 @@ class TraceRaw(TypedDict, total=False):
 class RowGapRaw(TypedDict, total=False):
     enabled: bool
     primary_loader_name: str
-    data_loader_names: Union[List[str], str]
+    data_loader_names: list[str] | str
     sample_limit: int
 
 
@@ -81,7 +79,7 @@ class ObservabilityRaw(TypedDict, total=False):
 
 class GuardrailsLoaderRaw(TypedDict, total=False):
     validate_result: bool
-    required_fields: List[Any]
+    required_fields: list[Any]
     on_transform_error: str
 
 

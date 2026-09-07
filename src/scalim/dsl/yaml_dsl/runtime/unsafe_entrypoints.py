@@ -8,7 +8,9 @@
 
 import logging
 import traceback
-from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
+from collections.abc import Mapping
+from dataclasses import replace
+from typing import Any
 
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
@@ -20,7 +22,6 @@ from ....ob.components import split_components
 from ....ob.observer import Observer
 from ....sinks import ISink
 from ....typedefs import KeyNormalizationMode, ParallelMode
-from ....vendor.dataclassesx import replace
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .compiler import compile as _compile
 from .contracts import (
@@ -50,7 +51,7 @@ def _validate_unsafe_template_sandbox(template_sandbox: str) -> str:
                 "迁移: 删除 `template_sandbox` 参数或显式设置 `template_sandbox='safe'`."
             )
             raise ValueError(msg)
-        msg = "`template_sandbox` 必须是 `safe`; 收到={!r}".format(value)
+        msg = f"`template_sandbox` 必须是 `safe`; 收到={value!r}"
         raise ValueError(msg)
     return value
 
@@ -68,24 +69,24 @@ def _audit_unsafe_call(fn_name: str, *, template_sandbox: str) -> None:
 def unsafe_run(  # noqa: PLR0913
     yaml_path: str,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]] = None,
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None = None,
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
-    components: Optional[List[Union[Observer, IExecutionHook]]] = None,
-    sink: Optional[ISink] = None,
-    overrides: Optional[RunOverrides] = None,
-    guardrails: Optional[GuardrailsPolicy] = None,
-    loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
-    batch_size: Union[Optional[int], UnsetType] = UNSET,
-    demand_failure_policy: Optional[str] = None,
+    components: list[Observer | IExecutionHook] | None = None,
+    sink: ISink | None = None,
+    overrides: RunOverrides | None = None,
+    guardrails: GuardrailsPolicy | None = None,
+    loader_retry: LoaderRetryPoliciesSpec | None = None,
+    batch_size: int | None | UnsetType = UNSET,
+    demand_failure_policy: str | None = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
-    init_vars: Optional[Dict[str, Any]] = None,
-    template_vars: Optional[Mapping[str, Any]] = None,
+    init_vars: dict[str, Any] | None = None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
+    allowed_yaml_roots: tuple[str, ...] | None = None,
 ) -> DemandRunResult:
     """不安全入口: 允许显式启用不安全能力.
 
@@ -149,23 +150,23 @@ def unsafe_run(  # noqa: PLR0913
 def unsafe_compile(  # noqa: PLR0913
     yaml_path: str,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]] = None,
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None = None,
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
-    components: Optional[List[Union[Observer, IExecutionHook]]] = None,
-    overrides: Optional[RunOverrides] = None,
-    guardrails: Optional[GuardrailsPolicy] = None,
-    loader_retry: Optional[LoaderRetryPoliciesSpec] = None,
-    batch_size: Union[Optional[int], UnsetType] = UNSET,
-    demand_failure_policy: Optional[str] = None,
+    components: list[Observer | IExecutionHook] | None = None,
+    overrides: RunOverrides | None = None,
+    guardrails: GuardrailsPolicy | None = None,
+    loader_retry: LoaderRetryPoliciesSpec | None = None,
+    batch_size: int | None | UnsetType = UNSET,
+    demand_failure_policy: str | None = None,
     parallel_mode: ParallelMode = "seq",
     max_workers: int = 0,
     key_normalization: KeyNormalizationMode = "raw",
-    init_vars: Optional[Dict[str, Any]] = None,
-    template_vars: Optional[Mapping[str, Any]] = None,
+    init_vars: dict[str, Any] | None = None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
+    allowed_yaml_roots: tuple[str, ...] | None = None,
 ) -> Compilation:
     """不安全入口: 允许显式启用不安全能力.
 

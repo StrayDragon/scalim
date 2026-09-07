@@ -4,16 +4,18 @@ import csv
 import io
 import logging
 import time
+from collections.abc import Callable, Sequence
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Optional
+
+from typing_extensions import Self, override
 
 from ..._internal.loggingx import prefix
+from ..._internal.strenum import StrEnum
 from ..._internal.utils.excel import escape_excel_formula
 from ...typedefs import CellValue, FieldValue, RowData, SinkRowKeySeq
-from ...vendor.compact import StrEnum
-from ...vendor.compact.typing_extensionsx import Self, override
-from ...vendor.dataclassesx import dataclass
 from .base import (
     BaseRowSink,
     ColumnBatch,
@@ -73,8 +75,8 @@ class InMemoryCsv:
     - `rows`: 已对齐的字符串化行数据(每行长度 `MUST` 与 `header` 等长)
     """
 
-    header: List[str]
-    rows: List[List[str]]
+    header: list[str]
+    rows: list[list[str]]
 
 
 class InMemoryCsvSink(BaseRowSink):
@@ -85,16 +87,16 @@ class InMemoryCsvSink(BaseRowSink):
     - 该 `sink` 不做 `IO`,仅用于 `workflow-managed` 中间态.
     """
 
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     _artifact: InMemoryCsv
     _closed: bool
 
     def __init__(
         self,
         *,
-        field_names: Union[List[str], None] = None,
-        header_names: Union[List[str], None] = None,
+        field_names: list[str] | None = None,
+        header_names: list[str] | None = None,
     ) -> None:
         if field_names is None:
             msg = "必须提供 field_names 参数"
@@ -107,7 +109,7 @@ class InMemoryCsvSink(BaseRowSink):
     def to_artifact(self) -> InMemoryCsv:
         return self._artifact
 
-    def _format_row(self, row: RowData) -> List[str]:
+    def _format_row(self, row: RowData) -> list[str]:
         return [_normalize_csv_value(row.get(field_name)) for field_name in self.field_names]
 
     @override
@@ -177,26 +179,26 @@ class CSVSink(BaseRowSink):
     allow_formulas: bool
     _rows_since_flush: int
     _closed: bool
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     _file: io.TextIOWrapper
     _writer: Any
     _temp_path: str
     _open_fn: Callable[..., io.TextIOWrapper]
-    _aligned_cache_field_keys: Optional[Tuple[str, ...]]
-    _aligned_cache_indexes: Optional[List[Optional[int]]]
+    _aligned_cache_field_keys: tuple[str, ...] | None
+    _aligned_cache_indexes: list[int | None] | None
 
     def __init__(
         self,
         output_path: str,
         delimiter: str = ",",
         encoding: str = "utf-8",
-        field_names: Union[List[str], None] = None,
-        header_names: Union[List[str], None] = None,
+        field_names: list[str] | None = None,
+        header_names: list[str] | None = None,
         include_header: bool = True,  # noqa: FBT001, FBT002
         flush_policy: str = "every_n_rows",
         flush_every_rows: int = 1000,
-        open_fn: Optional[Callable[..., io.TextIOWrapper]] = None,
+        open_fn: Callable[..., io.TextIOWrapper] | None = None,
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         self.output_path = output_path
@@ -218,7 +220,7 @@ class CSVSink(BaseRowSink):
         self.header_names = header_names if header_names is not None else field_names
 
         if self.flush_policy not in (CsvFlushPolicy.ALWAYS, CsvFlushPolicy.EVERY_N_ROWS):
-            msg = "Unknown flush_policy: '{}'".format(self.flush_policy)
+            msg = f"Unknown flush_policy: '{self.flush_policy}'"
             raise ValueError(msg)
         if self.flush_policy == CsvFlushPolicy.EVERY_N_ROWS and self.flush_every_rows < 1:
             msg = "flush_every_rows must be >= 1"
@@ -239,7 +241,7 @@ class CSVSink(BaseRowSink):
             [_normalize_csv_value_for_spreadsheet(value, allow_formulas=self.allow_formulas) for value in self.header_names]
         )
 
-    def _format_row(self, row: RowData) -> List[str]:
+    def _format_row(self, row: RowData) -> list[str]:
         return [
             _normalize_csv_value_for_spreadsheet(row.get(field_name), allow_formulas=self.allow_formulas) for field_name in self.field_names
         ]
@@ -261,18 +263,18 @@ class CSVSink(BaseRowSink):
 
     def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
         if len(field_keys) != len(values):
-            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            msg = f"`write_row_aligned` 长度不一致: field_keys={len(field_keys)} values={len(values)}"
             raise ValueError(msg)
 
         cache_keys = self._aligned_cache_field_keys
         field_keys_tuple = tuple(field_keys)
         if cache_keys != field_keys_tuple:
-            index_by_key: Dict[str, int] = {key: i for i, key in enumerate(field_keys_tuple)}
+            index_by_key: dict[str, int] = {key: i for i, key in enumerate(field_keys_tuple)}
             self._aligned_cache_field_keys = field_keys_tuple
             self._aligned_cache_indexes = [index_by_key.get(name) for name in self.field_names]
 
         indexes = self._aligned_cache_indexes or []
-        row_values: List[str] = []
+        row_values: list[str] = []
         for idx in indexes:
             if idx is None:
                 row_values.append("")
@@ -305,7 +307,7 @@ class CSVSink(BaseRowSink):
                 except OSError:
                     _LOGGER.warning(CSV_SINK_REMOVE_TEMP_FILE_FAILED_LOG, temp_path_obj, exc_info=True)
             best_effort_cleanup_temp_path_dir(self._temp_path)
-            msg = "CSVSink close failed: failed to replace temp file {} -> {}".format(temp_path_obj, self.output_path)
+            msg = f"CSVSink close failed: failed to replace temp file {temp_path_obj} -> {self.output_path}"
             raise OSError(msg) from exc
 
         self._closed = True
@@ -362,21 +364,21 @@ class ColumnCSVSink(IColumnSink):
     """
 
     output_path: str
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     delimiter: str
     encoding: str
     include_header: bool
     allow_formulas: bool
-    _row_ids: List[Any]
+    _row_ids: list[Any]
     _columns: ColumnData
     _closed: bool
 
     def __init__(
         self,
         output_path: str,
-        field_names: List[str],
-        header_names: Optional[List[str]] = None,
+        field_names: list[str],
+        header_names: list[str] | None = None,
         delimiter: str = ",",
         encoding: str = "utf-8",
         include_header: bool = True,  # noqa: FBT001, FBT002
@@ -403,12 +405,12 @@ class ColumnCSVSink(IColumnSink):
 
     def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
         if len(row_ids) != len(values):
-            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            msg = f"`write_column_aligned` 长度不一致: row_ids={len(row_ids)} values={len(values)}"
             raise ValueError(msg)
         if field_key not in self._columns:
             self._columns[field_key] = {}
         col = self._columns[field_key]
-        for row_id, value in zip(row_ids, values):
+        for row_id, value in zip(row_ids, values, strict=False):
             col[row_id] = value
 
     @override
@@ -433,7 +435,7 @@ class ColumnCSVSink(IColumnSink):
         temp_path = create_temp_path(self.output_path, ".csv.tmp")
 
         try:
-            with io.open(temp_path, "w", encoding=self.encoding, newline="") as f:
+            with io.open(temp_path, "w", encoding=self.encoding, newline="") as f:  # noqa: UP020  # 测试经 io.open 打桩
                 writer = csv.writer(f, delimiter=self.delimiter)
                 if self.include_header:
                     writer.writerow(
@@ -473,8 +475,8 @@ class ColumnCSVSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)
@@ -523,15 +525,15 @@ class BlockColumnCSVSink(IColumnSink):
     """
 
     output_path: str
-    field_names: List[str]
+    field_names: list[str]
     col_width: int
     delimiter: bytes
     encoding: str
     allow_formulas: bool
-    _row_ids: List[Any]
-    _pk_to_index: Dict[Any, int]
-    _field_to_col_index: Dict[str, int]
-    _file: Optional[BinaryIO]
+    _row_ids: list[Any]
+    _pk_to_index: dict[Any, int]
+    _field_to_col_index: dict[str, int]
+    _file: BinaryIO | None
     _closed: bool
     _write_delay: float
     _row_length: int
@@ -541,7 +543,7 @@ class BlockColumnCSVSink(IColumnSink):
     def __init__(
         self,
         output_path: str,
-        field_names: List[str],
+        field_names: list[str],
         col_width: int = 24,
         delimiter: str = ",",
         encoding: str = "utf-8",
@@ -571,9 +573,9 @@ class BlockColumnCSVSink(IColumnSink):
         if self._initialized:
             return
 
-        self._file = io.open(self.output_path, "wb+")  # noqa: SIM115
+        self._file = io.open(self.output_path, "wb+")  # noqa: SIM115, UP020  # 测试经 io.open 打桩
 
-        header_parts: List[bytes] = []
+        header_parts: list[bytes] = []
         for name in self.field_names:
             escaped = escape_excel_formula(name, allow_formulas=self.allow_formulas)
             name_bytes = str(escaped).encode(self.encoding)
@@ -658,7 +660,7 @@ class BlockColumnCSVSink(IColumnSink):
 
     def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
         if len(row_ids) != len(values):
-            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            msg = f"`write_column_aligned` 长度不一致: row_ids={len(row_ids)} values={len(values)}"
             raise ValueError(msg)
         if not self._initialized:
             msg = "必须先调用 set_row_ids"
@@ -668,7 +670,7 @@ class BlockColumnCSVSink(IColumnSink):
         if col_index is None or self._file is None:
             return
 
-        for pk, value in zip(row_ids, values):
+        for pk, value in zip(row_ids, values, strict=False):
             row_index = self._pk_to_index.get(pk)
             if row_index is not None:
                 self._write_cell(row_index, col_index, value)
@@ -726,8 +728,8 @@ class BlockColumnCSVSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)

@@ -5,7 +5,10 @@
 """
 
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, List, Set
+from collections.abc import Hashable
+from typing import TYPE_CHECKING
+
+from typing_extensions import override
 
 from ....._internal.utils.converters import auto_str_normalize_key
 from .....events import EventType
@@ -13,7 +16,6 @@ from .....planning.operators import LoadRefOperatorIr, SupportedOperatorIr
 from .....spec.ir import LookupStepIr
 from .....typedefs import LoaderResultMapping
 from .....utils.relation_signature import RelationSignature, build_relation_signature, can_group_by_relation
-from .....vendor.compact.typing_extensionsx import override
 from ....context import BatchContext
 from ...runtime.runtime import ExecutionRuntime
 from ..base import OperatorExecutor
@@ -34,7 +36,7 @@ def _maybe_emit_key_normalization_key_space_mismatch_warning(
     relation_signature: RelationSignature,
     step: LookupStepIr,
     field_id: str,
-    lookup_keys: "Set[LookupKey]",
+    lookup_keys: "set[LookupKey]",
     intermediate_result: LoaderResultMapping,
 ) -> None:
     if runtime.key_normalization != "auto_str":
@@ -77,7 +79,7 @@ def _maybe_emit_ref_default_applied_summary(*, runtime: ExecutionRuntime, exec_c
     counts = dict(exec_ctx.default_applied_counts or {})
     if not counts:
         return
-    text = ", ".join("{}={}".format(k, int(counts[k])) for k in sorted(counts.keys()))
+    text = ", ".join(f"{k}={int(counts[k])}" for k in sorted(counts.keys()))
     _logger.info(
         "`LoadRef` 已应用关联缺失缺省值: %s (批次=%s, 字段=%s, 关联=%s)",
         text,
@@ -95,7 +97,7 @@ class LoadRefOperatorExecutor(OperatorExecutor):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         if not isinstance(operator, LoadRefOperatorIr):
@@ -126,7 +128,7 @@ class LoadRefOperatorExecutor(OperatorExecutor):
             if not pk_to_first_fk:
                 return
 
-            current_mapping: Dict[Hashable, "LookupKey"] = pk_to_first_fk
+            current_mapping: dict[Hashable, LookupKey] = pk_to_first_fk
 
             for step_idx, step in enumerate(steps):
                 lookup_keys = set(current_mapping.values())

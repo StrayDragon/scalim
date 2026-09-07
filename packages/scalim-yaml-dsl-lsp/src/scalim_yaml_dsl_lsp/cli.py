@@ -2,15 +2,15 @@ import argparse
 import json
 import logging
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 from .core import discover_yaml_dsl_editor_project
 
 __all__ = ()
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="scalim-yaml-dsl-lsp")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -69,17 +69,17 @@ def _cmd_dump_discovery(yaml_path: str, *, as_json: bool) -> int:
     try:
         discovery = discover_yaml_dsl_editor_project(Path(str(yaml_path)))
     except Exception as exc:  # noqa: BLE001
-        sys.stderr.write("[错误] `dump-discovery` 失败: {}: {}\n".format(type(exc).__name__, exc))
+        sys.stderr.write(f"[错误] `dump-discovery` 失败: {type(exc).__name__}: {exc}\n")
         return 2
 
     payload = discovery.as_dict()
     if "scalim_yaml_path" not in payload:
         payload["scalim_yaml_path"] = None
     if not as_json:
-        sys.stdout.write("{}\n".format(payload))
+        sys.stdout.write(f"{payload}\n")
         return 0
 
-    sys.stdout.write("{}\n".format(json.dumps(payload, ensure_ascii=False, indent=2)))
+    sys.stdout.write(f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n")
     return 0
 
 
@@ -90,7 +90,7 @@ def _cmd_serve(*, tcp: bool, host: str, port: int, log_file: str, log_level: str
         from .server import create_server  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001
         msg_lines = [
-            "[错误] `LSP` 服务端导入失败: {}: {}".format(type(exc).__name__, exc),
+            f"[错误] `LSP` 服务端导入失败: {type(exc).__name__}: {exc}",
             "",
             "可能原因: 安装时使用了 `--no-deps`, 或环境损坏导致依赖缺失 (例如 `pygls`).",
             "修复 (installed): 重新安装并确保依赖完整:",
@@ -107,7 +107,7 @@ def _cmd_serve(*, tcp: bool, host: str, port: int, log_file: str, log_level: str
         server = create_server()
     except Exception as exc:  # noqa: BLE001
         msg_lines = [
-            "[错误] `LSP` 服务端初始化失败: {}: {}".format(type(exc).__name__, exc),
+            f"[错误] `LSP` 服务端初始化失败: {type(exc).__name__}: {exc}",
             "",
             "修复 (installed): 重新安装并确保依赖完整:",
             "  uv tool install scalim-yaml-dsl-lsp",
@@ -126,6 +126,6 @@ def _cmd_serve(*, tcp: bool, host: str, port: int, log_file: str, log_level: str
             server.start_io()
     except Exception as exc:
         logging.getLogger(__name__).exception("`LSP` 服务端启动失败: %s", type(exc).__name__)
-        sys.stderr.write("[错误] `LSP` 服务端启动失败: {}: {}\n".format(type(exc).__name__, exc))
+        sys.stderr.write(f"[错误] `LSP` 服务端启动失败: {type(exc).__name__}: {exc}\n")
         return 2
     return 0

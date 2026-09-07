@@ -1,7 +1,6 @@
-from typing import Dict, Optional
+from dataclasses import dataclass, field
 
 from ....typedefs import FieldPresentationKind
-from ....vendor.dataclassesx import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -10,12 +9,12 @@ class CsvFieldPresentationIr:
     CSV展示配置(IR): 定义CSV输出的格式参数
     """
 
-    delimiter: Optional[str] = None
+    delimiter: str | None = None
     """
     字段分隔符
     """
 
-    encoding: Optional[str] = None
+    encoding: str | None = None
     """
     文件编码
     """
@@ -27,42 +26,42 @@ class SpreadsheetFieldPresentationIr:
     电子表格展示配置(IR): 定义 `Excel` 等电子表格输出的样式参数
     """
 
-    number_format: Optional[str] = None
+    number_format: str | None = None
     """
     数字格式 (如 "#,##0.00")
     """
 
-    bold: Optional[bool] = None
+    bold: bool | None = None
     """
     是否加粗
     """
 
-    italic: Optional[bool] = None
+    italic: bool | None = None
     """
     是否斜体
     """
 
-    font_color: Optional[str] = None
+    font_color: str | None = None
     """
     字体颜色(例如 `#FF0000`).
     """
 
-    fill_color: Optional[str] = None
+    fill_color: str | None = None
     """
     填充颜色(例如 `#FFFF00`).
     """
 
-    alignment: Optional[str] = None
+    alignment: str | None = None
     """
     对齐方式(例如 `left`、`center`、`right`).
     """
 
-    width: Optional[int] = None
+    width: int | None = None
     """
     列宽
     """
 
-    wrap: Optional[bool] = None
+    wrap: bool | None = None
     """
     是否自动换行
     """
@@ -74,12 +73,12 @@ class PandasFieldPresentationIr:
     `pandas` 展示配置(IR): 定义 `pandas.DataFrame` 输出的类型参数
     """
 
-    dtype: Optional[str] = None
+    dtype: str | None = None
     """
     数据类型(例如 `int64`、`float64`、`str`).
     """
 
-    category: Optional[bool] = None
+    category: bool | None = None
     """
     是否转换为分类类型
     """
@@ -96,27 +95,27 @@ class FieldPresentationIr:
     展示类型(`generic`/`csv`/`excel`/`pandas`).
     """
 
-    label: Optional[str] = None
+    label: str | None = None
     """
     显示标签 (覆盖字段名)
     """
 
-    description: Optional[str] = None
+    description: str | None = None
     """
     字段描述
     """
 
-    csv: Optional[CsvFieldPresentationIr] = None
+    csv: CsvFieldPresentationIr | None = None
     """
     CSV专用配置
     """
 
-    excel: Optional[SpreadsheetFieldPresentationIr] = None
+    excel: SpreadsheetFieldPresentationIr | None = None
     """
     `Excel` 专用配置
     """
 
-    pandas: Optional[PandasFieldPresentationIr] = None
+    pandas: PandasFieldPresentationIr | None = None
     """
     `pandas` 专用配置
     """
@@ -133,12 +132,12 @@ class ExportProfileIr:
     配置名称
     """
 
-    default_presentation: Optional[FieldPresentationIr] = None
+    default_presentation: FieldPresentationIr | None = None
     """
     默认展示配置 (应用于所有字段)
     """
 
-    field_overrides: Dict[str, FieldPresentationIr] = field(default_factory=dict)
+    field_overrides: dict[str, FieldPresentationIr] = field(default_factory=dict)
     """
     字段级覆盖配置(`field_id` -> `FieldPresentationIr`).
     """

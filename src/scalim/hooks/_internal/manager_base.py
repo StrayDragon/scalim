@@ -1,9 +1,11 @@
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Protocol
+
+from typing_extensions import Self
 
 from ..._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
 from ...events import Event, EventType
-from ...vendor.compact.typing_extensionsx import Protocol, Self
 from .._dispatch import HookDispatchStrategy
 
 if TYPE_CHECKING:
@@ -42,12 +44,12 @@ class ExecutionHookLike(Protocol):
 
 HookTypedHandler = Callable[[Event], Any]
 HookOnEventHandler = Callable[[Event], Any]
-HookTypedHandlerPair = Tuple[ExecutionHookLike, HookTypedHandler]
-HookOnEventHandlerPair = Tuple[ExecutionHookLike, HookOnEventHandler]
+HookTypedHandlerPair = tuple[ExecutionHookLike, HookTypedHandler]
+HookOnEventHandlerPair = tuple[ExecutionHookLike, HookOnEventHandler]
 
 
 class HookManagerLike(Protocol):
-    hooks: List[ExecutionHookLike]
+    hooks: list[ExecutionHookLike]
     debug_mode: bool
     fallback_logger_enabled: bool
     loader_result_policy: LoaderResultPolicyValue
@@ -62,16 +64,16 @@ class HookManagerLike(Protocol):
     def has_hooks(self, value: bool) -> None: ...
 
     @property
-    def typed_handlers_by_event_type(self) -> Dict[EventType, Tuple[HookTypedHandlerPair, ...]]: ...
+    def typed_handlers_by_event_type(self) -> dict[EventType, tuple[HookTypedHandlerPair, ...]]: ...
 
     @typed_handlers_by_event_type.setter
-    def typed_handlers_by_event_type(self, value: Dict[EventType, Tuple[HookTypedHandlerPair, ...]]) -> None: ...
+    def typed_handlers_by_event_type(self, value: dict[EventType, tuple[HookTypedHandlerPair, ...]]) -> None: ...
 
     @property
-    def on_event_handlers_by_event_type(self) -> Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]: ...
+    def on_event_handlers_by_event_type(self) -> dict[EventType, tuple[HookOnEventHandlerPair, ...]]: ...
 
     @on_event_handlers_by_event_type.setter
-    def on_event_handlers_by_event_type(self, value: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]) -> None: ...
+    def on_event_handlers_by_event_type(self, value: dict[EventType, tuple[HookOnEventHandlerPair, ...]]) -> None: ...
 
     @property
     def lock(self) -> "threading.RLock": ...
@@ -92,16 +94,16 @@ class HookManagerLike(Protocol):
     def dispatch_strategy(self, value: HookDispatchStrategy) -> None: ...
 
     @property
-    def base_hook_on_event(self) -> Optional[Callable[..., None]]: ...
+    def base_hook_on_event(self) -> Callable[..., None] | None: ...
 
     @base_hook_on_event.setter
-    def base_hook_on_event(self, value: Optional[Callable[..., None]]) -> None: ...
+    def base_hook_on_event(self, value: Callable[..., None] | None) -> None: ...
 
     @property
-    def base_hook_typed_handlers(self) -> Dict[str, Optional[Callable[..., None]]]: ...
+    def base_hook_typed_handlers(self) -> dict[str, Callable[..., None] | None]: ...
 
     @base_hook_typed_handlers.setter
-    def base_hook_typed_handlers(self, value: Dict[str, Optional[Callable[..., None]]]) -> None: ...
+    def base_hook_typed_handlers(self, value: dict[str, Callable[..., None] | None]) -> None: ...
 
 
 class HookManagerBase(HookManagerLike, ABC):
@@ -112,7 +114,7 @@ class HookManagerBase(HookManagerLike, ABC):
     def _rebuild_subscription_cache(self) -> None:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 
-    def _summarize_result(self, result: Any) -> Dict[str, Any]:  # pragma: no cover  # pragma: allow-no-cover abstract method
+    def _summarize_result(self, result: Any) -> dict[str, Any]:  # pragma: no cover  # pragma: allow-no-cover abstract method
         _ = result
         raise NotImplementedError
 

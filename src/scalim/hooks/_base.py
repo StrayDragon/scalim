@@ -2,11 +2,13 @@
 
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
+from typing import Any
+
+from typing_extensions import override
 
 from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
 from ..events import Event, EventType
-from ..vendor.compact.typing_extensionsx import override
 from ._dispatch import HookDispatchStrategy
 from ._internal.common import HOOK_TYPED_DISPATCH_MAP
 from ._internal.manager_base import ExecutionHookLike, HookOnEventHandlerPair, HookTypedHandlerPair
@@ -84,7 +86,7 @@ Hook = IExecutionHook
 class BaseHook(IExecutionHook):
     """带有空操作方法的基础钩子实现."""
 
-    event_types: Optional[Set[EventType]] = None
+    event_types: set[EventType] | None = None
 
     def on_event(self, event: Event) -> None:
         """统一事件回调(用于订阅事件目录中的全部事件)."""
@@ -154,10 +156,10 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
     注意: 请使用 `register`/`unregister`/`clear` 管理钩子,不要直接修改 `hooks` 列表,否则 `fastpath` 缓存可能失效.
     """
 
-    hooks: List[ExecutionHookLike]
+    hooks: list[ExecutionHookLike]
     _has_hooks: bool
-    _typed_handlers_by_event_type: Dict[EventType, Tuple[HookTypedHandlerPair, ...]]
-    _on_event_handlers_by_event_type: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]
+    _typed_handlers_by_event_type: dict[EventType, tuple[HookTypedHandlerPair, ...]]
+    _on_event_handlers_by_event_type: dict[EventType, tuple[HookOnEventHandlerPair, ...]]
     debug_mode: bool
     fallback_logger_enabled: bool
     loader_result_policy: LoaderResultPolicyValue
@@ -165,8 +167,8 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
     _dispatch_strategy: HookDispatchStrategy
-    _base_hook_on_event: Optional[Callable[..., None]]
-    _base_hook_typed_handlers: Dict[str, Optional[Callable[..., None]]]
+    _base_hook_on_event: Callable[..., None] | None
+    _base_hook_typed_handlers: dict[str, Callable[..., None] | None]
 
     def __init__(
         self,
@@ -174,7 +176,7 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
         fallback_logger_enabled: bool = False,  # noqa: FBT001, FBT002
         loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL,
         loader_result_sample_size: int = 5,
-        dispatch_strategy: Optional[HookDispatchStrategy] = None,
+        dispatch_strategy: HookDispatchStrategy | None = None,
     ) -> None:
         self.hooks = []
         self._has_hooks = False
@@ -202,22 +204,22 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
 
     @property
     @override
-    def typed_handlers_by_event_type(self) -> Dict[EventType, Tuple[HookTypedHandlerPair, ...]]:
+    def typed_handlers_by_event_type(self) -> dict[EventType, tuple[HookTypedHandlerPair, ...]]:
         return self._typed_handlers_by_event_type
 
     @typed_handlers_by_event_type.setter
     @override
-    def typed_handlers_by_event_type(self, value: Dict[EventType, Tuple[HookTypedHandlerPair, ...]]) -> None:
+    def typed_handlers_by_event_type(self, value: dict[EventType, tuple[HookTypedHandlerPair, ...]]) -> None:
         self._typed_handlers_by_event_type = value
 
     @property
     @override
-    def on_event_handlers_by_event_type(self) -> Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]:
+    def on_event_handlers_by_event_type(self) -> dict[EventType, tuple[HookOnEventHandlerPair, ...]]:
         return self._on_event_handlers_by_event_type
 
     @on_event_handlers_by_event_type.setter
     @override
-    def on_event_handlers_by_event_type(self, value: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]]) -> None:
+    def on_event_handlers_by_event_type(self, value: dict[EventType, tuple[HookOnEventHandlerPair, ...]]) -> None:
         self._on_event_handlers_by_event_type = value
 
     @property
@@ -252,22 +254,22 @@ class HookManager(HookManagerStateMixin, HookManagerSubscriptionMixin, HookManag
 
     @property
     @override
-    def base_hook_on_event(self) -> Optional[Callable[..., None]]:
+    def base_hook_on_event(self) -> Callable[..., None] | None:
         return self._base_hook_on_event
 
     @base_hook_on_event.setter
     @override
-    def base_hook_on_event(self, value: Optional[Callable[..., None]]) -> None:
+    def base_hook_on_event(self, value: Callable[..., None] | None) -> None:
         self._base_hook_on_event = value
 
     @property
     @override
-    def base_hook_typed_handlers(self) -> Dict[str, Optional[Callable[..., None]]]:
+    def base_hook_typed_handlers(self) -> dict[str, Callable[..., None] | None]:
         return self._base_hook_typed_handlers
 
     @base_hook_typed_handlers.setter
     @override
-    def base_hook_typed_handlers(self, value: Dict[str, Optional[Callable[..., None]]]) -> None:
+    def base_hook_typed_handlers(self, value: dict[str, Callable[..., None] | None]) -> None:
         self._base_hook_typed_handlers = value
 
 

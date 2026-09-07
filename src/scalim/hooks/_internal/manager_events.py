@@ -1,6 +1,7 @@
 import logging
 from abc import ABC
-from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple, TypeVar
+from collections.abc import Callable, Hashable
+from typing import Any, TypeVar
 
 from ..._internal.loggingx import format_kv, prefix
 from ..._internal.utils.loader_result import LOADER_RESULT_POLICY_VALUES, parse_loader_result_policy
@@ -53,7 +54,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
 
     def _dispatch(
         self,
-        handler_pairs: Optional[Tuple[Tuple[ExecutionHookLike, Callable[[_EventT], Any]], ...]],
+        handler_pairs: tuple[tuple[ExecutionHookLike, Callable[[_EventT], Any]], ...] | None,
         event: _EventT,
     ) -> None:
         if not handler_pairs:
@@ -64,7 +65,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         self,
         event_type: EventType,
         payload: Any,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> Event:
         """为类型化分发包装最小 `Event` 信封(直调 `trigger_*` / 无 `ObserverManager` 时)."""
         return Event(
@@ -76,7 +77,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             seq=0,
         )
 
-    def _get_typed_handler_pairs(self, event_type: EventType) -> Optional[Tuple[HookTypedHandlerPair, ...]]:
+    def _get_typed_handler_pairs(self, event_type: EventType) -> tuple[HookTypedHandlerPair, ...] | None:
         manager = self._manager()
         if not manager.has_hooks:
             return None
@@ -86,7 +87,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
                 return None
             return manager.typed_handlers_by_event_type.get(event_type)
 
-    def _get_on_event_handler_pairs(self, event_type: EventType) -> Optional[Tuple[HookOnEventHandlerPair, ...]]:
+    def _get_on_event_handler_pairs(self, event_type: EventType) -> tuple[HookOnEventHandlerPair, ...] | None:
         manager = self._manager()
         if not manager.has_hooks:
             return None
@@ -125,7 +126,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
     def emit_on_event(self, event: Event) -> None:
         self._dispatch(self._get_on_event_handler_pairs(event.event_type), event)
 
-    def trigger_pipeline_start(self, targets: List[str], batch_size: Optional[int]) -> None:
+    def trigger_pipeline_start(self, targets: list[str], batch_size: int | None) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.PIPELINE_START)
         if handler_pairs is None:
             return
@@ -140,7 +141,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             self._typed_envelope(EventType.PIPELINE_END, PipelineEndEvent(total_batches, total_duration)),
         )
 
-    def trigger_batch_start(self, batch_num: int, row_ids: List[Any]) -> None:
+    def trigger_batch_start(self, batch_num: int, row_ids: list[Any]) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.BATCH_START)
         if handler_pairs is None:
             return
@@ -155,18 +156,18 @@ class HookManagerEventMixin(HookManagerBase, ABC):
     def trigger_loader_call(
         self,
         loader_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         result: Any,
         duration: float,
         *,
-        batch_num: Optional[int] = None,
-        cache_status: Optional[str] = None,
-        cache_scope: Optional[str] = None,
-        lookup_key_count: Optional[int] = None,
-        field_keys: Optional[List[str]] = None,
-        skipped_none_rows: Optional[int] = None,
-        chunk_offset: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        batch_num: int | None = None,
+        cache_status: str | None = None,
+        cache_scope: str | None = None,
+        lookup_key_count: int | None = None,
+        field_keys: list[str] | None = None,
+        skipped_none_rows: int | None = None,
+        chunk_offset: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         manager = self._manager()
         handler_pairs = self._get_typed_handler_pairs(EventType.LOADER_CALL)
@@ -205,9 +206,9 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         self,
         field_key: str,
         row_id: Hashable,
-        dependencies: Dict[str, Any],
+        dependencies: dict[str, Any],
         result: Any,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.FIELD_COMPUTE)
         if handler_pairs is None:
@@ -221,7 +222,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
             ),
         )
 
-    def trigger_error(self, error: Exception, context: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> None:
+    def trigger_error(self, error: Exception, context: dict[str, Any], meta: dict[str, Any] | None = None) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.ERROR)
         if handler_pairs is None:
             return
@@ -230,16 +231,16 @@ class HookManagerEventMixin(HookManagerBase, ABC):
     def trigger_diagnostic_warning(
         self,
         message: str,
-        source_id: Optional[str] = None,
-        field_id: Optional[str] = None,
+        source_id: str | None = None,
+        field_id: str | None = None,
         lookup_key: Any = None,
         row_id: Any = None,
         *,
         sample_once: bool = False,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         manager = self._manager()
-        handler_pairs: Optional[Tuple[HookTypedHandlerPair, ...]] = None
+        handler_pairs: tuple[HookTypedHandlerPair, ...] | None = None
         with manager.lock:
             if sample_once and manager.diagnostic_warning_emitted:
                 return
@@ -277,9 +278,9 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         field_key: str,
         reason: str,
         *,
-        batch_num: Optional[int] = None,
-        remaining_fields: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        batch_num: int | None = None,
+        remaining_fields: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.FIELD_SLIM)
         if handler_pairs is None:
@@ -292,9 +293,9 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         row_id: Hashable,
         *,
         field_count: int,
-        batch_num: Optional[int] = None,
-        row_index: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        batch_num: int | None = None,
+        row_index: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.ROW_WRITE)
         if handler_pairs is None:
@@ -306,10 +307,10 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         self,
         row_id: Hashable,
         *,
-        released_fields: List[str],
-        retained_fields: List[str],
-        batch_num: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        released_fields: list[str],
+        retained_fields: list[str],
+        batch_num: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.ROW_RELEASE)
         if handler_pairs is None:
@@ -326,9 +327,9 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         self,
         loader_name: str,
         original_keys: int,
-        extracted_fields: List[str],
-        batch_num: Optional[int] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        extracted_fields: list[str],
+        batch_num: int | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.LOADER_SLIM)
         if handler_pairs is None:
@@ -346,7 +347,7 @@ class HookManagerEventMixin(HookManagerBase, ABC):
         field_key: str,
         row_count: int,
         batch_num: int,
-        meta: Optional[Dict[str, Any]] = None,
+        meta: dict[str, Any] | None = None,
     ) -> None:
         handler_pairs = self._get_typed_handler_pairs(EventType.COLUMN_WRITE)
         if handler_pairs is None:

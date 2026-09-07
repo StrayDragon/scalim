@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from ...typedefs import FailurePolicyValue, RuntimeValue, parse_failure_policy
 
 _OUTPUT_COMPOSITION_FAILURE_POLICY_LABEL = "output_composition.failure_policy"

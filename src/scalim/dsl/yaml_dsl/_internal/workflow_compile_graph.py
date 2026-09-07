@@ -8,7 +8,7 @@
 - 本模块不负责 `resources` / `outputs` / `runtime options` 等编译逻辑.
 """
 
-from typing import Dict, List, Mapping, Optional, Tuple
+from collections.abc import Mapping
 
 from ....spec.ir._workflow import WorkflowAnyNodeIr, WorkflowEdgeIr, WorkflowNodeIr, WorkflowNodeType
 from ..workflow import WorkflowConfig, resolve_workflow_demand_path
@@ -20,22 +20,22 @@ def _build_demand_nodes_and_graph(
     wf_obj: WorkflowConfig,
     *,
     workflow_yaml_path: str,
-    path_aliases: Optional[Mapping[str, str]],
-    allowed_yaml_roots: Optional[Tuple[str, ...]],
-) -> Tuple[
-    List[WorkflowAnyNodeIr],
-    List[WorkflowEdgeIr],
-    Dict[str, Tuple[str, ...]],
-    Dict[str, str],
-    Dict[str, List[str]],
-    Dict[str, int],
+    path_aliases: Mapping[str, str] | None,
+    allowed_yaml_roots: tuple[str, ...] | None,
+) -> tuple[
+    list[WorkflowAnyNodeIr],
+    list[WorkflowEdgeIr],
+    dict[str, tuple[str, ...]],
+    dict[str, str],
+    dict[str, list[str]],
+    dict[str, int],
 ]:
-    nodes: List[WorkflowAnyNodeIr] = []
-    edges: List[WorkflowEdgeIr] = []
-    slots_by_node_id: Dict[str, Tuple[str, ...]] = {}
-    demand_yaml_paths_by_run_id: Dict[str, str] = {}
-    direct_dependents_by_run_id: Dict[str, List[str]] = {}
-    demand_node_pos_by_run_id: Dict[str, int] = {}
+    nodes: list[WorkflowAnyNodeIr] = []
+    edges: list[WorkflowEdgeIr] = []
+    slots_by_node_id: dict[str, tuple[str, ...]] = {}
+    demand_yaml_paths_by_run_id: dict[str, str] = {}
+    direct_dependents_by_run_id: dict[str, list[str]] = {}
+    demand_node_pos_by_run_id: dict[str, int] = {}
 
     for idx, run in enumerate(wf_obj.runs):
         demand_path = resolve_workflow_demand_path(
@@ -85,15 +85,15 @@ def build_demand_nodes_and_graph(
     wf_obj: WorkflowConfig,
     *,
     workflow_yaml_path: str,
-    path_aliases: Optional[Mapping[str, str]],
-    allowed_yaml_roots: Optional[Tuple[str, ...]],
-) -> Tuple[
-    List[WorkflowAnyNodeIr],
-    List[WorkflowEdgeIr],
-    Dict[str, Tuple[str, ...]],
-    Dict[str, str],
-    Dict[str, List[str]],
-    Dict[str, int],
+    path_aliases: Mapping[str, str] | None,
+    allowed_yaml_roots: tuple[str, ...] | None,
+) -> tuple[
+    list[WorkflowAnyNodeIr],
+    list[WorkflowEdgeIr],
+    dict[str, tuple[str, ...]],
+    dict[str, str],
+    dict[str, list[str]],
+    dict[str, int],
 ]:
     """`_build_demand_nodes_and_graph` 的跨模块入口包装.
 

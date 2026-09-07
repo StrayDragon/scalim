@@ -17,8 +17,9 @@
 
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Any, cast
 
 try:
     import pandas as pd
@@ -107,7 +108,7 @@ class PandasDataLoader:
         if self.random_delay > 0:
             time.sleep(self.random_delay)
 
-    def _df_to_dict(self, df: Union[pd.DataFrame, Any], pk_field_name: str) -> Dict[int, Dict[str, Any]]:
+    def _df_to_dict(self, df: pd.DataFrame | Any, pk_field_name: str) -> dict[int, dict[str, Any]]:
         """将 `DataFrame` 转换为字典.
 
         参数:
@@ -117,18 +118,18 @@ class PandasDataLoader:
         返回:
             以主键为键的字典
         """
-        result: Dict[int, Dict[str, Any]] = {}
+        result: dict[int, dict[str, Any]] = {}
         for _, row in df.iterrows():
             pk = int(row[pk_field_name])
-            row_dict = cast("Dict[str, Any]", row.to_dict())
+            row_dict = cast("dict[str, Any]", row.to_dict())
             result[pk] = row_dict
         return result
 
-    def _df_to_rows(self, df: Union[pd.DataFrame, Any]) -> List[Dict[str, Any]]:
+    def _df_to_rows(self, df: pd.DataFrame | Any) -> list[dict[str, Any]]:
         """将 `DataFrame` 转换为行列表."""
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for _, row in df.iterrows():
-            row_dict = cast("Dict[str, Any]", row.to_dict())
+            row_dict = cast("dict[str, Any]", row.to_dict())
             rows.append(row_dict)
         return rows
 
@@ -138,8 +139,8 @@ class PandasDataLoader:
         end_time: str,  # pyright: ignore[reportUnusedParameter]
         page: int = 0,
         page_size: int = 10,
-        order_ids: Optional[List[int]] = None,
-    ) -> List[Dict[str, Any]]:
+        order_ids: list[int] | None = None,
+    ) -> list[dict[str, Any]]:
         """获取订单数据.
 
         参数:
@@ -163,7 +164,7 @@ class PandasDataLoader:
 
         return self._df_to_rows(df)
 
-    def get_customers(self, customer_ids_set: Optional[Set[int]] = None, **extra_params: Any) -> Dict[int, Dict[str, Any]]:  # pyright: ignore[reportUnusedParameter]
+    def get_customers(self, customer_ids_set: set[int] | None = None, **extra_params: Any) -> dict[int, dict[str, Any]]:  # pyright: ignore[reportUnusedParameter]
         """获取客户数据.
 
         参数:
@@ -182,7 +183,7 @@ class PandasDataLoader:
 
         return self._df_to_dict(df, "customer_id")
 
-    def get_pays(self, pay_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_pays(self, pay_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取支付数据.
 
         参数:
@@ -200,7 +201,7 @@ class PandasDataLoader:
 
         return self._df_to_dict(df, "pay_id")
 
-    def get_countries(self, country_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_countries(self, country_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取国家数据.
 
         参数:
@@ -218,7 +219,7 @@ class PandasDataLoader:
 
         return self._df_to_dict(df, "country_id")
 
-    def get_order_types(self, type_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_order_types(self, type_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取订单类型数据(FR003:小数据集缓存示例).
 
         这是一个典型的小数据集:
@@ -241,9 +242,7 @@ class PandasDataLoader:
 
         return self._df_to_dict(df, "type_id")
 
-    def get_region_institution_mapping(
-        self, composite_keys: Optional[Set[Tuple[int, int]]] = None
-    ) -> Dict[Tuple[int, int], Dict[str, Any]]:
+    def get_region_institution_mapping(self, composite_keys: set[tuple[int, int]] | None = None) -> dict[tuple[int, int], dict[str, Any]]:
         """获取区域机构映射数据.
 
         参数:
@@ -272,15 +271,15 @@ class PandasDataLoader:
             df = self.region_institution_mapping_df
 
         # 转换为字典,键为(`region_id`, `institution_id`)元组
-        result: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        result: dict[tuple[int, int], dict[str, Any]] = {}
         for _, row in df.iterrows():
             key = (int(row["region_id"]), int(row["institution_id"]))
-            row_dict = cast("Dict[str, Any]", row.to_dict())
+            row_dict = cast("dict[str, Any]", row.to_dict())
             result[key] = row_dict
 
         return result
 
-    def get_small_groups(self, group_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_small_groups(self, group_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取小组数据(FR013:多级关联示例).
 
         参数:
@@ -298,7 +297,7 @@ class PandasDataLoader:
 
         return self._df_to_dict(df, "small_group_id")
 
-    def get_big_groups(self, group_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_big_groups(self, group_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取大组数据(FR013:多级关联示例).
 
         参数:
@@ -328,8 +327,8 @@ class Dal:
     """数据访问层 - 模拟数据库访问"""
 
     def paged_get_order_list(
-        self, begin_time: str, end_time: str, page: int = 0, page_size: int = 10, order_ids: Optional[List[int]] = None
-    ) -> List[Dict[str, Any]]:
+        self, begin_time: str, end_time: str, page: int = 0, page_size: int = 10, order_ids: list[int] | None = None
+    ) -> list[dict[str, Any]]:
         """分页获取订单列表.
 
         注意:这是一个典型的分页接口,参数由业务决定,框架不应做假设.
@@ -347,9 +346,9 @@ class Dal:
 
     def get_country_info_of_concrete_params(
         self,
-        country_ids_set: Optional[Set[int]] = None,
-        rows: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[int, Dict[str, Any]]:
+        country_ids_set: set[int] | None = None,
+        rows: list[dict[str, Any]] | None = None,
+    ) -> dict[int, dict[str, Any]]:
         """获取国家信息.
 
         注意:参数名 `country_ids_set` 为该接口约定,框架不应做假设.
@@ -364,7 +363,7 @@ DAL = Dal()
 class Bll:
     """业务逻辑层 - 模拟业务接口."""
 
-    def get_pay_info_from_api_of_concrete_params(self, pay_ids_set: Optional[Set[int]] = None) -> Dict[int, Dict[str, Any]]:
+    def get_pay_info_from_api_of_concrete_params(self, pay_ids_set: set[int] | None = None) -> dict[int, dict[str, Any]]:
         """获取支付信息.
 
         注意:参数名 `pay_ids_set` 为该接口约定,框架不应做假设.
@@ -372,8 +371,8 @@ class Bll:
         return data_loader.get_pays(pay_ids_set)
 
     def get_customer_info_from_api_of_kw_params(
-        self, customer_ids_set: Optional[Set[int]] = None, **extra_params: Any
-    ) -> Dict[int, Dict[str, Any]]:
+        self, customer_ids_set: set[int] | None = None, **extra_params: Any
+    ) -> dict[int, dict[str, Any]]:
         """获取客户信息.
 
         注意:使用 `**kwargs` 模式,参数名 `customer_ids_set` 为该接口约定.
@@ -840,7 +839,7 @@ def build_order_report_runtime_bindings() -> RuntimeBindings:
     bindings.params_builders[("region_institution_mapping", ("region_id", "institution_id"))] = _build_composite_keys
 
     def _profit_field_calculator(amount: float, cost: float) -> str:
-        return "{0:.2f}".format((amount or 0) - (cost or 0))
+        return f"{(amount or 0) - (cost or 0):.2f}"
 
     bindings.derived_calculators["profit"] = _profit_field_calculator
 

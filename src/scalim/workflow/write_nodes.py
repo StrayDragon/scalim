@@ -128,9 +128,8 @@ def run_workflow_write_sheet_node(
         )
         return
 
-    msg = "Unsupported write_sheet resource_type: {!r}".format(
-        str(node.resource_type)
-    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    # pragma: allow-no-cover unreachable: IR validated
+    msg = f"Unsupported write_sheet resource_type: {str(node.resource_type)!r}"  # pragma: no cover
     raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
@@ -160,9 +159,8 @@ def run_workflow_append_sheet_node(
                 error_prefix="append node",
             )
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            msg = "append_sheet requires sheet for book resource (resource_id={!r})".format(
-                str(node.resource_id)
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            # pragma: allow-no-cover invariant: sheet required by IR
+            msg = f"append_sheet requires sheet for book resource (resource_id={str(node.resource_id)!r})"  # pragma: no cover
             raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_book_append(
             workflow_node_id=str(node.node_id),
@@ -195,9 +193,8 @@ def run_workflow_append_sheet_node(
             error_prefix="append node",
         )
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            msg = "append_sheet requires sheet for workbook resource (resource_id={!r})".format(
-                str(node.resource_id)
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            # pragma: allow-no-cover invariant: sheet required by IR
+            msg = f"append_sheet requires sheet for workbook resource (resource_id={str(node.resource_id)!r})"  # pragma: no cover
             raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_workbook_append(
             workflow_node_id=str(node.node_id),
@@ -258,9 +255,8 @@ def run_workflow_append_sheet_node(
             error_prefix="append node",
         )
         if not node.sheet:  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
-            msg = "append_sheet requires sheet for sheetbook resource (resource_id={!r})".format(
-                str(node.resource_id)
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
+            # pragma: allow-no-cover invariant: sheet required by IR
+            msg = f"append_sheet requires sheet for sheetbook resource (resource_id={str(node.resource_id)!r})"  # pragma: no cover
             raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: sheet required by IR
         resource_manager.apply_sheetbook_append(
             workflow_node_id=str(node.node_id),
@@ -283,9 +279,8 @@ def run_workflow_append_sheet_node(
         )
         return
 
-    msg = "Unsupported append_sheet resource_type: {!r}".format(
-        str(node.resource_type)
-    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    # pragma: allow-no-cover unreachable: IR validated
+    msg = f"Unsupported append_sheet resource_type: {str(node.resource_type)!r}"  # pragma: no cover
     raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 
@@ -311,9 +306,7 @@ def run_workflow_write_node(
         )
         return
 
-    msg = "Unsupported workflow node type: {}".format(
-        type(node).__name__
-    )  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
+    msg = f"Unsupported workflow node type: {type(node).__name__}"  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
     raise ScalimWorkflowWriteError(msg)  # pragma: no cover  # pragma: allow-no-cover unreachable: IR validated
 
 

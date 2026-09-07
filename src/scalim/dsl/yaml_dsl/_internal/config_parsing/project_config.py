@@ -1,10 +1,10 @@
 import logging
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, TypeGuard, cast
 
-from .....vendor.compact.typing_extensionsx import TypeGuard
-from .....vendor.dataclassesx import dataclass
 from .error_envelope import ScalimYamlValidationError
 from .yaml_load import load_yaml_mapping_text
 
@@ -14,7 +14,7 @@ _logger = logging.getLogger("scalim.dsl.yaml_dsl.project_config")
 
 _YAML_DSL_KIND_DEMAND = "demand"
 _YAML_DSL_KIND_WORKFLOW = "workflow"
-_YAML_DSL_KIND_CHOICES: Tuple[str, ...] = (
+_YAML_DSL_KIND_CHOICES: tuple[str, ...] = (
     _YAML_DSL_KIND_DEMAND,
     _YAML_DSL_KIND_WORKFLOW,
 )
@@ -30,14 +30,14 @@ class YamlDslLspKindOverride:
 
 @dataclass(frozen=True)
 class YamlDslLspConfig:
-    python_roots: Tuple[Path, ...] = ()
-    kind_overrides: Tuple[YamlDslLspKindOverride, ...] = ()
+    python_roots: tuple[Path, ...] = ()
+    kind_overrides: tuple[YamlDslLspKindOverride, ...] = ()
 
 
 @dataclass(frozen=True)
 class YamlDslImportRoot:
     path: Path
-    alias: Optional[str] = None
+    alias: str | None = None
 
 
 @dataclass(frozen=True)
@@ -46,16 +46,16 @@ class YamlDslProjectConfig:
 
     scalim_yaml_path: Path
     project_root: Path
-    import_roots: Tuple[YamlDslImportRoot, ...]
+    import_roots: tuple[YamlDslImportRoot, ...]
     import_aliases: Mapping[str, Path]
-    lsp: Optional[YamlDslLspConfig] = None
+    lsp: YamlDslLspConfig | None = None
 
 
-def _is_list(value: Any) -> TypeGuard[List[Any]]:
+def _is_list(value: Any) -> TypeGuard[list[Any]]:
     return isinstance(value, list)
 
 
-def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
+def _read_yaml_mapping(path: Path) -> dict[str, Any]:
     try:
         loaded, _locations, _lines = load_yaml_mapping_text(
             path.read_text(encoding="utf-8"),
@@ -66,13 +66,13 @@ def _read_yaml_mapping(path: Path) -> Dict[str, Any]:
         for envelope in exc.errors:
             if str(envelope.code) == "yaml_empty_document":
                 return {}
-        msg = "scalim.yaml parse error: path='{}'".format(str(path))
+        msg = f"scalim.yaml parse error: path='{path!s}'"
         if exc.errors:
-            msg = "{}: {}".format(msg, exc.errors[0].message)
+            msg = f"{msg}: {exc.errors[0].message}"
         raise TypeError(msg) from exc
 
     if not isinstance(loaded, dict):
-        msg = "scalim.yaml must be a mapping: path='{}'".format(str(path))
+        msg = f"scalim.yaml must be a mapping: path='{path!s}'"
         raise TypeError(msg)
     return loaded
 
@@ -105,63 +105,58 @@ def _resolve_dir(value: Any, *, base_dir: Path, context_label: str) -> Path:
     return resolved
 
 
-def _parse_yaml_dsl_dict(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -> Dict[str, Any]:
+def _parse_yaml_dsl_dict(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -> dict[str, Any]:
     yaml_dsl = raw.get("yaml_dsl")
     if yaml_dsl is None:
         return {}
     if isinstance(yaml_dsl, dict):
-        return cast("Dict[str, Any]", yaml_dsl)  # pragma: allow-cast yaml mapping typed narrowing
-    msg = "scalim.yaml yaml_dsl must be a mapping: path='{}'".format(str(scalim_yaml_path))
+        return cast("dict[str, Any]", yaml_dsl)  # pragma: allow-cast yaml mapping typed narrowing
+    msg = f"scalim.yaml yaml_dsl must be a mapping: path='{scalim_yaml_path!s}'"
     raise TypeError(msg)
 
 
 def _parse_import_roots(
-    yaml_dsl_dict: Dict[str, Any],
+    yaml_dsl_dict: dict[str, Any],
     *,
     project_root: Path,
     scalim_yaml_path: Path,
-) -> Tuple[Tuple[YamlDslImportRoot, ...], Dict[str, Path]]:
+) -> tuple[tuple[YamlDslImportRoot, ...], dict[str, Path]]:
     raw_roots = yaml_dsl_dict.get("import_roots")
     if raw_roots is None:
         return (), {}
     if not _is_list(raw_roots):
-        msg = "scalim.yaml yaml_dsl.import_roots must be a list: path='{}'".format(str(scalim_yaml_path))
+        msg = f"scalim.yaml yaml_dsl.import_roots must be a list: path='{scalim_yaml_path!s}'"
         raise TypeError(msg)
 
-    import_roots: List[YamlDslImportRoot] = []
-    import_aliases: Dict[str, Path] = {}
+    import_roots: list[YamlDslImportRoot] = []
+    import_aliases: dict[str, Path] = {}
 
     for idx, raw_item in enumerate(raw_roots):
-        item_path = "yaml_dsl.import_roots[{}]".format(idx)
+        item_path = f"yaml_dsl.import_roots[{idx}]"
         if not isinstance(raw_item, dict):
-            msg = "scalim.yaml {} must be a mapping: path='{}'".format(item_path, str(scalim_yaml_path))
+            msg = f"scalim.yaml {item_path} must be a mapping: path='{scalim_yaml_path!s}'"
             raise TypeError(msg)
-        item = cast("Dict[str, Any]", raw_item)  # pragma: allow-cast yaml mapping typed narrowing
+        item = cast("dict[str, Any]", raw_item)  # pragma: allow-cast yaml mapping typed narrowing
         unknown = sorted({str(k) for k in item} - {"path", "alias"})
         if unknown:
             msg = "scalim.yaml {} has unknown keys: {}: path='{}'".format(item_path, ", ".join(unknown), str(scalim_yaml_path))
             raise TypeError(msg)
 
         raw_dir = item.get("path")
-        dir_path = _resolve_dir(raw_dir, base_dir=project_root, context_label="{}.path".format(item_path))
+        dir_path = _resolve_dir(raw_dir, base_dir=project_root, context_label=f"{item_path}.path")
 
         raw_alias = item.get("alias")
-        alias: Optional[str] = None
+        alias: str | None = None
         if raw_alias is not None:
             if not isinstance(raw_alias, str) or not raw_alias.strip():
-                msg = "scalim.yaml {}.alias must be a non-empty string: path='{}'".format(item_path, str(scalim_yaml_path))
+                msg = f"scalim.yaml {item_path}.alias must be a non-empty string: path='{scalim_yaml_path!s}'"
                 raise TypeError(msg)
             alias = str(raw_alias).strip()
             if alias != "@" and not _IMPORT_ROOT_ALIAS_RE.match(alias):
-                msg = "scalim.yaml {}.alias must be '@' or match {}: got={!r}: path='{}'".format(
-                    item_path,
-                    _IMPORT_ROOT_ALIAS_RE.pattern,
-                    alias,
-                    str(scalim_yaml_path),
-                )
+                msg = f"scalim.yaml {item_path}.alias must be '@' or match {_IMPORT_ROOT_ALIAS_RE.pattern}: got={alias!r}: path='{scalim_yaml_path!s}'"  # noqa: E501
                 raise ValueError(msg)
             if alias in import_aliases:
-                msg = "scalim.yaml yaml_dsl.import_roots alias must be unique: alias={!r}: path='{}'".format(alias, str(scalim_yaml_path))
+                msg = f"scalim.yaml yaml_dsl.import_roots alias must be unique: alias={alias!r}: path='{scalim_yaml_path!s}'"
                 raise ValueError(msg)
             import_aliases[alias] = dir_path
 
@@ -170,19 +165,19 @@ def _parse_import_roots(
     return tuple(import_roots), import_aliases
 
 
-def _parse_lsp_python_roots(lsp_dict: Dict[str, Any], *, project_root: Path, scalim_yaml_path: Path) -> Tuple[Path, ...]:
+def _parse_lsp_python_roots(lsp_dict: dict[str, Any], *, project_root: Path, scalim_yaml_path: Path) -> tuple[Path, ...]:
     raw_python_roots = lsp_dict.get("python_roots")
     if raw_python_roots is None:
         return ()
     if not _is_list(raw_python_roots):
-        msg = "scalim.yaml yaml_dsl.lsp.python_roots must be a list: path='{}'".format(str(scalim_yaml_path))
+        msg = f"scalim.yaml yaml_dsl.lsp.python_roots must be a list: path='{scalim_yaml_path!s}'"
         raise TypeError(msg)
 
-    resolved_py_roots: List[Path] = []
+    resolved_py_roots: list[Path] = []
     for idx, raw_root in enumerate(raw_python_roots):
         raw = str(raw_root or "")
         resolved = (project_root / raw).expanduser().resolve(strict=False)
-        ctx = "yaml_dsl.lsp.python_roots[{}]".format(idx)
+        ctx = f"yaml_dsl.lsp.python_roots[{idx}]"
 
         if not raw.strip():
             _logger.warning(
@@ -212,21 +207,21 @@ def _parse_lsp_python_roots(lsp_dict: Dict[str, Any], *, project_root: Path, sca
     return tuple(resolved_py_roots)
 
 
-def _parse_lsp_kind_overrides(lsp_dict: Dict[str, Any], *, scalim_yaml_path: Path) -> Tuple[YamlDslLspKindOverride, ...]:
+def _parse_lsp_kind_overrides(lsp_dict: dict[str, Any], *, scalim_yaml_path: Path) -> tuple[YamlDslLspKindOverride, ...]:
     raw_kind_overrides = lsp_dict.get("kind_overrides")
     if raw_kind_overrides is None:
         return ()
     if not _is_list(raw_kind_overrides):
-        msg = "scalim.yaml yaml_dsl.lsp.kind_overrides must be a list: path='{}'".format(str(scalim_yaml_path))
+        msg = f"scalim.yaml yaml_dsl.lsp.kind_overrides must be a list: path='{scalim_yaml_path!s}'"
         raise TypeError(msg)
 
-    overrides: List[YamlDslLspKindOverride] = []
+    overrides: list[YamlDslLspKindOverride] = []
     for idx, item in enumerate(raw_kind_overrides):
-        item_path = "yaml_dsl.lsp.kind_overrides[{}]".format(idx)
+        item_path = f"yaml_dsl.lsp.kind_overrides[{idx}]"
         if not isinstance(item, dict):
-            msg = "scalim.yaml {} must be a mapping: path='{}'".format(item_path, str(scalim_yaml_path))
+            msg = f"scalim.yaml {item_path} must be a mapping: path='{scalim_yaml_path!s}'"
             raise TypeError(msg)
-        item_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+        item_dict = cast("dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
 
         unknown = sorted({str(k) for k in item_dict} - {"glob", "kind"})
         if unknown:
@@ -236,18 +231,14 @@ def _parse_lsp_kind_overrides(lsp_dict: Dict[str, Any], *, scalim_yaml_path: Pat
         glob_raw = item_dict.get("glob")
         glob = str(glob_raw or "").strip() if isinstance(glob_raw, str) else ""
         if not glob:
-            msg = "scalim.yaml {}.glob must be a non-empty string: path='{}'".format(item_path, str(scalim_yaml_path))
+            msg = f"scalim.yaml {item_path}.glob must be a non-empty string: path='{scalim_yaml_path!s}'"
             raise TypeError(msg)
 
         kind_raw = item_dict.get("kind")
         kind = str(kind_raw or "").strip().lower() if isinstance(kind_raw, str) else ""
         if kind not in _YAML_DSL_KIND_CHOICES:
             allowed = ", ".join(_YAML_DSL_KIND_CHOICES)
-            msg = "scalim.yaml {}.kind must be one of {}: path='{}'".format(
-                item_path,
-                allowed,
-                str(scalim_yaml_path),
-            )
+            msg = f"scalim.yaml {item_path}.kind must be one of {allowed}: path='{scalim_yaml_path!s}'"
             raise ValueError(msg)
 
         overrides.append(YamlDslLspKindOverride(glob=glob, kind=kind))
@@ -255,15 +246,15 @@ def _parse_lsp_kind_overrides(lsp_dict: Dict[str, Any], *, scalim_yaml_path: Pat
     return tuple(overrides)
 
 
-def _parse_lsp_config(yaml_dsl_dict: Dict[str, Any], *, project_root: Path, scalim_yaml_path: Path) -> Optional[YamlDslLspConfig]:
+def _parse_lsp_config(yaml_dsl_dict: dict[str, Any], *, project_root: Path, scalim_yaml_path: Path) -> YamlDslLspConfig | None:
     raw_lsp = yaml_dsl_dict.get("lsp")
     if raw_lsp is None:
         return None
     if not isinstance(raw_lsp, dict):
-        msg = "scalim.yaml yaml_dsl.lsp must be a mapping: path='{}'".format(str(scalim_yaml_path))
+        msg = f"scalim.yaml yaml_dsl.lsp must be a mapping: path='{scalim_yaml_path!s}'"
         raise TypeError(msg)
 
-    lsp_dict = cast("Dict[str, Any]", raw_lsp)  # pragma: allow-cast yaml mapping typed narrowing
+    lsp_dict = cast("dict[str, Any]", raw_lsp)  # pragma: allow-cast yaml mapping typed narrowing
     unknown = sorted({str(k) for k in lsp_dict} - {"python_roots", "kind_overrides"})
     if unknown:
         msg = "scalim.yaml yaml_dsl.lsp has unknown keys: {}: path='{}'".format(", ".join(unknown), str(scalim_yaml_path))
@@ -299,18 +290,13 @@ def _parse_yaml_dsl_section(raw: Mapping[str, Any], *, scalim_yaml_path: Path) -
 def _locate_scalim_yaml(
     *,
     start_dir: Path,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-) -> Optional[Path]:
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+) -> Path | None:
     if scalim_yaml_override is not None:
         path = Path(str(scalim_yaml_override)).expanduser().resolve(strict=False)
         if not path.exists() or not path.is_file():
-            msg = "scalim.yaml override must exist and be a file: raw='{}' | resolved='{}' | exists={} | is_file={}".format(
-                str(scalim_yaml_override),
-                str(path),
-                bool(path.exists()),
-                bool(path.is_file()),
-            )
+            msg = f"scalim.yaml override must exist and be a file: raw='{scalim_yaml_override!s}' | resolved='{path!s}' | exists={bool(path.exists())} | is_file={bool(path.is_file())}"  # noqa: E501
             raise ValueError(msg)
         return path
 
@@ -318,9 +304,7 @@ def _locate_scalim_yaml(
         root = Path(str(project_root_override)).expanduser().resolve(strict=False)
         path = root / "scalim.yaml"
         if not path.exists() or not path.is_file():
-            msg = "project_root override does not contain scalim.yaml: raw='{}' | resolved='{}'".format(
-                str(project_root_override), str(path)
-            )
+            msg = f"project_root override does not contain scalim.yaml: raw='{project_root_override!s}' | resolved='{path!s}'"
             raise ValueError(msg)
         return path.resolve(strict=False)
 
@@ -338,9 +322,9 @@ def _locate_scalim_yaml(
 def load_yaml_dsl_project_config(
     demand_yaml_path: Path,
     *,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-) -> Optional[YamlDslProjectConfig]:
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+) -> YamlDslProjectConfig | None:
     """从 `demand YAML` 路径加载可选项目配置 `scalim.yaml`.
 
     规则:

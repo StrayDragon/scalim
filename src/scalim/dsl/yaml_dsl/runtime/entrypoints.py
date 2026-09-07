@@ -1,7 +1,7 @@
 # pragma: allow-c901-file plan: c10
 import logging
+from dataclasses import replace
 from pathlib import Path
-from typing import Dict, Optional
 
 from ....execution.run_ir import run_ir
 from ....execution.versioned_outputs import (
@@ -14,7 +14,6 @@ from ....execution.versioned_outputs import (
 )
 from ....hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch_size_signal
 from ....ob.components import split_components
-from ....vendor.dataclassesx import replace
 from .compiler import compile as _compile
 from .contracts import CaptureRows, Compilation, DemandRunOptions, DemandRunResult, UnsetType
 from .normalize import normalize_public_demand_run_options
@@ -27,9 +26,9 @@ def _ensure_versioned_output_dirs(compilation: Compilation) -> None:  # noqa: C9
     if spec is None:
         return
 
-    roots: Dict[str, str] = {}
+    roots: dict[str, str] = {}
 
-    def _collect(path_str: Optional[str]) -> None:
+    def _collect(path_str: str | None) -> None:
         if not path_str:
             return
         p = Path(str(path_str))
@@ -43,9 +42,7 @@ def _ensure_versioned_output_dirs(compilation: Compilation) -> None:  # noqa: C9
             roots[root_str] = version_id
             return
         if existing != version_id:
-            msg = "Multiple version_id values for the same output root: root={!r}, version_id={!r} vs {!r}".format(
-                root_str, existing, version_id
-            )
+            msg = f"Multiple version_id values for the same output root: root={root_str!r}, version_id={existing!r} vs {version_id!r}"
             raise ValueError(msg)
 
     for t in spec.targets:
@@ -67,9 +64,9 @@ def _update_versioned_output_manifests(result: DemandRunResult) -> None:
     if not outputs:
         return
 
-    books_by_root: Dict[str, Dict[str, str]] = {}
-    files_by_root: Dict[str, Dict[str, str]] = {}
-    version_id_by_root: Dict[str, str] = {}
+    books_by_root: dict[str, dict[str, str]] = {}
+    files_by_root: dict[str, dict[str, str]] = {}
+    version_id_by_root: dict[str, str] = {}
 
     for output_path in outputs.values():
         if not output_path:
@@ -84,9 +81,7 @@ def _update_versioned_output_manifests(result: DemandRunResult) -> None:
         if existing is None:
             version_id_by_root[root_str] = version_id
         elif existing != version_id:
-            msg = "Multiple version_id values for the same output root: root={!r}, version_id={!r} vs {!r}".format(
-                root_str, existing, version_id
-            )
+            msg = f"Multiple version_id values for the same output root: root={root_str!r}, version_id={existing!r} vs {version_id!r}"
             raise ValueError(msg)
         if parsed.kind == "books":
             books_by_root.setdefault(root_str, {})[str(parsed.artifact_id)] = str(parsed.artifact_relpath)

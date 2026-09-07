@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 from scalim.execution.loader_retry import LoaderRetryContext
 
@@ -18,7 +18,7 @@ def get_call_count() -> int:
     return int(_call_count_state["count"])
 
 
-def load_orders(**_kwargs: Any) -> List[Any]:
+def load_orders(**_kwargs: Any) -> list[Any]:
     _call_count_state["count"] += 1
     if _call_count_state["count"] == 1:
         msg = "模拟瞬态失败"

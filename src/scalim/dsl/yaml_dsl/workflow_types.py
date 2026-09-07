@@ -6,10 +6,11 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple, Union, cast
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import TYPE_CHECKING, TypeAlias, cast
 
-from ...vendor.dataclassesx import dataclass
-from ...vendor.dataclassesx import field as dataclass_field
 from .book_resource_policy import ResourcesPolicy
 from .runtime.contracts import UNSET, DemandDiagnosticsOverride, DemandRunOptions, RunOverrides, UnsetType
 from .workflow_config import (
@@ -24,11 +25,11 @@ from .workflow_config import (
 if TYPE_CHECKING:
     from ...execution.guardrails import GuardrailsPolicy
     from ...execution.loader_retry import LoaderRetryPoliciesSpec
-    from ...hooks import IExecutionHook
+    from ...hooks._base import IExecutionHook
     from ...ob.observer import Observer
 
 
-WorkflowComponent = Union["Observer", "IExecutionHook"]
+WorkflowComponent: TypeAlias = "Observer | IExecutionHook"
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,7 @@ class ComponentsInherit:
 class ComponentsReplace:
     """替换全局 `components` 列表(用 `items=()` 可显式禁用)."""
 
-    items: Tuple[WorkflowComponent, ...] = ()
+    items: tuple[WorkflowComponent, ...] = ()
 
     def __post_init__(self) -> None:
         items_raw = self.items
@@ -53,7 +54,7 @@ class ComponentsReplace:
 class ComponentsExtend:
     """在全局 `components` 列表后追加(保持顺序,不做隐式去重)."""
 
-    items: Tuple[WorkflowComponent, ...] = ()
+    items: tuple[WorkflowComponent, ...] = ()
 
     def __post_init__(self) -> None:
         items_raw = self.items
@@ -62,7 +63,7 @@ class ComponentsExtend:
         object.__setattr__(self, "items", items_raw)
 
 
-ComponentsPatch = Union[ComponentsInherit, ComponentsReplace, ComponentsExtend]
+ComponentsPatch = ComponentsInherit | ComponentsReplace | ComponentsExtend
 
 
 @dataclass(frozen=True)
@@ -75,15 +76,15 @@ class WorkflowNodePatch:
     - 非 `None`: 显式覆盖
     """
 
-    batch_size: Union[Optional[int], UnsetType] = UNSET
+    batch_size: int | None | UnsetType = UNSET
     components: ComponentsPatch = ComponentsInherit()
-    overrides: Union[Optional[RunOverrides], UnsetType] = UNSET
-    guardrails: Union[Optional["GuardrailsPolicy"], UnsetType] = UNSET
-    loader_retry: Union[Optional["LoaderRetryPoliciesSpec"], UnsetType] = UNSET
-    demand_failure_policy: Union[Optional[str], UnsetType] = UNSET
-    demand_diagnostics: Union[Optional[DemandDiagnosticsOverride], UnsetType] = UNSET
-    parallel_mode: Union[str, UnsetType] = UNSET
-    max_workers: Union[int, UnsetType] = UNSET
+    overrides: RunOverrides | None | UnsetType = UNSET
+    guardrails: "GuardrailsPolicy | None | UnsetType" = UNSET
+    loader_retry: "LoaderRetryPoliciesSpec | None | UnsetType" = UNSET
+    demand_failure_policy: str | None | UnsetType = UNSET
+    demand_diagnostics: DemandDiagnosticsOverride | None | UnsetType = UNSET
+    parallel_mode: str | UnsetType = UNSET
+    max_workers: int | UnsetType = UNSET
 
 
 @dataclass(frozen=True)
@@ -114,10 +115,10 @@ class WorkflowCachePoolPin:
             raise TypeError(msg)
         normalized_kind = kind_raw.strip().lower().replace("-", "_")
         if not normalized_kind:
-            msg = "WorkflowCachePoolPin.kind must not be empty; expected one of: {}".format(_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL)
+            msg = f"WorkflowCachePoolPin.kind must not be empty; expected one of: {_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL}"
             raise ValueError(msg)
         if normalized_kind not in _WORKFLOW_CACHE_POOL_PIN_KINDS:
-            msg = "WorkflowCachePoolPin.kind must be one of: {} (got {!r})".format(_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL, kind_raw)
+            msg = f"WorkflowCachePoolPin.kind must be one of: {_WORKFLOW_CACHE_POOL_PIN_KINDS_LABEL} (got {kind_raw!r})"
             raise ValueError(msg)
         object.__setattr__(self, "kind", str(normalized_kind))
 
@@ -147,7 +148,7 @@ class WorkflowCachePoolPreloadForeverShared(WorkflowCachePoolPreset):
     """启用跨节点共享 `preload_forever` 缓存条目(仅暴露最小必要参数)."""
 
     max_entries: int
-    pin: Tuple[WorkflowCachePoolPin, ...] = ()
+    pin: tuple[WorkflowCachePoolPin, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -168,7 +169,7 @@ class WorkflowRuntimeOptions:
     cache_pool: WorkflowCachePoolPreset = dataclass_field(default_factory=WorkflowCachePoolDisabled)
     resources_wait: WorkflowResourcesWaitOptions = dataclass_field(default_factory=WorkflowResourcesWaitOptions)
     output_staging: WorkflowOutputStagingOptions = dataclass_field(default_factory=WorkflowOutputStagingOptions)
-    scheduler: Union[PipelineSchedulerOptions, StageBarrierSchedulerOptions] = dataclass_field(default_factory=PipelineSchedulerOptions)
+    scheduler: PipelineSchedulerOptions | StageBarrierSchedulerOptions = dataclass_field(default_factory=PipelineSchedulerOptions)
 
     @classmethod
     def preset_default(cls) -> "WorkflowRuntimeOptions":
@@ -182,19 +183,19 @@ class WorkflowRunOptions:
     demand: DemandRunOptions
     """每个节点默认使用的 `demand` `options`(`SSOT`)."""
 
-    patches_by_run_id: Optional[Mapping[str, WorkflowNodePatch]] = None
+    patches_by_run_id: Mapping[str, WorkflowNodePatch] | None = None
     """可选:按 `run_id` 的补丁(作用于节点的 `demand` `options` 子集)."""
 
     runtime: WorkflowRuntimeOptions = dataclass_field(default_factory=WorkflowRuntimeOptions.preset_default)
     """可选:`workflow` 编排策略(调度/并发/资源等待等)."""
 
-    path_aliases: Optional[Mapping[str, str]] = None
+    path_aliases: Mapping[str, str] | None = None
     """可选:`workflow` 解析 `demand` 路径的别名表."""
 
-    workflow_components: Optional[Tuple[WorkflowComponent, ...]] = None
+    workflow_components: tuple[WorkflowComponent, ...] | None = None
     """可选:`workflow` 编排层观测组件(不作用于单个 `demand` 执行)."""
 
-    resources_policy: Optional["ResourcesPolicy"] = None
+    resources_policy: "ResourcesPolicy | None" = None
     """可选:`book` 写入策略与预算(`Python` `SSOT`;缺省 `builtin` `defaults`)."""
 
     def __post_init__(self) -> None:

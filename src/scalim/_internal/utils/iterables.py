@@ -1,9 +1,9 @@
-from typing import List, Sequence, Set, Tuple
+from collections.abc import Sequence
 
 from ...typedefs import RuntimeValue
 
 
-def ordered_unique_str(items: Sequence[RuntimeValue]) -> Tuple[str, ...]:
+def ordered_unique_str(items: Sequence[RuntimeValue]) -> tuple[str, ...]:
     """对输入序列做 `str()` 归一化后,去重并保序.
 
     语义:
@@ -12,8 +12,8 @@ def ordered_unique_str(items: Sequence[RuntimeValue]) -> Tuple[str, ...]:
     - 返回不可变 `Tuple[str, ...]` 作为稳定结果
     """
 
-    seen: Set[str] = set()
-    out: List[str] = []
+    seen: set[str] = set()
+    out: list[str] = []
     for item in items:
         key = str(item)
         if key in seen:

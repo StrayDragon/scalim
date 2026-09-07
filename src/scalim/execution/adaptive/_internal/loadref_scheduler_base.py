@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from ...pipeline.overrides import PipelineOverrides
 
 
-class AdaptiveLoadRefSchedulerBase(object):
+class AdaptiveLoadRefSchedulerBase:
     def _require_plan(self) -> ExecutionPlan:  # pragma: no cover  # pragma: allow-no-cover abstract method
         raise NotImplementedError
 

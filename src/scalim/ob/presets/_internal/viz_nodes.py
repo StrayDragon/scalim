@@ -1,12 +1,12 @@
-from typing import Any, Dict, Optional, Set, cast
+from typing import Any, cast
 
 
 class VizObserverNodeMixin:
-    snapshot: Optional[Dict[str, Any]] = None
-    _known_node_ids: Optional[Set[str]] = None
-    _node_id_cache: Optional[Dict[str, str]] = None
+    snapshot: dict[str, Any] | None = None
+    _known_node_ids: set[str] | None = None
+    _node_id_cache: dict[str, str] | None = None
 
-    def _get_node_id_cache(self) -> Dict[str, str]:
+    def _get_node_id_cache(self) -> dict[str, str]:
         cache = self._node_id_cache
         if cache is None:
             cache = {}
@@ -22,15 +22,15 @@ class VizObserverNodeMixin:
             return raw.split(" ", 1)[0].strip()
         return raw
 
-    def _get_known_node_ids(self) -> Set[str]:
+    def _get_known_node_ids(self) -> set[str]:
         if self._known_node_ids is not None:
             return self._known_node_ids
-        known: Set[str] = set()
+        known: set[str] = set()
         snapshot = self.snapshot
         if snapshot and isinstance(snapshot, dict):
             nodes = snapshot.get("nodes")
             if isinstance(nodes, list):
-                typed_nodes = cast("list[Dict[str, Any]]", nodes)  # pragma: allow-cast snapshot nodes typed narrowing
+                typed_nodes = cast("list[dict[str, Any]]", nodes)  # pragma: allow-cast snapshot nodes typed narrowing
                 for typed_item_dict in typed_nodes:
                     node_id = typed_item_dict.get("id")
                     if node_id:
@@ -59,7 +59,7 @@ class VizObserverNodeMixin:
                 return trimmed
 
         if raw.startswith("field:"):
-            prefix = "{}_".format(raw)
+            prefix = f"{raw}_"
             candidates = [item for item in known if item.startswith(prefix)]
             if candidates:
                 value = None
@@ -74,7 +74,7 @@ class VizObserverNodeMixin:
         cache[raw] = raw
         return raw
 
-    def _normalize_node_ref(self, node_ref: Dict[str, str]) -> Dict[str, str]:
+    def _normalize_node_ref(self, node_ref: dict[str, str]) -> dict[str, str]:
         raw_id = node_ref.get("id", "")
         if not raw_id:
             return node_ref

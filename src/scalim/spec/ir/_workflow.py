@@ -1,7 +1,6 @@
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, Union
-
-from ...vendor.dataclassesx import dataclass, field
+from typing import Any
 
 
 class WorkflowNodeType(str, Enum):
@@ -17,7 +16,7 @@ class WorkflowResourceIr:
     resource_id: str
     resource_type: str
     path: str
-    options: Optional[Dict[str, Any]] = None
+    options: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -25,16 +24,16 @@ class WorkflowNodeIr:
     node_id: str
     node_type: WorkflowNodeType
     decl_order: int
-    deps: Tuple[str, ...] = ()
-    demand_path: Optional[str] = None
-    init_vars: Optional[Dict[str, Any]] = None
-    main_rows_from_run_id: Optional[str] = None
+    deps: tuple[str, ...] = ()
+    demand_path: str | None = None
+    init_vars: dict[str, Any] | None = None
+    main_rows_from_run_id: str | None = None
 
 
 @dataclass(frozen=True)
 class WorkflowDemandNodeDerivedIr:
-    workbook_output_paths_abs: Tuple[str, ...] = ()
-    workflow_managed_csv_output_ids: Tuple[str, ...] = ()
+    workbook_output_paths_abs: tuple[str, ...] = ()
+    workflow_managed_csv_output_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -42,7 +41,7 @@ class WriteSheetNodeIr:
     node_id: str
     node_type: WorkflowNodeType
     decl_order: int
-    deps: Tuple[str, ...] = ()
+    deps: tuple[str, ...] = ()
     resource_type: str = ""
     resource_id: str = ""
     sheet: str = ""
@@ -56,10 +55,10 @@ class AppendSheetNodeIr:
     node_id: str
     node_type: WorkflowNodeType
     decl_order: int
-    deps: Tuple[str, ...] = ()
+    deps: tuple[str, ...] = ()
     resource_type: str = ""
     resource_id: str = ""
-    sheet: Optional[str] = None
+    sheet: str | None = None
     input_node_id: str = ""
     input_output_id: str = ""
     align_by: str = "field_id"
@@ -89,15 +88,15 @@ class WorkflowCachePoolPinIr:
 class WorkflowCachePoolIr:
     conflict_policy: str
     release_policy: str
-    budget: Optional[WorkflowCachePoolBudgetIr] = None
-    pin: Tuple[WorkflowCachePoolPinIr, ...] = ()
+    budget: WorkflowCachePoolBudgetIr | None = None
+    pin: tuple[WorkflowCachePoolPinIr, ...] = ()
 
 
 @dataclass(frozen=True)
 class WorkflowResourcesWaitDiagnosticsIr:
     enabled: bool = False
     warn_after_s: float = 30.0
-    repeat_every_s: Optional[float] = None
+    repeat_every_s: float | None = None
     capture_owner_callsite: bool = False
 
 
@@ -119,25 +118,25 @@ class WorkflowOptionsIr:
     max_concurrency: int = 1
     failure_policy: str = "all_fail"
     schedule_mode: str = "pipeline"
-    cache_pool: Optional[WorkflowCachePoolIr] = None
+    cache_pool: WorkflowCachePoolIr | None = None
     resources_wait: WorkflowResourcesWaitOptionsIr = field(default_factory=WorkflowResourcesWaitOptionsIr)
     output_staging: WorkflowOutputStagingOptionsIr = field(default_factory=WorkflowOutputStagingOptionsIr)
 
 
 @dataclass(frozen=True)
 class WorkflowArtifactsIr:
-    slots_by_node_id: Dict[str, Tuple[str, ...]]
+    slots_by_node_id: dict[str, tuple[str, ...]]
 
 
-WorkflowAnyNodeIr = Union[WorkflowNodeIr, WriteSheetNodeIr, AppendSheetNodeIr]
+WorkflowAnyNodeIr = WorkflowNodeIr | WriteSheetNodeIr | AppendSheetNodeIr
 
 
 @dataclass(frozen=True)
 class WorkflowIr:
-    nodes: Tuple[WorkflowAnyNodeIr, ...]
-    edges: Tuple[WorkflowEdgeIr, ...]
+    nodes: tuple[WorkflowAnyNodeIr, ...]
+    edges: tuple[WorkflowEdgeIr, ...]
     options: WorkflowOptionsIr
-    resources: Tuple[WorkflowResourceIr, ...]
+    resources: tuple[WorkflowResourceIr, ...]
     artifacts: WorkflowArtifactsIr
 
 

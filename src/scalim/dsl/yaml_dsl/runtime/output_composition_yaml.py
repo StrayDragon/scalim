@@ -1,6 +1,8 @@
 # pragma: allow-c901-file plan: c70
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple, cast
+from typing import Any, cast
 
 from ....execution.managed_artifacts import MANAGED_ARTIFACT_KIND_CSV, MANAGED_ARTIFACT_KIND_ROWS
 from ....execution.output_composition import (
@@ -20,7 +22,6 @@ from ....execution.run_ir import export_layout_from_demand_ir
 from ....execution.versioned_outputs import book_output_relpath, file_output_relpath, validate_version_id
 from ....spec.ir import DemandIr
 from ....typedefs import FIELD_VALUE_TYPES, CellValue, FailurePolicy, FieldValue, RowData, format_field_value_expected_types
-from ....vendor.dataclassesx import dataclass
 from .._internal.book_identity import is_pathful_book
 from .._internal.config_parsing.call_by import CallByValue, ParsedCallBy, ScalimCallByParseError, parse_call_by
 from .._internal.config_parsing.security import (
@@ -59,27 +60,22 @@ def _ensure_field_value(value: Any, *, field_id: str, producer: str) -> FieldVal
         return None
     if isinstance(value, FIELD_VALUE_TYPES):
         return cast("FieldValue", value)  # pragma: allow-cast literal typed narrowing
-    msg = "aggregate field {!r} produced unsupported value type {}; expected {} from {}".format(
-        field_id,
-        type(value).__name__,
-        format_field_value_expected_types(),
-        producer,
-    )
+    msg = f"aggregate field {field_id!r} produced unsupported value type {type(value).__name__}; expected {format_field_value_expected_types()} from {producer}"  # noqa: E501
     raise TypeError(msg)
 
 
-def _rendered_header_row(layout: ExportLayout) -> Tuple[str, ...]:
+def _rendered_header_row(layout: ExportLayout) -> tuple[str, ...]:
     header = layout.header_names if layout.header_names is not None else layout.field_ids
     return tuple(str(x) for x in header)
 
 
 @dataclass(frozen=True)
 class _AggregateCallByContext:
-    row_id: Optional[Any]
+    row_id: Any | None
     batch_num: int
     field_id: str
-    deps: Tuple[str, ...]
-    values: Dict[str, CellValue]
+    deps: tuple[str, ...]
+    values: dict[str, CellValue]
 
 
 def _eval_call_by_value(*, field_id: str, value: CallByValue, row: RowData, ctx: _AggregateCallByContext) -> Any:
@@ -92,9 +88,8 @@ def _eval_call_by_value(*, field_id: str, value: CallByValue, row: RowData, ctx:
         return ctx
     if kind == "ctx_attr":
         return getattr(ctx, str(value.value))  # pragma: allow-dynattr dsl: ctx_attr access
-    msg = "Unknown call_by value kind: {} (field_id={!r})".format(
-        kind, field_id
-    )  # pragma: no cover  # pragma: allow-no-cover invariant: exhaustive CallByValue kind
+    # pragma: allow-no-cover invariant: exhaustive CallByValue kind
+    msg = f"Unknown call_by value kind: {kind} (field_id={field_id!r})"  # pragma: no cover
     raise ValueError(msg)
 
 
@@ -107,18 +102,18 @@ def _compile_call_by_post_field(
     try:
         parsed = parse_call_by(call_by)
     except ScalimCallByParseError as exc:
-        msg = "aggregate.fields.{} has invalid call_by: {}".format(out_field_id, exc)
+        msg = f"aggregate.fields.{out_field_id} has invalid call_by: {exc}"
         raise ValueError(msg) from exc
 
     try:
         fn = resolver.resolve(parsed.reference)
     except Exception as exc:
-        msg = "aggregate.fields.{} failed to resolve call_by reference '{}': {}".format(out_field_id, parsed.reference, exc)
+        msg = f"aggregate.fields.{out_field_id} failed to resolve call_by reference '{parsed.reference}': {exc}"
         raise ValueError(msg) from exc
 
     try:
         validate_call_by_signature(
-            location="aggregate.fields.{}".format(out_field_id),
+            location=f"aggregate.fields.{out_field_id}",
             call_by=call_by,
             parsed=parsed,
             fn=fn,
@@ -129,7 +124,7 @@ def _compile_call_by_post_field(
     deps = tuple(str(x) for x in (parsed.field_names or ()))
 
     def calculator(row: RowData, p: ParsedCallBy = parsed, f: Callable[..., Any] = fn) -> FieldValue:
-        dep_values: Dict[str, CellValue] = {name: row.get(name) for name in deps}
+        dep_values: dict[str, CellValue] = {name: row.get(name) for name in deps}
         ctx = _AggregateCallByContext(
             row_id=None,
             batch_num=0,
@@ -138,11 +133,11 @@ def _compile_call_by_post_field(
             values=dep_values,
         )
 
-        args: List[Any] = []
+        args: list[Any] = []
         for arg_value in p.args:
             args.append(_eval_call_by_value(field_id=str(out_field_id), value=arg_value, row=row, ctx=ctx))
 
-        kwargs: Dict[str, Any] = {}
+        kwargs: dict[str, Any] = {}
         for key, kw_value in p.kwargs:
             kwargs[str(key)] = _eval_call_by_value(field_id=str(out_field_id), value=kw_value, row=row, ctx=ctx)
 
@@ -161,19 +156,19 @@ def _compile_call_by_post_field(
 def _compile_compute_post_field(
     *,
     out_field_id: str,
-    cfg: Dict[str, Any],
+    cfg: dict[str, Any],
     engine: SecureComputeEngine,
 ) -> PostFieldSpec:
     expr = str(cfg.get("expression") or "").strip()
-    deps = tuple(str(x) for x in cast("Tuple[str, ...]", cfg.get("dependencies") or ()))  # pragma: allow-cast yaml tuple typed narrowing
+    deps = tuple(str(x) for x in cast("tuple[str, ...]", cfg.get("dependencies") or ()))  # pragma: allow-cast yaml tuple typed narrowing
     if not expr:
-        msg = "aggregate.fields.{} has invalid compute config: missing expression".format(out_field_id)
+        msg = f"aggregate.fields.{out_field_id} has invalid compute config: missing expression"
         raise ValueError(msg)
 
     try:
         raw_calculator = cast("Callable[..., Any]", engine.compile(expr, deps))  # pragma: allow-cast compute engine compile typed narrowing
     except (ScalimComputeExpressionError, ScalimSecurityError) as exc:
-        msg = "aggregate.fields.{} has invalid compute expression: {}".format(out_field_id, exc)
+        msg = f"aggregate.fields.{out_field_id} has invalid compute expression: {exc}"
         raise ValueError(msg) from exc
 
     dep_keys = deps
@@ -224,7 +219,7 @@ def _export_layout_for_derived(
     if header_fields_output_by != "name":
         return ExportLayout(field_ids=normalized, header_names=None)
 
-    names: List[str] = []
+    names: list[str] = []
     has_diff = False
     for fid in normalized:
         resolved = _get_derived_field_name(fid, demand_ir, agg)
@@ -236,7 +231,7 @@ def _export_layout_for_derived(
     return ExportLayout(field_ids=normalized, header_names=tuple(names))
 
 
-def _output_spec_for_file_resource(file_cfg: FileConfig, *, path: Optional[str], include_header: bool) -> OutputSpec:
+def _output_spec_for_file_resource(file_cfg: FileConfig, *, path: str | None, include_header: bool) -> OutputSpec:
     return OutputSpec(
         format="csv",
         path=path,
@@ -251,7 +246,7 @@ def _compile_where_predicate(
     *,
     engine: SecureComputeEngine,
     expression: str,
-    requires: Tuple[str, ...],
+    requires: tuple[str, ...],
 ) -> OutputRowPredicate:
     calc = engine.compile(str(expression), tuple(str(x) for x in requires))
     dep_keys = tuple(str(x) for x in requires)
@@ -263,7 +258,7 @@ def _compile_where_predicate(
     return _predicate
 
 
-def _metric_spec_from_agg_field(*, out_field_id: str, producer_key: str, cfg: Dict[str, Any]) -> AggMetricSpec:
+def _metric_spec_from_agg_field(*, out_field_id: str, producer_key: str, cfg: dict[str, Any]) -> AggMetricSpec:
     field_id = str(cfg.get("field")) if cfg.get("field") else None
     field_ids = cfg.get("fields")
     field_ids_norm = tuple(str(x) for x in field_ids) if field_ids else None
@@ -288,18 +283,18 @@ def _derived_group_by_spec_from_yaml(
         _metric_spec_from_agg_field(
             out_field_id=metric_id,
             producer_key=str(cfg.fields[metric_id].producer_key),
-            cfg=cast("Dict[str, Any]", cfg.fields[metric_id].config),  # pragma: allow-cast yaml mapping typed narrowing
+            cfg=cast("dict[str, Any]", cfg.fields[metric_id].config),  # pragma: allow-cast yaml mapping typed narrowing
         )
         for metric_id in metric_ids
     )
 
-    rank_specs: List[RankFieldSpec] = []
+    rank_specs: list[RankFieldSpec] = []
     for out_field_id, field_cfg in cfg.fields.items():
         if str(field_cfg.producer_key) not in _RANK_FUNC_KEYS:
             continue
-        raw = cast("Dict[str, Any]", field_cfg.config)  # pragma: allow-cast yaml mapping typed narrowing
-        partition_by_raw = cast("Tuple[str, ...]", raw.get("partition_by") or ())  # pragma: allow-cast yaml tuple typed narrowing
-        order_by_raw = cast("Tuple[str, ...]", raw.get("order_by") or ())  # pragma: allow-cast yaml tuple typed narrowing
+        raw = cast("dict[str, Any]", field_cfg.config)  # pragma: allow-cast yaml mapping typed narrowing
+        partition_by_raw = cast("tuple[str, ...]", raw.get("partition_by") or ())  # pragma: allow-cast yaml tuple typed narrowing
+        order_by_raw = cast("tuple[str, ...]", raw.get("order_by") or ())  # pragma: allow-cast yaml tuple typed narrowing
         rank_specs.append(
             RankFieldSpec(
                 out_field_id=str(out_field_id),
@@ -313,7 +308,7 @@ def _derived_group_by_spec_from_yaml(
             )
         )
 
-    post_specs: List[PostFieldSpec] = []
+    post_specs: list[PostFieldSpec] = []
     for out_field_id, field_cfg in cfg.fields.items():
         producer_key = str(field_cfg.producer_key)
         if producer_key == "call_by":
@@ -328,7 +323,7 @@ def _derived_group_by_spec_from_yaml(
             post_specs.append(
                 _compile_compute_post_field(
                     out_field_id=str(out_field_id),
-                    cfg=cast("Dict[str, Any]", field_cfg.config),  # pragma: allow-cast yaml mapping typed narrowing
+                    cfg=cast("dict[str, Any]", field_cfg.config),  # pragma: allow-cast yaml mapping typed narrowing
                     engine=compute_engine,
                 )
             )
@@ -341,11 +336,11 @@ def _derived_group_by_spec_from_yaml(
     )
 
 
-def _derived_output_layout_fields(cfg: OutputAggregateConfig) -> Tuple[str, ...]:
+def _derived_output_layout_fields(cfg: OutputAggregateConfig) -> tuple[str, ...]:
     metric_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _AGG_FUNC_KEYS])
     rank_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _RANK_FUNC_KEYS])
     post_ids = sorted([fid for fid, fc in cfg.fields.items() if str(fc.producer_key) in _POST_FUNC_KEYS])
-    fields: List[str] = list(cfg.group_by) + metric_ids + rank_ids + post_ids
+    fields: list[str] = list(cfg.group_by) + metric_ids + rank_ids + post_ids
     return tuple(str(x) for x in fields)
 
 
@@ -354,21 +349,21 @@ def _compile_extra_sheet(
     target_id: str,
     cfg: OutputExtraSheetConfig,
     default_sheet: str,
-    default_workbook_path: Optional[str],
+    default_workbook_path: str | None,
     default_allow_formulas: bool,
     as_in_memory_csv: bool,
-) -> Tuple[OutputSpec, str]:
+) -> tuple[OutputSpec, str]:
     sheet = str(cfg.sheet) if cfg.sheet else str(default_sheet)
 
     if as_in_memory_csv:
         if cfg.path:
-            msg = "{}.path is not supported in workflow-managed mode (meta/audit must be written via books write nodes)".format(target_id)
+            msg = f"{target_id}.path is not supported in workflow-managed mode (meta/audit must be written via books write nodes)"
             raise ValueError(msg)
         return (OutputSpec(format="csv", path=None, streaming=True, include_header=True), sheet)
 
     path = str(cfg.path).strip() if cfg.path else (str(default_workbook_path) if default_workbook_path else "")
     if not path:
-        msg = "{} requires a workbook path (set {}.path or provide at least one workbook output)".format(target_id, target_id)
+        msg = f"{target_id} requires a workbook path (set {target_id}.path or provide at least one workbook output)"
         raise ValueError(msg)
     allow_formulas = default_allow_formulas if cfg.allow_formulas is None else bool(cfg.allow_formulas)
     return (
@@ -384,13 +379,13 @@ def _compile_extra_sheet(
 def _maybe_compile_extra_sheet(
     *,
     target_id: str,
-    cfg: Optional[OutputExtraSheetConfig],
+    cfg: OutputExtraSheetConfig | None,
     default_sheet: str,
-    default_workbook_path: Optional[str],
+    default_workbook_path: str | None,
     default_allow_formulas: bool,
     skip_without_workbook: bool,
     as_in_memory_csv: bool,
-) -> Optional[Tuple[OutputSpec, str]]:
+) -> tuple[OutputSpec, str] | None:
     if cfg is None or (not as_in_memory_csv and skip_without_workbook and cfg.path is None and default_workbook_path is None):
         return None
 
@@ -409,10 +404,10 @@ def _validate_extra_sheet_target_names(config: DemandConfig, *, outputs_path: st
     outputs = config.outputs or ()
     reserved = {str(t.name) for t in outputs}
     if config.meta is not None and "meta" in reserved:
-        msg = "{}.*.name cannot be 'meta' when meta sheet is enabled".format(outputs_path)
+        msg = f"{outputs_path}.*.name cannot be 'meta' when meta sheet is enabled"
         raise ValueError(msg)
     if config.audit is not None and "audit" in reserved:
-        msg = "{}.*.name cannot be 'audit' when audit sheet is enabled".format(outputs_path)
+        msg = f"{outputs_path}.*.name cannot be 'audit' when audit sheet is enabled"
         raise ValueError(msg)
 
 
@@ -421,8 +416,8 @@ def _effective_file_id_for_output(
     *,
     idx: int,
     outputs_path: str,
-) -> Tuple[Optional[str], str]:
-    file_ref_path = "{}.{}.to.file".format(outputs_path, int(idx))
+) -> tuple[str | None, str]:
+    file_ref_path = f"{outputs_path}.{int(idx)}.to.file"
     to_cfg = out_cfg.to
     if to_cfg is not None and to_cfg.file is not None:
         candidate = str(to_cfg.file or "").strip()
@@ -436,8 +431,8 @@ def _effective_book_id_for_output(
     *,
     idx: int,
     outputs_path: str,
-) -> Tuple[Optional[str], str]:
-    book_ref_path = "{}.{}.to.book".format(outputs_path, int(idx))
+) -> tuple[str | None, str]:
+    book_ref_path = f"{outputs_path}.{int(idx)}.to.book"
     to_cfg = out_cfg.to
     if to_cfg is not None and to_cfg.book is not None:
         candidate = str(to_cfg.book or "").strip()
@@ -447,12 +442,12 @@ def _effective_book_id_for_output(
     return None, book_ref_path
 
 
-def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, outputs_path: str) -> Tuple[str, str, bool]:
+def _effective_sheet_name_for_output(out_cfg: OutputTargetConfig, *, idx: int, outputs_path: str) -> tuple[str, str, bool]:
     to_cfg = out_cfg.to
     if to_cfg is not None and to_cfg.sheet is not None:
         sheet_raw = str(to_cfg.sheet or "").strip()
-        return sheet_raw, "{}.{}.to.sheet".format(outputs_path, int(idx)), False
-    return str(out_cfg.name or ""), "{}.{}.name".format(outputs_path, int(idx)), True
+        return sheet_raw, f"{outputs_path}.{int(idx)}.to.sheet", False
+    return str(out_cfg.name or ""), f"{outputs_path}.{int(idx)}.name", True
 
 
 def _require_file_resource(config: DemandConfig, *, file_id: str, file_ref_path: str) -> FileConfig:
@@ -461,11 +456,12 @@ def _require_file_resource(config: DemandConfig, *, file_id: str, file_ref_path:
     file_cfg = files.get(str(file_id))
     if file_cfg is None:
         msg = (
-            "Missing file resource id {!r} referenced by {}. "
-            "Hint: declare resources.files.{} in the demand YAML, declare workflow.resources.files.{} in the workflow YAML, "
-            "or provide overrides.resources.files.{} in Python."
-        ).format(str(file_id), str(file_ref_path), str(file_id), str(file_id), str(file_id))
-        err = "{} (path={})".format(msg, str(file_ref_path))
+            f"Missing file resource id {str(file_id)!r} referenced by {file_ref_path!s}. "
+            f"Hint: declare resources.files.{file_id!s} in the demand YAML, "
+            f"declare workflow.resources.files.{file_id!s} in the workflow YAML, "
+            f"or provide overrides.resources.files.{file_id!s} in Python."
+        )
+        err = f"{msg} (path={file_ref_path!s})"
         raise ValueError(err)
     return file_cfg
 
@@ -476,11 +472,12 @@ def _require_book_resource(config: DemandConfig, *, book_id: str, book_ref_path:
     book = books.get(str(book_id))
     if book is None:
         msg = (
-            "Missing book resource id {!r} referenced by {}. "
-            "Hint: declare resources.books.{} in the demand YAML, declare workflow.resources.books.{} in the workflow YAML, "
-            "or provide overrides.resources.books.{} in Python."
-        ).format(str(book_id), str(book_ref_path), str(book_id), str(book_id), str(book_id))
-        err = "{} (path={})".format(msg, str(book_ref_path))
+            f"Missing book resource id {str(book_id)!r} referenced by {book_ref_path!s}. "
+            f"Hint: declare resources.books.{book_id!s} in the demand YAML, "
+            f"declare workflow.resources.books.{book_id!s} in the workflow YAML, "
+            f"or provide overrides.resources.books.{book_id!s} in Python."
+        )
+        err = f"{msg} (path={book_ref_path!s})"
         raise ValueError(err)
     return book
 
@@ -494,9 +491,7 @@ def _validate_output_root_path(root: str, *, path: str) -> None:
     # `path` 语义升级为 `output root` (目录); 旧语义常见为 `./out/report.xlsx` / `./out/detail.csv`.
     suffix = Path(str(root)).suffix.lower()
     if suffix in (".xlsx", ".csv"):
-        msg = "{} now expects an output root directory, not a file path: {!r}. {}".format(
-            str(path), str(root), _VERSIONED_OUTPUT_MIGRATION_HINT
-        )
+        msg = f"{path!s} now expects an output root directory, not a file path: {str(root)!r}. {_VERSIONED_OUTPUT_MIGRATION_HINT}"
         raise ValueError(msg)
 
 
@@ -518,17 +513,17 @@ def _resolve_file_export_path(
     file_id: str,
     file_ref_path: str,
     yaml_base_dir: str,
-    init_vars: Optional[Dict[str, Any]],
+    init_vars: dict[str, Any] | None,
     version_id: str,
-) -> Tuple[str, FileConfig]:
+) -> tuple[str, FileConfig]:
     file_cfg = _require_file_resource(config, file_id=str(file_id), file_ref_path=str(file_ref_path))
     output_root = resolve_yaml_relative_output_path(
         file_cfg.path,
         base_dir=str(yaml_base_dir),
         init_vars=init_vars,
-        path="resources.files.{}.csv_file.path".format(str(file_id)),
+        path=f"resources.files.{file_id!s}.csv_file.path",
     )
-    _validate_output_root_path(str(output_root), path="resources.files.{}.csv_file.path".format(str(file_id)))
+    _validate_output_root_path(str(output_root), path=f"resources.files.{file_id!s}.csv_file.path")
     export_path = _versioned_file_output_path(output_root=str(output_root), version_id=str(version_id), file_id=str(file_id))
     return export_path, file_cfg
 
@@ -539,9 +534,9 @@ def _resolve_book_export_path(
     book_id: str,
     book_ref_path: str,
     yaml_base_dir: str,
-    init_vars: Optional[Dict[str, Any]],
+    init_vars: dict[str, Any] | None,
     version_id: str,
-) -> Tuple[str, bool]:
+) -> tuple[str, bool]:
     book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
 
     if is_pathful_book(book):
@@ -549,9 +544,9 @@ def _resolve_book_export_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.xlsx.path".format(str(book_id)),
+            path=f"resources.books.{book_id!s}.xlsx.path",
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path=f"resources.books.{book_id!s}.xlsx.path")
         export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
         return export_path, bool(book.allow_formulas)
 
@@ -559,19 +554,19 @@ def _resolve_book_export_path(
     export = book.export_xlsx
     if export is None:
         msg = (
-            "pathless book requires export_xlsx for standalone xlsx export (book_id={!r}); "
-            "prefer resources.books.{}.xlsx.path or run in a workflow"
-        ).format(str(book_id), str(book_id))
-        path_ref = "resources.books.{}.export_xlsx".format(str(book_id))
-        err = "{} (path={})".format(msg, path_ref)
+            f"pathless book requires export_xlsx for standalone xlsx export (book_id={str(book_id)!r}); "
+            f"prefer resources.books.{book_id!s}.xlsx.path or run in a workflow"
+        )
+        path_ref = f"resources.books.{book_id!s}.export_xlsx"
+        err = f"{msg} (path={path_ref})"
         raise ValueError(err)
     output_root = resolve_yaml_relative_output_path(
         export.path,
         base_dir=str(yaml_base_dir),
         init_vars=init_vars,
-        path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+        path=f"resources.books.{book_id!s}.export_xlsx.path",
     )
-    _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+    _validate_output_root_path(str(output_root), path=f"resources.books.{book_id!s}.export_xlsx.path")
     export_path = _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
     return export_path, bool(export.allow_formulas)
 
@@ -581,9 +576,9 @@ def _try_resolve_workflow_managed_book_export_path(
     *,
     book_id: str,
     yaml_base_dir: str,
-    init_vars: Optional[Dict[str, Any]],
+    init_vars: dict[str, Any] | None,
     version_id: str,
-) -> Optional[str]:
+) -> str | None:
     """为 `workflow-managed` 的 `book` 输出解析“可能存在”的最终导出路径.
 
     - `pathful`: 始终可导出,返回版本化 `.xlsx` 文件路径
@@ -594,9 +589,9 @@ def _try_resolve_workflow_managed_book_export_path(
             book.path,
             base_dir=str(yaml_base_dir),
             init_vars=init_vars,
-            path="resources.books.{}.xlsx.path".format(str(book_id)),
+            path=f"resources.books.{book_id!s}.xlsx.path",
         )
-        _validate_output_root_path(str(output_root), path="resources.books.{}.xlsx.path".format(str(book_id)))
+        _validate_output_root_path(str(output_root), path=f"resources.books.{book_id!s}.xlsx.path")
         return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
 
     export = book.export_xlsx
@@ -606,9 +601,9 @@ def _try_resolve_workflow_managed_book_export_path(
         export.path,
         base_dir=str(yaml_base_dir),
         init_vars=init_vars,
-        path="resources.books.{}.export_xlsx.path".format(str(book_id)),
+        path=f"resources.books.{book_id!s}.export_xlsx.path",
     )
-    _validate_output_root_path(str(output_root), path="resources.books.{}.export_xlsx.path".format(str(book_id)))
+    _validate_output_root_path(str(output_root), path=f"resources.books.{book_id!s}.export_xlsx.path")
     return _versioned_book_output_path(output_root=str(output_root), version_id=str(version_id), book_id=str(book_id))
 
 
@@ -636,16 +631,16 @@ def _effective_output_header_fields_output_by(
 def _effective_output_include_header(
     *,
     out_cfg: OutputTargetConfig,
-    mode: Optional[str],
-    header_policy: Optional[str],
+    mode: str | None,
+    header_policy: str | None,
     include_header_path: str,
-    header_policy_path: Optional[str] = None,
+    header_policy_path: str | None = None,
 ) -> bool:
     write_cfg = out_cfg.write
     if mode == "append":
         if write_cfg is not None and write_cfg.include_header is not None:
             hint_path = str(header_policy_path or "resources.books.*.write_defaults.header_policy")
-            msg = "{} is not allowed for append-mode book outputs; use {}".format(include_header_path, hint_path)
+            msg = f"{include_header_path} is not allowed for append-mode book outputs; use {hint_path}"
             raise ValueError(msg)
         return str(header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY) != "never"
 
@@ -668,13 +663,13 @@ def _validate_xlsx_memory_write_contract(
     if str(effective_defaults.align_by or "") != "header":
         return
 
-    align_by_path = "resources.books.{}.write_defaults.align_by".format(str(book_id))
+    align_by_path = f"resources.books.{book_id!s}.write_defaults.align_by"
     msg = (
         "pathless books (in-memory bus) do not support write_defaults.align_by=header; "
         "internal rows only use canonical field keys. Migrate to resources.books.<book_id>.write_defaults.align_by=field_id "
-        "and keep write.header_fields_output_by for export display (book_id={!r})"
-    ).format(str(book_id))
-    err = "{} (path={})".format(msg, str(align_by_path))
+        f"and keep write.header_fields_output_by for export display (book_id={str(book_id)!r})"
+    )
+    err = f"{msg} (path={align_by_path!s})"
     raise ValueError(err)
 
 
@@ -684,12 +679,12 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
     *,
     version_id: str,
     resolver: SecurePythonReferenceResolver,
-    init_vars: Optional[Dict[str, Any]] = None,
-    yaml_base_dir: Optional[str] = None,
-    workflow_managed_output_ids: Optional[FrozenSet[str]] = None,
+    init_vars: dict[str, Any] | None = None,
+    yaml_base_dir: str | None = None,
+    workflow_managed_output_ids: frozenset[str] | None = None,
     outputs_path: str = "outputs",
     skip_extra_sheets_without_workbook: bool = False,
-) -> Optional[OutputCompositionSpec]:
+) -> OutputCompositionSpec | None:
     outputs = config.outputs
     if not outputs:
         if config.meta is not None or config.audit is not None:
@@ -701,9 +696,9 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
 
     engine = build_compute_engine()
 
-    direct_targets: List[OutputTargetSpec] = []
-    derived_targets: List[DerivedOutputTargetSpec] = []
-    workbook_default_path: Optional[str] = None
+    direct_targets: list[OutputTargetSpec] = []
+    derived_targets: list[DerivedOutputTargetSpec] = []
+    workbook_default_path: str | None = None
     workbook_default_allow_formulas = True
 
     version_id = validate_version_id(str(version_id))
@@ -714,10 +709,10 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
         requires_opt = requires or None
 
         in_memory = False
-        book: Optional[BookConfig] = None
-        book_id: Optional[str] = None
-        workflow_export_header: Optional[Tuple[str, ...]] = None
-        managed_artifact_kind: Optional[str] = None
+        book: BookConfig | None = None
+        book_id: str | None = None
+        workflow_export_header: tuple[str, ...] | None = None
+        managed_artifact_kind: str | None = None
         output_spec: OutputSpec
         header_by = str(DEFAULT_OUTPUT_HEADER_BY)
 
@@ -739,7 +734,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 out_cfg=out_cfg,
                 mode=None,
                 header_policy=None,
-                include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
+                include_header_path=f"{outputs_path}.{idx}.write.include_header",
             )
             if workflow_managed_output_ids is not None and str(out_cfg.name) in workflow_managed_output_ids:
                 in_memory = True
@@ -752,10 +747,11 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
             book_id, book_ref_path = _effective_book_id_for_output(out_cfg, idx=int(idx), outputs_path=str(outputs_path))
             if book_id is None:
                 msg = (
-                    "Missing output destination for output {!r}; set {}.{}.to.file or {}.{}.to.book explicitly. "
+                    f"Missing output destination for output {str(out_cfg.name)!r}; "
+                    f"set {outputs_path!s}.{int(idx)}.to.file or {outputs_path!s}.{int(idx)}.to.book explicitly. "
                     "Reuse the binding with YAML anchors (`_templates`) or `$import` if needed."
-                ).format(str(out_cfg.name), str(outputs_path), int(idx), str(outputs_path), int(idx))
-                err = "{} (path={})".format(msg, book_ref_path)
+                )
+                err = f"{msg} (path={book_ref_path})"
                 raise ValueError(err)
             book = _require_book_resource(config, book_id=str(book_id), book_ref_path=str(book_ref_path))
             _validate_xlsx_memory_write_contract(
@@ -771,9 +767,7 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                 _validate_excel_sheet_name(sheet_name, path=sheet_ref_path)
             except ValueError as exc:
                 if defaulted_from_name:
-                    msg = ("Invalid default Excel sheet name for output {!r}; set {}.{}.to.sheet explicitly. {}").format(
-                        str(out_cfg.name), str(outputs_path), int(idx), exc
-                    )
+                    msg = f"Invalid default Excel sheet name for output {str(out_cfg.name)!r}; set {outputs_path!s}.{int(idx)}.to.sheet explicitly. {exc}"  # noqa: E501
                     raise ValueError(msg) from exc
                 raise
 
@@ -793,8 +787,8 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     out_cfg=out_cfg,
                     mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
                     header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
-                    include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
-                    header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
+                    include_header_path=f"{outputs_path}.{idx}.write.include_header",
+                    header_policy_path=f"resources.books.{book_id!s}.write_defaults.header_policy",
                 )
                 # `MANAGED_ARTIFACT_KIND_ROWS` = 类型化行工件(`InMemoryRows`/`FieldValue`);
                 # 与 `MANAGED_ARTIFACT_KIND_CSV`(字符串化)相对.不是 `pipeline` 的列写(`IColumnSink`)
@@ -816,8 +810,8 @@ def compile_output_composition_from_yaml(  # noqa: C901, PLR0912, PLR0915
                     out_cfg=out_cfg,
                     mode=str(effective_defaults.mode or DEFAULT_BOOK_WRITE_MODE),
                     header_policy=str(effective_defaults.header_policy or DEFAULT_BOOK_WRITE_HEADER_POLICY),
-                    include_header_path="{}.{}.write.include_header".format(outputs_path, idx),
-                    header_policy_path="resources.books.{}.write_defaults.header_policy".format(str(book_id)),
+                    include_header_path=f"{outputs_path}.{idx}.write.include_header",
+                    header_policy_path=f"resources.books.{book_id!s}.write_defaults.header_policy",
                 )
                 export_path, allow_formulas = _resolve_book_export_path(
                     config,

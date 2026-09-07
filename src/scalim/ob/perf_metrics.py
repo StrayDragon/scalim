@@ -2,10 +2,10 @@
 
 import json
 import statistics
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 from ..events._events import AdaptiveSchedulerDecisionEvent
-from ..vendor.dataclassesx import asdict, dataclass, field
 
 # endregion
 
@@ -16,8 +16,8 @@ class MemorySample:
     rss_mb: float
     label: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = asdict(self)
         result["timestamp"] = round(result["timestamp"], 3)
         result["rss_mb"] = round(result["rss_mb"], 2)
         return result
@@ -29,8 +29,8 @@ class CpuSample:
     percent: float
     label: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = asdict(self)
         result["timestamp"] = round(result["timestamp"], 3)
         result["percent"] = round(result["percent"], 2)
         return result
@@ -59,10 +59,10 @@ class LoaderStats:
     total_records: int = 0
     """累计返回记录数."""
 
-    durations: List[float] = field(default_factory=list)
+    durations: list[float] = field(default_factory=list)
     """每次调用耗时列表(秒)."""
 
-    def record_call(self, duration: float, record_count: int, cache_status: Optional[str] = None) -> None:
+    def record_call(self, duration: float, record_count: int, cache_status: str | None = None) -> None:
         self.call_count += 1
         self.total_duration += duration
         self.total_records += record_count
@@ -100,8 +100,8 @@ class LoaderStats:
             return 0.0
         return self.cache_hit_count / denominator
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = asdict(self)
         result.pop("durations", None)
         if self.durations:
             sorted_durations = sorted(float(x) for x in self.durations)
@@ -125,7 +125,7 @@ class FieldComputeStats:
     field_key: str
     call_count: int = 0
     total_duration: float = 0.0
-    durations: List[float] = field(default_factory=list)
+    durations: list[float] = field(default_factory=list)
 
     def record_call(self, duration: float) -> None:
         self.call_count += 1
@@ -138,8 +138,8 @@ class FieldComputeStats:
             return 0.0
         return self.total_duration / self.call_count
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = asdict(self)
         result.pop("durations", None)
         result["total_duration"] = round(self.total_duration, 4)
         result["avg_duration"] = round(self.avg_duration, 4)
@@ -157,7 +157,7 @@ class StageMetrics:
     compute_duration: float = 0.0
     write_duration: float = 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         result = asdict(self)
         return {
             "stream": round(result["stream_duration"], 4),
@@ -175,22 +175,22 @@ class AdaptiveSchedulerMetrics:
     serial_layers: int = 0
     """串行执行的层数."""
 
-    serial_reasons: Dict[str, int] = field(default_factory=dict)
+    serial_reasons: dict[str, int] = field(default_factory=dict)
     """串行原因计数(`reason` -> 次数)."""
 
-    backend_counts: Dict[str, int] = field(default_factory=dict)
+    backend_counts: dict[str, int] = field(default_factory=dict)
     """后端选择计数(`backend` -> 次数)."""
 
-    pool_limits: Dict[str, int] = field(default_factory=dict)
+    pool_limits: dict[str, int] = field(default_factory=dict)
     """任务池并发上限快照(`pool` -> 上限)."""
 
-    pool_wait_ms_total: Dict[str, float] = field(default_factory=dict)
+    pool_wait_ms_total: dict[str, float] = field(default_factory=dict)
     """任务池等待累计时间(毫秒,`pool` -> 累计等待)."""
 
-    pool_wait_ms_max: Dict[str, float] = field(default_factory=dict)
+    pool_wait_ms_max: dict[str, float] = field(default_factory=dict)
     """任务池等待最大时间(毫秒,`pool` -> 最大等待)."""
 
-    pool_wait_count: Dict[str, int] = field(default_factory=dict)
+    pool_wait_count: dict[str, int] = field(default_factory=dict)
     """任务池等待次数(`pool` -> 次数)."""
 
     def record_decision(self, event: AdaptiveSchedulerDecisionEvent) -> None:
@@ -234,7 +234,7 @@ class AdaptiveSchedulerMetrics:
             for name, count in event.pool_wait_count.items():
                 self.pool_wait_count[name] = int(self.pool_wait_count.get(name, 0)) + int(count)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "parallel_layers": int(self.parallel_layers),
             "serial_layers": int(self.serial_layers),
@@ -267,34 +267,34 @@ class PerformanceMetrics:
     total_rows: int = 0
     """输入行数(按 `row_ids` 口径统计)."""
 
-    batch_durations: List[float] = field(default_factory=list)
+    batch_durations: list[float] = field(default_factory=list)
     """每批耗时列表(秒)."""
 
     stage_metrics: StageMetrics = field(default_factory=StageMetrics)
     """各阶段耗时汇总."""
 
-    loader_stats: Dict[str, LoaderStats] = field(default_factory=dict)
+    loader_stats: dict[str, LoaderStats] = field(default_factory=dict)
     """按加载器汇总的统计信息(`loader_name` -> `LoaderStats`)."""
 
-    field_compute_stats: Dict[str, FieldComputeStats] = field(default_factory=dict)
+    field_compute_stats: dict[str, FieldComputeStats] = field(default_factory=dict)
     """可选:按字段汇总的 `compute` 耗时 `profiling`(`field_key` -> `FieldComputeStats`)."""
 
-    memory_samples: Optional[List[MemorySample]] = None
+    memory_samples: list[MemorySample] | None = None
     """可选:内存采样列表."""
 
-    cpu_samples: Optional[List[CpuSample]] = None
+    cpu_samples: list[CpuSample] | None = None
     """可选:CPU 采样列表."""
 
-    start_memory_mb: Optional[float] = None
+    start_memory_mb: float | None = None
     """开始时内存(单位:兆字节)."""
 
-    peak_memory_mb: Optional[float] = None
+    peak_memory_mb: float | None = None
     """峰值内存(单位:兆字节)."""
 
-    end_memory_mb: Optional[float] = None
+    end_memory_mb: float | None = None
     """结束时内存(单位:兆字节)."""
 
-    adaptive_scheduler: Optional[AdaptiveSchedulerMetrics] = None
+    adaptive_scheduler: AdaptiveSchedulerMetrics | None = None
     """可选:自适应调度器指标."""
 
     @property
@@ -322,7 +322,7 @@ class PerformanceMetrics:
         return max(self.batch_durations)
 
     @property
-    def memory_increase_mb(self) -> Optional[float]:
+    def memory_increase_mb(self) -> float | None:
         if self.start_memory_mb is None or self.end_memory_mb is None:
             return None
         return self.end_memory_mb - self.start_memory_mb
@@ -337,8 +337,8 @@ class PerformanceMetrics:
             self.field_compute_stats[field_key] = FieldComputeStats(field_key=field_key)
         return self.field_compute_stats[field_key]
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
             "summary": {
                 "total_duration": round(self.total_duration, 3),
                 "batch_count": self.batch_count,
@@ -381,10 +381,10 @@ class PerformanceMetrics:
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
-    def to_csv_rows(self) -> List[Dict[str, Any]]:
-        rows: List[Dict[str, Any]] = []
+    def to_csv_rows(self) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
         for i, duration in enumerate(self.batch_durations, 1):
-            row: Dict[str, Any] = {
+            row: dict[str, Any] = {
                 "batch_num": i,
                 "duration": round(duration, 4),
             }

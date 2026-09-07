@@ -1,9 +1,7 @@
 # region imports
 
 import math
-from typing import Dict
-
-from ...vendor.dataclassesx import dataclass, field
+from dataclasses import dataclass, field
 
 # endregion
 
@@ -22,10 +20,10 @@ class AdaptiveTuning:
     max_workers: int = 0
 
     # 资源池:`pool_name` -> 并发上限(必须 >= 1).
-    pools: Dict[str, int] = field(default_factory=dict)
+    pools: dict[str, int] = field(default_factory=dict)
 
     # 数据源绑定:`source_id` -> `pool_name`.未映射的数据源回退到 `DEFAULT_ADAPTIVE_POOL`.
-    source_pools: Dict[str, str] = field(default_factory=dict)
+    source_pools: dict[str, str] = field(default_factory=dict)
 
     # 阈值:避免在极小工作负载上产生并行开销.
     # 注意:对少于 2 个任务的层做并行没有意义;调度器会据此做下限收敛.
@@ -53,7 +51,7 @@ class AdaptiveTuning:
                 msg = "AdaptiveTuning.pools keys must be non-empty"
                 raise ValueError(msg)
             if int(limit) < 1:
-                msg = "AdaptiveTuning.pools['{}'] must be >= 1".format(pool_name)
+                msg = f"AdaptiveTuning.pools['{pool_name}'] must be >= 1"
                 raise ValueError(msg)
 
     def _validate_source_pools(self) -> None:
@@ -62,10 +60,10 @@ class AdaptiveTuning:
                 msg = "AdaptiveTuning.source_pools keys must be non-empty"
                 raise ValueError(msg)
             if not pool_name:
-                msg = "AdaptiveTuning.source_pools['{}'] must be non-empty".format(source_id)
+                msg = f"AdaptiveTuning.source_pools['{source_id}'] must be non-empty"
                 raise ValueError(msg)
             if pool_name != DEFAULT_ADAPTIVE_POOL and pool_name not in self.pools:
-                msg = "AdaptiveTuning.source_pools['{}'] refers to unknown pool '{}'".format(source_id, pool_name)
+                msg = f"AdaptiveTuning.source_pools['{source_id}'] refers to unknown pool '{pool_name}'"
                 raise ValueError(msg)
 
     def _validate_thresholds(self) -> None:

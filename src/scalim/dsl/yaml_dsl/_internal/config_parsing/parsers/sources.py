@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from ....schema_dsl.constants import (
     DEFAULT_CACHE_MODE,
@@ -22,18 +22,18 @@ from .utils import list_or_none, mapping_or_none, str_or_none
 
 class ParserSourcesMixin:
     @staticmethod
-    def _normalize_opt_str(value: Any) -> Optional[str]:
+    def _normalize_opt_str(value: Any) -> str | None:
         if value is None:
             return None
         raw = str(value).strip()
         return raw or None
 
-    def _parse_normalize_project_fields(self, raw_value: Any) -> Dict[str, NormalizeProjectFieldRuleConfig]:
+    def _parse_normalize_project_fields(self, raw_value: Any) -> dict[str, NormalizeProjectFieldRuleConfig]:
         fields_raw = mapping_or_none(raw_value)
         if fields_raw is None:
             return {}
 
-        fields_by_name: Dict[str, NormalizeProjectFieldRuleConfig] = {}
+        fields_by_name: dict[str, NormalizeProjectFieldRuleConfig] = {}
         for field_name_raw, field_rule_raw in fields_raw.items():
             field_name = str(field_name_raw or "").strip()
             if not field_name:
@@ -49,12 +49,12 @@ class ParserSourcesMixin:
             )
         return fields_by_name
 
-    def _parse_normalize_steps(self, raw_value: Any) -> Tuple[NormalizeStepConfig, ...]:
+    def _parse_normalize_steps(self, raw_value: Any) -> tuple[NormalizeStepConfig, ...]:
         steps_raw = list_or_none(raw_value)
         if steps_raw is None:
             return ()
 
-        steps_converted: List[NormalizeStepConfig] = []
+        steps_converted: list[NormalizeStepConfig] = []
         for item in steps_raw:
             step_dict = mapping_or_none(item)
             if step_dict is None:
@@ -75,13 +75,13 @@ class ParserSourcesMixin:
             branch = branches[0]
             params_dict = mapping_or_none(step_dict.get(branch))
             if params_dict is None:
-                msg = "normalize.map_values.steps.{} must be a dictionary".format(branch)
+                msg = f"normalize.map_values.steps.{branch} must be a dictionary"
                 raise TypeError(msg)
 
             step_kind = branch
             step_on_empty = None
             step_on_missing = None
-            step_fields: Dict[str, NormalizeProjectFieldRuleConfig] = {}
+            step_fields: dict[str, NormalizeProjectFieldRuleConfig] = {}
             if branch == "take_first":
                 step_on_empty = self._normalize_opt_str(params_dict.get("on_empty"))
             else:
@@ -115,8 +115,8 @@ class ParserSourcesMixin:
             order_by=order_by,
         )
 
-    def _parse_sources(self, raw: RawDemand) -> Dict[str, SourceConfig]:
-        sources: Dict[str, SourceConfig] = {}
+    def _parse_sources(self, raw: RawDemand) -> dict[str, SourceConfig]:
+        sources: dict[str, SourceConfig] = {}
         raw_sources = raw.get_mapping(DEMAND_KEYS["sources"])
         if raw_sources is None:
             return sources
@@ -147,7 +147,7 @@ class ParserSourcesMixin:
     def _with_main_source_fields(
         self,
         main_source: MainSourceConfig,
-        fields: Dict[str, SourceFieldConfig],
+        fields: dict[str, SourceFieldConfig],
     ) -> MainSourceConfig:
         return MainSourceConfig(
             source_id=main_source.source_id,
@@ -159,10 +159,10 @@ class ParserSourcesMixin:
 
     def _with_source_fields(
         self,
-        sources: Dict[str, SourceConfig],
-        fields_by_source: Dict[str, Dict[str, SourceFieldConfig]],
-    ) -> Dict[str, SourceConfig]:
-        updated: Dict[str, SourceConfig] = {}
+        sources: dict[str, SourceConfig],
+        fields_by_source: dict[str, dict[str, SourceFieldConfig]],
+    ) -> dict[str, SourceConfig]:
+        updated: dict[str, SourceConfig] = {}
         for source_id, source_config in sources.items():
             updated[source_id] = SourceConfig(
                 source_id=source_config.source_id,
@@ -176,7 +176,7 @@ class ParserSourcesMixin:
             )
         return updated
 
-    def _parse_lookup_cast(self, raw_lookup: Any) -> Optional[LookupCastConfig]:
+    def _parse_lookup_cast(self, raw_lookup: Any) -> LookupCastConfig | None:
         lookup_dict = mapping_or_none(raw_lookup)
         if lookup_dict is None:
             return None
@@ -196,7 +196,7 @@ class ParserSourcesMixin:
         branch = branches[0]
         params_dict = mapping_or_none(lookup_dict.get(branch))
         if params_dict is None:
-            msg = "lookup_cast.{} must be a dictionary".format(branch)
+            msg = f"lookup_cast.{branch} must be a dictionary"
             raise TypeError(msg)
 
         if branch == "sep_first":
@@ -206,12 +206,12 @@ class ParserSourcesMixin:
             )
 
         if params_dict:
-            msg = "lookup_cast.{} must be an empty object".format(branch)
+            msg = f"lookup_cast.{branch} must be an empty object"
             raise TypeError(msg)
 
         return LookupCastConfig(name=branch, sep=None)
 
-    def _parse_normalize(self, raw_value: Any) -> Optional[NormalizeConfig]:
+    def _parse_normalize(self, raw_value: Any) -> NormalizeConfig | None:
         norm_dict = mapping_or_none(raw_value)
         if norm_dict is None:
             return None
@@ -233,7 +233,7 @@ class ParserSourcesMixin:
         branch = branches[0]
         params_dict = mapping_or_none(norm_dict.get(branch))
         if params_dict is None:
-            msg = "normalize.{} must be a dictionary".format(branch)
+            msg = f"normalize.{branch} must be a dictionary"
             raise TypeError(msg)
 
         if branch == "index_by_key":
@@ -249,9 +249,9 @@ class ParserSourcesMixin:
 
     def _parse_normalize_index_by_key_params(
         self,
-        params_dict: Dict[str, Any],
+        params_dict: dict[str, Any],
         *,
-        call_by: Optional[str],
+        call_by: str | None,
     ) -> NormalizeConfig:
         key_field = str(params_dict.get(NORMALIZE_KEYS["key_field"], "")).strip()
         on_conflict = str(params_dict.get(NORMALIZE_KEYS["on_conflict"], "error")).strip() or "error"
@@ -270,9 +270,9 @@ class ParserSourcesMixin:
 
     def _parse_normalize_take_first_params(
         self,
-        params_dict: Dict[str, Any],
+        params_dict: dict[str, Any],
         *,
-        call_by: Optional[str],
+        call_by: str | None,
     ) -> NormalizeConfig:
         on_empty = self._normalize_opt_str(params_dict.get(NORMALIZE_KEYS["on_empty"]))
         return NormalizeConfig(
@@ -289,9 +289,9 @@ class ParserSourcesMixin:
 
     def _parse_normalize_project_fields_params(
         self,
-        params_dict: Dict[str, Any],
+        params_dict: dict[str, Any],
         *,
-        call_by: Optional[str],
+        call_by: str | None,
     ) -> NormalizeConfig:
         on_missing = self._normalize_opt_str(params_dict.get(NORMALIZE_KEYS["on_missing"]))
         fields_by_name = self._parse_normalize_project_fields(params_dict.get(NORMALIZE_KEYS["fields"]))
@@ -309,9 +309,9 @@ class ParserSourcesMixin:
 
     def _parse_normalize_map_values_params(
         self,
-        params_dict: Dict[str, Any],
+        params_dict: dict[str, Any],
         *,
-        call_by: Optional[str],
+        call_by: str | None,
     ) -> NormalizeConfig:
         steps_converted = self._parse_normalize_steps(params_dict.get(NORMALIZE_KEYS["steps"]))
         return NormalizeConfig(
@@ -326,20 +326,20 @@ class ParserSourcesMixin:
             call_by=call_by,
         )
 
-    def _parse_key(self, source_data: Dict[str, Any]) -> Union[str, Tuple[str, ...]]:
+    def _parse_key(self, source_data: dict[str, Any]) -> str | tuple[str, ...]:
         key_raw = source_data.get(SOURCE_KEYS["key"], "")
         key_items = list_or_none(key_raw)
         if key_items is not None:
             return tuple(str(item) for item in key_items)
         return str(key_raw)
 
-    def _parse_params(self, source_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_params(self, source_data: dict[str, Any]) -> dict[str, Any]:
         params_raw = mapping_or_none(source_data.get(SOURCE_KEYS["params"]))
         if params_raw is None:
             return {}
         return dict(params_raw)
 
-    def _parse_order_by(self, source_data: Dict[str, Any]) -> Tuple[str, ...]:
+    def _parse_order_by(self, source_data: dict[str, Any]) -> tuple[str, ...]:
         order_raw = source_data.get(MAIN_SOURCE_KEYS["order_by"])
         if order_raw is None:
             return ()
@@ -348,7 +348,7 @@ class ParserSourcesMixin:
             msg = "main_source.order_by must be a list"
             raise TypeError(msg)
 
-        order_by: List[str] = []
+        order_by: list[str] = []
         for item in order_items:
             if not isinstance(item, str):
                 msg = "main_source.order_by items must be strings"

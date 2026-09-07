@@ -1,7 +1,8 @@
-from typing import Any, Dict, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from .....exceptions import ScalimYamlError
-from .....vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)
@@ -9,7 +10,7 @@ class ErrorLoc:
     line: int
     column: int
 
-    def as_dict(self) -> Dict[str, int]:
+    def as_dict(self) -> dict[str, int]:
         return {"line": int(self.line), "column": int(self.column)}
 
 
@@ -24,11 +25,11 @@ class ErrorEnvelope:
     message: str
     source_path: str
     path: str
-    loc: Optional[ErrorLoc] = None
-    suggestions: Tuple[str, ...] = ()
+    loc: ErrorLoc | None = None
+    suggestions: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "code": str(self.code),
             "message": str(self.message),
             "source_path": str(self.source_path),
@@ -41,26 +42,26 @@ class ErrorEnvelope:
         return payload
 
     @property
-    def line(self) -> Optional[int]:
+    def line(self) -> int | None:
         return self.loc.line if self.loc is not None else None
 
     @property
-    def column(self) -> Optional[int]:
+    def column(self) -> int | None:
         return self.loc.column if self.loc is not None else None
 
 
 class ScalimYamlValidationError(ScalimYamlError):
-    errors: Tuple[ErrorEnvelope, ...]
-    warnings: Tuple[ErrorEnvelope, ...]
+    errors: tuple[ErrorEnvelope, ...]
+    warnings: tuple[ErrorEnvelope, ...]
 
     def __init__(
         self,
         message: str,
         *,
         errors: Sequence[ErrorEnvelope],
-        warnings: Optional[Sequence[ErrorEnvelope]] = None,
+        warnings: Sequence[ErrorEnvelope] | None = None,
     ) -> None:
-        super(ScalimYamlValidationError, self).__init__(message)
+        super().__init__(message)
         self.errors = tuple(errors)
         self.warnings = tuple(warnings or ())
 

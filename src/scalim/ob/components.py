@@ -1,6 +1,7 @@
 # region imports
 
-from typing import Any, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 from ..hooks import IExecutionHook
 from .observer import Observer
@@ -9,10 +10,10 @@ from .observer import Observer
 
 
 def split_components(
-    components: Optional[Sequence[Any]],
-) -> Tuple[Tuple[Observer, ...], Tuple[IExecutionHook, ...]]:
-    observers: List[Observer] = []
-    hooks: List[IExecutionHook] = []
+    components: Sequence[Any] | None,
+) -> tuple[tuple[Observer, ...], tuple[IExecutionHook, ...]]:
+    observers: list[Observer] = []
+    hooks: list[IExecutionHook] = []
 
     if not components:
         return (), ()
@@ -24,7 +25,7 @@ def split_components(
         if isinstance(component, IExecutionHook):
             hooks.append(component)
             continue
-        msg = "Invalid component at index {}: type {} (expected Observer or IExecutionHook)".format(idx, type(component).__name__)
+        msg = f"Invalid component at index {idx}: type {type(component).__name__} (expected Observer or IExecutionHook)"
         raise TypeError(msg)
 
     return tuple(observers), tuple(hooks)

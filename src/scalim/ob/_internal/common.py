@@ -1,7 +1,8 @@
 from collections.abc import Set as AbstractSet
-from typing import Any, Optional, Set, Tuple
+from typing import Any
 
 from ..._internal.loggingx import prefix
+from ..._internal.strenum import StrEnum
 from ..._internal.utils.policy import (
     ensure_policy_enum,
     normalize_token_lower_strip,
@@ -11,12 +12,11 @@ from ..._internal.utils.policy import (
 from ...events import EventType
 from ...exceptions import ScalimObserverError
 from ...typedefs import RuntimeValue
-from ...vendor.compact import StrEnum
 
 OBSERVER_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s.%s 抛出异常"
 OBSERVER_CLOSE_RAISED_EXCEPTION_WARNING = prefix("ob") + "观察者 %s 关闭时抛出异常"
 
-CATALOG_EVENT_TYPES: Tuple[EventType, ...] = (
+CATALOG_EVENT_TYPES: tuple[EventType, ...] = (
     EventType.PIPELINE_START,
     EventType.PIPELINE_END,
     EventType.BATCH_START,
@@ -50,7 +50,7 @@ CATALOG_EVENT_TYPES: Tuple[EventType, ...] = (
     EventType.WORKFLOW_RESOURCE_DISCARD,
 )
 
-CATALOG_EVENT_TYPES_SET: Set[EventType] = set(CATALOG_EVENT_TYPES)
+CATALOG_EVENT_TYPES_SET: set[EventType] = set(CATALOG_EVENT_TYPES)
 DEFAULT_MAX_RECORDED_EVENTS = 10_000
 
 
@@ -60,7 +60,7 @@ class ObserverManagerMode(StrEnum):
 
 
 ObserverManagerModeValue = str
-ObserverManagerModeLike = Optional[ObserverManagerModeValue]
+ObserverManagerModeLike = ObserverManagerModeValue | None
 
 _DEFAULT_OBSERVER_MANAGER_MODE = ObserverManagerMode.PROCESS
 
@@ -72,7 +72,7 @@ class CaptureOverflowPolicy(StrEnum):
 
 
 CaptureOverflowPolicyValue = str
-CaptureOverflowPolicyLike = Optional[CaptureOverflowPolicyValue]
+CaptureOverflowPolicyLike = CaptureOverflowPolicyValue | None
 
 _DEFAULT_CAPTURE_OVERFLOW_POLICY = CaptureOverflowPolicy.RAISE
 
@@ -119,23 +119,19 @@ def parse_capture_overflow_policy(value: RuntimeValue) -> CaptureOverflowPolicyV
     )
 
 
-def validate_event_types(observer: Any, value: Any) -> Optional[Set[EventType]]:
+def validate_event_types(observer: Any, value: Any) -> set[EventType] | None:
     if value is None:
         return None
     if not isinstance(value, AbstractSet):
-        msg = "observer.event_types must be None or Set[EventType]; got {} for {}".format(type(value).__name__, type(observer).__name__)
+        msg = f"observer.event_types must be None or set[EventType]; got {type(value).__name__} for {type(observer).__name__}"
         raise TypeError(msg)
-    normalized: Set[EventType] = set()
+    normalized: set[EventType] = set()
     for item in value:
         if not isinstance(item, EventType):
-            msg = "observer.event_types must contain only EventType; got {} element {!r} for {}".format(
-                type(item).__name__,
-                item,
-                type(observer).__name__,
-            )
+            msg = f"observer.event_types must contain only EventType; got {type(item).__name__} element {item!r} for {type(observer).__name__}"  # noqa: E501
             raise TypeError(msg)
         if item not in CATALOG_EVENT_TYPES_SET:
-            msg = "observer.event_types contains unknown event type {!r} for {}".format(item, type(observer).__name__)
+            msg = f"observer.event_types contains unknown event type {item!r} for {type(observer).__name__}"
             raise ValueError(msg)
         normalized.add(item)
     return normalized

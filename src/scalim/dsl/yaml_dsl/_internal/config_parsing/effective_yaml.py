@@ -1,6 +1,7 @@
+from collections.abc import Mapping, Sequence
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any
 
 from .....vendor.yamlx.ruamel.yaml import YAML
 from .imports import contains_import_syntax, load_and_expand_imports
@@ -9,14 +10,14 @@ __all__ = ()
 
 
 def load_effective_demand_yaml(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     *,
-    template_vars: Optional[Mapping[str, Any]] = None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
-    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-) -> Dict[str, Any]:
+    allowed_yaml_roots: Sequence[str | Path] | None = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+) -> dict[str, Any]:
     """把需求 `YAML` 渲染为 `effective YAML`(展开 `template_vars` + `imports/$import`).
 
     约束:

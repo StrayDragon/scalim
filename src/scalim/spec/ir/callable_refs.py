@@ -1,6 +1,4 @@
-from typing import Tuple, Union
-
-from ...vendor.dataclassesx import dataclass
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -14,7 +12,7 @@ class PythonReferenceIr:
 
     reference: str
     module_path: str
-    attr_path: Tuple[str, ...]
+    attr_path: tuple[str, ...]
     style: str
 
 
@@ -41,7 +39,7 @@ class RuntimeHandleIdIr:
     handle_id: str
 
 
-CallableRefIr = Union[PythonReferenceIr, BuiltinCallableIdIr, RuntimeHandleIdIr]
+CallableRefIr = PythonReferenceIr | BuiltinCallableIdIr | RuntimeHandleIdIr
 
 
 def describe_callable_ref(ref: CallableRefIr) -> str:
@@ -50,8 +48,8 @@ def describe_callable_ref(ref: CallableRefIr) -> str:
     if isinstance(ref, PythonReferenceIr):
         return str(ref.reference)
     if isinstance(ref, BuiltinCallableIdIr):
-        return "^{}".format(ref.callable_id)
-    return "runtime:{}".format(ref.handle_id)
+        return f"^{ref.callable_id}"
+    return f"runtime:{ref.handle_id}"
 
 
 __all__ = (

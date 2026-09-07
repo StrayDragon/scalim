@@ -1,0 +1,60 @@
+"""`enum.StrEnum`(`Python 3.11+`) 的运行时兜底。
+
+运行时下界当前为 `3.10`(见根 `ROADMAP.md`):下界到达 `3.11` 时必须删除本模块,
+调用方改用标准库 `enum.StrEnum`(路线图棘轮步骤)。
+"""
+
+import sys
+from enum import Enum
+
+from typing_extensions import Self, override
+
+if sys.version_info >= (3, 11):  # pragma: allow-no-cover floor<3.11 分支在支持矩阵内不可达
+    from enum import StrEnum  # pyright: ignore[reportUnreachable]
+else:
+    # 从上游源码复制: `https://github.com/python/cpython/blob/1ae900424b3c888d2b2cc97e6ef780717813d658/Lib/enum.py#L1365`
+    class ReprEnum(Enum):
+        """
+        仅改变 `repr()`,而 `str()` 与 `format()` 仍交由混入类型实现.
+        """
+
+    class StrEnum(str, ReprEnum):
+        """
+        成员也是(且必须是)字符串的枚举.
+        """
+
+        @override
+        def __str__(self) -> str:
+            # 对齐 `Python 3.11+` 的 `enum.StrEnum` 行为: `str(member)` 返回 `value` 而不是 `EnumClass.MEMBER`.
+            return self.value
+
+        def __new__(cls, *values: str) -> Self:
+            "参数 `values` 必须已经是 `str` 类型"
+            if len(values) > 3:  # noqa: PLR2004
+                raise TypeError(f"`str()` 参数过多: {values!r}")  # noqa: EM102, TRY003
+            if len(values) == 1:  # noqa: SIM102
+                # 必须是字符串
+                if not isinstance(values[0], str):
+                    raise TypeError(f"参数必须是字符串,但得到: {values[0]!r}")  # noqa: EM102, TRY003
+            if len(values) >= 2:  # noqa: PLR2004, SIM102
+                # 检查 `encoding` 参数是否为字符串
+                if not isinstance(values[1], str):
+                    raise TypeError(f"`encoding` 参数必须是字符串,但得到: {values[1]!r}")  # noqa: EM102, TRY003
+            if len(values) == 3:  # noqa: PLR2004, SIM102
+                # 检查 `errors` 参数是否为字符串
+                if not isinstance(values[2], str):
+                    raise TypeError(f"`errors` 参数必须是字符串,但得到: {values[2]!r}")  # noqa: EM102, TRY003
+            value = str(*values)
+            member = str.__new__(cls, value)
+            member._value_ = value
+            return member
+
+        @staticmethod
+        def _generate_next_value_(name: str, _start: int, _count: int, _last_values: list[str]) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+            """
+            返回成员名的小写版本.
+            """
+            return name.lower()
+
+
+__all__ = ()

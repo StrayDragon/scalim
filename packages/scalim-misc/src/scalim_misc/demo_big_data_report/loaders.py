@@ -24,11 +24,13 @@
 """
 
 import csv
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any
 
-from scalim.vendor.dataclassesx import dataclass
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # ============================================================================
 # 配置常量 - 增大默认数据量用于更有效的集成测试
@@ -106,7 +108,7 @@ def get_workflow_preload_counter_calls() -> int:
     return int(_WORKFLOW_PRELOAD_COUNTER["calls"])
 
 
-def load_workflow_preload_counter_table() -> Dict[int, Dict[str, Any]]:
+def load_workflow_preload_counter_table() -> dict[int, dict[str, Any]]:
     """用于 `workflow` fixture 的 `preload_forever` source.
 
     该 loader 的作用是提供一个轻量且确定性的“可观察”信号:
@@ -116,7 +118,7 @@ def load_workflow_preload_counter_table() -> Dict[int, Dict[str, Any]]:
     return {0: {"id": 0, "name": "preload_counter"}}
 
 
-def load_rows_from_csv(path: str, *, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+def load_rows_from_csv(path: str, *, limit: int | None = None) -> list[dict[str, Any]]:
     """从 workflow 上游的 CSV output 读取 rows.
 
     说明:
@@ -125,10 +127,10 @@ def load_rows_from_csv(path: str, *, limit: Optional[int] = None) -> List[Dict[s
     """
     p = Path(str(path))
     if not p.exists():
-        msg = "CSV not found: {!r}".format(str(p))
+        msg = f"CSV not found: {str(p)!r}"
         raise FileNotFoundError(msg)
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     with p.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for idx, row in enumerate(reader):
@@ -136,7 +138,7 @@ def load_rows_from_csv(path: str, *, limit: Optional[int] = None) -> List[Dict[s
                 break
             if not row:
                 continue
-            out: Dict[str, Any] = {}
+            out: dict[str, Any] = {}
             for k, v in row.items():
                 key = str(k or "").strip()
                 if not key:
@@ -225,7 +227,7 @@ _PAYMENT_METHODS = ["支付宝", "微信支付", "银行卡", "信用卡", "货�
 _LOGISTICS_NAMES = ["顺丰速运", "圆通快递", "中通快递", "韵达快递", "申通快递", "京东物流", "菜鸟驿站", "德邦快递"]
 
 
-def _safe_index(lst: List[str], idx: int) -> str:
+def _safe_index(lst: list[str], idx: int) -> str:
     return lst[idx % len(lst)]
 
 
@@ -236,10 +238,10 @@ def _safe_index(lst: List[str], idx: int) -> str:
 
 
 def load_orders(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """加载订单数据(主数据源)"""
     _ = is_ref_loader
     _ = field_keys
@@ -247,7 +249,7 @@ def load_orders(
     cfg = get_config()
     order_ids: Iterable[int] = range(cfg.order_count) if (ids is None or len(ids) == 0) else ids
 
-    result: List[Dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     for i in order_ids:
         order_id = 1001 + i
 
@@ -270,9 +272,9 @@ def load_orders(
         month = (day_of_year - 1) // 30 + 1
         day = (day_of_year - 1) % 30 + 1
         month = min(month, 12)
-        order_date = "2024-{:02d}-{:02d}".format(month, min(day, 28))
+        order_date = f"2024-{month:02d}-{min(day, 28):02d}"
 
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "order_id": order_id,
             "customer_id": customer_id,
             "product_id": product_id,
@@ -298,10 +300,10 @@ def load_orders(
 
 
 def load_customers(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载客户数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -311,18 +313,18 @@ def load_customers(
 
     levels = ["普通", "银卡", "金卡", "钻石"]
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for cid in customer_ids:
         prefix = _safe_index(_CUSTOMER_PREFIXES, cid)
         suffix = _safe_index(_CUSTOMER_SUFFIXES, cid // len(_CUSTOMER_PREFIXES))
         name = prefix + suffix
 
         level = levels[cid % len(levels)]
-        phone = "138{:08d}".format(cid * 12345 % 100000000)
+        phone = f"138{cid * 12345 % 100000000:08d}"
 
         reg_day = (cid * 7) % 365 + 1
         reg_month = (reg_day - 1) // 30 + 1
-        reg_date = "2023-{:02d}-{:02d}".format(min(reg_month, 12), (reg_day - 1) % 28 + 1)
+        reg_date = f"2023-{min(reg_month, 12):02d}-{(reg_day - 1) % 28 + 1:02d}"
 
         result[cid] = {
             "customer_id": cid,
@@ -336,10 +338,10 @@ def load_customers(
 
 
 def load_customers_by_rows(
-    rows: Optional[List[Dict[str, Any]]] = None,
-    field_keys: Optional[List[str]] = None,
+    rows: list[dict[str, Any]] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """`rows` 模式示例: 从 `batch_rows` 中提取 `customer_id` 后复用 `load_customers`."""
     _ = field_keys
     _ = is_ref_loader
@@ -347,7 +349,7 @@ def load_customers_by_rows(
     if not rows:
         return {}
 
-    customer_ids: Set[int] = set()
+    customer_ids: set[int] = set()
     for row in rows:
         customer_id = row.get("customer_id")
         if customer_id is None:
@@ -369,10 +371,10 @@ def load_customers_by_rows(
 
 
 def load_products(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载产品数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -382,7 +384,7 @@ def load_products(
 
     brands = ["华为", "苹果", "小米", "三星", "联想", "戴尔", "索尼", "佳能", "飞利浦", "松下"]
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for pid in product_ids:
         adj = _safe_index(_PRODUCT_ADJECTIVES, pid)
         noun = _safe_index(_PRODUCT_NOUNS, pid // len(_PRODUCT_ADJECTIVES))
@@ -409,10 +411,10 @@ def load_products(
 
 
 def load_categories(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载产品分类数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -420,7 +422,7 @@ def load_categories(
     cfg = get_config()
     category_ids: Iterable[int] = range(cfg.category_count) if ids is None else ids
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for cid in category_ids:
         name = _safe_index(_CATEGORY_NAMES, cid)
         level = (cid % 3) + 1
@@ -442,10 +444,10 @@ def load_categories(
 
 
 def load_warehouses(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载仓库数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -453,10 +455,10 @@ def load_warehouses(
     cfg = get_config()
     warehouse_ids: Iterable[int] = range(cfg.warehouse_count) if ids is None else ids
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for wid in warehouse_ids:
         city = _safe_index(_CITY_NAMES, wid)
-        name = "{}仓库-{}号".format(city, wid + 1)
+        name = f"{city}仓库-{wid + 1}号"
         region_id = wid % cfg.region_count
         capacity = 10000 + wid * 1000
 
@@ -476,10 +478,10 @@ def load_warehouses(
 
 
 def load_regions(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载区域数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -487,10 +489,10 @@ def load_regions(
     cfg = get_config()
     region_ids: Iterable[int] = range(cfg.region_count) if ids is None else ids
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for rid in region_ids:
         city = _safe_index(_CITY_NAMES, rid)
-        code = "RG-{:03d}".format(rid)
+        code = f"RG-{rid:03d}"
         manager = _safe_index(_CUSTOMER_PREFIXES, rid) + "经理"
 
         result[rid] = {
@@ -509,10 +511,10 @@ def load_regions(
 
 
 def load_region_pricing(
-    ids: Optional[List[Tuple[int, int]]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[tuple[int, int]] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[Tuple[int, int], Dict[str, Any]]:
+) -> dict[tuple[int, int], dict[str, Any]]:
     """加载区域产品定价数据(复合主键)"""
     _ = is_ref_loader
     _ = field_keys
@@ -520,11 +522,11 @@ def load_region_pricing(
     cfg = get_config()
 
     if ids is None:
-        composite_keys: Iterable[Tuple[int, int]] = ((r, c) for r in range(cfg.region_count) for c in range(cfg.category_count))
+        composite_keys: Iterable[tuple[int, int]] = ((r, c) for r in range(cfg.region_count) for c in range(cfg.category_count))
     else:
         composite_keys = ids
 
-    result: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    result: dict[tuple[int, int], dict[str, Any]] = {}
     for region_id, category_id in composite_keys:
         adjustment = 0.9 + ((region_id + category_id) % 5) * 0.05
         shipping = 5.0 + region_id * 2.0
@@ -547,10 +549,10 @@ def load_region_pricing(
 
 
 def load_promotions(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载促销活动数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -558,7 +560,7 @@ def load_promotions(
     cfg = get_config()
     promotion_ids: Iterable[int] = range(cfg.promotion_count) if ids is None else ids
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for pid in promotion_ids:
         name = _safe_index(_PROMOTION_NAMES, pid)
         discount = 0.5 + (pid % 10) * 0.05
@@ -570,8 +572,8 @@ def load_promotions(
             "promotion_id": pid,
             "promotion_name": name,
             "promotion_discount": round(discount, 2),
-            "promotion_start": "2024-{:02d}-01".format(start_month),
-            "promotion_end": "2024-{:02d}-28".format(end_month),
+            "promotion_start": f"2024-{start_month:02d}-01",
+            "promotion_end": f"2024-{end_month:02d}-28",
         }
 
     return result
@@ -583,10 +585,10 @@ def load_promotions(
 
 
 def load_payment_methods(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """加载支付方式数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -596,7 +598,7 @@ def load_payment_methods(
 
     fee_rates = [0.002, 0.002, 0.003, 0.005, 0.0]
 
-    result: List[Dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     for mid in method_ids:
         name = _safe_index(_PAYMENT_METHODS, mid)
         fee_rate = fee_rates[mid % len(fee_rates)]
@@ -613,10 +615,10 @@ def load_payment_methods(
 
 
 def load_payment_methods_candidates(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, List[Dict[str, Any]]]:
+) -> dict[int, list[dict[str, Any]]]:
     """加载支付方式候选数据(示例: `mapping[key -> list[row]]`)."""
     _ = is_ref_loader
     _ = field_keys
@@ -626,7 +628,7 @@ def load_payment_methods_candidates(
 
     fee_rates = [0.002, 0.002, 0.003, 0.005, 0.0]
 
-    result: Dict[int, List[Dict[str, Any]]] = {}
+    result: dict[int, list[dict[str, Any]]] = {}
     for mid in method_ids:
         name = _safe_index(_PAYMENT_METHODS, mid)
         fee_rate = fee_rates[mid % len(fee_rates)]
@@ -648,10 +650,10 @@ def load_payment_methods_candidates(
 
 
 def load_logistics(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """加载物流公司数据"""
     _ = is_ref_loader
     _ = field_keys
@@ -659,7 +661,7 @@ def load_logistics(
     cfg = get_config()
     logistics_ids: Iterable[int] = range(cfg.logistics_count) if ids is None else ids
 
-    result: Dict[int, Dict[str, Any]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for lid in logistics_ids:
         name = _safe_index(_LOGISTICS_NAMES, lid)
         speed = 1 + (lid % 5)
@@ -682,7 +684,7 @@ def load_logistics(
 # ============================================================================
 
 
-def calc_order_amount(**kwargs: Any) -> Optional[float]:
+def calc_order_amount(**kwargs: Any) -> float | None:
     """计算订单金额 = 数量 * 单价 * 折扣率"""
     quantity = kwargs.get("quantity")
     unit_price = kwargs.get("unit_price")
@@ -697,7 +699,7 @@ def calc_order_amount(**kwargs: Any) -> Optional[float]:
         return None
 
 
-def calc_profit(**kwargs: Any) -> Optional[float]:
+def calc_profit(**kwargs: Any) -> float | None:
     """计算利润 = 订单金额 - 成本 * 数量"""
     order_amount = kwargs.get("order_amount")
     product_cost = kwargs.get("product_cost")
@@ -712,7 +714,7 @@ def calc_profit(**kwargs: Any) -> Optional[float]:
         return None
 
 
-def calc_tax_amount(**kwargs: Any) -> Optional[float]:
+def calc_tax_amount(**kwargs: Any) -> float | None:
     """计算税费 = 订单金额 * 税率"""
     order_amount = kwargs.get("order_amount")
     tax_rate = kwargs.get("tax_rate")
@@ -726,7 +728,7 @@ def calc_tax_amount(**kwargs: Any) -> Optional[float]:
         return None
 
 
-def calc_final_price(**kwargs: Any) -> Optional[float]:
+def calc_final_price(**kwargs: Any) -> float | None:
     """计算最终价格 = 订单金额 * 区域调整系数 + 运费"""
     order_amount = kwargs.get("order_amount")
     price_adjustment = kwargs.get("price_adjustment")

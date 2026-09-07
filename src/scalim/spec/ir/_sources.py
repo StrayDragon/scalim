@@ -1,9 +1,11 @@
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Tuple, Union
+from typing import Any, TypeAlias
+
+from typing_extensions import override
 
 from ...typedefs import LoaderResultMapping, RuntimeValue, SourceSpecIrCacheMode, StaticParams
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass, field
 from ._relations import FieldRefIr
 from ._source_normalize import (
     NormalizeKind,
@@ -25,7 +27,7 @@ from .callable_refs import CallableRefIr
 from .lookup_casts import LookupCastSpecIr
 
 
-def _default_bindings() -> Dict[NormalizedLookupKeySpec, BindingIr]:
+def _default_bindings() -> dict[NormalizedLookupKeySpec, BindingIr]:
     return {}
 
 
@@ -35,12 +37,12 @@ class KeyIr:
     `Key`(IR): 描述数据源返回映射的键结构
     """
 
-    key: Union[str, Tuple[str, ...]]
+    key: str | tuple[str, ...]
     """
     键定义.
     """
 
-    cast: Optional[LookupCastSpecIr] = None
+    cast: LookupCastSpecIr | None = None
     """
     键归一化转换:用于对齐关联键类型.
 
@@ -51,7 +53,7 @@ class KeyIr:
         if isinstance(self.key, str):
             key = self.key.strip()
             if key.startswith("(") and key.endswith(")") and "," in key:
-                msg = "Composite key must be tuple, got string: {}".format(self.key)
+                msg = f"Composite key must be tuple, got string: {self.key}"
                 raise ValueError(msg)
 
     @override
@@ -85,13 +87,13 @@ class SourceNormalizeIr:
     on_missing: NormalizeOnMissing = "error"
     """缺失路径策略(`error`/`null`)."""
 
-    fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...] = ()
+    fields: tuple[SourceNormalizeProjectFieldRuleIr, ...] = ()
     """`project_fields` 的投影规则(按顺序)."""
 
-    steps: Tuple[SourceNormalizeStepIr, ...] = ()
+    steps: tuple[SourceNormalizeStepIr, ...] = ()
     """用于 `normalize.map_values` 分支的归一化步骤(按顺序)."""
 
-    call_by_ref: Optional[CallableRefIr] = None
+    call_by_ref: CallableRefIr | None = None
     """可选: `normalize.call_by` 可调用引用描述(纯数据,不包含可调用对象)."""
 
     def apply(
@@ -99,7 +101,7 @@ class SourceNormalizeIr:
         result: RuntimeValue,
         *,
         source_id: str,
-        call_by: Optional[Any] = None,
+        call_by: Any | None = None,
     ) -> LoaderResultMapping:
         normalized: LoaderResultMapping
         if self.kind == "index_by_key":
@@ -130,16 +132,16 @@ class SourceNormalizeIr:
                 steps=self.steps,
             )
         else:
-            msg = "Unknown normalize.kind '{}' for source '{}'".format(self.kind, source_id)
+            msg = f"Unknown normalize.kind '{self.kind}' for source '{source_id}'"
             raise ValueError(msg)
 
         if self.call_by_ref is None:
             return normalized
         if call_by is None:
-            msg = "Source '{}' normalize.call_by_ref requires runtime resolution before apply()".format(source_id)
+            msg = f"Source '{source_id}' normalize.call_by_ref requires runtime resolution before apply()"
             raise ValueError(msg)
         if not callable(call_by):
-            msg = "Source '{}' normalize.call_by_ref expects callable runtime binding, got '{}'".format(source_id, type(call_by).__name__)
+            msg = f"Source '{source_id}' normalize.call_by_ref expects callable runtime binding, got '{type(call_by).__name__}'"
             raise TypeError(msg)
         return normalize_call_by(
             normalized,
@@ -173,7 +175,7 @@ class SourceIr:
     加载器信息
     """
 
-    fk_fields: FrozenSet[str] = field(default_factory=frozenset)
+    fk_fields: frozenset[str] = field(default_factory=frozenset)
     """
     外键字段名集合
     """
@@ -183,14 +185,14 @@ class SourceIr:
     缓存模式
     """
 
-    lookup_chunk_size: Optional[int] = None
+    lookup_chunk_size: int | None = None
     """
     在 `keys` 模式下,引用加载的 `lookup_keys` 分片大小;`None`/`0` 表示不分片.
 
     来源:`DemandRunRuntimeOptions.lookup_chunking` / `LookupChunking`(YAML `lookup_chunk_size` 已迁出).
     """
 
-    lookup_chunk_parallel: Optional[bool] = None
+    lookup_chunk_parallel: bool | None = None
     """
     本 `source` 片间并行许可(`None`=继承运行级全局 `opt-in`;`True`/`False`=由 `LookupChunking.sized` 显式指定).
     """
@@ -201,12 +203,12 @@ class SourceIr:
     运行时为 `MappingProxyType` — 浅不可变.
     """
 
-    bind: Optional[BindingIr] = None
+    bind: BindingIr | None = None
     """
     默认绑定(当无 `key_field` 匹配时使用).
     """
 
-    normalize: Optional[SourceNormalizeIr] = None
+    normalize: SourceNormalizeIr | None = None
     """
     数据源 `whole-result` `normalize` 配置(可选).
     """
@@ -219,26 +221,26 @@ class SourceIr:
         """从 `source` 目录取运行时 `SourceIr`;缺 `id` 时立即失败,禁止回退图句柄."""
         source = sources.get(source_id)
         if source is None:
-            msg = "DemandIr.sources missing source_id {!r}; overlay policy cannot be resolved from graph handles".format(source_id)
+            msg = f"DemandIr.sources missing source_id {source_id!r}; overlay policy cannot be resolved from graph handles"
             raise KeyError(msg)
         if not isinstance(source, cls):
-            msg = "DemandIr.sources[{!r}] must be SourceIr, got {}".format(source_id, type(source).__name__)
+            msg = f"DemandIr.sources[{source_id!r}] must be SourceIr, got {type(source).__name__}"
             raise TypeError(msg)
         return source
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         state = dict(self.__dict__)
         bindings = state.get("bindings")
         if isinstance(bindings, MappingProxyType):
             state["bindings"] = dict(bindings)
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
         self.__post_init__()
 
-    def get_binding(self, key_field: NormalizedLookupKeySpec) -> Optional[BindingIr]:
+    def get_binding(self, key_field: NormalizedLookupKeySpec) -> BindingIr | None:
         """获取指定键字段的绑定.
 
         参数:
@@ -288,7 +290,7 @@ class MainSourceIr:
     加载器静态参数(直接透传给加载器函数).
     """
 
-    order_by: Tuple["OrderByKeyIr", ...] = field(default_factory=tuple)
+    order_by: tuple["OrderByKeyIr", ...] = field(default_factory=tuple)
     """
     批次内排序键(字段 + 方向);仅影响写入顺序,不改变 `row_id` 分配.
     """
@@ -324,6 +326,6 @@ class OrderByKeyIr:
     """
 
 
-SourceRefIr = Union["SourceIr", "MainSourceIr"]
+SourceRefIr: TypeAlias = "SourceIr | MainSourceIr"
 
 __all__ = ()

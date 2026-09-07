@@ -1,16 +1,15 @@
 import re
-from typing import FrozenSet
 
 __all__ = ()
 
 EXCEL_SHEET_NAME_MAX_LEN = 31
-EXCEL_SHEET_NAME_INVALID_CHARS: FrozenSet[str] = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
+EXCEL_SHEET_NAME_INVALID_CHARS: frozenset[str] = frozenset(["\\", "/", "?", "*", "[", "]", ":"])
 
 OUTPUT_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def _validation_error_message(*, path: str, reason: str, hint: str) -> str:
-    return "{}: {}. Hint: {}".format(str(path), str(reason), str(hint))
+    return f"{path!s}: {reason!s}. Hint: {hint!s}"
 
 
 def validate_excel_sheet_name(sheet: str, *, path: str) -> None:
@@ -28,10 +27,7 @@ def validate_excel_sheet_name(sheet: str, *, path: str) -> None:
             _validation_error_message(
                 path=str(path),
                 reason="Excel sheet name must be non-empty",
-                hint="provide a non-empty string (max_len={}; invalid chars: {}).".format(
-                    int(EXCEL_SHEET_NAME_MAX_LEN),
-                    invalid_chars_hint,
-                ),
+                hint=f"provide a non-empty string (max_len={int(EXCEL_SHEET_NAME_MAX_LEN)}; invalid chars: {invalid_chars_hint}).",
             )
         )
 
@@ -39,8 +35,8 @@ def validate_excel_sheet_name(sheet: str, *, path: str) -> None:
         raise ValueError(
             _validation_error_message(
                 path=str(path),
-                reason="Excel sheet name is too long: len={} > {}".format(len(name), int(EXCEL_SHEET_NAME_MAX_LEN)),
-                hint="use a shorter name (max_len={}).".format(int(EXCEL_SHEET_NAME_MAX_LEN)),
+                reason=f"Excel sheet name is too long: len={len(name)} > {int(EXCEL_SHEET_NAME_MAX_LEN)}",
+                hint=f"use a shorter name (max_len={int(EXCEL_SHEET_NAME_MAX_LEN)}).",
             )
         )
 
@@ -50,7 +46,7 @@ def validate_excel_sheet_name(sheet: str, *, path: str) -> None:
             _validation_error_message(
                 path=str(path),
                 reason="Excel sheet name contains invalid characters: {}".format("".join(invalid)),
-                hint="remove the invalid characters: {}.".format(invalid_chars_hint),
+                hint=f"remove the invalid characters: {invalid_chars_hint}.",
             )
         )
 
@@ -71,7 +67,7 @@ def validate_output_name(name: str, *, path: str) -> None:
         raise ValueError(
             _validation_error_message(
                 path=str(path),
-                reason="Invalid identifier {!r}".format(value),
+                reason=f"Invalid identifier {value!r}",
                 hint="expected [a-zA-Z_][a-zA-Z0-9_]*.",
             )
         )

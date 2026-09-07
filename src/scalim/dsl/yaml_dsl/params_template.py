@@ -1,11 +1,13 @@
 import re
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, TypeGuard
+
+from typing_extensions import override
 
 from ...exceptions import ScalimYamlError
 from ...spec.ir.binding import LoaderCallContextIr, build_stable_lookup_key_list
 from ...typedefs import LoaderCallKwargs, RowsReuseMode, RuntimeValue
-from ...vendor.compact.typing_extensionsx import TypeGuard, override
-from ...vendor.dataclassesx import dataclass
 
 _RUNTIME_PREFIX = "$runtime."
 _RUNTIME_VAR_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -31,7 +33,7 @@ class ScalimParamsTemplateCompileError(ScalimParamsTemplateError):
 
     @override
     def __str__(self) -> str:
-        return "{} (path={})".format(self.message, self.path)
+        return f"{self.message} (path={self.path})"
 
 
 class ScalimParamsTemplateRenderError(ScalimParamsTemplateError):
@@ -45,32 +47,32 @@ class ScalimParamsTemplateRenderError(ScalimParamsTemplateError):
 
     @override
     def __str__(self) -> str:
-        return "{} (path={})".format(self.message, self.path)
+        return f"{self.message} (path={self.path})"
 
 
 def _path_child(path: str, key: Any) -> str:
     if not path:
         return str(key)
-    return "{}.{}".format(path, str(key))
+    return f"{path}.{key!s}"
 
 
 def _path_index(path: str, idx: int) -> str:
-    return "{}[{}]".format(path, idx)
+    return f"{path}[{idx}]"
 
 
-def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[Any, Any]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[dict[Any, Any]]:
     return isinstance(value, dict)
 
 
-def _is_list(value: RuntimeValue) -> TypeGuard[List[Any]]:
+def _is_list(value: RuntimeValue) -> TypeGuard[list[Any]]:
     return isinstance(value, list)
 
 
-def _is_tuple(value: RuntimeValue) -> TypeGuard[Tuple[Any, ...]]:
+def _is_tuple(value: RuntimeValue) -> TypeGuard[tuple[Any, ...]]:
     return isinstance(value, tuple)
 
 
-def _is_set(value: RuntimeValue) -> TypeGuard[Set[Any]]:
+def _is_set(value: RuntimeValue) -> TypeGuard[set[Any]]:
     return isinstance(value, set)
 
 
@@ -78,7 +80,7 @@ def _deepcopy_literal(value: RuntimeValue) -> RuntimeValue:
     # 这里刻意只对常见容器做深拷贝,避免对任意对象进行 `deepcopy`.
     # `init_vars` 可能注入任意对象(例如 `datetime`/`Decimal` 等),应按“不透明字面值”透传.
     if _is_dict(value):
-        copied: Dict[Any, RuntimeValue] = {}
+        copied: dict[Any, RuntimeValue] = {}
         for k, v in value.items():
             copied[k] = _deepcopy_literal(v)
         return copied
@@ -87,7 +89,7 @@ def _deepcopy_literal(value: RuntimeValue) -> RuntimeValue:
     if _is_tuple(value):
         return tuple(_deepcopy_literal(v) for v in value)
     if _is_set(value):
-        copied_set: Set[RuntimeValue] = set()
+        copied_set: set[RuntimeValue] = set()
         for v in value:
             copied_set.add(_deepcopy_literal(v))
         return copied_set
@@ -116,11 +118,11 @@ class LiteralNode(_NodeBase):
 
 @dataclass(frozen=True)
 class MappingNode(_NodeBase):
-    items: Tuple[Tuple[Any, _NodeBase], ...]
+    items: tuple[tuple[Any, _NodeBase], ...]
 
     @override
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
-        out: Dict[Any, RuntimeValue] = {}
+        out: dict[Any, RuntimeValue] = {}
         for k, node in self.items:
             out[k] = node.render(ctx, path=_path_child(path, k))
         return out
@@ -128,11 +130,11 @@ class MappingNode(_NodeBase):
 
 @dataclass(frozen=True)
 class ListNode(_NodeBase):
-    items: Tuple[_NodeBase, ...]
+    items: tuple[_NodeBase, ...]
 
     @override
     def render(self, ctx: LoaderCallContextIr, *, path: str) -> RuntimeValue:
-        out: List[RuntimeValue] = []
+        out: list[RuntimeValue] = []
         for idx, node in enumerate(self.items):
             out.append(node.render(ctx, path=_path_index(path, idx)))
         return out
@@ -180,7 +182,7 @@ class RuntimeDirectiveNode(_NodeBase):
         raise ScalimParamsTemplateRenderError(msg, path=path)
 
 
-Node = Union[LiteralNode, MappingNode, ListNode, RuntimeDirectiveNode, KeysDirectiveNode, RowsDirectiveNode]
+Node = LiteralNode | MappingNode | ListNode | RuntimeDirectiveNode | KeysDirectiveNode | RowsDirectiveNode
 
 
 @dataclass(frozen=True)
@@ -195,7 +197,7 @@ class CompiledParamsTemplate:
             return False
         return not self.root.items
 
-    def top_level_mapping_string_keys(self) -> Tuple[str, ...]:
+    def top_level_mapping_string_keys(self) -> tuple[str, ...]:
         """返回顶层映射的字符串键 (若 `root` 不是映射则返回空).
 
         用途:
@@ -204,7 +206,7 @@ class CompiledParamsTemplate:
 
         if not isinstance(self.root, MappingNode):
             return ()
-        keys: List[str] = []
+        keys: list[str] = []
         for key, _node in self.root.items:
             if isinstance(key, str):
                 keys.append(key)
@@ -232,7 +234,7 @@ class CompiledParamsTemplate:
 
 @dataclass(frozen=True)
 class _CompileOptions:
-    init_vars: Optional[Mapping[str, RuntimeValue]]
+    init_vars: Mapping[str, RuntimeValue] | None
     allow_keys: bool
     allow_rows: bool
 
@@ -283,23 +285,21 @@ def _maybe_compile_runtime_literal(
         msg = "Legacy `$runtime.<name>` placeholder is not supported; use `{$init_var: <name>}`"
         raise ScalimParamsTemplateCompileError(msg, path=node_path)
     if not _RUNTIME_VAR_RE.match(var_name):
-        msg = "Legacy `$runtime.<name>` placeholder is not supported; invalid init var name '{}' (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(
-            var_name
-        )
+        msg = f"Legacy `$runtime.<name>` placeholder is not supported; invalid init var name '{var_name}' (expected [a-zA-Z_][a-zA-Z0-9_]*)"
         raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
-    msg = "Legacy `$runtime.{}` placeholder is not supported; use `{{$init_var: {}}}`".format(var_name, var_name)
+    msg = f"Legacy `$runtime.{var_name}` placeholder is not supported; use `{{$init_var: {var_name}}}`"
     raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
 
 def _compile_legacy_runtime_directive_node(
-    mapping_dict: Dict[Any, Any],
+    mapping_dict: dict[Any, Any],
     *,
     node_path: str,
 ) -> Node:
     var_name_raw = mapping_dict.get(_DIRECTIVE_RUNTIME)
     if isinstance(var_name_raw, str) and var_name_raw and _RUNTIME_VAR_RE.match(var_name_raw):
-        msg = "Legacy `{{$runtime: {}}}` directive is not supported; migrate to `{{$init_var: {}}}`".format(var_name_raw, var_name_raw)
+        msg = f"Legacy `{{$runtime: {var_name_raw}}}` directive is not supported; migrate to `{{$init_var: {var_name_raw}}}`"
         raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
     msg = "Legacy `{$runtime: <name>}` directive is not supported; migrate to `{$init_var: <name>}`"
@@ -307,7 +307,7 @@ def _compile_legacy_runtime_directive_node(
 
 
 def _compile_runtime_directive_node(
-    mapping_dict: Dict[Any, Any],
+    mapping_dict: dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -318,12 +318,12 @@ def _compile_runtime_directive_node(
         msg = "`$init_var` value must be a non-empty string"
         raise ScalimParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
     if not _RUNTIME_VAR_RE.match(var_name_raw):
-        msg = "`$init_var` value '{}' is invalid (expected [a-zA-Z_][a-zA-Z0-9_]*)".format(var_name_raw)
+        msg = f"`$init_var` value '{var_name_raw}' is invalid (expected [a-zA-Z_][a-zA-Z0-9_]*)"
         raise ScalimParamsTemplateCompileError(msg, path=_path_child(node_path, _DIRECTIVE_INIT_VAR))
 
     if resolve_runtime:
         if opts.init_vars is None or var_name_raw not in opts.init_vars:
-            msg = "Missing init var: {}".format(var_name_raw)
+            msg = f"Missing init var: {var_name_raw}"
             raise ScalimParamsTemplateCompileError(msg, path=node_path)
         return LiteralNode(opts.init_vars[var_name_raw])
 
@@ -331,7 +331,7 @@ def _compile_runtime_directive_node(
 
 
 def _compile_keys_directive_node(
-    mapping_dict: Dict[Any, Any],
+    mapping_dict: dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -347,7 +347,7 @@ def _compile_keys_directive_node(
 
 
 def _compile_rows_directive_node(
-    mapping_dict: Dict[Any, Any],
+    mapping_dict: dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
@@ -363,14 +363,14 @@ def _compile_rows_directive_node(
 
 
 def _maybe_compile_directive_node(
-    mapping_dict: Dict[Any, Any],
+    mapping_dict: dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
     state: _CompileState,
     resolve_runtime: bool,
-) -> Optional[Node]:
-    directive_key: Optional[str] = None
+) -> Node | None:
+    directive_key: str | None = None
     if _DIRECTIVE_INIT_VAR in mapping_dict:
         directive_key = _DIRECTIVE_INIT_VAR
     elif _DIRECTIVE_RUNTIME in mapping_dict:
@@ -383,9 +383,7 @@ def _maybe_compile_directive_node(
         return None
 
     if len(mapping_dict) != 1:
-        msg = "Directive node must be a single-key mapping: `{}`, `{}` or `{}`".format(
-            _DIRECTIVE_INIT_VAR, _DIRECTIVE_KEYS, _DIRECTIVE_ROWS
-        )
+        msg = f"Directive node must be a single-key mapping: `{_DIRECTIVE_INIT_VAR}`, `{_DIRECTIVE_KEYS}` or `{_DIRECTIVE_ROWS}`"
         raise ScalimParamsTemplateCompileError(msg, path=node_path)
 
     if directive_key == _DIRECTIVE_RUNTIME:
@@ -398,14 +396,14 @@ def _maybe_compile_directive_node(
 
 
 def _compile_mapping_node(
-    mapping_dict: Dict[Any, Any],
+    mapping_dict: dict[Any, Any],
     *,
     node_path: str,
     opts: _CompileOptions,
     state: _CompileState,
     resolve_runtime: bool,
 ) -> MappingNode:
-    mapping_items: List[Tuple[Any, Node]] = []
+    mapping_items: list[tuple[Any, Node]] = []
     for k, v in mapping_dict.items():
         mapping_items.append(
             (
@@ -430,7 +428,7 @@ def _compile_list_node(
     state: _CompileState,
     resolve_runtime: bool,
 ) -> ListNode:
-    list_items: List[Node] = []
+    list_items: list[Node] = []
     for idx, item in enumerate(list_value):
         list_items.append(
             _compile_params_template_node(
@@ -489,7 +487,7 @@ def compile_params_template(
     value: Any,
     *,
     path: str,
-    init_vars: Optional[Mapping[str, RuntimeValue]] = None,
+    init_vars: Mapping[str, RuntimeValue] | None = None,
     resolve_runtime: bool = True,
     allow_keys: bool = True,
     allow_rows: bool = True,
@@ -520,23 +518,23 @@ def _parse_single_option_str(
     directive: str,
     option_key: str,
     default_value: str,
-    allowed_values: Tuple[str, ...],
+    allowed_values: tuple[str, ...],
 ) -> str:
     if options_raw is None:
         return str(default_value)
     if not _is_dict(options_raw):
-        msg = "`{}` options must be a mapping or null".format(str(directive))
+        msg = f"`{directive!s}` options must be a mapping or null"
         raise ScalimParamsTemplateCompileError(msg, path=path)
     options = options_raw
     for k in options:
         if str(k) != str(option_key):
-            msg = "Unknown `{}` option: {}".format(str(directive), str(k))
+            msg = f"Unknown `{directive!s}` option: {k!s}"
             raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, k))
     raw_value = options.get(option_key)
     if raw_value is None:
         return str(default_value)
     if not isinstance(raw_value, str):
-        msg = "`{}.{}` must be a string".format(str(directive), str(option_key))
+        msg = f"`{directive!s}.{option_key!s}` must be a string"
         raise ScalimParamsTemplateCompileError(msg, path=_path_child(path, option_key))
     if raw_value not in allowed_values:
         msg = "`{}.{}` must be one of: {}".format(str(directive), str(option_key), ", ".join(allowed_values))

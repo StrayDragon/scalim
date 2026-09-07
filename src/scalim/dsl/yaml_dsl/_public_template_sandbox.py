@@ -1,8 +1,6 @@
-from typing import Tuple
-
 _SAFE = "safe"
 _LEGACY = "legacy"
-_KNOWN: Tuple[str, ...] = (_SAFE,)
+_KNOWN: tuple[str, ...] = (_SAFE,)
 
 
 def validate_public_template_sandbox(template_sandbox: str) -> str:

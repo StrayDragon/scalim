@@ -1,4 +1,4 @@
-from typing import Sequence, Tuple
+from collections.abc import Sequence
 
 from ...exceptions import ScalimExecutionError
 from .strategy_unit import AdaptiveTaskKey
@@ -10,15 +10,15 @@ def _format_items(items: Sequence[str], *, limit: int = 10) -> str:
     if len(items) <= int(limit):
         return ", ".join(items)
     remaining = len(items) - int(limit)
-    return ", ".join(items[: int(limit)]) + ", ... (+{} more)".format(remaining)
+    return ", ".join(items[: int(limit)]) + f", ... (+{remaining} more)"
 
 
 class ScalimAdaptiveTaskTimeoutError(ScalimExecutionError):
     """`parallel_mode=\"adaptive\"` 任务等待超时(可捕获的稳定异常类型)."""
 
     timeout_seconds: float
-    pending_task_keys: Tuple[AdaptiveTaskKey, ...]
-    pending_field_keys: Tuple[str, ...]
+    pending_task_keys: tuple[AdaptiveTaskKey, ...]
+    pending_field_keys: tuple[str, ...]
 
     def __init__(
         self,

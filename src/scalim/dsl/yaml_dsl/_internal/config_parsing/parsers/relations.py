@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from ....schema_dsl.models import (
     DEMAND_KEYS,
@@ -18,15 +18,15 @@ class ParserRelationsMixin(ParserSourcesMixin):
         self,
         relation_raw: Any,
         *,
-        relations: Dict[str, RelationConfig],
-    ) -> Optional[InlineRelationConfig]:
+        relations: dict[str, RelationConfig],
+    ) -> InlineRelationConfig | None:
         if isinstance(relation_raw, str):
             rel_id = relation_raw.strip()
             if not rel_id:
                 return None
             ref = relations.get(rel_id)
             if ref is None:
-                msg = "Unknown relation id '{}'".format(rel_id)
+                msg = f"Unknown relation id '{rel_id}'"
                 raise ValueError(msg)
             return InlineRelationConfig(steps=ref.steps)
 
@@ -38,8 +38,8 @@ class ParserRelationsMixin(ParserSourcesMixin):
         steps = self._parse_steps(steps_raw)
         return InlineRelationConfig(steps=steps)
 
-    def _parse_relations(self, raw: RawDemand) -> Dict[str, RelationConfig]:
-        relations: Dict[str, RelationConfig] = {}
+    def _parse_relations(self, raw: RawDemand) -> dict[str, RelationConfig]:
+        relations: dict[str, RelationConfig] = {}
         raw_relations = raw.get_mapping(DEMAND_KEYS["relations"])
         if raw_relations is None:
             return relations
@@ -54,19 +54,19 @@ class ParserRelationsMixin(ParserSourcesMixin):
 
         return relations
 
-    def _parse_relation(self, rel_id: str, rel_data: Dict[str, Any]) -> RelationConfig:
+    def _parse_relation(self, rel_id: str, rel_data: dict[str, Any]) -> RelationConfig:
         steps = self._parse_steps(rel_data.get(RELATION_CONFIG_KEYS["steps"]))
         return RelationConfig(
             relation_id=rel_id,
             steps=steps,
         )
 
-    def _parse_steps(self, steps_raw: Any) -> Tuple[RelationStepConfig, ...]:
+    def _parse_steps(self, steps_raw: Any) -> tuple[RelationStepConfig, ...]:
         step_items = list_or_none(steps_raw)
         if step_items is None:
             return ()
 
-        steps: List[RelationStepConfig] = []
+        steps: list[RelationStepConfig] = []
         for step_raw in step_items:
             step_data = mapping_or_none(step_raw)
             if step_data is None:
@@ -86,7 +86,7 @@ class ParserRelationsMixin(ParserSourcesMixin):
 
         return tuple(steps)
 
-    def _parse_step_field(self, raw_field: Any) -> Union[str, Tuple[str, ...]]:
+    def _parse_step_field(self, raw_field: Any) -> str | tuple[str, ...]:
         field_items = list_or_none(raw_field)
         if field_items is not None:
             return tuple(str(item) for item in field_items)

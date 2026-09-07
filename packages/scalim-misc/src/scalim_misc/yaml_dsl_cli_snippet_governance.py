@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Sequence, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 from .yaml_dsl_cli_reference_md import (
@@ -27,7 +28,7 @@ def _strip_autogen_blocks(text: str) -> str:
 
     The governance rule only forbids copyable CLI snippets outside injected blocks.
     """
-    outside_lines: List[str] = []
+    outside_lines: list[str] = []
     in_autogen_block = False
     for line in text.splitlines():
         if "<!-- BEGIN AUTOGEN:" in line:
@@ -39,34 +40,34 @@ def _strip_autogen_blocks(text: str) -> str:
     return "\n".join(outside_lines)
 
 
-def _missing_marker_errors(path: Path, *, begin_marker: str, end_marker: str) -> List[str]:
-    errors: List[str] = []
+def _missing_marker_errors(path: Path, *, begin_marker: str, end_marker: str) -> list[str]:
+    errors: list[str] = []
     text = _read_text(path)
     if begin_marker not in text:
-        errors.append("missing required marker in {}: {}".format(path, begin_marker))
+        errors.append(f"missing required marker in {path}: {begin_marker}")
     if end_marker not in text:
-        errors.append("missing required marker in {}: {}".format(path, end_marker))
+        errors.append(f"missing required marker in {path}: {end_marker}")
     return errors
 
 
-def _forbidden_snippet_errors(path: Path, *, forbidden_prefixes: Sequence[str]) -> List[str]:
+def _forbidden_snippet_errors(path: Path, *, forbidden_prefixes: Sequence[str]) -> list[str]:
     text = _read_text(path)
     outside = _strip_autogen_blocks(text)
-    errors: List[str] = []
+    errors: list[str] = []
     for prefix in forbidden_prefixes:
         if prefix in outside:
-            errors.append("hand-written CLI snippet outside injected blocks in {}: {!r}".format(path, prefix))
+            errors.append(f"hand-written CLI snippet outside injected blocks in {path}: {prefix!r}")
     return errors
 
 
-def check_yaml_dsl_cli_snippet_governance(repo_root: Path) -> List[str]:
+def check_yaml_dsl_cli_snippet_governance(repo_root: Path) -> list[str]:
     """Fail-fast governance gate for copyable YAML DSL CLI/LSP snippets.
 
     Rules (MVP scope):
     - required markers MUST exist
     - forbidden copyable command prefixes MUST NOT appear outside injected blocks
     """
-    forbidden_prefixes: Tuple[str, ...] = (
+    forbidden_prefixes: tuple[str, ...] = (
         "uv run scalim-cli yaml-dsl",
         "uvx scalim-cli yaml-dsl",
     )
@@ -92,18 +93,18 @@ def check_yaml_dsl_cli_snippet_governance(repo_root: Path) -> List[str]:
         ),
     ]
 
-    errors: List[str] = []
+    errors: list[str] = []
     for path, begin_marker, end_marker, fix_cmd in targets:
         if not path.exists():
-            errors.append("missing file: {}".format(path))
+            errors.append(f"missing file: {path}")
             continue
 
-        target_errors: List[str] = []
+        target_errors: list[str] = []
         target_errors.extend(_missing_marker_errors(path, begin_marker=begin_marker, end_marker=end_marker))
         target_errors.extend(_forbidden_snippet_errors(path, forbidden_prefixes=forbidden_prefixes))
         if target_errors:
             # Keep fix hints close to the offending file for fast iteration.
-            target_errors.append("Fix hint: run `{}` and avoid hand-writing snippets outside AUTOGEN blocks.".format(fix_cmd))
+            target_errors.append(f"Fix hint: run `{fix_cmd}` and avoid hand-writing snippets outside AUTOGEN blocks.")
             errors.extend(target_errors)
 
     return errors

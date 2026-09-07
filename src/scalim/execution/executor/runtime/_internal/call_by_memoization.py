@@ -3,7 +3,8 @@ import json
 import logging
 import os
 from collections import OrderedDict
-from typing import Any, Dict, Hashable, List, Optional, Tuple
+from collections.abc import Hashable
+from typing import Any
 
 from ....._internal.loggingx import prefix
 from ....._project_constants import (
@@ -23,10 +24,10 @@ _DISABLE_MIN_CALLS_MULTIPLIER = 4
 _DISABLE_MAX_HIT_RATE = 0.01
 
 
-def _parse_csv_patterns(raw: str) -> Tuple[str, ...]:
+def _parse_csv_patterns(raw: str) -> tuple[str, ...]:
     if not raw:
         return ()
-    items: List[str] = []
+    items: list[str] = []
     for part in str(raw).split(","):
         s = str(part).strip()
         if not s:
@@ -58,10 +59,10 @@ def _parse_bool_env(raw: str) -> bool:
 
 
 class CallByMemoizeFieldFilter:
-    allow_patterns: Tuple[str, ...]
-    deny_patterns: Tuple[str, ...]
+    allow_patterns: tuple[str, ...]
+    deny_patterns: tuple[str, ...]
 
-    def __init__(self, *, allow_patterns: Tuple[str, ...], deny_patterns: Tuple[str, ...]) -> None:
+    def __init__(self, *, allow_patterns: tuple[str, ...], deny_patterns: tuple[str, ...]) -> None:
         self.allow_patterns = tuple(allow_patterns or ())
         self.deny_patterns = tuple(deny_patterns or ())
 
@@ -78,7 +79,7 @@ class CallByMemoizeFieldFilter:
 class CallByMemoizationFieldCache:
     field_key: str
     max_entries: int
-    disabled_reason: Optional[str]
+    disabled_reason: str | None
 
     calls: int
     hits: int
@@ -115,7 +116,7 @@ class CallByMemoizationFieldCache:
         self.disabled += 1
         self._cache.clear()
 
-    def try_get(self, key: Hashable) -> Tuple[bool, FieldValue, bool]:
+    def try_get(self, key: Hashable) -> tuple[bool, FieldValue, bool]:
         """返回 `(hit, value, hashable)`."""
 
         self.calls += 1
@@ -159,7 +160,7 @@ class CallByMemoizationFieldCache:
         if hit_rate < _DISABLE_MAX_HIT_RATE:
             self._disable("low_hit_rate")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         hashable_calls = self.hits + self.misses
         hit_rate = None
         if hashable_calls > 0:
@@ -182,7 +183,7 @@ class CallByMemoizationController:
     max_entries: int
     field_filter: CallByMemoizeFieldFilter
     log_stats: bool
-    _field_caches: Dict[str, CallByMemoizationFieldCache]
+    _field_caches: dict[str, CallByMemoizationFieldCache]
 
     def __init__(
         self,
@@ -208,7 +209,7 @@ class CallByMemoizationController:
         self._field_caches[key] = cache
         return cache
 
-    def build_summary(self, *, top_n: int = 20) -> Dict[str, Any]:
+    def build_summary(self, *, top_n: int = 20) -> dict[str, Any]:
         fields = list(self._field_caches.values())
         fields.sort(key=lambda s: (-int(s.hits), -int(s.calls), str(s.field_key)))
         if top_n > 0:
@@ -256,7 +257,7 @@ class CallByMemoizationController:
         )
 
 
-def build_call_by_memoization_controller() -> Optional[CallByMemoizationController]:
+def build_call_by_memoization_controller() -> CallByMemoizationController | None:
     max_entries = _parse_int_env_positive_or_zero(os.environ.get(_ENV_MAX_ENTRIES) or "")
     if max_entries <= 0:
         return None

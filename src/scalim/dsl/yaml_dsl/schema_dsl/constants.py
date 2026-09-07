@@ -1,22 +1,22 @@
-from typing import Any, Dict
+from typing import Any
 
 SCHEMA_META_KEY = "schema"
 SCHEMA_OMIT_KEY = "schema_omit"
 
 
-def schema_meta(**kwargs: Any) -> Dict[str, Any]:
+def schema_meta(**kwargs: Any) -> dict[str, Any]:
     return {SCHEMA_META_KEY: kwargs}
 
 
-def schema_omit(**kwargs: Any) -> Dict[str, Any]:
-    meta: Dict[str, Any] = {SCHEMA_OMIT_KEY: True}
+def schema_omit(**kwargs: Any) -> dict[str, Any]:
+    meta: dict[str, Any] = {SCHEMA_OMIT_KEY: True}
     if kwargs:
         meta[SCHEMA_META_KEY] = kwargs
     return meta
 
 
-def schema_ref(name: str) -> Dict[str, Any]:
-    return {"$ref": "#/definitions/{}".format(name)}
+def schema_ref(name: str) -> dict[str, Any]:
+    return {"$ref": f"#/definitions/{name}"}
 
 
 _schema_meta = schema_meta
@@ -278,12 +278,12 @@ RELATION_STEP_TO_SCHEMA = {
     "examples": ["customers.customer_id", ["regions.region_id", "mappings.institution_id"]],
 }
 
-_LOOKUP_CAST_EMPTY_PARAMS_SCHEMA: Dict[str, Any] = {
+_LOOKUP_CAST_EMPTY_PARAMS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
 }
 
-LOOKUP_CAST_SCHEMA: Dict[str, Any] = {
+LOOKUP_CAST_SCHEMA: dict[str, Any] = {
     "type": "object",
     "oneOf": [
         {
@@ -541,7 +541,7 @@ _NORMALIZE_BRANCH_MAP_VALUES_SCHEMA = {
     "additionalProperties": False,
 }
 
-NORMALIZE_SCHEMA: Dict[str, Any] = {
+NORMALIZE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "index_by_key": _NORMALIZE_BRANCH_INDEX_BY_KEY_SCHEMA,
@@ -633,7 +633,7 @@ BIND_SCHEMA = {
     "markdownDescription": DESC_BIND_MD,
 }
 
-RELATION_STEPS_SCHEMA: Dict[str, Any] = {
+RELATION_STEPS_SCHEMA: dict[str, Any] = {
     "type": "array",
     "items": {
         "type": "object",

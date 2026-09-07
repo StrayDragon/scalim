@@ -13,7 +13,7 @@ from scalim.dsl.yaml_dsl.book_resource_policy import (
     resolve_write_defaults_config,
 )
 from scalim.dsl.yaml_dsl.schema_dsl.models import BookConfig, BookWriteDefaultsConfig, DemandConfig, ResourcesConfig
-from scalim.vendor.dataclassesx import replace
+from dataclasses import replace
 
 import pytest
 

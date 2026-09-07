@@ -1,9 +1,8 @@
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any, Literal
 
 from ..exceptions import ScalimExecutionError
-from ..vendor.compact.typing_extensionsx import Literal
-from ..vendor.dataclassesx import dataclass
-from ..vendor.dataclassesx import field as dataclass_field
 
 GuardrailMode = Literal["quiet", "fast_fail"]
 
@@ -12,14 +11,14 @@ class ScalimGuardrailViolationError(ScalimExecutionError):
     """当运行时防护触发时抛出(或记录)的异常."""
 
     code: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
 
     def __init__(
         self,
         message: str,
         *,
         code: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
@@ -29,19 +28,19 @@ class ScalimGuardrailViolationError(ScalimExecutionError):
 @dataclass(frozen=True)
 class GuardrailsLoaderPolicy:
     validate_result: bool = False
-    required_fields: Tuple[str, ...] = ()
-    on_transform_error: Optional[GuardrailMode] = None
+    required_fields: tuple[str, ...] = ()
+    on_transform_error: GuardrailMode | None = None
 
 
 @dataclass(frozen=True)
 class GuardrailsRelationsPolicy:
-    null_key_max_rate: Optional[float] = None
-    type_error_max_rate: Optional[float] = None
+    null_key_max_rate: float | None = None
+    type_error_max_rate: float | None = None
 
 
 @dataclass(frozen=True)
 class GuardrailsComputePolicy:
-    on_error: Optional[GuardrailMode] = None
+    on_error: GuardrailMode | None = None
 
 
 @dataclass(frozen=True)

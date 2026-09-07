@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, cast
 
 from ...typedefs import LoaderResultMapping, RuntimeValue
 from ._relations import JoinConditionIr, LookupStepIr, RelationIr, ScalimRelationInferenceError
@@ -11,7 +11,7 @@ def infer_lookup_steps(
     relation: Any,
     from_source: SourceRefIr,
     to_source: SourceIr,
-) -> Optional[Tuple[LookupStepIr, ...]]:
+) -> tuple[LookupStepIr, ...] | None:
     """
     从 `relation` 推断 `LookupStepIr` 序列
 
@@ -51,8 +51,8 @@ def infer_lookup_steps(
 
 
 def extract_from_fields(
-    steps: Tuple[LookupStepIr, ...],
-) -> Tuple[str, ...]:
+    steps: tuple[LookupStepIr, ...],
+) -> tuple[str, ...]:
     """
     从 `LookupStepIr` 序列中收集所有步骤的 `from_fields`,用于依赖分析
 
@@ -74,7 +74,7 @@ def extract_from_fields(
           `steps = (LookupStepIr(from_field=(\"region_id\", \"institution_id\"), to_source_id=\"mapping\"),)`
           `extract_from_fields(steps)`  # -> `(\"region_id\", \"institution_id\")`
     """
-    result: List[str] = []
+    result: list[str] = []
     for step in steps:
         from_fields = step.get_from_fields()  # 返回 `Tuple[str, ...]`
         result.extend(from_fields)
@@ -82,7 +82,7 @@ def extract_from_fields(
 
 
 def call_loader_with_binding(
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     context: LoaderCallContextIr,
     loader_fn: LoaderResultMapCallable,
 ) -> RuntimeValue:

@@ -1,14 +1,14 @@
-from typing import Any, List, Optional
+from typing import Any
 
 from .....exceptions import ScalimYamlError
 
 
 class ScalimConfigValidationError(ScalimYamlError):
-    errors: List[str]
-    issues: List[Any]
+    errors: list[str]
+    issues: list[Any]
 
-    def __init__(self, message: str, errors: Optional[List[str]] = None, issues: Optional[List[Any]] = None) -> None:
-        super(ScalimConfigValidationError, self).__init__(message)
+    def __init__(self, message: str, errors: list[str] | None = None, issues: list[Any] | None = None) -> None:
+        super().__init__(message)
         self.errors = errors or []
         self.issues = issues or []
 

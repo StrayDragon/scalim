@@ -1,5 +1,3 @@
-from typing import FrozenSet, Set
-
 from ...spec.ir import DemandIr, FieldIr
 from .resolver import LookupStepsResolver
 
@@ -8,10 +6,10 @@ def compute_key_fields(
     *,
     demand: DemandIr,
     resolver: LookupStepsResolver,
-    required_fields: Set[str],
-) -> FrozenSet[str]:
+    required_fields: set[str],
+) -> frozenset[str]:
     """计算关键字段(来自 `lookup_steps` 的信号)."""
-    key_fields: Set[str] = set()
+    key_fields: set[str] = set()
 
     main_source = demand.main_source
     if main_source:

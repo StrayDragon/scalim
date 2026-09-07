@@ -1,12 +1,13 @@
 import ast
 import json
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
-from functools import lru_cache
+from functools import cache
 from importlib.machinery import PathFinder
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, cast
 
 try:
     import jsonschema as _jsonschema  # type: ignore[import-not-found]
@@ -69,7 +70,7 @@ from .editor_types import EditorPosition, EditorRange
 YAML_DSL_KIND_DEMAND = "demand"
 YAML_DSL_KIND_WORKFLOW = "workflow"
 
-_YAML_DSL_KIND_CHOICES: Tuple[str, ...] = (
+_YAML_DSL_KIND_CHOICES: tuple[str, ...] = (
     YAML_DSL_KIND_DEMAND,
     YAML_DSL_KIND_WORKFLOW,
 )
@@ -99,11 +100,11 @@ class EditorDiagnostic:
     path: str
     source_path: str
     code: str = ""
-    range: Optional[EditorRange] = None
-    suggestions: Tuple[str, ...] = ()
+    range: EditorRange | None = None
+    suggestions: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "severity": str(self.severity),
             "message": str(self.message),
             "path": str(self.path),
@@ -123,12 +124,12 @@ class YamlDslEditorProjectDiscovery:
     """编辑器项目发现结果."""
 
     project_root: Path
-    scalim_yaml_path: Optional[Path]
-    python_roots: Tuple[Path, ...]
-    allowed_yaml_roots: Tuple[Path, ...]
+    scalim_yaml_path: Path | None
+    python_roots: tuple[Path, ...]
+    allowed_yaml_roots: tuple[Path, ...]
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "project_root": str(self.project_root),
             "python_roots": [str(p) for p in self.python_roots],
             "allowed_yaml_roots": [str(p) for p in self.allowed_yaml_roots],
@@ -142,10 +143,10 @@ class YamlDslEditorProjectDiscovery:
 class YamlDslEditorDiagnosticsResult:
     yaml_kind: str
     discovery: YamlDslEditorProjectDiscovery
-    errors: Tuple[EditorDiagnostic, ...]
-    warnings: Tuple[EditorDiagnostic, ...]
+    errors: tuple[EditorDiagnostic, ...]
+    warnings: tuple[EditorDiagnostic, ...]
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "yaml_kind": str(self.yaml_kind),
             "discovery": self.discovery.as_dict(),
@@ -161,14 +162,14 @@ class YamlDslEditorPlanDepsResult:
 
     yaml_kind: str
     discovery: YamlDslEditorProjectDiscovery
-    errors: Tuple[EditorDiagnostic, ...] = ()
-    warnings: Tuple[EditorDiagnostic, ...] = ()
-    import_fragment_files: Tuple[str, ...] = ()
-    plan_snapshot: Optional[Dict[str, Any]] = None
-    deps_snapshot: Optional[Dict[str, Any]] = None
+    errors: tuple[EditorDiagnostic, ...] = ()
+    warnings: tuple[EditorDiagnostic, ...] = ()
+    import_fragment_files: tuple[str, ...] = ()
+    plan_snapshot: dict[str, Any] | None = None
+    deps_snapshot: dict[str, Any] | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "yaml_kind": str(self.yaml_kind),
             "discovery": self.discovery.as_dict(),
             "errors": [d.as_dict() for d in self.errors],
@@ -186,12 +187,12 @@ class YamlDslEditorPlanDepsResult:
 @dataclass(frozen=True)
 class PythonDefinitionLocation:
     file_path: str
-    range: Optional[EditorRange]
+    range: EditorRange | None
     module_path: str
     symbol_path: str
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "file_path": str(self.file_path),
             "module_path": str(self.module_path),
             "symbol_path": str(self.symbol_path),
@@ -209,8 +210,8 @@ class ResolutionStep:
     rejected: bool = False
     reason: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "action": str(self.action),
             "input": str(self.input),
         }
@@ -226,12 +227,12 @@ class ResolutionStep:
 @dataclass(frozen=True)
 class ResolutionTrace:
     query: str
-    steps: Tuple[ResolutionStep, ...] = ()
-    locations: Tuple[PythonDefinitionLocation, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    steps: tuple[ResolutionStep, ...] = ()
+    locations: tuple[PythonDefinitionLocation, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "query": str(self.query),
             "steps": [step.as_dict() for step in self.steps],
             "locations": [loc.as_dict() for loc in self.locations],
@@ -243,12 +244,12 @@ class ResolutionTrace:
 
 @dataclass(frozen=True)
 class PythonDefinitionResult:
-    locations: Tuple[PythonDefinitionLocation, ...] = ()
-    warnings: Tuple[str, ...] = ()
-    trace: Optional[ResolutionTrace] = None
+    locations: tuple[PythonDefinitionLocation, ...] = ()
+    warnings: tuple[str, ...] = ()
+    trace: ResolutionTrace | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "locations": [loc.as_dict() for loc in self.locations],
         }
         if self.warnings:
@@ -261,10 +262,10 @@ class PythonDefinitionResult:
 @dataclass(frozen=True)
 class PythonHoverResult:
     text: str = ""
-    warnings: Tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"text": str(self.text)}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": str(self.text)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
@@ -273,11 +274,11 @@ class PythonHoverResult:
 @dataclass(frozen=True)
 class YamlImportDefinitionLocation:
     file_path: str
-    range: Optional[EditorRange]
+    range: EditorRange | None
     fragment_path: str
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "file_path": str(self.file_path),
             "fragment_path": str(self.fragment_path),
         }
@@ -288,11 +289,11 @@ class YamlImportDefinitionLocation:
 
 @dataclass(frozen=True)
 class YamlImportDefinitionResult:
-    locations: Tuple[YamlImportDefinitionLocation, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    locations: tuple[YamlImportDefinitionLocation, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "locations": [loc.as_dict() for loc in self.locations],
         }
         if self.warnings:
@@ -303,10 +304,10 @@ class YamlImportDefinitionResult:
 @dataclass(frozen=True)
 class YamlImportHoverResult:
     text: str = ""
-    warnings: Tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"text": str(self.text)}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": str(self.text)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
@@ -319,7 +320,7 @@ class YamlDslSugarCompletionItem:
     detail: str = ""
     is_snippet: bool = False
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "label": str(self.label),
             "insert_text": str(self.insert_text),
@@ -330,11 +331,11 @@ class YamlDslSugarCompletionItem:
 
 @dataclass(frozen=True)
 class YamlDslSugarCompletionResult:
-    items: Tuple[YamlDslSugarCompletionItem, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    items: tuple[YamlDslSugarCompletionItem, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"items": [item.as_dict() for item in self.items]}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"items": [item.as_dict() for item in self.items]}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
@@ -343,10 +344,10 @@ class YamlDslSugarCompletionResult:
 @dataclass(frozen=True)
 class YamlDslSugarHoverResult:
     text: str = ""
-    warnings: Tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"text": str(self.text)}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": str(self.text)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
@@ -357,10 +358,10 @@ class YamlDslImportPathDefinitionResult:
     kind: str = ""  # file|preset
     file_path: str = ""
     preset_id: str = ""
-    warnings: Tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "kind": str(self.kind or ""),
             "file_path": str(self.file_path or ""),
             "preset_id": str(self.preset_id or ""),
@@ -375,14 +376,14 @@ class YamlDslEntityHintDiagnostic:
     """实体引用解析失败时的 hint 级诊断(用于 LSP publishDiagnostics)."""
 
     message: str
-    range: Optional[EditorRange] = None
+    range: EditorRange | None = None
     code: str = "scalim_unknown_entity_id"
     yaml_path: str = ""
     kind: str = ""
     entity_id: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "message": str(self.message),
             "code": str(self.code),
         }
@@ -402,12 +403,12 @@ class YamlDslEntityDeclaration:
     kind: str
     entity_id: str
     yaml_path: str
-    range: Optional[EditorRange]
+    range: EditorRange | None
     summary: str = ""
     detail: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "kind": str(self.kind),
             "entity_id": str(self.entity_id),
             "yaml_path": str(self.yaml_path),
@@ -423,21 +424,21 @@ class YamlDslEntityDeclaration:
 class YamlDslEntityIndex:
     """单文件实体索引(仅基于 YAML 结构,不执行 Python)."""
 
-    sources: Dict[str, YamlDslEntityDeclaration]
-    relations: Dict[str, YamlDslEntityDeclaration]
-    outputs: Dict[str, YamlDslEntityDeclaration]
-    workflow_runs: Dict[str, YamlDslEntityDeclaration]
-    source_fields: Dict[Tuple[str, str], YamlDslEntityDeclaration]
-    derived_fields: Dict[str, YamlDslEntityDeclaration]
-    warnings: Tuple[str, ...] = ()
+    sources: dict[str, YamlDslEntityDeclaration]
+    relations: dict[str, YamlDslEntityDeclaration]
+    outputs: dict[str, YamlDslEntityDeclaration]
+    workflow_runs: dict[str, YamlDslEntityDeclaration]
+    source_fields: dict[tuple[str, str], YamlDslEntityDeclaration]
+    derived_fields: dict[str, YamlDslEntityDeclaration]
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "sources": {k: v.as_dict() for k, v in self.sources.items()},
             "relations": {k: v.as_dict() for k, v in self.relations.items()},
             "outputs": {k: v.as_dict() for k, v in self.outputs.items()},
             "workflow_runs": {k: v.as_dict() for k, v in self.workflow_runs.items()},
-            "source_fields": {"{}.{}".format(k[0], k[1]): v.as_dict() for k, v in self.source_fields.items()},
+            "source_fields": {f"{k[0]}.{k[1]}": v.as_dict() for k, v in self.source_fields.items()},
             "derived_fields": {k: v.as_dict() for k, v in self.derived_fields.items()},
             "warnings": list(self.warnings) if self.warnings else [],
         }
@@ -446,13 +447,13 @@ class YamlDslEntityIndex:
 @dataclass(frozen=True)
 class YamlDslEntityDefinitionLocation:
     file_path: str
-    range: Optional[EditorRange]
+    range: EditorRange | None
     entity_kind: str
     entity_id: str
     yaml_path: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "file_path": str(self.file_path),
             "entity_kind": str(self.entity_kind),
             "entity_id": str(self.entity_id),
@@ -466,12 +467,12 @@ class YamlDslEntityDefinitionLocation:
 
 @dataclass(frozen=True)
 class YamlDslEntityDefinitionResult:
-    locations: Tuple[YamlDslEntityDefinitionLocation, ...] = ()
-    warnings: Tuple[str, ...] = ()
-    hint: Optional[YamlDslEntityHintDiagnostic] = None
+    locations: tuple[YamlDslEntityDefinitionLocation, ...] = ()
+    warnings: tuple[str, ...] = ()
+    hint: YamlDslEntityHintDiagnostic | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "locations": [loc.as_dict() for loc in self.locations],
         }
         if self.warnings:
@@ -484,11 +485,11 @@ class YamlDslEntityDefinitionResult:
 @dataclass(frozen=True)
 class YamlDslEntityHoverResult:
     text: str = ""
-    warnings: Tuple[str, ...] = ()
-    hint: Optional[YamlDslEntityHintDiagnostic] = None
+    warnings: tuple[str, ...] = ()
+    hint: YamlDslEntityHintDiagnostic | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"text": str(self.text)}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": str(self.text)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         if self.hint is not None:
@@ -504,8 +505,8 @@ class YamlDslEntityCompletionItem:
     is_snippet: bool = False
     replace: str = "token"  # token|value
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "label": str(self.label),
             "insert_text": str(self.insert_text),
             "detail": str(self.detail or ""),
@@ -517,12 +518,12 @@ class YamlDslEntityCompletionItem:
 
 @dataclass(frozen=True)
 class YamlDslEntityCompletionResult:
-    items: Tuple[YamlDslEntityCompletionItem, ...] = ()
-    warnings: Tuple[str, ...] = ()
-    hint: Optional[YamlDslEntityHintDiagnostic] = None
+    items: tuple[YamlDslEntityCompletionItem, ...] = ()
+    warnings: tuple[str, ...] = ()
+    hint: YamlDslEntityHintDiagnostic | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "items": [item.as_dict() for item in self.items],
         }
         if self.warnings:
@@ -534,22 +535,22 @@ class YamlDslEntityCompletionResult:
 
 @dataclass(frozen=True)
 class PythonCompletionResult:
-    items: Tuple[str, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    items: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"items": list(self.items)}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"items": list(self.items)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
 
 
 def discover_yaml_dsl_editor_project(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     *,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-    workspace_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+    workspace_root_override: str | Path | None = None,
 ) -> YamlDslEditorProjectDiscovery:
     """执行 `YAML` `DSL` 编辑器项目发现逻辑.
 
@@ -570,7 +571,7 @@ def discover_yaml_dsl_editor_project(
     return _discover_yaml_dsl_editor_project_from_project_config(entry_path, cfg, workspace_root=workspace_root)
 
 
-def _resolve_workspace_root_override(raw: Optional[Union[str, Path]]) -> Optional[Path]:
+def _resolve_workspace_root_override(raw: str | Path | None) -> Path | None:
     if raw is None:
         return None
     text = str(raw).strip()
@@ -593,7 +594,7 @@ def _is_within_dir(path: Path, root: Path) -> bool:
     return True
 
 
-def _locate_scalim_yaml_bounded(*, start_dir: Path, stop_dir: Path) -> Optional[Path]:
+def _locate_scalim_yaml_bounded(*, start_dir: Path, stop_dir: Path) -> Path | None:
     current = start_dir.resolve(strict=False)
     stop = stop_dir.resolve(strict=False)
     if current != stop and not _is_within_dir(current, stop):
@@ -614,10 +615,10 @@ def _locate_scalim_yaml_bounded(*, start_dir: Path, stop_dir: Path) -> Optional[
 def _load_yaml_dsl_project_config_for_editor(
     entry_path: Path,
     *,
-    scalim_yaml_override: Optional[Union[str, Path]],
-    project_root_override: Optional[Union[str, Path]],
-    workspace_root: Optional[Path],
-) -> Optional[YamlDslProjectConfig]:
+    scalim_yaml_override: str | Path | None,
+    project_root_override: str | Path | None,
+    workspace_root: Path | None,
+) -> YamlDslProjectConfig | None:
     if scalim_yaml_override is not None or project_root_override is not None:
         return load_yaml_dsl_project_config(
             entry_path,
@@ -636,15 +637,15 @@ def _load_yaml_dsl_project_config_for_editor(
 
 def _discover_yaml_dsl_editor_project_from_project_config(
     entry_path: Path,
-    cfg: Optional[YamlDslProjectConfig],
+    cfg: YamlDslProjectConfig | None,
     *,
-    workspace_root: Optional[Path],
+    workspace_root: Path | None,
 ) -> YamlDslEditorProjectDiscovery:
     entry_dir = entry_path.parent
     project_root = entry_dir
-    scalim_yaml_path: Optional[Path] = None
-    raw_allowed_roots: Optional[Iterable[Union[str, Path]]] = None
-    raw_python_roots: Optional[Iterable[Union[str, Path]]] = None
+    scalim_yaml_path: Path | None = None
+    raw_allowed_roots: Iterable[str | Path] | None = None
+    raw_python_roots: Iterable[str | Path] | None = None
 
     if cfg is not None:
         project_root = cfg.project_root
@@ -674,7 +675,7 @@ def _discover_yaml_dsl_editor_project_from_project_config(
     )
 
 
-_YAML_DSL_SCHEMA_MARKERS: Tuple[str, ...] = (
+_YAML_DSL_SCHEMA_MARKERS: tuple[str, ...] = (
     "demand.gen.json",
     "workflow.gen.json",
     "scalim_yaml.gen.json",
@@ -684,7 +685,7 @@ _YAML_DSL_FALLBACK_HINT_RE = re.compile(r"(?m)^\s*(loader|call_by)\s*:")
 _YAML_DSL_DOLLAR_HINT_RE = re.compile(r"\$(import|init_var)\b")
 
 
-def _try_resolve_yaml_path(raw: Optional[Union[str, Path]]) -> Optional[Path]:
+def _try_resolve_yaml_path(raw: str | Path | None) -> Path | None:
     if raw is None:
         return None
     try:
@@ -693,7 +694,7 @@ def _try_resolve_yaml_path(raw: Optional[Union[str, Path]]) -> Optional[Path]:
         return None
 
 
-def _is_yaml_dsl_path_excluded(path: Optional[Path]) -> bool:
+def _is_yaml_dsl_path_excluded(path: Path | None) -> bool:
     if path is None:
         return False
     if path.name == _SCALIM_YAML_FILENAME:
@@ -710,17 +711,17 @@ def _has_yaml_dsl_text_hints(text: str) -> bool:
     return _YAML_DSL_FALLBACK_HINT_RE.search(text) is not None
 
 
-def _try_load_yaml_mapping(text: str) -> Optional[Dict[str, Any]]:
+def _try_load_yaml_mapping(text: str) -> dict[str, Any] | None:
     try:
         loaded = yaml.safe_load(text)
     except Exception:  # noqa: BLE001
         return None
     if not isinstance(loaded, dict):
         return None
-    return cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
+    return cast("dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
 
 
-def is_probably_yaml_dsl_document(yaml_path: Optional[Union[str, Path]], yaml_text: str) -> bool:
+def is_probably_yaml_dsl_document(yaml_path: str | Path | None, yaml_text: str) -> bool:
     """Best-effort heuristic to decide whether a YAML file looks like Scalim YAML DSL.
 
     This is used to avoid polluting unrelated YAML files with scalim diagnostics/features.
@@ -750,12 +751,12 @@ def is_probably_yaml_dsl_document(yaml_path: Optional[Union[str, Path]], yaml_te
 
 
 def classify_yaml_dsl_kind(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     yaml_text: str,
     *,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-    workspace_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+    workspace_root_override: str | Path | None = None,
 ) -> str:
     """对单个 `YAML` 文件执行类型分类(`demand`/`workflow`)."""
     path = Path(str(yaml_path)).expanduser().resolve(strict=False)
@@ -776,12 +777,12 @@ def classify_yaml_dsl_kind(
 
 
 def collect_yaml_dsl_editor_diagnostics(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     *,
-    yaml_text: Optional[str] = None,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-    workspace_root_override: Optional[Union[str, Path]] = None,
+    yaml_text: str | None = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+    workspace_root_override: str | Path | None = None,
 ) -> YamlDslEditorDiagnosticsResult:
     """收集编辑器/`LSP` 侧 `diagnostics`(不调用 `CLI`)."""
     path = Path(str(yaml_path)).expanduser().resolve(strict=False)
@@ -828,12 +829,12 @@ def collect_yaml_dsl_editor_diagnostics(
 
 
 def compile_yaml_dsl_editor_plan_deps(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     *,
-    yaml_text: Optional[str] = None,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-    workspace_root_override: Optional[Union[str, Path]] = None,
+    yaml_text: str | None = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+    workspace_root_override: str | Path | None = None,
 ) -> YamlDslEditorPlanDepsResult:
     """静态编译单个 YAML 文档到 plan/deps 快照(不导入/不执行用户模块).
 
@@ -888,7 +889,7 @@ def compile_yaml_dsl_editor_plan_deps(
     except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
             code="yaml_frontend_plan_error",
-            message="Failed to compile plan/deps: {}: {}".format(type(exc).__name__, exc),
+            message=f"Failed to compile plan/deps: {type(exc).__name__}: {exc}",
             source_path=str(path),
             path="(plan)",
             loc=ErrorLoc(1, 1),
@@ -924,7 +925,7 @@ def build_yaml_dsl_entity_index(
     source_path: str,
 ) -> YamlDslEntityIndex:
     """从单个 YAML 文档构建实体索引(单文件,静态,无副作用)."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     store = _EntityIndexStore(
         sources={},
         relations={},
@@ -945,7 +946,7 @@ def build_yaml_dsl_entity_index(
         _index_workflow_runs_entities(demand, locations, store)
 
     if yaml_kind not in _YAML_DSL_KIND_CHOICES:
-        warnings.append("Unknown yaml_kind: {}".format(str(yaml_kind)))
+        warnings.append(f"Unknown yaml_kind: {yaml_kind!s}")
 
     return YamlDslEntityIndex(
         sources=store.sources,
@@ -960,33 +961,33 @@ def build_yaml_dsl_entity_index(
 
 @dataclass
 class _EntityIndexStore:
-    sources: Dict[str, YamlDslEntityDeclaration]
-    relations: Dict[str, YamlDslEntityDeclaration]
-    outputs: Dict[str, YamlDslEntityDeclaration]
-    workflow_runs: Dict[str, YamlDslEntityDeclaration]
-    source_fields: Dict[Tuple[str, str], YamlDslEntityDeclaration]
-    derived_fields: Dict[str, YamlDslEntityDeclaration]
+    sources: dict[str, YamlDslEntityDeclaration]
+    relations: dict[str, YamlDslEntityDeclaration]
+    outputs: dict[str, YamlDslEntityDeclaration]
+    workflow_runs: dict[str, YamlDslEntityDeclaration]
+    source_fields: dict[tuple[str, str], YamlDslEntityDeclaration]
+    derived_fields: dict[str, YamlDslEntityDeclaration]
 
 
 def _load_yaml_mapping_for_entity_index(
     yaml_text: str,
     *,
     source_path: str,
-    warnings: List[str],
-) -> Optional[Tuple[Dict[str, Any], Dict[str, Tuple[int, int]]]]:
+    warnings: list[str],
+) -> tuple[dict[str, Any], dict[str, tuple[int, int]]] | None:
     try:
         loaded, locations, _lines = load_yaml_mapping_text(yaml_text, source_path=str(source_path))
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
-        warnings.append("YAML parse failed: {}".format(msg))
+        warnings.append(f"YAML parse failed: {msg}")
         return None
     except Exception as exc:  # noqa: BLE001
-        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"YAML parse failed: {type(exc).__name__}: {exc}")
         return None
     return loaded, locations
 
 
-def _index_main_source_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+def _index_main_source_entities(demand: dict[str, Any], locations: dict[str, tuple[int, int]], store: _EntityIndexStore) -> None:
     main_source = _as_yaml_mapping(demand.get("main_source"))
     if main_source is None:
         return
@@ -1012,8 +1013,8 @@ def _ranges_for_yaml_key_value_identifiers(
     yaml_text: str,
     *,
     yaml_path: str,
-    locations: Dict[str, Tuple[int, int]],
-) -> Dict[str, EditorRange]:
+    locations: dict[str, tuple[int, int]],
+) -> dict[str, EditorRange]:
     """Best-effort: map identifiers found in a single-line scalar/list value to their source ranges.
 
     Used for `sources.*.key` where the entity id lives in the *value* (not a mapping key).
@@ -1036,7 +1037,7 @@ def _ranges_for_yaml_key_value_identifiers(
     comment_idx = line_text.find("#", int(colon_idx) + 1)
     end0 = int(comment_idx) if comment_idx != -1 else len(line_text)
 
-    out: Dict[str, EditorRange] = {}
+    out: dict[str, EditorRange] = {}
     for m in _IDENTIFIER_RE.finditer(line_text, pos=int(colon_idx) + 1, endpos=int(end0)):
         token = m.group(0)
         if not token:
@@ -1048,12 +1049,12 @@ def _ranges_for_yaml_key_value_identifiers(
     return out
 
 
-def _source_key_ids_from_spec_map(spec_map: Optional[Dict[str, Any]]) -> Tuple[str, ...]:
+def _source_key_ids_from_spec_map(spec_map: dict[str, Any] | None) -> tuple[str, ...]:
     if spec_map is None:
         return ()
     key_spec = spec_map.get("key")
     if isinstance(key_spec, list):
-        values: List[str] = []
+        values: list[str] = []
         for item in key_spec:
             token = _safe_str(cast("object", item))
             if not token:
@@ -1070,12 +1071,12 @@ def _index_source_key_fields(
     source_id: str,
     key_ids: Sequence[str],
     yaml_text: str,
-    locations: Dict[str, Tuple[int, int]],
+    locations: dict[str, tuple[int, int]],
 ) -> None:
     if not key_ids:
         return
 
-    key_yaml_path = "sources.{}.key".format(str(source_id))
+    key_yaml_path = f"sources.{source_id!s}.key"
     ranges = _ranges_for_yaml_key_value_identifiers(yaml_text, yaml_path=key_yaml_path, locations=locations)
     fallback_range = _range_for_yaml_key_path(key_yaml_path, key_text="key", locations=locations)
 
@@ -1089,13 +1090,13 @@ def _index_source_key_fields(
             yaml_path=key_yaml_path,
             range=ranges.get(token) or fallback_range,
             summary="Key field",
-            detail="Declared via sources.{}.key".format(str(source_id)),
+            detail=f"Declared via sources.{source_id!s}.key",
         )
 
 
 def _index_lookup_sources_entities(
-    demand: Dict[str, Any],
-    locations: Dict[str, Tuple[int, int]],
+    demand: dict[str, Any],
+    locations: dict[str, tuple[int, int]],
     store: _EntityIndexStore,
     *,
     yaml_text: str,
@@ -1109,7 +1110,7 @@ def _index_lookup_sources_entities(
             continue
         decl = _build_source_declaration(
             sid,
-            yaml_path="sources.{}".format(sid),
+            yaml_path=f"sources.{sid}",
             range_key_text=sid,
             locations=locations,
             spec=spec,
@@ -1129,7 +1130,7 @@ def _index_lookup_sources_entities(
         )
 
         fields_map = spec_map.get("fields") if spec_map is not None else None
-        _index_source_fields(sid, fields_map, base_yaml_path="sources.{}.fields".format(sid), locations=locations, store=store)
+        _index_source_fields(sid, fields_map, base_yaml_path=f"sources.{sid}.fields", locations=locations, store=store)
 
 
 def _index_source_fields(
@@ -1137,7 +1138,7 @@ def _index_source_fields(
     fields_map: object,
     *,
     base_yaml_path: str,
-    locations: Dict[str, Tuple[int, int]],
+    locations: dict[str, tuple[int, int]],
     store: _EntityIndexStore,
 ) -> None:
     fields = _as_yaml_mapping(fields_map)
@@ -1147,7 +1148,7 @@ def _index_source_fields(
         fid = _safe_str(field_id)
         if not fid:
             continue
-        yaml_path = "{}.{}".format(base_yaml_path, fid)
+        yaml_path = f"{base_yaml_path}.{fid}"
         rng = _range_for_yaml_key_path(yaml_path, key_text=fid, locations=locations)
         store.source_fields[(source_id, fid)] = YamlDslEntityDeclaration(
             kind="source_field",
@@ -1159,7 +1160,7 @@ def _index_source_fields(
         )
 
 
-def _index_derived_fields_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+def _index_derived_fields_entities(demand: dict[str, Any], locations: dict[str, tuple[int, int]], store: _EntityIndexStore) -> None:
     derived_map = _as_yaml_mapping(demand.get("fields"))
     if derived_map is None:
         return
@@ -1167,7 +1168,7 @@ def _index_derived_fields_entities(demand: Dict[str, Any], locations: Dict[str, 
         fid = _safe_str(field_id)
         if not fid:
             continue
-        yaml_path = "fields.{}".format(fid)
+        yaml_path = f"fields.{fid}"
         rng = _range_for_yaml_key_path(yaml_path, key_text=fid, locations=locations)
         store.derived_fields[fid] = YamlDslEntityDeclaration(
             kind="derived_field",
@@ -1179,7 +1180,7 @@ def _index_derived_fields_entities(demand: Dict[str, Any], locations: Dict[str, 
         )
 
 
-def _index_relations_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+def _index_relations_entities(demand: dict[str, Any], locations: dict[str, tuple[int, int]], store: _EntityIndexStore) -> None:
     relations_map = _as_yaml_mapping(demand.get("relations"))
     if relations_map is None:
         return
@@ -1187,7 +1188,7 @@ def _index_relations_entities(demand: Dict[str, Any], locations: Dict[str, Tuple
         rid = _safe_str(rel_id)
         if not rid:
             continue
-        yaml_path = "relations.{}".format(rid)
+        yaml_path = f"relations.{rid}"
         rng = _range_for_yaml_key_path(yaml_path, key_text=rid, locations=locations)
         store.relations[rid] = YamlDslEntityDeclaration(
             kind="relation",
@@ -1199,7 +1200,7 @@ def _index_relations_entities(demand: Dict[str, Any], locations: Dict[str, Tuple
         )
 
 
-def _index_outputs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+def _index_outputs_entities(demand: dict[str, Any], locations: dict[str, tuple[int, int]], store: _EntityIndexStore) -> None:
     outputs_seq = _as_yaml_sequence(demand.get("outputs"))
     if outputs_seq is None:
         return
@@ -1210,7 +1211,7 @@ def _index_outputs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[i
         name = _safe_str(spec_map.get("name"))
         if not name:
             continue
-        yaml_path = "outputs.{}.name".format(idx)
+        yaml_path = f"outputs.{idx}.name"
         rng = _range_for_yaml_key_path(yaml_path, key_text="name", locations=locations)
         store.outputs[name] = YamlDslEntityDeclaration(
             kind="output",
@@ -1222,7 +1223,7 @@ def _index_outputs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[i
         )
 
 
-def _index_workflow_runs_entities(demand: Dict[str, Any], locations: Dict[str, Tuple[int, int]], store: _EntityIndexStore) -> None:
+def _index_workflow_runs_entities(demand: dict[str, Any], locations: dict[str, tuple[int, int]], store: _EntityIndexStore) -> None:
     workflow = _as_yaml_mapping(demand.get("workflow"))
     if workflow is None:
         return
@@ -1236,7 +1237,7 @@ def _index_workflow_runs_entities(demand: Dict[str, Any], locations: Dict[str, T
         run_id = _safe_str(spec_map.get("id"))
         if not run_id:
             continue
-        yaml_path = "workflow.runs.{}.id".format(idx)
+        yaml_path = f"workflow.runs.{idx}.id"
         rng = _range_for_yaml_key_path(yaml_path, key_text="id", locations=locations)
         store.workflow_runs[run_id] = YamlDslEntityDeclaration(
             kind="workflow_run",
@@ -1252,7 +1253,7 @@ def resolve_yaml_dsl_entity_definition(
     extraction: YamlCursorExtractionResult,
     *,
     entity_index: YamlDslEntityIndex,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
 ) -> YamlDslEntityDefinitionResult:
     """解析实体引用并返回定义位置(同文件)."""
     kind = str(getattr(extraction, "kind", "") or "").strip()
@@ -1267,7 +1268,7 @@ def resolve_yaml_dsl_entity_definition(
 
     kind_label, decl = _simple_decl_for_entity_reference(kind, ref, entity_index=entity_index)
     if not kind_label:
-        return YamlDslEntityDefinitionResult(warnings=("Unknown extraction kind: {}".format(kind),))
+        return YamlDslEntityDefinitionResult(warnings=(f"Unknown extraction kind: {kind}",))
     if decl is None:
         return YamlDslEntityDefinitionResult(hint=_unknown_hint(kind_label, ref, extraction))
     return _definition_result_for_decl(decl, file_path=file_path)
@@ -1289,7 +1290,7 @@ def _simple_decl_for_entity_reference(
     ref: str,
     *,
     entity_index: YamlDslEntityIndex,
-) -> Tuple[str, Optional[YamlDslEntityDeclaration]]:
+) -> tuple[str, YamlDslEntityDeclaration | None]:
     if kind in ("source_id", "relation_step_source_id"):
         return "source id", entity_index.sources.get(ref)
     if kind == "relation_id":
@@ -1315,7 +1316,7 @@ def _resolve_relation_step_field_definition(
 
     decl = entity_index.source_fields.get((source_id, field_id)) or entity_index.derived_fields.get(field_id)
     if decl is None:
-        return YamlDslEntityDefinitionResult(hint=_unknown_hint("field id", field_id, extraction, extra="source={}".format(source_id)))
+        return YamlDslEntityDefinitionResult(hint=_unknown_hint("field id", field_id, extraction, extra=f"source={source_id}"))
     return _definition_result_for_decl(decl, file_path=file_path)
 
 
@@ -1345,7 +1346,7 @@ def _simple_hover_decl_for_entity_reference(
     ref: str,
     *,
     entity_index: YamlDslEntityIndex,
-) -> Tuple[str, str, Optional[YamlDslEntityDeclaration]]:
+) -> tuple[str, str, YamlDslEntityDeclaration | None]:
     if kind in ("source_id", "relation_step_source_id"):
         return "Source", "source id", entity_index.sources.get(ref)
     if kind == "relation_id":
@@ -1366,10 +1367,10 @@ def _hover_relation_step_field(extraction: YamlCursorExtractionResult, *, entity
     if decl is None:
         return YamlDslEntityHoverResult(
             text="",
-            hint=_unknown_hint("field id", field_id, extraction, extra="source={}".format(source_id)),
+            hint=_unknown_hint("field id", field_id, extraction, extra=f"source={source_id}"),
         )
 
-    title = "Field ({})".format(source_id) if decl.kind == "source_field" else "Field"
+    title = f"Field ({source_id})" if decl.kind == "source_field" else "Field"
     return YamlDslEntityHoverResult(text=_hover_card(title, decl))
 
 
@@ -1390,13 +1391,13 @@ def complete_yaml_dsl_entity_reference(
 
     decls = _decls_for_simple_completion_kind(kind, entity_index=entity_index)
     if decls is None:
-        return YamlDslEntityCompletionResult(items=(), warnings=("Unknown extraction kind: {}".format(kind),))
+        return YamlDslEntityCompletionResult(items=(), warnings=(f"Unknown extraction kind: {kind}",))
 
     items = _completion_items_for_decls(sorted(decls, key=lambda d: d.entity_id), replace="token")
     return YamlDslEntityCompletionResult(items=items)
 
 
-def _decls_for_simple_completion_kind(kind: str, *, entity_index: YamlDslEntityIndex) -> Optional[Sequence[YamlDslEntityDeclaration]]:
+def _decls_for_simple_completion_kind(kind: str, *, entity_index: YamlDslEntityIndex) -> Sequence[YamlDslEntityDeclaration] | None:
     if kind == "source_id":
         return list(entity_index.sources.values())
     if kind == "relation_id":
@@ -1446,7 +1447,7 @@ def _safe_str(raw: object) -> str:
     return str(raw).strip()
 
 
-def _as_yaml_mapping(value: object) -> Optional[Dict[str, Any]]:
+def _as_yaml_mapping(value: object) -> dict[str, Any] | None:
     """Narrow YAML raw nodes to `Dict[str, Any]` for editor-only static analysis.
 
     NOTE: YAML DSL mappings are string-keyed by design. We cast after runtime `dict` check
@@ -1455,10 +1456,10 @@ def _as_yaml_mapping(value: object) -> Optional[Dict[str, Any]]:
 
     if not isinstance(value, dict):
         return None
-    return cast("Dict[str, Any]", value)
+    return cast("dict[str, Any]", value)
 
 
-def _as_yaml_sequence(value: object) -> Optional[Sequence[object]]:
+def _as_yaml_sequence(value: object) -> Sequence[object] | None:
     if not isinstance(value, list):
         return None
     return cast("Sequence[object]", value)
@@ -1468,8 +1469,8 @@ def _range_for_yaml_key_path(
     yaml_path: str,
     *,
     key_text: str,
-    locations: Dict[str, Tuple[int, int]],
-) -> Optional[EditorRange]:
+    locations: dict[str, tuple[int, int]],
+) -> EditorRange | None:
     loc = locations.get(str(yaml_path))
     if loc is None:
         return None
@@ -1486,9 +1487,9 @@ def _build_source_declaration(
     *,
     yaml_path: str,
     range_key_text: str,
-    locations: Dict[str, Tuple[int, int]],
+    locations: dict[str, tuple[int, int]],
     spec: object,
-) -> Optional[YamlDslEntityDeclaration]:
+) -> YamlDslEntityDeclaration | None:
     rng = _range_for_yaml_key_path(yaml_path, key_text=str(range_key_text), locations=locations)
     loader = ""
     key = ""
@@ -1499,7 +1500,7 @@ def _build_source_declaration(
         key_raw = spec_map.get("key")
         key_seq = _as_yaml_sequence(key_raw)
         if key_seq is not None:
-            key_items: List[str] = []
+            key_items: list[str] = []
             for item in key_seq:
                 cleaned = _safe_str(item)
                 if cleaned:
@@ -1511,14 +1512,14 @@ def _build_source_declaration(
         if fields_raw is not None:
             fields_cnt = len(fields_raw)
 
-    summary = "loader: {}".format(loader) if loader else ""
-    detail_lines: List[str] = ["id: {}".format(source_id)]
+    summary = f"loader: {loader}" if loader else ""
+    detail_lines: list[str] = [f"id: {source_id}"]
     if loader:
-        detail_lines.append("loader: {}".format(loader))
+        detail_lines.append(f"loader: {loader}")
     if key:
-        detail_lines.append("key: {}".format(key))
+        detail_lines.append(f"key: {key}")
     if fields_cnt:
-        detail_lines.append("fields: {}".format(int(fields_cnt)))
+        detail_lines.append(f"fields: {int(fields_cnt)}")
 
     return YamlDslEntityDeclaration(
         kind="source",
@@ -1535,7 +1536,7 @@ def _field_summary(spec: object) -> str:
     if spec_map is not None:
         name = _safe_str(spec_map.get("name"))
         if name:
-            return "name: {}".format(name)
+            return f"name: {name}"
     return ""
 
 
@@ -1544,18 +1545,18 @@ def _field_detail(spec: object) -> str:
     if spec_map is not None:
         name = _safe_str(spec_map.get("name"))
         if name:
-            return "name: {}".format(name)
+            return f"name: {name}"
     return ""
 
 
-def _relation_sources_involved(rel_spec: object) -> Tuple[str, ...]:
+def _relation_sources_involved(rel_spec: object) -> tuple[str, ...]:
     rel_map = _as_yaml_mapping(rel_spec)
     if rel_map is None:
         return ()
     steps = _as_yaml_sequence(rel_map.get("steps"))
     if steps is None:
         return ()
-    names: Dict[str, None] = {}
+    names: dict[str, None] = {}
     for step in steps:
         step_map = _as_yaml_mapping(step)
         if step_map is None:
@@ -1591,7 +1592,7 @@ def _relation_summary(rel_spec: object) -> str:
     sources = _relation_sources_involved(rel_map)
     if sources:
         return "steps: {} | sources: {}".format(int(step_cnt), ", ".join(sources))
-    return "steps: {}".format(int(step_cnt))
+    return f"steps: {int(step_cnt)}"
 
 
 def _relation_detail(rel_spec: object) -> str:
@@ -1601,7 +1602,7 @@ def _relation_detail(rel_spec: object) -> str:
     steps = _as_yaml_sequence(rel_map.get("steps"))
     step_cnt = len(steps) if steps is not None else 0
     sources = _relation_sources_involved(rel_map)
-    lines = ["steps: {}".format(int(step_cnt))]
+    lines = [f"steps: {int(step_cnt)}"]
     if sources:
         lines.append("sources: {}".format(", ".join(sources)))
     return "\n".join(lines)
@@ -1613,7 +1614,7 @@ def _output_summary(out_spec: object) -> str:
         return ""
     parent = _safe_str(out_map.get("from"))
     if parent:
-        return "from: {}".format(parent)
+        return f"from: {parent}"
     return ""
 
 
@@ -1621,13 +1622,13 @@ def _output_detail(out_spec: object) -> str:
     out_map = _as_yaml_mapping(out_spec)
     if out_map is None:
         return ""
-    lines: List[str] = []
+    lines: list[str] = []
     parent = _safe_str(out_map.get("from"))
     if parent:
-        lines.append("from: {}".format(parent))
+        lines.append(f"from: {parent}")
     fields_raw = _as_yaml_sequence(out_map.get("fields"))
     if fields_raw is not None:
-        lines.append("fields: {}".format(len(fields_raw)))
+        lines.append(f"fields: {len(fields_raw)}")
     if _as_yaml_mapping(out_map.get("aggregate")) is not None:
         lines.append("aggregate: true")
     return "\n".join(lines)
@@ -1639,7 +1640,7 @@ def _workflow_run_summary(run_spec: object) -> str:
         return ""
     deps_raw = _as_yaml_sequence(run_map.get("depends_on"))
     if deps_raw is not None:
-        deps: List[str] = []
+        deps: list[str] = []
         for item in deps_raw:
             cleaned = _safe_str(item)
             if cleaned:
@@ -1653,10 +1654,10 @@ def _workflow_run_detail(run_spec: object) -> str:
     run_map = _as_yaml_mapping(run_spec)
     if run_map is None:
         return ""
-    lines: List[str] = []
+    lines: list[str] = []
     deps_raw = _as_yaml_sequence(run_map.get("depends_on"))
     if deps_raw is not None:
-        deps: List[str] = []
+        deps: list[str] = []
         for item in deps_raw:
             cleaned = _safe_str(item)
             if cleaned:
@@ -1666,7 +1667,7 @@ def _workflow_run_detail(run_spec: object) -> str:
     return "\n".join(lines)
 
 
-def _split_source_field_ref(text: str) -> Tuple[str, str]:
+def _split_source_field_ref(text: str) -> tuple[str, str]:
     raw = _safe_str(text)
     if not raw:
         return "", ""
@@ -1679,8 +1680,8 @@ def _split_source_field_ref(text: str) -> Tuple[str, str]:
 def _unknown_hint(
     kind_label: str, entity_id: str, extraction: YamlCursorExtractionResult, *, extra: str = ""
 ) -> YamlDslEntityHintDiagnostic:
-    suffix = " ({})".format(extra) if extra else ""
-    msg = "Unknown {}: {}{}".format(str(kind_label), str(entity_id), suffix)
+    suffix = f" ({extra})" if extra else ""
+    msg = f"Unknown {kind_label!s}: {entity_id!s}{suffix}"
     return YamlDslEntityHintDiagnostic(
         message=msg,
         range=extraction.range,
@@ -1691,7 +1692,7 @@ def _unknown_hint(
 
 
 def _hover_card(title: str, decl: YamlDslEntityDeclaration) -> str:
-    lines = ["{}: {}".format(title, decl.entity_id)]
+    lines = [f"{title}: {decl.entity_id}"]
     detail = str(decl.detail or "").strip()
     if detail:
         for ln in detail.splitlines():
@@ -1706,8 +1707,8 @@ def _completion_items_for_decls(
     decls: Sequence[YamlDslEntityDeclaration],
     *,
     replace: str,
-) -> Tuple[YamlDslEntityCompletionItem, ...]:
-    items: List[YamlDslEntityCompletionItem] = []
+) -> tuple[YamlDslEntityCompletionItem, ...]:
+    items: list[YamlDslEntityCompletionItem] = []
     for decl in decls:
         detail = str(decl.summary or "")
         items.append(
@@ -1725,12 +1726,12 @@ def _completion_items_for_decls(
 def resolve_python_definition(
     reference: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> PythonDefinitionResult:
     """静态解析 `Python` 引用并返回定义位置(不执行用户代码)."""
-    warnings: List[str] = []
-    steps: List[ResolutionStep] = []
+    warnings: list[str] = []
+    steps: list[ResolutionStep] = []
     raw = str(reference or "").strip()
     if not raw:
         msg = "引用不能为空"
@@ -1787,7 +1788,7 @@ def resolve_python_definition(
         if any(("模块语法解析失败" in w or "读取模块文件失败" in w) for w in warnings) and not any(
             "无法解析符号定义" in w for w in warnings
         ):
-            warnings.append("无法解析符号定义: {}".format(parsed.reference))
+            warnings.append(f"无法解析符号定义: {parsed.reference}")
         _trace_add_step(steps, action="finalize_locations", input_text=str(parsed.reference), rejected=True, reason="no locations")
         trace = ResolutionTrace(query=raw, steps=tuple(steps), locations=(), warnings=tuple(warnings))
         return PythonDefinitionResult(locations=(), warnings=tuple(warnings), trace=trace)
@@ -1796,7 +1797,7 @@ def resolve_python_definition(
     return PythonDefinitionResult(locations=locations, warnings=tuple(warnings), trace=trace)
 
 
-def _scalim_editor_python_roots() -> Tuple[Path, ...]:
+def _scalim_editor_python_roots() -> tuple[Path, ...]:
     """为 editor 侧 builtin callables 提供可解析 scalim 自身源码的 roots.
 
     说明:
@@ -1812,7 +1813,7 @@ def _scalim_editor_python_roots() -> Tuple[Path, ...]:
     except Exception:  # noqa: BLE001
         return ()
 
-    pkg_dir: Optional[Path] = None
+    pkg_dir: Path | None = None
     for parent in module_file.parents:
         if parent.name == "scalim":
             pkg_dir = parent
@@ -1825,11 +1826,11 @@ def _scalim_editor_python_roots() -> Tuple[Path, ...]:
     return (root,)
 
 
-def _dedupe_python_roots(raw: Sequence[Union[str, Path]]) -> Tuple[Path, ...]:
-    seen: Dict[str, None] = {}
-    out: List[Path] = []
+def _dedupe_python_roots(raw: Sequence[str | Path]) -> tuple[Path, ...]:
+    seen: dict[str, None] = {}
+    out: list[Path] = []
     for item in raw:
-        p: Optional[Path]
+        p: Path | None
         try:
             p = Path(str(item)).expanduser().resolve(strict=False)
         except Exception:  # noqa: BLE001
@@ -1850,7 +1851,7 @@ def complete_yaml_dsl_builtin_callable_reference(
     call_by: bool,
 ) -> YamlDslSugarCompletionResult:
     """为 `^<id>` builtin callable 提供 completion(保守词表)."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     raw = str(reference_prefix or "")
     if not raw.strip():
         return YamlDslSugarCompletionResult(items=(), warnings=())
@@ -1865,16 +1866,16 @@ def complete_yaml_dsl_builtin_callable_reference(
 
     matched = [builtin_id for builtin_id in ids if builtin_id.startswith(id_prefix)]
     if not matched and id_prefix:
-        warnings.append("Unknown builtin callable id prefix: {!r}".format(id_prefix))
+        warnings.append(f"Unknown builtin callable id prefix: {id_prefix!r}")
 
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for builtin_id in matched:
         py_ref = python_refs.get(builtin_id, "")
-        detail = "python: {}".format(py_ref) if py_ref else ""
-        insert_text = "^{}".format(builtin_id)
+        detail = f"python: {py_ref}" if py_ref else ""
+        insert_text = f"^{builtin_id}"
         is_snippet = False
         if call_by:
-            insert_text = "^{}(${{1:arg}}=${{2:value}})".format(builtin_id)
+            insert_text = f"^{builtin_id}(${{1:arg}}=${{2:value}})"
             is_snippet = True
         items.append(
             YamlDslSugarCompletionItem(
@@ -1891,8 +1892,8 @@ def complete_yaml_dsl_builtin_callable_reference(
 def resolve_yaml_dsl_builtin_callable_definition(
     reference: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> PythonDefinitionResult:
     """静态解析 builtin callable 引用并尽可能跳转到 scalim 源码实现."""
     raw = str(reference or "").strip()
@@ -1902,7 +1903,7 @@ def resolve_yaml_dsl_builtin_callable_definition(
     python_refs = list_public_builtin_callable_python_references()
     py_ref = python_refs.get(builtin_id, "")
     if not py_ref:
-        msg = "Unknown builtin callable id: {!r}".format(builtin_id)
+        msg = f"Unknown builtin callable id: {builtin_id!r}"
         return PythonDefinitionResult(locations=(), warnings=(msg,))
 
     combined = _dedupe_python_roots([*python_roots, *_scalim_editor_python_roots()])
@@ -1912,11 +1913,11 @@ def resolve_yaml_dsl_builtin_callable_definition(
 def hover_yaml_dsl_builtin_callable_reference(
     reference: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> YamlDslSugarHoverResult:
     """返回 builtin callable 的 hover 文本(静态)."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     raw = str(reference or "").strip()
     if not raw.startswith("^"):
         return YamlDslSugarHoverResult(text="", warnings=())
@@ -1925,11 +1926,11 @@ def hover_yaml_dsl_builtin_callable_reference(
     python_refs = list_public_builtin_callable_python_references()
     py_ref = python_refs.get(builtin_id, "")
     if not py_ref:
-        warnings.append("Unknown builtin callable id: {!r}".format(builtin_id))
+        warnings.append(f"Unknown builtin callable id: {builtin_id!r}")
 
-    lines: List[str] = ["builtin: ^{}".format(builtin_id)]
+    lines: list[str] = [f"builtin: ^{builtin_id}"]
     if py_ref:
-        lines.append("python: {}".format(py_ref))
+        lines.append(f"python: {py_ref}")
 
         combined = _dedupe_python_roots([*python_roots, *_scalim_editor_python_roots()])
         doc = hover_python_reference(py_ref, python_roots=combined, anchor_path=anchor_path)
@@ -1946,7 +1947,7 @@ def hover_yaml_dsl_builtin_callable_reference(
 _IMPORT_ALIAS_TOKEN_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_]*)")
 
 
-def _split_import_path_alias_token(prefix: str) -> Tuple[str, str, str]:
+def _split_import_path_alias_token(prefix: str) -> tuple[str, str, str]:
     """拆分 `@/x` / `ALIAS:/x` 的 token.
 
     返回 `(alias, token, remainder)`; 不匹配返回空元组。
@@ -1962,7 +1963,7 @@ def _split_import_path_alias_token(prefix: str) -> Tuple[str, str, str]:
         return "", "", ""
     if _IMPORT_ALIAS_TOKEN_RE.fullmatch(head) is None:
         return "", "", ""
-    return head, "{}:/".format(head), tail
+    return head, f"{head}:/", tail
 
 
 def _iter_yaml_files_in_dir(dir_path: Path, *, name_prefix: str) -> Iterable[Path]:
@@ -1997,31 +1998,31 @@ def _complete_yaml_files_under_dir(
     base_dir: Path,
     token_prefix: str,
     allowed_roots: Sequence[Path],
-    warnings: List[str],
-) -> List["YamlDslSugarCompletionItem"]:
+    warnings: list[str],
+) -> list["YamlDslSugarCompletionItem"]:
     dir_part, _sep, name_part = str(raw_prefix or "").rpartition("/")
     search_dir = base_dir / dir_part if dir_part else base_dir
     if not search_dir.exists() or not search_dir.is_dir():
         return []
     if not _is_within_any_dir(search_dir, allowed_roots):
-        warnings.append("Import path completion rejected (escapes allowed roots): {}".format(str(search_dir)))
+        warnings.append(f"Import path completion rejected (escapes allowed roots): {search_dir!s}")
         return []
 
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for f in _iter_yaml_files_in_dir(search_dir, name_prefix=name_part):
         rel = f.relative_to(base_dir).as_posix()
-        insert_text = "{}{}".format(token_prefix, rel) if token_prefix else rel
+        insert_text = f"{token_prefix}{rel}" if token_prefix else rel
         items.append(YamlDslSugarCompletionItem(label=rel, insert_text=insert_text, detail=str(f)))
     return items
 
 
 def _complete_yaml_dsl_import_path_alias_tokens(
-    raw_prefix: str, *, project_config: Optional[YamlDslProjectConfig]
-) -> List["YamlDslSugarCompletionItem"]:
+    raw_prefix: str, *, project_config: YamlDslProjectConfig | None
+) -> list["YamlDslSugarCompletionItem"]:
     if project_config is None:
         return []
     prefix = str(raw_prefix or "")
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for alias in sorted(project_config.import_aliases):
         token = "{}{}".format(alias, "/") if alias.startswith("@") else "{}{}".format(alias, ":/")
         if prefix and not token.startswith(prefix):
@@ -2030,9 +2031,9 @@ def _complete_yaml_dsl_import_path_alias_tokens(
     return items
 
 
-def _complete_yaml_dsl_import_path_starters(raw_prefix: str) -> List["YamlDslSugarCompletionItem"]:
+def _complete_yaml_dsl_import_path_starters(raw_prefix: str) -> list["YamlDslSugarCompletionItem"]:
     prefix = str(raw_prefix or "")
-    out: List[YamlDslSugarCompletionItem] = []
+    out: list[YamlDslSugarCompletionItem] = []
     for token in ("./", "../"):
         if prefix and not token.startswith(prefix):
             continue
@@ -2045,14 +2046,14 @@ def _complete_yaml_dsl_import_path_files(
     *,
     anchor_dir: Path,
     allowed_roots: Sequence[Path],
-    project_config: Optional[YamlDslProjectConfig],
-    warnings: List[str],
-) -> List["YamlDslSugarCompletionItem"]:
+    project_config: YamlDslProjectConfig | None,
+    warnings: list[str],
+) -> list["YamlDslSugarCompletionItem"]:
     alias, token, remainder = _split_import_path_alias_token(raw_prefix)
     if alias and project_config is not None:
         base_dir = project_config.import_aliases.get(alias)
         if base_dir is None:
-            warnings.append("Unknown import root alias: {!r}".format(alias))
+            warnings.append(f"Unknown import root alias: {alias!r}")
             return []
         return _complete_yaml_files_under_dir(
             remainder,
@@ -2071,10 +2072,10 @@ def _complete_yaml_dsl_import_path_files(
     )
 
 
-def _dedupe_sugar_completion_items(items: Sequence["YamlDslSugarCompletionItem"]) -> Tuple["YamlDslSugarCompletionItem", ...]:
+def _dedupe_sugar_completion_items(items: Sequence["YamlDslSugarCompletionItem"]) -> tuple["YamlDslSugarCompletionItem", ...]:
     # Keep output stable.
-    unique: Dict[Tuple[str, str], None] = {}
-    deduped: List[YamlDslSugarCompletionItem] = []
+    unique: dict[tuple[str, str], None] = {}
+    deduped: list[YamlDslSugarCompletionItem] = []
     for item in items:
         key = (str(item.label), str(item.insert_text))
         if key in unique:
@@ -2087,13 +2088,13 @@ def _dedupe_sugar_completion_items(items: Sequence["YamlDslSugarCompletionItem"]
 def complete_yaml_dsl_import_path_reference(
     prefix: str,
     *,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlDslSugarCompletionResult:
     """为 `imports.*` 的 path 值提供 completion(别名前缀 + 相对路径)."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     raw_prefix = str(prefix or "")
 
     anchor_path = Path(str(anchor_yaml_path)).expanduser().resolve(strict=False)
@@ -2127,13 +2128,13 @@ def complete_yaml_dsl_import_path_reference(
 def resolve_yaml_dsl_import_path_definition(
     extraction: YamlCursorExtractionResult,
     *,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlDslImportPathDefinitionResult:
     """解析 `imports.*` 的 path 值,返回 file 或 preset 信息."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     raw_path = str(extraction.reference or "").strip()
     if not raw_path:
         return YamlDslImportPathDefinitionResult(kind="", warnings=("引用不能为空",))
@@ -2144,7 +2145,7 @@ def resolve_yaml_dsl_import_path_definition(
             preset_id = _parse_scalim_preset_uri(raw_path)
             _ = load_scalim_preset_yaml_text(preset_id)
         except Exception as exc:  # noqa: BLE001
-            warnings.append("invalid preset: {}: {}".format(type(exc).__name__, exc))
+            warnings.append(f"invalid preset: {type(exc).__name__}: {exc}")
         return YamlDslImportPathDefinitionResult(kind="preset", preset_id=preset_id, warnings=tuple(warnings))
 
     anchor_path = Path(str(anchor_yaml_path)).expanduser().resolve(strict=False)
@@ -2172,19 +2173,19 @@ def resolve_yaml_dsl_import_path_definition(
 def hover_yaml_dsl_import_path_reference(
     extraction: YamlCursorExtractionResult,
     *,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlDslSugarHoverResult:
     """返回 `imports.*` path 的 hover 文本."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     raw_path = str(extraction.reference or "").strip()
     if not raw_path:
         return YamlDslSugarHoverResult(text="", warnings=("引用不能为空",))
 
     title = str(extraction.yaml_path or "imports").strip() or "imports"
-    lines: List[str] = ["{}: {}".format(title, raw_path)]
+    lines: list[str] = [f"{title}: {raw_path}"]
 
     definition = resolve_yaml_dsl_import_path_definition(
         extraction,
@@ -2197,10 +2198,10 @@ def hover_yaml_dsl_import_path_reference(
         warnings.extend(list(definition.warnings))
 
     if definition.kind == "file" and definition.file_path:
-        lines.append("resolved: {}".format(definition.file_path))
+        lines.append(f"resolved: {definition.file_path}")
         lines.append("allowed_roots: ok")
     elif definition.kind == "preset" and definition.preset_id:
-        lines.append("preset_id: {}".format(definition.preset_id))
+        lines.append(f"preset_id: {definition.preset_id}")
         lines.append("readonly: true")
     else:
         lines.append("allowed_roots: unknown")
@@ -2212,14 +2213,14 @@ def resolve_yaml_import_definition(
     reference: str,
     *,
     anchor_yaml_text: str,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlImportDefinitionResult:
     """静态解析 `$import` 引用并返回 fragment key 的定义位置(不执行用户代码)."""
-    warnings: List[str] = []
-    locations: Tuple[YamlImportDefinitionLocation, ...] = ()
+    warnings: list[str] = []
+    locations: tuple[YamlImportDefinitionLocation, ...] = ()
     raw_ref = str(reference or "").strip()
     if not raw_ref:
         return YamlImportDefinitionResult(locations=(), warnings=("引用不能为空",))
@@ -2239,7 +2240,7 @@ def resolve_yaml_import_definition(
         imports = _extract_imports_mapping(anchor_yaml_text, warnings=warnings)
         raw_import_path = imports.get(alias)
         if raw_import_path is None:
-            warnings.append("Unknown $import alias: '{}' (missing top-level imports.{})".format(alias, alias))
+            warnings.append(f"Unknown $import alias: '{alias}' (missing top-level imports.{alias})")
         else:
             resolved_source = _resolve_import_source(
                 alias=alias,
@@ -2252,7 +2253,7 @@ def resolve_yaml_import_definition(
             if resolved_source is None:
                 pass
             elif resolved_source.kind != "file" or resolved_source.path is None:
-                warnings.append("imports.{} is not a local file path; go-to-definition is not supported".format(alias))
+                warnings.append(f"imports.{alias} is not a local file path; go-to-definition is not supported")
             else:
                 fragment_loc = _locate_fragment_key_location(
                     resolved_source.path,
@@ -2270,13 +2271,13 @@ def hover_yaml_import_reference(
     reference: str,
     *,
     anchor_yaml_text: str,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlImportHoverResult:
     """返回 `$import` 引用的 hover 文本(若可解析)."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     text = ""
     raw_ref = str(reference or "").strip()
     if not raw_ref:
@@ -2297,7 +2298,7 @@ def hover_yaml_import_reference(
         imports = _extract_imports_mapping(anchor_yaml_text, warnings=warnings)
         raw_import_path = imports.get(alias)
         if raw_import_path is None:
-            warnings.append("Unknown $import alias: '{}' (missing top-level imports.{})".format(alias, alias))
+            warnings.append(f"Unknown $import alias: '{alias}' (missing top-level imports.{alias})")
         else:
             resolved_source = _resolve_import_source(
                 alias=alias,
@@ -2311,15 +2312,15 @@ def hover_yaml_import_reference(
             if resolved_source is None:
                 pass
             elif resolved_source.kind != "file" or resolved_source.path is None:
-                warnings.append("imports.{} is not a local file path; hover is not supported".format(alias))
+                warnings.append(f"imports.{alias} is not a local file path; hover is not supported")
             elif _is_fragment_mapping_resolvable(resolved_source.path, segments=segments, ref=raw_ref, warnings=warnings):
                 fragment_path = ".".join(segments) if segments else "(root)"
                 text = "\n".join(
                     [
-                        "$import {}".format(raw_ref),
-                        "imports.{}: {}".format(alias, raw_import_path),
-                        "resolved: {}".format(str(resolved_source.path)),
-                        "fragment: {}".format(fragment_path),
+                        f"$import {raw_ref}",
+                        f"imports.{alias}: {raw_import_path}",
+                        f"resolved: {resolved_source.path!s}",
+                        f"fragment: {fragment_path}",
                     ]
                 )
 
@@ -2330,10 +2331,10 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
     prefix: str,
     *,
     anchor_yaml_text: str,
-    anchor_yaml_path: Union[str, Path],
+    anchor_yaml_path: str | Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlDslSugarCompletionResult:
     """为 `$import: <ref>` 提供 completion.
 
@@ -2346,17 +2347,17 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
     - 解析失败时返回空 items + warnings,不得 crash
     """
 
-    warnings: List[str] = []
+    warnings: list[str] = []
     raw_prefix = str(prefix or "")
 
     imports = _extract_imports_mapping(anchor_yaml_text, warnings=warnings)
     if not imports:
         return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
 
-    def _complete_aliases(alias_prefix: str) -> Tuple[YamlDslSugarCompletionItem, ...]:
-        items: List[YamlDslSugarCompletionItem] = []
+    def _complete_aliases(alias_prefix: str) -> tuple[YamlDslSugarCompletionItem, ...]:
+        items: list[YamlDslSugarCompletionItem] = []
         for alias in sorted(imports):
-            token = "{}.".format(str(alias))
+            token = f"{alias!s}."
             if alias_prefix and not token.startswith(alias_prefix):
                 continue
             items.append(YamlDslSugarCompletionItem(label=token, insert_text=token, detail="import alias"))
@@ -2372,7 +2373,7 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
     raw_import_path = imports.get(str(alias))
     if raw_import_path is None:
         # Unknown alias -> still offer alias completion.
-        warnings.append("Unknown $import alias: '{}'".format(alias))
+        warnings.append(f"Unknown $import alias: '{alias}'")
         return YamlDslSugarCompletionResult(items=_complete_aliases(raw_prefix), warnings=tuple(warnings))
 
     anchor_path = Path(str(anchor_yaml_path)).expanduser().resolve(strict=False)
@@ -2394,7 +2395,7 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
     if resolved_source is None:
         return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
 
-    loaded: Optional[Dict[str, Any]] = None
+    loaded: dict[str, Any] | None = None
     fragment_detail = ""
     if resolved_source.kind == "file" and resolved_source.path is not None:
         try:
@@ -2402,29 +2403,29 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
             fragment_detail = str(resolved_source.path)
         except ScalimYamlValidationError as exc:
             msg = exc.errors[0].message if exc.errors else str(exc)
-            warnings.append("fragment YAML 解析失败: {}".format(msg))
+            warnings.append(f"fragment YAML 解析失败: {msg}")
             loaded = None
         except Exception as exc:  # noqa: BLE001
-            warnings.append("fragment YAML 解析失败: {}: {}".format(type(exc).__name__, exc))
+            warnings.append(f"fragment YAML 解析失败: {type(exc).__name__}: {exc}")
             loaded = None
     elif resolved_source.kind == "preset" and resolved_source.preset_id:
         try:
             preset_text = load_scalim_preset_yaml_text(str(resolved_source.preset_id))
             loaded, _locations, _lines = load_yaml_mapping_text(
                 str(preset_text or ""),
-                source_path="scalim://{}".format(str(resolved_source.preset_id)),
+                source_path=f"scalim://{resolved_source.preset_id!s}",
                 detect_duplicate_keys=True,
             )
-            fragment_detail = "preset: {}".format(str(resolved_source.preset_id))
+            fragment_detail = f"preset: {resolved_source.preset_id!s}"
         except ScalimYamlValidationError as exc:
             msg = exc.errors[0].message if exc.errors else str(exc)
-            warnings.append("preset YAML 解析失败: {}".format(msg))
+            warnings.append(f"preset YAML 解析失败: {msg}")
             loaded = None
         except Exception as exc:  # noqa: BLE001
-            warnings.append("preset YAML 解析失败: {}: {}".format(type(exc).__name__, exc))
+            warnings.append(f"preset YAML 解析失败: {type(exc).__name__}: {exc}")
             loaded = None
     else:
-        warnings.append("imports.{} is not a YAML file; completion is not supported".format(alias))
+        warnings.append(f"imports.{alias} is not a YAML file; completion is not supported")
         return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
 
     if loaded is None:
@@ -2438,7 +2439,7 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
     if container is None:
         return YamlDslSugarCompletionResult(items=(), warnings=tuple(warnings))
 
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for key in sorted(container):
         k = key.strip()
         if not k:
@@ -2457,17 +2458,17 @@ def complete_yaml_import_reference(  # noqa: C901, PLR0911, PLR0912, PLR0915
 class _ResolvedImportSource:
     kind: str
     key: str
-    path: Optional[Path] = None
-    preset_id: Optional[str] = None
+    path: Path | None = None
+    preset_id: str | None = None
 
 
 def _safe_load_yaml_dsl_project_config(
     anchor_path: Path,
     *,
-    scalim_yaml_override: Optional[Union[str, Path]],
-    project_root_override: Optional[Union[str, Path]],
-    warnings: List[str],
-) -> Optional[YamlDslProjectConfig]:
+    scalim_yaml_override: str | Path | None,
+    project_root_override: str | Path | None,
+    warnings: list[str],
+) -> YamlDslProjectConfig | None:
     try:
         return load_yaml_dsl_project_config(
             anchor_path,
@@ -2475,11 +2476,11 @@ def _safe_load_yaml_dsl_project_config(
             project_root_override=project_root_override,
         )
     except Exception as exc:  # noqa: BLE001
-        warnings.append("加载 scalim.yaml 失败: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"加载 scalim.yaml 失败: {type(exc).__name__}: {exc}")
         return None
 
 
-def _parse_yaml_import_ref(raw_ref: str, *, warnings: List[str]) -> Optional[Tuple[str, List[str]]]:
+def _parse_yaml_import_ref(raw_ref: str, *, warnings: list[str]) -> tuple[str, list[str]] | None:
     ref = str(raw_ref or "").strip()
     if not ref:
         warnings.append("$import ref 不能为空")
@@ -2487,26 +2488,26 @@ def _parse_yaml_import_ref(raw_ref: str, *, warnings: List[str]) -> Optional[Tup
     parts = ref.split(".")
     alias = parts[0]
     if not _IMPORT_REF_SEGMENT_RE.match(alias):
-        warnings.append("Invalid $import alias: '{}'".format(alias))
+        warnings.append(f"Invalid $import alias: '{alias}'")
         return None
-    segments: List[str] = []
+    segments: list[str] = []
     for seg in parts[1:]:
         if not _IMPORT_REF_SEGMENT_RE.match(seg):
-            warnings.append("Invalid $import path segment: '{}'".format(seg))
+            warnings.append(f"Invalid $import path segment: '{seg}'")
             return None
         segments.append(seg)
     return alias, segments
 
 
-def _extract_imports_mapping(yaml_text: str, *, warnings: List[str]) -> Dict[str, str]:
+def _extract_imports_mapping(yaml_text: str, *, warnings: list[str]) -> dict[str, str]:
     try:
         loaded, _locations, _lines = load_yaml_mapping_text(yaml_text, source_path="(in-memory)", detect_duplicate_keys=False)
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
-        warnings.append("解析 YAML imports 失败: {}".format(msg))
+        warnings.append(f"解析 YAML imports 失败: {msg}")
         return {}
     except Exception as exc:  # noqa: BLE001
-        warnings.append("解析 YAML imports 失败: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"解析 YAML imports 失败: {type(exc).__name__}: {exc}")
         return {}
 
     raw_imports = loaded.get(_IMPORTS_KEY)
@@ -2516,8 +2517,8 @@ def _extract_imports_mapping(yaml_text: str, *, warnings: List[str]) -> Dict[str
         warnings.append("imports 必须是 mapping")
         return {}
 
-    out: Dict[str, str] = {}
-    for key, value in cast("Dict[Any, Any]", raw_imports).items():  # pragma: allow-cast yaml mapping typed narrowing
+    out: dict[str, str] = {}
+    for key, value in cast("dict[Any, Any]", raw_imports).items():  # pragma: allow-cast yaml mapping typed narrowing
         if not isinstance(key, str):
             continue
         stripped_key = key.strip()
@@ -2536,20 +2537,20 @@ def _compute_allowed_yaml_roots_for_imports(
     *,
     base_dir: Path,
     discovery_allowed_roots: Sequence[Path],
-    project_config: Optional[YamlDslProjectConfig],
-    warnings: List[str],
-) -> Tuple[Path, ...]:
-    extras: List[Path] = list(discovery_allowed_roots)
+    project_config: YamlDslProjectConfig | None,
+    warnings: list[str],
+) -> tuple[Path, ...]:
+    extras: list[Path] = list(discovery_allowed_roots)
     if project_config is not None:
         extras.extend([item.path for item in project_config.import_roots])
     try:
         return normalize_allowed_yaml_roots(extras, default_root=base_dir)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("allowed_yaml_roots 归一化失败: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"allowed_yaml_roots 归一化失败: {type(exc).__name__}: {exc}")
         return normalize_allowed_yaml_roots(None, default_root=base_dir)
 
 
-def _apply_import_aliases(raw_path: str, *, project_config: Optional[YamlDslProjectConfig]) -> Optional[Tuple[str, Path]]:
+def _apply_import_aliases(raw_path: str, *, project_config: YamlDslProjectConfig | None) -> tuple[str, Path] | None:
     if project_config is None:
         return None
     aliases = dict(project_config.import_aliases)
@@ -2557,7 +2558,7 @@ def _apply_import_aliases(raw_path: str, *, project_config: Optional[YamlDslProj
         return None
 
     value = str(raw_path or "")
-    matches: List[Tuple[int, str, Path]] = []
+    matches: list[tuple[int, str, Path]] = []
     for alias, dir_path in aliases.items():
         alias_text = str(alias or "").strip()
         if not alias_text:
@@ -2582,24 +2583,24 @@ def _normalize_import_path(raw: str) -> str:
         msg = "imports.* path cannot be empty"
         raise ValueError(msg)
     if _IMPORT_URI_SCHEME_RE.match(value):
-        msg = "Imports only supports relative .yaml/.yml file paths; URI schemes are not allowed: '{}'".format(value)
+        msg = f"Imports only supports relative .yaml/.yml file paths; URI schemes are not allowed: '{value}'"
         raise ValueError(msg)
     if value.startswith(("/", "\\")):
-        msg = "Imports only supports relative .yaml/.yml file paths; absolute paths are not allowed: '{}'".format(value)
+        msg = f"Imports only supports relative .yaml/.yml file paths; absolute paths are not allowed: '{value}'"
         raise ValueError(msg)
     if _IMPORT_WINDOWS_DRIVE_RE.match(value):
-        msg = "Imports only supports relative .yaml/.yml file paths; Windows drive paths are not allowed: '{}'".format(value)
+        msg = f"Imports only supports relative .yaml/.yml file paths; Windows drive paths are not allowed: '{value}'"
         raise ValueError(msg)
     if value.startswith("@") or _IMPORT_RESERVED_ALIAS_PREFIX_RE.match(value):
-        msg = "Imports only supports relative .yaml/.yml file paths; reserved alias prefixes are not allowed: '{}'".format(value)
+        msg = f"Imports only supports relative .yaml/.yml file paths; reserved alias prefixes are not allowed: '{value}'"
         raise ValueError(msg)
     if "\\" in value:
-        msg = "Imports only supports '/' path separators: '{}'".format(value)
+        msg = f"Imports only supports '/' path separators: '{value}'"
         raise ValueError(msg)
     while value.startswith("./"):
         value = value[2:]
     if not value.endswith((".yaml", ".yml")):
-        msg = "Imports only supports .yaml/.yml fragment paths: '{}'".format(raw)
+        msg = f"Imports only supports .yaml/.yml fragment paths: '{raw}'"
         raise ValueError(msg)
     return value
 
@@ -2607,7 +2608,7 @@ def _normalize_import_path(raw: str) -> str:
 def _parse_scalim_preset_uri(raw: str) -> str:
     uri = str(raw or "").strip()
     if not uri.startswith(_IMPORT_SCALIM_SCHEME_PREFIX):
-        msg = "Expected scalim:// preset URI, got: '{}'".format(uri)
+        msg = f"Expected scalim:// preset URI, got: '{uri}'"
         raise ValueError(msg)
     preset_id = uri[len(_IMPORT_SCALIM_SCHEME_PREFIX) :].lstrip("/")
     if not preset_id:
@@ -2622,12 +2623,12 @@ def _resolve_import_source(
     raw_import_path: str,
     base_dir: Path,
     allowed_yaml_roots: Sequence[Path],
-    project_config: Optional[YamlDslProjectConfig],
-    warnings: List[str],
-) -> Optional[_ResolvedImportSource]:
+    project_config: YamlDslProjectConfig | None,
+    warnings: list[str],
+) -> _ResolvedImportSource | None:
     raw_path = str(raw_import_path or "").strip()
     if not raw_path:
-        warnings.append("imports.{} path cannot be empty".format(alias))
+        warnings.append(f"imports.{alias} path cannot be empty")
         return None
 
     if raw_path.startswith(_IMPORT_SCALIM_SCHEME_PREFIX):
@@ -2643,11 +2644,11 @@ def _resolve_import_source(
     )
 
 
-def _resolve_import_source_preset(*, alias: str, raw_path: str, warnings: List[str]) -> Optional[_ResolvedImportSource]:
+def _resolve_import_source_preset(*, alias: str, raw_path: str, warnings: list[str]) -> _ResolvedImportSource | None:
     try:
         preset_id = _parse_scalim_preset_uri(raw_path)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("imports.{} invalid preset uri: {}: {}".format(alias, type(exc).__name__, exc))
+        warnings.append(f"imports.{alias} invalid preset uri: {type(exc).__name__}: {exc}")
         return None
     return _ResolvedImportSource(kind="preset", key=raw_path, preset_id=preset_id)
 
@@ -2658,9 +2659,9 @@ def _resolve_import_source_file(
     raw_path: str,
     base_dir: Path,
     allowed_yaml_roots: Sequence[Path],
-    project_config: Optional[YamlDslProjectConfig],
-    warnings: List[str],
-) -> Optional[_ResolvedImportSource]:
+    project_config: YamlDslProjectConfig | None,
+    warnings: list[str],
+) -> _ResolvedImportSource | None:
     resolve_base_dir = base_dir
     path_for_normalize = raw_path
     rewrite = _apply_import_aliases(raw_path, project_config=project_config)
@@ -2697,7 +2698,7 @@ def _resolve_import_source_file(
         return None
 
     if not resolved_path.exists() or not resolved_path.is_file():
-        warnings.append("imports.{} fragment 文件不存在: {}".format(alias, str(resolved_path)))
+        warnings.append(f"imports.{alias} fragment 文件不存在: {resolved_path!s}")
         return None
 
     return _ResolvedImportSource(kind="file", key=str(resolved_path), path=resolved_path)
@@ -2709,8 +2710,8 @@ def _try_normalize_import_path(
     raw_path: str,
     resolve_base_dir: Path,
     path_for_normalize: str,
-    warnings: List[str],
-) -> Optional[str]:
+    warnings: list[str],
+) -> str | None:
     try:
         return _normalize_import_path(path_for_normalize)
     except Exception as exc:  # noqa: BLE001
@@ -2739,7 +2740,7 @@ def _validate_import_resolved_path(
     resolve_base_dir: Path,
     resolved_path: Path,
     allowed_yaml_roots: Sequence[Path],
-    warnings: List[str],
+    warnings: list[str],
 ) -> bool:
     try:
         validate_resolved_yaml_path_within_roots(
@@ -2747,7 +2748,7 @@ def _validate_import_resolved_path(
             base_dir=resolve_base_dir,
             resolved_path=resolved_path,
             allowed_yaml_roots=allowed_yaml_roots,
-            context_label="imports.{}".format(alias),
+            context_label=f"imports.{alias}",
         )
     except Exception as exc:  # noqa: BLE001
         warnings.append(str(exc))
@@ -2757,43 +2758,43 @@ def _validate_import_resolved_path(
 
 
 def _select_mapping_fragment(
-    file_data: Dict[str, Any],
+    file_data: dict[str, Any],
     *,
-    segments: List[str],
+    segments: list[str],
     ref: str,
-    warnings: List[str],
-) -> Optional[Dict[str, Any]]:
+    warnings: list[str],
+) -> dict[str, Any] | None:
     current: Any = file_data
     for seg in segments:
         if not isinstance(current, dict):
-            warnings.append("$import ref '{}' points to a non-mapping value".format(ref))
+            warnings.append(f"$import ref '{ref}' points to a non-mapping value")
             return None
-        current_dict = cast("Dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
+        current_dict = cast("dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
         if seg not in current_dict:
-            warnings.append("$import ref '{}' missing key '{}'".format(ref, seg))
+            warnings.append(f"$import ref '{ref}' missing key '{seg}'")
             return None
         current = current_dict[seg]
     if not isinstance(current, dict):
-        warnings.append("$import ref '{}' points to a non-mapping value".format(ref))
+        warnings.append(f"$import ref '{ref}' points to a non-mapping value")
         return None
-    return cast("Dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
+    return cast("dict[str, Any]", current)  # pragma: allow-cast yaml import fragment typed narrowing
 
 
 def _is_fragment_mapping_resolvable(
     fragment_yaml_path: Path,
     *,
-    segments: List[str],
+    segments: list[str],
     ref: str,
-    warnings: List[str],
+    warnings: list[str],
 ) -> bool:
     try:
         loaded, _locations, _lines = load_yaml_mapping_cached(fragment_yaml_path)
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
-        warnings.append("fragment YAML 解析失败: {}".format(msg))
+        warnings.append(f"fragment YAML 解析失败: {msg}")
         return False
     except Exception as exc:  # noqa: BLE001
-        warnings.append("fragment YAML 解析失败: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"fragment YAML 解析失败: {type(exc).__name__}: {exc}")
         return False
 
     return _select_mapping_fragment(loaded, segments=segments, ref=ref, warnings=warnings) is not None
@@ -2802,18 +2803,18 @@ def _is_fragment_mapping_resolvable(
 def _locate_fragment_key_location(
     fragment_yaml_path: Path,
     *,
-    segments: List[str],
+    segments: list[str],
     ref: str,
-    warnings: List[str],
-) -> Optional[YamlImportDefinitionLocation]:
+    warnings: list[str],
+) -> YamlImportDefinitionLocation | None:
     try:
         loaded, locations, _lines = load_yaml_mapping_cached(fragment_yaml_path)
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
-        warnings.append("fragment YAML 解析失败: {}".format(msg))
+        warnings.append(f"fragment YAML 解析失败: {msg}")
         return None
     except Exception as exc:  # noqa: BLE001
-        warnings.append("fragment YAML 解析失败: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"fragment YAML 解析失败: {type(exc).__name__}: {exc}")
         return None
 
     if _select_mapping_fragment(loaded, segments=segments, ref=ref, warnings=warnings) is None:
@@ -2823,7 +2824,7 @@ def _locate_fragment_key_location(
     if segments:
         loc = locations.get(fragment_path)
         if loc is None:
-            warnings.append("$import ref '{}' missing key '{}'".format(ref, segments[-1]))
+            warnings.append(f"$import ref '{ref}' missing key '{segments[-1]}'")
             return None
         line, column = loc
         end_col = int(column) + max(1, len(str(segments[-1])))
@@ -2849,9 +2850,9 @@ def _locate_fragment_key_location(
 def _normalize_python_module_path(
     module_path: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]],
-    warnings: List[str],
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None,
+    warnings: list[str],
 ) -> str:
     raw_module_path = str(module_path or "").strip()
     result = ""
@@ -2860,7 +2861,7 @@ def _normalize_python_module_path(
     elif not raw_module_path.startswith("."):
         result = raw_module_path
     elif anchor_path is None:
-        warnings.append("相对模块引用 '{}' 需要 anchor_path 才能解析".format(raw_module_path))
+        warnings.append(f"相对模块引用 '{raw_module_path}' 需要 anchor_path 才能解析")
     else:
         roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
         base = _derive_base_module_path_from_anchor(anchor_path, roots=roots, warnings=warnings)
@@ -2870,31 +2871,31 @@ def _normalize_python_module_path(
             base_parts = [p for p in str(base).split(".") if p] if base else []
             up_levels = dot_count - 1
             if up_levels > len(base_parts):
-                warnings.append("相对模块引用 '{}' 超出了根包范围(`base_module_path='{}'`)".format(raw_module_path, base))
+                warnings.append(f"相对模块引用 '{raw_module_path}' 超出了根包范围(`base_module_path='{base}'`)")
             else:
                 prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
                 rest_parts = [p for p in rest.split(".") if p]
                 absolute_parts = prefix_parts + rest_parts
                 if not absolute_parts:
-                    warnings.append("相对模块引用 '{}' 解析为空模块路径".format(raw_module_path))
+                    warnings.append(f"相对模块引用 '{raw_module_path}' 解析为空模块路径")
                 else:
                     result = ".".join(absolute_parts)
     return result
 
 
 def _derive_base_module_path_from_anchor(
-    anchor_path: Union[str, Path],
+    anchor_path: str | Path,
     *,
     roots: Sequence[Path],
-    warnings: List[str],
-) -> Optional[str]:
+    warnings: list[str],
+) -> str | None:
     try:
         yaml_dir = Path(str(anchor_path)).expanduser().resolve(strict=False).parent
     except Exception as exc:  # noqa: BLE001
-        warnings.append("无法解析 anchor_path: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"无法解析 anchor_path: {type(exc).__name__}: {exc}")
         return None
 
-    candidates: List[Tuple[Tuple[str, ...], Path]] = []
+    candidates: list[tuple[tuple[str, ...], Path]] = []
     yaml_dir_resolved = yaml_dir.resolve(strict=False)
     for root in roots:
         root_resolved = root.resolve(strict=False)
@@ -2902,7 +2903,7 @@ def _derive_base_module_path_from_anchor(
             continue
 
         try:
-            rel_path: Optional[Path] = yaml_dir_resolved.relative_to(root_resolved)
+            rel_path: Path | None = yaml_dir_resolved.relative_to(root_resolved)
         except ValueError:
             rel_path = None
         if rel_path is None:
@@ -2923,10 +2924,8 @@ def _derive_base_module_path_from_anchor(
         candidates.append((parts, root_resolved))
 
     if not candidates:
-        warnings.append(
-            "无法推导相对模块引用的 base_module_path: yaml_dir='{}' 不在任何 python_roots 下. ".format(str(yaml_dir))
-            + "修复: 补充 `yaml_dsl.lsp.python_roots` 或改用绝对模块引用."
-        )
+        warnings.append(f"无法推导相对模块引用的 base_module_path: yaml_dir='{yaml_dir!s}' 不在任何 python_roots 下.")
+        warnings.append("修复: 补充 `yaml_dsl.lsp.python_roots` 或改用绝对模块引用.")
         return None
 
     parts, _root = min(candidates, key=lambda item: (len(item[0]), -len(item[1].parts), str(item[1])))
@@ -2937,8 +2936,8 @@ def _derive_base_module_path_from_anchor(
 class _ModuleBinding:
     kind: str
     node: ast.AST
-    import_module: Optional[str] = None
-    import_name: Optional[str] = None
+    import_module: str | None = None
+    import_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -2961,7 +2960,7 @@ class _LocationCandidate:
 
 
 def _trace_add_step(
-    trace_steps: Optional[List[ResolutionStep]],
+    trace_steps: list[ResolutionStep] | None,
     *,
     action: str,
     input_text: str,
@@ -3003,14 +3002,14 @@ def _candidate_from_node(
     )
 
 
-def _candidate_sort_key(candidate: _LocationCandidate) -> Tuple[int, str, int, int]:
+def _candidate_sort_key(candidate: _LocationCandidate) -> tuple[int, str, int, int]:
     rng = candidate.location.range
     start_line = int(rng.start.line) if rng is not None else 0
     start_col = int(rng.start.column) if rng is not None else 0
     return (int(candidate.priority), str(candidate.location.file_path), start_line, start_col)
 
 
-def _location_dedupe_key(location: PythonDefinitionLocation) -> Tuple[Any, ...]:
+def _location_dedupe_key(location: PythonDefinitionLocation) -> tuple[Any, ...]:
     rng = location.range
     if rng is None:
         return (str(location.file_path), None, str(location.symbol_path or ""))
@@ -3023,9 +3022,9 @@ def _location_dedupe_key(location: PythonDefinitionLocation) -> Tuple[Any, ...]:
     )
 
 
-def _finalize_location_candidates(candidates: Sequence[_LocationCandidate]) -> Tuple[PythonDefinitionLocation, ...]:
-    out: List[PythonDefinitionLocation] = []
-    seen: Set[Tuple[Any, ...]] = set()
+def _finalize_location_candidates(candidates: Sequence[_LocationCandidate]) -> tuple[PythonDefinitionLocation, ...]:
+    out: list[PythonDefinitionLocation] = []
+    seen: set[tuple[Any, ...]] = set()
     for candidate in sorted(candidates, key=_candidate_sort_key):
         key = _location_dedupe_key(candidate.location)
         if key in seen:
@@ -3038,10 +3037,10 @@ def _finalize_location_candidates(candidates: Sequence[_LocationCandidate]) -> T
 def _resolve_python_definition_locations(
     parsed: ParsedReference,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    warnings: List[str],
-    trace_steps: Optional[List[ResolutionStep]] = None,
-) -> Tuple[PythonDefinitionLocation, ...]:
+    python_roots: Sequence[str | Path],
+    warnings: list[str],
+    trace_steps: list[ResolutionStep] | None = None,
+) -> tuple[PythonDefinitionLocation, ...]:
     roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
     candidates = _resolve_locations_for_module_attr_path(
         parsed.module_path,
@@ -3058,20 +3057,20 @@ def _resolve_python_definition_locations(
 
 def _resolve_locations_for_module_attr_path(
     module_path: str,
-    attr_path: Tuple[str, ...],
+    attr_path: tuple[str, ...],
     *,
     roots: Sequence[Path],
-    warnings: List[str],
+    warnings: list[str],
     max_obj_import_hops: int,
     max_class_import_hops: int,
-    visited: Set[str],
-    trace_steps: Optional[List[ResolutionStep]],
-) -> List[_LocationCandidate]:
+    visited: set[str],
+    trace_steps: list[ResolutionStep] | None,
+) -> list[_LocationCandidate]:
     if not module_path:
         return []
 
     if module_path in visited:
-        msg = "import 跟随遇到循环依赖: {}".format(module_path)
+        msg = f"import 跟随遇到循环依赖: {module_path}"
         warnings.append(msg)
         _trace_add_step(trace_steps, action="follow_import", input_text=module_path, rejected=True, reason=msg)
         return []
@@ -3120,14 +3119,14 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
     *,
     file_path: Path,
     module_path: str,
-    attr_path: Tuple[str, ...],
+    attr_path: tuple[str, ...],
     roots: Sequence[Path],
-    warnings: List[str],
+    warnings: list[str],
     max_obj_import_hops: int,
     max_class_import_hops: int,
-    visited: Set[str],
-    trace_steps: Optional[List[ResolutionStep]],
-) -> List[_LocationCandidate]:
+    visited: set[str],
+    trace_steps: list[ResolutionStep] | None,
+) -> list[_LocationCandidate]:
     if not attr_path:
         return []
 
@@ -3194,7 +3193,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
             visited=visited,
         )
         if resolved_class is None:
-            msg = "无法静态推断 obj 的 class: {}".format(head)
+            msg = f"无法静态推断 obj 的 class: {head}"
             warnings.append(msg)
             _trace_add_step(trace_steps, action="infer_assignment_class", input_text=str(head), rejected=True, reason=msg)
             return [fallback]
@@ -3207,7 +3206,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
                     priority=_P0_IMPL,
                     file_path=str(resolved_class.file_path),
                     module_path=resolved_class.module_path,
-                    symbol_path="{}.{}".format(resolved_class.node.name, method_name),
+                    symbol_path=f"{resolved_class.node.name}.{method_name}",
                     node=method_node,
                     label="impl",
                 ),
@@ -3220,7 +3219,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
         _trace_add_step(
             trace_steps,
             action="find_method",
-            input_text="{}.{}".format(resolved_class.node.name, method_name),
+            input_text=f"{resolved_class.node.name}.{method_name}",
             rejected=True,
             reason="missing method (maybe inheritance/dynamic)",
         )
@@ -3238,10 +3237,10 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
 
     if binding.kind == "import_from":
         if binding.import_module is None or binding.import_name is None:
-            warnings.append("import 解析失败: {}".format(head))
+            warnings.append(f"import 解析失败: {head}")
             return [fallback]
         if max_obj_import_hops <= 0:
-            warnings.append("import 跟随超出限制(仅允许单跳): {}".format(head))
+            warnings.append(f"import 跟随超出限制(仅允许单跳): {head}")
             return [fallback]
 
         remote_attr_path = (binding.import_name, *tail)
@@ -3256,7 +3255,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
             trace_steps=trace_steps,
         )
         if not remote_locs:
-            msg = "import 跟随后仍无法解析符号定义: {}".format(head)
+            msg = f"import 跟随后仍无法解析符号定义: {head}"
             warnings.append(msg)
             _trace_add_step(trace_steps, action="follow_import", input_text=str(head), rejected=True, reason=msg)
             return [fallback]
@@ -3264,10 +3263,10 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
 
     if binding.kind == "import_module":
         if binding.import_module is None:
-            warnings.append("import 解析失败: {}".format(head))
+            warnings.append(f"import 解析失败: {head}")
             return [fallback]
         if max_class_import_hops <= 0:
-            warnings.append("import 跟随超出限制: {}".format(head))
+            warnings.append(f"import 跟随超出限制: {head}")
             return [fallback]
         remote_locs = _resolve_locations_for_module_attr_path(
             binding.import_module,
@@ -3280,7 +3279,7 @@ def _resolve_locations_for_attr_path_in_module_tree(  # noqa: C901,PLR0911,PLR09
             trace_steps=trace_steps,
         )
         if not remote_locs:
-            msg = "import 跟随后仍无法解析符号定义: {}".format(head)
+            msg = f"import 跟随后仍无法解析符号定义: {head}"
             warnings.append(msg)
             _trace_add_step(trace_steps, action="follow_import", input_text=str(head), rejected=True, reason=msg)
             return [fallback]
@@ -3308,30 +3307,30 @@ def _resolve_module_file_path(
     module_path: str,
     *,
     roots: Sequence[Path],
-    warnings: List[str],
-) -> Optional[Path]:
+    warnings: list[str],
+) -> Path | None:
     spec = _find_spec(str(module_path), roots=list(roots))
     origin = None
     if spec is not None:
         origin = spec.origin
     if not isinstance(origin, str) or not origin or origin in ("built-in", "frozen"):
-        warnings.append("无法定位模块文件: {}".format(module_path))
+        warnings.append(f"无法定位模块文件: {module_path}")
         return None
 
     file_path = Path(origin).expanduser().resolve(strict=False)
     if not file_path.exists() or not file_path.is_file():
-        warnings.append("模块文件不存在: {}".format(file_path))
+        warnings.append(f"模块文件不存在: {file_path}")
         return None
     return file_path
 
 
-def _load_module_ast(file_path: Path) -> Tuple[Optional[ast.Module], str]:
+def _load_module_ast(file_path: Path) -> tuple[ast.Module | None, str]:
     try:
         tree = parse_python_ast_cached(file_path)
     except SyntaxError as exc:
-        return None, "模块语法解析失败: {}: {}".format(type(exc).__name__, exc)
+        return None, f"模块语法解析失败: {type(exc).__name__}: {exc}"
     except Exception as exc:  # noqa: BLE001
-        return None, "读取模块文件失败: {}: {}".format(type(exc).__name__, exc)
+        return None, f"读取模块文件失败: {type(exc).__name__}: {exc}"
     return tree, ""
 
 
@@ -3340,8 +3339,8 @@ def _index_module_bindings(  # noqa: C901,PLR0912
     *,
     module_path: str,
     file_path: Path,
-) -> Dict[str, _ModuleBinding]:
-    out: Dict[str, _ModuleBinding] = {}
+) -> dict[str, _ModuleBinding]:
+    out: dict[str, _ModuleBinding] = {}
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             out[str(node.name)] = _ModuleBinding(kind="def", node=node)
@@ -3390,7 +3389,7 @@ def _resolve_import_from_module_path(
     *,
     file_path: Path,
     node: ast.ImportFrom,
-) -> Optional[str]:
+) -> str | None:
     mod = getattr(node, "module", None)
     level = getattr(node, "level", 0)
     if not isinstance(level, int) or level < 0:
@@ -3416,16 +3415,16 @@ def _resolve_import_from_module_path(
 def _infer_assignment_class_def(
     node: ast.AST,
     *,
-    bindings: Dict[str, _ModuleBinding],
+    bindings: dict[str, _ModuleBinding],
     module_path: str,
     file_path: Path,
     roots: Sequence[Path],
-    warnings: List[str],
+    warnings: list[str],
     max_class_import_hops: int,
-    visited: Set[str],
-) -> Optional[_ResolvedClassDef]:
-    annotation_expr: Optional[ast.AST] = None
-    value_expr: Optional[ast.AST] = None
+    visited: set[str],
+) -> _ResolvedClassDef | None:
+    annotation_expr: ast.AST | None = None
+    value_expr: ast.AST | None = None
     if isinstance(node, ast.AnnAssign):
         annotation_expr = node.annotation
         value_expr = node.value
@@ -3466,14 +3465,14 @@ def _infer_assignment_class_def(
     )
 
 
-def _expr_to_qualname_segments(expr: Optional[ast.AST]) -> Optional[Tuple[str, ...]]:
+def _expr_to_qualname_segments(expr: ast.AST | None) -> tuple[str, ...] | None:
     if expr is None:
         return None
     if isinstance(expr, ast.Name):
         return (str(expr.id),)
     if isinstance(expr, ast.Attribute):
-        parts: List[str] = []
-        current: Optional[ast.AST] = expr
+        parts: list[str] = []
+        current: ast.AST | None = expr
         while isinstance(current, ast.Attribute):
             parts.append(str(current.attr))
             current = current.value
@@ -3486,16 +3485,16 @@ def _expr_to_qualname_segments(expr: Optional[ast.AST]) -> Optional[Tuple[str, .
 
 
 def _resolve_class_def_from_qualname(  # noqa: C901,PLR0911
-    segments: Tuple[str, ...],
+    segments: tuple[str, ...],
     *,
-    bindings: Dict[str, _ModuleBinding],
+    bindings: dict[str, _ModuleBinding],
     module_path: str,
     file_path: Path,
     roots: Sequence[Path],
-    warnings: List[str],
+    warnings: list[str],
     max_class_import_hops: int,
-    visited: Set[str],
-) -> Optional[_ResolvedClassDef]:
+    visited: set[str],
+) -> _ResolvedClassDef | None:
     if not segments:
         return None
 
@@ -3541,7 +3540,7 @@ def _resolve_class_def_from_qualname(  # noqa: C901,PLR0911
     if binding.kind == "import_from" and binding.import_module and binding.import_name:
         if max_class_import_hops <= 0:
             return None
-        target_module = "{}.{}".format(binding.import_module, binding.import_name)
+        target_module = f"{binding.import_module}.{binding.import_name}"
         if len(tail_parts) > 1:
             target_module = "{}.{}".format(target_module, ".".join(tail_parts[:-1]))
         class_name = tail_parts[-1]
@@ -3562,10 +3561,10 @@ def _resolve_class_def_in_module(
     *,
     class_name: str,
     roots: Sequence[Path],
-    warnings: List[str],
+    warnings: list[str],
     max_class_import_hops: int,
-    visited: Set[str],
-) -> Optional[_ResolvedClassDef]:
+    visited: set[str],
+) -> _ResolvedClassDef | None:
     _ = max_class_import_hops  # reserved for future recursive extensions
     if module_path in visited:
         return None
@@ -3589,11 +3588,11 @@ def _resolve_class_def_in_module(
 def hover_python_reference(
     reference: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> PythonHoverResult:
     """返回 `Python` 引用的 `docstring`(若可解析)."""
-    warnings: List[str] = []
+    warnings: list[str] = []
     result = resolve_python_definition(reference, python_roots=python_roots, anchor_path=anchor_path)
     if result.warnings:
         warnings.extend(list(result.warnings))
@@ -3608,7 +3607,7 @@ def hover_python_reference(
         return PythonHoverResult(text="", warnings=tuple(warnings))
 
     symbol_path = str(loc.symbol_path or "").strip()
-    target_attr_path: Tuple[str, ...] = tuple([p for p in symbol_path.split(".") if p]) if symbol_path else ()
+    target_attr_path: tuple[str, ...] = tuple([p for p in symbol_path.split(".") if p]) if symbol_path else ()
     if not target_attr_path:
         return PythonHoverResult(text="", warnings=tuple(warnings))
 
@@ -3623,12 +3622,12 @@ def hover_python_reference(
 def complete_python_reference(
     reference: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> PythonCompletionResult:
     """在 `Python` 引用字符串内提供最小 `completion`."""
     raw = str(reference or "")
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     module_path_raw, attr_prefix, style = _split_reference_for_completion(raw)
     if not module_path_raw:
@@ -3649,7 +3648,7 @@ def complete_python_reference(
     if spec is not None:
         origin = spec.origin
     if not isinstance(origin, str) or not origin or origin in ("built-in", "frozen"):
-        warnings.append("无法定位模块文件: {}".format(module_path_resolved))
+        warnings.append(f"无法定位模块文件: {module_path_resolved}")
         return PythonCompletionResult(items=(), warnings=tuple(warnings))
 
     file_path = Path(origin).expanduser().resolve(strict=False)
@@ -3661,9 +3660,9 @@ def complete_python_reference(
 
     matched = sorted([name for name in symbols if name.startswith(attr_prefix or "")])
     if style == "class":
-        items = tuple(["{}:{}".format(module_path_raw, name) for name in matched])
+        items = tuple([f"{module_path_raw}:{name}" for name in matched])
     else:
-        items = tuple(["{}.{}".format(module_path_raw, name) for name in matched])
+        items = tuple([f"{module_path_raw}.{name}" for name in matched])
     return PythonCompletionResult(items=items, warnings=tuple(warnings))
 
 
@@ -3671,8 +3670,8 @@ def complete_python_module_segment(
     prefix_module_path: str,
     *,
     segment_prefix: str,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> PythonCompletionResult:
     """提供 module path 的 segment 补全.
 
@@ -3680,7 +3679,7 @@ def complete_python_module_segment(
     - prefix_module_path="pkg" + segment_prefix="mo" -> ["mod", "more"]
     - prefix_module_path="" + segment_prefix="pkg" -> ["pkg"]
     """
-    warnings: List[str] = []
+    warnings: list[str] = []
     prefix_raw = str(prefix_module_path or "").strip()
     seg_prefix = str(segment_prefix or "")
     search_locations = _python_module_search_locations(
@@ -3690,7 +3689,7 @@ def complete_python_module_segment(
         warnings=warnings,
     )
 
-    names: Dict[str, None] = {}
+    names: dict[str, None] = {}
     for base in search_locations:
         for name in _iter_python_module_child_names(base):
             if name.startswith(seg_prefix):
@@ -3703,12 +3702,12 @@ def complete_python_attr_path_segment(
     module_path: str,
     *,
     attr_path_prefix: str,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]] = None,
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None = None,
 ) -> PythonCompletionResult:
     """提供 `module_path + attr_path` 的补全(支持 class 内符号)."""
     raw_module_path = str(module_path or "").strip()
-    warnings: List[str] = []
+    warnings: list[str] = []
     if not raw_module_path:
         return PythonCompletionResult(items=(), warnings=("无法解析 module_path",))
 
@@ -3721,7 +3720,7 @@ def complete_python_attr_path_segment(
     if tree is None:
         return PythonCompletionResult(items=(), warnings=tuple(warnings))
 
-    current_symbols: Dict[str, ast.AST] = _index_module_symbols(tree)
+    current_symbols: dict[str, ast.AST] = _index_module_symbols(tree)
     for part in base_parts:
         node = current_symbols.get(part)
         if node is None:
@@ -3734,7 +3733,7 @@ def complete_python_attr_path_segment(
     return PythonCompletionResult(items=tuple(matched), warnings=tuple(warnings))
 
 
-def _safe_path(raw: object) -> Optional[Path]:
+def _safe_path(raw: object) -> Path | None:
     try:
         return Path(str(raw)).expanduser().resolve(strict=False)
     except Exception:  # noqa: BLE001
@@ -3744,10 +3743,10 @@ def _safe_path(raw: object) -> Optional[Path]:
 def _python_module_search_locations(
     prefix_module_path: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]],
-    warnings: List[str],
-) -> Tuple[Path, ...]:
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None,
+    warnings: list[str],
+) -> tuple[Path, ...]:
     roots = _normalize_python_roots(python_roots, default_root=Path().resolve(strict=False))
     prefix = str(prefix_module_path or "").strip()
     if not prefix:
@@ -3765,10 +3764,10 @@ def _python_module_search_locations(
     spec = _find_spec(resolved_prefix, roots=roots)
     locs = getattr(spec, "submodule_search_locations", None) if spec is not None else None
     if not locs:
-        warnings.append("无法定位模块包路径: {}".format(resolved_prefix))
+        warnings.append(f"无法定位模块包路径: {resolved_prefix}")
         return ()
 
-    out: List[Path] = []
+    out: list[Path] = []
     for loc in list(locs):
         p = _safe_path(loc)
         if p is None or not p.exists() or not p.is_dir():
@@ -3816,7 +3815,7 @@ def _iter_python_module_child_names(base: Path) -> Iterable[str]:
             yield name
 
 
-def _split_attr_path_prefix(prefix_full: str) -> Optional[Tuple[Tuple[str, ...], str]]:
+def _split_attr_path_prefix(prefix_full: str) -> tuple[tuple[str, ...], str] | None:
     parts = [p.strip() for p in str(prefix_full or "").split(".")]
     if not parts:
         return ((), "")
@@ -3830,10 +3829,10 @@ def _split_attr_path_prefix(prefix_full: str) -> Optional[Tuple[Tuple[str, ...],
 def _resolve_module_ast(
     raw_module_path: str,
     *,
-    python_roots: Sequence[Union[str, Path]],
-    anchor_path: Optional[Union[str, Path]],
-    warnings: List[str],
-) -> Optional[ast.Module]:
+    python_roots: Sequence[str | Path],
+    anchor_path: str | Path | None,
+    warnings: list[str],
+) -> ast.Module | None:
     module_path_resolved = _normalize_python_module_path(
         str(raw_module_path or ""),
         python_roots=python_roots,
@@ -3847,28 +3846,28 @@ def _resolve_module_ast(
     spec = _find_spec(module_path_resolved, roots=roots)
     origin = spec.origin if spec is not None else None
     if not isinstance(origin, str) or not origin or origin in ("built-in", "frozen"):
-        warnings.append("无法定位模块文件: {}".format(module_path_resolved))
+        warnings.append(f"无法定位模块文件: {module_path_resolved}")
         return None
 
     file_path = Path(origin).expanduser().resolve(strict=False)
     if not file_path.exists() or not file_path.is_file():
-        warnings.append("模块文件不存在: {}".format(file_path))
+        warnings.append(f"模块文件不存在: {file_path}")
         return None
 
     try:
         text = file_path.read_text(encoding="utf-8")
         return ast.parse(text)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("completion 解析失败: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"completion 解析失败: {type(exc).__name__}: {exc}")
         return None
 
 
 def _normalize_python_roots(
-    raw_roots: Optional[Iterable[Union[str, Path]]],
+    raw_roots: Iterable[str | Path] | None,
     *,
     default_root: Path,
-) -> Tuple[Path, ...]:
-    roots: List[Path] = []
+) -> tuple[Path, ...]:
+    roots: list[Path] = []
     if raw_roots is not None:
         for raw in raw_roots:
             p = Path(str(raw)).expanduser().resolve(strict=False)
@@ -3878,8 +3877,8 @@ def _normalize_python_roots(
     if not roots:
         roots.append(default_root)
 
-    seen: Dict[str, None] = {}
-    unique: List[Path] = []
+    seen: dict[str, None] = {}
+    unique: list[Path] = []
     for p in roots:
         key = str(p)
         if key in seen:
@@ -3889,8 +3888,8 @@ def _normalize_python_roots(
     return tuple(unique)
 
 
-def _infer_default_python_roots(project_root: Path) -> Tuple[Path, ...]:
-    roots: List[Path] = []
+def _infer_default_python_roots(project_root: Path) -> tuple[Path, ...]:
+    roots: list[Path] = []
 
     src_dir = project_root / "src"
     if src_dir.exists() and src_dir.is_dir():
@@ -3910,8 +3909,8 @@ def _infer_default_python_roots(project_root: Path) -> Tuple[Path, ...]:
     # - supports monorepos / ad-hoc modules (e.g. notebooks/)
     roots.append(project_root)
 
-    seen: Dict[str, None] = {}
-    unique: List[Path] = []
+    seen: dict[str, None] = {}
+    unique: list[Path] = []
     for root in roots:
         key = str(root)
         if key in seen:
@@ -3921,7 +3920,7 @@ def _infer_default_python_roots(project_root: Path) -> Tuple[Path, ...]:
     return tuple(unique)
 
 
-def _classify_yaml_kind_from_overrides(path: Path, cfg: Optional[YamlDslProjectConfig]) -> str:
+def _classify_yaml_kind_from_overrides(path: Path, cfg: YamlDslProjectConfig | None) -> str:
     if cfg is None or cfg.lsp is None or not cfg.lsp.kind_overrides:
         return ""
     rel = ""
@@ -3943,7 +3942,7 @@ def _classify_yaml_kind_by_heuristic(yaml_text: str) -> str:
     except Exception:  # noqa: BLE001
         return YAML_DSL_KIND_DEMAND
     if isinstance(loaded, dict):
-        wf = cast("Dict[str, Any]", loaded).get("workflow")  # pragma: allow-cast yaml safe_load typed narrowing
+        wf = cast("dict[str, Any]", loaded).get("workflow")  # pragma: allow-cast yaml safe_load typed narrowing
         if isinstance(wf, dict):
             return YAML_DSL_KIND_WORKFLOW
     return YAML_DSL_KIND_DEMAND
@@ -3953,19 +3952,19 @@ def _schema_dir() -> Path:
     return Path(yaml_dsl.__file__).resolve().parent / "schema"
 
 
-def _load_json_schema(path: Path) -> Dict[str, Any]:
+def _load_json_schema(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
-        return cast("Dict[str, Any]", json.load(f))  # pragma: allow-cast json schema typed boundary
+        return cast("dict[str, Any]", json.load(f))  # pragma: allow-cast json schema typed boundary
 
 
-_SCHEMA_REQUIRED_FILENAMES: Dict[str, str] = {
+_SCHEMA_REQUIRED_FILENAMES: dict[str, str] = {
     YAML_DSL_KIND_DEMAND: "demand.gen.json",
     YAML_DSL_KIND_WORKFLOW: "workflow.gen.json",
 }
 
 
-@lru_cache(maxsize=None)
-def _schema_required_keys(kind: str) -> Tuple[str, ...]:
+@cache
+def _schema_required_keys(kind: str) -> tuple[str, ...]:
     filename = _SCHEMA_REQUIRED_FILENAMES.get(str(kind))
     if not filename:
         return ()
@@ -3979,8 +3978,8 @@ def _schema_required_keys(kind: str) -> Tuple[str, ...]:
     if not isinstance(raw_required, list):
         return ()
 
-    keys: List[str] = []
-    seen: Dict[str, None] = {}
+    keys: list[str] = []
+    seen: dict[str, None] = {}
     for item in raw_required:
         if not isinstance(item, str):
             continue
@@ -3992,7 +3991,7 @@ def _schema_required_keys(kind: str) -> Tuple[str, ...]:
     return tuple(keys)
 
 
-def _classify_yaml_kind_by_required_keys_loaded(loaded: Dict[str, Any]) -> str:
+def _classify_yaml_kind_by_required_keys_loaded(loaded: dict[str, Any]) -> str:
     required_workflow = _schema_required_keys(YAML_DSL_KIND_WORKFLOW)
     if required_workflow and all(key in loaded for key in required_workflow):
         wf = loaded.get("workflow")
@@ -4012,7 +4011,7 @@ def _classify_yaml_kind_by_required_keys(yaml_text: str) -> str:
     except Exception:  # noqa: BLE001
         return ""
     if isinstance(loaded, dict):
-        loaded_dict = cast("Dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
+        loaded_dict = cast("dict[str, Any]", loaded)  # pragma: allow-cast yaml safe_load typed narrowing
         return _classify_yaml_kind_by_required_keys_loaded(loaded_dict)
     return ""
 
@@ -4022,9 +4021,9 @@ def _collect_demand_diagnostics(
     *,
     yaml_path: Path,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
-) -> Tuple[Tuple[EditorDiagnostic, ...], Tuple[EditorDiagnostic, ...]]:
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
+) -> tuple[tuple[EditorDiagnostic, ...], tuple[EditorDiagnostic, ...]]:
     effective_project_root_override = _effective_project_root_override_for_imports(
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
@@ -4041,7 +4040,7 @@ def _collect_demand_diagnostics(
     except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
             code="yaml_frontend_diagnostics_error",
-            message="Failed to compile demand diagnostics: {}: {}".format(type(exc).__name__, exc),
+            message=f"Failed to compile demand diagnostics: {type(exc).__name__}: {exc}",
             source_path=str(yaml_path),
             path="(diagnostics)",
             loc=ErrorLoc(1, 1),
@@ -4058,7 +4057,7 @@ def _collect_workflow_diagnostics(
     yaml_text: str,
     *,
     yaml_path: Path,
-) -> Tuple[Tuple[EditorDiagnostic, ...], Tuple[EditorDiagnostic, ...]]:
+) -> tuple[tuple[EditorDiagnostic, ...], tuple[EditorDiagnostic, ...]]:
     try:
         yaml_data, locations, _lines = load_yaml_mapping_text(yaml_text, source_path=str(yaml_path), detect_duplicate_keys=True)
     except ScalimYamlValidationError as exc:
@@ -4070,8 +4069,8 @@ def _collect_workflow_diagnostics(
     schema_path = _schema_dir() / "workflow.gen.json"
     schema = _load_json_schema(schema_path)
 
-    errors: List[EditorDiagnostic] = []
-    warnings: List[EditorDiagnostic] = []
+    errors: list[EditorDiagnostic] = []
+    warnings: list[EditorDiagnostic] = []
 
     jsonschema_module = import_jsonschema_module()
     if jsonschema_module is None:
@@ -4105,7 +4104,7 @@ def _collect_workflow_diagnostics(
         except Exception as exc:  # noqa: BLE001
             env = ErrorEnvelope(
                 code="yaml_schema_validate_warning",
-                message="Schema validation failed unexpectedly: {}: {}".format(type(exc).__name__, exc),
+                message=f"Schema validation failed unexpectedly: {type(exc).__name__}: {exc}",
                 source_path=str(yaml_path),
                 path="(schema)",
                 loc=ErrorLoc(1, 1),
@@ -4152,28 +4151,28 @@ def _collect_workflow_diagnostics(
 
 
 def _collect_workflow_book_migration_diagnostics(
-    yaml_data: Dict[str, Any],
+    yaml_data: dict[str, Any],
     *,
     yaml_path: Path,
-    locations: Dict[str, Tuple[int, int]],
-) -> List[EditorDiagnostic]:
+    locations: dict[str, tuple[int, int]],
+) -> list[EditorDiagnostic]:
     workflow_raw = yaml_data.get("workflow")
     if not isinstance(workflow_raw, dict):
         return []
-    resources_raw = cast("Dict[str, Any]", workflow_raw).get("resources")
+    resources_raw = cast("dict[str, Any]", workflow_raw).get("resources")
     if not isinstance(resources_raw, dict):
         return []
-    books_raw = cast("Dict[str, Any]", resources_raw).get("books")
+    books_raw = cast("dict[str, Any]", resources_raw).get("books")
     if not isinstance(books_raw, dict):
         return []
 
-    issues: List[ValidationIssue] = []
+    issues: list[ValidationIssue] = []
     ConfigValidator().validate_books_mapping(
-        cast("Dict[Any, Any]", books_raw),
+        cast("dict[Any, Any]", books_raw),
         books_root_path="workflow.resources.books",
         errors=issues,
     )
-    out: List[EditorDiagnostic] = []
+    out: list[EditorDiagnostic] = []
     for issue in issues:
         env = envelope_from_validation_issue(
             issue,
@@ -4189,7 +4188,7 @@ def _envelopes_to_diagnostics(
     envelopes: Sequence[ErrorEnvelope],
     *,
     severity: str,
-) -> List[EditorDiagnostic]:
+) -> list[EditorDiagnostic]:
     return [_envelope_to_diagnostic(env, severity=severity) for env in envelopes]
 
 
@@ -4211,13 +4210,13 @@ def _envelope_to_diagnostic(env: ErrorEnvelope, *, severity: str) -> EditorDiagn
     )
 
 
-def import_jsonschema_module() -> Optional[Any]:
+def import_jsonschema_module() -> Any | None:
     return _jsonschema
 
 
-def _find_spec(module_path: str, *, roots: Sequence[Path]) -> Optional[Any]:
+def _find_spec(module_path: str, *, roots: Sequence[Path]) -> Any | None:
     roots_str = [str(r) for r in roots]
-    spec: Optional[Any] = None
+    spec: Any | None = None
     try:
         parts = [p for p in str(module_path or "").split(".") if p]
         if not parts:
@@ -4234,7 +4233,7 @@ def _find_spec(module_path: str, *, roots: Sequence[Path]) -> Optional[Any]:
                 if not search_locations:
                     spec = None
                     break
-                prefix = "{}.{}".format(prefix, part)
+                prefix = f"{prefix}.{part}"
                 spec = PathFinder.find_spec(prefix, list(search_locations))
     except Exception:  # noqa: BLE001
         spec = None
@@ -4242,22 +4241,22 @@ def _find_spec(module_path: str, *, roots: Sequence[Path]) -> Optional[Any]:
     return spec
 
 
-def _resolve_attr_path_node(file_path: Path, parsed: ParsedReference) -> Tuple[Optional[ast.AST], str]:
+def _resolve_attr_path_node(file_path: Path, parsed: ParsedReference) -> tuple[ast.AST | None, str]:
     try:
         text = file_path.read_text(encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
-        return None, "读取模块文件失败: {}: {}".format(type(exc).__name__, exc)
+        return None, f"读取模块文件失败: {type(exc).__name__}: {exc}"
 
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
-        return None, "模块语法解析失败: {}: {}".format(type(exc).__name__, exc)
+        return None, f"模块语法解析失败: {type(exc).__name__}: {exc}"
 
-    node: Optional[ast.AST] = _find_symbol_in_module(tree, parsed.attr_path)
+    node: ast.AST | None = _find_symbol_in_module(tree, parsed.attr_path)
     return node, ""
 
 
-def _find_symbol_in_module(tree: ast.Module, attr_path: Tuple[str, ...]) -> Optional[ast.AST]:
+def _find_symbol_in_module(tree: ast.Module, attr_path: tuple[str, ...]) -> ast.AST | None:
     if not attr_path:
         return None
 
@@ -4277,8 +4276,8 @@ def _find_symbol_in_module(tree: ast.Module, attr_path: Tuple[str, ...]) -> Opti
     return current
 
 
-def _index_module_symbols(tree: ast.Module) -> Dict[str, ast.AST]:
-    out: Dict[str, ast.AST] = {}
+def _index_module_symbols(tree: ast.Module) -> dict[str, ast.AST]:
+    out: dict[str, ast.AST] = {}
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             out[str(node.name)] = node
@@ -4295,8 +4294,8 @@ def _index_module_symbols(tree: ast.Module) -> Dict[str, ast.AST]:
     return out
 
 
-def _index_class_symbols(node: ast.ClassDef) -> Dict[str, ast.AST]:
-    out: Dict[str, ast.AST] = {}
+def _index_class_symbols(node: ast.ClassDef) -> dict[str, ast.AST]:
+    out: dict[str, ast.AST] = {}
     for child in node.body:
         if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             out[str(child.name)] = child
@@ -4313,7 +4312,7 @@ def _index_class_symbols(node: ast.ClassDef) -> Dict[str, ast.AST]:
     return out
 
 
-def _node_range(node: ast.AST) -> Optional[EditorRange]:
+def _node_range(node: ast.AST) -> EditorRange | None:
     node_any = cast("Any", node)  # pragma: allow-cast ast node dynamic position fields
     try:
         lineno = node_any.lineno
@@ -4337,7 +4336,7 @@ def _node_range(node: ast.AST) -> Optional[EditorRange]:
     return EditorRange(start=start, end=end)
 
 
-def _split_reference_for_completion(reference: str) -> Tuple[str, str, str]:
+def _split_reference_for_completion(reference: str) -> tuple[str, str, str]:
     raw = str(reference or "").strip()
     if ":" in raw:
         module, attr = raw.split(":", 1)
@@ -4348,11 +4347,11 @@ def _split_reference_for_completion(reference: str) -> Tuple[str, str, str]:
     return "", "", ""
 
 
-def _list_module_symbols(file_path: Path) -> Tuple[Tuple[str, ...], str]:
+def _list_module_symbols(file_path: Path) -> tuple[tuple[str, ...], str]:
     try:
         tree = parse_python_ast_cached(file_path)
     except Exception as exc:  # noqa: BLE001
-        return (), "completion 解析失败: {}: {}".format(type(exc).__name__, exc)
+        return (), f"completion 解析失败: {type(exc).__name__}: {exc}"
     symbols = _index_module_symbols(tree)
     return tuple(sorted(symbols.keys())), ""
 
@@ -4365,8 +4364,8 @@ class YamlDslFieldInfo:
     summary: str = ""
     detail: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "field_id": str(self.field_id),
             "kind": str(self.kind),
             "source_id": str(self.source_id or ""),
@@ -4379,14 +4378,14 @@ class YamlDslFieldInfo:
 @dataclass(frozen=True)
 class YamlDslFieldDefinitionLocation:
     file_path: str
-    range: Optional[EditorRange]
+    range: EditorRange | None
     field_id: str
     kind: str
     source_id: str = ""
     yaml_path: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "file_path": str(self.file_path),
             "field_id": str(self.field_id),
             "kind": str(self.kind),
@@ -4400,11 +4399,11 @@ class YamlDslFieldDefinitionLocation:
 
 @dataclass(frozen=True)
 class YamlDslFieldDefinitionResult:
-    locations: Tuple[YamlDslFieldDefinitionLocation, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    locations: tuple[YamlDslFieldDefinitionLocation, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "locations": [loc.as_dict() for loc in self.locations],
         }
         if self.warnings:
@@ -4415,10 +4414,10 @@ class YamlDslFieldDefinitionResult:
 @dataclass(frozen=True)
 class YamlDslOutputFieldHoverResult:
     text: str = ""
-    warnings: Tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"text": str(self.text)}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": str(self.text)}
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         return payload
@@ -4426,11 +4425,11 @@ class YamlDslOutputFieldHoverResult:
 
 @dataclass(frozen=True)
 class YamlDslYamlAliasDefinitionResult:
-    range: Optional[EditorRange] = None
-    warnings: Tuple[str, ...] = ()
+    range: EditorRange | None = None
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
         if self.range is not None:
             payload["range"] = self.range.as_dict()
         if self.warnings:
@@ -4449,17 +4448,17 @@ class YamlDslEditorEffectiveView:
     """
 
     yaml_kind: str
-    field_ids: Tuple[str, ...] = ()
-    field_infos_by_id: Dict[str, Tuple[YamlDslFieldInfo, ...]] = field(default_factory=dict)
-    field_definitions_by_id: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = field(default_factory=dict)
-    outputs_effective_fields_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
-    yaml_anchor_ranges: Dict[str, EditorRange] = field(default_factory=dict)
-    yaml_anchor_expansions: Dict[str, Tuple[str, ...]] = field(default_factory=dict)
-    import_fragment_files: Tuple[str, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    field_ids: tuple[str, ...] = ()
+    field_infos_by_id: dict[str, tuple[YamlDslFieldInfo, ...]] = field(default_factory=dict)
+    field_definitions_by_id: dict[str, tuple[YamlDslFieldDefinitionLocation, ...]] = field(default_factory=dict)
+    outputs_effective_fields_by_output_index: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    yaml_anchor_ranges: dict[str, EditorRange] = field(default_factory=dict)
+    yaml_anchor_expansions: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    import_fragment_files: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "yaml_kind": str(self.yaml_kind or ""),
             "field_ids": list(self.field_ids),
             "field_infos_by_id": {k: [i.as_dict() for i in v] for k, v in self.field_infos_by_id.items()},
@@ -4480,17 +4479,17 @@ class YamlDslExpressionScopeIndex:
 
     yaml_kind: str
     file_path: str
-    field_ids: Tuple[str, ...] = ()
-    field_infos_by_id: Dict[str, Tuple[YamlDslFieldInfo, ...]] = field(default_factory=dict)
-    field_definitions_by_id: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = field(default_factory=dict)
-    outputs_effective_fields_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
-    aggregate_group_by_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
-    aggregate_out_field_ids_by_output_index: Dict[int, Tuple[str, ...]] = field(default_factory=dict)
-    aggregate_out_field_ranges_by_output_index: Dict[int, Dict[str, EditorRange]] = field(default_factory=dict)
-    warnings: Tuple[str, ...] = ()
+    field_ids: tuple[str, ...] = ()
+    field_infos_by_id: dict[str, tuple[YamlDslFieldInfo, ...]] = field(default_factory=dict)
+    field_definitions_by_id: dict[str, tuple[YamlDslFieldDefinitionLocation, ...]] = field(default_factory=dict)
+    outputs_effective_fields_by_output_index: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    aggregate_group_by_by_output_index: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    aggregate_out_field_ids_by_output_index: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    aggregate_out_field_ranges_by_output_index: dict[int, dict[str, EditorRange]] = field(default_factory=dict)
+    warnings: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "yaml_kind": str(self.yaml_kind or ""),
             "file_path": str(self.file_path or ""),
             "field_ids": list(self.field_ids),
@@ -4514,24 +4513,24 @@ class _EditorOutputsFieldResolver(ParserOutputsMixin):
         *,
         field_def_index: FieldDefIndex,
         context_label: str,
-        warnings: List[str],
-    ) -> List[str]:
-        out: List[str] = []
+        warnings: list[str],
+    ) -> list[str]:
+        out: list[str] = []
         try:
             flattened = self._walk_output_field_items(value, field_path="")
         except Exception as exc:  # noqa: BLE001
-            warnings.append("{} flatten failed: {}: {}".format(context_label, type(exc).__name__, exc))
+            warnings.append(f"{context_label} flatten failed: {type(exc).__name__}: {exc}")
             return out
 
         for field_path, item in flattened:
             try:
                 fid = self._resolve_field_ref(
                     item,
-                    path="{}.{}".format(context_label, field_path) if field_path else str(context_label),
+                    path=f"{context_label}.{field_path}" if field_path else str(context_label),
                     field_def_index=field_def_index,
                 )
             except Exception as exc:  # noqa: BLE001
-                warnings.append("{} resolve failed: {}: {}".format(context_label, type(exc).__name__, exc))
+                warnings.append(f"{context_label} resolve failed: {type(exc).__name__}: {exc}")
                 continue
             if fid:
                 out.append(str(fid))
@@ -4539,16 +4538,16 @@ class _EditorOutputsFieldResolver(ParserOutputsMixin):
 
     def resolve_outputs_effective_fields(
         self,
-        raw: Dict[str, Any],
+        raw: dict[str, Any],
         *,
         field_def_index: FieldDefIndex,
-        warnings: List[str],
-    ) -> Dict[int, Tuple[str, ...]]:
+        warnings: list[str],
+    ) -> dict[int, tuple[str, ...]]:
         outputs = _as_yaml_sequence(raw.get("outputs"))
         if outputs is None:
             return {}
 
-        out: Dict[int, Tuple[str, ...]] = {}
+        out: dict[int, tuple[str, ...]] = {}
         for idx, spec in enumerate(outputs):
             spec_map = _as_yaml_mapping(spec)
             if spec_map is None:
@@ -4557,7 +4556,7 @@ class _EditorOutputsFieldResolver(ParserOutputsMixin):
             if fields_raw is None:
                 continue
 
-            items: List[str] = []
+            items: list[str] = []
             for field_path, item in self._walk_output_field_items(fields_raw, field_path=""):
                 try:
                     fid = self._resolve_output_field_ref(
@@ -4568,7 +4567,7 @@ class _EditorOutputsFieldResolver(ParserOutputsMixin):
                         field_def_index=field_def_index,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    warnings.append("outputs.{}.fields.{}: {}: {}".format(int(idx), str(field_path), type(exc).__name__, exc))
+                    warnings.append(f"outputs.{int(idx)}.fields.{field_path!s}: {type(exc).__name__}: {exc}")
                     continue
                 if fid:
                     items.append(str(fid))
@@ -4580,8 +4579,8 @@ def _load_yaml_mapping_text_for_effective_view(
     yaml_text: str,
     *,
     yaml_path: Path,
-    warnings: List[str],
-) -> Tuple[Optional[Dict[str, Any]], Dict[str, Tuple[int, int]]]:
+    warnings: list[str],
+) -> tuple[dict[str, Any] | None, dict[str, tuple[int, int]]]:
     try:
         loaded, locations, _lines = load_yaml_mapping_text(
             str(yaml_text or ""),
@@ -4590,19 +4589,19 @@ def _load_yaml_mapping_text_for_effective_view(
         )
     except ScalimYamlValidationError as exc:
         msg = exc.errors[0].message if exc.errors else str(exc)
-        warnings.append("YAML parse failed: {}".format(msg))
+        warnings.append(f"YAML parse failed: {msg}")
         return None, {}
     except Exception as exc:  # noqa: BLE001
-        warnings.append("YAML parse failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"YAML parse failed: {type(exc).__name__}: {exc}")
         return None, {}
     return loaded, locations
 
 
 def _effective_project_root_override_for_imports(
     *,
-    scalim_yaml_override: Optional[Union[str, Path]],
-    project_root_override: Optional[Union[str, Path]],
-) -> Optional[Union[str, Path]]:
+    scalim_yaml_override: str | Path | None,
+    project_root_override: str | Path | None,
+) -> str | Path | None:
     if project_root_override is None:
         return None
     if scalim_yaml_override is not None:
@@ -4622,10 +4621,10 @@ def _effective_project_root_override_for_imports(
 
 
 def _collect_field_defs_for_effective_view(
-    raw: Dict[str, Any],
+    raw: dict[str, Any],
     *,
-    warnings: List[str],
-) -> Tuple[Optional[FieldDefIndex], str]:
+    warnings: list[str],
+) -> tuple[FieldDefIndex | None, str]:
     main_source_id = ""
     main_source = _as_yaml_mapping(raw.get("main_source"))
     if main_source is not None:
@@ -4634,7 +4633,7 @@ def _collect_field_defs_for_effective_view(
     try:
         field_def_index = collect_field_defs(RawDemand.from_raw(raw), main_source_id=main_source_id)
     except Exception as exc:  # noqa: BLE001
-        warnings.append("collect_field_defs failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"collect_field_defs failed: {type(exc).__name__}: {exc}")
         return None, main_source_id
     return field_def_index, main_source_id
 
@@ -4642,11 +4641,11 @@ def _collect_field_defs_for_effective_view(
 def build_yaml_dsl_editor_effective_view(
     yaml_text: str,
     *,
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     yaml_kind: str,
     allowed_yaml_roots: Sequence[Path],
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> YamlDslEditorEffectiveView:
     """构建 editor 侧 effective view (静态 + 可诊断降级).
 
@@ -4654,7 +4653,7 @@ def build_yaml_dsl_editor_effective_view(
     - 输入以打开文档的内存态文本为准
     - 失败时返回空结果 + warnings,不得 crash
     """
-    warnings: List[str] = []
+    warnings: list[str] = []
     yaml_path_resolved = Path(str(yaml_path)).expanduser().resolve(strict=False)
 
     yaml_anchor_ranges, yaml_anchor_values = _safe_collect_yaml_anchors_rt(yaml_text, warnings=warnings)
@@ -4678,8 +4677,8 @@ def build_yaml_dsl_editor_effective_view(
         scalim_yaml_override=scalim_yaml_override,
         project_root_override=project_root_override,
     )
-    effective_raw: Dict[str, Any] = raw
-    import_fragment_files: Tuple[str, ...] = ()
+    effective_raw: dict[str, Any] = raw
+    import_fragment_files: tuple[str, ...] = ()
     try:
         compilation = compile_demand_frontend_diagnostics(
             yaml_path_resolved,
@@ -4696,9 +4695,9 @@ def build_yaml_dsl_editor_effective_view(
             e for e in compilation.diagnostics.errors if str(getattr(e, "code", "") or "") == "yaml_import_expansion_error"
         ]
         if import_expansion_errors:
-            warnings.append("imports expansion failed: {}".format(str(import_expansion_errors[0].message)))
+            warnings.append(f"imports expansion failed: {import_expansion_errors[0].message!s}")
     except Exception as exc:  # noqa: BLE001
-        warnings.append("front-end compilation failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"front-end compilation failed: {type(exc).__name__}: {exc}")
 
     field_def_index, main_source_id = _collect_field_defs_for_effective_view(effective_raw, warnings=warnings)
     if field_def_index is None:
@@ -4721,7 +4720,7 @@ def build_yaml_dsl_editor_effective_view(
         warnings=warnings,
     )
 
-    definitions_by_id: Dict[str, List[YamlDslFieldDefinitionLocation]] = {}
+    definitions_by_id: dict[str, list[YamlDslFieldDefinitionLocation]] = {}
     _append_field_definitions_from_locations(
         definitions_by_id,
         field_def_index=field_def_index,
@@ -4737,7 +4736,7 @@ def build_yaml_dsl_editor_effective_view(
             fragment_path,
         )
 
-    definitions_final: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
+    definitions_final: dict[str, tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
 
     return YamlDslEditorEffectiveView(
         yaml_kind=YAML_DSL_KIND_DEMAND,
@@ -4755,7 +4754,7 @@ def build_yaml_dsl_editor_effective_view(
 def build_yaml_dsl_expression_scope_index(
     yaml_text: str,
     *,
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     yaml_kind: str,
 ) -> YamlDslExpressionScopeIndex:
     """构建表达式 scope 索引(同文件,静态 + 可诊断降级).
@@ -4766,7 +4765,7 @@ def build_yaml_dsl_expression_scope_index(
     - 失败时返回空结果 + warnings,不得 crash
     """
 
-    warnings: List[str] = []
+    warnings: list[str] = []
     yaml_path_resolved = Path(str(yaml_path)).expanduser().resolve(strict=False)
 
     if str(yaml_kind or "") != YAML_DSL_KIND_DEMAND:
@@ -4795,7 +4794,7 @@ def build_yaml_dsl_expression_scope_index(
     field_ids = tuple(sorted(field_def_index.defs_by_id.keys()))
     field_infos_by_id = _build_field_infos_by_id(field_def_index)
 
-    definitions_by_id: Dict[str, List[YamlDslFieldDefinitionLocation]] = {}
+    definitions_by_id: dict[str, list[YamlDslFieldDefinitionLocation]] = {}
     _append_field_definitions_from_locations(
         definitions_by_id,
         field_def_index=field_def_index,
@@ -4803,7 +4802,7 @@ def build_yaml_dsl_expression_scope_index(
         file_path=str(yaml_path_resolved),
         main_source_id=main_source_id,
     )
-    definitions_final: Dict[str, Tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
+    definitions_final: dict[str, tuple[YamlDslFieldDefinitionLocation, ...]] = {k: tuple(v) for k, v in definitions_by_id.items() if v}
 
     resolver = _EditorOutputsFieldResolver()
     outputs_effective = resolver.resolve_outputs_effective_fields(raw, field_def_index=field_def_index, warnings=warnings)
@@ -4827,13 +4826,13 @@ def build_yaml_dsl_expression_scope_index(
 
 
 def _collect_output_aggregate_scope_for_expression_index(
-    raw: Dict[str, Any],
+    raw: dict[str, Any],
     *,
-    locations: Dict[str, Tuple[int, int]],
-) -> Tuple[Dict[int, Tuple[str, ...]], Dict[int, Tuple[str, ...]], Dict[int, Dict[str, EditorRange]]]:
-    group_by_by_output_index: Dict[int, Tuple[str, ...]] = {}
-    out_field_ids_by_output_index: Dict[int, Tuple[str, ...]] = {}
-    out_field_ranges_by_output_index: Dict[int, Dict[str, EditorRange]] = {}
+    locations: dict[str, tuple[int, int]],
+) -> tuple[dict[int, tuple[str, ...]], dict[int, tuple[str, ...]], dict[int, dict[str, EditorRange]]]:
+    group_by_by_output_index: dict[int, tuple[str, ...]] = {}
+    out_field_ids_by_output_index: dict[int, tuple[str, ...]] = {}
+    out_field_ranges_by_output_index: dict[int, dict[str, EditorRange]] = {}
 
     outputs_obj = _as_yaml_sequence(raw.get("outputs"))
     if outputs_obj is None:
@@ -4857,7 +4856,7 @@ def _collect_output_aggregate_scope_for_expression_index(
     return group_by_by_output_index, out_field_ids_by_output_index, out_field_ranges_by_output_index
 
 
-def _output_aggregate_mapping(output: object) -> Optional[Dict[str, Any]]:
+def _output_aggregate_mapping(output: object) -> dict[str, Any] | None:
     output_map = _as_yaml_mapping(output)
     if output_map is None:
         return None
@@ -4867,9 +4866,9 @@ def _output_aggregate_mapping(output: object) -> Optional[Dict[str, Any]]:
     return agg_obj
 
 
-def _output_aggregate_group_by_ids(aggregate: Dict[str, Any]) -> Tuple[str, ...]:
+def _output_aggregate_group_by_ids(aggregate: dict[str, Any]) -> tuple[str, ...]:
     group_by_raw = aggregate.get("group_by")
-    values: List[str] = []
+    values: list[str] = []
     if isinstance(group_by_raw, str):
         values.append(str(group_by_raw))
     elif isinstance(group_by_raw, list):
@@ -4886,23 +4885,23 @@ def _output_aggregate_group_by_ids(aggregate: Dict[str, Any]) -> Tuple[str, ...]
 
 def _output_aggregate_out_field_ids_and_ranges(
     output_index: int,
-    aggregate: Dict[str, Any],
+    aggregate: dict[str, Any],
     *,
-    locations: Dict[str, Tuple[int, int]],
-) -> Tuple[Tuple[str, ...], Dict[str, EditorRange]]:
+    locations: dict[str, tuple[int, int]],
+) -> tuple[tuple[str, ...], dict[str, EditorRange]]:
     fields = _as_yaml_mapping(aggregate.get("fields"))
     if fields is None:
         return (), {}
 
-    out_field_ids: List[str] = []
-    ranges: Dict[str, EditorRange] = {}
+    out_field_ids: list[str] = []
+    ranges: dict[str, EditorRange] = {}
     for out_field_id in list(fields.keys()):
         fid = str(out_field_id).strip()
         if not fid:
             continue
         out_field_ids.append(fid)
 
-        yaml_path = "outputs.{}.aggregate.fields.{}".format(int(output_index), fid)
+        yaml_path = f"outputs.{int(output_index)}.aggregate.fields.{fid}"
         rng = _range_for_yaml_key_path(yaml_path, key_text=fid, locations=locations)
         if rng is not None:
             ranges[fid] = rng
@@ -4910,8 +4909,8 @@ def _output_aggregate_out_field_ids_and_ranges(
     return tuple(out_field_ids), ranges
 
 
-def _build_field_infos_by_id(field_def_index: FieldDefIndex) -> Dict[str, Tuple[YamlDslFieldInfo, ...]]:
-    infos: Dict[str, List[YamlDslFieldInfo]] = {}
+def _build_field_infos_by_id(field_def_index: FieldDefIndex) -> dict[str, tuple[YamlDslFieldInfo, ...]]:
+    infos: dict[str, list[YamlDslFieldInfo]] = {}
     for field_def in list(field_def_index.field_defs):
         info = YamlDslFieldInfo(
             field_id=str(field_def.field_id),
@@ -4925,10 +4924,10 @@ def _build_field_infos_by_id(field_def_index: FieldDefIndex) -> Dict[str, Tuple[
 
 
 def _append_field_definitions_from_locations(
-    out: Dict[str, List[YamlDslFieldDefinitionLocation]],
+    out: dict[str, list[YamlDslFieldDefinitionLocation]],
     *,
     field_def_index: FieldDefIndex,
-    locations: Dict[str, Tuple[int, int]],
+    locations: dict[str, tuple[int, int]],
     file_path: str,
     main_source_id: str,
 ) -> None:
@@ -4949,7 +4948,7 @@ def _append_field_definitions_from_locations(
 
 
 def _append_field_definitions_from_yaml_file(
-    out: Dict[str, List[YamlDslFieldDefinitionLocation]],
+    out: dict[str, list[YamlDslFieldDefinitionLocation]],
     fragment_yaml_path: Path,
 ) -> None:
     try:
@@ -4977,27 +4976,27 @@ def _append_field_definitions_from_yaml_file(
     )
 
 
-def _candidate_yaml_paths_for_field_def(field_def: FieldDef, *, main_source_id: str) -> Tuple[str, ...]:
+def _candidate_yaml_paths_for_field_def(field_def: FieldDef, *, main_source_id: str) -> tuple[str, ...]:
     fid = str(field_def.field_id)
     kind = str(field_def.kind)
     source_id = str(field_def.source_id or "")
 
     if kind == "derived":
-        return ("fields.{}".format(fid),)
+        return (f"fields.{fid}",)
 
     if kind != "source":
         return ()
 
-    candidates: List[str] = []
+    candidates: list[str] = []
     if main_source_id and source_id and source_id == main_source_id:
-        candidates.append("main_source.fields.{}".format(fid))
+        candidates.append(f"main_source.fields.{fid}")
     if source_id:
-        candidates.append("sources.{}.fields.{}".format(source_id, fid))
+        candidates.append(f"sources.{source_id}.fields.{fid}")
     return tuple(candidates)
 
 
-def _iter_file_import_cache_paths(cache: Dict[str, Dict[str, Any]]) -> List[str]:
-    files: List[str] = []
+def _iter_file_import_cache_paths(cache: dict[str, dict[str, Any]]) -> list[str]:
+    files: list[str] = []
     for key in sorted(cache.keys()):
         if not key:
             continue
@@ -5011,8 +5010,8 @@ def _iter_file_import_cache_paths(cache: Dict[str, Dict[str, Any]]) -> List[str]
 
 
 def _iter_ruamel_objects(root: object) -> Iterable[object]:
-    stack: List[object] = [root]
-    visited: Set[int] = set()
+    stack: list[object] = [root]
+    visited: set[int] = set()
     while stack:
         obj = stack.pop()
         if obj is None:
@@ -5029,7 +5028,7 @@ def _iter_ruamel_objects(root: object) -> Iterable[object]:
             stack.extend(cast("Any", obj))  # pragma: allow-cast ruamel commented seq typed narrowing
 
 
-def _anchor_range_for_ruamel_obj(obj: object, anchor_name: str, *, lines: Sequence[str]) -> Optional[EditorRange]:
+def _anchor_range_for_ruamel_obj(obj: object, anchor_name: str, *, lines: Sequence[str]) -> EditorRange | None:
     lc = getattr(obj, "lc", None)
     line0 = getattr(lc, "line", None)
     col0 = getattr(lc, "col", None)
@@ -5037,8 +5036,8 @@ def _anchor_range_for_ruamel_obj(obj: object, anchor_name: str, *, lines: Sequen
         return None
     line_text = str(lines[int(line0)])
 
-    token = "&{}".format(anchor_name)
-    col: Optional[int] = None
+    token = f"&{anchor_name}"
+    col: int | None = None
     if isinstance(col0, int) and 0 <= int(col0) < len(line_text) and line_text[int(col0) : int(col0) + len(token)] == token:
         col = int(col0)
     else:
@@ -5054,16 +5053,16 @@ def _anchor_range_for_ruamel_obj(obj: object, anchor_name: str, *, lines: Sequen
     return EditorRange(start=start, end=end)
 
 
-def _safe_collect_yaml_anchors_rt(yaml_text: str, *, warnings: List[str]) -> Tuple[Dict[str, EditorRange], Dict[str, object]]:
+def _safe_collect_yaml_anchors_rt(yaml_text: str, *, warnings: list[str]) -> tuple[dict[str, EditorRange], dict[str, object]]:
     """用 ruamel `rt` loader 收集 `&anchor` 的范围与绑定值."""
-    out_ranges: Dict[str, EditorRange] = {}
-    out_values: Dict[str, object] = {}
+    out_ranges: dict[str, EditorRange] = {}
+    out_values: dict[str, object] = {}
     try:
         yaml_rt = YAML(typ="rt")
         yaml_rt.version = (1, 2)  # pragma: allow-dynattr ruamel config
         data = yaml_rt.load(str(yaml_text or ""))
     except Exception as exc:  # noqa: BLE001
-        warnings.append("anchor scan failed: {}: {}".format(type(exc).__name__, exc))
+        warnings.append(f"anchor scan failed: {type(exc).__name__}: {exc}")
         return out_ranges, out_values
 
     lines = str(yaml_text or "").splitlines()
@@ -5087,13 +5086,13 @@ def _safe_collect_yaml_anchors_rt(yaml_text: str, *, warnings: List[str]) -> Tup
 
 
 def _build_yaml_anchor_expansions(
-    anchors: Dict[str, object],
+    anchors: dict[str, object],
     *,
     field_def_index: FieldDefIndex,
     resolver: _EditorOutputsFieldResolver,
-    warnings: List[str],
-) -> Dict[str, Tuple[str, ...]]:
-    out: Dict[str, Tuple[str, ...]] = {}
+    warnings: list[str],
+) -> dict[str, tuple[str, ...]]:
+    out: dict[str, tuple[str, ...]] = {}
     for name in sorted(anchors.keys()):
         value = anchors.get(name)
         if value is None:
@@ -5101,14 +5100,14 @@ def _build_yaml_anchor_expansions(
         field_ids = resolver.resolve_field_ids_from_value(
             value,
             field_def_index=field_def_index,
-            context_label="&{}".format(name),
+            context_label=f"&{name}",
             warnings=warnings,
         )
         out[str(name)] = tuple(field_ids)
     return out
 
 
-def _output_index_from_expression_yaml_path(yaml_path: str) -> Optional[int]:
+def _output_index_from_expression_yaml_path(yaml_path: str) -> int | None:
     parts = str(yaml_path or "").split(".")
     min_parts = 2
     if len(parts) < min_parts or str(parts[0]) != "outputs":
@@ -5119,9 +5118,9 @@ def _output_index_from_expression_yaml_path(yaml_path: str) -> Optional[int]:
         return None
 
 
-def _dedupe_keep_order(values: Sequence[str]) -> Tuple[str, ...]:
-    out: List[str] = []
-    seen: Set[str] = set()
+def _dedupe_keep_order(values: Sequence[str]) -> tuple[str, ...]:
+    out: list[str] = []
+    seen: set[str] = set()
     for raw in values:
         v = str(raw or "").strip()
         if not v or v in seen:
@@ -5134,14 +5133,14 @@ def _dedupe_keep_order(values: Sequence[str]) -> Tuple[str, ...]:
 def _expression_completion_candidates(
     kind: str,
     *,
-    output_index: Optional[int],
+    output_index: int | None,
     scope_index: YamlDslExpressionScopeIndex,
-) -> Optional[Tuple[Tuple[str, ...], Tuple[str, ...]]]:
+) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
     if kind == "expression_fields_compute":
         return tuple(scope_index.field_ids), ()
 
     if kind == "expression_outputs_where":
-        preferred: Tuple[str, ...] = ()
+        preferred: tuple[str, ...] = ()
         if output_index is not None:
             preferred = scope_index.outputs_effective_fields_by_output_index.get(int(output_index)) or ()
         return tuple(scope_index.field_ids), preferred
@@ -5162,9 +5161,9 @@ def _order_expression_completion_candidates(
     preferred: Sequence[str],
     *,
     prefix: str,
-) -> List[str]:
+) -> list[str]:
     preferred_set = {str(fid) for fid in preferred}
-    ordered: List[str] = []
+    ordered: list[str] = []
     for fid in preferred:
         if fid in ordered:
             continue
@@ -5179,7 +5178,7 @@ def _expression_completion_detail(
     field_id: str,
     *,
     kind: str,
-    output_index: Optional[int],
+    output_index: int | None,
     scope_index: YamlDslExpressionScopeIndex,
 ) -> str:
     detail = ""
@@ -5198,7 +5197,7 @@ def _expression_completion_detail(
     return detail
 
 
-def _append_expression_builtin_completion_items(items: List[YamlDslSugarCompletionItem], *, prefix: str) -> None:
+def _append_expression_builtin_completion_items(items: list[YamlDslSugarCompletionItem], *, prefix: str) -> None:
     existing = {item.label for item in items}
     for name in sorted(SecureComputeEngine.SAFE_BUILTINS):
         if prefix and not str(name).startswith(prefix):
@@ -5227,7 +5226,7 @@ def complete_yaml_dsl_expression_field_reference(
     candidates, preferred = inputs
     ordered = _order_expression_completion_candidates(candidates, preferred, prefix=prefix)
 
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for fid in ordered:
         detail = _expression_completion_detail(str(fid), kind=kind, output_index=output_index, scope_index=scope_index)
         items.append(YamlDslSugarCompletionItem(label=str(fid), insert_text=str(fid), detail=detail))
@@ -5241,7 +5240,7 @@ def resolve_yaml_dsl_expression_field_definition(
     *,
     scope_index: YamlDslExpressionScopeIndex,
 ) -> YamlDslFieldDefinitionResult:
-    warnings: List[str] = []
+    warnings: list[str] = []
     token = str(extraction.reference or "").strip()
     if not token:
         return YamlDslFieldDefinitionResult(locations=(), warnings=())
@@ -5258,7 +5257,7 @@ def resolve_yaml_dsl_expression_field_definition(
             rng = agg_ranges.get(token)
             if rng is None:
                 return YamlDslFieldDefinitionResult(locations=(), warnings=())
-            yaml_path = "outputs.{}.aggregate.fields.{}".format(int(output_index), token)
+            yaml_path = f"outputs.{int(output_index)}.aggregate.fields.{token}"
             loc = YamlDslFieldDefinitionLocation(
                 file_path=str(scope_index.file_path),
                 range=rng,
@@ -5284,7 +5283,7 @@ def complete_yaml_dsl_aggregate_field_reference(  # noqa: C901
 ) -> YamlDslSugarCompletionResult:
     """为 `outputs[*].aggregate` 内的字段引用提供 completion(分层候选 + 稳定排序)."""
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     if str(extraction.kind or "") != "aggregate_field_ref":
         warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
@@ -5300,8 +5299,8 @@ def complete_yaml_dsl_aggregate_field_reference(  # noqa: C901
     group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
     global_field_ids = getattr(view, "field_ids", ()) or ()
 
-    items: List[YamlDslSugarCompletionItem] = []
-    seen: Set[str] = set()
+    items: list[YamlDslSugarCompletionItem] = []
+    seen: set[str] = set()
 
     def _maybe_append(label: str, *, source: str) -> None:
         fid = str(label or "").strip()
@@ -5316,7 +5315,7 @@ def complete_yaml_dsl_aggregate_field_reference(  # noqa: C901
         infos = view.field_infos_by_id.get(fid) or ()
         for info in infos:
             if info.summary:
-                detail = "{} | {}".format(detail, str(info.summary))
+                detail = f"{detail} | {info.summary!s}"
                 break
 
         items.append(YamlDslSugarCompletionItem(label=fid, insert_text=fid, detail=detail))
@@ -5345,7 +5344,7 @@ def resolve_yaml_dsl_aggregate_field_definition(  # noqa: C901
 ) -> YamlDslFieldDefinitionResult:
     """为 `outputs[*].aggregate` 内的字段引用提供 definition(支持多 locations + 稳定排序)."""
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     if str(extraction.kind or "") != "aggregate_field_ref":
         warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
@@ -5360,15 +5359,15 @@ def resolve_yaml_dsl_aggregate_field_definition(  # noqa: C901
         warnings.append("failed to infer output_index from yaml_path: {}".format(str(extraction.yaml_path or "")))
         return YamlDslFieldDefinitionResult(locations=(), warnings=tuple(warnings))
 
-    locations: List[YamlDslFieldDefinitionLocation] = []
+    locations: list[YamlDslFieldDefinitionLocation] = []
 
     agg_ranges = scope_index.aggregate_out_field_ranges_by_output_index.get(int(output_index)) or {}
     if token in agg_ranges:
         rng = agg_ranges.get(token)
         if rng is None:
-            warnings.append("missing range for out_field_id: {}".format(token))
+            warnings.append(f"missing range for out_field_id: {token}")
         else:
-            yaml_path = "outputs.{}.aggregate.fields.{}".format(int(output_index), token)
+            yaml_path = f"outputs.{int(output_index)}.aggregate.fields.{token}"
             locations.append(
                 YamlDslFieldDefinitionLocation(
                     file_path=str(scope_index.file_path),
@@ -5382,16 +5381,16 @@ def resolve_yaml_dsl_aggregate_field_definition(  # noqa: C901
 
     defs = list(view.field_definitions_by_id.get(token) or ())
 
-    def _range_sort_key(rng: Optional[EditorRange]) -> Tuple[int, int, int, int]:
+    def _range_sort_key(rng: EditorRange | None) -> tuple[int, int, int, int]:
         if rng is None:
             return (1 << 30, 1 << 30, 1 << 30, 1 << 30)
         return (int(rng.start.line), int(rng.start.column), int(rng.end.line), int(rng.end.column))
 
     defs.sort(key=lambda loc: (str(loc.file_path), *_range_sort_key(loc.range), str(loc.yaml_path)))
 
-    seen: Set[Tuple[str, int, int, int, int]] = set()
+    seen: set[tuple[str, int, int, int, int]] = set()
 
-    def _loc_key(loc: YamlDslFieldDefinitionLocation) -> Tuple[str, int, int, int, int]:
+    def _loc_key(loc: YamlDslFieldDefinitionLocation) -> tuple[str, int, int, int, int]:
         start_line, start_column, end_line, end_column = _range_sort_key(loc.range)
         return (str(loc.file_path), int(start_line), int(start_column), int(end_line), int(end_column))
 
@@ -5407,7 +5406,7 @@ def resolve_yaml_dsl_aggregate_field_definition(  # noqa: C901
         seen.add(key)
 
     if not locations:
-        warnings.append("unresolved aggregate reference: {}".format(token))
+        warnings.append(f"unresolved aggregate reference: {token}")
 
     return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=tuple(warnings))
 
@@ -5420,7 +5419,7 @@ def hover_yaml_dsl_aggregate_field_reference(
 ) -> YamlDslSugarHoverResult:
     """为 `outputs[*].aggregate` 内的字段引用提供 hover(字段摘要 + 候选来源标注)."""
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     if str(extraction.kind or "") != "aggregate_field_ref":
         warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
@@ -5440,8 +5439,8 @@ def hover_yaml_dsl_aggregate_field_reference(
 
     if token in out_field_ids:
         lines = [
-            "Aggregate out_field_id: {}".format(token),
-            "source: outputs[{}].aggregate.fields".format(int(output_index)),
+            f"Aggregate out_field_id: {token}",
+            f"source: outputs[{int(output_index)}].aggregate.fields",
         ]
 
         # If token also matches a global field_id, append a compact field summary.
@@ -5458,11 +5457,11 @@ def hover_yaml_dsl_aggregate_field_reference(
 
     base = hover_yaml_dsl_output_field_id(token, view=view)
     if not str(base.text or "").strip():
-        warnings.append("unresolved aggregate reference: {}".format(token))
+        warnings.append(f"unresolved aggregate reference: {token}")
         return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
 
     lines = [str(line) for line in str(base.text).splitlines() if str(line).strip()]
-    lines.append("source: {}".format(source_label))
+    lines.append(f"source: {source_label}")
     return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings) + tuple(base.warnings))
 
 
@@ -5482,11 +5481,11 @@ def complete_yaml_dsl_call_by_kwargs_value_field_reference(
     extraction: YamlCursorExtractionResult,
     *,
     view: YamlDslEditorEffectiveView,
-    scope_index: Optional[YamlDslExpressionScopeIndex] = None,
+    scope_index: YamlDslExpressionScopeIndex | None = None,
 ) -> YamlDslSugarCompletionResult:
     """为 `call_by` kwargs `=` 右侧的 field-id token 提供 completion."""
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     if str(extraction.kind or "") != "call_by_kwargs_value_field_ref":
         warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
@@ -5504,7 +5503,7 @@ def complete_yaml_dsl_call_by_kwargs_value_field_reference(
     prefix = str(extraction.reference or "")
     field_ids = sorted(getattr(view, "field_ids", ()) or ())
 
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for field_id in field_ids:
         fid = str(field_id or "").strip()
         if not fid:
@@ -5530,11 +5529,11 @@ def resolve_yaml_dsl_call_by_kwargs_value_field_definition(
     extraction: YamlCursorExtractionResult,
     *,
     view: YamlDslEditorEffectiveView,
-    scope_index: Optional[YamlDslExpressionScopeIndex] = None,
+    scope_index: YamlDslExpressionScopeIndex | None = None,
 ) -> YamlDslFieldDefinitionResult:
     """为 `call_by` kwargs `=` 右侧的 field-id token 提供 definition."""
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     if str(extraction.kind or "") != "call_by_kwargs_value_field_ref":
         warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
@@ -5555,7 +5554,7 @@ def resolve_yaml_dsl_call_by_kwargs_value_field_definition(
 
     locations = view.field_definitions_by_id.get(token) or ()
     if not locations:
-        warnings.append("unresolved call_by kwargs value: {}".format(token))
+        warnings.append(f"unresolved call_by kwargs value: {token}")
 
     return YamlDslFieldDefinitionResult(locations=tuple(locations), warnings=tuple(warnings))
 
@@ -5564,11 +5563,11 @@ def hover_yaml_dsl_call_by_kwargs_value_field_reference(
     extraction: YamlCursorExtractionResult,
     *,
     view: YamlDslEditorEffectiveView,
-    scope_index: Optional[YamlDslExpressionScopeIndex] = None,
+    scope_index: YamlDslExpressionScopeIndex | None = None,
 ) -> YamlDslSugarHoverResult:
     """为 `call_by` kwargs `=` 右侧的 field-id token 提供 hover."""
 
-    warnings: List[str] = []
+    warnings: list[str] = []
 
     if str(extraction.kind or "") != "call_by_kwargs_value_field_ref":
         warnings.append("unsupported extraction kind: {}".format(str(extraction.kind or "")))
@@ -5589,7 +5588,7 @@ def hover_yaml_dsl_call_by_kwargs_value_field_reference(
 
     base = hover_yaml_dsl_output_field_id(token, view=view)
     if not str(base.text or "").strip():
-        warnings.append("unresolved call_by kwargs value: {}".format(token))
+        warnings.append(f"unresolved call_by kwargs value: {token}")
         return YamlDslSugarHoverResult(text="", warnings=tuple(warnings))
 
     return YamlDslSugarHoverResult(text=str(base.text or ""), warnings=tuple(warnings) + tuple(base.warnings))
@@ -5628,9 +5627,9 @@ def _try_hover_expression_aggregate_token(
     token: str,
     *,
     kind: str,
-    output_index: Optional[int],
+    output_index: int | None,
     scope_index: YamlDslExpressionScopeIndex,
-) -> Tuple[bool, Optional[YamlDslSugarHoverResult]]:
+) -> tuple[bool, YamlDslSugarHoverResult | None]:
     if kind != "expression_outputs_aggregate_compute" or output_index is None:
         return False, None
 
@@ -5639,9 +5638,9 @@ def _try_hover_expression_aggregate_token(
 
     if token in agg_ids:
         lines = [
-            "Aggregate field: {}".format(token),
-            "scope: outputs[{}].aggregate.fields.*.compute".format(int(output_index)),
-            "allowed: group_by({}) + aggregate.fields({})".format(len(group_by), len(agg_ids)),
+            f"Aggregate field: {token}",
+            f"scope: outputs[{int(output_index)}].aggregate.fields.*.compute",
+            f"allowed: group_by({len(group_by)}) + aggregate.fields({len(agg_ids)})",
         ]
         return True, YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=())
 
@@ -5655,7 +5654,7 @@ def _hover_expression_field_token(
     token: str,
     *,
     kind: str,
-    output_index: Optional[int],
+    output_index: int | None,
     scope_index: YamlDslExpressionScopeIndex,
 ) -> YamlDslSugarHoverResult:
     infos = scope_index.field_infos_by_id.get(token) or ()
@@ -5663,16 +5662,16 @@ def _hover_expression_field_token(
         return YamlDslSugarHoverResult(text="", warnings=())
 
     defs = scope_index.field_definitions_by_id.get(token) or ()
-    lines: List[str] = ["Field: {}".format(token)]
+    lines: list[str] = [f"Field: {token}"]
     if defs:
-        lines.append("definitions: {}".format(len(defs)))
+        lines.append(f"definitions: {len(defs)}")
 
     max_infos = 3
     for info in infos[:max_infos]:
         label = str(info.kind)
         if info.source_id:
-            label = "{} ({})".format(label, str(info.source_id))
-        parts: List[str] = [label]
+            label = f"{label} ({info.source_id!s})"
+        parts: list[str] = [label]
         if info.summary:
             parts.append(str(info.summary))
         lines.append("- {}".format(" | ".join(parts)))
@@ -5689,27 +5688,21 @@ def _hover_expression_field_token(
 def _expression_scope_explain_line(
     kind: str,
     *,
-    output_index: Optional[int],
+    output_index: int | None,
     scope_index: YamlDslExpressionScopeIndex,
 ) -> str:
     if kind == "expression_fields_compute":
-        return "scope: fields.*.compute (all fields: {})".format(len(scope_index.field_ids))
+        return f"scope: fields.*.compute (all fields: {len(scope_index.field_ids)})"
 
     if kind == "expression_outputs_where" and output_index is not None:
         preferred = scope_index.outputs_effective_fields_by_output_index.get(int(output_index)) or ()
-        return "scope: outputs[{}].where (all fields: {}; preferred by outputs.fields: {})".format(
-            int(output_index),
-            len(scope_index.field_ids),
-            len(preferred),
-        )
+        return f"scope: outputs[{int(output_index)}].where (all fields: {len(scope_index.field_ids)}; preferred by outputs.fields: {len(preferred)})"  # noqa: E501
 
     if kind == "expression_outputs_aggregate_compute" and output_index is not None:
         group_by = scope_index.aggregate_group_by_by_output_index.get(int(output_index)) or ()
         agg_ids = scope_index.aggregate_out_field_ids_by_output_index.get(int(output_index)) or ()
-        return "scope: outputs[{}].aggregate.fields.*.compute (group_by: {}; aggregate.fields: {})".format(
-            int(output_index),
-            len(group_by),
-            len(agg_ids),
+        return (
+            f"scope: outputs[{int(output_index)}].aggregate.fields.*.compute (group_by: {len(group_by)}; aggregate.fields: {len(agg_ids)})"
         )
 
     return ""
@@ -5718,7 +5711,7 @@ def _expression_scope_explain_line(
 def complete_yaml_dsl_output_field_id(prefix: str, *, view: YamlDslEditorEffectiveView) -> YamlDslSugarCompletionResult:
     """为 `outputs[*].fields` 的 field_id 提供 completion."""
     raw_prefix = str(prefix or "")
-    items: List[YamlDslSugarCompletionItem] = []
+    items: list[YamlDslSugarCompletionItem] = []
     for fid in view.field_ids:
         if raw_prefix and not str(fid).startswith(raw_prefix):
             continue
@@ -5742,7 +5735,7 @@ def resolve_yaml_dsl_output_field_definition(field_id: str, *, view: YamlDslEdit
 
 
 def hover_yaml_dsl_output_field_id(field_id: str, *, view: YamlDslEditorEffectiveView) -> YamlDslOutputFieldHoverResult:
-    warnings: List[str] = []
+    warnings: list[str] = []
     fid = str(field_id or "").strip()
     if not fid:
         return YamlDslOutputFieldHoverResult(text="", warnings=())
@@ -5753,17 +5746,17 @@ def hover_yaml_dsl_output_field_id(field_id: str, *, view: YamlDslEditorEffectiv
 
     defs = view.field_definitions_by_id.get(fid) or ()
 
-    lines: List[str] = ["Field: {}".format(fid)]
+    lines: list[str] = [f"Field: {fid}"]
     if defs:
-        lines.append("definitions: {}".format(len(defs)))
+        lines.append(f"definitions: {len(defs)}")
 
     # Keep output stable and compact.
     max_infos = 3
     for info in infos[:max_infos]:
         label = str(info.kind)
         if info.source_id:
-            label = "{} ({})".format(label, str(info.source_id))
-        parts: List[str] = [label]
+            label = f"{label} ({info.source_id!s})"
+        parts: list[str] = [label]
         if info.summary:
             parts.append(str(info.summary))
         lines.append("- {}".format(" | ".join(parts)))
@@ -5775,33 +5768,33 @@ def hover_yaml_dsl_output_field_id(field_id: str, *, view: YamlDslEditorEffectiv
 
 
 def resolve_yaml_dsl_yaml_alias_definition(alias_name: str, *, view: YamlDslEditorEffectiveView) -> YamlDslYamlAliasDefinitionResult:
-    warnings: List[str] = []
+    warnings: list[str] = []
     name = str(alias_name or "").strip()
     if not name:
         return YamlDslYamlAliasDefinitionResult(range=None, warnings=())
     rng = view.yaml_anchor_ranges.get(name)
     if rng is None:
-        warnings.append("Unknown YAML anchor: &{}".format(name))
+        warnings.append(f"Unknown YAML anchor: &{name}")
     return YamlDslYamlAliasDefinitionResult(range=rng, warnings=tuple(warnings))
 
 
 def hover_yaml_dsl_yaml_alias(alias_name: str, *, view: YamlDslEditorEffectiveView) -> YamlDslSugarHoverResult:
-    warnings: List[str] = []
+    warnings: list[str] = []
     name = str(alias_name or "").strip()
     if not name:
         return YamlDslSugarHoverResult(text="", warnings=())
 
-    lines: List[str] = ["YAML alias: *{}".format(name)]
+    lines: list[str] = [f"YAML alias: *{name}"]
     if name in view.yaml_anchor_ranges:
-        lines.append("anchor: &{}".format(name))
+        lines.append(f"anchor: &{name}")
     else:
-        warnings.append("Unknown YAML anchor: &{}".format(name))
+        warnings.append(f"Unknown YAML anchor: &{name}")
 
     expanded = list(view.yaml_anchor_expansions.get(name) or ())
     if expanded:
-        lines.append("expanded fields: {}".format(len(expanded)))
+        lines.append(f"expanded fields: {len(expanded)}")
         preview = ", ".join([str(x) for x in expanded[:10]])
-        lines.append("preview: {}".format(preview))
+        lines.append(f"preview: {preview}")
 
     return YamlDslSugarHoverResult(text="\n".join(lines).strip(), warnings=tuple(warnings))
 

@@ -1,12 +1,12 @@
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 
 from ...planning.operators import LoadRefOperatorIr
 from ...spec.ir import SourceIr
 from ...utils.relation_signature import RelationSignature, build_relation_signature, can_group_by_relation
-from ...vendor.dataclassesx import dataclass
 from ..executor.runtime.runtime import ExecutionRuntime
 
-AdaptiveTaskKey = Tuple[str, RelationSignature]
+AdaptiveTaskKey = tuple[str, RelationSignature]
 
 
 @dataclass(frozen=True)
@@ -21,10 +21,10 @@ def collect_layer_executable_ops(
     layer_ops: Sequence[LoadRefOperatorIr],
     *,
     runtime: ExecutionRuntime,
-    after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
-) -> Tuple[Set[str], List[LoadRefOperatorIr]]:
-    skipped_field_keys: Set[str] = set()
-    executable_ops: List[LoadRefOperatorIr] = []
+    after_operator: Callable[[LoadRefOperatorIr], None] | None,
+) -> tuple[set[str], list[LoadRefOperatorIr]]:
+    skipped_field_keys: set[str] = set()
+    executable_ops: list[LoadRefOperatorIr] = []
 
     for op in layer_ops:
         relation_key = build_relation_signature(op.lookup_steps, runtime.sources)
@@ -43,11 +43,11 @@ def build_task_specs(
     ops: Sequence[LoadRefOperatorIr],
     *,
     resolve_task_pool: Callable[[LoadRefOperatorIr], str],
-    sources: Dict[str, SourceIr],
-) -> Tuple[List[AdaptiveTaskKey], Dict[AdaptiveTaskKey, TaskSpec], Dict[str, AdaptiveTaskKey]]:
-    task_specs: Dict[AdaptiveTaskKey, TaskSpec] = {}
-    op_task_key: Dict[str, AdaptiveTaskKey] = {}
-    task_order: List[AdaptiveTaskKey] = []
+    sources: dict[str, SourceIr],
+) -> tuple[list[AdaptiveTaskKey], dict[AdaptiveTaskKey, TaskSpec], dict[str, AdaptiveTaskKey]]:
+    task_specs: dict[AdaptiveTaskKey, TaskSpec] = {}
+    op_task_key: dict[str, AdaptiveTaskKey] = {}
+    task_order: list[AdaptiveTaskKey] = []
 
     for op in ops:
         relation_key = build_relation_signature(op.lookup_steps, sources)

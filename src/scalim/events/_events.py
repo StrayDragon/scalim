@@ -1,10 +1,11 @@
 # region imports
 
-from typing import Any, Dict, Hashable, List, Optional, Tuple
+from collections.abc import Hashable
+from dataclasses import dataclass, field
+from typing import Any
 
 from ..exceptions import safe_error_message, safe_error_type
 from ..typedefs import RelationLookupResult
-from ..vendor.dataclassesx import dataclass, field
 
 # endregion
 
@@ -16,10 +17,10 @@ class PipelineStartEvent:
     当管线开始执行时触发.
     """
 
-    targets: List[str]
+    targets: list[str]
     """目标字段键列表."""
 
-    batch_size: Optional[int]
+    batch_size: int | None
     """配置的批处理大小(`None` 表示不分批)."""
 
 
@@ -47,7 +48,7 @@ class BatchStartEvent:
     batch_num: int
     """批处理编号(从 1 开始)."""
 
-    row_ids: List[Any]
+    row_ids: list[Any]
     """此批次中的行标识列表."""
 
 
@@ -75,7 +76,7 @@ class LoaderCallEvent:
     loader_name: str
     """加载器名称."""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     """传递给加载器的参数."""
 
     result: Any
@@ -84,25 +85,25 @@ class LoaderCallEvent:
     duration: float
     """加载器执行耗时(秒)."""
 
-    batch_num: Optional[int] = None
+    batch_num: int | None = None
     """批次编号(可选)."""
 
-    cache_status: Optional[str] = None
+    cache_status: str | None = None
     """缓存命中状态(`hit`/`miss`,可选)."""
 
-    cache_scope: Optional[str] = None
+    cache_scope: str | None = None
     """缓存作用域(例如 `batch`,可选)."""
 
-    lookup_key_count: Optional[int] = None
+    lookup_key_count: int | None = None
     """本次调用的查找键数量(可选)."""
 
-    skipped_none_rows: Optional[int] = None
+    skipped_none_rows: int | None = None
     """可选: `normalize.on_none=skip` 时跳过的 `key_field is None` 行数."""
 
-    field_keys: Optional[List[str]] = None
+    field_keys: list[str] | None = None
     """加载器关联字段键列表(可选)."""
 
-    chunk_offset: Optional[int] = None
+    chunk_offset: int | None = None
     """可选: `lookup_chunk_size` 分片调用在 `keys` 列表上的切片起点.
 
     说明:
@@ -141,10 +142,10 @@ class LoaderRetryEvent:
     error_type: str
     """异常类型名称."""
 
-    error_message: Optional[str] = None
+    error_message: str | None = None
     """异常信息(可选)."""
 
-    batch_num: Optional[int] = None
+    batch_num: int | None = None
     """批次编号(可选)."""
 
 
@@ -158,10 +159,10 @@ class FieldComputeEvent:
     field_key: str
     """字段键."""
 
-    row_id: Optional[Hashable]
+    row_id: Hashable | None
     """行标识."""
 
-    dependencies: Dict[str, Any]
+    dependencies: dict[str, Any]
     """依赖字段值映射."""
 
     result: Any
@@ -178,13 +179,13 @@ class ErrorEvent:
     error: Exception
     """发生的异常对象."""
 
-    context: Dict[str, Any]
+    context: dict[str, Any]
     """额外的上下文信息."""
 
     error_type: str = field(init=False)
     """异常类型名称(稳定字段)."""
 
-    error_message: Optional[str] = field(init=False)
+    error_message: str | None = field(init=False)
     """安全的异常信息(稳定字段,默认脱敏)."""
 
     def __post_init__(self) -> None:
@@ -203,16 +204,16 @@ class DiagnosticWarningEvent:
     message: str
     """可读的告警说明."""
 
-    source_id: Optional[str]
+    source_id: str | None
     """关联的目标数据源标识."""
 
-    field_id: Optional[str]
+    field_id: str | None
     """当前计算字段标识."""
 
     lookup_key: Any
     """外键值/关联键."""
 
-    row_id: Optional[Hashable]
+    row_id: Hashable | None
     """行标识(可选)."""
 
 
@@ -226,10 +227,10 @@ class FieldSlimEvent:
     reason: str
     """触发原因标识."""
 
-    batch_num: Optional[int]
+    batch_num: int | None
     """批次编号(可选)."""
 
-    remaining_fields: Optional[int]
+    remaining_fields: int | None
     """瘦身后保留的字段数量."""
 
 
@@ -243,10 +244,10 @@ class RowWriteEvent:
     field_count: int
     """写入的字段数量."""
 
-    batch_num: Optional[int]
+    batch_num: int | None
     """批次编号(可选)."""
 
-    row_index: Optional[int]
+    row_index: int | None
     """批次内行序号(从 0 开始)."""
 
 
@@ -257,13 +258,13 @@ class RowReleaseEvent:
     row_id: Hashable
     """行标识."""
 
-    released_fields: List[str]
+    released_fields: list[str]
     """已释放的字段键列表."""
 
-    retained_fields: List[str]
+    retained_fields: list[str]
     """仍保留的字段键列表."""
 
-    batch_num: Optional[int]
+    batch_num: int | None
     """批次编号(可选)."""
 
 
@@ -277,10 +278,10 @@ class LoaderSlimEvent:
     original_keys: int
     """瘦身前的键数量."""
 
-    extracted_fields: List[str]
+    extracted_fields: list[str]
     """被抽取/保留的字段键列表."""
 
-    batch_num: Optional[int]
+    batch_num: int | None
     """批次编号(可选)."""
 
 
@@ -320,13 +321,13 @@ class RelationLookupEvent:
     result: RelationLookupResult
     """关联查找结果类型."""
 
-    fk_type: Optional[str] = None
+    fk_type: str | None = None
     """原始外键类型名称(可选)."""
 
-    expected_type: Optional[str] = None
+    expected_type: str | None = None
     """期望的外键类型名称(可选)."""
 
-    error_message: Optional[str] = None
+    error_message: str | None = None
     """错误说明(可选)."""
 
 
@@ -356,7 +357,7 @@ class OperatorSpanEvent:
     operator_type: str
     """算子类型(例如 `compute`)."""
 
-    field_key: Optional[str]
+    field_key: str | None
     """字段键(仅对部分算子有意义;例如 `compute`)."""
 
     batch_num: int
@@ -376,10 +377,10 @@ class OutputTargetEndEvent:
     target_id: str
     """输出目标标识."""
 
-    output_path: Optional[str]
+    output_path: str | None
     """输出路径(可选;例如工作簿路径或文件路径)."""
 
-    sheet_name: Optional[str]
+    sheet_name: str | None
     """`Excel` 工作表名称(可选)."""
 
     row_count: int
@@ -394,10 +395,10 @@ class OutputTargetEndEvent:
     disabled: bool
     """是否被禁用(例如 `failure_policy=primary_only` 下发生错误后被禁用)."""
 
-    error_type: Optional[str] = None
+    error_type: str | None = None
     """首个错误的异常类型(可选)."""
 
-    error_message: Optional[str] = None
+    error_message: str | None = None
     """首个错误的异常消息(可选)."""
 
 
@@ -420,25 +421,25 @@ class AdaptiveSchedulerDecisionEvent:
     backend: str
     """执行后端标识."""
 
-    reason: Optional[str] = None
+    reason: str | None = None
     """决策原因说明(可选)."""
 
-    layer_task_count: Optional[int] = None
+    layer_task_count: int | None = None
     """当前层任务数量(可选)."""
 
-    process_failure_mode: Optional[str] = None
+    process_failure_mode: str | None = None
     """进程后端失败处理模式(可选)."""
 
-    pool_limits: Optional[Dict[str, int]] = None
+    pool_limits: dict[str, int] | None = None
     """执行器池容量限制映射(可选)."""
 
-    pool_wait_ms_total: Optional[Dict[str, float]] = None
+    pool_wait_ms_total: dict[str, float] | None = None
     """按池统计的等待总时长(毫秒,可选)."""
 
-    pool_wait_ms_max: Optional[Dict[str, float]] = None
+    pool_wait_ms_max: dict[str, float] | None = None
     """按池统计的单次等待最大时长(毫秒,可选)."""
 
-    pool_wait_count: Optional[Dict[str, int]] = None
+    pool_wait_count: dict[str, int] | None = None
     """按池统计的等待次数(可选)."""
 
 
@@ -495,13 +496,13 @@ class WorkflowNodeStartEvent:
     node_type: str
     """节点类型(例如 `demand`)."""
 
-    demand_path: Optional[str] = None
+    demand_path: str | None = None
     """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
 
-    schedule_mode: Optional[str] = None
+    schedule_mode: str | None = None
     """本次 `workflow` 的调度模式(例如 `pipeline` / `stage_barrier`,可选)."""
 
-    stage: Optional[int] = None
+    stage: int | None = None
     """该节点的阶段归因(可选)."""
 
 
@@ -524,19 +525,19 @@ class WorkflowNodeEndEvent:
     status: str
     """结束状态(例如 `ok`/`error`)."""
 
-    demand_path: Optional[str] = None
+    demand_path: str | None = None
     """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
 
-    error_type: Optional[str] = None
+    error_type: str | None = None
     """失败时的异常类型(可选)."""
 
-    error_message: Optional[str] = None
+    error_message: str | None = None
     """失败时的异常消息(可选)."""
 
-    schedule_mode: Optional[str] = None
+    schedule_mode: str | None = None
     """本次 `workflow` 的调度模式(例如 `pipeline` / `stage_barrier`,可选)."""
 
-    stage: Optional[int] = None
+    stage: int | None = None
     """该节点的阶段归因(可选)."""
 
 
@@ -562,13 +563,13 @@ class WorkflowNodeCancelledEvent:
     message: str
     """可读的诊断说明(用于排障)."""
 
-    demand_path: Optional[str] = None
+    demand_path: str | None = None
     """当 `node_type=demand` 时,对应的 `demand` `YAML` 路径(可选)."""
 
-    schedule_mode: Optional[str] = None
+    schedule_mode: str | None = None
     """本次 `workflow` 的调度模式(例如 `pipeline` / `stage_barrier`,可选)."""
 
-    stage: Optional[int] = None
+    stage: int | None = None
     """该节点的阶段归因(可选)."""
 
 
@@ -587,8 +588,8 @@ class WorkflowCacheAcquireEvent:
     cache_status: str
     conflict_policy: str
     conflict_detected: bool = False
-    conflict_diff_fields: Tuple[str, ...] = ()
-    conflict_target_signature_digest: Optional[str] = None
+    conflict_diff_fields: tuple[str, ...] = ()
+    conflict_target_signature_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -651,9 +652,9 @@ class WorkflowResourceWriteEvent:
     path: str
     write_kind: str
     action: str
-    input_node_id: Optional[str] = None
-    input_output_id: Optional[str] = None
-    sheet: Optional[str] = None
+    input_node_id: str | None = None
+    input_output_id: str | None = None
+    sheet: str | None = None
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,4 @@
-from __future__ import absolute_import
-
-from typing import Optional, Tuple
-
-from ..vendor.dataclassesx import dataclass
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -14,8 +10,8 @@ class ExportLayout:
     - 与字段顺序对齐的可选表头名称
     """
 
-    field_ids: Tuple[str, ...]
-    header_names: Optional[Tuple[str, ...]] = None
+    field_ids: tuple[str, ...]
+    header_names: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.header_names is not None and len(self.header_names) != len(self.field_ids):
@@ -35,11 +31,11 @@ class OutputSpec:
     """
 
     format: str = "csv"
-    path: Optional[str] = None
+    path: str | None = None
     encoding: str = "utf-8"
     streaming: bool = True
     include_header: bool = True
-    sheet_name: Optional[str] = None
+    sheet_name: str | None = None
     excel_allow_formulas: bool = True
 
 

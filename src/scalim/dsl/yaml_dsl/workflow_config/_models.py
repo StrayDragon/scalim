@@ -1,7 +1,7 @@
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any
 
-from ....vendor.dataclassesx import dataclass
-from ....vendor.dataclassesx import field as dataclass_field
 from ..schema_dsl.models import ResourcesConfig
 
 
@@ -9,16 +9,16 @@ from ..schema_dsl.models import ResourcesConfig
 class WorkflowRun:
     id: str
     demand: str
-    depends_on: Tuple[str, ...] = ()
-    main_rows_from_run_id: Optional[str] = None
-    init_vars: Optional[Dict[str, Any]] = None
+    depends_on: tuple[str, ...] = ()
+    main_rows_from_run_id: str | None = None
+    init_vars: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
 class WorkflowResourcesWaitDiagnosticsOptions:
     enabled: bool = False
     warn_after_s: float = 30.0
-    repeat_every_s: Optional[float] = None
+    repeat_every_s: float | None = None
     capture_owner_callsite: bool = False
 
 
@@ -37,7 +37,7 @@ class WorkflowOutputStagingOptions:
 
 @dataclass(frozen=True)
 class WorkflowConfig:
-    runs: Tuple[WorkflowRun, ...]
+    runs: tuple[WorkflowRun, ...]
     resources: ResourcesConfig = dataclass_field(default_factory=ResourcesConfig)
 
 

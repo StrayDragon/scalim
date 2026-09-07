@@ -1,8 +1,9 @@
 """工作流可视化(`viz`)快照/报告助手(`c45 Phase 1b`)."""
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any
 
 from ..ob.presets._internal import viz_config as viz_config_module
 from ..ob.presets._internal.viz_config import normalize_output_dir as _normalize_viz_output_dir
@@ -54,7 +55,7 @@ class WorkflowVizReporter:
             best_effort_remove_temp_path(temp_path)
 
     def fix_child_replay_links(self, replays: Iterable[str], parent_run_id: str) -> None:
-        demand_run_id_by_workflow_node_id: Dict[str, str] = {}
+        demand_run_id_by_workflow_node_id: dict[str, str] = {}
         for run_id in replays:
             node_id = str(run_id).strip()
             if self._has_child_replay(node_id):

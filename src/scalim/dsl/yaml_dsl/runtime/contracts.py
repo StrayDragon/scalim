@@ -1,6 +1,11 @@
 # pragma: allow-c901-file plan: c70
 import os
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple, Union, cast
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import TYPE_CHECKING, Any, cast
+
+from typing_extensions import override
 
 from ....execution.excel_column_residency import ExcelColumnResidency
 from ....execution.guardrails import GuardrailsPolicy
@@ -14,9 +19,6 @@ from ....ob.observer import Observer
 from ....sinks.accept_types import SinkTypePrecheck
 from ....typedefs import KeyNormalizationMode, ParallelMode
 from ....vendor.compact.importlibx import import_module
-from ....vendor.compact.typing_extensionsx import override
-from ....vendor.dataclassesx import dataclass
-from ....vendor.dataclassesx import field as dataclass_field
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..book_resource_policy import ResourcesPolicy
 from ..init_var_nodes import OptionalPathNode
@@ -35,20 +37,20 @@ if TYPE_CHECKING:
     from ....spec.ir import DemandIr
 
 
-def _empty_lookup_chunking() -> Dict[str, LookupChunking]:
+def _empty_lookup_chunking() -> dict[str, LookupChunking]:
     return {}
 
 
-def _empty_source_cache() -> Dict[str, SourceCache]:
+def _empty_source_cache() -> dict[str, SourceCache]:
     return {}
 
 
-def _empty_rows_reuse() -> Dict[str, RowsReuse]:
+def _empty_rows_reuse() -> dict[str, RowsReuse]:
     return {}
 
 
 class _UnsetType:
-    __slots__: Tuple[str, ...] = ()
+    __slots__: tuple[str, ...] = ()
 
     @override
     def __repr__(self) -> str:
@@ -72,11 +74,11 @@ class RunOverrides:
     - `resources`: 仅 `IO` 层覆盖,语义为叠加/深合并(`overlay`/`deep-merge`),覆盖 YAML `resources.*`.
     """
 
-    outputs: Optional[Sequence["OutputOverride"]] = None
-    resources: Optional["ResourcesOverride"] = None
-    outputs_defaults: Optional["OutputsDefaultsOverride"] = None
-    output_extras: Optional["OutputExtrasOverride"] = None
-    viz_config: Union[Optional["VizObserverConfig"], _UnsetType] = UNSET
+    outputs: Sequence["OutputOverride"] | None = None
+    resources: "ResourcesOverride | None" = None
+    outputs_defaults: "OutputsDefaultsOverride | None" = None
+    output_extras: "OutputExtrasOverride | None" = None
+    viz_config: "VizObserverConfig | None | _UnsetType" = UNSET
 
     def __post_init__(self) -> None:  # noqa: C901, PLR0912
         if self.outputs is not None:
@@ -133,7 +135,7 @@ class RunOverrides:
     def csv_file(
         cls,
         *,
-        output_root: Union[str, "os.PathLike[str]"],
+        output_root: "str | os.PathLike[str]",
         fields: Sequence[str],
         output_name: str = "detail",
         file_id: str = "detail_csv",
@@ -157,7 +159,7 @@ class RunOverrides:
     def xlsx_file_single_sheet(
         cls,
         *,
-        output_root: Union[str, "os.PathLike[str]"],
+        output_root: "str | os.PathLike[str]",
         fields: Sequence[str],
         sheet: str,
         output_name: str = "detail",
@@ -190,9 +192,9 @@ class RunOverrides:
 
 @dataclass(frozen=True)
 class OutputToOverride:
-    file: Optional[str] = None
-    book: Optional[str] = None
-    sheet: Optional[str] = None
+    file: str | None = None
+    book: str | None = None
+    sheet: str | None = None
 
     def __post_init__(self) -> None:
         file_id = str(self.file).strip() if self.file is not None else None
@@ -205,8 +207,8 @@ class OutputToOverride:
 
 @dataclass(frozen=True)
 class OutputWriteOverride:
-    include_header: Optional[bool] = None
-    header_fields_output_by: Optional[str] = None
+    include_header: bool | None = None
+    header_fields_output_by: str | None = None
 
     def __post_init__(self) -> None:
         header_by = str(self.header_fields_output_by).strip() if self.header_fields_output_by is not None else None
@@ -215,9 +217,9 @@ class OutputWriteOverride:
 
 @dataclass(frozen=True)
 class OutputExtraSheetOverride:
-    path: Optional[Union[str, "os.PathLike[str]"]] = None
-    sheet: Optional[str] = None
-    allow_formulas: Optional[bool] = None
+    path: "str | os.PathLike[str] | None" = None
+    sheet: str | None = None
+    allow_formulas: bool | None = None
 
     def __post_init__(self) -> None:
         sheet = str(self.sheet).strip() if self.sheet is not None else None
@@ -232,8 +234,8 @@ class OutputExtrasOverride:
     - 该能力从 `YAML` 主线迁出,仅能通过运行入口参数(例如 `RunOverrides.output_extras`)配置.
     """
 
-    meta: Optional[Union[bool, OutputExtraSheetOverride]] = None
-    audit: Optional[Union[bool, OutputExtraSheetOverride]] = None
+    meta: bool | OutputExtraSheetOverride | None = None
+    audit: bool | OutputExtraSheetOverride | None = None
 
     def __post_init__(self) -> None:
         def _validate(item: Any, *, key: str) -> None:
@@ -243,7 +245,7 @@ class OutputExtrasOverride:
                 return
             if isinstance(item, OutputExtraSheetOverride):
                 return
-            msg = "{} must be a boolean or an OutputExtraSheetOverride".format(key)
+            msg = f"{key} must be a boolean or an OutputExtraSheetOverride"
             raise TypeError(msg)
 
         _validate(self.meta, key="meta")
@@ -253,9 +255,9 @@ class OutputExtrasOverride:
 @dataclass(frozen=True)
 class OutputOverride:
     name: str
-    fields: Tuple[str, ...]
+    fields: tuple[str, ...]
     to: OutputToOverride
-    write: Optional[OutputWriteOverride] = None
+    write: OutputWriteOverride | None = None
 
     def __post_init__(self) -> None:
         name = str(self.name or "").strip()
@@ -264,8 +266,8 @@ class OutputOverride:
         fields_raw_any: Any = self.fields  # pragma: allow-any typed contract input normalization boundary
         if not isinstance(fields_raw_any, tuple):
             fields_raw_any = tuple(fields_raw_any)
-        fields_raw = cast("Tuple[object, ...]", fields_raw_any)  # pragma: allow-cast contract input normalization boundary
-        normalized: List[str] = []
+        fields_raw = cast("tuple[object, ...]", fields_raw_any)  # pragma: allow-cast contract input normalization boundary
+        normalized: list[str] = []
         for item in fields_raw:
             normalized.append(str(item).strip())
         object.__setattr__(self, "fields", tuple(normalized))
@@ -274,16 +276,16 @@ class OutputOverride:
 @dataclass(frozen=True)
 class BookExportXlsxOverride:
     path: OptionalPathNode = None
-    allow_formulas: Optional[bool] = None
+    allow_formulas: bool | None = None
 
 
 @dataclass(frozen=True)
 class BookResourceOverride:
     # `kind` 保留但未使用(仅兼容旧 `wire`); 非 `None` 时在 `resource_override` 应用阶段 `fail-fast`.
-    kind: Optional[str] = None
+    kind: str | None = None
     path: OptionalPathNode = None
-    export_xlsx: Optional[BookExportXlsxOverride] = None
-    allow_formulas: Optional[bool] = None
+    export_xlsx: BookExportXlsxOverride | None = None
+    allow_formulas: bool | None = None
 
     def __post_init__(self) -> None:
         # `write_defaults` 已迁出 `RunOverrides.resources`(`Python` `BookWritePolicy` `SSOT`).
@@ -294,15 +296,15 @@ class BookResourceOverride:
 
 @dataclass(frozen=True)
 class FileResourceOverride:
-    kind: Optional[str] = None
+    kind: str | None = None
     path: OptionalPathNode = None
-    encoding: Optional[str] = None
+    encoding: str | None = None
 
 
 @dataclass(frozen=True)
 class ResourcesOverride:
-    books: Optional[Mapping[str, BookResourceOverride]] = None
-    files: Optional[Mapping[str, FileResourceOverride]] = None
+    books: Mapping[str, BookResourceOverride] | None = None
+    files: Mapping[str, FileResourceOverride] | None = None
 
     def __post_init__(self) -> None:
         books = dict(self.books or {})
@@ -313,7 +315,7 @@ class ResourcesOverride:
 
 @dataclass(frozen=True)
 class OutputDefaultsToOverride:
-    book: Optional[str] = None
+    book: str | None = None
 
     def __post_init__(self) -> None:
         book_id = str(self.book).strip() if self.book is not None else None
@@ -360,8 +362,8 @@ class DemandDiagnosticsOverride:
     - `bool`: 显式覆盖
     """
 
-    include_full_error_message: Union[bool, UnsetType] = UNSET
-    validate_unique_field_names: Union[bool, UnsetType] = UNSET
+    include_full_error_message: bool | UnsetType = UNSET
+    validate_unique_field_names: bool | UnsetType = UNSET
 
     def __post_init__(self) -> None:
         include_full = self.include_full_error_message
@@ -385,34 +387,34 @@ class CaptureRows:
     """捕获本次运行产生的行数据(显式开启)."""
 
 
-CapturePolicy = Union[CaptureNone, CaptureRows]
+CapturePolicy = CaptureNone | CaptureRows
 
 
-def _coerce_iterable_str_frozenset(value: Any, *, field_name: str) -> FrozenSet[str]:
+def _coerce_iterable_str_frozenset(value: Any, *, field_name: str) -> frozenset[str]:
     if value is None:
-        msg = "{} must be an iterable of str".format(field_name)
+        msg = f"{field_name} must be an iterable of str"
         raise TypeError(msg)
     if isinstance(value, str):
-        msg = "{} must be an iterable of str (not a str)".format(field_name)
+        msg = f"{field_name} must be an iterable of str (not a str)"
         raise TypeError(msg)
     try:
         return frozenset(str(item) for item in value)
     except TypeError:
-        msg = "{} must be an iterable of str".format(field_name)
+        msg = f"{field_name} must be an iterable of str"
         raise TypeError(msg) from None
 
 
-def _coerce_iterable_str_tuple(value: Any, *, field_name: str) -> Tuple[str, ...]:
+def _coerce_iterable_str_tuple(value: Any, *, field_name: str) -> tuple[str, ...]:
     if value is None:
-        msg = "{} must be an iterable of str".format(field_name)
+        msg = f"{field_name} must be an iterable of str"
         raise TypeError(msg)
     if isinstance(value, str):
-        msg = "{} must be an iterable of str (not a str)".format(field_name)
+        msg = f"{field_name} must be an iterable of str (not a str)"
         raise TypeError(msg)
     try:
         return tuple(str(item) for item in value)
     except TypeError:
-        msg = "{} must be an iterable of str".format(field_name)
+        msg = f"{field_name} must be an iterable of str"
         raise TypeError(msg) from None
 
 
@@ -420,22 +422,22 @@ def _coerce_iterable_str_tuple(value: Any, *, field_name: str) -> Tuple[str, ...
 class DemandRunSecurityOptions:
     """`demand` 运行的安全边界选项."""
 
-    allowed_modules: FrozenSet[str]
+    allowed_modules: frozenset[str]
     """允许被引用/导入的模块白名单(用于安全解析)."""
 
-    allowed_functions: Optional[FrozenSet[str]] = None
+    allowed_functions: frozenset[str] | None = None
     """可选:允许被引用/导入的函数白名单(用于更细粒度的安全控制)."""
 
     resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST
     """`Python` 引用 `resolver` 的安全模式."""
 
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None
+    allowed_yaml_roots: tuple[str, ...] | None = None
     """可选:允许读取 `YAML` 文件的根目录集合."""
 
-    builtin_callables: Optional[Mapping[str, Any]] = None
+    builtin_callables: Mapping[str, Any] | None = None
     """可选:内置可调用对象词表(用于 `^<id>` 引用)."""
 
-    public_builtin_callable_ids: Optional[Tuple[str, ...]] = None
+    public_builtin_callable_ids: tuple[str, ...] | None = None
     """可选:用户可见的内置 `<id>` 列表(用于错误信息/文档提示;应为保守子集)."""
 
     def __post_init__(self) -> None:
@@ -494,7 +496,7 @@ class DemandRunSecurityOptions:
 class DemandRunTemplateOptions:
     """`demand` 编译期模板/注入相关选项."""
 
-    template_vars: Optional[Mapping[str, Any]] = None
+    template_vars: Mapping[str, Any] | None = None
     """可选:模板变量注入(编译期使用,用于在 `YAML` 解析前对 `YAML` 文本执行 `LiteJinja2` 预编译)."""
 
     template_sandbox: str = "safe"
@@ -503,7 +505,7 @@ class DemandRunTemplateOptions:
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN
     """当启用 `template_vars` 预编译时,渲染后 `YAML` 文本长度上限(字符数)."""
 
-    init_vars: Optional[Dict[str, Any]] = None
+    init_vars: dict[str, Any] | None = None
     """可选:初始化变量注入(编译期使用,用于解析 `params` 中的 `{$init_var: <name>}` 指令节点)."""
 
     def __post_init__(self) -> None:
@@ -524,16 +526,16 @@ class DemandRunTemplateOptions:
 class DemandRunRuntimeOptions:
     """`demand` 执行期选项(与执行编排相关)."""
 
-    components: Optional[List[Union[Observer, IExecutionHook]]] = None
+    components: list[Observer | IExecutionHook] | None = None
     """可选:要挂载的 `Observer`/`Hook` 组件列表(作用于 `demand` 执行层)."""
 
-    guardrails: Optional[GuardrailsPolicy] = None
+    guardrails: GuardrailsPolicy | None = None
     """可选:运行时护栏策略."""
 
-    loader_retry: Optional[LoaderRetryPoliciesSpec] = None
+    loader_retry: LoaderRetryPoliciesSpec | None = None
     """可选:加载重试策略规范."""
 
-    batch_size: Union[Optional[int], UnsetType] = UNSET
+    batch_size: int | None | UnsetType = UNSET
     """可选:覆盖批大小.
 
     - `UNSET`(默认): 不覆盖,使用配置/默认值
@@ -541,10 +543,10 @@ class DemandRunRuntimeOptions:
     - `int`: 显式覆盖为批大小(>= 1)
     """
 
-    demand_failure_policy: Optional[str] = None
+    demand_failure_policy: str | None = None
     """可选:覆盖 `demand` 多输出失败策略(`None` 表示不覆盖)."""
 
-    demand_diagnostics: Optional["DemandDiagnosticsPolicy"] = None
+    demand_diagnostics: "DemandDiagnosticsPolicy | None" = None
     """可选:`demand` 诊断/治理策略."""
 
     parallel_mode: ParallelMode = "seq"
@@ -568,7 +570,7 @@ class DemandRunRuntimeOptions:
     - `loader_call` 回调可能直接发生在分片工作线程上(非主线程回放),订阅方须自行保证线程安全.
     """
 
-    max_chunk_workers: Optional[int] = None
+    max_chunk_workers: int | None = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
 
     lookup_chunking: Mapping[str, LookupChunking] = dataclass_field(default_factory=_empty_lookup_chunking)
@@ -586,7 +588,7 @@ class DemandRunRuntimeOptions:
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `IR` `excel`+`streaming=False` 生效;默认 `BUFFERED`)."""
 
-    output_write_layout: Optional[OutputWriteLayout] = None
+    output_write_layout: OutputWriteLayout | None = None
     """可选:显式文件写出布局(`None`=按 `streaming`/`residency` 推导;仅接受 `OutputWriteLayout`)."""
 
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
@@ -680,21 +682,21 @@ class DemandRunRuntimeOptions:
         )
 
 
-def _normalize_source_policy_mapping(raw: Any, *, field_name: str, expected_type: type) -> Dict[str, Any]:
+def _normalize_source_policy_mapping(raw: Any, *, field_name: str, expected_type: type) -> dict[str, Any]:
     if raw is None:
         return {}
     if not isinstance(raw, Mapping):
-        msg = "{} must be a Mapping[str, {}]".format(field_name, expected_type.__name__)
+        msg = f"{field_name} must be a Mapping[str, {expected_type.__name__}]"
         raise TypeError(msg)
     mapping = cast("Mapping[Any, Any]", raw)  # pragma: allow-cast policy map normalize boundary
-    normalized: Dict[str, Any] = {}
+    normalized: dict[str, Any] = {}
     for raw_sid, policy in mapping.items():
         sid = str(raw_sid).strip()
         if not sid:
-            msg = "{} keys must be non-empty source ids".format(field_name)
+            msg = f"{field_name} keys must be non-empty source ids"
             raise ValueError(msg)
         if not isinstance(policy, expected_type):
-            msg = "{}[{!r}] must be a {}".format(field_name, sid, expected_type.__name__)
+            msg = f"{field_name}[{sid!r}] must be a {expected_type.__name__}"
             raise TypeError(msg)
         normalized[sid] = policy
     return normalized
@@ -704,13 +706,13 @@ def _normalize_source_policy_mapping(raw: Any, *, field_name: str, expected_type
 class DemandRunOutputOptions:
     """`demand` 输出与捕获选项."""
 
-    overrides: Optional[RunOverrides] = None
+    overrides: RunOverrides | None = None
     """可选:运行期覆盖项(例如输出与 `viz` 配置覆盖)."""
 
-    output_version_id: Optional[str] = None
+    output_version_id: str | None = None
     """可选:覆盖版本化输出(`D-2`)的 `version_id`."""
 
-    workflow_managed_output_ids: Optional[FrozenSet[str]] = None
+    workflow_managed_output_ids: frozenset[str] | None = None
     """可选: `workflow` 托管的 `output_id` 白名单."""
 
     capture: CapturePolicy = dataclass_field(default_factory=CaptureNone)
@@ -741,7 +743,7 @@ class DemandRunOptions:
     template: DemandRunTemplateOptions = dataclass_field(default_factory=DemandRunTemplateOptions)
     runtime: DemandRunRuntimeOptions = dataclass_field(default_factory=DemandRunRuntimeOptions)
     outputs: DemandRunOutputOptions = dataclass_field(default_factory=DemandRunOutputOptions)
-    resources_policy: Optional["ResourcesPolicy"] = None
+    resources_policy: "ResourcesPolicy | None" = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.security, DemandRunSecurityOptions):
@@ -772,7 +774,7 @@ class DemandRunResult:
     core: ExecutionResult
     config: DemandConfig
     yaml_path: str
-    captured_rows: Optional["InMemoryRows"]
+    captured_rows: "InMemoryRows | None"
 
     def __init__(
         self,
@@ -780,7 +782,7 @@ class DemandRunResult:
         *,
         config: DemandConfig,
         yaml_path: str,
-        captured_rows: Optional["InMemoryRows"] = None,
+        captured_rows: "InMemoryRows | None" = None,
     ) -> None:
         self.core = core
         self.config = config
@@ -788,7 +790,7 @@ class DemandRunResult:
         self.captured_rows = captured_rows
 
     @property
-    def output_path(self) -> Optional[str]:
+    def output_path(self) -> str | None:
         return self.core.output_path
 
     @property

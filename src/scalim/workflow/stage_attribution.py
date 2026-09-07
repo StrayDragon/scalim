@@ -5,8 +5,6 @@
 - 实现必须兼容 `Python 3.6`.
 """
 
-from typing import Dict, Set
-
 from ..spec.ir._workflow import (
     AppendSheetNodeIr,
     WorkflowAnyNodeIr,
@@ -15,7 +13,7 @@ from ..spec.ir._workflow import (
 )
 
 
-def derive_workflow_struct_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
+def derive_workflow_struct_levels(workflow_ir: WorkflowIr) -> dict[str, int]:
     """推导 `workflow` `DAG` 的拓扑层级(`level`).
 
     `level` 定义:
@@ -26,14 +24,14 @@ def derive_workflow_struct_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
     - `cycle` 本应在编译阶段被拒绝;这里仍提供 `visiting` 回退以避免派生信息导致崩溃.
     """
 
-    node_by_id: Dict[str, WorkflowAnyNodeIr] = {}
+    node_by_id: dict[str, WorkflowAnyNodeIr] = {}
     for node in workflow_ir.nodes:
         node_id = str(node.node_id or "").strip()
         if node_id:
             node_by_id[node_id] = node
 
-    visiting: Set[str] = set()
-    memo: Dict[str, int] = {}
+    visiting: set[str] = set()
+    memo: dict[str, int] = {}
 
     def _level(node_id: str) -> int:
         cached = memo.get(node_id)
@@ -63,7 +61,7 @@ def derive_workflow_struct_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
     return memo
 
 
-def derive_workflow_user_stages(workflow_ir: WorkflowIr, *, struct_levels: Dict[str, int]) -> Dict[str, int]:
+def derive_workflow_user_stages(workflow_ir: WorkflowIr, *, struct_levels: dict[str, int]) -> dict[str, int]:
     """推导用户侧 `stage` 归因.
 
     规则:
@@ -74,7 +72,7 @@ def derive_workflow_user_stages(workflow_ir: WorkflowIr, *, struct_levels: Dict[
     - 该 `stage` 主要用于解释与阶段屏障调度; `struct_levels` 仍应保留用于诊断/布局.
     """
 
-    stages: Dict[str, int] = dict(struct_levels or {})
+    stages: dict[str, int] = dict(struct_levels or {})
 
     for node in workflow_ir.nodes:
         node_id = str(node.node_id or "").strip()

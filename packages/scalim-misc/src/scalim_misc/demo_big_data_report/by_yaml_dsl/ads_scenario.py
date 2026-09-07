@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
 from scalim_misc.examples.oracle import diff_first_mismatch, stable_sort_rows
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     from scalim.execution.loader_retry import LoaderRetryContext
 
 
 class AdsTransientError(RuntimeError):
     def __init__(self, message: str = "simulated transient error (retry expected)") -> None:
-        super(AdsTransientError, self).__init__(message)
+        super().__init__(message)
 
 
 _ADS_CREATIVES_RETRY_COUNTER = {"calls": 0}
@@ -40,7 +42,7 @@ def _to_csv_cell(value: Any) -> str:
 # Deterministic fixtures (loaders)
 # -----------------------------------------------------------------------------
 
-_ADS_IMPRESSIONS: List[Dict[str, Any]] = [
+_ADS_IMPRESSIONS: list[dict[str, Any]] = [
     {
         "imp_id": 1,
         "ts": "2026-03-01T10:00:00Z",
@@ -83,33 +85,33 @@ _ADS_IMPRESSIONS: List[Dict[str, Any]] = [
     },
 ]
 
-_ADS_ADGROUPS: Dict[int, Dict[str, Any]] = {
+_ADS_ADGROUPS: dict[int, dict[str, Any]] = {
     10: {"adgroup_id": 10, "adgroup_name": "AG-10 (Prospecting)", "campaign_id": 1},
     20: {"adgroup_id": 20, "adgroup_name": "AG-20 (Retargeting)", "campaign_id": 2},
 }
 
-_ADS_CAMPAIGNS: Dict[int, Dict[str, Any]] = {
+_ADS_CAMPAIGNS: dict[int, dict[str, Any]] = {
     1: {"campaign_id": 1, "campaign_name": "C-1 (App Install)", "objective": "install"},
     2: {"campaign_id": 2, "campaign_name": "C-2 (Web Conversion)", "objective": "conversion"},
 }
 
-_ADS_CREATIVES: Dict[int, Dict[str, Any]] = {
+_ADS_CREATIVES: dict[int, dict[str, Any]] = {
     101: {"creative_id": 101, "creative_format": "image", "creative_size": "1:1"},
     202: {"creative_id": 202, "creative_format": "video", "creative_size": "16:9"},
 }
 
-_ADS_CLICKS: Dict[int, Dict[str, Any]] = {
+_ADS_CLICKS: dict[int, dict[str, Any]] = {
     1: {"impression_id": 1, "click_id": "clk-1"},
     3: {"impression_id": 3, "click_id": "clk-3"},
     4: {"impression_id": 4, "click_id": "clk-4"},
 }
 
-_ADS_CONVERSIONS: Dict[int, Dict[str, Any]] = {
+_ADS_CONVERSIONS: dict[int, dict[str, Any]] = {
     1: {"impression_id": 1, "conversion_id": "cv-1", "conversion_value": Decimal(4)},
     4: {"impression_id": 4, "conversion_id": "cv-4", "conversion_value": Decimal(6)},
 }
 
-_ADS_PRICING: Dict[Tuple[str, str], Dict[str, Any]] = {
+_ADS_PRICING: dict[tuple[str, str], dict[str, Any]] = {
     ("feed", "US"): {"placement": "feed", "country": "US", "cpm_multiplier": 1.2},
     # ("search", "CN") deliberately missing: demonstrate "miss -> None -> fallback" in derived compute.
 }
@@ -134,11 +136,11 @@ def micros_to_usd(*, cost_micros: Any) -> float:
 
 
 def load_ads_impressions(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if not ids:
@@ -148,11 +150,11 @@ def load_ads_impressions(
 
 
 def load_ads_adgroups(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
@@ -161,11 +163,11 @@ def load_ads_adgroups(
 
 
 def load_ads_campaigns(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
@@ -174,11 +176,11 @@ def load_ads_campaigns(
 
 
 def load_ads_creatives(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     _ADS_CREATIVES_RETRY_COUNTER["calls"] = int(_ADS_CREATIVES_RETRY_COUNTER["calls"]) + 1
@@ -192,11 +194,11 @@ def load_ads_creatives(
 
 
 def load_ads_clicks(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
@@ -205,11 +207,11 @@ def load_ads_clicks(
 
 
 def load_ads_conversions(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
@@ -218,16 +220,16 @@ def load_ads_conversions(
 
 
 def load_ads_pricing(
-    ids: Optional[List[Tuple[str, str]]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[tuple[str, str]] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[Tuple[str, str], Dict[str, Any]]:
+) -> dict[tuple[str, str], dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
         return dict(_ADS_PRICING)
-    out: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    out: dict[tuple[str, str], dict[str, Any]] = {}
     for placement, country in ids:
         key = (str(placement), str(country))
         if key in _ADS_PRICING:
@@ -244,9 +246,9 @@ def _join_one(table: Mapping[Any, Mapping[str, Any]], key: Any) -> Mapping[str, 
     return table.get(key) or {}
 
 
-def build_ads_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], List[Dict[str, str]], List[Dict[str, str]]]:
-    detail_all: List[Dict[str, str]] = []
-    detail_clicks: List[Dict[str, str]] = []
+def build_ads_expected_outputs_csv_rows() -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
+    detail_all: list[dict[str, str]] = []
+    detail_clicks: list[dict[str, str]] = []
 
     for imp in _ADS_IMPRESSIONS:
         impression_id = int(imp["imp_id"])
@@ -273,7 +275,7 @@ def build_ads_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], List[Di
         cpm_multiplier = pricing.get("cpm_multiplier")
         cost_usd_adjusted = cost_usd if cpm_multiplier is None else (cost_usd * float(cpm_multiplier))
 
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "impression_id": impression_id,
             "user_id": int(imp["user_id"]),
             "campaign_name": campaign.get("campaign_name") or "",
@@ -293,7 +295,7 @@ def build_ads_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], List[Di
             detail_clicks.append(dict(csv_row))
 
     # metrics by campaign_name
-    by_campaign: Dict[str, Dict[str, Any]] = {}
+    by_campaign: dict[str, dict[str, Any]] = {}
     for row in detail_all:
         key = row["campaign_name"]
         acc = by_campaign.setdefault(
@@ -313,7 +315,7 @@ def build_ads_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], List[Di
         acc["spend_usd"] = acc["spend_usd"] + Decimal(row.get("cost_usd") or "0")
         acc["revenue_usd"] = acc["revenue_usd"] + Decimal(row.get("conversion_value") or "0")
 
-    metrics_rows: List[Dict[str, str]] = []
+    metrics_rows: list[dict[str, str]] = []
     for acc in by_campaign.values():
         imp_cnt = int(acc["impression_cnt"])
         click_cnt = int(acc["click_cnt"])
@@ -346,7 +348,7 @@ def verify_ads_outputs_csv_rows(
     actual_detail_all: Sequence[Mapping[str, Any]],
     actual_detail_clicks: Sequence[Mapping[str, Any]],
     actual_metrics_by_campaign: Sequence[Mapping[str, Any]],
-) -> Tuple[bool, str, Dict[str, Any]]:
+) -> tuple[bool, str, dict[str, Any]]:
     exp_detail_all, exp_detail_clicks, exp_metrics = build_ads_expected_outputs_csv_rows()
 
     detail_fields = [
@@ -388,8 +390,8 @@ def verify_ads_outputs_csv_rows(
     ok_metrics, msg_metrics = diff_first_mismatch(act_metrics, exp_metrics_sorted, fields=metrics_fields)
 
     ok = bool(ok_all and ok_clicks and ok_metrics)
-    summary = "detail_all={} detail_clicks={} metrics={}".format(msg_all, msg_clicks, msg_metrics)
-    details: Dict[str, Any] = {
+    summary = f"detail_all={msg_all} detail_clicks={msg_clicks} metrics={msg_metrics}"
+    details: dict[str, Any] = {
         "detail_all": {"actual": len(act_detail_all), "expected": len(exp_detail_all_sorted), "first_mismatch": msg_all},
         "detail_clicks": {"actual": len(act_detail_clicks), "expected": len(exp_detail_clicks_sorted), "first_mismatch": msg_clicks},
         "metrics_by_campaign": {"actual": len(act_metrics), "expected": len(exp_metrics_sorted), "first_mismatch": msg_metrics},

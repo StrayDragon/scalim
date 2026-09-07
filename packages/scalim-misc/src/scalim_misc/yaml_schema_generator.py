@@ -1,23 +1,24 @@
 # pragma: allow-cast-file gen-only schema generator; casts for Any-narrowing (not runtime hot path)
 import copy
 import json
+import types
+from dataclasses import Field, dataclass
+from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union, cast
+from typing import Any, ClassVar, Union, cast
 
 from scalim.dsl.yaml_dsl.schema_dsl import constants as schema_constants
 from scalim.dsl.yaml_dsl.schema_dsl import models as schema_models
 from scalim.dsl.yaml_dsl.schema_dsl import workflow_ssot
 from scalim.dsl.yaml_dsl.schema_dsl.constants import SCHEMA_META_KEY
-from scalim.vendor.dataclassesx import Field, dataclass
-from scalim.vendor.dataclassesx import fields as dataclass_fields
 
 from .yaml_schema_doc_standardizer import standardize_schema_docs
 
 _IMPORT_KEY = "$import"
 _IMPORTS_KEY = "imports"
 
-_SCHEMA_DOC_FIXTURE_RELATIVE_PATHS: Tuple[str, ...] = (
+_SCHEMA_DOC_FIXTURE_RELATIVE_PATHS: tuple[str, ...] = (
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_rank_score_report.yaml",
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/workflow_fixture_cache_pool_pin.yaml",
     "notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/scalim.yaml",
@@ -75,7 +76,7 @@ def _allow_yaml_merge_key_in_property_names(schema: Any) -> Any:
     return schema
 
 
-def _find_repo_root(start: Path) -> Optional[Path]:
+def _find_repo_root(start: Path) -> Path | None:
     current = start.parent if start.is_file() else start
     for _ in range(12):
         if (current / "src" / "scalim").exists() and (current / "packages").exists():
@@ -87,7 +88,7 @@ def _find_repo_root(start: Path) -> Optional[Path]:
     return None
 
 
-def _resolve_schema_doc_fixture_paths() -> List[str]:
+def _resolve_schema_doc_fixture_paths() -> list[str]:
     """用于编辑器悬停提示的 `JSON Schema` 示例样例(仅生成期使用).
 
     说明:
@@ -98,7 +99,7 @@ def _resolve_schema_doc_fixture_paths() -> List[str]:
     repo_root = _find_repo_root(Path(__file__).resolve())
     if repo_root is None:
         return []
-    resolved: List[str] = []
+    resolved: list[str] = []
     for rel in _SCHEMA_DOC_FIXTURE_RELATIVE_PATHS:
         path = repo_root / rel
         if not path.exists():
@@ -108,7 +109,7 @@ def _resolve_schema_doc_fixture_paths() -> List[str]:
 
 
 def _build_default_types_module() -> Any:
-    merged: Dict[str, Any] = {}
+    merged: dict[str, Any] = {}
     # 仅复制公开名称.这样可以保持默认模块显式化,并避免动态属性回退.
     for name, value in vars(schema_constants).items():
         if name.startswith("_"):
@@ -126,8 +127,8 @@ _DEFAULT_TYPES_MODULE = _build_default_types_module()
 
 @dataclass(frozen=True)
 class SchemaMeta:
-    schema_name: Optional[str]
-    meta: Dict[str, Any]
+    schema_name: str | None
+    meta: dict[str, Any]
 
     @classmethod
     def from_field(cls, dc_field: "Field[Any]") -> "SchemaMeta":
@@ -139,7 +140,7 @@ class SchemaMeta:
 
 
 class SchemaBuilder:
-    META_KEY_MAP: ClassVar[Dict[str, str]] = {
+    META_KEY_MAP: ClassVar[dict[str, str]] = {
         "desc": "description",
         "md": "markdownDescription",
         "markdown": "markdownDescription",
@@ -163,26 +164,26 @@ class SchemaBuilder:
         "items_choices": "items_choices",
         "example": "examples",
     }
-    ORDER_INSENSITIVE_KEYS: ClassVar[Set[str]] = {"required", "enum", "oneOf", "anyOf", "allOf"}
-    IGNORED_KEYS: ClassVar[Set[str]] = {"$comment"}
+    ORDER_INSENSITIVE_KEYS: ClassVar[set[str]] = {"required", "enum", "oneOf", "anyOf", "allOf"}
+    IGNORED_KEYS: ClassVar[set[str]] = {"$comment"}
     ELLIPSIS_TUPLE_LEN: ClassVar[int] = 2
     GENERATED_SCHEMA_COMMENT: ClassVar[str] = "自动生成, 请勿手动修改. 生成脚本: scripts/gen-yaml-dsl-schema.py"
-    PRIMITIVE_TYPE_MAP: ClassVar[Dict[Type[Any], str]] = {
+    PRIMITIVE_TYPE_MAP: ClassVar[dict[type[Any], str]] = {
         bool: "boolean",
         int: "integer",
         float: "number",
         str: "string",
     }
-    NUMERIC_CONSTRAINT_KEYS: ClassVar[Set[str]] = {"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"}
-    NUMERIC_SCHEMA_TYPES: ClassVar[Set[str]] = {"number", "integer"}
+    NUMERIC_CONSTRAINT_KEYS: ClassVar[set[str]] = {"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"}
+    NUMERIC_SCHEMA_TYPES: ClassVar[set[str]] = {"number", "integer"}
     _types: Any
 
-    def __init__(self, types_module: Optional[Any] = None) -> None:
+    def __init__(self, types_module: Any | None = None) -> None:
         if types_module is None:
             types_module = _DEFAULT_TYPES_MODULE
         self._types = types_module
 
-    def build_demand_schema(self) -> Dict[str, Any]:
+    def build_demand_schema(self) -> dict[str, Any]:
         types_mod = self._types
         definitions = {
             "main_source": self._build_definition(types_mod.MainSourceConfig),
@@ -208,7 +209,7 @@ class SchemaBuilder:
             "loader_retry": self._build_definition(types_mod.LoaderRetryConfig),
         }
 
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "$schema": types_mod.DEMAND_SCHEMA_META["$schema"],
             "$id": types_mod.DEMAND_SCHEMA_META["$id"],
             "title": types_mod.DEMAND_SCHEMA_META["title"],
@@ -230,10 +231,10 @@ class SchemaBuilder:
         _ = _allow_yaml_merge_key_in_property_names(schema)
         return schema
 
-    def build_workflow_schema(self) -> Dict[str, Any]:
+    def build_workflow_schema(self) -> dict[str, Any]:
         types_mod = self._types
 
-        definitions: Dict[str, Any] = {
+        definitions: dict[str, Any] = {
             "book_xlsx": self._build_definition(types_mod.BookXlsxConfig, allow_import=False),
             "book": self._build_definition(types_mod.BookConfig, allow_import=False),
             "file_csv_file": self._build_definition(types_mod.FileCsvFileConfig, allow_import=False),
@@ -243,7 +244,7 @@ class SchemaBuilder:
 
         workflow = workflow_ssot.build_workflow_workflow_schema()
 
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "$schema": types_mod.WORKFLOW_SCHEMA_META["$schema"],
             "$id": types_mod.WORKFLOW_SCHEMA_META["$id"],
             "title": types_mod.WORKFLOW_SCHEMA_META["title"],
@@ -260,10 +261,10 @@ class SchemaBuilder:
         _ = _allow_yaml_merge_key_in_property_names(schema)
         return schema
 
-    def build_scalim_yaml_schema(self) -> Dict[str, Any]:
+    def build_scalim_yaml_schema(self) -> dict[str, Any]:
         types_mod = self._types
 
-        definitions: Dict[str, Any] = {
+        definitions: dict[str, Any] = {
             "scalim_yaml_import_root": self._build_definition(
                 types_mod.ScalimYamlImportRootConfig,
                 allow_import=False,
@@ -286,7 +287,7 @@ class SchemaBuilder:
             ),
         }
 
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "$schema": types_mod.SCALIM_YAML_SCHEMA_META["$schema"],
             "$id": types_mod.SCALIM_YAML_SCHEMA_META["$id"],
             "title": types_mod.SCALIM_YAML_SCHEMA_META["title"],
@@ -304,12 +305,12 @@ class SchemaBuilder:
         _ = _allow_yaml_merge_key_in_property_names(schema)
         return schema
 
-    def _build_definition(self, cls: type, *, allow_import: bool = True) -> Dict[str, Any]:
+    def _build_definition(self, cls: type, *, allow_import: bool = True) -> dict[str, Any]:
         types_mod = self._types
         properties = self._build_class_properties(cls, allow_import=allow_import)
         if allow_import:
             properties.setdefault(_IMPORT_KEY, copy.deepcopy(types_mod.IMPORT_REF_SCHEMA))
-        schema: Dict[str, Any] = {
+        schema: dict[str, Any] = {
             "type": "object",
             "properties": properties,
         }
@@ -332,11 +333,11 @@ class SchemaBuilder:
 
         return schema
 
-    def _build_demand_properties(self) -> Dict[str, Any]:
+    def _build_demand_properties(self) -> dict[str, Any]:
         types_mod = self._types
         base_properties = self._build_class_properties(types_mod.DemandConfig, allow_import=True)
         base_properties.setdefault(_IMPORTS_KEY, copy.deepcopy(types_mod.IMPORTS_SCHEMA))
-        ordered: Dict[str, Any] = {}
+        ordered: dict[str, Any] = {}
         for name in types_mod.DEMAND_SCHEMA_PROPERTIES_ORDER:
             if name == "_templates":
                 ordered[name] = {
@@ -365,7 +366,7 @@ class SchemaBuilder:
             ordered[name] = base_properties[name]
         return ordered
 
-    def _build_field_definition(self) -> Dict[str, Any]:
+    def _build_field_definition(self) -> dict[str, Any]:
         types_mod = self._types
         source_props = self._build_class_properties(types_mod.SourceFieldConfig, allow_import=True)
         derived_props = self._build_class_properties(types_mod.DerivedFieldConfig, allow_import=True)
@@ -374,7 +375,7 @@ class SchemaBuilder:
         for name, schema in derived_props.items():
             if name in properties:
                 if properties[name] != schema:
-                    msg = "Field schema mismatch for '{}'".format(name)
+                    msg = f"Field schema mismatch for '{name}'"
                     raise ValueError(msg)
                 continue
             properties[name] = schema
@@ -388,9 +389,9 @@ class SchemaBuilder:
             "allOf": copy.deepcopy(types_mod.FIELD_DERIVED_CONDITIONS),
         }
 
-    def _build_class_properties(self, cls: type, *, allow_import: bool) -> Dict[str, Any]:
+    def _build_class_properties(self, cls: type, *, allow_import: bool) -> dict[str, Any]:
         types_mod = self._types
-        properties: Dict[str, Any] = {}
+        properties: dict[str, Any] = {}
         for dc_field in dataclass_fields(cls):
             if dc_field.metadata.get(types_mod.SCHEMA_OMIT_KEY):
                 continue
@@ -399,19 +400,19 @@ class SchemaBuilder:
             properties[prop_name] = self._build_field_schema(cls, dc_field, meta, allow_import=allow_import)
         return properties
 
-    def _build_field_schema(self, owner_cls: type, dc_field: "Field[Any]", meta: SchemaMeta, *, allow_import: bool) -> Dict[str, Any]:
-        context = "{}.{}".format(owner_cls.__name__, meta.schema_name or dc_field.name)
+    def _build_field_schema(self, owner_cls: type, dc_field: "Field[Any]", meta: SchemaMeta, *, allow_import: bool) -> dict[str, Any]:
+        context = f"{owner_cls.__name__}.{meta.schema_name or dc_field.name}"
         meta_payload = dict(meta.meta)
         if "ref" in meta_payload:
             ref_name = meta_payload.pop("ref")
             if not meta_payload:
-                return {"$ref": "#/definitions/{}".format(ref_name)}
+                return {"$ref": f"#/definitions/{ref_name}"}
             expanded = self._expand_meta(meta_payload)
-            expanded["allOf"] = [{"$ref": "#/definitions/{}".format(ref_name)}]
+            expanded["allOf"] = [{"$ref": f"#/definitions/{ref_name}"}]
             self._assert_numeric_constraints_typed(expanded, context=context)
             return expanded
         if "schema" in meta_payload:
-            schema = cast("Dict[str, Any]", copy.deepcopy(meta_payload.pop("schema")))  # pragma: allow-cast meta schema typed narrowing
+            schema = cast("dict[str, Any]", copy.deepcopy(meta_payload.pop("schema")))  # pragma: allow-cast meta schema typed narrowing
             schema.update(self._expand_meta(meta_payload))
             self._assert_numeric_constraints_typed(schema, context=context)
             return schema
@@ -421,17 +422,17 @@ class SchemaBuilder:
         self._assert_numeric_constraints_typed(schema, context=context)
         return schema
 
-    def _assert_numeric_constraints_typed(self, schema: Dict[str, Any], *, context: str) -> None:
+    def _assert_numeric_constraints_typed(self, schema: dict[str, Any], *, context: str) -> None:
         constraint_keys = self.NUMERIC_CONSTRAINT_KEYS.intersection(schema)
         if not constraint_keys:
             return
 
         raw_type = cast("object", schema.get("type"))  # pragma: allow-cast jsonschema `type` can be scalar/list
-        types: List[str] = []
+        types: list[str] = []
         if isinstance(raw_type, str):
             types = [raw_type]
         elif isinstance(raw_type, list):
-            for item in cast("List[Any]", raw_type):  # pragma: allow-cast jsonschema list typed narrowing
+            for item in cast("list[Any]", raw_type):  # pragma: allow-cast jsonschema list typed narrowing
                 if isinstance(item, str):
                     types.append(item)
 
@@ -447,17 +448,17 @@ class SchemaBuilder:
 
     def _assert_schema_does_not_expose_import_key(self, value: Any, *, path: str) -> None:
         if isinstance(value, dict):
-            typed = cast("Dict[str, Any]", value)  # pragma: allow-cast schema traversal typed narrowing
+            typed = cast("dict[str, Any]", value)  # pragma: allow-cast schema traversal typed narrowing
             if _IMPORT_KEY in typed:
-                msg = "Workflow schema MUST NOT expose {!r} (found at {})".format(_IMPORT_KEY, path)
+                msg = f"Workflow schema MUST NOT expose {_IMPORT_KEY!r} (found at {path})"
                 raise ValueError(msg)
             for key, item in typed.items():
-                self._assert_schema_does_not_expose_import_key(item, path="{}.{}".format(path, key))
+                self._assert_schema_does_not_expose_import_key(item, path=f"{path}.{key}")
             return
         if isinstance(value, list):
-            items = cast("List[Any]", value)  # pragma: allow-cast schema traversal typed narrowing
+            items = cast("list[Any]", value)  # pragma: allow-cast schema traversal typed narrowing
             for idx, item in enumerate(items):
-                self._assert_schema_does_not_expose_import_key(item, path="{}[{}]".format(path, idx))
+                self._assert_schema_does_not_expose_import_key(item, path=f"{path}[{idx}]")
             return
 
     def schemas_equivalent(self, left: Any, right: Any) -> bool:
@@ -465,24 +466,24 @@ class SchemaBuilder:
 
     def normalize_schema(self, value: Any, key: str = "") -> Any:
         if isinstance(value, dict):
-            typed = cast("Dict[str, Any]", value)  # pragma: allow-cast yaml mapping typed narrowing
+            typed = cast("dict[str, Any]", value)  # pragma: allow-cast yaml mapping typed narrowing
             return {k: self.normalize_schema(v, k) for k, v in typed.items() if k not in self.IGNORED_KEYS}
         if isinstance(value, list):
-            items = cast("List[Any]", value)  # pragma: allow-cast yaml list typed narrowing
+            items = cast("list[Any]", value)  # pragma: allow-cast yaml list typed narrowing
             normalized = [self.normalize_schema(item) for item in items]
             if key in self.ORDER_INSENSITIVE_KEYS:
                 return sorted(normalized, key=self._sort_key)
             return normalized
         if isinstance(value, tuple):
-            items = cast("Tuple[Any, ...]", value)  # pragma: allow-cast yaml tuple typed narrowing
+            items = cast("tuple[Any, ...]", value)  # pragma: allow-cast yaml tuple typed narrowing
             return self.normalize_schema(list(items), key)
         return value
 
     def _sort_key(self, value: Any) -> str:
         return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
-    def _expand_meta(self, meta: Dict[str, Any]) -> Dict[str, Any]:
-        expanded: Dict[str, Any] = {}
+    def _expand_meta(self, meta: dict[str, Any]) -> dict[str, Any]:
+        expanded: dict[str, Any] = {}
         items_choices = None
         for key, value in meta.items():
             mapped_key = self.META_KEY_MAP.get(key, key)
@@ -497,7 +498,7 @@ class SchemaBuilder:
             if "items" not in expanded:
                 expanded["items"] = {}
             if isinstance(expanded["items"], dict):
-                items_schema = cast("Dict[str, Any]", expanded["items"])  # pragma: allow-cast schema expansion typed narrowing
+                items_schema = cast("dict[str, Any]", expanded["items"])  # pragma: allow-cast schema expansion typed narrowing
                 items_schema["enum"] = copy.deepcopy(items_choices)
 
         if "examples" in expanded and not isinstance(expanded["examples"], list):
@@ -509,10 +510,10 @@ class SchemaBuilder:
 
     def _expand_additional_props(self, value: Any) -> Any:
         if isinstance(value, str):
-            return {"$ref": "#/definitions/{}".format(value)}
+            return {"$ref": f"#/definitions/{value}"}
         return copy.deepcopy(value)
 
-    def _schema_for_type(self, tp: Any, *, allow_import: bool) -> Dict[str, Any]:
+    def _schema_for_type(self, tp: Any, *, allow_import: bool) -> dict[str, Any]:
         tp = self._strip_optional(tp)
         origin = getattr(tp, "__origin__", None)  # pragma: allow-dynattr introspection: __origin__
         primitive = self._primitive_schema(tp)
@@ -531,18 +532,19 @@ class SchemaBuilder:
 
     def _strip_optional(self, tp: Any) -> Any:
         origin = getattr(tp, "__origin__", None)  # pragma: allow-dynattr introspection: __origin__
-        if origin is Union:
+        is_union = origin is Union or isinstance(tp, types.UnionType)
+        if is_union:
             args = [arg for arg in getattr(tp, "__args__", ()) if arg is not type(None)]  # pragma: allow-dynattr introspection: __args__
             if len(args) == 1:
                 return args[0]
         return tp
 
-    def _primitive_schema(self, tp: Any) -> Dict[str, Any]:
+    def _primitive_schema(self, tp: Any) -> dict[str, Any]:
         if isinstance(tp, type) and tp in self.PRIMITIVE_TYPE_MAP:
             return {"type": self.PRIMITIVE_TYPE_MAP[tp]}
         return {}
 
-    def _container_schema(self, tp: Any, origin: Any, *, allow_import: bool) -> Dict[str, Any]:
+    def _container_schema(self, tp: Any, origin: Any, *, allow_import: bool) -> dict[str, Any]:
         types_mod = self._types
 
         if origin is list or tp is list:
@@ -560,9 +562,9 @@ class SchemaBuilder:
 
         return {}
 
-    def _tuple_schema(self, tp: Any, *, allow_import: bool) -> Dict[str, Any]:
+    def _tuple_schema(self, tp: Any, *, allow_import: bool) -> dict[str, Any]:
         raw_args = getattr(tp, "__args__", ())  # pragma: allow-dynattr introspection: __args__
-        args = cast("Tuple[Any, ...]", raw_args)  # pragma: allow-cast typing args typed narrowing
+        args = cast("tuple[Any, ...]", raw_args)  # pragma: allow-cast typing args typed narrowing
         if len(args) == self.ELLIPSIS_TUPLE_LEN and args[1] is Ellipsis:
             return {"type": "array", "items": self._schema_for_type(args[0], allow_import=allow_import)}
 
@@ -578,30 +580,30 @@ class SchemaBuilder:
 
         return {"type": "array"}
 
-    def _ref_schema(self, tp: Any) -> Dict[str, Any]:
+    def _ref_schema(self, tp: Any) -> dict[str, Any]:
         if isinstance(tp, type):
             schema_name = getattr(tp, "SCHEMA_NAME", None)  # pragma: allow-dynattr metadata: schema meta
             if isinstance(schema_name, str):
-                return {"$ref": "#/definitions/{}".format(schema_name)}
+                return {"$ref": f"#/definitions/{schema_name}"}
         return {}
 
 
 _DEFAULT_BUILDER = SchemaBuilder()
 
 
-def build_demand_schema() -> Dict[str, Any]:
+def build_demand_schema() -> dict[str, Any]:
     return _DEFAULT_BUILDER.build_demand_schema()
 
 
-def build_workflow_schema() -> Dict[str, Any]:
+def build_workflow_schema() -> dict[str, Any]:
     return _DEFAULT_BUILDER.build_workflow_schema()
 
 
-def build_scalim_yaml_schema() -> Dict[str, Any]:
+def build_scalim_yaml_schema() -> dict[str, Any]:
     return _DEFAULT_BUILDER.build_scalim_yaml_schema()
 
 
-def load_schema(path: Path) -> Dict[str, Any]:
+def load_schema(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 

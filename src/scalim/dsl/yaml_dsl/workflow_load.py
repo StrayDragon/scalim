@@ -5,7 +5,8 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import Any, Mapping, Optional, Tuple
+from collections.abc import Mapping
+from typing import Any
 
 from ._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from .workflow import ScalimWorkflowConfigError, WorkflowConfig, load_workflow_config
@@ -14,10 +15,10 @@ from .workflow import ScalimWorkflowConfigError, WorkflowConfig, load_workflow_c
 def load_workflow_config_from_path(
     workflow_yaml_path: str,
     *,
-    template_vars: Optional[Mapping[str, Any]] = None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-) -> Tuple[str, WorkflowConfig]:
+) -> tuple[str, WorkflowConfig]:
     workflow_path = str(workflow_yaml_path or "").strip()
     if not workflow_path:
         msg = "workflow_yaml_path is required"

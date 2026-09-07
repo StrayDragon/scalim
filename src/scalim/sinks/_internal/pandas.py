@@ -1,14 +1,16 @@
 # region imports
 
-from typing import TYPE_CHECKING, Any, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
+from collections.abc import Hashable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional
 
 from ...vendor.compact.importlibx import require_optional_dependency
 
 if TYPE_CHECKING:
     import pandas as pd
 
+from typing_extensions import Self, override
+
 from ...typedefs import CellValue, RowData, SinkRowKeySeq
-from ...vendor.compact.typing_extensionsx import Self, override
 from .base import ColumnValues, IColumnSink, IRowSink, exit_sink
 
 if TYPE_CHECKING:
@@ -22,11 +24,11 @@ def _get_pandas_module() -> Any:
 
 
 class PandasRowSink(IRowSink):
-    field_names: List[str]
-    _rows: List[RowData]
+    field_names: list[str]
+    _rows: list[RowData]
     _closed: bool
 
-    def __init__(self, field_names: Optional[List[str]] = None) -> None:
+    def __init__(self, field_names: list[str] | None = None) -> None:
         self.field_names = field_names if field_names is not None else []
         self._rows = []
         self._closed = False
@@ -41,9 +43,9 @@ class PandasRowSink(IRowSink):
 
     def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[CellValue]) -> None:
         if len(field_keys) != len(values):
-            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            msg = f"`write_row_aligned` 长度不一致: field_keys={len(field_keys)} values={len(values)}"
             raise ValueError(msg)
-        self.write_row(dict(zip(field_keys, values)))
+        self.write_row(dict(zip(field_keys, values, strict=False)))
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
@@ -67,7 +69,7 @@ class PandasRowSink(IRowSink):
             return pd_module.DataFrame(self._rows, columns=self.field_names)
         return pd_module.DataFrame(self._rows)
 
-    def get_rows(self) -> List[RowData]:
+    def get_rows(self) -> list[RowData]:
         return self._rows
 
     def __enter__(self) -> Self:
@@ -75,21 +77,21 @@ class PandasRowSink(IRowSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)
 
 
 class PandasColumnSink(IColumnSink):
-    field_names: List[str]
-    _row_ids: List[Hashable]
-    _columns: Dict[str, Dict[Hashable, CellValue]]
+    field_names: list[str]
+    _row_ids: list[Hashable]
+    _columns: dict[str, dict[Hashable, CellValue]]
     _closed: bool
     _auto_field_names: bool
 
-    def __init__(self, field_names: Optional[List[str]] = None) -> None:
+    def __init__(self, field_names: list[str] | None = None) -> None:
         self._auto_field_names = field_names is None
         self.field_names = field_names if field_names is not None else []
         self._row_ids = []
@@ -110,12 +112,12 @@ class PandasColumnSink(IColumnSink):
 
     def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[CellValue]) -> None:
         if len(row_ids) != len(values):
-            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            msg = f"`write_column_aligned` 长度不一致: row_ids={len(row_ids)} values={len(values)}"
             raise ValueError(msg)
         if field_key not in self._columns:
             self._columns[field_key] = {}
         col = self._columns[field_key]
-        for row_id, value in zip(row_ids, values):
+        for row_id, value in zip(row_ids, values, strict=False):
             col[row_id] = value
         if self._auto_field_names and field_key not in self.field_names:
             self.field_names.append(field_key)
@@ -154,7 +156,7 @@ class PandasColumnSink(IColumnSink):
             return pd_module.DataFrame(columns=self.field_names or [])
 
         fields = self.field_names or list(self._columns.keys())
-        data: Dict[str, List[Union[CellValue, None]]] = {}
+        data: dict[str, list[CellValue | None]] = {}
 
         for field_key in fields:
             col_data = self._columns.get(field_key, {})
@@ -162,10 +164,10 @@ class PandasColumnSink(IColumnSink):
 
         return pd_module.DataFrame(data, columns=fields)
 
-    def get_columns(self) -> Dict[str, Dict[Hashable, CellValue]]:
+    def get_columns(self) -> dict[str, dict[Hashable, CellValue]]:
         return self._columns
 
-    def get_row_ids(self) -> List[Hashable]:
+    def get_row_ids(self) -> list[Hashable]:
         return self._row_ids
 
     def __enter__(self) -> Self:
@@ -173,8 +175,8 @@ class PandasColumnSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)

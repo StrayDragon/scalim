@@ -2,25 +2,24 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Optional, Union
 
 
-def _read_lines(path: Union[str, Path]) -> str:
+def _read_lines(path: str | Path) -> str:
     p = path if isinstance(path, Path) else Path(path)
     return p.read_text(encoding="utf-8")
 
 
-def excerpt_head(path: Union[str, Path], *, max_lines: int = 80) -> str:
+def excerpt_head(path: str | Path, *, max_lines: int = 80) -> str:
     text = _read_lines(path)
     lines = text.splitlines()
     return "\n".join(lines[: int(max_lines)]).rstrip()
 
 
 def excerpt_by_regex(
-    path: Union[str, Path],
+    path: str | Path,
     *,
-    start_regex: Optional[str] = None,
-    end_regex: Optional[str] = None,
+    start_regex: str | None = None,
+    end_regex: str | None = None,
     max_lines: int = 120,
 ) -> str:
     text = _read_lines(path)

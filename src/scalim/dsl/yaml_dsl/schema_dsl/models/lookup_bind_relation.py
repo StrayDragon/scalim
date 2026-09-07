@@ -1,7 +1,7 @@
-from typing import ClassVar, Optional, Tuple, Union
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     BIND_AS_ENUM,
     BIND_CACHE_MODE_ENUM,
@@ -29,7 +29,7 @@ class LookupCastConfig:
     SCHEMA_NAME: ClassVar[str] = "lookup_cast"
     """查找键归一化配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("name",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("name",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -45,7 +45,7 @@ class LookupCastConfig:
     )
     """转换名称(例如 `auto`/`int`/`str`/`sep_first`)."""
 
-    sep: Optional[str] = dataclass_field(
+    sep: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(desc="sep_first 的分隔符(默认 ,)", md="sep_first 的分隔符, 默认 `,`."),
     )
@@ -57,7 +57,7 @@ class BindRowsConfig:
     SCHEMA_NAME: ClassVar[str] = "bind_rows"
     """`rows` 模式参数绑定配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("param",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("param",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -87,7 +87,7 @@ class BindKeysConfig:
     SCHEMA_NAME: ClassVar[str] = "bind_keys"
     """`keys` 模式参数绑定配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("param",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("param",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -118,19 +118,19 @@ class BindConfig:
     SCHEMA_NAME: ClassVar[str] = "bind"
     """参数绑定配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ()
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ()
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    use_rows: Optional[BindRowsConfig] = dataclass_field(
+    use_rows: BindRowsConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(schema=BIND_ROWS_SCHEMA, schema_name="use_rows"),
     )
     """可选:使用 `rows` 模式的绑定配置."""
 
-    use_keys: Optional[BindKeysConfig] = dataclass_field(
+    use_keys: BindKeysConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(schema=BIND_KEYS_SCHEMA, schema_name="use_keys"),
     )
@@ -142,25 +142,25 @@ class RelationStepConfig:
     SCHEMA_NAME: ClassVar[str] = "relation_step"
     """关联步骤配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("from", "to")
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("from", "to")
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    from_: Union[str, Tuple[str, ...]] = dataclass_field(
+    from_: str | tuple[str, ...] = dataclass_field(
         default="",
         metadata=schema_meta(schema=RELATION_STEP_FROM_SCHEMA, schema_name="from"),
     )
     """关联起点字段名(对应 `from`)."""
 
-    to: Union[str, Tuple[str, ...]] = dataclass_field(
+    to: str | tuple[str, ...] = dataclass_field(
         default="",
         metadata=schema_meta(schema=RELATION_STEP_TO_SCHEMA),
     )
     """关联终点字段名."""
 
-    lookup_cast: Optional[LookupCastConfig] = dataclass_field(
+    lookup_cast: LookupCastConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=LOOKUP_CAST_SCHEMA,
@@ -176,7 +176,7 @@ class RelationConfig:
     SCHEMA_NAME: ClassVar[str] = "relation"
     """命名关联关系配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("steps",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("steps",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -185,7 +185,7 @@ class RelationConfig:
     relation_id: str = dataclass_field(default="", metadata=schema_omit())
     """关联关系标识(内部字段;由外层映射键提供)."""
 
-    steps: Tuple[RelationStepConfig, ...] = dataclass_field(
+    steps: tuple[RelationStepConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
     )
@@ -197,13 +197,13 @@ class InlineRelationConfig:
     SCHEMA_NAME: ClassVar[str] = "relation_inline"
     """内联关联关系配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("steps",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("steps",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    steps: Tuple[RelationStepConfig, ...] = dataclass_field(
+    steps: tuple[RelationStepConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(schema=RELATION_STEPS_SCHEMA, desc=DESC_RELATION_STEPS),
     )

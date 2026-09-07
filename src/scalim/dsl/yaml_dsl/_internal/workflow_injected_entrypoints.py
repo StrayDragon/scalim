@@ -5,7 +5,7 @@
 - 对外入口应使用 `scalim.dsl.yaml_dsl.run_workflow` 或 `scalim.dsl.yaml_dsl.workflow_entrypoints.run_workflow`.
 """
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ....execution.run_ir import ExecutionResult
 from ....workflow.report import WorkflowResult
@@ -18,8 +18,8 @@ def run_workflow_injected(
     workflow_yaml_path: str,
     *,
     options: WorkflowRunOptions,
-    run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    compile_demand_yaml_fn: Optional[Callable[..., WorkflowCompilationLike]] = None,
+    run_ir_fn: Callable[..., ExecutionResult] | None = None,
+    compile_demand_yaml_fn: Callable[..., WorkflowCompilationLike] | None = None,
 ) -> WorkflowResult:
     return _run_workflow_injected(
         workflow_yaml_path,

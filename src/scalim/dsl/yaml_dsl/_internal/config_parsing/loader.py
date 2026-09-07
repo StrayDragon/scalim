@@ -1,7 +1,8 @@
 # pragma: allow-c901-file plan: c60
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import IO, Any, Dict, Mapping, Optional, Sequence, Union, cast
+from typing import IO, Any, cast
 
 from ....._internal.loggingx import get_logger, prefix
 from .....typedefs import FailurePolicy
@@ -41,30 +42,30 @@ class YamlDemandLoader(
     ParserFieldsMixin,
     ParserOutputsMixin,
 ):
-    _validator: Optional[ConfigValidator]
+    _validator: ConfigValidator | None
 
     def __init__(self) -> None:
         self._validator = None
 
     def load(
         self,
-        source: Union[str, Path, IO[str]],
+        source: str | Path | IO[str],
         *,
-        template_vars: Optional[Mapping[str, Any]] = None,
+        template_vars: Mapping[str, Any] | None = None,
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-        allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
-        scalim_yaml_override: Optional[Union[str, Path]] = None,
-        project_root_override: Optional[Union[str, Path]] = None,
+        allowed_yaml_roots: Sequence[str | Path] | None = None,
+        scalim_yaml_override: str | Path | None = None,
+        project_root_override: str | Path | None = None,
     ) -> DemandConfig:
-        yaml_path: Optional[Path] = None
+        yaml_path: Path | None = None
         if isinstance(source, (str, Path)):
             yaml_path = Path(source)
             text = yaml_path.read_text(encoding=UTF8_ENCODING)
             text = maybe_precompile_yaml_text(
                 text,
                 template_vars=template_vars,
-                context_label="需求 `YAML` 文件 `{}`".format(str(yaml_path)),
+                context_label=f"需求 `YAML` 文件 `{yaml_path!s}`",
                 context_kind="demand",
                 template_sandbox=template_sandbox,
                 rendered_yaml_max_len=rendered_yaml_max_len,
@@ -170,7 +171,7 @@ class YamlDemandLoader(
                 for item in warnings:
                     msg = "{}{}".format(prefix("yaml_dsl"), item.message)
                     if item.path and item.path != "(root)":
-                        msg = "{} (path={})".format(msg, item.path)
+                        msg = f"{msg} (path={item.path})"
                     _LOADER_LOGGER.warning(msg)
 
         return self._parse_config(raw_demand)
@@ -179,7 +180,7 @@ class YamlDemandLoader(
         self,
         yaml_string: str,
         *,
-        template_vars: Optional[Mapping[str, Any]] = None,
+        template_vars: Mapping[str, Any] | None = None,
         template_sandbox: str = "safe",
         rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
     ) -> DemandConfig:
@@ -249,7 +250,7 @@ class YamlDemandLoader(
                 for item in warnings:
                     msg = "{}{}".format(prefix("yaml_dsl"), item.message)
                     if item.path and item.path != "(root)":
-                        msg = "{} (path={})".format(msg, item.path)
+                        msg = f"{msg} (path={item.path})"
                     _LOADER_LOGGER.warning(msg)
 
         return self._parse_config(raw_demand)
@@ -341,12 +342,12 @@ class YamlDemandLoader(
             audit=audit,
         )
 
-    def _parse_resources(self, raw: RawDemand) -> Optional[ResourcesConfig]:  # noqa: C901, PLR0912
+    def _parse_resources(self, raw: RawDemand) -> ResourcesConfig | None:  # noqa: C901, PLR0912
         resources_dict = raw.get_mapping(DEMAND_KEYS["resources"])
         if resources_dict is None:
             return None
 
-        books: Dict[str, BookConfig] = {}
+        books: dict[str, BookConfig] = {}
         books_dict = mapping_or_none(resources_dict.get(RESOURCES_KEYS["books"]))
         if books_dict is None:
             if RESOURCES_KEYS["books"] in resources_dict:
@@ -361,12 +362,12 @@ class YamlDemandLoader(
 
                 book_cfg_dict = mapping_or_none(raw_book_cfg)
                 if book_cfg_dict is None:
-                    msg = "resources.books.{} must be an object".format(book_id)
+                    msg = f"resources.books.{book_id} must be an object"
                     raise TypeError(msg)
 
-                books[book_id] = self._parse_book_config(book_cfg_dict, base_path="resources.books.{}".format(book_id))
+                books[book_id] = self._parse_book_config(book_cfg_dict, base_path=f"resources.books.{book_id}")
 
-        files: Dict[str, FileConfig] = {}
+        files: dict[str, FileConfig] = {}
         files_dict = mapping_or_none(resources_dict.get(RESOURCES_KEYS["files"]))
         if files_dict is None:
             if RESOURCES_KEYS["files"] in resources_dict:
@@ -381,19 +382,19 @@ class YamlDemandLoader(
 
                 file_cfg_dict = mapping_or_none(raw_file_cfg)
                 if file_cfg_dict is None:
-                    msg = "resources.files.{} must be an object".format(file_id)
+                    msg = f"resources.files.{file_id} must be an object"
                     raise TypeError(msg)
 
-                files[file_id] = self._parse_file_config(file_cfg_dict, base_path="resources.files.{}".format(file_id))
+                files[file_id] = self._parse_file_config(file_cfg_dict, base_path=f"resources.files.{file_id}")
 
         return ResourcesConfig(books=books, files=files)
 
-    def _parse_book_config(self, raw: Dict[str, Any], *, base_path: str) -> BookConfig:
-        def _error(message: str, path: Optional[str] = None) -> ValueError:
+    def _parse_book_config(self, raw: dict[str, Any], *, base_path: str) -> BookConfig:
+        def _error(message: str, path: str | None = None) -> ValueError:
             _ = path
             return ValueError(message)
 
-        def _ignore_import(_data: Mapping[str, Any], path: Optional[str] = None) -> None:
+        def _ignore_import(_data: Mapping[str, Any], path: str | None = None) -> None:
             _ = path
 
         return parse_book_config_mapping(
@@ -404,23 +405,21 @@ class YamlDemandLoader(
             error_factory=_error,
         )
 
-    def _parse_file_config(self, raw: Dict[str, Any], *, base_path: str) -> FileConfig:
+    def _parse_file_config(self, raw: dict[str, Any], *, base_path: str) -> FileConfig:
         if "write_lock" in raw:
             msg = (
-                "{}.write_lock was removed. "
+                f"{base_path}.write_lock was removed. "
                 "Migration: set resources.files.<id>.csv_file.path to an output root directory "
                 "(e.g. './out'), and locate outputs via <root>/manifest/latest.json."
-            ).format(base_path)
+            )
             raise ValueError(msg)
 
         if "kind" in raw:
             kind = str(raw.get("kind") or "").strip()
             if kind == "csv_file":
-                msg = (
-                    "{}.kind was removed. Migration: use oneOf branch object: {}.csv_file: {{path: <output_root>, encoding?: utf-8}}."
-                ).format(base_path, base_path)
+                msg = f"{base_path}.kind was removed. Migration: use oneOf branch object: {base_path}.csv_file: {{path: <output_root>, encoding?: utf-8}}."  # noqa: E501
             else:
-                msg = ("{}.kind was removed. Migration: use oneOf branch object: {}.csv_file: {{...}}.").format(base_path, base_path)
+                msg = f"{base_path}.kind was removed. Migration: use oneOf branch object: {base_path}.csv_file: {{...}}."
             raise ValueError(msg)
 
         allowed_keys = {FILE_KEYS["csv_file"]}
@@ -430,29 +429,29 @@ class YamlDemandLoader(
             raise ValueError(msg)
 
         if FILE_KEYS["csv_file"] not in raw:
-            msg = "{}.csv_file is required".format(base_path)
+            msg = f"{base_path}.csv_file is required"
             raise ValueError(msg)
 
         csv_branch = mapping_or_none(raw.get(FILE_KEYS["csv_file"]))
         if csv_branch is None:
-            msg = "{}.csv_file must be an object".format(base_path)
+            msg = f"{base_path}.csv_file must be an object"
             raise TypeError(msg)
 
-        branch_path = "{}.csv_file".format(base_path)
+        branch_path = f"{base_path}.csv_file"
         allowed_branch_keys = {FILE_CSV_FILE_KEYS["path"], FILE_CSV_FILE_KEYS["encoding"]}
         unknown_branch = sorted({str(k) for k in csv_branch} - allowed_branch_keys)
         if unknown_branch:
             if "write_lock" in unknown_branch:
-                msg = ("{}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json").format(
-                    branch_path
+                msg = (
+                    f"{branch_path}.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
                 )
                 raise ValueError(msg)
             msg = "{} has unknown keys: {}".format(branch_path, ", ".join(unknown_branch))
             raise ValueError(msg)
 
-        path = self._parse_path_or_init_var(csv_branch.get(FILE_CSV_FILE_KEYS["path"]), path="{}.path".format(branch_path))
+        path = self._parse_path_or_init_var(csv_branch.get(FILE_CSV_FILE_KEYS["path"]), path=f"{branch_path}.path")
         if not path or (isinstance(path, str) and not path.strip()):
-            msg = "{}.path is required".format(branch_path)
+            msg = f"{branch_path}.path is required"
             raise ValueError(msg)
 
         encoding = str(csv_branch.get(FILE_CSV_FILE_KEYS["encoding"]) or "").strip() or UTF8_ENCODING
@@ -461,12 +460,12 @@ class YamlDemandLoader(
     def _parse_path_or_init_var(self, raw: Any, *, path: str) -> OptionalPathNode:
         if isinstance(raw, dict):
             return parse_init_var_ref(
-                cast("Dict[str, Any]", raw),  # pragma: allow-cast init_var mapping typed narrowing
+                cast("dict[str, Any]", raw),  # pragma: allow-cast init_var mapping typed narrowing
                 path=path,
             )
         if raw is None:
             return None
         if isinstance(raw, str):
             return raw.strip()
-        msg = "{} must be a non-empty string or {{$init_var: <name>}}".format(path)
+        msg = f"{path} must be a non-empty string or {{$init_var: <name>}}"
         raise TypeError(msg)

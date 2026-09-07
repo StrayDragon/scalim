@@ -2,15 +2,16 @@ import ast
 import os
 import threading
 from collections import OrderedDict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Generic, Optional, Tuple, TypeVar
+from typing import Any, Generic, TypeVar
 
 from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import load_yaml_mapping_text
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
 
-_CacheKey = Tuple[str, int]
+_CacheKey = tuple[str, int]
 
 _DEFAULT_CACHE_MAXSIZE = 128
 _CACHE_MAXSIZE_ENV = "SCALIM_YAML_DSL_LSP_CACHE_MAXSIZE"
@@ -37,11 +38,11 @@ class _InflightCacheProducedNoValueError(_InflightCacheError):
 
 
 class _Inflight(Generic[_V]):
-    __slots__: Tuple[str, ...] = ("event", "exc", "value")
+    __slots__: tuple[str, ...] = ("event", "exc", "value")
 
     event: threading.Event
-    value: Optional[_V]
-    exc: Optional[BaseException]
+    value: _V | None
+    exc: BaseException | None
 
     def __init__(self) -> None:
         self.event = threading.Event()
@@ -56,8 +57,8 @@ class _LRUCache(Generic[_K, _V]):
     def __init__(self, *, maxsize: int) -> None:
         self.maxsize = max(0, int(maxsize))
         self._lock = threading.Lock()
-        self._data: "OrderedDict[_K, _V]" = OrderedDict()
-        self._inflight: Dict[_K, _Inflight[_V]] = {}
+        self._data: OrderedDict[_K, _V] = OrderedDict()
+        self._inflight: dict[_K, _Inflight[_V]] = {}
 
     def clear(self) -> None:
         with self._lock:
@@ -113,7 +114,7 @@ class _LRUCache(Generic[_K, _V]):
 
 _text_cache: _LRUCache[_CacheKey, str] = _LRUCache(maxsize=_parse_maxsize_env())
 _ast_cache: _LRUCache[_CacheKey, ast.Module] = _LRUCache(maxsize=_parse_maxsize_env())
-_yaml_cache: _LRUCache[_CacheKey, Tuple[Dict[str, Any], Any, Any]] = _LRUCache(maxsize=_parse_maxsize_env())
+_yaml_cache: _LRUCache[_CacheKey, tuple[dict[str, Any], Any, Any]] = _LRUCache(maxsize=_parse_maxsize_env())
 
 
 def cache_maxsize() -> int:
@@ -132,7 +133,7 @@ def clear_caches() -> None:
     _yaml_cache.clear()
 
 
-def _cache_key_for_path(path: Path) -> Optional[_CacheKey]:
+def _cache_key_for_path(path: Path) -> _CacheKey | None:
     try:
         stat = path.stat()
     except Exception:  # noqa: BLE001
@@ -165,7 +166,7 @@ def parse_python_ast_cached(path: Path) -> ast.Module:
     return _ast_cache.get_or_compute(key, lambda: ast.parse(_read_text_cached_by_key(key)))
 
 
-def load_yaml_mapping_cached(path: Path) -> Tuple[Dict[str, Any], Any, Any]:
+def load_yaml_mapping_cached(path: Path) -> tuple[dict[str, Any], Any, Any]:
     key = _cache_key_for_path(path)
     if key is None:
         text = path.read_text(encoding="utf-8")

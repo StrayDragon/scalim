@@ -19,7 +19,7 @@ from scalim.sinks.memory import InMemoryColumnSink, InMemoryRowDataSink
 from scalim.sinks._internal.rows import InMemoryRows
 from scalim.spec.ir import DemandIr, FieldIr, MainSourceIr, RuntimeHandleIdIr
 from scalim._internal.warningsx import ScalimExperimentalWarning
-from scalim.vendor.compact.typing_extensionsx import override
+from typing_extensions import override
 
 
 def test_run_ir_dunder_all_excludes_internal_stats_collector() -> None:

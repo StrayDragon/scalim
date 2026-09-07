@@ -1,67 +1,67 @@
-from typing import Dict, FrozenSet, Mapping, Sequence, Set, Tuple
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 from ..spec.ir._workflow import WorkflowIr
-from ..vendor.dataclassesx import dataclass
 
 
-def _validate_workflow_node_ids(*, deps_by_node_id: Mapping[str, Sequence[str]]) -> Set[str]:
-    node_ids: Set[str] = set()
+def _validate_workflow_node_ids(*, deps_by_node_id: Mapping[str, Sequence[str]]) -> set[str]:
+    node_ids: set[str] = set()
     for raw_node_id in deps_by_node_id:
         node_id = str(raw_node_id).strip()
         if not node_id:
             msg = "workflow node_id must be a non-empty string"
             raise ValueError(msg)
         if node_id in node_ids:
-            msg = "workflow node_id duplicated: {!r}".format(node_id)
+            msg = f"workflow node_id duplicated: {node_id!r}"
             raise ValueError(msg)
         node_ids.add(node_id)
     return node_ids
 
 
-def _normalize_workflow_deps(*, deps_by_node_id: Mapping[str, Sequence[str]]) -> Dict[str, Tuple[str, ...]]:
-    normalized: Dict[str, Tuple[str, ...]] = {}
+def _normalize_workflow_deps(*, deps_by_node_id: Mapping[str, Sequence[str]]) -> dict[str, tuple[str, ...]]:
+    normalized: dict[str, tuple[str, ...]] = {}
     for raw_node_id, deps in deps_by_node_id.items():
         consumer = str(raw_node_id).strip()
         if not consumer:
             msg = "workflow node_id must be a non-empty string"
             raise ValueError(msg)
 
-        tmp: Set[str] = set()
+        tmp: set[str] = set()
         for dep_id in deps or ():
             dep = str(dep_id).strip()
             if not dep:
-                msg = "workflow deps must contain only non-empty strings (node_id={!r})".format(consumer)
+                msg = f"workflow deps must contain only non-empty strings (node_id={consumer!r})"
                 raise ValueError(msg)
             tmp.add(dep)
         normalized[consumer] = tuple(sorted(tmp))
     return normalized
 
 
-def _validate_workflow_deps_exist(*, deps_by_node_id: Mapping[str, Sequence[str]], node_ids: Set[str]) -> None:
+def _validate_workflow_deps_exist(*, deps_by_node_id: Mapping[str, Sequence[str]], node_ids: set[str]) -> None:
     for raw_consumer, deps in deps_by_node_id.items():
         consumer = str(raw_consumer).strip()
         for raw_dep in deps or ():
             dep = str(raw_dep).strip()
             if dep and dep not in node_ids:
-                msg = "workflow node {!r} depends_on unknown node {!r}".format(consumer, dep)
+                msg = f"workflow node {consumer!r} depends_on unknown node {dep!r}"
                 raise ValueError(msg)
 
 
-def _build_workflow_visibility_closure(*, deps_by_node_id: Mapping[str, Tuple[str, ...]], node_ids: Set[str]) -> Dict[str, FrozenSet[str]]:
-    cache: Dict[str, FrozenSet[str]] = {}
-    visiting: Set[str] = set()
+def _build_workflow_visibility_closure(*, deps_by_node_id: Mapping[str, tuple[str, ...]], node_ids: set[str]) -> dict[str, frozenset[str]]:
+    cache: dict[str, frozenset[str]] = {}
+    visiting: set[str] = set()
 
-    def _visible(consumer_node_id: str) -> FrozenSet[str]:
+    def _visible(consumer_node_id: str) -> frozenset[str]:
         cached = cache.get(consumer_node_id)
         if cached is not None:
             return cached
 
         if consumer_node_id in visiting:
-            msg = "workflow depends_on cycle detected at node_id={!r}".format(consumer_node_id)
+            msg = f"workflow depends_on cycle detected at node_id={consumer_node_id!r}"
             raise ValueError(msg)
 
         visiting.add(consumer_node_id)
-        out: Set[str] = set()
+        out: set[str] = set()
         for dep in deps_by_node_id.get(consumer_node_id, ()):
             out.add(dep)
             out.update(_visible(dep))
@@ -83,7 +83,7 @@ class WorkflowVisibilityIndex:
     - 该对象仅做纯计算/纯数据,用于在上下文引用与产物读取等处复用.
     """
 
-    visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
+    visible_by_consumer_node_id: dict[str, frozenset[str]]
 
     @classmethod
     def build(cls, *, deps_by_node_id: Mapping[str, Sequence[str]]) -> "WorkflowVisibilityIndex":
@@ -98,7 +98,7 @@ class WorkflowVisibilityIndex:
         deps_by_node_id = {str(node.node_id): tuple(str(dep_id) for dep_id in node.deps) for node in workflow_ir.nodes}
         return cls.build(deps_by_node_id=deps_by_node_id)
 
-    def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
+    def visible_producer_node_ids(self, consumer_node_id: str) -> frozenset[str]:
         return self.visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
 

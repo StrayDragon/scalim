@@ -89,7 +89,7 @@
 - desc: workflow 类型(拆分给 typing/依赖方用)
 - scenario: 仅用类型,或避免重导入
 - marker: `src/scalim/dsl/yaml_dsl/__init__.py:9`
-- source: `src/scalim/dsl/yaml_dsl/workflow_types.py:227`
+- source: `src/scalim/dsl/yaml_dsl/workflow_types.py:228`
 - exports (`__all__`, tuple, count=22):
   - `UNSET`
   - `ComponentsExtend`
@@ -353,7 +353,7 @@
 - desc: outputs discovery facade
 - scenario: 定位最新一次发布的 workbook/books 与 files
 - marker: `src/scalim/shortcuts/resources/__init__.py:8`
-- source: `src/scalim/shortcuts/resources/outputs.py:216`
+- source: `src/scalim/shortcuts/resources/outputs.py:197`
 - exports (`__all__`, tuple, count=5):
   - `LatestOutputs`
   - `latest_book_path`

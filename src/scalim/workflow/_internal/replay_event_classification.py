@@ -1,25 +1,24 @@
-from typing import Dict, List, Set
+from dataclasses import dataclass
 
 from ...events import (
     Event,
     EventType,
 )
-from ...vendor.dataclassesx import dataclass
 
 __all__ = ()
 
 
 @dataclass(frozen=True)
 class WorkflowReplayEventBuckets:
-    started_events: List[Event]
-    finished_events: List[Event]
-    other_global_events: List[Event]
-    unknown_node_events: List[Event]
-    resource_commit_events: List[Event]
-    node_start_events_by_node_id: Dict[str, List[Event]]
-    node_end_events_by_node_id: Dict[str, List[Event]]
-    node_cancelled_events_by_node_id: Dict[str, List[Event]]
-    node_other_events_by_node_id: Dict[str, List[Event]]
+    started_events: list[Event]
+    finished_events: list[Event]
+    other_global_events: list[Event]
+    unknown_node_events: list[Event]
+    resource_commit_events: list[Event]
+    node_start_events_by_node_id: dict[str, list[Event]]
+    node_end_events_by_node_id: dict[str, list[Event]]
+    node_cancelled_events_by_node_id: dict[str, list[Event]]
+    node_other_events_by_node_id: dict[str, list[Event]]
 
 
 def _workflow_event_workflow_node_id(event: Event) -> str:
@@ -32,27 +31,27 @@ def _workflow_event_workflow_node_id(event: Event) -> str:
     return str(raw_node_id).strip()
 
 
-def classify_workflow_events_for_replay(workflow_events: List[Event], *, known_node_ids: Set[str]) -> WorkflowReplayEventBuckets:
+def classify_workflow_events_for_replay(workflow_events: list[Event], *, known_node_ids: set[str]) -> WorkflowReplayEventBuckets:
     """将工作流捕获的事件按回放所需语义做分类/分桶(纯数据整形)."""
 
-    started_events: List[Event] = []
-    finished_events: List[Event] = []
-    other_global_events: List[Event] = []
-    unknown_node_events: List[Event] = []
-    resource_commit_events: List[Event] = []
+    started_events: list[Event] = []
+    finished_events: list[Event] = []
+    other_global_events: list[Event] = []
+    unknown_node_events: list[Event] = []
+    resource_commit_events: list[Event] = []
 
-    node_start_events_by_node_id: Dict[str, List[Event]] = {}
-    node_end_events_by_node_id: Dict[str, List[Event]] = {}
-    node_cancelled_events_by_node_id: Dict[str, List[Event]] = {}
-    node_other_events_by_node_id: Dict[str, List[Event]] = {}
+    node_start_events_by_node_id: dict[str, list[Event]] = {}
+    node_end_events_by_node_id: dict[str, list[Event]] = {}
+    node_cancelled_events_by_node_id: dict[str, list[Event]] = {}
+    node_other_events_by_node_id: dict[str, list[Event]] = {}
 
-    global_buckets: Dict[str, List[Event]] = {
+    global_buckets: dict[str, list[Event]] = {
         str(EventType.WORKFLOW_STARTED): started_events,
         str(EventType.WORKFLOW_FINISHED): finished_events,
         str(EventType.WORKFLOW_RESOURCE_COMMIT): resource_commit_events,
     }
 
-    node_event_buckets: Dict[str, Dict[str, List[Event]]] = {
+    node_event_buckets: dict[str, dict[str, list[Event]]] = {
         str(EventType.WORKFLOW_NODE_START): node_start_events_by_node_id,
         str(EventType.WORKFLOW_NODE_END): node_end_events_by_node_id,
         str(EventType.WORKFLOW_NODE_CANCELLED): node_cancelled_events_by_node_id,

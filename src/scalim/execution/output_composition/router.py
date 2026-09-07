@@ -1,9 +1,10 @@
-from __future__ import absolute_import
-
 import hashlib
 import time
+from collections.abc import Sequence
 from contextlib import suppress
-from typing import List, Optional, Sequence, Tuple
+from dataclasses import dataclass
+
+from typing_extensions import override
 
 from ..._project_constants import VERSION as SCALIM_VERSION
 from ...events import EventType
@@ -12,8 +13,6 @@ from ...exceptions import ScalimExecutionError
 from ...ob.hub import InstrumentationHub
 from ...sinks import BaseRowSink, ExcelWorkbookSink, IRowSink
 from ...typedefs import FailurePolicy, RowData
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import AggregatingRowSink, fingerprint_for_meta
 from .policy import parse_output_failure_policy
 from .sinks import RowCounter
@@ -24,7 +23,7 @@ class ScalimOutputTargetWriteError(ScalimExecutionError):
     target_id: str
 
     def __init__(self, target_id: str, exc: Exception) -> None:
-        super(ScalimOutputTargetWriteError, self).__init__("Output target failed: {}: {}".format(target_id, exc))
+        super().__init__(f"Output target failed: {target_id}: {exc}")
         self.target_id = str(target_id)
 
 
@@ -51,17 +50,17 @@ def truncate_text(value: str, *, max_chars: int) -> str:
 class RouteState:
     target_id: str
     sink: IRowSink
-    predicate: Optional[OutputRowPredicate]
+    predicate: OutputRowPredicate | None
     is_primary: bool
-    output_path: Optional[str]
-    sheet_name: Optional[str]
-    derived_fingerprint: Optional[str] = None
+    output_path: str | None
+    sheet_name: str | None
+    derived_fingerprint: str | None = None
     disabled: bool = False
     input_row_count: int = 0
     error_count: int = 0
     duration_seconds: float = 0.0
-    first_error: Optional[Exception] = None
-    output_counter: Optional[RowCounter] = None
+    first_error: Exception | None = None
+    output_counter: RowCounter | None = None
 
 
 @dataclass
@@ -69,8 +68,8 @@ class FinalTargetState:
     target_id: str
     sink: IRowSink
     output_counter: RowCounter
-    output_path: Optional[str]
-    sheet_name: Optional[str]
+    output_path: str | None
+    sheet_name: str | None
 
 
 class RouterRowSink(BaseRowSink):
@@ -83,24 +82,24 @@ class RouterRowSink(BaseRowSink):
     - `close()` 时写入元信息/审计并保存工作簿容器
     """
 
-    _routes: List[RouteState]
+    _routes: list[RouteState]
     _failure_policy: str
-    _workbook_resources: List["ExcelWorkbookSink"]
-    _meta_target: Optional[FinalTargetState]
-    _audit_target: Optional[FinalTargetState]
+    _workbook_resources: list["ExcelWorkbookSink"]
+    _meta_target: FinalTargetState | None
+    _audit_target: FinalTargetState | None
     _emit_events: bool
-    _instrumentation: Optional[InstrumentationHub]
+    _instrumentation: InstrumentationHub | None
     _input_rows: int
     _closed: bool
-    _final_stats: List[OutputTargetStats]
+    _final_stats: list[OutputTargetStats]
 
     _demand_name: str
     _demand_main_source_id: str
-    _demand_target_fields: List[str]
-    _demand_field_fingerprints: List[Tuple[str, str, str, str]]
-    _run_started_at_epoch: Optional[float]
+    _demand_target_fields: list[str]
+    _demand_field_fingerprints: list[tuple[str, str, str, str]]
+    _run_started_at_epoch: float | None
     _run_parallel_mode: str
-    _run_batch_size: Optional[int]
+    _run_batch_size: int | None
     _run_failure_policy: str
     _include_full_error_message: bool
 
@@ -110,17 +109,17 @@ class RouterRowSink(BaseRowSink):
         routes: Sequence[RouteState],
         failure_policy: str,
         workbook_resources: Sequence["ExcelWorkbookSink"],
-        meta_target: Optional[FinalTargetState] = None,
-        audit_target: Optional[FinalTargetState] = None,
+        meta_target: FinalTargetState | None = None,
+        audit_target: FinalTargetState | None = None,
         emit_events: bool = False,
-        instrumentation: Optional[InstrumentationHub] = None,
+        instrumentation: InstrumentationHub | None = None,
         demand_name: str = "",
         demand_main_source_id: str = "",
-        demand_target_fields: Optional[Sequence[str]] = None,
-        demand_field_fingerprints: Optional[Sequence[Tuple[str, str, str, str]]] = None,
-        run_started_at_epoch: Optional[float] = None,
+        demand_target_fields: Sequence[str] | None = None,
+        demand_field_fingerprints: Sequence[tuple[str, str, str, str]] | None = None,
+        run_started_at_epoch: float | None = None,
         run_parallel_mode: str = "",
-        run_batch_size: Optional[int] = None,
+        run_batch_size: int | None = None,
         run_failure_policy: str = "",
         include_full_error_message: bool = False,
     ) -> None:
@@ -145,8 +144,8 @@ class RouterRowSink(BaseRowSink):
         self._run_failure_policy = str(run_failure_policy or "")
         self._include_full_error_message = bool(include_full_error_message)
 
-    def get_target_stats(self) -> List[OutputTargetStats]:
-        stats: List[OutputTargetStats] = []
+    def get_target_stats(self) -> list[OutputTargetStats]:
+        stats: list[OutputTargetStats] = []
         for r in self._routes:
             output_rows = int(r.output_counter.rows) if r.output_counter is not None else int(r.input_row_count)
             error_type = type(r.first_error).__name__ if r.first_error is not None else None
@@ -160,7 +159,7 @@ class RouterRowSink(BaseRowSink):
                     error_message = truncate_text(normalized, max_chars=2000)
                 else:
                     # 默认使用脱敏摘要,避免把敏感信息落到输出文件中.
-                    error_message = "sha256={}".format(error_message_hash)
+                    error_message = f"sha256={error_message_hash}"
             stats.append(
                 OutputTargetStats(
                     target_id=r.target_id,
@@ -219,7 +218,7 @@ class RouterRowSink(BaseRowSink):
                 return
             raise ScalimOutputTargetWriteError(route.target_id, exc) from exc
 
-    def _routes_by_output_path(self, output_path: Optional[str]) -> List[RouteState]:
+    def _routes_by_output_path(self, output_path: str | None) -> list[RouteState]:
         key = str(output_path or "")
         return [r for r in self._routes if str(r.output_path or "") == key]
 
@@ -321,9 +320,9 @@ class RouterRowSink(BaseRowSink):
         self._write_meta()
         self._write_audit()
 
-    def _append_output_stats_meta_rows(self, rows: List[RowData]) -> None:
+    def _append_output_stats_meta_rows(self, rows: list[RowData]) -> None:
         for stat in self.get_target_stats():
-            prefix = "output.{}".format(stat.target_id)
+            prefix = f"output.{stat.target_id}"
             rows.append({"key": prefix + ".input_rows", "value": int(stat.input_row_count)})
             rows.append({"key": prefix + ".rows", "value": int(stat.row_count)})
             rows.append({"key": prefix + ".errors", "value": int(stat.error_count)})
@@ -339,19 +338,19 @@ class RouterRowSink(BaseRowSink):
                 if stat.error_message_hash:
                     rows.append({"key": prefix + ".error_message_hash", "value": str(stat.error_message_hash)})
 
-    def _append_derived_meta_rows(self, rows: List[RowData]) -> None:
+    def _append_derived_meta_rows(self, rows: list[RowData]) -> None:
         # 派生聚合指纹与诊断(仅包含对拍友好的脱敏信息)
         for route in self._routes:
             if route.derived_fingerprint:
-                rows.append({"key": "derived.{}.fingerprint".format(route.target_id), "value": str(route.derived_fingerprint)})
+                rows.append({"key": f"derived.{route.target_id}.fingerprint", "value": str(route.derived_fingerprint)})
             if not isinstance(route.sink, AggregatingRowSink):
                 continue
             diag = route.sink.aggregator.diagnostics()
             for k, v in diag.meta.items():
-                rows.append({"key": "derived.{}.{}".format(route.target_id, str(k)), "value": v})
+                rows.append({"key": f"derived.{route.target_id}.{k!s}", "value": v})
 
-    def _build_meta_rows(self) -> List[RowData]:
-        rows: List[RowData] = []
+    def _build_meta_rows(self) -> list[RowData]:
+        rows: list[RowData] = []
         fingerprint = fingerprint_for_meta(
             demand_name=self._demand_name,
             main_source_id=self._demand_main_source_id,
@@ -398,8 +397,8 @@ class RouterRowSink(BaseRowSink):
             )
         )
 
-    def _build_audit_rows(self) -> List[RowData]:
-        rows: List[RowData] = []
+    def _build_audit_rows(self) -> list[RowData]:
+        rows: list[RowData] = []
         route_by_id = {r.target_id: r for r in self._routes}
 
         for stat in self.get_target_stats():

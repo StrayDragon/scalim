@@ -10,21 +10,22 @@
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, cast
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any, Optional, Protocol, cast
 
 from ...execution.run_ir import ExecutionRequest, ExecutionResult
 from ...hooks.policy_signals import PreUseBatchSizeDecision, emit_pre_use_batch_size_signal
 from ...ob.components import split_components
 from ...spec.ir import DemandIr
 from ...spec.ir._workflow import WorkflowIr, WorkflowNodeIr
-from ...vendor.compact.typing_extensionsx import Protocol
-from ...vendor.dataclassesx import dataclass, replace
 from ...workflow.execute import ScalimWorkflowRunFailedError, run_workflow_ir
 from ...workflow.report import WorkflowResult
 from .runtime.compiler import compile as _compile_demand_default
 from .runtime.contracts import (
     BookExportXlsxOverride,
     BookResourceOverride,
+    Compilation,
     DemandDiagnosticsOverride,
     DemandDiagnosticsPolicy,
     DemandRunOptions,
@@ -59,9 +60,9 @@ _ADAPTIVE_MAX_WORKERS_HARD_CAP = 256
 
 
 def _merge_book_export_xlsx_overrides(
-    left: Optional[BookExportXlsxOverride],
-    right: Optional[BookExportXlsxOverride],
-) -> Optional[BookExportXlsxOverride]:
+    left: BookExportXlsxOverride | None,
+    right: BookExportXlsxOverride | None,
+) -> BookExportXlsxOverride | None:
     if right is None:
         return left
     if left is None:
@@ -72,7 +73,7 @@ def _merge_book_export_xlsx_overrides(
     )
 
 
-def _merge_book_resource_overrides(left: Optional[BookResourceOverride], right: BookResourceOverride) -> BookResourceOverride:
+def _merge_book_resource_overrides(left: BookResourceOverride | None, right: BookResourceOverride) -> BookResourceOverride:
     if left is None:
         return right
     return BookResourceOverride(
@@ -83,7 +84,7 @@ def _merge_book_resource_overrides(left: Optional[BookResourceOverride], right: 
     )
 
 
-def _merge_file_resource_overrides(left: Optional[FileResourceOverride], right: FileResourceOverride) -> FileResourceOverride:
+def _merge_file_resource_overrides(left: FileResourceOverride | None, right: FileResourceOverride) -> FileResourceOverride:
     if left is None:
         return right
     return FileResourceOverride(
@@ -94,16 +95,16 @@ def _merge_file_resource_overrides(left: Optional[FileResourceOverride], right: 
 
 
 def _merge_resources_overrides(
-    workflow_override: Optional[ResourcesOverride],
-    user_override: Optional[ResourcesOverride],
-) -> Optional[ResourcesOverride]:
+    workflow_override: ResourcesOverride | None,
+    user_override: ResourcesOverride | None,
+) -> ResourcesOverride | None:
     if workflow_override is None:
         return user_override
     if user_override is None:
         return workflow_override
 
-    merged_books: Dict[str, BookResourceOverride] = dict(workflow_override.books or {})
-    merged_files: Dict[str, FileResourceOverride] = dict(workflow_override.files or {})
+    merged_books: dict[str, BookResourceOverride] = dict(workflow_override.books or {})
+    merged_files: dict[str, FileResourceOverride] = dict(workflow_override.files or {})
 
     for book_id, book_override in (user_override.books or {}).items():
         merged_books[str(book_id)] = _merge_book_resource_overrides(merged_books.get(str(book_id)), book_override)
@@ -136,7 +137,7 @@ def _file_config_to_resource_override(file_cfg: FileConfig) -> FileResourceOverr
     return FileResourceOverride(kind=kind, path=file_cfg.path if file_cfg.path is not None else None, encoding=encoding)
 
 
-def _workflow_resources_override(wf: WorkflowConfig) -> Optional[ResourcesOverride]:
+def _workflow_resources_override(wf: WorkflowConfig) -> ResourcesOverride | None:
     resources = wf.resources
     resources_cfg = resources if isinstance(resources, ResourcesConfig) else None
     if resources_cfg is None:
@@ -152,10 +153,10 @@ def _workflow_resources_override(wf: WorkflowConfig) -> Optional[ResourcesOverri
 
 
 def _merge_node_overrides(
-    base_overrides: Optional[RunOverrides],
+    base_overrides: RunOverrides | None,
     *,
-    workflow_resources_override: Optional[ResourcesOverride],
-) -> Optional[RunOverrides]:
+    workflow_resources_override: ResourcesOverride | None,
+) -> RunOverrides | None:
     base_resources = None if base_overrides is None else base_overrides.resources
     merged_resources = _merge_resources_overrides(workflow_resources_override, base_resources)
 
@@ -171,16 +172,16 @@ def _merge_node_overrides(
 
 
 def _validate_patches_by_run_id(  # noqa: C901
-    patches: Optional[Mapping[str, Any]],
+    patches: Mapping[str, Any] | None,
     *,
-    known_run_ids: FrozenSet[str],
-) -> Optional[Mapping[str, WorkflowNodePatch]]:
+    known_run_ids: frozenset[str],
+) -> Mapping[str, WorkflowNodePatch] | None:
     if patches is None:
         return None
     items = patches.items()
 
-    unknown: List[str] = []
-    typed: Dict[str, WorkflowNodePatch] = {}
+    unknown: list[str] = []
+    typed: dict[str, WorkflowNodePatch] = {}
     for raw_run_id, raw_patch in items:
         if not isinstance(raw_run_id, str):
             msg = "patches_by_run_id keys must be workflow run ids (str)"
@@ -202,20 +203,21 @@ def _validate_patches_by_run_id(  # noqa: C901
                     "public_builtin_callable_ids",
                 }
             )
-            forbidden: List[str] = []
+            forbidden: list[str] = []
             for raw_key in raw_patch_mapping:
                 if isinstance(raw_key, str) and raw_key in forbidden_field_names:
                     forbidden.append(raw_key)
             forbidden.sort()
             if forbidden:
-                msg = "patches_by_run_id['{}'].{} is not patchable (security boundary)".format(run_id, forbidden[0])
+                msg = f"patches_by_run_id['{run_id}'].{forbidden[0]} is not patchable (security boundary)"
                 raise TypeError(msg)
-            msg = "patches_by_run_id['{}'] must be a typed WorkflowNodePatch (dict patches are not supported). ".format(
-                run_id,
-            ) + "Example: patches_by_run_id={{'{}': WorkflowNodePatch(batch_size=5000)}}".format(run_id)
+            msg = (
+                f"patches_by_run_id['{run_id}'] must be a typed WorkflowNodePatch (dict patches are not supported). "
+                f"Example: patches_by_run_id={{'{run_id}': WorkflowNodePatch(batch_size=5000)}}"
+            )
             raise TypeError(msg)
         if not isinstance(raw_patch, WorkflowNodePatch):
-            msg = "patches_by_run_id['{}'] must be a WorkflowNodePatch".format(run_id)
+            msg = f"patches_by_run_id['{run_id}'] must be a WorkflowNodePatch"
             raise TypeError(msg)
         typed[run_id] = raw_patch
 
@@ -366,7 +368,7 @@ class WorkflowCompilationLike(Protocol):
     def request(self) -> ExecutionRequest: ...
 
 
-def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Optional["VizObserverConfig"]:
+def _extract_bundle_viz_base_config(overrides: RunOverrides | None) -> Optional["VizObserverConfig"]:
     # 工作流 `bundle` 可视化: 通过
     # `run_workflow(..., options=WorkflowRunOptions(demand=DemandRunOptions(outputs=DemandRunOutputOptions(`
     # `overrides=RunOverrides(viz_config=...)))))`
@@ -377,7 +379,7 @@ def _extract_bundle_viz_base_config(overrides: Optional[RunOverrides]) -> Option
     if viz_config is None or isinstance(viz_config, UnsetType):
         return None
 
-    bundle_viz_base_config: "VizObserverConfig" = viz_config
+    bundle_viz_base_config: VizObserverConfig = viz_config
     if getattr(bundle_viz_base_config, "has_explicit_paths", lambda: False)():  # pragma: allow-dynattr optional-interface: viz_config
         msg = "工作流 `bundle` 可视化需要 `viz_config.output_dir`(请勿设置 `output_path`/`snapshot_path`/`trace_path`)."
         raise ScalimWorkflowConfigError(msg, path="run_workflow.options.demand.outputs.overrides.viz_config")
@@ -436,8 +438,8 @@ class WorkflowLifecyclePreloadResult:
     workflow_config: WorkflowConfig
     workflow_ir: WorkflowIr
     demand_configs_by_run_id: Mapping[str, DemandConfig]
-    cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]]
-    cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]]
+    cache_pool_logical_keys_by_node_id: dict[str, frozenset[tuple[str, str]]] | None
+    cache_pool_consumers_by_logical_key: dict[tuple[str, str], frozenset[str]] | None
 
 
 @dataclass(frozen=True)
@@ -453,9 +455,9 @@ class WorkflowLifecycleEffectiveRun:
 class WorkflowLifecycleEffectiveMergeResult:
     workflow_yaml_path: str
     workflow_ir: WorkflowIr
-    runs: Tuple[WorkflowLifecycleEffectiveRun, ...]
-    options_by_run_id: Dict[str, DemandRunOptions]
-    patches_by_run_id: Optional[Mapping[str, WorkflowNodePatch]]
+    runs: tuple[WorkflowLifecycleEffectiveRun, ...]
+    options_by_run_id: dict[str, DemandRunOptions]
+    patches_by_run_id: Mapping[str, WorkflowNodePatch] | None
     bundle_viz_base_config: Optional["VizObserverConfig"]
 
 
@@ -560,8 +562,8 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
 
     bundle_viz_base_config = _extract_bundle_viz_base_config(base_demand_options.outputs.overrides)
 
-    runs: List[WorkflowLifecycleEffectiveRun] = []
-    options_by_run_id: Dict[str, DemandRunOptions] = {}
+    runs: list[WorkflowLifecycleEffectiveRun] = []
+    options_by_run_id: dict[str, DemandRunOptions] = {}
     for node in workflow_ir.nodes:
         if not isinstance(node, WorkflowNodeIr):
             continue
@@ -569,7 +571,7 @@ def run_workflow_lifecycle_until_preflight(  # noqa: C901, PLR0912, PLR0915
         run_id = str(node.node_id)
         demand_config = demand_configs_by_run_id.get(run_id)
         if demand_config is None:
-            msg = "Missing workflow structural preload result for run_id={!r}".format(run_id)
+            msg = f"Missing workflow structural preload result for run_id={run_id!r}"
             raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
 
         node_options = base_demand_options
@@ -643,8 +645,8 @@ def run_workflow_injected(  # noqa: C901, PLR0915
     workflow_yaml_path: str,
     *,
     options: WorkflowRunOptions,
-    run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    compile_demand_yaml_fn: Optional[Callable[..., WorkflowCompilationLike]] = None,
+    run_ir_fn: Callable[..., ExecutionResult] | None = None,
+    compile_demand_yaml_fn: Callable[..., WorkflowCompilationLike] | None = None,
 ) -> WorkflowResult:
     options = _normalize_and_validate_workflow_options(options)
     base_demand_options = options.demand
@@ -672,8 +674,8 @@ def run_workflow_injected(  # noqa: C901, PLR0915
         workflow_exec_id: str,
         workflow_node_id: str,
         workflow_node_decl_order: int,
-        node_init_vars: Dict[str, Any],
-        managed_output_ids: Optional[FrozenSet[str]],
+        node_init_vars: dict[str, Any],
+        managed_output_ids: frozenset[str] | None,
         viz_config: Optional["VizObserverConfig"],
     ) -> WorkflowCompilationLike:
         _ = workflow_node_decl_order
@@ -681,7 +683,7 @@ def run_workflow_injected(  # noqa: C901, PLR0915
         run_id = str(workflow_node_id)
         base_node_options = effective_options_by_run_id.get(run_id)
         if base_node_options is None:
-            msg = "Unknown workflow run id in runtime compile: {!r}".format(run_id)
+            msg = f"Unknown workflow run id in runtime compile: {run_id!r}"
             raise ScalimWorkflowConfigError(msg, path="workflow.runs[*].demand")
 
         node_options = base_node_options
@@ -739,7 +741,10 @@ def run_workflow_injected(  # noqa: C901, PLR0915
                 main_loader=main_loader,
             )
             emit_pre_use_batch_size_signal(hooks, decision)
-            compilation = replace(compilation, request=replace(request, batch_size=decision.value))
+            compilation_obj: Compilation = cast(  # pragma: allow-cast 注入的 WorkflowCompilationLike 协议对象在本路径必为 Compilation
+                "Compilation", compilation
+            )
+            compilation = replace(compilation_obj, request=replace(request, batch_size=decision.value))
 
             if decision.history:
                 _policy_logger.info(

@@ -5,15 +5,13 @@
 - 该模块必须保持“向下依赖”(允许被解析层、运行时、自省层(`introspection`)以及 `schema` 生成层依赖),禁止反向依赖运行时实现
 """
 
-from typing import Tuple
-
-FILE_KINDS: Tuple[str, ...] = ("csv_file",)
+FILE_KINDS: tuple[str, ...] = ("csv_file",)
 """`resources.files.*.kind` 枚举."""
 
-BOOK_KINDS: Tuple[str, ...] = ()
+BOOK_KINDS: tuple[str, ...] = ()
 """`YAML`/`Python` 的 `book` `kind` 判别已移除; 身份由 `path` 有无决定(`pathful`/`pathless`)."""
 
-BOOK_WRITE_MODE_ENUM: Tuple[str, ...] = (
+BOOK_WRITE_MODE_ENUM: tuple[str, ...] = (
     "sheet",
     "append",
 )
@@ -22,7 +20,7 @@ BOOK_WRITE_MODE_ENUM: Tuple[str, ...] = (
 DEFAULT_BOOK_WRITE_MODE: str = "sheet"
 """`resources.books.*.write_defaults.mode` 默认值."""
 
-BOOK_WRITE_ALIGN_BY_ENUM: Tuple[str, ...] = (
+BOOK_WRITE_ALIGN_BY_ENUM: tuple[str, ...] = (
     "field_id",
     "header",
 )
@@ -31,7 +29,7 @@ BOOK_WRITE_ALIGN_BY_ENUM: Tuple[str, ...] = (
 DEFAULT_BOOK_WRITE_ALIGN_BY: str = "field_id"
 """`resources.books.*.write_defaults.align_by` 默认值."""
 
-BOOK_WRITE_HEADER_POLICY_ENUM: Tuple[str, ...] = (
+BOOK_WRITE_HEADER_POLICY_ENUM: tuple[str, ...] = (
     "once",
     "always",
     "never",
@@ -41,7 +39,7 @@ BOOK_WRITE_HEADER_POLICY_ENUM: Tuple[str, ...] = (
 DEFAULT_BOOK_WRITE_HEADER_POLICY: str = "once"
 """`resources.books.*.write_defaults.header_policy` 默认值."""
 
-BOOK_WRITE_ON_MISMATCH_ENUM: Tuple[str, ...] = (
+BOOK_WRITE_ON_MISMATCH_ENUM: tuple[str, ...] = (
     "error",
     "warn",
     "skip",
@@ -51,7 +49,7 @@ BOOK_WRITE_ON_MISMATCH_ENUM: Tuple[str, ...] = (
 DEFAULT_BOOK_WRITE_ON_MISMATCH: str = "error"
 """`resources.books.*.write_defaults.on_mismatch` 默认值."""
 
-BOOK_WRITE_ON_CONFLICT_ENUM: Tuple[str, ...] = (
+BOOK_WRITE_ON_CONFLICT_ENUM: tuple[str, ...] = (
     "error",
     "overwrite",
     "skip",
@@ -62,14 +60,14 @@ DEFAULT_BOOK_WRITE_ON_CONFLICT: str = "error"
 """`resources.books.*.write_defaults.on_conflict` 默认值."""
 
 
-OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM: Tuple[str, ...] = (
+OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM: tuple[str, ...] = (
     "field_id",
     "name",
 )
 """`outputs.*.write.header_fields_output_by` 枚举."""
 
 
-AGG_RANK_ORDER_ENUM: Tuple[str, ...] = (
+AGG_RANK_ORDER_ENUM: tuple[str, ...] = (
     "asc",
     "desc",
 )
@@ -80,7 +78,7 @@ DEFAULT_AGG_RANK_ORDER: str = "desc"
 """`outputs.*.aggregate.fields.*.<rank>.order` 默认值."""
 
 
-AGG_RANK_TOP_K_MODE_ENUM: Tuple[str, ...] = (
+AGG_RANK_TOP_K_MODE_ENUM: tuple[str, ...] = (
     "rank",
     "rows",
 )
@@ -91,7 +89,7 @@ DEFAULT_AGG_RANK_TOP_K_MODE: str = "rank"
 """`outputs.*.aggregate.fields.*.<rank>.top_k_mode` 默认值."""
 
 
-AGG_METRIC_PRODUCER_KEYS: Tuple[str, ...] = (
+AGG_METRIC_PRODUCER_KEYS: tuple[str, ...] = (
     "count",
     "sum",
     "min",
@@ -103,7 +101,7 @@ AGG_METRIC_PRODUCER_KEYS: Tuple[str, ...] = (
 """`aggregate` 指标 `producer_key` 枚举(聚合指标)."""
 
 
-AGG_RANK_PRODUCER_KEYS: Tuple[str, ...] = (
+AGG_RANK_PRODUCER_KEYS: tuple[str, ...] = (
     "row_number",
     "rank",
     "dense_rank",
@@ -111,7 +109,7 @@ AGG_RANK_PRODUCER_KEYS: Tuple[str, ...] = (
 """`aggregate` 排名 `producer_key` 枚举(排名字段)."""
 
 
-AGG_POST_PRODUCER_KEYS: Tuple[str, ...] = (
+AGG_POST_PRODUCER_KEYS: tuple[str, ...] = (
     "call_by",
     "compute",
 )

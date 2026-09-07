@@ -4,20 +4,18 @@ YAML `sources.*.lookup_chunk_size` 已迁出:通过 `DemandRunRuntimeOptions.loo
 片间并行仅允许挂在 `sized(...)` 上,且仍须 `parallel_mode=adaptive` 等既有护栏.
 """
 
-from typing import Optional
-
-from ..vendor.dataclassesx import dataclass
+from dataclasses import dataclass
 
 
-def normalize_optional_max_chunk_workers(workers: Optional[int], *, label: str) -> Optional[int]:
+def normalize_optional_max_chunk_workers(workers: int | None, *, label: str) -> int | None:
     """校验并规范化可选的 `max_chunk_workers`(>=1 的 `int`,或 `None`)."""
     if workers is None:
         return None
     if isinstance(workers, bool) or not isinstance(workers, int):
-        msg = "{} must be an int or None".format(label)
+        msg = f"{label} must be an int or None"
         raise TypeError(msg)
     if int(workers) < 1:
-        msg = "{} must be >= 1 when provided".format(label)
+        msg = f"{label} must be >= 1 when provided"
         raise ValueError(msg)
     return int(workers)
 
@@ -32,9 +30,9 @@ class LookupChunking:
       `parallel=True` 时允许片间并行(仅 `sized` 可表达)
     """
 
-    size: Optional[int] = None
+    size: int | None = None
     parallel: bool = False
-    max_chunk_workers: Optional[int] = None
+    max_chunk_workers: int | None = None
     _kind: str = "off"
 
     @classmethod
@@ -47,7 +45,7 @@ class LookupChunking:
         size: int,
         *,
         parallel: bool = False,
-        max_chunk_workers: Optional[int] = None,
+        max_chunk_workers: int | None = None,
     ) -> "LookupChunking":
         if isinstance(size, bool) or not isinstance(size, int):
             msg = "LookupChunking.sized(size=...) must be an int >= 1"
@@ -95,7 +93,7 @@ class LookupChunking:
     def is_sized(self) -> bool:
         return self._kind == "sized"
 
-    def effective_chunk_size(self) -> Optional[int]:
+    def effective_chunk_size(self) -> int | None:
         """写入 `SourceIr.lookup_chunk_size` 的有效值;`off` → `None`."""
         if self.is_off():
             return None

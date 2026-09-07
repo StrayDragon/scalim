@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Set, cast
+from dataclasses import asdict
+from typing import TYPE_CHECKING, Any, cast
 
 from ....events import Event
-from ....vendor.dataclassesx import asdict
 from .viz_config import VizObserverConfig
 from .viz_output import VizEventEmitter
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from ....events._events import ErrorEvent
 
 
@@ -17,12 +19,12 @@ def _safe_len(value: Any) -> int:
         return 0
 
 
-def _normalize_dict_keys(value: Dict[Any, Any]) -> Dict[str, Any]:
-    normalized: Dict[str, Any] = {}
+def _normalize_dict_keys(value: dict[Any, Any]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
     for key, item in value.items():
         item_value = item
         if isinstance(item_value, dict):
-            item_value = _normalize_dict_keys(cast("Dict[Any, Any]", item_value))  # pragma: allow-cast dict typed narrowing
+            item_value = _normalize_dict_keys(cast("dict[Any, Any]", item_value))  # pragma: allow-cast dict typed narrowing
         normalized[str(key)] = item_value
     return normalized
 
@@ -33,24 +35,24 @@ def _sample_value(value: Any, size: int) -> Any:
     if value is None:
         return None
     if isinstance(value, dict):
-        value = _normalize_dict_keys(cast("Dict[Any, Any]", value))  # pragma: allow-cast dict typed narrowing
+        value = _normalize_dict_keys(cast("dict[Any, Any]", value))  # pragma: allow-cast dict typed narrowing
     if isinstance(value, dict):
-        value_dict = cast("Dict[Any, Any]", value)  # pragma: allow-cast dict typed narrowing
+        value_dict = cast("dict[Any, Any]", value)  # pragma: allow-cast dict typed narrowing
         return dict(list(value_dict.items())[:size])
     if isinstance(value, (list, tuple)):
         value_seq = cast("Sequence[Any]", value)  # pragma: allow-cast sequence typed narrowing
         return list(value_seq[:size])
     if isinstance(value, set):
-        value_set = cast("Set[Any]", value)  # pragma: allow-cast set typed narrowing
+        value_set = cast("set[Any]", value)  # pragma: allow-cast set typed narrowing
         return list(list(value_set)[:size])
     return value
 
 
 class VizObserverHandlerMixin(ABC):
     config: VizObserverConfig
-    run_id: Optional[str] = None
-    _events_emitter: Optional[VizEventEmitter] = None
-    _trace_emitter: Optional[VizEventEmitter] = None
+    run_id: str | None = None
+    _events_emitter: VizEventEmitter | None = None
+    _trace_emitter: VizEventEmitter | None = None
 
     @abstractmethod
     def _ensure_run_id(self) -> None: ...
@@ -59,13 +61,13 @@ class VizObserverHandlerMixin(ABC):
     def _ensure_emitters(self) -> None: ...
 
     @abstractmethod
-    def _select_payload(self, summary: Dict[str, Any], sample: Dict[str, Any], full: Dict[str, Any]) -> Dict[str, Any]: ...
+    def _select_payload(self, summary: dict[str, Any], sample: dict[str, Any], full: dict[str, Any]) -> dict[str, Any]: ...
 
     @abstractmethod
-    def _emit_event(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None: ...
+    def _emit_event(self, event_type: str, node_ref: dict[str, str], payload: dict[str, Any]) -> None: ...
 
     @abstractmethod
-    def _emit_trace(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None: ...
+    def _emit_trace(self, event_type: str, node_ref: dict[str, str], payload: dict[str, Any]) -> None: ...
 
     @staticmethod
     @abstractmethod
@@ -122,7 +124,7 @@ class VizObserverHandlerMixin(ABC):
             "row_ids_sample": _sample_value([str(rid) for rid in payload.row_ids], self.config.sample_size),
         }
         payload_out = self._select_payload(summary, sample, {"data": asdict(payload)})
-        self._emit_event("batch_started", {"type": "batch", "id": "batch:{}".format(payload.batch_num)}, payload_out)
+        self._emit_event("batch_started", {"type": "batch", "id": f"batch:{payload.batch_num}"}, payload_out)
 
     def on_batch_end(self, event: Event) -> None:
         payload = event.payload
@@ -135,7 +137,7 @@ class VizObserverHandlerMixin(ABC):
             "duration_ms": int(payload.duration * 1000),
         }
         payload_out = self._select_payload(summary, {}, {"data": asdict(payload)})
-        self._emit_event("batch_finished", {"type": "batch", "id": "batch:{}".format(payload.batch_num)}, payload_out)
+        self._emit_event("batch_finished", {"type": "batch", "id": f"batch:{payload.batch_num}"}, payload_out)
 
     def on_loader_call(self, event: Event) -> None:
         payload = event.payload
@@ -160,13 +162,13 @@ class VizObserverHandlerMixin(ABC):
         full_event = asdict(payload)
         result_value = full_event.get("result")
         if isinstance(result_value, dict):
-            full_event["result"] = _normalize_dict_keys(cast("Dict[Any, Any]", result_value))  # pragma: allow-cast dict typed narrowing
+            full_event["result"] = _normalize_dict_keys(cast("dict[Any, Any]", result_value))  # pragma: allow-cast dict typed narrowing
         sample = {
             "sample_size": self.config.sample_size,
             "sample": _sample_value(payload.result, self.config.sample_size),
         }
         payload_out = self._select_payload(summary, sample, {"data": full_event})
-        self._emit_event("loader_called", {"type": "loader", "id": "loader:{}".format(canonical_loader_name)}, payload_out)
+        self._emit_event("loader_called", {"type": "loader", "id": f"loader:{canonical_loader_name}"}, payload_out)
 
     def on_field_compute(self, event: Event) -> None:
         payload = event.payload
@@ -185,7 +187,7 @@ class VizObserverHandlerMixin(ABC):
             "dependencies_sample": _sample_value(payload.dependencies, self.config.sample_size),
         }
         payload_out = self._select_payload(summary, sample, {"data": asdict(payload)})
-        self._emit_trace("field_computed", {"type": "field", "id": "field:{}".format(payload.field_key)}, payload_out)
+        self._emit_trace("field_computed", {"type": "field", "id": f"field:{payload.field_key}"}, payload_out)
 
     def on_error(self, event: Event) -> None:
         payload = cast("ErrorEvent", event.payload)  # pragma: allow-cast typed ErrorEvent payload
@@ -198,15 +200,15 @@ class VizObserverHandlerMixin(ABC):
         loader_name = context.get("loader_name") or context.get("loader")
         source_id = context.get("source_id") or context.get("source")
         if field_key:
-            node_ref = {"type": "field", "id": "field:{}".format(field_key)}
+            node_ref = {"type": "field", "id": f"field:{field_key}"}
         elif loader_name:
             canonical = self._canonical_loader_name(loader_name)
-            node_ref = {"type": "loader", "id": "loader:{}".format(canonical or loader_name)}
+            node_ref = {"type": "loader", "id": f"loader:{canonical or loader_name}"}
         elif source_id:
-            node_ref = {"type": "source", "id": "source:{}".format(source_id)}
+            node_ref = {"type": "source", "id": f"source:{source_id}"}
         else:
             node_ref = {"type": "pipeline", "id": "pipeline"}
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "error_type": payload.error_type,
             "message": payload.error_message,
         }
@@ -214,10 +216,10 @@ class VizObserverHandlerMixin(ABC):
             summary["row_id"] = str(context.get("row_id"))
         if context:
             summary["context_keys"] = list(context.keys())
-        sample: Dict[str, Any] = {}
+        sample: dict[str, Any] = {}
         if context:
             sample["context_sample"] = _sample_value(context, self.config.sample_size)
-        full: Dict[str, Any] = {
+        full: dict[str, Any] = {
             "error_type": payload.error_type,
             "message": payload.error_message,
             "context": context,
@@ -231,7 +233,7 @@ class VizObserverHandlerMixin(ABC):
             return
         if self._events_emitter is None:
             return
-        node_ref = {"type": "field", "id": "field:{}".format(payload.field_id)}
+        node_ref = {"type": "field", "id": f"field:{payload.field_id}"}
         summary = {
             "message": payload.message,
             "source_id": payload.source_id,
@@ -254,7 +256,7 @@ class VizObserverHandlerMixin(ABC):
             "batch_num": payload.batch_num,
         }
         payload_out = self._select_payload(summary, {}, {"data": asdict(payload)})
-        self._emit_event("column_written", {"type": "field", "id": "field:{}".format(payload.field_key)}, payload_out)
+        self._emit_event("column_written", {"type": "field", "id": f"field:{payload.field_key}"}, payload_out)
 
     def on_row_write(self, event: Event) -> None:
         payload = event.payload
@@ -269,7 +271,7 @@ class VizObserverHandlerMixin(ABC):
             "batch_num": payload.batch_num,
         }
         payload_out = self._select_payload(summary, {}, {"data": asdict(payload)})
-        self._emit_trace("row_written", {"type": "batch", "id": "batch:{}".format(payload.batch_num)}, payload_out)
+        self._emit_trace("row_written", {"type": "batch", "id": f"batch:{payload.batch_num}"}, payload_out)
 
     def on_row_release(self, event: Event) -> None:
         payload = event.payload
@@ -288,7 +290,7 @@ class VizObserverHandlerMixin(ABC):
             "retained_fields_sample": _sample_value(payload.retained_fields, self.config.sample_size),
         }
         payload_out = self._select_payload(summary, sample, {"data": asdict(payload)})
-        self._emit_trace("row_released", {"type": "batch", "id": "batch:{}".format(payload.batch_num)}, payload_out)
+        self._emit_trace("row_released", {"type": "batch", "id": f"batch:{payload.batch_num}"}, payload_out)
 
     def on_field_slim(self, event: Event) -> None:
         payload = event.payload
@@ -303,7 +305,7 @@ class VizObserverHandlerMixin(ABC):
             "batch_num": payload.batch_num,
         }
         payload_out = self._select_payload(summary, {}, {"data": asdict(payload)})
-        self._emit_event("memory_released", {"type": "field", "id": "field:{}".format(payload.field_key)}, payload_out)
+        self._emit_event("memory_released", {"type": "field", "id": f"field:{payload.field_key}"}, payload_out)
 
     def on_loader_slim(self, event: Event) -> None:
         payload = event.payload
@@ -322,7 +324,7 @@ class VizObserverHandlerMixin(ABC):
         if display_loader_name and canonical_loader_name and display_loader_name != canonical_loader_name:
             summary["loader_display_name"] = display_loader_name
         payload_out = self._select_payload(summary, {}, {"data": asdict(payload)})
-        self._emit_event("memory_released", {"type": "loader", "id": "loader:{}".format(canonical_loader_name)}, payload_out)
+        self._emit_event("memory_released", {"type": "loader", "id": f"loader:{canonical_loader_name}"}, payload_out)
 
     def on_relation_lookup(self, event: Event) -> None:
         body = event.payload
@@ -330,7 +332,7 @@ class VizObserverHandlerMixin(ABC):
             return
         if self._trace_emitter is None:
             return
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "field_key": body.field_key,
             "row_id": str(body.row_id),
             "target_source": body.target_source,
@@ -343,7 +345,7 @@ class VizObserverHandlerMixin(ABC):
         if body.expected_type:
             summary["expected_type"] = body.expected_type
         payload = self._select_payload(summary, {}, {"data": asdict(body)})
-        self._emit_trace("relation_lookup", {"type": "field", "id": "field:{}".format(body.field_key)}, payload)
+        self._emit_trace("relation_lookup", {"type": "field", "id": f"field:{body.field_key}"}, payload)
 
     def on_stage_span(self, event: Event) -> None:
         body = event.payload
@@ -357,7 +359,7 @@ class VizObserverHandlerMixin(ABC):
             "duration_ms": int(body.duration * 1000),
         }
         payload = self._select_payload(summary, {}, {"data": asdict(body)})
-        self._emit_event("stage_span", {"type": "batch", "id": "batch:{}".format(body.batch_num)}, payload)
+        self._emit_event("stage_span", {"type": "batch", "id": f"batch:{body.batch_num}"}, payload)
 
     def on_adaptive_scheduler_decision(self, event: Event) -> None:
         body = event.payload
@@ -365,7 +367,7 @@ class VizObserverHandlerMixin(ABC):
             return
         if self._events_emitter is None:
             return
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "batch_num": body.batch_num,
             "layer_index": body.layer_index,
             "decision": body.decision,
@@ -388,7 +390,7 @@ class VizObserverHandlerMixin(ABC):
         payload = self._select_payload(summary, {}, {"data": asdict(body)})
         self._emit_event(
             "adaptive_scheduler_decision",
-            {"type": "batch", "id": "batch:{}".format(body.batch_num)},
+            {"type": "batch", "id": f"batch:{body.batch_num}"},
             payload,
         )
 
@@ -398,7 +400,7 @@ class VizObserverHandlerMixin(ABC):
             return
         if self._events_emitter is None:
             return
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "target_id": body.target_id,
             "row_count": int(body.row_count),
             "error_count": int(body.error_count),
@@ -416,7 +418,7 @@ class VizObserverHandlerMixin(ABC):
         payload = self._select_payload(summary, {}, {"data": asdict(body)})
         self._emit_event(
             "output_target_finished",
-            {"type": "output_target", "id": "output_target:{}".format(body.target_id)},
+            {"type": "output_target", "id": f"output_target:{body.target_id}"},
             payload,
         )
 

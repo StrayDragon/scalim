@@ -1,8 +1,8 @@
 import re
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from collections.abc import Mapping
+from typing import Any, TypeGuard
 
 from ....._internal.loggingx import get_logger
-from .....vendor.compact.typing_extensionsx import TypeGuard
 from .....vendor.litejinja2 import TemplateError, from_string
 
 __all__ = ()
@@ -10,19 +10,19 @@ __all__ = ()
 _logger = get_logger("dsl.yaml_dsl.template_vars")
 
 _TEMPLATE_SANDBOX_SAFE = "safe"
-_TEMPLATE_VARS_JSON_LIKE_SCALARS: Tuple[type, ...] = (bool, int, float, str)
+_TEMPLATE_VARS_JSON_LIKE_SCALARS: tuple[type, ...] = (bool, int, float, str)
 DEFAULT_RENDERED_YAML_MAX_LEN = 1048576
 
 
-def _is_json_like_list(value: Any) -> TypeGuard[List[Any]]:
+def _is_json_like_list(value: Any) -> TypeGuard[list[Any]]:
     return isinstance(value, list)
 
 
-def _is_json_like_tuple(value: Any) -> TypeGuard[Tuple[Any, ...]]:
+def _is_json_like_tuple(value: Any) -> TypeGuard[tuple[Any, ...]]:
     return isinstance(value, tuple)
 
 
-def _is_json_like_dict(value: Any) -> TypeGuard[Dict[Any, Any]]:
+def _is_json_like_dict(value: Any) -> TypeGuard[dict[Any, Any]]:
     return isinstance(value, dict)
 
 
@@ -35,7 +35,7 @@ def _validate_template_sandbox(template_sandbox: str) -> str:
                 "迁移: 删除 `template_sandbox` 参数或显式设置 `template_sandbox='safe'`."
             )
             raise ValueError(msg)
-        msg = "`template_sandbox` 必须是 `safe`; 收到={!r}".format(value)
+        msg = f"`template_sandbox` 必须是 `safe`; 收到={value!r}"
         raise ValueError(msg)
     return value
 
@@ -60,11 +60,11 @@ def _raise_template_vars_not_json_like(
     path: str,
     *,
     type_name: str,
-    key_type_name: Optional[str] = None,
+    key_type_name: str | None = None,
 ) -> None:
-    msg = "`template_vars` 必须是 `JSON/YAML-like` 类型: 路径=`{}`, 类型=`{}`".format(path, type_name)
+    msg = f"`template_vars` 必须是 `JSON/YAML-like` 类型: 路径=`{path}`, 类型=`{type_name}`"
     if key_type_name is not None:
-        msg = msg + ", 键类型={}".format(key_type_name)
+        msg = msg + f", 键类型={key_type_name}"
     raise ValueError(msg)
 
 
@@ -73,7 +73,7 @@ def _validate_json_like_value(value: Any, *, path: str) -> None:
         return
     if _is_json_like_list(value) or _is_json_like_tuple(value):
         for idx, item in enumerate(value):
-            _validate_json_like_value(item, path="{}[{}]".format(path, idx))
+            _validate_json_like_value(item, path=f"{path}[{idx}]")
         return
     if _is_json_like_dict(value):
         for raw_key, raw_value in value.items():
@@ -83,7 +83,7 @@ def _validate_json_like_value(value: Any, *, path: str) -> None:
                     type_name=type(value).__name__,
                     key_type_name=type(raw_key).__name__,
                 )
-            _validate_json_like_value(raw_value, path="{}['{}']".format(path, raw_key))
+            _validate_json_like_value(raw_value, path=f"{path}['{raw_key}']")
         return
     _raise_template_vars_not_json_like(path, type_name=type(value).__name__)
 
@@ -96,7 +96,7 @@ def _validate_template_vars_json_like(template_vars: Mapping[str, Any]) -> None:
                 type_name=type(template_vars).__name__,
                 key_type_name=type(key).__name__,
             )
-        _validate_json_like_value(value, path="template_vars['{}']".format(key))
+        _validate_json_like_value(value, path=f"template_vars['{key}']")
 
 
 def _validate_template_vars_json_like_or_raise(template_vars: Mapping[str, Any], *, context_label: str) -> None:
@@ -139,7 +139,7 @@ def _ensure_rendered_yaml_within_limit(
 def maybe_precompile_yaml_text(
     text: str,
     *,
-    template_vars: Optional[Mapping[str, Any]],
+    template_vars: Mapping[str, Any] | None,
     context_label: str,
     context_kind: str,
     template_sandbox: str = _TEMPLATE_SANDBOX_SAFE,

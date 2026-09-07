@@ -1,7 +1,7 @@
-from typing import Any, Dict, Iterable, List, Tuple, cast
+from collections.abc import Iterable
+from typing import Any, Protocol, cast
 
 from .....exceptions import ScalimYamlError
-from .....vendor.compact.typing_extensionsx import Protocol
 from .validators.issues import VALIDATION_SEVERITY_ERROR, ValidationIssue
 
 
@@ -14,10 +14,10 @@ class _JsonSchemaValidator(Protocol):
 
 
 class _JsonSchemaDraft7ValidatorFactory(Protocol):
-    def __call__(self, schema: Dict[str, Any]) -> _JsonSchemaValidator: ...
+    def __call__(self, schema: dict[str, Any]) -> _JsonSchemaValidator: ...
 
 
-def _build_draft7_validator(schema: Dict[str, Any], *, jsonschema_module: Any) -> _JsonSchemaValidator:
+def _build_draft7_validator(schema: dict[str, Any], *, jsonschema_module: Any) -> _JsonSchemaValidator:
     try:
         draft7_validator = jsonschema_module.Draft7Validator
     except AttributeError:
@@ -34,11 +34,11 @@ def _build_draft7_validator(schema: Dict[str, Any], *, jsonschema_module: Any) -
     try:
         return validator_factory(schema)
     except Exception as exc:
-        msg = "jsonschema Draft7Validator init failed: {}: {}".format(type(exc).__name__, exc)
+        msg = f"jsonschema Draft7Validator init failed: {type(exc).__name__}: {exc}"
         raise ScalimJsonSchemaCollectorError(msg) from exc
 
 
-def _iter_validation_errors(validator: _JsonSchemaValidator, yaml_data: Dict[str, Any]) -> Iterable[Any]:
+def _iter_validation_errors(validator: _JsonSchemaValidator, yaml_data: dict[str, Any]) -> Iterable[Any]:
     try:
         iter_errors = validator.iter_errors
     except AttributeError:
@@ -50,7 +50,7 @@ def _iter_validation_errors(validator: _JsonSchemaValidator, yaml_data: Dict[str
 
 
 def _append_context_issues(
-    issues: List[ValidationIssue],
+    issues: list[ValidationIssue],
     *,
     error: Any,
     filter_additional_properties: bool,
@@ -67,13 +67,13 @@ def _append_context_issues(
         issues.append(
             ValidationIssue(
                 severity=VALIDATION_SEVERITY_ERROR,
-                message="↳ {}".format(_error_message(ctx)),
+                message=f"↳ {_error_message(ctx)}",
                 path=_format_error_path(ctx),
             )
         )
 
 
-def _absolute_path(error: Any) -> Tuple[str, ...]:
+def _absolute_path(error: Any) -> tuple[str, ...]:
     try:
         absolute_path = error.absolute_path
     except AttributeError:
@@ -113,18 +113,18 @@ def _is_additional_properties_error(error: Any) -> bool:
     return str(validator) == "additionalProperties"
 
 
-def _error_sort_key(error: Any) -> Tuple[Tuple[str, ...], str]:
+def _error_sort_key(error: Any) -> tuple[tuple[str, ...], str]:
     return _absolute_path(error), _error_message(error)
 
 
 def collect_jsonschema_validation_issues(
-    yaml_data: Dict[str, Any],
-    schema: Dict[str, Any],
+    yaml_data: dict[str, Any],
+    schema: dict[str, Any],
     *,
     jsonschema_module: Any,
     include_context: bool,
     filter_additional_properties: bool,
-) -> List[ValidationIssue]:
+) -> list[ValidationIssue]:
     """收集 `JSONSchema` 校验问题, 并保证输出顺序稳定.
 
     说明:
@@ -136,14 +136,14 @@ def collect_jsonschema_validation_issues(
     validator = _build_draft7_validator(schema, jsonschema_module=jsonschema_module)
     errors_raw = list(_iter_validation_errors(validator, yaml_data))
 
-    issues: List[ValidationIssue] = []
+    issues: list[ValidationIssue] = []
     for error in sorted(errors_raw, key=_error_sort_key):
         if filter_additional_properties and _is_additional_properties_error(error):
             continue
         issues.append(
             ValidationIssue(
                 severity=VALIDATION_SEVERITY_ERROR,
-                message="Schema validation error: {}".format(_error_message(error)),
+                message=f"Schema validation error: {_error_message(error)}",
                 path=_format_error_path(error),
             )
         )

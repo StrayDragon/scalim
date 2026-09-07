@@ -1,4 +1,4 @@
-from typing import Iterator, List, Sequence, Tuple, Union
+from collections.abc import Iterator, Sequence
 
 from .....planning.operators import LoadRefOperatorIr as LoadRefOp
 from .....planning.operators import SupportedOperatorIr
@@ -6,12 +6,12 @@ from .....planning.operators import SupportedOperatorIr
 
 def iter_operator_segments(
     operators: Sequence[SupportedOperatorIr],
-) -> Iterator[Tuple[bool, Union[List[LoadRefOp], SupportedOperatorIr]]]:
+) -> Iterator[tuple[bool, list[LoadRefOp] | SupportedOperatorIr]]:
     idx = 0
     while idx < len(operators):
         operator = operators[idx]
         if isinstance(operator, LoadRefOp):
-            segment: List[LoadRefOp] = []
+            segment: list[LoadRefOp] = []
             while idx < len(operators):
                 op = operators[idx]
                 if not isinstance(op, LoadRefOp):

@@ -2,7 +2,9 @@
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Hashable, List, Mapping, MutableMapping, Optional, Set, Tuple
+from collections.abc import Hashable, Mapping, MutableMapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Optional
 
 from ...._internal.loggingx import prefix
 from ...._internal.utils.converters import auto_str_normalize_key
@@ -16,7 +18,6 @@ from ....spec.ir import LookupStepIr, MainSourceIr, SourceIr, SupportedFieldIr
 from ....spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ....typedefs import KeyNormalizationMode, LoaderResultMapping, LoaderResultValue, LookupKey, ParallelMode, RowData, RuntimeValue
 from ....utils.relation_signature import LoadRefCacheKey, RelationSignature, build_relation_signature
-from ....vendor.dataclassesx import dataclass
 from ...chunk_parallelism import LookupChunkParallelismPolicy, build_chunk_inflight_semaphore, resolve_chunk_inflight_capacity
 from ...guardrails import GuardrailsPolicy
 from ...key_normalization import normalize_key_normalization, should_apply_str_key_normalization
@@ -39,43 +40,43 @@ _logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class LoadRefCacheEntry:
     result: LoaderResultMapping
-    batch_rows: Optional[List[RowData]] = None
+    batch_rows: list[RowData] | None = None
 
 
 class ExecutionRuntime:
     """执行运行时 - 共享资源"""
 
     preloaded_cache: MutableMapping[str, LoaderResultMapping]
-    workflow_cache_pool: Optional[WorkflowCachePool]
-    workflow_node_id: Optional[str]
-    _preload_source_ids: FrozenSet[str]
-    _preloaded_cache_str_views: Dict[str, LoaderResultMapping]
+    workflow_cache_pool: WorkflowCachePool | None
+    workflow_node_id: str | None
+    _preload_source_ids: frozenset[str]
+    _preloaded_cache_str_views: dict[str, LoaderResultMapping]
     # `NOTE:` `parallel_mode="adaptive"` 会在同一批次内并发执行多个 `LoadRef(keys)` 任务,这些缓存/集合会被多个工作线程读写.
     # `NOTE:` 当前实现未对这些共享结构加锁,其并发正确性依赖 `CPython` 的 `GIL`(实现细节),而非语言层面保证.
     # `WARN:` `free-threaded`/`no-GIL` 的 `Python` 不在支持范围内;若要支持,必须引入显式锁或线程安全容器/同步策略.
-    load_ref_cache: Dict[LoadRefCacheKey, LoadRefCacheEntry]
-    key_normalize_cache: Dict[RelationSignature, Dict[Tuple[str, ...], Dict[Hashable, Optional[LookupKey]]]]
-    load_ref_group_fields: Dict[RelationSignature, Tuple[str, ...]]
-    load_ref_group_executed: Set[RelationSignature]
-    rows_cache_logged: Set[RelationSignature]
-    guardrail_logged: Set[Tuple[str, ...]]
-    key_space_mismatch_logged: Set[Tuple[RelationSignature, str]]
-    relation_guardrail_stats: Dict[int, Any]
+    load_ref_cache: dict[LoadRefCacheKey, LoadRefCacheEntry]
+    key_normalize_cache: dict[RelationSignature, dict[tuple[str, ...], dict[Hashable, LookupKey | None]]]
+    load_ref_group_fields: dict[RelationSignature, tuple[str, ...]]
+    load_ref_group_executed: set[RelationSignature]
+    rows_cache_logged: set[RelationSignature]
+    guardrail_logged: set[tuple[str, ...]]
+    key_space_mismatch_logged: set[tuple[RelationSignature, str]]
+    relation_guardrail_stats: dict[int, Any]
     hook_manager: HookManager
     observer_manager: ObserverManager
     instrumentation: InstrumentationHub
     guardrails: GuardrailsPolicy
     loader_retry: LoaderRetryPolicies
-    field_specs: Dict[str, SupportedFieldIr]
-    sources: Dict[str, SourceIr]
-    key_fields: FrozenSet[str]
-    reverse_deps: Dict[str, Set[str]]
-    field_consumers: Dict[str, int]
-    target_fields: List[str]
-    late_fields: FrozenSet[str]
-    primary_field: Optional[str]
-    main_source: Optional[MainSourceIr]
-    sink: Optional[ISink]
+    field_specs: dict[str, SupportedFieldIr]
+    sources: dict[str, SourceIr]
+    key_fields: frozenset[str]
+    reverse_deps: dict[str, set[str]]
+    field_consumers: dict[str, int]
+    target_fields: list[str]
+    late_fields: frozenset[str]
+    primary_field: str | None
+    main_source: MainSourceIr | None
+    sink: ISink | None
     batch_num: int
     parallel_mode: ParallelMode
     # `NOTE:` `adaptive` 的每任务子运行时会被置为 `parallel_mode="seq"`(任务内串行),
@@ -88,32 +89,32 @@ class ExecutionRuntime:
     chunk_inflight_capacity: int
     max_workers: int
     key_normalization: KeyNormalizationMode
-    adaptive_backend: Optional[str]
-    adaptive_process_failure_mode: Optional[str]
+    adaptive_backend: str | None
+    adaptive_process_failure_mode: str | None
     runtime_bindings: RuntimeBindings
-    call_by_dep_cardinality: Optional[CallByDepCardinalityCollector]
-    call_by_memoization: Optional[CallByMemoizationController]
+    call_by_dep_cardinality: CallByDepCardinalityCollector | None
+    call_by_memoization: CallByMemoizationController | None
     # 由 `batch` `stage_spans` 的 `attach_write_clock` 设置(`StageWriteClock` | `None`);用 `Any` 避免循环导入.
-    write_stage_clock: Optional[Any]
+    write_stage_clock: Any | None
 
     def __init__(
         self,
         plan: ExecutionPlan,
         hook_manager: HookManager,
         observer_manager: ObserverManager,
-        main_source: Optional[MainSourceIr],
+        main_source: MainSourceIr | None,
         sources: Mapping[str, SourceIr],
         runtime_bindings: RuntimeBindings,
-        guardrails: Optional[GuardrailsPolicy] = None,
-        loader_retry: Optional[LoaderRetryPolicies] = None,
+        guardrails: GuardrailsPolicy | None = None,
+        loader_retry: LoaderRetryPolicies | None = None,
         *,
         parallel_mode: ParallelMode = "seq",
         max_workers: int = 0,
         key_normalization: KeyNormalizationMode = "raw",
-        preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
-        workflow_cache_pool: Optional[WorkflowCachePool] = None,
-        workflow_node_id: Optional[str] = None,
-        chunk_parallelism: Optional[LookupChunkParallelismPolicy] = None,
+        preloaded_cache: MutableMapping[str, LoaderResultMapping] | None = None,
+        workflow_cache_pool: WorkflowCachePool | None = None,
+        workflow_node_id: str | None = None,
+        chunk_parallelism: LookupChunkParallelismPolicy | None = None,
     ) -> None:
         self.preloaded_cache = preloaded_cache if preloaded_cache is not None else {}
         self._preloaded_cache_str_views = {}
@@ -226,7 +227,7 @@ class ExecutionRuntime:
         source_id = str(source.source_id)
         mapping = self.preloaded_cache.get(source_id)
         if mapping is None:
-            msg = "Unknown cached source '{}'".format(source_id)
+            msg = f"Unknown cached source '{source_id}'"
             raise KeyError(msg)
 
         has_explicit_cast = step.lookup_cast is not None or source.key.cast is not None
@@ -238,7 +239,7 @@ class ExecutionRuntime:
             return cached_view
 
         # 延迟构建规范化视图(稳定字符串 `key` 空间)用于匹配.
-        out: Dict[LookupKey, LoaderResultValue] = {}
+        out: dict[LookupKey, LoaderResultValue] = {}
         merged_collision_count = 0
         for raw_key, value in mapping.items():
             normalized_key, status, _error_message = auto_str_normalize_key(raw_key)
@@ -257,10 +258,10 @@ class ExecutionRuntime:
                     continue
 
                 msg = (
-                    "key_normalization collision in cached source '{}' (mode='{}'): "
+                    f"key_normalization collision in cached source '{source_id}' (mode='{self.key_normalization}'): "
                     "multiple keys normalize to the same stable string key but values differ; fail-fast. "
                     "(redacted: raw keys omitted)"
-                ).format(source_id, self.key_normalization)
+                )
                 raise ValueError(msg)
 
             out[normalized_key] = value
@@ -268,11 +269,11 @@ class ExecutionRuntime:
         if merged_collision_count:
             self.instrumentation.emit_diagnostic_warning(
                 message=(
-                    "key_normalization collision in cached source '{}' (mode='{}'): "
-                    "merged {} duplicate keys because values are equal. "
+                    f"key_normalization collision in cached source '{source_id}' (mode='{self.key_normalization}'): "
+                    f"merged {merged_collision_count} duplicate keys because values are equal. "
                     "Consider normalizing loader/cached mapping keys into a single key space. "
                     "(redacted: raw keys omitted)"
-                ).format(source_id, self.key_normalization, merged_collision_count),
+                ),
                 source_id=source_id,
                 field_id="(cache)",
                 lookup_key=None,
@@ -282,9 +283,9 @@ class ExecutionRuntime:
         self._preloaded_cache_str_views[source_id] = out
         return out
 
-    def _compute_reverse_deps(self, plan: ExecutionPlan) -> Dict[str, Set[str]]:
+    def _compute_reverse_deps(self, plan: ExecutionPlan) -> dict[str, set[str]]:
         """计算反向依赖"""
-        reverse_deps: Dict[str, Set[str]] = {}
+        reverse_deps: dict[str, set[str]] = {}
         for field_key in plan.field_specs:
             deps = plan.field_dependencies.get(field_key, ())
             for dep in deps:
@@ -293,9 +294,9 @@ class ExecutionRuntime:
                 reverse_deps[dep].add(field_key)
         return reverse_deps
 
-    def _compute_field_consumers(self) -> Dict[str, int]:
+    def _compute_field_consumers(self) -> dict[str, int]:
         """计算字段消费者数量"""
-        field_consumers: Dict[str, int] = {}
+        field_consumers: dict[str, int] = {}
         for field_key, dependents in self.reverse_deps.items():
             field_consumers[field_key] = len(dependents)
         return field_consumers
@@ -303,8 +304,8 @@ class ExecutionRuntime:
     def _build_load_ref_group_fields(
         self,
         plan: ExecutionPlan,
-    ) -> Dict[RelationSignature, Tuple[str, ...]]:
-        groups: Dict[RelationSignature, Set[str]] = {}
+    ) -> dict[RelationSignature, tuple[str, ...]]:
+        groups: dict[RelationSignature, set[str]] = {}
         for operator in plan.operators:
             if not isinstance(operator, LoadRefOperatorIr):
                 continue
@@ -330,7 +331,7 @@ class ExecutionRuntime:
     def is_source_cached(self, source_name: str) -> bool:
         return source_name in self.preloaded_cache
 
-    def get_from_cache(self, source_name: str, lookup_key: LookupKey) -> Optional[LoaderResultValue]:
+    def get_from_cache(self, source_name: str, lookup_key: LookupKey) -> LoaderResultValue | None:
         cache = self.preloaded_cache.get(source_name)
         if cache is None:
             return None
@@ -340,7 +341,7 @@ class ExecutionRuntime:
         self,
         raw_key: RuntimeValue,
         step: LookupStepIr,
-    ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+    ) -> tuple[LookupKey | None, str, str | None]:
         """将外键值规范化为目标源键类型,并返回状态信息"""
         normalized, status, error_message = self._normalize_lookup_key_status(raw_key, step)
         maybe_enforce_relation_guardrails(self, step, status=status, error_message=error_message)
@@ -350,7 +351,7 @@ class ExecutionRuntime:
         self,
         raw_key: RuntimeValue,
         step: LookupStepIr,
-    ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+    ) -> tuple[LookupKey | None, str, str | None]:
         if raw_key is None:
             return None, "null_key", None
 
@@ -392,10 +393,10 @@ class ExecutionRuntime:
         *,
         is_multi: bool,
         none_message: str,
-    ) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+    ) -> tuple[LookupKey | None, str, str | None]:
         cast_fn = self.runtime_bindings.get_lookup_key_cast(lookup_cast_id(lookup_cast, is_multi=is_multi))
         if cast_fn is None:
-            msg = "Missing runtime lookup_cast callable for {}".format(lookup_cast_id(lookup_cast, is_multi=is_multi))
+            msg = f"Missing runtime lookup_cast callable for {lookup_cast_id(lookup_cast, is_multi=is_multi)}"
             raise KeyError(msg)
         try:
             normalized = cast_fn(raw_key)
@@ -411,7 +412,7 @@ class ExecutionRuntime:
         self,
         raw_key: RuntimeValue,
         step: LookupStepIr,
-    ) -> Optional[LookupKey]:
+    ) -> LookupKey | None:
         """将外键值规范化为目标源键类型"""
         normalized, status, _ = self.normalize_lookup_key_with_status(raw_key, step)
         if status != "ok":

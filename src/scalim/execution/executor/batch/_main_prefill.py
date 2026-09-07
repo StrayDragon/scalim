@@ -1,4 +1,5 @@
-from typing import Any, Callable, Hashable, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from collections.abc import Callable, Hashable, Mapping, Sequence
+from typing import Any
 
 from ....spec.ir import FieldIr
 from ....typedefs import FieldValue, RowData
@@ -11,11 +12,11 @@ from ..runtime.runtime import ExecutionRuntime
 def collect_main_source_fields(
     *,
     plan_field_specs: Mapping[str, Any],
-    field_keys: Set[str],
+    field_keys: set[str],
     main_source_id: str,
-) -> Tuple[List[Tuple[str, FieldIr]], List[str]]:
-    main_field_specs: List[Tuple[str, FieldIr]] = []
-    passthrough_fields: List[str] = []
+) -> tuple[list[tuple[str, FieldIr]], list[str]]:
+    main_field_specs: list[tuple[str, FieldIr]] = []
+    passthrough_fields: list[str] = []
 
     for field_key in field_keys:
         field_spec = plan_field_specs.get(field_key)
@@ -30,15 +31,15 @@ def collect_main_source_fields(
 
 def _build_main_field_ops(
     *,
-    main_field_specs: List[Tuple[str, FieldIr]],
-    get_value_transform: Callable[[str], Optional[Callable[[FieldValue], FieldValue]]],
-) -> List[Tuple[str, str, Tuple[Union[str, int], ...], Optional[Callable[[FieldValue], FieldValue]]]]:
+    main_field_specs: list[tuple[str, FieldIr]],
+    get_value_transform: Callable[[str], Callable[[FieldValue], FieldValue] | None],
+) -> list[tuple[str, str, tuple[str | int, ...], Callable[[FieldValue], FieldValue] | None]]:
     # 热路径: 预计算每个字段的提取方式/`value_transform`,避免逐行重复查找.
     #
     # 注意:
     # - `value_transform` 以 `field_id` 为索引,在整个 `pipeline` 中是稳定的,可以安全提到循环外.
     # - `data_key` 仅用于 `guardrails` 的诊断信息,提到循环外不会改变语义.
-    ops: List[Tuple[str, str, Tuple[Union[str, int], ...], Optional[Callable[[FieldValue], FieldValue]]]] = []
+    ops: list[tuple[str, str, tuple[str | int, ...], Callable[[FieldValue], FieldValue] | None]] = []
     for field_key, field_spec in main_field_specs:
         data_key = field_spec.extract_expr or field_spec.data_key or field_key
         ops.append((field_key, data_key, field_spec.extract_segments, get_value_transform(field_spec.field_id)))
@@ -88,30 +89,31 @@ def _dense_prepare_rowwise_main_ops(
     context: DenseBatchContext,
     row_count: int,
     present_mask: bytes,
-    main_field_ops: List[Tuple[str, str, Tuple[Union[str, int], ...], Optional[Callable[[FieldValue], FieldValue]]]],
-    required_guardrail_keys: Set[str],
-) -> Optional[
-    List[
-        Tuple[
+    main_field_ops: list[tuple[str, str, tuple[str | int, ...], Callable[[FieldValue], FieldValue] | None]],
+    required_guardrail_keys: set[str],
+) -> (
+    list[
+        tuple[
             str,
             str,
-            Tuple[Union[str, int], ...],
-            Optional[Callable[[FieldValue], FieldValue]],
-            List[FieldValue],
+            tuple[str | int, ...],
+            Callable[[FieldValue], FieldValue] | None,
+            list[FieldValue],
             bool,
-            Optional[Callable[[str, Hashable], None]],
+            Callable[[str, Hashable], None] | None,
         ]
     ]
-]:
-    prepared_main: List[
-        Tuple[
+    | None
+):
+    prepared_main: list[
+        tuple[
             str,
             str,
-            Tuple[Union[str, int], ...],
-            Optional[Callable[[FieldValue], FieldValue]],
-            List[FieldValue],
+            tuple[str | int, ...],
+            Callable[[FieldValue], FieldValue] | None,
+            list[FieldValue],
             bool,
-            Optional[Callable[[str, Hashable], None]],
+            Callable[[str, Hashable], None] | None,
         ]
     ] = []
     for field_key, data_key, segments, value_transform in main_field_ops:
@@ -137,10 +139,10 @@ def _dense_prepare_rowwise_passthrough_ops(
     context: DenseBatchContext,
     row_count: int,
     present_mask: bytes,
-    passthrough_fields: List[str],
-    required_guardrail_keys: Set[str],
-) -> Optional[List[Tuple[str, List[FieldValue], bool, Optional[Callable[[str, Hashable], None]]]]]:
-    prepared_passthrough: List[Tuple[str, List[FieldValue], bool, Optional[Callable[[str, Hashable], None]]]] = []
+    passthrough_fields: list[str],
+    required_guardrail_keys: set[str],
+) -> list[tuple[str, list[FieldValue], bool, Callable[[str, Hashable], None] | None]] | None:
+    prepared_passthrough: list[tuple[str, list[FieldValue], bool, Callable[[str, Hashable], None] | None]] = []
     for field_key in passthrough_fields:
         values = context.dense_prefill_prepare_storage(field_key, row_count=row_count, present_mask=present_mask)
         if values is None:
@@ -163,19 +165,19 @@ def _dense_execute_rowwise_prefill(
     main_rows: Sequence[RowData],
     runtime: ExecutionRuntime,
     main_source_id: str,
-    prepared_main: List[
-        Tuple[
+    prepared_main: list[
+        tuple[
             str,
             str,
-            Tuple[Union[str, int], ...],
-            Optional[Callable[[FieldValue], FieldValue]],
-            List[FieldValue],
+            tuple[str | int, ...],
+            Callable[[FieldValue], FieldValue] | None,
+            list[FieldValue],
             bool,
-            Optional[Callable[[str, Hashable], None]],
+            Callable[[str, Hashable], None] | None,
         ]
     ],
-    prepared_passthrough: List[Tuple[str, List[FieldValue], bool, Optional[Callable[[str, Hashable], None]]]],
-    required_guardrail_keys: Set[str],
+    prepared_passthrough: list[tuple[str, list[FieldValue], bool, Callable[[str, Hashable], None] | None]],
+    required_guardrail_keys: set[str],
     required_mode: str,
     transform_mode: str,
 ) -> None:
@@ -245,9 +247,9 @@ def _dense_prefill_rowwise(
     main_rows: Sequence[RowData],
     runtime: ExecutionRuntime,
     main_source_id: str,
-    main_field_ops: List[Tuple[str, str, Tuple[Union[str, int], ...], Optional[Callable[[FieldValue], FieldValue]]]],
-    passthrough_fields: List[str],
-    required_guardrail_keys: Set[str],
+    main_field_ops: list[tuple[str, str, tuple[str | int, ...], Callable[[FieldValue], FieldValue] | None]],
+    passthrough_fields: list[str],
+    required_guardrail_keys: set[str],
     required_mode: str,
     transform_mode: str,
 ) -> bool:
@@ -297,9 +299,9 @@ def _prefill_main_source_fields_dense(
     main_rows: Sequence[RowData],
     runtime: ExecutionRuntime,
     main_source_id: str,
-    main_field_ops: List[Tuple[str, str, Tuple[Union[str, int], ...], Optional[Callable[[FieldValue], FieldValue]]]],
-    passthrough_fields: List[str],
-    required_guardrail_keys: Set[str],
+    main_field_ops: list[tuple[str, str, tuple[str | int, ...], Callable[[FieldValue], FieldValue] | None]],
+    passthrough_fields: list[str],
+    required_guardrail_keys: set[str],
     required_mode: str,
     transform_mode: str,
 ) -> bool:
@@ -335,9 +337,9 @@ def _prefill_main_source_fields_generic(
     main_rows: Sequence[RowData],
     runtime: ExecutionRuntime,
     main_source_id: str,
-    main_field_ops: List[Tuple[str, str, Tuple[Union[str, int], ...], Optional[Callable[[FieldValue], FieldValue]]]],
-    passthrough_fields: List[str],
-    required_guardrail_keys: Set[str],
+    main_field_ops: list[tuple[str, str, tuple[str | int, ...], Callable[[FieldValue], FieldValue] | None]],
+    passthrough_fields: list[str],
+    required_guardrail_keys: set[str],
     required_mode: str,
     transform_mode: str,
 ) -> None:
@@ -398,8 +400,8 @@ def prefill_main_source_fields(
     plan_field_specs: Mapping[str, Any],
     runtime: ExecutionRuntime,
     batch_row_nth: Sequence[Hashable],
-    main_rows: Optional[Sequence[RowData]],
-    required_fields: Optional[Set[str]],
+    main_rows: Sequence[RowData] | None,
+    required_fields: set[str] | None,
 ) -> None:
     if main_rows is None or runtime.main_source is None:
         return
@@ -417,7 +419,7 @@ def prefill_main_source_fields(
         return
 
     guardrails = runtime.guardrails
-    required_guardrail_keys: Set[str] = set()
+    required_guardrail_keys: set[str] = set()
     if guardrails.enabled and guardrails.loader.required_fields:
         required_guardrail_keys = set(field_keys) & set(guardrails.loader.required_fields)
     required_mode = guardrails.mode

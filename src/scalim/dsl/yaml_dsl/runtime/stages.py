@@ -8,12 +8,13 @@
 5)执行请求映射
 """
 
-from typing import Any, FrozenSet, Mapping, Optional
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any
 
 from ....exceptions import ScalimYamlError
 from ....execution.run_ir import ExecutionRequest
 from ....spec.ir import DemandIr
-from ....vendor.dataclassesx import dataclass
 from ..schema_dsl.models import DemandConfig
 from .compiler import (
     build_request,
@@ -27,7 +28,7 @@ from .references import SecurePythonReferenceResolver
 from .runtime_linking import resolve_runtime_bindings
 
 
-def stage_validate_allowlist(*, allowed_modules: FrozenSet[str], allowed_functions: Optional[FrozenSet[str]]) -> None:
+def stage_validate_allowlist(*, allowed_modules: frozenset[str], allowed_functions: frozenset[str] | None) -> None:
     validate_allowlist(allowed_modules=allowed_modules, allowed_functions=allowed_functions)
 
 
@@ -35,17 +36,17 @@ class ScalimStageAllowlistMismatchError(ScalimYamlError):
     MESSAGE: str = "Stage context allowlist must match DemandRunOptions.security allowlist"
 
     def __init__(self) -> None:
-        super(ScalimStageAllowlistMismatchError, self).__init__(self.MESSAGE)
+        super().__init__(self.MESSAGE)
 
 
 @dataclass(frozen=True)
 class YamlDslStageContext:
-    allowed_modules: FrozenSet[str]
-    allowed_functions: Optional[FrozenSet[str]]
+    allowed_modules: frozenset[str]
+    allowed_functions: frozenset[str] | None
     resolver: SecurePythonReferenceResolver
 
 
-def stage_create_context(*, allowed_modules: FrozenSet[str], allowed_functions: Optional[FrozenSet[str]]) -> YamlDslStageContext:
+def stage_create_context(*, allowed_modules: frozenset[str], allowed_functions: frozenset[str] | None) -> YamlDslStageContext:
     stage_validate_allowlist(allowed_modules=allowed_modules, allowed_functions=allowed_functions)
     resolver = create_reference_resolver(
         allowed_modules=allowed_modules,
@@ -58,7 +59,7 @@ def stage_create_context(*, allowed_modules: FrozenSet[str], allowed_functions: 
     )
 
 
-def stage_load_yaml_config(yaml_path: str, *, template_vars: Optional[Mapping[str, Any]] = None) -> DemandConfig:
+def stage_load_yaml_config(yaml_path: str, *, template_vars: Mapping[str, Any] | None = None) -> DemandConfig:
     return load_config(yaml_path, template_vars=template_vars)
 
 

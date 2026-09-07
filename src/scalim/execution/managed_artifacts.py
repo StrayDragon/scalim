@@ -5,12 +5,12 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import TYPE_CHECKING, Optional, Tuple
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
 
 from ..sinks import IRowSink
 from ..sinks.memory import InMemoryCsvSink
 from ..sinks.rows import InMemoryRowsSink, in_memory_rows_to_in_memory_csv
-from ..vendor.dataclassesx import dataclass
 from .output_contracts import ExportLayout, OutputSpec
 
 MANAGED_ARTIFACT_KIND_CSV = "csv"
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class ManagedArtifactPlan:
     kind: str
-    rows_sink: Optional[InMemoryRowsSink] = None
-    csv_sink: Optional[InMemoryCsvSink] = None
+    rows_sink: InMemoryRowsSink | None = None
+    csv_sink: InMemoryCsvSink | None = None
 
     def to_rows_artifact(self) -> Optional["InMemoryRows"]:
         if self.rows_sink is None:
@@ -46,8 +46,8 @@ def create_managed_artifact_sink(
     fmt: str,
     layout: ExportLayout,
     output: OutputSpec,
-    managed_artifact_kind: Optional[str],
-) -> Tuple[IRowSink, ManagedArtifactPlan]:
+    managed_artifact_kind: str | None,
+) -> tuple[IRowSink, ManagedArtifactPlan]:
     if not output.streaming:
         msg = "Composed outputs only support streaming row sinks for csv (streaming=true)"
         raise ValueError(msg)
@@ -59,14 +59,14 @@ def create_managed_artifact_sink(
 
     if kind == MANAGED_ARTIFACT_KIND_CSV:
         if fmt != "csv":
-            msg = "In-memory composed output only supports format=csv (target_id={}, format={})".format(target_id, fmt)
+            msg = f"In-memory composed output only supports format=csv (target_id={target_id}, format={fmt})"
             raise ValueError(msg)
         field_names = list(layout.field_ids)
         header_names = list(layout.header_names) if layout.header_names is not None else list(field_names)
         csv_sink = InMemoryCsvSink(field_names=field_names, header_names=header_names)
         return csv_sink, ManagedArtifactPlan(kind=kind, csv_sink=csv_sink)
 
-    msg = "Unsupported managed artifact kind: {!r} (target_id={})".format(kind, target_id)
+    msg = f"Unsupported managed artifact kind: {kind!r} (target_id={target_id})"
     raise ValueError(msg)
 
 

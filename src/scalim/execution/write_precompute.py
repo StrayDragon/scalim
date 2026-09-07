@@ -10,7 +10,8 @@
 # region imports
 
 import logging
-from typing import Any, Callable, Dict, FrozenSet, Hashable, List, Optional, Sequence, Tuple
+from collections.abc import Callable, Hashable, Sequence
+from typing import Any
 
 from ..events import EventType
 from ..spec.ir import DerivedFieldIr
@@ -44,10 +45,10 @@ _DISCARD_CONTEXT = _DiscardValueSink()
 class _LateFieldPlan:
     """单个 `late` 字段的预解析执行计划(每次 `run` 只解析一次)."""
 
-    __slots__: Tuple[str, ...] = ("calculator", "dep_cardinality", "deps", "field_key", "memo_cache", "value_transform")
+    __slots__: tuple[str, ...] = ("calculator", "dep_cardinality", "deps", "field_key", "memo_cache", "value_transform")
 
     field_key: str
-    deps: Tuple[str, ...]
+    deps: tuple[str, ...]
     calculator: Any
     value_transform: Any
     memo_cache: Any
@@ -57,7 +58,7 @@ class _LateFieldPlan:
         self,
         *,
         field_key: str,
-        deps: Tuple[str, ...],
+        deps: tuple[str, ...],
         calculator: Any,
         value_transform: Any,
         memo_cache: Any,
@@ -74,13 +75,13 @@ class _LateFieldPlan:
 class _LateRowSlot:
     """`late` 字段在写出行数组中的落位与依赖读取方式(每批解析一次)."""
 
-    __slots__: Tuple[str, ...] = ("dep_slots", "plan", "position")
+    __slots__: tuple[str, ...] = ("dep_slots", "plan", "position")
 
     plan: _LateFieldPlan
     position: int
-    dep_slots: Tuple[Tuple[int, str], ...]
+    dep_slots: tuple[tuple[int, str], ...]
 
-    def __init__(self, *, plan: _LateFieldPlan, position: int, dep_slots: Tuple[Tuple[int, str], ...]) -> None:
+    def __init__(self, *, plan: _LateFieldPlan, position: int, dep_slots: tuple[tuple[int, str], ...]) -> None:
         self.plan = plan
         self.position = position
         self.dep_slots = dep_slots
@@ -89,7 +90,7 @@ class _LateRowSlot:
 class LateRowWriteLayout:
     """行写出布局: 先按上下文填非 `late` 位,再按拓扑序就地算出 `late` 位."""
 
-    __slots__: Tuple[str, ...] = (
+    __slots__: tuple[str, ...] = (
         "compute_mode",
         "direct_calls",
         "duplicate_positions",
@@ -100,9 +101,9 @@ class LateRowWriteLayout:
     )
 
     width: int
-    eager_positions: Tuple[Tuple[int, str], ...]
-    slots: Tuple[_LateRowSlot, ...]
-    duplicate_positions: Tuple[Tuple[int, int], ...]
+    eager_positions: tuple[tuple[int, str], ...]
+    slots: tuple[_LateRowSlot, ...]
+    duplicate_positions: tuple[tuple[int, int], ...]
     wants_field_compute: bool
     compute_mode: str
     direct_calls: bool
@@ -111,9 +112,9 @@ class LateRowWriteLayout:
         self,
         *,
         width: int,
-        eager_positions: Tuple[Tuple[int, str], ...],
-        slots: Tuple[_LateRowSlot, ...],
-        duplicate_positions: Tuple[Tuple[int, int], ...],
+        eager_positions: tuple[tuple[int, str], ...],
+        slots: tuple[_LateRowSlot, ...],
+        duplicate_positions: tuple[tuple[int, int], ...],
         wants_field_compute: bool,
         compute_mode: str,
     ) -> None:
@@ -129,7 +130,7 @@ class LateRowWriteLayout:
         )
 
 
-def _invoke_calculator(plan: "_LateFieldPlan", dep_args: Tuple[Any, ...]) -> FieldValue:
+def _invoke_calculator(plan: "_LateFieldPlan", dep_args: tuple[Any, ...]) -> FieldValue:
     """调用派生计算器(与早算路径共享 `call_by` 记忆化语义)."""
     memo_cache = plan.memo_cache
     if memo_cache is None:
@@ -148,9 +149,9 @@ class LateFieldMaterializer:
     """`late` 派生字段的写出前物化器(行路径与列路径共用求值原语)."""
 
     _runtime: ExecutionRuntime
-    _late_fields: Tuple[str, ...]
-    _plans: Optional[List[_LateFieldPlan]]
-    _plan_by_field: Dict[str, _LateFieldPlan]
+    _late_fields: tuple[str, ...]
+    _plans: list[_LateFieldPlan] | None
+    _plan_by_field: dict[str, _LateFieldPlan]
 
     def __init__(self, *, runtime: ExecutionRuntime, late_fields: Sequence[str]) -> None:
         self._runtime = runtime
@@ -159,10 +160,10 @@ class LateFieldMaterializer:
         self._plan_by_field = {}
 
     @property
-    def late_fields(self) -> Tuple[str, ...]:
+    def late_fields(self) -> tuple[str, ...]:
         return self._late_fields
 
-    def _ensure_plans(self) -> List[_LateFieldPlan]:
+    def _ensure_plans(self) -> list[_LateFieldPlan]:
         plans = self._plans
         if plans is not None:
             return plans
@@ -170,7 +171,7 @@ class LateFieldMaterializer:
         runtime = self._runtime
         bindings = runtime.runtime_bindings
         memoization = runtime.call_by_memoization
-        built: List[_LateFieldPlan] = []
+        built: list[_LateFieldPlan] = []
         for field_key in self._late_fields:
             field_spec = runtime.field_specs.get(field_key)
             if not isinstance(field_spec, DerivedFieldIr):
@@ -192,7 +193,7 @@ class LateFieldMaterializer:
         self._plans = built
         return built
 
-    def plan_for(self, field_key: str) -> Optional[_LateFieldPlan]:
+    def plan_for(self, field_key: str) -> _LateFieldPlan | None:
         _ = self._ensure_plans()
         return self._plan_by_field.get(field_key)
 
@@ -201,9 +202,9 @@ class LateFieldMaterializer:
         plans = self._ensure_plans()
         late_set = set(self._plan_by_field)
 
-        position_of: Dict[str, int] = {}
-        eager_positions: List[Tuple[int, str]] = []
-        duplicate_positions: List[Tuple[int, int]] = []
+        position_of: dict[str, int] = {}
+        eager_positions: list[tuple[int, str]] = []
+        duplicate_positions: list[tuple[int, int]] = []
         for idx, field_key in enumerate(target_fields):
             is_late = field_key in late_set
             if field_key in position_of:
@@ -216,7 +217,7 @@ class LateFieldMaterializer:
             if not is_late:
                 eager_positions.append((idx, field_key))
 
-        slots: List[_LateRowSlot] = []
+        slots: list[_LateRowSlot] = []
         for plan in plans:
             position = position_of.get(plan.field_key)
             if position is None:
@@ -234,10 +235,10 @@ class LateFieldMaterializer:
             compute_mode=self.compute_mode(),
         )
 
-    def fill_row_values(self, layout: LateRowWriteLayout, context: BatchContext, row_id: Hashable) -> List[FieldValue]:
+    def fill_row_values(self, layout: LateRowWriteLayout, context: BatchContext, row_id: Hashable) -> list[FieldValue]:
         """按布局产出整行写出值(`late` 位就地物化,不写回 `BatchContext`)."""
         get_field_value = context.get_field_value
-        values: List[FieldValue] = [None] * layout.width
+        values: list[FieldValue] = [None] * layout.width
         for position, field_key in layout.eager_positions:
             values[position] = get_field_value(field_key, row_id)
 
@@ -274,7 +275,7 @@ class LateFieldMaterializer:
         self,
         plan: _LateFieldPlan,
         row_id: Hashable,
-        dep_args: Tuple[Any, ...],
+        dep_args: tuple[Any, ...],
         exc: Exception,
         compute_mode: str,
         *,
@@ -302,7 +303,7 @@ class LateFieldMaterializer:
         self,
         plan: _LateFieldPlan,
         row_id: Hashable,
-        dep_args: Tuple[Any, ...],
+        dep_args: tuple[Any, ...],
         *,
         wants_field_compute: bool,
         compute_mode: str,
@@ -314,7 +315,7 @@ class LateFieldMaterializer:
         if dep_cardinality is not None:
             dep_cardinality.record(field_key=plan.field_key, dep_args=dep_args)
 
-        dep_values_payload: Dict[str, Any] = {}
+        dep_values_payload: dict[str, Any] = {}
         if wants_field_compute:
             dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
 
@@ -366,15 +367,15 @@ class LateFieldMaterializer:
         self,
         plan: _LateFieldPlan,
         row_id: Hashable,
-        dep_args: Tuple[Any, ...],
+        dep_args: tuple[Any, ...],
         *,
-        dep_values_payload: Dict[str, Any],
+        dep_values_payload: dict[str, Any],
         exc: Exception,
         compute_mode: str,
         unexpected: bool,
     ) -> None:
         runtime = self._runtime
-        deps_payload: Dict[str, Any] = {}
+        deps_payload: dict[str, Any] = {}
         if not runtime.guardrails.enabled:
             deps_payload = dep_values_payload or build_field_compute_dependencies_payload(plan.deps, dep_args)
         handle_compute_error(
@@ -392,7 +393,7 @@ class LateFieldMaterializer:
 
 def _make_dense_reader(storage: Any, base_row_id: int, row_count: int) -> Callable[[Hashable], FieldValue]:
     """把稠密存储的 `values`/`present` 提到逐行循环之外(避免逐行字段查找)."""
-    values: List[FieldValue] = storage.values
+    values: list[FieldValue] = storage.values
     present: bytearray = storage.present
 
     def _read(row_id: Hashable) -> FieldValue:
@@ -419,17 +420,17 @@ class LateColumnMaterializer:
     """列路径 `late` 物化: 写出某列前现场算该列,链式中间列暂留到消费方写完."""
 
     _materializer: LateFieldMaterializer
-    _late_set: FrozenSet[str]
-    _late_deps: Dict[str, Tuple[str, ...]]
-    _pending_consumers: Dict[str, int]
-    _columns: Dict[str, Dict[Hashable, FieldValue]]
-    _remaining_consumers: Dict[str, int]
+    _late_set: frozenset[str]
+    _late_deps: dict[str, tuple[str, ...]]
+    _pending_consumers: dict[str, int]
+    _columns: dict[str, dict[Hashable, FieldValue]]
+    _remaining_consumers: dict[str, int]
 
     def __init__(
         self,
         *,
         materializer: LateFieldMaterializer,
-        field_dependencies: Dict[str, Tuple[str, ...]],
+        field_dependencies: dict[str, tuple[str, ...]],
     ) -> None:
         self._materializer = materializer
         self._late_set = frozenset(materializer.late_fields)
@@ -456,7 +457,7 @@ class LateColumnMaterializer:
         context: BatchContext,
         field_key: str,
         row_ids: Sequence[Hashable],
-    ) -> List[FieldValue]:
+    ) -> list[FieldValue]:
         """物化 `late` 列;若该列还有 `late` 消费者则暂留,否则算完即弃."""
         plan = self._materializer.plan_for(field_key)
         if plan is None:
@@ -479,20 +480,20 @@ class LateColumnMaterializer:
             )
 
         if self._remaining_consumers.get(field_key, 0) > 0:
-            self._columns[field_key] = dict(zip(row_ids, values))
+            self._columns[field_key] = dict(zip(row_ids, values, strict=False))
         return values
 
     def _compute_column_direct(
         self,
         plan: _LateFieldPlan,
         row_ids: Sequence[Hashable],
-        dep_readers: List[Callable[[Hashable], FieldValue]],
+        dep_readers: list[Callable[[Hashable], FieldValue]],
         compute_mode: str,
-    ) -> List[FieldValue]:
+    ) -> list[FieldValue]:
         """无事件 / 无记忆化 / 无探针时的整列直呼快路径."""
         materializer = self._materializer
         calculator = plan.calculator
-        values: List[FieldValue] = []
+        values: list[FieldValue] = []
         for row_id in row_ids:
             dep_args = tuple(read(row_id) for read in dep_readers)
             try:
@@ -512,13 +513,13 @@ class LateColumnMaterializer:
         self,
         plan: _LateFieldPlan,
         row_ids: Sequence[Hashable],
-        dep_readers: List[Callable[[Hashable], FieldValue]],
+        dep_readers: list[Callable[[Hashable], FieldValue]],
         *,
         wants_field_compute: bool,
         compute_mode: str,
-    ) -> List[FieldValue]:
+    ) -> list[FieldValue]:
         compute_value = self._materializer.compute_value
-        values: List[FieldValue] = []
+        values: list[FieldValue] = []
         for row_id in row_ids:
             dep_args = tuple(read(row_id) for read in dep_readers)
             values.append(
@@ -532,13 +533,13 @@ class LateColumnMaterializer:
             )
         return values
 
-    def _build_dep_readers(self, context: BatchContext, deps: Tuple[str, ...]) -> List[Callable[[Hashable], FieldValue]]:
+    def _build_dep_readers(self, context: BatchContext, deps: tuple[str, ...]) -> list[Callable[[Hashable], FieldValue]]:
         """为每个依赖预解析取值闭包(把存储查找提到逐行循环之外)."""
         dense = context if isinstance(context, DenseBatchContext) else None
         base_row_id = dense.dense_base_row_id() if dense is not None else 0
         row_count = dense.dense_row_count() if dense is not None else 0
 
-        readers: List[Callable[[Hashable], FieldValue]] = []
+        readers: list[Callable[[Hashable], FieldValue]] = []
         for dep_key in deps:
             dep_column = self._columns.get(dep_key)
             if dep_column is not None:

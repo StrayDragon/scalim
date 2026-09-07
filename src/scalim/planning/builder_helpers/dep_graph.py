@@ -1,4 +1,4 @@
-from typing import Dict, Sequence, Tuple
+from collections.abc import Sequence
 
 from ..._internal.utils import graph
 from ...spec.ir import DemandIr, DerivedFieldIr, FieldIr
@@ -34,9 +34,9 @@ def build_field_dependencies(
     *,
     field_order: Sequence[str],
     dep_graph: "graph.DependencyGraph[str]",
-) -> Dict[str, Tuple[str, ...]]:
+) -> dict[str, tuple[str, ...]]:
     """根据依赖图构建字段依赖映射."""
-    field_dependencies: Dict[str, Tuple[str, ...]] = {}
+    field_dependencies: dict[str, tuple[str, ...]] = {}
     for field_key in field_order:
         field_dependencies[field_key] = tuple(dep_graph.get_deps(field_key))
     return field_dependencies

@@ -5,10 +5,10 @@
 - 默认不预检;启用后在 `sink` 写出前 `fail-fast`.
 """
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
+from ..._internal.strenum import StrEnum
 from ...typedefs import FIELD_VALUE_TYPES, CellValue, RuntimeValue, format_field_value_expected_types
-from ...vendor.compact import StrEnum
 
 
 class SinkTypePrecheck(StrEnum):
@@ -21,7 +21,7 @@ class SinkTypePrecheck(StrEnum):
 def require_sink_type_precheck(type_precheck: RuntimeValue, *, where: str) -> SinkTypePrecheck:
     """公开 `API` 运行时门禁:仅接受 `SinkTypePrecheck`(注解之外的字符串字面量 `fail-fast`)."""
     if not isinstance(type_precheck, SinkTypePrecheck):
-        msg = "{0} must be a SinkTypePrecheck".format(where)
+        msg = f"{where} must be a SinkTypePrecheck"
         raise TypeError(msg)
     return type_precheck
 
@@ -45,18 +45,13 @@ def ensure_sink_accepted_cell(
     field_id: str,
     sink_name: str,
     accepted: Callable[[CellValue], bool],
-    expected_label: Optional[str] = None,
+    expected_label: str | None = None,
 ) -> CellValue:
     """`opt-in` 预检:不接受则 `TypeError`(含 `field`/`type`/`sink`)."""
     if accepted(value):
         return value
     expected = expected_label if expected_label is not None else format_field_value_expected_types()
-    msg = "sink type precheck failed: sink={!r}, field_id={!r}, type={!r}, expected {}".format(
-        sink_name,
-        str(field_id),
-        type(value).__name__,
-        expected,
-    )
+    msg = f"sink type precheck failed: sink={sink_name!r}, field_id={str(field_id)!r}, type={type(value).__name__!r}, expected {expected}"
     raise TypeError(msg)
 
 

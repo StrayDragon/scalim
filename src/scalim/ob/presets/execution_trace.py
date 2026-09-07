@@ -2,11 +2,11 @@
 import json
 import logging
 import time
-from collections.abc import Sized
-from typing import Any, Dict, Hashable, Iterable, List, Optional, Union, cast
+from collections.abc import Hashable, Iterable, Sized
+from dataclasses import asdict, dataclass, field
+from typing import Any, cast
 
 from ...events import Event
-from ...vendor.dataclassesx import asdict, dataclass, field
 from .._internal.console_report import emit_info, format_seconds
 from ..observer import EventDispatchObserver
 
@@ -21,17 +21,17 @@ class LoaderCallStep:
 
     step_type: str = "loader_call"
     loader_name: str = ""
-    params: Dict[str, str] = field(default_factory=dict)
+    params: dict[str, str] = field(default_factory=dict)
     result_count: int = 0
     duration: float = 0.0
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @staticmethod
-    def serialize_params(params: Dict[str, Any]) -> Dict[str, str]:
-        result: Dict[str, str] = {}
+    def serialize_params(params: dict[str, Any]) -> dict[str, str]:
+        result: dict[str, str] = {}
         for key, pv in params.items():
             if isinstance(pv, (set, list, tuple)):
                 items = list(cast("Iterable[Any]", pv))  # pragma: allow-cast iterable typed narrowing
@@ -48,10 +48,10 @@ class FieldSlimStep:
     step_type: str = "field_slim"
     field_key: str = ""
     reason: str = ""
-    remaining_fields: Optional[int] = None
+    remaining_fields: int | None = None
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -60,11 +60,11 @@ class RowWriteStep:
     """行写入步骤"""
 
     step_type: str = "row_write"
-    row_id: Optional[Hashable] = None
-    batch_num: Optional[int] = None
+    row_id: Hashable | None = None
+    batch_num: int | None = None
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         if self.row_id is not None:
             result["row_id"] = str(self.row_id)
@@ -75,21 +75,21 @@ class RowWriteStep:
 class BatchTrace:
     """单个批次的执行追踪"""
 
-    batch_num: Optional[int] = None
-    row_ids: List[Hashable] = field(default_factory=list)
-    steps: "List[Union[LoaderCallStep, FieldSlimStep, RowWriteStep]]" = field(default_factory=list)
+    batch_num: int | None = None
+    row_ids: list[Hashable] = field(default_factory=list)
+    steps: "list[LoaderCallStep | FieldSlimStep | RowWriteStep]" = field(default_factory=list)
     start_time: float = field(default_factory=time.time)
-    end_time: Optional[float] = None
-    duration: Optional[float] = None
+    end_time: float | None = None
+    duration: float | None = None
 
-    def add_step(self, step: "Union[LoaderCallStep, FieldSlimStep, RowWriteStep]") -> None:
+    def add_step(self, step: "LoaderCallStep | FieldSlimStep | RowWriteStep") -> None:
         self.steps.append(step)
 
     def finish(self) -> None:
         self.end_time = time.time()
         self.duration = self.end_time - self.start_time
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["row_ids"] = [str(k) for k in self.row_ids]
         return result
@@ -99,13 +99,13 @@ class ExecutionTraceObserver(EventDispatchObserver):
     """执行追踪观察者:记录详细的执行步骤"""
 
     def __init__(self) -> None:
-        self.batches: List[BatchTrace] = []
-        self.current_batch: Optional[BatchTrace] = None
+        self.batches: list[BatchTrace] = []
+        self.current_batch: BatchTrace | None = None
 
-        self.pipeline_start_time: Optional[float] = None
-        self.pipeline_end_time: Optional[float] = None
-        self.target_fields: List[str] = []
-        self.batch_size: Optional[int] = None
+        self.pipeline_start_time: float | None = None
+        self.pipeline_end_time: float | None = None
+        self.target_fields: list[str] = []
+        self.batch_size: int | None = None
 
         self.total_loader_calls: int = 0
         self.total_field_slims: int = 0

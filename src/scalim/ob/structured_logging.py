@@ -13,11 +13,13 @@ import logging
 import os
 import sys
 import threading
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, List, Mapping, Optional, Set, Tuple, cast
+from typing import Any, Literal, cast
+
+from typing_extensions import override
 
 from ..typedefs import RuntimeValue
-from ..vendor.compact.typing_extensionsx import Literal, override
 
 StructuredLogProfile = Literal["compact", "verbose"]
 
@@ -48,7 +50,7 @@ def _normalize_stream_name(value: str) -> str:
     return "stderr"
 
 
-def _as_json_dict(value: RuntimeValue) -> Optional[Dict[str, Any]]:
+def _as_json_dict(value: RuntimeValue) -> dict[str, Any] | None:
     if value is None:
         return None
     if isinstance(value, dict):
@@ -57,7 +59,7 @@ def _as_json_dict(value: RuntimeValue) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _format_exception(exc_info: Any) -> Optional[Dict[str, Any]]:
+def _format_exception(exc_info: Any) -> dict[str, Any] | None:
     if not exc_info or exc_info is True:
         return None
 
@@ -68,7 +70,7 @@ def _format_exception(exc_info: Any) -> Optional[Dict[str, Any]]:
         exc_type = type(exc_info)
     elif isinstance(exc_info, tuple):
         try:
-            exc_type, exc, _tb = cast("Tuple[Any, Any, Any]", exc_info)  # pragma: allow-cast narrowing
+            exc_type, exc, _tb = cast("tuple[Any, Any, Any]", exc_info)  # pragma: allow-cast narrowing
         except ValueError:
             return None
 
@@ -89,7 +91,7 @@ def _format_exception(exc_info: Any) -> Optional[Dict[str, Any]]:
 # region key registry
 
 # `SSOT`: 全称键 -> 唯一缩写键(在所有已注册键中全局唯一).
-_FULL_TO_ABBR: Dict[str, str] = {
+_FULL_TO_ABBR: dict[str, str] = {
     # 基础字段
     "timestamp": "ts",
     "level": "lvl",
@@ -181,41 +183,41 @@ _FULL_TO_ABBR: Dict[str, str] = {
 
 
 def _assert_unique_abbreviations(full_to_abbr: Mapping[str, str]) -> None:
-    dup_abbr: List[str] = []
-    seen: Set[str] = set()
+    dup_abbr: list[str] = []
+    seen: set[str] = set()
     for abbr in full_to_abbr.values():
         if abbr in seen:
             dup_abbr.append(str(abbr))
         else:
             seen.add(str(abbr))
     if dup_abbr:
-        message = "Duplicate structured-log abbreviations detected: {}".format(sorted(set(dup_abbr)))
+        message = f"Duplicate structured-log abbreviations detected: {sorted(set(dup_abbr))}"
         raise RuntimeError(message)
 
 
 _assert_unique_abbreviations(_FULL_TO_ABBR)
 
-_ABBR_TO_FULL: Dict[str, str] = {abbr: full for full, abbr in _FULL_TO_ABBR.items()}
+_ABBR_TO_FULL: dict[str, str] = {abbr: full for full, abbr in _FULL_TO_ABBR.items()}
 
 
-def full_to_abbr_key(full_key: str) -> Optional[str]:
+def full_to_abbr_key(full_key: str) -> str | None:
     return _FULL_TO_ABBR.get(str(full_key))
 
 
-def abbr_to_full_key(abbr_key: str) -> Optional[str]:
+def abbr_to_full_key(abbr_key: str) -> str | None:
     return _ABBR_TO_FULL.get(str(abbr_key))
 
 
 def normalize_keys_to_full(obj: Any) -> Any:
     """递归地把已知缩写键映射为全称键(尽力而为)."""
     if isinstance(obj, dict):
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in cast("Mapping[object, Any]", obj).items():  # pragma: allow-cast narrowing
             full = abbr_to_full_key(str(key)) or str(key)
             out[full] = normalize_keys_to_full(value)
         return out
     if isinstance(obj, list):
-        return [normalize_keys_to_full(x) for x in cast("List[Any]", obj)]  # pragma: allow-cast narrowing
+        return [normalize_keys_to_full(x) for x in cast("list[Any]", obj)]  # pragma: allow-cast narrowing
     return obj
 
 
@@ -224,14 +226,14 @@ def apply_profile(obj: Any, profile: StructuredLogProfile) -> Any:
     if profile != "compact":
         return obj
     if isinstance(obj, dict):
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in cast("Mapping[object, Any]", obj).items():  # pragma: allow-cast narrowing
             key_text = str(key)
             abbr = full_to_abbr_key(key_text) or key_text
             out[abbr] = apply_profile(value, profile)
         return out
     if isinstance(obj, list):
-        return [apply_profile(x, profile) for x in cast("List[Any]", obj)]  # pragma: allow-cast narrowing
+        return [apply_profile(x, profile) for x in cast("list[Any]", obj)]  # pragma: allow-cast narrowing
     return obj
 
 
@@ -242,10 +244,10 @@ def apply_profile(obj: Any, profile: StructuredLogProfile) -> Any:
 
 
 class _LogContextState:
-    __slots__: Tuple[str, ...] = ("stack",)
+    __slots__: tuple[str, ...] = ("stack",)
 
     def __init__(self) -> None:
-        self.stack: List[Dict[str, Any]] = []
+        self.stack: list[dict[str, Any]] = []
 
 
 _log_context_local = threading.local()
@@ -262,8 +264,8 @@ def _state() -> _LogContextState:
     return state
 
 
-def get_log_context() -> Dict[str, Any]:
-    merged: Dict[str, Any] = {}
+def get_log_context() -> dict[str, Any]:
+    merged: dict[str, Any] = {}
     for entry in _state().stack:
         merged.update(entry)
     return merged
@@ -292,7 +294,7 @@ class JsonlFormatter(logging.Formatter):
 
     @override
     def format(self, record: logging.LogRecord) -> str:  # 与 `logging.Formatter` 接口对齐
-        base: Dict[str, Any] = {
+        base: dict[str, Any] = {
             "timestamp": float(record.created),
             "level": int(record.levelno),
             "logger": str(record.name),
@@ -336,7 +338,7 @@ def is_jsonl_logging_installed() -> bool:
 
 def install_jsonl_logging(
     *,
-    stream: Optional[Any] = None,
+    stream: Any | None = None,
     stream_name: str = "stderr",
     profile: StructuredLogProfile = "compact",
 ) -> None:
@@ -385,11 +387,11 @@ def emit_structured(
     level: int,
     kind: str,
     message: str,
-    fields: Optional[Mapping[str, Any]] = None,
-    ctx: Optional[Mapping[str, Any]] = None,
+    fields: Mapping[str, Any] | None = None,
+    ctx: Mapping[str, Any] | None = None,
     exc_info: Any = None,
 ) -> None:
-    extra: Dict[str, Any] = {
+    extra: dict[str, Any] = {
         "scalim_kind": str(kind),
     }
     if fields:

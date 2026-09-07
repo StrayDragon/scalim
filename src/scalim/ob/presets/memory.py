@@ -1,11 +1,11 @@
 # region imports
 
 import logging
-from typing import List, Set
+
+from typing_extensions import override
 
 from ...events import Event
 from ...events._events import ColumnWriteEvent, FieldSlimEvent, LoaderSlimEvent, RowReleaseEvent, RowWriteEvent
-from ...vendor.compact.typing_extensionsx import override
 from .._internal.console_report import emit_info
 from ..observer import EventDispatchObserver
 
@@ -15,11 +15,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MemoryOptimizationObserver(EventDispatchObserver):
-    field_slim_events: List[FieldSlimEvent]
-    row_write_events: List[RowWriteEvent]
-    row_release_events: List[RowReleaseEvent]
-    loader_slim_events: List[LoaderSlimEvent]
-    column_write_events: List[ColumnWriteEvent]
+    field_slim_events: list[FieldSlimEvent]
+    row_write_events: list[RowWriteEvent]
+    row_release_events: list[RowReleaseEvent]
+    loader_slim_events: list[LoaderSlimEvent]
+    column_write_events: list[ColumnWriteEvent]
     _logger: logging.Logger
 
     auto_report: bool
@@ -66,10 +66,10 @@ class MemoryOptimizationObserver(EventDispatchObserver):
         self.column_write_events.append(payload)
         self._logger.debug("  [列写入] %s | %d 行", payload.field_key, payload.row_count)
 
-    def get_slimmed_fields(self) -> Set[str]:
+    def get_slimmed_fields(self) -> set[str]:
         return {e.field_key for e in self.field_slim_events}
 
-    def get_columns_written(self) -> Set[str]:
+    def get_columns_written(self) -> set[str]:
         return {e.field_key for e in self.column_write_events}
 
     def print_summary(self, max_fields: int = 0) -> None:

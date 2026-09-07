@@ -1,8 +1,8 @@
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 import scalim
 from scalim.vendor.yamlx.ruamel.yaml import YAML
@@ -37,32 +37,32 @@ DEFAULT_SCHEMA_PATH = str(schema_dir())
 def resolve_schema_ref(schema_type: str, schema_path: str) -> str:
     schema_type = (schema_type or "").strip() or DEFAULT_SCHEMA_TYPE
     if not _SCHEMA_TYPE_PATTERN.match(schema_type):
-        msg = "Invalid schema type: {}".format(schema_type)
+        msg = f"Invalid schema type: {schema_type}"
         raise ValueError(msg)
 
     schema_path = (schema_path or "").strip() or DEFAULT_SCHEMA_PATH
-    schema_filename = "{}.gen.json".format(schema_type)
+    schema_filename = f"{schema_type}.gen.json"
 
     if schema_path.endswith(".json"):
         return schema_path
 
     if schema_path.startswith(("http://", "https://")):
         base_url = schema_path.rstrip("/")
-        return "{}/{}".format(base_url, schema_filename)
+        return f"{base_url}/{schema_filename}"
 
     base_dir = Path(schema_path)
     return str(base_dir / schema_filename)
 
 
 def make_intellij_schema_modeline(schema_ref: str) -> str:
-    return "# $schema: {}".format(schema_ref)
+    return f"# $schema: {schema_ref}"
 
 
 def make_yaml_language_server_schema_modeline(schema_ref: str) -> str:
-    return "# yaml-language-server: $schema={}".format(schema_ref)
+    return f"# yaml-language-server: $schema={schema_ref}"
 
 
-def make_schema_modelines(schema_ref: str, *, comment_style: str) -> List[str]:
+def make_schema_modelines(schema_ref: str, *, comment_style: str) -> list[str]:
     comment_style = (comment_style or "").strip() or DEFAULT_COMMENT_STYLE
 
     if comment_style == COMMENT_STYLE_ALL:
@@ -106,7 +106,7 @@ def _roundtrip_noop_text(text: str) -> str:
     return buf.getvalue()
 
 
-def _strip_schema_modelines(lines: Sequence[str], *, max_scan_lines: int) -> List[str]:
+def _strip_schema_modelines(lines: Sequence[str], *, max_scan_lines: int) -> list[str]:
     scan_limit = min(len(lines), int(max_scan_lines))
     indices = [idx for idx in range(scan_limit) if _is_schema_modeline(lines[idx])]
     if not indices:
@@ -124,17 +124,17 @@ def _roundtrip_noop_gate_error(
     *,
     failure_prefix: str,
     mismatch_message: str,
-) -> Optional[str]:
+) -> str | None:
     try:
         dumped = _roundtrip_noop_text(text)
     except Exception as exc:  # noqa: BLE001
-        return "{}: {}: {}".format(failure_prefix, type(exc).__name__, exc)
+        return f"{failure_prefix}: {type(exc).__name__}: {exc}"
     if dumped != text:
         return mismatch_message
     return None
 
 
-def _minimal_edit_gate_error(old_text: str, new_text: str, *, max_scan_lines: int) -> Optional[str]:
+def _minimal_edit_gate_error(old_text: str, new_text: str, *, max_scan_lines: int) -> str | None:
     old_lines = old_text.splitlines()
     new_lines = new_text.splitlines()
     if _strip_schema_modelines(old_lines, max_scan_lines=max_scan_lines) != _strip_schema_modelines(
@@ -149,14 +149,14 @@ def upsert_schema_modelines_text(
     *,
     schema_modelines: Sequence[str],
     max_scan_lines: int = DEFAULT_MAX_SCAN_LINES,
-) -> Tuple[str, bool]:
+) -> tuple[str, bool]:
     newline = "\r\n" if "\r\n" in text else "\n"
     ends_with_newline = text.endswith("\n")
 
     lines = text.splitlines()
     scan_limit = min(len(lines), int(max_scan_lines))
 
-    cleaned_lines: List[str] = []
+    cleaned_lines: list[str] = []
     for idx, line in enumerate(lines):
         if idx < scan_limit and _is_schema_modeline(line):
             continue
@@ -174,7 +174,7 @@ def upsert_schema_modelines_text(
             insert_at = idx + 1
         break
 
-    new_lines: List[str] = list(cleaned_lines)
+    new_lines: list[str] = list(cleaned_lines)
     new_lines[insert_at:insert_at] = list(schema_modelines)
 
     sep_idx = insert_at + len(schema_modelines)
@@ -192,7 +192,7 @@ def upsert_schema_modelines_text(
 class UpsertResult:
     path: Path
     changed: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 def upsert_schema_modelines_file(
@@ -204,7 +204,7 @@ def upsert_schema_modelines_file(
     try:
         text = path.read_text(encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
-        return UpsertResult(path=path, changed=False, error="Failed to read: {}".format(exc))
+        return UpsertResult(path=path, changed=False, error=f"Failed to read: {exc}")
 
     error = _roundtrip_noop_gate_error(
         text,
@@ -231,7 +231,7 @@ def upsert_schema_modelines_file(
         try:
             _ = path.write_text(new_text, encoding="utf-8")
         except Exception as exc:  # noqa: BLE001
-            return UpsertResult(path=path, changed=False, error="Failed to write: {}".format(exc))
+            return UpsertResult(path=path, changed=False, error=f"Failed to write: {exc}")
 
     return UpsertResult(path=path, changed=changed)
 

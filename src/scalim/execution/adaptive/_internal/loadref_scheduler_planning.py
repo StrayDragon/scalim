@@ -1,5 +1,6 @@
+from collections.abc import Callable, Hashable, Sequence
 from concurrent.futures import Executor
-from typing import Any, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, cast
 
 from ....events import EventType
 from ....events._events import AdaptiveSchedulerDecisionEvent
@@ -24,8 +25,8 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         layer_ops: Sequence[LoadRefOperatorIr],
         *,
         runtime: ExecutionRuntime,
-        after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
-    ) -> Tuple[Set[str], List[LoadRefOperatorIr]]:
+        after_operator: Callable[[LoadRefOperatorIr], None] | None,
+    ) -> tuple[set[str], list[LoadRefOperatorIr]]:
         return _collect_layer_executable_ops_unit(
             layer_ops,
             runtime=runtime,
@@ -37,9 +38,9 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         layer_task_ops: Sequence[LoadRefOperatorIr],
         *,
         runtime: ExecutionRuntime,
-        pool: Optional[Executor],
+        pool: Executor | None,
         max_workers: int,
-        layer_lookup_keys: Optional[Dict[str, int]],
+        layer_lookup_keys: dict[str, int] | None,
     ) -> AdaptiveLayerDecision:
         resolved_workers = max(1, int(max_workers))
         policy = self._require_policy()
@@ -57,7 +58,7 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         tuning = self._require_tuning()
         pool_name = self._require_policy().choose_task_pool(op=op, tuning=tuning) or DEFAULT_ADAPTIVE_POOL
         if pool_name != DEFAULT_ADAPTIVE_POOL and pool_name not in tuning.pools:
-            msg = "AdaptivePolicy returned unknown pool '{}' for field '{}'".format(pool_name, op.field_key)
+            msg = f"AdaptivePolicy returned unknown pool '{pool_name}' for field '{op.field_key}'"
             raise ValueError(msg)
         return pool_name
 
@@ -66,13 +67,13 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         op: LoadRefOperatorIr,
         *,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
     ) -> int:
         if not op.lookup_steps:
             return 0
 
         step = op.lookup_steps[0]
-        seen: Set[Hashable] = set()
+        seen: set[Hashable] = set()
 
         if step.is_multi_field():
             from_fields = step.get_from_fields()
@@ -102,21 +103,21 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         self,
         ops: Sequence[LoadRefOperatorIr],
         *,
-        sources: Dict[str, Any],
-    ) -> Tuple[List[AdaptiveTaskKey], Dict[AdaptiveTaskKey, _TaskSpec], Dict[str, AdaptiveTaskKey]]:
+        sources: dict[str, Any],
+    ) -> tuple[list[AdaptiveTaskKey], dict[AdaptiveTaskKey, _TaskSpec], dict[str, AdaptiveTaskKey]]:
         return _build_task_specs_unit(ops, resolve_task_pool=self._resolve_task_pool, sources=sources)
 
     def _commit_layer_results(
         self,
         layer_ops: Sequence[LoadRefOperatorIr],
         *,
-        skipped_field_keys: Set[str],
-        op_task_key: Dict[str, AdaptiveTaskKey],
-        results_by_key: Dict[AdaptiveTaskKey, Any],
+        skipped_field_keys: set[str],
+        op_task_key: dict[str, AdaptiveTaskKey],
+        results_by_key: dict[AdaptiveTaskKey, Any],
         context: BatchContext,
         runtime: ExecutionRuntime,
-        committed_relation_keys: Set[RelationSignature],
-        after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
+        committed_relation_keys: set[RelationSignature],
+        after_operator: Callable[[LoadRefOperatorIr], None] | None,
     ) -> None:
         _commit_layer_results_unit(
             layer_ops,
@@ -136,16 +137,16 @@ class AdaptiveLoadRefSchedulerPlanningMixin(AdaptiveLoadRefSchedulerBase):
         layer_index: int,
         decision: str,
         backend: str,
-        reason: Optional[str],
-        layer_task_count: Optional[int],
-        process_failure_mode: Optional[str] = None,
-        layer_stats: Optional[_LayerScheduleStats] = None,
+        reason: str | None,
+        layer_task_count: int | None,
+        process_failure_mode: str | None = None,
+        layer_stats: _LayerScheduleStats | None = None,
     ) -> None:
         def _build_payload() -> AdaptiveSchedulerDecisionEvent:
-            pool_limits: Optional[Dict[str, int]] = None
-            pool_wait_ms_total: Optional[Dict[str, float]] = None
-            pool_wait_ms_max: Optional[Dict[str, float]] = None
-            pool_wait_count: Optional[Dict[str, int]] = None
+            pool_limits: dict[str, int] | None = None
+            pool_wait_ms_total: dict[str, float] | None = None
+            pool_wait_ms_max: dict[str, float] | None = None
+            pool_wait_count: dict[str, int] | None = None
 
             if layer_stats is not None:
                 pool_limits = dict(layer_stats.pool_limits)

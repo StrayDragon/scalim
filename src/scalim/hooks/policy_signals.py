@@ -5,11 +5,12 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import TYPE_CHECKING, Any
 
 from ..events import EventType
-from ..vendor.dataclassesx import dataclass
-from ..vendor.dataclassesx import field as dataclass_field
 from ._base import HookManager
 
 if TYPE_CHECKING:
@@ -19,8 +20,8 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class DecisionOverrideHistoryEntry:
     hook_id: str
-    prev_value: Optional[int]
-    next_value: Optional[int]
+    prev_value: int | None
+    next_value: int | None
     reason: str
 
 
@@ -37,14 +38,14 @@ class PreUseBatchSizeDecision:
     - `main_loader`: 可选: 主数据源加载函数(若可获取).
     """
 
-    value: Optional[int]
-    run_id: Optional[str] = None
-    demand_path: Optional[str] = None
-    init_vars: Optional[Dict[str, Any]] = None
-    main_loader: Optional[Any] = None
-    history: List[DecisionOverrideHistoryEntry] = dataclass_field(default_factory=list)
+    value: int | None
+    run_id: str | None = None
+    demand_path: str | None = None
+    init_vars: dict[str, Any] | None = None
+    main_loader: Any | None = None
+    history: list[DecisionOverrideHistoryEntry] = dataclass_field(default_factory=list)
 
-    _active_hook_id: Optional[str] = dataclass_field(default=None, repr=False, compare=False)
+    _active_hook_id: str | None = dataclass_field(default=None, repr=False, compare=False)
 
     def _enter_hook(self, hook: "ExecutionHookLike") -> None:
         self._active_hook_id = type(hook).__name__

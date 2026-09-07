@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any
 
 from ....planning import PlanBuilder
 from ....planning.snapshots import execution_deps_snapshot, execution_plan_snapshot
@@ -13,8 +14,8 @@ from ..runtime.conversion import ConfigToIRConverter
 from .contracts import FrontendDiagnostics, StaticCompilation
 
 
-def _iter_file_import_cache_paths(cache: Dict[str, Dict[str, Any]]) -> List[str]:
-    files: List[str] = []
+def _iter_file_import_cache_paths(cache: dict[str, dict[str, Any]]) -> list[str]:
+    files: list[str] = []
     for key in sorted(cache.keys()):
         if not key:
             continue
@@ -31,7 +32,7 @@ def _load_yaml_mapping_with_locations(
     yaml_text: str,
     *,
     yaml_path: Path,
-) -> Tuple[Optional[Dict[str, Any]], Dict[str, Tuple[int, int]], FrontendDiagnostics]:
+) -> tuple[dict[str, Any] | None, dict[str, tuple[int, int]], FrontendDiagnostics]:
     try:
         yaml_data, locations, _lines = load_yaml_mapping_text(
             str(yaml_text or ""),
@@ -43,7 +44,7 @@ def _load_yaml_mapping_with_locations(
     except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
             code="yaml_parse_failed",
-            message="YAML parse failed: {}: {}".format(type(exc).__name__, exc),
+            message=f"YAML parse failed: {type(exc).__name__}: {exc}",
             source_path=str(yaml_path),
             path="(root)",
             loc=ErrorLoc(1, 1),
@@ -53,18 +54,18 @@ def _load_yaml_mapping_with_locations(
 
 
 def _validate_demand_yaml(
-    yaml_data: Dict[str, Any],
+    yaml_data: dict[str, Any],
     *,
     yaml_path: Path,
-    locations: Dict[str, Tuple[int, int]],
+    locations: dict[str, tuple[int, int]],
 ) -> FrontendDiagnostics:
     report = ConfigValidator().validate_report(
         yaml_data,
         strict_unknown_fields=True,
     )
 
-    errors: List[ErrorEnvelope] = []
-    warnings: List[ErrorEnvelope] = []
+    errors: list[ErrorEnvelope] = []
+    warnings: list[ErrorEnvelope] = []
 
     for issue in report.errors():
         errors.append(
@@ -90,12 +91,12 @@ def _validate_demand_yaml(
 
 
 def compile_demand_frontend_diagnostics(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     *,
-    yaml_text: Optional[str] = None,
-    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    yaml_text: str | None = None,
+    allowed_yaml_roots: Sequence[str | Path] | None = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> StaticCompilation:
     """编译单个需求 YAML,产出诊断信息与生效后的 YAML 视图(不导入/不执行用户模块).
 
@@ -112,7 +113,7 @@ def compile_demand_frontend_diagnostics(
         except Exception as exc:  # noqa: BLE001
             env = ErrorEnvelope(
                 code="yaml_read_failed",
-                message="Failed to read YAML file: {}: {}".format(type(exc).__name__, exc),
+                message=f"Failed to read YAML file: {type(exc).__name__}: {exc}",
                 source_path=str(yaml_path_resolved),
                 path="(file)",
                 loc=ErrorLoc(1, 1),
@@ -123,8 +124,8 @@ def compile_demand_frontend_diagnostics(
     if yaml_data is None:
         return StaticCompilation(diagnostics=parse_diags)
 
-    import_cache: Dict[str, Dict[str, Any]] = {}
-    fragment_files: Tuple[str, ...] = ()
+    import_cache: dict[str, dict[str, Any]] = {}
+    fragment_files: tuple[str, ...] = ()
     if contains_import_syntax(yaml_data):
         try:
             _ = expand_imports_inplace(
@@ -153,7 +154,7 @@ def compile_demand_frontend_diagnostics(
         except Exception as exc:  # noqa: BLE001
             env = ErrorEnvelope(
                 code="yaml_import_expansion_error",
-                message="imports expansion failed unexpectedly: {}: {}".format(type(exc).__name__, exc),
+                message=f"imports expansion failed unexpectedly: {type(exc).__name__}: {exc}",
                 source_path=str(yaml_path_resolved),
                 path="(imports)",
                 loc=ErrorLoc(1, 1),
@@ -180,12 +181,12 @@ def compile_demand_frontend_diagnostics(
 
 
 def compile_demand_frontend(
-    yaml_path: Union[str, Path],
+    yaml_path: str | Path,
     *,
-    yaml_text: Optional[str] = None,
-    allowed_yaml_roots: Optional[Sequence[Union[str, Path]]] = None,
-    scalim_yaml_override: Optional[Union[str, Path]] = None,
-    project_root_override: Optional[Union[str, Path]] = None,
+    yaml_text: str | None = None,
+    allowed_yaml_roots: Sequence[str | Path] | None = None,
+    scalim_yaml_override: str | Path | None = None,
+    project_root_override: str | Path | None = None,
 ) -> StaticCompilation:
     """编译单个需求 YAML,产出静态 IR 与 `ExecutionPlan`(不导入/不执行用户模块)."""
 
@@ -211,7 +212,7 @@ def compile_demand_frontend(
     except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
             code="yaml_frontend_config_error",
-            message="Failed to parse demand config: {}: {}".format(type(exc).__name__, exc),
+            message=f"Failed to parse demand config: {type(exc).__name__}: {exc}",
             source_path=str(yaml_path),
             path="(root)",
             loc=ErrorLoc(1, 1),
@@ -227,7 +228,7 @@ def compile_demand_frontend(
     except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
             code="yaml_frontend_ir_error",
-            message="Failed to build static IR: {}: {}".format(type(exc).__name__, exc),
+            message=f"Failed to build static IR: {type(exc).__name__}: {exc}",
             source_path=str(yaml_path),
             path="(ir)",
             loc=ErrorLoc(1, 1),
@@ -245,7 +246,7 @@ def compile_demand_frontend(
     except Exception as exc:  # noqa: BLE001
         env = ErrorEnvelope(
             code="yaml_frontend_plan_error",
-            message="Failed to build ExecutionPlan: {}: {}".format(type(exc).__name__, exc),
+            message=f"Failed to build ExecutionPlan: {type(exc).__name__}: {exc}",
             source_path=str(yaml_path),
             path="(plan)",
             loc=ErrorLoc(1, 1),

@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from .runtime.introspection import OutputConfigDict
 from .runtime.introspection import load_output_config as _load_output_config
@@ -12,8 +12,8 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
 def derive_base_module_path(
     yaml_path: str,
     *,
-    sys_path: Optional[Sequence[Optional[str]]] = None,
-    cwd: Optional[str] = None,
+    sys_path: Sequence[str | None] | None = None,
+    cwd: str | None = None,
 ) -> str:
     return _derive_base_module_path(yaml_path, sys_path=sys_path, cwd=cwd)
 

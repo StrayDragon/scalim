@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
 from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, load_orders, set_config
 from scalim_misc.examples.oracle import diff_first_mismatch, stable_sort_rows
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 TOP_K = 2
 
@@ -27,7 +30,7 @@ class _AggRow:
     score: Decimal
 
 
-def build_expected_rows_top2_by_region(*, cfg: Optional[ECommerceConfig] = None) -> List[Dict[str, str]]:
+def build_expected_rows_top2_by_region(*, cfg: ECommerceConfig | None = None) -> list[dict[str, str]]:
     """构造 `ecommerce_rank_score_report.yaml` 的纯 Python 期望输出.
 
     说明:
@@ -41,7 +44,7 @@ def build_expected_rows_top2_by_region(*, cfg: Optional[ECommerceConfig] = None)
     if cfg is not None:
         set_config(cfg)
     try:
-        groups: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        groups: dict[tuple[int, int], dict[str, Any]] = {}
         for row in load_orders():
             region_id = int(row.get("region_id") or 0)
             category_id = int(row.get("product_category_id") or 0)
@@ -59,11 +62,11 @@ def build_expected_rows_top2_by_region(*, cfg: Optional[ECommerceConfig] = None)
             acc["order_cnt"] = int(acc["order_cnt"]) + 1
             acc["sum_final_amount"] = Decimal(str(acc["sum_final_amount"])) + final_dec
 
-        by_region: Dict[int, List[Dict[str, Any]]] = {}
+        by_region: dict[int, list[dict[str, Any]]] = {}
         for acc in groups.values():
             by_region.setdefault(int(acc["region_id"]), []).append(acc)
 
-        ordered: List[_AggRow] = []
+        ordered: list[_AggRow] = []
         for region_id in sorted(by_region.keys()):
             bucket = by_region[region_id]
             # 对齐 `RankedGroupByAggregator._row_sort_key` 的统一 `desc` 方向:
@@ -72,7 +75,7 @@ def build_expected_rows_top2_by_region(*, cfg: Optional[ECommerceConfig] = None)
             bucket.sort(key=lambda r: (Decimal(str(r["sum_final_amount"])), int(r["product_category_id"])), reverse=True)
 
             # 先计算 rank/row_number(全量),再按 row_number top_k 截断,最后计算 score.
-            prev_sig: Optional[str] = None
+            prev_sig: str | None = None
             last_rank = 0
             for idx, r in enumerate(bucket):
                 row_no = int(idx) + 1
@@ -122,8 +125,8 @@ def build_expected_rows_top2_by_region(*, cfg: Optional[ECommerceConfig] = None)
 def verify_ecommerce_rank_score_csv_rows(
     *,
     actual_rows: Sequence[Mapping[str, Any]],
-    cfg: Optional[ECommerceConfig] = None,
-) -> Tuple[bool, str, Dict[str, Any]]:
+    cfg: ECommerceConfig | None = None,
+) -> tuple[bool, str, dict[str, Any]]:
     """逐行对拍 `ecommerce_rank_score_report` 的 CSV 输出."""
     expected_rows = build_expected_rows_top2_by_region(cfg=cfg)
     actual_sorted = stable_sort_rows(actual_rows, by=("region_id", "row_no", "product_category_id"))
@@ -131,7 +134,7 @@ def verify_ecommerce_rank_score_csv_rows(
 
     fields = ["region_id", "product_category_id", "order_cnt", "sum_final_amount", "rank", "row_no", "score"]
     ok, msg = diff_first_mismatch(actual_sorted, expected_sorted, fields=fields)
-    details: Dict[str, Any] = {
+    details: dict[str, Any] = {
         "actual": len(actual_sorted),
         "expected": len(expected_sorted),
         "first_mismatch": msg,

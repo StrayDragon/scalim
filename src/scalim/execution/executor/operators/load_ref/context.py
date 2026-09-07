@@ -1,4 +1,4 @@
-from typing import Dict, Hashable, List, Optional, Tuple
+from collections.abc import Hashable
 
 from .....spec.ir import LookupStepIr
 from .....spec.ir._source_contracts import LookupSourceRefIrBase
@@ -16,16 +16,16 @@ class LoadRefExecutionContext:
 
     runtime: ExecutionRuntime
     context: BatchContext
-    batch_row_nth: List[Hashable]
+    batch_row_nth: list[Hashable]
     field_key: str
     relation_signature: RelationSignature
-    default_applied_counts: Dict[str, int]
+    default_applied_counts: dict[str, int]
 
     def __init__(
         self,
         runtime: ExecutionRuntime,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         field_key: str,
         relation_signature: RelationSignature,
     ) -> None:
@@ -47,10 +47,10 @@ class LoadRefExecutionContext:
         self,
         row_id: Hashable,
         fk_raw: RuntimeValue,
-        fk_normalized: Optional[LookupKey],
+        fk_normalized: LookupKey | None,
         target_source: LookupSourceRefIrBase,
         result: RelationLookupResult,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> None:
         fk_type = type(fk_raw).__name__ if fk_raw is not None else None
         self.runtime.instrumentation.emit_relation_lookup(
@@ -86,8 +86,8 @@ class LoadRefExecutionContext:
         raw_key: RuntimeValue,
         step: LookupStepIr,
         *,
-        from_fields: Optional[Tuple[str, ...]] = None,
-    ) -> Optional[LookupKey]:
+        from_fields: tuple[str, ...] | None = None,
+    ) -> LookupKey | None:
         if from_fields is None:
             from_fields = step.get_from_fields()
 
@@ -118,7 +118,7 @@ class LoadRefExecutionContext:
         fields_cache[row_id] = None
         return None
 
-    def build_batch_rows(self) -> List[RowData]:
+    def build_batch_rows(self) -> list[RowData]:
         field_keys = sorted(self.context.get_field_keys())
         return [build_row(self.context, row_id, field_keys) for row_id in self.batch_row_nth]
 

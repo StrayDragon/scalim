@@ -1,5 +1,4 @@
 import argparse
-from typing import List, Optional
 
 from . import log as log_cmd
 from . import yaml_dsl
@@ -19,7 +18,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     return args.func(args)  # type: ignore[attr-defined]

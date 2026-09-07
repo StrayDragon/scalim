@@ -564,7 +564,7 @@ def test_loadref_cached_rows_hit_reuses_cached_batch_rows() -> None:
 
 def test_rows_reuse_catalog_none_disables_group_when_nested_snapshot_is_batch() -> None:
     """r1004: Python RowsReuse.none() overlay 必须禁用分组,即使图句柄仍是 YAML batch 快照."""
-    from scalim.vendor.dataclassesx import replace
+    from dataclasses import replace
 
     loader = _RowsLoader()
     snapshot_bind = _make_rows_binding(cache_mode="batch")
@@ -620,7 +620,7 @@ def test_rows_reuse_catalog_none_disables_group_when_nested_snapshot_is_batch() 
 
 def test_rows_reuse_catalog_batch_enables_group_when_nested_snapshot_is_none() -> None:
     """r1004: Python RowsReuse.batch() overlay 必须启用分组,即使图句柄仍是 YAML none 快照."""
-    from scalim.vendor.dataclassesx import replace
+    from dataclasses import replace
 
     loader = _RowsLoader()
     snapshot_bind = _make_rows_binding(cache_mode="none")

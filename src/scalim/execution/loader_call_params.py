@@ -1,5 +1,3 @@
-from typing import Optional
-
 from ..spec.ir.binding import BindingIr, LoaderCallContextIr
 from ..typedefs import LoaderCallParams
 from .runtime_bindings import RuntimeBindings
@@ -7,7 +5,7 @@ from .runtime_bindings import RuntimeBindings
 
 def build_loader_call_params(
     *,
-    binding: Optional[BindingIr],
+    binding: BindingIr | None,
     context: LoaderCallContextIr,
     runtime_bindings: RuntimeBindings,
 ) -> LoaderCallParams:
@@ -24,7 +22,7 @@ def build_loader_call_params(
     if binding.params_builder_ref is not None:
         params_builder = runtime_bindings.get_params_builder(context.source_id, binding.key_field)
         if params_builder is None:
-            msg = "Missing runtime params builder for source_id={!r}, key_field={!r}".format(context.source_id, binding.key_field)
+            msg = f"Missing runtime params builder for source_id={context.source_id!r}, key_field={binding.key_field!r}"
             raise KeyError(msg)
         return params_builder(context)
 

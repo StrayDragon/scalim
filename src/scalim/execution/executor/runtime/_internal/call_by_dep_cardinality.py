@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any
 
 from ....._project_constants import ENV_PROBE_CALL_BY_DEP_CARDINALITY
 
@@ -19,7 +19,7 @@ class CallByDepCardinalityStats:
     call_count: int
     hashable_count: int
     unhashable_count: int
-    unique_hashes: Set[int]
+    unique_hashes: set[int]
     unique_overflow: bool
 
     def __init__(self, field_key: str, *, max_unique: int) -> None:
@@ -31,7 +31,7 @@ class CallByDepCardinalityStats:
         self.unique_hashes = set()
         self.unique_overflow = False
 
-    def record(self, dep_args: Tuple[Any, ...]) -> None:
+    def record(self, dep_args: tuple[Any, ...]) -> None:
         self.call_count += 1
         if self.unique_overflow:
             return
@@ -45,7 +45,7 @@ class CallByDepCardinalityStats:
         if len(self.unique_hashes) >= self.max_unique:
             self.unique_overflow = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         unique = len(self.unique_hashes)
         hashable = self.hashable_count
         repeat_rate = None
@@ -67,7 +67,7 @@ class CallByDepCardinalityCollector:
     """单次运行内的 `ctx-free call_by` 依赖元组去重统计器(内存有上限)."""
 
     max_unique: int
-    stats_by_field: Dict[str, CallByDepCardinalityStats]
+    stats_by_field: dict[str, CallByDepCardinalityStats]
 
     def __init__(self, *, max_unique: int) -> None:
         self.max_unique = int(max_unique)
@@ -82,10 +82,10 @@ class CallByDepCardinalityCollector:
         self.stats_by_field[key] = stat
         return stat
 
-    def record(self, *, field_key: str, dep_args: Tuple[Any, ...]) -> None:
+    def record(self, *, field_key: str, dep_args: tuple[Any, ...]) -> None:
         self.get_or_create(field_key).record(dep_args)
 
-    def build_summary(self, *, top_n: int = 20) -> Dict[str, Any]:
+    def build_summary(self, *, top_n: int = 20) -> dict[str, Any]:
         # 先按 `call_count` 降序, 再按 `unique` 升序 (越小越可能可缓存).
         stats = list(self.stats_by_field.values())
         stats.sort(key=lambda s: (-int(s.call_count), len(s.unique_hashes)))
@@ -98,7 +98,7 @@ class CallByDepCardinalityCollector:
         }
 
 
-def build_call_by_dep_cardinality_collector() -> Optional[CallByDepCardinalityCollector]:
+def build_call_by_dep_cardinality_collector() -> CallByDepCardinalityCollector | None:
     raw = (os.environ.get(_ENV_ENABLE) or "").strip()
     if not raw:
         return None

@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Set
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
 
 from ...planning.operators import LoadRefOperatorIr
 from ...utils.relation_signature import RelationSignature
@@ -12,7 +13,7 @@ def commit_task_result(
     *,
     context: BatchContext,
     runtime: ExecutionRuntime,
-    committed_relation_keys: Set[RelationSignature],
+    committed_relation_keys: set[RelationSignature],
 ) -> None:
     for field_key in sorted(result.overlay.keys()):
         values = result.overlay[field_key]
@@ -33,15 +34,15 @@ def commit_task_result(
 def commit_layer_results(
     layer_ops: Sequence[LoadRefOperatorIr],
     *,
-    skipped_field_keys: Set[str],
-    op_task_key: Dict[str, AdaptiveTaskKey],
+    skipped_field_keys: set[str],
+    op_task_key: dict[str, AdaptiveTaskKey],
     results_by_key: Mapping[AdaptiveTaskKey, Any],
     context: BatchContext,
     runtime: ExecutionRuntime,
-    committed_relation_keys: Set[RelationSignature],
-    after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
+    committed_relation_keys: set[RelationSignature],
+    after_operator: Callable[[LoadRefOperatorIr], None] | None,
 ) -> None:
-    committed: Set[AdaptiveTaskKey] = set()
+    committed: set[AdaptiveTaskKey] = set()
     for op in layer_ops:
         if op.field_key in skipped_field_keys:
             continue

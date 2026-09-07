@@ -1,6 +1,6 @@
 import threading
 from collections import deque
-from typing import Deque, Dict, List, Optional, Set, Tuple, cast
+from typing import cast
 
 from ...events import Event, EventType
 from ..observer import EventDispatchObserver, Observer
@@ -8,29 +8,29 @@ from .common import CATALOG_EVENT_TYPES, CATALOG_EVENT_TYPES_SET, ObserverManage
 
 
 class ObserverManagerRegistryMixin:
-    observers: Optional[List[Observer]] = None
+    observers: list[Observer] | None = None
     mode: ObserverManagerModeValue = "process"
     _has_observers: bool = False
     _supports_all: bool = False
-    _supported_event_types: Optional[Set[EventType]] = None
-    _observers_by_event_type: Optional[Dict[EventType, Tuple[Observer, ...]]] = None
-    _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
-    _capture_event_types: Optional[Set[EventType]] = None
+    _supported_event_types: set[EventType] | None = None
+    _observers_by_event_type: dict[EventType, tuple[Observer, ...]] | None = None
+    _observers_for_unknown_event_type: tuple[Observer, ...] = ()
+    _capture_event_types: set[EventType] | None = None
     _capture_unknown_event_types: bool = False
-    _recorded_events: Optional[Deque[Event]] = None
+    _recorded_events: deque[Event] | None = None
     _lock: "threading.RLock" = threading.RLock()
 
-    def _get_observers(self) -> List[Observer]:
+    def _get_observers(self) -> list[Observer]:
         observers = self.observers
         if observers is None:
             observers = []
             self.observers = observers
         return observers
 
-    def _ensure_recorded_events(self) -> Deque[Event]:
+    def _ensure_recorded_events(self) -> deque[Event]:
         recorded_events = self._recorded_events
         if recorded_events is None:
-            recorded_events = cast("Deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
+            recorded_events = cast("deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
             self._recorded_events = recorded_events
         return recorded_events
 
@@ -43,12 +43,12 @@ class ObserverManagerRegistryMixin:
     def _infer_eventdispatch_observer_event_types(
         self,
         observer: EventDispatchObserver,
-    ) -> Tuple[EventType, ...]:
+    ) -> tuple[EventType, ...]:
         dispatch_map_value = observer.dispatch_map
         if not isinstance(dispatch_map_value, dict):
             return ()
 
-        supported: List[EventType] = []
+        supported: list[EventType] = []
         for event_type, handler_name in dispatch_map_value.items():
             if not isinstance(event_type, EventType) or not isinstance(handler_name, str):
                 continue
@@ -60,7 +60,7 @@ class ObserverManagerRegistryMixin:
             supported.append(event_type)
         return tuple(supported)
 
-    def _infer_observer_subscriptions(self, observer: Observer) -> Tuple[EventType, ...]:
+    def _infer_observer_subscriptions(self, observer: Observer) -> tuple[EventType, ...]:
         try:
             supports_attr = type(observer).supports
         except AttributeError:
@@ -86,16 +86,16 @@ class ObserverManagerRegistryMixin:
                 return CATALOG_EVENT_TYPES
             return tuple(event_type for event_type in event_types if event_type in CATALOG_EVENT_TYPES_SET)
 
-        supported: List[EventType] = []
+        supported: list[EventType] = []
         for event_type in CATALOG_EVENT_TYPES:
             if self._supports_safely(observer, event_type):
                 supported.append(event_type)
         return tuple(supported)
 
     def _rebuild_subscription_cache(self) -> None:
-        observers_by_event_type: Dict[EventType, List[Observer]] = {event_type: [] for event_type in CATALOG_EVENT_TYPES}
+        observers_by_event_type: dict[EventType, list[Observer]] = {event_type: [] for event_type in CATALOG_EVENT_TYPES}
         # 需要接收未知事件类型的观察者(显式选择加入).
-        unknown_observers: List[Observer] = []
+        unknown_observers: list[Observer] = []
 
         observers = self._get_observers()
         for observer in observers:
@@ -110,7 +110,7 @@ class ObserverManagerRegistryMixin:
             if supports_unknown:
                 unknown_observers.append(observer)
 
-        supported_event_types: Set[EventType] = {event_type for event_type, observers in observers_by_event_type.items() if observers}
+        supported_event_types: set[EventType] = {event_type for event_type, observers in observers_by_event_type.items() if observers}
 
         self._has_observers = bool(observers)
         self._supports_all = len(supported_event_types) == len(observers_by_event_type)

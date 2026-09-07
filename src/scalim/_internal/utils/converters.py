@@ -2,26 +2,26 @@
 # pragma: allow-c901-file plan: c60
 
 import math
+from collections.abc import Sequence
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import TypeGuard
 
 from ...spec.ir.aliases import LookupKeyCast
 from ...typedefs import LookupKey, RuntimeValue
-from ...vendor.compact.typing_extensionsx import TypeGuard
 
 # endregion
 
-ConvertibleToInt = Union[int, float, str, bytes, bytearray, Decimal]
+ConvertibleToInt = int | float | str | bytes | bytearray | Decimal
 """可转换为 `int` 的类型"""
 
-ConvertibleToStr = Union[int, float, str, bytes, bytearray, bool, Decimal]
+ConvertibleToStr = int | float | str | bytes | bytearray | bool | Decimal
 """可转换为 `str` 的类型"""
 
-ConvertibleToIntTuple = Union[Tuple[ConvertibleToInt, ...], List[ConvertibleToInt], Sequence[ConvertibleToInt]]
+ConvertibleToIntTuple = tuple[ConvertibleToInt, ...] | list[ConvertibleToInt] | Sequence[ConvertibleToInt]
 """可转换为 `int` 元组的类型"""
 
-SeparatedValues = Union[str, int, float]
+SeparatedValues = str | int | float
 """CSV 字符串或已转换的值"""
 
 
@@ -33,14 +33,14 @@ class NamedLookupCast:
     """用于给 `lookup_cast` 打标签的可调用包装器,提供稳定名称."""
 
     scalim_lookup_cast_name: str
-    scalim_lookup_cast_meta: Dict[str, RuntimeValue]
+    scalim_lookup_cast_meta: dict[str, RuntimeValue]
 
-    def __init__(self, name: str, fn: LookupKeyCast, *, meta: Optional[Dict[str, RuntimeValue]] = None) -> None:
+    def __init__(self, name: str, fn: LookupKeyCast, *, meta: dict[str, RuntimeValue] | None = None) -> None:
         self.scalim_lookup_cast_name = name
         self.scalim_lookup_cast_meta = dict(meta or {})
         self._fn: LookupKeyCast = fn
 
-    def __call__(self, value: RuntimeValue) -> Optional[LookupKey]:
+    def __call__(self, value: RuntimeValue) -> LookupKey | None:
         return self._fn(value)
 
 
@@ -54,9 +54,9 @@ def to_str(value: ConvertibleToStr) -> str:
     return str(value)
 
 
-def to_int_tuple(value: ConvertibleToIntTuple) -> Tuple[int, ...]:
+def to_int_tuple(value: ConvertibleToIntTuple) -> tuple[int, ...]:
     """将序列的每个元素转换为 `int`: 会抛异常哦!"""
-    converted_items: List[int] = []
+    converted_items: list[int] = []
     for item in value:
         converted_items.append(int(item))
     return tuple(converted_items)
@@ -76,7 +76,7 @@ def get_seps_values_first_int(value: RuntimeValue, sep: str = ",") -> int:
     raise TypeError(msg)
 
 
-def must_to_int(value: RuntimeValue) -> Optional[int]:
+def must_to_int(value: RuntimeValue) -> int | None:
     """强制转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
@@ -86,20 +86,20 @@ def must_to_int(value: RuntimeValue) -> Optional[int]:
         return None
 
 
-def must_to_str(value: RuntimeValue) -> Optional[str]:
+def must_to_str(value: RuntimeValue) -> str | None:
     """强制转换为 `str`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
     return str(value)
 
 
-def must_to_int_tuple(value: RuntimeValue) -> Optional[Tuple[int, ...]]:
+def must_to_int_tuple(value: RuntimeValue) -> tuple[int, ...] | None:
     """强制将序列的每个元素转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
     if not _is_sequence(value):
         return None
-    converted_items: List[int] = []
+    converted_items: list[int] = []
     for item in value:
         converted = must_to_int(item)
         if converted is None:
@@ -108,7 +108,7 @@ def must_to_int_tuple(value: RuntimeValue) -> Optional[Tuple[int, ...]]:
     return tuple(converted_items)
 
 
-def must_get_seps_values_first_int(value: RuntimeValue, sep: str = ",") -> Optional[int]:
+def must_get_seps_values_first_int(value: RuntimeValue, sep: str = ",") -> int | None:
     """强制从分割字符串提取第一个值并转换为 `int`: 抑制异常,异常时为 `None`"""
     if value is None:
         return None
@@ -150,7 +150,7 @@ def _format_decimal_no_exponent(d: Decimal) -> str:
     return result or "0"
 
 
-def auto_str_normalize(value: RuntimeValue) -> Optional[str]:  # noqa: C901, PLR0911, PLR0912
+def auto_str_normalize(value: RuntimeValue) -> str | None:  # noqa: C901, PLR0911, PLR0912
     """将值规范化为稳定的字符串形式,用于关联键匹配
 
     规则:
@@ -207,7 +207,7 @@ def auto_str_normalize(value: RuntimeValue) -> Optional[str]:  # noqa: C901, PLR
     return None
 
 
-def auto_normalize_key(value: RuntimeValue) -> Optional[LookupKey]:  # noqa: PLR0911
+def auto_normalize_key(value: RuntimeValue) -> LookupKey | None:  # noqa: PLR0911
     """自动规范化关联键,尝试类型转换后回退到 `auto_str_normalize`
 
     策略:
@@ -244,13 +244,13 @@ def auto_normalize_key(value: RuntimeValue) -> Optional[LookupKey]:  # noqa: PLR
     return auto_str_normalize(value)
 
 
-def auto_str_normalize_key(value: RuntimeValue) -> Tuple[Optional[LookupKey], str, Optional[str]]:
+def auto_str_normalize_key(value: RuntimeValue) -> tuple[LookupKey | None, str, str | None]:
     """将 `key` 规范化为稳定字符串口径(单键或复合键).
 
     语义:
     - 输入值为 `None` 视为“空值”: 返回 `(None, "null_key", None)`
     - 输入值非 `None` 但规范化失败: 返回 `(None, "type_error", <message>)`
-    - 复合键逐字段规范化并构造 `Tuple[str, ...]`
+    - 复合键逐字段规范化并构造 `tuple[str, ...]`
 
     注意: 返回的 `message` 不得包含明细值(避免泄露敏感数据).
     """
@@ -258,20 +258,20 @@ def auto_str_normalize_key(value: RuntimeValue) -> Tuple[Optional[LookupKey], st
         return None, "null_key", None
 
     if _is_sequence(value):
-        out: List[str] = []
+        out: list[str] = []
         for idx, item in enumerate(value):
             if item is None:
                 return None, "null_key", None
             normalized = auto_str_normalize(item)
             if normalized is None:
-                msg = "key_normalization failed for tuple element #{} (type={})".format(idx, type(item).__name__)
+                msg = f"key_normalization failed for tuple element #{idx} (type={type(item).__name__})"
                 return None, "type_error", msg
             out.append(normalized)
         return tuple(out), "ok", None
 
     normalized = auto_str_normalize(value)
     if normalized is None:
-        msg = "key_normalization failed (type={})".format(type(value).__name__)
+        msg = f"key_normalization failed (type={type(value).__name__})"
         return None, "type_error", msg
 
     return normalized, "ok", None

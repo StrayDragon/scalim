@@ -1,12 +1,14 @@
 # region imports
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Hashable, Iterator, Mapping, Sequence
 from contextlib import suppress
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, List, Mapping, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+
+from typing_extensions import Self, override
 
 from ..._internal.utils import atomic_paths as _atomic_paths
 from ...typedefs import CellValue, FieldValue, LoaderResultMapping, RowData, RuntimeValue, SinkRowKeySeq
-from ...vendor.compact.typing_extensionsx import Protocol, Self, override, runtime_checkable
 
 if TYPE_CHECKING:
     import types
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 
 ColumnValues = Mapping[Hashable, CellValue]
 ColumnBatch = Mapping[str, ColumnValues]
-ColumnData = Dict[str, Dict[Hashable, CellValue]]
+ColumnData = dict[str, dict[Hashable, CellValue]]
 
 # 从 `_internal.utils.atomic_paths` 再导出,兼容既有导入路径.
 atomic_replace_temp_path = _atomic_paths.atomic_replace_temp_path
@@ -38,7 +40,7 @@ def update_columns(columns: ColumnData, updates: ColumnBatch) -> None:
 
 def store_rows_as_columns(
     rows: Sequence[RowData],
-    row_ids: List[Hashable],
+    row_ids: list[Hashable],
     columns: ColumnData,
     pk_factory: Callable[[int], Hashable],
     append_unique: bool = True,  # noqa: FBT001, FBT002
@@ -53,9 +55,9 @@ def store_rows_as_columns(
             columns[field_key][pk] = value
 
 
-def iter_row_values(row_ids: "SinkRowKeySeq", field_names: Sequence[str], columns: ColumnData) -> Iterator[List[CellValue]]:
+def iter_row_values(row_ids: "SinkRowKeySeq", field_names: Sequence[str], columns: ColumnData) -> Iterator[list[CellValue]]:
     for pk in row_ids:
-        row_values: List[CellValue] = []
+        row_values: list[CellValue] = []
         for field_name in field_names:
             column_data = columns.get(field_name, {})
             row_values.append(column_data.get(pk))
@@ -284,7 +286,7 @@ def discard_sink(sink: RuntimeValue) -> None:
             _ = discard()
 
 
-def exit_sink(sink: RuntimeValue, exc_type: Optional[Type[BaseException]]) -> None:
+def exit_sink(sink: RuntimeValue, exc_type: type[BaseException] | None) -> None:
     """`CM` 退出:成功则 `close()`;异常则 `discard()` 且 `MUST NOT` 成功 `promote`."""
     if exc_type is not None:
         with suppress(Exception):
@@ -322,8 +324,8 @@ class BaseSink(ISink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)
@@ -357,8 +359,8 @@ class BaseRowSink(IRowSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)
@@ -392,8 +394,8 @@ class BaseColumnSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)

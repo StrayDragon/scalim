@@ -6,16 +6,18 @@
 """
 
 from abc import ABC
+from collections.abc import Iterator
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Iterator, List, Optional, Tuple, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, cast
+
+from typing_extensions import override
 
 from .._internal.utils.excel import escape_excel_formula
 from .._internal.utils.openpyxl_helpers import save_openpyxl_workbook_atomic as _save_openpyxl_workbook_atomic_impl
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
 from ..typedefs import CellValue
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 from .resources_csv import build_alignment_mapping, describe_header_diff
 from .resources_workbook import best_effort_close_write_only_workbook_worksheets, get_openpyxl_workbook_class
@@ -35,11 +37,11 @@ def _save_openpyxl_workbook_atomic(workbook: "Workbook", *, output_path: str) ->
     try:
         _save_openpyxl_workbook_atomic_impl(workbook, output_path=output_path)
     except Exception as exc:
-        msg = "Sheetbook export failed: {}: {}".format(type(exc).__name__, exc)
+        msg = f"Sheetbook export failed: {type(exc).__name__}: {exc}"
         raise ScalimWorkflowWriteError(msg) from exc
 
 
-def _sheetbook_has_alignment_mismatch(expected: List[str], input_header: List[str], *, align_by: str) -> bool:
+def _sheetbook_has_alignment_mismatch(expected: list[str], input_header: list[str], *, align_by: str) -> bool:
     if str(align_by) == "field_id":
         exp_set = {str(x) for x in expected}
         act_set = {str(x) for x in input_header}
@@ -49,7 +51,7 @@ def _sheetbook_has_alignment_mismatch(expected: List[str], input_header: List[st
     return list(input_header) != list(expected)
 
 
-def _sheetbook_decide_alignment_action(expected: List[str], input_header: List[str], *, align_by: str, on_mismatch: str) -> str:
+def _sheetbook_decide_alignment_action(expected: list[str], input_header: list[str], *, align_by: str, on_mismatch: str) -> str:
     if not _sheetbook_has_alignment_mismatch(expected, input_header, align_by=str(align_by)):
         return "ok"
     if str(on_mismatch) in {"error", "warn", "skip"}:
@@ -57,12 +59,12 @@ def _sheetbook_decide_alignment_action(expected: List[str], input_header: List[s
     return "error"
 
 
-def _sheetbook_has_duplicate_producer_write(segments: List["_SheetBookSegment"], *, producer_node_id: str) -> bool:
+def _sheetbook_has_duplicate_producer_write(segments: list["_SheetBookSegment"], *, producer_node_id: str) -> bool:
     needle = str(producer_node_id)
     return any(str(seg.producer_node_id) == needle for seg in segments)
 
 
-def _sheetbook_find_cutoff_index(segments: List["_SheetBookSegment"], *, producer_node_id: str) -> Optional[int]:
+def _sheetbook_find_cutoff_index(segments: list["_SheetBookSegment"], *, producer_node_id: str) -> int | None:
     needle = str(producer_node_id)
     for idx, seg in enumerate(segments):
         if str(seg.producer_node_id) == needle:
@@ -71,15 +73,15 @@ def _sheetbook_find_cutoff_index(segments: List["_SheetBookSegment"], *, produce
 
 
 def _sheetbook_collect_visible_segments(
-    segments: List["_SheetBookSegment"],
+    segments: list["_SheetBookSegment"],
     *,
     cutoff_idx: int,
     producer_node_id: str,
-    visible_producer_node_ids: FrozenSet[str],
-) -> List[Tuple[str, List[List[CellValue]]]]:
+    visible_producer_node_ids: frozenset[str],
+) -> list[tuple[str, list[list[CellValue]]]]:
     producer = str(producer_node_id)
     visible = frozenset(str(x) for x in visible_producer_node_ids)
-    out: List[Tuple[str, List[List[CellValue]]]] = []
+    out: list[tuple[str, list[list[CellValue]]]] = []
     for seg in segments[: int(cutoff_idx) + 1]:
         seg_producer = str(seg.producer_node_id)
         if seg_producer != producer and seg_producer not in visible:
@@ -89,18 +91,18 @@ def _sheetbook_collect_visible_segments(
 
 
 def _iter_sheetbook_row_dicts(
-    baseline_header: List[str],
-    segments: List[Tuple[str, List[List[CellValue]]]],
-) -> Iterator[Dict[str, CellValue]]:
+    baseline_header: list[str],
+    segments: list[tuple[str, list[list[CellValue]]]],
+) -> Iterator[dict[str, CellValue]]:
     for _seg_producer, seg_rows in segments:
         for row_values in seg_rows:
-            row: Dict[str, CellValue] = {}
+            row: dict[str, CellValue] = {}
             for idx, key in enumerate(baseline_header):
                 row[str(key)] = row_values[idx] if idx >= 0 and idx < len(row_values) else ""
             yield row
 
 
-def _sorted_sheetbook_segments(segments: List["_SheetBookSegment"]) -> List["_SheetBookSegment"]:
+def _sorted_sheetbook_segments(segments: list["_SheetBookSegment"]) -> list["_SheetBookSegment"]:
     return sorted(segments, key=lambda seg: (int(seg.decl_order), str(seg.producer_node_id)))
 
 
@@ -128,7 +130,7 @@ def _write_sheetbook_plan_to_openpyxl_workbook(workbook: "Workbook", plan: "_She
 @dataclass(frozen=True)
 class SheetBookDef:
     resource_id: str
-    export_path: Optional[str]
+    export_path: str | None
     export_allow_formulas: bool = True
 
 
@@ -136,64 +138,61 @@ class SheetBookDef:
 class _SheetBookSegment:
     producer_node_id: str
     decl_order: int
-    rows: List[List[CellValue]]
+    rows: list[list[CellValue]]
     header_policy: str
 
 
 @dataclass
 class _SheetBookSheetPlan:
     sheet: str
-    baseline_header: List[str]
-    export_header: Optional[List[str]]
-    segments: List[_SheetBookSegment]
+    baseline_header: list[str]
+    export_header: list[str] | None
+    segments: list[_SheetBookSegment]
 
 
 @dataclass
 class _SheetBookPlan:
     resource_id: str
-    export_path: Optional[str]
+    export_path: str | None
     export_allow_formulas: bool
-    sheet_decl_order: Dict[str, int]
-    sheet_order: List[str]
-    sheets: Dict[str, _SheetBookSheetPlan]
-    last_workflow_node_id: Optional[str] = None
+    sheet_decl_order: dict[str, int]
+    sheet_order: list[str]
+    sheets: dict[str, _SheetBookSheetPlan]
+    last_workflow_node_id: str | None = None
 
 
 class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
     @staticmethod
-    def _sheetbook_has_alignment_mismatch(expected: List[str], input_header: List[str], *, align_by: str) -> bool:
+    def _sheetbook_has_alignment_mismatch(expected: list[str], input_header: list[str], *, align_by: str) -> bool:
         return _sheetbook_has_alignment_mismatch(expected, input_header, align_by=str(align_by))
 
     @staticmethod
-    def _normalize_sheetbook_export_header(expected: List[str], export_header: Optional[Tuple[str, ...]]) -> List[str]:
+    def _normalize_sheetbook_export_header(expected: list[str], export_header: tuple[str, ...] | None) -> list[str]:
         if export_header is None:
             return list(expected)
 
         resolved = [str(x) for x in export_header]
         if len(resolved) != len(expected):
-            msg = "Sheetbook export header width mismatch: expected={}, actual={}".format(len(expected), len(resolved))
+            msg = f"Sheetbook export header width mismatch: expected={len(expected)}, actual={len(resolved)}"
             raise ScalimWorkflowWriteError(msg)
         return resolved
 
     @classmethod
     def _resolve_sheetbook_export_header(
         cls,
-        expected: List[str],
+        expected: list[str],
         *,
-        export_header: Optional[Tuple[str, ...]],
-        existing_export_header: Optional[List[str]] = None,
-        sheetbook_id: Optional[str] = None,
-        sheet_name: Optional[str] = None,
-    ) -> List[str]:
+        export_header: tuple[str, ...] | None,
+        existing_export_header: list[str] | None = None,
+        sheetbook_id: str | None = None,
+        sheet_name: str | None = None,
+    ) -> list[str]:
         resolved = cls._normalize_sheetbook_export_header(expected, export_header)
         if existing_export_header is not None and list(existing_export_header) != list(resolved):
-            msg = "Sheetbook export header baseline mismatch: sheetbook={!r}, sheet={!r}".format(
-                str(sheetbook_id),
-                str(sheet_name),
-            )
+            msg = f"Sheetbook export header baseline mismatch: sheetbook={str(sheetbook_id)!r}, sheet={str(sheet_name)!r}"
             diff = [
-                "existing_export_header={!r}".format(list(existing_export_header)),
-                "new_export_header={!r}".format(list(resolved)),
+                f"existing_export_header={list(existing_export_header)!r}",
+                f"new_export_header={list(resolved)!r}",
             ]
             raise ScalimWorkflowWriteError(msg, diff=diff)
         return resolved
@@ -212,7 +211,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheetbook_id: str,
         sheet_name: str,
         on_conflict: str,
-    ) -> Tuple[str, bool]:
+    ) -> tuple[str, bool]:
         action = "write"
         pending_skip = False
         existing = plan.sheets.get(sheet_name)
@@ -222,7 +221,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
                 plan.last_workflow_node_id = str(workflow_node_id)
                 pending_skip = True
             if on_conflict == "error":
-                msg = "Sheet conflict (sheetbook_sheet): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                msg = f"Sheet conflict (sheetbook_sheet): sheetbook={str(sheetbook_id)!r}, sheet={sheet_name!r}"
                 raise ScalimWorkflowWriteError(msg, diff=["on_conflict=error", "existing_sheet=present"])
             if on_conflict == "overwrite":
                 action = "overwrite"
@@ -236,9 +235,9 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet_name: str,
         decl_order: int,
         input_node_id: str,
-        expected: List[str],
-        export_header: Optional[Tuple[str, ...]],
-        rows: List[List[CellValue]],
+        expected: list[str],
+        export_header: tuple[str, ...] | None,
+        rows: list[list[CellValue]],
     ) -> None:
         existing_decl_order = plan.sheet_decl_order.get(sheet_name)
         resolved_decl_order = int(decl_order)
@@ -277,14 +276,14 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet_name: str,
         decl_order: int,
         input_node_id: str,
-        input_header: List[str],
-        export_header: Optional[Tuple[str, ...]],
+        input_header: list[str],
+        export_header: tuple[str, ...] | None,
         align_by: str,
         on_mismatch: str,
-    ) -> Tuple[List[str], List[int], Optional[DiagnosticWarningEvent], Optional[Dict[str, Any]], bool]:
+    ) -> tuple[list[str], list[int], DiagnosticWarningEvent | None, dict[str, Any] | None, bool]:
         msg: str
-        pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, Any]] = None
+        pending_warning: DiagnosticWarningEvent | None = None
+        pending_warning_meta: dict[str, Any] | None = None
         pending_skip = False
 
         sheet_plan = plan.sheets.get(sheet_name)
@@ -327,11 +326,11 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         if action != "ok":
             diff = _describe_header_diff(expected, input_header)
             if action == "error":
-                msg = "Field alignment mismatch (sheetbook_append): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+                msg = f"Field alignment mismatch (sheetbook_append): sheetbook={str(sheetbook_id)!r}, sheet={sheet_name!r}"
                 raise ScalimWorkflowWriteError(msg, diff=diff)
             if action == "warn":
                 pending_warning = DiagnosticWarningEvent(
-                    message="Field alignment mismatch (warn): sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name),
+                    message=f"Field alignment mismatch (warn): sheetbook={str(sheetbook_id)!r}, sheet={sheet_name!r}",
                     source_id=None,
                     field_id=None,
                     lookup_key={"expected": expected, "actual": list(input_header)},
@@ -344,12 +343,8 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
         # 重复写入检测: 同一生产者不应写入同一工作表多次.
         if not pending_skip and _sheetbook_has_duplicate_producer_write(sheet_plan.segments, producer_node_id=str(input_node_id)):
-            msg = "Duplicate sheetbook write for the same producer: sheetbook={!r}, sheet={!r}, producer={!r}".format(
-                str(sheetbook_id),
-                sheet_name,
-                str(input_node_id),
-            )
-            raise ScalimWorkflowWriteError(msg, diff=["producer_node_id={!r}".format(str(input_node_id))])
+            msg = f"Duplicate sheetbook write for the same producer: sheetbook={str(sheetbook_id)!r}, sheet={sheet_name!r}, producer={str(input_node_id)!r}"  # noqa: E501
+            raise ScalimWorkflowWriteError(msg, diff=[f"producer_node_id={str(input_node_id)!r}"])
         return expected, mapping, pending_warning, pending_warning_meta, pending_skip
 
     def _sheetbook_append_apply(
@@ -361,12 +356,12 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         workflow_node_id: str,
         input_node_id: str,
         decl_order: int,
-        rows: List[List[CellValue]],
+        rows: list[list[CellValue]],
         header_policy: str,
     ) -> None:
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:  # pragma: no cover  # pragma: allow-no-cover unreachable: sheet_plan always exists
-            msg = "Sheetbook sheet missing during append: sheetbook={!r}, sheet={!r}".format(str(sheetbook_id), sheet_name)
+            msg = f"Sheetbook sheet missing during append: sheetbook={str(sheetbook_id)!r}, sheet={sheet_name!r}"
             raise ScalimWorkflowWriteError(msg)
 
         sheet_plan.segments.append(
@@ -381,13 +376,13 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
 
     def _get_or_create_sheetbook(self, sheetbook_id: str, *, workflow_node_id: str) -> _SheetBookPlan:
         key = str(sheetbook_id)
-        existing = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(key))  # pragma: allow-cast sheetbook plan typed narrowing
+        existing = cast("_SheetBookPlan | None", self._sheetbooks.get(key))  # pragma: allow-cast sheetbook plan typed narrowing
         if existing is not None:
             return existing
 
         raw_def = self._sheetbook_defs.get(key)
         if raw_def is None:
-            msg = "Unknown sheetbook resource id: {!r}".format(key)
+            msg = f"Unknown sheetbook resource id: {key!r}"
             raise ScalimWorkflowWriteError(msg)
 
         raw_def = cast("SheetBookDef", raw_def)  # pragma: allow-cast sheetbook def typed narrowing
@@ -421,7 +416,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         input_output_id: str,
         input_csv: WorkflowTabularInput,
         on_conflict: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         plan = self._get_or_create_sheetbook(sheetbook_id, workflow_node_id=str(workflow_node_id))
         sheet_name = str(sheet)
@@ -491,7 +486,7 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         align_by: str,
         header_policy: str,
         on_mismatch: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         if str(align_by or "field_id") == "header":
             msg = (
@@ -565,11 +560,11 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         self,
         *,
         consumer_node_id: str,
-        visible_producer_node_ids: FrozenSet[str],
+        visible_producer_node_ids: frozenset[str],
         producer_node_id: str,
         sheetbook_id: str,
         sheet: str,
-    ) -> Iterator[Dict[str, CellValue]]:
+    ) -> Iterator[dict[str, CellValue]]:
         """读取 `sheetbook` 的行快照(按 `ref.node` 截断;按依赖可见性过滤).
 
         返回: `Iterator[Dict[str, CellValue]]`.
@@ -580,19 +575,19 @@ class _WorkflowSheetBookResourceMixin(WorkflowResourceManagerBase, ABC):
         sheet_name = str(sheet)
         visible = frozenset(str(x) for x in visible_producer_node_ids)
 
-        plan = cast("Optional[_SheetBookPlan]", self._sheetbooks.get(sb_id))  # pragma: allow-cast sheetbook plan typed narrowing
+        plan = cast("_SheetBookPlan | None", self._sheetbooks.get(sb_id))  # pragma: allow-cast sheetbook plan typed narrowing
         if plan is None:
-            msg = "Unknown sheetbook resource id: {!r}".format(sb_id)
+            msg = f"Unknown sheetbook resource id: {sb_id!r}"
             raise ValueError(msg)
         sheet_plan = plan.sheets.get(sheet_name)
         if sheet_plan is None:
-            msg = "Unknown sheetbook sheet: sheetbook={!r}, sheet={!r}".format(sb_id, sheet_name)
+            msg = f"Unknown sheetbook sheet: sheetbook={sb_id!r}, sheet={sheet_name!r}"
             raise ValueError(msg)
 
         ordered_segments = _sorted_sheetbook_segments(list(sheet_plan.segments))
         cutoff_idx = _sheetbook_find_cutoff_index(ordered_segments, producer_node_id=producer)
         if cutoff_idx is None:
-            msg = "Unknown sheetbook ref node for sheet: node={!r}, sheetbook={!r}, sheet={!r}".format(producer, sb_id, sheet_name)
+            msg = f"Unknown sheetbook ref node for sheet: node={producer!r}, sheetbook={sb_id!r}, sheet={sheet_name!r}"
             raise ValueError(msg)
 
         baseline_header = list(sheet_plan.baseline_header)

@@ -1,31 +1,26 @@
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Tuple, Union
 
 __all__ = ()
 
 
 def normalize_allowed_yaml_roots(
-    allowed_yaml_roots: Optional[Iterable[Union[str, Path]]],
+    allowed_yaml_roots: Iterable[str | Path] | None,
     *,
     default_root: Path,
-) -> Tuple[Path, ...]:
+) -> tuple[Path, ...]:
     """归一化读取 `YAML` 文件的允许根目录(`allowed_yaml_roots`)策略.
 
     - 无论调用方是否显式提供,都会包含入口 `YAML` 的所在目录 `default_root`.
     - 所有根目录都必须存在且为目录(否则快速失败,避免静默误配置).
     - 返回去重后的绝对路径列表(稳定顺序,便于错误诊断比较).
     """
-    roots_by_str: Dict[str, Path] = {}
+    roots_by_str: dict[str, Path] = {}
 
-    def _add_root(raw_root: Union[str, Path]) -> None:
+    def _add_root(raw_root: str | Path) -> None:
         root = Path(str(raw_root)).expanduser().resolve(strict=False)
         if not root.exists() or not root.is_dir():
-            msg = "allowed_yaml_roots must be existing directories: root='{}' | resolved='{}' | exists={} | is_dir={}".format(
-                str(raw_root),
-                str(root),
-                bool(root.exists()),
-                bool(root.is_dir()),
-            )
+            msg = f"allowed_yaml_roots must be existing directories: root='{raw_root!s}' | resolved='{root!s}' | exists={bool(root.exists())} | is_dir={bool(root.is_dir())}"  # noqa: E501
             raise ValueError(msg)
         roots_by_str[str(root)] = root
 

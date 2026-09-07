@@ -1,8 +1,9 @@
 import difflib
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any
 
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.scalarstring import (
@@ -16,9 +17,9 @@ from ruamel.yaml.scalarstring import (
 
 from scalim.vendor.yamlx.ruamel.yaml import YAML
 
-_EXCLUDED_DIR_NAMES: Tuple[str, ...] = (".tmp", "dist")
+_EXCLUDED_DIR_NAMES: tuple[str, ...] = (".tmp", "dist")
 
-_TARGET_KEYS: Tuple[str, ...] = ("loader", "call_by", "compute")
+_TARGET_KEYS: tuple[str, ...] = ("loader", "call_by", "compute")
 _TARGET_RETRY_KEY = "retry"
 _TARGET_RETRY_SHOULD_RETRY_KEY = "should_retry"
 
@@ -31,7 +32,7 @@ class TextPosition:
     line: int
     character: int
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {"line": self.line, "character": self.character}
 
 
@@ -40,7 +41,7 @@ class TextRange:
     start: TextPosition
     end: TextPosition
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {"start": self.start.as_dict(), "end": self.end.as_dict()}
 
 
@@ -52,7 +53,7 @@ class LintIssue:
     path: str
     range: TextRange
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "code": self.code,
             "severity": self.severity,
@@ -62,24 +63,24 @@ class LintIssue:
         }
 
 
-def discover_yaml_files(paths: Sequence[Path]) -> Tuple[List[Path], List[str]]:
-    errors: List[str] = []
-    output: List[Path] = []
+def discover_yaml_files(paths: Sequence[Path]) -> tuple[list[Path], list[str]]:
+    errors: list[str] = []
+    output: list[Path] = []
 
     for raw in paths:
         path = Path(raw)
         if not path.exists():
-            errors.append("Path does not exist: {}".format(path))
+            errors.append(f"Path does not exist: {path}")
             continue
         if path.is_file():
             if path.suffix.lower() not in (".yaml", ".yml"):
-                errors.append("Not a YAML file: {}".format(path))
+                errors.append(f"Not a YAML file: {path}")
                 continue
             output.append(path)
             continue
 
         if not path.is_dir():
-            errors.append("Not a file or directory: {}".format(path))
+            errors.append(f"Not a file or directory: {path}")
             continue
 
         output.extend(_iter_yaml_files_recursively(path))
@@ -103,11 +104,11 @@ def _has_excluded_parent(path: Path) -> bool:
     return any(part in _EXCLUDED_DIR_NAMES for part in path.parts)
 
 
-def format_yaml_dsl_file(path: Path) -> Tuple[bool, Optional[str], Optional[str]]:
+def format_yaml_dsl_file(path: Path) -> tuple[bool, str | None, str | None]:
     try:
         old_text = path.read_text(encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
-        return False, None, "Failed to read: {}: {}".format(type(exc).__name__, exc)
+        return False, None, f"Failed to read: {type(exc).__name__}: {exc}"
 
     new_text, changed, error = format_yaml_dsl_text(old_text)
     if error is not None:
@@ -118,17 +119,17 @@ def format_yaml_dsl_file(path: Path) -> Tuple[bool, Optional[str], Optional[str]
     try:
         _ = path.write_text(new_text, encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
-        return False, None, "Failed to write: {}: {}".format(type(exc).__name__, exc)
+        return False, None, f"Failed to write: {type(exc).__name__}: {exc}"
     return True, new_text, None
 
 
-def format_yaml_dsl_text(text: str) -> Tuple[str, bool, Optional[str]]:
+def format_yaml_dsl_text(text: str) -> tuple[str, bool, str | None]:
     yaml_rt = _make_yaml_rt(text)
 
     try:
         data = yaml_rt.load(text)
     except Exception as exc:  # noqa: BLE001
-        return text, False, "YAML parse failed: {}: {}".format(type(exc).__name__, exc)
+        return text, False, f"YAML parse failed: {type(exc).__name__}: {exc}"
 
     if data is None:
         return text, False, None
@@ -141,7 +142,7 @@ def format_yaml_dsl_text(text: str) -> Tuple[str, bool, Optional[str]]:
     try:
         yaml_rt.dump(data, buf)
     except Exception as exc:  # noqa: BLE001
-        return text, False, "YAML dump failed: {}: {}".format(type(exc).__name__, exc)
+        return text, False, f"YAML dump failed: {type(exc).__name__}: {exc}"
 
     new_text = buf.getvalue()
     return new_text, new_text != text, None
@@ -159,12 +160,12 @@ def diff_text(*, old_text: str, new_text: str, path: Path) -> str:
     return "".join(diff)
 
 
-def lint_yaml_dsl_text(text: str, *, source_path: str) -> Tuple[List[LintIssue], Optional[str]]:
+def lint_yaml_dsl_text(text: str, *, source_path: str) -> tuple[list[LintIssue], str | None]:
     yaml_rt = _make_yaml_rt(text)
     try:
         data = yaml_rt.load(text)
     except Exception as exc:  # noqa: BLE001
-        msg = "YAML parse failed: {}: {}".format(type(exc).__name__, exc)
+        msg = f"YAML parse failed: {type(exc).__name__}: {exc}"
         return [
             LintIssue(
                 code="YDL000",
@@ -179,7 +180,7 @@ def lint_yaml_dsl_text(text: str, *, source_path: str) -> Tuple[List[LintIssue],
         return [], None
 
     source_lines = text.splitlines()
-    issues: List[LintIssue] = []
+    issues: list[LintIssue] = []
     for parent, key, value, key_kind in _iter_target_fields(data):
         issue_range = _issue_range_for_value(source_lines, parent, key)
         if issue_range is None:
@@ -224,7 +225,7 @@ def _apply_formatting_inplace(data: Any) -> bool:
     return changed
 
 
-def _iter_target_fields(obj: Any) -> Iterator[Tuple[CommentedMap, str, Any, str]]:
+def _iter_target_fields(obj: Any) -> Iterator[tuple[CommentedMap, str, Any, str]]:
     if isinstance(obj, CommentedMap):
         for key, value in obj.items():
             if isinstance(key, str) and key in _TARGET_KEYS:
@@ -245,7 +246,7 @@ def _iter_target_fields(obj: Any) -> Iterator[Tuple[CommentedMap, str, Any, str]
         yield from _iter_target_fields(child)
 
 
-def _value_position(parent: CommentedMap, key: str) -> Optional[Tuple[int, int]]:
+def _value_position(parent: CommentedMap, key: str) -> tuple[int, int] | None:
     loc = parent.lc.data.get(key)  # type: ignore[attr-defined]  # pragma: allow-dynattr third-party: ruamel lc
     if not loc or len(loc) < _LC_DATA_VALUE_POS_LEN:
         return None
@@ -313,7 +314,7 @@ def _is_safe_plain_scalar(value: str) -> bool:
     try:
         yaml_safe = YAML(typ="safe")
         yaml_safe.version = (1, 2)
-        data = yaml_safe.load("x: {}\n".format(value))
+        data = yaml_safe.load(f"x: {value}\n")
     except Exception:  # noqa: BLE001
         return False
     if not isinstance(data, dict):
@@ -337,7 +338,7 @@ def _single_pos_range(*, line: int, character: int) -> TextRange:
     return TextRange(start=pos, end=pos)
 
 
-def _issue_range_for_value(source_lines: Sequence[str], parent: CommentedMap, key: str) -> Optional[TextRange]:
+def _issue_range_for_value(source_lines: Sequence[str], parent: CommentedMap, key: str) -> TextRange | None:
     loc = _value_position(parent, key)
     if loc is None:
         return None
@@ -357,8 +358,8 @@ def _lint_target_field_value(
     value: Any,
     issue_range: TextRange,
     source_path: str,
-) -> List[LintIssue]:
-    issues: List[LintIssue] = []
+) -> list[LintIssue]:
+    issues: list[LintIssue] = []
 
     if key_kind == "call_by" and _is_long_single_line_call_by(value):
         issues.append(
@@ -376,7 +377,7 @@ def _lint_target_field_value(
             LintIssue(
                 code="YDL002",
                 severity="error",
-                message="value is not a string (YAML parsed as {}); quote it if you intended a string".format(type(value).__name__),
+                message=f"value is not a string (YAML parsed as {type(value).__name__}); quote it if you intended a string",
                 path=source_path,
                 range=issue_range,
             )
@@ -405,13 +406,11 @@ def _lint_target_field_value(
 
 def _iter_children(obj: Any) -> Iterator[Any]:
     if isinstance(obj, (CommentedSeq, list)):
-        for item in obj:
-            yield item
+        yield from obj
         return
 
     if isinstance(obj, dict):
-        for value in obj.values():
-            yield value
+        yield from obj.values()
         return
 
 

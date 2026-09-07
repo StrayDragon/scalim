@@ -1,8 +1,8 @@
 # region imports
 
-from typing import Dict, List, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from ..vendor.dataclassesx import dataclass
 from ._events import (
     AdaptiveSchedulerDecisionEvent,
     BatchEndEvent,
@@ -120,7 +120,7 @@ class EventDescriptor:
     """负载类型名称(通常为事件数据类名)."""
 
 
-_EVENT_CATALOG: List[EventDescriptor] = [
+_EVENT_CATALOG: list[EventDescriptor] = [
     EventDescriptor(
         name=EVENT_PIPELINE_START,
         summary="pipeline 启动",
@@ -372,11 +372,11 @@ _EVENT_CATALOG: List[EventDescriptor] = [
 ]
 
 
-def get_event_catalog() -> List[EventDescriptor]:
+def get_event_catalog() -> list[EventDescriptor]:
     return list(_EVENT_CATALOG)
 
 
-def get_event_catalog_map() -> Dict[str, EventDescriptor]:
+def get_event_catalog_map() -> dict[str, EventDescriptor]:
     return {item.name: item for item in _EVENT_CATALOG}
 
 

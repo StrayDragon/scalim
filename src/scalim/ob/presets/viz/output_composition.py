@@ -1,6 +1,5 @@
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
-
-from ....vendor.compact.typing_extensionsx import Protocol
+from collections.abc import Iterable
+from typing import Any, Protocol, cast
 
 
 class _OutputSpecLike(Protocol):
@@ -14,13 +13,13 @@ class _ExportLayoutLike(Protocol):
 
 class _OutputTargetNodeLike(Protocol):
     target_id: Any
-    output: Optional[_OutputSpecLike]
+    output: _OutputSpecLike | None
     is_primary: bool
 
 
 class _OutputTargetDirectLike(_OutputTargetNodeLike, Protocol):
-    layout: Optional[_ExportLayoutLike]
-    requires: Optional[Tuple[str, ...]]
+    layout: _ExportLayoutLike | None
+    requires: tuple[str, ...] | None
 
 
 class _DerivedSpecLike(Protocol):
@@ -28,29 +27,29 @@ class _DerivedSpecLike(Protocol):
 
 
 class _OutputTargetDerivedLike(_OutputTargetNodeLike, Protocol):
-    derived: Optional[_DerivedSpecLike]
-    requires: Optional[Tuple[str, ...]]
+    derived: _DerivedSpecLike | None
+    requires: tuple[str, ...] | None
 
 
 class _OutputSheetLike(Protocol):
     target_id: Any
-    output: Optional[_OutputSpecLike]
+    output: _OutputSpecLike | None
     sheet_name: Any
 
 
 class _OutputCompositionLike(Protocol):
     targets: Iterable[_OutputTargetDirectLike]
     derived_targets: Iterable[_OutputTargetDerivedLike]
-    meta_sheet: Optional[_OutputSheetLike]
-    audit_sheet: Optional[_OutputSheetLike]
+    meta_sheet: _OutputSheetLike | None
+    audit_sheet: _OutputSheetLike | None
 
 
-def _get_snapshot_node_ids(snapshot: Dict[str, Any]) -> Set[str]:
-    ids: Set[str] = set()
+def _get_snapshot_node_ids(snapshot: dict[str, Any]) -> set[str]:
+    ids: set[str] = set()
     nodes_value = snapshot.get("nodes")
     if not isinstance(nodes_value, list):
         return ids
-    nodes = cast("List[Dict[str, Any]]", nodes_value)  # pragma: allow-cast snapshot nodes typed narrowing
+    nodes = cast("list[dict[str, Any]]", nodes_value)  # pragma: allow-cast snapshot nodes typed narrowing
     for item in nodes:
         node_id = item.get("id")
         if node_id:
@@ -58,17 +57,17 @@ def _get_snapshot_node_ids(snapshot: Dict[str, Any]) -> Set[str]:
     return ids
 
 
-def _ensure_snapshot_list(snapshot: Dict[str, Any], key: str) -> List[Dict[str, Any]]:
+def _ensure_snapshot_list(snapshot: dict[str, Any], key: str) -> list[dict[str, Any]]:
     value = snapshot.get(key)
     if isinstance(value, list):
-        return cast("List[Dict[str, Any]]", value)  # pragma: allow-cast snapshot list typed narrowing
-    out: List[Dict[str, Any]] = []
+        return cast("list[dict[str, Any]]", value)  # pragma: allow-cast snapshot list typed narrowing
+    out: list[dict[str, Any]] = []
     snapshot[key] = out
     return out
 
 
-def _get_snapshot_edge_keys(edges: List[Dict[str, Any]]) -> Set[Tuple[str, str, str]]:
-    keys: Set[Tuple[str, str, str]] = set()
+def _get_snapshot_edge_keys(edges: list[dict[str, Any]]) -> set[tuple[str, str, str]]:
+    keys: set[tuple[str, str, str]] = set()
     for edge in edges:
         source = str(edge.get("source") or "")
         target = str(edge.get("target") or "")
@@ -78,7 +77,7 @@ def _get_snapshot_edge_keys(edges: List[Dict[str, Any]]) -> Set[Tuple[str, str, 
     return keys
 
 
-def _as_optional_text(value: Any) -> Optional[str]:
+def _as_optional_text(value: Any) -> str | None:
     if value is None:
         return None
     text = str(value)
@@ -87,7 +86,7 @@ def _as_optional_text(value: Any) -> Optional[str]:
     return text
 
 
-def _describe_output_spec(output: Optional[_OutputSpecLike]) -> Tuple[Optional[str], Optional[str]]:
+def _describe_output_spec(output: _OutputSpecLike | None) -> tuple[str | None, str | None]:
     if output is None:
         return None, None
     output_path = _as_optional_text(output.path)
@@ -96,8 +95,8 @@ def _describe_output_spec(output: Optional[_OutputSpecLike]) -> Tuple[Optional[s
 
 
 def _append_output_target_nodes_for_targets(
-    nodes: List[Dict[str, Any]],
-    node_ids: Set[str],
+    nodes: list[dict[str, Any]],
+    node_ids: set[str],
     *,
     targets: Iterable[_OutputTargetNodeLike],
     kind: str,
@@ -119,8 +118,8 @@ def _append_output_target_nodes_for_targets(
 
 
 def _append_output_target_node_for_sheet(
-    nodes: List[Dict[str, Any]],
-    node_ids: Set[str],
+    nodes: list[dict[str, Any]],
+    node_ids: set[str],
     *,
     sheet: _OutputSheetLike,
     kind: str,
@@ -142,9 +141,9 @@ def _append_output_target_node_for_sheet(
 
 
 def _append_output_target_edges_for_direct_targets(
-    edges: List[Dict[str, Any]],
-    edge_keys: Set[Tuple[str, str, str]],
-    node_ids: Set[str],
+    edges: list[dict[str, Any]],
+    edge_keys: set[tuple[str, str, str]],
+    node_ids: set[str],
     *,
     targets: Iterable[_OutputTargetDirectLike],
 ) -> None:
@@ -165,9 +164,9 @@ def _append_output_target_edges_for_direct_targets(
 
 
 def _append_output_target_edges_for_derived_targets(
-    edges: List[Dict[str, Any]],
-    edge_keys: Set[Tuple[str, str, str]],
-    node_ids: Set[str],
+    edges: list[dict[str, Any]],
+    edge_keys: set[tuple[str, str, str]],
+    node_ids: set[str],
     *,
     targets: Iterable[_OutputTargetDerivedLike],
 ) -> None:
@@ -190,12 +189,12 @@ def _append_output_target_edges_for_derived_targets(
             _maybe_add_output_target_edge(edges, edge_keys, node_ids, source_field_id=field_id, target_id=target_id)
 
 
-def _sort_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _sort_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(nodes, key=lambda item: str(item.get("id", "")))
 
 
-def _sort_edges(edges: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    def edge_key(item: Dict[str, Any]) -> Tuple[str, str, str, str]:
+def _sort_edges(edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def edge_key(item: dict[str, Any]) -> tuple[str, str, str, str]:
         return (
             str(item.get("source", "")),
             str(item.get("target", "")),
@@ -207,20 +206,20 @@ def _sort_edges(edges: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _add_output_target_node(
-    nodes: List[Dict[str, Any]],
-    node_ids: Set[str],
+    nodes: list[dict[str, Any]],
+    node_ids: set[str],
     *,
     target_id: str,
     kind: str,
-    output_path: Optional[str],
-    sheet_name: Optional[str],
+    output_path: str | None,
+    sheet_name: str | None,
     is_primary: bool,
 ) -> None:
-    node_id = "output_target:{}".format(target_id)
+    node_id = f"output_target:{target_id}"
     if node_id in node_ids:
         return
     node_ids.add(node_id)
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "label": str(target_id),
         "target_id": str(target_id),
         "kind": str(kind),
@@ -241,9 +240,9 @@ def _add_output_target_node(
     )
 
 
-def _iter_unique_field_ids(field_ids: Iterable[str], requires: Optional[Tuple[str, ...]]) -> Tuple[str, ...]:
-    seen: Set[str] = set()
-    ordered: List[str] = []
+def _iter_unique_field_ids(field_ids: Iterable[str], requires: tuple[str, ...] | None) -> tuple[str, ...]:
+    seen: set[str] = set()
+    ordered: list[str] = []
     for item in list(field_ids) + list(requires or ()):
         key = str(item)
         if not key or key in seen:
@@ -254,15 +253,15 @@ def _iter_unique_field_ids(field_ids: Iterable[str], requires: Optional[Tuple[st
 
 
 def _maybe_add_output_target_edge(
-    edges: List[Dict[str, Any]],
-    edge_keys: Set[Tuple[str, str, str]],
-    node_ids: Set[str],
+    edges: list[dict[str, Any]],
+    edge_keys: set[tuple[str, str, str]],
+    node_ids: set[str],
     *,
     source_field_id: str,
     target_id: str,
 ) -> None:
-    source = "field:{}".format(source_field_id)
-    target = "output_target:{}".format(target_id)
+    source = f"field:{source_field_id}"
+    target = f"output_target:{target_id}"
     edge_type = "composed_from"
     if source not in node_ids or target not in node_ids:
         return
@@ -272,7 +271,7 @@ def _maybe_add_output_target_edge(
     edge_keys.add(key)
     edges.append(
         {
-            "id": "e_out:{}:{}:{}".format(source, target, edge_type),
+            "id": f"e_out:{source}:{target}:{edge_type}",
             "source": source,
             "target": target,
             "type": edge_type,
@@ -282,10 +281,10 @@ def _maybe_add_output_target_edge(
 
 
 def augment_viz_graph_snapshot_for_output_composition(
-    snapshot: Dict[str, Any],
+    snapshot: dict[str, Any],
     *,
     output_composition: _OutputCompositionLike,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """对 `VizGraphSnapshot` 做最小增强:追加 `output_target:*` 节点与 `composed_from` 边."""
 
     if not snapshot or not isinstance(snapshot, dict):

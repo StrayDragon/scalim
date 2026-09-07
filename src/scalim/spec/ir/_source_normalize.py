@@ -7,13 +7,12 @@
 """
 
 import inspect
-from collections.abc import Hashable, Mapping
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
-from typing import Mapping as TypingMapping
+from collections.abc import Callable, Hashable, Mapping, Sequence
+from collections.abc import Mapping as TypingMapping
+from dataclasses import dataclass
+from typing import Any, Literal, TypeGuard, cast
 
 from ...typedefs import LoaderResultMap, LoaderResultMapping, RowData, RuntimeValue
-from ...vendor.compact.typing_extensionsx import Literal, TypeGuard
-from ...vendor.dataclassesx import dataclass
 
 __all__ = ()
 
@@ -38,7 +37,7 @@ class SourceNormalizeProjectFieldRuleIr:
     name: str
     from_key: bool = False
     extract_expr: str = ""
-    extract_segments: Tuple[Union[str, int], ...] = ()
+    extract_segments: tuple[str | int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -48,7 +47,7 @@ class SourceNormalizeStepIr:
     kind: NormalizeStepKind
     on_empty: NormalizeOnEmpty = "miss"
     on_missing: NormalizeOnMissing = "error"
-    fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...] = ()
+    fields: tuple[SourceNormalizeProjectFieldRuleIr, ...] = ()
 
     def apply_value(self, value: RuntimeValue, *, lookup_key: Hashable, source_id: str, step_index: int) -> RuntimeValue:
         if self.kind == "take_first":
@@ -57,7 +56,7 @@ class SourceNormalizeStepIr:
                 source_id=source_id,
                 lookup_key=lookup_key,
                 on_empty=self.on_empty,
-                config_label="normalize.map_values.steps[{}].take_first".format(step_index),
+                config_label=f"normalize.map_values.steps[{step_index}].take_first",
             )
         if self.kind == "project_fields":
             return normalize_project_fields_value(
@@ -66,9 +65,9 @@ class SourceNormalizeStepIr:
                 lookup_key=lookup_key,
                 fields=self.fields,
                 on_missing=self.on_missing,
-                config_label="normalize.map_values.steps[{}].project_fields".format(step_index),
+                config_label=f"normalize.map_values.steps[{step_index}].project_fields",
             )
-        msg = "Unknown normalize.step.kind '{}' for source '{}' at step {}".format(self.kind, source_id, step_index)
+        msg = f"Unknown normalize.step.kind '{self.kind}' for source '{source_id}' at step {step_index}"
         raise ValueError(msg)
 
 
@@ -125,9 +124,9 @@ def normalize_call_by(
     kind: NormalizeKind,
     call_by: NormalizeCallByFn,
 ) -> LoaderResultMapping:
-    config_path = "sources.{}.normalize.call_by".format(source_id)
+    config_path = f"sources.{source_id}.normalize.call_by"
     if not _is_mapping(result):
-        msg = "Source '{}' normalize.call_by expected Mapping input at '{}', got '{}'".format(source_id, config_path, type(result).__name__)
+        msg = f"Source '{source_id}' normalize.call_by expected Mapping input at '{config_path}', got '{type(result).__name__}'"
         raise TypeError(msg)
 
     result_mapping = result
@@ -135,11 +134,11 @@ def normalize_call_by(
     try:
         returned = _call_normalize_call_by(call_by, result_mapping, ctx)
     except TypeError as exc:
-        msg = "Source '{}' normalize.call_by failed to call function at '{}': {}".format(source_id, config_path, str(exc))
+        msg = f"Source '{source_id}' normalize.call_by failed to call function at '{config_path}': {exc!s}"
         raise TypeError(msg) from exc
 
     if not isinstance(returned, Mapping):
-        msg = "Source '{}' normalize.call_by must return Mapping at '{}', got '{}'".format(source_id, config_path, type(returned).__name__)
+        msg = f"Source '{source_id}' normalize.call_by must return Mapping at '{config_path}', got '{type(returned).__name__}'"
         raise TypeError(msg)
     return cast("LoaderResultMapping", returned)  # pragma: allow-cast normalize.call_by return typed narrowing
 
@@ -244,19 +243,15 @@ def normalize_index_by_key(
         return cast("LoaderResultMapping", result)  # pragma: allow-cast normalize.index_by_key mapping passthrough
 
     if on_none not in {"raise", "skip"}:
-        msg = "Source '{}' normalize.index_by_key has invalid on_none '{}' (config: sources.{}.normalize.index_by_key.on_none)".format(
-            source_id,
-            on_none,
-            source_id,
-        )
+        msg = f"Source '{source_id}' normalize.index_by_key has invalid on_none '{on_none}' (config: sources.{source_id}.normalize.index_by_key.on_none)"  # noqa: E501
         raise ValueError(msg)
 
     if not _is_sequence(result):
-        msg = "Source '{}' normalize.index_by_key expected loader result list[row], got '{}'".format(source_id, type(result).__name__)
+        msg = f"Source '{source_id}' normalize.index_by_key expected loader result list[row], got '{type(result).__name__}'"
         raise TypeError(msg)
 
     indexed: LoaderResultMap = {}
-    indexed_stats: Optional[IndexByKeyNormalizedMapping] = None
+    indexed_stats: IndexByKeyNormalizedMapping | None = None
     skipped_none_rows = 0
     if on_none == "skip":
         stats = IndexByKeyNormalizedMapping()
@@ -277,11 +272,7 @@ def normalize_index_by_key(
 
 def _normalize_index_by_key_require_row(item: RuntimeValue, *, source_id: str, idx: int) -> RowData:
     if not _is_str_mapping(item):
-        msg = "Source '{}' normalize.index_by_key expected list[row] where row is a Mapping, got '{}' at index {}".format(
-            source_id,
-            type(item).__name__,
-            idx,
-        )
+        msg = f"Source '{source_id}' normalize.index_by_key expected list[row] where row is a Mapping, got '{type(item).__name__}' at index {idx}"  # noqa: E501
         raise TypeError(msg)
     return item
 
@@ -293,33 +284,20 @@ def _normalize_index_by_key_extract_key(
     key_field: str,
     idx: int,
     on_none: str,
-) -> Optional[Hashable]:
-    config_key_field = "sources.{}.normalize.index_by_key.key_field".format(source_id)
-    config_on_none = "sources.{}.normalize.index_by_key.on_none".format(source_id)
+) -> Hashable | None:
+    config_key_field = f"sources.{source_id}.normalize.index_by_key.key_field"
+    config_on_none = f"sources.{source_id}.normalize.index_by_key.on_none"
     if key_field not in row:
-        msg = "Source '{}' normalize.index_by_key missing key_field '{}' at row index {} (config: {})".format(
-            source_id,
-            key_field,
-            idx,
-            config_key_field,
-        )
+        msg = f"Source '{source_id}' normalize.index_by_key missing key_field '{key_field}' at row index {idx} (config: {config_key_field})"
         raise KeyError(msg)
     key = row.get(key_field)
     if key is None:
         if on_none == "skip":
             return None
-        msg = (
-            "Source '{}' normalize.index_by_key key_field '{}' is None at row index {} (config: {}). To skip None keys, set {}: skip"
-        ).format(source_id, key_field, idx, config_key_field, config_on_none)
+        msg = f"Source '{source_id}' normalize.index_by_key key_field '{key_field}' is None at row index {idx} (config: {config_key_field}). To skip None keys, set {config_on_none}: skip"  # noqa: E501
         raise ValueError(msg)
     if not isinstance(key, Hashable):
-        msg = "Source '{}' normalize.index_by_key key_field '{}' must be hashable, got '{}' at row index {} (config: {})".format(
-            source_id,
-            key_field,
-            type(key).__name__,
-            idx,
-            config_key_field,
-        )
+        msg = f"Source '{source_id}' normalize.index_by_key key_field '{key_field}' must be hashable, got '{type(key).__name__}' at row index {idx} (config: {config_key_field})"  # noqa: E501
         raise TypeError(msg)
     return key
 
@@ -342,12 +320,10 @@ def _normalize_index_by_key_insert(
         indexed[key] = row
         return
     if on_conflict != "error":
-        config_on_conflict = "sources.{}.normalize.index_by_key.on_conflict".format(source_id)
-        msg = "Source '{}' normalize.index_by_key has invalid on_conflict '{}' (config: {})".format(
-            source_id, on_conflict, config_on_conflict
-        )
+        config_on_conflict = f"sources.{source_id}.normalize.index_by_key.on_conflict"
+        msg = f"Source '{source_id}' normalize.index_by_key has invalid on_conflict '{on_conflict}' (config: {config_on_conflict})"
         raise ValueError(msg)
-    msg = "Source '{}' normalize.index_by_key duplicate key '{}' at row index {}".format(source_id, key, idx)
+    msg = f"Source '{source_id}' normalize.index_by_key duplicate key '{key}' at row index {idx}"
     raise ValueError(msg)
 
 
@@ -364,15 +340,13 @@ def normalize_take_first(
 ) -> LoaderResultMapping:
     if isinstance(result, (list, tuple)):
         msg = (
-            "Source '{}' normalize.take_first does not support loader result list[row]. "
+            f"Source '{source_id}' normalize.take_first does not support loader result list[row]. "
             "Use normalize.index_by_key with on_conflict to handle duplicate keys."
-        ).format(source_id)
+        )
         raise TypeError(msg)
 
     if not _is_hashable_mapping(result):
-        msg = "Source '{}' normalize.take_first expected loader result mapping[key -> list[row]], got '{}'".format(
-            source_id, type(result).__name__
-        )
+        msg = f"Source '{source_id}' normalize.take_first expected loader result mapping[key -> list[row]], got '{type(result).__name__}'"
         raise TypeError(msg)
 
     out: LoaderResultMap = {}
@@ -399,9 +373,7 @@ def normalize_take_first_value(
     config_label: str,
 ) -> RuntimeValue:
     if not _is_sequence(candidates_obj):
-        msg = "Source '{}' {} expected list[row] for key '{}', got '{}'".format(
-            source_id, config_label, lookup_key, type(candidates_obj).__name__
-        )
+        msg = f"Source '{source_id}' {config_label} expected list[row] for key '{lookup_key}', got '{type(candidates_obj).__name__}'"
         raise TypeError(msg)
 
     candidates = candidates_obj
@@ -411,16 +383,14 @@ def normalize_take_first_value(
         if on_empty == "null":
             return None
         if on_empty != "error":
-            msg = "Source '{}' {} has invalid on_empty '{}'".format(source_id, config_label, on_empty)
+            msg = f"Source '{source_id}' {config_label} has invalid on_empty '{on_empty}'"
             raise ValueError(msg)
-        msg = "Source '{}' {} got empty candidates list for key '{}'".format(source_id, config_label, lookup_key)
+        msg = f"Source '{source_id}' {config_label} got empty candidates list for key '{lookup_key}'"
         raise ValueError(msg)
 
     first = candidates[0]
     if not _is_mapping(first):
-        msg = "Source '{}' {} expected row to be a Mapping for key '{}', got '{}'".format(
-            source_id, config_label, lookup_key, type(first).__name__
-        )
+        msg = f"Source '{source_id}' {config_label} expected row to be a Mapping for key '{lookup_key}', got '{type(first).__name__}'"
         raise TypeError(msg)
     return first
 
@@ -434,13 +404,11 @@ def normalize_project_fields(
     result: RuntimeValue,
     *,
     source_id: str,
-    fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...],
+    fields: tuple[SourceNormalizeProjectFieldRuleIr, ...],
     on_missing: str,
 ) -> LoaderResultMapping:
     if not _is_hashable_mapping(result):
-        msg = "Source '{}' normalize.project_fields expected loader result mapping[key -> row], got '{}'".format(
-            source_id, type(result).__name__
-        )
+        msg = f"Source '{source_id}' normalize.project_fields expected loader result mapping[key -> row], got '{type(result).__name__}'"
         raise TypeError(msg)
 
     out: LoaderResultMap = {}
@@ -462,18 +430,16 @@ def normalize_project_fields_value(
     *,
     source_id: str,
     lookup_key: Hashable,
-    fields: Tuple[SourceNormalizeProjectFieldRuleIr, ...],
+    fields: tuple[SourceNormalizeProjectFieldRuleIr, ...],
     on_missing: str,
     config_label: str,
 ) -> RuntimeValue:
     if not _is_mapping(row_obj):
-        msg = "Source '{}' {} expected row to be a Mapping for key '{}', got '{}'".format(
-            source_id, config_label, lookup_key, type(row_obj).__name__
-        )
+        msg = f"Source '{source_id}' {config_label} expected row to be a Mapping for key '{lookup_key}', got '{type(row_obj).__name__}'"
         raise TypeError(msg)
 
     row = row_obj
-    projected: Dict[str, RuntimeValue] = {}
+    projected: dict[str, RuntimeValue] = {}
     for rule in fields:
         if rule.from_key:
             projected[rule.name] = lookup_key
@@ -488,15 +454,9 @@ def normalize_project_fields_value(
             projected[rule.name] = None
             continue
         if on_missing != "error":
-            msg = "Source '{}' {} has invalid on_missing '{}'".format(source_id, config_label, on_missing)
+            msg = f"Source '{source_id}' {config_label} has invalid on_missing '{on_missing}'"
             raise ValueError(msg)
-        msg = "Source '{}' {} missing extract '{}' for field '{}' (key '{}')".format(
-            source_id,
-            config_label,
-            rule.extract_expr,
-            rule.name,
-            lookup_key,
-        )
+        msg = f"Source '{source_id}' {config_label} missing extract '{rule.extract_expr}' for field '{rule.name}' (key '{lookup_key}')"
         raise KeyError(msg)
 
     return projected
@@ -511,10 +471,10 @@ def normalize_map_values(
     result: RuntimeValue,
     *,
     source_id: str,
-    steps: Tuple[SourceNormalizeStepIr, ...],
+    steps: tuple[SourceNormalizeStepIr, ...],
 ) -> LoaderResultMapping:
     if not _is_hashable_mapping(result):
-        msg = "Source '{}' normalize.map_values expected loader result Mapping, got '{}'".format(source_id, type(result).__name__)
+        msg = f"Source '{source_id}' normalize.map_values expected loader result Mapping, got '{type(result).__name__}'"
         raise TypeError(msg)
 
     out: LoaderResultMap = {}
@@ -539,8 +499,8 @@ def normalize_map_values(
 
 def extract_segments_with_presence(
     data: RuntimeValue,
-    segments: Tuple[Union[str, int], ...],
-) -> Tuple[bool, RuntimeValue]:
+    segments: tuple[str | int, ...],
+) -> tuple[bool, RuntimeValue]:
     current: RuntimeValue = data
     for segment in segments:
         if current is None:
@@ -553,8 +513,8 @@ def extract_segments_with_presence(
 
 def _extract_segment_with_presence(
     data: RuntimeValue,
-    segment: Union[str, int],
-) -> Tuple[bool, RuntimeValue]:
+    segment: str | int,
+) -> tuple[bool, RuntimeValue]:
     if _is_mapping(data):
         mapping = data
         if segment in mapping:

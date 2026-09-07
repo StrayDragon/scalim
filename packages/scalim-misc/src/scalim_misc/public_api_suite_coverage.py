@@ -3,9 +3,10 @@ from __future__ import annotations
 import ast
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
     from pathlib import Path
 
 
@@ -19,11 +20,11 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 @dataclass(frozen=True)
 class Tier1Coverage:
-    covered_modules: Tuple[str, ...]
-    module_to_chapter_ids: Dict[str, Tuple[str, ...]]
+    covered_modules: tuple[str, ...]
+    module_to_chapter_ids: dict[str, tuple[str, ...]]
 
 
-def _as_str_constant(node: ast.AST) -> Optional[str]:
+def _as_str_constant(node: ast.AST) -> str | None:
     ast_str = getattr(ast, "Str", None)
     if ast_str is not None and isinstance(node, ast_str):  # pragma: no cover - for old runtimes
         return str(getattr(node, "s", ""))
@@ -68,12 +69,12 @@ def _raise_literal_str_seq_error(*, label: str, path: Path) -> None:
     raise CoverageError(msg)
 
 
-def _extract_literal_str_seq(node: ast.AST, *, label: str, path: Path) -> Tuple[str, ...]:
+def _extract_literal_str_seq(node: ast.AST, *, label: str, path: Path) -> tuple[str, ...]:
     if not isinstance(node, (ast.List, ast.Tuple)):
         _raise_literal_str_seq_error(label=label, path=path)
     items = list(node.elts)
 
-    values: List[str] = []
+    values: list[str] = []
     for item in items:
         value = _as_str_constant(item)
         if value is None:
@@ -84,7 +85,7 @@ def _extract_literal_str_seq(node: ast.AST, *, label: str, path: Path) -> Tuple[
     return tuple(values)
 
 
-def extract_declared_tier1_modules(path: Path) -> Tuple[str, ...]:
+def extract_declared_tier1_modules(path: Path) -> tuple[str, ...]:
     """读取章节中显式声明的覆盖集合.
 
     约定:
@@ -95,7 +96,7 @@ def extract_declared_tier1_modules(path: Path) -> Tuple[str, ...]:
     text = _read_text(path)
     tree = _parse_python_ast(text=text, path=path)
 
-    last_value: Optional[ast.AST] = None
+    last_value: ast.AST | None = None
     for node in getattr(tree, "body", []):
         if isinstance(node, ast.Assign):
             if any(isinstance(t, ast.Name) and t.id == "COVERS_TIER1_MODULES" for t in node.targets):
@@ -111,7 +112,7 @@ def extract_declared_tier1_modules(path: Path) -> Tuple[str, ...]:
 
 class _ImportCandidateVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
-        self.candidates: Set[str] = set()
+        self.candidates: set[str] = set()
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -139,7 +140,7 @@ class _ImportCandidateVisitor(ast.NodeVisitor):
             self.candidates.add(f"{module}.{child}")
 
 
-def extract_import_module_candidates(path: Path) -> Tuple[str, ...]:
+def extract_import_module_candidates(path: Path) -> tuple[str, ...]:
     text = _read_text(path)
     tree = _parse_python_ast(text=text, path=path)
     visitor = _ImportCandidateVisitor()
@@ -153,15 +154,15 @@ def _chapter_id_for_path(path: Path) -> str:
 
 def build_tier1_coverage_for_examples_suite(
     repo_root: Path,
-    tier1_modules: Set[str],
+    tier1_modules: set[str],
     *,
-    chapter_ids: Optional[Sequence[str]] = None,
+    chapter_ids: Sequence[str] | None = None,
 ) -> Tier1Coverage:
-    selected: Optional[Set[str]] = None
+    selected: set[str] | None = None
     if chapter_ids is not None:
         selected = {str(item) for item in chapter_ids}
 
-    module_to_chapters: Dict[str, Set[str]] = {}
+    module_to_chapters: dict[str, set[str]] = {}
 
     for chapter_path in iter_example_public_api_suite_chapters(repo_root):
         chapter_id = _chapter_id_for_path(chapter_path)
@@ -171,7 +172,7 @@ def build_tier1_coverage_for_examples_suite(
         declared = set(extract_declared_tier1_modules(chapter_path))
         imported_candidates = set(extract_import_module_candidates(chapter_path))
         candidates = declared | imported_candidates
-        covered_set: Set[str] = set()
+        covered_set: set[str] = set()
         for candidate in candidates:
             parts = [p for p in str(candidate).split(".") if p]
             for end in range(1, len(parts) + 1):
@@ -187,7 +188,7 @@ def build_tier1_coverage_for_examples_suite(
     return Tier1Coverage(covered_modules=covered_modules, module_to_chapter_ids=module_to_chapter_ids)
 
 
-def _call_name(node: ast.AST) -> Optional[str]:
+def _call_name(node: ast.AST) -> str | None:
     if isinstance(node, ast.Name):
         return str(node.id)
     if isinstance(node, ast.Attribute):
@@ -195,14 +196,14 @@ def _call_name(node: ast.AST) -> Optional[str]:
     return None
 
 
-def _find_keyword_value(call: ast.Call, *, keyword: str) -> Optional[ast.AST]:
+def _find_keyword_value(call: ast.Call, *, keyword: str) -> ast.AST | None:
     for kw in call.keywords:
         if str(getattr(kw, "arg", "") or "") == keyword and kw.value is not None:
             return kw.value
     return None
 
 
-def parse_public_api_pytest_chapter_ids(repo_root: Path) -> Tuple[str, ...]:
+def parse_public_api_pytest_chapter_ids(repo_root: Path) -> tuple[str, ...]:
     test_path = repo_root / "tests" / "public_api" / "test_example_public_api_suite.py"
     if not test_path.exists():
         msg = f"未找到 pytest public_api suite 入口: {test_path}"
@@ -215,7 +216,7 @@ def parse_public_api_pytest_chapter_ids(repo_root: Path) -> Tuple[str, ...]:
         msg = f"pytest public_api suite AST 解析失败: {test_path}: {exc}"
         raise CoverageError(msg) from exc
 
-    chapter_ids: List[str] = []
+    chapter_ids: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue

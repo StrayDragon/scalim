@@ -1,4 +1,4 @@
-from typing import Dict, List, Mapping, Optional, Union
+from collections.abc import Mapping
 
 from ....spec.ir import DemandIr, DerivedFieldIr, FieldIr, MainSourceIr, SourceIr
 from ....typedefs import RuntimeValue
@@ -20,19 +20,19 @@ del _non_public_exports
 
 
 class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
-    _compute_engine: Optional[SecureComputeEngine]
-    _sources_ir: Optional[Dict[str, SourceIr]]
-    _main_source_ir: Optional[MainSourceIr]
-    _relation_steps: Optional[Dict[str, List[StepInfo]]]
-    _relation_adjacency: Optional[Dict[str, List[StepInfo]]]
-    _source_field_id_map: Optional[Dict[str, Dict[str, str]]]
-    _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]]
-    _init_vars: Optional[Mapping[str, RuntimeValue]]
+    _compute_engine: SecureComputeEngine | None
+    _sources_ir: dict[str, SourceIr] | None
+    _main_source_ir: MainSourceIr | None
+    _relation_steps: dict[str, list[StepInfo]] | None
+    _relation_adjacency: dict[str, list[StepInfo]] | None
+    _source_field_id_map: dict[str, dict[str, str]] | None
+    _source_data_key_map: dict[str, dict[str, list[str]]] | None
+    _init_vars: Mapping[str, RuntimeValue] | None
 
     def __init__(
         self,
-        compute_engine: Optional[SecureComputeEngine] = None,
-        init_vars: Optional[Mapping[str, RuntimeValue]] = None,
+        compute_engine: SecureComputeEngine | None = None,
+        init_vars: Mapping[str, RuntimeValue] | None = None,
     ) -> None:
         self._compute_engine = compute_engine or build_compute_engine()
         self._init_vars = init_vars
@@ -61,14 +61,14 @@ class ConfigToIRConverter(ConfigToIRConversionSourceMixin):
             sources_ir[source_id] = self._convert_source(source_config)
 
         if main_source_ir.source_id in sources_ir:
-            msg = "Main source '{}' conflicts with sources".format(main_source_ir.source_id)
+            msg = f"Main source '{main_source_ir.source_id}' conflicts with sources"
             raise ScalimConversionError(msg)
 
         relation_steps = self._convert_relations(config)
         self._relation_steps = relation_steps
         self._relation_adjacency = self._build_relation_adjacency(relation_steps)
 
-        fields_ir: List[Union[FieldIr, DerivedFieldIr]] = []
+        fields_ir: list[FieldIr | DerivedFieldIr] = []
 
         for field_config in config.source_fields.values():
             fields_ir.append(self._convert_source_field(field_config, config))

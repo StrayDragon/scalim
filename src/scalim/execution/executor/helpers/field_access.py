@@ -1,5 +1,5 @@
-from collections.abc import Mapping
-from typing import Any, Dict, Iterable, Tuple, Union, cast
+from collections.abc import Iterable, Mapping
+from typing import Any, cast
 
 from ....typedefs import FieldValue
 
@@ -9,7 +9,7 @@ def extract_field(data: Any, field_key: str) -> FieldValue:
     # - `isinstance(x, dict)` 是 C 层快速路径
     # - `isinstance(x, Mapping)` 需要走 `ABCMeta.__instancecheck__`,在紧密循环里更慢
     if isinstance(data, dict):
-        mapping = cast("Dict[str, Any]", data)  # pragma: allow-cast dict keys typed narrowing
+        mapping = cast("dict[str, Any]", data)  # pragma: allow-cast dict keys typed narrowing
         return cast("FieldValue", mapping.get(field_key))  # pragma: allow-cast dict field value typed narrowing
 
     if isinstance(data, Mapping):
@@ -32,7 +32,7 @@ def extract_field(data: Any, field_key: str) -> FieldValue:
         return None
 
 
-def extract_field_segments(data: Any, segments: Tuple[Union[str, int], ...]) -> FieldValue:
+def extract_field_segments(data: Any, segments: tuple[str | int, ...]) -> FieldValue:
     """
     按 `segments` 逐段读取字段值.
 
@@ -49,10 +49,10 @@ def extract_field_segments(data: Any, segments: Tuple[Union[str, int], ...]) -> 
     return cast("FieldValue", current)  # pragma: allow-cast extracted field value typed narrowing
 
 
-def _extract_field_segment(data: Any, segment: Union[str, int]) -> Any:
+def _extract_field_segment(data: Any, segment: str | int) -> Any:
     # 热路径优化: `dict` 是最常见的承载类型,优先走快速路径.
     if isinstance(data, dict):
-        mapping = cast("Dict[Any, Any]", data)  # pragma: allow-cast dict typed narrowing
+        mapping = cast("dict[Any, Any]", data)  # pragma: allow-cast dict typed narrowing
         return mapping.get(segment)
 
     if isinstance(data, Mapping):

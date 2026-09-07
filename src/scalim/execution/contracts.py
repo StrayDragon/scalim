@@ -6,13 +6,14 @@
 """
 
 import warnings
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from collections.abc import Iterable
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import TYPE_CHECKING, Optional
 
 from ..sinks import ISink
 from ..sinks.accept_types import SinkTypePrecheck
 from ..typedefs import KeyNormalizationMode, ParallelMode, RowData, RuntimeValue
-from ..vendor.dataclassesx import dataclass
-from ..vendor.dataclassesx import field as dataclass_field
 from .excel_column_residency import ExcelColumnResidency
 from .lookup_chunking import normalize_optional_max_chunk_workers
 from .output_contracts import ExportLayout, OutputSpec
@@ -67,7 +68,7 @@ def _validate_execution_request_sink(sink: RuntimeValue) -> None:
         raise TypeError(msg)
 
 
-def _validate_execution_request_batch_size(batch_size: Optional[int]) -> None:
+def _validate_execution_request_batch_size(batch_size: int | None) -> None:
     if batch_size is None:
         return
 
@@ -103,7 +104,7 @@ def _validate_execution_request_parallel_mode(parallel_mode: RuntimeValue) -> No
         raise ValueError(msg)
 
 
-def _validate_execution_request_chunk_parallelism(parallelize_lookup_chunks: RuntimeValue, max_chunk_workers: Optional[int]) -> None:
+def _validate_execution_request_chunk_parallelism(parallelize_lookup_chunks: RuntimeValue, max_chunk_workers: int | None) -> None:
     if not isinstance(parallelize_lookup_chunks, bool):
         msg = "ExecutionRequest.parallelize_lookup_chunks must be a boolean"
         raise TypeError(msg)
@@ -156,13 +157,13 @@ class ExecutionRequest:
     sink: Optional["ISink"] = None
     """可选:显式指定输出端;若为 `None` 则按 `output` 策略创建."""
 
-    observability: Optional[ObservabilitySpec] = None
+    observability: ObservabilitySpec | None = None
     """可选:可观测性请求(例如 `viz` 配置)."""
 
-    components: Optional[List[Union["Observer", "IExecutionHook"]]] = None
+    components: list["Observer | IExecutionHook"] | None = None
     """可选:要挂载的 `Observer`/`Hook` 组件列表."""
 
-    batch_size: Optional[int] = 1000
+    batch_size: int | None = 1000
     """批大小(`None` 表示不分批)."""
 
     parallel_mode: ParallelMode = "seq"
@@ -186,7 +187,7 @@ class ExecutionRequest:
     - `loader_call` 回调可能直接发生在分片工作线程上(非主线程回放),订阅方须自行保证线程安全.
     """
 
-    max_chunk_workers: Optional[int] = None
+    max_chunk_workers: int | None = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
 
     key_normalization: KeyNormalizationMode = "raw"
@@ -214,7 +215,7 @@ class ExecutionRequest:
     - 运行计划的目标字段将由组合请求的 `required_demand_fields` 计算得出
     """
 
-    main_rows: Optional[Iterable[RowData]] = None
+    main_rows: Iterable[RowData] | None = None
     """可选:显式注入 `main_rows`(当提供时绕过主数据源 `loader`)."""
 
     capture_in_memory_rows: bool = False
@@ -223,7 +224,7 @@ class ExecutionRequest:
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED
     """列式 `Excel` 文件 `sink` 驻留策略(仅 `format=excel` 且 `streaming=False` 时生效)."""
 
-    output_write_layout: Optional[OutputWriteLayout] = None
+    output_write_layout: OutputWriteLayout | None = None
     """可选:显式文件写出布局(`None`=按 `streaming`/`residency` 推导;仅接受 `OutputWriteLayout`)."""
 
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF
@@ -254,24 +255,24 @@ class ExecutionResult:
       (例如 `PerformanceMetrics.total_rows` 统计的是输入 `row_ids`).
     """
 
-    output_path: Optional[str]
+    output_path: str | None
     total_rows: int
     duration: float
     demand_ir: "DemandIr"
     plan: "ExecutionPlan"
-    outputs: Optional[Dict[str, str]] = None
+    outputs: dict[str, str] | None = None
     """可选:输出目标到 `output_path` 的映射(多输出组合时提供)."""
 
-    output_target_stats: Optional[List["OutputTargetStats"]] = None
+    output_target_stats: list["OutputTargetStats"] | None = None
     """可选:每个输出目标的统计(行数/耗时/错误/禁用)(多输出组合时提供)."""
 
-    in_memory_csv_outputs: Optional[Dict[str, "InMemoryCsv"]] = None
+    in_memory_csv_outputs: dict[str, "InMemoryCsv"] | None = None
     """可选: `workflow-managed` 输出的 CSV 工件映射(多输出组合时提供)."""
 
-    in_memory_rows_outputs: Optional[Dict[str, "InMemoryRows"]] = None
+    in_memory_rows_outputs: dict[str, "InMemoryRows"] | None = None
     """可选: `workflow-managed` 输出的类型化行工件映射(多输出组合时提供)."""
 
-    workflow_managed_output_export_headers: Optional[Dict[str, Tuple[str, ...]]] = None
+    workflow_managed_output_export_headers: dict[str, tuple[str, ...]] | None = None
     """可选: `xlsx_memory` 工作流托管输出的结果侧导出表头元数据."""
 
     in_memory_rows: Optional["InMemoryRows"] = None

@@ -3,9 +3,12 @@
 
 import logging
 import zipfile
+from collections.abc import Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Type
+from typing import TYPE_CHECKING, Any, Optional
+
+from typing_extensions import Self, override
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
@@ -17,7 +20,6 @@ from ..._internal.utils.openpyxl_helpers import (
 )
 from ...typedefs import CellValue, FieldValue, RowData, SinkRowKeySeq
 from ...vendor.compact.importlibx import require_optional_dependency
-from ...vendor.compact.typing_extensionsx import Self, override
 from .accept_types import (
     SinkTypePrecheck,
     ensure_sink_accepted_cell,
@@ -46,7 +48,7 @@ if TYPE_CHECKING:
 # endregion
 
 
-def _excel_atomic_save_errors() -> Tuple[Type[BaseException], ...]:
+def _excel_atomic_save_errors() -> tuple[type[BaseException], ...]:
     openpyxl_utils_exceptions: Any = require_optional_dependency(
         "openpyxl.utils.exceptions",
         context="scalim.sinks",
@@ -67,7 +69,7 @@ def _excel_atomic_save_errors() -> Tuple[Type[BaseException], ...]:
     )
 
 
-def _excel_sink_outer_close_errors() -> Tuple[Type[BaseException], ...]:
+def _excel_sink_outer_close_errors() -> tuple[type[BaseException], ...]:
     return (RuntimeError, *_excel_atomic_save_errors())
 
 
@@ -132,20 +134,20 @@ class ExcelSink(BaseRowSink):
     sheet_name: str
     include_header: bool
     _closed: bool
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     _workbook: Any
     _worksheet: Any
     _allow_formulas: bool
     _type_precheck: SinkTypePrecheck
-    _aligned_cache_field_keys: Optional[Tuple[str, ...]]
-    _aligned_cache_indexes: Optional[List[Optional[int]]]
+    _aligned_cache_field_keys: tuple[str, ...] | None
+    _aligned_cache_indexes: list[int | None] | None
 
     def __init__(
         self,
         output_path: str,
-        field_names: List[str],
-        header_names: Optional[List[str]] = None,
+        field_names: list[str],
+        header_names: list[str] | None = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
@@ -176,8 +178,8 @@ class ExcelSink(BaseRowSink):
             accepted=is_excel_accepted_cell,
         )
 
-    def _format_row(self, row: RowData) -> List[Any]:
-        values: List[Any] = []
+    def _format_row(self, row: RowData) -> list[Any]:
+        values: list[Any] = []
         for field_name in self.field_names:
             raw = self._maybe_precheck(field_name, row.get(field_name))
             values.append(escape_excel_formula(raw, allow_formulas=self._allow_formulas))
@@ -189,18 +191,18 @@ class ExcelSink(BaseRowSink):
 
     def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[FieldValue]) -> None:
         if len(field_keys) != len(values):
-            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            msg = f"`write_row_aligned` 长度不一致: field_keys={len(field_keys)} values={len(values)}"
             raise ValueError(msg)
 
         cache_keys = self._aligned_cache_field_keys
         field_keys_tuple = tuple(field_keys)
         if cache_keys != field_keys_tuple:
-            index_by_key: Dict[str, int] = {key: i for i, key in enumerate(field_keys_tuple)}
+            index_by_key: dict[str, int] = {key: i for i, key in enumerate(field_keys_tuple)}
             self._aligned_cache_field_keys = field_keys_tuple
             self._aligned_cache_indexes = [index_by_key.get(name) for name in self.field_names]
 
         indexes = self._aligned_cache_indexes or []
-        row_values: List[Any] = []
+        row_values: list[Any] = []
         for i, idx in enumerate(indexes):
             if idx is None:
                 v = None
@@ -275,8 +277,8 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
 
     sheet_name: str
     include_header: bool
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     _worksheet: Any
     _closed: bool
     _allow_formulas: bool
@@ -287,8 +289,8 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
         *,
         worksheet: Any,
         sheet_name: str,
-        field_names: List[str],
-        header_names: Optional[List[str]] = None,
+        field_names: list[str],
+        header_names: list[str] | None = None,
         include_header: bool = True,
         allow_formulas: bool = True,
         type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
@@ -315,8 +317,8 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
             accepted=is_excel_accepted_cell,
         )
 
-    def _format_row(self, row: RowData) -> List[Any]:
-        values: List[Any] = []
+    def _format_row(self, row: RowData) -> list[Any]:
+        values: list[Any] = []
         for field_name in self.field_names:
             raw = self._maybe_precheck(field_name, row.get(field_name))
             values.append(escape_excel_formula(raw, allow_formulas=self._allow_formulas))
@@ -325,14 +327,14 @@ class ExcelWorkbookSheetRowSink(BaseRowSink):
     @override
     def write_row(self, row: RowData) -> None:
         if self._closed:
-            msg = "ExcelWorkbookSheetRowSink is closed: {}".format(self.sheet_name)
+            msg = f"ExcelWorkbookSheetRowSink is closed: {self.sheet_name}"
             raise RuntimeError(msg)
         _ = self._worksheet.append(self._format_row(row))
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
         if self._closed:
-            msg = "ExcelWorkbookSheetRowSink is closed: {}".format(self.sheet_name)
+            msg = f"ExcelWorkbookSheetRowSink is closed: {self.sheet_name}"
             raise RuntimeError(msg)
         for row in rows:
             _ = self._worksheet.append(self._format_row(row))
@@ -362,7 +364,7 @@ class ExcelWorkbookSink:
 
     output_path: str
     _workbook: Any
-    _sheet_names: List[str]
+    _sheet_names: list[str]
     _closed: bool
 
     def __init__(
@@ -378,19 +380,19 @@ class ExcelWorkbookSink:
         self,
         sheet_name: str,
         *,
-        field_names: List[str],
-        header_names: Optional[List[str]] = None,
+        field_names: list[str],
+        header_names: list[str] | None = None,
         include_header: bool = True,
         allow_formulas: bool = True,
         type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
     ) -> ExcelWorkbookSheetRowSink:
         if self._closed:
-            msg = "ExcelWorkbookSink is closed: {}".format(self.output_path)
+            msg = f"ExcelWorkbookSink is closed: {self.output_path}"
             raise RuntimeError(msg)
 
         name = str(sheet_name)
         if name in self._sheet_names:
-            msg = "Duplicate excel sheet name in workbook: {!r}".format(name)
+            msg = f"Duplicate excel sheet name in workbook: {name!r}"
             raise ValueError(msg)
 
         ws = self._workbook.create_sheet(name)
@@ -453,8 +455,8 @@ class ExcelWorkbookSink:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)
@@ -498,11 +500,11 @@ class ColumnExcelSink(IColumnSink):
     """
 
     output_path: str
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     sheet_name: str
     include_header: bool
-    _row_ids: List[Any]
+    _row_ids: list[Any]
     _columns: ColumnData
     _closed: bool
     _allow_formulas: bool
@@ -511,8 +513,8 @@ class ColumnExcelSink(IColumnSink):
     def __init__(
         self,
         output_path: str,
-        field_names: List[str],
-        header_names: Optional[List[str]] = None,
+        field_names: list[str],
+        header_names: list[str] | None = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
@@ -532,7 +534,7 @@ class ColumnExcelSink(IColumnSink):
     def _maybe_precheck_column(self, field_key: str, values: ColumnValues) -> ColumnValues:
         if self._type_precheck is SinkTypePrecheck.OFF:
             return values
-        checked: Dict[Any, Any] = {}
+        checked: dict[Any, Any] = {}
         for pk, value in values.items():
             checked[pk] = ensure_sink_accepted_cell(
                 value,
@@ -552,13 +554,13 @@ class ColumnExcelSink(IColumnSink):
 
     def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[FieldValue]) -> None:
         if len(row_ids) != len(values):
-            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            msg = f"`write_column_aligned` 长度不一致: row_ids={len(row_ids)} values={len(values)}"
             raise ValueError(msg)
-        self.write_column(field_key, dict(zip(row_ids, values)))
+        self.write_column(field_key, dict(zip(row_ids, values, strict=False)))
 
     @override
     def write_columns(self, columns: ColumnBatch) -> None:
-        checked: Dict[str, ColumnValues] = {}
+        checked: dict[str, ColumnValues] = {}
         for field_key, values in columns.items():
             checked[str(field_key)] = self._maybe_precheck_column(str(field_key), values)
         update_columns(self._columns, checked)
@@ -567,9 +569,9 @@ class ColumnExcelSink(IColumnSink):
     def write_batch(self, rows: Sequence[RowData]) -> None:
         start_index = len(self._row_ids)
         if self._type_precheck is SinkTypePrecheck.ON:
-            checked_rows: List[RowData] = []
+            checked_rows: list[RowData] = []
             for row in rows:
-                checked: Dict[str, object] = {}
+                checked: dict[str, object] = {}
                 for field_key, value in row.items():
                     checked[str(field_key)] = ensure_sink_accepted_cell(
                         value,
@@ -645,8 +647,8 @@ class ColumnExcelSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)

@@ -12,11 +12,12 @@
 - 运行时选项: 选项归一化/校验 -> `OptionsIr` (纯规则)
 """
 
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Set, Tuple, cast
+from typing import Any, cast
 
 from ...spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowNodeIr
-from ...vendor.dataclassesx import dataclass
 from ._internal import workflow_compile_graph as _workflow_compile_graph_mod
 from ._internal import workflow_compile_options as _workflow_compile_options_mod
 from ._internal import workflow_compile_outputs as _workflow_compile_outputs_mod
@@ -32,7 +33,7 @@ from .workflow_types import WorkflowRuntimeOptions
 @dataclass(frozen=True)
 class WorkflowCompileResult:
     workflow_ir: WorkflowIr
-    demand_configs_by_run_id: Dict[str, DemandConfig]
+    demand_configs_by_run_id: dict[str, DemandConfig]
 
 
 _validate_excel_sheet_name = _workflow_compile_outputs_mod.validate_excel_sheet_name
@@ -84,15 +85,15 @@ def compile_workflow_ir(
     wf: Any,
     *,
     workflow_yaml_path: str,
-    path_aliases: Optional[Mapping[str, str]],
-    template_vars: Optional[Mapping[str, Any]] = None,
+    path_aliases: Mapping[str, str] | None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
-    allowed_yaml_roots: Optional[Tuple[str, ...]] = None,
-    init_vars: Optional[Dict[str, Any]] = None,
-    overrides: Optional[Any] = None,
-    workflow_runtime_options: Optional[WorkflowRuntimeOptions] = None,
-    resources_policy: Optional[ResourcesPolicy] = None,
+    allowed_yaml_roots: tuple[str, ...] | None = None,
+    init_vars: dict[str, Any] | None = None,
+    overrides: Any | None = None,
+    workflow_runtime_options: WorkflowRuntimeOptions | None = None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> WorkflowCompileResult:
     """将工作流配置编译为工作流 `IR`.
 
@@ -189,18 +190,18 @@ def derive_cache_pool_consumers(
     workflow_ir: WorkflowIr,
     *,
     demand_configs_by_run_id: Mapping[str, DemandConfig],
-) -> Tuple[Dict[str, FrozenSet[Tuple[str, str]]], Dict[Tuple[str, str], FrozenSet[str]]]:
+) -> tuple[dict[str, frozenset[tuple[str, str]]], dict[tuple[str, str], frozenset[str]]]:
     """基于 `workflow IR` + `demand YAML` 推导缓存消费者集合上界.
 
     `v0`: 仅覆盖 `cache_mode=preload_forever` 的 `sources`,按 `(kind, source_id)` 聚合.
     """
 
-    logical_keys_by_node_id: Dict[str, FrozenSet[Tuple[str, str]]] = {}
-    consumers_by_logical_key: Dict[Tuple[str, str], Set[str]] = {}
+    logical_keys_by_node_id: dict[str, frozenset[tuple[str, str]]] = {}
+    consumers_by_logical_key: dict[tuple[str, str], set[str]] = {}
 
     for node in workflow_ir.nodes:
         node_id = str(node.node_id)
-        keys: Set[Tuple[str, str]] = set()
+        keys: set[tuple[str, str]] = set()
         config = demand_configs_by_run_id.get(node_id) if isinstance(node, WorkflowNodeIr) else None
         if config is not None:
             for source_id, source in config.sources.items():

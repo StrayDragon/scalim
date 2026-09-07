@@ -1,13 +1,13 @@
 import math
 import re
+from collections.abc import Callable, Sequence
 from decimal import Decimal, InvalidOperation
-from typing import Callable, ClassVar, Dict, List, Optional, Sequence
+from typing import ClassVar, TypeGuard
 
 from ....._internal.utils.converters import NamedLookupCast, auto_normalize_key, auto_str_normalize, must_to_int, must_to_str
 from .....spec.ir.aliases import LookupKeyCast
 from .....spec.ir.lookup_casts import LookupCastSpecIr
 from .....typedefs import FieldValue, LookupKey, RuntimeValue
-from .....vendor.compact.typing_extensionsx import TypeGuard
 from ..errors import ScalimConversionError
 
 _SOURCE_ID_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
@@ -18,7 +18,7 @@ def _is_sequence(value: RuntimeValue) -> TypeGuard[Sequence[RuntimeValue]]:
     return isinstance(value, (list, tuple))
 
 
-def cast_int(value: RuntimeValue) -> Optional[int]:
+def cast_int(value: RuntimeValue) -> int | None:
     if value is None:
         return None
     try:
@@ -26,11 +26,11 @@ def cast_int(value: RuntimeValue) -> Optional[int]:
     except ValueError:
         raise
     except TypeError as exc:
-        msg = "Unsupported int cast value type: {}".format(type(value).__name__)
+        msg = f"Unsupported int cast value type: {type(value).__name__}"
         raise TypeError(msg) from exc
 
 
-def cast_str(value: RuntimeValue) -> Optional[str]:
+def cast_str(value: RuntimeValue) -> str | None:
     if value is None:
         return None
     return str(value)
@@ -38,27 +38,27 @@ def cast_str(value: RuntimeValue) -> Optional[str]:
 
 def _cast_decimal_from_float(value: float) -> Decimal:
     if not math.isfinite(value):
-        msg = "Invalid decimal float literal: {!r}".format(value)
+        msg = f"Invalid decimal float literal: {value!r}"
         raise ValueError(msg)
     try:
         return Decimal(str(value))
     except (InvalidOperation, ValueError) as exc:
-        msg = "Invalid decimal float literal: {!r}".format(value)
+        msg = f"Invalid decimal float literal: {value!r}"
         raise ValueError(msg) from exc
 
 
-def _cast_decimal_from_string(value: str) -> Optional[Decimal]:
+def _cast_decimal_from_string(value: str) -> Decimal | None:
     text = value.strip()
     if not text:
         return None
     try:
         return Decimal(text)
     except InvalidOperation as exc:
-        msg = "Invalid decimal string literal: {!r}".format(value)
+        msg = f"Invalid decimal string literal: {value!r}"
         raise ValueError(msg) from exc
 
 
-def cast_decimal(value: RuntimeValue) -> Optional[Decimal]:
+def cast_decimal(value: RuntimeValue) -> Decimal | None:
     if value is None:
         return None
 
@@ -72,11 +72,11 @@ def cast_decimal(value: RuntimeValue) -> Optional[Decimal]:
         return _cast_decimal_from_float(value)
     if isinstance(value, str):
         return _cast_decimal_from_string(value)
-    msg = "Unsupported decimal cast value type: {}".format(type(value).__name__)
+    msg = f"Unsupported decimal cast value type: {type(value).__name__}"
     raise TypeError(msg)
 
 
-VALUE_CASTS: Dict[str, Callable[[FieldValue], FieldValue]] = {
+VALUE_CASTS: dict[str, Callable[[FieldValue], FieldValue]] = {
     "int": cast_int,
     "str": cast_str,
     "auto": auto_str_normalize,
@@ -85,7 +85,7 @@ VALUE_CASTS: Dict[str, Callable[[FieldValue], FieldValue]] = {
 
 
 class LookupCastRegistry:
-    _BASE_CASTS: ClassVar[Dict[str, LookupKeyCast]] = {
+    _BASE_CASTS: ClassVar[dict[str, LookupKeyCast]] = {
         "auto": auto_normalize_key,
         "int": must_to_int,
         "str": must_to_str,
@@ -93,7 +93,7 @@ class LookupCastRegistry:
 
     def build(self, lookup_cast: LookupCastSpecIr, *, is_multi: bool) -> LookupKeyCast:
         base = self._get_base_cast(lookup_cast)
-        meta: Dict[str, RuntimeValue] = {}
+        meta: dict[str, RuntimeValue] = {}
         if lookup_cast.name == "sep_first":
             meta["sep"] = lookup_cast.sep or ","
         if not is_multi:
@@ -105,14 +105,14 @@ class LookupCastRegistry:
             return self._build_sep_first(lookup_cast.sep)
         base = self._BASE_CASTS.get(lookup_cast.name)
         if base is None:
-            msg = "Unknown lookup_cast: '{}'".format(lookup_cast.name)
+            msg = f"Unknown lookup_cast: '{lookup_cast.name}'"
             raise ScalimConversionError(msg)
         return base
 
-    def _build_sep_first(self, sep: Optional[str]) -> LookupKeyCast:
+    def _build_sep_first(self, sep: str | None) -> LookupKeyCast:
         separator = sep or ","
 
-        def _cast(value: RuntimeValue) -> Optional[LookupKey]:
+        def _cast(value: RuntimeValue) -> LookupKey | None:
             if value is None:
                 return None
             raw = str(value)
@@ -124,10 +124,10 @@ class LookupCastRegistry:
         return _cast
 
     def _wrap_multi(self, base: LookupKeyCast) -> LookupKeyCast:
-        def _cast_multi(value: RuntimeValue) -> Optional[LookupKey]:
+        def _cast_multi(value: RuntimeValue) -> LookupKey | None:
             if not _is_sequence(value):
                 return None
-            casted: List[LookupKey] = []
+            casted: list[LookupKey] = []
             for item in value:
                 converted = base(item)
                 if converted is None:
@@ -140,7 +140,7 @@ class LookupCastRegistry:
 
 def validate_source_id(source_id: str, context: str) -> None:
     if not _SOURCE_ID_PATTERN.match(source_id):
-        msg = "{}: source_id '{}' must match pattern [a-zA-Z_][a-zA-Z0-9_]*".format(context, source_id)
+        msg = f"{context}: source_id '{source_id}' must match pattern [a-zA-Z_][a-zA-Z0-9_]*"
         raise ScalimConversionError(msg)
 
 

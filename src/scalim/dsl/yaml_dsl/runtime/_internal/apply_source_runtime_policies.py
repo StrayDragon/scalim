@@ -5,13 +5,13 @@
 执行与规划按 `id` 回目录解析,不得把嵌套快照当成策略真源.
 """
 
-from typing import Dict, Mapping, Optional, Tuple
+from collections.abc import Mapping
+from dataclasses import replace
 
 from .....execution.lookup_chunking import LookupChunking
 from .....spec.ir import DemandIr, SourceIr
 from .....spec.ir.aliases import NormalizedLookupKeySpec  # noqa: TC001 — used in runtime Dict annotations (py36)
 from .....spec.ir.binding import BindingIr  # noqa: TC001 — used in runtime Dict annotations (py36)
-from .....vendor.dataclassesx import replace
 from ..source_policies import RowsReuse, SourceCache
 
 
@@ -26,7 +26,7 @@ def apply_source_runtime_policies(
     if not lookup_chunking and not source_cache and not rows_reuse:
         return demand_ir
 
-    next_sources: Dict[str, SourceIr] = {}
+    next_sources: dict[str, SourceIr] = {}
     changed = False
     for source_id, source in demand_ir.sources.items():
         next_source, source_changed = _apply_one_source_policies(
@@ -46,9 +46,9 @@ def apply_source_runtime_policies(
 def resolve_chunk_parallelism_from_runtime(
     *,
     parallelize_lookup_chunks: bool,
-    max_chunk_workers: Optional[int],
+    max_chunk_workers: int | None,
     lookup_chunking: Mapping[str, LookupChunking],
-) -> Tuple[bool, Optional[int]]:
+) -> tuple[bool, int | None]:
     """合并旧平铺布尔与 `LookupChunking.sized(parallel=...)`.
 
     返回 `(enabled, workers)`:
@@ -71,10 +71,10 @@ def resolve_chunk_parallelism_from_runtime(
 def _apply_one_source_policies(
     source: SourceIr,
     *,
-    chunk_policy: Optional[LookupChunking],
-    cache_policy: Optional[SourceCache],
-    reuse_policy: Optional[RowsReuse],
-) -> Tuple[SourceIr, bool]:
+    chunk_policy: LookupChunking | None,
+    cache_policy: SourceCache | None,
+    reuse_policy: RowsReuse | None,
+) -> tuple[SourceIr, bool]:
     next_source = source
     changed = False
 
@@ -111,7 +111,7 @@ def _apply_rows_reuse(source: SourceIr, policy: RowsReuse) -> SourceIr:
     if bind is not None and bind.mode == "rows" and bind.cache_mode != mode:
         next_bind = replace(bind, cache_mode=mode)
 
-    next_bindings: Dict[NormalizedLookupKeySpec, BindingIr] = {}
+    next_bindings: dict[NormalizedLookupKeySpec, BindingIr] = {}
     bindings_changed = False
     for key, binding in source.bindings.items():
         if binding.mode == "rows" and binding.cache_mode != mode:

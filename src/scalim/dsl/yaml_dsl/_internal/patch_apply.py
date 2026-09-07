@@ -5,14 +5,15 @@
 - 运行时需兼容 `Python 3.6`
 """
 
-from typing import Any, Dict, Mapping, Optional, Set, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ..workflow import ScalimWorkflowConfigError
 
 __all__ = ()
 
 
-def assert_no_unknown_keys(patch: Mapping[str, Any], *, allowed_keys: Set[str], path: str) -> None:
+def assert_no_unknown_keys(patch: Mapping[str, Any], *, allowed_keys: set[str], path: str) -> None:
     unknown = sorted({str(k) for k in patch} - set(allowed_keys))
     if not unknown:
         return
@@ -20,20 +21,20 @@ def assert_no_unknown_keys(patch: Mapping[str, Any], *, allowed_keys: Set[str], 
     raise ScalimWorkflowConfigError(msg, path=path)
 
 
-def as_opt_mapping(value: Any, *, path: str) -> Optional[Dict[str, Any]]:
+def as_opt_mapping(value: Any, *, path: str) -> dict[str, Any] | None:
     if value is None:
         return None
     if not isinstance(value, dict):
-        msg = "{} must be a mapping".format(path)
+        msg = f"{path} must be a mapping"
         raise ScalimWorkflowConfigError(msg, path=path)
-    return cast("Dict[str, Any]", value)  # pragma: allow-cast runtime overrides dict narrowing
+    return cast("dict[str, Any]", value)  # pragma: allow-cast runtime overrides dict narrowing
 
 
-def as_opt_str(value: Any, *, path: str) -> Optional[str]:
+def as_opt_str(value: Any, *, path: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        msg = "{} must be a string".format(path)
+        msg = f"{path} must be a string"
         raise ScalimWorkflowConfigError(msg, path=path)
     v = str(value).strip()
     return v or None
@@ -41,17 +42,17 @@ def as_opt_str(value: Any, *, path: str) -> Optional[str]:
 
 def as_required_non_empty_str(value: Any, *, path: str) -> str:
     if not isinstance(value, str):
-        msg = "{} must be a non-empty string".format(path)
+        msg = f"{path} must be a non-empty string"
         raise ScalimWorkflowConfigError(msg, path=path)
     v = str(value).strip()
     if not v:
-        msg = "{} must be a non-empty string".format(path)
+        msg = f"{path} must be a non-empty string"
         raise ScalimWorkflowConfigError(msg, path=path)
     return v
 
 
 def as_bool(value: Any, *, path: str) -> bool:
     if not isinstance(value, bool):
-        msg = "{} must be a bool".format(path)
+        msg = f"{path} must be a bool"
         raise ScalimWorkflowConfigError(msg, path=path)
     return bool(value)

@@ -1,7 +1,7 @@
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any, ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DESC_FIELD_NAME,
     DESC_FIELD_NAME_MD,
@@ -15,7 +15,7 @@ from ..constants import (
 from ..doc_texts import SOURCE_FIELD_EXTRACT_DESC, SOURCE_FIELD_EXTRACT_MD
 from .lookup_bind_relation import InlineRelationConfig
 
-_REF_DEFAULT_WHEN_ENUM: Tuple[str, ...] = ("relation_miss",)
+_REF_DEFAULT_WHEN_ENUM: tuple[str, ...] = ("relation_miss",)
 _REF_DEFAULT_CALL_BY_PAREN_PATTERN = r"^[\s\S]*\([\s\S]*\)[\s\S]*$"
 _REF_DEFAULT_LITERAL_SCHEMA = {
     # 注意: YAML 标量边界,需要与 `FieldValue` 级别的 DSL 编写面保持一致:
@@ -70,7 +70,7 @@ class SourceFieldConfig:
     SCHEMA_NAME: ClassVar[str] = "source_field"
     """源字段配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
+    SCHEMA_ALL_OF: ClassVar[list[dict[str, Any]]] = [
         {"not": {"required": ["call_by"]}},
         {"not": {"required": ["field"]}},
         {"if": {"required": ["default"]}, "then": {"required": ["relation"]}},
@@ -96,7 +96,7 @@ class SourceFieldConfig:
     )
     """字段来源的 `source_id`(可选;在容器内通常可省略)."""
 
-    extract: Optional[str] = dataclass_field(
+    extract: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
@@ -118,7 +118,7 @@ class SourceFieldConfig:
     name: str = dataclass_field(default="", metadata=schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
     """字段展示名称(可选)."""
 
-    relation: Optional[Union[str, InlineRelationConfig]] = dataclass_field(
+    relation: str | InlineRelationConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
@@ -157,7 +157,7 @@ class SourceFieldConfig:
     )
     """可选:关系路径引用(内联 `steps` 或 `YAML` 别名)."""
 
-    value_cast: Optional[str] = dataclass_field(
+    value_cast: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="字段值转换(仅源字段),用于写入上下文/输出前的类型调整",
@@ -168,7 +168,7 @@ class SourceFieldConfig:
     )
     """可选:字段值类型转换策略(仅源字段)."""
 
-    default: Optional[Tuple[Dict[str, Any], ...]] = dataclass_field(
+    default: tuple[dict[str, Any], ...] | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
@@ -205,7 +205,7 @@ class DerivedFieldConfig:
     name: str = dataclass_field(default="", metadata=schema_meta(desc=DESC_FIELD_NAME, md=DESC_FIELD_NAME_MD))
     """字段展示名称(可选)."""
 
-    compute: Optional[str] = dataclass_field(
+    compute: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="派生字段计算表达式(使用 field_id 作为变量名)",
@@ -215,7 +215,7 @@ class DerivedFieldConfig:
     )
     """派生字段计算表达式(与 `call_by` 互斥)."""
 
-    call_by: Optional[str] = dataclass_field(
+    call_by: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="派生字段函数调用(函数引用 + 参数列表),与 compute 互斥",
@@ -242,7 +242,7 @@ class DerivedFieldConfig:
     )
     """派生字段函数调用(与 `compute` 互斥)."""
 
-    depends_on: Tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=schema_omit())
+    depends_on: tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=schema_omit())
     """依赖字段标识列表(内部字段;解析后填充)."""
 
 

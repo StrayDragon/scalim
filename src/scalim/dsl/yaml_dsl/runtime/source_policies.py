@@ -4,8 +4,9 @@
 覆盖优先级:显式 `Python` > YAML 声明 > `builtin` 默认.
 """
 
+from dataclasses import dataclass
+
 from ....typedefs import RowsReuseMode, SourceSpecIrCacheMode
-from ....vendor.dataclassesx import dataclass
 
 
 @dataclass(frozen=True)

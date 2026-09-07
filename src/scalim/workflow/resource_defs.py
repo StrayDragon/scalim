@@ -5,21 +5,20 @@
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, TypeGuard
 
 from ..execution import versioned_outputs
 from ..spec.ir._workflow import WorkflowIr
 from ..typedefs import RuntimeValue
-from ..vendor.compact.typing_extensionsx import TypeGuard
 from .errors import ScalimWorkflowConfigError
 from .resources import SheetBookDef
 
 
-def _is_dict_str_any(value: RuntimeValue) -> TypeGuard[Dict[str, Any]]:
+def _is_dict_str_any(value: RuntimeValue) -> TypeGuard[dict[str, Any]]:
     return isinstance(value, dict)
 
 
-def _is_pathful_resource_options(opts: Dict[str, Any]) -> Optional[bool]:
+def _is_pathful_resource_options(opts: dict[str, Any]) -> bool | None:
     """从 `WorkflowResourceIr.options` 读取 `pathful` 身份标志."""
 
     if "pathful" not in opts:
@@ -37,13 +36,13 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
     workflow_ir: WorkflowIr,
     *,
     workflow_exec_id: str,
-) -> Tuple[Dict[str, str], Dict[str, bool], Dict[str, str], Dict[str, SheetBookDef]]:
-    workbook_defs: Dict[str, str] = {}
-    workbook_allow_formulas_by_id: Dict[str, bool] = {}
-    csv_defs: Dict[str, str] = {}
-    sheetbook_defs: Dict[str, SheetBookDef] = {}
+) -> tuple[dict[str, str], dict[str, bool], dict[str, str], dict[str, SheetBookDef]]:
+    workbook_defs: dict[str, str] = {}
+    workbook_allow_formulas_by_id: dict[str, bool] = {}
+    csv_defs: dict[str, str] = {}
+    sheetbook_defs: dict[str, SheetBookDef] = {}
 
-    layouts_by_root: Dict[str, versioned_outputs.OutputRootLayout] = {}
+    layouts_by_root: dict[str, versioned_outputs.OutputRootLayout] = {}
 
     def _layout_for_root(output_root: str, *, path: str) -> versioned_outputs.OutputRootLayout:
         root_str = str(output_root or "").strip()
@@ -62,11 +61,11 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
         except FileExistsError as exc:
             msg = (
                 "Version directory already exists (possible concurrent writers or reused workflow_exec_id): "
-                "root={!r}, workflow_exec_id={!r}"
-            ).format(root_norm, str(workflow_exec_id))
+                f"root={root_norm!r}, workflow_exec_id={str(workflow_exec_id)!r}"
+            )
             raise ScalimWorkflowConfigError(msg, path=str(path)) from exc
         except OSError as exc:
-            msg = "Failed to prepare output root for workflow run: {}: {}".format(type(exc).__name__, exc)
+            msg = f"Failed to prepare output root for workflow run: {type(exc).__name__}: {exc}"
             raise ScalimWorkflowConfigError(msg, path=str(path)) from exc
 
         layouts_by_root[root_norm] = layout
@@ -77,23 +76,23 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
         if res_type == "book":
             opts = res.options or {}
             if not _is_dict_str_any(opts):
-                msg = "Invalid workflow resource options for book: resource_id={!r}".format(str(res.resource_id))
+                msg = f"Invalid workflow resource options for book: resource_id={str(res.resource_id)!r}"
                 raise ScalimWorkflowConfigError(msg, path="workflow.resources.books")
             pathful = _is_pathful_resource_options(opts)
             if pathful is True:
                 output_root = str(res.path or "")
-                layout = _layout_for_root(output_root, path="workflow.resources.books.{}.path".format(str(res.resource_id)))
+                layout = _layout_for_root(output_root, path=f"workflow.resources.books.{res.resource_id!s}.path")
                 final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
                 workbook_defs[str(res.resource_id)] = str(final_path)
                 workbook_allow_formulas_by_id[str(res.resource_id)] = bool(opts.get("allow_formulas", True))
                 continue
             if pathful is False:
                 export_cfg_obj = opts.get("export_xlsx")
-                export_cfg_dict: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
+                export_cfg_dict: dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
                 export_allow_formulas = bool(export_cfg_dict.get("allow_formulas", True))
                 export_path = str(res.path or "").strip() or None
                 if export_path is not None:
-                    layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
+                    layout = _layout_for_root(export_path, path=f"workflow.resources.books.{res.resource_id!s}.export_xlsx.path")
                     final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
                     export_path = str(final_path)
                 sheetbook_defs[str(res.resource_id)] = SheetBookDef(
@@ -103,16 +102,12 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
                 )
                 continue
 
-            msg = (
-                "Unknown book identity for book_id={!r}; expected options.pathful (true=pathful workbook, false=pathless sheetbook)".format(
-                    str(res.resource_id)
-                )
-            )
-            raise ScalimWorkflowConfigError(msg, path="workflow.resources.books.{}".format(str(res.resource_id)))
+            msg = f"Unknown book identity for book_id={str(res.resource_id)!r}; expected options.pathful (true=pathful workbook, false=pathless sheetbook)"  # noqa: E501
+            raise ScalimWorkflowConfigError(msg, path=f"workflow.resources.books.{res.resource_id!s}")
 
         if res_type == "workbook":
             output_root = str(res.path or "")
-            layout = _layout_for_root(output_root, path="workflow.resources.workbooks.{}.path".format(str(res.resource_id)))
+            layout = _layout_for_root(output_root, path=f"workflow.resources.workbooks.{res.resource_id!s}.path")
             final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
             workbook_defs[str(res.resource_id)] = str(final_path)
             opts = res.options or {}
@@ -121,7 +116,7 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
 
         if res_type == "csv":
             output_root = str(res.path or "")
-            layout = _layout_for_root(output_root, path="workflow.resources.files.{}.path".format(str(res.resource_id)))
+            layout = _layout_for_root(output_root, path=f"workflow.resources.files.{res.resource_id!s}.path")
             final_path = versioned_outputs.file_output_path(layout, version_id=str(workflow_exec_id), file_id=str(res.resource_id))
             csv_defs[str(res.resource_id)] = str(final_path)
             continue
@@ -129,11 +124,11 @@ def build_workflow_resource_defs(  # noqa: C901, PLR0915  # pragma: allow-c901 p
         if res_type == "sheetbook":
             opts = res.options or {}
             export_cfg_obj = opts.get("export_xlsx")
-            sheetbook_export_cfg: Dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
+            sheetbook_export_cfg: dict[str, Any] = export_cfg_obj if _is_dict_str_any(export_cfg_obj) else {}
             export_allow_formulas = bool(sheetbook_export_cfg.get("allow_formulas", True))
             export_path = str(res.path or "").strip() or None
             if export_path is not None:
-                layout = _layout_for_root(export_path, path="workflow.resources.books.{}.export_xlsx.path".format(str(res.resource_id)))
+                layout = _layout_for_root(export_path, path=f"workflow.resources.books.{res.resource_id!s}.export_xlsx.path")
                 final_path = versioned_outputs.book_output_path(layout, version_id=str(workflow_exec_id), book_id=str(res.resource_id))
                 export_path = str(final_path)
             sheetbook_defs[str(res.resource_id)] = SheetBookDef(

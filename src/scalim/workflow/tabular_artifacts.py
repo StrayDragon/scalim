@@ -7,18 +7,18 @@
 """
 
 import csv
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Iterator, List, Sequence, Union
 
 from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows
 from ..typedefs import CellValue
 from .resources_base import ScalimWorkflowWriteError
 
-WorkflowTabularInput = Union[str, InMemoryCsv, InMemoryRows]
+WorkflowTabularInput = str | InMemoryCsv | InMemoryRows
 
 
-def read_tabular_header(input_tabular: WorkflowTabularInput) -> List[str]:
+def read_tabular_header(input_tabular: WorkflowTabularInput) -> list[str]:
     if isinstance(input_tabular, InMemoryRows):
         header = [str(x or "").strip() for x in input_tabular.header]
         if not header or any(not x for x in header):
@@ -36,23 +36,23 @@ def read_tabular_header(input_tabular: WorkflowTabularInput) -> List[str]:
     path = str(input_tabular)
     csv_path = Path(path)
     if not csv_path.exists():
-        msg = "Missing input CSV: {!r}".format(path)
+        msg = f"Missing input CSV: {path!r}"
         raise ScalimWorkflowWriteError(msg)
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
         try:
             header = next(reader)
         except StopIteration:
-            msg = "Input CSV is empty (missing header): {!r}".format(path)
+            msg = f"Input CSV is empty (missing header): {path!r}"
             raise ScalimWorkflowWriteError(msg) from None
     header = [str(x or "").strip() for x in header]
     if not header or any(not x for x in header):
-        msg = "Input CSV has invalid header (empty field): {!r}".format(path)
+        msg = f"Input CSV has invalid header (empty field): {path!r}"
         raise ScalimWorkflowWriteError(msg)
     return header
 
 
-def iter_tabular_rows(input_tabular: WorkflowTabularInput) -> Iterator[List[CellValue]]:
+def iter_tabular_rows(input_tabular: WorkflowTabularInput) -> Iterator[list[CellValue]]:
     if isinstance(input_tabular, InMemoryRows):
         for row in input_tabular.rows:
             yield list(row)
@@ -76,11 +76,11 @@ def materialize_aligned_tabular_rows(
     mapping: Sequence[int],
     *,
     input_tabular: WorkflowTabularInput,
-) -> List[List[CellValue]]:
+) -> list[list[CellValue]]:
     _ = list(expected)
-    rows: List[List[CellValue]] = []
+    rows: list[list[CellValue]] = []
     for row in iter_tabular_rows(input_tabular):
-        out_row: List[CellValue] = []
+        out_row: list[CellValue] = []
         for src_idx in mapping:
             out_row.append(row[src_idx] if src_idx >= 0 and src_idx < len(row) else "")
         rows.append(out_row)

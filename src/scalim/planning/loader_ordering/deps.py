@@ -1,6 +1,6 @@
 import logging
 from collections import OrderedDict
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING
 
 from ...spec.ir import FieldIr
 from ...spec.ir._helpers import extract_from_fields, infer_lookup_steps
@@ -8,7 +8,7 @@ from ...spec.ir._helpers import extract_from_fields, infer_lookup_steps
 _logger = logging.getLogger(__name__)
 
 
-def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: FieldIr) -> Tuple[str, ...]:
+def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: FieldIr) -> tuple[str, ...]:
     """为引用字段的排序构建依赖信号.
 
     返回一个由字段键组成的元组,这些字段键来源于关联步骤的 `from_field`,
@@ -26,7 +26,7 @@ def build_ref_field_ordering_deps(demand: "DemandIr", field_key: str, field: Fie
     main_source_id = demand.main_source.source_id if demand.main_source else ""
     raw_deps = extract_from_fields(steps)
 
-    deps: List[str] = []
+    deps: list[str] = []
     for dep_key in raw_deps:
         if dep_key == field_key:
             continue

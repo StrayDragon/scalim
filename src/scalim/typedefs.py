@@ -1,16 +1,16 @@
 # region imports
 
+from collections.abc import Hashable, Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Dict, Hashable, List, Mapping, Sequence, Set, Tuple, Union
+from typing import Literal
 
+from ._internal.strenum import StrEnum
 from ._internal.utils.policy import ensure_policy_enum, parse_policy_value
-from .vendor.compact import StrEnum
-from .vendor.compact.typing_extensionsx import Literal
 
 # endregion
 
-FieldValue = Union[int, float, Decimal, str, bool, None, datetime, date, time, timedelta]
+FieldValue = int | float | Decimal | str | bool | None | datetime | date | time | timedelta
 """内建 `Excel` 推荐细胞闭集(文档 / `opt-in` 预检参考).
 
 含 `openpyxl` 的 `TIME_TYPES`(`datetime` / `date` / `time` / `timedelta`).
@@ -36,7 +36,7 @@ RowData = Mapping[str, CellValue]
 RuntimeValue = object  # pragma: allow-object RuntimeValue SSOT: dynamic runtime boundary before narrowing
 """运行时动态值边界: 外部输入先按 `object` 处理,再做显式窄化."""
 
-StaticParams = Dict[str, RuntimeValue]
+StaticParams = dict[str, RuntimeValue]
 """静态参数映射: 用于主源/加载器的透传参数."""
 
 # region literal types
@@ -71,7 +71,7 @@ FieldPresentationKind = Literal["generic", "csv", "excel", "pandas"]
 # region record key types
 # 记录键类型体系:
 # - `RecordIndex`: 批次内的记录索引 (0, 1, 2, ...)
-# - `BusinessKey`: 业务层面的记录标识 (`str` 或复合键 `Tuple[str, ...]`)
+# - `BusinessKey`: 业务层面的记录标识 (`str` 或复合键 `tuple[str, ...]`)
 # - `RecordKey`: 通用记录键 (可以是索引或业务键)
 #
 # 命名说明:
@@ -80,16 +80,16 @@ FieldPresentationKind = Literal["generic", "csv", "excel", "pandas"]
 RecordIndex = int
 """批次内的记录索引 (0, 1, 2, ...), 由框架内部分配."""
 
-BusinessKey = Union[str, Tuple[str, ...]]
-"""业务层面的记录标识, 来自 `loader` 返回的 `Dict` 的 `key`. 可以是 `str` 或复合键 `Tuple[str, ...]`."""
+BusinessKey = str | tuple[str, ...]
+"""业务层面的记录标识, 来自 `loader` 返回的 `dict` 的 `key`. 可以是 `str` 或复合键 `tuple[str, ...]`."""
 
-RecordKey = Union[RecordIndex, BusinessKey]
-"""通用记录键 - 可以是批次内索引 (`int`) 或业务 `key` (`str`/`Tuple[str, ...]`)."""
+RecordKey = RecordIndex | BusinessKey
+"""通用记录键 - 可以是批次内索引 (`int`) 或业务 `key` (`str`/`tuple[str, ...]`)."""
 
 RecordKeySeq = Sequence[RecordKey]
 """记录键序列, 用于函数参数 (只读, 协变)."""
 
-LoaderResult = Dict[BusinessKey, RowData]
+LoaderResult = dict[BusinessKey, RowData]
 """`Loader` 函数返回的数据映射: `business_key` -> `row_data`."""
 
 LookupKey = Hashable
@@ -98,10 +98,10 @@ LookupKey = Hashable
 LookupKeySeq = Sequence[LookupKey]
 """关联查找键序列 (只读)."""
 
-LookupKeyList = List[LookupKey]
+LookupKeyList = list[LookupKey]
 """关联查找键列表."""
 
-LookupKeySet = Set[LookupKey]
+LookupKeySet = set[LookupKey]
 """关联查找键集合."""
 
 LoaderResultValue = RuntimeValue
@@ -110,16 +110,16 @@ LoaderResultValue = RuntimeValue
 LoaderResultMapping = Mapping[LookupKey, LoaderResultValue]
 """`Loader` 结果的只读映射视图."""
 
-LoaderResultMap = Dict[LookupKey, LoaderResultValue]
+LoaderResultMap = dict[LookupKey, LoaderResultValue]
 """`Loader` 结果的具体字典形态,用于缓存与合并."""
 
-LoaderCallArgs = Tuple[RuntimeValue, ...]
+LoaderCallArgs = tuple[RuntimeValue, ...]
 """调用 `Loader` 时的位置参数元组."""
 
-LoaderCallKwargs = Dict[str, RuntimeValue]
+LoaderCallKwargs = dict[str, RuntimeValue]
 """调用 `Loader` 时的关键字参数映射."""
 
-LoaderCallParams = Tuple[LoaderCallArgs, LoaderCallKwargs]
+LoaderCallParams = tuple[LoaderCallArgs, LoaderCallKwargs]
 """`params_builder` 构造出的 `(args, kwargs)` 结果."""
 
 # `Sink` 接口使用的类型 (等同于 `RecordKey`/`RecordKeySeq`)

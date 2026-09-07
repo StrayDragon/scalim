@@ -1,4 +1,5 @@
-from typing import Callable, Tuple, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 HookT = TypeVar("HookT")
 EventT = TypeVar("EventT")
@@ -10,7 +11,7 @@ class HookDispatchStrategy:
 
     def dispatch(
         self,
-        handler_pairs: Tuple[Tuple[HookT, Callable[[EventT], HandlerResultT]], ...],
+        handler_pairs: tuple[tuple[HookT, Callable[[EventT], HandlerResultT]], ...],
         event: EventT,
         safe_call: Callable[[HookT, Callable[[EventT], HandlerResultT], EventT], None],
     ) -> None:

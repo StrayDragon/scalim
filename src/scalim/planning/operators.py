@@ -1,9 +1,9 @@
 # region imports
 
-from typing import TYPE_CHECKING, Tuple, Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from ..vendor.compact import StrEnum
-from ..vendor.dataclassesx import dataclass, field
+from .._internal.strenum import StrEnum
 
 # endregion
 
@@ -34,8 +34,8 @@ class LoadOperatorIr:
     operator_id: str
     operator_type: str
     source_id: str
-    field_keys: Tuple[str, ...]
-    depends_on: Tuple[str, ...] = field(default_factory=tuple)
+    field_keys: tuple[str, ...]
+    depends_on: tuple[str, ...] = field(default_factory=tuple)
     is_primary: bool = False
 
 
@@ -47,8 +47,8 @@ class LoadRefOperatorIr:
     operator_type: str
     source_id: str
     field_key: str
-    lookup_steps: "Tuple[LookupStepIr, ...]"
-    depends_on: Tuple[str, ...] = field(default_factory=tuple)
+    lookup_steps: "tuple[LookupStepIr, ...]"
+    depends_on: tuple[str, ...] = field(default_factory=tuple)
     use_cache: bool = False
 
 
@@ -59,8 +59,8 @@ class ComputeOperatorIr:
     operator_id: str
     operator_type: str
     field_key: str
-    input_fields: Tuple[str, ...]
-    depends_on: Tuple[str, ...] = field(default_factory=tuple)
+    input_fields: tuple[str, ...]
+    depends_on: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ class WriteColumnOperatorIr:
     operator_id: str
     operator_type: str
     field_key: str
-    depends_on: Tuple[str, ...] = field(default_factory=tuple)
+    depends_on: tuple[str, ...] = field(default_factory=tuple)
     can_release_after: bool = False
 
 
@@ -80,8 +80,8 @@ class WriteRowOperatorIr:
 
     operator_id: str
     operator_type: str
-    target_fields: Tuple[str, ...]
-    depends_on: Tuple[str, ...] = field(default_factory=tuple)
+    target_fields: tuple[str, ...]
+    depends_on: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -91,24 +91,15 @@ class ReleaseOperatorIr:
     operator_id: str
     operator_type: str
     field_key: str
-    depends_on: Tuple[str, ...] = field(default_factory=tuple)
+    depends_on: tuple[str, ...] = field(default_factory=tuple)
     reason: str = ""
 
 
-SupportedOperatorIr = Union[
-    LoadOperatorIr,
-    LoadRefOperatorIr,
-    ComputeOperatorIr,
-    WriteColumnOperatorIr,
-    WriteRowOperatorIr,
-    ReleaseOperatorIr,
-]
+SupportedOperatorIr = (
+    LoadOperatorIr | LoadRefOperatorIr | ComputeOperatorIr | WriteColumnOperatorIr | WriteRowOperatorIr | ReleaseOperatorIr
+)
 
-PlanOperatorIr = Union[
-    LoadOperatorIr,
-    LoadRefOperatorIr,
-    ComputeOperatorIr,
-]
+PlanOperatorIr = LoadOperatorIr | LoadRefOperatorIr | ComputeOperatorIr
 
 __all__ = (
     "ComputeOperatorIr",

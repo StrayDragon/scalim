@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 REDACTED_ERROR_MESSAGE = "(redacted)"
 _DEBUG_ERRORS_ENV = "SCALIM_DEBUG_ERRORS"
@@ -43,7 +42,7 @@ def _env_debug_errors_enabled() -> bool:
     return raw not in ("", "0", "false", "no", "off")
 
 
-def safe_error_message(error: BaseException, *, debug: Optional[bool] = None) -> Optional[str]:
+def safe_error_message(error: BaseException, *, debug: bool | None = None) -> str | None:
     """返回适用于对外输出的错误消息.
 
     默认策略:

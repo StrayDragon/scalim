@@ -7,9 +7,8 @@
 运行时需兼容 `Python 3.6`
 """
 
-from typing import List, Optional, Tuple
+from dataclasses import replace
 
-from ....vendor.dataclassesx import replace
 from ..book_resource_policy import ResourcesPolicy, resolve_write_defaults_config
 from ..schema_dsl.constants import DEFAULT_OUTPUT_HEADER_BY, DEFAULT_OUTPUT_INCLUDE_HEADER
 from ..schema_dsl.models import DemandConfig, OutputTargetConfig, OutputToConfig
@@ -18,16 +17,16 @@ from .contracts import DemandRunOptions, OutputOverride, OutputsDefaultsOverride
 
 
 def apply_default_book_binding_to_outputs(
-    outputs: Tuple[OutputTargetConfig, ...],
+    outputs: tuple[OutputTargetConfig, ...],
     *,
     default_book_id: str,
-) -> Tuple[OutputTargetConfig, ...]:
+) -> tuple[OutputTargetConfig, ...]:
     if not outputs:
         return outputs
     if not default_book_id:
         return outputs
 
-    updated: List[OutputTargetConfig] = []
+    updated: list[OutputTargetConfig] = []
     for out_cfg in outputs:
         to_cfg = out_cfg.to
         if to_cfg is None:
@@ -48,9 +47,9 @@ def apply_default_book_binding_to_outputs(
 def effective_book_write_mode(
     config: DemandConfig,
     *,
-    resources_override: Optional[ResourcesOverride],
+    resources_override: ResourcesOverride | None,
     book_id: str,
-    resources_policy: Optional[ResourcesPolicy] = None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> str:
     _ = resources_override  # `IO` `overlay` 不再承载 `write` `policy`
     policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
@@ -67,9 +66,9 @@ def effective_book_write_mode(
 def effective_book_header_policy(
     config: DemandConfig,
     *,
-    resources_override: Optional[ResourcesOverride],
+    resources_override: ResourcesOverride | None,
     book_id: str,
-    resources_policy: Optional[ResourcesPolicy] = None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> str:
     _ = resources_override  # `IO` `overlay` 不再承载 `write` `policy`
     policy = resources_policy if isinstance(resources_policy, ResourcesPolicy) else None
@@ -89,8 +88,8 @@ def output_target_requires_unique_effective_field_display_names(
     config: DemandConfig,
     output: OutputTargetConfig,
     *,
-    resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[ResourcesPolicy] = None,
+    resources_override: ResourcesOverride | None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> bool:
     to_cfg = output.to
     if to_cfg is None:
@@ -132,9 +131,9 @@ def output_override_requires_unique_effective_field_display_names(
     config: DemandConfig,
     output: OutputOverride,
     *,
-    default_book_id: Optional[str],
-    resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[ResourcesPolicy] = None,
+    default_book_id: str | None,
+    resources_override: ResourcesOverride | None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> bool:
     to_cfg = output.to
     write_cfg = output.write
@@ -175,9 +174,9 @@ def output_override_requires_unique_effective_field_display_names(
 def outputs_require_unique_effective_field_display_names(
     config: DemandConfig,
     *,
-    outputs: Tuple[OutputTargetConfig, ...],
-    resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[ResourcesPolicy] = None,
+    outputs: tuple[OutputTargetConfig, ...],
+    resources_override: ResourcesOverride | None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> bool:
     return any(
         output_target_requires_unique_effective_field_display_names(
@@ -190,10 +189,10 @@ def outputs_require_unique_effective_field_display_names(
 def output_overrides_require_unique_effective_field_display_names(
     config: DemandConfig,
     *,
-    outputs: Tuple[OutputOverride, ...],
-    default_book_id: Optional[str],
-    resources_override: Optional[ResourcesOverride],
-    resources_policy: Optional[ResourcesPolicy] = None,
+    outputs: tuple[OutputOverride, ...],
+    default_book_id: str | None,
+    resources_override: ResourcesOverride | None,
+    resources_policy: ResourcesPolicy | None = None,
 ) -> bool:
     return any(
         output_override_requires_unique_effective_field_display_names(

@@ -1,10 +1,11 @@
 # pragma: allow-cast-file 运行时类型窄化辅助函数
-from typing import Any, Dict, List, Mapping, Optional, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from ..typedefs import RuntimeValue
 
 
-def as_mapping(value: RuntimeValue, *, path: str = "") -> Optional[Dict[str, Any]]:
+def as_mapping(value: RuntimeValue, *, path: str = "") -> dict[str, Any] | None:
     """
     将 `value` 尝试窄化为配置类映射(`dict`).
 
@@ -15,10 +16,10 @@ def as_mapping(value: RuntimeValue, *, path: str = "") -> Optional[Dict[str, Any
     _ = path
     if not isinstance(value, dict):
         return None
-    return cast("Dict[str, Any]", value)
+    return cast("dict[str, Any]", value)
 
 
-def as_list(value: RuntimeValue, *, path: str = "") -> Optional[List[Any]]:
+def as_list(value: RuntimeValue, *, path: str = "") -> list[Any] | None:
     """
     将 `value` 尝试窄化为配置类列表(`list`).
 
@@ -29,7 +30,7 @@ def as_list(value: RuntimeValue, *, path: str = "") -> Optional[List[Any]]:
     _ = path
     if not isinstance(value, list):
         return None
-    return cast("List[Any]", value)
+    return cast("list[Any]", value)
 
 
 def require_str(value: RuntimeValue, *, path: str) -> str:
@@ -37,11 +38,11 @@ def require_str(value: RuntimeValue, *, path: str) -> str:
 
     if isinstance(value, str):
         return value
-    msg = "{} must be a string, got '{}'".format(path, type(value).__name__)
+    msg = f"{path} must be a string, got '{type(value).__name__}'"
     raise TypeError(msg)
 
 
-def mapping_get_str(mapping: Mapping[str, Any], key: str, *, path: str) -> Optional[str]:
+def mapping_get_str(mapping: Mapping[str, Any], key: str, *, path: str) -> str | None:
     """从映射读取可选的 `str` 字段; 若字段存在但类型不为 `str` 则抛出 `TypeError`."""
 
     if key not in mapping:
@@ -51,7 +52,7 @@ def mapping_get_str(mapping: Mapping[str, Any], key: str, *, path: str) -> Optio
         return None
     if isinstance(value, str):
         return value
-    msg = "{}.{} must be a string, got '{}'".format(path, key, type(value).__name__)
+    msg = f"{path}.{key} must be a string, got '{type(value).__name__}'"
     raise TypeError(msg)
 
 

@@ -1,12 +1,11 @@
-from __future__ import absolute_import
-
 import hashlib
 from abc import ABC, abstractmethod
-from typing import Callable, List, Optional, Tuple
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from typing_extensions import override
 
 from ...typedefs import FailurePolicy, KeyNormalizationMode, RowData
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import (
     AggMetricSpec,
     GroupByAggregator,
@@ -29,20 +28,20 @@ class OutputTargetSpec:
     layout: ExportLayout
     output: OutputSpec
     in_memory: bool = False
-    predicate: Optional[OutputRowPredicate] = None
+    predicate: OutputRowPredicate | None = None
     is_primary: bool = False
-    requires: Optional[Tuple[str, ...]] = None
-    workflow_export_header: Optional[Tuple[str, ...]] = None
-    managed_artifact_kind: Optional[str] = None
+    requires: tuple[str, ...] | None = None
+    workflow_export_header: tuple[str, ...] | None = None
+    managed_artifact_kind: str | None = None
 
 
 class IDerivedAggregationSpec(ABC):
     @abstractmethod
-    def required_fields(self) -> Tuple[str, ...]:
+    def required_fields(self) -> tuple[str, ...]:
         raise NotImplementedError
 
     @abstractmethod
-    def fingerprint_parts(self) -> Tuple[str, ...]:
+    def fingerprint_parts(self) -> tuple[str, ...]:
         raise NotImplementedError
 
     @abstractmethod
@@ -58,7 +57,7 @@ def metric_fingerprint_part(m: AggMetricSpec) -> str:
     field_id = str(m.field_id) if m.field_id else ""
     field_ids = ",".join(str(x) for x in (m.field_ids or ()))
     threshold = "" if m.threshold is None else str(m.threshold)
-    return "{}|op={}|field_id={}|field_ids={}|threshold={}".format(str(m.out_field_id), str(m.op), field_id, field_ids, threshold)
+    return f"{m.out_field_id!s}|op={m.op!s}|field_id={field_id}|field_ids={field_ids}|threshold={threshold}"
 
 
 def rank_field_fingerprint_part(r: RankFieldSpec) -> str:
@@ -87,19 +86,19 @@ def post_field_fingerprint_part(p: PostFieldSpec) -> str:
 class DerivedGroupBySpec(IDerivedAggregationSpec):
     """派生汇总输出(内置 `group_by`)."""
 
-    group_by: Tuple[str, ...]
-    metrics: Tuple[AggMetricSpec, ...]
-    rank_fields: Tuple[RankFieldSpec, ...] = ()
-    post_fields: Tuple[PostFieldSpec, ...] = ()
+    group_by: tuple[str, ...]
+    metrics: tuple[AggMetricSpec, ...]
+    rank_fields: tuple[RankFieldSpec, ...] = ()
+    post_fields: tuple[PostFieldSpec, ...] = ()
 
     @override
-    def required_fields(self) -> Tuple[str, ...]:
+    def required_fields(self) -> tuple[str, ...]:
         agg = GroupByAggregator(group_by=self.group_by, metrics=self.metrics)
         return agg.required_fields()
 
     @override
-    def fingerprint_parts(self) -> Tuple[str, ...]:
-        parts: List[str] = []
+    def fingerprint_parts(self) -> tuple[str, ...]:
+        parts: list[str] = []
         parts.append("kind=group_by")
         parts.append("group_by=" + ",".join(str(x) for x in self.group_by))
         parts.append("metrics=")
@@ -115,14 +114,7 @@ class DerivedGroupBySpec(IDerivedAggregationSpec):
         plan = build_finalize_dag_plan(rank_fields=self.rank_fields, post_fields=self.post_fields)
         for item in plan.items:
             deps = ",".join(str(x) for x in (item.dependencies or ()))
-            parts.append(
-                "  {}|producer_key={}|phase={}|deps={}".format(
-                    str(item.out_field_id),
-                    str(item.producer_key),
-                    str(item.phase),
-                    deps,
-                )
-            )
+            parts.append(f"  {item.out_field_id!s}|producer_key={item.producer_key!s}|phase={item.phase!s}|deps={deps}")
         return tuple(parts)
 
     @override
@@ -156,11 +148,11 @@ class DerivedOutputTargetSpec:
     output_layout: ExportLayout
     output: OutputSpec
     in_memory: bool = False
-    predicate: Optional[OutputRowPredicate] = None
+    predicate: OutputRowPredicate | None = None
     is_primary: bool = False
-    requires: Optional[Tuple[str, ...]] = None
-    workflow_export_header: Optional[Tuple[str, ...]] = None
-    managed_artifact_kind: Optional[str] = None
+    requires: tuple[str, ...] | None = None
+    workflow_export_header: tuple[str, ...] | None = None
+    managed_artifact_kind: str | None = None
 
 
 @dataclass(frozen=True)
@@ -192,10 +184,10 @@ class OutputCompositionSpec:
     - `primary_only`: 非主输出失败将被记录并禁用该输出,不阻断主输出
     """
 
-    targets: Tuple[OutputTargetSpec, ...] = ()
-    derived_targets: Tuple[DerivedOutputTargetSpec, ...] = ()
-    meta_sheet: Optional[MetaSheetSpec] = None
-    audit_sheet: Optional[AuditSheetSpec] = None
+    targets: tuple[OutputTargetSpec, ...] = ()
+    derived_targets: tuple[DerivedOutputTargetSpec, ...] = ()
+    meta_sheet: MetaSheetSpec | None = None
+    audit_sheet: AuditSheetSpec | None = None
     failure_policy: str = FailurePolicy.ALL_FAIL.value
     include_full_error_message: bool = False
 
@@ -208,11 +200,11 @@ class OutputTargetStats:
     error_count: int
     duration_seconds: float
     disabled: bool
-    output_path: Optional[str]
-    sheet_name: Optional[str]
-    error_type: Optional[str] = None
-    error_message: Optional[str] = None
-    error_message_hash: Optional[str] = None
+    output_path: str | None
+    sheet_name: str | None
+    error_type: str | None = None
+    error_message: str | None = None
+    error_message_hash: str | None = None
 
 
 def fingerprint_for_derived_target(*, target_id: str, derived: IDerivedAggregationSpec) -> str:

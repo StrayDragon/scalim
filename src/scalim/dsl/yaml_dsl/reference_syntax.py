@@ -1,8 +1,7 @@
 import re
-from typing import Tuple
+from dataclasses import dataclass
 
 from ...exceptions import ScalimYamlError
-from ...vendor.dataclassesx import dataclass
 
 _MODULE_PATH_RE = re.compile(r"^[.]*[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)*$")
 _REFERENCE_PARTS_COUNT = 2
@@ -21,7 +20,7 @@ class ScalimReferenceSyntaxError(ScalimYamlError):
 class ParsedReference:
     reference: str
     module_path: str
-    attr_path: Tuple[str, ...]
+    attr_path: tuple[str, ...]
     style: str
 
     @property
@@ -62,21 +61,21 @@ def is_valid_callable_reference(reference: str) -> bool:
 def _parse_class_style(reference: str) -> ParsedReference:
     parts = reference.split(":")
     if len(parts) != _REFERENCE_PARTS_COUNT:
-        msg = "类式引用 '{}' 非法;期望格式: `module.path:attr` 或 `module.path:obj.method`".format(reference)
+        msg = f"类式引用 '{reference}' 非法;期望格式: `module.path:attr` 或 `module.path:obj.method`"
         raise ScalimReferenceSyntaxError(msg)
 
     module_path, attr_path = parts
     if module_path and not module_path.strip("."):
-        msg = "引用 '{}' 中的相对模块路径 '{}' 非法: 前导点后缺少模块路径".format(reference, module_path)
+        msg = f"引用 '{reference}' 中的相对模块路径 '{module_path}' 非法: 前导点后缺少模块路径"
         raise ScalimReferenceSyntaxError(msg)
     if not module_path or _MODULE_PATH_RE.fullmatch(module_path) is None:
-        msg = "引用 '{}' 的模块路径 '{}' 非法".format(reference, module_path)
+        msg = f"引用 '{reference}' 的模块路径 '{module_path}' 非法"
         raise ScalimReferenceSyntaxError(msg)
 
     attr_parts = tuple(attr_path.split("."))
     invalid = [part for part in attr_parts if not part or not part.isidentifier()]
     if invalid:
-        msg = "引用 '{}' 的属性路径 '{}' 非法".format(reference, attr_path)
+        msg = f"引用 '{reference}' 的属性路径 '{attr_path}' 非法"
         raise ScalimReferenceSyntaxError(msg)
 
     return ParsedReference(reference=reference, module_path=module_path, attr_path=attr_parts, style="class")
@@ -85,19 +84,19 @@ def _parse_class_style(reference: str) -> ParsedReference:
 def _parse_dotted_style(reference: str) -> ParsedReference:
     parts = reference.rsplit(".", 1)
     if len(parts) != _REFERENCE_PARTS_COUNT:
-        msg = "点号形式引用 '{}' 非法;期望格式: `module.path.function`".format(reference)
+        msg = f"点号形式引用 '{reference}' 非法;期望格式: `module.path.function`"
         raise ScalimReferenceSyntaxError(msg)
 
     module_path, func_name = parts
     if not module_path:
-        msg = "相对点号引用 '{}' 非法;期望格式: `.module.path.function`".format(reference)
+        msg = f"相对点号引用 '{reference}' 非法;期望格式: `.module.path.function`"
         raise ScalimReferenceSyntaxError(msg)
 
     if _MODULE_PATH_RE.fullmatch(module_path) is None:
-        msg = "引用 '{}' 的模块路径 '{}' 非法".format(reference, module_path)
+        msg = f"引用 '{reference}' 的模块路径 '{module_path}' 非法"
         raise ScalimReferenceSyntaxError(msg)
     if not func_name.isidentifier():
-        msg = "引用 '{}' 的可调用名 '{}' 非法".format(reference, func_name)
+        msg = f"引用 '{reference}' 的可调用名 '{func_name}' 非法"
         raise ScalimReferenceSyntaxError(msg)
 
     return ParsedReference(reference=reference, module_path=module_path, attr_path=(func_name,), style="dotted")

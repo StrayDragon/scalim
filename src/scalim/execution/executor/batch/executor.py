@@ -6,8 +6,9 @@
 # region imports
 
 import time
+from collections.abc import Callable, Hashable, Sequence
 from concurrent.futures import Executor
-from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, cast
+from typing import cast
 
 from ....events import EventType
 from ....planning.builder_helpers.fusion_groups import MIN_FUSION_GROUP_SIZE, ComputeFusionGroup
@@ -43,15 +44,15 @@ from ._main_prefill import prefill_main_source_fields
 def _try_execute_fused_compute(
     *,
     field_key: str,
-    fusion_by_field: Dict[str, ComputeFusionGroup],
-    fused_done: Set[str],
+    fusion_by_field: dict[str, ComputeFusionGroup],
+    fused_done: set[str],
     context: BatchContext,
-    batch_row_nth: List[Hashable],
+    batch_row_nth: list[Hashable],
     runtime: ExecutionRuntime,
     wants_stage_spans: bool,
-    stage_map: Dict[str, str],
-    stage_durations: Dict[str, float],
-    stage_perf_counter_fn: Optional[Callable[[], float]],
+    stage_map: dict[str, str],
+    stage_durations: dict[str, float],
+    stage_perf_counter_fn: Callable[[], float] | None,
 ) -> bool:
     """若 `field_key` 是可融合组的首字段则执行融合并返回 `True`."""
     if field_key in fused_done:
@@ -102,7 +103,7 @@ class BatchExecutor:
 
     plan: ExecutionPlan
     runtime: ExecutionRuntime
-    _executors: Dict[str, OperatorExecutor]
+    _executors: dict[str, OperatorExecutor]
     _overrides: "PipelineOverrides"
     _adaptive_scheduler: "AdaptiveLoadRefScheduler"
 
@@ -111,7 +112,7 @@ class BatchExecutor:
         plan: ExecutionPlan,
         runtime: ExecutionRuntime,
         *,
-        overrides: Optional["PipelineOverrides"] = None,
+        overrides: "PipelineOverrides | None" = None,
     ) -> None:
         self.plan = plan
         self.runtime = runtime
@@ -131,9 +132,9 @@ class BatchExecutor:
     def prefill_main_source_fields(
         self,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
-        main_rows: Optional[Sequence[RowData]],
-        required_fields: Optional[Set[str]] = None,
+        batch_row_nth: list[Hashable],
+        main_rows: Sequence[RowData] | None,
+        required_fields: set[str] | None = None,
     ) -> None:
         prefill_main_source_fields(
             context=context,
@@ -146,14 +147,14 @@ class BatchExecutor:
 
     def execute_batch(
         self,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         batch_num: int,
-        sink: Optional[ISink] = None,
-        required_fields: Optional[Set[str]] = None,
-        main_rows: Optional[Sequence[RowData]] = None,
+        sink: ISink | None = None,
+        required_fields: set[str] | None = None,
+        main_rows: Sequence[RowData] | None = None,
         *,
-        adaptive_pool: Optional[Executor] = None,
-    ) -> List[RowData]:
+        adaptive_pool: Executor | None = None,
+    ) -> list[RowData]:
         context = create_batch_context_for_rows(batch_row_nth, required_fields=required_fields)
         self.runtime.sink = sink
         self.runtime.batch_num = batch_num
@@ -182,13 +183,13 @@ class BatchExecutor:
     def execute_operators(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c20-fusion-dispatch
         self,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         *,
         runtime: ExecutionRuntime,
-        required_fields: Optional[Set[str]],
-        adaptive_pool: Optional[Executor],
-        after_operator: Optional[Callable[[SupportedOperatorIr], None]],
-    ) -> Optional[Dict[str, float]]:
+        required_fields: set[str] | None,
+        adaptive_pool: Executor | None,
+        after_operator: Callable[[SupportedOperatorIr], None] | None,
+    ) -> dict[str, float] | None:
         wants_stage_spans, stage_durations, stage_map = init_stage_span_tracking(runtime)
         wants_operator_spans = runtime.instrumentation.wants(EventType.OPERATOR_SPAN)
         perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
@@ -212,18 +213,18 @@ class BatchExecutor:
             _, _, resolved_workers = resolve_adaptive_policy_tuning_and_workers(runtime=runtime, overrides=self._overrides)
 
         # `field_key` -> 融合组; 同组后续字段在已融合时跳过.
-        fusion_by_field: Dict[str, ComputeFusionGroup] = {}
+        fusion_by_field: dict[str, ComputeFusionGroup] = {}
         for group in self.plan.compute_fusion_groups:
             for field_key in group.field_keys:
                 fusion_by_field[field_key] = group
-        fused_done: Set[str] = set()
+        fused_done: set[str] = set()
 
         try:
             for is_loadref, segment in iter_operator_segments(
                 cast("Sequence[SupportedOperatorIr]", self.plan.operators)  # pragma: allow-cast plan operators typed narrowing
             ):
                 if is_loadref:
-                    loadref_ops = cast("List[LoadRefOp]", segment)  # pragma: allow-cast segment typed narrowing
+                    loadref_ops = cast("list[LoadRefOp]", segment)  # pragma: allow-cast segment typed narrowing
                     stage = stage_map.get(OperatorType.LOAD_REF.value)
                     if wants_stage_spans and stage:
                         clock.enter_stage(stage)
@@ -320,12 +321,12 @@ class BatchExecutor:
         ops: Sequence[LoadRefOp],
         *,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
-        required_fields: Optional[Set[str]],
-        adaptive_pool: Optional[Executor],
+        required_fields: set[str] | None,
+        adaptive_pool: Executor | None,
         max_workers: int,
-        after_operator: Optional[Callable[[SupportedOperatorIr], None]],
+        after_operator: Callable[[SupportedOperatorIr], None] | None,
     ) -> None:
         executor = self._executors.get(OperatorType.LOAD_REF.value)
         if executor is None:
@@ -366,7 +367,7 @@ class BatchExecutor:
             max_workers=max_workers,
             required_fields=required_fields,
             after_operator=cast(  # pragma: allow-cast callback typed narrowing
-                "Optional[Callable[[LoadRefOp], None]]",
+                "Callable[[LoadRefOp], None] | None",
                 after_operator,
             ),
         )
@@ -377,9 +378,9 @@ class BatchExecutor:
         ops: Sequence[LoadRefOp],
         *,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
-        after_operator: Optional[Callable[[SupportedOperatorIr], None]],
+        after_operator: Callable[[SupportedOperatorIr], None] | None,
     ) -> None:
         for op in ops:
             executor.execute(op, context, batch_row_nth, runtime)
@@ -389,12 +390,12 @@ class BatchExecutor:
     def _extract_results(
         self,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
-    ) -> List[RowData]:
+        batch_row_nth: list[Hashable],
+    ) -> list[RowData]:
         """提取批次结果"""
-        results: List[RowData] = []
+        results: list[RowData] = []
         for row_id in batch_row_nth:
-            row: Dict[str, FieldValue] = {}
+            row: dict[str, FieldValue] = {}
             for field_key in self.plan.target_fields:
                 row[field_key] = context.get_field_value(field_key, row_id)
             results.append(row)

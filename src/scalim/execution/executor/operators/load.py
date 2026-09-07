@@ -1,8 +1,10 @@
 import contextlib
 import time
-from collections.abc import Mapping
-from typing import Hashable, List, Optional, Set, cast
-from typing import Mapping as TypingMapping
+from collections.abc import Hashable, Mapping
+from collections.abc import Mapping as TypingMapping
+from typing import Protocol, TypeGuard, cast
+
+from typing_extensions import override
 
 from ....events import EventType
 from ....planning.operators import LoadOperatorIr, SupportedOperatorIr
@@ -10,7 +12,6 @@ from ....spec.ir import FieldIr, SourceIr
 from ....spec.ir._helpers import coerce_loader_result_mapping
 from ....spec.ir.binding import BindingIr, LoaderCallContextIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, LoaderResultValue, RuntimeValue
-from ....vendor.compact.typing_extensionsx import Protocol, TypeGuard, override
 from ...context import BatchContext
 from ...loader_call_params import build_loader_call_params
 from ...loader_retry import CALLSITE_LOAD, call_with_loader_retry
@@ -41,7 +42,7 @@ class LoadOperatorExecutor(OperatorExecutor):
     def _build_loader_call_kwargs(
         self,
         runtime: "ExecutionRuntime",
-        binding: Optional[BindingIr],
+        binding: BindingIr | None,
         loader_context: LoaderCallContextIr,
     ) -> LoaderCallKwargs:
         if binding is None:
@@ -61,7 +62,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         *,
         loader_name: str,
         result: RuntimeValue,
-        field_keys: List[str],
+        field_keys: list[str],
     ) -> None:
         if not runtime.instrumentation.wants(EventType.LOADER_SLIM):
             return
@@ -78,7 +79,7 @@ class LoadOperatorExecutor(OperatorExecutor):
                 batch_num=runtime.batch_num,
             )
 
-    def _resolve_required_field_keys(self, runtime: ExecutionRuntime, field_keys: List[str]) -> Set[str]:
+    def _resolve_required_field_keys(self, runtime: ExecutionRuntime, field_keys: list[str]) -> set[str]:
         guardrails = runtime.guardrails
         if guardrails.enabled and guardrails.loader.required_fields:
             return set(field_keys) & set(guardrails.loader.required_fields)
@@ -91,7 +92,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         source: SourceIr,
         result: LoaderResultMapping,
         row_id: Hashable,
-        required_field_keys: Set[str],
+        required_field_keys: set[str],
         required_mode: str,
         transform_mode: str,
     ) -> RuntimeValue:
@@ -169,8 +170,8 @@ class LoadOperatorExecutor(OperatorExecutor):
         source: SourceIr,
         row_id: Hashable,
         data: LoaderResultValue,
-        field_keys: List[str],
-        required_field_keys: Set[str],
+        field_keys: list[str],
+        required_field_keys: set[str],
         required_mode: str,
         transform_mode: str,
     ) -> None:
@@ -201,8 +202,8 @@ class LoadOperatorExecutor(OperatorExecutor):
         context: BatchContext,
         runtime: ExecutionRuntime,
         source: SourceIr,
-        field_keys: List[str],
-        batch_row_nth: List[Hashable],
+        field_keys: list[str],
+        batch_row_nth: list[Hashable],
         result: LoaderResultMapping,
     ) -> None:
         guardrails = runtime.guardrails
@@ -241,7 +242,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         if not isinstance(operator, LoadOperatorIr):
@@ -250,7 +251,7 @@ class LoadOperatorExecutor(OperatorExecutor):
         op = operator
         source = runtime.sources.get(op.source_id)
         if source is None:
-            msg = "Unknown source_id={!r} in operator {}".format(op.source_id, op.operator_id)
+            msg = f"Unknown source_id={op.source_id!r} in operator {op.operator_id}"
             raise KeyError(msg)
         field_keys = list(op.field_keys)
 
@@ -291,7 +292,7 @@ class LoadOperatorExecutor(OperatorExecutor):
             result_obj = source.normalize.apply(result_raw, source_id=source.source_id, call_by=normalize_call_by)
 
         call_kwargs = self._build_loader_call_kwargs(runtime, binding, loader_context)
-        skipped_none_rows: Optional[int] = None
+        skipped_none_rows: int | None = None
         with contextlib.suppress(AttributeError):
             skipped_none_rows = cast(
                 "_LoaderResultWithNormalizeStats", result_obj

@@ -1,10 +1,11 @@
 import secrets
 import time
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any, TypeVar
 
+from .._internal.strenum import StrEnum
 from ..events import EventType
-from ..vendor.compact import StrEnum
-from ..vendor.dataclassesx import dataclass, field
 
 CALLSITE_LOAD = "load"
 CALLSITE_LOAD_REF = "load_ref"
@@ -56,14 +57,14 @@ class LoaderRetryPolicySpec:
     所有字段均可选;合并到基础策略时,非 `None` 的值会覆盖基础值.
     """
 
-    enabled: Optional[bool] = None
-    should_retry: Optional[ShouldRetryFn] = None
-    max_attempts: Optional[int] = None
-    max_elapsed_seconds: Optional[float] = None
-    backoff: Optional[str] = None
-    base_delay_seconds: Optional[float] = None
-    max_delay_seconds: Optional[float] = None
-    jitter: Optional[bool] = None
+    enabled: bool | None = None
+    should_retry: ShouldRetryFn | None = None
+    max_attempts: int | None = None
+    max_elapsed_seconds: float | None = None
+    backoff: str | None = None
+    base_delay_seconds: float | None = None
+    max_delay_seconds: float | None = None
+    jitter: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -71,7 +72,7 @@ class LoaderRetryPolicy:
     """单次加载调用的生效重试策略."""
 
     enabled: bool = False
-    should_retry: Optional[ShouldRetryFn] = None
+    should_retry: ShouldRetryFn | None = None
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
     max_elapsed_seconds: float = DEFAULT_MAX_ELAPSED_SECONDS
     backoff: str = DEFAULT_BACKOFF
@@ -115,7 +116,7 @@ class LoaderRetryPolicies:
     """一次运行的生效重试策略: 默认策略 + 按加载器覆盖."""
 
     default: LoaderRetryPolicy = field(default_factory=LoaderRetryPolicy.disabled)
-    by_loader: Dict[str, LoaderRetryPolicy] = field(default_factory=dict)
+    by_loader: dict[str, LoaderRetryPolicy] = field(default_factory=dict)
 
     @classmethod
     def disabled(cls) -> "LoaderRetryPolicies":
@@ -132,11 +133,11 @@ class LoaderRetryPoliciesSpec:
     用于 `DSL` 适配器(例如 `YAML` 运行时)与配置派生的策略合并.
     """
 
-    default: Optional[LoaderRetryPolicySpec] = None
-    by_loader: Dict[str, LoaderRetryPolicySpec] = field(default_factory=dict)
+    default: LoaderRetryPolicySpec | None = None
+    by_loader: dict[str, LoaderRetryPolicySpec] = field(default_factory=dict)
 
 
-def merge_loader_retry_policy(base: LoaderRetryPolicy, spec: Optional[LoaderRetryPolicySpec]) -> LoaderRetryPolicy:
+def merge_loader_retry_policy(base: LoaderRetryPolicy, spec: LoaderRetryPolicySpec | None) -> LoaderRetryPolicy:
     if spec is None:
         return base
     return LoaderRetryPolicy(
@@ -172,7 +173,7 @@ def _secure_unit_random() -> float:
     return float(secrets.randbits(_JITTER_BITS)) / _JITTER_MAX
 
 
-def _validate_enabled_and_should_retry(*, enabled: Any, should_retry: Optional[Any]) -> None:
+def _validate_enabled_and_should_retry(*, enabled: Any, should_retry: Any | None) -> None:
     if not isinstance(enabled, bool):
         msg = "LoaderRetryPolicy.enabled must be a bool"
         raise TypeError(msg)
@@ -192,7 +193,7 @@ def _validate_max_attempts(*, max_attempts: Any) -> None:
         msg = "LoaderRetryPolicy.max_attempts must be >= 1"
         raise ValueError(msg)
     if max_attempts > HARD_CAP_MAX_ATTEMPTS:
-        msg = "LoaderRetryPolicy.max_attempts must be <= {}".format(HARD_CAP_MAX_ATTEMPTS)
+        msg = f"LoaderRetryPolicy.max_attempts must be <= {HARD_CAP_MAX_ATTEMPTS}"
         raise ValueError(msg)
 
 
@@ -204,7 +205,7 @@ def _validate_max_elapsed_seconds(*, max_elapsed_seconds: Any) -> None:
         msg = "LoaderRetryPolicy.max_elapsed_seconds must be > 0"
         raise ValueError(msg)
     if float(max_elapsed_seconds) > HARD_CAP_MAX_ELAPSED_SECONDS:
-        msg = "LoaderRetryPolicy.max_elapsed_seconds must be <= {}".format(HARD_CAP_MAX_ELAPSED_SECONDS)
+        msg = f"LoaderRetryPolicy.max_elapsed_seconds must be <= {HARD_CAP_MAX_ELAPSED_SECONDS}"
         raise ValueError(msg)
 
 
@@ -235,7 +236,7 @@ def _validate_max_delay_seconds(*, max_delay_seconds: Any) -> None:
         msg = "LoaderRetryPolicy.max_delay_seconds must be >= 0"
         raise ValueError(msg)
     if float(max_delay_seconds) > HARD_CAP_MAX_DELAY_SECONDS:
-        msg = "LoaderRetryPolicy.max_delay_seconds must be <= {}".format(HARD_CAP_MAX_DELAY_SECONDS)
+        msg = f"LoaderRetryPolicy.max_delay_seconds must be <= {HARD_CAP_MAX_DELAY_SECONDS}"
         raise ValueError(msg)
 
 
@@ -249,12 +250,12 @@ def _build_error_context(
     *,
     loader_name: str,
     callsite: str,
-    batch_num: Optional[int],
+    batch_num: int | None,
     attempt_num: int,
     max_attempts: int,
     elapsed_seconds: float,
     retry_reason: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "loader_name": loader_name,
         "callsite": callsite,
@@ -266,7 +267,7 @@ def _build_error_context(
     }
 
 
-def _emit_error(instrumentation: Any, exc: Exception, context: Dict[str, Any]) -> None:
+def _emit_error(instrumentation: Any, exc: Exception, context: dict[str, Any]) -> None:
     if instrumentation is None:
         return
     instrumentation.emit_error(exc, context)
@@ -278,7 +279,7 @@ def _retry_reason_and_sleep(
     exc: Exception,
     ctx: LoaderRetryContext,
     elapsed_seconds: float,
-) -> Tuple[Optional[str], float]:
+) -> tuple[str | None, float]:
     if ctx.attempt_num >= policy.max_attempts:
         return "max_attempts_exceeded", 0.0
     if elapsed_seconds >= policy.max_elapsed_seconds:
@@ -305,7 +306,7 @@ def _emit_loader_retry_event(
     elapsed_seconds: float,
     sleep_seconds: float,
     exc: Exception,
-    batch_num: Optional[int],
+    batch_num: int | None,
 ) -> None:
     if instrumentation is None:
         return
@@ -332,7 +333,7 @@ def call_with_loader_retry(
     policy: LoaderRetryPolicy,
     loader_name: str,
     callsite: str,
-    batch_num: Optional[int] = None,
+    batch_num: int | None = None,
 ) -> _T:
     """按重试策略调用加载函数.
 

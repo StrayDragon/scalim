@@ -5,11 +5,12 @@
 公开构造函数仅接受 `StrEnum`(严格 `in`);内部/`IR` 仍使用 `builtin` `str`.
 """
 
-from typing import TYPE_CHECKING, Dict, Mapping, Optional
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
+from typing import TYPE_CHECKING
 
-from ...vendor.compact import StrEnum
-from ...vendor.dataclassesx import dataclass, replace
-from ...vendor.dataclassesx import field as dataclass_field
+from ..._internal.strenum import StrEnum
 from .schema_dsl.models import BookWriteDefaultsConfig
 from .schema_dsl.output_enums import (
     DEFAULT_BOOK_WRITE_ALIGN_BY,
@@ -102,7 +103,7 @@ class BookResourcePolicy:
 class ResourcesPolicy:
     """`Workflow`/`demand` 级资源策略(`Python` `SSOT`)."""
 
-    books: Optional[Mapping[str, BookResourcePolicy]] = None
+    books: Mapping[str, BookResourcePolicy] | None = None
 
     def __post_init__(self) -> None:
         books = self.books
@@ -111,14 +112,14 @@ class ResourcesPolicy:
         if not isinstance(books, Mapping):
             msg = "ResourcesPolicy.books must be a mapping or None"
             raise TypeError(msg)
-        normalized: Dict[str, BookResourcePolicy] = {}
+        normalized: dict[str, BookResourcePolicy] = {}
         for book_id, policy in books.items():
             key = str(book_id).strip()
             if not key:
                 msg = "ResourcesPolicy.books keys must be non-empty book ids"
                 raise ValueError(msg)
             if not isinstance(policy, BookResourcePolicy):
-                msg = "ResourcesPolicy.books[{!r}] must be a BookResourcePolicy".format(key)
+                msg = f"ResourcesPolicy.books[{key!r}] must be a BookResourcePolicy"
                 raise TypeError(msg)
             normalized[key] = policy
         object.__setattr__(self, "books", normalized or None)
@@ -144,7 +145,7 @@ def builtin_write_defaults_config() -> BookWriteDefaultsConfig:
 def resolve_write_defaults_config(
     *,
     book_id: str,
-    resources_policy: Optional[ResourcesPolicy],
+    resources_policy: ResourcesPolicy | None,
 ) -> BookWriteDefaultsConfig:
     if resources_policy is None:
         return builtin_write_defaults_config()
@@ -153,7 +154,7 @@ def resolve_write_defaults_config(
 
 def materialize_resources_policy_onto_books(
     config: "DemandConfig",
-    resources_policy: Optional[ResourcesPolicy],
+    resources_policy: ResourcesPolicy | None,
 ) -> "DemandConfig":
     """将 `Python` `ResourcesPolicy` 物化到 `DemandConfig.books` 的内部 `write_defaults` 槽位.
 

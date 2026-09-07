@@ -1,11 +1,11 @@
 import contextlib
 import threading
-from typing import Any, FrozenSet, Iterator, Mapping
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from typing import Any, TypeGuard
 
 from ..exceptions import ScalimInternalError
 from ..typedefs import RuntimeValue
-from ..vendor.compact.typing_extensionsx import TypeGuard
-from ..vendor.dataclassesx import dataclass
 from .errors import ScalimWorkflowConfigError
 from .resources import WorkflowResourceManager
 
@@ -14,7 +14,7 @@ from .resources import WorkflowResourceManager
 class _WorkflowLoaderContext:
     workflow_exec_id: str
     workflow_node_id: str
-    visible_producer_node_ids: FrozenSet[str]
+    visible_producer_node_ids: frozenset[str]
     resource_manager: WorkflowResourceManager
 
 
@@ -30,7 +30,7 @@ def workflow_loader_context(
     *,
     workflow_exec_id: str,
     workflow_node_id: str,
-    visible_producer_node_ids: FrozenSet[str],
+    visible_producer_node_ids: frozenset[str],
     resource_manager: WorkflowResourceManager,
 ) -> Iterator[None]:
     """在执行一个 `workflow` 的 `demand` 节点时,注入内置 `workflow loader` 所需上下文(`thread-local`)."""
@@ -65,7 +65,7 @@ def _require_context() -> _WorkflowLoaderContext:
         msg = "workflow loader requires workflow context (only valid inside run_workflow execution)"
         raise ScalimWorkflowConfigError(msg)
     if not isinstance(ctx, _WorkflowLoaderContext):
-        msg = "workflow loader context is corrupted (expected _WorkflowLoaderContext, got {})".format(type(ctx).__name__)
+        msg = f"workflow loader context is corrupted (expected _WorkflowLoaderContext, got {type(ctx).__name__})"
         raise ScalimInternalError(msg)
     return ctx
 
@@ -100,7 +100,7 @@ def book_sheet_rows(*, ref: RuntimeValue) -> Iterator[Mapping[str, Any]]:
     consumer_node_id = str(ctx.workflow_node_id)
     visible = ctx.visible_producer_node_ids
     if producer_node_id != consumer_node_id and producer_node_id not in visible:
-        msg = "Book ref node {!r} is not visible to node {!r} (declare depends_on)".format(producer_node_id, consumer_node_id)
+        msg = f"Book ref node {producer_node_id!r} is not visible to node {consumer_node_id!r} (declare depends_on)"
         raise ScalimWorkflowConfigError(msg)
 
     return ctx.resource_manager.iter_book_sheet_rows(

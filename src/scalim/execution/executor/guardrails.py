@@ -1,9 +1,10 @@
-from typing import Any, Dict, Hashable, Optional, Sequence, Tuple
+from collections.abc import Hashable, Sequence
+from typing import Any
 
 from ..guardrails import GuardrailMode, ScalimGuardrailViolationError
 
 
-def build_guardrail_once_key(code: str, *parts: Any) -> Tuple[str, ...]:
+def build_guardrail_once_key(code: str, *parts: Any) -> tuple[str, ...]:
     return (code, *tuple(str(part) for part in parts))
 
 
@@ -12,17 +13,17 @@ def build_loader_row_guardrail_payload(
     *,
     source_id: str,
     row_id: Hashable,
-    field_key: Optional[str] = None,
-    reason: Optional[str] = None,
-    data_key: Optional[str] = None,
-    error_type: Optional[str] = None,
-    error: Optional[str] = None,
+    field_key: str | None = None,
+    reason: str | None = None,
+    data_key: str | None = None,
+    error_type: str | None = None,
+    error: str | None = None,
     is_ref_loader: bool = False,
     lookup_key: Any = None,
     include_lookup_key: bool = False,
     main_source: bool = False,
-) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "source_id": source_id,
         "batch_num": runtime.batch_num,
         "row_id": row_id,
@@ -54,8 +55,8 @@ def build_loader_result_guardrail_payload(
     source_id: str,
     result: Any,
     is_ref_loader: bool = False,
-) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "source_id": source_id,
         "batch_num": runtime.batch_num,
         "result_type": type(result).__name__,
@@ -74,8 +75,8 @@ def build_compute_error_guardrail_payload(
     exc: Exception,
     include_error: bool = False,
     unexpected: bool = False,
-) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "batch_num": runtime.batch_num,
         "field_key": field_key,
         "row_id": row_id,
@@ -94,8 +95,8 @@ def build_guardrail_context(
     *,
     code: str,
     action_mode: GuardrailMode,
-    context: Dict[str, Any],
-) -> Dict[str, Any]:
+    context: dict[str, Any],
+) -> dict[str, Any]:
     payload = dict(context)
     payload["guardrail"] = True
     payload["guardrail_code"] = code
@@ -110,8 +111,8 @@ def record_guardrail(
     code: str,
     message: str,
     action_mode: GuardrailMode,
-    context: Dict[str, Any],
-    once_key: Optional[Tuple[str, ...]] = None,
+    context: dict[str, Any],
+    once_key: tuple[str, ...] | None = None,
 ) -> None:
     payload = build_guardrail_context(runtime, code=code, action_mode=action_mode, context=context)
     if once_key is not None:
@@ -129,9 +130,9 @@ def fail_guardrail(
     *,
     code: str,
     message: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     action_mode: GuardrailMode = "fast_fail",
-    cause: Optional[Exception] = None,
+    cause: Exception | None = None,
 ) -> None:
     payload = build_guardrail_context(runtime, code=code, action_mode=action_mode, context=context)
     if cause is not None:

@@ -1,6 +1,5 @@
 # region imports
 
-from typing import Dict, List, Optional, Set, Tuple
 
 from .._internal.utils import graph
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SourceIr
@@ -51,7 +50,7 @@ class PlanBuilder:
         self._resolver = LookupStepsResolver()
         self._graph = build_dependency_graph(demand=self.demand, resolver=self._resolver)
 
-    def build(self, targets: Optional[List[str]] = None) -> ExecutionPlan:
+    def build(self, targets: list[str] | None = None) -> ExecutionPlan:
         """构建执行计划"""
         if targets is None:
             targets = list(self.demand.fields.keys())
@@ -67,7 +66,7 @@ class PlanBuilder:
         if cycles:
             cycle = cycles[0] if cycles else []
             cycle_path = " -> ".join(str(x) for x in cycle) if cycle else str(cycles)
-            msg = "检测到循环依赖: {}".format(cycle_path)
+            msg = f"检测到循环依赖: {cycle_path}"
 
             has_derived = any(isinstance(self.demand.fields.get(str(x)), DerivedFieldIr) for x in cycle)
             has_ref = False
@@ -161,7 +160,7 @@ class PlanBuilder:
             compute_fusion_groups=compute_fusion_groups,
         )
 
-    def _collect_order_by_field_keys(self) -> Set[str]:
+    def _collect_order_by_field_keys(self) -> set[str]:
         """收集写出排序键(必须在写出排序前可得,因此不可 `late`)."""
         order_by = self.demand.main_source.order_by
         if not order_by:
@@ -171,13 +170,13 @@ class PlanBuilder:
     def _validate_relation_from_derived_fields(
         self,
         *,
-        required_fields: Set[str],
-        pre_ref_available: Set[str],
-        pre_ref_derived: Set[str],
+        required_fields: set[str],
+        pre_ref_available: set[str],
+        pre_ref_derived: set[str],
     ) -> None:
         """校验当 `relation` 的连接键引用派生字段时,其满足 `pre-ref` 约束."""
 
-        derived_consumers: Dict[str, Set[str]] = {}
+        derived_consumers: dict[str, set[str]] = {}
         for field_key in required_fields:
             field_spec = self.demand.fields.get(field_key)
             if not isinstance(field_spec, FieldIr):
@@ -211,23 +210,23 @@ class PlanBuilder:
             consumers = ",".join(sorted(derived_consumers.get(str(derived_key), set())))
             chain_text = " -> ".join(chain) if chain else str(derived_key)
             msg = (
-                "Derived field {!r} is used as relation join key (consumed_by={}), "
+                f"Derived field {str(derived_key)!r} is used as relation join key (consumed_by={consumers}), "
                 "but it is not pre-relation computable. "
-                "Blocking dependency chain: {}"
-            ).format(str(derived_key), consumers, chain_text)
+                f"Blocking dependency chain: {chain_text}"
+            )
             raise ValueError(msg)
 
     def _find_pre_ref_blocking_chain(
         self,
         *,
         start: str,
-        pre_ref_available: Set[str],
-        pre_ref_derived: Set[str],
-    ) -> List[str]:
+        pre_ref_available: set[str],
+        pre_ref_derived: set[str],
+    ) -> list[str]:
         """返回一个阻塞链条: 起点 -> ... -> 阻塞节点."""
 
-        seen: Set[str] = set()
-        stack: List[Tuple[str, List[str]]] = [(str(start), [str(start)])]
+        seen: set[str] = set()
+        stack: list[tuple[str, list[str]]] = [(str(start), [str(start)])]
 
         while stack:
             current, path = stack.pop()
@@ -258,21 +257,21 @@ class PlanBuilder:
 
         return [str(start)]
 
-    def _get_primary_field_key(self) -> Optional[str]:
+    def _get_primary_field_key(self) -> str | None:
         """获取主键字段名"""
         primary_field = self.demand.get_primary_field()
         return primary_field.field_id if primary_field else None
 
-    def _collect_preload_sources(self) -> Tuple[SourceIr, ...]:
+    def _collect_preload_sources(self) -> tuple[SourceIr, ...]:
         """收集预加载数据源 (FR003)"""
-        preload_sources: List[SourceIr] = []
+        preload_sources: list[SourceIr] = []
         for source in self.demand.sources.values():
             if source.is_preload_forever():
                 preload_sources.append(source)
         return tuple(preload_sources)
 
-    def _collect_dependencies(self, targets: List[str]) -> Set[str]:
-        def get_deps_with_fk(field_key: str) -> List[str]:
+    def _collect_dependencies(self, targets: list[str]) -> set[str]:
+        def get_deps_with_fk(field_key: str) -> list[str]:
             if field_key not in self.demand.fields:
                 return []
             return self._graph.get_deps(field_key)

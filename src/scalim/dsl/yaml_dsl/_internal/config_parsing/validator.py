@@ -1,14 +1,15 @@
 # pragma: allow-cast-file yaml validation boundary typed narrowing
 # pragma: allow-c901-file plan: c60
 import json
+from collections.abc import Iterable, Mapping
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple, cast
-
-from .....vendor.dataclassesx import asdict, dataclass
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from .....vendor.compact.typing_extensionsx import TypeGuard
-from .....vendor.dataclassesx import field as dataclass_field
+    from typing import TypeGuard
+from dataclasses import field as dataclass_field
+
 from ...init_var_nodes import ScalimInitVarNodeTypeError, ScalimInitVarNodeValueError, parse_init_var_mapping_node
 from ...schema_dsl.models import (
     BOOK_KEYS,
@@ -43,25 +44,25 @@ from .yaml_load import (
 __all__ = ()
 
 
-def _is_list(value: Any) -> "TypeGuard[List[Any]]":
+def _is_list(value: Any) -> "TypeGuard[list[Any]]":
     return isinstance(value, list)
 
 
-def _is_dict(value: Any) -> "TypeGuard[Dict[Any, Any]]":
+def _is_dict(value: Any) -> "TypeGuard[dict[Any, Any]]":
     return isinstance(value, dict)
 
 
 class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, ValidatorFieldsMixin):
     _schema_path: str
-    _schema: Optional[Dict[str, Any]]
-    _compute_engine: Optional[SecureComputeEngine]
-    _step_allowed_fields_by_source: Dict[str, Set[str]]
+    _schema: dict[str, Any] | None
+    _compute_engine: SecureComputeEngine | None
+    _step_allowed_fields_by_source: dict[str, set[str]]
     _max_validation_error_lines: int
 
     def __init__(
         self,
-        schema_path: Optional[str] = None,
-        max_validation_error_lines: Optional[int] = None,
+        schema_path: str | None = None,
+        max_validation_error_lines: int | None = None,
     ) -> None:
         super().__init__()
         if schema_path is None:
@@ -77,31 +78,31 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
             msg = "max_validation_error_lines must be >= 1"
             raise ValueError(msg)
 
-    def validate(self, config: Dict[str, Any]) -> None:
+    def validate(self, config: dict[str, Any]) -> None:
         report = self.validate_report(config, strict_unknown_fields=True)
         issues = report.errors()
         if not issues:
             return
 
-        errors: List[str] = []
+        errors: list[str] = []
         for issue in issues[: self._max_validation_error_lines]:
             if issue.path:
-                errors.append("{}: {}".format(issue.path, issue.message))
+                errors.append(f"{issue.path}: {issue.message}")
             else:
                 errors.append(issue.message)
 
-        msg = "Configuration validation failed with {} error(s)".format(len(issues))
+        msg = f"Configuration validation failed with {len(issues)} error(s)"
         if len(issues) > self._max_validation_error_lines:
-            msg = "{} (showing first {} errors)".format(msg, self._max_validation_error_lines)
+            msg = f"{msg} (showing first {self._max_validation_error_lines} errors)"
         raise ScalimConfigValidationError(msg, errors=errors, issues=report.issues)
 
     def validate_report(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         *,
         strict_unknown_fields: bool = False,
     ) -> ValidationReport:
-        errors: List[ValidationIssue] = []
+        errors: list[ValidationIssue] = []
         config = self._error_and_strip_legacy_observability(config, errors)
         config = self._error_and_strip_removed_demand_runtime_policy_fields(config, errors)
         config = self._error_and_strip_removed_output_extras_fields(config, errors)
@@ -128,22 +129,22 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
 
         return ValidationReport(issues=errors)
 
-    def _validate_outputs_shape(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+    def _validate_outputs_shape(self, config: dict[str, Any], errors: list[ValidationIssue]) -> None:
         outputs_key = DEMAND_KEYS["outputs"]
         outputs_raw = config.get(outputs_key)
         if outputs_raw is None:
             return
         if not isinstance(outputs_raw, list):
-            self._add_error(errors, "'{}' must be a list".format(outputs_key), path=str(outputs_key))
+            self._add_error(errors, f"'{outputs_key}' must be a list", path=str(outputs_key))
             return
 
-        outputs_list = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
+        outputs_list = cast("list[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
         for idx, item in enumerate(outputs_list):
             if isinstance(item, dict):
                 continue
-            self._add_error(errors, "outputs.{} must be a dictionary".format(int(idx)), path="outputs.{}".format(int(idx)))
+            self._add_error(errors, f"outputs.{int(idx)} must be a dictionary", path=f"outputs.{int(idx)}")
 
-    def _validate_outputs_detail_requires_fields_or_from(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+    def _validate_outputs_detail_requires_fields_or_from(self, config: dict[str, Any], errors: list[ValidationIssue]) -> None:
         outputs_raw: Any = config.get(DEMAND_KEYS["outputs"])
         if not _is_list(outputs_raw):
             return
@@ -157,7 +158,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         for idx, item in enumerate(outputs):
             if not isinstance(item, dict):
                 continue
-            out_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+            out_dict = cast("dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
 
             if "$import" in out_dict and set(out_dict.keys()) == {"$import"}:
                 continue
@@ -167,7 +168,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
 
             fields_raw = out_dict.get(fields_key)
             from_raw = out_dict.get(from_key)
-            has_fields = isinstance(fields_raw, list) and bool(cast("List[Any]", fields_raw))
+            has_fields = isinstance(fields_raw, list) and bool(cast("list[Any]", fields_raw))
             has_from = isinstance(from_raw, str) and bool(from_raw.strip())
             if has_fields or has_from:
                 continue
@@ -175,40 +176,41 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
             name_raw = out_dict.get(name_key)
             output_name = name_raw.strip() if isinstance(name_raw, str) else ""
             label = output_name or str(int(idx))
-            msg = "outputs.{} requires fields for detail output (or set from to inherit fields)".format(label)
-            self._add_error(errors, msg, path="outputs.{}.{}".format(int(idx), fields_key))
+            msg = f"outputs.{label} requires fields for detail output (or set from to inherit fields)"
+            self._add_error(errors, msg, path=f"outputs.{int(idx)}.{fields_key}")
 
-    def _validate_removed_output_container(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:
+    def _validate_removed_output_container(self, config: dict[str, Any], errors: list[ValidationIssue]) -> None:
         outputs_raw = config.get(DEMAND_KEYS["outputs"])
         if not _is_list(outputs_raw):
             return
         for idx, item in enumerate(outputs_raw):
             if not isinstance(item, dict):
                 continue
-            out_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+            out_dict = cast("dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
             if "container" not in out_dict:
                 continue
             msg = (
-                "outputs.{}.container was removed; migrate CSV outputs to resources.files + outputs[*].to.file + outputs[*].write, "
+                f"outputs.{int(idx)}.container was removed; migrate CSV outputs to resources.files "
+                f"+ outputs[*].to.file + outputs[*].write, "
                 "and .xlsx outputs to resources.books + outputs[*].to.book / outputs[*].to.sheet + outputs[*].write"
-            ).format(int(idx))
-            self._add_error(errors, msg, path="outputs.{}.container".format(int(idx)))
+            )
+            self._add_error(errors, msg, path=f"outputs.{int(idx)}.container")
 
-    def _build_aggregate_field_index(self, aggregate: Dict[str, Any]) -> Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]:
+    def _build_aggregate_field_index(self, aggregate: dict[str, Any]) -> tuple[dict[int, str], list[tuple[str, dict[str, Any]]]]:
         fields_raw: Any = aggregate.get("fields")
         if not _is_dict(fields_raw):
             return {}, []
         fields_dict = fields_raw
 
-        alias_index: Dict[int, str] = {}
-        field_defs: List[Tuple[str, Dict[str, Any]]] = []
+        alias_index: dict[int, str] = {}
+        field_defs: list[tuple[str, dict[str, Any]]] = []
         for out_field_id_raw, field_raw in fields_dict.items():
             out_field_id = str(out_field_id_raw or "").strip()
             if not out_field_id:
                 continue
             if not isinstance(field_raw, dict):
                 continue
-            field_dict = cast("Dict[str, Any]", field_raw)  # pragma: allow-cast yaml mapping typed narrowing
+            field_dict = cast("dict[str, Any]", field_raw)  # pragma: allow-cast yaml mapping typed narrowing
             alias_index[id(field_dict)] = out_field_id
             field_defs.append((out_field_id, field_dict))
         return alias_index, field_defs
@@ -218,12 +220,12 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         field_def_index: FieldDefIndex,
         item: Any,
         *,
-        agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
-    ) -> Optional[str]:
+        agg_field_index: tuple[dict[int, str], list[tuple[str, dict[str, Any]]]] | None = None,
+    ) -> str | None:
         if not isinstance(item, dict):
             return "must be field_id string, YAML alias(object), or YAML alias(list)"
 
-        typed = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
+        typed = cast("dict[str, Any]", item)  # pragma: allow-cast yaml mapping typed narrowing
         if agg_field_index is not None:
             alias_index, _ = agg_field_index
             if alias_index.get(id(typed)) is not None:
@@ -233,7 +235,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         if direct is not None:
             return None
 
-        matches: List[str] = []
+        matches: list[str] = []
         if agg_field_index is not None:
             _, field_defs = agg_field_index
             matches.extend([out_field_id for out_field_id, data in field_defs if data == typed])
@@ -249,23 +251,23 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
 
     def _validate_outputs_fields_list_object_refs(
         self,
-        fields_list: List[Any],
-        errors: List[ValidationIssue],
+        fields_list: list[Any],
+        errors: list[ValidationIssue],
         *,
         base_path: str,
         field_def_index: FieldDefIndex,
-        agg_field_index: Optional[Tuple[Dict[int, str], List[Tuple[str, Dict[str, Any]]]]] = None,
+        agg_field_index: tuple[dict[int, str], list[tuple[str, dict[str, Any]]]] | None = None,
     ) -> None:
-        def _walk(item: Any, *, path: str) -> List[Tuple[str, Any]]:
+        def _walk(item: Any, *, path: str) -> list[tuple[str, Any]]:
             if _is_list(item):
-                out: List[Tuple[str, Any]] = []
+                out: list[tuple[str, Any]] = []
                 for idx, sub in enumerate(item):
-                    out.extend(_walk(sub, path="{}.{}".format(path, idx)))
+                    out.extend(_walk(sub, path=f"{path}.{idx}"))
                 return out
             return [(path, item)]
 
         for field_idx, item in enumerate(fields_list):
-            root_path = "{}.{}".format(base_path, field_idx)
+            root_path = f"{base_path}.{field_idx}"
             for leaf_path, leaf in _walk(item, path=root_path):
                 if isinstance(leaf, str):
                     continue
@@ -276,7 +278,7 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
     def _validate_outputs_fields_object_refs(
         self,
         raw: RawDemand,
-        errors: List[ValidationIssue],
+        errors: list[ValidationIssue],
         *,
         main_source_id: str,
     ) -> None:
@@ -286,27 +288,27 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         outputs_raw = raw.data.get(outputs_key)
         if not isinstance(outputs_raw, list):
             return
-        outputs_list = cast("List[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
+        outputs_list = cast("list[Any]", outputs_raw)  # pragma: allow-cast yaml list typed narrowing
 
         fields_key = OUTPUT_TARGET_KEYS["fields"]
 
         for output_idx, output_raw in enumerate(outputs_list):
             if not isinstance(output_raw, dict):
                 continue
-            output_dict = cast("Dict[str, Any]", output_raw)  # pragma: allow-cast yaml mapping typed narrowing
+            output_dict = cast("dict[str, Any]", output_raw)  # pragma: allow-cast yaml mapping typed narrowing
             fields_raw = output_dict.get(fields_key)
             if not isinstance(fields_raw, list):
                 continue
-            fields_list = cast("List[Any]", fields_raw)  # pragma: allow-cast yaml list typed narrowing
+            fields_list = cast("list[Any]", fields_raw)  # pragma: allow-cast yaml list typed narrowing
 
             agg_field_index = None
             agg_raw = output_dict.get("aggregate")
             if isinstance(agg_raw, dict):
                 agg_field_index = self._build_aggregate_field_index(
-                    cast("Dict[str, Any]", agg_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    cast("dict[str, Any]", agg_raw)  # pragma: allow-cast yaml mapping typed narrowing
                 )
 
-            base_path = "{}.{}.{}".format(outputs_key, output_idx, fields_key)
+            base_path = f"{outputs_key}.{output_idx}.{fields_key}"
             self._validate_outputs_fields_list_object_refs(
                 fields_list,
                 errors,
@@ -315,61 +317,59 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
                 agg_field_index=agg_field_index,
             )
 
-    def _validate_resource_output_paths(self, config: Dict[str, Any], errors: List[ValidationIssue]) -> None:  # noqa: C901, PLR0912
+    def _validate_resource_output_paths(self, config: dict[str, Any], errors: list[ValidationIssue]) -> None:  # noqa: C901, PLR0912
         resources_raw = config.get(DEMAND_KEYS["resources"])
         if not isinstance(resources_raw, dict):
             return
 
         files_raw = cast("Any", resources_raw).get(RESOURCES_KEYS["files"])
         if isinstance(files_raw, dict):
-            for raw_file_id, raw_file_cfg in cast("Dict[Any, Any]", files_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
+            for raw_file_id, raw_file_cfg in cast("dict[Any, Any]", files_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
                 file_id = str(raw_file_id or "").strip()
                 if not file_id or not isinstance(raw_file_cfg, dict):
                     continue
-                file_cfg = cast("Dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+                file_cfg = cast("dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
 
                 if "kind" in file_cfg:
                     kind = str(file_cfg.get("kind") or "").strip()
                     if kind == "csv_file":
                         msg = (
-                            "resources.files.{}.kind was removed. "
-                            "Migration: use resources.files.{}.csv_file: {{path: <output_root>, encoding?: utf-8}}."
-                        ).format(file_id, file_id)
-                    else:
-                        msg = ("resources.files.{}.kind was removed. Migration: use resources.files.{}.csv_file: {{...}}.").format(
-                            file_id, file_id
+                            f"resources.files.{file_id}.kind was removed. "
+                            f"Migration: use resources.files.{file_id}.csv_file: {{path: <output_root>, encoding?: utf-8}}."
                         )
-                    self._add_error(errors, msg, path="resources.files.{}.kind".format(file_id))
+                    else:
+                        msg = f"resources.files.{file_id}.kind was removed. Migration: use resources.files.{file_id}.csv_file: {{...}}."
+                    self._add_error(errors, msg, path=f"resources.files.{file_id}.kind")
 
                 csv_raw = file_cfg.get(FILE_KEYS["csv_file"])
                 if csv_raw is None:
-                    msg = "resources.files.{}.csv_file is required".format(file_id)
-                    self._add_error(errors, msg, path="resources.files.{}".format(file_id))
+                    msg = f"resources.files.{file_id}.csv_file is required"
+                    self._add_error(errors, msg, path=f"resources.files.{file_id}")
                     continue
                 if not isinstance(csv_raw, dict):
-                    msg = "resources.files.{}.csv_file must be an object".format(file_id)
-                    self._add_error(errors, msg, path="resources.files.{}.csv_file".format(file_id))
+                    msg = f"resources.files.{file_id}.csv_file must be an object"
+                    self._add_error(errors, msg, path=f"resources.files.{file_id}.csv_file")
                     continue
 
-                csv_cfg = cast("Dict[str, Any]", csv_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                csv_cfg = cast("dict[str, Any]", csv_raw)  # pragma: allow-cast yaml mapping typed narrowing
                 path_value = csv_cfg.get(FILE_CSV_FILE_KEYS["path"])
                 if path_value is None or (isinstance(path_value, str) and not path_value.strip()):
-                    msg = "resources.files.{}.csv_file.path is required".format(file_id)
-                    self._add_error(errors, msg, path="resources.files.{}.csv_file.path".format(file_id))
+                    msg = f"resources.files.{file_id}.csv_file.path is required"
+                    self._add_error(errors, msg, path=f"resources.files.{file_id}.csv_file.path")
                 if isinstance(path_value, str) and Path(path_value).suffix.lower() == ".csv":
                     msg = (
-                        "resources.files.{}.csv_file.path now expects an output root directory, not a file path. "
+                        f"resources.files.{file_id}.csv_file.path now expects an output root directory, not a file path. "
                         "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-                    ).format(file_id)
-                    self._add_error(errors, msg, path="resources.files.{}.csv_file.path".format(file_id))
+                    )
+                    self._add_error(errors, msg, path=f"resources.files.{file_id}.csv_file.path")
 
                 path_raw = csv_cfg.get(FILE_CSV_FILE_KEYS["path"])
                 if not isinstance(path_raw, dict):
                     continue
                 try:
                     _ = parse_init_var_mapping_node(
-                        cast("Dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
-                        path="resources.files.{}.csv_file.path".format(file_id),
+                        cast("dict[str, Any]", path_raw),  # pragma: allow-cast yaml mapping typed narrowing
+                        path=f"resources.files.{file_id}.csv_file.path",
                     )
                 except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
                     self._add_error(errors, exc.reason, path=exc.path)
@@ -388,31 +388,31 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
         books_raw: Mapping[Any, Any],
         *,
         books_root_path: str,
-        errors: List[ValidationIssue],
+        errors: list[ValidationIssue],
     ) -> None:
         """静态校验 `books` `mapping`(`demand`: `resources.books`; `workflow`: `workflow.resources.books`)."""
 
-        for raw_book_id, raw_book_cfg in cast("Dict[Any, Any]", books_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
+        for raw_book_id, raw_book_cfg in cast("dict[Any, Any]", books_raw).items():  # pragma: allow-cast yaml mapping typed narrowing
             book_id = str(raw_book_id or "").strip()
             if not book_id or not isinstance(raw_book_cfg, dict):
                 continue
-            book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
-            book_path = "{}.{}".format(str(books_root_path), book_id)
+            book_cfg = cast("dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+            book_path = f"{books_root_path!s}.{book_id}"
             if "kind" in book_cfg:
                 kind = str(book_cfg.get("kind") or "").strip()
                 if kind == "xlsx_file":
-                    msg = ("{}.kind was removed. Migration: use {}.xlsx: {{path: <output_root>}}.").format(book_path, book_path)
+                    msg = f"{book_path}.kind was removed. Migration: use {book_path}.xlsx: {{path: <output_root>}}."
                 elif kind == "xlsx_memory":
-                    msg = ("{}.kind was removed. Migration: use {}.xlsx: {{}}.").format(book_path, book_path)
+                    msg = f"{book_path}.kind was removed. Migration: use {book_path}.xlsx: {{}}."
                 else:
-                    msg = ("{}.kind was removed. Migration: use {}.xlsx: {{path?: ...}}.").format(book_path, book_path)
-                self._add_error(errors, msg, path="{}.kind".format(book_path))
+                    msg = f"{book_path}.kind was removed. Migration: use {book_path}.xlsx: {{path?: ...}}."
+                self._add_error(errors, msg, path=f"{book_path}.kind")
 
             if "xlsx_file" in book_cfg:
                 self._add_error(
                     errors,
                     removed_xlsx_file_message(path=book_path),
-                    path="{}.xlsx_file".format(book_path),
+                    path=f"{book_path}.xlsx_file",
                 )
 
             if "xlsx_memory" in book_cfg:
@@ -421,57 +421,57 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
                 self._add_error(
                     errors,
                     removed_xlsx_memory_message(path=book_path, has_export=has_export),
-                    path="{}.xlsx_memory".format(book_path),
+                    path=f"{book_path}.xlsx_memory",
                 )
 
             has_xlsx = BOOK_KEYS["xlsx"] in book_cfg
             if not has_xlsx and "xlsx_file" not in book_cfg and "xlsx_memory" not in book_cfg:
-                msg = "{} must declare exactly one variant key: xlsx".format(book_path)
+                msg = f"{book_path} must declare exactly one variant key: xlsx"
                 self._add_error(errors, msg, path=book_path)
 
             xlsx_raw = book_cfg.get(BOOK_KEYS["xlsx"])
             if xlsx_raw is not None:
                 if not isinstance(xlsx_raw, dict):
-                    msg = "{}.xlsx must be an object".format(book_path)
-                    self._add_error(errors, msg, path="{}.xlsx".format(book_path))
+                    msg = f"{book_path}.xlsx must be an object"
+                    self._add_error(errors, msg, path=f"{book_path}.xlsx")
                 else:
-                    xlsx_cfg = cast("Dict[str, Any]", xlsx_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    xlsx_cfg = cast("dict[str, Any]", xlsx_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "export_xlsx" in xlsx_cfg:
                         msg = (
-                            "{}.xlsx.export_xlsx is not allowed; set {}.xlsx.path "
-                            "for export (or use empty {}.xlsx: {{}} for an in-memory bus)."
-                        ).format(book_path, book_path, book_path)
-                        self._add_error(errors, msg, path="{}.xlsx.export_xlsx".format(book_path))
+                            f"{book_path}.xlsx.export_xlsx is not allowed; set {book_path}.xlsx.path "
+                            f"for export (or use empty {book_path}.xlsx: {{}} for an in-memory bus)."
+                        )
+                        self._add_error(errors, msg, path=f"{book_path}.xlsx.export_xlsx")
                     if "write_defaults" in xlsx_cfg:
                         msg = (
-                            "{}.xlsx.write_defaults was removed from YAML authoring. "
+                            f"{book_path}.xlsx.write_defaults was removed from YAML authoring. "
                             "Migration: configure BookWritePolicy via Python ResourcesPolicy."
-                        ).format(book_path)
-                        self._add_error(errors, msg, path="{}.xlsx.write_defaults".format(book_path))
+                        )
+                        self._add_error(errors, msg, path=f"{book_path}.xlsx.write_defaults")
                     if "budget" in xlsx_cfg:
                         msg = (
-                            "{}.xlsx.budget was removed. Delete this field; book cell/sheet budget "
+                            f"{book_path}.xlsx.budget was removed. Delete this field; book cell/sheet budget "
                             "is no longer supported — rely on host resource limits for memory risk."
-                        ).format(book_path)
-                        self._add_error(errors, msg, path="{}.xlsx.budget".format(book_path))
+                        )
+                        self._add_error(errors, msg, path=f"{book_path}.xlsx.budget")
 
                     path_value = xlsx_cfg.get(BOOK_XLSX_KEYS["path"]) if "path" in xlsx_cfg else None
                     if "path" in xlsx_cfg and (path_value is None or (isinstance(path_value, str) and not path_value.strip())):
-                        msg = "{}.xlsx.path must be a non-empty output root when provided".format(book_path)
-                        self._add_error(errors, msg, path="{}.xlsx.path".format(book_path))
+                        msg = f"{book_path}.xlsx.path must be a non-empty output root when provided"
+                        self._add_error(errors, msg, path=f"{book_path}.xlsx.path")
                     if isinstance(path_value, str) and Path(path_value).suffix.lower() == ".xlsx":
                         msg = (
-                            "{}.xlsx.path expects an output root directory, not a file path. "
+                            f"{book_path}.xlsx.path expects an output root directory, not a file path. "
                             "Migration: set path to './out' and locate outputs via <root>/manifest/latest.json."
-                        ).format(book_path)
-                        self._add_error(errors, msg, path="{}.xlsx.path".format(book_path))
+                        )
+                        self._add_error(errors, msg, path=f"{book_path}.xlsx.path")
 
                     path_raw = xlsx_cfg.get(BOOK_XLSX_KEYS["path"]) if "path" in xlsx_cfg else None
                     if isinstance(path_raw, dict):
                         try:
                             _ = parse_init_var_mapping_node(
-                                cast("Dict[str, Any]", path_raw),
-                                path="{}.xlsx.path".format(book_path),
+                                cast("dict[str, Any]", path_raw),
+                                path=f"{book_path}.xlsx.path",
                             )
                         except (ScalimInitVarNodeValueError, ScalimInitVarNodeTypeError) as exc:
                             self._add_error(errors, exc.reason, path=exc.path)
@@ -481,11 +481,11 @@ class ConfigValidator(ValidatorMigrationsMixin, ValidatorUnknownFieldsMixin, Val
 class YamlValidationIssue:
     path: str
     message: str
-    suggestions: List[str] = dataclass_field(default_factory=list)
-    line: Optional[int] = None
-    column: Optional[int] = None
+    suggestions: list[str] = dataclass_field(default_factory=list)
+    line: int | None = None
+    column: int | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         if self.line is None:
             payload.pop("line", None)
@@ -497,10 +497,10 @@ class YamlValidationIssue:
 @dataclass(frozen=True)
 class YamlValidationResult:
     ok: bool
-    errors: List[YamlValidationIssue] = dataclass_field(default_factory=list)
-    warnings: List[YamlValidationIssue] = dataclass_field(default_factory=list)
+    errors: list[YamlValidationIssue] = dataclass_field(default_factory=list)
+    warnings: list[YamlValidationIssue] = dataclass_field(default_factory=list)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "ok": bool(self.ok),
             "errors": [issue.as_dict() for issue in self.errors],
@@ -508,8 +508,8 @@ class YamlValidationResult:
         }
 
 
-def _issues_to_rows(issues: Iterable[ValidationIssue]) -> List[YamlValidationIssue]:
-    rows: List[YamlValidationIssue] = []
+def _issues_to_rows(issues: Iterable[ValidationIssue]) -> list[YamlValidationIssue]:
+    rows: list[YamlValidationIssue] = []
     for issue in issues:
         rows.append(
             YamlValidationIssue(
@@ -522,14 +522,14 @@ def _issues_to_rows(issues: Iterable[ValidationIssue]) -> List[YamlValidationIss
 
 
 def attach_locations(
-    issues: List[YamlValidationIssue],
+    issues: list[YamlValidationIssue],
     locations: YamlLocationIndex,
     *,
-    default: Optional[Tuple[int, int]] = (1, 1),
-) -> List[YamlValidationIssue]:
+    default: tuple[int, int] | None = (1, 1),
+) -> list[YamlValidationIssue]:
     if not issues:
         return issues
-    output: List[YamlValidationIssue] = []
+    output: list[YamlValidationIssue] = []
     for issue in issues:
         if issue.line is not None:
             output.append(issue)
@@ -557,7 +557,7 @@ def attach_locations(
 def validate_yaml_text(
     yaml_text: str,
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
-    schema_path: Optional[str] = None,
+    schema_path: str | None = None,
 ) -> YamlValidationResult:
     """使用 `Scalim` 内置校验器对 `YAML DSL` 文本进行校验.
 
@@ -570,7 +570,7 @@ def validate_yaml_text(
             detect_duplicate_keys=True,
         )
     except ScalimYamlValidationError as exc:
-        errors: List[YamlValidationIssue] = []
+        errors: list[YamlValidationIssue] = []
         for envelope in exc.errors:
             loc = envelope.loc
             errors.append(
@@ -582,7 +582,7 @@ def validate_yaml_text(
                     column=loc.column if loc is not None else None,
                 )
             )
-        warnings: List[YamlValidationIssue] = []
+        warnings: list[YamlValidationIssue] = []
         for envelope in exc.warnings:
             loc = envelope.loc
             warnings.append(
@@ -624,7 +624,7 @@ def validate_yaml_text(
 def validate_yaml_text_json(
     yaml_text: str,
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
-    schema_path: Optional[str] = None,
+    schema_path: str | None = None,
 ) -> str:
     """返回与 `YAML DSL` 编辑器的"精确校验器"兼容的 `JSON` 载荷."""
     result = validate_yaml_text(

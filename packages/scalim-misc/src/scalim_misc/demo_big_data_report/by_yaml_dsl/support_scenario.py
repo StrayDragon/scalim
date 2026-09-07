@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
 from scalim.ob.observer import EventDispatchObserver
 from scalim_misc.examples.oracle import diff_first_mismatch, stable_sort_rows
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     from scalim.events import Event
 
 _SLA_BREACH_THRESHOLD_MINUTES = 60
@@ -64,7 +66,7 @@ def test_batch_num(*, ticket_id: object, batch_num: object) -> str:
     用于验证 $ctx.batch_num 能正确传递批次号.
     """
     _ = ticket_id
-    return "batch:{}".format(batch_num)
+    return f"batch:{batch_num}"
 
 
 def test_field_id(*, ticket_id: object, field_id: object) -> str:
@@ -73,7 +75,7 @@ def test_field_id(*, ticket_id: object, field_id: object) -> str:
     用于验证 $ctx.field_id 能正确传递字段 ID.
     """
     _ = ticket_id
-    return "field:{}".format(field_id)
+    return f"field:{field_id}"
 
 
 def test_deps(*, ticket_id: object, deps: object) -> str:
@@ -83,7 +85,7 @@ def test_deps(*, ticket_id: object, deps: object) -> str:
     """
     _ = ticket_id
     if isinstance(deps, (tuple, list)):
-        return "deps:{}".format(len(deps))
+        return f"deps:{len(deps)}"
     return "deps:?"
 
 
@@ -94,7 +96,7 @@ def test_values(*, ticket_id: object, values: object) -> str:
     """
     _ = ticket_id
     if isinstance(values, dict):
-        return "values:{}".format(len(values))
+        return f"values:{len(values)}"
     return "values:?"
 
 
@@ -106,7 +108,7 @@ def enrich_status_with_context(*, category: object, priority: object, ctx: objec
     _ = ctx
     cat_str = str(category or "")[:3]
     pri_str = str(priority or "")[:2]
-    return "status_{}_{}_ctx".format(cat_str, pri_str)
+    return f"status_{cat_str}_{pri_str}_ctx"
 
 
 def normalize_identity(result: Mapping[object, Mapping[str, Any]], ctx: object) -> Mapping[object, Mapping[str, Any]]:
@@ -131,7 +133,7 @@ def normalize_kwonly_result(*, result: Mapping[object, Mapping[str, Any]]) -> Ma
 # Deterministic fixtures (loaders)
 # -----------------------------------------------------------------------------
 
-_SUPPORT_TICKETS: List[Dict[str, Any]] = [
+_SUPPORT_TICKETS: list[dict[str, Any]] = [
     {
         "ticket_id": 1001,
         "customer_id": 1,
@@ -184,7 +186,7 @@ _SUPPORT_TICKETS: List[Dict[str, Any]] = [
     },
 ]
 
-_SUPPORT_CUSTOMERS: Dict[int, Dict[str, Any]] = {
+_SUPPORT_CUSTOMERS: dict[int, dict[str, Any]] = {
     1: {"customer_id": 1, "customer_segment": "new"},
     2: {"customer_id": 2, "customer_segment": "vip"},
     3: {"customer_id": 3, "customer_segment": "vip"},
@@ -192,7 +194,7 @@ _SUPPORT_CUSTOMERS: Dict[int, Dict[str, Any]] = {
     # 5 intentionally missing -> row_gap
 }
 
-_SUPPORT_AGENTS: Dict[int, Dict[str, Any]] = {
+_SUPPORT_AGENTS: dict[int, dict[str, Any]] = {
     11: {"agent_id": 11, "agent_team": "team-a"},
     12: {"agent_id": 12, "agent_team": "team-b"},
     # 99 intentionally missing -> row_gap
@@ -202,7 +204,7 @@ _SUPPORT_AGENTS: Dict[int, Dict[str, Any]] = {
 # Dirty-key fixtures: lookup_cast=sep_first + relations.type_error guardrails
 # -----------------------------------------------------------------------------
 
-_SUPPORT_TICKETS_DIRTY_AGENT_ID: List[Dict[str, Any]] = [
+_SUPPORT_TICKETS_DIRTY_AGENT_ID: list[dict[str, Any]] = [
     {
         "ticket_id": 2001,
         "agent_id": "11,legacy",
@@ -223,11 +225,11 @@ _SUPPORT_TICKETS_DIRTY_AGENT_ID: List[Dict[str, Any]] = [
 
 
 def load_support_tickets(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if not ids:
@@ -237,11 +239,11 @@ def load_support_tickets(
 
 
 def load_support_tickets_dirty_agent_id(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """dirty-key 场景: agent_id 可能来自 CSV/Excel 导出,带后缀或为空字符串."""
     _ = field_keys
     _ = is_ref_loader
@@ -252,11 +254,11 @@ def load_support_tickets_dirty_agent_id(
 
 
 def load_support_customers(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
@@ -265,11 +267,11 @@ def load_support_customers(
 
 
 def load_support_agents_str_keys(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """返回 string key 的 agents 维表,用于演示 `lookup_cast.sep_first` 的真实 join 场景."""
     _ = field_keys
     _ = is_ref_loader
@@ -280,11 +282,11 @@ def load_support_agents_str_keys(
 
 
 def load_support_agents(
-    ids: Optional[List[int]] = None,
-    field_keys: Optional[List[str]] = None,
+    ids: list[int] | None = None,
+    field_keys: list[str] | None = None,
     *,
     is_ref_loader: bool = False,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     _ = field_keys
     _ = is_ref_loader
     if ids is None:
@@ -301,12 +303,12 @@ def load_support_agents(
 class GuardrailSignal:
     code: str
     source_id: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
 
 class GuardrailCaptureObserver(EventDispatchObserver):
     def __init__(self) -> None:
-        self.signals: List[GuardrailSignal] = []
+        self.signals: list[GuardrailSignal] = []
 
     def on_error(self, event: Event) -> None:
         payload = event.payload
@@ -320,8 +322,8 @@ class GuardrailCaptureObserver(EventDispatchObserver):
         self.signals.append(GuardrailSignal(code=code, source_id=source_id, payload=dict(context)))
 
 
-def build_support_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
-    detail_rows: List[Dict[str, str]] = []
+def build_support_expected_outputs_csv_rows() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    detail_rows: list[dict[str, str]] = []
     for t in _SUPPORT_TICKETS:
         ticket_id = int(t["ticket_id"])
         customer_id = int(t["customer_id"])
@@ -335,7 +337,7 @@ def build_support_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], Lis
         resolve_minutes = int(t["resolve_minutes"])
         is_sla_breach = bool(resolve_minutes >= _SLA_BREACH_THRESHOLD_MINUTES)
 
-        row: Dict[str, Any] = {
+        row: dict[str, Any] = {
             "ticket_id": ticket_id,
             "customer_id": customer_id,
             "agent_id": agent_id,
@@ -351,7 +353,7 @@ def build_support_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], Lis
         detail_rows.append({k: _to_csv_cell(v) for k, v in row.items()})
 
     # metrics by agent_team (filter empty team via where in YAML)
-    by_team: Dict[str, Dict[str, Any]] = {}
+    by_team: dict[str, dict[str, Any]] = {}
     for r in detail_rows:
         team = r.get("agent_team") or ""
         if not team:
@@ -361,7 +363,7 @@ def build_support_expected_outputs_csv_rows() -> Tuple[List[Dict[str, str]], Lis
         acc["sla_breach_cnt"] = int(acc["sla_breach_cnt"]) + (1 if r.get("is_sla_breach") == "True" else 0)
         acc["sum_resolve_minutes"] = int(acc["sum_resolve_minutes"]) + int(r.get("resolve_minutes") or 0)
 
-    metrics_rows: List[Dict[str, str]] = []
+    metrics_rows: list[dict[str, str]] = []
     for acc in by_team.values():
         ticket_cnt = int(acc["ticket_cnt"]) or 1
         avg_resolve = Decimal(int(acc["sum_resolve_minutes"])) / Decimal(ticket_cnt)
@@ -380,7 +382,7 @@ def verify_support_outputs_csv_rows(
     *,
     actual_detail: Sequence[Mapping[str, Any]],
     actual_metrics_by_team: Sequence[Mapping[str, Any]],
-) -> Tuple[bool, str, Dict[str, Any]]:
+) -> tuple[bool, str, dict[str, Any]]:
     exp_detail, exp_metrics = build_support_expected_outputs_csv_rows()
 
     detail_fields = [
@@ -412,15 +414,15 @@ def verify_support_outputs_csv_rows(
     ok_m, msg_m = diff_first_mismatch(act_metrics, exp_metrics_sorted, fields=metrics_fields)
 
     ok = bool(ok_d and ok_m)
-    summary = "detail={} metrics={}".format(msg_d, msg_m)
-    details: Dict[str, Any] = {
+    summary = f"detail={msg_d} metrics={msg_m}"
+    details: dict[str, Any] = {
         "detail": {"actual": len(act_detail), "expected": len(exp_detail_sorted), "first_mismatch": msg_d},
         "metrics_by_team": {"actual": len(act_metrics), "expected": len(exp_metrics_sorted), "first_mismatch": msg_m},
     }
     return ok, summary, details
 
 
-def expected_support_row_gap_totals() -> Dict[str, int]:
+def expected_support_row_gap_totals() -> dict[str, int]:
     # When `batch_size: null`, each ref loader is called once with unique `$keys`.
     expected_customers = len({int(r["customer_id"]) for r in _SUPPORT_TICKETS})
     actual_customers = len(_SUPPORT_CUSTOMERS)
@@ -433,7 +435,7 @@ def expected_support_row_gap_totals() -> Dict[str, int]:
     }
 
 
-def expected_support_guardrail_codes() -> Tuple[str, ...]:
+def expected_support_guardrail_codes() -> tuple[str, ...]:
     # - `loader_required_field_missing`: `agent_id` is None on ticket 1004
     # - `relation_null_key_rate_exceeded`: relation lookup sees null_key for agents step (guardrails.relations.null_key_max_rate=0)
     return (

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from scalim_cli import yaml_dsl as yaml_dsl_cli
 
@@ -17,7 +17,7 @@ _CLI_DOCS_HELP_WIDTH = 100
 _CLI_DOCS_HELP_MAX_POSITION = 28
 
 
-TokenPath = Tuple[str, ...]
+TokenPath = tuple[str, ...]
 
 
 class StableCliHelpFormatter(argparse.HelpFormatter):
@@ -27,8 +27,8 @@ class StableCliHelpFormatter(argparse.HelpFormatter):
 
 @dataclass
 class CommandRecording:
-    parsers: Dict[TokenPath, argparse.ArgumentParser] = field(default_factory=dict)
-    helps: Dict[TokenPath, str] = field(default_factory=dict)
+    parsers: dict[TokenPath, argparse.ArgumentParser] = field(default_factory=dict)
+    helps: dict[TokenPath, str] = field(default_factory=dict)
 
 
 class RecordingSubparsers:
@@ -68,7 +68,7 @@ class RecordingArgumentParser(argparse.ArgumentParser):
         return RecordingSubparsers(action, recording=self.recording, prefix=self.recording_prefix)
 
 
-def build_yaml_dsl_command_docs() -> List[Dict[str, Any]]:
+def build_yaml_dsl_command_docs() -> list[dict[str, Any]]:
     root_parser = RecordingArgumentParser(prog=_project_constants.CLI_NAME, description="Scalim CLI")
     root_subparsers = root_parser.add_subparsers(dest="command")
     yaml_dsl_cli.register(root_subparsers)

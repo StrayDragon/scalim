@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -9,7 +9,7 @@ class EditorPosition:
     line: int
     column: int
 
-    def as_dict(self) -> Dict[str, int]:
+    def as_dict(self) -> dict[str, int]:
         return {"line": int(self.line), "column": int(self.column)}
 
 
@@ -20,5 +20,5 @@ class EditorRange:
     start: EditorPosition
     end: EditorPosition
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {"start": self.start.as_dict(), "end": self.end.as_dict()}

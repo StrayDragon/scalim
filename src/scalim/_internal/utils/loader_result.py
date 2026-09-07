@@ -11,10 +11,10 @@ from collections.abc import Sequence as SequenceABC
 from collections.abc import Set as AbstractSet
 from collections.abc import Sized as SizedABC
 from itertools import islice
-from typing import Any, Dict, cast
+from typing import Any, cast
 
+from ..._internal.strenum import StrEnum
 from ...typedefs import RuntimeValue
-from ...vendor.compact import StrEnum
 from .policy import (
     ensure_policy_enum,
     enum_values,
@@ -61,9 +61,9 @@ def normalize_loader_result_policy(policy: LoaderResultPolicy) -> LoaderResultPo
     return format_loader_result_policy(enum_value)
 
 
-def summarize_loader_result(result: Any) -> Dict[str, Any]:
+def summarize_loader_result(result: Any) -> dict[str, Any]:
     """返回 `loader result` 的轻量摘要字典."""
-    summary: Dict[str, Any] = {"type": type(result).__name__}
+    summary: dict[str, Any] = {"type": type(result).__name__}
     if isinstance(result, SizedABC):
         with contextlib.suppress(Exception):
             summary["size"] = len(result)

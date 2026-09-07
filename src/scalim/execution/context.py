@@ -1,9 +1,11 @@
 # region imports
 
-from typing import Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
+from collections.abc import Callable, Hashable, Sequence
+from typing import Optional
+
+from typing_extensions import override
 
 from ..typedefs import FieldValue
-from ..vendor.compact.typing_extensionsx import override
 
 # endregion
 
@@ -16,7 +18,7 @@ class _DenseFieldStorage:
     - 用 `bytearray` 避免缺失哨兵带来的 `pickle` 兼容性问题.
     """
 
-    values: List[FieldValue]
+    values: list[FieldValue]
     present: bytearray
     present_count: int
 
@@ -27,18 +29,18 @@ class _DenseFieldStorage:
 
 
 class BatchContext:
-    _data: Dict[str, Dict[Hashable, FieldValue]]
-    _required_fields: Optional[Set[str]]
-    _on_field_set: Optional[Callable[[str, Hashable], None]]
-    _on_field_set_fields: Optional[Set[str]]
-    _disabled_rows: Optional[Set[Hashable]]
+    _data: dict[str, dict[Hashable, FieldValue]]
+    _required_fields: set[str] | None
+    _on_field_set: Callable[[str, Hashable], None] | None
+    _on_field_set_fields: set[str] | None
+    _disabled_rows: set[Hashable] | None
 
     def __init__(
         self,
-        required_fields: Optional[Set[str]] = None,
+        required_fields: set[str] | None = None,
         *,
-        on_field_set: Optional[Callable[[str, Hashable], None]] = None,
-        on_field_set_fields: Optional[Set[str]] = None,
+        on_field_set: Callable[[str, Hashable], None] | None = None,
+        on_field_set_fields: set[str] | None = None,
     ) -> None:
         self._data = {}
         self._required_fields = required_fields
@@ -65,7 +67,7 @@ class BatchContext:
             return
         on_field_set(field_key, row_id)
 
-    def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
+    def get_field_value(self, field_key: str, row_id: Hashable, default: FieldValue | None = None) -> FieldValue:
         field_data = self._data.get(field_key)
         if field_data is None:
             return default
@@ -91,15 +93,15 @@ class BatchContext:
             if not field_data:
                 del self._data[field_key]
 
-    def delete_row_from_all_fields(self, row_id: Hashable, exclude_fields: Optional[Set[str]] = None) -> List[str]:
+    def delete_row_from_all_fields(self, row_id: Hashable, exclude_fields: set[str] | None = None) -> list[str]:
         """FR023 行级释放: 删除特定行在所有字段中的值,但保留 `exclude_fields` 中的字段.
 
         `row_id` 为批次内行号(`batch_row_nth`),不是主键.
         触发点:该行已被写出且不再被后续步骤使用时调用,以清理上下文内存.
         """
         exclude = exclude_fields or set()
-        released_fields: List[str] = []
-        empty_fields: Optional[List[str]] = None
+        released_fields: list[str] = []
+        empty_fields: list[str] | None = None
 
         # 热路径: 避免每次调用都复制 `keys` 列表;通过延迟删除空字段来保持迭代安全.
         data = self._data
@@ -125,7 +127,7 @@ class BatchContext:
             self._disabled_rows = set()
         self._disabled_rows.add(row_id)
 
-    def get_field_values_for_row(self, row_id: Hashable, field_keys: List[str]) -> Dict[str, FieldValue]:
+    def get_field_values_for_row(self, row_id: Hashable, field_keys: list[str]) -> dict[str, FieldValue]:
         # 注意: 内存优化 - 批量获取减少查找开销
         return {key: self.get_field_value(key, row_id) for key in field_keys}
 
@@ -135,13 +137,13 @@ class BatchContext:
         if self._disabled_rows:
             self._disabled_rows.clear()
 
-    def get_all_rows_for_field(self, field_key: str) -> Set[Hashable]:
+    def get_all_rows_for_field(self, field_key: str) -> set[Hashable]:
         field_data = self._data.get(field_key)
         if field_data is None:
             return set()
         return set(field_data.keys())
 
-    def get_field_keys(self) -> Set[str]:
+    def get_field_keys(self) -> set[str]:
         return set(self._data.keys())
 
     def get_field_count(self) -> int:
@@ -157,19 +159,19 @@ class DenseBatchContext(BatchContext):
 
     _base_row_id: int
     _row_count: int
-    _dense_data: Dict[str, _DenseFieldStorage]
-    _dense_pinned_refcounts: Optional[Dict[str, int]]
+    _dense_data: dict[str, _DenseFieldStorage]
+    _dense_pinned_refcounts: dict[str, int] | None
 
     def __init__(
         self,
         *,
         base_row_id: int,
         row_count: int,
-        required_fields: Optional[Set[str]] = None,
-        on_field_set: Optional[Callable[[str, Hashable], None]] = None,
-        on_field_set_fields: Optional[Set[str]] = None,
+        required_fields: set[str] | None = None,
+        on_field_set: Callable[[str, Hashable], None] | None = None,
+        on_field_set_fields: set[str] | None = None,
     ) -> None:
-        super(DenseBatchContext, self).__init__(
+        super().__init__(
             required_fields=required_fields,
             on_field_set=on_field_set,
             on_field_set_fields=on_field_set_fields,
@@ -179,7 +181,7 @@ class DenseBatchContext(BatchContext):
         self._dense_data = {}
         self._dense_pinned_refcounts = None
 
-    def _idx_of(self, row_id: Hashable) -> Optional[int]:
+    def _idx_of(self, row_id: Hashable) -> int | None:
         if not isinstance(row_id, int):
             return None
         base = self._base_row_id
@@ -202,7 +204,7 @@ class DenseBatchContext(BatchContext):
     def dense_row_count(self) -> int:
         return int(self._row_count)
 
-    def dense_idx_of(self, row_id: Hashable) -> Optional[int]:
+    def dense_idx_of(self, row_id: Hashable) -> int | None:
         """返回 `row_id` 在稠密批次内的索引,用于热路径复用.
 
         说明:
@@ -228,7 +230,7 @@ class DenseBatchContext(BatchContext):
             return None
         return self._ensure_storage(field_key)
 
-    def dense_disabled_rows_or_none(self) -> Optional[Set[Hashable]]:
+    def dense_disabled_rows_or_none(self) -> set[Hashable] | None:
         """返回被禁用行集合(若未启用行级禁用则为 `None`)."""
 
         return self._disabled_rows
@@ -239,7 +241,7 @@ class DenseBatchContext(BatchContext):
         *,
         row_count: int,
         present_mask: bytes,
-    ) -> Optional[List[FieldValue]]:
+    ) -> list[FieldValue] | None:
         """为主数据源预填充准备稠密存储,并返回可写的 `values` 列表.
 
         说明:
@@ -259,7 +261,7 @@ class DenseBatchContext(BatchContext):
             return None
 
         if len(present_mask) != resolved_row_count:
-            msg = "present_mask length mismatch: expected {}, got {}".format(resolved_row_count, len(present_mask))
+            msg = f"present_mask length mismatch: expected {resolved_row_count}, got {len(present_mask)}"
             raise ValueError(msg)
 
         storage = self._ensure_storage(field_key)
@@ -267,7 +269,7 @@ class DenseBatchContext(BatchContext):
         storage.present_count = resolved_row_count
         return storage.values
 
-    def dense_on_field_set_callback_for_field(self, field_key: str) -> Optional[Callable[[str, Hashable], None]]:
+    def dense_on_field_set_callback_for_field(self, field_key: str) -> Callable[[str, Hashable], None] | None:
         on_field_set = self._on_field_set
         if on_field_set is None:
             return None
@@ -325,7 +327,7 @@ class DenseBatchContext(BatchContext):
         idx = self._idx_of(row_id)
         if idx is None:
             # 该实现仅用于连续 `int row_id`;若不满足条件,让调用方回退到通用实现.
-            msg = "`DenseBatchContext` row_id 不在范围内或不是 `int`: {!r}".format(row_id)
+            msg = f"`DenseBatchContext` row_id 不在范围内或不是 `int`: {row_id!r}"
             raise ValueError(msg)
 
         storage = self._ensure_storage(field_key)
@@ -342,7 +344,7 @@ class DenseBatchContext(BatchContext):
                 on_field_set(field_key, row_id)
 
     @override
-    def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
+    def get_field_value(self, field_key: str, row_id: Hashable, default: FieldValue | None = None) -> FieldValue:
         storage = self._dense_data.get(field_key)
         if storage is None:
             return default
@@ -380,14 +382,14 @@ class DenseBatchContext(BatchContext):
             _ = self._dense_data.pop(field_key, None)
 
     @override
-    def delete_row_from_all_fields(self, row_id: Hashable, exclude_fields: Optional[Set[str]] = None) -> List[str]:
+    def delete_row_from_all_fields(self, row_id: Hashable, exclude_fields: set[str] | None = None) -> list[str]:
         exclude = exclude_fields or set()
         idx = self._idx_of(row_id)
         if idx is None:
             return []
 
-        released_fields: List[str] = []
-        empty_fields: Optional[List[str]] = None
+        released_fields: list[str] = []
+        empty_fields: list[str] | None = None
 
         # 热路径: 避免每次调用都复制 `keys` 列表;通过延迟 `pop` 空字段来保持迭代安全.
         dense_data = self._dense_data
@@ -414,7 +416,7 @@ class DenseBatchContext(BatchContext):
         return released_fields
 
     @override
-    def get_field_values_for_row(self, row_id: Hashable, field_keys: List[str]) -> Dict[str, FieldValue]:
+    def get_field_values_for_row(self, row_id: Hashable, field_keys: list[str]) -> dict[str, FieldValue]:
         return {key: self.get_field_value(key, row_id) for key in field_keys}
 
     @override
@@ -424,11 +426,11 @@ class DenseBatchContext(BatchContext):
             self._disabled_rows.clear()
 
     @override
-    def get_all_rows_for_field(self, field_key: str) -> Set[Hashable]:
+    def get_all_rows_for_field(self, field_key: str) -> set[Hashable]:
         storage = self._dense_data.get(field_key)
         if storage is None:
             return set()
-        out: Set[Hashable] = set()
+        out: set[Hashable] = set()
         base = int(self._base_row_id)
         for idx, present in enumerate(storage.present):
             if present:
@@ -436,7 +438,7 @@ class DenseBatchContext(BatchContext):
         return out
 
     @override
-    def get_field_keys(self) -> Set[str]:
+    def get_field_keys(self) -> set[str]:
         return set(self._dense_data.keys())
 
     @override
@@ -444,7 +446,7 @@ class DenseBatchContext(BatchContext):
         return len(self._dense_data)
 
 
-def _try_resolve_dense_range(row_ids: Sequence[Hashable]) -> Optional[Tuple[int, int]]:
+def _try_resolve_dense_range(row_ids: Sequence[Hashable]) -> tuple[int, int] | None:
     if not row_ids:
         return None
     first = row_ids[0]
@@ -462,9 +464,9 @@ def _try_resolve_dense_range(row_ids: Sequence[Hashable]) -> Optional[Tuple[int,
 def create_batch_context_for_rows(
     row_ids: Sequence[Hashable],
     *,
-    required_fields: Optional[Set[str]] = None,
-    on_field_set: Optional[Callable[[str, Hashable], None]] = None,
-    on_field_set_fields: Optional[Set[str]] = None,
+    required_fields: set[str] | None = None,
+    on_field_set: Callable[[str, Hashable], None] | None = None,
+    on_field_set_fields: set[str] | None = None,
 ) -> BatchContext:
     resolved = _try_resolve_dense_range(row_ids)
     if resolved is None:

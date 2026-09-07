@@ -1,7 +1,7 @@
-from typing import ClassVar, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import schema_meta
 
 
@@ -9,7 +9,7 @@ from ..constants import schema_meta
 class ScalimYamlLspKindOverrideConfig:
     SCHEMA_NAME: ClassVar[str] = "scalim_yaml_lsp_kind_override"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("glob", "kind")
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("glob", "kind")
 
     glob: str = dataclass_field(
         default="",
@@ -41,7 +41,7 @@ class ScalimYamlLspConfig:
     SCHEMA_NAME: ClassVar[str] = "scalim_yaml_lsp"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
-    python_roots: Tuple[str, ...] = dataclass_field(
+    python_roots: tuple[str, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             desc="可选: 用于静态解析 Python 引用的搜索根(相对 scalim.yaml 所在目录)",
@@ -53,7 +53,7 @@ class ScalimYamlLspConfig:
         ),
     )
 
-    kind_overrides: Tuple[ScalimYamlLspKindOverrideConfig, ...] = dataclass_field(
+    kind_overrides: tuple[ScalimYamlLspKindOverrideConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             desc="可选: 按文件路径覆盖 YAML 类型(demand/workflow), glob 相对 project root",
@@ -69,7 +69,7 @@ class ScalimYamlLspConfig:
 class ScalimYamlImportRootConfig:
     SCHEMA_NAME: ClassVar[str] = "scalim_yaml_import_root"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("path",)
 
     path: str = dataclass_field(
         default="",
@@ -86,7 +86,7 @@ class ScalimYamlImportRootConfig:
         ),
     )
 
-    alias: Optional[str] = dataclass_field(
+    alias: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="可选: imports 路径别名(例如 @ / fragments)",
@@ -108,7 +108,7 @@ class ScalimYamlYamlDslConfig:
     SCHEMA_NAME: ClassVar[str] = "scalim_yaml_yaml_dsl"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
-    import_roots: Tuple[ScalimYamlImportRootConfig, ...] = dataclass_field(
+    import_roots: tuple[ScalimYamlImportRootConfig, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             desc="可选: imports roots 注册表(目录注册 + alias 可选)",
@@ -126,7 +126,7 @@ class ScalimYamlYamlDslConfig:
         ),
     )
 
-    lsp: Optional[ScalimYamlLspConfig] = dataclass_field(
+    lsp: ScalimYamlLspConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
@@ -147,7 +147,7 @@ class ScalimYamlConfig:
     SCHEMA_NAME: ClassVar[str] = "scalim_yaml"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = True
 
-    yaml_dsl: Optional[ScalimYamlYamlDslConfig] = dataclass_field(
+    yaml_dsl: ScalimYamlYamlDslConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={

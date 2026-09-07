@@ -1,5 +1,3 @@
-from typing import Optional
-
 from ..typedefs import KeyNormalizationMode, RuntimeValue
 
 
@@ -9,7 +7,7 @@ def normalize_key_normalization(value: RuntimeValue) -> KeyNormalizationMode:
     raw = str(value).strip()
     if raw in ("raw", "auto_str", "force_str"):
         return raw
-    msg = "Invalid key_normalization={!r}. Expected 'raw', 'auto_str', or 'force_str'.".format(value)
+    msg = f"Invalid key_normalization={value!r}. Expected 'raw', 'auto_str', or 'force_str'."
     raise ValueError(msg)
 
 
@@ -25,7 +23,7 @@ def should_apply_str_key_normalization(
     return True
 
 
-def is_experimental_key_normalization(mode: Optional[RuntimeValue]) -> bool:
+def is_experimental_key_normalization(mode: RuntimeValue | None) -> bool:
     try:
         resolved = normalize_key_normalization(mode)
     except ValueError:

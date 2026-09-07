@@ -2,11 +2,12 @@
 import math
 import threading
 import time
+from collections.abc import Callable, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, as_completed, wait
 from concurrent.futures import TimeoutError as FuturesTimeoutError
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
+from dataclasses import dataclass
+from typing import TypeVar
 
-from ...vendor.dataclassesx import dataclass
 from .errors import ScalimAdaptiveTaskTimeoutError
 from .strategy_unit import AdaptiveTaskKey, TaskSpec
 
@@ -20,8 +21,8 @@ class PoolWaitStats:
 
 @dataclass
 class LayerScheduleStats:
-    pool_limits: Dict[str, int]
-    pool_wait: Dict[str, PoolWaitStats]
+    pool_limits: dict[str, int]
+    pool_wait: dict[str, PoolWaitStats]
 
 
 _POOL_WAIT_EPSILON_SECONDS = 0.000_001
@@ -32,15 +33,15 @@ _TResult = TypeVar("_TResult")
 
 def run_tasks_in_pool(  # noqa: C901, PLR0912, PLR0915
     task_order: Sequence[AdaptiveTaskKey],
-    task_specs: Dict[AdaptiveTaskKey, TaskSpec],
+    task_specs: dict[AdaptiveTaskKey, TaskSpec],
     *,
     max_workers: int,
     # `Python 3.6` 兼容性:`concurrent.futures.Future` 在运行时不可下标.
     submit_task: Callable[[TaskSpec], "Future[_TResult]"],
     collect_stats: bool,
     resolve_pool_limit: Callable[[str, int], int],
-    timeout_seconds: Optional[float] = None,
-) -> Tuple[Dict[AdaptiveTaskKey, _TResult], Optional[LayerScheduleStats]]:
+    timeout_seconds: float | None = None,
+) -> tuple[dict[AdaptiveTaskKey, _TResult], LayerScheduleStats | None]:
     timeout_s = None
     if timeout_seconds is not None:
         if isinstance(timeout_seconds, bool):
@@ -53,17 +54,17 @@ def run_tasks_in_pool(  # noqa: C901, PLR0912, PLR0915
         if value > 0:
             timeout_s = value
 
-    deadline: Optional[float] = None
+    deadline: float | None = None
     if timeout_s is not None:
         deadline = time.perf_counter() + float(timeout_s)
 
-    def _remaining_timeout_seconds() -> Optional[float]:
+    def _remaining_timeout_seconds() -> float | None:
         if deadline is None:
             return None
         return max(0.0, float(deadline) - time.perf_counter())
 
     def _raise_timeout(*, pending_task_keys: Sequence[AdaptiveTaskKey]) -> None:
-        pending_field_keys: List[str] = []
+        pending_field_keys: list[str] = []
         for task_key in pending_task_keys:
             spec = task_specs.get(task_key)
             if spec is None:  # pragma: no cover  # pragma: allow-no-cover defensive: unknown key
@@ -78,10 +79,10 @@ def run_tasks_in_pool(  # noqa: C901, PLR0912, PLR0915
     resolved_workers = max(1, int(max_workers))
     global_sem = threading.BoundedSemaphore(resolved_workers)
 
-    pool_sems: Dict[str, threading.BoundedSemaphore] = {}
-    pool_limits: Dict[str, int] = {}
-    pool_wait: Dict[str, PoolWaitStats] = {}
-    pool_wait_start: Dict[str, float] = {}
+    pool_sems: dict[str, threading.BoundedSemaphore] = {}
+    pool_limits: dict[str, int] = {}
+    pool_wait: dict[str, PoolWaitStats] = {}
+    pool_wait_start: dict[str, float] = {}
     for task_key in task_order:
         spec = task_specs[task_key]
         if spec.pool_name not in pool_sems:
@@ -91,14 +92,14 @@ def run_tasks_in_pool(  # noqa: C901, PLR0912, PLR0915
             if collect_stats:
                 pool_wait[spec.pool_name] = PoolWaitStats()
 
-    futures: Dict[AdaptiveTaskKey, "Future[_TResult]"] = {}
-    future_to_key: Dict["Future[_TResult]", AdaptiveTaskKey] = {}
+    futures: dict[AdaptiveTaskKey, Future[_TResult]] = {}
+    future_to_key: dict[Future[_TResult], AdaptiveTaskKey] = {}
 
     def _release_tokens(pool_name: str) -> None:
         pool_sems[pool_name].release()
         global_sem.release()
 
-    pending: List[AdaptiveTaskKey] = list(task_order)
+    pending: list[AdaptiveTaskKey] = list(task_order)
     while pending:
         submitted_any = False
         i = 0
@@ -157,14 +158,14 @@ def run_tasks_in_pool(  # noqa: C901, PLR0912, PLR0915
             return_when=FIRST_COMPLETED,
         )
         if not done:
-            pending_task_keys: List[AdaptiveTaskKey] = []
+            pending_task_keys: list[AdaptiveTaskKey] = []
             pending_task_keys.extend(pending)
             pending_task_keys.extend(task_key for task_key, fut in futures.items() if not fut.done())
             for fut in futures.values():
                 _ = fut.cancel()
             _raise_timeout(pending_task_keys=pending_task_keys)
 
-    results_by_key: Dict[AdaptiveTaskKey, _TResult] = {}
+    results_by_key: dict[AdaptiveTaskKey, _TResult] = {}
     try:
         remaining_timeout = _remaining_timeout_seconds()
         if remaining_timeout is None:

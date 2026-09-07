@@ -1,6 +1,8 @@
 import threading
 from abc import ABC
-from typing import Any, Dict, Tuple
+from typing import Any
+
+from typing_extensions import override
 
 from ..._internal.utils.loader_result import (
     LoaderResultPolicy,
@@ -11,20 +13,19 @@ from ..._internal.utils.loader_result import (
     summarize_loader_result,
 )
 from ...events import EventType  # noqa: TC001
-from ...vendor.compact.typing_extensionsx import override
 from .._dispatch import HookDispatchStrategy
 from .manager_base import HookManagerBase, HookOnEventHandlerPair, HookTypedHandlerPair
 
 
 class HookManagerStateMixin(HookManagerBase, ABC):
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         state = dict(self.__dict__)
         state.pop("_lock", None)
         state.pop("_typed_handlers_by_event_type", None)
         state.pop("_on_event_handlers_by_event_type", None)
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         manager = self._manager()
         vars(self).update(state)
         manager.lock = threading.RLock()
@@ -45,8 +46,8 @@ class HookManagerStateMixin(HookManagerBase, ABC):
         else:
             manager.has_hooks = bool(manager.hooks)
 
-        typed_handlers_by_event_type: Dict[EventType, Tuple[HookTypedHandlerPair, ...]] = {}
-        on_event_handlers_by_event_type: Dict[EventType, Tuple[HookOnEventHandlerPair, ...]] = {}
+        typed_handlers_by_event_type: dict[EventType, tuple[HookTypedHandlerPair, ...]] = {}
+        on_event_handlers_by_event_type: dict[EventType, tuple[HookOnEventHandlerPair, ...]] = {}
         manager.typed_handlers_by_event_type = typed_handlers_by_event_type
         manager.on_event_handlers_by_event_type = on_event_handlers_by_event_type
 
@@ -65,7 +66,7 @@ class HookManagerStateMixin(HookManagerBase, ABC):
         return normalize_loader_result_policy(policy)
 
     @override
-    def _summarize_result(self, result: Any) -> Dict[str, Any]:
+    def _summarize_result(self, result: Any) -> dict[str, Any]:
         return summarize_loader_result(result)
 
     @override

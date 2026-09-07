@@ -3,7 +3,7 @@
 import logging
 import threading
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from .._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue
 from ..events import Event, EventType, generate_run_id
@@ -46,40 +46,40 @@ class ObserverManager(
     注意:请通过 `register`/`unregister`/`clear` 管理观察者;直接修改 `observers` 列表可能导致订阅缓存不同步.
     """
 
-    observers: Optional[List[Observer]]
+    observers: list[Observer] | None
     _has_observers: bool
     _supports_all: bool
-    _supported_event_types: Optional[Set[EventType]]
-    _observers_by_event_type: Optional[Dict[EventType, Tuple[Observer, ...]]]
-    _observers_for_unknown_event_type: Tuple[Observer, ...]
-    _capture_event_types: Optional[Set[EventType]]
+    _supported_event_types: set[EventType] | None
+    _observers_by_event_type: dict[EventType, tuple[Observer, ...]] | None
+    _observers_for_unknown_event_type: tuple[Observer, ...]
+    _capture_event_types: set[EventType] | None
     _capture_unknown_event_types: bool
     debug_mode: bool
     fallback_logger_enabled: bool
     loader_result_policy: LoaderResultPolicyValue
     loader_result_sample_size: int
     run_id: str
-    _event_meta_defaults: Optional[Dict[str, Any]]
+    _event_meta_defaults: dict[str, Any] | None
     mode: ObserverManagerModeValue
-    max_recorded_events: Optional[int]
+    max_recorded_events: int | None
     capture_overflow_policy: CaptureOverflowPolicyValue
     _lock: "threading.RLock"
     _diagnostic_warning_emitted: bool
     _seq: int
-    _recorded_events: Optional[Deque[Event]]
+    _recorded_events: deque[Event] | None
 
     def __init__(
         self,
-        observers: Optional[List[Observer]] = None,
+        observers: list[Observer] | None = None,
         *,
         enable_debugging: bool = False,
         fallback_logger_enabled: bool = False,
         loader_result_policy: LoaderResultPolicy = LoaderResultPolicy.FULL,
         loader_result_sample_size: int = 5,
-        run_id: Optional[str] = None,
-        event_meta_defaults: Optional[Dict[str, Any]] = None,
+        run_id: str | None = None,
+        event_meta_defaults: dict[str, Any] | None = None,
         mode: ObserverManagerMode = ObserverManagerMode.PROCESS,
-        max_recorded_events: Optional[int] = DEFAULT_MAX_RECORDED_EVENTS,
+        max_recorded_events: int | None = DEFAULT_MAX_RECORDED_EVENTS,
         capture_overflow_policy: CaptureOverflowPolicy = CaptureOverflowPolicy.RAISE,
     ) -> None:
         self.observers = list(observers or [])

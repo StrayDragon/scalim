@@ -7,11 +7,12 @@
 - 运行时需兼容 `Python 3.6`.
 """
 
-from typing import Iterable, Iterator, List, Optional, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from dataclasses import dataclass
+
+from typing_extensions import override
 
 from ...typedefs import CellValue, RowData
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
 from .base import BaseRowSink
 from .sink_csv import InMemoryCsv
 
@@ -24,36 +25,36 @@ class InMemoryRows:
     - `rows`: 行数据(细胞为任意 `object`;每行长度必须与 `header` 等长,列序一致)
     """
 
-    header: List[str]
-    rows: List[List[CellValue]]
+    header: list[str]
+    rows: list[list[CellValue]]
 
     def __post_init__(self) -> None:
         msg: str
         for idx, field_id in enumerate(self.header):
             if not isinstance(field_id, str) or not field_id.strip():
-                msg = "InMemoryRows.header[{}] must be a non-empty string".format(idx)
+                msg = f"InMemoryRows.header[{idx}] must be a non-empty string"
                 raise ValueError(msg)
 
         width = len(self.header)
         for row_idx, row in enumerate(self.rows):
             if len(row) != width:
-                msg = "InMemoryRows.rows[{}] length mismatch: {} != {}".format(row_idx, len(row), width)
+                msg = f"InMemoryRows.rows[{row_idx}] length mismatch: {len(row)} != {width}"
                 raise ValueError(msg)
 
     def iter_row_data(self) -> Iterator[RowData]:
         header = list(self.header)
         for row in self.rows:
-            yield dict(zip(header, row))
+            yield dict(zip(header, row, strict=False))
 
 
 class InMemoryRowsSink(BaseRowSink):
     """将行流写入 `InMemoryRows` 的内存 `sink`."""
 
-    field_ids: List[str]
+    field_ids: list[str]
     _artifact: InMemoryRows
     _closed: bool
 
-    def __init__(self, *, field_ids: Optional[Sequence[str]]) -> None:
+    def __init__(self, *, field_ids: Sequence[str] | None) -> None:
         if field_ids is None:
             msg = "必须提供 field_ids 参数"
             raise ValueError(msg)
@@ -64,8 +65,8 @@ class InMemoryRowsSink(BaseRowSink):
     def to_artifact(self) -> InMemoryRows:
         return self._artifact
 
-    def _format_row(self, row: RowData) -> List[CellValue]:
-        values: List[CellValue] = []
+    def _format_row(self, row: RowData) -> list[CellValue]:
+        values: list[CellValue] = []
         for field_id in self.field_ids:
             values.append(row.get(field_id))
         return values
@@ -99,7 +100,7 @@ def in_memory_rows_to_in_memory_csv(artifact: InMemoryRows) -> InMemoryCsv:
         return "" if value is None else str(value)
 
     header = list(artifact.header)
-    rows: List[List[str]] = []
+    rows: list[list[str]] = []
     for row in artifact.rows:
         rows.append([_normalize(v) for v in row])
     return InMemoryCsv(header=header, rows=rows)
@@ -109,17 +110,17 @@ def iter_in_memory_rows_as_main_rows(artifact: InMemoryRows) -> Iterable[RowData
     """将 `InMemoryRows` 适配为 `engine.run(main_rows=...)` 可消费的行流."""
 
     class _Iterable:
-        _header: List[str]
-        _rows: List[List[CellValue]]
+        _header: list[str]
+        _rows: list[list[CellValue]]
 
-        def __init__(self, header: List[str], rows: List[List[CellValue]]) -> None:
+        def __init__(self, header: list[str], rows: list[list[CellValue]]) -> None:
             self._header = header
             self._rows = rows
 
         def __iter__(self) -> Iterator[RowData]:
             header = self._header
             for row in self._rows:
-                yield dict(zip(header, row))
+                yield dict(zip(header, row, strict=False))
 
     return _Iterable(header=list(artifact.header), rows=artifact.rows)
 

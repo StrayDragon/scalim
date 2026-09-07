@@ -1,5 +1,6 @@
+from collections.abc import Callable, Hashable
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, NamedTuple, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, NamedTuple
 
 from .....spec.ir import CallBySpecIr, ComputeCallContextIr, FieldIr, LookupStepIr
 from .....spec.ir._fields import call_by_requires_ctx
@@ -28,13 +29,13 @@ def _eval_ref_default_call_by(
 ) -> FieldValue:
     calculator = exec_ctx.runtime.runtime_bindings.get_ref_default_calculator(field_key, int(idx))
     if calculator is None:
-        msg = "Missing runtime ref default calculator for field_id={!r}, default_idx={}".format(field_key, int(idx))
+        msg = f"Missing runtime ref default calculator for field_id={field_key!r}, default_idx={int(idx)}"
         raise KeyError(msg)
 
     deps = tuple(str(x) for x in (call_by.field_names or ()))
     needs_ctx = call_by_requires_ctx(call_by)
-    dep_values: List[FieldValue] = []
-    dep_payload: Optional[Dict[str, FieldValue]] = {} if needs_ctx else None
+    dep_values: list[FieldValue] = []
+    dep_payload: dict[str, FieldValue] | None = {} if needs_ctx else None
     for dep in deps:
         v: FieldValue = exec_ctx.context.get_field_value(dep, row_id)
         dep_values.append(v)
@@ -59,7 +60,7 @@ def _resolve_ref_default_value_on_relation_miss(  # noqa: PLR0911
     row_id: Hashable,
     *,
     field_key: str,
-) -> Tuple[FieldValue, bool]:
+) -> tuple[FieldValue, bool]:
     field_spec = exec_ctx.runtime.field_specs.get(field_key)
     if not isinstance(field_spec, FieldIr):
         return None, False
@@ -93,7 +94,7 @@ def _write_relation_miss_field_value(
     row_id: Hashable,
     *,
     field_key: str,
-    required_field_keys: Set[str],
+    required_field_keys: set[str],
     required_mode: str,
     transform_mode: str,
     reason: str,
@@ -149,7 +150,7 @@ def _null_fill_row(
     exec_ctx: LoadRefExecutionContext,
     row_id: Hashable,
     *,
-    null_fill_fields: Optional[Tuple[str, ...]],
+    null_fill_fields: tuple[str, ...] | None,
 ) -> None:
     if not null_fill_fields:
         return
@@ -173,9 +174,9 @@ def init_first_fk_mapping(
     exec_ctx: LoadRefExecutionContext,
     first_step: LookupStepIr,
     *,
-    null_fill_fields: Optional[Tuple[str, ...]] = None,
-) -> Dict[Hashable, LookupKey]:
-    pk_to_first_fk: Dict[Hashable, LookupKey] = {}
+    null_fill_fields: tuple[str, ...] | None = None,
+) -> dict[Hashable, LookupKey]:
+    pk_to_first_fk: dict[Hashable, LookupKey] = {}
     batch_row_nth = exec_ctx.batch_row_nth
     normalize_key = exec_ctx.normalize_key
     get_field_value = exec_ctx.context.get_field_value
@@ -210,11 +211,11 @@ def _collect_multi_field_fk(
     row_id: Hashable,
     step: LookupStepIr,
     *,
-    from_fields: Tuple[str, ...],
-) -> Optional[Hashable]:
+    from_fields: tuple[str, ...],
+) -> Hashable | None:
     get_field_value = exec_ctx.context.get_field_value
     normalize_key = exec_ctx.normalize_key
-    fk_values: List[FieldValue] = []
+    fk_values: list[FieldValue] = []
     for key in from_fields:
         val: FieldValue = get_field_value(key, row_id)
         if val is None:
@@ -231,9 +232,9 @@ def _resolve_next_step_fk(
     data: RuntimeValue,
     step: LookupStepIr,
     *,
-    from_field: Optional[str],
-    from_fields: Tuple[str, ...],
-) -> Optional[LookupKey]:
+    from_field: str | None,
+    from_fields: tuple[str, ...],
+) -> LookupKey | None:
     if from_field is not None:
         next_fk: FieldValue = extract_field(data, str(from_field))
         if next_fk is None:
@@ -245,13 +246,13 @@ def _resolve_next_step_fk(
 
 def build_next_mapping(
     exec_ctx: LoadRefExecutionContext,
-    current_mapping: Dict[Hashable, LookupKey],
+    current_mapping: dict[Hashable, LookupKey],
     intermediate_result: LoaderResultMapping,
     next_step: LookupStepIr,
     *,
-    null_fill_fields: Optional[Tuple[str, ...]] = None,
-) -> Dict[Hashable, LookupKey]:
-    new_mapping: Dict[Hashable, LookupKey] = {}
+    null_fill_fields: tuple[str, ...] | None = None,
+) -> dict[Hashable, LookupKey]:
+    new_mapping: dict[Hashable, LookupKey] = {}
     null_fill_row = _null_fill_row
 
     next_from_fields = next_step.get_from_fields()
@@ -287,10 +288,10 @@ def _collect_multi_field_fk_from_data(
     data: RuntimeValue,
     step: LookupStepIr,
     *,
-    from_fields: Tuple[str, ...],
-) -> Optional[LookupKey]:
+    from_fields: tuple[str, ...],
+) -> LookupKey | None:
     normalize_key = exec_ctx.normalize_key
-    fk_values: List[FieldValue] = []
+    fk_values: list[FieldValue] = []
     for key in from_fields:
         val: FieldValue = extract_field(data, key)
         if val is None:
@@ -304,8 +305,8 @@ def _collect_multi_field_fk_from_data(
 def _resolve_ref_required_field_keys(
     *,
     runtime: "ExecutionRuntime",
-    group_field_keys: Tuple[str, ...],
-) -> Set[str]:
+    group_field_keys: tuple[str, ...],
+) -> set[str]:
     guardrails = runtime.guardrails
     if guardrails.enabled and guardrails.loader.required_fields:
         return set(group_field_keys) & set(guardrails.loader.required_fields)
@@ -315,13 +316,13 @@ def _resolve_ref_required_field_keys(
 class _RefFieldWritePlan(NamedTuple):
     field_key: str
     is_field_ir: bool
-    extract_segments: Tuple[Union[str, int], ...]
+    extract_segments: tuple[str | int, ...]
     data_key: str
-    value_transform: Optional[Callable[[FieldValue], FieldValue]]
+    value_transform: Callable[[FieldValue], FieldValue] | None
 
 
-def _build_ref_field_write_plans(exec_ctx: LoadRefExecutionContext, *, group_field_keys: Tuple[str, ...]) -> Tuple[_RefFieldWritePlan, ...]:
-    plans: List[_RefFieldWritePlan] = []
+def _build_ref_field_write_plans(exec_ctx: LoadRefExecutionContext, *, group_field_keys: tuple[str, ...]) -> tuple[_RefFieldWritePlan, ...]:
+    plans: list[_RefFieldWritePlan] = []
     for field_key in group_field_keys:
         field_spec = exec_ctx.runtime.field_specs.get(field_key)
         if isinstance(field_spec, FieldIr):
@@ -351,10 +352,10 @@ def _build_ref_field_write_plans(exec_ctx: LoadRefExecutionContext, *, group_fie
 
 def write_final_step(  # noqa: C901  # pragma: allow-c901 plan: c0
     exec_ctx: LoadRefExecutionContext,
-    current_mapping: Dict[Hashable, LookupKey],
+    current_mapping: dict[Hashable, LookupKey],
     intermediate_result: LoaderResultMapping,
     source: LookupSourceRefIrBase,
-    group_field_keys: Tuple[str, ...],
+    group_field_keys: tuple[str, ...],
 ) -> None:
     required_field_keys = _resolve_ref_required_field_keys(runtime=exec_ctx.runtime, group_field_keys=group_field_keys)
     guardrails = exec_ctx.runtime.guardrails

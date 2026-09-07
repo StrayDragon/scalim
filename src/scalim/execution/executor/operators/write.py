@@ -1,8 +1,10 @@
-from typing import Hashable, List, cast
+from collections.abc import Hashable
+from typing import cast
+
+from typing_extensions import override
 
 from ....planning.operators import SupportedOperatorIr, WriteColumnOperatorIr, WriteRowOperatorIr
 from ....sinks import IColumnSink, IRowSink
-from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ..helpers.batch_data import build_column_data, build_row
 from ..runtime.runtime import ExecutionRuntime
@@ -17,7 +19,7 @@ class WriteColumnOperatorExecutor(OperatorExecutor):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         op = cast("WriteColumnOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing
@@ -54,7 +56,7 @@ class WriteRowOperatorExecutor(OperatorExecutor):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         op = cast("WriteRowOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing

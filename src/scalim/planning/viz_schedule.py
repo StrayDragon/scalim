@@ -1,31 +1,31 @@
 import time
-from typing import Any, Dict, List, Sequence, Set, Tuple, Union
+from collections.abc import Sequence
+from typing import Any, Protocol, TypedDict
 
 from ..spec.ir import SourceIr
 from ..utils.relation_signature import RelationSignature, build_relation_signature, has_rows_binding
-from ..vendor.compact.typing_extensionsx import Protocol, TypedDict
 from .operators import LoadRefOperatorIr, PlanOperatorIr
 
-_RefLoaderOrderingDep = Union[str, Tuple[str, ...]]
-_RefLoaderField = Tuple[str, _RefLoaderOrderingDep]
-_RefLoaderSequenceItem = Tuple[SourceIr, List[_RefLoaderField]]
+_RefLoaderOrderingDep = str | tuple[str, ...]
+_RefLoaderField = tuple[str, _RefLoaderOrderingDep]
+_RefLoaderSequenceItem = tuple[SourceIr, list[_RefLoaderField]]
 
 
 class _ExecutionPlanLike(Protocol):
-    operators: Tuple[PlanOperatorIr, ...]
-    ref_loader_sequence: List[_RefLoaderSequenceItem]
-    target_fields: List[str]
+    operators: tuple[PlanOperatorIr, ...]
+    ref_loader_sequence: list[_RefLoaderSequenceItem]
+    target_fields: list[str]
 
 
 class _VizTask(TypedDict):
     task_id: str
-    chain: List[str]
-    fields: List[str]
+    chain: list[str]
+    fields: list[str]
     rows_binding: bool
 
 
-def _build_ref_deps(plan: _ExecutionPlanLike) -> Dict[str, Tuple[str, ...]]:
-    deps: Dict[str, Tuple[str, ...]] = {}
+def _build_ref_deps(plan: _ExecutionPlanLike) -> dict[str, tuple[str, ...]]:
+    deps: dict[str, tuple[str, ...]] = {}
     for _source, items in plan.ref_loader_sequence:
         for field_key, dep_ref_field_keys in items:
             if not dep_ref_field_keys:
@@ -37,14 +37,14 @@ def _build_ref_deps(plan: _ExecutionPlanLike) -> Dict[str, Tuple[str, ...]]:
     return deps
 
 
-def _build_layers(field_keys: Sequence[str], *, deps: Dict[str, Tuple[str, ...]]) -> List[List[str]]:
-    remaining: Set[str] = set(field_keys)
-    done: Set[str] = set()
-    layers: List[List[str]] = []
+def _build_layers(field_keys: Sequence[str], *, deps: dict[str, tuple[str, ...]]) -> list[list[str]]:
+    remaining: set[str] = set(field_keys)
+    done: set[str] = set()
+    layers: list[list[str]] = []
 
     # 确定性的 O(n^2) 分层,与规划/算子顺序对齐.
     while remaining:
-        ready: List[str] = []
+        ready: list[str] = []
         for key in field_keys:
             if key not in remaining:
                 continue
@@ -67,7 +67,7 @@ def _build_layers(field_keys: Sequence[str], *, deps: Dict[str, Tuple[str, ...]]
 
 def build_viz_schedule_plan(
     plan: _ExecutionPlanLike,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """生成 `viz_schedule_plan.json` (用于 `adaptive` 计划视角的可视化).
 
     说明:
@@ -76,26 +76,26 @@ def build_viz_schedule_plan(
     """
 
     loadref_ops = [op for op in plan.operators if isinstance(op, LoadRefOperatorIr)]
-    op_by_field_key: Dict[str, LoadRefOperatorIr] = {op.field_key: op for op in loadref_ops}
-    field_keys: List[str] = [op.field_key for op in loadref_ops]
+    op_by_field_key: dict[str, LoadRefOperatorIr] = {op.field_key: op for op in loadref_ops}
+    field_keys: list[str] = [op.field_key for op in loadref_ops]
 
     deps = _build_ref_deps(plan)
     layers = _build_layers(field_keys, deps=deps)
 
-    sources: Dict[str, SourceIr] = {}
+    sources: dict[str, SourceIr] = {}
     for src, _items in plan.ref_loader_sequence:
         sources[str(src.source_id)] = src
 
-    layer_items: List[Dict[str, Any]] = []
+    layer_items: list[dict[str, Any]] = []
     for layer_index, layer_field_keys in enumerate(layers):
-        layer_ops: List[LoadRefOperatorIr] = []
+        layer_ops: list[LoadRefOperatorIr] = []
         for key in layer_field_keys:
             layer_ops.append(op_by_field_key[key])
 
         rows_barrier = any(has_rows_binding(op.lookup_steps, sources) for op in layer_ops)
 
-        groups: Dict[RelationSignature, _VizTask] = {}
-        group_order: List[RelationSignature] = []
+        groups: dict[RelationSignature, _VizTask] = {}
+        group_order: list[RelationSignature] = []
 
         for op in layer_ops:
             sig = build_relation_signature(op.lookup_steps, sources)
@@ -103,7 +103,7 @@ def build_viz_schedule_plan(
             if item is None:
                 chain = [step[0] for step in sig]
                 new_item: _VizTask = {
-                    "task_id": "t{}".format(len(group_order)),
+                    "task_id": f"t{len(group_order)}",
                     "chain": chain,
                     "fields": [],
                     "rows_binding": bool(has_rows_binding(op.lookup_steps, sources)),

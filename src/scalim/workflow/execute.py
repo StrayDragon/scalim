@@ -5,8 +5,10 @@ import sys
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, TypeGuard, cast
 
 from .._internal.utils.json_like import JsonLike
 from .._internal.utils.json_like import ensure_json_like as _ensure_json_like_ssot
@@ -45,8 +47,6 @@ from ..spec.ir._workflow import (
     WriteSheetNodeIr,
 )
 from ..typedefs import FailurePolicy, RuntimeValue, parse_failure_policy
-from ..vendor.compact.typing_extensionsx import TypeGuard
-from ..vendor.dataclassesx import dataclass, replace
 from . import input_artifacts as _input_artifacts_module
 from . import resource_defs as _resource_defs_module
 from . import resource_lifecycle as _resource_lifecycle_module
@@ -94,9 +94,9 @@ def ensure_json_like(value: RuntimeValue, *, path: str) -> JsonLike:
 
 
 class WorkflowCtxStore:
-    _visible_by_consumer_node_id: Dict[str, FrozenSet[str]]
-    _values_by_producer_node_id: Dict[str, Dict[str, JsonLike]]
-    _owner_thread_id: Optional[int]
+    _visible_by_consumer_node_id: dict[str, frozenset[str]]
+    _values_by_producer_node_id: dict[str, dict[str, JsonLike]]
+    _owner_thread_id: int | None
 
     def __init__(self, workflow_ir: WorkflowIr) -> None:
         visibility = WorkflowVisibilityIndex.from_workflow_ir(workflow_ir)
@@ -109,7 +109,7 @@ class WorkflowCtxStore:
             msg = "WorkflowCtxStore write must be called from controller thread"
             raise RuntimeError(msg)
 
-    def visible_producer_node_ids(self, consumer_node_id: str) -> FrozenSet[str]:
+    def visible_producer_node_ids(self, consumer_node_id: str) -> frozenset[str]:
         return self._visible_by_consumer_node_id.get(str(consumer_node_id), frozenset())
 
     def publish_default_summary(self, producer_node_id: str, result: ExecutionResult) -> None:
@@ -134,31 +134,31 @@ class WorkflowCtxStore:
         ctx_key = str(key)
 
         if producer == consumer:
-            msg = "$ctx does not allow node=self (node_id={})".format(consumer)
+            msg = f"$ctx does not allow node=self (node_id={consumer})"
             raise ScalimWorkflowConfigError(msg, path=path)
 
         visible = self.visible_producer_node_ids(consumer)
         if producer not in visible:
-            msg = "ctx key '{}' from node '{}' is not visible to node '{}' (declare depends_on)".format(ctx_key, producer, consumer)
+            msg = f"ctx key '{ctx_key}' from node '{producer}' is not visible to node '{consumer}' (declare depends_on)"
             raise ScalimWorkflowConfigError(msg, path=path)
 
         by_key = self._values_by_producer_node_id.get(producer) or {}
         if ctx_key not in by_key:
-            msg = "Unknown ctx key '{}' for node '{}'".format(ctx_key, producer)
+            msg = f"Unknown ctx key '{ctx_key}' for node '{producer}'"
             raise ScalimWorkflowConfigError(msg, path=path)
         return by_key[ctx_key]
 
 
-def _is_list(value: RuntimeValue) -> TypeGuard[List[RuntimeValue]]:
+def _is_list(value: RuntimeValue) -> TypeGuard[list[RuntimeValue]]:
     return isinstance(value, list)
 
 
-def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[str, RuntimeValue]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[dict[str, RuntimeValue]]:
     return isinstance(value, dict)
 
 
-def iter_ctx_directives(value: RuntimeValue, *, path: str) -> List[Tuple[str, str]]:
-    out: List[Tuple[str, str]] = []
+def iter_ctx_directives(value: RuntimeValue, *, path: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
     if _is_dict(value):
         mapping = value
         if len(mapping) == 1 and "$ctx" in mapping:
@@ -179,13 +179,13 @@ def iter_ctx_directives(value: RuntimeValue, *, path: str) -> List[Tuple[str, st
             out.append((node_id, ctx_key))
             return out
         for raw_key, raw_value in mapping.items():
-            child_path = "{}.{}".format(path, str(raw_key))
+            child_path = f"{path}.{raw_key!s}"
             out.extend(iter_ctx_directives(raw_value, path=child_path))
         return out
 
     if _is_list(value):
         for idx, item in enumerate(value):
-            child_path = "{}.{}".format(path, idx)
+            child_path = f"{path}.{idx}"
             out.extend(iter_ctx_directives(item, path=child_path))
     return out
 
@@ -211,15 +211,15 @@ def render_ctx_directives(value: RuntimeValue, *, consumer_node_id: str, ctx_sto
             value = ctx_store.resolve(str(consumer_node_id), node=node_id, key=ctx_key, path=path)
             return ensure_json_like(value, path=path)
 
-        out: Dict[str, RuntimeValue] = {}
+        out: dict[str, RuntimeValue] = {}
         for raw_key, raw_value in mapping.items():
-            child_path = "{}.{}".format(path, str(raw_key))
+            child_path = f"{path}.{raw_key!s}"
             out[raw_key] = render_ctx_directives(raw_value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=child_path)
         return out
 
     if _is_list(value):
         return [
-            render_ctx_directives(item, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path="{}.{}".format(path, idx))
+            render_ctx_directives(item, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=f"{path}.{idx}")
             for idx, item in enumerate(value)
         ]
 
@@ -227,17 +227,17 @@ def render_ctx_directives(value: RuntimeValue, *, consumer_node_id: str, ctx_sto
 
 
 def _render_workflow_init_vars(
-    init_vars: Optional[Dict[str, RuntimeValue]],
+    init_vars: dict[str, RuntimeValue] | None,
     *,
     consumer_node_id: str,
     ctx_store: WorkflowCtxStore,
     path_prefix: str,
-) -> Dict[str, JsonLike]:
+) -> dict[str, JsonLike]:
     if init_vars is None:
         return {}
-    out: Dict[str, JsonLike] = {}
+    out: dict[str, JsonLike] = {}
     for key, value in init_vars.items():
-        item_path = "{}.{}".format(path_prefix, key)
+        item_path = f"{path_prefix}.{key}"
         rendered = render_ctx_directives(value, consumer_node_id=consumer_node_id, ctx_store=ctx_store, path=item_path)
         out[str(key)] = ensure_json_like(rendered, path=item_path)
     return out
@@ -253,18 +253,18 @@ def _validate_workflow_ctx_refs(workflow_ir: WorkflowIr, *, ctx_store: WorkflowC
         if not init_vars:
             continue
         visible = ctx_store.visible_producer_node_ids(node_id)
-        prefix = "workflow.runs.{}.init_vars".format(int(node.decl_order))
+        prefix = f"workflow.runs.{int(node.decl_order)}.init_vars"
         for key, value in init_vars.items():
-            item_path = "{}.{}".format(prefix, key)
+            item_path = f"{prefix}.{key}"
             for ref_node_id, _ref_key in iter_ctx_directives(value, path=item_path):
                 if ref_node_id == node_id:
-                    msg = "$ctx does not allow node=self (node_id={})".format(node_id)
+                    msg = f"$ctx does not allow node=self (node_id={node_id})"
                     raise ScalimWorkflowConfigError(msg, path=item_path)
                 if ref_node_id not in node_ids:
-                    msg = "Unknown ctx node '{}'".format(ref_node_id)
+                    msg = f"Unknown ctx node '{ref_node_id}'"
                     raise ScalimWorkflowConfigError(msg, path=item_path)
                 if ref_node_id not in visible:
-                    msg = "ctx reference to node '{}' is not visible to node '{}' (declare depends_on)".format(ref_node_id, node_id)
+                    msg = f"ctx reference to node '{ref_node_id}' is not visible to node '{node_id}' (declare depends_on)"
                     raise ScalimWorkflowConfigError(msg, path=item_path)
 
 
@@ -273,7 +273,7 @@ class ScalimWorkflowRunFailedError(ScalimWorkflowError):
     demand_path: str
 
     def __init__(self, message: str, *, run_id: str, demand_path: str) -> None:
-        super(ScalimWorkflowRunFailedError, self).__init__(message)
+        super().__init__(message)
         self.run_id = str(run_id)
         self.demand_path = str(demand_path)
 
@@ -282,29 +282,29 @@ class ScalimWorkflowRunFailedError(ScalimWorkflowError):
 class _PreparedWorkflowRun:
     workflow_path: str
     workflow_exec_id: str
-    workflow_components: Tuple[Any, ...]
+    workflow_components: tuple[Any, ...]
     workflow_ir: WorkflowIr
     artifacts_dir: WorkflowArtifactsDirectory
     ctx_store: WorkflowCtxStore
     max_concurrency: int
     failure_policy: str
     workflow_wall_start_ts: float
-    bundle_viz_base_config: Optional[VizObserverConfig]
+    bundle_viz_base_config: VizObserverConfig | None
     workflow_observer_manager: ObserverManager
-    workflow_viz_observer: Optional[WorkflowVizObserver]
+    workflow_viz_observer: WorkflowVizObserver | None
     workflow_instrumentation: InstrumentationHub
-    workflow_cache_pool: Optional[WorkflowCachePool]
+    workflow_cache_pool: WorkflowCachePool | None
     resource_manager: WorkflowResourceManager
     resource_lifecycle: WorkflowResourceLifecycle
-    write_output_ids_by_run_id: Dict[str, FrozenSet[str]]
-    write_consumers_remaining_by_output_key: Dict[Tuple[str, str], int]
-    main_rows_consumers_remaining_by_run_id: Dict[str, int]
+    write_output_ids_by_run_id: dict[str, frozenset[str]]
+    write_consumers_remaining_by_output_key: dict[tuple[str, str], int]
+    main_rows_consumers_remaining_by_run_id: dict[str, int]
     capture_observability: bool
-    workflow_replay_instrumentation: Optional[InstrumentationHub]
-    captured_demand_events_by_node_id: Dict[str, List[Event]]
-    captured_demand_hook_events_by_node_id: Dict[str, List[HookRecordedEvent]]
-    captured_demand_viz_observer_by_node_id: Dict[str, Optional[Observer]]
-    captured_demand_request_by_node_id: Dict[str, ExecutionRequest]
+    workflow_replay_instrumentation: InstrumentationHub | None
+    captured_demand_events_by_node_id: dict[str, list[Event]]
+    captured_demand_hook_events_by_node_id: dict[str, list[HookRecordedEvent]]
+    captured_demand_viz_observer_by_node_id: dict[str, Observer | None]
+    captured_demand_request_by_node_id: dict[str, ExecutionRequest]
 
 
 def _build_workflow_instrumentation(
@@ -312,9 +312,9 @@ def _build_workflow_instrumentation(
     workflow_exec_id: str,
     workflow_path: str,
     workflow_ir: WorkflowIr,
-    components: Optional[Sequence[Any]],
-    bundle_viz_base_config: Optional[VizObserverConfig],
-) -> Tuple[ObserverManager, Optional[WorkflowVizObserver], InstrumentationHub]:
+    components: Sequence[Any] | None,
+    bundle_viz_base_config: VizObserverConfig | None,
+) -> tuple[ObserverManager, WorkflowVizObserver | None, InstrumentationHub]:
     # 工作流层事件:复用 `hooks`/`observers` 分发通道,并以 `workflow_exec_id` 作为 `run_id` 分区.
     component_observers, component_hooks = split_components(components)
     workflow_observer_manager = Observability().build_manager(run_id=workflow_exec_id)
@@ -322,7 +322,7 @@ def _build_workflow_instrumentation(
         for observer in component_observers:
             workflow_observer_manager.register(observer)
 
-        workflow_viz_observer: Optional[WorkflowVizObserver] = None
+        workflow_viz_observer: WorkflowVizObserver | None = None
         if bundle_viz_base_config is not None:
             workflow_viz_config = replace(bundle_viz_base_config, run_id="workflow")
             workflow_snapshot = build_workflow_viz_graph_snapshot(
@@ -354,9 +354,9 @@ def _maybe_build_workflow_cache_pool(
     workflow_exec_id: str,
     workflow_ir: WorkflowIr,
     workflow_instrumentation: InstrumentationHub,
-    logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]],
-    consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]],
-) -> Optional[WorkflowCachePool]:
+    logical_keys_by_node_id: dict[str, frozenset[tuple[str, str]]] | None,
+    consumers_by_logical_key: dict[tuple[str, str], frozenset[str]] | None,
+) -> WorkflowCachePool | None:
     cache_pool_ir = workflow_ir.options.cache_pool
     if cache_pool_ir is None:
         return None
@@ -373,16 +373,16 @@ def _maybe_build_workflow_cache_pool(
     )
 
 
-def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, FrozenSet[str]]:
-    tmp_write_output_ids: Dict[str, Set[str]] = {}
+def _build_write_output_ids_by_run_id(workflow_ir: WorkflowIr) -> dict[str, frozenset[str]]:
+    tmp_write_output_ids: dict[str, set[str]] = {}
     for node in workflow_ir.nodes:
         if isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
             tmp_write_output_ids.setdefault(str(node.input_node_id), set()).add(str(node.input_output_id))
     return {run_id: frozenset(sorted(ids)) for run_id, ids in tmp_write_output_ids.items()}
 
 
-def _build_write_consumers_remaining_by_output_key(workflow_ir: WorkflowIr) -> Dict[Tuple[str, str], int]:
-    counts: Dict[Tuple[str, str], int] = {}
+def _build_write_consumers_remaining_by_output_key(workflow_ir: WorkflowIr) -> dict[tuple[str, str], int]:
+    counts: dict[tuple[str, str], int] = {}
     for node in workflow_ir.nodes:
         if isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
             key = (str(node.input_node_id), str(node.input_output_id))
@@ -390,8 +390,8 @@ def _build_write_consumers_remaining_by_output_key(workflow_ir: WorkflowIr) -> D
     return counts
 
 
-def _build_main_rows_consumers_remaining_by_run_id(workflow_ir: WorkflowIr) -> Dict[str, int]:
-    counts: Dict[str, int] = {}
+def _build_main_rows_consumers_remaining_by_run_id(workflow_ir: WorkflowIr) -> dict[str, int]:
+    counts: dict[str, int] = {}
     for node in workflow_ir.nodes:
         if not isinstance(node, WorkflowNodeIr):
             continue
@@ -406,10 +406,10 @@ def _prepare_workflow_run_ir(
     workflow_path: str,
     workflow_ir: WorkflowIr,
     *,
-    components: Optional[Sequence[Any]],
-    bundle_viz_base_config: Optional[VizObserverConfig],
-    cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]],
-    cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]],
+    components: Sequence[Any] | None,
+    bundle_viz_base_config: VizObserverConfig | None,
+    cache_pool_logical_keys_by_node_id: dict[str, frozenset[tuple[str, str]]] | None,
+    cache_pool_consumers_by_logical_key: dict[tuple[str, str], frozenset[str]] | None,
 ) -> _PreparedWorkflowRun:
     workflow_exec_id = generate_run_id(prefix="wf")
     artifacts_dir = WorkflowArtifactsDirectory(workflow_ir)
@@ -420,8 +420,8 @@ def _prepare_workflow_run_ir(
     failure_policy = parse_failure_policy(workflow_ir.options.failure_policy, label="workflow.options.failure_policy")
     workflow_wall_start_ts = time.time()
 
-    workflow_observer_manager: Optional[ObserverManager] = None
-    workflow_cache_pool: Optional[WorkflowCachePool] = None
+    workflow_observer_manager: ObserverManager | None = None
+    workflow_cache_pool: WorkflowCachePool | None = None
     try:
         workflow_observer_manager, workflow_viz_observer, workflow_instrumentation = _build_workflow_instrumentation(
             workflow_exec_id=workflow_exec_id,
@@ -433,7 +433,7 @@ def _prepare_workflow_run_ir(
 
         component_observers, component_hooks = split_components(components)
         capture_observability = int(max_concurrency) > 1 and bool(component_observers or component_hooks)
-        workflow_replay_instrumentation: Optional[InstrumentationHub] = None
+        workflow_replay_instrumentation: InstrumentationHub | None = None
         if capture_observability:
             workflow_replay_instrumentation = workflow_instrumentation
             capture_hook_manager = HookCaptureManager(workflow_instrumentation.hook_manager)
@@ -531,11 +531,11 @@ def _compile_demand_node(
     workflow_exec_id: str,
     ctx_store: WorkflowCtxStore,
     compile_demand_fn: Callable[..., Any],
-    bundle_viz_base_config: Optional[VizObserverConfig],
-    write_output_ids_by_run_id: Dict[str, FrozenSet[str]],
-    main_rows_consumers_remaining_by_run_id: Dict[str, int],
+    bundle_viz_base_config: VizObserverConfig | None,
+    write_output_ids_by_run_id: dict[str, frozenset[str]],
+    main_rows_consumers_remaining_by_run_id: dict[str, int],
     artifacts_dir: WorkflowArtifactsDirectory,
-) -> Tuple[Any, ExecutionRequest]:
+) -> tuple[Any, ExecutionRequest]:
     node_id = str(node.node_id)
     demand_path = str(node.demand_path or "")
 
@@ -543,7 +543,7 @@ def _compile_demand_node(
         node.init_vars,
         consumer_node_id=node_id,
         ctx_store=ctx_store,
-        path_prefix="workflow.runs.{}.init_vars".format(int(node.decl_order)),
+        path_prefix=f"workflow.runs.{int(node.decl_order)}.init_vars",
     )
 
     managed_output_ids = write_output_ids_by_run_id.get(node_id)
@@ -572,10 +572,10 @@ def _compile_demand_node(
         try:
             typed_rows_obj = artifacts_dir.get(str(node_id), producer_run_id, "in_memory_rows")
         except ValueError as exc:
-            path = "workflow.runs.{}.main_rows_from_run_id".format(int(node.decl_order))
+            path = f"workflow.runs.{int(node.decl_order)}.main_rows_from_run_id"
             raise ScalimWorkflowConfigError(str(exc), path=path) from exc
         if not isinstance(typed_rows_obj, InMemoryRows):
-            msg = "Missing workflow-managed typed rows artifact: producer_node_id={!r}".format(producer_run_id)
+            msg = f"Missing workflow-managed typed rows artifact: producer_node_id={producer_run_id!r}"
             raise ScalimWorkflowWriteError(msg)
         overrides = replace(overrides, main_rows=iter_in_memory_rows_as_main_rows(typed_rows_obj))
 
@@ -587,9 +587,9 @@ def _execute_workflow_run(
     prepared: _PreparedWorkflowRun,
     *,
     compile_demand_fn: Callable[..., Any],
-    build_demand_run_result_fn: Optional[Callable[..., Any]],
+    build_demand_run_result_fn: Callable[..., Any] | None,
     run_ir_fn: Callable[..., ExecutionResult],
-) -> Tuple[List[WorkflowRunOutcome], Optional[WorkflowRunOutcome], Optional[BaseException]]:
+) -> tuple[list[WorkflowRunOutcome], WorkflowRunOutcome | None, BaseException | None]:
     max_concurrency = int(prepared.max_concurrency)
     failure_policy = prepared.failure_policy
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_concurrency) as executor:
@@ -650,7 +650,7 @@ def _report_workflow_viz_finished(prepared: _PreparedWorkflowRun) -> None:
             workflow_yaml_path=prepared.workflow_path,
             base_config=prepared.bundle_viz_base_config,
         )
-        replays: List[str] = []
+        replays: list[str] = []
         for node in prepared.workflow_ir.nodes:
             if not isinstance(node, WorkflowNodeIr):
                 continue
@@ -683,8 +683,8 @@ def _auto_write_workflow_run_stats_siblings(prepared: _PreparedWorkflowRun) -> N
     `workflow_components`),通过保留 `demand` `request` 并在 `teardown` 读取其
     `VizObserverConfig` / 累计器实例完成.
     """
-    observers: List[Any] = []
-    extra_dirs: List[str] = []
+    observers: list[Any] = []
+    extra_dirs: list[str] = []
     manager = prepared.workflow_observer_manager
     _manager_observers = getattr(manager, "observers", None)  # pragma: allow-dynattr optional-interface: ObserverManager.observers
     observers.extend(list(_manager_observers or []))
@@ -731,14 +731,14 @@ def run_workflow_ir(
     workflow_ir: WorkflowIr,
     *,
     compile_demand_fn: Callable[..., Any],
-    build_demand_run_result_fn: Optional[Callable[..., Any]] = None,
-    run_ir_fn: Optional[Callable[..., ExecutionResult]] = None,
-    components: Optional[Sequence[Any]] = None,
-    bundle_viz_base_config: Optional[VizObserverConfig] = None,
-    cache_pool_logical_keys_by_node_id: Optional[Dict[str, FrozenSet[Tuple[str, str]]]] = None,
-    cache_pool_consumers_by_logical_key: Optional[Dict[Tuple[str, str], FrozenSet[str]]] = None,
+    build_demand_run_result_fn: Callable[..., Any] | None = None,
+    run_ir_fn: Callable[..., ExecutionResult] | None = None,
+    components: Sequence[Any] | None = None,
+    bundle_viz_base_config: VizObserverConfig | None = None,
+    cache_pool_logical_keys_by_node_id: dict[str, frozenset[tuple[str, str]]] | None = None,
+    cache_pool_consumers_by_logical_key: dict[tuple[str, str], frozenset[str]] | None = None,
 ) -> WorkflowResult:
-    prepared: Optional[_PreparedWorkflowRun] = None
+    prepared: _PreparedWorkflowRun | None = None
     resources_finalized = False
     try:
         prepared = _prepare_workflow_run_ir(
@@ -769,7 +769,7 @@ def run_workflow_ir(
 
         result = WorkflowResult(outcomes=tuple(final_outcomes))
         if failed is not None and prepared.failure_policy == FailurePolicy.ALL_FAIL:
-            msg = "工作流运行失败(run_id={}, demand_path={})".format(failed.run_id, failed.demand_path)
+            msg = f"工作流运行失败(run_id={failed.run_id}, demand_path={failed.demand_path})"
             exc = ScalimWorkflowRunFailedError(msg, run_id=failed.run_id, demand_path=failed.demand_path)
             if failed_exc is not None:
                 exc.__cause__ = failed_exc

@@ -28,9 +28,10 @@ assert report.all_passed, report.summary
 import csv
 import tempfile
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
+from typing import Any
 
 from scalim.execution.engine import ScalimEngine
 from scalim.planning import PlanBuilder
@@ -65,7 +66,7 @@ class FieldStats:
     total_count: int = 0
     null_count: int = 0
     distinct_count: int = 0
-    sample_values: List[Any] = field(default_factory=list)
+    sample_values: list[Any] = field(default_factory=list)
 
     @property
     def null_rate(self) -> float:
@@ -82,7 +83,7 @@ class ComparisonStats:
     both_null_count: int = 0
     expected_null_count: int = 0
     actual_null_count: int = 0
-    sample_mismatches: List[Dict[str, Any]] = field(default_factory=list)
+    sample_mismatches: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def match_rate(self) -> float:
@@ -97,13 +98,13 @@ class VerificationResult:
     passed: bool
     total_rows: int
     checked_rows: int
-    mismatches: List[Dict[str, Any]]
+    mismatches: list[dict[str, Any]]
     summary: str
-    field_stats: Dict[str, ComparisonStats] = field(default_factory=dict)
+    field_stats: dict[str, ComparisonStats] = field(default_factory=dict)
 
     def __str__(self) -> str:
         status = "✅ PASSED" if self.passed else "❌ FAILED"
-        return "{} - {}/{} rows, {} mismatches\n{}".format(status, self.checked_rows, self.total_rows, len(self.mismatches), self.summary)
+        return f"{status} - {self.checked_rows}/{self.total_rows} rows, {len(self.mismatches)} mismatches\n{self.summary}"
 
     def __bool__(self) -> bool:
         return self.passed
@@ -117,9 +118,8 @@ class VerificationResult:
         for fname, stats in self.field_stats.items():
             if stats.mismatch_count > 0:
                 lines.append(
-                    "  {}: {}/{} mismatches ({:.1f}% match rate)".format(
-                        fname, stats.mismatch_count, stats.match_count + stats.mismatch_count, stats.match_rate * 100
-                    )
+                    f"  {fname}: {stats.mismatch_count}/{stats.match_count + stats.mismatch_count} mismatches ({stats.match_rate * 100:.1f}% match "  # noqa: E501
+                    f"rate)"
                 )
         return "\n".join(lines) if lines else "All fields matched"
 
@@ -132,17 +132,17 @@ class DetailedVerificationReport:
     row_count_match: bool
     expected_rows: int
     actual_rows: int
-    field_results: Dict[str, VerificationResult]
-    relation_checks: List[Dict[str, str]]
-    performance_stats: Dict[str, float]
+    field_results: dict[str, VerificationResult]
+    relation_checks: list[dict[str, str]]
+    performance_stats: dict[str, float]
     summary: str
 
     def __str__(self) -> str:
         status = "✅ ALL PASSED" if self.all_passed else "❌ SOME FAILED"
         lines = [
             status,
-            "Rows: expected={}, actual={}, match={}".format(self.expected_rows, self.actual_rows, self.row_count_match),
-            "Fields checked: {}".format(len(self.field_results)),
+            f"Rows: expected={self.expected_rows}, actual={self.actual_rows}, match={self.row_count_match}",
+            f"Fields checked: {len(self.field_results)}",
         ]
         failed_fields = [f for f, r in self.field_results.items() if not r.passed]
         if failed_fields:
@@ -161,8 +161,8 @@ class _PythonJoinEngine:
     """
 
     def __init__(self) -> None:
-        self._cache: Dict[str, Any] = {}
-        self._load_stats: Dict[str, int] = {}
+        self._cache: dict[str, Any] = {}
+        self._load_stats: dict[str, int] = {}
 
     def _load(self, key: str, loader: Callable[[], Any]) -> Any:
         if key not in self._cache:
@@ -174,15 +174,15 @@ class _PythonJoinEngine:
             self._load_stats[key] = len(self._cache[key]) if hasattr(self._cache[key], "__len__") else 0
         return self._cache[key]
 
-    def _lookup(self, row: Dict[str, Any], fk: str, table: Dict[Any, Dict[str, Any]], field: str) -> Any:
+    def _lookup(self, row: dict[str, Any], fk: str, table: dict[Any, dict[str, Any]], field: str) -> Any:
         fk_val = row.get(fk)
         if fk_val is None:
             return None
         target = table.get(fk_val)
         return target.get(field) if target else None
 
-    def _lookup_multi(self, row: Dict[str, Any], path: List[Tuple[str, Dict[Any, Dict[str, Any]]]], field: str) -> Any:
-        cur: Optional[Dict[str, Any]] = row
+    def _lookup_multi(self, row: dict[str, Any], path: list[tuple[str, dict[Any, dict[str, Any]]]], field: str) -> Any:
+        cur: dict[str, Any] | None = row
         for fk, table in path:
             if cur is None:
                 return None
@@ -192,7 +192,7 @@ class _PythonJoinEngine:
             cur = table.get(fk_val)
         return cur.get(field) if cur else None
 
-    def _lookup_composite(self, row: Dict[str, Any], fks: Tuple[str, ...], table: Dict[Tuple[Any, ...], Dict[str, Any]], field: str) -> Any:
+    def _lookup_composite(self, row: dict[str, Any], fks: tuple[str, ...], table: dict[tuple[Any, ...], dict[str, Any]], field: str) -> Any:
         vals = []
         for fk in fks:
             v = row.get(fk)
@@ -202,10 +202,10 @@ class _PythonJoinEngine:
         target = table.get(tuple(vals))
         return target.get(field) if target else None
 
-    def get_load_stats(self) -> Dict[str, int]:
+    def get_load_stats(self) -> dict[str, int]:
         return dict(self._load_stats)
 
-    def build_expected(self, order: Dict[str, Any]) -> Dict[str, Any]:
+    def build_expected(self, order: dict[str, Any]) -> dict[str, Any]:
         customers = self._load("customers", load_customers)
         products = self._load("products", load_products)
         categories = self._load("categories", load_categories)
@@ -216,7 +216,7 @@ class _PythonJoinEngine:
         payment_methods = self._load("payment_methods", load_payment_methods)
         logistics = self._load("logistics", load_logistics)
 
-        r: Dict[str, Any] = {}
+        r: dict[str, Any] = {}
 
         # 基础字段 (主表直接字段)
         for f in ["order_id", "quantity", "unit_price", "discount_rate", "order_date"]:
@@ -272,20 +272,20 @@ class _PythonJoinEngine:
 
         return r
 
-    def build_all_expected(self) -> List[Dict[str, Any]]:
+    def build_all_expected(self) -> list[dict[str, Any]]:
         orders = self._load("orders", load_orders)
         return [self.build_expected(o) for o in orders]
 
-    def get_expected_stats(self) -> Dict[str, FieldStats]:
+    def get_expected_stats(self) -> dict[str, FieldStats]:
         all_expected = self.build_all_expected()
 
-        stats: Dict[str, FieldStats] = {}
+        stats: dict[str, FieldStats] = {}
         if not all_expected:
             return stats
 
         for field_name in all_expected[0]:
             fs = FieldStats(field_name=field_name)
-            values: List[Any] = []
+            values: list[Any] = []
             for row in all_expected:
                 val = row.get(field_name)
                 fs.total_count += 1
@@ -315,7 +315,7 @@ def _values_equal(expected: Any, actual: Any, tolerance: float = 0.01) -> bool:
 
 def verify_scalim_output(
     scalim_output: Sequence[RowData],
-    fields_to_check: Optional[Sequence[str]] = None,
+    fields_to_check: Sequence[str] | None = None,
     tolerance: float = 0.01,
     max_mismatches: int = 10,
     *,
@@ -339,8 +339,8 @@ def verify_scalim_output(
     expected_by_pk = {r["order_id"]: r for r in expected_results}
     actual_by_pk = {r["order_id"]: r for r in scalim_output if "order_id" in r}
 
-    mismatches: List[Dict[str, Any]] = []
-    field_stats: Dict[str, ComparisonStats] = {}
+    mismatches: list[dict[str, Any]] = []
+    field_stats: dict[str, ComparisonStats] = {}
     checked = 0
 
     for pk, actual in actual_by_pk.items():
@@ -381,13 +381,13 @@ def verify_scalim_output(
 
     passed = len(mismatches) == 0
     if passed:
-        summary = "All {} rows validated successfully.".format(checked)
+        summary = f"All {checked} rows validated successfully."
     else:
-        lines = ["{} mismatches found:".format(len(mismatches))]
+        lines = [f"{len(mismatches)} mismatches found:"]
         for m in mismatches[:_SUMMARY_MISMATCH_LIMIT]:
             lines.append("  PK={}, {}: {} != {}".format(m["pk"], m["field"], m["expected"], m["actual"]))
         if len(mismatches) > _SUMMARY_MISMATCH_LIMIT:
-            lines.append("  ... and {} more".format(len(mismatches) - _SUMMARY_MISMATCH_LIMIT))
+            lines.append(f"  ... and {len(mismatches) - _SUMMARY_MISMATCH_LIMIT} more")
         summary = "\n".join(lines)
 
     total_rows = len(scalim_output)
@@ -396,7 +396,7 @@ def verify_scalim_output(
     )
 
 
-_DEFAULT_OUTPUT_CSV_INT_FIELDS: FrozenSet[str] = frozenset(
+_DEFAULT_OUTPUT_CSV_INT_FIELDS: frozenset[str] = frozenset(
     [
         "order_id",
         "quantity",
@@ -405,7 +405,7 @@ _DEFAULT_OUTPUT_CSV_INT_FIELDS: FrozenSet[str] = frozenset(
     ]
 )
 
-_DEFAULT_OUTPUT_CSV_FLOAT_FIELDS: FrozenSet[str] = frozenset(
+_DEFAULT_OUTPUT_CSV_FLOAT_FIELDS: frozenset[str] = frozenset(
     [
         "unit_price",
         "discount_rate",
@@ -426,8 +426,8 @@ def _coerce_output_csv_value(
     field_id: str,
     raw: object,
     *,
-    int_fields: FrozenSet[str],
-    float_fields: FrozenSet[str],
+    int_fields: frozenset[str],
+    float_fields: frozenset[str],
 ) -> Any:
     if raw is None:
         return None
@@ -452,9 +452,9 @@ def _coerce_output_csv_value(
 def read_output_csv_rows(
     path: object,
     *,
-    int_fields: Optional[Sequence[str]] = None,
-    float_fields: Optional[Sequence[str]] = None,
-) -> List[RowData]:
+    int_fields: Sequence[str] | None = None,
+    float_fields: Sequence[str] | None = None,
+) -> list[RowData]:
     """读取 scalim 输出的 CSV rows,并做最小类型还原.
 
     说明:
@@ -466,14 +466,14 @@ def read_output_csv_rows(
 
     p = Path(str(path))
     if not p.exists():
-        msg = "Missing output CSV: {!r}".format(str(p))
+        msg = f"Missing output CSV: {str(p)!r}"
         raise FileNotFoundError(msg)
 
-    rows: List[RowData] = []
+    rows: list[RowData] = []
     with p.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
-            out: Dict[str, Any] = {}
+            out: dict[str, Any] = {}
             for k, v in (row or {}).items():
                 key = str(k or "").strip()
                 if not key:
@@ -491,17 +491,14 @@ def read_output_csv_rows(
 def verify_scalim_output_csv(
     output_csv_path: object,
     *,
-    fields_to_check: Optional[Sequence[str]] = None,
+    fields_to_check: Sequence[str] | None = None,
     tolerance: float = 0.01,
 ) -> VerificationResult:
     """对拍验证: 从 CSV 输出读取 rows 并用纯 Python 对照组验证."""
     rows = read_output_csv_rows(output_csv_path)
     result = verify_scalim_output(rows, fields_to_check=fields_to_check, tolerance=tolerance)
     if rows and result.checked_rows != len(rows):
-        summary = "PK mismatch: checked_rows={} != total_rows={} (did you forget to coerce order_id to int?)".format(
-            result.checked_rows,
-            len(rows),
-        )
+        summary = f"PK mismatch: checked_rows={result.checked_rows} != total_rows={len(rows)} (did you forget to coerce order_id to int?)"
         return VerificationResult(
             passed=False,
             total_rows=len(rows),
@@ -523,19 +520,19 @@ class DetailedVerification:
     - 性能统计
     """
 
-    def __init__(self, scalim_output: Sequence[RowData], fields_to_check: Optional[Sequence[str]] = None, tolerance: float = 0.01) -> None:
+    def __init__(self, scalim_output: Sequence[RowData], fields_to_check: Sequence[str] | None = None, tolerance: float = 0.01) -> None:
         self.scalim_output = scalim_output
         self.fields_to_check = fields_to_check
         self.tolerance = tolerance
         self._engine = _PythonJoinEngine()
-        self._expected_results: Optional[List[Dict[str, Any]]] = None
+        self._expected_results: list[dict[str, Any]] | None = None
 
-    def _get_expected(self) -> List[Dict[str, Any]]:
+    def _get_expected(self) -> list[dict[str, Any]]:
         if self._expected_results is None:
             self._expected_results = self._engine.build_all_expected()
         return self._expected_results
 
-    def verify_row_count(self) -> Tuple[bool, int, int]:
+    def verify_row_count(self) -> tuple[bool, int, int]:
         expected = self._get_expected()
         return len(expected) == len(self.scalim_output), len(expected), len(self.scalim_output)
 
@@ -567,7 +564,7 @@ class DetailedVerification:
         full_result = verify_scalim_output(self.scalim_output, fields_to_check=check_fields, tolerance=self.tolerance, max_mismatches=100)
 
         # 从完整结果中提取每个字段的状态
-        field_results: Dict[str, VerificationResult] = {}
+        field_results: dict[str, VerificationResult] = {}
         mismatched_fields = {str(m.get("field")) for m in full_result.mismatches if m.get("field")}
         for fname in check_fields:
             field_passed = fname not in mismatched_fields
@@ -576,11 +573,11 @@ class DetailedVerification:
                 total_rows=full_result.total_rows,
                 checked_rows=full_result.checked_rows,
                 mismatches=[m for m in full_result.mismatches if m.get("field") == fname],
-                summary="OK" if field_passed else "Field {} has mismatches".format(fname),
+                summary="OK" if field_passed else f"Field {fname} has mismatches",
             )
 
         # 按关联类型汇总
-        relation_checks: List[Dict[str, str]] = []
+        relation_checks: list[dict[str, str]] = []
         type_mapping = {
             "basic": "基础字段",
             "single_level": "单级关联",
@@ -593,7 +590,7 @@ class DetailedVerification:
             if self.fields_to_check:
                 fields = [f for f in fields if f in self.fields_to_check]
             failed = [f for f in fields if f in mismatched_fields]
-            status = "✅ PASS" if not failed else "❌ FAIL ({} mismatches)".format(len(failed))
+            status = "✅ PASS" if not failed else f"❌ FAIL ({len(failed)} mismatches)"
             relation_checks.append({"关联类型": rtype, "状态": status})
 
         all_passed = row_match and full_result.passed
@@ -603,11 +600,11 @@ class DetailedVerification:
 
         summary_lines = []
         if not row_match:
-            summary_lines.append("Row count mismatch: expected={}, actual={}".format(expected_rows, actual_rows))
+            summary_lines.append(f"Row count mismatch: expected={expected_rows}, actual={actual_rows}")
         if mismatched_fields:
             summary_lines.append("Failed fields: {}".format(", ".join(sorted(mismatched_fields))))
         if not summary_lines:
-            summary_lines.append("All {} fields verified successfully".format(len(field_results)))
+            summary_lines.append(f"All {len(field_results)} fields verified successfully")
 
         return DetailedVerificationReport(
             all_passed=all_passed,
@@ -662,7 +659,7 @@ RELATION_CHECKS = [
 ]
 
 # 按关联类型分组的字段
-RELATION_TYPE_GROUPS: Dict[str, List[str]] = {
+RELATION_TYPE_GROUPS: dict[str, list[str]] = {
     "基础字段": ["order_id", "quantity", "unit_price", "discount_rate", "order_date"],
     "单级关联": [
         "customer_name",
@@ -685,12 +682,12 @@ RELATION_TYPE_GROUPS: Dict[str, List[str]] = {
 }
 
 
-def get_relation_check_results(result: VerificationResult) -> List[Dict[str, str]]:
+def get_relation_check_results(result: VerificationResult) -> list[dict[str, str]]:
     mismatched = {m.get("field") for m in result.mismatches if "field" in m}
     return [{"关联类型": name, "字段": field, "状态": "❌ FAIL" if field in mismatched else "✅ PASS"} for name, field in RELATION_CHECKS]
 
 
-def get_relation_type_summary(result: VerificationResult) -> List[Dict[str, str]]:
+def get_relation_type_summary(result: VerificationResult) -> list[dict[str, str]]:
     """按关联类型分组的验证结果汇总"""
     mismatched = {m.get("field") for m in result.mismatches if "field" in m}
     summary = []
@@ -698,18 +695,18 @@ def get_relation_type_summary(result: VerificationResult) -> List[Dict[str, str]
         failed = [f for f in fields if f in mismatched]
         total = len(fields)
         passed = total - len(failed)
-        status = "✅ {}/{} PASS".format(passed, total) if not failed else "❌ {}/{} FAIL: {}".format(passed, total, ", ".join(failed))
+        status = f"✅ {passed}/{total} PASS" if not failed else "❌ {}/{} FAIL: {}".format(passed, total, ", ".join(failed))
         summary.append({"关联类型": group_name, "状态": status})
     return summary
 
 
-def quick_verify(scalim_output: Sequence[RowData], fields: Optional[Sequence[str]] = None) -> bool:
+def quick_verify(scalim_output: Sequence[RowData], fields: Sequence[str] | None = None) -> bool:
     """快速验证 - 返回布尔值,适合断言使用"""
     result = verify_scalim_output(scalim_output, fields_to_check=fields)
     return result.passed
 
 
-def assert_scalim_correct(scalim_output: Sequence[RowData], fields: Optional[Sequence[str]] = None, msg: str = "") -> None:
+def assert_scalim_correct(scalim_output: Sequence[RowData], fields: Sequence[str] | None = None, msg: str = "") -> None:
     """断言 Scalim 输出正确 - 失败时抛出详细异常"""
     result = verify_scalim_output(scalim_output, fields_to_check=fields, max_mismatches=20)
     if not result.passed:
@@ -725,7 +722,7 @@ def assert_scalim_correct(scalim_output: Sequence[RowData], fields: Optional[Seq
 # ============================================================================
 
 
-def python_build_order_report(target_fields: List[str]) -> List[Dict[str, Any]]:
+def python_build_order_report(target_fields: list[str]) -> list[dict[str, Any]]:
     """纯 Python 实现订单报表构建
 
     这个函数用纯 Python 代码实现与 Scalim 相同的数据关联和计算逻辑.
@@ -758,7 +755,7 @@ def export_to_csv(data: Sequence[RowData], filepath: str, fields: Sequence[str])
         writer.writerows([dict(row) for row in data])
 
 
-def compare_csv_files(file1: str, file2: str) -> Tuple[bool, str]:
+def compare_csv_files(file1: str, file2: str) -> tuple[bool, str]:
     """对比两个 CSV 文件
 
     Returns:
@@ -771,20 +768,20 @@ def compare_csv_files(file1: str, file2: str) -> Tuple[bool, str]:
         reader2 = list(csv.DictReader(f2))
 
     if len(reader1) != len(reader2):
-        return False, "行数不同: {} vs {}".format(len(reader1), len(reader2))
+        return False, f"行数不同: {len(reader1)} vs {len(reader2)}"
 
     differences = []
-    for i, (row1, row2) in enumerate(zip(reader1, reader2)):
+    for i, (row1, row2) in enumerate(zip(reader1, reader2, strict=False)):
         for key in row1:
             v1, v2 = row1.get(key), row2.get(key)
             # 浮点数比较
             try:
                 f1, f2 = float(v1 or 0), float(v2 or 0)
                 if abs(f1 - f2) > _CSV_FLOAT_TOLERANCE:
-                    differences.append("行{} 字段{}: {} vs {}".format(i, key, v1, v2))
+                    differences.append(f"行{i} 字段{key}: {v1} vs {v2}")
             except (ValueError, TypeError):
                 if v1 != v2:
-                    differences.append("行{} 字段{}: {} vs {}".format(i, key, v1, v2))
+                    differences.append(f"行{i} 字段{key}: {v1} vs {v2}")
 
     if differences:
         return False, "发现 {} 处差异:\n{}".format(len(differences), "\n".join(differences[:10]))
@@ -805,7 +802,7 @@ class _ReverseSortValue:
 @dataclass
 class OrderByVerificationResult:
     passed: bool
-    order_by: Tuple[str, ...]
+    order_by: tuple[str, ...]
     message: str
 
 
@@ -821,7 +818,7 @@ def verify_order_by(scalim_output: Sequence[RowData], order_by: Sequence[str]) -
         descending = key.startswith("-")
         field_key = key[1:] if descending else key
 
-        def _sort_key(idx: int, *, _field_key: str = field_key, _descending: bool = descending) -> Tuple[int, Any]:
+        def _sort_key(idx: int, *, _field_key: str = field_key, _descending: bool = descending) -> tuple[int, Any]:
             value = scalim_output[idx].get(_field_key)
             if value is None:
                 return (1, 0)
@@ -836,7 +833,7 @@ def verify_order_by(scalim_output: Sequence[RowData], order_by: Sequence[str]) -
         return OrderByVerificationResult(passed=True, order_by=tuple(order_by), message="order_by matched")
 
     mismatch_at = next((idx for idx, expected_idx in enumerate(expected) if expected_idx != idx), -1)
-    message = "order_by mismatch at position {}".format(mismatch_at)
+    message = f"order_by mismatch at position {mismatch_at}"
     return OrderByVerificationResult(passed=False, order_by=tuple(order_by), message=message)
 
 
@@ -852,10 +849,10 @@ class FileComparisonResult:
 
     def __str__(self) -> str:
         status = "✅ MATCHED" if self.matched else "❌ DIFFERENT"
-        return "{}: {} 行\n{}".format(status, self.row_count, self.diff_summary)
+        return f"{status}: {self.row_count} 行\n{self.diff_summary}"
 
 
-def run_parallel_comparison(target_fields: List[str], output_dir: Optional[str] = None) -> FileComparisonResult:
+def run_parallel_comparison(target_fields: list[str], output_dir: str | None = None) -> FileComparisonResult:
     """运行并行对比测试
 
     同时用 Scalim 框架和纯 Python 实现处理相同数据,

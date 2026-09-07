@@ -1,7 +1,7 @@
-from typing import Any, ClassVar, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any, ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ...init_var_nodes import OptionalPathNode
 from ..constants import DEFAULT_OUTPUT_ENCODING, schema_meta, schema_omit, schema_ref
 from ..output_enums import (
@@ -49,7 +49,7 @@ _PATH_OR_INIT_VAR_SCHEMA = {
 @dataclass(frozen=True)
 class BookExportXlsxConfig:
     SCHEMA_NAME: ClassVar[str] = "book_export_xlsx"
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("path",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
     path: OptionalPathNode = dataclass_field(
@@ -173,7 +173,7 @@ class BookXlsxConfig:
 class BookConfig:
     SCHEMA_NAME: ClassVar[str] = "book"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
-    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
+    SCHEMA_ALL_OF: ClassVar[list[dict[str, Any]]] = [
         {
             "anyOf": [
                 {"required": ["$import"]},
@@ -192,7 +192,7 @@ class BookConfig:
         metadata=schema_omit(),
     )
 
-    export_xlsx: Optional[BookExportXlsxConfig] = dataclass_field(
+    export_xlsx: BookExportXlsxConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
@@ -202,12 +202,12 @@ class BookConfig:
         metadata=schema_omit(),
     )
 
-    write_defaults: Optional[BookWriteDefaultsConfig] = dataclass_field(
+    write_defaults: BookWriteDefaultsConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
 
-    xlsx: Optional[BookXlsxConfig] = dataclass_field(
+    xlsx: BookXlsxConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="xlsx: 统一 book identity(有 path=落盘;无 path=内存总线)",
@@ -228,7 +228,7 @@ class BookConfig:
 @dataclass(frozen=True)
 class FileConfig:
     SCHEMA_NAME: ClassVar[str] = "file"
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("csv_file",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("csv_file",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
     kind: str = dataclass_field(
@@ -246,7 +246,7 @@ class FileConfig:
         metadata=schema_omit(),
     )
 
-    csv_file: Optional["FileCsvFileConfig"] = dataclass_field(
+    csv_file: "FileCsvFileConfig | None" = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="csv_file: CSV 文件导出配置",
@@ -259,7 +259,7 @@ class FileConfig:
 @dataclass(frozen=True)
 class FileCsvFileConfig:
     SCHEMA_NAME: ClassVar[str] = "file_csv_file"
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("path",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("path",)
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
     path: OptionalPathNode = dataclass_field(
@@ -286,7 +286,7 @@ class ResourcesConfig:
     SCHEMA_NAME: ClassVar[str] = "resources"
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
 
-    books: Dict[str, BookConfig] = dataclass_field(
+    books: dict[str, BookConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             desc="books 资源映射(Excel book; key 为 book_id)",
@@ -302,7 +302,7 @@ class ResourcesConfig:
         ),
     )
 
-    files: Dict[str, FileConfig] = dataclass_field(
+    files: dict[str, FileConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             desc="files 资源映射(文件输出资源; key 为 file_id)",

@@ -17,7 +17,8 @@
 # region imports
 
 import heapq
-from typing import Callable, Dict, Generic, Hashable, Iterable, List, Optional, Sequence, Set, Tuple, TypeVar
+from collections.abc import Callable, Hashable, Iterable, Sequence
+from typing import Generic, TypeVar
 
 from ...exceptions import ScalimExecutionError
 
@@ -29,7 +30,7 @@ T = TypeVar("T", bound=Hashable)
 def _stable_tie_break_key(node: Hashable) -> str:
     if isinstance(node, str):
         return node
-    return "{}:{}".format(type(node).__name__, repr(node))
+    return f"{type(node).__name__}:{node!r}"
 
 
 class ScalimCyclicDependencyError(ScalimExecutionError):
@@ -37,7 +38,7 @@ class ScalimCyclicDependencyError(ScalimExecutionError):
 
     cycles: Sequence[Sequence[Hashable]]
 
-    def __init__(self, message: str, cycles: Optional[Sequence[Sequence[Hashable]]] = None) -> None:
+    def __init__(self, message: str, cycles: Sequence[Sequence[Hashable]] | None = None) -> None:
         super().__init__(message)
         self.cycles = cycles or []
 
@@ -47,7 +48,7 @@ def collect_dependencies(
     get_deps: Callable[[T], Iterable[T]],
     *,
     include_target: bool = True,
-) -> Set[T]:
+) -> set[T]:
     """从目标节点递归收集所有依赖.
 
     参数:
@@ -63,7 +64,7 @@ def collect_dependencies(
         - `collect_dependencies(["a"], lambda x: deps.get(x, []))`
         - `{"a", "b", "c", "d"}`
     """
-    visited: Set[T] = set()
+    visited: set[T] = set()
 
     def dfs(node: T) -> None:
         if node in visited:
@@ -85,13 +86,13 @@ def collect_dependencies(
 def detect_cycles(
     nodes: Iterable[T],
     get_deps: Callable[[T], Iterable[T]],
-) -> List[List[T]]:
+) -> list[list[T]]:
     node_set = set(nodes)
-    cycles: List[List[T]] = []
-    visited: Set[T] = set()
-    rec_stack: Set[T] = set()
+    cycles: list[list[T]] = []
+    visited: set[T] = set()
+    rec_stack: set[T] = set()
 
-    def dfs(node: T, path: List[T]) -> None:
+    def dfs(node: T, path: list[T]) -> None:
         if node not in node_set:
             return
 
@@ -122,7 +123,7 @@ def detect_cycles(
 def topological_sort(
     nodes: Iterable[T],
     get_deps: Callable[[T], Iterable[T]],
-) -> List[T]:
+) -> list[T]:
     """拓扑排序.
 
     使用卡恩算法实现, 预先构建反向依赖图以获得 O(n+e) 复杂度.
@@ -149,13 +150,13 @@ def topological_sort(
         return []
 
     ordered_nodes = sorted(node_set, key=_stable_tie_break_key)
-    node_rank: Dict[T, int] = {node: idx for idx, node in enumerate(ordered_nodes)}
+    node_rank: dict[T, int] = {node: idx for idx, node in enumerate(ordered_nodes)}
 
     # 计算入度和反向依赖 (预计算以获得 O(n+e) 复杂度)
     # 注意: 这里的"依赖"是指 A 依赖 B,则 A -> B
     # 入度是指 A 有多少个依赖; 反向依赖是指 B 被哪些节点依赖
-    in_degree: Dict[T, int] = dict.fromkeys(ordered_nodes, 0)
-    reverse_deps: Dict[T, List[T]] = {node: [] for node in ordered_nodes}
+    in_degree: dict[T, int] = dict.fromkeys(ordered_nodes, 0)
+    reverse_deps: dict[T, list[T]] = {node: [] for node in ordered_nodes}
 
     for node in ordered_nodes:
         for dep in get_deps(node):
@@ -164,9 +165,9 @@ def topological_sort(
                 in_degree[node] += 1
                 reverse_deps[dep].append(node)
 
-    ready: List[Tuple[int, T]] = [(node_rank[node], node) for node in ordered_nodes if in_degree[node] == 0]
+    ready: list[tuple[int, T]] = [(node_rank[node], node) for node in ordered_nodes if in_degree[node] == 0]
     heapq.heapify(ready)
-    result: List[T] = []
+    result: list[T] = []
 
     while ready:
         _rank, current = heapq.heappop(ready)
@@ -189,8 +190,8 @@ def topological_sort(
 def compute_levels(
     nodes: Iterable[T],
     get_deps: Callable[[T], Iterable[T]],
-    sorted_nodes: Optional[List[T]] = None,
-) -> Dict[T, int]:
+    sorted_nodes: list[T] | None = None,
+) -> dict[T, int]:
     """计算每个节点的依赖层级.
 
     层级 0 表示无依赖,层级 N 表示最长依赖链长度为 N.
@@ -212,7 +213,7 @@ def compute_levels(
         sorted_nodes = topological_sort(nodes, get_deps)
 
     node_set = set(nodes)
-    levels: Dict[T, int] = {}
+    levels: dict[T, int] = {}
 
     for node in sorted_nodes:
         deps = [d for d in get_deps(node) if d in node_set]
@@ -228,7 +229,7 @@ def compute_levels(
 def group_by_level(
     nodes: Iterable[T],
     get_deps: Callable[[T], Iterable[T]],
-) -> List[List[T]]:
+) -> list[list[T]]:
     """按依赖层级分组节点.
 
     同一层级的节点可以并行处理.
@@ -253,7 +254,7 @@ def group_by_level(
     max_level = max(levels.values()) if levels else 0
 
     # 按层级分组
-    groups: List[List[T]] = [[] for _ in range(max_level + 1)]
+    groups: list[list[T]] = [[] for _ in range(max_level + 1)]
     for node in sorted_nodes:
         level = levels[node]
         groups[level].append(node)
@@ -264,13 +265,13 @@ def group_by_level(
 class DependencyGraph(Generic[T]):
     """依赖图封装类: 提供便捷的依赖图操作接口"""
 
-    _adjacency: Dict[T, List[T]]
+    _adjacency: dict[T, list[T]]
 
     def __init__(self) -> None:
         """初始化空图"""
         self._adjacency = {}
 
-    def add_node(self, node: T, deps: Optional[Iterable[T]] = None) -> None:
+    def add_node(self, node: T, deps: Iterable[T] | None = None) -> None:
         """添加节点及其依赖.
 
         参数:
@@ -279,31 +280,31 @@ class DependencyGraph(Generic[T]):
         """
         self._adjacency[node] = list(deps) if deps else []
 
-    def get_deps(self, node: T) -> List[T]:
+    def get_deps(self, node: T) -> list[T]:
         """获取节点的依赖"""
         return self._adjacency.get(node, [])
 
-    def nodes(self) -> Set[T]:
+    def nodes(self) -> set[T]:
         """获取所有节点"""
         return set(self._adjacency.keys())
 
-    def collect_deps(self, targets: Iterable[T]) -> Set[T]:
+    def collect_deps(self, targets: Iterable[T]) -> set[T]:
         """收集目标节点的所有依赖"""
         return collect_dependencies(targets, self.get_deps)
 
-    def detect_cycles(self) -> List[List[T]]:
+    def detect_cycles(self) -> list[list[T]]:
         """检测循环依赖"""
         return detect_cycles(self._adjacency.keys(), self.get_deps)
 
-    def topological_sort(self) -> List[T]:
+    def topological_sort(self) -> list[T]:
         """拓扑排序"""
         return topological_sort(self._adjacency.keys(), self.get_deps)
 
-    def compute_levels(self) -> Dict[T, int]:
+    def compute_levels(self) -> dict[T, int]:
         """计算层级"""
         return compute_levels(self._adjacency.keys(), self.get_deps)
 
-    def group_by_level(self) -> List[List[T]]:
+    def group_by_level(self) -> list[list[T]]:
         """按层级分组"""
         return group_by_level(self._adjacency.keys(), self.get_deps)
 

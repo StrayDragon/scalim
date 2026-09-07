@@ -1,10 +1,6 @@
+from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
-    List,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
 )
 
 from ..spec.ir import DerivedFieldIr, FieldIr, SourceIr
@@ -13,9 +9,9 @@ from .plan import PlanMetadata
 
 def build_metadata(
     demand: "DemandIr",
-    required_fields: Set[str],
-    loader_sequence: Sequence[Tuple[SourceIr, List[str]]],
-    ref_loader_sequence: Sequence[Tuple[SourceIr, List[Tuple[str, Union[str, Tuple[str, ...]]]]]],
+    required_fields: set[str],
+    loader_sequence: Sequence[tuple[SourceIr, list[str]]],
+    ref_loader_sequence: Sequence[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]],
     *,
     max_depth: int,
 ) -> PlanMetadata:
@@ -31,13 +27,13 @@ def build_metadata(
             has_ref = True
             break
 
-    sources_used: Set[str] = set()
+    sources_used: set[str] = set()
     for field_key in required_fields:
         field = demand.fields.get(field_key)
         if isinstance(field, FieldIr):
             sources_used.add(field.source_id)
 
-    cached_sources: List[str] = []
+    cached_sources: list[str] = []
     for source in demand.sources.values():
         if source.is_preload_forever():
             cached_sources.append(source.source_id)

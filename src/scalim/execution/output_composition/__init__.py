@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 # 说明: 以下类型来自 `derived_outputs`,并且历史上可通过 `scalim.execution.output_composition` 导入.
 # 它们不属于本模块 `__all__`,但仍保留为稳定导入路径的一部分(避免非预期回归).
 from ..derived_outputs import AggMetricSpec as AggMetricSpec

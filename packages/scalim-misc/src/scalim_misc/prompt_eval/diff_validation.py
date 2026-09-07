@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
     from pathlib import Path
 
 _AUTOGEN_BEGIN_RE = re.compile(r"<!--\s*BEGIN AUTOGEN:([A-Za-z0-9_.-]+)\s*-->")
@@ -25,11 +26,11 @@ def read_text(path: Path) -> str:
 class Issue:
     code: str
     message: str
-    path: Optional[str] = None
-    line: Optional[int] = None
+    path: str | None = None
+    line: int | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {"code": self.code, "message": self.message}
+    def as_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"code": self.code, "message": self.message}
         if self.path is not None:
             payload["path"] = self.path
         if self.line is not None:
@@ -41,28 +42,28 @@ class Issue:
 class DiffHunk:
     old_start: int
     new_start: int
-    lines: Tuple[str, ...]
+    lines: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class FilePatch:
     old_path: str
     new_path: str
-    hunks: Tuple[DiffHunk, ...]
+    hunks: tuple[DiffHunk, ...]
 
-    def paths(self) -> Tuple[str, str]:
+    def paths(self) -> tuple[str, str]:
         return (self.old_path, self.new_path)
 
 
-def parse_patch(text: str) -> Tuple[FilePatch, ...]:
-    file_patches: List[FilePatch] = []
+def parse_patch(text: str) -> tuple[FilePatch, ...]:
+    file_patches: list[FilePatch] = []
 
-    current_old: Optional[str] = None
-    current_new: Optional[str] = None
-    current_hunks: List[DiffHunk] = []
-    current_hunk_lines: List[str] = []
-    current_hunk_old_start: Optional[int] = None
-    current_hunk_new_start: Optional[int] = None
+    current_old: str | None = None
+    current_new: str | None = None
+    current_hunks: list[DiffHunk] = []
+    current_hunk_lines: list[str] = []
+    current_hunk_old_start: int | None = None
+    current_hunk_new_start: int | None = None
 
     def _flush_hunk() -> None:
         nonlocal current_hunk_lines, current_hunk_old_start, current_hunk_new_start
@@ -123,7 +124,7 @@ def _has_gen_path(paths: Iterable[str]) -> bool:
     return any(".gen." in p for p in paths)
 
 
-def _effective_existing_path(root: Path, file_patch: FilePatch) -> Optional[Path]:
+def _effective_existing_path(root: Path, file_patch: FilePatch) -> Path | None:
     candidates = [root / file_patch.new_path, root / file_patch.old_path]
     for c in candidates:
         if c.exists() and c.is_file():
@@ -131,10 +132,10 @@ def _effective_existing_path(root: Path, file_patch: FilePatch) -> Optional[Path
     return None
 
 
-def _autogen_block_ranges(text: str) -> List[Tuple[str, int, int]]:
+def _autogen_block_ranges(text: str) -> list[tuple[str, int, int]]:
     # 区间为闭区间(行号为 `1-based`).
-    ranges: List[Tuple[str, int, int]] = []
-    begin_stack: List[Tuple[str, int]] = []
+    ranges: list[tuple[str, int, int]] = []
+    begin_stack: list[tuple[str, int]] = []
 
     for idx, line in enumerate(text.splitlines(), start=1):
         begin_m = _AUTOGEN_BEGIN_RE.search(line)
@@ -152,17 +153,17 @@ def _autogen_block_ranges(text: str) -> List[Tuple[str, int, int]]:
     return ranges
 
 
-def _is_in_ranges(line_no: int, ranges: Sequence[Tuple[str, int, int]]) -> Optional[str]:
+def _is_in_ranges(line_no: int, ranges: Sequence[tuple[str, int, int]]) -> str | None:
     for block_id, begin, end in ranges:
         if begin <= line_no <= end:
             return block_id
     return None
 
 
-def validate_generated_file_boundary(file_patches: Sequence[FilePatch], *, allow_gen: bool) -> List[Issue]:
+def validate_generated_file_boundary(file_patches: Sequence[FilePatch], *, allow_gen: bool) -> list[Issue]:
     if allow_gen:
         return []
-    issues: List[Issue] = []
+    issues: list[Issue] = []
     for fp in file_patches:
         if _has_gen_path(fp.paths()):
             issues.append(
@@ -175,8 +176,8 @@ def validate_generated_file_boundary(file_patches: Sequence[FilePatch], *, allow
     return issues
 
 
-def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root: Path) -> List[Issue]:  # noqa: C901
-    issues: List[Issue] = []
+def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root: Path) -> list[Issue]:  # noqa: C901
+    issues: list[Issue] = []
     for fp in file_patches:
         base_path = _effective_existing_path(root, fp)
         if base_path is None:
@@ -204,7 +205,7 @@ def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root:
                         issues.append(
                             Issue(
                                 code="autogen_block",
-                                message="补丁修改了注入的 `AUTOGEN` 块 `{}`; 请修改 SSOT 并重新运行 `just gen-docs`.".format(block_id),
+                                message=f"补丁修改了注入的 `AUTOGEN` 块 `{block_id}`; 请修改 SSOT 并重新运行 `just gen-docs`.",
                                 path=fp.new_path,
                                 line=old_line,
                             )
@@ -218,9 +219,7 @@ def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root:
                         issues.append(
                             Issue(
                                 code="autogen_block",
-                                message="补丁向注入的 `AUTOGEN` 块 `{}` 中插入内容; 请修改 SSOT 并重新运行 `just gen-docs`.".format(
-                                    block_id
-                                ),
+                                message=f"补丁向注入的 `AUTOGEN` 块 `{block_id}` 中插入内容; 请修改 SSOT 并重新运行 `just gen-docs`.",
                                 path=fp.new_path,
                                 line=old_line,
                             )
@@ -231,7 +230,7 @@ def validate_injected_block_boundary(file_patches: Sequence[FilePatch], *, root:
     return issues
 
 
-def validate_patch_text(patch_text: str, *, root: Path, allow_gen: bool) -> List[Issue]:
+def validate_patch_text(patch_text: str, *, root: Path, allow_gen: bool) -> list[Issue]:
     file_patches = parse_patch(patch_text)
     if not file_patches:
         return [
@@ -241,7 +240,7 @@ def validate_patch_text(patch_text: str, *, root: Path, allow_gen: bool) -> List
             )
         ]
 
-    issues: List[Issue] = []
+    issues: list[Issue] = []
     issues.extend(validate_generated_file_boundary(file_patches, allow_gen=allow_gen))
     issues.extend(validate_injected_block_boundary(file_patches, root=root))
     return issues

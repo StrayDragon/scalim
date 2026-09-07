@@ -1,19 +1,20 @@
 # region imports
 
 import itertools
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Iterable, Iterator, List, Optional, Type
+from dataclasses import dataclass
+from typing import Any
 
-from ...vendor.dataclassesx import dataclass
 from ..adaptive.policy import AdaptivePolicy
 from ..adaptive.tuning import AdaptiveTuning
 
 # endregion
 
-ChunkIterableFn = Callable[[Iterable[Any], int], Iterator[List[Any]]]
+ChunkIterableFn = Callable[[Iterable[Any], int], Iterator[list[Any]]]
 
 
-def chunk_iterable(iterable: Iterable[Any], chunk_size: int) -> Iterator[List[Any]]:
+def chunk_iterable(iterable: Iterable[Any], chunk_size: int) -> Iterator[list[Any]]:
     it = iter(iterable)
     return iter(lambda: list(itertools.islice(it, chunk_size)), [])
 
@@ -23,19 +24,19 @@ class PipelineOverrides:
     chunk_iterable: ChunkIterableFn = chunk_iterable
     """将输入可迭代对象按 `chunk_size` 切分为块的函数."""
 
-    adaptive_executor_cls: Type[Any] = ThreadPoolExecutor
+    adaptive_executor_cls: type[Any] = ThreadPoolExecutor
     """自适应并发默认使用的执行器类型(线程池)."""
 
     adaptive_min_parallel_tasks: int = 2
     """每层最小并行任务数阈值(小于该值将倾向于串行)."""
 
-    adaptive_tuning: Optional[AdaptiveTuning] = None
+    adaptive_tuning: AdaptiveTuning | None = None
     """可选:自适应调优参数(将作为默认值,可能被策略覆盖)."""
 
-    adaptive_policy: Optional[AdaptivePolicy] = None
+    adaptive_policy: AdaptivePolicy | None = None
     """可选:自适应策略(用于定制并行决策/后端选择/任务池分配)."""
 
-    adaptive_loadref_executor_factory: Optional[Callable[[], Any]] = None
+    adaptive_loadref_executor_factory: Callable[[], Any] | None = None
     """可选:为 `LoadRef` 关联加载创建执行器的工厂函数."""
 
     parallelize_lookup_chunks: bool = False
@@ -48,19 +49,19 @@ class PipelineOverrides:
     - `loader_call` 回调可能直接发生在分片工作线程上(非主线程回放),订阅方须自行保证线程安全.
     """
 
-    max_chunk_workers: Optional[int] = None
+    max_chunk_workers: int | None = None
     """可选:单步分片扇出上限(`None` 表示仅受全局在途帽 `W` 与分片数限制)."""
 
-    stage_perf_counter_fn: Optional[Callable[[], float]] = None
+    stage_perf_counter_fn: Callable[[], float] | None = None
     """可选:阶段计时函数(默认使用系统计时)."""
 
-    gc_collect_fn: Optional[Callable[[], int]] = None
+    gc_collect_fn: Callable[[], int] | None = None
     """可选:`GC` 回收函数(用于注入/测试)."""
 
-    sys_module: Optional[Any] = None
+    sys_module: Any | None = None
     """可选:`sys` 模块注入点(用于测试或兼容性处理)."""
 
-    warnings_module: Optional[Any] = None
+    warnings_module: Any | None = None
     """可选:`warnings` 模块注入点(用于测试或兼容性处理)."""
 
 

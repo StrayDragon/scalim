@@ -3,11 +3,13 @@ import logging
 import os
 import sys
 from collections import OrderedDict
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable, ClassVar, FrozenSet, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, ClassVar
+
+from typing_extensions import override
 
 from ...._internal.loggingx import format_kv, prefix
-from ....vendor.compact.typing_extensionsx import override
 from ..reference_syntax import BUILTIN_CALLABLE_REFERENCE_PREFIX, ParsedReference, ScalimReferenceSyntaxError, parse_python_reference
 from .allowlist_policy import ResolverTrustedMode
 from .builtin_callables import resolve_builtin_callable_reference
@@ -25,8 +27,8 @@ _TRUSTED_MODE_ALLOW_ALL_MODULES_WARNING = (
 _TRUSTED_MODE_ENV_GATE = "SCALIM_ALLOW_TRUSTED_ALL_MODULES"
 
 _TRUSTED_MODE_ENV_GATE_REJECTED_MSG = (
-    "trusted_allow_all_modules 需要显式设置环境变量 {}=1 方可启用. 此模式等效于代码执行权限,仅用于完全可信的输入."
-).format(_TRUSTED_MODE_ENV_GATE)
+    f"trusted_allow_all_modules 需要显式设置环境变量 {_TRUSTED_MODE_ENV_GATE}=1 方可启用. 此模式等效于代码执行权限,仅用于完全可信的输入."
+)
 
 _WILDCARD_MODULES_REJECTED_BY_DEFAULT_MSG = (
     "不允许在 `allowed_modules` 中使用通配符 `*` (默认 resolver_trusted_mode=strict_allowlist 会 fail-fast). "
@@ -48,7 +50,7 @@ _TRUSTED_MODE_MIXED_ALLOWLIST_REJECTED_MSG = (
 )
 
 
-def _has_wildcard(values: Optional[FrozenSet[str]]) -> bool:
+def _has_wildcard(values: frozenset[str] | None) -> bool:
     return values is not None and _ALLOWLIST_WILDCARD in values
 
 
@@ -68,14 +70,14 @@ class ReferenceParser:
 
 
 class ResolverPolicy:
-    _allowed_modules: Optional[FrozenSet[str]]
-    _allowed_functions: Optional[FrozenSet[str]]
+    _allowed_modules: frozenset[str] | None
+    _allowed_functions: frozenset[str] | None
     _allow_all_modules: bool
 
     def __init__(
         self,
-        allowed_modules: Optional[FrozenSet[str]] = None,
-        allowed_functions: Optional[FrozenSet[str]] = None,
+        allowed_modules: frozenset[str] | None = None,
+        allowed_functions: frozenset[str] | None = None,
     ) -> None:
         self._allowed_modules = allowed_modules
         self._allowed_functions = allowed_functions
@@ -89,8 +91,8 @@ class ResolverPolicy:
         if self._is_allowed_function(module_path, func_name):
             return
         if self._allowed_functions is not None and self._allowed_modules is None:
-            full_path = "{}:{}".format(module_path, func_name)
-            msg = "函数 '{}' 不在 `allowed_functions` 允许列表中".format(full_path)
+            full_path = f"{module_path}:{func_name}"
+            msg = f"函数 '{full_path}' 不在 `allowed_functions` 允许列表中"
             if "." in func_name:
                 msg += " (类式引用的允许列表必须写完整属性链,例如 `pkg.mod:Obj.safe` 或 `pkg.mod.Obj.safe`)"
             raise ScalimAllowlistViolationError(msg)
@@ -109,19 +111,19 @@ class ResolverPolicy:
                 break
 
         if not allowed:
-            msg = "模块 '{}' 不在 `allowed_modules` 允许列表中".format(module_path)
+            msg = f"模块 '{module_path}' 不在 `allowed_modules` 允许列表中"
             raise ScalimAllowlistViolationError(msg)
 
     def _is_allowed_function(self, module_path: str, func_name: str) -> bool:
         if self._allowed_functions is None:
             return False
 
-        full_path = "{}:{}".format(module_path, func_name)
-        dotted_path = "{}.{}".format(module_path, func_name)
+        full_path = f"{module_path}:{func_name}"
+        dotted_path = f"{module_path}.{func_name}"
         return full_path in self._allowed_functions or dotted_path in self._allowed_functions
 
     @staticmethod
-    def _has_wildcard(values: Optional[FrozenSet[str]]) -> bool:
+    def _has_wildcard(values: frozenset[str] | None) -> bool:
         return values is not None and _ALLOWLIST_WILDCARD in values
 
 
@@ -132,17 +134,17 @@ class PythonReferenceResolver:
     _parser: ReferenceParser
     _cache: "OrderedDict[str, Callable[..., Any]]"
     _max_cache_size: int
-    _builtin_callables_by_id: Optional[Mapping[str, Callable[..., Any]]]
-    _public_builtin_callable_ids: Optional[Tuple[str, ...]]
+    _builtin_callables_by_id: Mapping[str, Callable[..., Any]] | None
+    _public_builtin_callable_ids: tuple[str, ...] | None
 
     def __init__(
         self,
-        allowed_modules: Optional[FrozenSet[str]] = None,
-        allowed_functions: Optional[FrozenSet[str]] = None,
+        allowed_modules: frozenset[str] | None = None,
+        allowed_functions: frozenset[str] | None = None,
         resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
         max_cache_size: int = DEFAULT_CACHE_MAX_SIZE,
-        builtin_callables_by_id: Optional[Mapping[str, Callable[..., Any]]] = None,
-        public_builtin_callable_ids: Optional[Sequence[str]] = None,
+        builtin_callables_by_id: Mapping[str, Callable[..., Any]] | None = None,
+        public_builtin_callable_ids: Sequence[str] | None = None,
     ) -> None:
         if int(max_cache_size) < 1:
             msg = "`max_cache_size` 必须 >= 1"
@@ -216,10 +218,10 @@ class PythonReferenceResolver:
         obj: Any = module
         for attr_name in parsed.attr_path:
             if attr_name.startswith("__"):
-                msg = "引用 '{}' 禁止访问双下划线属性 '{}'".format(parsed.reference, attr_name)
+                msg = f"引用 '{parsed.reference}' 禁止访问双下划线属性 '{attr_name}'"
                 raise ScalimResolverError(msg)
             if not hasattr(obj, attr_name):  # pragma: allow-dynattr dsl: resolver attr traversal
-                msg = "对象 '{}' 不存在属性 '{}'".format(obj, attr_name)
+                msg = f"对象 '{obj}' 不存在属性 '{attr_name}'"
                 raise ScalimResolverError(msg)
             obj = getattr(obj, attr_name)  # pragma: allow-dynattr dsl: resolver attr traversal
 
@@ -233,7 +235,7 @@ class PythonReferenceResolver:
         func_name = parsed.entry_attr
 
         if func_name.startswith("__"):
-            msg = "引用 '{}' 禁止访问双下划线属性 '{}'".format(parsed.reference, func_name)
+            msg = f"引用 '{parsed.reference}' 禁止访问双下划线属性 '{func_name}'"
             raise ScalimResolverError(msg)
 
         self._policy.check(parsed.module_path, func_name)
@@ -241,12 +243,12 @@ class PythonReferenceResolver:
         module = self._import_module(parsed.module_path)
 
         if not hasattr(module, func_name):  # pragma: allow-dynattr dsl: module callable resolution
-            msg = "模块 '{}' 不存在属性 '{}'".format(parsed.module_path, func_name)
+            msg = f"模块 '{parsed.module_path}' 不存在属性 '{func_name}'"
             raise ScalimResolverError(msg)
 
         obj = getattr(module, func_name)  # pragma: allow-dynattr dsl: module callable resolution
         if not callable(obj):
-            msg = "'{}' 不是可调用对象".format(parsed.reference)
+            msg = f"'{parsed.reference}' 不是可调用对象"
             raise ScalimResolverError(msg)
 
         return obj
@@ -255,12 +257,12 @@ class PythonReferenceResolver:
         try:
             return importlib.import_module(module_path)
         except ImportError as e:
-            msg = "导入模块 '{}' 失败: {}".format(module_path, e)
+            msg = f"导入模块 '{module_path}' 失败: {e}"
             raise ScalimResolverError(msg) from e
 
 
 class SecurePythonReferenceResolver(PythonReferenceResolver):
-    DANGEROUS_MODULES: ClassVar[FrozenSet[str]] = frozenset(
+    DANGEROUS_MODULES: ClassVar[frozenset[str]] = frozenset(
         [
             "os",
             "sys",
@@ -289,7 +291,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         ]
     )
 
-    DANGEROUS_FUNCTIONS: ClassVar[FrozenSet[str]] = frozenset(
+    DANGEROUS_FUNCTIONS: ClassVar[frozenset[str]] = frozenset(
         [
             "eval",
             "exec",
@@ -308,19 +310,19 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         ]
     )
 
-    _base_module_path: Optional[str]
+    _base_module_path: str | None
 
     def __init__(
         self,
-        allowed_modules: Optional[FrozenSet[str]] = None,
-        allowed_functions: Optional[FrozenSet[str]] = None,
+        allowed_modules: frozenset[str] | None = None,
+        allowed_functions: frozenset[str] | None = None,
         resolver_trusted_mode: ResolverTrustedMode = ResolverTrustedMode.STRICT_ALLOWLIST,
         max_cache_size: int = PythonReferenceResolver.DEFAULT_CACHE_MAX_SIZE,
-        base_module_path: Optional[str] = None,
-        builtin_callables_by_id: Optional[Mapping[str, Callable[..., Any]]] = None,
-        public_builtin_callable_ids: Optional[Sequence[str]] = None,
+        base_module_path: str | None = None,
+        builtin_callables_by_id: Mapping[str, Callable[..., Any]] | None = None,
+        public_builtin_callable_ids: Sequence[str] | None = None,
     ) -> None:
-        super(SecurePythonReferenceResolver, self).__init__(
+        super().__init__(
             allowed_modules=allowed_modules,
             allowed_functions=allowed_functions,
             resolver_trusted_mode=resolver_trusted_mode,
@@ -334,15 +336,15 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
     def resolve(self, reference: str) -> Callable[..., Any]:
         raw = str(reference or "").strip()
         if raw.startswith(BUILTIN_CALLABLE_REFERENCE_PREFIX):
-            return super(SecurePythonReferenceResolver, self).resolve(reference)
+            return super().resolve(reference)
 
         if reference.startswith("."):
             normalized = self._normalize_reference(reference)
             self._security_check(normalized)
-            return super(SecurePythonReferenceResolver, self).resolve(normalized)
+            return super().resolve(normalized)
 
         self._security_check(reference)
-        return super(SecurePythonReferenceResolver, self).resolve(reference)
+        return super().resolve(reference)
 
     def _security_check_attr_traversal_part(self, part: str) -> None:
         """`defense-in-depth`: 遍历属性链时逐级校验 `denylist`.
@@ -352,7 +354,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
           避免未来引用字符串校验逻辑调整造成空窗.
         """
         if part in self.DANGEROUS_FUNCTIONS or part == "lambda":
-            msg = "安全限制: 函数 '{}' 位于危险函数列表中".format(part)
+            msg = f"安全限制: 函数 '{part}' 位于危险函数列表中"
             raise ScalimResolverError(msg)
         if "__" in part:
             msg = "安全限制: 引用中包含危险模式 '__'"
@@ -368,7 +370,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         for attr_name in parsed.attr_path:
             self._security_check_attr_traversal_part(attr_name)
             if not hasattr(obj, attr_name):  # pragma: allow-dynattr dsl: resolver attr traversal
-                msg = "对象 '{}' 不存在属性 '{}'".format(obj, attr_name)
+                msg = f"对象 '{obj}' 不存在属性 '{attr_name}'"
                 raise ScalimResolverError(msg)
             obj = getattr(obj, attr_name)  # pragma: allow-dynattr dsl: resolver attr traversal
 
@@ -383,7 +385,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         absolute_module_path = self._normalize_relative_module_path(parsed.module_path, reference=reference)
         if parsed.style == "class":
             return "{}:{}".format(absolute_module_path, ".".join(parsed.attr_path))
-        return "{}.{}".format(absolute_module_path, parsed.entry_attr)
+        return f"{absolute_module_path}.{parsed.entry_attr}"
 
     def _normalize_relative_module_path(self, module_path: str, *, reference: str) -> str:
         base = self._base_module_path
@@ -396,7 +398,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         base_parts = [p for p in str(base).split(".") if p] if base else []
         up_levels = dot_count - 1
         if up_levels > len(base_parts):
-            msg = "相对模块引用 '{}' 超出了根包范围(`base_module_path='{}'`)".format(reference, base)
+            msg = f"相对模块引用 '{reference}' 超出了根包范围(`base_module_path='{base}'`)"
             raise ScalimResolverError(msg)
 
         prefix_parts = base_parts[: len(base_parts) - up_levels] if up_levels else base_parts
@@ -412,7 +414,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
         module_parts = module_path.split(".")
         for part in module_parts:
             if part in self.DANGEROUS_MODULES:
-                msg = "安全限制: 模块 '{}' 位于危险模块列表中".format(part)
+                msg = f"安全限制: 模块 '{part}' 位于危险模块列表中"
                 raise ScalimResolverError(msg)
             if "__" in part:
                 msg = "安全限制: 引用中包含危险模式 '__'"
@@ -427,7 +429,7 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
 
         for part in parsed.attr_path:
             if part in self.DANGEROUS_FUNCTIONS or part == "lambda":
-                msg = "安全限制: 函数 '{}' 位于危险函数列表中".format(part)
+                msg = f"安全限制: 函数 '{part}' 位于危险函数列表中"
                 raise ScalimResolverError(msg)
             if "__" in part:
                 msg = "安全限制: 引用中包含危险模式 '__'"
@@ -437,8 +439,8 @@ class SecurePythonReferenceResolver(PythonReferenceResolver):
 def derive_base_module_path(
     yaml_path: str,
     *,
-    sys_path: Optional[Sequence[Optional[str]]] = None,
-    cwd: Optional[str] = None,
+    sys_path: Sequence[str | None] | None = None,
+    cwd: str | None = None,
 ) -> str:
     """从 `yaml_path` + `sys.path` 推导相对引用的基准模块路径(`base module path`).
 
@@ -460,12 +462,12 @@ def derive_base_module_path(
 
     if not candidates:
         msg = (
-            "无法根据 `yaml_path='{}'` 推导 `base_module_path`: 目录 '{}' 不在任何 `sys.path` 条目下. "
+            f"无法根据 `yaml_path='{raw_yaml_path}'` 推导 `base_module_path`: 目录 '{yaml_dir!s}' 不在任何 `sys.path` 条目下. "
             "修复方式: 把包根目录加入 `PYTHONPATH`(或 `sys.path`),或者改用绝对模块引用."
-        ).format(raw_yaml_path, str(yaml_dir))
+        )
         raise ScalimResolverError(msg)
 
-    valid: List[Tuple[Tuple[str, ...], Path]] = []
+    valid: list[tuple[tuple[str, ...], Path]] = []
     for sys_prefix in candidates:
         rel_path = yaml_dir.relative_to(sys_prefix)
         if rel_path == Path():
@@ -498,7 +500,7 @@ def derive_base_module_path(
     )  # pragma: no cover  # pragma: allow-no-cover invariant: valid parts would have matched earlier valid-prefix branch
 
 
-def _normalize_sys_path_entry(entry: Optional[str], *, cwd_path: Path) -> Optional[Path]:
+def _normalize_sys_path_entry(entry: str | None, *, cwd_path: Path) -> Path | None:
     if entry is None:
         return None
     item = str(entry)
@@ -510,8 +512,8 @@ def _normalize_sys_path_entry(entry: Optional[str], *, cwd_path: Path) -> Option
     return p.resolve(strict=False)
 
 
-def _collect_sys_path_prefixes(*, yaml_dir: Path, sys_path: Optional[Sequence[Optional[str]]], cwd_path: Path) -> List[Path]:
-    candidates: List[Path] = []
+def _collect_sys_path_prefixes(*, yaml_dir: Path, sys_path: Sequence[str | None] | None, cwd_path: Path) -> list[Path]:
+    candidates: list[Path] = []
     for entry in list(sys_path) if sys_path is not None else list(sys.path):
         p = _normalize_sys_path_entry(entry, cwd_path=cwd_path)
         if p is None:
@@ -527,9 +529,9 @@ def _validate_module_parts(*, parts: Sequence[str], raw_yaml_path: str, yaml_dir
         if part.isidentifier():
             continue
         msg = (
-            "无法根据 `yaml_path='{}'` 推导 `base_module_path`: 目录片段 '{}' (来自 '{}', sys.path 前缀='{}')"
+            f"无法根据 `yaml_path='{raw_yaml_path}'` 推导 `base_module_path`: 目录片段 '{part}' (来自 '{yaml_dir!s}', sys.path 前缀='{prefix!s}')"  # noqa: E501
             "不是合法的 Python 标识符. 修复方式: 重命名该目录片段,或改用绝对引用."
-        ).format(raw_yaml_path, part, str(yaml_dir), str(prefix))
+        )
         raise ScalimResolverError(msg)
 
 

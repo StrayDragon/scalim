@@ -3,13 +3,14 @@
 import logging
 import time
 import warnings
-from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass, field
+from typing import Any
+
+from typing_extensions import override
 
 from ..._internal.loggingx import get_logger
 from ...events import Event, EventType
 from ...vendor.compact.importlibx import import_module
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass, field
 from .._internal.console_report import emit_info
 from ..observer import EventDispatchObserver
 from ..report_formats import ConsoleJsonlReportFormat as _StageMemoryReportFormat
@@ -28,8 +29,8 @@ class StageMemorySample:
     batch_num: int
     stage: str
     duration_s: float
-    rss_mb: Optional[float]
-    delta_mb: Optional[float]
+    rss_mb: float | None
+    delta_mb: float | None
     timestamp: float = field(default_factory=time.time)
 
 
@@ -53,14 +54,14 @@ class StageMemoryObserver(EventDispatchObserver):
     """
 
     config: StageMemoryConfig
-    samples: List[StageMemorySample]
-    event_types: Optional[Set[EventType]]
+    samples: list[StageMemorySample]
+    event_types: set[EventType] | None
 
     _enabled: bool
     _process: Any
-    _batch_last_rss_mb: Dict[int, Optional[float]]
+    _batch_last_rss_mb: dict[int, float | None]
 
-    def __init__(self, config: Optional[StageMemoryConfig] = None) -> None:
+    def __init__(self, config: StageMemoryConfig | None = None) -> None:
         if config is None:
             config = StageMemoryConfig.default()
         self.config = config
@@ -100,7 +101,7 @@ class StageMemoryObserver(EventDispatchObserver):
             return True
         return int(batch_num) % interval == 0
 
-    def _get_rss_mb(self) -> Optional[float]:
+    def _get_rss_mb(self) -> float | None:
         if not self._enabled or self._process is None:
             return None
         try:
@@ -137,15 +138,15 @@ class StageMemoryObserver(EventDispatchObserver):
             )
             return
 
-        rss_text = "{:.1f}".format(sample.rss_mb) if sample.rss_mb is not None else None
-        delta_text = "{:+.1f}".format(sample.delta_mb) if sample.delta_mb is not None else None
+        rss_text = f"{sample.rss_mb:.1f}" if sample.rss_mb is not None else None
+        delta_text = f"{sample.delta_mb:+.1f}" if sample.delta_mb is not None else None
         emit_info(
             self.config.logger,
             "stage_memory",
             "sample",
             batch_num=int(sample.batch_num),
             stage=str(sample.stage),
-            duration_s="{:.3f}".format(float(sample.duration_s)),
+            duration_s=f"{float(sample.duration_s):.3f}",
             rss_mb=rss_text,
             delta_mb=delta_text,
         )
@@ -189,7 +190,7 @@ class StageMemoryObserver(EventDispatchObserver):
         rss_mb = self._get_rss_mb()
         last_mb = self._batch_last_rss_mb.get(batch_num)
 
-        delta_mb: Optional[float] = None
+        delta_mb: float | None = None
         if rss_mb is not None and last_mb is not None:
             delta_mb = float(rss_mb) - float(last_mb)
 

@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
 
-def build_workflow_run_item_schema() -> Dict[str, Any]:
+def build_workflow_run_item_schema() -> dict[str, Any]:
     return {
         "type": "object",
         "required": ["id", "demand"],
@@ -72,7 +72,7 @@ def build_workflow_run_item_schema() -> Dict[str, Any]:
     }
 
 
-def build_workflow_workflow_schema() -> Dict[str, Any]:
+def build_workflow_workflow_schema() -> dict[str, Any]:
     run_item = build_workflow_run_item_schema()
     return {
         "type": "object",

@@ -1,6 +1,8 @@
 # pragma: allow-c901-file plan: c60
 import time
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, cast
+from collections.abc import Mapping
+from dataclasses import asdict
+from typing import Any, cast
 
 from ....events import Event, EventType
 from ....spec.ir._workflow import (
@@ -12,14 +14,13 @@ from ....spec.ir._workflow import (
     WriteSheetNodeIr,
 )
 from ....typedefs import RuntimeValue
-from ....vendor.dataclassesx import asdict
 from ....workflow.stage_attribution import derive_workflow_struct_levels, derive_workflow_user_stages
 from ...observer import EventDispatchObserver as _EventDispatchObserver
 from .._internal.viz_config import VizObserverConfig
 from .._internal.viz_nodes import VizObserverNodeMixin
 from .._internal.viz_output import VizObserverOutputMixin
 
-_WORKFLOW_DISPATCH_MAP: Dict[EventType, str] = {
+_WORKFLOW_DISPATCH_MAP: dict[EventType, str] = {
     EventType.WORKFLOW_NODE_START: "on_workflow_node_start",
     EventType.WORKFLOW_NODE_END: "on_workflow_node_end",
     EventType.WORKFLOW_NODE_CANCELLED: "on_workflow_node_cancelled",
@@ -40,18 +41,18 @@ def _as_node_id(value: RuntimeValue) -> str:
     return str(value or "").strip()
 
 
-def _workflow_node_ref(workflow_node_id: str) -> Dict[str, str]:
-    return {"type": "workflow_node", "id": "workflow_node:{}".format(str(workflow_node_id))}
+def _workflow_node_ref(workflow_node_id: str) -> dict[str, str]:
+    return {"type": "workflow_node", "id": f"workflow_node:{workflow_node_id!s}"}
 
 
-def _workflow_resource_ref(resource_type: str, resource_id: str) -> Dict[str, str]:
+def _workflow_resource_ref(resource_type: str, resource_id: str) -> dict[str, str]:
     return {
         "type": "workflow_resource",
-        "id": "workflow_resource:{}:{}".format(str(resource_type), str(resource_id)),
+        "id": f"workflow_resource:{resource_type!s}:{resource_id!s}",
     }
 
 
-def _derive_workflow_stage_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
+def _derive_workflow_stage_levels(workflow_ir: WorkflowIr) -> dict[str, int]:
     struct_levels = derive_workflow_struct_levels(workflow_ir)
     return derive_workflow_user_stages(workflow_ir, struct_levels=struct_levels)
 
@@ -59,9 +60,9 @@ def _derive_workflow_stage_levels(workflow_ir: WorkflowIr) -> Dict[str, int]:
 def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
     workflow_ir: WorkflowIr,
     *,
-    demand_run_id_by_workflow_node_id: Optional[Mapping[str, str]] = None,
-    workflow_yaml_path: Optional[str] = None,
-) -> Dict[str, Any]:
+    demand_run_id_by_workflow_node_id: Mapping[str, str] | None = None,
+    workflow_yaml_path: str | None = None,
+) -> dict[str, Any]:
     """构建与 `scalim-viz` 兼容的工作流级 `VizGraphSnapshot`.
 
     说明:
@@ -72,14 +73,14 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
     demand_run_id_by_workflow_node_id = dict(demand_run_id_by_workflow_node_id or {})
     stage_level_by_node_id = _derive_workflow_stage_levels(workflow_ir)
 
-    stage_nodes: Dict[int, List[str]] = {}
+    stage_nodes: dict[int, list[str]] = {}
     for node_id, level in stage_level_by_node_id.items():
         stage_nodes.setdefault(int(level), []).append(str(node_id))
 
-    stages: List[Dict[str, Any]] = []
-    stage_id_by_node_id: Dict[str, str] = {}
+    stages: list[dict[str, Any]] = []
+    stage_id_by_node_id: dict[str, str] = {}
     for level in sorted(stage_nodes.keys()):
-        stage_id = "wf stage {}".format(level)
+        stage_id = f"wf stage {level}"
         members = sorted(stage_nodes.get(level, []))
         for node_id in members:
             stage_id_by_node_id[str(node_id)] = stage_id
@@ -92,10 +93,10 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
                 }
             )
 
-    nodes: List[Dict[str, Any]] = []
-    known_node_ids: Set[str] = set()
+    nodes: list[dict[str, Any]] = []
+    known_node_ids: set[str] = set()
 
-    def _add_node(node_id: str, node_type: str, data: Dict[str, Any]) -> None:
+    def _add_node(node_id: str, node_type: str, data: dict[str, Any]) -> None:
         if not node_id or node_id in known_node_ids:
             return
         known_node_ids.add(node_id)
@@ -113,18 +114,18 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
         workflow_node_id = _as_node_id(node.node_id)
         if not workflow_node_id:
             continue
-        node_ref_id = "workflow_node:{}".format(workflow_node_id)
+        node_ref_id = f"workflow_node:{workflow_node_id}"
         node_type = str(node.node_type.value)
 
         kind = "workflow_node"
-        demand_path: Optional[str] = None
+        demand_path: str | None = None
         if isinstance(node, WorkflowNodeIr) and node.node_type == WorkflowNodeType.DEMAND:
             kind = "workflow_demand"
             demand_path = str(node.demand_path) if node.demand_path is not None else None
         elif isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
             kind = "workflow_write"
 
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "label": workflow_node_id,
             "field_key": workflow_node_id,
             "kind": kind,
@@ -171,8 +172,8 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
     for res in workflow_ir.resources:
         _append_resource_node(res, add_node=_add_node)
 
-    edges: List[Dict[str, Any]] = []
-    edge_keys: Set[Tuple[str, str, str]] = set()
+    edges: list[dict[str, Any]] = []
+    edge_keys: set[tuple[str, str, str]] = set()
 
     def _add_edge(source: str, target: str, edge_type: str) -> None:
         if not source or not target or not edge_type:
@@ -185,7 +186,7 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
         edge_keys.add(key)
         edges.append(
             {
-                "id": "e_wf:{}:{}:{}".format(source, target, edge_type),
+                "id": f"e_wf:{source}:{target}:{edge_type}",
                 "source": source,
                 "target": target,
                 "type": edge_type,
@@ -197,23 +198,23 @@ def build_workflow_viz_graph_snapshot(  # noqa: C901, PLR0912, PLR0915
         workflow_node_id = _as_node_id(node.node_id)
         if not workflow_node_id:
             continue
-        node_ref_id = "workflow_node:{}".format(workflow_node_id)
+        node_ref_id = f"workflow_node:{workflow_node_id}"
         deps = node.deps or ()
         for dep_id in deps:
             dep_key = _as_node_id(dep_id)
             if not dep_key:
                 continue
-            dep_ref_id = "workflow_node:{}".format(dep_key)
+            dep_ref_id = f"workflow_node:{dep_key}"
             _add_edge(dep_ref_id, node_ref_id, "depends_on")
 
         if isinstance(node, (WriteSheetNodeIr, AppendSheetNodeIr)):
             resource_type = str(node.resource_type or "").strip()
             resource_id = str(node.resource_id or "").strip()
             if resource_type and resource_id:
-                res_node_id = "workflow_resource:{}:{}".format(resource_type, resource_id)
+                res_node_id = f"workflow_resource:{resource_type}:{resource_id}"
                 _add_edge(node_ref_id, res_node_id, "writes_to")
 
-    meta: Dict[str, Any] = {
+    meta: dict[str, Any] = {
         "schema_version": "vizgraph/v1",
         "created_at": time.time(),
         "target_fields": [],
@@ -246,8 +247,8 @@ def _append_resource_node(res: WorkflowResourceIr, *, add_node: Any) -> None:
     resource_type = str(res.resource_type or "").strip()
     if not resource_id or not resource_type:
         return
-    node_id = "workflow_resource:{}:{}".format(resource_type, resource_id)
-    label = "{}:{}".format(resource_type, resource_id)
+    node_id = f"workflow_resource:{resource_type}:{resource_id}"
+    label = f"{resource_type}:{resource_id}"
     add_node(
         node_id,
         "output_target",
@@ -267,25 +268,25 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
 
     supports_unknown_event_types: bool = True
 
-    dispatch_map: Dict[EventType, str] = _WORKFLOW_DISPATCH_MAP
+    dispatch_map: dict[EventType, str] = _WORKFLOW_DISPATCH_MAP
 
     config: VizObserverConfig
-    snapshot: Optional[Dict[str, Any]]
-    run_id: Optional[str]
+    snapshot: dict[str, Any] | None
+    run_id: str | None
     _events_emitter: Any
     _trace_emitter: Any
-    _known_node_ids: Optional[Set[str]]
-    _node_id_cache: Optional[Dict[str, str]]
+    _known_node_ids: set[str] | None
+    _node_id_cache: dict[str, str] | None
     _snapshot_written: bool
     _run_dir_applied: bool
-    _node_wall_start_ts: Dict[str, float]
-    _workflow_wall_start_ts: Optional[float]
+    _node_wall_start_ts: dict[str, float]
+    _workflow_wall_start_ts: float | None
 
     def __init__(
         self,
         *,
-        config: Optional[VizObserverConfig] = None,
-        snapshot: Optional[Dict[str, Any]] = None,
+        config: VizObserverConfig | None = None,
+        snapshot: dict[str, Any] | None = None,
     ) -> None:
         self.config = config or VizObserverConfig()
         self.snapshot = snapshot
@@ -310,8 +311,8 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
         snapshot = self.snapshot or {}
         nodes = snapshot.get("nodes")
         if isinstance(nodes, list):
-            ids: List[str] = []
-            for item in cast("List[Dict[str, Any]]", nodes):  # pragma: allow-cast snapshot nodes typed narrowing
+            ids: list[str] = []
+            for item in cast("list[dict[str, Any]]", nodes):  # pragma: allow-cast snapshot nodes typed narrowing
                 node_id = str(item.get("id") or "").strip()
                 if node_id.startswith("workflow_node:"):
                     ids.append(node_id)
@@ -320,7 +321,7 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
                 return ids[0]
         return "workflow_node:__workflow__"
 
-    def _emit_workflow_event(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None:
+    def _emit_workflow_event(self, event_type: str, node_ref: dict[str, str], payload: dict[str, Any]) -> None:
         if not self.config.is_enabled():
             return
         self._ensure_started()
@@ -330,9 +331,9 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
         payload = event.payload
         self._workflow_wall_start_ts = time.time()
         node_ref_id = self._entry_workflow_node_ref_id()
-        data: Dict[str, Any]
+        data: dict[str, Any]
         if isinstance(payload, dict):
-            data = cast("Dict[str, Any]", payload)  # pragma: allow-cast payload dict typed narrowing
+            data = cast("dict[str, Any]", payload)  # pragma: allow-cast payload dict typed narrowing
         else:
             data = {}
         self._emit_workflow_event(
@@ -344,9 +345,9 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
     def on_workflow_finished(self, event: Event) -> None:
         payload = event.payload
         node_ref_id = self._entry_workflow_node_ref_id()
-        data: Dict[str, Any]
+        data: dict[str, Any]
         if isinstance(payload, dict):
-            data = cast("Dict[str, Any]", payload)  # pragma: allow-cast payload dict typed narrowing
+            data = cast("dict[str, Any]", payload)  # pragma: allow-cast payload dict typed narrowing
         else:
             data = {}
         self._emit_workflow_event(
@@ -374,10 +375,10 @@ class WorkflowVizObserver(VizObserverNodeMixin, VizObserverOutputMixin, _EventDi
         payload = event.payload
         node_id = str(payload.workflow_node_id)
         started = self._node_wall_start_ts.get(node_id)
-        duration_ms: Optional[int] = None
+        duration_ms: int | None = None
         if started is not None:
             duration_ms = int(max(0.0, time.time() - started) * 1000)
-        out: Dict[str, Any] = {
+        out: dict[str, Any] = {
             "workflow_exec_id": payload.workflow_exec_id,
             "workflow_node_id": node_id,
             "node_type": payload.node_type,

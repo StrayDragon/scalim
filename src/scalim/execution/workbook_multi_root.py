@@ -1,12 +1,10 @@
-from __future__ import absolute_import
-
-from typing import List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from dataclasses import replace
 
 from ..exceptions import ScalimExecutionError
 from ..sinks import ExcelWorkbookSink
 from ..spec.ir import DemandIr
 from ..typedefs import FailurePolicy, normalize_failure_policy
-from ..vendor.dataclassesx import replace
 from .run_ir import ExecutionRequest, ExecutionResult, OutputSpec, run_ir
 
 
@@ -14,16 +12,16 @@ class ScalimMultiRootWorkbookRunError(ScalimExecutionError):
     sheet_name: str
 
     def __init__(self, sheet_name: str, exc: Exception) -> None:
-        super(ScalimMultiRootWorkbookRunError, self).__init__("Workbook sheet run failed: {}: {}".format(sheet_name, exc))
+        super().__init__(f"Workbook sheet run failed: {sheet_name}: {exc}")
         self.sheet_name = str(sheet_name)
 
 
 def run_multi_root_workbook(
     *,
     output_path: str,
-    runs: Sequence[Tuple[str, DemandIr, ExecutionRequest]],
+    runs: Sequence[tuple[str, DemandIr, ExecutionRequest]],
     failure_policy: FailurePolicy = FailurePolicy.ALL_FAIL,
-) -> List[ExecutionResult]:
+) -> list[ExecutionResult]:
     """将多个独立 `demand` 依次写入同一 `workbook`(多根数据源 `sheet` 集合).
 
     规则:
@@ -37,8 +35,8 @@ def run_multi_root_workbook(
     policy = normalize_failure_policy(failure_policy, label="run_multi_root_workbook.failure_policy")
 
     wb = ExcelWorkbookSink(str(output_path))
-    results: List[ExecutionResult] = []
-    first_error: Optional[Exception] = None
+    results: list[ExecutionResult] = []
+    first_error: Exception | None = None
 
     try:
         for sheet_name, demand_ir, request in runs:

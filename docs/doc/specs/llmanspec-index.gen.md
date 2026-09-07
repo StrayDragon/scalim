@@ -143,7 +143,7 @@ Sources:
 ### `governance-module-organization`
 - Title: governance-module-organization
 - Source: [governance-module-organization.feature](repo:llmanspec/specs/governance-module-organization/governance-module-organization.feature)
-- Summary: 定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+- Summary: 定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 运行时兼容性(支持窗口与 floor 见根 ROADMAP,当前 3.10). [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 
 ### `governance-package-identity`
 - Title: governance-package-identity
@@ -315,16 +315,6 @@ Sources:
 - Source: [tools-resources-discovery.feature](repo:llmanspec/specs/tools-resources-discovery/tools-resources-discovery.feature)
 - Summary: 定义面向用户的稳定公开入口,用于从 output root 定位“最新一次成功发布”的产物集合(books/files),并隐藏底层 D-2 版本化输出协议的内部落盘细节. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 
-### `vendor-dataclassesx`
-- Title: vendor-dataclassesx
-- Source: [vendor-dataclassesx.feature](repo:llmanspec/specs/vendor-dataclassesx/vendor-dataclassesx.feature)
-- Summary: 为 `scalim/` 提供一个可 vendors 化、可审计的 dataclasses 能力入口,在保持 Python 3.6 运行时兼容的同时避免依赖外部 `dataclasses` backport,并避免包内绝对导入在多份包共存时混入错误实现。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
-
-### `vendor-legacy-sync`
-- Title: vendor-legacy-sync
-- Source: [vendor-legacy-sync.feature](repo:llmanspec/specs/vendor-legacy-sync/vendor-legacy-sync.feature)
-- Summary: 为下游采用 `vendors/libs/` 导入链路的旧工程提供一个可审计、可重复的同步入口,用于将本仓库的 `src/scalim/` vendors 化后镜像到目标 `<vendors/libs>/scalim/`。默认仅预览(dry-run),并在显式确认时执行实际同步。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
-
 ### `workflow-cache-pool`
 - Title: workflow-cache-pool
 - Source: [workflow-cache-pool.feature](repo:llmanspec/specs/workflow-cache-pool/workflow-cache-pool.feature)
@@ -333,7 +323,7 @@ Sources:
 ### `workflow-execute-organization`
 - Title: workflow-execute-organization
 - Source: [workflow-execute-organization.feature](repo:llmanspec/specs/workflow-execute-organization/workflow-execute-organization.feature)
-- Summary: 重构 workflow execute 模块结构（extract outcome_builder/scheduler_rules/resource_lifecycle/viz_reporter），不改变外部可观测行为、不增加热路径开销，并保持 Python 3.6 兼容。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+- Summary: 重构 workflow execute 模块结构（extract outcome_builder/scheduler_rules/resource_lifecycle/viz_reporter），不改变外部可观测行为、不增加热路径开销，并保持与项目 Python 支持窗口兼容(根 `ROADMAP.md`)。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 
 ### `workflow-intermediate-store`
 - Title: workflow-intermediate-store

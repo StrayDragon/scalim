@@ -2,8 +2,8 @@ import threading
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Iterable
-from typing import Any, Deque, Dict, Optional, cast
-from typing import Iterable as TypingIterable
+from collections.abc import Iterable as TypingIterable
+from typing import Any, cast
 
 from ..._internal.utils.loader_result import (
     LoaderResultPolicy,
@@ -29,24 +29,24 @@ from .common import (
 
 class ObserverManagerStateMixin(ABC):
     mode: ObserverManagerModeValue = "process"
-    max_recorded_events: Optional[int] = None
+    max_recorded_events: int | None = None
     capture_overflow_policy: CaptureOverflowPolicyValue = "raise"
     loader_result_policy: LoaderResultPolicyValue = "full"
     loader_result_sample_size: int = 5
     _lock: "threading.RLock" = threading.RLock()
-    _recorded_events: Optional[Deque[Event]] = None
+    _recorded_events: deque[Event] | None = None
 
     @abstractmethod
     def _rebuild_subscription_cache(self) -> None: ...
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         state = dict(self.__dict__)
         state.pop("_lock", None)
         state.pop("_observers_by_event_type", None)
         state.pop("_observers_for_unknown_event_type", None)
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         state_map = vars(self)
         state_map.update(state)
         self._lock = threading.RLock()
@@ -88,8 +88,8 @@ class ObserverManagerStateMixin(ABC):
             self._recorded_events = deque()
         self._rebuild_subscription_cache()
 
-    def _normalize_recorded_events(self, recorded: TypingIterable[Event]) -> Deque[Event]:
-        normalized: Deque[Event] = deque()
+    def _normalize_recorded_events(self, recorded: TypingIterable[Event]) -> deque[Event]:
+        normalized: deque[Event] = deque()
         for event in recorded:
             if not isinstance(event, Event):
                 continue
@@ -105,7 +105,7 @@ class ObserverManagerStateMixin(ABC):
             )
         return normalized
 
-    def _normalize_max_recorded_events(self, max_recorded_events: Optional[int]) -> Optional[int]:
+    def _normalize_max_recorded_events(self, max_recorded_events: int | None) -> int | None:
         if max_recorded_events is None:
             return None
         resolved = int(max_recorded_events)
@@ -123,13 +123,13 @@ class ObserverManagerStateMixin(ABC):
     def _normalize_loader_result_policy(self, policy: LoaderResultPolicy) -> LoaderResultPolicyValue:
         return normalize_loader_result_policy(policy)
 
-    def _summarize_result(self, result: Any) -> Dict[str, Any]:
+    def _summarize_result(self, result: Any) -> dict[str, Any]:
         return summarize_loader_result(result)
 
     def _sample_result(self, result: Any) -> Any:
         return sample_loader_result(result, sample_size=self.loader_result_sample_size)
 
-    def summarize_result(self, result: Any) -> Dict[str, Any]:
+    def summarize_result(self, result: Any) -> dict[str, Any]:
         return summarize_loader_result(result)
 
     def sample_result(self, result: Any) -> Any:

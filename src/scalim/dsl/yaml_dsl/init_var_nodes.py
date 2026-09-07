@@ -1,9 +1,10 @@
-from typing import Any, Dict, Optional, Union
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any
+
+from typing_extensions import override
 
 from ...exceptions import ScalimYamlError
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
-from ...vendor.dataclassesx import field as dataclass_field
 
 
 class ScalimInitVarNodeValueError(ScalimYamlError):
@@ -17,7 +18,7 @@ class ScalimInitVarNodeValueError(ScalimYamlError):
 
     @override
     def __str__(self) -> str:
-        return "{} {}".format(self.path, self.reason)
+        return f"{self.path} {self.reason}"
 
 
 class ScalimInitVarNodeTypeError(ScalimYamlError):
@@ -31,7 +32,7 @@ class ScalimInitVarNodeTypeError(ScalimYamlError):
 
     @override
     def __str__(self) -> str:
-        return "{} {}".format(self.path, self.reason)
+        return f"{self.path} {self.reason}"
 
 
 _INIT_VAR_KEY = "$init_var"
@@ -45,11 +46,11 @@ class InitVarRef:
     path: str = dataclass_field(compare=False)
 
 
-PathNode = Union[str, InitVarRef]
-OptionalPathNode = Optional[PathNode]
+PathNode = str | InitVarRef
+OptionalPathNode = PathNode | None
 
 
-def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
+def parse_init_var_mapping_node(raw: dict[str, Any], *, path: str) -> str:
     """校验并解析 `{$init_var: <name>}` 指令节点,返回归一化后的变量名.
 
     说明:
@@ -66,18 +67,18 @@ def parse_init_var_mapping_node(raw: Dict[str, Any], *, path: str) -> str:
     # - `{}`: 缺少 `$init_var` 键,属于“结构/形状”错误
     # - `null`: 键存在但值非法,属于“值类型”错误
     if _INIT_VAR_KEY not in raw:
-        msg = "only supports {{{}: <name>}}; missing '{}'".format(_INIT_VAR_KEY, _INIT_VAR_KEY)
+        msg = f"only supports {{{_INIT_VAR_KEY}: <name>}}; missing '{_INIT_VAR_KEY}'"
         raise ScalimInitVarNodeValueError(msg, path=path)
 
     init_var_raw = raw.get(_INIT_VAR_KEY)
     if not isinstance(init_var_raw, str) or not init_var_raw.strip():
         reason = "must be a non-empty string"
-        raise ScalimInitVarNodeTypeError(reason, path="{}.{}".format(path, _INIT_VAR_KEY))
+        raise ScalimInitVarNodeTypeError(reason, path=f"{path}.{_INIT_VAR_KEY}")
 
     return init_var_raw.strip()
 
 
-def parse_init_var_ref(raw: Dict[str, Any], *, path: str) -> InitVarRef:
+def parse_init_var_ref(raw: dict[str, Any], *, path: str) -> InitVarRef:
     """校验并解析 `{$init_var: <name>}` 指令节点,返回显式 `InitVarRef`."""
 
     name = parse_init_var_mapping_node(raw, path=path)

@@ -7,14 +7,15 @@
 # region imports
 
 import logging
-from typing import AbstractSet, Any, Callable, Collection, Dict, Hashable, List, Optional, Sequence, Tuple
+from collections.abc import Callable, Collection, Hashable, Sequence
+from collections.abc import Set as AbstractSet
+from typing import Any, Protocol
 
 from .....events import EventType
 from .....planning.builder_helpers.fusion_groups import ComputeFusionGroup
 from .....sinks import IColumnSink
 from .....spec.ir import DerivedFieldIr
 from .....typedefs import FieldValue
-from .....vendor.compact.typing_extensionsx import Protocol
 from ....context import BatchContext, DenseBatchContext
 from ...runtime.runtime import ExecutionRuntime
 from .errors import handle_compute_error
@@ -36,7 +37,7 @@ _DEPS_LEN_TWO = 2
 class _DenseStorageView(Protocol):
     """稠密字段存储的只读/写出视图(避免跨模块依赖私有 `_DenseFieldStorage`)."""
 
-    values: List[FieldValue]
+    values: list[FieldValue]
     present: bytearray
     present_count: int
 
@@ -45,7 +46,7 @@ def fusion_disabled_reason(
     runtime: ExecutionRuntime,
     group: ComputeFusionGroup,
     active_field_keys: Sequence[str],
-) -> Optional[str]:
+) -> str | None:
     """返回禁用原因码;`None` 表示可融合.
 
     `fast_fail` 仅在 `guardrails` **启用**且有效 `compute` 模式为 `fast_fail` 时禁用
@@ -77,7 +78,7 @@ def fusion_disabled_reason(
     return None
 
 
-def active_fusion_members(group: ComputeFusionGroup, late_fields: Collection[str]) -> Tuple[str, ...]:
+def active_fusion_members(group: ComputeFusionGroup, late_fields: Collection[str]) -> tuple[str, ...]:
     """去掉当前 `runtime` `late` 后的组员(写出路径跳过 `late`)."""
     if not late_fields:
         return group.field_keys
@@ -92,9 +93,9 @@ def active_fusion_members(group: ComputeFusionGroup, late_fields: Collection[str
 def _execute_fused_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 plan: c20-fused-dense
     *,
     group: ComputeFusionGroup,
-    field_plans: Sequence[Tuple[str, Any, Any]],
+    field_plans: Sequence[tuple[str, Any, Any]],
     context: DenseBatchContext,
-    batch_row_nth: List[Hashable],
+    batch_row_nth: list[Hashable],
     runtime: ExecutionRuntime,
 ) -> bool:
     """稠密批次快路径: 按 `idx` 读 `deps` 一次,再写多字段."""
@@ -109,8 +110,8 @@ def _execute_fused_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
     for field_key in pinned:
         context.dense_pin_field_storage(field_key)
     try:
-        out_storages: List[_DenseStorageView] = []
-        on_sets: List[Optional[Callable[[str, Hashable], None]]] = []
+        out_storages: list[_DenseStorageView] = []
+        on_sets: list[Callable[[str, Hashable], None] | None] = []
         for field_key, _, _ in field_plans:
             # `dense_*` 返回私有存储类型;经 `Any` 桥接到本地 `Protocol` 视图.
             storage_any: Any = context.dense_prepare_write_storage(field_key)
@@ -120,7 +121,7 @@ def _execute_fused_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
             out_storages.append(storage)
             on_sets.append(context.dense_on_field_set_callback_for_field(field_key))
 
-        dep_storages: List[Optional[_DenseStorageView]] = []
+        dep_storages: list[_DenseStorageView | None] = []
         for dep_key in deps:
             dep_any: Any = context.dense_get_storage_for_read(dep_key)
             dep_storages.append(None if dep_any is None else dep_any)
@@ -136,7 +137,7 @@ def _execute_fused_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
             if idx < 0 or idx >= row_count:
                 return False
 
-            dep_args: Tuple[FieldValue, ...]
+            dep_args: tuple[FieldValue, ...]
             if deps_len == _DEPS_LEN_ONE:
                 st0 = dep_storages[0]
                 d0: FieldValue = None if st0 is None or st0.present[idx] == 0 else st0.values[idx]
@@ -148,7 +149,7 @@ def _execute_fused_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
                 d1: FieldValue = None if st1 is None or st1.present[idx] == 0 else st1.values[idx]
                 dep_args = (d0, d1)
             else:
-                args_list: List[FieldValue] = []
+                args_list: list[FieldValue] = []
                 for st in dep_storages:
                     if st is None or st.present[idx] == 0:
                         args_list.append(None)
@@ -156,7 +157,7 @@ def _execute_fused_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
                         args_list.append(st.values[idx])
                 dep_args = tuple(args_list)
 
-            dep_payload: Optional[Dict[str, Any]] = None
+            dep_payload: dict[str, Any] | None = None
             for i, (field_key, calculator, value_transform) in enumerate(field_plans):
                 try:
                     result = calculator(*dep_args)
@@ -215,14 +216,14 @@ def execute_fused_compute_group(  # noqa: C901  # pragma: allow-c901 plan: c20-f
     group: ComputeFusionGroup,
     field_keys: Sequence[str],
     context: BatchContext,
-    batch_row_nth: List[Hashable],
+    batch_row_nth: list[Hashable],
     runtime: ExecutionRuntime,
 ) -> None:
     """对 `field_keys`(`size>=2`) 执行行内融合;依赖读取一次/行."""
     deps = group.deps
     compute_mode = runtime.guardrails.effective_compute_mode()
     guardrails_enabled = runtime.guardrails.enabled
-    field_plans: List[Tuple[str, Any, Any]] = []
+    field_plans: list[tuple[str, Any, Any]] = []
 
     for field_key in field_keys:
         field_spec = runtime.field_specs.get(field_key)
@@ -243,7 +244,7 @@ def execute_fused_compute_group(  # noqa: C901  # pragma: allow-c901 plan: c20-f
 
     for row_id in batch_row_nth:
         dep_args = tuple(context.get_field_value(dep, row_id) for dep in deps)
-        dep_payload: Optional[Dict[str, Any]] = None
+        dep_payload: dict[str, Any] | None = None
 
         for field_key, calculator, value_transform in field_plans:
             try:

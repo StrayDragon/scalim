@@ -1,8 +1,8 @@
 # region imports
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from ...vendor.compact import StrEnum
+from ..._internal.strenum import StrEnum
 from ..report_formats import ConsoleJsonlReportFormat
 from .performance import PerformanceConfig, PerformanceObserver
 from .relations import RelationConfig, RelationObserver
@@ -31,23 +31,24 @@ PROFILE_BENCH_PLUS = ObservabilityProfile.BENCH_PLUS.value
 PROFILE_DEBUG = ObservabilityProfile.DEBUG.value
 
 
-def _coerce_profile(name: Union[ObservabilityProfile, str, None]) -> ObservabilityProfile:
+def _coerce_profile(name: ObservabilityProfile | str | None) -> ObservabilityProfile:
     if isinstance(name, ObservabilityProfile):
         return name
     raw = str(name or ObservabilityProfile.BASELINE).strip().lower()
     try:
         return ObservabilityProfile(raw)
     except ValueError:
-        raise ValueError("未知可观测性 `profile`: {!r}".format(name))
+        msg = f"未知可观测性 `profile`: {name!r}"
+        raise ValueError(msg)
 
 
 def build_observability_profile(
-    name: Union[ObservabilityProfile, str],
+    name: ObservabilityProfile | str,
     sampling_interval: int = 1,
     include_memory: bool = False,
-    viz_output_dir: Optional[str] = None,
+    viz_output_dir: str | None = None,
     persist_batches: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """按具名低漂移 `profile` 组装 `observer` 组件.
 
     返回含键 `name`/`components`/`handles`/`viz_config`/`meta` 的 `dict`.
@@ -55,14 +56,14 @@ def build_observability_profile(
     """
     profile = _coerce_profile(name)
     name_s = profile.value
-    components: List[Any] = []
-    handles: Dict[str, Any] = {
+    components: list[Any] = []
+    handles: dict[str, Any] = {
         "accum": None,
         "perf": None,
         "stage_memory": None,
         "relation": None,
     }
-    viz_config: Optional[VizObserverConfig] = None
+    viz_config: VizObserverConfig | None = None
     meta = {"profile": name_s, "sampling_interval": int(sampling_interval)}
 
     if profile == ObservabilityProfile.BASELINE:
@@ -77,7 +78,7 @@ def build_observability_profile(
     # `bench_plus` 始终采样 `memory`;`debug`/`bench` 仅当 `include_memory=True`
     sample_rss = bool(include_memory) or profile == ObservabilityProfile.BENCH_PLUS
     if sample_rss:
-        require_psutil_for_memory("profile={}".format(name_s))
+        require_psutil_for_memory(f"profile={name_s}")
 
     accum = WorkflowStatsAccumulator(sample_rss=sample_rss, persist_batches=bool(persist_batches))
     components.append(accum)

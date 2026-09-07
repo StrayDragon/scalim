@@ -1,7 +1,8 @@
 import logging
 import threading
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Hashable, List, Optional, Tuple
+from collections.abc import Callable, Hashable
+from typing import Any
 
 from ..._internal.loggingx import format_kv, prefix
 from ..._internal.utils.loader_result import LOADER_RESULT_POLICY_VALUES, LoaderResultPolicyValue, parse_loader_result_policy
@@ -42,7 +43,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ObserverManagerEmitMixin(ABC):
-    observers: Optional[List[Observer]] = None
+    observers: list[Observer] | None = None
     debug_mode: bool = False
     fallback_logger_enabled: bool = False
     loader_result_policy: LoaderResultPolicyValue = "full"
@@ -50,13 +51,13 @@ class ObserverManagerEmitMixin(ABC):
     mode: ObserverManagerModeValue = "process"
     _lock: "threading.RLock" = threading.RLock()
     _has_observers: bool = False
-    _observers_by_event_type: Optional[Dict[EventType, Tuple[Observer, ...]]] = None
-    _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
+    _observers_by_event_type: dict[EventType, tuple[Observer, ...]] | None = None
+    _observers_for_unknown_event_type: tuple[Observer, ...] = ()
     _diagnostic_warning_emitted: bool = False
     _seq: int = 0
-    _event_meta_defaults: Optional[Dict[str, Any]] = None
+    _event_meta_defaults: dict[str, Any] | None = None
 
-    def _merge_event_meta_defaults(self, meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _merge_event_meta_defaults(self, meta: dict[str, Any] | None) -> dict[str, Any]:
         defaults = self._event_meta_defaults
         if not defaults:
             return meta or {}
@@ -65,7 +66,7 @@ class ObserverManagerEmitMixin(ABC):
 
         for key in WORKFLOW_ATTRIBUTION_META_KEYS:
             if key in defaults and key in meta:
-                msg = "Event.meta key '{}' is reserved for workflow attribution and cannot be overridden.".format(key)
+                msg = f"Event.meta key '{key}' is reserved for workflow attribution and cannot be overridden."
                 raise ValueError(msg)
 
         merged = dict(defaults)
@@ -82,7 +83,7 @@ class ObserverManagerEmitMixin(ABC):
     def _should_emit_event_type(self, event_type: EventType) -> bool: ...
 
     @abstractmethod
-    def _summarize_result(self, result: Any) -> Dict[str, Any]: ...
+    def _summarize_result(self, result: Any) -> dict[str, Any]: ...
 
     @abstractmethod
     def _sample_result(self, result: Any) -> Any: ...
@@ -128,8 +129,8 @@ class ObserverManagerEmitMixin(ABC):
             return
         event_type = event.event_type
 
-        observers: Tuple[Observer, ...] = ()
-        unknown_observers: Tuple[Observer, ...] = ()
+        observers: tuple[Observer, ...] = ()
+        unknown_observers: tuple[Observer, ...] = ()
         with self._lock:
             if not self._has_observers:
                 return
@@ -154,7 +155,7 @@ class ObserverManagerEmitMixin(ABC):
                 continue
             self._safe_call(observer, observer.on_event, event)
 
-    def build_event(self, event_type: EventType, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+    def build_event(self, event_type: EventType, payload: Any, meta: dict[str, Any] | None = None) -> Event:
         """构造 `Event` 信封(分配 `seq` / 合并 `meta`),不进行分发."""
         merged_meta = self._merge_event_meta_defaults(meta)
         return Event(
@@ -166,7 +167,7 @@ class ObserverManagerEmitMixin(ABC):
             seq=self._next_seq(),
         )
 
-    def emit_event(self, event_type: EventType, payload: Any, meta: Optional[Dict[str, Any]] = None) -> Event:
+    def emit_event(self, event_type: EventType, payload: Any, meta: dict[str, Any] | None = None) -> Event:
         event = self.build_event(event_type, payload, meta=meta)
         self.emit(event)
         return event
@@ -180,7 +181,7 @@ class ObserverManagerEmitMixin(ABC):
             for observer in observers:
                 self._close_observer_safely(observer)
 
-    def emit_pipeline_start(self, targets: List[str], batch_size: Optional[int]) -> None:
+    def emit_pipeline_start(self, targets: list[str], batch_size: int | None) -> None:
         if not self._should_emit_event_type(EventType.PIPELINE_START):
             return
         payload = PipelineStartEvent(targets, batch_size)
@@ -192,7 +193,7 @@ class ObserverManagerEmitMixin(ABC):
         payload = PipelineEndEvent(total_batches, total_duration)
         _ = self.emit_event(EventType.PIPELINE_END, payload)
 
-    def emit_batch_start(self, batch_num: int, row_ids: List[Any]) -> None:
+    def emit_batch_start(self, batch_num: int, row_ids: list[Any]) -> None:
         if not self._should_emit_event_type(EventType.BATCH_START):
             return
         payload = BatchStartEvent(batch_num, row_ids)
@@ -207,17 +208,17 @@ class ObserverManagerEmitMixin(ABC):
     def emit_loader_call(
         self,
         loader_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         result: Any,
         duration: float,
         *,
-        batch_num: Optional[int] = None,
-        cache_status: Optional[str] = None,
-        cache_scope: Optional[str] = None,
-        lookup_key_count: Optional[int] = None,
-        skipped_none_rows: Optional[int] = None,
-        field_keys: Optional[List[str]] = None,
-        chunk_offset: Optional[int] = None,
+        batch_num: int | None = None,
+        cache_status: str | None = None,
+        cache_scope: str | None = None,
+        lookup_key_count: int | None = None,
+        skipped_none_rows: int | None = None,
+        field_keys: list[str] | None = None,
+        chunk_offset: int | None = None,
     ) -> None:
         if not self._should_emit_event_type(EventType.LOADER_CALL):
             return
@@ -259,8 +260,8 @@ class ObserverManagerEmitMixin(ABC):
         elapsed_seconds: float,
         sleep_seconds: float,
         error_type: str,
-        error_message: Optional[str],
-        batch_num: Optional[int] = None,
+        error_message: str | None,
+        batch_num: int | None = None,
     ) -> None:
         if not self._should_emit_event_type(EventType.LOADER_RETRY):
             return
@@ -281,7 +282,7 @@ class ObserverManagerEmitMixin(ABC):
         self,
         field_key: str,
         row_id: Hashable,
-        dependencies: Dict[str, Any],
+        dependencies: dict[str, Any],
         result: Any,
     ) -> None:
         if not self._should_emit_event_type(EventType.FIELD_COMPUTE):
@@ -289,7 +290,7 @@ class ObserverManagerEmitMixin(ABC):
         payload = FieldComputeEvent(field_key, row_id, dependencies, result)
         _ = self.emit_event(EventType.FIELD_COMPUTE, payload)
 
-    def emit_error(self, error: Exception, context: Dict[str, Any]) -> None:
+    def emit_error(self, error: Exception, context: dict[str, Any]) -> None:
         if not self._should_emit_event_type(EventType.ERROR):
             return
         payload = ErrorEvent(error, context)
@@ -357,8 +358,8 @@ class ObserverManagerEmitMixin(ABC):
     def emit_row_release(
         self,
         row_id: Hashable,
-        released_fields: List[str],
-        retained_fields: List[str],
+        released_fields: list[str],
+        retained_fields: list[str],
         batch_num: int,
     ) -> None:
         if not self._should_emit_event_type(EventType.ROW_RELEASE):
@@ -370,7 +371,7 @@ class ObserverManagerEmitMixin(ABC):
         self,
         loader_name: str,
         original_keys: int,
-        extracted_fields: List[str],
+        extracted_fields: list[str],
         batch_num: int,
     ) -> None:
         if not self._should_emit_event_type(EventType.LOADER_SLIM):
@@ -397,9 +398,9 @@ class ObserverManagerEmitMixin(ABC):
         fk_normalized: Any,
         target_source: str,
         result: RelationLookupResult,
-        fk_type: Optional[str] = None,
-        expected_type: Optional[str] = None,
-        error_message: Optional[str] = None,
+        fk_type: str | None = None,
+        expected_type: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         if not self._should_emit_event_type(EventType.RELATION_LOOKUP):
             return

@@ -1,6 +1,6 @@
 import threading
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, cast
 
 from ..._internal.utils.loader_result import LoaderResultPolicy, LoaderResultPolicyValue, parse_loader_result_policy
 from ...events import Event, EventType
@@ -21,21 +21,21 @@ class ObserverManagerCaptureMixin:
     loader_result_policy: LoaderResultPolicyValue = "full"
     loader_result_sample_size: int = 5
     run_id: str = ""
-    max_recorded_events: Optional[int] = None
+    max_recorded_events: int | None = None
     capture_overflow_policy: CaptureOverflowPolicyValue = "raise"
     _lock: "threading.RLock" = threading.RLock()
-    _supported_event_types: Optional[Set[EventType]] = None
-    _observers_for_unknown_event_type: Tuple[Observer, ...] = ()
-    _capture_event_types: Optional[Set[EventType]] = None
+    _supported_event_types: set[EventType] | None = None
+    _observers_for_unknown_event_type: tuple[Observer, ...] = ()
+    _capture_event_types: set[EventType] | None = None
     _capture_unknown_event_types: bool = False
-    _recorded_events: Optional[Deque[Event]] = None
-    _event_meta_defaults: Optional[Dict[str, Any]] = None
+    _recorded_events: deque[Event] | None = None
+    _event_meta_defaults: dict[str, Any] | None = None
 
     def _record_event(self, event: Event) -> None:
         with self._lock:
             recorded_events = self._recorded_events
             if recorded_events is None:
-                recorded_events = cast("Deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
+                recorded_events = cast("deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
                 self._recorded_events = recorded_events
             max_recorded_events = self.max_recorded_events
             if max_recorded_events is None:
@@ -65,16 +65,16 @@ class ObserverManagerCaptureMixin:
                 return
 
             msg = (
-                "ObserverManager capture recorded events overflow (size={}, limit={}, policy={}). "
+                f"ObserverManager capture recorded events overflow (size={len(recorded_events)}, limit={limit}, policy={policy}). "
                 "Increase max_recorded_events, or set capture_overflow_policy to 'drop-oldest'/'drop-newest'."
-            ).format(len(recorded_events), limit, policy)
+            )
             raise ScalimObserverCaptureOverflowError(msg)
 
-    def drain_events(self) -> List[Event]:
+    def drain_events(self) -> list[Event]:
         with self._lock:
             recorded_events = self._recorded_events
             if recorded_events is None:
-                recorded_events = cast("Deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
+                recorded_events = cast("deque[Event]", deque())  # pragma: allow-cast deque typed narrowing
                 self._recorded_events = recorded_events
             if not recorded_events:
                 return []

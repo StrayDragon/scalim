@@ -1,7 +1,8 @@
-from typing import Dict, Hashable, List, Optional, Set
+from collections.abc import Hashable
+
+from typing_extensions import override
 
 from ...typedefs import FieldValue
-from ...vendor.compact.typing_extensionsx import override
 from ..context import BatchContext
 
 
@@ -15,12 +16,12 @@ class OverlayBatchContext(BatchContext):
 
     _base: BatchContext
 
-    def __init__(self, base: BatchContext, *, required_fields: Optional[Set[str]] = None) -> None:
-        super(OverlayBatchContext, self).__init__(required_fields=required_fields)
+    def __init__(self, base: BatchContext, *, required_fields: set[str] | None = None) -> None:
+        super().__init__(required_fields=required_fields)
         self._base = base
 
     @override
-    def get_field_value(self, field_key: str, row_id: Hashable, default: Optional[FieldValue] = None) -> FieldValue:
+    def get_field_value(self, field_key: str, row_id: Hashable, default: FieldValue | None = None) -> FieldValue:
         field_data = self._data.get(field_key)
         if field_data is not None and row_id in field_data:
             return field_data.get(row_id, default)
@@ -31,11 +32,11 @@ class OverlayBatchContext(BatchContext):
         return field_key in self._data or self._base.has_field(field_key)
 
     @override
-    def get_field_values_for_row(self, row_id: Hashable, field_keys: List[str]) -> Dict[str, FieldValue]:
+    def get_field_values_for_row(self, row_id: Hashable, field_keys: list[str]) -> dict[str, FieldValue]:
         return {key: self.get_field_value(key, row_id) for key in field_keys}
 
     @override
-    def get_all_rows_for_field(self, field_key: str) -> Set[Hashable]:
+    def get_all_rows_for_field(self, field_key: str) -> set[Hashable]:
         rows = set(self._base.get_all_rows_for_field(field_key))
         overlay_rows = self._data.get(field_key)
         if overlay_rows:
@@ -43,7 +44,7 @@ class OverlayBatchContext(BatchContext):
         return rows
 
     @override
-    def get_field_keys(self) -> Set[str]:
+    def get_field_keys(self) -> set[str]:
         keys = set(self._base.get_field_keys())
         keys |= set(self._data.keys())
         return keys
@@ -52,10 +53,10 @@ class OverlayBatchContext(BatchContext):
     def get_field_count(self) -> int:
         return len(self.get_field_keys())
 
-    def drain_overlay(self) -> Dict[str, Dict[Hashable, FieldValue]]:
+    def drain_overlay(self) -> dict[str, dict[Hashable, FieldValue]]:
         if not self._data:
             return {}
-        data: Dict[str, Dict[Hashable, FieldValue]] = {}
+        data: dict[str, dict[Hashable, FieldValue]] = {}
         for field_key in list(self._data.keys()):
             data[field_key] = self._data.pop(field_key)
         return data

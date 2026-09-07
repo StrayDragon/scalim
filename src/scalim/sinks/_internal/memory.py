@@ -1,9 +1,11 @@
 # region imports
 
-from typing import TYPE_CHECKING, Dict, Hashable, List, Mapping, Optional, Sequence, Type, Union
+from collections.abc import Hashable, Mapping, Sequence
+from typing import TYPE_CHECKING, Optional
+
+from typing_extensions import Self, override
 
 from ...typedefs import CellValue, RowData, SinkRowKeySeq
-from ...vendor.compact.typing_extensionsx import Self, override
 from .base import BaseRowSink, ColumnValues, IColumnSink, exit_sink
 
 if TYPE_CHECKING:
@@ -27,7 +29,7 @@ class InMemoryRowDataSink(BaseRowSink):
     """
 
     def __init__(self) -> None:
-        self._data: List[RowData] = []
+        self._data: list[RowData] = []
         self._closed: bool = False
 
     @override
@@ -36,9 +38,9 @@ class InMemoryRowDataSink(BaseRowSink):
 
     def write_row_aligned(self, field_keys: Sequence[str], values: Sequence[CellValue]) -> None:
         if len(field_keys) != len(values):
-            msg = "`write_row_aligned` 长度不一致: field_keys={} values={}".format(len(field_keys), len(values))
+            msg = f"`write_row_aligned` 长度不一致: field_keys={len(field_keys)} values={len(values)}"
             raise ValueError(msg)
-        self._data.append(dict(zip(field_keys, values)))
+        self._data.append(dict(zip(field_keys, values, strict=False)))
 
     @override
     def write_batch(self, rows: Sequence[RowData]) -> None:
@@ -56,7 +58,7 @@ class InMemoryRowDataSink(BaseRowSink):
         self._data = []
         self._closed = True
 
-    def get_data(self) -> List[RowData]:
+    def get_data(self) -> list[RowData]:
         return self._data
 
 
@@ -84,13 +86,13 @@ class InMemoryColumnSink(IColumnSink):
     ```
     """
 
-    field_names: List[str]
-    _row_ids: List[Hashable]
-    _columns: Dict[str, Dict[Hashable, CellValue]]
+    field_names: list[str]
+    _row_ids: list[Hashable]
+    _columns: dict[str, dict[Hashable, CellValue]]
     _closed: bool
     _auto_field_names: bool
 
-    def __init__(self, field_names: Optional[List[str]] = None) -> None:
+    def __init__(self, field_names: list[str] | None = None) -> None:
         self._auto_field_names = field_names is None
         self.field_names = field_names if field_names is not None else []
         self._row_ids = []
@@ -111,13 +113,13 @@ class InMemoryColumnSink(IColumnSink):
 
     def write_column_aligned(self, field_key: str, row_ids: "SinkRowKeySeq", values: Sequence[CellValue]) -> None:
         if len(row_ids) != len(values):
-            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            msg = f"`write_column_aligned` 长度不一致: row_ids={len(row_ids)} values={len(values)}"
             raise ValueError(msg)
 
         if field_key not in self._columns:
             self._columns[field_key] = {}
         col = self._columns[field_key]
-        for row_id, value in zip(row_ids, values):
+        for row_id, value in zip(row_ids, values, strict=False):
             col[row_id] = value
 
         if self._auto_field_names and field_key not in self.field_names:
@@ -155,16 +157,16 @@ class InMemoryColumnSink(IColumnSink):
     # 数据访问方法
     # ============================================================
 
-    def get_columns(self) -> Dict[str, Dict[Hashable, CellValue]]:
+    def get_columns(self) -> dict[str, dict[Hashable, CellValue]]:
         return self._columns
 
-    def get_column(self, field_key: str) -> Dict[Hashable, CellValue]:
+    def get_column(self, field_key: str) -> dict[Hashable, CellValue]:
         return self._columns.get(field_key, {})
 
-    def get_rows(self) -> List[RowData]:
-        rows: List[RowData] = []
+    def get_rows(self) -> list[RowData]:
+        rows: list[RowData] = []
         for pk in self._row_ids:
-            row: Dict[str, CellValue] = {}
+            row: dict[str, CellValue] = {}
             for field_key in self._columns:
                 if pk in self._columns[field_key]:
                     row[field_key] = self._columns[field_key][pk]
@@ -175,15 +177,15 @@ class InMemoryColumnSink(IColumnSink):
         self,
         *,
         include_header: bool = False,
-    ) -> List[List[Union[str, CellValue]]]:
-        result: List[List[Union[str, CellValue]]] = []
+    ) -> list[list[str | CellValue]]:
+        result: list[list[str | CellValue]] = []
         fields = self.field_names or list(self._columns.keys())
 
         if include_header:
             result.append(list(fields))
 
         for pk in self._row_ids:
-            row_values: List[Union[str, CellValue]] = []
+            row_values: list[str | CellValue] = []
             for field_key in fields:
                 column_data = self._columns.get(field_key, {})
                 row_values.append(column_data.get(pk))
@@ -191,10 +193,10 @@ class InMemoryColumnSink(IColumnSink):
 
         return result
 
-    def get_row_ids(self) -> List[Hashable]:
+    def get_row_ids(self) -> list[Hashable]:
         return self._row_ids
 
-    def get_field_names(self) -> List[str]:
+    def get_field_names(self) -> list[str]:
         return self.field_names or list(self._columns.keys())
 
     def __enter__(self) -> Self:
@@ -202,8 +204,8 @@ class InMemoryColumnSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)

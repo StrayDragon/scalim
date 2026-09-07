@@ -9,7 +9,7 @@ BREAKING (c10-remove-dedup-and-two-stage-derived):
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from scalim.execution import ExecutionRequest, ExportLayout, OutputSpec, export_layout_from_demand_ir, run_ir
 from scalim.execution.output_composition import (
@@ -35,10 +35,10 @@ _SHEET_AUDIT = "Audit"
 @dataclass
 class DerivedSetAggregationsDemoResult:
     workbook_path: str
-    sheet_names: List[str]
-    detail_rows: List[Dict[str, Any]]
-    distinct_rows: List[Dict[str, Any]]
-    expected_distinct_rows: List[Dict[str, Any]]
+    sheet_names: list[str]
+    detail_rows: list[dict[str, Any]]
+    distinct_rows: list[dict[str, Any]]
+    expected_distinct_rows: list[dict[str, Any]]
     passed: bool
     message: str
 
@@ -80,7 +80,7 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
         demand_ir = build_ecommerce_model()
         runtime_bindings = build_ecommerce_runtime_bindings()
 
-        detail_fields: Tuple[str, ...] = (
+        detail_fields: tuple[str, ...] = (
             "order_id",
             "customer_name",
             "product_name",
@@ -155,7 +155,7 @@ def run_derived_set_aggregations_demo(output_path: str) -> DerivedSetAggregation
         set_config(prev_config)
 
 
-def _read_workbook_sheet_names(path: str) -> List[str]:
+def _read_workbook_sheet_names(path: str) -> list[str]:
     from openpyxl import load_workbook  # noqa: PLC0415
 
     workbook = load_workbook(filename=str(path), read_only=True, data_only=True)
@@ -165,7 +165,7 @@ def _read_workbook_sheet_names(path: str) -> List[str]:
         workbook.close()
 
 
-def _read_sheet_rows_as_dicts(path: str, sheet_name: str) -> List[Dict[str, Any]]:
+def _read_sheet_rows_as_dicts(path: str, sheet_name: str) -> list[dict[str, Any]]:
     from openpyxl import load_workbook  # noqa: PLC0415
 
     workbook = load_workbook(filename=str(path), read_only=True, data_only=True)
@@ -179,14 +179,14 @@ def _read_sheet_rows_as_dicts(path: str, sheet_name: str) -> List[Dict[str, Any]
         return []
 
     header = [str(item) if item is not None else "" for item in rows[0]]
-    payload: List[Dict[str, Any]] = []
+    payload: list[dict[str, Any]] = []
     for row in rows[1:]:
         payload.append({header[idx]: row[idx] if idx < len(row) else None for idx in range(len(header))})
     return payload
 
 
-def _expected_distinct_by_payment(detail_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    groups: Dict[str, set] = {}
+def _expected_distinct_by_payment(detail_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, set] = {}
     for row in detail_rows:
         payment = str(row.get("payment_method_name") or "")
         customer_name = row.get("customer_name")
@@ -196,11 +196,11 @@ def _expected_distinct_by_payment(detail_rows: List[Dict[str, Any]]) -> List[Dic
     return out
 
 
-def _compare_rows(actual: List[Dict[str, Any]], expected: List[Dict[str, Any]], fields: Tuple[str, ...]) -> Tuple[bool, str]:
+def _compare_rows(actual: list[dict[str, Any]], expected: list[dict[str, Any]], fields: tuple[str, ...]) -> tuple[bool, str]:
     if len(actual) != len(expected):
-        return False, "row count mismatch: actual={} expected={}".format(len(actual), len(expected))
-    for idx, (a, e) in enumerate(zip(actual, expected), start=1):
+        return False, f"row count mismatch: actual={len(actual)} expected={len(expected)}"
+    for idx, (a, e) in enumerate(zip(actual, expected, strict=False), start=1):
         for f in fields:
             if a.get(f) != e.get(f):
-                return False, "row {} field '{}' mismatch: actual={} expected={}".format(idx, f, a.get(f), e.get(f))
+                return False, f"row {idx} field '{f}' mismatch: actual={a.get(f)} expected={e.get(f)}"
     return True, "ok: {}".format(",".join(fields))

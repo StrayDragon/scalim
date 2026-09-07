@@ -1,7 +1,9 @@
-from typing import Hashable, List, cast
+from collections.abc import Hashable
+from typing import cast
+
+from typing_extensions import override
 
 from ....planning.operators import ReleaseOperatorIr, SupportedOperatorIr
-from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext
 from ..runtime.runtime import ExecutionRuntime
 from .base import OperatorExecutor
@@ -15,7 +17,7 @@ class ReleaseOperatorExecutor(OperatorExecutor):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         op = cast("ReleaseOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing

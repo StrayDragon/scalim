@@ -8,14 +8,15 @@
 """
 
 import json
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Union, cast
+from typing import cast
 
 from ..._internal.utils.json_like import JsonLike
 from ...typedefs import RuntimeValue
-from ...vendor.dataclassesx import dataclass
 
-OutputRoot = Union[str, Path]
+OutputRoot = str | Path
 
 
 @dataclass(frozen=True)
@@ -40,20 +41,14 @@ def _read_json_object(path: Path, *, what: str, output_root: Path) -> Mapping[st
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        msg = "{} not found: path={!r}, output_root={!r}".format(str(what), str(path), str(output_root))
+        msg = f"{what!s} not found: path={str(path)!r}, output_root={str(output_root)!r}"
         raise FileNotFoundError(msg) from exc
     except Exception as exc:
-        msg = "Failed to parse {}: path={!r}, output_root={!r} ({}: {})".format(
-            str(what),
-            str(path),
-            str(output_root),
-            type(exc).__name__,
-            exc,
-        )
+        msg = f"Failed to parse {what!s}: path={str(path)!r}, output_root={str(output_root)!r} ({type(exc).__name__}: {exc})"
         raise ValueError(msg) from exc
 
     if not isinstance(payload, dict):
-        msg = "{} must be a JSON object: path={!r}, output_root={!r}".format(str(what), str(path), str(output_root))
+        msg = f"{what!s} must be a JSON object: path={str(path)!r}, output_root={str(output_root)!r}"
         raise TypeError(msg)
     return cast("Mapping[str, JsonLike]", payload)  # pragma: allow-cast json-load runtime boundary
 
@@ -61,7 +56,7 @@ def _read_json_object(path: Path, *, what: str, output_root: Path) -> Mapping[st
 def _require_non_empty_str(value: RuntimeValue, *, field: str, what: str, output_root: Path, path: Path) -> str:
     raw = str(value or "").strip()
     if not raw:
-        msg = "{} missing required field {!r}: path={!r}, output_root={!r}".format(str(what), str(field), str(path), str(output_root))
+        msg = f"{what!s} missing required field {str(field)!r}: path={str(path)!r}, output_root={str(output_root)!r}"
         raise ValueError(msg)
     return str(raw)
 
@@ -73,36 +68,26 @@ def _parse_id_to_paths(
     base_dir: Path,
     manifest_path: Path,
     output_root: Path,
-) -> Dict[str, Path]:
+) -> dict[str, Path]:
     if value is None:
         return {}
     if not isinstance(value, dict):
-        msg = "Invalid version manifest: {!r} must be a JSON object: manifest={!r}, output_root={!r}".format(
-            str(kind),
-            str(manifest_path),
-            str(output_root),
-        )
+        msg = f"Invalid version manifest: {str(kind)!r} must be a JSON object: manifest={str(manifest_path)!r}, output_root={str(output_root)!r}"  # noqa: E501
         raise TypeError(msg)
 
-    out: Dict[str, Path] = {}
+    out: dict[str, Path] = {}
     value_dict = cast("Mapping[object, object]", value)  # pragma: allow-cast json-load runtime boundary
     for raw_id, raw_relpath in value_dict.items():
         if not isinstance(raw_id, str):
-            msg = "Invalid version manifest: {} id must be a string: manifest={!r}, output_root={!r}".format(
-                str(kind), str(manifest_path), str(output_root)
+            msg = (
+                f"Invalid version manifest: {kind!s} id must be a string: manifest={str(manifest_path)!r}, output_root={str(output_root)!r}"
             )
             raise TypeError(msg)
         rel = str(raw_relpath or "").strip()
         if not rel:
             continue
         if not _is_safe_relpath(rel):
-            msg = "Invalid version manifest relpath: kind={!r}, id={!r}, relpath={!r}, manifest={!r}, output_root={!r}".format(
-                str(kind),
-                str(raw_id),
-                rel,
-                str(manifest_path),
-                str(output_root),
-            )
+            msg = f"Invalid version manifest relpath: kind={str(kind)!r}, id={str(raw_id)!r}, relpath={rel!r}, manifest={str(manifest_path)!r}, output_root={str(output_root)!r}"  # noqa: E501
             raise ValueError(msg)
         out[str(raw_id)] = base_dir / rel
     return out
@@ -121,7 +106,7 @@ def load_latest_outputs(output_root: OutputRoot) -> LatestOutputs:
     root = _as_root(output_root)
     latest_path = root / "manifest" / "latest.json"
     if not latest_path.is_file():
-        msg = "Latest outputs pointer not found: path={!r}, output_root={!r}".format(str(latest_path), str(root))
+        msg = f"Latest outputs pointer not found: path={str(latest_path)!r}, output_root={str(root)!r}"
         raise FileNotFoundError(msg)
 
     latest = _read_json_object(latest_path, what="latest outputs pointer", output_root=root)
@@ -136,9 +121,7 @@ def load_latest_outputs(output_root: OutputRoot) -> LatestOutputs:
         path=latest_path,
     )
     if not _is_safe_relpath(relpath):
-        msg = "Invalid latest outputs pointer: version_manifest_relpath must be a safe relative path: {!r} (output_root={!r})".format(
-            relpath, str(root)
-        )
+        msg = f"Invalid latest outputs pointer: version_manifest_relpath must be a safe relative path: {relpath!r} (output_root={str(root)!r})"  # noqa: E501
         raise ValueError(msg)
 
     manifest_path = root / relpath
@@ -165,16 +148,14 @@ def load_latest_outputs(output_root: OutputRoot) -> LatestOutputs:
         ("file", fid, p) for fid, p in files.items() if not p.exists()
     ]
     if missing:
-        kinds = ", ".join(["{}:{}={!r}".format(k, i, str(p)) for k, i, p in missing[:5]])
-        msg = "Latest outputs manifest points to missing artifacts: output_root={!r}, run_id={!r}, missing={}".format(
-            str(root), run_id, kinds
-        )
+        kinds = ", ".join([f"{k}:{i}={str(p)!r}" for k, i, p in missing[:5]])
+        msg = f"Latest outputs manifest points to missing artifacts: output_root={str(root)!r}, run_id={run_id!r}, missing={kinds}"
         raise FileNotFoundError(msg)
 
     return LatestOutputs(run_id=str(run_id), books=dict(books), files=dict(files))
 
 
-def try_load_latest_outputs(output_root: OutputRoot) -> Optional[LatestOutputs]:
+def try_load_latest_outputs(output_root: OutputRoot) -> LatestOutputs | None:
     """尝试发现最新 `outputs` 快照(缺失返回 `None`).
 
     缺失 `latest` 指示时返回 `None`;其它解析/一致性错误仍抛出异常.
@@ -196,7 +177,7 @@ def latest_book_path(output_root: OutputRoot, *, book_id: str) -> Path:
     try:
         return latest.books[bid]
     except KeyError as exc:
-        msg = "Latest outputs missing book_id: {!r} (output_root={!r}, run_id={!r})".format(bid, str(_as_root(output_root)), latest.run_id)
+        msg = f"Latest outputs missing book_id: {bid!r} (output_root={str(_as_root(output_root))!r}, run_id={latest.run_id!r})"
         raise KeyError(msg) from exc
 
 
@@ -209,7 +190,7 @@ def latest_file_path(output_root: OutputRoot, *, file_id: str) -> Path:
     try:
         return latest.files[fid]
     except KeyError as exc:
-        msg = "Latest outputs missing file_id: {!r} (output_root={!r}, run_id={!r})".format(fid, str(_as_root(output_root)), latest.run_id)
+        msg = f"Latest outputs missing file_id: {fid!r} (output_root={str(_as_root(output_root))!r}, run_id={latest.run_id!r})"
         raise KeyError(msg) from exc
 
 

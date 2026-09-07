@@ -1,7 +1,7 @@
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
 
 from .....spec.ir import LookupStepIr
-from .....vendor.dataclassesx import dataclass
 from ...guardrails import build_guardrail_once_key, fail_guardrail, record_guardrail
 
 
@@ -12,7 +12,7 @@ class _RelationGuardrailStats:
     type_error: int = 0
 
 
-def _stats_for_step(runtime: Any, step: LookupStepIr) -> Tuple[int, _RelationGuardrailStats]:
+def _stats_for_step(runtime: Any, step: LookupStepIr) -> tuple[int, _RelationGuardrailStats]:
     step_key = id(step)
     stats = runtime.relation_guardrail_stats.get(step_key)
     if stats is None:
@@ -27,7 +27,7 @@ def _emit_or_raise_relation_guardrail(
     *,
     code: str,
     message: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     step_key: int,
 ) -> None:
     guardrails = runtime.guardrails
@@ -59,7 +59,7 @@ def maybe_enforce_relation_guardrails(
     step: LookupStepIr,
     *,
     status: str,
-    error_message: Optional[str],
+    error_message: str | None,
 ) -> None:
     guardrails = runtime.guardrails
     if not guardrails.enabled or not guardrails.relations_enabled():

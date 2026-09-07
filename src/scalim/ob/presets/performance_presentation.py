@@ -1,8 +1,8 @@
 import csv
 import logging
 import statistics
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
 from ..._internal.loggingx import prefix
 from .._internal.console_report import build_line, format_percent, format_seconds
@@ -18,7 +18,7 @@ class PerformancePresentationLayer:
     """性能指标展示/导出层."""
 
     @staticmethod
-    def _percentile(sorted_values: List[float], p: float) -> float:
+    def _percentile(sorted_values: list[float], p: float) -> float:
         if not sorted_values:
             return 0.0
         if p <= 0:
@@ -35,7 +35,7 @@ class PerformancePresentationLayer:
         *,
         metrics: PerformanceMetrics,
         report_format: str,
-        output_path: Optional[str],
+        output_path: str | None,
         include_loader_stats: bool,
         include_loader_top_n: int,
         include_field_compute_top_n: int,
@@ -74,7 +74,7 @@ class PerformancePresentationLayer:
         self,
         *,
         metrics: PerformanceMetrics,
-        output_path: Optional[str],
+        output_path: str | None,
         logger: logging.Logger,
     ) -> None:
         if not output_path:
@@ -94,7 +94,7 @@ class PerformancePresentationLayer:
         self,
         *,
         metrics: PerformanceMetrics,
-        output_path: Optional[str],
+        output_path: str | None,
         logger: logging.Logger,
     ) -> None:
         if not output_path:
@@ -127,14 +127,14 @@ class PerformancePresentationLayer:
             "summary",
             total_duration_s=format_seconds(metrics.total_duration, digits=3),
             total_rows=int(metrics.total_rows),
-            throughput_rows_s="{:.1f}".format(float(metrics.throughput)),
+            throughput_rows_s=f"{float(metrics.throughput):.1f}",
             batch_count=int(metrics.batch_count),
             avg_batch_duration_s=format_seconds(metrics.avg_batch_duration, digits=4),
-            peak_memory_mb="{:.1f}".format(float(peak_memory_mb)) if peak_memory_mb is not None else None,
-            memory_increase_mb="{:.1f}".format(float(memory_increase_mb)) if memory_increase_mb is not None else None,
+            peak_memory_mb=f"{float(peak_memory_mb):.1f}" if peak_memory_mb is not None else None,
+            memory_increase_mb=f"{float(memory_increase_mb):.1f}" if memory_increase_mb is not None else None,
         )
 
-    def _iter_stage_items(self, metrics: PerformanceMetrics) -> Iterator[Tuple[str, float, float]]:
+    def _iter_stage_items(self, metrics: PerformanceMetrics) -> Iterator[tuple[str, float, float]]:
         stages = metrics.stage_metrics
         total_stage = (
             float(stages.stream_duration) + float(stages.loader_duration) + float(stages.compute_duration) + float(stages.write_duration)
@@ -153,8 +153,8 @@ class PerformancePresentationLayer:
                 continue
             yield str(stage), float(duration), float(duration / total_stage)
 
-    def _iter_console_stage_lines(self, metrics: PerformanceMetrics) -> List[str]:
-        lines: List[str] = []
+    def _iter_console_stage_lines(self, metrics: PerformanceMetrics) -> list[str]:
+        lines: list[str] = []
         for stage, duration, percent in self._iter_stage_items(metrics):
             lines.append(
                 build_line(
@@ -167,7 +167,7 @@ class PerformancePresentationLayer:
             )
         return lines
 
-    def _compute_loader_breakdown(self, metrics: PerformanceMetrics) -> Optional[Dict[str, float]]:
+    def _compute_loader_breakdown(self, metrics: PerformanceMetrics) -> dict[str, float] | None:
         if metrics.total_duration <= 0:
             return None
 
@@ -185,7 +185,7 @@ class PerformancePresentationLayer:
             "untracked_overhead_s": float(max(0.0, overhead_s)),
         }
 
-    def _build_console_loader_breakdown_line(self, metrics: PerformanceMetrics) -> Optional[str]:
+    def _build_console_loader_breakdown_line(self, metrics: PerformanceMetrics) -> str | None:
         breakdown = self._compute_loader_breakdown(metrics)
         if not breakdown:
             return None
@@ -199,7 +199,7 @@ class PerformancePresentationLayer:
             untracked_overhead_s=format_seconds(breakdown["untracked_overhead_s"], digits=4),
         )
 
-    def _compute_batch_stats(self, metrics: PerformanceMetrics) -> Optional[Dict[str, float]]:
+    def _compute_batch_stats(self, metrics: PerformanceMetrics) -> dict[str, float] | None:
         if not metrics.batch_durations:
             return None
         durations = sorted(float(x) for x in metrics.batch_durations)
@@ -214,7 +214,7 @@ class PerformancePresentationLayer:
             "stddev_s": float(stddev_s),
         }
 
-    def _build_console_batch_stats_line(self, metrics: PerformanceMetrics) -> Optional[str]:
+    def _build_console_batch_stats_line(self, metrics: PerformanceMetrics) -> str | None:
         stats = self._compute_batch_stats(metrics)
         if not stats:
             return None
@@ -229,7 +229,7 @@ class PerformancePresentationLayer:
             stddev_s=format_seconds(stats["stddev_s"], digits=4),
         )
 
-    def _iter_console_loader_top_lines(self, metrics: PerformanceMetrics, *, include_loader_top_n: int) -> List[str]:
+    def _iter_console_loader_top_lines(self, metrics: PerformanceMetrics, *, include_loader_top_n: int) -> list[str]:
         if not metrics.loader_stats or include_loader_top_n <= 0:
             return []
 
@@ -237,7 +237,7 @@ class PerformancePresentationLayer:
             metrics.loader_stats.values(),
             key=lambda s: (-float(s.total_duration), str(s.name)),
         )
-        lines: List[str] = []
+        lines: list[str] = []
         for stats in items[: int(max(0, include_loader_top_n))]:
             lines.append(
                 build_line(
@@ -248,16 +248,16 @@ class PerformancePresentationLayer:
                     exec_calls=int(stats.exec_count),
                     calls=int(stats.call_count),
                     records=int(stats.total_records),
-                    cache_hit_rate="{:.2f}".format(float(stats.cache_hit_rate)),
+                    cache_hit_rate=f"{float(stats.cache_hit_rate):.2f}",
                 )
             )
         return lines
 
-    def _iter_console_loader_lines(self, metrics: PerformanceMetrics) -> List[str]:
+    def _iter_console_loader_lines(self, metrics: PerformanceMetrics) -> list[str]:
         if not metrics.loader_stats:
             return []
 
-        lines: List[str] = []
+        lines: list[str] = []
         for name in sorted(metrics.loader_stats.keys()):
             stats = metrics.loader_stats[name]
             durations = sorted(float(x) for x in stats.durations) if stats.durations else []
@@ -275,12 +275,12 @@ class PerformancePresentationLayer:
                     avg_time_s=format_seconds(stats.avg_duration, digits=4),
                     p50_s=format_seconds(p50_s, digits=4) if p50_s is not None else None,
                     p90_s=format_seconds(p90_s, digits=4) if p90_s is not None else None,
-                    cache_hit_rate="{:.2f}".format(float(stats.cache_hit_rate)),
+                    cache_hit_rate=f"{float(stats.cache_hit_rate):.2f}",
                 )
             )
         return lines
 
-    def _iter_console_field_top_lines(self, metrics: PerformanceMetrics, *, include_field_compute_top_n: int) -> List[str]:
+    def _iter_console_field_top_lines(self, metrics: PerformanceMetrics, *, include_field_compute_top_n: int) -> list[str]:
         if not metrics.field_compute_stats or include_field_compute_top_n <= 0:
             return []
 
@@ -288,7 +288,7 @@ class PerformancePresentationLayer:
             metrics.field_compute_stats.values(),
             key=lambda s: (-float(s.total_duration), str(s.field_key)),
         )
-        lines: List[str] = []
+        lines: list[str] = []
         for stats in items[: int(max(0, include_field_compute_top_n))]:
             lines.append(
                 build_line(
@@ -302,7 +302,7 @@ class PerformancePresentationLayer:
             )
         return lines
 
-    def _iter_console_advisor_hint_lines(self, metrics: PerformanceMetrics) -> List[str]:
+    def _iter_console_advisor_hint_lines(self, metrics: PerformanceMetrics) -> list[str]:
         return [build_line("performance", "advisor_hint", hint=str(h), severity=str(s)) for h, s in self._iter_advisor_hints(metrics)]
 
     def _emit_structured_summary(self, metrics: PerformanceMetrics, *, logger: logging.Logger) -> None:
@@ -457,7 +457,7 @@ class PerformancePresentationLayer:
         include_loader_top_n: int,
         include_field_compute_top_n: int,
         include_advisor_hints: bool,
-    ) -> List[str]:
+    ) -> list[str]:
         lines = [self._build_console_summary_line(metrics)]
         lines.extend(self._iter_console_stage_lines(metrics))
 
@@ -517,7 +517,7 @@ class PerformancePresentationLayer:
         if include_advisor_hints:
             self._emit_structured_advisor_hints(metrics, logger=logger)
 
-    def _iter_advisor_hints(self, metrics: PerformanceMetrics) -> Iterable[Tuple[str, str]]:
+    def _iter_advisor_hints(self, metrics: PerformanceMetrics) -> Iterable[tuple[str, str]]:
         stages = metrics.stage_metrics
         total_stage = (
             float(stages.stream_duration) + float(stages.loader_duration) + float(stages.compute_duration) + float(stages.write_duration)
@@ -532,7 +532,7 @@ class PerformancePresentationLayer:
             "write": float(stages.write_duration) / total_stage if total_stage else 0.0,
         }
 
-        hints: List[Tuple[str, str]] = []
+        hints: list[tuple[str, str]] = []
         if ratios["stream"] >= _ADVISOR_DOMINANCE_RATIO:
             hints.append(("streaming-dominated: prioritize DB/streaming, not source lookup tuning", "info"))
         if ratios["lookup"] >= _ADVISOR_DOMINANCE_RATIO:
@@ -553,7 +553,7 @@ class PerformancePresentationLayer:
             )
             if low_hit:
                 s0 = low_hit[0]
-                hints.append(("low cache hit-rate for loader '{}': consider preload_forever or cache key strategy".format(s0.name), "warn"))
+                hints.append((f"low cache hit-rate for loader '{s0.name}': consider preload_forever or cache key strategy", "warn"))
 
         return hints[:3]
 

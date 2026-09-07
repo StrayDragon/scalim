@@ -1,9 +1,9 @@
 # region imports
 
 import logging
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Any
 
-from ..vendor.dataclassesx import dataclass, field
 from ._internal.console_report import emit_info, format_seconds
 
 # endregion
@@ -18,7 +18,7 @@ class LoaderMetrics:
     name: str
     call_count: int = field(default=0, init=False)
     total_duration: float = field(default=0.0, init=False)
-    durations: List[float] = field(default_factory=list, init=False)
+    durations: list[float] = field(default_factory=list, init=False)
     total_records: int = field(default=0, init=False)
 
     def record_call(self, duration: float, record_count: int) -> None:
@@ -50,8 +50,8 @@ class LoaderMetrics:
 class MetricsCollector:
     """性能指标收集器"""
 
-    loader_metrics: Dict[str, LoaderMetrics] = field(default_factory=dict, init=False)
-    batch_durations: List[float] = field(default_factory=list, init=False)
+    loader_metrics: dict[str, LoaderMetrics] = field(default_factory=dict, init=False)
+    batch_durations: list[float] = field(default_factory=list, init=False)
     total_batches: int = field(default=0, init=False)
     total_records: int = field(default=0, init=False)
     high_call_count_threshold: int = 10
@@ -94,8 +94,8 @@ class MetricsCollector:
                 avg_time_s=format_seconds(metrics.avg_duration, digits=4),
             )
 
-    def get_summary_dict(self) -> Dict[str, Any]:
-        summary: Dict[str, Any] = {
+    def get_summary_dict(self) -> dict[str, Any]:
+        summary: dict[str, Any] = {
             "total_batches": self.total_batches,
             "total_records": self.total_records,
             "batch_durations": self.batch_durations,

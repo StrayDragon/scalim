@@ -1,7 +1,8 @@
 from collections import UserDict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType, SimpleNamespace
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any
 
 
 class _GetItemRow:
@@ -24,7 +25,7 @@ class _RefRowObj:
     value: str
 
 
-def load_guardrails_demo_main_rows() -> List[Any]:
+def load_guardrails_demo_main_rows() -> list[Any]:
     """运行期 `guardrails` + `extract_field` 契约演示用的主表行数据.
 
     这些行刻意混合多种“像行一样”的数据形状:
@@ -45,13 +46,13 @@ def load_guardrails_demo_main_rows() -> List[Any]:
     ]
 
 
-def load_guardrails_demo_ref_table(ids: Optional[List[int]] = None) -> Dict[int, Any]:
+def load_guardrails_demo_ref_table(ids: list[int] | None = None) -> dict[int, Any]:
     """演示中 `relation` 字段使用的引用表加载器.
 
     Returns:
         一个映射:`ref_id` -> `row_data`(其中 `row_data` 也会混合多种形状)
     """
-    full: Dict[int, Any] = {
+    full: dict[int, Any] = {
         1: UserDict({"value": "U1"}),
         2: MappingProxyType({"value": "P2"}),
         3: SimpleNamespace(value="S3"),

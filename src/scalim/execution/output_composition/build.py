@@ -1,13 +1,11 @@
-from __future__ import absolute_import
-
-from typing import Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from ..._internal.utils.iterables import ordered_unique_str
 from ...ob.hub import InstrumentationHub
 from ...sinks import ExcelWorkbookSink, IRowSink
 from ...sinks.accept_types import SinkTypePrecheck
 from ...typedefs import KeyNormalizationMode, RuntimeValue
-from ...vendor.dataclassesx import dataclass
 from ..derived_outputs import AggregatingRowSink
 from ..managed_artifacts import MANAGED_ARTIFACT_KIND_CSV, ManagedArtifactPlan
 from ..output_contracts import ExportLayout, OutputSpec
@@ -26,9 +24,9 @@ from .specs import (
 )
 
 
-def required_demand_fields(spec: OutputCompositionSpec) -> Tuple[str, ...]:
+def required_demand_fields(spec: OutputCompositionSpec) -> tuple[str, ...]:
     """计算一次运行的目标字段列表(去重保序)."""
-    fields: List[str] = []
+    fields: list[str] = []
     for target in spec.targets:
         fields.extend([str(x) for x in target.layout.field_ids])
         if target.requires:
@@ -43,8 +41,8 @@ def required_demand_fields(spec: OutputCompositionSpec) -> Tuple[str, ...]:
 @dataclass(frozen=True)
 class OutputCompositionPlan:
     sink: RouterRowSink
-    output_paths: Dict[str, str]
-    managed_artifact_plans: Dict[str, ManagedArtifactPlan]
+    output_paths: dict[str, str]
+    managed_artifact_plans: dict[str, ManagedArtifactPlan]
 
 
 def normalize_output_failure_policy(failure_policy: RuntimeValue) -> str:
@@ -53,9 +51,9 @@ def normalize_output_failure_policy(failure_policy: RuntimeValue) -> str:
 
 def validate_excel_workbook_sheet_names(spec: OutputCompositionSpec) -> None:
     """确保同一路径的 `excel` 输出都显式声明 `sheet_name`(避免隐式覆盖)."""
-    excel_paths: Dict[str, List[Tuple[str, Optional[str]]]] = {}
+    excel_paths: dict[str, list[tuple[str, str | None]]] = {}
 
-    def _collect_excel_path(target_id: str, output: OutputSpec, sheet_name: Optional[str]) -> None:
+    def _collect_excel_path(target_id: str, output: OutputSpec, sheet_name: str | None) -> None:
         fmt = (output.format or "csv").lower()
         if fmt == "excel" and output.path:
             excel_paths.setdefault(str(output.path), []).append((str(target_id), sheet_name))
@@ -82,15 +80,15 @@ def validate_excel_workbook_sheet_names(spec: OutputCompositionSpec) -> None:
 
 def _append_route_state(
     *,
-    routes: List[RouteState],
-    output_paths: Dict[str, str],
+    routes: list[RouteState],
+    output_paths: dict[str, str],
     target_id: str,
     sink: IRowSink,
-    predicate: Optional[OutputRowPredicate],
+    predicate: OutputRowPredicate | None,
     is_primary: bool,
     output: OutputSpec,
     output_counter: RowCounter,
-    derived_fingerprint: Optional[str] = None,
+    derived_fingerprint: str | None = None,
 ) -> None:
     output_paths[str(target_id)] = str(output.path) if output.path else ""
     routes.append(
@@ -109,11 +107,11 @@ def _append_route_state(
 
 def _append_direct_target_routes(
     *,
-    routes: List[RouteState],
-    output_paths: Dict[str, str],
-    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
+    routes: list[RouteState],
+    output_paths: dict[str, str],
+    managed_artifact_plans: dict[str, ManagedArtifactPlan],
     targets: Sequence[OutputTargetSpec],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: dict[str, ExcelWorkbookSink],
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> None:
     for t in targets:
@@ -144,17 +142,17 @@ def _validate_derived_parallel_mode(target_id: str, derived: IDerivedAggregation
     try:
         derived.validate_parallel_mode(run_parallel_mode)
     except ValueError as exc:
-        msg = "派生输出不支持 parallel_mode={!r}: target_id={!r}: {}".format(str(run_parallel_mode), str(target_id), exc)
+        msg = f"派生输出不支持 parallel_mode={str(run_parallel_mode)!r}: target_id={str(target_id)!r}: {exc}"
         raise ValueError(msg) from exc
 
 
 def _append_derived_target_routes(
     *,
-    routes: List[RouteState],
-    output_paths: Dict[str, str],
-    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
+    routes: list[RouteState],
+    output_paths: dict[str, str],
+    managed_artifact_plans: dict[str, ManagedArtifactPlan],
     targets: Sequence[DerivedOutputTargetSpec],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
+    workbook_by_path: dict[str, ExcelWorkbookSink],
     run_parallel_mode: str,
     run_key_normalization: KeyNormalizationMode,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
@@ -191,19 +189,19 @@ def _append_derived_target_routes(
         )
 
 
-def ensure_primary_route(routes: List[RouteState]) -> None:
+def ensure_primary_route(routes: list[RouteState]) -> None:
     if routes and not any(r.is_primary for r in routes):
         routes[0].is_primary = True
 
 
 def _maybe_create_meta_target(
     *,
-    meta_sheet: Optional[MetaSheetSpec],
-    output_paths: Dict[str, str],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
-    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
+    meta_sheet: MetaSheetSpec | None,
+    output_paths: dict[str, str],
+    workbook_by_path: dict[str, ExcelWorkbookSink],
+    managed_artifact_plans: dict[str, ManagedArtifactPlan],
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
-) -> Optional[FinalTargetState]:
+) -> FinalTargetState | None:
     if meta_sheet is None:
         return None
 
@@ -240,12 +238,12 @@ def _maybe_create_meta_target(
 
 def _maybe_create_audit_target(
     *,
-    audit_sheet: Optional[AuditSheetSpec],
-    output_paths: Dict[str, str],
-    workbook_by_path: Dict[str, ExcelWorkbookSink],
-    managed_artifact_plans: Dict[str, ManagedArtifactPlan],
+    audit_sheet: AuditSheetSpec | None,
+    output_paths: dict[str, str],
+    workbook_by_path: dict[str, ExcelWorkbookSink],
+    managed_artifact_plans: dict[str, ManagedArtifactPlan],
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
-) -> Optional[FinalTargetState]:
+) -> FinalTargetState | None:
     if audit_sheet is None:
         return None
 
@@ -307,12 +305,12 @@ def build_output_composition(
     demand_name: str,
     demand_main_source_id: str,
     demand_target_fields: Sequence[str],
-    demand_field_fingerprints: Sequence[Tuple[str, str, str, str]],
-    run_started_at_epoch: Optional[float] = None,
+    demand_field_fingerprints: Sequence[tuple[str, str, str, str]],
+    run_started_at_epoch: float | None = None,
     run_parallel_mode: str = "",
-    run_batch_size: Optional[int] = None,
+    run_batch_size: int | None = None,
     run_key_normalization: KeyNormalizationMode = "raw",
-    instrumentation: Optional[InstrumentationHub] = None,
+    instrumentation: InstrumentationHub | None = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> OutputCompositionPlan:
     """物化多输出组合为一个 `IRowSink`(`RouterRowSink`).
@@ -323,11 +321,11 @@ def build_output_composition(
     failure_policy = normalize_output_failure_policy(spec.failure_policy)
     validate_excel_workbook_sheet_names(spec)
 
-    workbook_by_path: Dict[str, ExcelWorkbookSink] = {}
-    output_paths: Dict[str, str] = {}
-    managed_artifact_plans: Dict[str, ManagedArtifactPlan] = {}
+    workbook_by_path: dict[str, ExcelWorkbookSink] = {}
+    output_paths: dict[str, str] = {}
+    managed_artifact_plans: dict[str, ManagedArtifactPlan] = {}
 
-    routes: List[RouteState] = []
+    routes: list[RouteState] = []
 
     _append_direct_target_routes(
         routes=routes,

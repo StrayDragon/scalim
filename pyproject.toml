@@ -4,18 +4,18 @@ version = "0.10.3"
 description = "A data-orchestration framework simplifying perf opt & dev with unified way"
 readme = "README.md"
 authors = [{ name = "straydragon", email = "straydragonl@foxmail.com" }]
-requires-python = ">=3.6"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    # Python 3.6 兼容依赖 (通过 PyPI API 确认的版本边界)
-    # NOTE: YAML 解析实现通过 `src/scalim/vendor/yamlx/` vendors 化,运行时不依赖外部安装 `PyYAML`/`ruamel.yaml`。
-    # typing-extensions: 4.1.1 是最后支持 3.6 的版本, 4.2.0+ 需要 >=3.7
-    "typing-extensions>=4.1.1,<4.2;python_version<'3.7'",
-    "typing-extensions>=4.1.1;python_version>='3.7'",
+    # NOTE: YAML 解析实现通过 `src/scalim/vendor/yamlx/` vendors 化,运行时不依赖外部安装 `PyYAML`/`ruamel.yaml`(Stage B 解除)。
+    # typing-extensions: 仅 `Self`(3.11+)/`override`(3.12+) 尚未进 stdlib;floor 达到对应版本后可删(ROADMAP ratchet)。
+    "typing-extensions>=4.4",
 ]
 
 [tool.uv.workspace]
@@ -30,17 +30,11 @@ scalim = { workspace = true }
 
 [project.optional-dependencies]
 pandas = [
-    # numpy: 1.19.5 是最后支持 3.6 的版本, 1.20.0+ 需要 >=3.7
-    "numpy>=1.19.0,<1.20;python_version<'3.7'",
-    "numpy>=1.24.4;python_version>='3.7'",
-    # pandas: 1.1.5 是最后支持 3.6 的版本, 1.2.0+ 需要 >=3.7.1
-    "pandas>=1.0.0,<1.2;python_version<'3.7'",
-    "pandas>=2.0.3;python_version>='3.7'",
+    "numpy>=1.24.4",
+    "pandas>=2.0.3",
 ]
 excel = [
-    # openpyxl: 3.1.3 是最后支持 3.6 的版本, 3.1.4+ 需要 >=3.8
-    "openpyxl>=3.0.0,<3.1.4;python_version<'3.8'",
-    "openpyxl>=3.1.5;python_version>='3.8'",
+    "openpyxl>=3.1.5",
 ]
 
 [tool.uv.dependency-groups]
@@ -151,28 +145,23 @@ exclude = [
     "venv",
     "**/*.ipynb",
     "docs/**/*.py",
-    "src/scalim/vendor/dataclassesx/_backport.py",
     "src/scalim/vendor/yamlx/**",
 ]
 
 line-length = 140
 indent-width = 4
 
-target-version = "py37" # NOTE: 实际需要需要支持到3.6, 但是uv不支持
+target-version = "py310"
 
 [tool.ruff.lint]
 fixable = ["ALL"]
-unfixable = [
-    "UP", # 因为ruff仅最低支持py37 为了避免不兼容 所以禁用 pyupgrade
-]
+unfixable = []
 
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 select = ["ALL"]
 ignore = [
     "D",
-    "UP",
-    "FA100",   # 默认使用老的typing导入List Dict方式, 避免 py36不兼容
     "COM812",
     "TID252",  # 相对导入相关
     "PERF401", # 推荐列表推导式
@@ -209,7 +198,6 @@ max-args = 16
     "C901",
     "PLR0912",
 ]
-"src/scalim/vendor/compact/typing_extensionsx.py" = ["TID251"]
 "src/scalim/ob/presets/run_stats.py" = [
     "ANN",
     "BLE001",
@@ -237,9 +225,6 @@ max-args = 16
 "src/scalim/execution/executor/batch/_internal/stage_spans.py" = ["ANN", "B012", "F401", "FBT001"]
 "src/scalim/workflow/execute.py" = ["C901", "PLC0415"]
 ".tmp/**/*.py" = ["ALL"]
-
-[tool.ruff.lint.flake8-tidy-imports.banned-api]
-"typing_extensions".msg = "Use src/scalim/vendor/compact/typing_extensionsx.py instead (Python 3.6 + old typing_extensions compat)."
 
 [tool.ruff.format]
 quote-style = "double"
@@ -285,15 +270,13 @@ ignore = [
     "scripts",
     "agentdev/skills/scalim-yaml-dsl/scripts/**",
     "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py",
-    "src/scalim/vendor/dataclassesx/__init__.py",
-    "src/scalim/vendor/dataclassesx/_backport.py",
     "src/scalim/vendor/yamlx/**/*.py",
     "*.gen.py",
     ".tmp/**/*.py",
 ]
-extraPaths = ["./src/scalim/vendor/yamlx", "./src/scalim/vendor/dataclassesx"]
+extraPaths = ["./src/scalim/vendor/yamlx"]
 defineConstant = { DEBUG = true }
-pythonVersion = "3.6"
+pythonVersion = "3.10"
 pythonPlatform = "Linux"
 
 # 逐步收紧 `Any`/unknown 边界: 先覆盖核心 IR + `LoadRef` 执行链路.

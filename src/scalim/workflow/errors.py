@@ -13,12 +13,12 @@ class ScalimWorkflowConfigError(ScalimWorkflowError):
 
     def __init__(self, message: str, *, path: str = "") -> None:
         self.path = str(path or "")
-        super(ScalimWorkflowConfigError, self).__init__(self._format(message))
+        super().__init__(self._format(message))
 
     def _format(self, message: str) -> str:
         if not self.path:
             return str(message)
-        return "{} (path={})".format(message, self.path)
+        return f"{message} (path={self.path})"
 
 
 __all__ = ("ScalimWorkflowConfigError",)

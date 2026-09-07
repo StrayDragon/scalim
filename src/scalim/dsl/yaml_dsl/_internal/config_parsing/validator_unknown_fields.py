@@ -6,7 +6,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .unknown_fields import find_unknown_fields
 from .validators.issues import (
@@ -27,9 +27,9 @@ class ValidatorUnknownFieldsMixin:
     """
 
     _schema_path: str  # pyright: ignore[reportUninitializedInstanceVariable]
-    _schema: Optional[Dict[str, Any]]  # pyright: ignore[reportUninitializedInstanceVariable]
+    _schema: dict[str, Any] | None  # pyright: ignore[reportUninitializedInstanceVariable]
 
-    def _load_schema(self) -> Dict[str, Any]:
+    def _load_schema(self) -> dict[str, Any]:
         if self._schema is None:
             with Path(self._schema_path).open("r", encoding="utf-8") as f:
                 self._schema = json.load(f)
@@ -38,7 +38,7 @@ class ValidatorUnknownFieldsMixin:
             raise RuntimeError(msg)
         return self._schema
 
-    def _validate_unknown_fields(self, config: Dict[str, Any], issues: List[ValidationIssue], *, strict: bool) -> None:
+    def _validate_unknown_fields(self, config: dict[str, Any], issues: list[ValidationIssue], *, strict: bool) -> None:
         try:
             schema = self._load_schema()
         except Exception as exc:  # noqa: BLE001
@@ -46,10 +46,7 @@ class ValidatorUnknownFieldsMixin:
                 issues.append(
                     ValidationIssue(
                         severity=VALIDATION_SEVERITY_ERROR,
-                        message="加载 `JSON Schema` '{}' 失败; strict_unknown_fields=True 无法校验未知字段: {}".format(
-                            self._schema_path,
-                            type(exc).__name__,
-                        ),
+                        message=f"加载 `JSON Schema` '{self._schema_path}' 失败; strict_unknown_fields=True 无法校验未知字段: {type(exc).__name__}",  # noqa: E501
                         path="schema",
                     )
                 )

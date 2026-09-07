@@ -5,9 +5,12 @@
 """
 
 import logging
+from collections.abc import Hashable, Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Hashable, List, Optional, Sequence, Set, Type
+from typing import TYPE_CHECKING, Any, Optional
+
+from typing_extensions import Self, override
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
@@ -17,7 +20,6 @@ from ..._internal.utils.openpyxl_helpers import (
 )
 from ...typedefs import CellValue, RowData, SinkRowKeySeq
 from ...vendor.compact.importlibx import require_optional_dependency
-from ...vendor.compact.typing_extensionsx import Self, override
 from .accept_types import (
     SinkTypePrecheck,
     ensure_sink_accepted_cell,
@@ -57,15 +59,15 @@ class StreamingColumnExcelSink(IColumnSink):
     """
 
     output_path: str
-    field_names: List[str]
-    header_names: List[str]
+    field_names: list[str]
+    header_names: list[str]
     sheet_name: str
     include_header: bool
-    _row_ids: List[Hashable]
-    _row_index: Dict[Hashable, int]
-    _pending: List[Optional[Set[str]]]
-    _values: List[Optional[List[CellValue]]]
-    _field_index: Dict[str, int]
+    _row_ids: list[Hashable]
+    _row_index: dict[Hashable, int]
+    _pending: list[set[str] | None]
+    _values: list[list[CellValue] | None]
+    _field_index: dict[str, int]
     _workbook: Any
     _worksheet: Any
     _next_flush_index: int
@@ -77,8 +79,8 @@ class StreamingColumnExcelSink(IColumnSink):
     def __init__(
         self,
         output_path: str,
-        field_names: List[str],
-        header_names: Optional[List[str]] = None,
+        field_names: list[str],
+        header_names: list[str] | None = None,
         sheet_name: str = "Sheet1",
         include_header: bool = True,  # noqa: FBT001, FBT002
         allow_formulas: bool = True,  # noqa: FBT001, FBT002
@@ -114,7 +116,7 @@ class StreamingColumnExcelSink(IColumnSink):
 
         for pk in new_ids:
             if pk in self._row_index:
-                msg = "重复 `row_id`: {!r}".format(pk)
+                msg = f"重复 `row_id`: {pk!r}"
                 raise RuntimeError(msg)
 
         start = len(self._row_ids)
@@ -125,7 +127,7 @@ class StreamingColumnExcelSink(IColumnSink):
 
         n = len(new_ids)
         self._pending.extend(set(self.field_names) for _ in range(n))
-        empty_row: List[CellValue] = [None] * len(self.field_names)  # type: ignore[list-item]
+        empty_row: list[CellValue] = [None] * len(self.field_names)  # type: ignore[list-item]
         self._values.extend(list(empty_row) for _ in range(n))
 
         if not first_batch:
@@ -198,7 +200,7 @@ class StreamingColumnExcelSink(IColumnSink):
             msg = "必须先调用 `set_row_ids`"
             raise RuntimeError(msg)
         if len(row_ids) != len(values):
-            msg = "`write_column_aligned` 长度不一致: row_ids={} values={}".format(len(row_ids), len(values))
+            msg = f"`write_column_aligned` 长度不一致: row_ids={len(row_ids)} values={len(values)}"
             raise ValueError(msg)
 
         field = str(field_key)
@@ -206,7 +208,7 @@ class StreamingColumnExcelSink(IColumnSink):
             raise KeyError(field)
 
         fidx = self._field_index[field]
-        for pk, raw_value in zip(row_ids, values):
+        for pk, raw_value in zip(row_ids, values, strict=False):
             ridx = self._row_index.get(pk)
             if ridx is None:
                 continue
@@ -250,7 +252,7 @@ class StreamingColumnExcelSink(IColumnSink):
         if leftover:
             self._abandon_open_workbook()
             self._closed = True
-            msg = "仍有未齐备行: {}".format(leftover)
+            msg = f"仍有未齐备行: {leftover}"
             raise RuntimeError(msg)
 
         output_dir = Path(self.output_path).parent
@@ -277,8 +279,8 @@ class StreamingColumnExcelSink(IColumnSink):
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
         exc_tb: Optional["types.TracebackType"],  # noqa: PYI036
     ) -> None:
         exit_sink(self, exc_type)

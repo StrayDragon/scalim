@@ -1,13 +1,13 @@
-from typing import Any, Optional
+from dataclasses import dataclass, replace
+from typing import Any
 
 from ...execution.run_ir import ExecutionRequest
-from ...vendor.dataclassesx import dataclass, replace
 
 
 @dataclass(frozen=True)
 class WorkflowNodeRequestOverrides:
     capture_in_memory_rows: bool = False
-    main_rows: Optional[Any] = None
+    main_rows: Any | None = None
 
 
 def merge_workflow_node_request(base_request: ExecutionRequest, overrides: WorkflowNodeRequestOverrides) -> ExecutionRequest:

@@ -1,25 +1,24 @@
+from dataclasses import dataclass
 from difflib import get_close_matches
-from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, cast
-
-from .....vendor.dataclassesx import dataclass
+from typing import Any, cast
 
 
 @dataclass(frozen=True)
 class UnknownFieldIssue:
     path: str
     field: str
-    suggestions: Tuple[str, ...] = ()
+    suggestions: tuple[str, ...] = ()
 
     @property
     def message(self) -> str:
-        return "Unknown field '{}'".format(self.field)
+        return f"Unknown field '{self.field}'"
 
 
 def _unescape_json_pointer(value: str) -> str:
     return value.replace("~1", "/").replace("~0", "~")
 
 
-def _resolve_json_pointer(root: Dict[str, Any], pointer: str) -> Optional[Dict[str, Any]]:
+def _resolve_json_pointer(root: dict[str, Any], pointer: str) -> dict[str, Any] | None:
     if not pointer.startswith("#/"):
         return None
 
@@ -28,15 +27,15 @@ def _resolve_json_pointer(root: Dict[str, Any], pointer: str) -> Optional[Dict[s
         part = _unescape_json_pointer(raw_part)
         if not isinstance(current, dict):
             return None
-        current_dict = cast("Dict[str, Any]", current)  # pragma: allow-cast json pointer mapping typed narrowing
+        current_dict = cast("dict[str, Any]", current)  # pragma: allow-cast json pointer mapping typed narrowing
         if part not in current_dict:
             return None
         current = current_dict[part]
 
-    return cast("Dict[str, Any]", current) if isinstance(current, dict) else None  # pragma: allow-cast json pointer mapping typed narrowing
+    return cast("dict[str, Any]", current) if isinstance(current, dict) else None  # pragma: allow-cast json pointer mapping typed narrowing
 
 
-def _deref_schema(schema: Dict[str, Any], root_schema: Dict[str, Any]) -> Dict[str, Any]:
+def _deref_schema(schema: dict[str, Any], root_schema: dict[str, Any]) -> dict[str, Any]:
     current = schema
     max_depth = 32
     for _ in range(max_depth):
@@ -50,22 +49,22 @@ def _deref_schema(schema: Dict[str, Any], root_schema: Dict[str, Any]) -> Dict[s
     return current
 
 
-def _iter_effective_schemas(schema: Dict[str, Any], root_schema: Dict[str, Any], *, seen: Set[int]) -> List[Dict[str, Any]]:
+def _iter_effective_schemas(schema: dict[str, Any], root_schema: dict[str, Any], *, seen: set[int]) -> list[dict[str, Any]]:
     current = _deref_schema(schema, root_schema)
     schema_id = id(current)
     if schema_id in seen:
         return []
     seen.add(schema_id)
 
-    schemas: List[Dict[str, Any]] = [current]
+    schemas: list[dict[str, Any]] = [current]
 
     all_of = current.get("allOf")
     if isinstance(all_of, list):
-        for item in cast("List[Any]", all_of):  # pragma: allow-cast jsonschema list typed narrowing
+        for item in cast("list[Any]", all_of):  # pragma: allow-cast jsonschema list typed narrowing
             if isinstance(item, dict):
                 schemas.extend(
                     _iter_effective_schemas(
-                        cast("Dict[str, Any]", item),  # pragma: allow-cast jsonschema schema typed narrowing
+                        cast("dict[str, Any]", item),  # pragma: allow-cast jsonschema schema typed narrowing
                         root_schema,
                         seen=seen,
                     )
@@ -74,8 +73,8 @@ def _iter_effective_schemas(schema: Dict[str, Any], root_schema: Dict[str, Any],
     return schemas
 
 
-def _value_schema_types(value: Any) -> FrozenSet[str]:
-    types: Set[str] = set()
+def _value_schema_types(value: Any) -> frozenset[str]:
+    types: set[str] = set()
     if value is None:
         types.add("null")
     elif isinstance(value, bool):
@@ -94,19 +93,19 @@ def _value_schema_types(value: Any) -> FrozenSet[str]:
     return frozenset(types)
 
 
-def _schema_type_set(schema: Dict[str, Any]) -> Optional[FrozenSet[str]]:
+def _schema_type_set(schema: dict[str, Any]) -> frozenset[str] | None:
     typ = schema.get("type")
     if isinstance(typ, str) and typ:
         return frozenset({typ})
     if isinstance(typ, list):
-        typ_list = cast("List[Any]", typ)  # pragma: allow-cast jsonschema list typed narrowing
+        typ_list = cast("list[Any]", typ)  # pragma: allow-cast jsonschema list typed narrowing
         normalized = [str(t) for t in typ_list if isinstance(t, str) and t]
         if normalized:
             return frozenset(normalized)
     return None
 
 
-def _schema_accepts_value(schema: Dict[str, Any], value: Any) -> bool:
+def _schema_accepts_value(schema: dict[str, Any], value: Any) -> bool:
     expected = _schema_type_set(schema)
     if expected is None:
         return True
@@ -116,44 +115,44 @@ def _schema_accepts_value(schema: Dict[str, Any], value: Any) -> bool:
     return bool(expected & actual)
 
 
-def _extract_variant_candidates(schema: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _extract_variant_candidates(schema: dict[str, Any]) -> list[dict[str, Any]]:
     raw_variants: Any = schema.get("oneOf")
     if not isinstance(raw_variants, list):
         raw_variants = schema.get("anyOf")
     if not isinstance(raw_variants, list):
         return []
-    variants = cast("List[Any]", raw_variants)  # pragma: allow-cast jsonschema variants list typed narrowing
-    candidates: List[Dict[str, Any]] = []
+    variants = cast("list[Any]", raw_variants)  # pragma: allow-cast jsonschema variants list typed narrowing
+    candidates: list[dict[str, Any]] = []
     for item in variants:
         if isinstance(item, dict):
-            candidates.append(cast("Dict[str, Any]", item))  # pragma: allow-cast jsonschema variant schema typed narrowing
+            candidates.append(cast("dict[str, Any]", item))  # pragma: allow-cast jsonschema variant schema typed narrowing
     return candidates
 
 
 def _filter_variants_by_value_type(
-    candidates: List[Dict[str, Any]],
+    candidates: list[dict[str, Any]],
     *,
-    root_schema: Dict[str, Any],
+    root_schema: dict[str, Any],
     value: Any,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     return [c for c in candidates if _schema_accepts_value(_deref_schema(c, root_schema), value)]
 
 
-def _visible_object_keys(value: Dict[Any, Any]) -> Tuple[str, ...]:
+def _visible_object_keys(value: dict[Any, Any]) -> tuple[str, ...]:
     return tuple(str(k) for k in value if not str(k).startswith("_"))
 
 
 def _select_best_object_variants(
-    candidates: List[Dict[str, Any]],
+    candidates: list[dict[str, Any]],
     *,
-    root_schema: Dict[str, Any],
-    value: Dict[Any, Any],
-) -> List[Dict[str, Any]]:
+    root_schema: dict[str, Any],
+    value: dict[Any, Any],
+) -> list[dict[str, Any]]:
     value_keys = _visible_object_keys(value)
     if not value_keys:
         return candidates
 
-    def _hits(branch: Dict[str, Any]) -> int:
+    def _hits(branch: dict[str, Any]) -> int:
         keys = _collect_declared_property_keys(branch, root_schema)
         return sum(1 for k in value_keys if k in keys)
 
@@ -162,7 +161,7 @@ def _select_best_object_variants(
     return [branch for branch, score in scored if score == best]
 
 
-def _maybe_select_variant_branches(schema: Dict[str, Any], root_schema: Dict[str, Any], value: Any) -> List[Dict[str, Any]]:
+def _maybe_select_variant_branches(schema: dict[str, Any], root_schema: dict[str, Any], value: Any) -> list[dict[str, Any]]:
     """对 `oneOf`/`anyOf` 做 `best-effort` 分支选择.
 
     规则:
@@ -183,16 +182,16 @@ def _maybe_select_variant_branches(schema: Dict[str, Any], root_schema: Dict[str
     return _select_best_object_variants(
         filtered,
         root_schema=root_schema,
-        value=cast("Dict[Any, Any]", value),  # pragma: allow-cast value dict typed narrowing
+        value=cast("dict[Any, Any]", value),  # pragma: allow-cast value dict typed narrowing
     )
 
 
-def _iter_relevant_schemas(schema: Dict[str, Any], root_schema: Dict[str, Any], value: Any) -> List[Dict[str, Any]]:
+def _iter_relevant_schemas(schema: dict[str, Any], root_schema: dict[str, Any], value: Any) -> list[dict[str, Any]]:
     variants = _iter_effective_schemas(schema, root_schema, seen=set())
-    selected: List[Dict[str, Any]] = []
-    seen_ids: Set[int] = set()
+    selected: list[dict[str, Any]] = []
+    seen_ids: set[int] = set()
 
-    def _add(s: Dict[str, Any]) -> None:
+    def _add(s: dict[str, Any]) -> None:
         sid = id(s)
         if sid in seen_ids:
             return
@@ -208,16 +207,16 @@ def _iter_relevant_schemas(schema: Dict[str, Any], root_schema: Dict[str, Any], 
     return selected
 
 
-def _collect_declared_property_keys(schema: Dict[str, Any], root_schema: Dict[str, Any]) -> FrozenSet[str]:
-    keys: Set[str] = set()
+def _collect_declared_property_keys(schema: dict[str, Any], root_schema: dict[str, Any]) -> frozenset[str]:
+    keys: set[str] = set()
     for variant in _iter_effective_schemas(schema, root_schema, seen=set()):
         props = variant.get("properties")
         if isinstance(props, dict):
-            keys.update([str(k) for k in cast("Dict[str, Any]", props)])  # pragma: allow-cast jsonschema properties mapping typed narrowing
+            keys.update([str(k) for k in cast("dict[str, Any]", props)])  # pragma: allow-cast jsonschema properties mapping typed narrowing
     return frozenset(keys)
 
 
-def _merge_schema_variants(schemas: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _merge_schema_variants(schemas: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not schemas:
         return None
     if len(schemas) == 1:
@@ -225,45 +224,45 @@ def _merge_schema_variants(schemas: List[Dict[str, Any]]) -> Optional[Dict[str, 
     return {"anyOf": schemas}
 
 
-def _collect_object_property_schema_variants(relevant: List[Dict[str, Any]]) -> Tuple[bool, Dict[str, List[Dict[str, Any]]]]:
+def _collect_object_property_schema_variants(relevant: list[dict[str, Any]]) -> tuple[bool, dict[str, list[dict[str, Any]]]]:
     saw_props = False
-    property_variants: Dict[str, List[Dict[str, Any]]] = {}
+    property_variants: dict[str, list[dict[str, Any]]] = {}
     for variant in relevant:
         props = variant.get("properties")
         if not isinstance(props, dict):
             continue
         saw_props = True
-        for key, value in cast("Dict[str, Any]", props).items():  # pragma: allow-cast jsonschema properties mapping typed narrowing
+        for key, value in cast("dict[str, Any]", props).items():  # pragma: allow-cast jsonschema properties mapping typed narrowing
             if not isinstance(value, dict):
                 continue
             property_variants.setdefault(str(key), []).append(
-                cast("Dict[str, Any]", value)  # pragma: allow-cast jsonschema property schema typed narrowing
+                cast("dict[str, Any]", value)  # pragma: allow-cast jsonschema property schema typed narrowing
             )
     return saw_props, property_variants
 
 
-def _collect_additional_properties_schemas(relevant: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    additional_schemas: List[Dict[str, Any]] = []
+def _collect_additional_properties_schemas(relevant: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    additional_schemas: list[dict[str, Any]] = []
     for variant in relevant:
         additional = variant.get("additionalProperties")
         if isinstance(additional, dict):
-            additional_schemas.append(cast("Dict[str, Any]", additional))  # pragma: allow-cast jsonschema schema typed narrowing
+            additional_schemas.append(cast("dict[str, Any]", additional))  # pragma: allow-cast jsonschema schema typed narrowing
     return additional_schemas
 
 
-def _build_properties_schema_map(property_variants: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Dict[str, Any]]:
-    properties_schema_map: Dict[str, Dict[str, Any]] = {}
+def _build_properties_schema_map(property_variants: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
+    properties_schema_map: dict[str, dict[str, Any]] = {}
     for key, schemas in property_variants.items():
-        merged = cast("Dict[str, Any]", _merge_schema_variants(schemas))  # pragma: allow-cast non-empty schema merge typed narrowing
+        merged = cast("dict[str, Any]", _merge_schema_variants(schemas))  # pragma: allow-cast non-empty schema merge typed narrowing
         properties_schema_map[key] = merged
     return properties_schema_map
 
 
 def _collect_object_schema_info(
-    yaml_dict: Dict[Any, Any],
-    schema: Dict[str, Any],
-    root_schema: Dict[str, Any],
-) -> Tuple[Optional[FrozenSet[str]], Dict[str, Dict[str, Any]], Optional[Dict[str, Any]]]:
+    yaml_dict: dict[Any, Any],
+    schema: dict[str, Any],
+    root_schema: dict[str, Any],
+) -> tuple[frozenset[str] | None, dict[str, dict[str, Any]], dict[str, Any] | None]:
     """返回 (`known_keys`, `properties_schema_map`, `additional_schema`).
 
     - `known_keys=None` 表示跳过该节点的 `unknown-keys` 检查.
@@ -278,7 +277,7 @@ def _collect_object_schema_info(
     dynamic_mapping = bool(additional_schemas)
     saw_props, property_variants = _collect_object_property_schema_variants(relevant)
 
-    known_keys: Optional[FrozenSet[str]]
+    known_keys: frozenset[str] | None
     if dynamic_mapping:
         known_keys = None
     elif saw_props:
@@ -291,26 +290,26 @@ def _collect_object_schema_info(
     return known_keys, properties_schema_map, additional_schema
 
 
-def _resolve_array_item_schema(schema: Dict[str, Any], root_schema: Dict[str, Any], index: int, value: Any) -> Optional[Dict[str, Any]]:
+def _resolve_array_item_schema(schema: dict[str, Any], root_schema: dict[str, Any], index: int, value: Any) -> dict[str, Any] | None:
     relevant = _iter_relevant_schemas(schema, root_schema, value)
-    items_schemas: List[Dict[str, Any]] = []
+    items_schemas: list[dict[str, Any]] = []
 
     for variant in relevant:
         items_raw: Any = variant.get("items")
         if isinstance(items_raw, dict):
-            items_schemas.append(cast("Dict[str, Any]", items_raw))  # pragma: allow-cast jsonschema items schema typed narrowing
+            items_schemas.append(cast("dict[str, Any]", items_raw))  # pragma: allow-cast jsonschema items schema typed narrowing
             continue
         if isinstance(items_raw, list):
-            items_list = cast("List[Any]", items_raw)  # pragma: allow-cast jsonschema items list typed narrowing
+            items_list = cast("list[Any]", items_raw)  # pragma: allow-cast jsonschema items list typed narrowing
             if 0 <= index < len(items_list) and isinstance(items_list[index], dict):
                 items_schemas.append(
-                    cast("Dict[str, Any]", items_list[index])  # pragma: allow-cast jsonschema items schema typed narrowing
+                    cast("dict[str, Any]", items_list[index])  # pragma: allow-cast jsonschema items schema typed narrowing
                 )
                 continue
             additional_items = variant.get("additionalItems")
             if isinstance(additional_items, dict):
                 items_schemas.append(
-                    cast("Dict[str, Any]", additional_items)  # pragma: allow-cast jsonschema schema typed narrowing
+                    cast("dict[str, Any]", additional_items)  # pragma: allow-cast jsonschema schema typed narrowing
                 )
 
     if not items_schemas:
@@ -322,22 +321,22 @@ def _resolve_array_item_schema(schema: Dict[str, Any], root_schema: Dict[str, An
 
 def find_unknown_fields(
     yaml_data: Any,
-    schema: Dict[str, Any],
+    schema: dict[str, Any],
     *,
-    path: Optional[List[str]] = None,
-) -> List[UnknownFieldIssue]:
+    path: list[str] | None = None,
+) -> list[UnknownFieldIssue]:
     return _collect_unknown_fields_node(yaml_data, schema, root_schema=schema, path=path or [])
 
 
 def _collect_unknown_fields_object(
-    yaml_dict: Dict[Any, Any],
-    schema: Dict[str, Any],
+    yaml_dict: dict[Any, Any],
+    schema: dict[str, Any],
     *,
-    root_schema: Dict[str, Any],
-    path: List[str],
-) -> List[UnknownFieldIssue]:
+    root_schema: dict[str, Any],
+    path: list[str],
+) -> list[UnknownFieldIssue]:
     known_keys, property_schemas, additional_schema = _collect_object_schema_info(yaml_dict, schema, root_schema)
-    unknown: List[UnknownFieldIssue] = []
+    unknown: list[UnknownFieldIssue] = []
 
     for k, v in yaml_dict.items():
         key = str(k)
@@ -347,7 +346,7 @@ def _collect_unknown_fields_object(
         path_str = ".".join(child_path)
 
         if known_keys is not None and key not in known_keys:
-            suggestions: Tuple[str, ...] = ()
+            suggestions: tuple[str, ...] = ()
             if known_keys:
                 suggestions = tuple(get_close_matches(key, sorted(known_keys), n=3, cutoff=0.5))
             unknown.append(UnknownFieldIssue(path=path_str, field=key, suggestions=suggestions))
@@ -361,13 +360,13 @@ def _collect_unknown_fields_object(
 
 
 def _collect_unknown_fields_array(
-    items: List[Any],
-    schema: Dict[str, Any],
+    items: list[Any],
+    schema: dict[str, Any],
     *,
-    root_schema: Dict[str, Any],
-    path: List[str],
-) -> List[UnknownFieldIssue]:
-    nested: List[UnknownFieldIssue] = []
+    root_schema: dict[str, Any],
+    path: list[str],
+) -> list[UnknownFieldIssue]:
+    nested: list[UnknownFieldIssue] = []
     for idx, item in enumerate(items):
         child_schema = _resolve_array_item_schema(schema, root_schema, idx, items)
         if child_schema is None:
@@ -378,21 +377,21 @@ def _collect_unknown_fields_array(
 
 def _collect_unknown_fields_node(
     value: Any,
-    schema: Dict[str, Any],
+    schema: dict[str, Any],
     *,
-    root_schema: Dict[str, Any],
-    path: List[str],
-) -> List[UnknownFieldIssue]:
+    root_schema: dict[str, Any],
+    path: list[str],
+) -> list[UnknownFieldIssue]:
     if isinstance(value, dict):
         return _collect_unknown_fields_object(
-            cast("Dict[Any, Any]", value),  # pragma: allow-cast value dict typed narrowing
+            cast("dict[Any, Any]", value),  # pragma: allow-cast value dict typed narrowing
             schema,
             root_schema=root_schema,
             path=path,
         )
     if isinstance(value, list):
         return _collect_unknown_fields_array(
-            cast("List[Any]", value),  # pragma: allow-cast value list typed narrowing
+            cast("list[Any]", value),  # pragma: allow-cast value list typed narrowing
             schema,
             root_schema=root_schema,
             path=path,

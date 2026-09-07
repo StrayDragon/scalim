@@ -1,4 +1,4 @@
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from collections.abc import Callable, Iterable
 
 from ....typedefs import LoaderCallParams, LoaderResultMapping, LookupKey, RowData
 
@@ -19,7 +19,7 @@ LoaderParamsBuilder = Callable[..., LoaderCallParams]
 """
 
 
-LookupKeyCast = Callable[[object], Optional[LookupKey]]
+LookupKeyCast = Callable[[object], LookupKey | None]
 """关联键归一化函数类型."""
 
 
@@ -35,13 +35,13 @@ MainSourceRowIterableCallable = Callable[..., Iterable[RowData]]
 """
 
 
-LookupKeySpec = Union[str, Tuple[str, ...], List[str]]
+LookupKeySpec = str | tuple[str, ...] | list[str]
 """
 `Lookup` 字段键类型: 支持单字段(`str`)与多字段(`list`/`tuple`)
 """
 
 
-NormalizedLookupKeySpec = Union[str, Tuple[str, ...]]
+NormalizedLookupKeySpec = str | tuple[str, ...]
 """归一化后的字段键类型: 单字段 `str` 或复合字段元组."""
 
 

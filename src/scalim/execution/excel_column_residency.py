@@ -5,7 +5,7 @@
 未设 `OutputWriteLayout` 时:`BUFFERED` 推导 `column_buffered`,`CHUNKED` 推导 `column_chunked`.
 """
 
-from ..vendor.compact import StrEnum
+from .._internal.strenum import StrEnum
 
 
 class ExcelColumnResidency(StrEnum):

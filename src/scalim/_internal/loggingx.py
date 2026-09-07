@@ -8,9 +8,8 @@
 
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Mapping, Optional
-
-from ..vendor.compact.typing_extensionsx import TypeGuard
+from collections.abc import Iterable, Mapping
+from typing import Any, TypeGuard
 
 _SCALIM_ROOT_LOGGER_NAME = "scalim"
 
@@ -30,7 +29,7 @@ def get_logger(subsystem: str = "") -> logging.Logger:
 
     subsystem_text = str(subsystem or "").strip()
     if subsystem_text:
-        return logging.getLogger("{}.{}".format(_SCALIM_ROOT_LOGGER_NAME, subsystem_text))
+        return logging.getLogger(f"{_SCALIM_ROOT_LOGGER_NAME}.{subsystem_text}")
     return logging.getLogger(_SCALIM_ROOT_LOGGER_NAME)
 
 
@@ -40,7 +39,7 @@ def prefix(subsystem: str) -> str:
     subsystem_text = str(subsystem or "").strip()
     if not subsystem_text:
         return "[scalim] "
-    return "[scalim] {}: ".format(subsystem_text)
+    return f"[scalim] {subsystem_text}: "
 
 
 def _is_list_or_tuple(value: Any) -> TypeGuard[Iterable[Any]]:
@@ -51,7 +50,7 @@ def _is_set(value: Any) -> TypeGuard[Iterable[Any]]:
     return isinstance(value, set)
 
 
-def _is_dict(value: Any) -> TypeGuard[Dict[Any, Any]]:
+def _is_dict(value: Any) -> TypeGuard[dict[Any, Any]]:
     return isinstance(value, dict)
 
 
@@ -70,26 +69,26 @@ def _stringify_value(value: Any) -> str:
     return str(value)
 
 
-def format_kv(mapping: Optional[Mapping[str, Any]] = None, **kwargs: Any) -> str:
+def format_kv(mapping: Mapping[str, Any] | None = None, **kwargs: Any) -> str:
     """将键值对格式化为稳定的 `k=v, k2=v2` 文本.
 
     - 键会按字典序排序,保证稳定输出.
     - 值为 `None` 的条目会被忽略.
     """
 
-    items: Dict[str, Any] = {}
+    items: dict[str, Any] = {}
     if mapping:
         for key, value in mapping.items():
             items[str(key)] = value
     for key, value in kwargs.items():
         items[str(key)] = value
 
-    parts: List[str] = []
+    parts: list[str] = []
     for key in sorted(items.keys()):
         value = items[key]
         if value is None:
             continue
-        parts.append("{}={}".format(key, _stringify_value(value)))
+        parts.append(f"{key}={_stringify_value(value)}")
     return ", ".join(parts)
 
 

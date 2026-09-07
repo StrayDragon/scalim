@@ -8,7 +8,7 @@
 业务场景说明请参考 _loaders.py
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from scalim.execution.runtime_bindings import RuntimeBindings
 from scalim.spec.ir import (
@@ -69,12 +69,12 @@ __all__ = [
 # ============================================================================
 
 
-def _default_binding_params(ctx: LoaderCallContextIr) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+def _default_binding_params(ctx: LoaderCallContextIr) -> tuple[tuple[Any, ...], dict[str, Any]]:
     ids = ctx.lookup_keys_list or []
     return (), {"ids": ids, "field_keys": list(ctx.field_keys), "is_ref_loader": ctx.is_ref_loader}
 
 
-def _composite_binding_params(ctx: LoaderCallContextIr) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+def _composite_binding_params(ctx: LoaderCallContextIr) -> tuple[tuple[Any, ...], dict[str, Any]]:
     ids = ctx.lookup_keys_list or []
     return (), {"ids": ids, "field_keys": list(ctx.field_keys), "is_ref_loader": ctx.is_ref_loader}
 
@@ -132,7 +132,7 @@ TARGET_FIELDS_FULL = TARGET_FIELDS_BASIC + TARGET_FIELDS_RELATIONS + TARGET_FIEL
 # ============================================================================
 
 
-def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
+def build_ecommerce_model(config: ECommerceConfig | None = None) -> DemandIr:
     """构建电商订单报表 IR 模型
 
     Args:
@@ -324,7 +324,7 @@ def build_ecommerce_model(config: Optional[ECommerceConfig] = None) -> DemandIr:
     # 字段定义
     # ========================================================================
 
-    fields: List[Any] = [
+    fields: list[Any] = [
         # 主键
         FieldIr(field_id="order_id", name="订单ID", source_id=main_source.source_id, is_primary=True),
         # 基础字段
@@ -503,7 +503,7 @@ def build_ecommerce_runtime_bindings() -> RuntimeBindings:
     return bindings
 
 
-def build_target_sets() -> Dict[str, List[str]]:
+def build_target_sets() -> dict[str, list[str]]:
     """构建预定义的目标字段集"""
     return {
         "full": TARGET_FIELDS_FULL,

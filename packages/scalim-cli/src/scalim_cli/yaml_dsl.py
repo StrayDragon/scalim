@@ -2,8 +2,9 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.imports import (
@@ -246,7 +247,7 @@ def _default_schema_path() -> Path:
     return yaml_dsl_lsp.schema_dir() / "demand.gen.json"
 
 
-def _resolve_schema_path(arg: Optional[Path]) -> Path:
+def _resolve_schema_path(arg: Path | None) -> Path:
     return arg.resolve() if arg is not None else _default_schema_path()
 
 
@@ -256,12 +257,12 @@ _SCHEMA_TYPE_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")
 def _schema_path_for_schema_type(schema_type: str) -> Path:
     schema_type = (schema_type or "").strip() or yaml_dsl_lsp.DEFAULT_SCHEMA_TYPE
     if not _SCHEMA_TYPE_PATTERN.match(schema_type):
-        msg = "Invalid schema type: {}".format(schema_type)
+        msg = f"Invalid schema type: {schema_type}"
         raise ValueError(msg)
-    return yaml_dsl_lsp.schema_dir() / "{}.gen.json".format(schema_type)
+    return yaml_dsl_lsp.schema_dir() / f"{schema_type}.gen.json"
 
 
-def _load_json_schema(schema_path: Path) -> Dict[str, Any]:
+def _load_json_schema(schema_path: Path) -> dict[str, Any]:
     with schema_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -286,11 +287,11 @@ def _format_issue_location(yaml_path: Path, issue: ErrorEnvelope) -> str:
     if issue.line is None:
         return str(yaml_path)
     if issue.column is not None:
-        return "{}:{}:{}".format(yaml_path, issue.line, issue.column)
-    return "{}:{}".format(yaml_path, issue.line)
+        return f"{yaml_path}:{issue.line}:{issue.column}"
+    return f"{yaml_path}:{issue.line}"
 
 
-def _emit_source_snippet(issue: ErrorEnvelope, source_lines: Optional[List[str]], *, verbose: bool) -> None:
+def _emit_source_snippet(issue: ErrorEnvelope, source_lines: list[str] | None, *, verbose: bool) -> None:
     if source_lines is None or issue.line is None:
         return
     total_lines = len(source_lines)
@@ -307,31 +308,31 @@ def _emit_source_snippet(issue: ErrorEnvelope, source_lines: Optional[List[str]]
     _write_line("  |")
     for current in range(start, end + 1):
         text = source_lines[current - 1].rstrip("\n")
-        _write_line("{:>4} | {}".format(current, text))
+        _write_line(f"{current:>4} | {text}")
         if current == line_no:
             column = issue.column or 1
             pointer = " " * max(column - 1, 0)
-            _write_line("  | {}^".format(pointer))
+            _write_line(f"  | {pointer}^")
 
 
 def _print_linter_result(
     yaml_path: Path,
     *,
-    errors: List[ErrorEnvelope],
-    warnings: List[ErrorEnvelope],
+    errors: list[ErrorEnvelope],
+    warnings: list[ErrorEnvelope],
     verbose: bool,
-    source_lines: Optional[List[str]],
+    source_lines: list[str] | None,
 ) -> None:
     if not errors and not warnings:
-        _write_line("OK {}".format(yaml_path.name))
+        _write_line(f"OK {yaml_path.name}")
         return
 
     for issue in errors:
         path_suffix = _display_issue_path(issue.path)
         message = issue.message
         if path_suffix != "(root)":
-            message = "{} [{}]".format(message, path_suffix)
-        _write_line("ERROR {} --> {}".format(message, _format_issue_location(yaml_path, issue)))
+            message = f"{message} [{path_suffix}]"
+        _write_line(f"ERROR {message} --> {_format_issue_location(yaml_path, issue)}")
         _emit_source_snippet(issue, source_lines, verbose=verbose)
         if issue.suggestions:
             _write_line("help: {}".format(", ".join(issue.suggestions)))
@@ -341,29 +342,29 @@ def _print_linter_result(
         path_suffix = _display_issue_path(issue.path)
         message = issue.message
         if path_suffix != "(root)":
-            message = "{} [{}]".format(message, path_suffix)
-        _write_line("WARN {} --> {}".format(message, _format_issue_location(yaml_path, issue)))
+            message = f"{message} [{path_suffix}]"
+        _write_line(f"WARN {message} --> {_format_issue_location(yaml_path, issue)}")
         _emit_source_snippet(issue, source_lines, verbose=verbose)
         if issue.suggestions:
             _write_line("help: {}".format(", ".join(issue.suggestions)))
         _write_line("")
 
-    summary_parts: List[str] = []
+    summary_parts: list[str] = []
     if errors:
         summary_parts.append("{} error{}".format(len(errors), "" if len(errors) == 1 else "s"))
     if warnings:
         summary_parts.append("{} warning{}".format(len(warnings), "" if len(warnings) == 1 else "s"))
     summary = ", ".join(summary_parts) if summary_parts else "no issues"
-    _write_line("Found {}.".format(summary))
+    _write_line(f"Found {summary}.")
 
 
 def _render_result(
     yaml_path: Path,
     *,
-    errors: List[ErrorEnvelope],
-    warnings: List[ErrorEnvelope],
+    errors: list[ErrorEnvelope],
+    warnings: list[ErrorEnvelope],
     verbose: bool,
-    source_lines: Optional[List[str]],
+    source_lines: list[str] | None,
 ) -> None:
     _print_linter_result(
         yaml_path,
@@ -378,9 +379,9 @@ def _emit_error(
     message: str,
     *,
     json_output: bool,
-    yaml_path: Optional[Path] = None,
-    schema_path: Optional[Path] = None,
-    mode: Optional[str] = None,
+    yaml_path: Path | None = None,
+    schema_path: Path | None = None,
+    mode: str | None = None,
 ) -> None:
     if json_output:
         source_path = str(yaml_path) if yaml_path is not None else "(unknown)"
@@ -401,7 +402,7 @@ def _emit_error(
         )
         _write_line(json.dumps(payload.as_dict(), ensure_ascii=False))
         return
-    _write_line_stderr("错误: {}".format(message))
+    _write_line_stderr(f"错误: {message}")
 
 
 def _emit_workflow_context_errors(
@@ -411,9 +412,9 @@ def _emit_workflow_context_errors(
     yaml_path: Path,
     schema_path: Path,
     workflow_path: Path,
-    workflow_source_lines: Optional[List[str]],
-    errors: List[ErrorEnvelope],
-    warnings: List[ErrorEnvelope],
+    workflow_source_lines: list[str] | None,
+    errors: list[ErrorEnvelope],
+    warnings: list[ErrorEnvelope],
 ) -> int:
     if args.json:
         payload = ValidationPayload(
@@ -451,21 +452,21 @@ def _infer_yaml_type(yaml_text: str) -> str:
     return "demand"
 
 
-def _parse_path_aliases(raw_values: Iterable[str]) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
-    output: Dict[str, str] = {}
+def _parse_path_aliases(raw_values: Iterable[str]) -> tuple[dict[str, str] | None, str | None]:
+    output: dict[str, str] = {}
     for raw in raw_values:
         item = str(raw or "").strip()
         if not item:
             continue
         if "=" not in item:
-            return None, "Invalid --path-alias value: {!r} (expected <alias>=<path>)".format(item)
+            return None, f"Invalid --path-alias value: {item!r} (expected <alias>=<path>)"
         alias, base = item.split("=", 1)
         alias = str(alias or "").strip()
         base = str(base or "").strip()
         if not alias:
-            return None, "Invalid --path-alias value: {!r} (alias must be non-empty)".format(item)
+            return None, f"Invalid --path-alias value: {item!r} (alias must be non-empty)"
         if not base:
-            return None, "Invalid --path-alias value: {!r} (path must be non-empty)".format(item)
+            return None, f"Invalid --path-alias value: {item!r} (path must be non-empty)"
         output[alias] = base
     return output, None
 
@@ -474,15 +475,15 @@ def _run_validate_workflow(
     yaml_path: Path,
     *,
     schema_path: Path,
-    path_aliases: Optional[Dict[str, str]],
-    allowed_yaml_roots: Optional[List[Path]],
+    path_aliases: dict[str, str] | None,
+    allowed_yaml_roots: list[Path] | None,
     args: argparse.Namespace,
 ) -> int:
     try:
         workflow_text = yaml_path.read_text(encoding="utf-8")
     except Exception:  # noqa: BLE001
         _emit_error(
-            "YAML 文件读取失败: {}".format(yaml_path),
+            f"YAML 文件读取失败: {yaml_path}",
             json_output=args.json,
             yaml_path=yaml_path,
             schema_path=schema_path,
@@ -525,18 +526,18 @@ def _run_validate_workflow(
 def _run_validate_demand(
     yaml_path: Path,
     *,
-    yaml_text: Optional[str],
+    yaml_text: str | None,
     schema_path: Path,
-    allowed_yaml_roots: Optional[List[Path]],
-    available_book_ids: Optional[Set[str]],
-    available_file_ids: Optional[Set[str]],
+    allowed_yaml_roots: list[Path] | None,
+    available_book_ids: set[str] | None,
+    available_file_ids: set[str] | None,
     args: argparse.Namespace,
 ) -> int:
     try:
         text = str(yaml_text or "") or yaml_path.read_text(encoding="utf-8")
     except Exception:  # noqa: BLE001
         _emit_error(
-            "YAML 文件读取失败: {}".format(yaml_path),
+            f"YAML 文件读取失败: {yaml_path}",
             json_output=args.json,
             yaml_path=yaml_path,
             schema_path=schema_path,
@@ -588,8 +589,8 @@ def _run_validate(args: argparse.Namespace) -> int:
     raw_allowed_yaml_roots = args_dict.get("allowed_yaml_roots")
     allowed_yaml_roots = list(raw_allowed_yaml_roots) if raw_allowed_yaml_roots else None
 
-    workflow_book_ids: Optional[Set[str]] = None
-    workflow_file_ids: Optional[Set[str]] = None
+    workflow_book_ids: set[str] | None = None
+    workflow_file_ids: set[str] | None = None
     raw_workflow_path = args_dict.get("workflow")
     workflow_path = None
     if raw_workflow_path:
@@ -621,7 +622,7 @@ def _run_validate(args: argparse.Namespace) -> int:
 
     if not schema_path.exists():
         _emit_error(
-            "Schema 文件不存在: {}".format(schema_path),
+            f"Schema 文件不存在: {schema_path}",
             json_output=args.json,
             yaml_path=yaml_path,
             schema_path=schema_path,
@@ -653,17 +654,11 @@ def _run_viz_compile_demand(yaml_path: Path, *, output_dir: Path) -> int:
     try:
         snapshot_path, schedule_path = yaml_dsl_viz.compile_demand_viz(yaml_path, output_dir=output_dir)
     except Exception as exc:  # noqa: BLE001
-        _write_line_stderr(
-            "[错误] viz compile 失败: {}: {}: {}".format(
-                str(yaml_path),
-                type(exc).__name__,
-                exc,
-            )
-        )
+        _write_line_stderr(f"[错误] viz compile 失败: {yaml_path!s}: {type(exc).__name__}: {exc}")
         return 1
-    _write_line("OK {}".format(str(output_dir)))
-    _write_line("snapshot: {}".format(str(snapshot_path)))
-    _write_line("schedule: {}".format(str(schedule_path)))
+    _write_line(f"OK {output_dir!s}")
+    _write_line(f"snapshot: {snapshot_path!s}")
+    _write_line(f"schedule: {schedule_path!s}")
     return 0
 
 
@@ -671,18 +666,12 @@ def _run_viz_compile_workflow(yaml_path: Path, *, output_dir: Path) -> int:
     try:
         out_paths = yaml_dsl_viz.compile_workflow_viz(yaml_path, output_dir=output_dir)
     except Exception as exc:  # noqa: BLE001
-        _write_line_stderr(
-            "[错误] viz compile 失败: {}: {}: {}".format(
-                str(yaml_path),
-                type(exc).__name__,
-                exc,
-            )
-        )
+        _write_line_stderr(f"[错误] viz compile 失败: {yaml_path!s}: {type(exc).__name__}: {exc}")
         return 1
     manifest_path = out_paths.get("bundle:manifest")
-    _write_line("OK {}".format(str(output_dir)))
+    _write_line(f"OK {output_dir!s}")
     if manifest_path is not None:
-        _write_line("manifest: {}".format(str(manifest_path)))
+        _write_line(f"manifest: {manifest_path!s}")
     return 0
 
 
@@ -692,10 +681,10 @@ def _run_viz_compile(args: argparse.Namespace) -> int:
     viz_type = str(getattr(args, "viz_type", "") or "").strip()
 
     if not yaml_path.exists() or not yaml_path.is_file():
-        _write_line_stderr("[错误] YAML 文件不存在: {}".format(str(yaml_path)))
+        _write_line_stderr(f"[错误] YAML 文件不存在: {yaml_path!s}")
         return 2
     if output_dir.exists() and not output_dir.is_dir():
-        _write_line_stderr("[错误] --output-dir 必须是目录: {}".format(str(output_dir)))
+        _write_line_stderr(f"[错误] --output-dir 必须是目录: {output_dir!s}")
         return 2
 
     if viz_type == "demand":
@@ -703,7 +692,7 @@ def _run_viz_compile(args: argparse.Namespace) -> int:
     if viz_type == "workflow":
         return _run_viz_compile_workflow(yaml_path, output_dir=output_dir)
 
-    _write_line_stderr("[错误] Unknown --type: {!r}".format(viz_type))
+    _write_line_stderr(f"[错误] Unknown --type: {viz_type!r}")
     return 2
 
 
@@ -716,10 +705,10 @@ def _run_lint(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
     yaml_paths, discovery_errors = yaml_dsl_authoring.discover_yaml_files(raw_paths)
     if discovery_errors:
         for err in discovery_errors:
-            _write_line_stderr("error: {}".format(err))
+            _write_line_stderr(f"error: {err}")
         return 2
 
-    issues: List[yaml_dsl_authoring.LintIssue] = []
+    issues: list[yaml_dsl_authoring.LintIssue] = []
     had_fatal_error = False
 
     for path in yaml_paths:
@@ -730,7 +719,7 @@ def _run_lint(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
                 yaml_dsl_authoring.LintIssue(
                     code="YDL000",
                     severity="error",
-                    message="Failed to read: {}: {}".format(type(exc).__name__, exc),
+                    message=f"Failed to read: {type(exc).__name__}: {exc}",
                     path=str(path),
                     range=yaml_dsl_authoring.TextRange(
                         start=yaml_dsl_authoring.TextPosition(line=1, character=1),
@@ -766,7 +755,7 @@ def _run_lint(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
                         yaml_dsl_authoring.LintIssue(
                             code="YDL000",
                             severity="error",
-                            message="Failed to write: {}: {}".format(type(exc).__name__, exc),
+                            message=f"Failed to write: {type(exc).__name__}: {exc}",
                             path=str(path),
                             range=yaml_dsl_authoring.TextRange(
                                 start=yaml_dsl_authoring.TextPosition(line=1, character=1),
@@ -805,16 +794,7 @@ def _run_lint(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
     else:
         for issue in issues:
             start = issue.range.start
-            _write_line(
-                "{}:{}:{}: {} {} {}".format(
-                    issue.path,
-                    start.line,
-                    start.character,
-                    issue.severity.upper(),
-                    issue.code,
-                    issue.message,
-                )
-            )
+            _write_line(f"{issue.path}:{start.line}:{start.character}: {issue.severity.upper()} {issue.code} {issue.message}")
         if not issues:
             _write_line("OK")
 
@@ -834,7 +814,7 @@ def _run_format(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
     yaml_paths, discovery_errors = yaml_dsl_authoring.discover_yaml_files(raw_paths)
     if discovery_errors:
         for err in discovery_errors:
-            _write_line_stderr("error: {}".format(err))
+            _write_line_stderr(f"error: {err}")
         return 2
 
     had_fatal_error = False
@@ -844,18 +824,18 @@ def _run_format(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
         try:
             old_text = path.read_text(encoding="utf-8")
         except Exception as exc:  # noqa: BLE001
-            _write_line_stderr("error: Failed to read {}: {}: {}".format(path, type(exc).__name__, exc))
+            _write_line_stderr(f"error: Failed to read {path}: {type(exc).__name__}: {exc}")
             had_fatal_error = True
             continue
 
         new_text, changed, error = yaml_dsl_authoring.format_yaml_dsl_text(old_text)
         if error is not None:
-            _write_line_stderr("error: {}: {}".format(path, error))
+            _write_line_stderr(f"error: {path}: {error}")
             had_fatal_error = True
             continue
         if not changed:
             if not check and not diff:
-                _write_line("OK {}".format(path))
+                _write_line(f"OK {path}")
             continue
 
         had_changes = True
@@ -865,16 +845,16 @@ def _run_format(args: argparse.Namespace) -> int:  # noqa: C901, PLR0912
             continue
 
         if check:
-            _write_line("WOULD_FORMAT {}".format(path))
+            _write_line(f"WOULD_FORMAT {path}")
             continue
 
         try:
             _ = path.write_text(new_text, encoding="utf-8")
         except Exception as exc:  # noqa: BLE001
-            _write_line_stderr("error: Failed to write {}: {}: {}".format(path, type(exc).__name__, exc))
+            _write_line_stderr(f"error: Failed to write {path}: {type(exc).__name__}: {exc}")
             had_fatal_error = True
             continue
-        _write_line("FORMATTED {}".format(path))
+        _write_line(f"FORMATTED {path}")
 
     if had_fatal_error:
         return 2
@@ -888,8 +868,8 @@ def _load_workflow_context_for_schema_validate(
     args: argparse.Namespace,
     yaml_path: Path,
     schema_path: Path,
-    yaml_data_dict: Dict[str, Any],
-) -> Tuple[Optional[Set[str]], Optional[Set[str]], bool]:
+    yaml_data_dict: dict[str, Any],
+) -> tuple[set[str] | None, set[str] | None, bool]:
     args_dict = vars(args)
     raw_workflow_path = args_dict.get("workflow")
     if not raw_workflow_path:
@@ -934,17 +914,17 @@ def _run_schema_validate(args: argparse.Namespace) -> int:
         yaml_text = yaml_path.read_text(encoding="utf-8")
     except Exception:  # noqa: BLE001
         _emit_error(
-            "YAML 文件读取失败: {}".format(yaml_path),
+            f"YAML 文件读取失败: {yaml_path}",
             json_output=args.json,
             yaml_path=yaml_path,
             schema_path=schema_path,
             mode="schema-validate",
         )
         return 1
-    source_lines: Optional[List[str]] = yaml_text.splitlines()
+    source_lines: list[str] | None = yaml_text.splitlines()
 
-    errors: List[ErrorEnvelope] = []
-    warnings: List[ErrorEnvelope] = []
+    errors: list[ErrorEnvelope] = []
+    warnings: list[ErrorEnvelope] = []
     ok = False
 
     try:
@@ -1014,10 +994,10 @@ def _load_schema_or_error(
     *,
     yaml_path: Path,
     args: argparse.Namespace,
-) -> Tuple[Optional[Dict[str, Any]], int]:
+) -> tuple[dict[str, Any] | None, int]:
     if not schema_path.exists():
         _emit_error(
-            "Schema 文件不存在: {}".format(schema_path),
+            f"Schema 文件不存在: {schema_path}",
             json_output=args.json,
             yaml_path=yaml_path,
             schema_path=schema_path,
@@ -1029,7 +1009,7 @@ def _load_schema_or_error(
         return _load_json_schema(schema_path), 0
     except json.JSONDecodeError:
         _emit_error(
-            "Schema JSON 无法解析: {}".format(schema_path),
+            f"Schema JSON 无法解析: {schema_path}",
             json_output=args.json,
             yaml_path=yaml_path,
             schema_path=schema_path,
@@ -1043,7 +1023,7 @@ def _get_jsonschema_module(
     *,
     yaml_path: Path,
     schema_path: Path,
-) -> Optional[Any]:
+) -> Any | None:
     if _HAS_JSONSCHEMA and jsonschema is not None:
         return jsonschema
     _emit_error(
@@ -1057,16 +1037,16 @@ def _get_jsonschema_module(
 
 
 def _collect_schema_issues(
-    yaml_data: Dict[str, Any],
-    schema: Dict[str, Any],
+    yaml_data: dict[str, Any],
+    schema: dict[str, Any],
     args: argparse.Namespace,
     jsonschema_module: Any,
     *,
-    workflow_book_ids: Optional[Set[str]],
-    workflow_file_ids: Optional[Set[str]],
+    workflow_book_ids: set[str] | None,
+    workflow_file_ids: set[str] | None,
     source_path: str,
     locations: YamlLocationIndex,
-) -> Tuple[List[ErrorEnvelope], List[ErrorEnvelope]]:
+) -> tuple[list[ErrorEnvelope], list[ErrorEnvelope]]:
     try:
         issues = collect_jsonschema_validation_issues(
             yaml_data,
@@ -1148,12 +1128,12 @@ def _collect_schema_issues(
 def _emit_schema_result(
     yaml_path: Path,
     schema_path: Path,
-    errors: List[ErrorEnvelope],
-    warnings: List[ErrorEnvelope],
+    errors: list[ErrorEnvelope],
+    warnings: list[ErrorEnvelope],
     args: argparse.Namespace,
     *,
     ok: bool,
-    source_lines: Optional[List[str]],
+    source_lines: list[str] | None,
 ) -> int:
     if args.json:
         payload = ValidationPayload(
@@ -1185,7 +1165,7 @@ def _run_schema_show(args: argparse.Namespace) -> int:
         _emit_error(str(exc), json_output=False)
         return 1
     if not schema_path.exists():
-        _emit_error("Schema 文件不存在: {}".format(schema_path), json_output=False)
+        _emit_error(f"Schema 文件不存在: {schema_path}", json_output=False)
         return 1
     _write_raw(schema_path.read_text(encoding="utf-8"))
     return 0
@@ -1200,7 +1180,7 @@ def _run_schema_path(args: argparse.Namespace) -> int:
         _emit_error(str(exc), json_output=False)
         return 1
     if not schema_path.exists():
-        _emit_error("Schema 文件不存在: {}".format(schema_path), json_output=False)
+        _emit_error(f"Schema 文件不存在: {schema_path}", json_output=False)
         return 1
     _write_line(str(schema_path))
     return 0
@@ -1225,41 +1205,36 @@ def _run_upsert_lsp_comment(args: argparse.Namespace) -> int:
         return 1
 
     exit_code = 0
-    changed: List[Path] = []
-    unchanged: List[Path] = []
+    changed: list[Path] = []
+    unchanged: list[Path] = []
 
     paths = list(args_dict.get("paths", []) or [])
     for raw_path in paths:
         path = raw_path
         if not path.exists():
-            _write_line_stderr("错误: YAML 文件不存在: {}".format(path))
+            _write_line_stderr(f"错误: YAML 文件不存在: {path}")
             exit_code = 1
             continue
         if not path.is_file():
-            _write_line_stderr("错误: 不是文件: {}".format(path))
+            _write_line_stderr(f"错误: 不是文件: {path}")
             exit_code = 1
             continue
 
         result = yaml_dsl_lsp.upsert_schema_modelines_file(path, schema_modelines=schema_modelines)
         if result.error:
-            _write_line_stderr("错误: {} ({})".format(result.error, path))
+            _write_line_stderr(f"错误: {result.error} ({path})")
             exit_code = 1
             continue
         if result.changed:
             changed.append(path)
-            _write_line("UPDATED {}".format(path))
+            _write_line(f"UPDATED {path}")
         else:
             unchanged.append(path)
-            _write_line("OK {}".format(path))
+            _write_line(f"OK {path}")
 
     if changed or unchanged:
         _write_line("")
-        _write_line(
-            "Summary: {} updated, {} ok".format(
-                len(changed),
-                len(unchanged),
-            )
-        )
+        _write_line(f"Summary: {len(changed)} updated, {len(unchanged)} ok")
 
     return exit_code
 

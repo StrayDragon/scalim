@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 EXAMPLE_KIND_SMOKE = "smoke"
 EXAMPLE_KIND_ORACLE = "oracle"
@@ -12,10 +12,10 @@ class ExampleResult:
     passed: bool
     kind: str
     summary: str
-    details: Optional[Dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
     def raise_if_failed(self) -> None:
         if self.passed:
             return
-        msg = "[{}] {}".format(self.example_id, self.summary)
+        msg = f"[{self.example_id}] {self.summary}"
         raise AssertionError(msg)

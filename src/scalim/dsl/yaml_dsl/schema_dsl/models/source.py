@@ -1,7 +1,7 @@
-from typing import Any, ClassVar, Dict, Optional, Tuple, Union
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any, ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DEFAULT_CACHE_MODE,
     DEFAULT_LOADER_RETRY_BACKOFF,
@@ -48,7 +48,7 @@ class LoaderRetryConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    enabled: Optional[bool] = dataclass_field(
+    enabled: bool | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc=DESC_LOADER_RETRY,
@@ -64,7 +64,7 @@ class LoaderRetryConfig:
     )
     """是否启用加载重试(可选;为空则使用默认值)."""
 
-    should_retry: Optional[str] = dataclass_field(
+    should_retry: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="重试判定回调引用(安全引用,由 allowlist 约束)",
@@ -82,7 +82,7 @@ class LoaderRetryConfig:
     )
     """重试判定回调引用(受允许列表约束)."""
 
-    max_attempts: Optional[int] = dataclass_field(
+    max_attempts: int | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="最大尝试次数(含首次)",
@@ -95,7 +95,7 @@ class LoaderRetryConfig:
     )
     """最大尝试次数(包含首次调用,可选)."""
 
-    max_elapsed_seconds: Optional[float] = dataclass_field(
+    max_elapsed_seconds: float | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="最大累计耗时(秒,包含 sleep)",
@@ -108,7 +108,7 @@ class LoaderRetryConfig:
     )
     """最大累计耗时(秒,包含等待,可选)."""
 
-    backoff: Optional[str] = dataclass_field(
+    backoff: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="退避策略(fixed/exponential)",
@@ -120,7 +120,7 @@ class LoaderRetryConfig:
     )
     """退避策略:`fixed` 或 `exponential`(可选)."""
 
-    base_delay_seconds: Optional[float] = dataclass_field(
+    base_delay_seconds: float | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="基础等待时间(秒)",
@@ -132,7 +132,7 @@ class LoaderRetryConfig:
     )
     """基础等待时间(秒,可选)."""
 
-    max_delay_seconds: Optional[float] = dataclass_field(
+    max_delay_seconds: float | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="最大单次等待时间(秒)",
@@ -145,7 +145,7 @@ class LoaderRetryConfig:
     )
     """最大单次等待时间(秒,可选)."""
 
-    jitter: Optional[bool] = dataclass_field(
+    jitter: bool | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="启用 jitter(随机扰动)",
@@ -162,16 +162,16 @@ class NormalizeProjectFieldRuleConfig:
     SCHEMA_NAME: ClassVar[str] = "normalize_project_field_rule"
     """用于 `project_fields` 的投影规则(内部模型)."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ()
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ()
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    from_key: Optional[bool] = dataclass_field(default=None)
+    from_key: bool | None = dataclass_field(default=None)
     """将 `lookup key` 注入该字段(可选)."""
 
-    extract: Optional[str] = dataclass_field(default=None)
+    extract: str | None = dataclass_field(default=None)
     """从 `row value` 中提取字段值的路径表达式(可选)."""
 
 
@@ -180,7 +180,7 @@ class NormalizeStepConfig:
     SCHEMA_NAME: ClassVar[str] = "normalize_step"
     """用于 `normalize.map_values.steps` 的步骤配置对象(内部模型)."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("kind",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -189,13 +189,13 @@ class NormalizeStepConfig:
     kind: str = dataclass_field(default="")
     """`normalize` 步骤类型."""
 
-    on_empty: Optional[str] = dataclass_field(default=None)
+    on_empty: str | None = dataclass_field(default=None)
     """空列表策略(仅 `take_first`)."""
 
-    on_missing: Optional[str] = dataclass_field(default=None)
+    on_missing: str | None = dataclass_field(default=None)
     """缺失路径策略(仅 `project_fields`)."""
 
-    fields: Dict[str, NormalizeProjectFieldRuleConfig] = dataclass_field(default_factory=dict)
+    fields: dict[str, NormalizeProjectFieldRuleConfig] = dataclass_field(default_factory=dict)
     """`project_fields` 的投影规则."""
 
 
@@ -204,7 +204,7 @@ class NormalizeConfig:
     SCHEMA_NAME: ClassVar[str] = "normalize"
     """`whole-result` `normalize` 配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("kind",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("kind",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -222,19 +222,19 @@ class NormalizeConfig:
     on_none: str = dataclass_field(default="raise")
     """`key_field is None` 策略(仅 `index_by_key` 有意义)."""
 
-    on_empty: Optional[str] = dataclass_field(default=None)
+    on_empty: str | None = dataclass_field(default=None)
     """空列表策略(仅 `take_first`)."""
 
-    on_missing: Optional[str] = dataclass_field(default=None)
+    on_missing: str | None = dataclass_field(default=None)
     """缺失路径策略(仅 `project_fields`)."""
 
-    fields: Dict[str, NormalizeProjectFieldRuleConfig] = dataclass_field(default_factory=dict)
+    fields: dict[str, NormalizeProjectFieldRuleConfig] = dataclass_field(default_factory=dict)
     """`project_fields` 的投影规则."""
 
-    steps: Tuple[NormalizeStepConfig, ...] = dataclass_field(default_factory=tuple)
+    steps: tuple[NormalizeStepConfig, ...] = dataclass_field(default_factory=tuple)
     """用于 `normalize.map_values.steps` 的步骤列表."""
 
-    call_by: Optional[str] = dataclass_field(default=None)
+    call_by: str | None = dataclass_field(default=None)
     """可选: `normalize` 受控扩展点(安全引用)."""
 
 
@@ -243,7 +243,7 @@ class SourceConfig:
     SCHEMA_NAME: ClassVar[str] = "source"
     """数据源配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("loader", "key")
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("loader", "key")
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -263,7 +263,7 @@ class SourceConfig:
     )
     """加载器引用(模块路径 + 可调用对象)."""
 
-    key: Union[str, Tuple[str, ...]] = dataclass_field(
+    key: str | tuple[str, ...] = dataclass_field(
         default="",
         metadata=schema_meta(
             one_of=[
@@ -277,13 +277,13 @@ class SourceConfig:
     )
     """加载器返回映射的主键字段(支持复合键)."""
 
-    lookup_cast: Optional[LookupCastConfig] = dataclass_field(
+    lookup_cast: LookupCastConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(schema=LOOKUP_CAST_SCHEMA, desc=DESC_LOOKUP_CAST, md=DESC_LOOKUP_CAST_MD),
     )
     """可选:查找键归一化配置."""
 
-    normalize: Optional[NormalizeConfig] = dataclass_field(
+    normalize: NormalizeConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(schema=NORMALIZE_SCHEMA, desc=DESC_SOURCE_NORMALIZE, md=DESC_SOURCE_NORMALIZE_MD),
     )
@@ -307,13 +307,13 @@ class SourceConfig:
     )
     """缓存模式:`none` 或 `preload_forever`."""
 
-    retry: Optional[LoaderRetryConfig] = dataclass_field(
+    retry: LoaderRetryConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
     """运行期加载重试配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
-    fields: Dict[str, SourceFieldConfig] = dataclass_field(
+    fields: dict[str, SourceFieldConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             desc="数据源字段配置映射, key 为 field_id",
@@ -329,7 +329,7 @@ class SourceConfig:
     )
     """数据源字段配置映射,键为 `field_id`."""
 
-    params: Dict[str, Any] = dataclass_field(
+    params: dict[str, Any] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props={}),
     )
@@ -341,7 +341,7 @@ class MainSourceConfig:
     SCHEMA_NAME: ClassVar[str] = "main_source"
     """主数据源配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("source_id", "loader")
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("source_id", "loader")
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
@@ -368,7 +368,7 @@ class MainSourceConfig:
     )
     """主数据源加载器引用."""
 
-    fields: Dict[str, SourceFieldConfig] = dataclass_field(
+    fields: dict[str, SourceFieldConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             desc="主数据源字段配置映射, key 为 field_id",
@@ -384,19 +384,19 @@ class MainSourceConfig:
     )
     """主数据源字段配置映射,键为 `field_id`."""
 
-    params: Dict[str, Any] = dataclass_field(
+    params: dict[str, Any] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(desc=DESC_PARAMS, md=DESC_PARAMS_MD, additional_props={}),
     )
     """传递给主数据源加载器的静态参数映射."""
 
-    retry: Optional[LoaderRetryConfig] = dataclass_field(
+    retry: LoaderRetryConfig | None = dataclass_field(
         default=None,
         metadata=schema_omit(),
     )
     """运行期加载重试配置;从 `YAML` 主线迁出,通过运行入口参数控制."""
 
-    order_by: Tuple[str, ...] = dataclass_field(
+    order_by: tuple[str, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             schema={"type": "array", "items": {"type": "string"}},

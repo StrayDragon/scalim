@@ -1,9 +1,9 @@
-from typing import Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
 
 from ...spec.ir import DemandIr, FieldIr, LookupStepIr, SourceIr, SourceRefIr
 from ...spec.ir._helpers import extract_from_fields, infer_lookup_steps
 
-InferLookupStepsFn = Callable[[object, SourceRefIr, SourceIr], Optional[Tuple[LookupStepIr, ...]]]
+InferLookupStepsFn = Callable[[object, SourceRefIr, SourceIr], tuple[LookupStepIr, ...] | None]
 
 
 class LookupStepsResolver:
@@ -12,7 +12,7 @@ class LookupStepsResolver:
     缓存仅为内部优化:测试中禁止依赖缓存命中/未命中的行为.
     """
 
-    _cache: Dict[str, Optional[Tuple[LookupStepIr, ...]]]
+    _cache: dict[str, tuple[LookupStepIr, ...] | None]
     _infer_lookup_steps: InferLookupStepsFn
 
     def __init__(
@@ -28,9 +28,9 @@ class LookupStepsResolver:
         field_spec: FieldIr,
         main_source: SourceRefIr,
         *,
-        field_key: Optional[str] = None,
-        to_source: Optional[SourceIr] = None,
-    ) -> Optional[Tuple[LookupStepIr, ...]]:
+        field_key: str | None = None,
+        to_source: SourceIr | None = None,
+    ) -> tuple[LookupStepIr, ...] | None:
         cache_key = field_key or field_spec.field_id
         if field_spec.lookup_steps:
             self._cache[cache_key] = field_spec.lookup_steps
@@ -52,7 +52,7 @@ def extract_relation_dependency_keys(
     field_spec: FieldIr,
     resolver: LookupStepsResolver,
     field_key: str,
-) -> List[str]:
+) -> list[str]:
     """提取 `FieldIr` 的依赖字段键(来自 `lookup_steps` 或 `relation`)."""
     if field_spec.lookup_steps:
         steps = resolver.resolve(field_spec, demand.main_source, field_key=field_key, to_source=demand.sources.get(field_spec.source_id))

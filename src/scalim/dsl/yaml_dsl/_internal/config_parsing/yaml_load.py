@@ -3,14 +3,14 @@ import re
 from collections.abc import Hashable
 from pathlib import Path
 from types import MethodType
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 from .....vendor.yamlx.ruamel.yaml import YAML
 from ...schema_dsl.constants import UTF8_ENCODING
 from .error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
 from .validators.issues import ValidationIssue
 
-YamlLocationIndex = Dict[str, Tuple[int, int]]
+YamlLocationIndex = dict[str, tuple[int, int]]
 
 _BRACKET_INDEX_RE = re.compile(r"\[(\d+)\]")
 
@@ -20,7 +20,7 @@ def safe_yaml_parse_error_message(exc: Exception) -> str:
     context = getattr(exc, "context", None)  # pragma: allow-dynattr third-party: pyyaml MarkedYAMLError
     problem = getattr(exc, "problem", None)  # pragma: allow-dynattr third-party: pyyaml MarkedYAMLError
 
-    parts: List[str] = []
+    parts: list[str] = []
     if isinstance(context, str) and context.strip():
         parts.append(context.strip())
     if isinstance(problem, str) and problem.strip() and problem.strip() not in parts:
@@ -30,7 +30,7 @@ def safe_yaml_parse_error_message(exc: Exception) -> str:
     return ": ".join(parts)
 
 
-def _extract_yaml_error_location(exc: Exception) -> Optional[Tuple[int, int]]:
+def _extract_yaml_error_location(exc: Exception) -> tuple[int, int] | None:
     problem_mark = getattr(exc, "problem_mark", None)  # pragma: allow-dynattr third-party: pyyaml YAMLError mark
     context_mark = getattr(exc, "context_mark", None)  # pragma: allow-dynattr third-party: pyyaml YAMLError mark
     mark = problem_mark or context_mark
@@ -58,7 +58,7 @@ def _raise_yaml_duplicate_key(
     mark = getattr(key_node, "start_mark", None)  # pragma: allow-dynattr third-party: ruamel node.start_mark
     line_raw = getattr(mark, "line", None)  # pragma: allow-dynattr third-party: ruamel Mark
     column_raw = getattr(mark, "column", None)  # pragma: allow-dynattr third-party: ruamel Mark
-    loc: Optional[ErrorLoc] = None
+    loc: ErrorLoc | None = None
     if isinstance(line_raw, int) and isinstance(column_raw, int):
         loc = ErrorLoc(line=int(line_raw) + 1, column=int(column_raw) + 1)
 
@@ -68,7 +68,7 @@ def _raise_yaml_duplicate_key(
         errors=[
             ErrorEnvelope(
                 code="yaml_duplicate_key",
-                message="Duplicate key in YAML mapping: {!r}".format(key),
+                message=f"Duplicate key in YAML mapping: {key!r}",
                 source_path=source_path,
                 path="(root)",
                 loc=loc,
@@ -83,7 +83,7 @@ def _validate_no_duplicate_yaml_keys(
     constructor: Any,
     source_path: str,
 ) -> None:
-    explicit_seen: Dict[Any, bool] = {}
+    explicit_seen: dict[Any, bool] = {}
     for key_node, _value_node in pairs:
         tag = getattr(key_node, "tag", None)  # pragma: allow-dynattr third-party: ruamel node.tag
         if str(tag) == "tag:yaml.org,2002:merge":
@@ -105,7 +105,7 @@ def _construct_ruamel_mapping(
     deep: bool,
     detect_duplicate_keys: bool,
     source_path: str,
-) -> Dict[Any, Any]:
+) -> dict[Any, Any]:
     node_id = getattr(node, "id", None)  # pragma: allow-dynattr third-party: ruamel node.id
     if str(node_id) != "mapping":
         msg = "expected a mapping node, but found {}".format(str(node_id) if node_id is not None else "(unknown)")
@@ -117,7 +117,7 @@ def _construct_ruamel_mapping(
 
     constructor.flatten_mapping(node)
 
-    mapping: Dict[Any, Any] = constructor.yaml_base_dict_type()
+    mapping: dict[Any, Any] = constructor.yaml_base_dict_type()
     for key_node, value_node in getattr(node, "value", ()):  # pragma: allow-dynattr third-party: ruamel MappingNode.value
         key = constructor.construct_object(key_node, deep=True)
         key = _normalize_yaml_mapping_key(key)
@@ -139,7 +139,7 @@ def _safe_load_yaml_ruamel(text: str, *, source_path: str, detect_duplicate_keys
     yaml_rt = YAML(typ="safe")
     cast("Any", yaml_rt).version = (1, 2)
 
-    def _construct_mapping(self: Any, node: Any, deep: bool = False) -> Dict[Any, Any]:  # noqa: FBT001, FBT002
+    def _construct_mapping(self: Any, node: Any, deep: bool = False) -> dict[Any, Any]:  # noqa: FBT001, FBT002
         return _construct_ruamel_mapping(
             self,
             node,
@@ -160,7 +160,7 @@ def _safe_load_yaml(text: str, *, source_path: str, detect_duplicate_keys: bool)
     return _safe_load_yaml_ruamel(text, source_path=source_path, detect_duplicate_keys=bool(detect_duplicate_keys))
 
 
-def _record_location(locations: YamlLocationIndex, path: List[str], mark: Any) -> None:
+def _record_location(locations: YamlLocationIndex, path: list[str], mark: Any) -> None:
     if mark is None:
         return
     path_key = ".".join(path)
@@ -171,7 +171,7 @@ def _record_location(locations: YamlLocationIndex, path: List[str], mark: Any) -
 
 def _index_yaml_node(
     node: Any,
-    path: List[str],
+    path: list[str],
     locations: YamlLocationIndex,
     *,
     record_current: bool = True,
@@ -207,10 +207,10 @@ def _index_yaml_node(
             _index_yaml_node(item_node, idx_path, locations, record_current=False)
 
 
-def _compose_yaml_node(yaml_text: str) -> Optional[Any]:
+def _compose_yaml_node(yaml_text: str) -> Any | None:
     yaml_safe = YAML(typ="safe")
     cast("Any", yaml_safe).version = (1, 2)
-    return cast("Optional[Any]", yaml_safe.compose(yaml_text))  # pragma: allow-cast ruamel compose typed narrowing
+    return cast("Any | None", yaml_safe.compose(yaml_text))  # pragma: allow-cast ruamel compose typed narrowing
 
 
 def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:
@@ -251,7 +251,7 @@ def normalize_yaml_diagnostic_path(path: str) -> str:
     return cleaned.lstrip(".")
 
 
-def lookup_yaml_location(path: str, locations: YamlLocationIndex) -> Optional[Tuple[int, int]]:
+def lookup_yaml_location(path: str, locations: YamlLocationIndex) -> tuple[int, int] | None:
     normalized = normalize_yaml_diagnostic_path(path)
     if normalized in locations:
         return locations[normalized]
@@ -270,8 +270,8 @@ def error_loc_for_yaml_path(
     path: str,
     locations: YamlLocationIndex,
     *,
-    default: Optional[Tuple[int, int]] = (1, 1),
-) -> Optional[ErrorLoc]:
+    default: tuple[int, int] | None = (1, 1),
+) -> ErrorLoc | None:
     loc_raw = lookup_yaml_location(path, locations)
     if loc_raw is None:
         if default is None:
@@ -307,8 +307,8 @@ def load_yaml_mapping_text(
     *,
     source_path: str,
     detect_duplicate_keys: bool = True,
-) -> Tuple[Dict[str, Any], YamlLocationIndex, List[str]]:
-    lines: List[str] = yaml_text.splitlines()
+) -> tuple[dict[str, Any], YamlLocationIndex, list[str]]:
+    lines: list[str] = yaml_text.splitlines()
 
     try:
         loaded = _safe_load_yaml(yaml_text, source_path=source_path, detect_duplicate_keys=bool(detect_duplicate_keys))
@@ -323,7 +323,7 @@ def load_yaml_mapping_text(
             errors=[
                 ErrorEnvelope(
                     code="yaml_parse_error",
-                    message="YAML parse error: {}".format(safe_yaml_parse_error_message(exc)),
+                    message=f"YAML parse error: {safe_yaml_parse_error_message(exc)}",
                     source_path=source_path,
                     path="(root)",
                     loc=loc,
@@ -363,7 +363,7 @@ def load_yaml_mapping_text(
 
     locations = build_yaml_location_index(yaml_text)
     return (
-        cast("Dict[str, Any]", loaded),  # pragma: allow-cast yaml.safe_load mapping typed narrowing
+        cast("dict[str, Any]", loaded),  # pragma: allow-cast yaml.safe_load mapping typed narrowing
         locations,
         lines,
     )
@@ -373,7 +373,7 @@ def load_yaml_mapping_file(
     yaml_path: Path,
     *,
     detect_duplicate_keys: bool = True,
-) -> Tuple[Dict[str, Any], YamlLocationIndex, List[str]]:
+) -> tuple[dict[str, Any], YamlLocationIndex, list[str]]:
     try:
         yaml_text = yaml_path.read_text(encoding=UTF8_ENCODING)
     except Exception as exc:  # noqa: BLE001
@@ -383,7 +383,7 @@ def load_yaml_mapping_file(
             errors=[
                 ErrorEnvelope(
                     code="yaml_file_read_error",
-                    message="Failed to read YAML file: {}: {}".format(type(exc).__name__, exc),
+                    message=f"Failed to read YAML file: {type(exc).__name__}: {exc}",
                     source_path=str(yaml_path),
                     path="(file)",
                     loc=None,

@@ -1,5 +1,5 @@
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 from ....schema_dsl.constants import FIELD_KIND_DERIVED, FIELD_KIND_SOURCE
 from ....schema_dsl.models import (
@@ -25,10 +25,10 @@ class ParserFieldsMixin(ParserRelationsMixin):
         self,
         raw: RawDemand,
         main_source_id: str,
-        required_field_ids: Optional[List[str]],
-        relations: Dict[str, RelationConfig],
+        required_field_ids: list[str] | None,
+        relations: dict[str, RelationConfig],
         *,
-        field_def_index: Optional[FieldDefIndex] = None,
+        field_def_index: FieldDefIndex | None = None,
     ) -> ParsedFieldsResult:
         index = field_def_index or self._collect_field_defs(raw, main_source_id)
         self._ensure_unique_field_ids(index.field_defs)
@@ -60,25 +60,21 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
     def _select_field_defs(
         self,
-        required_field_ids: Optional[List[str]],
-        defs_by_id: Dict[str, List[FieldDef]],
-        all_field_defs: List[FieldDef],
-    ) -> List[FieldDef]:
+        required_field_ids: list[str] | None,
+        defs_by_id: dict[str, list[FieldDef]],
+        all_field_defs: list[FieldDef],
+    ) -> list[FieldDef]:
         if required_field_ids is None:
             return list(all_field_defs)
 
-        selected: List[FieldDef] = []
+        selected: list[FieldDef] = []
         for fid in required_field_ids:
             matched = defs_by_id.get(fid, [])
             if not matched:
-                msg = "Required field '{}' is not defined".format(fid)
+                msg = f"Required field '{fid}' is not defined"
                 raise ValueError(msg)
             if len(matched) > 1:
-                msg = (
-                    "Field '{}' is defined multiple times; field_id must be unique (output.fields disambiguation has been removed)".format(
-                        fid
-                    )
-                )
+                msg = f"Field '{fid}' is defined multiple times; field_id must be unique (output.fields disambiguation has been removed)"
                 raise ValueError(msg)
             selected.append(matched[0])
         return selected
@@ -87,8 +83,8 @@ class ParserFieldsMixin(ParserRelationsMixin):
         self,
         raw: RawDemand,
         main_source_id: str,
-        defs_by_id: Dict[str, List[FieldDef]],
-    ) -> List[FieldDef]:
+        defs_by_id: dict[str, list[FieldDef]],
+    ) -> list[FieldDef]:
         raw_main = raw.get_mapping(DEMAND_KEYS["main_source"])
         if raw_main is None:
             return []
@@ -97,14 +93,14 @@ class ParserFieldsMixin(ParserRelationsMixin):
         if order_items is None:
             return []
 
-        order_defs: List[FieldDef] = []
+        order_defs: list[FieldDef] = []
         for item in order_items:
             if not isinstance(item, str):
                 continue
             raw_item = item.strip()
             if not raw_item or raw_item == "-":
                 continue
-            field_id = raw_item[1:] if raw_item.startswith("-") else raw_item
+            field_id = raw_item.removeprefix("-")
             matched = [field_def for field_def in defs_by_id.get(field_id, []) if (field_def.source_id or "") == main_source_id]
             if matched:
                 order_defs.append(matched[0])
@@ -112,10 +108,10 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
     def _merge_required_defs(
         self,
-        required_defs: List[FieldDef],
-        extra_defs: List[FieldDef],
-    ) -> List[FieldDef]:
-        merged: Dict[Tuple[str, Optional[str], str, int], FieldDef] = {}
+        required_defs: list[FieldDef],
+        extra_defs: list[FieldDef],
+    ) -> list[FieldDef]:
+        merged: dict[tuple[str, str | None, str, int], FieldDef] = {}
         for field_def in required_defs:
             merged[field_def_key(field_def)] = field_def
         for field_def in extra_defs:
@@ -129,19 +125,19 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
     def _build_field_configs(
         self,
-        required_defs: List[FieldDef],
+        required_defs: list[FieldDef],
         main_source_id: str,
-        relations: Dict[str, RelationConfig],
-    ) -> Tuple[
-        Dict[str, SourceFieldConfig],
-        Dict[str, DerivedFieldConfig],
-        Dict[str, SourceFieldConfig],
-        Dict[str, Dict[str, SourceFieldConfig]],
+        relations: dict[str, RelationConfig],
+    ) -> tuple[
+        dict[str, SourceFieldConfig],
+        dict[str, DerivedFieldConfig],
+        dict[str, SourceFieldConfig],
+        dict[str, dict[str, SourceFieldConfig]],
     ]:
-        source_fields: Dict[str, SourceFieldConfig] = {}
-        derived_fields: Dict[str, DerivedFieldConfig] = {}
-        main_source_fields: Dict[str, SourceFieldConfig] = {}
-        source_fields_by_source: Dict[str, Dict[str, SourceFieldConfig]] = {}
+        source_fields: dict[str, SourceFieldConfig] = {}
+        derived_fields: dict[str, DerivedFieldConfig] = {}
+        main_source_fields: dict[str, SourceFieldConfig] = {}
+        source_fields_by_source: dict[str, dict[str, SourceFieldConfig]] = {}
 
         for field_def in required_defs:
             field_data = dict(field_def.data)
@@ -162,9 +158,9 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
     def _build_source_field_id_map(
         self,
-        field_defs: List[FieldDef],
-    ) -> Dict[str, Dict[str, str]]:
-        source_field_id_map: Dict[str, Dict[str, str]] = {}
+        field_defs: list[FieldDef],
+    ) -> dict[str, dict[str, str]]:
+        source_field_id_map: dict[str, dict[str, str]] = {}
         for field_def in field_defs:
             if field_def.kind != FIELD_KIND_SOURCE:
                 continue
@@ -178,8 +174,8 @@ class ParserFieldsMixin(ParserRelationsMixin):
             source_field_id_map.setdefault(source_id, {})[field_def.field_id] = data_key
         return source_field_id_map
 
-    def _ensure_unique_field_ids(self, field_defs: List[FieldDef]) -> None:
-        seen: Dict[str, FieldDef] = {}
+    def _ensure_unique_field_ids(self, field_defs: list[FieldDef]) -> None:
+        seen: dict[str, FieldDef] = {}
         for field_def in field_defs:
             existing = seen.get(field_def.field_id)
             if existing is None:
@@ -187,20 +183,20 @@ class ParserFieldsMixin(ParserRelationsMixin):
                 continue
             if existing is not field_def:
                 msg = (
-                    "Field '{}' is defined multiple times; field_id must be unique "
+                    f"Field '{field_def.field_id}' is defined multiple times; field_id must be unique "
                     "(output.fields disambiguation has been removed; rename the field_id)"
-                ).format(field_def.field_id)
+                )
                 raise ValueError(msg)
 
     def _collect_required_field_defs(
         self,
-        selected_defs: List[FieldDef],
-        defs_by_id: Dict[str, List[FieldDef]],
-    ) -> List[FieldDef]:
-        required: Dict[Tuple[str, Optional[str], str, int], FieldDef] = {}
+        selected_defs: list[FieldDef],
+        defs_by_id: dict[str, list[FieldDef]],
+    ) -> list[FieldDef]:
+        required: dict[tuple[str, str | None, str, int], FieldDef] = {}
         for field_def in selected_defs:
             required[field_def_key(field_def)] = field_def
-        queue: "Deque[FieldDef]" = deque(field_def for field_def in selected_defs if field_def.kind == FIELD_KIND_DERIVED)
+        queue: deque[FieldDef] = deque(field_def for field_def in selected_defs if field_def.kind == FIELD_KIND_DERIVED)
 
         while queue:
             field_def = queue.popleft()
@@ -208,10 +204,10 @@ class ParserFieldsMixin(ParserRelationsMixin):
             for dep in depends_on:
                 matched = defs_by_id.get(dep, [])
                 if not matched:
-                    msg = "Derived field '{}' depends on unknown field '{}'".format(field_def.field_id, dep)
+                    msg = f"Derived field '{field_def.field_id}' depends on unknown field '{dep}'"
                     raise ValueError(msg)
                 if len(matched) > 1:
-                    msg = "Derived field '{}' depends on ambiguous field '{}'".format(field_def.field_id, dep)
+                    msg = f"Derived field '{field_def.field_id}' depends on ambiguous field '{dep}'"
                     raise ValueError(msg)
                 dep_def = matched[0]
                 dep_key = field_def_key(dep_def)
@@ -223,7 +219,7 @@ class ParserFieldsMixin(ParserRelationsMixin):
 
         return list(required.values())
 
-    def _infer_derived_dependencies(self, field_id: str, field_data: Dict[str, Any]) -> List[str]:
+    def _infer_derived_dependencies(self, field_id: str, field_data: dict[str, Any]) -> list[str]:
         if "depends_on" in field_data:
             msg = "Derived field '{}' does not allow 'depends_on'; dependencies are inferred from '{}'/'{}'".format(
                 field_id,
@@ -243,14 +239,14 @@ class ParserFieldsMixin(ParserRelationsMixin):
             return extract_call_by_dependencies(call_by_expr)
         return []
 
-    def _parse_derived_field(self, field_id: str, field_data: Dict[str, Any]) -> DerivedFieldConfig:
+    def _parse_derived_field(self, field_id: str, field_data: dict[str, Any]) -> DerivedFieldConfig:
         compute_expr_raw = field_data.get(DERIVED_FIELD_KEYS["compute"])
         compute_expr = str(compute_expr_raw) if compute_expr_raw is not None else None
         call_by_raw = field_data.get(DERIVED_FIELD_KEYS["call_by"])
         call_by_expr = str(call_by_raw) if call_by_raw is not None else None
 
         inferred = self._infer_derived_dependencies(field_id, field_data)
-        depends_on: Tuple[str, ...] = tuple(inferred)
+        depends_on: tuple[str, ...] = tuple(inferred)
 
         return DerivedFieldConfig(
             field_id=field_id,
@@ -263,10 +259,10 @@ class ParserFieldsMixin(ParserRelationsMixin):
     def _parse_source_field(
         self,
         field_id: str,
-        field_data: Dict[str, Any],
+        field_data: dict[str, Any],
         *,
-        source_id: Optional[str] = None,
-        relations: Dict[str, RelationConfig],
+        source_id: str | None = None,
+        relations: dict[str, RelationConfig],
     ) -> SourceFieldConfig:
         resolved_source_id = source_id or str(field_data.get(SOURCE_FIELD_KEYS["source"], ""))
         extract_raw = field_data.get(SOURCE_FIELD_KEYS["extract"])
@@ -274,18 +270,18 @@ class ParserFieldsMixin(ParserRelationsMixin):
         relation = self._parse_relation_ref(field_data.get(SOURCE_FIELD_KEYS["relation"]), relations=relations)
 
         default_raw = field_data.get(SOURCE_FIELD_KEYS["default"])
-        default_cases: Optional[Tuple[Dict[str, Any], ...]] = None
+        default_cases: tuple[dict[str, Any], ...] | None = None
         if default_raw is not None:
             if not isinstance(default_raw, list):
-                msg = "Source field '{}' default must be a list".format(field_id)
+                msg = f"Source field '{field_id}' default must be a list"
                 raise TypeError(msg)
-            default_items = cast("List[object]", default_raw)  # pragma: allow-cast yaml scalar list boundary
-            items: List[Dict[str, Any]] = []
+            default_items = cast("list[object]", default_raw)  # pragma: allow-cast yaml scalar list boundary
+            items: list[dict[str, Any]] = []
             for idx, item in enumerate(default_items):
                 if not isinstance(item, dict):
-                    msg = "Source field '{}' default[{}] must be an object".format(field_id, int(idx))
+                    msg = f"Source field '{field_id}' default[{int(idx)}] must be an object"
                     raise TypeError(msg)
-                item_dict = cast("Dict[str, Any]", item)  # pragma: allow-cast yaml mapping boundary
+                item_dict = cast("dict[str, Any]", item)  # pragma: allow-cast yaml mapping boundary
                 items.append(dict(item_dict))
             default_cases = tuple(items)
 

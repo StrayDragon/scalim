@@ -2,7 +2,6 @@ import json
 import os
 from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from scalim.dsl.yaml_dsl._internal.config_parsing.loader import YamlDemandLoader
 from scalim.dsl.yaml_dsl._internal.config_parsing.project_config import load_yaml_dsl_project_config
@@ -30,7 +29,7 @@ class InitVarMapping(Mapping[str, object]):
     - `viz compile` is static-only; it should not require real runtime variables.
     """
 
-    def __init__(self, base: Optional[Mapping[str, object]] = None) -> None:
+    def __init__(self, base: Mapping[str, object] | None = None) -> None:
         self._base = dict(base or {})
 
     def __getitem__(self, key: str) -> object:
@@ -38,7 +37,7 @@ class InitVarMapping(Mapping[str, object]):
             raise KeyError(key)
         if key in self._base:
             return self._base[key]
-        return "<init_var:{}>".format(key)
+        return f"<init_var:{key}>"
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._base)
@@ -74,7 +73,7 @@ def _relpath_posix(path: Path, *, start: Path) -> str:
 def _compile_demand_plan(
     yaml_path: Path,
     *,
-    init_vars: Optional[Mapping[str, object]] = None,
+    init_vars: Mapping[str, object] | None = None,
 ) -> ExecutionPlan:
     loader = YamlDemandLoader()
     config = loader.load(str(yaml_path))
@@ -82,7 +81,7 @@ def _compile_demand_plan(
     return PlanBuilder(demand_ir).build(targets=list(demand_ir.fields.keys()))
 
 
-def compile_demand_viz(yaml_path: Path, *, output_dir: Path) -> Tuple[Path, Path]:
+def compile_demand_viz(yaml_path: Path, *, output_dir: Path) -> tuple[Path, Path]:
     """Export static viz artifacts for a single demand YAML."""
     plan = _compile_demand_plan(yaml_path, init_vars=None)
 
@@ -93,7 +92,7 @@ def compile_demand_viz(yaml_path: Path, *, output_dir: Path) -> Tuple[Path, Path
     return snapshot_path, schedule_path
 
 
-def compile_workflow_viz(workflow_yaml_path: Path, *, output_dir: Path) -> Dict[str, Path]:
+def compile_workflow_viz(workflow_yaml_path: Path, *, output_dir: Path) -> dict[str, Path]:
     """Export a static workflow viz bundle under `<output_dir>/scalim-viz/`.
 
     Outputs:
@@ -109,7 +108,7 @@ def compile_workflow_viz(workflow_yaml_path: Path, *, output_dir: Path) -> Dict[
     project_config = load_yaml_dsl_project_config(workflow_yaml_path)
     project_root = (project_config.project_root if project_config is not None else workflow_yaml_path.parent).resolve(strict=False)
 
-    path_aliases: Dict[str, str] = {}
+    path_aliases: dict[str, str] = {}
     if project_config is not None:
         for alias, base in (project_config.import_aliases or {}).items():
             path_aliases[str(alias)] = str(base)
@@ -119,11 +118,11 @@ def compile_workflow_viz(workflow_yaml_path: Path, *, output_dir: Path) -> Dict[
     scalim_viz_dir = Path(normalize_output_dir(str(output_dir))).expanduser().resolve(strict=False)
     scalim_viz_dir.mkdir(parents=True, exist_ok=True)
 
-    demand_run_id_by_workflow_node_id: Dict[str, str] = {}
-    nodes: List[WorkflowNodeIr] = []
-    edges: List[WorkflowEdgeIr] = []
+    demand_run_id_by_workflow_node_id: dict[str, str] = {}
+    nodes: list[WorkflowNodeIr] = []
+    edges: list[WorkflowEdgeIr] = []
 
-    out_paths: Dict[str, Path] = {}
+    out_paths: dict[str, Path] = {}
     for idx, run in enumerate(wf.runs):
         run_id = str(run.id or "").strip()
         if not run_id:
@@ -143,8 +142,8 @@ def compile_workflow_viz(workflow_yaml_path: Path, *, output_dir: Path) -> Dict[
         schedule_path = run_dir / "viz_schedule_plan.json"
         _write_json(snapshot_path, plan.to_viz_graph_snapshot())
         _write_json(schedule_path, plan.to_viz_schedule_plan())
-        out_paths["run:{}:snapshot".format(run_id)] = snapshot_path
-        out_paths["run:{}:schedule".format(run_id)] = schedule_path
+        out_paths[f"run:{run_id}:snapshot"] = snapshot_path
+        out_paths[f"run:{run_id}:schedule"] = schedule_path
 
         demand_run_id_by_workflow_node_id[run_id] = run_id
 

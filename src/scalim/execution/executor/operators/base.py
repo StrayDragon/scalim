@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Hashable, List
+from collections.abc import Hashable
 
 from ....planning.operators import SupportedOperatorIr
 from ...context import BatchContext
@@ -14,7 +14,7 @@ class OperatorExecutor(ABC):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         """执行算子"""

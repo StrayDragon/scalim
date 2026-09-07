@@ -1,11 +1,13 @@
 import logging
+from collections.abc import Hashable
 from types import MappingProxyType
-from typing import Any, Dict, Hashable, List, Tuple, cast
+from typing import Any, cast
+
+from typing_extensions import override
 
 from .....events import EventType
 from .....planning.operators import ComputeOperatorIr, SupportedOperatorIr
 from .....spec.ir import ComputeCallContextIr, DerivedFieldIr
-from .....vendor.compact.typing_extensionsx import override
 from ....compute_phase import COMPUTE_PHASE_META_KEY, COMPUTE_PHASE_OPERATOR
 from ....context import BatchContext, DenseBatchContext
 from ...runtime.runtime import ExecutionRuntime
@@ -14,7 +16,7 @@ from .errors import handle_compute_error
 from .payloads import build_field_compute_dependencies_payload
 
 
-def _operator_phase_meta() -> Dict[str, Any]:
+def _operator_phase_meta() -> dict[str, Any]:
     return {COMPUTE_PHASE_META_KEY: COMPUTE_PHASE_OPERATOR}
 
 
@@ -34,12 +36,12 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
     *,
     field_spec: DerivedFieldIr,
     context: DenseBatchContext,
-    batch_row_nth: List[Hashable],
+    batch_row_nth: list[Hashable],
     runtime: ExecutionRuntime,
     compute_mode: str,
     wants_field_compute: bool,
 ) -> bool:
-    deps: Tuple[str, ...] = tuple(field_spec.dependencies or ())
+    deps: tuple[str, ...] = tuple(field_spec.dependencies or ())
     deps_len = len(deps)
     calculator = runtime.runtime_bindings.require_derived_calculator(field_spec.field_id)
     value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
@@ -83,11 +85,11 @@ def _execute_row_compute_dense(  # noqa: C901, PLR0912, PLR0915  # pragma: allow
             if idx < 0 or idx >= row_count:
                 return False
 
-            dep_values_payload: Dict[str, Any] = {}
+            dep_values_payload: dict[str, Any] = {}
             d0: Any = None
             d1: Any = None
             d2: Any = None
-            dep_args: Tuple[Any, ...] = ()
+            dep_args: tuple[Any, ...] = ()
 
             try:
                 if deps_len == _DEPS_LEN_ONE:
@@ -314,13 +316,13 @@ def _execute_constant_compute(
     *,
     field_spec: DerivedFieldIr,
     context: BatchContext,
-    batch_row_nth: List[Hashable],
+    batch_row_nth: list[Hashable],
     runtime: ExecutionRuntime,
     compute_mode: str,
     wants_field_compute: bool,
 ) -> None:
-    deps: Tuple[str, ...] = tuple(field_spec.dependencies or ())
-    dep_payload: Dict[str, Any] = {}
+    deps: tuple[str, ...] = tuple(field_spec.dependencies or ())
+    dep_payload: dict[str, Any] = {}
     calculator = runtime.runtime_bindings.require_derived_calculator(field_spec.field_id)
     value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
 
@@ -379,12 +381,12 @@ def _execute_row_compute(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
     *,
     field_spec: DerivedFieldIr,
     context: BatchContext,
-    batch_row_nth: List[Hashable],
+    batch_row_nth: list[Hashable],
     runtime: ExecutionRuntime,
     compute_mode: str,
     wants_field_compute: bool,
 ) -> None:
-    deps: Tuple[str, ...] = tuple(field_spec.dependencies or ())
+    deps: tuple[str, ...] = tuple(field_spec.dependencies or ())
     calculator = runtime.runtime_bindings.require_derived_calculator(field_spec.field_id)
     value_transform = runtime.runtime_bindings.get_value_transform(field_spec.field_id)
     guardrails_enabled = runtime.guardrails.enabled
@@ -408,10 +410,10 @@ def _execute_row_compute(  # noqa: C901, PLR0912, PLR0915  # pragma: allow-c901 
         return
 
     for row_id in batch_row_nth:
-        dep_args: Tuple[Any, ...] = tuple(context.get_field_value(dep_key, row_id) for dep_key in deps)
+        dep_args: tuple[Any, ...] = tuple(context.get_field_value(dep_key, row_id) for dep_key in deps)
         if dep_cardinality is not None:
             dep_cardinality.record(field_key=field_spec.field_id, dep_args=dep_args)
-        dep_values_payload: Dict[str, Any] = {}
+        dep_values_payload: dict[str, Any] = {}
         if use_ctx or wants_field_compute:
             dep_values_payload = build_field_compute_dependencies_payload(deps, dep_args)
         try:
@@ -498,7 +500,7 @@ class ComputeOperatorExecutor(OperatorExecutor):
         self,
         operator: SupportedOperatorIr,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
     ) -> None:
         op = cast("ComputeOperatorIr", operator)  # pragma: allow-cast operator dispatch typed narrowing

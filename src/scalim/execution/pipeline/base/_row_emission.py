@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Dict, Hashable, List, Optional, Sequence, Set
+from collections.abc import Hashable, Sequence
+from typing import TYPE_CHECKING
 
 from ....sinks import IRowSink
 from ....sinks._internal.base import SupportsWriteRowAligned
@@ -15,23 +16,23 @@ class RowEmissionCoordinator:
     _runtime: ExecutionRuntime
     _sink: IRowSink
     _context: BatchContext
-    _target_fields: List[str]
-    _gate_fields: Set[str]
-    _late_materializer: Optional[LateFieldMaterializer]
-    _late_layout: Optional[LateRowWriteLayout]
-    _global_ready_fields: Set[str]
+    _target_fields: list[str]
+    _gate_fields: set[str]
+    _late_materializer: LateFieldMaterializer | None
+    _late_layout: LateRowWriteLayout | None
+    _global_ready_fields: set[str]
     _required_non_global_targets: int
-    _ready_counts: Dict[Hashable, int]
-    _dense_base_row_id: Optional[int]
+    _ready_counts: dict[Hashable, int]
+    _dense_base_row_id: int | None
     _dense_row_count: int
-    _dense_ready_counts: Optional[List[int]]
-    _write_row_ids: List[Hashable]
+    _dense_ready_counts: list[int] | None
+    _write_row_ids: list[Hashable]
     _next_write_idx: int
     _next_release_idx: int
-    _next_write_row_id: Optional[Hashable]
+    _next_write_row_id: Hashable | None
     _allow_release: bool
-    _rows_to_remove: Set[Hashable]
-    _retained_fields: Set[str]
+    _rows_to_remove: set[Hashable]
+    _retained_fields: set[str]
 
     def __init__(
         self,
@@ -39,10 +40,10 @@ class RowEmissionCoordinator:
         runtime: ExecutionRuntime,
         sink: IRowSink,
         target_fields: Sequence[str],
-        retained_fields: Set[str],
-        global_ready_fields: Set[str],
+        retained_fields: set[str],
+        global_ready_fields: set[str],
         allow_release: bool,
-        late_materializer: Optional[LateFieldMaterializer] = None,
+        late_materializer: LateFieldMaterializer | None = None,
     ) -> None:
         self._runtime = runtime
         self._sink = sink
@@ -51,7 +52,7 @@ class RowEmissionCoordinator:
         self._late_materializer = late_materializer
         self._late_layout = None
         # 写出闸门: `late` 字段不在 `compute` 段落库,因此不参与“行是否就绪”的计数.
-        late_fields: Set[str] = set(late_materializer.late_fields) if late_materializer is not None else set()
+        late_fields: set[str] = set(late_materializer.late_fields) if late_materializer is not None else set()
         self._gate_fields = set(self._target_fields) - late_fields
         self._global_ready_fields = set(global_ready_fields) - late_fields
         self._required_non_global_targets = max(0, len(self._gate_fields) - len(self._global_ready_fields))
@@ -67,7 +68,7 @@ class RowEmissionCoordinator:
         self._rows_to_remove = set()
         self._retained_fields = set(retained_fields)
 
-    def on_field_set_fields(self) -> Set[str]:
+    def on_field_set_fields(self) -> set[str]:
         """需要触发就绪计数回调的字段集合(排除全局就绪与 `late` 字段)."""
         return self._gate_fields - self._global_ready_fields
 
@@ -82,7 +83,7 @@ class RowEmissionCoordinator:
             self._dense_row_count = 0
             self._dense_ready_counts = None
 
-    def set_write_order(self, write_row_ids: List[Hashable]) -> None:
+    def set_write_order(self, write_row_ids: list[Hashable]) -> None:
         self._write_row_ids = list(write_row_ids)
         if self._write_row_ids:
             self._next_write_row_id = self._write_row_ids[self._next_write_idx]
@@ -124,7 +125,7 @@ class RowEmissionCoordinator:
         self._allow_release = True
         self._maybe_release_written_prefix()
 
-    def drain_rows_to_remove(self) -> Set[Hashable]:
+    def drain_rows_to_remove(self) -> set[Hashable]:
         if not self._rows_to_remove:
             return set()
         drained = set(self._rows_to_remove)
@@ -173,7 +174,7 @@ class RowEmissionCoordinator:
 
         clock = get_write_clock(self._runtime)
         if isinstance(self._sink, SupportsWriteRowAligned):
-            values: List["FieldValue"] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
+            values: list[FieldValue] = [self._context.get_field_value(field_key, row_id) for field_key in self._target_fields]
             if clock is not None and clock.enabled:
                 with clock.time_write():
                     self._sink.write_row_aligned(self._target_fields, values)
@@ -181,7 +182,7 @@ class RowEmissionCoordinator:
                 self._sink.write_row_aligned(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
-            row: "RowData" = self._context.get_field_values_for_row(row_id, self._target_fields)
+            row: RowData = self._context.get_field_values_for_row(row_id, self._target_fields)
             if clock is not None and clock.enabled:
                 with clock.time_write():
                     self._sink.write_row(row)
@@ -207,7 +208,7 @@ class RowEmissionCoordinator:
         if layout is None:
             layout = late_materializer.build_row_layout(self._target_fields)
             self._late_layout = layout
-        values: List["FieldValue"] = late_materializer.fill_row_values(layout, self._context, row_id)
+        values: list[FieldValue] = late_materializer.fill_row_values(layout, self._context, row_id)
 
         clock = get_write_clock(self._runtime)
         if isinstance(self._sink, SupportsWriteRowAligned):
@@ -218,7 +219,7 @@ class RowEmissionCoordinator:
                 self._sink.write_row_aligned(self._target_fields, values)
             field_count = len(self._target_fields)
         else:
-            row: "RowData" = {}
+            row: RowData = {}
             for idx, field_key in enumerate(self._target_fields):
                 row[field_key] = values[idx]
             if clock is not None and clock.enabled:

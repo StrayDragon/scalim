@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, List, Set, Tuple, Union
+from typing import TYPE_CHECKING
 
 from ...spec.ir import FieldIr, SourceIr
 from .deps import build_ref_field_ordering_deps
@@ -7,11 +7,11 @@ from .sorting import sort_ref_loaders
 
 def build_loader_sequences(
     demand: "DemandIr",
-    required_fields: Set[str],
-) -> Tuple[List[Tuple[SourceIr, List[str]]], List[Tuple[SourceIr, List[Tuple[str, Union[str, Tuple[str, ...]]]]]]]:
-    normal_loaders: Dict[str, List[str]] = {}
-    ref_loaders: Dict[str, List[Tuple[str, Union[str, Tuple[str, ...]]]]] = {}
-    source_map: Dict[str, SourceIr] = {}
+    required_fields: set[str],
+) -> tuple[list[tuple[SourceIr, list[str]]], list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]]]:
+    normal_loaders: dict[str, list[str]] = {}
+    ref_loaders: dict[str, list[tuple[str, str | tuple[str, ...]]]] = {}
+    source_map: dict[str, SourceIr] = {}
     main_source_id = demand.main_source.source_id if demand.main_source else ""
 
     for field_key in required_fields:

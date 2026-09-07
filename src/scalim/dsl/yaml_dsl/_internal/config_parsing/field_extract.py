@@ -1,15 +1,13 @@
-from typing import List, Optional, Tuple, Union
-
 from .....exceptions import ScalimYamlError
 
-ExtractSegment = Union[str, int]
+ExtractSegment = str | int
 
 
 class ScalimFieldExtractCompileError(ScalimYamlError):
     pass
 
 
-def compile_field_extract(expr: str) -> Tuple[ExtractSegment, ...]:
+def compile_field_extract(expr: str) -> tuple[ExtractSegment, ...]:
     """
     将 `dot + bracket` 路径表达式编译为一串带类型的段.
 
@@ -28,11 +26,11 @@ def compile_field_extract(expr: str) -> Tuple[ExtractSegment, ...]:
 
     i = 0
     n = len(expr)
-    segments: List[ExtractSegment] = []
+    segments: list[ExtractSegment] = []
 
     while i < n:
         if expr[i] == ".":
-            msg = "extract contains empty segment at position {}".format(i)
+            msg = f"extract contains empty segment at position {i}"
             raise ScalimFieldExtractCompileError(msg)
 
         segment, i = _parse_segment(expr, i)
@@ -49,13 +47,13 @@ def compile_field_extract(expr: str) -> Tuple[ExtractSegment, ...]:
         if expr[i] == "[":
             continue
 
-        msg = "extract has invalid character '{}' at position {}".format(expr[i], i)
+        msg = f"extract has invalid character '{expr[i]}' at position {i}"
         raise ScalimFieldExtractCompileError(msg)
 
     return tuple(segments)
 
 
-def derive_source_field_data_key(*, field_id: str, extract: Optional[str]) -> str:
+def derive_source_field_data_key(*, field_id: str, extract: str | None) -> str:
     """
     解析源字段的扁平 `data_key`(用于 `output.fields` 选择器与 `relation.steps` 引用等旧语义).
 
@@ -74,13 +72,13 @@ def derive_source_field_data_key(*, field_id: str, extract: Optional[str]) -> st
     return field_id
 
 
-def _parse_segment(expr: str, i: int) -> Tuple[ExtractSegment, int]:
+def _parse_segment(expr: str, i: int) -> tuple[ExtractSegment, int]:
     if expr[i] == "[":
         return _parse_bracket_segment(expr, i)
     return _parse_identifier(expr, i)
 
 
-def _parse_identifier(expr: str, i: int) -> Tuple[str, int]:
+def _parse_identifier(expr: str, i: int) -> tuple[str, int]:
     n = len(expr)
     if i >= n:
         msg = "extract contains empty identifier segment"
@@ -88,7 +86,7 @@ def _parse_identifier(expr: str, i: int) -> Tuple[str, int]:
 
     ch0 = expr[i]
     if not _is_ident_start(ch0):
-        msg = ("extract has invalid identifier start '{}' at position {}; use bracket string segment for special keys").format(ch0, i)
+        msg = f"extract has invalid identifier start '{ch0}' at position {i}; use bracket string segment for special keys"
         raise ScalimFieldExtractCompileError(msg)
     j = i + 1
     while j < n and _is_ident_char(expr[j]):
@@ -96,7 +94,7 @@ def _parse_identifier(expr: str, i: int) -> Tuple[str, int]:
     return expr[i:j], j
 
 
-def _parse_bracket_segment(expr: str, i: int) -> Tuple[ExtractSegment, int]:
+def _parse_bracket_segment(expr: str, i: int) -> tuple[ExtractSegment, int]:
     n = len(expr)
     if (
         i >= n or expr[i] != "["
@@ -106,7 +104,7 @@ def _parse_bracket_segment(expr: str, i: int) -> Tuple[ExtractSegment, int]:
             msg
         )  # pragma: no cover  # pragma: allow-no-cover internal invariant: caller only dispatches to bracket parser on '['
     if i + 1 >= n:
-        msg = "extract has unclosed bracket at position {}".format(i)
+        msg = f"extract has unclosed bracket at position {i}"
         raise ScalimFieldExtractCompileError(msg)
 
     ch = expr[i + 1]
@@ -115,11 +113,11 @@ def _parse_bracket_segment(expr: str, i: int) -> Tuple[ExtractSegment, int]:
     if ch in {'"', "'"}:
         return _parse_bracket_string(expr, i + 2, quote=ch)
 
-    msg = ("extract has invalid bracket segment at position {}; int key must be [0-9]+, string key must be [\"...\"] or ['...']").format(i)
+    msg = f"extract has invalid bracket segment at position {i}; int key must be [0-9]+, string key must be [\"...\"] or ['...']"
     raise ScalimFieldExtractCompileError(msg)
 
 
-def _parse_bracket_int(expr: str, i: int) -> Tuple[int, int]:
+def _parse_bracket_int(expr: str, i: int) -> tuple[int, int]:
     n = len(expr)
     start = i
     j = i
@@ -131,15 +129,15 @@ def _parse_bracket_int(expr: str, i: int) -> Tuple[int, int]:
             msg
         )  # pragma: no cover  # pragma: allow-no-cover internal invariant: digit branch only enters when first char is [0-9]
     if j >= n or expr[j] != "]":
-        msg = "extract has invalid int bracket segment at position {}; use '[1]' (no spaces, no sign)".format(start - 1)
+        msg = f"extract has invalid int bracket segment at position {start - 1}; use '[1]' (no spaces, no sign)"
         raise ScalimFieldExtractCompileError(msg)
     value = int(expr[start:j])
     return value, j + 1
 
 
-def _parse_bracket_string(expr: str, i: int, *, quote: str) -> Tuple[str, int]:
+def _parse_bracket_string(expr: str, i: int, *, quote: str) -> tuple[str, int]:
     n = len(expr)
-    chars: List[str] = []
+    chars: list[str] = []
     j = i
     found_quote = False
     while j < n:
@@ -150,7 +148,7 @@ def _parse_bracket_string(expr: str, i: int, *, quote: str) -> Tuple[str, int]:
             break
         if ch == "\\":
             if j + 1 >= n:
-                msg = "extract has unclosed escape sequence at position {}".format(j)
+                msg = f"extract has unclosed escape sequence at position {j}"
                 raise ScalimFieldExtractCompileError(msg)
             next_ch = expr[j + 1]
             if next_ch == "\\":
@@ -161,7 +159,7 @@ def _parse_bracket_string(expr: str, i: int, *, quote: str) -> Tuple[str, int]:
                 chars.append(quote)
                 j += 2
                 continue
-            msg = "extract has invalid escape sequence '\\{}' at position {}".format(next_ch, j)
+            msg = f"extract has invalid escape sequence '\\{next_ch}' at position {j}"
             raise ScalimFieldExtractCompileError(msg)
         chars.append(ch)
         j += 1

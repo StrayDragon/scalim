@@ -1,5 +1,6 @@
 import inspect
-from typing import Any, Callable, List, Optional, Sequence, Set
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from ..._internal.config_parsing.call_by import CallByValue, ParsedCallBy
 from .callable_preflight import (
@@ -30,18 +31,18 @@ def validate_call_by_signature(*, location: str, call_by: str, parsed: ParsedCal
             fn=fn,
             candidates=candidates,
             hint=None,  # 提示信息在异常路径中再生成,保证诊断文本稳定
-            extra="call_by={!r}".format(str(call_by)),
+            extra=f"call_by={str(call_by)!r}",
         )
     except ScalimCallablePreflightError as exc:
         sig = inspect.signature(fn)  # pragma: no cover  # pragma: allow-no-cover invariant: error implies signature available
         hint = _build_keyword_only_hint(parsed=parsed, sig=sig)
         if hint and "建议:" not in str(exc):
-            msg = "{}. 建议: {}".format(str(exc), hint)
+            msg = f"{exc!s}. 建议: {hint}"
             raise ScalimCallablePreflightError(msg) from exc
         raise
 
 
-def _build_keyword_only_hint(*, parsed: ParsedCallBy, sig: inspect.Signature) -> Optional[str]:
+def _build_keyword_only_hint(*, parsed: ParsedCallBy, sig: inspect.Signature) -> str | None:
     if not parsed.args:
         return None
 
@@ -60,8 +61,8 @@ def _build_keyword_only_hint(*, parsed: ParsedCallBy, sig: inspect.Signature) ->
     if not field_names:
         return generic
 
-    rendered = ", ".join("{}={}".format(name, name) for name in field_names)
-    return "可改写为: {}({})".format(parsed.reference, rendered)
+    rendered = ", ".join(f"{name}={name}" for name in field_names)
+    return f"可改写为: {parsed.reference}({rendered})"
 
 
 def _is_field_value(value: CallByValue) -> bool:
@@ -83,12 +84,12 @@ def _signature_accepts_positional(sig: inspect.Signature) -> bool:
     return any(p.kind in tuple(positional_kinds) for p in params)
 
 
-def _kwonly_param_names(sig: inspect.Signature) -> Set[str]:
+def _kwonly_param_names(sig: inspect.Signature) -> set[str]:
     return {p.name for p in sig.parameters.values() if p.kind == inspect.Parameter.KEYWORD_ONLY}
 
 
-def _kwonly_field_names(*, args: Sequence[CallByValue], kwonly_names: Set[str]) -> Optional[List[str]]:
-    field_names: List[str] = []
+def _kwonly_field_names(*, args: Sequence[CallByValue], kwonly_names: set[str]) -> list[str] | None:
+    field_names: list[str] = []
     for arg in args:
         if not _is_field_value(arg):
             return None

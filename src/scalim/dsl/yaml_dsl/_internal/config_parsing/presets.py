@@ -1,9 +1,7 @@
-from typing import Dict
-
 __all__ = ()
 
 
-_YAML_PRESET_REGISTRY: Dict[str, str] = {
+_YAML_PRESET_REGISTRY: dict[str, str] = {
     # 说明: 注册表为 `SSOT`;仅允许预定义的 `preset_id`,避免变成“任意读包内路径”.
     "yaml-dsl/presets/common.yaml": (
         """
@@ -21,6 +19,6 @@ def load_scalim_preset_yaml_text(preset_id: str) -> str:
         msg = "scalim:// preset id cannot be empty"
         raise ValueError(msg)
     if key not in _YAML_PRESET_REGISTRY:
-        msg = "Unknown scalim:// preset id: '{}'".format(key)
+        msg = f"Unknown scalim:// preset id: '{key}'"
         raise ValueError(msg)
     return str(_YAML_PRESET_REGISTRY[key])

@@ -4,7 +4,10 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _schema_path() -> Path:
@@ -19,18 +22,18 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="ignore")
 
 
-def _top_level_block_lines(text: str, *, key: str) -> Optional[List[str]]:
+def _top_level_block_lines(text: str, *, key: str) -> list[str] | None:
     # Very small YAML-ish block extractor (indentation based; good enough for fixtures).
     lines = text.splitlines()
-    start: Optional[int] = None
+    start: int | None = None
     for idx, line in enumerate(lines):
-        if line.startswith("{}:".format(key)) and (line.strip() == "{}:".format(key)):
+        if line.startswith(f"{key}:") and (line.strip() == f"{key}:"):
             start = idx + 1
             break
     if start is None:
         return None
 
-    block: List[str] = []
+    block: list[str] = []
     for line in lines[start:]:
         if not line.strip():
             block.append(line)
@@ -41,15 +44,15 @@ def _top_level_block_lines(text: str, *, key: str) -> Optional[List[str]]:
     return block
 
 
-def _main_source_block(text: str) -> Optional[List[str]]:
+def _main_source_block(text: str) -> list[str] | None:
     return _top_level_block_lines(text, key="main_source")
 
 
-def _fields_block(text: str) -> Optional[List[str]]:
+def _fields_block(text: str) -> list[str] | None:
     return _top_level_block_lines(text, key="fields")
 
 
-def _validate_no_derived_in_main_source(text: str) -> Optional[str]:
+def _validate_no_derived_in_main_source(text: str) -> str | None:
     block = _main_source_block(text)
     if not block:
         return None
@@ -59,7 +62,7 @@ def _validate_no_derived_in_main_source(text: str) -> Optional[str]:
     return None
 
 
-def _validate_has_derived_in_top_fields(text: str) -> Optional[str]:
+def _validate_has_derived_in_top_fields(text: str) -> str | None:
     block = _fields_block(text)
     if not block:
         return "Missing top-level `fields:` block."
@@ -69,7 +72,7 @@ def _validate_has_derived_in_top_fields(text: str) -> Optional[str]:
     return "Expected at least one derived field (compute/call_by) under top-level `fields:`."
 
 
-def _extract_schema_header(text: str) -> Optional[str]:
+def _extract_schema_header(text: str) -> str | None:
     for line in text.splitlines()[:20]:
         if "$schema=" not in line:
             continue
@@ -87,14 +90,14 @@ def _cmd_yaml_dsl_schema_path(_args: argparse.Namespace) -> int:
 def _cmd_yaml_dsl_schema_validate(args: argparse.Namespace) -> int:
     yaml_path = Path(args.yaml_file).resolve()
     if not yaml_path.exists():
-        sys.stderr.write("YAML file not found: {}\n".format(yaml_path))
+        sys.stderr.write(f"YAML file not found: {yaml_path}\n")
         return 1
     text = _read_text(yaml_path)
     header = _extract_schema_header(text)
     expected = str(_schema_path())
     if header != expected:
         sys.stderr.write("Schema header mismatch.\n")
-        sys.stderr.write("  expected: {}\n".format(expected))
+        sys.stderr.write(f"  expected: {expected}\n")
         sys.stderr.write("  observed: {}\n".format(header or "(missing)"))
         return 1
     sys.stdout.write("OK\n")
@@ -104,7 +107,7 @@ def _cmd_yaml_dsl_schema_validate(args: argparse.Namespace) -> int:
 def _cmd_yaml_dsl_validate(args: argparse.Namespace) -> int:
     yaml_path = Path(args.yaml_file).resolve()
     if not yaml_path.exists():
-        sys.stderr.write("YAML file not found: {}\n".format(yaml_path))
+        sys.stderr.write(f"YAML file not found: {yaml_path}\n")
         return 1
     text = _read_text(yaml_path)
 
@@ -127,7 +130,7 @@ def _cmd_missing(_args: argparse.Namespace) -> int:
     return 2
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog=Path(sys.argv[0]).name)
     subparsers = parser.add_subparsers(dest="command")
 

@@ -1,18 +1,18 @@
 import math
-from typing import Callable, Dict, List, Sequence, Union
+from collections.abc import Callable, Sequence
+from typing import TypeGuard
 
 from ...typedefs import RuntimeValue
-from ...vendor.compact.typing_extensionsx import TypeGuard
 
-JsonScalar = Union[None, bool, int, float, str]
-JsonLike = Union[JsonScalar, List["JsonLike"], Dict[str, "JsonLike"]]
+JsonScalar = None | bool | int | float | str
+JsonLike = JsonScalar | list["JsonLike"] | dict[str, "JsonLike"]
 
 
 def _is_sequence(value: RuntimeValue) -> TypeGuard[Sequence[RuntimeValue]]:
     return isinstance(value, (list, tuple))
 
 
-def _is_dict(value: RuntimeValue) -> TypeGuard[Dict[RuntimeValue, RuntimeValue]]:
+def _is_dict(value: RuntimeValue) -> TypeGuard[dict[RuntimeValue, RuntimeValue]]:
     return isinstance(value, dict)
 
 
@@ -36,7 +36,7 @@ def ensure_json_like(
         return value
     if isinstance(value, float):
         if not math.isfinite(value):
-            msg = "{} must be JSON-like (float must be finite)".format(str(value_name))
+            msg = f"{value_name!s} must be JSON-like (float must be finite)"
             raise error_cls(msg, path=str(path))
         return value
     if _is_sequence(value):
@@ -53,13 +53,13 @@ def ensure_json_like(
             for item in value
         ]
     if _is_dict(value):
-        out: Dict[str, JsonLike] = {}
+        out: dict[str, JsonLike] = {}
         for raw_key, raw_value in value.items():
             if not isinstance(raw_key, str):
-                msg = "{} must be JSON-like (dict key must be {})".format(str(value_name), str(dict_key_desc))
+                msg = f"{value_name!s} must be JSON-like (dict key must be {dict_key_desc!s})"
                 raise error_cls(msg, path=str(path))
             if require_nonempty_dict_key and not raw_key.strip():
-                msg = "{} must be JSON-like (dict key must be {})".format(str(value_name), str(dict_key_desc))
+                msg = f"{value_name!s} must be JSON-like (dict key must be {dict_key_desc!s})"
                 raise error_cls(msg, path=str(path))
             out[raw_key] = ensure_json_like(
                 raw_value,
@@ -71,7 +71,7 @@ def ensure_json_like(
                 error_cls=error_cls,
             )
         return out
-    msg = "{} must be JSON-like ({}), got {}".format(str(value_name), str(allowed_types_desc), type(value).__name__)
+    msg = f"{value_name!s} must be JSON-like ({allowed_types_desc!s}), got {type(value).__name__}"
     raise error_cls(msg, path=str(path))
 
 

@@ -11,10 +11,10 @@
 写出路径再按 `runtime.late_fields` 过滤;组大小 < 2 时运行时回退 `field-major`.
 """
 
-from typing import List, Mapping, Optional, Sequence, Set, Tuple
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 from ...spec.ir import DerivedFieldIr, SupportedFieldIr
-from ...vendor.dataclassesx import dataclass
 from ..operators import ComputeOperatorIr, LoadRefOperatorIr, PlanOperatorIr
 
 MIN_FUSION_GROUP_SIZE = 2
@@ -27,14 +27,14 @@ class ComputeFusionGroup:
     segment: str
     """`pre_ref` 或 `post_ref`."""
 
-    field_keys: Tuple[str, ...]
+    field_keys: tuple[str, ...]
     """组内字段(稳定序: 该段 `compute` 算子出现序)."""
 
-    deps: Tuple[str, ...]
+    deps: tuple[str, ...]
     """组内共享依赖(完全相同)."""
 
 
-def _is_fusion_member_candidate(field_spec: Optional[SupportedFieldIr]) -> bool:
+def _is_fusion_member_candidate(field_spec: SupportedFieldIr | None) -> bool:
     if not isinstance(field_spec, DerivedFieldIr):
         return False
     if field_spec.is_constant_compute:
@@ -44,11 +44,11 @@ def _is_fusion_member_candidate(field_spec: Optional[SupportedFieldIr]) -> bool:
     return not (field_spec.call_by is None and not field_spec.compute_expr)
 
 
-def _segment_compute_field_keys(operators: Sequence[PlanOperatorIr]) -> List[Tuple[str, Tuple[str, ...]]]:
+def _segment_compute_field_keys(operators: Sequence[PlanOperatorIr]) -> list[tuple[str, tuple[str, ...]]]:
     """按段切分: 返回 `(segment, field_keys_in_order)` 列表."""
-    segments: List[Tuple[str, List[str]]] = []
+    segments: list[tuple[str, list[str]]] = []
     current_name = "pre_ref"
-    current: List[str] = []
+    current: list[str] = []
 
     for op in operators:
         if isinstance(op, LoadRefOperatorIr):
@@ -64,7 +64,7 @@ def _segment_compute_field_keys(operators: Sequence[PlanOperatorIr]) -> List[Tup
     if current:
         segments.append((current_name, current))
 
-    result: List[Tuple[str, Tuple[str, ...]]] = []
+    result: list[tuple[str, tuple[str, ...]]] = []
     for name, keys in segments:
         result.append((name, tuple(keys)))
     return result
@@ -74,13 +74,13 @@ def _group_keys_in_segment(
     field_keys: Sequence[str],
     *,
     field_specs: Mapping[str, SupportedFieldIr],
-    field_dependencies: Mapping[str, Tuple[str, ...]],
-) -> List[Tuple[Tuple[str, ...], Tuple[str, ...]]]:
+    field_dependencies: Mapping[str, tuple[str, ...]],
+) -> list[tuple[tuple[str, ...], tuple[str, ...]]]:
     """在一段内贪心合并连续同 `deps` 候选;返回 `(field_keys, deps)` 且 `len>=2`."""
-    groups: List[Tuple[Tuple[str, ...], Tuple[str, ...]]] = []
-    pending_keys: List[str] = []
-    pending_deps: Optional[Tuple[str, ...]] = None
-    pending_set: Set[str] = set()
+    groups: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+    pending_keys: list[str] = []
+    pending_deps: tuple[str, ...] | None = None
+    pending_set: set[str] = set()
 
     def _flush() -> None:
         nonlocal pending_keys, pending_deps, pending_set
@@ -121,10 +121,10 @@ def derive_compute_fusion_groups(
     *,
     operators: Sequence[PlanOperatorIr],
     field_specs: Mapping[str, SupportedFieldIr],
-    field_dependencies: Mapping[str, Tuple[str, ...]],
-) -> Tuple[ComputeFusionGroup, ...]:
+    field_dependencies: Mapping[str, tuple[str, ...]],
+) -> tuple[ComputeFusionGroup, ...]:
     """从 `plan` `operators` 推导融合组(仅 `size>=2`)."""
-    out: List[ComputeFusionGroup] = []
+    out: list[ComputeFusionGroup] = []
     for segment_name, field_keys in _segment_compute_field_keys(operators):
         for keys, deps in _group_keys_in_segment(
             field_keys,

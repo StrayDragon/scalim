@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple, cast
+from collections.abc import Callable, Hashable, Sequence
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from concurrent.futures import Future
@@ -29,10 +30,10 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
         ops: Sequence[LoadRefOperatorIr],
         *,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
         serial_executor: LoadRefOperatorExecutor,
-        after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
+        after_operator: Callable[[LoadRefOperatorIr], None] | None,
     ) -> None:
         for op in ops:
             serial_executor.execute(op, context, batch_row_nth, runtime)
@@ -43,9 +44,9 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
         self,
         spec: _TaskSpec,
         base_context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
-        required_fields: Optional[Set[str]],
+        required_fields: set[str] | None,
     ) -> _AdaptiveTaskResult:
         hook_manager = HookCaptureManager(runtime.hook_manager)
         observer_manager = runtime.observer_manager.create_capture_manager()
@@ -85,12 +86,12 @@ class AdaptiveLoadRefSchedulerExecutionMixin(AdaptiveLoadRefSchedulerBase):
     def _run_tasks_in_pool(
         self,
         task_order: Sequence[AdaptiveTaskKey],
-        task_specs: Dict[AdaptiveTaskKey, _TaskSpec],
+        task_specs: dict[AdaptiveTaskKey, _TaskSpec],
         *,
         max_workers: int,
         submit_task: Callable[[_TaskSpec], "Future[_AdaptiveTaskResult]"],
         collect_stats: bool,
-    ) -> Tuple[Dict[AdaptiveTaskKey, _AdaptiveTaskResult], Optional[_LayerScheduleStats]]:
+    ) -> tuple[dict[AdaptiveTaskKey, _AdaptiveTaskResult], _LayerScheduleStats | None]:
         results_by_key, layer_stats = _run_tasks_in_pool_unit(
             task_order,
             task_specs,

@@ -12,9 +12,11 @@ import os
 import tempfile
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar
+from typing import Any, TypeVar
 
 from .._internal import loggingx
 from .._internal.loggingx import format_kv, get_logger
@@ -28,7 +30,6 @@ from ..events._events import (
 )
 from ..exceptions import ScalimWorkflowError
 from ..execution import versioned_outputs
-from ..vendor.dataclassesx import dataclass
 
 _TPlan = TypeVar("_TPlan")
 
@@ -44,7 +45,7 @@ class WorkflowResourceWaitDiagnostics:
 
     enabled: bool
     warn_after_s: float = 30.0
-    repeat_every_s: Optional[float] = None
+    repeat_every_s: float | None = None
     capture_owner_callsite: bool = False
 
     def __post_init__(self) -> None:
@@ -70,10 +71,10 @@ class WorkflowResourceWaitDiagnostics:
 
 
 class ScalimWorkflowWriteError(ScalimWorkflowError):
-    diff: Optional[List[str]]
+    diff: list[str] | None
 
-    def __init__(self, message: str, *, diff: Optional[List[str]] = None) -> None:
-        super(ScalimWorkflowWriteError, self).__init__(message)
+    def __init__(self, message: str, *, diff: list[str] | None = None) -> None:
+        super().__init__(message)
         self.diff = list(diff) if diff is not None else None
 
 
@@ -91,17 +92,17 @@ class _WorkflowResourceManagerBase(ABC):
 
     _workflow_exec_id: str
     _instrumentation: Any
-    _workbook_defs: Dict[str, str]
-    _workbook_allow_formulas: Dict[str, bool]
-    _csv_defs: Dict[str, str]
-    _sheetbook_defs: Dict[str, Any]
-    _workbooks: Dict[str, Any]
-    _csvs: Dict[str, Any]
-    _sheetbooks: Dict[str, Any]
+    _workbook_defs: dict[str, str]
+    _workbook_allow_formulas: dict[str, bool]
+    _csv_defs: dict[str, str]
+    _sheetbook_defs: dict[str, Any]
+    _workbooks: dict[str, Any]
+    _csvs: dict[str, Any]
+    _sheetbooks: dict[str, Any]
     _output_staging_dir_name: str
     _output_staging_keep_on_success: bool
     _output_staging_keep_on_failure: bool
-    _staged_outputs: List[_StagedOutput]
+    _staged_outputs: list[_StagedOutput]
 
     def __init__(
         self,
@@ -109,7 +110,7 @@ class _WorkflowResourceManagerBase(ABC):
         workflow_exec_id: str,
         instrumentation: Any,
         workbook_defs: Mapping[str, str],
-        workbook_allow_formulas: Optional[Mapping[str, bool]] = None,
+        workbook_allow_formulas: Mapping[str, bool] | None = None,
         csv_defs: Mapping[str, str],
         sheetbook_defs: Mapping[str, Any],
         output_staging_dir_name: str = ".scalim-staging",
@@ -202,7 +203,7 @@ class _WorkflowResourceManagerBase(ABC):
         if not self._staged_outputs:
             return
 
-        def _sort_key(item: _StagedOutput) -> Tuple[str, str, str]:
+        def _sort_key(item: _StagedOutput) -> tuple[str, str, str]:
             return (str(item.resource_type), str(item.resource_id), str(item.final_path))
 
         staged = sorted(self._staged_outputs, key=_sort_key)
@@ -227,16 +228,16 @@ class _WorkflowResourceManagerBase(ABC):
                 else:
                     _ = Path(staged_path).replace(final_path)
             except Exception as exc:
-                msg = "Publish staged output failed: {}: {}".format(type(exc).__name__, exc)
+                msg = f"Publish staged output failed: {type(exc).__name__}: {exc}"
                 raise ScalimWorkflowWriteError(
                     msg,
                     diff=[
-                        "resource_type={!r}".format(str(item.resource_type)),
-                        "resource_id={!r}".format(str(item.resource_id)),
-                        "workflow_node_id={!r}".format(str(node_id)),
-                        "staged_path={!r}".format(str(staged_path)),
-                        "final_path={!r}".format(str(final_path)),
-                        "keep_on_success={!r}".format(bool(self._output_staging_keep_on_success)),
+                        f"resource_type={str(item.resource_type)!r}",
+                        f"resource_id={str(item.resource_id)!r}",
+                        f"workflow_node_id={str(node_id)!r}",
+                        f"staged_path={str(staged_path)!r}",
+                        f"final_path={str(final_path)!r}",
+                        f"keep_on_success={bool(self._output_staging_keep_on_success)!r}",
                         "hint=check_permissions_and_disk_space_or_set_workflow_runtime_options.output_staging.keep_on_success=true",
                     ],
                 ) from exc
@@ -251,13 +252,11 @@ class _WorkflowResourceManagerBase(ABC):
                 self._cleanup_output_staging_exec_dir_for_final_path(final_path)
 
         # 成功发布后才写入版本 `manifest` 并更新 `latest` 指示 (`root` 维度 `last-writer-wins`).
-        by_root: Dict[str, Dict[str, Dict[str, str]]] = {}
+        by_root: dict[str, dict[str, dict[str, str]]] = {}
         for item in staged:
             parsed = versioned_outputs.parse_versioned_output_path(Path(str(item.final_path)))
             if str(parsed.version_id) != str(self._workflow_exec_id):
-                msg = "Workflow published output version_id mismatch: expected={!r}, got={!r} (path={!r})".format(
-                    str(self._workflow_exec_id), str(parsed.version_id), str(item.final_path)
-                )
+                msg = f"Workflow published output version_id mismatch: expected={str(self._workflow_exec_id)!r}, got={str(parsed.version_id)!r} (path={str(item.final_path)!r})"  # noqa: E501
                 raise ScalimWorkflowWriteError(msg)
             root_key = str(parsed.root)
             entry = by_root.setdefault(root_key, {"books": {}, "files": {}})
@@ -301,7 +300,7 @@ class _WorkflowResourceManagerBase(ABC):
         *,
         resource_type: str,
         resource_id: str,
-        plans: Dict[str, _TPlan],
+        plans: dict[str, _TPlan],
         create_fn: Callable[[], _TPlan],
         on_create: Callable[[_TPlan], None],
     ) -> _TPlan:
@@ -341,9 +340,9 @@ class _WorkflowResourceManagerBase(ABC):
         path: str,
         write_kind: str,
         action: str,
-        input_node_id: Optional[str] = None,
-        input_output_id: Optional[str] = None,
-        sheet: Optional[str] = None,
+        input_node_id: str | None = None,
+        input_output_id: str | None = None,
+        sheet: str | None = None,
     ) -> None:
         _ = self._instrumentation.emit(
             EventType.WORKFLOW_RESOURCE_WRITE,

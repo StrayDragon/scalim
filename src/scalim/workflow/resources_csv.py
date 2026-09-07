@@ -8,21 +8,23 @@
 import csv
 import io
 from abc import ABC
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, cast
+
+from typing_extensions import override
 
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
 from ..sinks._internal.base import atomic_replace_temp_path, best_effort_remove_temp_path, create_temp_path
 from ..sinks.memory import InMemoryCsv
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 
-WorkflowCsvInput = Union[str, InMemoryCsv]
+WorkflowCsvInput = str | InMemoryCsv
 
 
-def _read_csv_header(input_csv: WorkflowCsvInput) -> List[str]:
+def _read_csv_header(input_csv: WorkflowCsvInput) -> list[str]:
     if isinstance(input_csv, InMemoryCsv):
         header = [str(x or "").strip() for x in input_csv.header]
         if not header or any(not x for x in header):
@@ -33,23 +35,23 @@ def _read_csv_header(input_csv: WorkflowCsvInput) -> List[str]:
     path = str(input_csv)
     p = Path(path)
     if not p.exists():
-        msg = "Missing input CSV: {!r}".format(path)
+        msg = f"Missing input CSV: {path!r}"
         raise ScalimWorkflowWriteError(msg)
     with p.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
         try:
             header = next(reader)
         except StopIteration:
-            msg = "Input CSV is empty (missing header): {!r}".format(path)
+            msg = f"Input CSV is empty (missing header): {path!r}"
             raise ScalimWorkflowWriteError(msg) from None
     header = [str(x or "").strip() for x in header]
     if not header or any(not x for x in header):
-        msg = "Input CSV has invalid header (empty field): {!r}".format(path)
+        msg = f"Input CSV has invalid header (empty field): {path!r}"
         raise ScalimWorkflowWriteError(msg)
     return header
 
 
-def _iter_csv_rows(input_csv: WorkflowCsvInput) -> Iterator[List[str]]:
+def _iter_csv_rows(input_csv: WorkflowCsvInput) -> Iterator[list[str]]:
     if isinstance(input_csv, InMemoryCsv):
         for row in input_csv.rows:
             yield [str(v) for v in row]
@@ -63,7 +65,7 @@ def _iter_csv_rows(input_csv: WorkflowCsvInput) -> Iterator[List[str]]:
             yield [str(v) for v in row]
 
 
-def _describe_header_diff(expected: Sequence[str], actual: Sequence[str]) -> List[str]:
+def _describe_header_diff(expected: Sequence[str], actual: Sequence[str]) -> list[str]:
     exp_set = {str(x) for x in expected}
     act_set = {str(x) for x in actual}
     missing = sorted(exp_set.difference(act_set))
@@ -76,13 +78,13 @@ def _describe_header_diff(expected: Sequence[str], actual: Sequence[str]) -> Lis
     ]
 
 
-def _build_alignment_mapping(expected: Sequence[str], actual: Sequence[str]) -> List[int]:
-    index_by_key: Dict[str, int] = {}
+def _build_alignment_mapping(expected: Sequence[str], actual: Sequence[str]) -> list[int]:
+    index_by_key: dict[str, int] = {}
     for idx, key in enumerate(actual):
         k = str(key)
         if k not in index_by_key:
             index_by_key[k] = int(idx)
-    mapping: List[int] = []
+    mapping: list[int] = []
     for key in expected:
         mapping.append(int(index_by_key.get(str(key), -1)))
     return mapping
@@ -93,20 +95,20 @@ class _AppendSegment:
     decl_order: int
     input_csv: WorkflowCsvInput
     header_policy: str
-    mapping: List[int]
+    mapping: list[int]
     on_mismatch: str
     align_by: str
-    input_header: List[str]
+    input_header: list[str]
 
 
 @dataclass
 class _CsvPlan:
     resource_id: str
     path: str
-    baseline_header: Optional[List[str]] = None
-    export_header: Optional[List[str]] = None
-    segments: Optional[List[_AppendSegment]] = None
-    last_workflow_node_id: Optional[str] = None
+    baseline_header: list[str] | None = None
+    export_header: list[str] | None = None
+    segments: list[_AppendSegment] | None = None
+    last_workflow_node_id: str | None = None
 
 
 class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
@@ -116,7 +118,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         def _create() -> _CsvPlan:
             raw_path = self._csv_defs.get(key)
             if raw_path is None:
-                msg = "Unknown csv resource id: {!r}".format(key)
+                msg = f"Unknown csv resource id: {key!r}"
                 raise ScalimWorkflowWriteError(msg)
             return _CsvPlan(resource_id=key, path=str(raw_path))
 
@@ -148,13 +150,13 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         input_csv: WorkflowCsvInput,
         header_policy: str,
         on_mismatch: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         plan = self._get_or_create_csv(csv_id, workflow_node_id=str(workflow_node_id))
         input_header = _read_csv_header(input_csv)
 
-        pending_warning: Optional[DiagnosticWarningEvent] = None
-        pending_warning_meta: Optional[Dict[str, Any]] = None
+        pending_warning: DiagnosticWarningEvent | None = None
+        pending_warning_meta: dict[str, Any] | None = None
         pending_skip = False
 
         if plan.baseline_header is None:
@@ -168,11 +170,11 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         if list(input_header) != expected:
             diff = _describe_header_diff(expected, input_header)
             if on_mismatch == "error":
-                msg = "Field alignment mismatch (csv_append): csv={!r}".format(str(csv_id))
+                msg = f"Field alignment mismatch (csv_append): csv={str(csv_id)!r}"
                 raise ScalimWorkflowWriteError(msg, diff=diff)
             if on_mismatch == "warn":
                 pending_warning = DiagnosticWarningEvent(
-                    message="Field alignment mismatch (warn): csv={!r}".format(str(csv_id)),
+                    message=f"Field alignment mismatch (warn): csv={str(csv_id)!r}",
                     source_id=None,
                     field_id=None,
                     lookup_key={"expected": expected, "actual": list(input_header)},
@@ -184,7 +186,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                 pending_skip = True
 
         if not pending_skip:
-            cast("List[_AppendSegment]", plan.segments).append(  # pragma: allow-cast csv segments typed narrowing
+            cast("list[_AppendSegment]", plan.segments).append(  # pragma: allow-cast csv segments typed narrowing
                 _AppendSegment(
                     decl_order=int(decl_order),
                     input_csv=input_csv,
@@ -237,7 +239,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
         temp_obj = Path(temp_path)
 
         try:
-            with io.open(str(temp_obj), "w", encoding="utf-8", newline="") as handle:
+            with io.open(str(temp_obj), "w", encoding="utf-8", newline="") as handle:  # noqa: UP020  # 测试经 io.open 打桩
                 writer = csv.writer(handle)
                 header_written = False
                 segments = sorted(p.segments, key=lambda seg: int(seg.decl_order))
@@ -247,7 +249,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
                         header_written = True
 
                     for row in _iter_csv_rows(seg.input_csv):
-                        out_row: List[str] = []
+                        out_row: list[str] = []
                         for idx in seg.mapping:
                             out_row.append(row[idx] if idx >= 0 and idx < len(row) else "")
                         writer.writerow(out_row)
@@ -255,7 +257,7 @@ class _WorkflowCsvResourceMixin(WorkflowResourceManagerBase, ABC):
             atomic_replace_temp_path(temp_path, staging_path)
         except Exception as exc:
             best_effort_remove_temp_path(temp_path)
-            msg = "CSV commit failed: {}: {}".format(type(exc).__name__, exc)
+            msg = f"CSV commit failed: {type(exc).__name__}: {exc}"
             raise ScalimWorkflowWriteError(msg) from exc
 
         node_id = p.last_workflow_node_id or "__wf__commit"

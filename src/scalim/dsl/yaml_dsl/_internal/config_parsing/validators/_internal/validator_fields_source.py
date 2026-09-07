@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, cast
 
 from .....schema_dsl.constants import FIELD_KIND_SOURCE, VALUE_CAST_ENUM
 from ...call_by import ScalimCallByParseError, parse_call_by
@@ -16,12 +16,12 @@ _F = F
 class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin):
     def _validate_source_field_id_data_key_conflicts(
         self,
-        field_defs: List[FieldDef],
-        errors: List[ValidationIssue],
+        field_defs: list[FieldDef],
+        errors: list[ValidationIssue],
         main_source_id: str,
     ) -> None:
-        field_ids_by_source: Dict[str, Set[str]] = {}
-        data_key_map_by_source: Dict[str, Dict[str, Set[str]]] = {}
+        field_ids_by_source: dict[str, set[str]] = {}
+        data_key_map_by_source: dict[str, dict[str, set[str]]] = {}
 
         for field_def in field_defs:
             if field_def.kind != FIELD_KIND_SOURCE:
@@ -57,22 +57,22 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 if main_source_id and source_id == main_source_id:
                     base_path = "main_source.fields"
                 else:
-                    base_path = "sources.{}.fields".format(source_id)
+                    base_path = f"sources.{source_id}.fields"
                 self._add_error(errors, msg, path=base_path)
 
     def _collect_main_source_fields(
         self,
         raw: RawDemand,
-        errors: List[ValidationIssue],
-        sources_set: Set[str],
-        sources_info: Dict[str, Dict[str, bool]],
+        errors: list[ValidationIssue],
+        sources_set: set[str],
+        sources_info: dict[str, dict[str, bool]],
         main_source_id: str,
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
-        field_defs: List[FieldDef],
-        defs_by_id: Dict[str, List[FieldDef]],
+        relation_paths: dict[str, list[tuple[str, str, bool]]],
+        field_defs: list[FieldDef],
+        defs_by_id: dict[str, list[FieldDef]],
         alias_index: AliasIndex,
-        duplicate_fields_by_source: Dict[str, Set[str]],
-        seen_field_values_by_source: Dict[str, Dict[str, str]],
+        duplicate_fields_by_source: dict[str, set[str]],
+        seen_field_values_by_source: dict[str, dict[str, str]],
     ) -> None:
         raw_main = raw.get_mapping(_F.MAIN_SOURCE)
         if raw_main is None:
@@ -89,18 +89,18 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if field_data is not None and _F.COMPUTE in field_data:
                 self._add_error(
                     errors,
-                    "main_source.fields '{}' must not declare compute".format(field_id),
-                    path="main_source.fields.{}".format(field_id),
+                    f"main_source.fields '{field_id}' must not declare compute",
+                    path=f"main_source.fields.{field_id}",
                 )
                 continue
             if field_data is not None and _F.CALL_BY in field_data:
                 self._add_error(
                     errors,
-                    "main_source.fields '{}' must not declare call_by".format(field_id),
-                    path="main_source.fields.{}".format(field_id),
+                    f"main_source.fields '{field_id}' must not declare call_by",
+                    path=f"main_source.fields.{field_id}",
                 )
                 continue
-            self._validate_field_id_not_reserved(field_id, errors, path="main_source.fields.{}".format(field_id))
+            self._validate_field_id_not_reserved(field_id, errors, path=f"main_source.fields.{field_id}")
             field_def = self._add_field_def(
                 field_id,
                 FIELD_KIND_SOURCE,
@@ -122,7 +122,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 relation_paths,
                 errors,
                 source_id_override=main_source_id,
-                base_path="main_source.fields.{}".format(field_id),
+                base_path=f"main_source.fields.{field_id}",
             )
             self._track_duplicate_source_field(
                 main_source_id,
@@ -135,16 +135,16 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
     def _collect_source_fields(
         self,
         raw: RawDemand,
-        errors: List[ValidationIssue],
-        sources_set: Set[str],
-        sources_info: Dict[str, Dict[str, bool]],
+        errors: list[ValidationIssue],
+        sources_set: set[str],
+        sources_info: dict[str, dict[str, bool]],
         main_source_id: str,
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
-        field_defs: List[FieldDef],
-        defs_by_id: Dict[str, List[FieldDef]],
+        relation_paths: dict[str, list[tuple[str, str, bool]]],
+        field_defs: list[FieldDef],
+        defs_by_id: dict[str, list[FieldDef]],
         alias_index: AliasIndex,
-        duplicate_fields_by_source: Dict[str, Set[str]],
-        seen_field_values_by_source: Dict[str, Dict[str, str]],
+        duplicate_fields_by_source: dict[str, set[str]],
+        seen_field_values_by_source: dict[str, dict[str, str]],
     ) -> None:
         raw_sources = raw.get_mapping(_F.SOURCES)
         if raw_sources is None:
@@ -160,8 +160,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 if source_dict.get(_F.FIELDS) is not None:
                     self._add_error(
                         errors,
-                        "'{}' must be a dictionary".format("sources.{}.fields".format(source_id)),
-                        path="sources.{}.fields".format(source_id),
+                        "'{}' must be a dictionary".format(f"sources.{source_id}.fields"),
+                        path=f"sources.{source_id}.fields",
                     )
                 continue
             for field_id_raw, field_data_raw in source_fields.items():
@@ -170,18 +170,18 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                 if field_data is not None and _F.COMPUTE in field_data:
                     self._add_error(
                         errors,
-                        "sources.{}.fields '{}' must not declare compute".format(source_id, field_id),
-                        path="sources.{}.fields.{}".format(source_id, field_id),
+                        f"sources.{source_id}.fields '{field_id}' must not declare compute",
+                        path=f"sources.{source_id}.fields.{field_id}",
                     )
                     continue
                 if field_data is not None and _F.CALL_BY in field_data:
                     self._add_error(
                         errors,
-                        "sources.{}.fields '{}' must not declare call_by".format(source_id, field_id),
-                        path="sources.{}.fields.{}".format(source_id, field_id),
+                        f"sources.{source_id}.fields '{field_id}' must not declare call_by",
+                        path=f"sources.{source_id}.fields.{field_id}",
                     )
                     continue
-                self._validate_field_id_not_reserved(field_id, errors, path="sources.{}.fields.{}".format(source_id, field_id))
+                self._validate_field_id_not_reserved(field_id, errors, path=f"sources.{source_id}.fields.{field_id}")
                 field_def = self._add_field_def(
                     field_id,
                     FIELD_KIND_SOURCE,
@@ -203,7 +203,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                     relation_paths,
                     errors,
                     source_id_override=source_id,
-                    base_path="sources.{}.fields.{}".format(source_id, field_id),
+                    base_path=f"sources.{source_id}.fields.{field_id}",
                 )
                 self._track_duplicate_source_field(
                     source_id,
@@ -216,16 +216,16 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
     def _validate_source_field(
         self,
         field_id: str,
-        field_data: Dict[str, Any],
-        sources_set: Set[str],
-        sources_info: Dict[str, Dict[str, bool]],
+        field_data: dict[str, Any],
+        sources_set: set[str],
+        sources_info: dict[str, dict[str, bool]],
         main_source_id: str,
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
-        errors: List[ValidationIssue],
-        source_id_override: Optional[str] = None,
-        base_path: Optional[str] = None,
+        relation_paths: dict[str, list[tuple[str, str, bool]]],
+        errors: list[ValidationIssue],
+        source_id_override: str | None = None,
+        base_path: str | None = None,
     ) -> None:
-        field_path = base_path or "fields.{}".format(field_id)
+        field_path = base_path or f"fields.{field_id}"
         source_id = self._resolve_source_id_for_field(field_id, field_data, source_id_override, errors, field_path)
         if source_id is None:
             return
@@ -236,8 +236,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         if source_id not in sources_set:
             self._add_error(
                 errors,
-                "Field '{}' references unknown source '{}'".format(field_id, source_id),
-                path="{}.{}".format(field_path, _F.SOURCE),
+                f"Field '{field_id}' references unknown source '{source_id}'",
+                path=f"{field_path}.{_F.SOURCE}",
             )
             return
 
@@ -271,20 +271,20 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         self,
         *,
         field_id: str,
-        field_data: Dict[str, Any],
+        field_data: dict[str, Any],
         relation_val: Any,
-        errors: List[ValidationIssue],
+        errors: list[ValidationIssue],
         field_path: str,
     ) -> None:
         default_val = field_data.get(_F.DEFAULT)
         if default_val is None:
             return
 
-        default_path = "{}.{}".format(field_path, _F.DEFAULT)
+        default_path = f"{field_path}.{_F.DEFAULT}"
         if relation_val is None:
             self._add_error(
                 errors,
-                "Field '{}' default is only allowed for ref fields (requires '{}')".format(field_id, _F.RELATION),
+                f"Field '{field_id}' default is only allowed for ref fields (requires '{_F.RELATION}')",
                 path=default_path,
             )
             return
@@ -292,46 +292,44 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         if not isinstance(default_val, list):
             self._add_error(
                 errors,
-                "Field '{}' default must be a list".format(field_id),
+                f"Field '{field_id}' default must be a list",
                 path=default_path,
             )
             return
 
-        cases = cast("List[object]", default_val)  # pragma: allow-cast yaml scalar list boundary
+        cases = cast("list[object]", default_val)  # pragma: allow-cast yaml scalar list boundary
         if not cases:
             self._add_error(
                 errors,
-                "Field '{}' default must not be empty".format(field_id),
+                f"Field '{field_id}' default must not be empty",
                 path=default_path,
             )
             return
 
         for idx, case_raw in enumerate(cases):
-            case_path = "{}.{}.{}".format(field_path, _F.DEFAULT, int(idx))
+            case_path = f"{field_path}.{_F.DEFAULT}.{int(idx)}"
             if not isinstance(case_raw, dict):
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}] must be an object".format(field_id, int(idx)),
+                    f"Field '{field_id}' default[{int(idx)}] must be an object",
                     path=case_path,
                 )
                 continue
 
-            case_dict = cast("Dict[str, Any]", case_raw)  # pragma: allow-cast yaml mapping boundary
+            case_dict = cast("dict[str, Any]", case_raw)  # pragma: allow-cast yaml mapping boundary
             when_raw = case_dict.get("when")
             when = when_raw.strip() if isinstance(when_raw, str) else ""
             if not when:
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}] missing required 'when'".format(field_id, int(idx)),
+                    f"Field '{field_id}' default[{int(idx)}] missing required 'when'",
                     path=case_path,
                 )
             elif when != "relation_miss":
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}] has unsupported when={!r} (v1 only supports 'relation_miss')".format(
-                        field_id, int(idx), when_raw
-                    ),
-                    path="{}.when".format(case_path),
+                    f"Field '{field_id}' default[{int(idx)}] has unsupported when={when_raw!r} (v1 only supports 'relation_miss')",
+                    path=f"{case_path}.when",
                 )
 
             has_literal = "literal" in case_dict
@@ -339,7 +337,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if has_literal == has_call_by:
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}] must declare exactly one of: literal/call_by".format(field_id, int(idx)),
+                    f"Field '{field_id}' default[{int(idx)}] must declare exactly one of: literal/call_by",
                     path=case_path,
                 )
                 continue
@@ -350,8 +348,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                     continue
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}].literal must be a YAML scalar (int/float/str/bool/null)".format(field_id, int(idx)),
-                    path="{}.literal".format(case_path),
+                    f"Field '{field_id}' default[{int(idx)}].literal must be a YAML scalar (int/float/str/bool/null)",
+                    path=f"{case_path}.literal",
                 )
                 continue
 
@@ -359,8 +357,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if not isinstance(call_by_raw, str) or not call_by_raw.strip():
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}].call_by must be a non-empty string".format(field_id, int(idx)),
-                    path="{}.call_by".format(case_path),
+                    f"Field '{field_id}' default[{int(idx)}].call_by must be a non-empty string",
+                    path=f"{case_path}.call_by",
                 )
                 continue
 
@@ -369,49 +367,49 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             except ScalimCallByParseError as exc:
                 self._add_error(
                     errors,
-                    "Field '{}' default[{}] has invalid call_by: {}".format(field_id, int(idx), exc),
-                    path="{}.call_by".format(case_path),
+                    f"Field '{field_id}' default[{int(idx)}] has invalid call_by: {exc}",
+                    path=f"{case_path}.call_by",
                 )
                 continue
 
             reference = str(parsed.reference or "").strip()
             if reference == "^defaults/zero_of_value_cast":
                 msg = (
-                    "Field '{}' default[{}].call_by uses removed builtin '{}()'; "
+                    f"Field '{field_id}' default[{int(idx)}].call_by uses removed builtin '{reference}()'; "
                     "use '^defaults/default()' (or '^defaults/default_of_value_cast()') instead"
-                ).format(field_id, int(idx), reference)
+                )
                 self._add_error(
                     errors,
                     msg,
-                    path="{}.call_by".format(case_path),
+                    path=f"{case_path}.call_by",
                 )
                 continue
 
             if reference in ("^defaults/default_of_value_cast", "^defaults/default") and _F.VALUE_CAST not in field_data:
                 msg = (
-                    "Field '{}' default[{}].call_by uses '{}()' which requires explicit value_cast; "
+                    f"Field '{field_id}' default[{int(idx)}].call_by uses '{reference}()' which requires explicit value_cast; "
                     "add 'value_cast: int/decimal/str/auto' or use 'literal: ...'"
-                ).format(field_id, int(idx), reference)
+                )
                 self._add_error(
                     errors,
                     msg,
-                    path="{}.call_by".format(case_path),
+                    path=f"{case_path}.call_by",
                 )
 
     def _resolve_source_id_for_field(
         self,
         field_id: str,
-        field_data: Dict[str, Any],
-        source_id_override: Optional[str],
-        errors: List[ValidationIssue],
+        field_data: dict[str, Any],
+        source_id_override: str | None,
+        errors: list[ValidationIssue],
         field_path: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         if source_id_override is None:
             if _F.SOURCE not in field_data:
                 self._add_error(
                     errors,
-                    "Field '{}' missing required '{}'".format(field_id, _F.SOURCE),
-                    path="{}.{}".format(field_path, _F.SOURCE),
+                    f"Field '{field_id}' missing required '{_F.SOURCE}'",
+                    path=f"{field_path}.{_F.SOURCE}",
                 )
                 return None
 
@@ -419,8 +417,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if not isinstance(source_val, str) or not source_val:
                 self._add_error(
                     errors,
-                    "Field '{}' has invalid source '{}', expected source_id".format(field_id, source_val),
-                    path="{}.{}".format(field_path, _F.SOURCE),
+                    f"Field '{field_id}' has invalid source '{source_val}', expected source_id",
+                    path=f"{field_path}.{_F.SOURCE}",
                 )
                 return None
             return source_val
@@ -430,15 +428,15 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if not isinstance(source_val, str) or not source_val:
                 self._add_error(
                     errors,
-                    "Field '{}' has invalid source '{}', expected source_id".format(field_id, source_val),
-                    path="{}.{}".format(field_path, _F.SOURCE),
+                    f"Field '{field_id}' has invalid source '{source_val}', expected source_id",
+                    path=f"{field_path}.{_F.SOURCE}",
                 )
                 return None
             if source_val != source_id_override:
                 self._add_error(
                     errors,
-                    "Field '{}' source '{}' does not match container source '{}'".format(field_id, source_val, source_id_override),
-                    path="{}.{}".format(field_path, _F.SOURCE),
+                    f"Field '{field_id}' source '{source_val}' does not match container source '{source_id_override}'",
+                    path=f"{field_path}.{_F.SOURCE}",
                 )
                 return None
 
@@ -447,22 +445,22 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
     def _validate_source_field_name(
         self,
         field_id: str,
-        field_data: Dict[str, Any],
-        errors: List[ValidationIssue],
+        field_data: dict[str, Any],
+        errors: list[ValidationIssue],
         field_path: str,
     ) -> bool:
         if "field" in field_data:
             legacy_val = field_data.get("field")
-            msg = "Legacy source field 'field: {}' is not allowed; 请改用 'extract: ...'".format(legacy_val)
-            self._add_error(errors, msg, path="{}.field".format(field_path))
+            msg = f"Legacy source field 'field: {legacy_val}' is not allowed; 请改用 'extract: ...'"
+            self._add_error(errors, msg, path=f"{field_path}.field")
             return False
 
         extract_val = field_data.get(_F.EXTRACT)
         if extract_val is not None and (not isinstance(extract_val, str) or not extract_val):
             self._add_error(
                 errors,
-                "Field '{}' has invalid extract '{}', expected non-empty string".format(field_id, extract_val),
-                path="{}.{}".format(field_path, _F.EXTRACT),
+                f"Field '{field_id}' has invalid extract '{extract_val}', expected non-empty string",
+                path=f"{field_path}.{_F.EXTRACT}",
             )
             return False
 
@@ -470,11 +468,11 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         try:
             _ = compile_field_extract(extract_expr)
         except ScalimFieldExtractCompileError as exc:
-            msg = "Field '{}' has invalid extract '{}': {}".format(field_id, extract_expr, str(exc))
+            msg = f"Field '{field_id}' has invalid extract '{extract_expr}': {exc!s}"
             self._add_error(
                 errors,
                 msg,
-                path="{}.{}".format(field_path, _F.EXTRACT) if extract_val is not None else field_path,
+                path=f"{field_path}.{_F.EXTRACT}" if extract_val is not None else field_path,
             )
             return False
 
@@ -483,8 +481,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
     def _validate_source_field_value_cast(
         self,
         field_id: str,
-        field_data: Dict[str, Any],
-        errors: List[ValidationIssue],
+        field_data: dict[str, Any],
+        errors: list[ValidationIssue],
         field_path: str,
     ) -> None:
         if _F.VALUE_CAST not in field_data:
@@ -498,7 +496,7 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
                     value_cast,
                     ", ".join(VALUE_CAST_ENUM),
                 ),
-                path="{}.{}".format(field_path, _F.VALUE_CAST),
+                path=f"{field_path}.{_F.VALUE_CAST}",
             )
 
     def _validate_field_relation(
@@ -507,10 +505,10 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
         relation_val: Any,
         source_id: str,
         main_source_id: str,
-        sources_set: Set[str],
-        sources_info: Dict[str, Dict[str, bool]],
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
-        errors: List[ValidationIssue],
+        sources_set: set[str],
+        sources_info: dict[str, dict[str, bool]],
+        relation_paths: dict[str, list[tuple[str, str, bool]]],
+        errors: list[ValidationIssue],
         field_path: str,
     ) -> None:
         relation_dict = mapping_or_none(relation_val)
@@ -526,8 +524,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if not rel_id:
                 self._add_error(
                     errors,
-                    "Field '{}' relation must be a non-empty relation id or steps object".format(field_id),
-                    path="{}.{}".format(field_path, _F.RELATION),
+                    f"Field '{field_id}' relation must be a non-empty relation id or steps object",
+                    path=f"{field_path}.{_F.RELATION}",
                 )
                 return
 
@@ -535,8 +533,8 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
             if steps is None:
                 self._add_error(
                     errors,
-                    "Field '{}' references unknown relation id '{}'; missing 'relations.{}'".format(field_id, rel_id, rel_id),
-                    path="{}.{}".format(field_path, _F.RELATION),
+                    f"Field '{field_id}' references unknown relation id '{rel_id}'; missing 'relations.{rel_id}'",
+                    path=f"{field_path}.{_F.RELATION}",
                 )
                 return
 
@@ -546,17 +544,17 @@ class ValidatorFieldSourceMixin(ValidatorRelationsMixin, ValidatorFieldBaseMixin
 
         self._add_error(
             errors,
-            "Field '{}' relation must be {{steps: [...]}}".format(field_id),
-            path="{}.{}".format(field_path, _F.RELATION),
+            f"Field '{field_id}' relation must be {{steps: [...]}}",
+            path=f"{field_path}.{_F.RELATION}",
         )
 
     def _track_duplicate_source_field(
         self,
         source_id: str,
         field_id: str,
-        field_dict: Dict[str, Any],
-        duplicates: Dict[str, Set[str]],
-        seen_values: Dict[str, Dict[str, str]],
+        field_dict: dict[str, Any],
+        duplicates: dict[str, set[str]],
+        seen_values: dict[str, dict[str, str]],
     ) -> None:
         extract_raw = field_dict.get(_F.EXTRACT)
         extract_expr = None if extract_raw is None else str(extract_raw)

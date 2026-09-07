@@ -1,10 +1,10 @@
 # region imports
 
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any
 
 from .._internal.utils.loader_result import LoaderResultPolicy
 from .._internal.utils.policy import ensure_policy_enum
-from ..vendor.dataclassesx import dataclass
 from ._internal.common import ObserverManagerMode
 from .manager import ObserverManager
 from .observer import Observer
@@ -25,13 +25,13 @@ class ObservabilityOptions:
         try:
             policy = ensure_policy_enum(LoaderResultPolicy, self.loader_result_policy, label="ObservabilityOptions.loader_result_policy")
         except TypeError as exc:
-            msg = "ObservabilityOptions.loader_result_policy: {}".format(str(exc))
+            msg = f"ObservabilityOptions.loader_result_policy: {exc!s}"
             raise TypeError(msg) from exc
         object.__setattr__(self, "loader_result_policy", policy)
 
         sample_size = int(self.loader_result_sample_size)
         if sample_size < 1:
-            msg = "ObservabilityOptions.loader_result_sample_size: must be >= 1, got: {!r}".format(self.loader_result_sample_size)
+            msg = f"ObservabilityOptions.loader_result_sample_size: must be >= 1, got: {self.loader_result_sample_size!r}"
             raise ValueError(msg)
         object.__setattr__(self, "loader_result_sample_size", sample_size)
 
@@ -39,14 +39,14 @@ class ObservabilityOptions:
 class Observability:
     """可观测性门面:注册观察者并构建 `ObserverManager`."""
 
-    observers: List[Observer]
+    observers: list[Observer]
     options: ObservabilityOptions
 
     def __init__(
         self,
-        observers: Optional[List[Observer]] = None,
+        observers: list[Observer] | None = None,
         *,
-        options: Optional[ObservabilityOptions] = None,
+        options: ObservabilityOptions | None = None,
     ) -> None:
         self.observers = list(observers or [])
         self.options = options or ObservabilityOptions()
@@ -57,8 +57,8 @@ class Observability:
     def build_manager(
         self,
         *,
-        run_id: Optional[str] = None,
-        event_meta_defaults: Optional[Dict[str, Any]] = None,
+        run_id: str | None = None,
+        event_meta_defaults: dict[str, Any] | None = None,
         mode: ObserverManagerMode = ObserverManagerMode.PROCESS,
     ) -> ObserverManager:
         return ObserverManager(

@@ -1,7 +1,6 @@
 # pragma: allow-c901-file plan: c60
 import heapq
 import logging
-from typing import Dict, List, Set, Tuple, Union
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils import graph
@@ -17,8 +16,8 @@ REF_LOADER_ORDERING_DEGRADED_WARNING = (
 
 
 def sort_ref_loaders(  # noqa: C901, PLR0912
-    ref_loaders: List[Tuple[SourceIr, List[Tuple[str, Union[str, Tuple[str, ...]]]]]],
-) -> List[Tuple[SourceIr, List[Tuple[str, Union[str, Tuple[str, ...]]]]]]:
+    ref_loaders: list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]],
+) -> list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]]:
     """基于引用字段的依赖信号对引用加载器进行拓扑排序.
 
     排序约束:
@@ -30,14 +29,14 @@ def sort_ref_loaders(  # noqa: C901, PLR0912
         return ref_loaders
 
     loader_ids = [source.source_id for source, _ in ref_loaders]
-    loader_deps: Dict[str, Set[str]] = {loader_id: set() for loader_id in loader_ids}
-    field_to_loader: Dict[str, str] = {}
+    loader_deps: dict[str, set[str]] = {loader_id: set() for loader_id in loader_ids}
+    field_to_loader: dict[str, str] = {}
 
     for source, ref_fields in ref_loaders:
         for field_key, _ in ref_fields:
             field_to_loader[field_key] = source.source_id
 
-    unmapped_dep_keys: Set[str] = set()
+    unmapped_dep_keys: set[str] = set()
     for source, ref_fields in ref_loaders:
         loader_id = source.source_id
         for _field_key, dep_ref_field_keys in ref_fields:
@@ -58,8 +57,8 @@ def sort_ref_loaders(  # noqa: C901, PLR0912
             unmapped_preview += ", ..."
         _logger.warning(REF_LOADER_ORDERING_DEGRADED_WARNING, len(unmapped_dep_keys), unmapped_preview)
 
-    in_degree: Dict[str, int] = dict.fromkeys(loader_ids, 0)
-    reverse_deps: Dict[str, List[str]] = {loader_id: [] for loader_id in loader_ids}
+    in_degree: dict[str, int] = dict.fromkeys(loader_ids, 0)
+    reverse_deps: dict[str, list[str]] = {loader_id: [] for loader_id in loader_ids}
     for loader_id, deps in loader_deps.items():
         for dep in deps:
             in_degree[loader_id] += 1
@@ -67,7 +66,7 @@ def sort_ref_loaders(  # noqa: C901, PLR0912
 
     ready = [name for name, degree in in_degree.items() if degree == 0]
     heapq.heapify(ready)
-    sorted_loaders: List[str] = []
+    sorted_loaders: list[str] = []
     while ready:
         name = heapq.heappop(ready)
         sorted_loaders.append(name)
@@ -79,7 +78,7 @@ def sort_ref_loaders(  # noqa: C901, PLR0912
     if len(sorted_loaders) != len(in_degree):
         cycles = graph.detect_cycles(loader_ids, lambda name: sorted(loader_deps.get(name, set())))
         cycle_str = "; ".join(" -> ".join(cycle) for cycle in cycles) if cycles else "<unknown>"
-        msg = "检测到 ref loader 循环依赖: {}".format(cycle_str)
+        msg = f"检测到 ref loader 循环依赖: {cycle_str}"
         raise graph.ScalimCyclicDependencyError(msg, cycles)
 
     loader_map = {source.source_id: (source, fields) for source, fields in ref_loaders}

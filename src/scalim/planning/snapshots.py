@@ -1,23 +1,22 @@
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Protocol, cast, runtime_checkable
 
 from ..spec.ir._relations import LookupStepIr
 from ..spec.ir.binding import BindingIr
 from ..spec.ir.lookup_casts import LookupCastSpecIr
 from ..typedefs import RuntimeValue
-from ..vendor.compact.typing_extensionsx import Protocol, runtime_checkable
 from .operators import ComputeOperatorIr, LoadOperatorIr, LoadRefOperatorIr
 from .plan import ExecutionPlan
 
 
 @runtime_checkable
 class _SupportsTopLevelMappingStringKeys(Protocol):
-    def top_level_mapping_string_keys(self) -> Tuple[str, ...]: ...
+    def top_level_mapping_string_keys(self) -> tuple[str, ...]: ...
 
 
-def _lookup_cast_snapshot(spec: Optional[LookupCastSpecIr]) -> Optional[Dict[str, Any]]:
+def _lookup_cast_snapshot(spec: LookupCastSpecIr | None) -> dict[str, Any] | None:
     if spec is None:
         return None
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "name": str(spec.name or "auto"),
     }
     if spec.sep is not None:
@@ -25,11 +24,11 @@ def _lookup_cast_snapshot(spec: Optional[LookupCastSpecIr]) -> Optional[Dict[str
     return payload
 
 
-def _binding_snapshot(binding: Optional[BindingIr]) -> Optional[Dict[str, Any]]:
+def _binding_snapshot(binding: BindingIr | None) -> dict[str, Any] | None:
     if binding is None:
         return None
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "key_field": binding.key_field,
         "mode": str(binding.mode or "keys"),
         "as": str(binding.as_ or "set"),
@@ -50,7 +49,7 @@ def _binding_snapshot(binding: Optional[BindingIr]) -> Optional[Dict[str, Any]]:
     return payload
 
 
-def _lookup_step_snapshot(step: LookupStepIr) -> Dict[str, Any]:
+def _lookup_step_snapshot(step: LookupStepIr) -> dict[str, Any]:
     from_field = step.from_field
     to_field = step.to_field
     lookup_cast = step.lookup_cast
@@ -60,16 +59,16 @@ def _lookup_step_snapshot(step: LookupStepIr) -> Dict[str, Any]:
 
     from_field_snapshot: Any = from_field
     if isinstance(from_field, tuple):
-        from_field_snapshot = list(cast("Tuple[RuntimeValue, ...]", from_field))  # pragma: allow-cast runtime typed narrowing
+        from_field_snapshot = list(cast("tuple[RuntimeValue, ...]", from_field))  # pragma: allow-cast runtime typed narrowing
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "from_field": from_field_snapshot,
         "to_source_id": str(to_source_id or ""),
     }
     if to_field is not None:
         to_field_snapshot: Any = to_field
         if isinstance(to_field, tuple):
-            to_field_snapshot = list(cast("Tuple[RuntimeValue, ...]", to_field))  # pragma: allow-cast runtime typed narrowing
+            to_field_snapshot = list(cast("tuple[RuntimeValue, ...]", to_field))  # pragma: allow-cast runtime typed narrowing
         payload["to_field"] = to_field_snapshot
     cast_snapshot = _lookup_cast_snapshot(lookup_cast)
     if cast_snapshot is not None:
@@ -80,7 +79,7 @@ def _lookup_step_snapshot(step: LookupStepIr) -> Dict[str, Any]:
     return payload
 
 
-def operator_snapshot(op: RuntimeValue) -> Dict[str, Any]:
+def operator_snapshot(op: RuntimeValue) -> dict[str, Any]:
     if isinstance(op, LoadOperatorIr):
         return {
             "operator_id": str(op.operator_id),
@@ -108,11 +107,11 @@ def operator_snapshot(op: RuntimeValue) -> Dict[str, Any]:
             "depends_on": list(op.depends_on),
             "use_cache": bool(op.use_cache),
         }
-    msg = "Unsupported operator type: {}".format(type(op).__name__)
+    msg = f"Unsupported operator type: {type(op).__name__}"
     raise TypeError(msg)
 
 
-def execution_plan_snapshot(plan: ExecutionPlan, *, schema_version: str = "execution_plan/v1") -> Dict[str, Any]:
+def execution_plan_snapshot(plan: ExecutionPlan, *, schema_version: str = "execution_plan/v1") -> dict[str, Any]:
     return {
         "schema_version": str(schema_version),
         "operators": [operator_snapshot(op) for op in (plan.operators or ())],
@@ -123,10 +122,10 @@ def execution_plan_snapshot(plan: ExecutionPlan, *, schema_version: str = "execu
     }
 
 
-def execution_deps_snapshot(plan: ExecutionPlan, *, schema_version: str = "execution_deps/v1") -> Dict[str, Any]:
+def execution_deps_snapshot(plan: ExecutionPlan, *, schema_version: str = "execution_deps/v1") -> dict[str, Any]:
     deps = plan.field_dependencies or {}
 
-    edges: List[Tuple[str, str]] = []
+    edges: list[tuple[str, str]] = []
     for field_key in deps:
         for dep in deps.get(field_key) or ():
             edges.append((str(dep), str(field_key)))

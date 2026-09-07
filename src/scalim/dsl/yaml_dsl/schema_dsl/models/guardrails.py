@@ -1,7 +1,7 @@
-from typing import Any, ClassVar, Optional, Tuple
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any, ClassVar
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import DEFAULT_GUARDRAILS_MODE, GUARDRAILS_MODE_ENUM, schema_meta
 
 
@@ -23,7 +23,7 @@ class GuardrailsLoaderConfig:
     )
     """是否校验加载器返回结构(契约校验)."""
 
-    required_fields: Tuple[Any, ...] = dataclass_field(
+    required_fields: tuple[Any, ...] = dataclass_field(
         default=(),
         metadata=schema_meta(
             desc="关键字段列表(缺失/None 触发护栏;支持 field_id 字符串或 YAML alias)",
@@ -39,7 +39,7 @@ class GuardrailsLoaderConfig:
     )
     """关键字段列表(缺失或为 `None` 时触发护栏)."""
 
-    on_transform_error: Optional[str] = dataclass_field(
+    on_transform_error: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="字段转换异常策略(可选;默认继承 mode)",
@@ -66,7 +66,7 @@ class GuardrailsRelationsConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    null_key_max_rate: Optional[float] = dataclass_field(
+    null_key_max_rate: float | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="关联 null_key 最大比例(0.0-1.0;未设置则不启用)",
@@ -77,7 +77,7 @@ class GuardrailsRelationsConfig:
     )
     """关联查找中 `null_key` 的最大比例阈值(可选)."""
 
-    type_error_max_rate: Optional[float] = dataclass_field(
+    type_error_max_rate: float | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="关联 type_error 最大比例(0.0-1.0;未设置则不启用)",
@@ -97,7 +97,7 @@ class GuardrailsComputeConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    on_error: Optional[str] = dataclass_field(
+    on_error: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="派生字段 compute 异常策略(可选;默认继承 mode)",
@@ -144,19 +144,19 @@ class GuardrailsConfig:
     )
     """护栏模式:`quiet` 或 `fast_fail`."""
 
-    loader: Optional[GuardrailsLoaderConfig] = dataclass_field(
+    loader: GuardrailsLoaderConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(ref="guardrails_loader"),
     )
     """加载器护栏子配置(可选)."""
 
-    relations: Optional[GuardrailsRelationsConfig] = dataclass_field(
+    relations: GuardrailsRelationsConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(ref="guardrails_relations"),
     )
     """关联护栏子配置(可选)."""
 
-    compute: Optional[GuardrailsComputeConfig] = dataclass_field(
+    compute: GuardrailsComputeConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(ref="guardrails_compute"),
     )

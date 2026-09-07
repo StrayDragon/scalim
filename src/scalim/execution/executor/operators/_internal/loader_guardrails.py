@@ -1,4 +1,5 @@
-from typing import Any, Hashable, Set
+from collections.abc import Hashable
+from typing import Any
 
 from .....typedefs import FieldValue
 from ...guardrails import build_guardrail_once_key, build_loader_row_guardrail_payload, fail_guardrail, record_guardrail
@@ -57,7 +58,7 @@ def maybe_enforce_required_field_value(
     row_id: Hashable,
     field_key: str,
     value: FieldValue,
-    required_field_keys: Set[str],
+    required_field_keys: set[str],
     mode: str,
     reason: str,
     is_ref_loader: bool = False,

@@ -1,7 +1,7 @@
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import Field
+from dataclasses import fields as dataclass_fields
+from typing import Any
 
-from .....vendor.dataclassesx import Field
-from .....vendor.dataclassesx import fields as dataclass_fields
 from ..constants import SCHEMA_META_KEY, SCHEMA_OMIT_KEY
 from .demand import DemandConfig
 from .field import DerivedFieldConfig, SourceFieldConfig
@@ -34,19 +34,19 @@ from .source import LoaderRetryConfig, MainSourceConfig, NormalizeConfig, Source
 
 
 class _KeyMap:
-    __slots__: Tuple[str, ...] = ("_keys",)
-    _keys: Dict[str, str]
+    __slots__: tuple[str, ...] = ("_keys",)
+    _keys: dict[str, str]
 
-    def __init__(self, keys: Dict[str, str]) -> None:
+    def __init__(self, keys: dict[str, str]) -> None:
         self._keys = keys
 
     def __getitem__(self, item: str) -> str:
         return self._keys[item]
 
-    def get(self, item: str, default: Optional[str] = None) -> Optional[str]:
+    def get(self, item: str, default: str | None = None) -> str | None:
         return self._keys.get(item, default)
 
-    def items(self) -> List[Tuple[str, str]]:
+    def items(self) -> list[tuple[str, str]]:
         return list(self._keys.items())
 
 
@@ -59,7 +59,7 @@ def _schema_name_for_field(dc_field: "Field[Any]") -> str:
 
 
 def _build_key_map(cls: type, *, include_omitted: bool = False) -> _KeyMap:
-    keys: Dict[str, str] = {}
+    keys: dict[str, str] = {}
     for dc_field in dataclass_fields(cls):
         if not include_omitted and dc_field.metadata.get(SCHEMA_OMIT_KEY):
             continue

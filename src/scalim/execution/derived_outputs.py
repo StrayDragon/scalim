@@ -1,18 +1,19 @@
 # pragma: allow-c901-file plan: c60
-from __future__ import absolute_import
 
 import hashlib
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, cast
+
+from typing_extensions import override
 
 from .._internal.utils import graph as graph_utils
 from .._internal.utils.converters import auto_str_normalize
 from .._internal.utils.iterables import ordered_unique_str
 from ..sinks import BaseRowSink, IRowSink
 from ..typedefs import CellValue, FieldValue, KeyNormalizationMode, RowData, RuntimeValue
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass, field
 from .key_normalization import normalize_key_normalization
 
 
@@ -21,7 +22,7 @@ def _auto_str_normalize_derived_key_part(*, value: RuntimeValue, field_id: str, 
         return None
     normalized = auto_str_normalize(value)
     if normalized is None:
-        msg = "key_normalization failed for {} key field {!r} (type={})".format(str(context), str(field_id), type(value).__name__)
+        msg = f"key_normalization failed for {context!s} key field {str(field_id)!r} (type={type(value).__name__})"
         raise ValueError(msg)
     return normalized
 
@@ -39,15 +40,15 @@ class AggregatorDiagnostics:
     - `meta`/`audit_events` 不得包含明细行内容与聚合 `key` 的具体值(避免泄露敏感数据).
     """
 
-    meta: Dict[str, CellValue] = field(default_factory=dict)
-    audit_events: List[Dict[str, CellValue]] = field(default_factory=list)
+    meta: dict[str, CellValue] = field(default_factory=dict)
+    audit_events: list[dict[str, CellValue]] = field(default_factory=list)
 
 
 class IRowAggregator(ABC):
     """派生聚合器最小接口: 初始化/累计/收尾(对应 `required_fields`/`accumulate`/`finalize_rows`)."""
 
     @abstractmethod
-    def required_fields(self) -> Tuple[str, ...]:
+    def required_fields(self) -> tuple[str, ...]:
         """返回聚合所需的输入字段列表(来自明细流)."""
 
     @abstractmethod
@@ -55,7 +56,7 @@ class IRowAggregator(ABC):
         """消费一行明细数据,更新聚合状态."""
 
     @abstractmethod
-    def finalize_rows(self) -> List[RowData]:
+    def finalize_rows(self) -> list[RowData]:
         """在结束时输出聚合结果行列表."""
 
     @abstractmethod
@@ -69,9 +70,9 @@ class AggMetricSpec:
 
     out_field_id: str
     op: str
-    field_id: Optional[str] = None
-    field_ids: Optional[Tuple[str, ...]] = None
-    threshold: Optional[RuntimeValue] = None
+    field_id: str | None = None
+    field_ids: tuple[str, ...] | None = None
+    threshold: RuntimeValue | None = None
 
 
 @dataclass(frozen=True)
@@ -81,9 +82,9 @@ class RankFieldSpec:
     out_field_id: str
     kind: str
     by: str
-    partition_by: Tuple[str, ...] = ()
+    partition_by: tuple[str, ...] = ()
     order: str = "desc"
-    order_by: Tuple[str, ...] = ()
+    order_by: tuple[str, ...] = ()
     top_k: int = 0
     top_k_mode: str = "rank"
 
@@ -97,7 +98,7 @@ class PostFieldSpec:
 
     out_field_id: str
     kind: str
-    dependencies: Tuple[str, ...]
+    dependencies: tuple[str, ...]
     fingerprint: str
     calculator: PostFieldCalculator
 
@@ -106,7 +107,7 @@ class PostFieldSpec:
 class FinalizeDagPlanItem:
     out_field_id: str
     producer_key: str
-    dependencies: Tuple[str, ...]
+    dependencies: tuple[str, ...]
     phase: str
 
 
@@ -120,14 +121,14 @@ class FinalizeDagPlan:
       - `post_top_k`: 计算其余派生字段(过滤后行).
     """
 
-    items: Tuple[FinalizeDagPlanItem, ...]
+    items: tuple[FinalizeDagPlanItem, ...]
 
     @property
-    def pre_top_k_ids(self) -> Tuple[str, ...]:
+    def pre_top_k_ids(self) -> tuple[str, ...]:
         return tuple(item.out_field_id for item in self.items if str(item.phase) == "pre_top_k")
 
     @property
-    def post_top_k_ids(self) -> Tuple[str, ...]:
+    def post_top_k_ids(self) -> tuple[str, ...]:
         return tuple(item.out_field_id for item in self.items if str(item.phase) == "post_top_k")
 
 
@@ -137,15 +138,15 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
     依赖方向约定: A 依赖 B 表示 A -> B, 因此 B 必须在 A 之前计算.
     """
 
-    rank_by_id: Dict[str, RankFieldSpec] = {str(r.out_field_id): r for r in rank_fields}
-    post_by_id: Dict[str, PostFieldSpec] = {str(p.out_field_id): p for p in post_fields}
+    rank_by_id: dict[str, RankFieldSpec] = {str(r.out_field_id): r for r in rank_fields}
+    post_by_id: dict[str, PostFieldSpec] = {str(p.out_field_id): p for p in post_fields}
 
-    node_ids: Set[str] = set(rank_by_id.keys()) | set(post_by_id.keys())
+    node_ids: set[str] = set(rank_by_id.keys()) | set(post_by_id.keys())
     if not node_ids:
         return FinalizeDagPlan(items=())
 
-    deps_by_id: Dict[str, Tuple[str, ...]] = {}
-    producer_by_id: Dict[str, str] = {}
+    deps_by_id: dict[str, tuple[str, ...]] = {}
+    producer_by_id: dict[str, str] = {}
     for node_id in node_ids:
         rank_spec = rank_by_id.get(node_id)
         if rank_spec is not None:
@@ -158,7 +159,7 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
         deps_by_id[node_id] = tuple(str(x) for x in (post_spec.dependencies or ()))
         producer_by_id[node_id] = str(post_spec.kind)
 
-    def _get_derived_deps(node_id: str) -> Tuple[str, ...]:
+    def _get_derived_deps(node_id: str) -> tuple[str, ...]:
         raw_deps = deps_by_id.get(str(node_id), ())
         return tuple(d for d in raw_deps if d in node_ids)
 
@@ -168,7 +169,7 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
         cycles = exc.cycles or ()
         cycle = cycles[0] if cycles else ()
         chain = " -> ".join(str(x) for x in cycle) if cycle else "unknown"
-        msg = "Aggregate finalize fields has cyclic dependency: {}".format(chain)
+        msg = f"Aggregate finalize fields has cyclic dependency: {chain}"
         raise ValueError(msg) from exc
 
     # `rank_fields` 存在时:
@@ -183,7 +184,7 @@ def build_finalize_dag_plan(*, rank_fields: Sequence[RankFieldSpec], post_fields
     ordered_pre = [node_id for node_id in topo_order if node_id in pre_top_k_set]
     ordered_post = [node_id for node_id in topo_order if node_id not in pre_top_k_set]
 
-    items: List[FinalizeDagPlanItem] = []
+    items: list[FinalizeDagPlanItem] = []
     for node_id in ordered_pre:
         items.append(
             FinalizeDagPlanItem(
@@ -210,7 +211,7 @@ _DECIMAL_ZERO = Decimal(0)
 _DECIMAL_ONE = Decimal(1)
 
 
-def _decimal_from_text(text: str) -> Optional[Decimal]:
+def _decimal_from_text(text: str) -> Decimal | None:
     if not text:
         return None
     try:
@@ -219,10 +220,10 @@ def _decimal_from_text(text: str) -> Optional[Decimal]:
         return None
 
 
-def _to_decimal(value: RuntimeValue) -> Optional[Decimal]:
+def _to_decimal(value: RuntimeValue) -> Decimal | None:
     if value is None:
         return None
-    dec: Optional[Decimal] = None
+    dec: Decimal | None = None
     if isinstance(value, Decimal):
         dec = value
     elif isinstance(value, bool):
@@ -250,10 +251,10 @@ def _stable_sort_key(value: RuntimeValue) -> str:
     numeric = _to_decimal(value)
     if numeric is not None:
         return "num:" + format(numeric, "f")
-    return "{}:{}".format(type(value).__name__, repr(value))
+    return f"{type(value).__name__}:{value!r}"
 
 
-def _stable_group_key_tuple(key: Tuple[RuntimeValue, ...]) -> str:
+def _stable_group_key_tuple(key: tuple[RuntimeValue, ...]) -> str:
     return "\x1f".join(_stable_sort_key(item) for item in key)
 
 
@@ -269,9 +270,9 @@ class _MetricState(ABC):
 
 class _CountMetric(_MetricState):
     _count: int
-    _field_id: Optional[str]
+    _field_id: str | None
 
-    def __init__(self, field_id: Optional[str]) -> None:
+    def __init__(self, field_id: str | None) -> None:
         self._count = 0
         self._field_id = field_id
 
@@ -333,7 +334,7 @@ class _MinMetric(_MetricState):
     _value: CellValue
     _field_id: str
     _has_value: bool
-    _best_key: Optional[Tuple[int, Decimal, str]]
+    _best_key: tuple[int, Decimal, str] | None
 
     def __init__(self, field_id: str) -> None:
         self._field_id = str(field_id)
@@ -347,7 +348,7 @@ class _MinMetric(_MetricState):
         if raw is None:
             return
 
-        def _cmp_key(v: RuntimeValue) -> Tuple[int, Decimal, str]:
+        def _cmp_key(v: RuntimeValue) -> tuple[int, Decimal, str]:
             dec = _to_decimal(v)
             if dec is not None:
                 return (0, dec, "")
@@ -375,7 +376,7 @@ class _MaxMetric(_MetricState):
     _value: CellValue
     _field_id: str
     _has_value: bool
-    _best_key: Optional[Tuple[int, Decimal, str]]
+    _best_key: tuple[int, Decimal, str] | None
 
     def __init__(self, field_id: str) -> None:
         self._field_id = str(field_id)
@@ -389,7 +390,7 @@ class _MaxMetric(_MetricState):
         if raw is None:
             return
 
-        def _cmp_key(v: RuntimeValue) -> Tuple[int, Decimal, str]:
+        def _cmp_key(v: RuntimeValue) -> tuple[int, Decimal, str]:
             dec = _to_decimal(v)
             if dec is not None:
                 return (0, dec, "")
@@ -414,8 +415,8 @@ class _MaxMetric(_MetricState):
 
 
 class _CountDistinctMetric(_MetricState):
-    _field_ids: Tuple[str, ...]
-    _distinct: Set[Tuple[CellValue, ...]]
+    _field_ids: tuple[str, ...]
+    _distinct: set[tuple[CellValue, ...]]
 
     def __init__(self, *, field_ids: Sequence[str]) -> None:
         ids = [str(x) for x in field_ids if str(x)]
@@ -541,15 +542,15 @@ def _metric_state_from_spec(spec: AggMetricSpec) -> _MetricState:
     op = str(spec.op).lower()
     factory = _METRIC_STATE_FACTORY_BY_OP.get(op)
     if factory is None:
-        msg = "Unsupported aggregation op: {!r}".format(spec.op)
+        msg = f"Unsupported aggregation op: {spec.op!r}"
         raise ValueError(msg)
     return factory(spec)
 
 
 class GroupByAggregator(IRowAggregator):
-    _group_by: Tuple[str, ...]
-    _metrics: Tuple[AggMetricSpec, ...]
-    _states: Dict[Tuple[CellValue, ...], Tuple[_MetricState, ...]]
+    _group_by: tuple[str, ...]
+    _metrics: tuple[AggMetricSpec, ...]
+    _states: dict[tuple[CellValue, ...], tuple[_MetricState, ...]]
     _key_normalization: KeyNormalizationMode
 
     def __init__(
@@ -571,16 +572,16 @@ class GroupByAggregator(IRowAggregator):
         self._key_normalization = normalize_key_normalization(key_normalization)
 
     @override
-    def required_fields(self) -> Tuple[str, ...]:
-        required: List[str] = list(self._group_by)
+    def required_fields(self) -> tuple[str, ...]:
+        required: list[str] = list(self._group_by)
         for m in self._metrics:
             if m.field_id:
                 required.append(str(m.field_id))
             if m.field_ids:
                 required.extend([str(x) for x in m.field_ids])
         # 去重但保留顺序.
-        seen: Set[str] = set()
-        ordered: List[str] = []
+        seen: set[str] = set()
+        ordered: list[str] = []
         for fid in required:
             if fid in seen:
                 continue
@@ -604,23 +605,23 @@ class GroupByAggregator(IRowAggregator):
             metric.accumulate(row)
 
     @override
-    def finalize_rows(self) -> List[RowData]:
-        rows: List[RowData] = []
+    def finalize_rows(self) -> list[RowData]:
+        rows: list[RowData] = []
         sorted_keys = sorted(self._states.keys(), key=_stable_group_key_tuple)
         for key in sorted_keys:
             state = self._states[key]
-            out: Dict[str, CellValue] = {}
+            out: dict[str, CellValue] = {}
             for idx, fid in enumerate(self._group_by):
                 out[fid] = key[idx] if idx < len(key) else None
-            for metric_spec, metric_state in zip(self._metrics, state):
+            for metric_spec, metric_state in zip(self._metrics, state, strict=False):
                 out[str(metric_spec.out_field_id)] = metric_state.finalize()
             rows.append(out)
         return rows
 
     @override
     def diagnostics(self) -> AggregatorDiagnostics:
-        meta: Dict[str, CellValue] = {"group_count": len(self._states)}
-        audit_events: List[Dict[str, CellValue]] = []
+        meta: dict[str, CellValue] = {"group_count": len(self._states)}
+        audit_events: list[dict[str, CellValue]] = []
 
         distinct_indices = [i for i, m in enumerate(self._metrics) if str(m.op).lower() == "count_distinct"]
         for idx in distinct_indices:
@@ -634,8 +635,8 @@ class GroupByAggregator(IRowAggregator):
                 total_keys += int(metric_state.key_count)
                 max_keys_per_group = max(max_keys_per_group, int(metric_state.key_count))
 
-            meta["metric.{}.distinct_keys_total".format(out_field)] = int(total_keys)
-            meta["metric.{}.distinct_keys_max_per_group".format(out_field)] = int(max_keys_per_group)
+            meta[f"metric.{out_field}.distinct_keys_total"] = int(total_keys)
+            meta[f"metric.{out_field}.distinct_keys_max_per_group"] = int(max_keys_per_group)
 
         return AggregatorDiagnostics(meta=meta, audit_events=audit_events)
 
@@ -649,9 +650,9 @@ class RankedGroupByAggregator(IRowAggregator):
     """
 
     _base: GroupByAggregator
-    _group_by: Tuple[str, ...]
-    _rank_fields: Tuple[RankFieldSpec, ...]
-    _post_fields: Tuple[PostFieldSpec, ...]
+    _group_by: tuple[str, ...]
+    _rank_fields: tuple[RankFieldSpec, ...]
+    _post_fields: tuple[PostFieldSpec, ...]
     _finalize_plan: FinalizeDagPlan
 
     def __init__(
@@ -674,7 +675,7 @@ class RankedGroupByAggregator(IRowAggregator):
         )
 
     @override
-    def required_fields(self) -> Tuple[str, ...]:
+    def required_fields(self) -> tuple[str, ...]:
         return self._base.required_fields()
 
     @override
@@ -682,13 +683,13 @@ class RankedGroupByAggregator(IRowAggregator):
         self._base.accumulate(row)
 
     @override
-    def finalize_rows(self) -> List[RowData]:  # noqa: C901
-        rows: List[Dict[str, CellValue]] = [dict(r) for r in self._base.finalize_rows()]
+    def finalize_rows(self) -> list[RowData]:  # noqa: C901
+        rows: list[dict[str, CellValue]] = [dict(r) for r in self._base.finalize_rows()]
         if not rows:
             return []
 
-        rank_by_id: Dict[str, RankFieldSpec] = {str(r.out_field_id): r for r in self._rank_fields}
-        post_by_id: Dict[str, PostFieldSpec] = {str(p.out_field_id): p for p in self._post_fields}
+        rank_by_id: dict[str, RankFieldSpec] = {str(r.out_field_id): r for r in self._rank_fields}
+        post_by_id: dict[str, PostFieldSpec] = {str(p.out_field_id): p for p in self._post_fields}
 
         for fid in self._finalize_plan.pre_top_k_ids:
             rank_spec = rank_by_id.get(str(fid))
@@ -700,7 +701,7 @@ class RankedGroupByAggregator(IRowAggregator):
             if (
                 post_spec is None
             ):  # pragma: no cover  # pragma: allow-no-cover invariant: finalize plan ids are derived from rank/post specs
-                msg = "Unknown finalize field id: {!r}".format(fid)
+                msg = f"Unknown finalize field id: {fid!r}"
                 raise ValueError(msg)
             out_key = str(post_spec.out_field_id)
             for row in rows:
@@ -720,7 +721,7 @@ class RankedGroupByAggregator(IRowAggregator):
             if (
                 post_spec is None
             ):  # pragma: no cover  # pragma: allow-no-cover invariant: finalize plan ids are derived from rank/post specs
-                msg = "Unknown finalize field id: {!r}".format(fid)
+                msg = f"Unknown finalize field id: {fid!r}"
                 raise ValueError(msg)
             out_key = str(post_spec.out_field_id)
             for row in rows:
@@ -728,7 +729,7 @@ class RankedGroupByAggregator(IRowAggregator):
 
         return list(rows)
 
-    def _select_primary_rank_spec(self) -> Optional[RankFieldSpec]:
+    def _select_primary_rank_spec(self) -> RankFieldSpec | None:
         if not self._rank_fields:
             return None
         with_top_k = [r for r in self._rank_fields if int(r.top_k) > 0]
@@ -737,13 +738,13 @@ class RankedGroupByAggregator(IRowAggregator):
         # 按 `out_field_id` 稳定选择一个,用于稳定输出顺序.
         return sorted(self._rank_fields, key=lambda r: str(r.out_field_id))[0]
 
-    def _apply_top_k_and_sort(self, rows: List[Dict[str, CellValue]], spec: RankFieldSpec) -> List[Dict[str, CellValue]]:
-        partitions: Dict[Tuple[CellValue, ...], List[Dict[str, CellValue]]] = {}
+    def _apply_top_k_and_sort(self, rows: list[dict[str, CellValue]], spec: RankFieldSpec) -> list[dict[str, CellValue]]:
+        partitions: dict[tuple[CellValue, ...], list[dict[str, CellValue]]] = {}
         for row in rows:
             key = self._partition_key(row, spec)
             partitions.setdefault(key, []).append(row)
 
-        ordered: List[Dict[str, CellValue]] = []
+        ordered: list[dict[str, CellValue]] = []
         for p_key in sorted(partitions.keys(), key=_stable_group_key_tuple):
             bucket = partitions[p_key]
             bucket.sort(key=lambda r: self._row_sort_key(r, spec))
@@ -758,22 +759,22 @@ class RankedGroupByAggregator(IRowAggregator):
 
         return ordered
 
-    def _partition_key(self, row: Dict[str, CellValue], spec: RankFieldSpec) -> Tuple[CellValue, ...]:
+    def _partition_key(self, row: dict[str, CellValue], spec: RankFieldSpec) -> tuple[CellValue, ...]:
         if not spec.partition_by:
             return ()
         return tuple(row.get(str(fid)) for fid in spec.partition_by)
 
-    def _row_sort_key(self, row: Dict[str, CellValue], spec: RankFieldSpec) -> Tuple[RuntimeValue, ...]:
+    def _row_sort_key(self, row: dict[str, CellValue], spec: RankFieldSpec) -> tuple[RuntimeValue, ...]:
         desc = str(spec.order or "desc").lower() != "asc"
         order_fields = tuple(str(x) for x in (spec.order_by or ())) or (str(spec.by),)
-        key_parts: List[RuntimeValue] = []
+        key_parts: list[RuntimeValue] = []
         for fid in order_fields:
             key_parts.extend(self._value_sort_key(row.get(fid), desc=desc))
         group_key = tuple(row.get(fid) for fid in self._group_by)
         key_parts.append(_stable_group_key_tuple(group_key))
         return tuple(key_parts)
 
-    def _value_sort_key(self, value: RuntimeValue, *, desc: bool) -> Tuple[int, int, "_ReversibleValue"]:
+    def _value_sort_key(self, value: RuntimeValue, *, desc: bool) -> tuple[int, int, "_ReversibleValue"]:
         # `None` 永远排在最后;其余尽量按数值排序(失败时回退为稳定字符串键).
         if value is None:
             return (1, 0, _ReversibleValue(_DECIMAL_ZERO, desc=False))
@@ -782,8 +783,8 @@ class RankedGroupByAggregator(IRowAggregator):
             return (0, 0, _ReversibleValue(dec, desc=desc))
         return (0, 1, _ReversibleValue(_stable_sort_key(value), desc=desc))
 
-    def _apply_rank_field(self, rows: List[Dict[str, CellValue]], spec: RankFieldSpec) -> None:
-        partitions: Dict[Tuple[CellValue, ...], List[Dict[str, CellValue]]] = {}
+    def _apply_rank_field(self, rows: list[dict[str, CellValue]], spec: RankFieldSpec) -> None:
+        partitions: dict[tuple[CellValue, ...], list[dict[str, CellValue]]] = {}
         for row in rows:
             key = self._partition_key(row, spec)
             partitions.setdefault(key, []).append(row)
@@ -821,11 +822,11 @@ class RankedGroupByAggregator(IRowAggregator):
 
 class _ReversibleValue:
     desc: bool
-    value: Union[Decimal, str]
+    value: Decimal | str
 
-    __slots__: Tuple[str, str] = ("desc", "value")
+    __slots__: tuple[str, str] = ("desc", "value")
 
-    def __init__(self, value: Union[Decimal, str], *, desc: bool) -> None:
+    def __init__(self, value: Decimal | str, *, desc: bool) -> None:
         self.value = value
         self.desc = bool(desc)
 
@@ -842,8 +843,8 @@ class _ReversibleValue:
             result = other.value < self.value if self.desc else self.value < other.value
         else:
             # 防御性兜底: 理论上不会发生(由 `_value_sort_key` 保证类型一致),但这里仍保持确定性.
-            left = "{}:{}".format(type(self.value).__name__, str(self.value))
-            right = "{}:{}".format(type(other.value).__name__, str(other.value))
+            left = f"{type(self.value).__name__}:{self.value!s}"
+            right = f"{type(other.value).__name__}:{other.value!s}"
             result = right < left if self.desc else left < right
         return bool(result)
 
@@ -902,7 +903,7 @@ def fingerprint_for_meta(
     demand_name: str,
     main_source_id: str,
     target_fields: Sequence[str],
-    field_specs: Iterable[Tuple[str, str, str, str]],
+    field_specs: Iterable[tuple[str, str, str, str]],
 ) -> str:
     """生成稳定的元信息指纹(用于对拍/诊断).
 

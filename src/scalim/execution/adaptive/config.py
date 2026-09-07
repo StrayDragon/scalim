@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 from .loadref_scheduler import resolve_adaptive_max_workers
 from .policy import DefaultAdaptivePolicy
@@ -14,7 +14,7 @@ def resolve_adaptive_policy_tuning_and_workers(
     *,
     runtime: "ExecutionRuntime",
     overrides: "PipelineOverrides",
-) -> Tuple["AdaptivePolicy", AdaptiveTuning, int]:
+) -> tuple["AdaptivePolicy", AdaptiveTuning, int]:
     """解析自适应执行所需的(`policy`、`tuning`、`resolved_max_workers`).
 
     该辅助函数用于避免在解析/校验自适应配置时,流水线与批执行器之间出现语义漂移.

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from scalim.vendor.dataclassesx import replace
+from dataclasses import replace
 
 
 def test_workflow_cache_pool_requires_derived_consumers_mapping() -> None:

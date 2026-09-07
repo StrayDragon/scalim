@@ -1,12 +1,11 @@
-from __future__ import absolute_import
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from typing import Dict, Optional, Sequence, Tuple
+from typing_extensions import override
 
 from ...sinks import BaseRowSink, CSVSink, ExcelSink, ExcelWorkbookSink, IRowSink, ISink
 from ...sinks.accept_types import SinkTypePrecheck
 from ...typedefs import RowData
-from ...vendor.compact.typing_extensionsx import override
-from ...vendor.dataclassesx import dataclass
 from ..managed_artifacts import ManagedArtifactPlan, create_managed_artifact_sink
 from ..output_contracts import ExportLayout, OutputSpec
 
@@ -81,7 +80,7 @@ def _create_excel_row_sink(
 def get_or_create_excel_workbook_sink(
     output: OutputSpec,
     *,
-    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
+    workbook_by_path: dict[str, "ExcelWorkbookSink"],
 ) -> "ExcelWorkbookSink":
     path = str(output.path)
     wb = workbook_by_path.get(path)
@@ -96,14 +95,14 @@ def create_row_sink_for_composed_output(
     target_id: str,
     output: OutputSpec,
     layout: ExportLayout,
-    workbook_by_path: Dict[str, "ExcelWorkbookSink"],
+    workbook_by_path: dict[str, "ExcelWorkbookSink"],
     in_memory: bool = False,
-    managed_artifact_kind: Optional[str] = None,
+    managed_artifact_kind: str | None = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
-) -> Tuple[IRowSink, RowCounter, Optional[ManagedArtifactPlan]]:
+) -> tuple[IRowSink, RowCounter, ManagedArtifactPlan | None]:
     fmt = (output.format or "csv").lower()
     if not output.path and not in_memory:
-        msg = "OutputSpec.path is required for composed outputs (target_id={}, format={})".format(target_id, fmt)
+        msg = f"OutputSpec.path is required for composed outputs (target_id={target_id}, format={fmt})"
         raise ValueError(msg)
 
     if in_memory:
@@ -154,5 +153,5 @@ def create_row_sink_for_composed_output(
         )
         return sink, counter, None
 
-    msg = "Unsupported output format for composed outputs: {!r}".format(output.format)
+    msg = f"Unsupported output format for composed outputs: {output.format!r}"
     raise ValueError(msg)

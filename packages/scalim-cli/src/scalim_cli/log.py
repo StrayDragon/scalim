@@ -1,8 +1,9 @@
 import argparse
 import json
 import sys
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Tuple
+from typing import Any
 
 from scalim.ob.structured_logging import normalize_keys_to_full
 
@@ -56,14 +57,14 @@ def _iter_input_lines(path: str) -> Iterator[str]:
             yield line
 
 
-def _iter_json_objects(lines: Iterable[str]) -> Iterator[Dict[str, Any]]:
+def _iter_json_objects(lines: Iterable[str]) -> Iterator[dict[str, Any]]:
     """Best-effort JSON object scanner with multiline recovery.
 
     Strategy:
     - Ignore non-JSON lines.
     - When a line looks like a JSON object start, try parse; if fails, keep buffering until parse succeeds.
     """
-    buf: List[str] = []
+    buf: list[str] = []
     for raw in lines:
         line = raw.rstrip("\n")
         if not buf:
@@ -101,8 +102,8 @@ def _shorten(value: object, *, max_chars: int) -> str:
     return text[: max_chars - 1] + "…"
 
 
-def _format_kv(items: Dict[str, Any], *, max_fields: int, max_value_chars: int) -> str:
-    parts: List[str] = []
+def _format_kv(items: dict[str, Any], *, max_fields: int, max_value_chars: int) -> str:
+    parts: list[str] = []
     for key in sorted(items.keys()):
         if max_fields > 0 and len(parts) >= max_fields:
             parts.append("…")
@@ -110,11 +111,11 @@ def _format_kv(items: Dict[str, Any], *, max_fields: int, max_value_chars: int) 
         val = items[key]
         if val is None:
             continue
-        parts.append("{}={}".format(key, _shorten(val, max_chars=max_value_chars)))
+        parts.append(f"{key}={_shorten(val, max_chars=max_value_chars)}")
     return ", ".join(parts)
 
 
-def _format_human(record: Dict[str, Any], *, max_fields: int, max_value_chars: int) -> str:
+def _format_human(record: dict[str, Any], *, max_fields: int, max_value_chars: int) -> str:
     level = int(record.get("level") or 0)
     logger = str(record.get("logger") or "")
     kind = str(record.get("kind") or "")
@@ -126,27 +127,27 @@ def _format_human(record: Dict[str, Any], *, max_fields: int, max_value_chars: i
 
     ctx_text = ""
     if isinstance(ctx, dict) and ctx:
-        picked: Dict[str, Any] = {}
+        picked: dict[str, Any] = {}
         for k in ("demand", "workflow_node_id", "run_id", "demand_path"):
             if k in ctx and ctx[k] not in (None, ""):
                 picked[k] = ctx[k]
         if picked:
-            ctx_text = " ctx({})".format(_format_kv(picked, max_fields=6, max_value_chars=max_value_chars))
+            ctx_text = f" ctx({_format_kv(picked, max_fields=6, max_value_chars=max_value_chars)})"
 
     fields_text = ""
     if isinstance(fields, dict) and fields:
-        fields_text = " {}".format(_format_kv(fields, max_fields=max_fields, max_value_chars=max_value_chars))
+        fields_text = f" {_format_kv(fields, max_fields=max_fields, max_value_chars=max_value_chars)}"
 
     err_text = ""
     if isinstance(err, dict) and err:
-        err_text = " err({})".format(_format_kv(err, max_fields=6, max_value_chars=max_value_chars))
+        err_text = f" err({_format_kv(err, max_fields=6, max_value_chars=max_value_chars)})"
 
     head = kind or message or "<log>"
     if logger:
-        head = "{} {}".format(logger, head)
+        head = f"{logger} {head}"
 
     prefix = "ERROR " if level >= _LOG_LEVEL_ERROR else ""
-    return "{}{}{}{}{}".format(prefix, head, ctx_text, fields_text, err_text).strip()
+    return f"{prefix}{head}{ctx_text}{fields_text}{err_text}".strip()
 
 
 def _run_fmt(args: argparse.Namespace) -> int:
@@ -158,8 +159,8 @@ def _run_fmt(args: argparse.Namespace) -> int:
     return 0
 
 
-def _summarize_kinds(records: List[Dict[str, Any]]) -> List[Tuple[str, int]]:
-    counts: Dict[str, int] = {}
+def _summarize_kinds(records: list[dict[str, Any]]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
     for r in records:
         kind = str(r.get("kind") or "")
         if not kind:
@@ -173,11 +174,11 @@ def _run_summarize(args: argparse.Namespace) -> int:
     budget = int(getattr(args, "budget_chars", 8000) or 8000)
     records = list(_iter_json_objects(_iter_input_lines(path)))
 
-    lines: List[str] = []
-    lines.append("records={}".format(len(records)))
+    lines: list[str] = []
+    lines.append(f"records={len(records)}")
 
     for kind, count in _summarize_kinds(records)[:20]:
-        lines.append("{}={}".format(kind, count))
+        lines.append(f"{kind}={count}")
 
     # best-effort: show last performance/relations summaries if present
     for want_kind in ("performance.summary", "performance.loader_breakdown", "relations.summary"):

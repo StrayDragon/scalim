@@ -6025,7 +6025,7 @@ def test_workflow_execute_release_main_rows_artifact_returns_when_missing_count_
         WorkflowNodeType,
         WorkflowOptionsIr,
     )
-    from scalim.vendor.dataclassesx import dataclass
+    from dataclasses import dataclass
 
     @dataclass(frozen=True)
     class _Compilation:
@@ -6115,7 +6115,7 @@ def test_workflow_execute_release_main_rows_artifact_raises_on_negative_count(tm
         WorkflowNodeType,
         WorkflowOptionsIr,
     )
-    from scalim.vendor.dataclassesx import dataclass
+    from dataclasses import dataclass
 
     @dataclass(frozen=True)
     class _Compilation:

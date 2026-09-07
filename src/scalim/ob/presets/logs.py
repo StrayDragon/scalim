@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events import Event
@@ -21,7 +21,7 @@ LOGGING_OBSERVER_COLUMN_WRITE_LOG = prefix("pipeline") + "写入列"
 
 
 class _PrettyStdoutHandlerSlot:
-    handler: Optional[logging.Handler]
+    handler: logging.Handler | None
     owned: bool
 
     def __init__(self) -> None:
@@ -37,7 +37,7 @@ class LoggingObserver(EventDispatchObserver):
 
     logger: logging.Logger
 
-    def __init__(self, logger: Optional[logging.Logger] = None) -> None:
+    def __init__(self, logger: logging.Logger | None = None) -> None:
         if logger is None:
             logger = _LOGGER
         self.logger = logger
@@ -74,7 +74,7 @@ class LoggingObserver(EventDispatchObserver):
                 },
             )
             return
-        kv = format_kv(batches=payload.total_batches, total_duration_s="{:.2f}".format(float(payload.total_duration)))
+        kv = format_kv(batches=payload.total_batches, total_duration_s=f"{float(payload.total_duration):.2f}")
         self.logger.info("%s管道完成 %s", prefix("pipeline"), kv)
 
     def on_batch_start(self, event: Event) -> None:
@@ -108,7 +108,7 @@ class LoggingObserver(EventDispatchObserver):
                 },
             )
             return
-        kv = format_kv(batch_num=payload.batch_num, duration_s="{:.2f}".format(float(payload.duration)))
+        kv = format_kv(batch_num=payload.batch_num, duration_s=f"{float(payload.duration):.2f}")
         self.logger.info("%s批次完成 %s", prefix("pipeline"), kv)
 
     def on_loader_call(self, event: Event) -> None:
@@ -142,7 +142,7 @@ class LoggingObserver(EventDispatchObserver):
         kv = format_kv(
             loader_name=payload.loader_name,
             result_count=int(result_size),
-            duration_s="{:.2f}".format(float(payload.duration)),
+            duration_s=f"{float(payload.duration):.2f}",
             cache_status=cache_status,
             cache_fields=cache_fields,
         )
@@ -304,7 +304,7 @@ class LoggingObserver(EventDispatchObserver):
 
 
 class PrettyLoggingObserver(EventDispatchObserver):
-    _loader_stats: Dict[str, Dict[str, Any]]
+    _loader_stats: dict[str, dict[str, Any]]
     _total_rows: int
 
     def __init__(self) -> None:
@@ -336,7 +336,7 @@ class PrettyLoggingObserver(EventDispatchObserver):
 
         owned_handler = _pretty_stdout_handler_slot.handler if _pretty_stdout_handler_slot.owned else None
 
-        user_named_handler: Optional[logging.Handler] = None
+        user_named_handler: logging.Handler | None = None
         for handler in _PRETTY_LOGGER.handlers:
             if handler.name != _PRETTY_STDOUT_HANDLER_NAME:
                 continue

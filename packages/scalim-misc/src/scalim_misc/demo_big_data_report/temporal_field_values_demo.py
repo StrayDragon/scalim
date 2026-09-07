@@ -3,15 +3,16 @@
 对应 change: `c0-add-field-value-datetime`.
 """
 
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any
 
 import openpyxl
 
 from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
-TEMPORAL_FIELD_IDS: Tuple[str, ...] = (
+TEMPORAL_FIELD_IDS: tuple[str, ...] = (
     "order_id",
     "created",
     "day",
@@ -37,8 +38,8 @@ def load_table_temporal_values() -> Iterable[Mapping[str, object]]:
     ]
 
 
-def _check_temporal_cells(by_name: Mapping[str, Any]) -> List[str]:
-    checks: List[str] = []
+def _check_temporal_cells(by_name: Mapping[str, Any]) -> list[str]:
+    checks: list[str] = []
     order_id = by_name["order_id"]
     if order_id.value != _ORDER_ID or order_id.data_type != "n":
         checks.append("order_id not typed numeric")
@@ -68,21 +69,21 @@ def inspect_temporal_workbook_sheet(
     *,
     sheet: str = "Types",
     field_ids: Sequence[str] = TEMPORAL_FIELD_IDS,
-) -> Tuple[bool, str, Dict[str, Any]]:
+) -> tuple[bool, str, dict[str, Any]]:
     """Read xlsx and assert temporal columns stay Excel date cells (not `str`)."""
-    details: Dict[str, Any] = {"book_path": str(book_path), "sheet": sheet}
+    details: dict[str, Any] = {"book_path": str(book_path), "sheet": sheet}
     if not book_path.exists():
-        return False, "book missing: {}".format(book_path), details
+        return False, f"book missing: {book_path}", details
 
     wb = openpyxl.load_workbook(str(book_path), data_only=False)
     try:
         if sheet not in wb.sheetnames:
-            return False, "sheet missing: {}".format(sheet), details
+            return False, f"sheet missing: {sheet}", details
         ws = wb[sheet]
         headers = [c.value for c in next(ws.iter_rows(min_row=1, max_row=1))]
         details["headers"] = list(headers)
         if list(headers) != list(field_ids):
-            return False, "header mismatch: {} != {}".format(headers, list(field_ids)), details
+            return False, f"header mismatch: {headers} != {list(field_ids)}", details
 
         cells = list(next(ws.iter_rows(min_row=2, max_row=2)))
         by_name = {str(headers[i]): cells[i] for i in range(len(headers))}
@@ -98,7 +99,7 @@ def inspect_temporal_workbook_sheet(
 def verify_temporal_field_values_example(
     *,
     example_id: str,
-    book_path: Optional[Path],
+    book_path: Path | None,
     errors: Sequence[object] = (),
 ) -> ExampleResult:
     if errors:
@@ -106,7 +107,7 @@ def verify_temporal_field_values_example(
             example_id=example_id,
             passed=False,
             kind=EXAMPLE_KIND_ORACLE,
-            summary="workflow errors: {}".format(len(errors)),
+            summary=f"workflow errors: {len(errors)}",
             details={"errors": list(errors)},
         )
     if book_path is None:

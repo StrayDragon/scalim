@@ -6,13 +6,16 @@
 - `book` 身份以 `defs` 成员关系表达(`pathful`→`workbook_defs`; `pathless`→`sheetbook_defs`)
 """
 
-from typing import Any, FrozenSet, Iterator, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from .resources_base import ScalimWorkflowWriteError
 from .resources_csv import WorkflowCsvResourceMixin
 from .resources_sheetbook import SheetBookDef, WorkflowSheetBookResourceMixin
 from .resources_workbook import WorkflowWorkbookResourceMixin
 from .tabular_artifacts import WorkflowTabularInput
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping
 
 
 class WorkflowResourceManager(
@@ -39,7 +42,7 @@ class WorkflowResourceManager(
         input_output_id: str,
         input_csv: WorkflowTabularInput,
         on_conflict: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         bid = str(book_id)
         if bid in self._workbook_defs:
@@ -66,7 +69,7 @@ class WorkflowResourceManager(
                 export_header=export_header,
                 on_conflict=str(on_conflict or "error"),
             )
-        msg = "Unknown book resource id: {!r}".format(str(book_id))
+        msg = f"Unknown book resource id: {str(book_id)!r}"
         raise ScalimWorkflowWriteError(msg)
 
     def apply_book_append(
@@ -82,7 +85,7 @@ class WorkflowResourceManager(
         align_by: str,
         header_policy: str,
         on_mismatch: str,
-        export_header: Optional[Tuple[str, ...]] = None,
+        export_header: tuple[str, ...] | None = None,
     ) -> None:
         bid = str(book_id)
         if bid in self._workbook_defs:
@@ -113,14 +116,14 @@ class WorkflowResourceManager(
                 header_policy=str(header_policy or "once"),
                 on_mismatch=str(on_mismatch or "error"),
             )
-        msg = "Unknown book resource id: {!r}".format(str(book_id))
+        msg = f"Unknown book resource id: {str(book_id)!r}"
         raise ScalimWorkflowWriteError(msg)
 
     def iter_book_sheet_rows(
         self,
         *,
         consumer_node_id: str,
-        visible_producer_node_ids: FrozenSet[str],
+        visible_producer_node_ids: frozenset[str],
         producer_node_id: str,
         book_id: str,
         sheet: str,
@@ -142,7 +145,7 @@ class WorkflowResourceManager(
                 workbook_id=bid,
                 sheet=str(sheet),
             )
-        msg = "book_sheet_rows only supports pathful/pathless books (book_id={!r})".format(str(book_id))
+        msg = f"book_sheet_rows only supports pathful/pathless books (book_id={str(book_id)!r})"
         raise ValueError(msg)
 
 

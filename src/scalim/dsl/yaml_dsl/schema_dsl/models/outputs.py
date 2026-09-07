@@ -1,7 +1,7 @@
-from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, cast
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from typing import Any, ClassVar, cast
 
-from .....vendor.dataclassesx import dataclass
-from .....vendor.dataclassesx import field as dataclass_field
 from ..constants import (
     DEFAULT_OUTPUT_HEADER_BY,
     DEFAULT_OUTPUT_INCLUDE_HEADER,
@@ -112,7 +112,7 @@ class OutputToConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    file: Optional[str] = dataclass_field(
+    file: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={"type": "string", "minLength": 1, "description": "可选:目标 file_id"},
@@ -122,7 +122,7 @@ class OutputToConfig:
     )
     """可选:目标 `file_id`."""
 
-    book: Optional[str] = dataclass_field(
+    book: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={"type": "string", "minLength": 1, "description": "可选:目标 book_id"},
@@ -132,7 +132,7 @@ class OutputToConfig:
     )
     """可选:目标 `book_id`."""
 
-    sheet: Optional[str] = dataclass_field(
+    sheet: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={"type": "string", "minLength": 1, "description": "可选:目标 sheet 名称"},
@@ -151,7 +151,7 @@ class OutputWriteConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    include_header: Optional[bool] = dataclass_field(
+    include_header: bool | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={"type": "boolean", "default": DEFAULT_OUTPUT_INCLUDE_HEADER},
@@ -168,7 +168,7 @@ class OutputWriteConfig:
         ),
     )
 
-    header_fields_output_by: Optional[str] = dataclass_field(
+    header_fields_output_by: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={"type": "string", "enum": list(OUTPUT_HEADER_FIELDS_OUTPUT_BY_ENUM), "default": DEFAULT_OUTPUT_HEADER_BY},
@@ -203,13 +203,13 @@ class OutputAggregateConfig:
     SCHEMA_NAME: ClassVar[str] = "output_aggregate"
     """派生汇总配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("group_by", "fields")
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("group_by", "fields")
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    group_by: Tuple[str, ...] = dataclass_field(
+    group_by: tuple[str, ...] = dataclass_field(
         default_factory=tuple,
         metadata=schema_meta(
             schema={
@@ -256,7 +256,7 @@ class OutputAggregateConfig:
     )
     """分组字段列表."""
 
-    fields: Dict[str, OutputAggregateFieldConfig] = dataclass_field(
+    fields: dict[str, OutputAggregateFieldConfig] = dataclass_field(
         default_factory=dict,
         metadata=schema_meta(
             schema={
@@ -651,13 +651,13 @@ class OutputTargetConfig:
     SCHEMA_NAME: ClassVar[str] = "output_target"
     """输出目标配置对象在 `YAML` 中的节点名称."""
 
-    SCHEMA_REQUIRED: ClassVar[Tuple[str, ...]] = ("name",)
+    SCHEMA_REQUIRED: ClassVar[tuple[str, ...]] = ("name",)
     """该配置对象在 `YAML` 中的必填字段列表."""
 
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    SCHEMA_ALL_OF: ClassVar[List[Dict[str, Any]]] = [
+    SCHEMA_ALL_OF: ClassVar[list[dict[str, Any]]] = [
         {
             # 当声明了 `aggregate`,明细输出的 `fields/from` 约束不再适用.
             # 注意: 输出编排区不支持 `$import` (见 `llmanspec`: `yaml-dsl-demand-imports-scope`).
@@ -675,7 +675,7 @@ class OutputTargetConfig:
     )
     """输出名称(`name`; 必填且唯一)."""
 
-    from_: Optional[str] = dataclass_field(
+    from_: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema=_OUTPUT_NAME_SCHEMA,
@@ -687,7 +687,7 @@ class OutputTargetConfig:
     )
     """可选:继承来源输出."""
 
-    to: Optional[OutputToConfig] = dataclass_field(
+    to: OutputToConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             ref="output_to",
@@ -701,7 +701,7 @@ class OutputTargetConfig:
     )
     """可选:输出 `IO` 绑定."""
 
-    write: Optional[OutputWriteConfig] = dataclass_field(
+    write: OutputWriteConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             ref="output_write",
@@ -715,7 +715,7 @@ class OutputTargetConfig:
     )
     """可选:写入策略覆盖."""
 
-    fields: Optional[Tuple[str, ...]] = dataclass_field(
+    fields: tuple[str, ...] | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
@@ -776,7 +776,7 @@ class OutputTargetConfig:
     )
     """可选:输出字段顺序(`field_id` 列表)."""
 
-    where: Optional[str] = dataclass_field(
+    where: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="可选:过滤表达式(安全表达式)",
@@ -799,7 +799,7 @@ class OutputTargetConfig:
     )
     """可选:过滤表达式(安全表达式)."""
 
-    aggregate: Optional[OutputAggregateConfig] = dataclass_field(
+    aggregate: OutputAggregateConfig | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             ref="output_aggregate",
@@ -808,7 +808,7 @@ class OutputTargetConfig:
     )
     """可选:派生汇总配置(声明后视为派生输出)."""
 
-    requires: Tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=schema_omit())
+    requires: tuple[str, ...] = dataclass_field(default_factory=tuple, metadata=schema_omit())
     """编译期注入: `where` 等表达式依赖字段(内部字段)."""
 
 
@@ -820,7 +820,7 @@ class OutputExtraSheetConfig:
     SCHEMA_ADDITIONAL_PROPERTIES: ClassVar[bool] = False
     """是否允许出现未声明的额外键."""
 
-    path: Optional[str] = dataclass_field(
+    path: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="可选:工作簿路径(缺省使用 primary workbook)",
@@ -830,7 +830,7 @@ class OutputExtraSheetConfig:
     )
     """可选:工作簿路径(缺省使用 `primary` 输出的工作簿)."""
 
-    sheet: Optional[str] = dataclass_field(
+    sheet: str | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             schema={
@@ -844,7 +844,7 @@ class OutputExtraSheetConfig:
     )
     """可选:工作表名称."""
 
-    allow_formulas: Optional[bool] = dataclass_field(
+    allow_formulas: bool | None = dataclass_field(
         default=None,
         metadata=schema_meta(
             desc="可选:允许 Excel 公式(缺省使用 primary workbook 的容器配置)",
@@ -856,23 +856,23 @@ class OutputExtraSheetConfig:
 
 
 def _validate_output_aggregate_producer_keys_schema() -> None:
-    expected: Set[str] = set(AGG_METRIC_PRODUCER_KEYS + AGG_RANK_PRODUCER_KEYS + AGG_POST_PRODUCER_KEYS)
+    expected: set[str] = set(AGG_METRIC_PRODUCER_KEYS + AGG_RANK_PRODUCER_KEYS + AGG_POST_PRODUCER_KEYS)
 
     meta = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
-        "Dict[str, Any]",
+        "dict[str, Any]",
         OutputAggregateConfig.__dataclass_fields__["fields"].metadata.get("schema") or {},
     )
-    schema = cast("Dict[str, Any]", meta.get("schema") or {})  # pragma: allow-cast dataclass schema metadata typed narrowing
+    schema = cast("dict[str, Any]", meta.get("schema") or {})  # pragma: allow-cast dataclass schema metadata typed narrowing
     additional_props = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
-        "Dict[str, Any]",
+        "dict[str, Any]",
         schema.get("additionalProperties") or {},
     )
-    one_of: List[Dict[str, Any]] = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
-        "List[Dict[str, Any]]",
+    one_of: list[dict[str, Any]] = cast(  # pragma: allow-cast dataclass schema metadata typed narrowing
+        "list[dict[str, Any]]",
         additional_props.get("oneOf") or [],
     )
 
-    actual: Set[str] = set()
+    actual: set[str] = set()
     for item in one_of:
         required = list(item.get("required") or [])
         if len(required) != 1:

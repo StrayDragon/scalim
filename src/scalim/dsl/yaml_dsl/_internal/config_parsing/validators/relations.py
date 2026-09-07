@@ -1,6 +1,6 @@
 # pragma: allow-c901-file plan: c60
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from ..parsers.utils import list_or_none, mapping_or_none
 from .constants import F
@@ -13,29 +13,29 @@ _F = F
 class ValidatorRelationsMixin(ValidatorSourcesMixin):
     def _validate_relations(
         self,
-        config: Dict[str, Any],
-        errors: List[ValidationIssue],
-        sources_info: Dict[str, Dict[str, bool]],
+        config: dict[str, Any],
+        errors: list[ValidationIssue],
+        sources_info: dict[str, dict[str, bool]],
         main_source_id: str,
-    ) -> Dict[str, List[Tuple[str, str, bool]]]:
+    ) -> dict[str, list[tuple[str, str, bool]]]:
         relations_raw = mapping_or_none(config.get(_F.RELATIONS, {}))
         if relations_raw is None:
             if config.get(_F.RELATIONS) is not None:
-                self._add_error(errors, "'{}' must be a dictionary".format(_F.RELATIONS), path=_F.RELATIONS)
+                self._add_error(errors, f"'{_F.RELATIONS}' must be a dictionary", path=_F.RELATIONS)
             return {}
 
-        sources_set: Set[str] = set(sources_info.keys())
+        sources_set: set[str] = set(sources_info.keys())
         if main_source_id:
             sources_set.add(main_source_id)
 
         derived_field_ids = self._collect_declared_field_names(config.get(_F.FIELDS))
 
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]] = {}
+        relation_paths: dict[str, list[tuple[str, str, bool]]] = {}
         for rel_id_raw, rel_data_raw in relations_raw.items():
             rel_id = str(rel_id_raw)
             rel_dict = mapping_or_none(rel_data_raw)
             if rel_dict is None:
-                self._add_error(errors, "Relation '{}' must be a dictionary".format(rel_id), path="relations.{}".format(rel_id))
+                self._add_error(errors, f"Relation '{rel_id}' must be a dictionary", path=f"relations.{rel_id}")
                 continue
 
             steps_raw = rel_dict.get(_F.STEPS)
@@ -43,7 +43,7 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                 steps_raw,
                 sources_set,
                 errors,
-                "relations.{}".format(rel_id),
+                f"relations.{rel_id}",
                 main_source_id=main_source_id,
                 derived_field_ids=derived_field_ids,
             )
@@ -54,39 +54,39 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
     def _validate_steps(  # noqa: C901, PLR0912
         self,
         steps_raw: Any,
-        sources_set: Set[str],
-        errors: List[ValidationIssue],
+        sources_set: set[str],
+        errors: list[ValidationIssue],
         context: str,
         *,
         main_source_id: str = "",
-        derived_field_ids: Optional[Set[str]] = None,
-    ) -> List[Tuple[str, str, bool]]:
+        derived_field_ids: set[str] | None = None,
+    ) -> list[tuple[str, str, bool]]:
         steps_list = list_or_none(steps_raw)
         if steps_list is None:
-            self._add_error(errors, "{} steps must be a list".format(context), path="{}.steps".format(context))
+            self._add_error(errors, f"{context} steps must be a list", path=f"{context}.steps")
             return []
         if not steps_list:
-            self._add_error(errors, "{} steps must not be empty".format(context), path="{}.steps".format(context))
+            self._add_error(errors, f"{context} steps must not be empty", path=f"{context}.steps")
             return []
 
-        steps: List[Tuple[str, str, bool]] = []
-        prev_to_source: Optional[str] = None
+        steps: list[tuple[str, str, bool]] = []
+        prev_to_source: str | None = None
 
         for idx, step_raw in enumerate(steps_list):
-            step_path = "{}.steps.{}".format(context, idx)
+            step_path = f"{context}.steps.{idx}"
             step_dict = mapping_or_none(step_raw)
             if step_dict is None:
-                self._add_error(errors, "{} steps[{}] must be a dictionary".format(context, idx), path=step_path)
+                self._add_error(errors, f"{context} steps[{idx}] must be a dictionary", path=step_path)
                 continue
 
             if _F.FROM not in step_dict or _F.TO not in step_dict:
-                self._add_error(errors, "{} steps[{}] missing 'from' or 'to'".format(context, idx), path=step_path)
+                self._add_error(errors, f"{context} steps[{idx}] missing 'from' or 'to'", path=step_path)
                 continue
 
             from_info = self._parse_source_field_group(step_dict.get(_F.FROM))
             to_info = self._parse_source_field_group(step_dict.get(_F.TO))
             if from_info is None or to_info is None:
-                self._add_error(errors, "{} steps[{}] from/to must be source.field or list".format(context, idx), path=step_path)
+                self._add_error(errors, f"{context} steps[{idx}] from/to must be source.field or list", path=step_path)
                 continue
 
             from_source, from_fields = from_info
@@ -95,13 +95,13 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
             if from_source not in sources_set:
                 self._add_error(
                     errors,
-                    "{} steps[{}] references unknown source '{}'".format(context, idx, from_source),
+                    f"{context} steps[{idx}] references unknown source '{from_source}'",
                     path=step_path,
                 )
             if to_source not in sources_set:
                 self._add_error(
                     errors,
-                    "{} steps[{}] references unknown source '{}'".format(context, idx, to_source),
+                    f"{context} steps[{idx}] references unknown source '{to_source}'",
                     path=step_path,
                 )
 
@@ -114,8 +114,8 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                     from_fields,
                     sources_set,
                     errors,
-                    "{} steps[{}]".format(context, idx),
-                    "{}.{}".format(step_path, _F.FROM),
+                    f"{context} steps[{idx}]",
+                    f"{step_path}.{_F.FROM}",
                     derived_allowed_fields=derived_allowed,
                 )
                 self._validate_step_field_names(
@@ -123,17 +123,17 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                     to_fields,
                     sources_set,
                     errors,
-                    "{} steps[{}]".format(context, idx),
-                    "{}.{}".format(step_path, _F.TO),
+                    f"{context} steps[{idx}]",
+                    f"{step_path}.{_F.TO}",
                 )
 
             if len(from_fields) != len(to_fields):
-                self._add_error(errors, "{} steps[{}] from/to field length mismatch".format(context, idx), path=step_path)
+                self._add_error(errors, f"{context} steps[{idx}] from/to field length mismatch", path=step_path)
 
             if prev_to_source is not None and from_source != prev_to_source:
                 self._add_error(
                     errors,
-                    "{} steps[{}] breaks chain: expected from source '{}'".format(context, idx, prev_to_source),
+                    f"{context} steps[{idx}] breaks chain: expected from source '{prev_to_source}'",
                     path=step_path,
                 )
 
@@ -142,7 +142,7 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
 
             lookup_raw = step_dict.get(_F.LOOKUP_CAST)
             if lookup_raw is not None:
-                self._validate_lookup_cast(lookup_raw, errors, "{} steps[{}]".format(context, idx), step_path)
+                self._validate_lookup_cast(lookup_raw, errors, f"{context} steps[{idx}]", step_path)
 
             to_bind_raw = step_dict.get(_F.TO_BIND)
             if to_bind_raw is not None:
@@ -157,8 +157,8 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
                         "      params:\n"
                         "        ids:\n"
                         "          $keys: {{as: set}}"
-                    ).format("{}.{}".format(step_path, _F.TO_BIND)),
-                    path="{}.{}".format(step_path, _F.TO_BIND),
+                    ).format(f"{step_path}.{_F.TO_BIND}"),
+                    path=f"{step_path}.{_F.TO_BIND}",
                 )
 
             steps.append((from_source, to_source, has_to_bind))
@@ -168,12 +168,12 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
     def _validate_step_field_names(
         self,
         source_id: str,
-        fields: List[str],
-        sources_set: Set[str],
-        errors: List[ValidationIssue],
+        fields: list[str],
+        sources_set: set[str],
+        errors: list[ValidationIssue],
         context: str,
         path: str,
-        derived_allowed_fields: Optional[Set[str]] = None,
+        derived_allowed_fields: set[str] | None = None,
     ) -> None:
         if source_id not in sources_set:
             return
@@ -186,15 +186,9 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
             if derived_allowed_fields is not None and field_name in derived_allowed_fields:
                 continue
             base_msg = (
-                "{} references unknown field '{}.{}'; "
+                f"{context} references unknown field '{source_id}.{field_name}'; "
                 "relation steps must use field_id (YAML key), not loader data_key. "
-                "Define it under main_source.fields or sources.{}.fields (or use sources.{}.key for key fields)"
-            ).format(
-                context,
-                source_id,
-                field_name,
-                source_id,
-                source_id,
+                f"Define it under main_source.fields or sources.{source_id}.fields (or use sources.{source_id}.key for key fields)"
             )
 
             suggestions = sorted(self._step_field_ids_by_source_data_key.get(source_id, {}).get(field_name, set()))
@@ -204,7 +198,7 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
 
             step_key = path.rsplit(".", 1)[-1] if path else "from"
             suggested = suggestions[0]
-            fix_snippet = "  {}: {}.{}".format(step_key, source_id, suggested)
+            fix_snippet = f"  {step_key}: {source_id}.{suggested}"
             msg = "{}\nLikely field_id: {}\nFix snippet:\n{}".format(base_msg, ", ".join(suggestions), fix_snippet)
             self._add_error(errors, msg, path=path)
 
@@ -213,29 +207,29 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         field_id: str,
         source_id: str,
         main_source_id: str,
-        relation_paths: Dict[str, List[Tuple[str, str, bool]]],
-        errors: List[ValidationIssue],
+        relation_paths: dict[str, list[tuple[str, str, bool]]],
+        errors: list[ValidationIssue],
         field_path: str,
     ) -> None:
         path_count = self._count_paths(main_source_id, source_id, relation_paths)
         if path_count == 0:
             self._add_error(
                 errors,
-                "Field '{}' has no relation path from main_source to '{}'; specify relation".format(field_id, source_id),
-                path="{}.{}".format(field_path, _F.RELATION),
+                f"Field '{field_id}' has no relation path from main_source to '{source_id}'; specify relation",
+                path=f"{field_path}.{_F.RELATION}",
             )
         elif path_count > 1:
             self._add_error(
                 errors,
-                "Field '{}' has ambiguous relation paths to '{}'; specify relation".format(field_id, source_id),
-                path="{}.{}".format(field_path, _F.RELATION),
+                f"Field '{field_id}' has ambiguous relation paths to '{source_id}'; specify relation",
+                path=f"{field_path}.{_F.RELATION}",
             )
 
     def _validate_steps_binding_requirements(
         self,
-        steps: List[Tuple[str, str, bool]],
-        sources_info: Dict[str, Dict[str, bool]],
-        errors: List[ValidationIssue],
+        steps: list[tuple[str, str, bool]],
+        sources_info: dict[str, dict[str, bool]],
+        errors: list[ValidationIssue],
         context: str,
     ) -> None:
         _ = (steps, sources_info, errors, context)
@@ -246,32 +240,32 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
         field_id: str,
         source_id: str,
         main_source_id: str,
-        steps: List[Tuple[str, str, bool]],
-        errors: List[ValidationIssue],
+        steps: list[tuple[str, str, bool]],
+        errors: list[ValidationIssue],
         field_path: str,
     ) -> None:
         if not steps:
             self._add_error(
                 errors,
-                "Field '{}' relation steps is empty".format(field_id),
-                path="{}.{}".format(field_path, _F.RELATION),
+                f"Field '{field_id}' relation steps is empty",
+                path=f"{field_path}.{_F.RELATION}",
             )
             return
         start_source, end_source = steps[0][0], steps[-1][1]
         if main_source_id and start_source != main_source_id:
             self._add_error(
                 errors,
-                "Field '{}' relation must start from main_source '{}'".format(field_id, main_source_id),
-                path="{}.{}".format(field_path, _F.RELATION),
+                f"Field '{field_id}' relation must start from main_source '{main_source_id}'",
+                path=f"{field_path}.{_F.RELATION}",
             )
         if end_source != source_id:
             self._add_error(
                 errors,
-                "Field '{}' relation must end at source '{}'".format(field_id, source_id),
-                path="{}.{}".format(field_path, _F.RELATION),
+                f"Field '{field_id}' relation must end at source '{source_id}'",
+                path=f"{field_path}.{_F.RELATION}",
             )
 
-    def _parse_source_field_expr(self, expr: Any) -> Optional[Tuple[str, str]]:
+    def _parse_source_field_expr(self, expr: Any) -> tuple[str, str] | None:
         if not isinstance(expr, str):
             return None
         if "." not in expr:
@@ -285,15 +279,15 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
             return None
         return source_id, field_name
 
-    def _parse_source_field_group(self, value: Any) -> Optional[Tuple[str, List[str]]]:
+    def _parse_source_field_group(self, value: Any) -> tuple[str, list[str]] | None:
         if isinstance(value, str):
             parsed = self._parse_source_field_expr(value)
             if parsed is None:
                 return None
             return parsed[0], [parsed[1]]
 
-        source_id: Optional[str] = None
-        fields: List[str] = []
+        source_id: str | None = None
+        fields: list[str] = []
         values = list_or_none(value)
         if values:
             for item in values:
@@ -314,17 +308,17 @@ class ValidatorRelationsMixin(ValidatorSourcesMixin):
             return None
         return source_id, fields
 
-    def _count_paths(self, start: str, target: str, relation_paths: Dict[str, List[Tuple[str, str, bool]]]) -> int:
+    def _count_paths(self, start: str, target: str, relation_paths: dict[str, list[tuple[str, str, bool]]]) -> int:
         if not start or not target:
             return 0
-        adjacency: Dict[str, List[Tuple[str, str]]] = {}
+        adjacency: dict[str, list[tuple[str, str]]] = {}
         for rel_id, steps in relation_paths.items():
             for idx, (from_source, to_source, _has_to_bind) in enumerate(steps):
-                adjacency.setdefault(from_source, []).append((to_source, "{}:{}".format(rel_id, idx)))
+                adjacency.setdefault(from_source, []).append((to_source, f"{rel_id}:{idx}"))
 
         max_paths = 2
         paths_found = 0
-        queue: List[Tuple[str, Set[str]]] = [(start, {start})]
+        queue: list[tuple[str, set[str]]] = [(start, {start})]
 
         while queue and paths_found < max_paths:
             current, visited = queue.pop(0)

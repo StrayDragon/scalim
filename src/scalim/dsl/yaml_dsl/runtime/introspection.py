@@ -1,9 +1,8 @@
 # pragma: allow-c901-file plan: c70
-from typing import Any, Dict, FrozenSet, List, Optional, Set
+from typing import Any, TypedDict
 
 from ....ob.presets.viz import VizObserver, VizObserverConfig
 from ....planning.builder import PlanBuilder
-from ....vendor.compact.typing_extensionsx import TypedDict
 from .._internal.config_parsing.error_envelope import ScalimYamlValidationError
 from .._internal.config_parsing.errors import ScalimConfigValidationError
 from .._internal.config_parsing.loader import YamlDemandLoader
@@ -22,13 +21,13 @@ from .contracts import DemandRunOptions, DemandRunSecurityOptions
 
 
 class OutputConfigDict(TypedDict):
-    params: Dict[str, Any]
-    field_name_mapping: Dict[str, str]
-    output_fields: List[str]
-    outputs: List[Dict[str, Any]]
+    params: dict[str, Any]
+    field_name_mapping: dict[str, str]
+    output_fields: list[str]
+    outputs: list[dict[str, Any]]
 
 
-def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str]:
+def _default_output_fields_from_primary_output(config: DemandConfig) -> list[str]:
     outputs = config.outputs
     if not outputs:
         return []
@@ -49,10 +48,10 @@ def _default_output_fields_from_primary_output(config: DemandConfig) -> List[str
 def resolve_required_field_ids(  # noqa: C901
     yaml_path: str,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]] = None,
-    output_fields: Optional[List[str]] = None,
-) -> List[str]:
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None = None,
+    output_fields: list[str] | None = None,
+) -> list[str]:
     options = DemandRunOptions(
         security=DemandRunSecurityOptions(
             allowed_modules=allowed_modules,
@@ -70,8 +69,8 @@ def resolve_required_field_ids(  # noqa: C901
         targets = list(compilation.request.export_layout.field_ids)
     plan = PlanBuilder(compilation.demand_ir).build(targets=targets)
 
-    required_fields: Set[str] = set()
-    visited: Set[str] = set()
+    required_fields: set[str] = set()
+    visited: set[str] = set()
     stack = list(plan.target_fields)
     while stack:
         field_key = stack.pop()
@@ -100,10 +99,10 @@ def resolve_required_field_ids(  # noqa: C901
 def build_viz_observer(
     yaml_path: str,
     *,
-    allowed_modules: FrozenSet[str],
-    allowed_functions: Optional[FrozenSet[str]] = None,
-    output_fields: Optional[List[str]] = None,
-    config: Optional[VizObserverConfig] = None,
+    allowed_modules: frozenset[str],
+    allowed_functions: frozenset[str] | None = None,
+    output_fields: list[str] | None = None,
+    config: VizObserverConfig | None = None,
 ) -> VizObserver:
     options = DemandRunOptions(
         security=DemandRunSecurityOptions(
@@ -125,11 +124,11 @@ def build_viz_observer(
     return VizObserver.from_plan(plan, actual_config, output_composition=compilation.request.output_composition)
 
 
-def _yaml_validation_errors_to_lines(exc: ScalimYamlValidationError) -> List[str]:
-    errors: List[str] = []
+def _yaml_validation_errors_to_lines(exc: ScalimYamlValidationError) -> list[str]:
+    errors: list[str] = []
     for env in exc.errors:
         if env.path and env.path != "(root)":
-            errors.append("{}: {}".format(env.path, env.message))
+            errors.append(f"{env.path}: {env.message}")
         else:
             errors.append(env.message)
     return errors
@@ -156,7 +155,7 @@ def load_output_config(yaml_path: str) -> OutputConfigDict:
     params = config.main_source.params
     output_fields = _default_output_fields_from_primary_output(config)
 
-    field_name_mapping: Dict[str, str] = {}
+    field_name_mapping: dict[str, str] = {}
     for field_id, field_config in config.source_fields.items():
         if field_config.name:
             field_name_mapping[field_id] = field_config.name

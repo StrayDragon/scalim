@@ -1,8 +1,12 @@
 import contextlib
 import time
 import warnings as py_warnings
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Optional
+
+from typing_extensions import override
 
 from .._internal.utils.loader_result import LoaderResultPolicy, normalize_loader_result_policy
 from .._internal.warningsx import ScalimExperimentalWarning
@@ -37,8 +41,6 @@ from ..sinks.memory import InMemoryCsv
 from ..sinks.rows import InMemoryRows, InMemoryRowsSink
 from ..spec.ir import DemandIr, DerivedFieldIr, FieldIr, SupportedFieldIr
 from ..typedefs import RowData, SinkRowKeySeq
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import dataclass, replace
 from .adaptive.capture import HookCaptureManager, HookRecordedEvent
 from .contracts import ExecutionRequest, ExecutionResult, ObservabilitySpec
 from .engine import ScalimEngine
@@ -91,7 +93,7 @@ class _TeeRowSink(BaseRowSink):
 @dataclass(frozen=True)
 class _OutputPlan:
     sink: ISink
-    output_path: Optional[str]
+    output_path: str | None
 
 
 class _TeeColumnSink(IColumnSink):
@@ -265,7 +267,7 @@ def _create_engine_sink_for_in_memory_rows_capture(
     *,
     sink: ISink,
     field_ids: Sequence[str],
-) -> Tuple[ISink, InMemoryRowsSink]:
+) -> tuple[ISink, InMemoryRowsSink]:
     rows_sink = InMemoryRowsSink(field_ids=field_ids)
     if isinstance(sink, IColumnSink):
         msg = "capture_in_memory_rows currently requires an IRowSink/ISink output (got IColumnSink)"
@@ -281,7 +283,7 @@ def _prepare_engine_sink(
     field_ids: Sequence[str],
     capture_in_memory_rows: bool,
     observer_manager: "ObserverManager",
-) -> Tuple[ISink, Optional[InMemoryRowsSink]]:
+) -> tuple[ISink, InMemoryRowsSink | None]:
     if not capture_in_memory_rows:
         return sink, None
     try:
@@ -326,7 +328,7 @@ def export_layout_from_demand_ir(
     if header_fields_output_by != "name":
         return ExportLayout(field_ids=normalized_ids, header_names=None)
 
-    name_map: Dict[str, str] = {}
+    name_map: dict[str, str] = {}
     for fid in normalized_ids:
         field_ir = demand_ir.fields.get(fid)
         if field_ir is None:
@@ -338,7 +340,7 @@ def export_layout_from_demand_ir(
     if not name_map:
         return ExportLayout(field_ids=normalized_ids, header_names=None)
 
-    header_names: Tuple[str, ...] = tuple(name_map.get(fid, fid) for fid in normalized_ids)
+    header_names: tuple[str, ...] = tuple(name_map.get(fid, fid) for fid in normalized_ids)
     return ExportLayout(field_ids=normalized_ids, header_names=header_names)
 
 
@@ -347,9 +349,9 @@ def _create_file_sink(
     layout: ExportLayout,
     *,
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED,
-    output_write_layout: Optional[OutputWriteLayout] = None,
+    output_write_layout: OutputWriteLayout | None = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
-) -> Optional[ISink]:
+) -> ISink | None:
     if not output.path:
         return None
 
@@ -426,7 +428,7 @@ def _create_file_sink(
             type_precheck=sink_type_precheck,
         )
 
-    msg = "Unsupported output format: '{}'. Supported formats: excel, csv.".format(output.format)
+    msg = f"Unsupported output format: '{output.format}'. Supported formats: excel, csv."
     raise ValueError(msg)
 
 
@@ -435,7 +437,7 @@ def _create_tee_sink(primary: ISink, secondary: ISink) -> ISink:
         return _TeeRowSink(primary, secondary)
     if isinstance(primary, IColumnSink) and isinstance(secondary, IColumnSink):
         return _TeeColumnSink(primary, secondary)
-    msg = "Incompatible sinks for tee: {} vs {}".format(type(primary).__name__, type(secondary).__name__)
+    msg = f"Incompatible sinks for tee: {type(primary).__name__} vs {type(secondary).__name__}"
     raise ValueError(msg)
 
 
@@ -450,10 +452,10 @@ def _describe_sink_kind(sink: ISink) -> str:
 def _create_output_plan(
     output: OutputSpec,
     layout: ExportLayout,
-    sink: Optional[ISink],
+    sink: ISink | None,
     *,
     excel_column_residency: ExcelColumnResidency = ExcelColumnResidency.BUFFERED,
-    output_write_layout: Optional[OutputWriteLayout] = None,
+    output_write_layout: OutputWriteLayout | None = None,
     sink_type_precheck: SinkTypePrecheck = SinkTypePrecheck.OFF,
 ) -> _OutputPlan:
     file_sink = _create_file_sink(
@@ -463,7 +465,7 @@ def _create_output_plan(
         output_write_layout=output_write_layout,
         sink_type_precheck=sink_type_precheck,
     )
-    output_path: Optional[str] = output.path or None
+    output_path: str | None = output.path or None
 
     if sink is None:
         if file_sink is not None:
@@ -477,16 +479,13 @@ def _create_output_plan(
         tee_sink = _create_tee_sink(file_sink, sink)
     except ValueError as e:
         msg = (
-            "ExecutionRequest.sink: Incompatible sinks for tee: file_sink={}({}) vs sink={}({}). "
+            f"ExecutionRequest.sink: Incompatible sinks for tee: "
+            f"file_sink={type(file_sink).__name__}({_describe_sink_kind(file_sink)}) "
+            f"vs sink={type(sink).__name__}({_describe_sink_kind(sink)}). "
             "Both sinks must be IRowSink or both must be IColumnSink. "
             "Hint: set output.streaming=true for a row file sink (CSV/Excel) when teeing with an IRowSink; "
             "or use a column sink such as InMemoryColumnSink when output.streaming=false. "
             "If you pass a custom sink, it must implement IRowSink or IColumnSink to be tee-compatible."
-        ).format(
-            type(file_sink).__name__,
-            _describe_sink_kind(file_sink),
-            type(sink).__name__,
-            _describe_sink_kind(sink),
         )
         with contextlib.suppress(Exception):
             _best_effort_discard_sink(file_sink)
@@ -498,19 +497,19 @@ def _create_output_plan(
 @dataclass(frozen=True)
 class _OutputAssembly:
     counting_sink: ISink
-    output_path: Optional[str]
-    outputs: Optional[Dict[str, str]]
-    managed_artifact_plans: Optional[Dict[str, "ManagedArtifactPlan"]]
+    output_path: str | None
+    outputs: dict[str, str] | None
+    managed_artifact_plans: dict[str, "ManagedArtifactPlan"] | None
     composition_router: Optional["RouterRowSink"]
 
 
 def _collect_workflow_managed_output_export_headers(
     spec: Optional["OutputCompositionSpec"],
-) -> Optional[Dict[str, Tuple[str, ...]]]:
+) -> dict[str, tuple[str, ...]] | None:
     if spec is None:
         return None
 
-    headers: Dict[str, Tuple[str, ...]] = {}
+    headers: dict[str, tuple[str, ...]] = {}
     for target in spec.targets:
         if not target.in_memory or target.workflow_export_header is None:
             continue
@@ -523,7 +522,7 @@ def _collect_workflow_managed_output_export_headers(
 
 
 def _build_execution_plan(demand_ir: DemandIr, request: ExecutionRequest) -> ExecutionPlan:
-    plan_targets: List[str] = list(request.export_layout.field_ids)
+    plan_targets: list[str] = list(request.export_layout.field_ids)
     if request.output_composition is not None:
         plan_targets = list(required_demand_fields(request.output_composition))
     return PlanBuilder(demand_ir).build(targets=plan_targets)
@@ -534,10 +533,10 @@ def _build_observer_and_hook_managers(
     plan: ExecutionPlan,
     request: ExecutionRequest,
     run_id: str,
-    event_meta_defaults: Optional[Dict[str, Any]] = None,
-) -> Tuple["ObserverManager", HookManager, Optional[VizObserver]]:
+    event_meta_defaults: dict[str, Any] | None = None,
+) -> tuple["ObserverManager", HookManager, VizObserver | None]:
     fallback_logger_enabled = False
-    viz_config: Optional[VizObserverConfig] = None
+    viz_config: VizObserverConfig | None = None
     if request.observability is not None:
         fallback_logger_enabled = request.observability.fallback_logger_enabled
         viz_config = request.observability.viz_config
@@ -551,7 +550,7 @@ def _build_observer_and_hook_managers(
     for observer in component_observers:
         observer_manager.register(observer)
 
-    viz_observer: Optional[VizObserver] = None
+    viz_observer: VizObserver | None = None
     if viz_config is not None:
         viz_observer = VizObserver.from_plan(plan, viz_config, output_composition=request.output_composition)
         observer_manager.register(viz_observer)
@@ -563,9 +562,9 @@ def _build_observer_and_hook_managers(
     return observer_manager, hook_manager, viz_observer
 
 
-def _build_field_fingerprints_for_meta(demand_ir: DemandIr) -> List[Tuple[str, str, str, str]]:
+def _build_field_fingerprints_for_meta(demand_ir: DemandIr) -> list[tuple[str, str, str, str]]:
     """生成稳定指纹(不包含可调用对象`callable`),用于元信息工作表."""
-    field_fingerprints: List[Tuple[str, str, str, str]] = []
+    field_fingerprints: list[tuple[str, str, str, str]] = []
     for field_id in sorted(demand_ir.fields.keys()):
         spec = demand_ir.fields[field_id]
         if isinstance(spec, FieldIr):
@@ -585,7 +584,7 @@ def _emit_key_normalization_warning_if_needed(
 ) -> None:
     if request.key_normalization == "raw":
         return
-    msg = "EXPERIMENTAL: key_normalization='{}' is enabled; semantics may change in future releases.".format(request.key_normalization)
+    msg = f"EXPERIMENTAL: key_normalization='{request.key_normalization}' is enabled; semantics may change in future releases."
 
     hooks_want = hook_manager.wants_typed(EventType.DIAGNOSTIC_WARNING)
     event_want = observer_manager.wants(EventType.DIAGNOSTIC_WARNING) or hook_manager.wants_on_event(EventType.DIAGNOSTIC_WARNING)
@@ -611,13 +610,13 @@ def _emit_key_normalization_warning_if_needed(
 
 
 def _collect_managed_artifact_outputs(
-    managed_artifact_plans: Optional[Dict[str, "ManagedArtifactPlan"]],
-) -> Tuple[Optional[Dict[str, InMemoryRows]], Optional[Dict[str, InMemoryCsv]]]:
+    managed_artifact_plans: dict[str, "ManagedArtifactPlan"] | None,
+) -> tuple[dict[str, InMemoryRows] | None, dict[str, InMemoryCsv] | None]:
     if managed_artifact_plans is None:
         return None, None
 
-    rows_map: Dict[str, InMemoryRows] = {}
-    csv_map: Dict[str, InMemoryCsv] = {}
+    rows_map: dict[str, InMemoryRows] = {}
+    csv_map: dict[str, InMemoryCsv] = {}
     for target_id, plan_obj in managed_artifact_plans.items():
         rows_artifact = plan_obj.to_rows_artifact()
         if rows_artifact is not None:
@@ -639,9 +638,9 @@ def _build_execution_result(
     output_assembly: _OutputAssembly,
     stats: InternalStatsCollector,
     start_time: float,
-    in_memory_rows_sink: Optional[InMemoryRowsSink],
+    in_memory_rows_sink: InMemoryRowsSink | None,
 ) -> ExecutionResult:
-    output_target_stats: Optional[List["OutputTargetStats"]] = None
+    output_target_stats: list[OutputTargetStats] | None = None
     if output_assembly.composition_router is not None:
         output_target_stats = output_assembly.composition_router.get_target_stats()
 
@@ -664,8 +663,8 @@ def _build_execution_result(
     )
 
 
-def _select_primary_output_path(outputs: Dict[str, str], spec: "OutputCompositionSpec") -> Optional[str]:
-    primary_id: Optional[str] = None
+def _select_primary_output_path(outputs: dict[str, str], spec: "OutputCompositionSpec") -> str | None:
+    primary_id: str | None = None
     for t in spec.targets:
         if t.is_primary:
             primary_id = str(t.target_id)
@@ -694,7 +693,7 @@ def _assemble_outputs(
     hook_manager: HookManager,
     observer_manager: "ObserverManager",
     wall_start_time: float,
-    batch_size: Optional[int],
+    batch_size: int | None,
     stats: InternalStatsCollector,
 ) -> _OutputAssembly:
     composition_spec = request.output_composition
@@ -757,14 +756,11 @@ def _assemble_outputs(
             composed_sink = _create_tee_sink(router_sink, request.sink)
         except ValueError as e:
             msg = (
-                "ExecutionRequest.sink: Incompatible sinks for tee: composed_sink={}({}) vs sink={}({}). "
+                f"ExecutionRequest.sink: Incompatible sinks for tee: "
+                f"composed_sink={type(router_sink).__name__}({_describe_sink_kind(router_sink)}) "
+                f"vs sink={type(request.sink).__name__}({_describe_sink_kind(request.sink)}). "
                 "Both sinks must be IRowSink (output_composition only supports streaming row sinks). "
                 "Hint: use InMemoryRowDataSink (or another IRowSink) when teeing with composed outputs."
-            ).format(
-                type(router_sink).__name__,
-                _describe_sink_kind(router_sink),
-                type(request.sink).__name__,
-                _describe_sink_kind(request.sink),
             )
             with contextlib.suppress(Exception):
                 _best_effort_discard_sink(router_sink)
@@ -789,9 +785,9 @@ def _create_engine_with_cleanup(
     request: ExecutionRequest,
     hook_manager: HookManager,
     observer_manager: "ObserverManager",
-    batch_size: Optional[int],
+    batch_size: int | None,
     sink: ISink,
-    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+    engine_factory: Callable[..., ScalimEngine] | None = None,
 ) -> ScalimEngine:
     engine_cls = engine_factory or ScalimEngine
     runtime_bindings = request.runtime_bindings
@@ -799,7 +795,7 @@ def _create_engine_with_cleanup(
         msg = "ExecutionRequest.runtime_bindings is required (missing runtime linking stage)"
         raise ValueError(msg)
     # 分片并行 `opt-in`(`Python` 策略面)通过 `PipelineOverrides` 传入 `engine`;未 `opt-in` 时保持 `None`.
-    pipeline_overrides: Optional[PipelineOverrides] = None
+    pipeline_overrides: PipelineOverrides | None = None
     if request.parallelize_lookup_chunks:
         pipeline_overrides = PipelineOverrides(
             parallelize_lookup_chunks=True,
@@ -837,7 +833,7 @@ def _run_ir_with_plan_and_managers(
     observer_manager: "ObserverManager",
     wall_start_time: float,
     start_time: float,
-    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
+    engine_factory: Callable[..., ScalimEngine] | None = None,
 ) -> ExecutionResult:
     _emit_key_normalization_warning_if_needed(
         request=request,
@@ -922,7 +918,7 @@ class _RunIrBootstrap:
     run_id: str
     plan: ExecutionPlan
     request: ExecutionRequest
-    ctx: Dict[str, Any]
+    ctx: dict[str, Any]
     start_time: float
     wall_start_time: float
 
@@ -930,12 +926,12 @@ class _RunIrBootstrap:
 def _bootstrap_run_ir(
     demand_ir: DemandIr,
     request: ExecutionRequest,
-    event_meta_defaults: Optional[Dict[str, Any]] = None,
+    event_meta_defaults: dict[str, Any] | None = None,
 ) -> _RunIrBootstrap:
     maybe_install_jsonl_logging_from_env()
     run_id = generate_run_id(prefix="run")
 
-    ctx: Dict[str, Any] = {"run_id": str(run_id)}
+    ctx: dict[str, Any] = {"run_id": str(run_id)}
     if demand_ir.name:
         ctx["demand"] = str(demand_ir.name)
     if event_meta_defaults:
@@ -962,9 +958,9 @@ def _bootstrap_run_ir(
 def run_ir_capture_events(
     demand_ir: DemandIr,
     request: ExecutionRequest,
-    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
-    event_meta_defaults: Optional[Dict[str, Any]] = None,
-) -> Tuple[ExecutionResult, List[HookRecordedEvent], List[Event], Optional[VizObserver]]:
+    engine_factory: Callable[..., ScalimEngine] | None = None,
+    event_meta_defaults: dict[str, Any] | None = None,
+) -> tuple[ExecutionResult, list[HookRecordedEvent], list[Event], VizObserver | None]:
     """运行一次 `demand IR`,但不调用用户 `hooks/observers`;改为捕获事件供上层按确定顺序回放.
 
     主要用于工作流并发执行时实现 `capture+replay`.
@@ -1003,8 +999,8 @@ def run_ir_capture_events(
 def run_ir(
     demand_ir: DemandIr,
     request: ExecutionRequest,
-    engine_factory: Optional[Callable[..., ScalimEngine]] = None,
-    event_meta_defaults: Optional[Dict[str, Any]] = None,
+    engine_factory: Callable[..., ScalimEngine] | None = None,
+    event_meta_defaults: dict[str, Any] | None = None,
 ) -> ExecutionResult:
     boot = _bootstrap_run_ir(demand_ir, request, event_meta_defaults)
 

@@ -1,7 +1,8 @@
 from collections import deque
-from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 from .....spec.ir import LookupStepIr, MainSourceIr, SourceIr
+from .....spec.ir.aliases import NormalizedLookupKeySpec
 from .....spec.ir.binding import BindingIr
 from .....spec.ir.lookup_casts import LookupCastSpecIr
 from ...schema_dsl.models import (
@@ -12,19 +13,16 @@ from ...schema_dsl.models import (
 )
 from ..errors import ScalimConversionError
 
-if TYPE_CHECKING:
-    from .....spec.ir.aliases import NormalizedLookupKeySpec
-
-StepInfo = Tuple[str, str, LookupStepIr]
+StepInfo = tuple[str, str, LookupStepIr]
 
 
 class ConfigToIRConversionRelationMixin:
-    _sources_ir: Optional[Dict[str, SourceIr]] = None
-    _main_source_ir: Optional[MainSourceIr] = None
-    _relation_steps: Optional[Dict[str, List[StepInfo]]] = None
-    _relation_adjacency: Optional[Dict[str, List[StepInfo]]] = None
-    _source_field_id_map: Optional[Dict[str, Dict[str, str]]] = None
-    _source_data_key_map: Optional[Dict[str, Dict[str, List[str]]]] = None
+    _sources_ir: dict[str, SourceIr] | None = None
+    _main_source_ir: MainSourceIr | None = None
+    _relation_steps: dict[str, list[StepInfo]] | None = None
+    _relation_adjacency: dict[str, list[StepInfo]] | None = None
+    _source_field_id_map: dict[str, dict[str, str]] | None = None
+    _source_data_key_map: dict[str, dict[str, list[str]]] | None = None
 
     def _get_lookup_cast_spec(self, lookup_cast: LookupCastConfig) -> LookupCastSpecIr:
         _ = lookup_cast
@@ -35,61 +33,61 @@ class ConfigToIRConversionRelationMixin:
         bind_config: Any,
         static_params: Any,
         key_field: "NormalizedLookupKeySpec",
-    ) -> Optional[BindingIr]:
+    ) -> BindingIr | None:
         _ = (bind_config, static_params, key_field)
         raise NotImplementedError
 
-    def _require_sources_ir(self) -> Dict[str, SourceIr]:
+    def _require_sources_ir(self) -> dict[str, SourceIr]:
         sources_ir = self._sources_ir
         if sources_ir is None:
             msg = "Source IR map is not initialized"
             raise ScalimConversionError(msg)
         return sources_ir
 
-    def _require_relation_steps(self) -> Dict[str, List[StepInfo]]:
+    def _require_relation_steps(self) -> dict[str, list[StepInfo]]:
         relation_steps = self._relation_steps
         if relation_steps is None:
             msg = "Relation steps are not initialized"
             raise ScalimConversionError(msg)
         return relation_steps
 
-    def _require_relation_adjacency(self) -> Dict[str, List[StepInfo]]:
+    def _require_relation_adjacency(self) -> dict[str, list[StepInfo]]:
         relation_adjacency = self._relation_adjacency
         if relation_adjacency is None:
             msg = "Relation adjacency is not initialized"
             raise ScalimConversionError(msg)
         return relation_adjacency
 
-    def _require_source_field_id_map(self) -> Dict[str, Dict[str, str]]:
+    def _require_source_field_id_map(self) -> dict[str, dict[str, str]]:
         source_field_id_map = self._source_field_id_map
         if source_field_id_map is None:
             msg = "Source field id map is not initialized"
             raise ScalimConversionError(msg)
         return source_field_id_map
 
-    def _require_source_data_key_map(self) -> Dict[str, Dict[str, List[str]]]:
+    def _require_source_data_key_map(self) -> dict[str, dict[str, list[str]]]:
         source_data_key_map = self._source_data_key_map
         if source_data_key_map is None:
             msg = "Source data key map is not initialized"
             raise ScalimConversionError(msg)
         return source_data_key_map
 
-    def _convert_relations(self, config: DemandConfig) -> Dict[str, List[StepInfo]]:
-        relation_steps: Dict[str, List[StepInfo]] = {}
+    def _convert_relations(self, config: DemandConfig) -> dict[str, list[StepInfo]]:
+        relation_steps: dict[str, list[StepInfo]] = {}
         for rel_id, rel_config in config.relations.items():
             relation_steps[rel_id] = self._convert_steps(rel_config.steps, config)
         return relation_steps
 
-    def _build_relation_adjacency(self, relation_steps: Dict[str, List[StepInfo]]) -> Dict[str, List[StepInfo]]:
-        adjacency: Dict[str, List[StepInfo]] = {}
+    def _build_relation_adjacency(self, relation_steps: dict[str, list[StepInfo]]) -> dict[str, list[StepInfo]]:
+        adjacency: dict[str, list[StepInfo]] = {}
         for steps in relation_steps.values():
             for step_info in steps:
                 from_source_id, _to_source_id, _step_ir = step_info
                 adjacency.setdefault(from_source_id, []).append(step_info)
         return adjacency
 
-    def _convert_steps(self, steps: Tuple[RelationStepConfig, ...], config: DemandConfig) -> List[StepInfo]:
-        step_infos: List[StepInfo] = []
+    def _convert_steps(self, steps: tuple[RelationStepConfig, ...], config: DemandConfig) -> list[StepInfo]:
+        step_infos: list[StepInfo] = []
         for step in steps:
             step_infos.append(self._convert_step(step, config))
         return step_infos
@@ -116,13 +114,13 @@ class ConfigToIRConversionRelationMixin:
     def _require_source_ir(self, source_id: str) -> SourceIr:
         source = self._require_sources_ir().get(source_id)
         if source is None:
-            msg = "Step references unknown source '{}'".format(source_id)
+            msg = f"Step references unknown source '{source_id}'"
             raise ScalimConversionError(msg)
         return source
 
-    def _resolve_to_field(self, to_fields: List[str], to_source: SourceIr) -> Optional["NormalizedLookupKeySpec"]:
+    def _resolve_to_field(self, to_fields: list[str], to_source: SourceIr) -> NormalizedLookupKeySpec | None:
         if len(to_fields) > 1:
-            to_field: Optional["NormalizedLookupKeySpec"] = tuple(to_fields)
+            to_field: NormalizedLookupKeySpec | None = tuple(to_fields)
         else:
             to_field = to_fields[0]
 
@@ -130,7 +128,7 @@ class ConfigToIRConversionRelationMixin:
             return None
         return to_field
 
-    def _resolve_step_lookup_cast(self, step: RelationStepConfig) -> Optional[LookupCastSpecIr]:
+    def _resolve_step_lookup_cast(self, step: RelationStepConfig) -> LookupCastSpecIr | None:
         if step.lookup_cast is None:
             return None
         return self._get_lookup_cast_spec(step.lookup_cast)
@@ -141,7 +139,7 @@ class ConfigToIRConversionRelationMixin:
         config: DemandConfig,
         to_source_id: str,
         key_field: "NormalizedLookupKeySpec",
-    ) -> Optional[BindingIr]:
+    ) -> BindingIr | None:
         _ = (step, config, to_source_id, key_field)
         return None
 
@@ -150,7 +148,7 @@ class ConfigToIRConversionRelationMixin:
         field_config: SourceFieldConfig,
         config: DemandConfig,
         target_source: SourceIr,
-    ) -> Optional[Tuple[LookupStepIr, ...]]:
+    ) -> tuple[LookupStepIr, ...] | None:
         if self._main_source_ir is None:
             return None
 
@@ -164,7 +162,7 @@ class ConfigToIRConversionRelationMixin:
         if isinstance(relation, str):
             relation_config = config.relations.get(relation)
             if relation_config is None:
-                msg = "Unsupported relation reference: '{}'".format(relation)
+                msg = f"Unsupported relation reference: '{relation}'"
                 raise ScalimConversionError(msg)
             relation_steps = relation_config.steps
         else:
@@ -173,7 +171,7 @@ class ConfigToIRConversionRelationMixin:
         steps = self._convert_steps(relation_steps, config)
         return tuple(step for _from_id, _to_id, step in steps)
 
-    def _infer_unique_path(self, start_id: str, target_id: str) -> Optional[List[StepInfo]]:
+    def _infer_unique_path(self, start_id: str, target_id: str) -> list[StepInfo] | None:
         if start_id == target_id:
             return []
 
@@ -184,8 +182,8 @@ class ConfigToIRConversionRelationMixin:
             self._relation_adjacency = adjacency
 
         max_paths = 2
-        found_paths: List[List[StepInfo]] = []
-        queue: Deque[Tuple[str, List[StepInfo], Set[str]]] = deque([(start_id, [], {start_id})])
+        found_paths: list[list[StepInfo]] = []
+        queue: deque[tuple[str, list[StepInfo], set[str]]] = deque([(start_id, [], {start_id})])
 
         while queue and len(found_paths) < max_paths:
             current, path, visited = queue.popleft()
@@ -204,33 +202,33 @@ class ConfigToIRConversionRelationMixin:
             return found_paths[0]
 
         if not found_paths:
-            msg = "No relation path found from '{}' to '{}'".format(start_id, target_id)
+            msg = f"No relation path found from '{start_id}' to '{target_id}'"
             raise ScalimConversionError(msg)
 
-        msg = "Ambiguous relation paths from '{}' to '{}'".format(start_id, target_id)
+        msg = f"Ambiguous relation paths from '{start_id}' to '{target_id}'"
         raise ScalimConversionError(msg)
 
-    def _parse_source_field_expr(self, expr: str) -> Tuple[str, str]:
+    def _parse_source_field_expr(self, expr: str) -> tuple[str, str]:
         if "." not in expr:
-            msg = "Invalid field reference: '{}'".format(expr)
+            msg = f"Invalid field reference: '{expr}'"
             raise ScalimConversionError(msg)
         source_id, field_name = expr.split(".", 1)
         if not source_id or not field_name:
-            msg = "Invalid field reference: '{}'".format(expr)
+            msg = f"Invalid field reference: '{expr}'"
             raise ScalimConversionError(msg)
         field_name = self._resolve_source_field_name(source_id, field_name)
         return source_id, field_name
 
-    def _parse_step_field(self, value: Union[str, Tuple[str, ...]]) -> Tuple[str, List[str]]:
+    def _parse_step_field(self, value: str | tuple[str, ...]) -> tuple[str, list[str]]:
         if isinstance(value, tuple):
-            source_id: Optional[str] = None
-            fields: List[str] = []
+            source_id: str | None = None
+            fields: list[str] = []
             for item in value:
                 src, field_name = self._parse_source_field_expr(item)
                 if source_id is None:
                     source_id = src
                 elif source_id != src:
-                    msg = "Step fields must reference the same source, got '{}' and '{}'".format(source_id, src)
+                    msg = f"Step fields must reference the same source, got '{source_id}' and '{src}'"
                     raise ScalimConversionError(msg)
                 fields.append(field_name)
             if source_id is None:
@@ -241,8 +239,8 @@ class ConfigToIRConversionRelationMixin:
         src, field_name = self._parse_source_field_expr(value)
         return src, [field_name]
 
-    def _build_source_data_key_map(self, source_field_id_map: Dict[str, Dict[str, str]]) -> Dict[str, Dict[str, List[str]]]:
-        data_key_map: Dict[str, Dict[str, List[str]]] = {}
+    def _build_source_data_key_map(self, source_field_id_map: dict[str, dict[str, str]]) -> dict[str, dict[str, list[str]]]:
+        data_key_map: dict[str, dict[str, list[str]]] = {}
         for source_id, field_map in source_field_id_map.items():
             source_data_keys = data_key_map.setdefault(source_id, {})
             for field_id, data_key in field_map.items():

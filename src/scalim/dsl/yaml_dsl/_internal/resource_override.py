@@ -10,9 +10,10 @@
 """
 
 import os
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, cast
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
+from typing import Any, cast
 
-from ....vendor.dataclassesx import replace
 from ....workflow.errors import ScalimWorkflowConfigError
 from ..init_var_nodes import InitVarRef, OptionalPathNode, parse_init_var_ref
 from ..runtime.contracts import (
@@ -58,25 +59,25 @@ from .validation_contracts import validate_output_name as _validate_output_name_
 
 __all__ = ()
 
-_OUTPUT_HEADER_BY_ENUM: Tuple[str, ...] = ("field_id", "name")
+_OUTPUT_HEADER_BY_ENUM: tuple[str, ...] = ("field_id", "name")
 
 
-def _as_opt_non_empty_str_or_pathlike(value: Any, *, path: str) -> Optional[str]:
+def _as_opt_non_empty_str_or_pathlike(value: Any, *, path: str) -> str | None:
     if value is None:
         return None
     if isinstance(value, os.PathLike):
         v = str(os.fspath(value)).strip()
         if not v:
-            msg = "{} must not be empty".format(path)
+            msg = f"{path} must not be empty"
             raise ScalimWorkflowConfigError(msg, path=str(path))
         return v
     if isinstance(value, str):
         v = str(value).strip()
         if not v:
-            msg = "{} must not be empty".format(path)
+            msg = f"{path} must not be empty"
             raise ScalimWorkflowConfigError(msg, path=str(path))
         return v
-    msg = "{} must be a string or os.PathLike".format(path)
+    msg = f"{path} must be a string or os.PathLike"
     raise ScalimWorkflowConfigError(msg, path=str(path))
 
 
@@ -96,48 +97,48 @@ def _as_opt_path_or_init_var(value: Any, *, path: str) -> OptionalPathNode:
         return value
 
     if isinstance(value, dict):
-        return parse_init_var_ref(cast("Dict[str, Any]", value), path=str(path))  # pragma: allow-cast mapping narrowing
+        return parse_init_var_ref(cast("dict[str, Any]", value), path=str(path))  # pragma: allow-cast mapping narrowing
 
     if isinstance(value, os.PathLike):
         v = str(os.fspath(value)).strip()
         if not v:
-            msg = "{} must not be empty".format(path)
+            msg = f"{path} must not be empty"
             raise ScalimWorkflowConfigError(msg, path=str(path))
         return v
 
     if isinstance(value, str):
         v = str(value).strip()
         if not v:
-            msg = "{} must not be empty".format(path)
+            msg = f"{path} must not be empty"
             raise ScalimWorkflowConfigError(msg, path=str(path))
         return v
 
-    msg = "{} must be a string, os.PathLike, InitVarRef, or {{$init_var: <name>}}".format(path)
+    msg = f"{path} must be a string, os.PathLike, InitVarRef, or {{$init_var: <name>}}"
     raise ScalimWorkflowConfigError(msg, path=str(path))
 
 
-def parse_outputs_defaults_book_id(defaults: Optional[Any], *, path: str) -> Optional[str]:
+def parse_outputs_defaults_book_id(defaults: Any | None, *, path: str) -> str | None:
     if defaults is None:
         return None
     if not isinstance(defaults, OutputsDefaultsOverride):
-        msg = "{} must be an OutputsDefaultsOverride".format(path)
+        msg = f"{path} must be an OutputsDefaultsOverride"
         raise ScalimWorkflowConfigError(msg, path=str(path))
     book_id = str(defaults.to.book or "").strip()
     if not book_id:
-        msg = "{}.to.book is required".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.to.book".format(path))
+        msg = f"{path}.to.book is required"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.to.book")
     return str(book_id)
 
 
 def apply_default_book_binding_to_outputs(
-    outputs: Tuple[OutputTargetConfig, ...],
+    outputs: tuple[OutputTargetConfig, ...],
     *,
     default_book_id: str,
-) -> Tuple[OutputTargetConfig, ...]:
+) -> tuple[OutputTargetConfig, ...]:
     if not outputs or not default_book_id:
         return outputs
 
-    updated: List[OutputTargetConfig] = []
+    updated: list[OutputTargetConfig] = []
     for out_cfg in outputs:
         to_cfg = out_cfg.to
         if to_cfg is None:
@@ -171,8 +172,8 @@ def _parse_typed_overrides_output_to(raw: OutputToOverride) -> OutputToConfig:
 def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) -> OutputWriteConfig:
     include_header = raw.include_header
     if include_header is not None and not isinstance(include_header, bool):
-        msg = "{}.include_header must be a boolean".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.include_header".format(path))
+        msg = f"{path}.include_header must be a boolean"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.include_header")
 
     header_fields_output_by = str(raw.header_fields_output_by).strip() if raw.header_fields_output_by is not None else None
     header_fields_output_by = header_fields_output_by or None
@@ -180,7 +181,7 @@ def _parse_typed_overrides_output_write(raw: OutputWriteOverride, *, path: str) 
         msg = "{}.header_fields_output_by={!r} is invalid; expected one of: {}".format(
             path, header_fields_output_by, ", ".join(_OUTPUT_HEADER_BY_ENUM)
         )
-        raise ScalimWorkflowConfigError(msg, path="{}.header_fields_output_by".format(path))
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.header_fields_output_by")
 
     return OutputWriteConfig(include_header=include_header, header_fields_output_by=header_fields_output_by)
 
@@ -189,7 +190,7 @@ def parse_output_extra_sheet_override(
     raw: Any,
     *,
     path: str,
-) -> Optional[OutputExtraSheetConfig]:
+) -> OutputExtraSheetConfig | None:
     if raw is None:
         return None
     if isinstance(raw, bool):
@@ -197,21 +198,21 @@ def parse_output_extra_sheet_override(
             return None
         return OutputExtraSheetConfig()
     if not isinstance(raw, OutputExtraSheetOverride):
-        msg = "{} must be a boolean or an OutputExtraSheetOverride".format(path)
+        msg = f"{path} must be a boolean or an OutputExtraSheetOverride"
         raise ScalimWorkflowConfigError(msg, path=str(path))
 
     sheet = str(raw.sheet).strip() if raw.sheet is not None else None
 
     raw_path = raw.path
     if raw_path is not None and not isinstance(raw_path, (str, os.PathLike)):
-        msg = "{}.path must be a string or os.PathLike".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
-    resolved_path = _as_opt_non_empty_str_or_pathlike(raw_path, path="{}.path".format(path)) if raw_path is not None else None
+        msg = f"{path}.path must be a string or os.PathLike"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.path")
+    resolved_path = _as_opt_non_empty_str_or_pathlike(raw_path, path=f"{path}.path") if raw_path is not None else None
 
     allow_formulas = raw.allow_formulas
     if allow_formulas is not None and not isinstance(allow_formulas, bool):
-        msg = "{}.allow_formulas must be a bool".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+        msg = f"{path}.allow_formulas must be a bool"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.allow_formulas")
 
     return OutputExtraSheetConfig(
         path=resolved_path,
@@ -221,18 +222,18 @@ def parse_output_extra_sheet_override(
 
 
 def compile_output_extras_override(
-    extras: Optional[Any],
+    extras: Any | None,
     *,
     path: str,
-) -> Tuple[Optional[OutputExtraSheetConfig], Optional[OutputExtraSheetConfig]]:
+) -> tuple[OutputExtraSheetConfig | None, OutputExtraSheetConfig | None]:
     if extras is None:
         return None, None
     if not isinstance(extras, OutputExtrasOverride):
-        msg = "{} must be an OutputExtrasOverride".format(path)
+        msg = f"{path} must be an OutputExtrasOverride"
         raise ScalimWorkflowConfigError(msg, path=str(path))
 
-    meta = parse_output_extra_sheet_override(extras.meta, path="{}.meta".format(path))
-    audit = parse_output_extra_sheet_override(extras.audit, path="{}.audit".format(path))
+    meta = parse_output_extra_sheet_override(extras.meta, path=f"{path}.meta")
+    audit = parse_output_extra_sheet_override(extras.audit, path=f"{path}.audit")
     return meta, audit
 
 
@@ -240,78 +241,78 @@ def parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915  # pragma: 
     overrides: Sequence[OutputOverride],
     *,
     path: str,
-    default_book_id: Optional[str],
+    default_book_id: str | None,
     default_book_ref: str,
-    known_field_ids: Optional[Set[str]],
-) -> Tuple[OutputTargetConfig, ...]:
+    known_field_ids: set[str] | None,
+) -> tuple[OutputTargetConfig, ...]:
     """将强类型 `RunOverrides.outputs` 解析为有效的 `OutputTargetConfig` 列表.
 
     若提供 `known_field_ids`, 会校验 `fields` 中引用的 `field_id` 是否存在.
     """
 
     if not isinstance(overrides, tuple) and not isinstance(overrides, list):
-        msg = "{} must be a sequence of OutputOverride".format(path)
+        msg = f"{path} must be a sequence of OutputOverride"
         raise ScalimWorkflowConfigError(msg, path=str(path))
     if not overrides:
-        msg = "{} cannot be empty".format(path)
+        msg = f"{path} cannot be empty"
         raise ScalimWorkflowConfigError(msg, path=str(path))
 
-    seen_names: Set[str] = set()
-    parsed: List[OutputTargetConfig] = []
+    seen_names: set[str] = set()
+    parsed: list[OutputTargetConfig] = []
 
     for idx, item in enumerate(overrides):
         if not isinstance(item, OutputOverride):
-            msg = "{}.{} must be an OutputOverride".format(path, idx)
-            raise ScalimWorkflowConfigError(msg, path="{}.{}".format(path, idx))
+            msg = f"{path}.{idx} must be an OutputOverride"
+            raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}")
 
         name = str(item.name or "").strip()
         try:
-            _validate_output_name_ssot(name, path="{}.{}.name".format(path, idx))
+            _validate_output_name_ssot(name, path=f"{path}.{idx}.name")
         except ValueError as exc:
-            raise ScalimWorkflowConfigError(str(exc), path="{}.{}.name".format(path, idx)) from exc
+            raise ScalimWorkflowConfigError(str(exc), path=f"{path}.{idx}.name") from exc
         if name in seen_names:
-            msg = "{} has duplicate output name: {}".format(path, name)
+            msg = f"{path} has duplicate output name: {name}"
             raise ScalimWorkflowConfigError(msg, path=str(path))
         seen_names.add(name)
 
         fields = item.fields
         if not isinstance(fields, tuple):
-            msg = "{}.{}.fields must be a tuple[str, ...]".format(path, idx)
-            raise ScalimWorkflowConfigError(msg, path="{}.{}.fields".format(path, idx))
+            msg = f"{path}.{idx}.fields must be a tuple[str, ...]"
+            raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.fields")
         if not fields:
-            msg = "{}.{}.fields must not be empty".format(path, idx)
-            raise ScalimWorkflowConfigError(msg, path="{}.{}.fields".format(path, idx))
+            msg = f"{path}.{idx}.fields must not be empty"
+            raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.fields")
 
-        field_ids: List[str] = []
+        field_ids: list[str] = []
         for field_idx, field_id_raw in enumerate(fields):
             if not isinstance(field_id_raw, str):
-                msg = "{}.{}.fields.{} must be a field_id string".format(path, idx, field_idx)
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.fields.{}".format(path, idx, field_idx))
+                msg = f"{path}.{idx}.fields.{field_idx} must be a field_id string"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.fields.{field_idx}")
             field_id = field_id_raw.strip()
             if not field_id:
-                msg = "{}.{}.fields.{} must not be empty".format(path, idx, field_idx)
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.fields.{}".format(path, idx, field_idx))
+                msg = f"{path}.{idx}.fields.{field_idx} must not be empty"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.fields.{field_idx}")
             field_ids.append(field_id)
 
         if known_field_ids is not None:
             unknown_fields = [fid for fid in field_ids if fid not in known_field_ids]
             if unknown_fields:
                 msg = "{}.{}.fields reference unknown fields: {}".format(path, idx, ", ".join(sorted(set(unknown_fields))))
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.fields".format(path, idx))
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.fields")
 
         to_override = item.to
         if not isinstance(to_override, OutputToOverride):
-            msg = "{}.{}.to must be an OutputToOverride".format(path, idx)
-            raise ScalimWorkflowConfigError(msg, path="{}.{}.to".format(path, idx))
+            msg = f"{path}.{idx}.to must be an OutputToOverride"
+            raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.to")
         to_cfg = _parse_typed_overrides_output_to(to_override)
 
         write_cfg = None
         if item.write is not None:
             write_override = item.write
             if not isinstance(write_override, OutputWriteOverride):
-                msg = "{}.{}.write must be an OutputWriteOverride".format(path, idx)
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.write".format(path, idx))
-            write_cfg = _parse_typed_overrides_output_write(write_override, path="{}.{}.write".format(path, idx))
+                msg = f"{path}.{idx}.write must be an OutputWriteOverride"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.write")
+            write_cfg = _parse_typed_overrides_output_write(write_override, path=f"{path}.{idx}.write")
 
         file_id = str(to_cfg.file or "").strip() if to_cfg.file is not None else ""
         book_id = str(to_cfg.book or "").strip() if to_cfg.book is not None else ""
@@ -319,18 +320,16 @@ def parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915  # pragma: 
 
         if file_id:
             if book_id:
-                msg = "{}.{}.to must declare exactly one of to.file or to.book".format(path, idx)
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.to".format(path, idx))
+                msg = f"{path}.{idx}.to must declare exactly one of to.file or to.book"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.to")
             if sheet:
-                msg = "{}.{}.to.sheet is not allowed with to.file".format(path, idx)
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.to.sheet".format(path, idx))
+                msg = f"{path}.{idx}.to.sheet is not allowed with to.file"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.to.sheet")
         else:
             effective_book_id = book_id or str(default_book_id or "").strip()
             if not effective_book_id:
-                msg = ("Missing output destination for {}.{}.to; set {}.{}.to.book explicitly or provide {}.").format(
-                    path, idx, path, idx, default_book_ref
-                )
-                raise ScalimWorkflowConfigError(msg, path="{}.{}.to".format(path, idx))
+                msg = f"Missing output destination for {path}.{idx}.to; set {path}.{idx}.to.book explicitly or provide {default_book_ref}."
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.{idx}.to")
             if book_id != effective_book_id:
                 to_cfg = replace(to_cfg, book=str(effective_book_id))
 
@@ -351,40 +350,36 @@ def parse_overrides_outputs_targets(  # noqa: C901, PLR0912, PLR0915  # pragma: 
 
 
 def _apply_optional_book_export_xlsx_patch(
-    base: Optional[BookExportXlsxConfig],
+    base: BookExportXlsxConfig | None,
     value: Any,
     *,
     path: str,
-) -> Optional[BookExportXlsxConfig]:
-    patch = _patch_as_opt_mapping(value, path="{}.export_xlsx".format(path))
+) -> BookExportXlsxConfig | None:
+    patch = _patch_as_opt_mapping(value, path=f"{path}.export_xlsx")
     if patch is None:
         # 显式指定 `None` 表示清空可选的 `export_xlsx` 补丁.
         return None
 
     if "write_lock" in patch:
-        msg = (
-            "{}.export_xlsx.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json".format(
-                path
-            )
-        )
-        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.write_lock".format(path))
+        msg = f"{path}.export_xlsx.write_lock was removed; migrate to versioned outputs and locate results via <root>/manifest/latest.json"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.export_xlsx.write_lock")
 
     allowed_keys = {"path", "allow_formulas"}
-    _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path="{}.export_xlsx".format(path))
+    _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=f"{path}.export_xlsx")
 
     raw_path = patch.get("path")
     if raw_path is not None:
-        export_path = _as_opt_path_or_init_var(raw_path, path="{}.export_xlsx.path".format(path))
+        export_path = _as_opt_path_or_init_var(raw_path, path=f"{path}.export_xlsx.path")
     else:
         export_path = base.path if base is not None else None
 
     if export_path is None:
-        msg = "{}.export_xlsx.path is required when creating export_xlsx".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx.path".format(path))
+        msg = f"{path}.export_xlsx.path is required when creating export_xlsx"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.export_xlsx.path")
 
     allow_formulas = bool(base.allow_formulas) if base is not None else True
     if "allow_formulas" in patch:
-        allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path="{}.export_xlsx.allow_formulas".format(path))
+        allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path=f"{path}.export_xlsx.allow_formulas")
 
     return BookExportXlsxConfig(path=export_path, allow_formulas=bool(allow_formulas))
 
@@ -396,7 +391,7 @@ def _is_pathful_book_path(book_path: Any) -> bool:
 def _validate_book_identity_contracts(
     *,
     book_path: Any,
-    export_xlsx: Optional[BookExportXlsxConfig],
+    export_xlsx: BookExportXlsxConfig | None,
     allow_formulas: bool,
     path: str,
 ) -> None:
@@ -404,20 +399,20 @@ def _validate_book_identity_contracts(
 
     if _is_pathful_book_path(book_path):
         if isinstance(book_path, str) and not str(book_path).strip():
-            msg = "{}.path is required for pathful books".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+            msg = f"{path}.path is required for pathful books"
+            raise ScalimWorkflowConfigError(msg, path=f"{path}.path")
         if export_xlsx is not None:
-            msg = "{}.export_xlsx is not allowed for pathful books".format(path)
-            raise ScalimWorkflowConfigError(msg, path="{}.export_xlsx".format(path))
+            msg = f"{path}.export_xlsx is not allowed for pathful books"
+            raise ScalimWorkflowConfigError(msg, path=f"{path}.export_xlsx")
         return
 
     if allow_formulas:
-        msg = "{}.allow_formulas is not allowed for pathless books".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.allow_formulas".format(path))
+        msg = f"{path}.allow_formulas is not allowed for pathless books"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.allow_formulas")
 
 
 def apply_book_resource_override(
-    base: Optional[BookConfig],
+    base: BookConfig | None,
     override: BookResourceOverride,
     *,
     path: str,
@@ -426,21 +421,21 @@ def apply_book_resource_override(
     return _apply_book_patch(base, patch, path=str(path))
 
 
-def _patch_set_if_not_none(patch: Dict[str, Any], key: str, value: Any) -> None:
+def _patch_set_if_not_none(patch: dict[str, Any], key: str, value: Any) -> None:
     if value is None:
         return
     patch[str(key)] = value
 
 
-def _book_export_xlsx_override_to_patch(override: BookExportXlsxOverride) -> Dict[str, Any]:
-    patch: Dict[str, Any] = {}
+def _book_export_xlsx_override_to_patch(override: BookExportXlsxOverride) -> dict[str, Any]:
+    patch: dict[str, Any] = {}
     _patch_set_if_not_none(patch, "path", override.path)
     _patch_set_if_not_none(patch, "allow_formulas", override.allow_formulas)
     return patch
 
 
-def _book_resource_override_to_patch(override: BookResourceOverride) -> Dict[str, Any]:
-    patch: Dict[str, Any] = {}
+def _book_resource_override_to_patch(override: BookResourceOverride) -> dict[str, Any]:
+    patch: dict[str, Any] = {}
 
     _patch_set_if_not_none(patch, "kind", override.kind)
     _patch_set_if_not_none(patch, "path", override.path)
@@ -453,7 +448,7 @@ def _book_resource_override_to_patch(override: BookResourceOverride) -> Dict[str
 
 
 def _apply_book_patch(
-    base: Optional[BookConfig],
+    base: BookConfig | None,
     patch: Mapping[str, Any],
     *,
     path: str,
@@ -465,32 +460,32 @@ def _apply_book_patch(
 
     if "write_defaults" in patch:
         msg = (
-            "{}.write_defaults was removed from RunOverrides.resources. "
+            f"{path}.write_defaults was removed from RunOverrides.resources. "
             "Migration: configure BookWritePolicy via DemandRunOptions.resources_policy "
             "or WorkflowRunOptions.resources_policy (Python SSOT)."
-        ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.write_defaults".format(path))
+        )
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.write_defaults")
     if "budget" in patch:
         msg = (
-            "{}.budget was removed. Delete this field; book cell/sheet budget is no longer "
+            f"{path}.budget was removed. Delete this field; book cell/sheet budget is no longer "
             "supported — rely on host resource limits for memory risk."
-        ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.budget".format(path))
+        )
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.budget")
 
     if "kind" in patch:
         msg = (
-            "{}.kind was removed. Book identity is pathful/pathless via path "
+            f"{path}.kind was removed. Book identity is pathful/pathless via path "
             "(set path for pathful/xlsx export root; omit path for pathless in-memory bus)."
-        ).format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+        )
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.kind")
 
     allowed_keys = {"path", "export_xlsx", "allow_formulas"}
     _patch_assert_no_unknown_keys(patch, allowed_keys=allowed_keys, path=path)
 
     if "path" in patch:
-        book_path = _as_opt_path_or_init_var(patch.get("path"), path="{}.path".format(path))
+        book_path = _as_opt_path_or_init_var(patch.get("path"), path=f"{path}.path")
     if "allow_formulas" in patch:
-        allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path="{}.allow_formulas".format(path))
+        allow_formulas = _patch_as_bool(patch.get("allow_formulas"), path=f"{path}.allow_formulas")
     if "export_xlsx" in patch:
         export_xlsx = _apply_optional_book_export_xlsx_patch(export_xlsx, patch.get("export_xlsx"), path=path)
 
@@ -514,12 +509,12 @@ def _apply_book_patch(
 
 
 def apply_file_resource_override(
-    base: Optional[FileConfig],
+    base: FileConfig | None,
     override: FileResourceOverride,
     *,
     path: str,
 ) -> FileConfig:
-    patch: Dict[str, Any] = {}
+    patch: dict[str, Any] = {}
     if override.kind is not None:
         patch["kind"] = override.kind
     if override.path is not None:
@@ -529,7 +524,7 @@ def apply_file_resource_override(
     return _apply_file_patch(base, patch, path=str(path))
 
 
-def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, Any], *, path: str) -> FileConfig:
+def _apply_file_patch(base: FileConfig | None, patch: Mapping[str, Any], *, path: str) -> FileConfig:
     allowed_keys = {"kind", "path", "encoding"}
     unknown = sorted({str(k) for k in patch} - allowed_keys)
     if unknown:
@@ -543,20 +538,20 @@ def _apply_file_patch(base: Optional[FileConfig], patch: Mapping[str, Any], *, p
     raw_kind = patch.get("kind", kind)
     kind = str(raw_kind or "").strip() if isinstance(raw_kind, str) else ""
     if not kind:
-        msg = "{}.kind must be a non-empty string".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+        msg = f"{path}.kind must be a non-empty string"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.kind")
     if kind not in FILE_KINDS:
         msg = "{}.kind={!r} is invalid; expected one of: {}".format(path, kind, ", ".join(FILE_KINDS))
-        raise ScalimWorkflowConfigError(msg, path="{}.kind".format(path))
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.kind")
 
     if "path" in patch:
-        file_path = _as_opt_path_or_init_var(patch.get("path"), path="{}.path".format(path))
+        file_path = _as_opt_path_or_init_var(patch.get("path"), path=f"{path}.path")
     if file_path is None:
-        msg = "{}.path is required for kind=csv_file".format(path)
-        raise ScalimWorkflowConfigError(msg, path="{}.path".format(path))
+        msg = f"{path}.path is required for kind=csv_file"
+        raise ScalimWorkflowConfigError(msg, path=f"{path}.path")
 
     if "encoding" in patch:
-        encoding = _patch_as_opt_str(patch.get("encoding"), path="{}.encoding".format(path)) or DEFAULT_OUTPUT_ENCODING
+        encoding = _patch_as_opt_str(patch.get("encoding"), path=f"{path}.encoding") or DEFAULT_OUTPUT_ENCODING
 
     return FileConfig(kind=str(kind), path=file_path, encoding=str(encoding))
 
@@ -573,37 +568,37 @@ def overlay_resources_override(
         return config
 
     base_resources = config.resources
-    merged_books: Dict[str, BookConfig] = dict(base_resources.books) if base_resources is not None else {}
-    merged_files: Dict[str, FileConfig] = dict(base_resources.files) if base_resources is not None else {}
+    merged_books: dict[str, BookConfig] = dict(base_resources.books) if base_resources is not None else {}
+    merged_files: dict[str, FileConfig] = dict(base_resources.files) if base_resources is not None else {}
 
     if override.books:
         for raw_book_id, book_override in override.books.items():
             if not isinstance(raw_book_id, str) or not str(raw_book_id).strip():
-                msg = "{}.books keys must be non-empty strings".format(path)
-                raise ScalimWorkflowConfigError(msg, path="{}.books".format(path))
+                msg = f"{path}.books keys must be non-empty strings"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.books")
             book_id = str(raw_book_id).strip()
             if not isinstance(book_override, BookResourceOverride):
-                msg = "{}.books.{} must be a BookResourceOverride".format(path, book_id)
-                raise ScalimWorkflowConfigError(msg, path="{}.books.{}".format(path, book_id))
+                msg = f"{path}.books.{book_id} must be a BookResourceOverride"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.books.{book_id}")
             merged_books[book_id] = apply_book_resource_override(
                 merged_books.get(book_id),
                 book_override,
-                path="{}.books.{}".format(path, book_id),
+                path=f"{path}.books.{book_id}",
             )
 
     if override.files:
         for raw_file_id, file_override in override.files.items():
             if not isinstance(raw_file_id, str) or not str(raw_file_id).strip():
-                msg = "{}.files keys must be non-empty strings".format(path)
-                raise ScalimWorkflowConfigError(msg, path="{}.files".format(path))
+                msg = f"{path}.files keys must be non-empty strings"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.files")
             file_id = str(raw_file_id).strip()
             if not isinstance(file_override, FileResourceOverride):
-                msg = "{}.files.{} must be a FileResourceOverride".format(path, file_id)
-                raise ScalimWorkflowConfigError(msg, path="{}.files.{}".format(path, file_id))
+                msg = f"{path}.files.{file_id} must be a FileResourceOverride"
+                raise ScalimWorkflowConfigError(msg, path=f"{path}.files.{file_id}")
             merged_files[file_id] = apply_file_resource_override(
                 merged_files.get(file_id),
                 file_override,
-                path="{}.files.{}".format(path, file_id),
+                path=f"{path}.files.{file_id}",
             )
 
     return replace(config, resources=ResourcesConfig(books=merged_books, files=merged_files))

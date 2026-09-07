@@ -4,40 +4,30 @@ import inspect
 import logging
 import operator
 import os
-import sys
 import threading
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from collections.abc import Callable, Container, Iterator, Mapping
 from collections.abc import Mapping as AbcMapping
+from dataclasses import dataclass
 from decimal import Decimal
 from types import CodeType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
-    Container,
-    Dict,
-    FrozenSet,
-    Iterator,
-    List,
-    Mapping,
     Optional,
-    Set,
-    Tuple,
-    Type,
-    Union,
     cast,
 )
 
+from typing_extensions import override
+
 from .....exceptions import ScalimYamlError
-from .....vendor.compact.typing_extensionsx import override
-from .....vendor.dataclassesx import dataclass
 from ...runtime._internal.conversion_lookup import cast_decimal
 
 
 class SecureComputeCalculatorContract(ABC):
-    __slots__: Tuple[str, ...] = ()
+    __slots__: tuple[str, ...] = ()
 
     @abstractmethod
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -47,8 +37,6 @@ class SecureComputeCalculatorContract(ABC):
 def is_secure_compute_calculator(value: Any) -> bool:
     return isinstance(value, SecureComputeCalculatorContract)
 
-
-_PY38_PLUS = sys.version_info >= (3, 8)
 
 security_logger = logging.getLogger("scalim.dsl.yaml_dsl.security")
 
@@ -76,11 +64,11 @@ SECURITY_AUDIT_INVALID_EXPRESSION_LOG = SECURITY_AUDIT_INVALID_EXPRESSION_PREFIX
 
 
 class _NameCollector(ast.NodeVisitor):
-    _builtin_names: FrozenSet[str]
-    _seen_order: List[str]
-    _seen_set: Set[str]
+    _builtin_names: frozenset[str]
+    _seen_order: list[str]
+    _seen_set: set[str]
 
-    def __init__(self, builtin_names: FrozenSet[str]) -> None:
+    def __init__(self, builtin_names: frozenset[str]) -> None:
         self._builtin_names = builtin_names
         self._seen_order = []
         self._seen_set = set()
@@ -93,11 +81,11 @@ class _NameCollector(ast.NodeVisitor):
             self._seen_set.add(name)
         self.generic_visit(node)
 
-    def get_dependencies(self) -> Tuple[str, ...]:
+    def get_dependencies(self) -> tuple[str, ...]:
         return tuple(self._seen_order)
 
 
-def extract_dependencies_from_compute(expression: str, builtin_names: FrozenSet[str]) -> Tuple[str, ...]:
+def extract_dependencies_from_compute(expression: str, builtin_names: frozenset[str]) -> tuple[str, ...]:
     try:
         tree = ast.parse(expression, mode="eval")
     except SyntaxError:
@@ -153,9 +141,9 @@ class ComputeLimits:
 class SecureComputeCalculator(SecureComputeCalculatorContract):
     engine: "SecureComputeEngine"
     expression: str
-    dependencies: Tuple[str, ...]
+    dependencies: tuple[str, ...]
     code: CodeType
-    dep_index: Dict[str, int]
+    dep_index: dict[str, int]
 
     @override
     def __call__(self, *args: Any, **field_values: Any) -> Any:
@@ -204,12 +192,12 @@ else:
 
 
 class _PositionalLocalsView(_PositionalLocalsViewBase):  # pragma: allow-no-docstring hotpath view
-    __slots__: Tuple[str, ...] = ("_dep_index", "_dep_keys", "_dep_values")
-    _dep_keys: Tuple[str, ...]
-    _dep_values: Tuple[Any, ...]
-    _dep_index: Dict[str, int]
+    __slots__: tuple[str, ...] = ("_dep_index", "_dep_keys", "_dep_values")
+    _dep_keys: tuple[str, ...]
+    _dep_values: tuple[Any, ...]
+    _dep_index: dict[str, int]
 
-    def __init__(self, dep_keys: Tuple[str, ...], dep_values: Tuple[Any, ...], dep_index: Dict[str, int]) -> None:
+    def __init__(self, dep_keys: tuple[str, ...], dep_values: tuple[Any, ...], dep_index: dict[str, int]) -> None:
         self._dep_keys = dep_keys
         self._dep_values = dep_values
         self._dep_index = dep_index
@@ -249,29 +237,29 @@ def _warn_full_audit_enabled_once() -> None:
         _full_audit_warning_emitted.set()
 
 
-def _safe_decimal_helper(value: Any) -> Optional[Decimal]:
+def _safe_decimal_helper(value: Any) -> Decimal | None:
     return cast_decimal(value)
 
 
 class ExpressionValidator:
-    _allowed_names: Set[str]
-    _allowed_functions: FrozenSet[str]
-    _function_map: Dict[str, Callable[..., Any]]
-    _safe_operators: Dict[Type[ast.operator], Callable[..., Any]]
-    _safe_unary: Dict[Type[ast.unaryop], Callable[..., Any]]
-    _safe_comparators: Dict[Type[ast.cmpop], Callable[..., bool]]
-    _forbidden_names: FrozenSet[str]
-    _handlers: Dict[Type[ast.AST], Callable[[ast.AST], None]]
+    _allowed_names: set[str]
+    _allowed_functions: frozenset[str]
+    _function_map: dict[str, Callable[..., Any]]
+    _safe_operators: dict[type[ast.operator], Callable[..., Any]]
+    _safe_unary: dict[type[ast.unaryop], Callable[..., Any]]
+    _safe_comparators: dict[type[ast.cmpop], Callable[..., bool]]
+    _forbidden_names: frozenset[str]
+    _handlers: dict[type[ast.AST], Callable[[ast.AST], None]]
 
     def __init__(
         self,
-        allowed_names: Set[str],
-        allowed_functions: FrozenSet[str],
-        safe_operators: Dict[Type[ast.operator], Callable[..., Any]],
-        safe_unary: Dict[Type[ast.unaryop], Callable[..., Any]],
-        safe_comparators: Dict[Type[ast.cmpop], Callable[..., bool]],
-        forbidden_names: FrozenSet[str],
-        function_map: Optional[Dict[str, Callable[..., Any]]] = None,
+        allowed_names: set[str],
+        allowed_functions: frozenset[str],
+        safe_operators: dict[type[ast.operator], Callable[..., Any]],
+        safe_unary: dict[type[ast.unaryop], Callable[..., Any]],
+        safe_comparators: dict[type[ast.cmpop], Callable[..., bool]],
+        forbidden_names: frozenset[str],
+        function_map: dict[str, Callable[..., Any]] | None = None,
     ) -> None:
         self._allowed_names = allowed_names
         self._allowed_functions = allowed_functions
@@ -299,20 +287,10 @@ class ExpressionValidator:
     def _visit(self, node: ast.AST) -> None:
         if isinstance(node, ast.Constant):
             return
-        if not _PY38_PLUS and isinstance(
-            node,
-            (
-                ast.Str,
-                ast.Num,
-                ast.Bytes,
-                ast.NameConstant,
-            ),
-        ):  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
-            return  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
 
         handler = self._handlers.get(type(node))
         if handler is None:
-            msg = "Unsupported AST node type: {}".format(type(node).__name__)
+            msg = f"Unsupported AST node type: {type(node).__name__}"
             raise ScalimSecurityError(msg)
         handler(node)
 
@@ -320,7 +298,7 @@ class ExpressionValidator:
         typed = cast("ast.Name", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         name = typed.id
         if name in self._forbidden_names:
-            msg = "Forbidden name '{}' in expression".format(name)
+            msg = f"Forbidden name '{name}' in expression"
             raise ScalimSecurityError(msg)
         if name not in self._allowed_names and name not in self._allowed_functions:
             msg = "Unknown name '{}' in expression. Allowed: {}".format(name, ", ".join(sorted(self._allowed_names)))
@@ -329,7 +307,7 @@ class ExpressionValidator:
     def _validate_binop_node(self, node: ast.AST) -> None:
         typed = cast("ast.BinOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         if type(typed.op) not in self._safe_operators:
-            msg = "Unsupported operator: {}".format(type(typed.op).__name__)
+            msg = f"Unsupported operator: {type(typed.op).__name__}"
             raise ScalimSecurityError(msg)
         self._visit(typed.left)
         self._visit(typed.right)
@@ -337,9 +315,8 @@ class ExpressionValidator:
     def _validate_unaryop_node(self, node: ast.AST) -> None:
         typed = cast("ast.UnaryOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         if type(typed.op) not in self._safe_unary:  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
-            msg = "Unsupported unary operator: {}".format(
-                type(typed.op).__name__
-            )  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
+            # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
+            msg = f"Unsupported unary operator: {type(typed.op).__name__}"  # pragma: no cover
             raise ScalimSecurityError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
         self._visit(typed.operand)
 
@@ -350,7 +327,7 @@ class ExpressionValidator:
             self._visit(comp)
         for op in typed.ops:
             if type(op) not in self._safe_comparators:
-                msg = "Unsupported comparator: {}".format(type(op).__name__)
+                msg = f"Unsupported comparator: {type(op).__name__}"
                 raise ScalimSecurityError(msg)
 
     def _validate_ifexp_node(self, node: ast.AST) -> None:
@@ -373,7 +350,7 @@ class ExpressionValidator:
             raise ScalimSecurityError(msg)
         func_name = typed.func.id
         if func_name not in self._allowed_functions:
-            msg = "Function '{}' is not in the allowed list".format(func_name)
+            msg = f"Function '{func_name}' is not in the allowed list"
             raise ScalimSecurityError(msg)
         for arg in typed.args:
             self._visit(arg)
@@ -398,7 +375,7 @@ class ExpressionValidator:
                 "compute callable preflight 失败: 调用形态不匹配 (ref={ref!r}, call=`{call}`, reason=`{reason}`, signature=`{signature}`)"
             ).format(
                 ref=str(func_name),
-                call="{}(<{} args>)".format(str(func_name), int(argc)),
+                call=f"{func_name!s}(<{int(argc)} args>)",
                 reason=str(exc),
                 signature=str(sig),
             )
@@ -407,9 +384,9 @@ class ExpressionValidator:
     def _validate_attribute_node(self, node: ast.AST) -> None:
         typed = cast("ast.Attribute", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         msg = (
-            "Attribute access is not allowed in compute expressions (got attribute={!r}); "
+            f"Attribute access is not allowed in compute expressions (got attribute={str(typed.attr)!r}); "
             'move this logic to call_by (allowlisted), e.g. call_by: "myapp.module:fn(value=value, ctx=$ctx)"'
-        ).format(str(typed.attr))
+        )
         raise ScalimSecurityError(msg)
 
     def _validate_boolop_node(self, node: ast.AST) -> None:
@@ -418,14 +395,14 @@ class ExpressionValidator:
             self._visit(value)
 
     def _validate_sequence_node(self, node: ast.AST) -> None:
-        typed = cast("Union[ast.List, ast.Tuple]", node)  # pragma: allow-cast ast handler dispatch typed narrowing
+        typed = cast("ast.List | ast.Tuple", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         for elt in typed.elts:
             self._visit(elt)
 
 
 class SecureComputeEngine:
     # 二元运算符: +, -, *, /, //, %, **
-    SAFE_OPERATORS: ClassVar[Dict[Type[ast.operator], Callable[..., Any]]] = {
+    SAFE_OPERATORS: ClassVar[dict[type[ast.operator], Callable[..., Any]]] = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
@@ -437,7 +414,7 @@ class SecureComputeEngine:
     }
 
     # 一元运算符: -, +, ~, `not`
-    SAFE_UNARY_OPERATORS: ClassVar[Dict[Type[ast.unaryop], Callable[..., Any]]] = {
+    SAFE_UNARY_OPERATORS: ClassVar[dict[type[ast.unaryop], Callable[..., Any]]] = {
         ast.USub: operator.neg,
         ast.UAdd: operator.pos,
         ast.Invert: operator.invert,
@@ -445,7 +422,7 @@ class SecureComputeEngine:
     }
 
     # 比较运算符: ==, !=, <, <=, >, >=, `in`, `not in`, `is`, `is not`
-    SAFE_COMPARATORS: ClassVar[Dict[Type[ast.cmpop], Callable[..., bool]]] = {
+    SAFE_COMPARATORS: ClassVar[dict[type[ast.cmpop], Callable[..., bool]]] = {
         ast.Eq: operator.eq,
         ast.NotEq: operator.ne,
         ast.Lt: operator.lt,
@@ -458,7 +435,7 @@ class SecureComputeEngine:
         ast.IsNot: operator.is_not,
     }
 
-    SAFE_FUNCTIONS: ClassVar[Dict[str, Callable[..., Any]]] = {
+    SAFE_FUNCTIONS: ClassVar[dict[str, Callable[..., Any]]] = {
         # 类型转换
         "int": int,
         "float": float,
@@ -499,9 +476,9 @@ class SecureComputeEngine:
         "isinstance": isinstance,
         "type": type,
     }
-    SAFE_BUILTINS: ClassVar[FrozenSet[str]] = frozenset(SAFE_FUNCTIONS)
+    SAFE_BUILTINS: ClassVar[frozenset[str]] = frozenset(SAFE_FUNCTIONS)
 
-    FORBIDDEN_NAMES: ClassVar[FrozenSet[str]] = frozenset(
+    FORBIDDEN_NAMES: ClassVar[frozenset[str]] = frozenset(
         [
             "__import__",
             "eval",
@@ -528,21 +505,21 @@ class SecureComputeEngine:
     )
     DEFAULT_COMPILED_CACHE_MAX_SIZE: ClassVar[int] = 256
 
-    _allowed_functions: FrozenSet[str]
-    _custom_functions: Dict[str, Callable[..., Any]]
+    _allowed_functions: frozenset[str]
+    _custom_functions: dict[str, Callable[..., Any]]
     _audit_callback: Optional["AuditCallback"]
     _compiled_cache: "OrderedDict[str, SecureComputeCalculator]"
     _compiled_cache_max_size: int
     _compiled_cache_lock: threading.Lock
     _limits: ComputeLimits
-    _base_globals: Dict[str, Any]
+    _base_globals: dict[str, Any]
 
     def __init__(
         self,
-        allowed_functions: Optional[FrozenSet[str]] = None,
-        allowed_function_map: Optional[Dict[str, Callable[..., Any]]] = None,
+        allowed_functions: frozenset[str] | None = None,
+        allowed_function_map: dict[str, Callable[..., Any]] | None = None,
         audit_mode: str = "none",
-        limits: Optional[ComputeLimits] = None,
+        limits: ComputeLimits | None = None,
         max_compiled_cache_size: int = DEFAULT_COMPILED_CACHE_MAX_SIZE,
     ) -> None:
         if max_compiled_cache_size < 1:
@@ -572,15 +549,15 @@ class SecureComputeEngine:
             audit_callback = redacted_audit_callback
         elif normalized_audit_mode == "full":
             if not _is_full_audit_unlocked():
-                msg = "compute full/raw 审计模式需要显式解锁: 请设置环境变量 {}=1".format(EVAL_AUDIT_FULL_UNLOCK_ENV)
+                msg = f"compute full/raw 审计模式需要显式解锁: 请设置环境变量 {EVAL_AUDIT_FULL_UNLOCK_ENV}=1"
                 raise ScalimSecurityError(msg)
             _warn_full_audit_enabled_once()
             audit_callback = unsafe_audit_callback
 
         self._audit_callback = audit_callback
 
-    def _build_base_globals(self) -> Dict[str, Any]:
-        base_globals: Dict[str, Any] = {
+    def _build_base_globals(self) -> dict[str, Any]:
+        base_globals: dict[str, Any] = {
             "__builtins__": {},
             # 常量
             "True": True,
@@ -611,10 +588,10 @@ class SecureComputeEngine:
         ):
             numeric_value = int(value)
             if numeric_value < 0:
-                msg = "ComputeLimits.{} must be >= 0".format(name)
+                msg = f"ComputeLimits.{name} must be >= 0"
                 raise ValueError(msg)
 
-    def compile(self, expression: str, dependencies: Tuple[str, ...]) -> SecureComputeCalculator:
+    def compile(self, expression: str, dependencies: tuple[str, ...]) -> SecureComputeCalculator:
         cache_key = "{}:{}".format(expression, ",".join(dependencies))
         with self._compiled_cache_lock:
             cached = self._compiled_cache.get(cache_key)
@@ -639,18 +616,15 @@ class SecureComputeEngine:
                 _ = self._compiled_cache.popitem(last=False)
         return calculator
 
-    def _validate_expression(self, expression: str, dependencies: Tuple[str, ...]) -> ast.Expression:
+    def _validate_expression(self, expression: str, dependencies: tuple[str, ...]) -> ast.Expression:
         if len(expression) > int(self._limits.max_expression_len):
-            msg = "Compute expression exceeds max_expression_len (len={}, limit={})".format(
-                len(expression),
-                int(self._limits.max_expression_len),
-            )
+            msg = f"Compute expression exceeds max_expression_len (len={len(expression)}, limit={int(self._limits.max_expression_len)})"
             raise ScalimComputeExpressionError(msg)
 
         try:
             tree = ast.parse(expression, mode="eval")
         except SyntaxError as e:
-            msg = "Invalid expression syntax: {}".format(e)
+            msg = f"Invalid expression syntax: {e}"
             raise ScalimComputeExpressionError(msg) from e
 
         self._enforce_ast_limits(tree)
@@ -676,23 +650,23 @@ class SecureComputeEngine:
         *,
         expression: str,
         code: CodeType,
-        dependencies: Tuple[str, ...],
-        dep_index: Dict[str, int],
-        args: Tuple[Any, ...],
-        field_values: Dict[str, Any],
+        dependencies: tuple[str, ...],
+        dep_index: dict[str, int],
+        args: tuple[Any, ...],
+        field_values: dict[str, Any],
     ) -> Any:
         if args:
             if field_values:
                 msg = "Secure compute calculator does not accept mixed args and kwargs"
                 raise TypeError(msg)
             if len(args) != len(dependencies):
-                msg = "Secure compute calculator expected {} positional args, got {}".format(len(dependencies), len(args))
+                msg = f"Secure compute calculator expected {len(dependencies)} positional args, got {len(args)}"
                 raise TypeError(msg)
             return self._evaluate_positional(expression, code, dependencies, dep_index, args)
         return self._evaluate(expression, code, field_values)
 
     @staticmethod
-    def _as_int_literal(node: ast.AST) -> Optional[int]:
+    def _as_int_literal(node: ast.AST) -> int | None:
         try:
             value = ast.literal_eval(node)
         except (SyntaxError, ValueError):
@@ -704,17 +678,12 @@ class SecureComputeEngine:
         return None
 
     @staticmethod
-    def _string_literal_len(node: ast.AST) -> Optional[int]:
+    def _string_literal_len(node: ast.AST) -> int | None:
         if isinstance(node, ast.Constant):
             value = node.value
             if isinstance(value, (str, bytes)):
                 return len(value)
             return None
-        if not _PY38_PLUS and isinstance(node, (ast.Str, ast.Bytes)):  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
-            literal = cast(
-                "Union[str, bytes]", node.s
-            )  # pragma: no cover  # pragma: allow-no-cover py<3.8  # pragma: allow-cast py<3.8 ast.Str/Bytes .s
-            return len(literal)  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
         return None
 
     @staticmethod
@@ -723,17 +692,12 @@ class SecureComputeEngine:
             return True
         if isinstance(node, ast.Constant):
             return isinstance(node.value, (str, bytes))
-        return not _PY38_PLUS and isinstance(
-            node, (ast.Str, ast.Bytes)
-        )  # pragma: no cover  # pragma: allow-no-cover py<3.8 legacy AST nodes
+        return False
 
     @staticmethod
     def _check_collection_literal_limit(node: ast.AST, max_collection_literal_len: int) -> None:
         if isinstance(node, (ast.List, ast.Tuple)) and len(node.elts) > max_collection_literal_len:
-            msg = "Compute expression exceeds max_collection_literal_len (len={}, limit={})".format(
-                len(node.elts),
-                max_collection_literal_len,
-            )
+            msg = f"Compute expression exceeds max_collection_literal_len (len={len(node.elts)}, limit={max_collection_literal_len})"
             raise ScalimComputeExpressionError(msg)
 
     @classmethod
@@ -743,10 +707,10 @@ class SecureComputeEngine:
         left_repeat = cls._as_int_literal(node.left)
         right_repeat = cls._as_int_literal(node.right)
         if left_repeat is not None and cls._is_repeatable_literal(node.right) and left_repeat > max_repeat:
-            msg = "Compute expression exceeds max_repeat (repeat={}, limit={})".format(left_repeat, max_repeat)
+            msg = f"Compute expression exceeds max_repeat (repeat={left_repeat}, limit={max_repeat})"
             raise ScalimComputeExpressionError(msg)
         if right_repeat is not None and cls._is_repeatable_literal(node.left) and right_repeat > max_repeat:
-            msg = "Compute expression exceeds max_repeat (repeat={}, limit={})".format(right_repeat, max_repeat)
+            msg = f"Compute expression exceeds max_repeat (repeat={right_repeat}, limit={max_repeat})"
             raise ScalimComputeExpressionError(msg)
 
     @classmethod
@@ -765,12 +729,12 @@ class SecureComputeEngine:
             return
 
         try:
-            range_len = len(range(*cast("Tuple[int, ...]", tuple(args))))  # pragma: allow-cast args not-none guard typed narrowing
+            range_len = len(range(*cast("tuple[int, ...]", tuple(args))))  # pragma: allow-cast args not-none guard typed narrowing
         except (OverflowError, TypeError, ValueError):
             return
 
         if range_len > max_range_len:
-            msg = "Compute expression exceeds max_range_len (len={}, limit={})".format(range_len, max_range_len)
+            msg = f"Compute expression exceeds max_range_len (len={range_len}, limit={max_range_len})"
             raise ScalimComputeExpressionError(msg)
 
     def _enforce_ast_limits(self, tree: ast.Expression) -> None:
@@ -783,23 +747,20 @@ class SecureComputeEngine:
         max_range_len = int(limits.max_range_len)
 
         node_count = 0
-        stack: List[Tuple[ast.AST, int]] = [(tree, 1)]
+        stack: list[tuple[ast.AST, int]] = [(tree, 1)]
         while stack:
             node, depth = stack.pop()
             node_count += 1
             if node_count > max_nodes:
-                msg = "Compute expression exceeds max_ast_nodes (nodes={}, limit={})".format(node_count, max_nodes)
+                msg = f"Compute expression exceeds max_ast_nodes (nodes={node_count}, limit={max_nodes})"
                 raise ScalimComputeExpressionError(msg)
             if depth > max_depth:
-                msg = "Compute expression exceeds max_ast_depth (depth={}, limit={})".format(depth, max_depth)
+                msg = f"Compute expression exceeds max_ast_depth (depth={depth}, limit={max_depth})"
                 raise ScalimComputeExpressionError(msg)
 
             literal_len = self._string_literal_len(node)
             if literal_len is not None and literal_len > max_literal_string_len:
-                msg = "Compute expression exceeds max_literal_string_len (len={}, limit={})".format(
-                    literal_len,
-                    max_literal_string_len,
-                )
+                msg = f"Compute expression exceeds max_literal_string_len (len={literal_len}, limit={max_literal_string_len})"
                 raise ScalimComputeExpressionError(msg)
 
             self._check_collection_literal_limit(node, max_collection_literal_len)
@@ -814,11 +775,11 @@ class SecureComputeEngine:
         max_range_len = int(self._limits.max_range_len)
         rng_len = len(rng)
         if rng_len > max_range_len:
-            msg = "`range` 长度 {} 超过 max_range_len={}".format(rng_len, max_range_len)
+            msg = f"`range` 长度 {rng_len} 超过 max_range_len={max_range_len}"
             raise ScalimComputeExpressionError(msg)
         return rng
 
-    def _evaluate(self, expression: str, code: Any, field_values: Dict[str, Any]) -> Any:
+    def _evaluate(self, expression: str, code: Any, field_values: dict[str, Any]) -> Any:
         try:
             result = eval(code, self._base_globals, field_values)  # noqa: S307
             if self._audit_callback is not None:
@@ -828,7 +789,7 @@ class SecureComputeEngine:
         except Exception as e:
             expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
             security_logger.exception("表达式求值失败: expr_hash=%s", expr_id)
-            msg = "表达式求值失败 [expr:{}]: {}".format(expr_id, type(e).__name__)
+            msg = f"表达式求值失败 [expr:{expr_id}]: {type(e).__name__}"
             raise ScalimComputeExpressionError(msg) from e
         else:
             return result
@@ -837,9 +798,9 @@ class SecureComputeEngine:
         self,
         expression: str,
         code: Any,
-        dep_keys: Tuple[str, ...],
-        dep_index: Dict[str, int],
-        dep_values: Tuple[Any, ...],
+        dep_keys: tuple[str, ...],
+        dep_index: dict[str, int],
+        dep_values: tuple[Any, ...],
     ) -> Any:
         locals_view = _PositionalLocalsView(dep_keys, dep_values, dep_index)
         audit_callback = self._audit_callback
@@ -852,7 +813,7 @@ class SecureComputeEngine:
         except Exception as e:
             expr_id = hashlib.sha256(expression.encode("utf-8")).hexdigest()[:12]
             security_logger.exception("表达式求值失败: expr_hash=%s", expr_id)
-            msg = "表达式求值失败 [expr:{}]: {}".format(expr_id, type(e).__name__)
+            msg = f"表达式求值失败 [expr:{expr_id}]: {type(e).__name__}"
             raise ScalimComputeExpressionError(msg) from e
         else:
             return result
@@ -862,7 +823,7 @@ class SecurityAuditLogger:
     def __init__(self, logger_name: str = "scalim.dsl.security") -> None:
         self._logger: logging.Logger = logging.getLogger(logger_name)
 
-    def log_resolve_attempt(self, reference: str, *, success: bool, error: Optional[str] = None) -> None:
+    def log_resolve_attempt(self, reference: str, *, success: bool, error: str | None = None) -> None:
         if success:
             self._logger.info(SECURITY_AUDIT_RESOLVED_REFERENCE_LOG, reference)
         else:
@@ -871,7 +832,7 @@ class SecurityAuditLogger:
     def log_security_violation(self, reference: str, violation_type: str, details: str) -> None:
         self._logger.error(SECURITY_AUDIT_SECURITY_VIOLATION_LOG, reference, violation_type, details)
 
-    def log_expression_validation(self, expression: str, *, valid: bool, error: Optional[str] = None) -> None:
+    def log_expression_validation(self, expression: str, *, valid: bool, error: str | None = None) -> None:
         if valid:
             self._logger.debug(SECURITY_AUDIT_EXPRESSION_VALID_LOG, expression)
         else:
@@ -882,7 +843,7 @@ def build_compute_engine(*, audit_mode: str = "none") -> "SecureComputeEngine":
     return SecureComputeEngine(audit_mode=audit_mode)
 
 
-def extract_compute_dependencies(compute_expr: str) -> List[str]:
+def extract_compute_dependencies(compute_expr: str) -> list[str]:
     return list(extract_dependencies_from_compute(compute_expr, SecureComputeEngine.SAFE_BUILTINS))
 
 

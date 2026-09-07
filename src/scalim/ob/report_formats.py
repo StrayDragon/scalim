@@ -1,6 +1,6 @@
 # region imports
 
-from ..vendor.compact import StrEnum
+from .._internal.strenum import StrEnum
 
 # endregion
 

@@ -1,6 +1,3 @@
-from typing import List
-
-
 def _first_non_empty_line(text: str) -> str:
     for line in text.splitlines():
         stripped = line.strip()
@@ -89,7 +86,7 @@ sources:
 SOURCE_FIELD_EXTRACT_DESC = _first_non_empty_line(SOURCE_FIELD_EXTRACT_MD)
 
 
-def build_generated_doc_block(lines: List[str]) -> str:
+def build_generated_doc_block(lines: list[str]) -> str:
     """生成写入到 `Markdown` 文档中的块(不包含 `marker` 本身)."""
 
     if not lines:

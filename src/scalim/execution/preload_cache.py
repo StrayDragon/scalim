@@ -2,41 +2,43 @@ import math
 import threading
 import time
 import traceback
+from collections.abc import Callable, Hashable, Iterator
 from collections.abc import MutableMapping as MutableMappingABC
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, Iterator, Optional
+from typing import TYPE_CHECKING
+
+from typing_extensions import override
 
 from .._internal import loggingx
+from .._internal.strenum import StrEnum
 from .._internal.utils.exceptions import clone_exception_for_reraise
 from ..typedefs import LoaderResultMapping
-from ..vendor.compact import StrEnum
-from ..vendor.compact.typing_extensionsx import override
 
 if TYPE_CHECKING:
-    from typing import MutableMapping as MutableMappingType
+    from collections.abc import MutableMapping as MutableMappingType
 
     _PreloadCacheBase = MutableMappingType[str, LoaderResultMapping]
 else:
     _PreloadCacheBase = MutableMappingABC
 
 
-class _InFlight(object):
+class _InFlight:
     def __init__(
         self,
         *,
         owner_ident: int,
-        signature_digest: Optional[str] = None,
-        owner_callsite: Optional[str] = None,
+        signature_digest: str | None = None,
+        owner_callsite: str | None = None,
     ) -> None:
         self.owner_ident: int = owner_ident
-        self.signature_digest: Optional[str] = signature_digest
-        self.owner_callsite: Optional[str] = owner_callsite
+        self.signature_digest: str | None = signature_digest
+        self.owner_callsite: str | None = owner_callsite
         self.done: threading.Event = threading.Event()
         self.ref_count: int = 1
-        self.value: Optional[LoaderResultMapping] = None
-        self.error: Optional[BaseException] = None
+        self.value: LoaderResultMapping | None = None
+        self.error: BaseException | None = None
 
 
-class PreloadCacheWaitDiagnostics(object):
+class PreloadCacheWaitDiagnostics:
     """`PreloadCache` `inflight` 等待诊断配置(默认关闭).
 
     说明:
@@ -49,7 +51,7 @@ class PreloadCacheWaitDiagnostics(object):
         *,
         enabled: bool,
         warn_after_s: float = 30.0,
-        repeat_every_s: Optional[float] = None,
+        repeat_every_s: float | None = None,
         capture_owner_callsite: bool = False,
     ) -> None:
         self.enabled: bool = bool(enabled)
@@ -64,7 +66,7 @@ class PreloadCacheWaitDiagnostics(object):
         if repeat_every is not None and (not math.isfinite(repeat_every) or repeat_every <= 0):
             msg = "repeat_every_s must be a finite positive float"
             raise ValueError(msg)
-        self.repeat_every_s: Optional[float] = repeat_every
+        self.repeat_every_s: float | None = repeat_every
 
         self.capture_owner_callsite: bool = bool(capture_owner_callsite)
 
@@ -73,7 +75,7 @@ class PreloadCacheWaitDiagnostics(object):
         return cls(enabled=False)
 
 
-class PreloadCacheSignatureGuardrail(object):
+class PreloadCacheSignatureGuardrail:
     """`PreloadCache` `signature` 护栏配置(默认关闭).
 
     用途:
@@ -118,13 +120,13 @@ class PreloadCache(_PreloadCacheBase):
     def __init__(
         self,
         *,
-        wait_diagnostics: Optional[PreloadCacheWaitDiagnostics] = None,
-        signature_guardrail: Optional[PreloadCacheSignatureGuardrail] = None,
+        wait_diagnostics: PreloadCacheWaitDiagnostics | None = None,
+        signature_guardrail: PreloadCacheSignatureGuardrail | None = None,
     ) -> None:
-        self._data: Dict[str, LoaderResultMapping] = {}
-        self._inflight: Dict[str, _InFlight] = {}
-        self._signature_digests: Dict[str, str] = {}
-        self._locks: Dict[str, threading.Lock] = {}
+        self._data: dict[str, LoaderResultMapping] = {}
+        self._inflight: dict[str, _InFlight] = {}
+        self._signature_digests: dict[str, str] = {}
+        self._locks: dict[str, threading.Lock] = {}
         self._global_lock: threading.Lock = threading.Lock()
         self._wait_diagnostics: PreloadCacheWaitDiagnostics = wait_diagnostics or PreloadCacheWaitDiagnostics.disabled()
         self._signature_guardrail: PreloadCacheSignatureGuardrail = signature_guardrail or PreloadCacheSignatureGuardrail.disabled()
@@ -233,14 +235,14 @@ class PreloadCache(_PreloadCacheBase):
             raise clone_exception_for_reraise(error)
         if value is not None:
             return value
-        msg = "PreloadCache internal error: inflight done but missing value/error for source_id: {!r}".format(source_id)
+        msg = f"PreloadCache internal error: inflight done but missing value/error for source_id: {source_id!r}"
         raise RuntimeError(msg)
 
     @property
     def signature_guardrail_enabled(self) -> bool:
         return bool(self._signature_guardrail.enabled)
 
-    def _guardrail_digest_or_none(self, signature_digest: Optional[str], *, source_id: str) -> Optional[str]:
+    def _guardrail_digest_or_none(self, signature_digest: str | None, *, source_id: str) -> str | None:
         if not self._signature_guardrail.enabled:
             return None
         return self._normalize_signature_digest(signature_digest, source_id=source_id)
@@ -270,14 +272,14 @@ class PreloadCache(_PreloadCacheBase):
             return
         raise RuntimeError(msg)
 
-    def _normalize_signature_digest(self, signature_digest: Optional[str], *, source_id: str) -> str:
+    def _normalize_signature_digest(self, signature_digest: str | None, *, source_id: str) -> str:
         digest = str(signature_digest or "").strip()
         if not digest:
-            msg = "PreloadCache signature guardrail is enabled but signature_digest is missing for source_id: {!r}".format(source_id)
+            msg = f"PreloadCache signature guardrail is enabled but signature_digest is missing for source_id: {source_id!r}"
             raise ValueError(msg)
         return digest
 
-    def _guardrail_check_cached_locked(self, *, source_id: str, digest: Optional[str]) -> None:
+    def _guardrail_check_cached_locked(self, *, source_id: str, digest: str | None) -> None:
         if digest is None:
             return
         cached = self._signature_digests.get(source_id)
@@ -287,7 +289,7 @@ class PreloadCache(_PreloadCacheBase):
         if cached != digest:
             self._handle_signature_mismatch(source_id=source_id, cached_digest=cached, requested_digest=digest)
 
-    def _guardrail_check_inflight_locked(self, *, source_id: str, inflight: _InFlight, digest: Optional[str]) -> None:
+    def _guardrail_check_inflight_locked(self, *, source_id: str, inflight: _InFlight, digest: str | None) -> None:
         if digest is None:
             return
         existing = inflight.signature_digest
@@ -297,7 +299,7 @@ class PreloadCache(_PreloadCacheBase):
         if existing != digest:
             self._handle_signature_mismatch(source_id=source_id, cached_digest=str(existing), requested_digest=str(digest))
 
-    def _create_inflight(self, *, owner_ident: int, digest: Optional[str]) -> _InFlight:
+    def _create_inflight(self, *, owner_ident: int, digest: str | None) -> _InFlight:
         owner_callsite = None
         diagnostics = self._wait_diagnostics
         if diagnostics.enabled and diagnostics.capture_owner_callsite:
@@ -309,7 +311,7 @@ class PreloadCache(_PreloadCacheBase):
         source_id: str,
         load_fn: Callable[[], LoaderResultMapping],
         *,
-        signature_digest: Optional[str] = None,
+        signature_digest: str | None = None,
     ) -> LoaderResultMapping:
         digest = self._guardrail_digest_or_none(signature_digest, source_id=source_id)
 
@@ -327,7 +329,7 @@ class PreloadCache(_PreloadCacheBase):
                 self._inflight[source_id] = inflight
                 is_owner = True
             elif inflight.owner_ident == current_ident:
-                msg = "Detected recursive preload for the same source_id: {!r}".format(source_id)
+                msg = f"Detected recursive preload for the same source_id: {source_id!r}"
                 raise RuntimeError(msg)
             else:
                 self._guardrail_check_inflight_locked(source_id=source_id, inflight=inflight, digest=digest)
@@ -362,7 +364,7 @@ def _capture_owner_callsite() -> str:
             continue
         func = str(frame.name or "")
         lineno = int(frame.lineno or 0)
-        return "{}:{}:{}".format(filename, lineno, func)
+        return f"{filename}:{lineno}:{func}"
     return "(unknown)"
 
 

@@ -1,17 +1,19 @@
 # region imports
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Set
+from collections.abc import Callable
+from typing import Any
+
+from typing_extensions import override
 
 from ..events import (
     Event,
     EventType,
 )
-from ..vendor.compact.typing_extensionsx import override
 
 # endregion
 
-_DISPATCH_MAP: Dict[EventType, str] = {
+_DISPATCH_MAP: dict[EventType, str] = {
     EventType.PIPELINE_START: "on_pipeline_start",
     EventType.PIPELINE_END: "on_pipeline_end",
     EventType.BATCH_START: "on_batch_start",
@@ -37,7 +39,7 @@ _DISPATCH_MAP: Dict[EventType, str] = {
 class Observer(ABC):
     """观测器插件基类."""
 
-    event_types: Optional[Set[EventType]] = None
+    event_types: set[EventType] | None = None
     supports_unknown_event_types: bool = False
 
     def supports(self, event_type: EventType) -> bool:
@@ -56,8 +58,8 @@ class Observer(ABC):
 class EventDispatchObserver(Observer):
     """将事件分发到已定义的类型化处理函数."""
 
-    dispatch_map: Dict[EventType, str] = _DISPATCH_MAP
-    _handler_cache: Dict[EventType, Optional[Callable[[Any], Any]]]
+    dispatch_map: dict[EventType, str] = _DISPATCH_MAP
+    _handler_cache: dict[EventType, Callable[[Any], Any] | None]
 
     @override
     def on_event(self, event: Event) -> None:

@@ -1,7 +1,6 @@
 """工作流运行的资源/缓存生命周期助手(`c45 Phase 1b`)."""
 
 import contextlib
-from typing import List, Optional
 
 from ..execution.workflow_cache_pool import WorkflowCachePool
 from .artifacts import WorkflowArtifactsDirectory
@@ -15,13 +14,13 @@ class WorkflowResourceLifecycle:
 
     _rm: WorkflowResourceManager
     _artifacts: WorkflowArtifactsDirectory
-    _cache_pool: Optional[WorkflowCachePool]
+    _cache_pool: WorkflowCachePool | None
 
     def __init__(
         self,
         resource_manager: WorkflowResourceManager,
         artifacts_dir: WorkflowArtifactsDirectory,
-        cache_pool: Optional[WorkflowCachePool],
+        cache_pool: WorkflowCachePool | None,
     ) -> None:
         self._rm = resource_manager
         self._artifacts = artifacts_dir
@@ -62,8 +61,8 @@ class WorkflowResourceLifecycle:
 def commit_workflow_resources(
     *,
     resource_manager: WorkflowResourceManager,
-    outcomes: List[WorkflowRunOutcome],
-    failed: Optional[WorkflowRunOutcome],
+    outcomes: list[WorkflowRunOutcome],
+    failed: WorkflowRunOutcome | None,
 ) -> None:
     """提交或丢弃工作流资源(保留旧入口以便测试/对拍)."""
     try:

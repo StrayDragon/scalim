@@ -6,11 +6,12 @@
 - 类型化 `payload` 数据类由 `scalim.events` 公开再导出;具体实现仍可在私有模块中.
 """
 
+from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, cast
 
-from ..vendor.compact.typing_extensionsx import override
-from ..vendor.dataclassesx import asdict, dataclass, field, is_dataclass
+from typing_extensions import override
+
 from ._attribution import WORKFLOW_ATTRIBUTION_META_KEYS, WORKFLOW_EXEC_ID_META_KEY, WORKFLOW_NODE_ID_META_KEY
 from ._catalog import (
     EVENT_ADAPTIVE_SCHEDULER_DECISION,
@@ -112,13 +113,13 @@ def parse_event_type(value: Any) -> EventType:
     if isinstance(value, EventType):
         return value
     if type(value) is not str:
-        msg = "event_type must be EventType or builtin str; got {}".format(type(value).__name__)
+        msg = f"event_type must be EventType or builtin str; got {type(value).__name__}"
         raise TypeError(msg)
     try:
         return EventType(value)
     except ValueError:
         allowed = sorted(member.value for member in EventType)
-        msg = "unknown event_type {!r}; allowed={}".format(value, allowed)
+        msg = f"unknown event_type {value!r}; allowed={allowed}"
         raise ValueError(msg) from None
 
 
@@ -145,17 +146,17 @@ class Event:
     payload: Any
     """事件负载(数据类或原始数据)."""
 
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)
     """可选元数据,用于传输/调试/并发上下文提示."""
 
     seq: int = 0
     """发送端序号 (0 表示未设置; 由 `ObserverManager` 填充)."""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         payload = self.payload
         if is_dataclass(payload):
-            payload = asdict(payload)
-        result: Dict[str, Any] = {
+            payload = asdict(cast("Any", payload))  # pragma: allow-cast stdlib asdict 精确签名 vs EventPayload 宽类型
+        result: dict[str, Any] = {
             "event_type": self.event_type.value,
             "timestamp": self.timestamp,
             "run_id": self.run_id,

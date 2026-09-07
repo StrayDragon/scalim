@@ -3,14 +3,14 @@
 import logging
 import time
 import warnings
-from collections.abc import Sized
-from typing import Any, Callable, Dict, List, Optional, Set
+from collections.abc import Callable, Sized
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
 from ...events import Event, EventType
 from ...typedefs import PerformanceReportFormat
 from ...vendor.compact.importlibx import import_module
-from ...vendor.dataclassesx import dataclass, field
 from ..observer import EventDispatchObserver
 from ..perf_metrics import AdaptiveSchedulerMetrics, CpuSample, MemorySample, PerformanceMetrics
 from ..structured_logging import emit_structured, is_jsonl_logging_installed
@@ -27,13 +27,13 @@ PSUTIL_METRICS_DISABLED_WARNING = PSUTIL_NOT_INSTALLED_WARNING_PREFIX + ", 已�
 
 @dataclass
 class PerformanceThresholds:
-    batch_duration_warn: Optional[float] = None
-    memory_increase_warn: Optional[float] = None
+    batch_duration_warn: float | None = None
+    memory_increase_warn: float | None = None
 
 
 @dataclass
 class PerformanceConfig:
-    metrics: Set[str] = field(default_factory=lambda: {"duration"})
+    metrics: set[str] = field(default_factory=lambda: {"duration"})
     """要收集的指标集合(例如 `duration`/`memory`/`cpu`)."""
 
     sampling_interval: int = 1
@@ -42,7 +42,7 @@ class PerformanceConfig:
     report_format: PerformanceReportFormat = "console"
     """报告输出格式(例如 `console`/`json`/`csv`/`none`)."""
 
-    output_path: Optional[str] = None
+    output_path: str | None = None
     """可选:报告输出路径(部分格式必需)."""
 
     include_batch_lines: bool = False
@@ -94,19 +94,19 @@ class PerformanceObserver(EventDispatchObserver):
     """
 
     config: PerformanceConfig
-    event_types: Optional[Set[EventType]]
+    event_types: set[EventType] | None
     metrics: PerformanceMetrics
     _has_psutil: bool
     _process: Any
     _current_batch_num: int
-    _batch_stage_durations: Dict[int, Dict[str, float]]
-    _on_threshold_exceeded: Optional[Callable[[str, Any], None]]
+    _batch_stage_durations: dict[int, dict[str, float]]
+    _on_threshold_exceeded: Callable[[str, Any], None] | None
     _presentation: PerformancePresentationLayer
 
     def __init__(
         self,
-        config: Optional[PerformanceConfig] = None,
-        on_threshold_exceeded: Optional[Callable[[str, Any], None]] = None,
+        config: PerformanceConfig | None = None,
+        on_threshold_exceeded: Callable[[str, Any], None] | None = None,
     ) -> None:
         if config is None:
             config = PerformanceConfig.default()
@@ -156,7 +156,7 @@ class PerformanceObserver(EventDispatchObserver):
 
         except ImportError:
             self._has_psutil = False
-            disabled_metrics: List[str] = []
+            disabled_metrics: list[str] = []
             if "memory" in self.config.metrics:
                 disabled_metrics.append("memory")
             if "cpu" in self.config.metrics:
@@ -167,7 +167,7 @@ class PerformanceObserver(EventDispatchObserver):
                     stacklevel=2,
                 )
 
-    def _get_memory_mb(self) -> Optional[float]:
+    def _get_memory_mb(self) -> float | None:
         if not self._has_psutil or self._process is None:
             return None
         try:
@@ -176,7 +176,7 @@ class PerformanceObserver(EventDispatchObserver):
         except (OSError, AttributeError):
             return None
 
-    def _get_cpu_percent(self) -> Optional[float]:
+    def _get_cpu_percent(self) -> float | None:
         if not self._has_psutil or self._process is None:
             return None
         try:
@@ -212,12 +212,12 @@ class PerformanceObserver(EventDispatchObserver):
                 exceeded = True
                 kv = format_kv(
                     batch_num=int(self._current_batch_num),
-                    duration_s="{:.2f}".format(float(value)),
-                    threshold_s="{:.2f}".format(float(thresholds.batch_duration_warn)),
+                    duration_s=f"{float(value):.2f}",
+                    threshold_s=f"{float(thresholds.batch_duration_warn):.2f}",
                 )
                 msg = "批次耗时超阈值"
                 if kv:
-                    msg = "{} {}".format(msg, kv)
+                    msg = f"{msg} {kv}"
 
         elif (
             metric_name == "memory_increase"
@@ -227,19 +227,19 @@ class PerformanceObserver(EventDispatchObserver):
         ):
             exceeded = True
             kv = format_kv(
-                memory_increase_mb="{:.1f}".format(float(value)),
-                threshold_mb="{:.1f}".format(float(thresholds.memory_increase_warn)),
+                memory_increase_mb=f"{float(value):.1f}",
+                threshold_mb=f"{float(thresholds.memory_increase_warn):.1f}",
             )
             msg = "内存增长超阈值"
             if kv:
-                msg = "{} {}".format(msg, kv)
+                msg = f"{msg} {kv}"
 
         if exceeded:
             self.config.logger.warning("%s%s", prefix("performance"), msg)
             if self._on_threshold_exceeded:
                 self._on_threshold_exceeded(metric_name, value)
 
-    def _get_batch_stage_entry(self, batch_num: int) -> Dict[str, float]:
+    def _get_batch_stage_entry(self, batch_num: int) -> dict[str, float]:
         entry = self._batch_stage_durations.get(batch_num)
         if entry is None:
             entry = {"stream": 0.0, "loader": 0.0, "compute": 0.0, "write": 0.0}
@@ -309,7 +309,7 @@ class PerformanceObserver(EventDispatchObserver):
 
         should_sample = payload.batch_num % self.config.sampling_interval == 0
         if should_sample:
-            label = "batch_{}".format(payload.batch_num)
+            label = f"batch_{payload.batch_num}"
             self._sample_memory(label)
             self._sample_cpu(label)
 
@@ -337,15 +337,15 @@ class PerformanceObserver(EventDispatchObserver):
                 )
                 return
 
-            parts = ["duration={:.2f}s".format(payload.duration)]
+            parts = [f"duration={payload.duration:.2f}s"]
             parts.append("stream={:.2f}s".format(stage_entry.get("stream", 0.0)))
             parts.append("loader={:.2f}s".format(stage_entry["loader"]))
             parts.append("compute={:.2f}s".format(stage_entry["compute"]))
             parts.append("write={:.2f}s".format(stage_entry["write"]))
             if mem_mb is not None:
-                parts.append("memory={:.1f}MB".format(mem_mb))
+                parts.append(f"memory={mem_mb:.1f}MB")
             if cpu_pct is not None:
-                parts.append("cpu={:.1f}%".format(cpu_pct))
+                parts.append(f"cpu={cpu_pct:.1f}%")
             self.config.logger.info(
                 "%s批次 %d | %s",
                 prefix("performance"),

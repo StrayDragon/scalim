@@ -1,4 +1,5 @@
-from typing import Any, Dict, Hashable, Sequence
+from collections.abc import Hashable, Sequence
+from typing import Any
 
 from ...guardrails import build_compute_error_guardrail_payload, fail_guardrail, record_guardrail
 
@@ -9,7 +10,7 @@ def handle_compute_error(
     *,
     field_key: str,
     row_id: Hashable,
-    dependencies: Dict[str, Any],
+    dependencies: dict[str, Any],
     dependency_names: Sequence[str],
     exc: Exception,
     compute_mode: str,
@@ -19,7 +20,7 @@ def handle_compute_error(
 
     guardrails = runtime.guardrails
     if not guardrails.enabled:
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "field_key": field_key,
             "row_id": row_id,
             "dependencies": dependencies,

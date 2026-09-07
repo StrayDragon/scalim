@@ -1,6 +1,4 @@
-from typing import Optional
-
-from ...vendor.dataclassesx import dataclass
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -8,7 +6,7 @@ class LookupCastSpecIr:
     """关联键转换规范(纯数据,不包含可调用对象)."""
 
     name: str = "auto"
-    sep: Optional[str] = None
+    sep: str | None = None
 
 
 def lookup_cast_id(spec: "LookupCastSpecIr", *, is_multi: bool) -> str:
@@ -24,7 +22,7 @@ def lookup_cast_id(spec: "LookupCastSpecIr", *, is_multi: bool) -> str:
     scope = "multi" if bool(is_multi) else "single"
     if name == "sep_first":
         return "lookup_cast:{}:{}:sep={!r}".format(scope, name, sep or ",")
-    return "lookup_cast:{}:{}".format(scope, name)
+    return f"lookup_cast:{scope}:{name}"
 
 
 __all__ = (

@@ -6,9 +6,12 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING
 
 from scalim_misc.public_api_suite_coverage import build_tier1_coverage_for_examples_suite, parse_public_api_pytest_chapter_ids
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 SKILL_NAME = "scalim-public-api"
 SKILL_TITLE = "Scalim Public API (Tier1)"
@@ -44,14 +47,14 @@ class Tier1Entrypoint:
     marker_relpath: str
     marker_lineno: int
     module_source_relpath: str
-    exports: Tuple[str, ...]
+    exports: tuple[str, ...]
     exports_kind: str
     exports_lineno: int
 
 
 @dataclass(frozen=True)
 class ModuleAllLiteral:
-    values: Tuple[str, ...]
+    values: tuple[str, ...]
     kind: str
     lineno: int
 
@@ -83,7 +86,7 @@ def _write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _as_str_constant(node: ast.AST) -> Optional[str]:
+def _as_str_constant(node: ast.AST) -> str | None:
     ast_str = getattr(ast, "Str", None)
     if ast_str is not None and isinstance(node, ast_str):  # pragma: no cover
         return str(getattr(node, "s", ""))
@@ -111,7 +114,7 @@ def _iter_tier1_marker_files(repo_root: Path) -> Iterable[Path]:
         yield path
 
 
-def resolve_module_source_path(repo_root: Path, module: str) -> Optional[Path]:
+def resolve_module_source_path(repo_root: Path, module: str) -> Path | None:
     src_root = repo_root / "src"
     parts = [p for p in str(module).split(".") if p]
     if not parts:
@@ -126,7 +129,7 @@ def resolve_module_source_path(repo_root: Path, module: str) -> Optional[Path]:
     return None
 
 
-def extract_literal_module_all(path: Path, *, repo_root: Path) -> Tuple[Optional[ModuleAllLiteral], Optional[str]]:
+def extract_literal_module_all(path: Path, *, repo_root: Path) -> tuple[ModuleAllLiteral | None, str | None]:
     tree, parse_err = _try_parse_python_ast(path, repo_root=repo_root)
     if tree is None:
         return None, parse_err
@@ -143,7 +146,7 @@ def extract_literal_module_all(path: Path, *, repo_root: Path) -> Tuple[Optional
     return ModuleAllLiteral(values=values, kind=kind, lineno=lineno), None
 
 
-def _try_parse_python_ast(path: Path, *, repo_root: Path) -> Tuple[Optional[ast.AST], Optional[str]]:
+def _try_parse_python_ast(path: Path, *, repo_root: Path) -> tuple[ast.AST | None, str | None]:
     rel = _path_to_posix(path.relative_to(repo_root))
     text = _read_text(path)
     try:
@@ -153,9 +156,9 @@ def _try_parse_python_ast(path: Path, *, repo_root: Path) -> Tuple[Optional[ast.
     return tree, None
 
 
-def _find_last_module_all_value(tree: ast.AST) -> Tuple[Optional[ast.AST], Optional[int]]:
-    last_value: Optional[ast.AST] = None
-    last_lineno: Optional[int] = None
+def _find_last_module_all_value(tree: ast.AST) -> tuple[ast.AST | None, int | None]:
+    last_value: ast.AST | None = None
+    last_lineno: int | None = None
 
     for node in getattr(tree, "body", []):
         if isinstance(node, ast.Assign):
@@ -169,7 +172,7 @@ def _find_last_module_all_value(tree: ast.AST) -> Tuple[Optional[ast.AST], Optio
     return last_value, last_lineno
 
 
-def _extract_module_all_values(value: ast.AST) -> Tuple[Tuple[str, ...], str, Optional[str]]:
+def _extract_module_all_values(value: ast.AST) -> tuple[tuple[str, ...], str, str | None]:
     if isinstance(value, ast.List):
         kind = "list"
         elts = list(value.elts)
@@ -180,10 +183,10 @@ def _extract_module_all_values(value: ast.AST) -> Tuple[Tuple[str, ...], str, Op
         return (
             (),
             "",
-            "`__all__` 非字面量 (期望字符串常量组成的 list/tuple; 当前: {})".format(type(value).__name__),
+            f"`__all__` 非字面量 (期望字符串常量组成的 list/tuple; 当前: {type(value).__name__})",
         )
 
-    values: List[str] = []
+    values: list[str] = []
     for elt in elts:
         token = _as_str_constant(elt)
         if token is None:
@@ -198,18 +201,18 @@ def _parse_tier1_marker_match(
     *,
     rel_marker: str,
     lineno: int,
-) -> Tuple[Optional[Tuple[int, str, str, str]], Optional[str]]:
+) -> tuple[tuple[int, str, str, str] | None, str | None]:
     module = str(match.group("module") or "").strip()
     desc = str(match.group("desc") or "").strip()
     scenario = str(match.group("scenario") or "").strip()
     order = int(match.group("order"))
 
     if not module:
-        return None, "- {}:{}: tier1 标记缺少模块名".format(rel_marker, lineno)
+        return None, f"- {rel_marker}:{lineno}: tier1 标记缺少模块名"
     if not desc:
-        return None, "- {}:{}: {}: tier1 标记缺少说明".format(rel_marker, lineno, module)
+        return None, f"- {rel_marker}:{lineno}: {module}: tier1 标记缺少说明"
     if not scenario:
-        return None, "- {}:{}: {}: tier1 标记缺少常见场景".format(rel_marker, lineno, module)
+        return None, f"- {rel_marker}:{lineno}: {module}: tier1 标记缺少常见场景"
 
     return (order, module, desc, scenario), None
 
@@ -223,7 +226,7 @@ def _build_tier1_entrypoint(
     scenario: str,
     rel_marker: str,
     lineno: int,
-) -> Tuple[Optional[Tier1Entrypoint], Optional[str]]:
+) -> tuple[Tier1Entrypoint | None, str | None]:
     module_path = resolve_module_source_path(repo_root, module)
     if module_path is None:
         problem = "- {}:{}: {}: 在 `src/` 下找不到模块 (期望存在 `src/{}.py` 或 `src/{}/__init__.py`)".format(
@@ -261,9 +264,9 @@ def _build_tier1_entrypoint(
     return entry, None
 
 
-def discover_tier1_entrypoints(repo_root: Path) -> Tuple[Tuple[Tier1Entrypoint, ...], Tuple[str, ...]]:
-    problems: List[str] = []
-    discovered: Dict[str, Tier1Entrypoint] = {}
+def discover_tier1_entrypoints(repo_root: Path) -> tuple[tuple[Tier1Entrypoint, ...], tuple[str, ...]]:
+    problems: list[str] = []
+    discovered: dict[str, Tier1Entrypoint] = {}
 
     for path in _iter_tier1_marker_files(repo_root):
         text = _read_text(path)
@@ -281,7 +284,7 @@ def discover_tier1_entrypoints(repo_root: Path) -> Tuple[Tuple[Tier1Entrypoint, 
                 problems.append(problem)
                 continue
             if parsed is None:  # pragma: no cover
-                problems.append("- {}:{}: tier1 标记解析失败".format(rel_marker, lineno))
+                problems.append(f"- {rel_marker}:{lineno}: tier1 标记解析失败")
                 continue
             order, module, desc, scenario = parsed
 
@@ -298,19 +301,13 @@ def discover_tier1_entrypoints(repo_root: Path) -> Tuple[Tuple[Tier1Entrypoint, 
                 problems.append(problem)
                 continue
             if entry is None:  # pragma: no cover
-                problems.append("- {}:{}: {}: tier1 entrypoint 构建失败".format(rel_marker, lineno, module))
+                problems.append(f"- {rel_marker}:{lineno}: {module}: tier1 entrypoint 构建失败")
                 continue
 
             if module in discovered:
                 first = discovered[module]
                 problems.append(
-                    "- {}:{}: {}: 重复的 tier1 标记 (已在 {}:{} 声明)".format(
-                        rel_marker,
-                        lineno,
-                        module,
-                        first.marker_relpath,
-                        first.marker_lineno,
-                    )
+                    f"- {rel_marker}:{lineno}: {module}: 重复的 tier1 标记 (已在 {first.marker_relpath}:{first.marker_lineno} 声明)"
                 )
                 continue
             discovered[module] = entry
@@ -320,8 +317,8 @@ def discover_tier1_entrypoints(repo_root: Path) -> Tuple[Tuple[Tier1Entrypoint, 
 
 
 def _render_tier1_entrypoints_markdown(entrypoints: Sequence[Tier1Entrypoint]) -> str:
-    lines: List[str] = []
-    lines.append("# {}".format(SKILL_TITLE))
+    lines: list[str] = []
+    lines.append(f"# {SKILL_TITLE}")
     lines.append("")
     lines.append("此文档由 `scripts/gen-public-api-skill.py` 自动生成.")
     lines.append("")
@@ -329,17 +326,17 @@ def _render_tier1_entrypoints_markdown(entrypoints: Sequence[Tier1Entrypoint]) -
     lines.append("- Tier1 curated entrypoints markers: `src/scalim/**/__init__.py`")
     lines.append("- Entrypoint exports: 每个入口模块的字面量 `__all__` (AST 扫描; 不 import)")
     lines.append("")
-    lines.append("## Tier1 Entrypoints ({})".format(len(entrypoints)))
+    lines.append(f"## Tier1 Entrypoints ({len(entrypoints)})")
     for entry in entrypoints:
         lines.append("")
-        lines.append("### `{}` (order={})".format(entry.module, int(entry.order)))
-        lines.append("- desc: {}".format(entry.description))
-        lines.append("- scenario: {}".format(entry.common_scenario))
-        lines.append("- marker: `{}:{}`".format(entry.marker_relpath, int(entry.marker_lineno)))
-        lines.append("- source: `{}:{}`".format(entry.module_source_relpath, int(entry.exports_lineno)))
-        lines.append("- exports (`__all__`, {}, count={}):".format(entry.exports_kind, len(entry.exports)))
+        lines.append(f"### `{entry.module}` (order={int(entry.order)})")
+        lines.append(f"- desc: {entry.description}")
+        lines.append(f"- scenario: {entry.common_scenario}")
+        lines.append(f"- marker: `{entry.marker_relpath}:{int(entry.marker_lineno)}`")
+        lines.append(f"- source: `{entry.module_source_relpath}:{int(entry.exports_lineno)}`")
+        lines.append(f"- exports (`__all__`, {entry.exports_kind}, count={len(entry.exports)}):")
         for name in entry.exports:
-            lines.append("  - `{}`".format(name))
+            lines.append(f"  - `{name}`")
     lines.append("")
     return "\n".join(lines)
 
@@ -347,11 +344,11 @@ def _render_tier1_entrypoints_markdown(entrypoints: Sequence[Tier1Entrypoint]) -
 def _render_tier1_coverage_markdown(
     *,
     entrypoints: Sequence[Tier1Entrypoint],
-    examples_coverage: Dict[str, Tuple[str, ...]],
-    pytest_coverage: Dict[str, Tuple[str, ...]],
+    examples_coverage: dict[str, tuple[str, ...]],
+    pytest_coverage: dict[str, tuple[str, ...]],
     pytest_chapter_ids: Sequence[str],
 ) -> str:
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append("# Tier1 Coverage Map (examples ↔ pytest)")
     lines.append("")
     lines.append("此文档由 `scripts/gen-public-api-skill.py` 自动生成.")
@@ -362,30 +359,28 @@ def _render_tier1_coverage_markdown(
     lines.append("- Run pytest public_api suite: `pytest -q tests/public_api/ --no-cov`")
     lines.append("- Full gate: `just qa`")
     lines.append("")
-    lines.append("## Pytest Selected Chapters ({}):".format(len(pytest_chapter_ids)))
+    lines.append(f"## Pytest Selected Chapters ({len(pytest_chapter_ids)}):")
     for chapter_id in pytest_chapter_ids:
-        lines.append("- `{}`".format(chapter_id))
+        lines.append(f"- `{chapter_id}`")
     lines.append("")
-    lines.append("## Tier1 Modules Coverage ({})".format(len(entrypoints)))
+    lines.append(f"## Tier1 Modules Coverage ({len(entrypoints)})")
     lines.append("")
     for entry in entrypoints:
         module = entry.module
         examples = list(examples_coverage.get(module, ()))
         pytest = list(pytest_coverage.get(module, ()))
 
-        lines.append("### `{}`".format(module))
+        lines.append(f"### `{module}`")
         lines.append(
-            "- examples chapters ({}): {}".format(len(examples), ", ".join("`{}`".format(c) for c in examples) if examples else "(missing)")
+            "- examples chapters ({}): {}".format(len(examples), ", ".join(f"`{c}`" for c in examples) if examples else "(missing)")
         )
-        lines.append(
-            "- pytest chapters ({}): {}".format(len(pytest), ", ".join("`{}`".format(c) for c in pytest) if pytest else "(missing)")
-        )
+        lines.append("- pytest chapters ({}): {}".format(len(pytest), ", ".join(f"`{c}`" for c in pytest) if pytest else "(missing)"))
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> None:
+def _sync_generated_files(skill_dir: Path, generated_files: dict[Path, str]) -> None:
     generated_root = skill_dir / GENERATED_ROOT_REL
     expected_paths = {skill_dir / rel_path for rel_path in generated_files}
 
@@ -400,24 +395,24 @@ def _sync_generated_files(skill_dir: Path, generated_files: Dict[Path, str]) -> 
         _write_text(skill_dir / rel_path, content)
 
 
-def _list_files(root: Path, base: Optional[Path] = None) -> List[str]:
+def _list_files(root: Path, base: Path | None = None) -> list[str]:
     if base is None:
         base = root
-    items: List[str] = []
+    items: list[str] = []
     for path in root.rglob("*"):
         if path.is_file():
             items.append(_path_to_posix(path.relative_to(base)))
     return sorted(items)
 
 
-def list_managed_output_files(skill_dir: Path) -> List[str]:
+def list_managed_output_files(skill_dir: Path) -> list[str]:
     generated_root = skill_dir / GENERATED_ROOT_REL
     if not generated_root.exists():
         return []
     return _list_files(generated_root, base=skill_dir)
 
 
-def build_skill(repo_root: Path, output_root: Path) -> List[str]:
+def build_skill(repo_root: Path, output_root: Path) -> list[str]:
     skill_dir = output_root / SKILL_NAME
     if is_forbidden_output(skill_dir):
         msg = "拒绝写入到用户技能目录下."
@@ -464,7 +459,7 @@ def validate_skill(repo_root: Path, output_root: Path) -> bool:
     generated_root = skill_dir / GENERATED_ROOT_REL
 
     if not generated_root.exists():
-        sys.stderr.write("未找到 `references/generated/` 目录: {}\n".format(generated_root))
+        sys.stderr.write(f"未找到 `references/generated/` 目录: {generated_root}\n")
         return False
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -476,15 +471,15 @@ def validate_skill(repo_root: Path, output_root: Path) -> bool:
         actual_files = list_managed_output_files(skill_dir)
         if expected_files != actual_files:
             sys.stderr.write("受控参考文件集合不一致.\n")
-            sys.stderr.write("期望: {}\n".format(expected_files))
-            sys.stderr.write("实际: {}\n".format(actual_files))
+            sys.stderr.write(f"期望: {expected_files}\n")
+            sys.stderr.write(f"实际: {actual_files}\n")
             return False
 
         for rel_path in expected_files:
             expected_path = tmp_skill_dir / rel_path
             actual_path = skill_dir / rel_path
             if expected_path.read_bytes() != actual_path.read_bytes():
-                sys.stderr.write("检测到受控产物内容漂移: {}\n".format(rel_path))
+                sys.stderr.write(f"检测到受控产物内容漂移: {rel_path}\n")
                 return False
 
     return True

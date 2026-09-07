@@ -6,7 +6,7 @@
 并生成对应的 `ValidationIssue` 条目供校验报告使用.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from ....._internal.type_narrowing import as_list, as_mapping
 from ...schema_dsl.models import (
@@ -17,7 +17,7 @@ from ...schema_dsl.models import (
 )
 
 if TYPE_CHECKING:
-    from .....vendor.compact.typing_extensionsx import TypeGuard
+    from typing import TypeGuard
 from .validators.base import ValidatorMixinBase
 from .validators.issues import (
     VALIDATION_SEVERITY_ERROR,
@@ -27,14 +27,14 @@ from .validators.issues import (
 __all__ = ()
 
 
-def _is_dict(value: Any) -> "TypeGuard[Dict[Any, Any]]":
+def _is_dict(value: Any) -> "TypeGuard[dict[Any, Any]]":
     return isinstance(value, dict)
 
 
 class ValidatorMigrationsMixin(ValidatorMixinBase):
     """为 `ConfigValidator` 提供遗留字段迁移方法的 `Mixin`."""
 
-    def _error_and_strip_legacy_observability(self, config: Dict[str, Any], issues: List["ValidationIssue"]) -> Dict[str, Any]:
+    def _error_and_strip_legacy_observability(self, config: dict[str, Any], issues: list["ValidationIssue"]) -> dict[str, Any]:
         if "observability" not in config:
             return config
 
@@ -53,14 +53,14 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
         return cleaned
 
     @staticmethod
-    def _append_removed_runtime_policy_error(issues: List["ValidationIssue"], *, path: str, msg: str) -> None:
+    def _append_removed_runtime_policy_error(issues: list["ValidationIssue"], *, path: str, msg: str) -> None:
         issues.append(ValidationIssue(severity=VALIDATION_SEVERITY_ERROR, message=msg, path=path))
 
     def _error_and_strip_removed_demand_runtime_policy_fields(
         self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        config: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         cleaned = dict(config)
         cleaned = self._strip_removed_demand_runtime_policy_top_level(cleaned, issues)
         cleaned = self._strip_removed_demand_runtime_policy_main_source_retry(cleaned, issues)
@@ -68,9 +68,9 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
     def _error_and_strip_removed_output_extras_fields(
         self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        config: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         cleaned = dict(config)
 
         meta_msg = "YAML key 'meta' was moved out of YAML mainline (output extras boundary). "
@@ -91,7 +91,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             + "output_extras=OutputExtrasOverride(audit=True))), ...))."
         )
 
-        removed: Tuple[Tuple[str, str], ...] = (
+        removed: tuple[tuple[str, str], ...] = (
             ("meta", meta_msg),
             ("audit", audit_msg),
         )
@@ -106,25 +106,25 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
     def _error_and_strip_removed_output_write_workbook_fields(
         self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        config: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         outputs = as_list(config.get("outputs"), path="outputs")
         if not outputs:
             return config
 
-        next_config: Optional[Dict[str, Any]] = None
+        next_config: dict[str, Any] | None = None
         for idx, out_raw in enumerate(outputs):
-            out = as_mapping(out_raw, path="outputs.{}".format(int(idx)))
+            out = as_mapping(out_raw, path=f"outputs.{int(idx)}")
             if out is None:
                 continue
 
             write_raw = out.get("write")
-            write_cfg = as_mapping(write_raw, path="outputs.{}.write".format(int(idx)))
+            write_cfg = as_mapping(write_raw, path=f"outputs.{int(idx)}.write")
             if write_cfg is None:
                 continue
 
-            removed: Tuple[str, ...] = (
+            removed: tuple[str, ...] = (
                 "mode",
                 "align_by",
                 "header_policy",
@@ -140,12 +140,12 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                 removed_any = True
                 ValidatorMigrationsMixin._append_removed_runtime_policy_error(
                     issues,
-                    path="outputs.{}.write.{}".format(int(idx), str(key)),
+                    path=f"outputs.{int(idx)}.write.{key!s}",
                     msg=(
-                        "YAML key 'outputs[*].write.{}' was moved out of output-local write config. "
+                        f"YAML key 'outputs[*].write.{key!s}' was moved out of output-local write config. "
                         "Hint: configure workbook write policy via DemandRunOptions.resources_policy "
-                        "/ WorkflowRunOptions.resources_policy (BookWritePolicy.{})."
-                    ).format(str(key), str(key)),
+                        f"/ WorkflowRunOptions.resources_policy (BookWritePolicy.{key!s})."
+                    ),
                 )
                 next_write.pop(key, None)
 
@@ -169,25 +169,25 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
     def _error_and_strip_removed_resources_write_lock_fields(  # noqa: C901, PLR0912, PLR0915
         self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        config: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         resources_raw: Any = config.get(DEMAND_KEYS["resources"])
         if not _is_dict(resources_raw):
             return config
 
-        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
-        next_config: Optional[Dict[str, Any]] = None
+        resources = cast("dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        next_config: dict[str, Any] | None = None
 
-        def _ensure_next_config() -> Dict[str, Any]:
+        def _ensure_next_config() -> dict[str, Any]:
             nonlocal next_config
             if next_config is None:
                 next_config = dict(config)
             return next_config
 
-        def _ensure_next_resources() -> Dict[str, Any]:
+        def _ensure_next_resources() -> dict[str, Any]:
             c = _ensure_next_config()
-            existing_resources = cast("Dict[str, Any]", c.get(DEMAND_KEYS["resources"]) or {})
+            existing_resources = cast("dict[str, Any]", c.get(DEMAND_KEYS["resources"]) or {})
             next_resources = dict(existing_resources)
             c[DEMAND_KEYS["resources"]] = next_resources
             return next_resources
@@ -200,31 +200,31 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
         files_raw: Any = resources.get(RESOURCES_KEYS["files"])
         if _is_dict(files_raw):
-            files = cast("Dict[str, Any]", files_raw)  # pragma: allow-cast yaml mapping typed narrowing
+            files = cast("dict[str, Any]", files_raw)  # pragma: allow-cast yaml mapping typed narrowing
             for raw_file_id, raw_file_cfg in files.items():
                 file_id = str(raw_file_id or "").strip()
                 if not file_id or not _is_dict(raw_file_cfg):
                     continue
-                file_cfg = cast("Dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
-                next_file_cfg: Optional[Dict[str, Any]] = None
+                file_cfg = cast("dict[str, Any]", raw_file_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+                next_file_cfg: dict[str, Any] | None = None
 
                 if "write_lock" in file_cfg:
                     self._add_error(
                         issues,
-                        "resources.files.{}.write_lock was removed; {}".format(file_id, write_lock_hint),
-                        path="resources.files.{}.write_lock".format(file_id),
+                        f"resources.files.{file_id}.write_lock was removed; {write_lock_hint}",
+                        path=f"resources.files.{file_id}.write_lock",
                     )
                     next_file_cfg = dict(file_cfg)
                     next_file_cfg.pop("write_lock", None)
 
                 csv_raw = file_cfg.get(FILE_KEYS["csv_file"])
                 if _is_dict(csv_raw):
-                    csv_cfg = cast("Dict[str, Any]", csv_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    csv_cfg = cast("dict[str, Any]", csv_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "write_lock" in csv_cfg:
                         self._add_error(
                             issues,
-                            "resources.files.{}.csv_file.write_lock was removed; {}".format(file_id, write_lock_hint),
-                            path="resources.files.{}.csv_file.write_lock".format(file_id),
+                            f"resources.files.{file_id}.csv_file.write_lock was removed; {write_lock_hint}",
+                            path=f"resources.files.{file_id}.csv_file.write_lock",
                         )
                         if next_file_cfg is None:
                             next_file_cfg = dict(file_cfg)
@@ -234,37 +234,37 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
                 if next_file_cfg is not None:
                     next_resources = _ensure_next_resources()
-                    next_files = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["files"]) or files))
+                    next_files = dict(cast("dict[str, Any]", next_resources.get(RESOURCES_KEYS["files"]) or files))
                     next_files[str(raw_file_id)] = next_file_cfg
                     next_resources[RESOURCES_KEYS["files"]] = next_files
 
         books_raw: Any = resources.get(RESOURCES_KEYS["books"])
         if _is_dict(books_raw):
-            books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
+            books = cast("dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
             for raw_book_id, raw_book_cfg in books.items():
                 book_id = str(raw_book_id or "").strip()
                 if not book_id or not _is_dict(raw_book_cfg):
                     continue
-                book_cfg = cast("Dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
-                next_book_cfg: Optional[Dict[str, Any]] = None
+                book_cfg = cast("dict[str, Any]", raw_book_cfg)  # pragma: allow-cast yaml mapping typed narrowing
+                next_book_cfg: dict[str, Any] | None = None
 
                 if "write_lock" in book_cfg:
                     self._add_error(
                         issues,
-                        "resources.books.{}.write_lock was removed; {}".format(book_id, write_lock_hint),
-                        path="resources.books.{}.write_lock".format(book_id),
+                        f"resources.books.{book_id}.write_lock was removed; {write_lock_hint}",
+                        path=f"resources.books.{book_id}.write_lock",
                     )
                     next_book_cfg = dict(book_cfg)
                     next_book_cfg.pop("write_lock", None)
 
                 export_raw = book_cfg.get("export_xlsx")
                 if _is_dict(export_raw):
-                    export_cfg = cast("Dict[str, Any]", export_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    export_cfg = cast("dict[str, Any]", export_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "write_lock" in export_cfg:
                         self._add_error(
                             issues,
-                            "resources.books.{}.export_xlsx.write_lock was removed; {}".format(book_id, write_lock_hint),
-                            path="resources.books.{}.export_xlsx.write_lock".format(book_id),
+                            f"resources.books.{book_id}.export_xlsx.write_lock was removed; {write_lock_hint}",
+                            path=f"resources.books.{book_id}.export_xlsx.write_lock",
                         )
                         if next_book_cfg is None:
                             next_book_cfg = dict(book_cfg)
@@ -274,12 +274,12 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
                 xlsx_file_raw = book_cfg.get("xlsx_file")
                 if _is_dict(xlsx_file_raw):
-                    xlsx_file_cfg = cast("Dict[str, Any]", xlsx_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    xlsx_file_cfg = cast("dict[str, Any]", xlsx_file_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "write_lock" in xlsx_file_cfg:
                         self._add_error(
                             issues,
-                            "resources.books.{}.xlsx_file.write_lock was removed; {}".format(book_id, write_lock_hint),
-                            path="resources.books.{}.xlsx_file.write_lock".format(book_id),
+                            f"resources.books.{book_id}.xlsx_file.write_lock was removed; {write_lock_hint}",
+                            path=f"resources.books.{book_id}.xlsx_file.write_lock",
                         )
                         if next_book_cfg is None:
                             next_book_cfg = dict(book_cfg)
@@ -289,12 +289,12 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
                 xlsx_memory_raw = book_cfg.get("xlsx_memory")
                 if _is_dict(xlsx_memory_raw):
-                    xlsx_memory_cfg = cast("Dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                    xlsx_memory_cfg = cast("dict[str, Any]", xlsx_memory_raw)  # pragma: allow-cast yaml mapping typed narrowing
                     if "write_lock" in xlsx_memory_cfg:
                         self._add_error(
                             issues,
-                            "resources.books.{}.xlsx_memory.write_lock was removed; {}".format(book_id, write_lock_hint),
-                            path="resources.books.{}.xlsx_memory.write_lock".format(book_id),
+                            f"resources.books.{book_id}.xlsx_memory.write_lock was removed; {write_lock_hint}",
+                            path=f"resources.books.{book_id}.xlsx_memory.write_lock",
                         )
                         if next_book_cfg is None:
                             next_book_cfg = dict(book_cfg)
@@ -304,16 +304,16 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
                     export_mem_raw = xlsx_memory_cfg.get("export_xlsx")
                     if _is_dict(export_mem_raw):
-                        export_mem_cfg = cast("Dict[str, Any]", export_mem_raw)  # pragma: allow-cast yaml mapping typed narrowing
+                        export_mem_cfg = cast("dict[str, Any]", export_mem_raw)  # pragma: allow-cast yaml mapping typed narrowing
                         if "write_lock" in export_mem_cfg:
                             self._add_error(
                                 issues,
-                                "resources.books.{}.xlsx_memory.export_xlsx.write_lock was removed; {}".format(book_id, write_lock_hint),
-                                path="resources.books.{}.xlsx_memory.export_xlsx.write_lock".format(book_id),
+                                f"resources.books.{book_id}.xlsx_memory.export_xlsx.write_lock was removed; {write_lock_hint}",
+                                path=f"resources.books.{book_id}.xlsx_memory.export_xlsx.write_lock",
                             )
                             if next_book_cfg is None:
                                 next_book_cfg = dict(book_cfg)
-                            next_xlsx_memory = dict(cast("Dict[str, Any]", next_book_cfg.get("xlsx_memory") or xlsx_memory_cfg))
+                            next_xlsx_memory = dict(cast("dict[str, Any]", next_book_cfg.get("xlsx_memory") or xlsx_memory_cfg))
                             next_export_mem = dict(export_mem_cfg)
                             next_export_mem.pop("write_lock", None)
                             next_xlsx_memory["export_xlsx"] = next_export_mem
@@ -321,7 +321,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
                 if next_book_cfg is not None:
                     next_resources = _ensure_next_resources()
-                    next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
+                    next_books = dict(cast("dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
                     next_books[str(raw_book_id)] = next_book_cfg
                     next_resources[RESOURCES_KEYS["books"]] = next_books
 
@@ -329,18 +329,18 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
     def _error_and_strip_removed_resources_write_budget_fields(  # noqa: C901, PLR0915
         self,
-        config: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        config: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         resources_raw: Any = config.get(DEMAND_KEYS["resources"])
         if not _is_dict(resources_raw):
             return config
 
-        resources = cast("Dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        resources = cast("dict[str, Any]", resources_raw)  # pragma: allow-cast yaml mapping typed narrowing
         books_raw = resources.get(RESOURCES_KEYS["books"])
         if not _is_dict(books_raw):
             return config
-        books = cast("Dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
+        books = cast("dict[str, Any]", books_raw)  # pragma: allow-cast yaml mapping typed narrowing
 
         write_hint = (
             "write_defaults was removed from YAML authoring (Python ResourcesPolicy SSOT). "
@@ -352,26 +352,26 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             "supported — rely on host resource limits for memory risk."
         )
 
-        next_config: Optional[Dict[str, Any]] = None
+        next_config: dict[str, Any] | None = None
 
-        def _ensure_next_resources() -> Dict[str, Any]:
+        def _ensure_next_resources() -> dict[str, Any]:
             nonlocal next_config
             if next_config is None:
                 next_config = dict(config)
                 next_config[DEMAND_KEYS["resources"]] = dict(resources)
-            return cast("Dict[str, Any]", next_config[DEMAND_KEYS["resources"]])  # pragma: allow-cast
+            return cast("dict[str, Any]", next_config[DEMAND_KEYS["resources"]])  # pragma: allow-cast
 
         for raw_book_id, book_raw in books.items():
-            book_cfg = as_mapping(book_raw, path="resources.books.{}".format(raw_book_id))
+            book_cfg = as_mapping(book_raw, path=f"resources.books.{raw_book_id}")
             if book_cfg is None:
                 continue
-            next_book_cfg: Optional[Dict[str, Any]] = None
+            next_book_cfg: dict[str, Any] | None = None
 
             if "write_defaults" in book_cfg:
                 ValidatorMigrationsMixin._append_removed_runtime_policy_error(
                     issues,
-                    msg="resources.books.{}.write_defaults was removed; {}".format(raw_book_id, write_hint),
-                    path="resources.books.{}.write_defaults".format(raw_book_id),
+                    msg=f"resources.books.{raw_book_id}.write_defaults was removed; {write_hint}",
+                    path=f"resources.books.{raw_book_id}.write_defaults",
                 )
                 next_book_cfg = dict(book_cfg)
                 next_book_cfg.pop("write_defaults", None)
@@ -379,13 +379,13 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             xlsx_memory_raw = book_cfg.get("xlsx_memory")
             xlsx_memory_cfg = as_mapping(
                 xlsx_memory_raw,
-                path="resources.books.{}.xlsx_memory".format(raw_book_id),
+                path=f"resources.books.{raw_book_id}.xlsx_memory",
             )
             if xlsx_memory_cfg is not None and "budget" in xlsx_memory_cfg:
                 ValidatorMigrationsMixin._append_removed_runtime_policy_error(
                     issues,
-                    msg="resources.books.{}.xlsx_memory.budget was removed; {}".format(raw_book_id, budget_hint),
-                    path="resources.books.{}.xlsx_memory.budget".format(raw_book_id),
+                    msg=f"resources.books.{raw_book_id}.xlsx_memory.budget was removed; {budget_hint}",
+                    path=f"resources.books.{raw_book_id}.xlsx_memory.budget",
                 )
                 if next_book_cfg is None:
                     next_book_cfg = dict(book_cfg)
@@ -394,12 +394,12 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                 next_book_cfg["xlsx_memory"] = next_xlsx_memory
 
             xlsx_raw = book_cfg.get(BOOK_KEYS["xlsx"])
-            xlsx_cfg = as_mapping(xlsx_raw, path="resources.books.{}.xlsx".format(raw_book_id))
+            xlsx_cfg = as_mapping(xlsx_raw, path=f"resources.books.{raw_book_id}.xlsx")
             if xlsx_cfg is not None and "budget" in xlsx_cfg:
                 ValidatorMigrationsMixin._append_removed_runtime_policy_error(
                     issues,
-                    msg="resources.books.{}.xlsx.budget was removed; {}".format(raw_book_id, budget_hint),
-                    path="resources.books.{}.xlsx.budget".format(raw_book_id),
+                    msg=f"resources.books.{raw_book_id}.xlsx.budget was removed; {budget_hint}",
+                    path=f"resources.books.{raw_book_id}.xlsx.budget",
                 )
                 if next_book_cfg is None:
                     next_book_cfg = dict(book_cfg)
@@ -409,18 +409,18 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             if xlsx_cfg is not None and "write_defaults" in xlsx_cfg:
                 ValidatorMigrationsMixin._append_removed_runtime_policy_error(
                     issues,
-                    msg="resources.books.{}.xlsx.write_defaults was removed; {}".format(raw_book_id, write_hint),
-                    path="resources.books.{}.xlsx.write_defaults".format(raw_book_id),
+                    msg=f"resources.books.{raw_book_id}.xlsx.write_defaults was removed; {write_hint}",
+                    path=f"resources.books.{raw_book_id}.xlsx.write_defaults",
                 )
                 if next_book_cfg is None:
                     next_book_cfg = dict(book_cfg)
-                next_xlsx = dict(cast("Dict[str, Any]", next_book_cfg.get(BOOK_KEYS["xlsx"]) or xlsx_cfg))
+                next_xlsx = dict(cast("dict[str, Any]", next_book_cfg.get(BOOK_KEYS["xlsx"]) or xlsx_cfg))
                 next_xlsx.pop("write_defaults", None)
                 next_book_cfg[BOOK_KEYS["xlsx"]] = next_xlsx
 
             if next_book_cfg is not None:
                 next_resources = _ensure_next_resources()
-                next_books = dict(cast("Dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
+                next_books = dict(cast("dict[str, Any]", next_resources.get(RESOURCES_KEYS["books"]) or books))
                 next_books[str(raw_book_id)] = next_book_cfg
                 next_resources[RESOURCES_KEYS["books"]] = next_books
 
@@ -428,9 +428,9 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
     @staticmethod
     def _strip_removed_demand_runtime_policy_top_level(
-        cleaned: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        cleaned: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         guardrails_msg = "YAML key 'guardrails' was moved out of YAML mainline (runtime policy boundary). "
         guardrails_msg = (
             guardrails_msg
@@ -498,7 +498,7 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             "See docs/doc/getting-started/excel-column-residency.md."
         )
 
-        removed: Tuple[Tuple[str, str], ...] = (
+        removed: tuple[tuple[str, str], ...] = (
             (
                 "guardrails",
                 guardrails_msg,
@@ -543,9 +543,9 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
 
     @staticmethod
     def _strip_removed_demand_runtime_policy_main_source_retry(
-        cleaned: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        cleaned: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         main_source = as_mapping(cleaned.get("main_source"), path="main_source")
         if main_source is None or "retry" not in main_source:
             return cleaned
@@ -560,27 +560,27 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                 "runtime=DemandRunRuntimeOptions(loader_retry=LoaderRetryPoliciesSpec(by_loader={...})), ...))."
             ),
         )
-        next_main: Dict[str, Any] = dict(main_source)
+        next_main: dict[str, Any] = dict(main_source)
         next_main.pop("retry", None)
         cleaned["main_source"] = next_main
         return cleaned
 
     @staticmethod
     def _strip_removed_source_runtime_policy_keys(
-        cleaned: Dict[str, Any],
-        issues: List["ValidationIssue"],
-    ) -> Dict[str, Any]:
+        cleaned: dict[str, Any],
+        issues: list["ValidationIssue"],
+    ) -> dict[str, Any]:
         sources = as_mapping(cleaned.get("sources"), path="sources")
         if sources is None:
             return cleaned
 
-        next_sources: Optional[Dict[str, Any]] = None
+        next_sources: dict[str, Any] | None = None
         for source_id, source_cfg_raw in sources.items():
-            source_cfg = as_mapping(source_cfg_raw, path="sources.{}".format(str(source_id)))
+            source_cfg = as_mapping(source_cfg_raw, path=f"sources.{source_id!s}")
             if source_cfg is None:
                 continue
 
-            remove_keys: List[Tuple[str, str]] = []
+            remove_keys: list[tuple[str, str]] = []
             if "retry" in source_cfg:
                 remove_keys.append(
                     (
@@ -598,11 +598,11 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
                     (
                         "lookup_chunk_size",
                         (
-                            "sources.{}.lookup_chunk_size was moved out of YAML authoring. "
+                            f"sources.{source_id!s}.lookup_chunk_size was moved out of YAML authoring. "
                             "Configure LookupChunking via DemandRunOptions.runtime "
-                            "(DemandRunRuntimeOptions.lookup_chunking={{...: LookupChunking.sized(...)}}); "
+                            "(DemandRunRuntimeOptions.lookup_chunking={...: LookupChunking.sized(...)}); "
                             "see upgrade notes."
-                        ).format(str(source_id)),
+                        ),
                     )
                 )
             if not remove_keys:
@@ -611,11 +611,11 @@ class ValidatorMigrationsMixin(ValidatorMixinBase):
             if next_sources is None:
                 next_sources = dict(sources)
 
-            next_cfg: Dict[str, Any] = dict(source_cfg)
+            next_cfg: dict[str, Any] = dict(source_cfg)
             for key, msg in remove_keys:
                 ValidatorMigrationsMixin._append_removed_runtime_policy_error(
                     issues,
-                    path="sources.{}.{}".format(str(source_id), key),
+                    path=f"sources.{source_id!s}.{key}",
                     msg=msg,
                 )
                 next_cfg.pop(key, None)

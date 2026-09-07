@@ -5,7 +5,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import IO, Any, Dict, Optional, Tuple, cast
+from typing import IO, Any, Optional, cast
 
 from ...._internal.loggingx import get_logger, prefix
 from ....events import generate_run_id
@@ -17,17 +17,17 @@ from .viz_config import normalize_output_dir as _normalize_output_dir
 _LOGGER = get_logger("viz")
 
 _VIZ_JSONL_QUEUE_MAXSIZE = 4096
-_VizQueueItem = Tuple[str, threading.Event]
+_VizQueueItem = tuple[str, threading.Event]
 
 
 class VizEventEmitter:
-    _output_handle: Optional[IO[bytes]]
+    _output_handle: IO[bytes] | None
     _logger: logging.Logger
     _queue: Optional["queue.Queue[_VizQueueItem]"]
     _writer_thread: Optional["threading.Thread"]
     _closing: "threading.Event"
 
-    def __init__(self, path: Optional[str], *, logger: Optional[logging.Logger] = None, append: bool = True) -> None:
+    def __init__(self, path: str | None, *, logger: logging.Logger | None = None, append: bool = True) -> None:
         self._logger = logger or _LOGGER
         self._closing = threading.Event()
         self._queue = None
@@ -46,7 +46,7 @@ class VizEventEmitter:
             self._output_handle = None
             return
 
-        queue_obj: "queue.Queue[_VizQueueItem]" = queue.Queue(maxsize=_VIZ_JSONL_QUEUE_MAXSIZE)
+        queue_obj: queue.Queue[_VizQueueItem] = queue.Queue(maxsize=_VIZ_JSONL_QUEUE_MAXSIZE)
         self._queue = queue_obj
         self._writer_thread = threading.Thread(
             target=self._writer_main,
@@ -55,7 +55,7 @@ class VizEventEmitter:
         )
         self._writer_thread.start()
 
-    def emit(self, event: Dict[str, Any]) -> None:
+    def emit(self, event: dict[str, Any]) -> None:
         try:
             line = json.dumps(event, ensure_ascii=False, default=str)
         except (TypeError, ValueError, RecursionError) as exc:
@@ -134,15 +134,15 @@ class VizEventEmitter:
 
 class VizObserverOutputMixin(ABC):
     config: VizObserverConfig
-    snapshot: Optional[Dict[str, Any]] = None
-    run_id: Optional[str] = None
-    _events_emitter: Optional[VizEventEmitter] = None
-    _trace_emitter: Optional[VizEventEmitter] = None
+    snapshot: dict[str, Any] | None = None
+    run_id: str | None = None
+    _events_emitter: VizEventEmitter | None = None
+    _trace_emitter: VizEventEmitter | None = None
     _snapshot_written: bool = False
     _run_dir_applied: bool = False
 
     @abstractmethod
-    def _normalize_node_ref(self, node_ref: Dict[str, str]) -> Dict[str, str]: ...
+    def _normalize_node_ref(self, node_ref: dict[str, str]) -> dict[str, str]: ...
 
     def _ensure_run_id(self) -> None:
         if self.run_id is not None:
@@ -196,11 +196,11 @@ class VizObserverOutputMixin(ABC):
         if not isinstance(meta, dict):
             meta = {}
             snapshot["meta"] = meta
-        meta = cast("Dict[str, Any]", meta)  # pragma: allow-cast dict typed narrowing
+        meta = cast("dict[str, Any]", meta)  # pragma: allow-cast dict typed narrowing
         viz_meta = meta.get("viz")
         if not isinstance(viz_meta, dict):
             viz_meta = {}
-        viz_meta = cast("Dict[str, Any]", viz_meta)  # pragma: allow-cast dict typed narrowing
+        viz_meta = cast("dict[str, Any]", viz_meta)  # pragma: allow-cast dict typed narrowing
         trace_enabled = self.config.trace_enabled_effective()
         viz_meta.update(
             {
@@ -238,7 +238,7 @@ class VizObserverOutputMixin(ABC):
             if temp_path is not None:
                 best_effort_remove_temp_path(temp_path)
 
-    def _select_payload(self, summary: Dict[str, Any], sample: Dict[str, Any], full: Dict[str, Any]) -> Dict[str, Any]:
+    def _select_payload(self, summary: dict[str, Any], sample: dict[str, Any], full: dict[str, Any]) -> dict[str, Any]:
         policy = (self.config.payload_policy or "summary").lower()
         if policy == "none":
             return {}
@@ -252,7 +252,7 @@ class VizObserverOutputMixin(ABC):
             return payload
         return summary
 
-    def _emit_to(self, emitter: Optional[VizEventEmitter], event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None:
+    def _emit_to(self, emitter: VizEventEmitter | None, event_type: str, node_ref: dict[str, str], payload: dict[str, Any]) -> None:
         if not self.config.is_enabled():
             return
         if emitter is None:
@@ -270,10 +270,10 @@ class VizObserverOutputMixin(ABC):
         }
         emitter.emit(event)
 
-    def _emit_event(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None:
+    def _emit_event(self, event_type: str, node_ref: dict[str, str], payload: dict[str, Any]) -> None:
         self._emit_to(self._events_emitter, event_type, node_ref, payload)
 
-    def _emit_trace(self, event_type: str, node_ref: Dict[str, str], payload: Dict[str, Any]) -> None:
+    def _emit_trace(self, event_type: str, node_ref: dict[str, str], payload: dict[str, Any]) -> None:
         if not self.config.trace_enabled_effective():
             return
         self._emit_to(self._trace_emitter, event_type, node_ref, payload)

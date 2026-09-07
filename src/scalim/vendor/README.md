@@ -2,22 +2,18 @@
 
 本目录承载 `scalim` 运行时所需的 vendor/shim 代码.目标是:
 
-- 保持 Python 3.6 运行时可用性
+- 保持与根 `ROADMAP.md` Python 支持窗口(floor 3.10)的兼容
 - 在 vendors/libs 同步场景下尽量自包含
 - 对来源/许可证/用途保持可审计
 
-## dataclassesx
+> 0.20.x Stage A 已移除 `dataclassesx`(→ stdlib `dataclasses`)与
+> `compact/typing_extensionsx`(→ `typing` + `typing_extensions>=4.4`).
 
-- **用途**: 为 Python 3.6 提供自包含的 dataclasses 能力入口 `scalim.vendor.dataclassesx`.
-- **来源**: PyPI `dataclasses==0.8`(https://github.com/ericvsmith/dataclasses)
-- **许可证**: Apache-2.0(见 `src/scalim/vendor/dataclassesx/LICENSE.txt`)
-- **更新**: 见 `src/scalim/vendor/dataclassesx/SOURCE.md`
+## compact/importlibx
 
-## compact/typing_extensionsx.py
-
-- **用途**: Python 3.6 + 旧 `typing_extensions` 兼容层; `src/scalim/` 内扩展 typing 能力的唯一入口.
+- **用途**: 显式 import seam(`IMPORT_MODULE` 测试替换点)与可选依赖守卫(`require_optional_dependency`).
 - **来源/许可证**: 本仓库内实现(随仓库许可证).
-- **更新**: 由维护者按需求扩展,并保持对旧 `typing_extensions` 的运行时兼容.
+- **更新**: 由维护者按需求扩展;Stage C 计划迁至 `_internal/utils/`.
 
 ## yamlx
 

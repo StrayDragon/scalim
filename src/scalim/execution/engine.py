@@ -1,7 +1,8 @@
 # region imports
 
 import threading
-from typing import TYPE_CHECKING, Iterable, MutableMapping, Optional, Sequence
+from collections.abc import Iterable, MutableMapping, Sequence
+from typing import TYPE_CHECKING, Optional
 
 from ..hooks import HookManager
 from ..ob.manager import ObserverManager
@@ -34,7 +35,7 @@ class ScalimEngine:
     plan: ExecutionPlan
     hook_manager: HookManager
     observer_manager: ObserverManager
-    batch_size: Optional[int]
+    batch_size: int | None
     gc_interval: int
     _pipeline: Pipeline
     _run_lock: "threading.RLock"
@@ -44,19 +45,19 @@ class ScalimEngine:
         demand: DemandIr,
         plan: ExecutionPlan,
         runtime_bindings: RuntimeBindings,
-        hook_manager: Optional[HookManager] = None,
-        observer_manager: Optional[ObserverManager] = None,
-        batch_size: Optional[int] = 1000,
+        hook_manager: HookManager | None = None,
+        observer_manager: ObserverManager | None = None,
+        batch_size: int | None = 1000,
         gc_interval: int = 10,
         parallel_mode: str = "seq",
         max_workers: int = 0,
         key_normalization: KeyNormalizationMode = "raw",
-        pipeline_overrides: Optional[PipelineOverrides] = None,
-        guardrails: Optional[GuardrailsPolicy] = None,
-        loader_retry: Optional[LoaderRetryPolicies] = None,
-        preloaded_cache: Optional[MutableMapping[str, LoaderResultMapping]] = None,
+        pipeline_overrides: PipelineOverrides | None = None,
+        guardrails: GuardrailsPolicy | None = None,
+        loader_retry: LoaderRetryPolicies | None = None,
+        preloaded_cache: MutableMapping[str, LoaderResultMapping] | None = None,
         workflow_cache_pool: Optional["WorkflowCachePool"] = None,
-        workflow_node_id: Optional[str] = None,
+        workflow_node_id: str | None = None,
     ) -> None:
         """初始化 `ScalimEngine` 计算引擎.
 
@@ -89,10 +90,10 @@ class ScalimEngine:
         if batch_size is None:
             resolved_batch_size = None
         elif isinstance(batch_size, bool) or not isinstance(batch_size, int):
-            msg = "Invalid batch_size={!r}. Expected null or an integer >= 1.".format(batch_size)
+            msg = f"Invalid batch_size={batch_size!r}. Expected null or an integer >= 1."
             raise TypeError(msg)
         elif batch_size < 1:
-            msg = "Invalid batch_size={!r}. Expected null or an integer >= 1.".format(batch_size)
+            msg = f"Invalid batch_size={batch_size!r}. Expected null or an integer >= 1."
             raise ValueError(msg)
         else:
             resolved_batch_size = batch_size
@@ -102,12 +103,12 @@ class ScalimEngine:
 
         if parallel_mode in ("thread", "process"):
             msg = (
-                "parallel_mode='{}' was removed. "
+                f"parallel_mode='{parallel_mode}' was removed. "
                 "Use parallel_mode='adaptive' (auto fan-out/fan-in for intrabatch LoadRef) or parallel_mode='seq'."
-            ).format(parallel_mode)
+            )
             raise ValueError(msg)
         if parallel_mode not in ("seq", "adaptive"):
-            msg = "Invalid parallel_mode='{}'. Expected 'seq' or 'adaptive'.".format(parallel_mode)
+            msg = f"Invalid parallel_mode='{parallel_mode}'. Expected 'seq' or 'adaptive'."
             raise ValueError(msg)
 
         # 分片并行是 `Python` 运行策略(无 `YAML` 键):`opt-in` 走 `PipelineOverrides`.
@@ -151,8 +152,8 @@ class ScalimEngine:
 
     def run(
         self,
-        main_rows: Optional[Iterable[RowData]] = None,
-        sink: Optional[ISink] = None,
+        main_rows: Iterable[RowData] | None = None,
+        sink: ISink | None = None,
     ) -> Sequence[RowData]:
         """执行流水线.
 

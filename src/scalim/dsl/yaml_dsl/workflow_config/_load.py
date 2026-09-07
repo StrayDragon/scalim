@@ -1,6 +1,7 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 from ....workflow.errors import ScalimWorkflowConfigError
 from .._internal.config_parsing.error_envelope import ScalimYamlValidationError
@@ -14,7 +15,7 @@ from ._parse import load_workflow_config_from_mapping
 def load_workflow_config(
     workflow_yaml_path: str,
     *,
-    template_vars: Optional[Mapping[str, Any]] = None,
+    template_vars: Mapping[str, Any] | None = None,
     template_sandbox: str = "safe",
     rendered_yaml_max_len: int = DEFAULT_RENDERED_YAML_MAX_LEN,
 ) -> WorkflowConfig:
@@ -24,14 +25,14 @@ def load_workflow_config(
     try:
         text = yaml_path.read_text(encoding="utf-8")
     except Exception as exc:
-        msg = "Failed to read workflow YAML: {}: {}".format(type(exc).__name__, exc)
+        msg = f"Failed to read workflow YAML: {type(exc).__name__}: {exc}"
         raise ScalimWorkflowConfigError(msg, path="(file)") from exc
 
     try:
         text = maybe_precompile_yaml_text(
             text,
             template_vars=template_vars,
-            context_label="工作流 `YAML` 文件 `{}`".format(str(yaml_path)),
+            context_label=f"工作流 `YAML` 文件 `{yaml_path!s}`",
             context_kind="workflow",
             template_sandbox=template_sandbox,
             rendered_yaml_max_len=rendered_yaml_max_len,
@@ -56,7 +57,7 @@ def load_workflow_config(
 def validate_workflow_yaml_text_json(
     yaml_text: str,
     strict_unknown_fields: bool = False,  # noqa: FBT001, FBT002
-    schema_path: Optional[str] = None,
+    schema_path: str | None = None,
 ) -> str:
     """返回与 YAML DSL 编辑器的“精确校验器”兼容的 JSON 载荷(`Workflow` 版).
 
@@ -69,7 +70,7 @@ def validate_workflow_yaml_text_json(
     return json.dumps(payload, ensure_ascii=False)
 
 
-def _validate_workflow_yaml_text(yaml_text: str) -> Dict[str, Any]:
+def _validate_workflow_yaml_text(yaml_text: str) -> dict[str, Any]:
     try:
         yaml_data, _locations, _lines = load_yaml_mapping_text(
             yaml_text,

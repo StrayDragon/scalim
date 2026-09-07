@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..init_var_nodes import InitVarRef, OptionalPathNode
 
@@ -8,7 +8,7 @@ from ..init_var_nodes import InitVarRef, OptionalPathNode
 def resolve_output_container_path(
     raw: OptionalPathNode,
     *,
-    init_vars: Optional[Dict[str, Any]],
+    init_vars: dict[str, Any] | None,
     path: str,
 ) -> str:
     """解析输出资源路径节点为非空字符串路径.
@@ -23,39 +23,39 @@ def resolve_output_container_path(
     """
 
     if isinstance(raw, dict):
-        msg = "{} must be a string path or InitVarRef".format(path)
+        msg = f"{path} must be a string path or InitVarRef"
         raise TypeError(msg)
 
     if isinstance(raw, InitVarRef):
         var_name = str(raw.name)
         if init_vars is None or var_name not in init_vars:
-            msg = "Missing init_var '{}' for {}".format(var_name, path)
+            msg = f"Missing init_var '{var_name}' for {path}"
             raise ValueError(msg)
         raw_value = init_vars[var_name]
         if raw_value is None:
-            msg = "{} init_var '{}' resolved to None".format(path, var_name)
+            msg = f"{path} init_var '{var_name}' resolved to None"
             raise ValueError(msg)
         if isinstance(raw_value, os.PathLike):
             resolved_raw = os.fspath(raw_value)
         elif isinstance(raw_value, str):
             resolved_raw = raw_value
         else:
-            msg = "{} init_var '{}' must be str or os.PathLike, got {}".format(path, var_name, type(raw_value).__name__)
+            msg = f"{path} init_var '{var_name}' must be str or os.PathLike, got {type(raw_value).__name__}"
             raise TypeError(msg)
 
         resolved = str(resolved_raw).strip()
         if not resolved:
-            msg = "{} init_var '{}' resolved to an empty string".format(path, var_name)
+            msg = f"{path} init_var '{var_name}' resolved to an empty string"
             raise ValueError(msg)
         return resolved
 
     if raw is None:
-        msg = "{} is required".format(path)
+        msg = f"{path} is required"
         raise ValueError(msg)
 
     resolved = str(os.fspath(raw) if isinstance(raw, os.PathLike) else raw).strip()
     if not resolved:
-        msg = "{} is required".format(path)
+        msg = f"{path} is required"
         raise ValueError(msg)
     return resolved
 
@@ -64,7 +64,7 @@ def resolve_yaml_relative_output_path(
     raw: OptionalPathNode,
     *,
     base_dir: str,
-    init_vars: Optional[Dict[str, Any]],
+    init_vars: dict[str, Any] | None,
     path: str,
 ) -> str:
     """解析路径并将相对路径按 `base_dir` 归一化为绝对路径.

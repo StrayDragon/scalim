@@ -7,12 +7,13 @@
 - 静态 `IR`/`ExecutionPlan` 不得保存任何 `Python` 可调用对象;统一通过 `RuntimeBindings` 注入.
 """
 
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
+from typing import Any
 
 from ..spec.ir.aliases import NormalizedLookupKeySpec
 from ..spec.ir.binding import LoaderCallContextIr
 from ..typedefs import FieldValue, LoaderCallParams, LoaderResultMapping, LookupKey, RowData, RuntimeValue
-from ..vendor.dataclassesx import dataclass, field
 
 MainSourceLoaderFn = Callable[..., Iterable[RowData]]
 SourceLoaderFn = Callable[..., object]
@@ -21,7 +22,7 @@ NormalizeCallByFn = Callable[..., object]
 DerivedCalculatorFn = Callable[..., FieldValue]
 RefDefaultCalculatorFn = Callable[..., FieldValue]
 ValueTransformFn = Callable[[FieldValue], FieldValue]
-LookupKeyCastFn = Callable[[object], Optional[LookupKey]]
+LookupKeyCastFn = Callable[[object], LookupKey | None]
 
 
 @dataclass
@@ -32,57 +33,57 @@ class RuntimeBindings:
     - 执行阶段不做 `import`/解析;所有函数对象在运行前通过“运行时链接”阶段解析后放入此处.
     """
 
-    main_source_loaders: Dict[str, MainSourceLoaderFn] = field(default_factory=dict)
-    source_loaders: Dict[str, SourceLoaderFn] = field(default_factory=dict)
-    params_builders: Dict[Tuple[str, NormalizedLookupKeySpec], ParamsBuilderFn] = field(default_factory=dict)
-    source_normalize_call_bys: Dict[str, NormalizeCallByFn] = field(default_factory=dict)
-    derived_calculators: Dict[str, DerivedCalculatorFn] = field(default_factory=dict)
-    ref_default_calculators: Dict[Tuple[str, int], RefDefaultCalculatorFn] = field(default_factory=dict)
-    value_transforms: Dict[str, ValueTransformFn] = field(default_factory=dict)
-    lookup_key_casts: Dict[str, LookupKeyCastFn] = field(default_factory=dict)
-    loader_extractors: Dict[str, Callable[[LookupKey, LoaderResultMapping], RuntimeValue]] = field(default_factory=dict)
+    main_source_loaders: dict[str, MainSourceLoaderFn] = field(default_factory=dict)
+    source_loaders: dict[str, SourceLoaderFn] = field(default_factory=dict)
+    params_builders: dict[tuple[str, NormalizedLookupKeySpec], ParamsBuilderFn] = field(default_factory=dict)
+    source_normalize_call_bys: dict[str, NormalizeCallByFn] = field(default_factory=dict)
+    derived_calculators: dict[str, DerivedCalculatorFn] = field(default_factory=dict)
+    ref_default_calculators: dict[tuple[str, int], RefDefaultCalculatorFn] = field(default_factory=dict)
+    value_transforms: dict[str, ValueTransformFn] = field(default_factory=dict)
+    lookup_key_casts: dict[str, LookupKeyCastFn] = field(default_factory=dict)
+    loader_extractors: dict[str, Callable[[LookupKey, LoaderResultMapping], RuntimeValue]] = field(default_factory=dict)
 
     def require_main_source_loader(self, source_id: str) -> MainSourceLoaderFn:
         fn = self.main_source_loaders.get(str(source_id))
         if fn is None:
-            msg = "Missing runtime main source loader for source_id={!r}".format(source_id)
+            msg = f"Missing runtime main source loader for source_id={source_id!r}"
             raise KeyError(msg)
         return fn
 
     def require_source_loader(self, source_id: str) -> SourceLoaderFn:
         fn = self.source_loaders.get(str(source_id))
         if fn is None:
-            msg = "Missing runtime source loader for source_id={!r}".format(source_id)
+            msg = f"Missing runtime source loader for source_id={source_id!r}"
             raise KeyError(msg)
         return fn
 
-    def get_params_builder(self, source_id: str, key_field: NormalizedLookupKeySpec) -> Optional[ParamsBuilderFn]:
+    def get_params_builder(self, source_id: str, key_field: NormalizedLookupKeySpec) -> ParamsBuilderFn | None:
         key = (str(source_id), key_field)
         return self.params_builders.get(key)
 
-    def get_source_normalize_call_by(self, source_id: str) -> Optional[NormalizeCallByFn]:
+    def get_source_normalize_call_by(self, source_id: str) -> NormalizeCallByFn | None:
         return self.source_normalize_call_bys.get(str(source_id))
 
     def require_derived_calculator(self, field_id: str) -> DerivedCalculatorFn:
         fn = self.derived_calculators.get(str(field_id))
         if fn is None:
-            msg = "Missing runtime derived calculator for field_id={!r}".format(field_id)
+            msg = f"Missing runtime derived calculator for field_id={field_id!r}"
             raise KeyError(msg)
         return fn
 
-    def get_ref_default_calculator(self, field_id: str, idx: int) -> Optional[RefDefaultCalculatorFn]:
+    def get_ref_default_calculator(self, field_id: str, idx: int) -> RefDefaultCalculatorFn | None:
         return self.ref_default_calculators.get((str(field_id), int(idx)))
 
-    def get_value_transform(self, field_id: str) -> Optional[ValueTransformFn]:
+    def get_value_transform(self, field_id: str) -> ValueTransformFn | None:
         return self.value_transforms.get(str(field_id))
 
-    def get_lookup_key_cast(self, cast_id: str) -> Optional[LookupKeyCastFn]:
+    def get_lookup_key_cast(self, cast_id: str) -> LookupKeyCastFn | None:
         return self.lookup_key_casts.get(str(cast_id))
 
-    def get_loader_extractor(self, source_id: str) -> Optional[Callable[[LookupKey, LoaderResultMapping], RuntimeValue]]:
+    def get_loader_extractor(self, source_id: str) -> Callable[[LookupKey, LoaderResultMapping], RuntimeValue] | None:
         return self.loader_extractors.get(str(source_id))
 
-    def debug_summary(self) -> Dict[str, Any]:
+    def debug_summary(self) -> dict[str, Any]:
         return {
             "main_source_loaders": len(self.main_source_loaders),
             "source_loaders": len(self.source_loaders),

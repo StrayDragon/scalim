@@ -1,4 +1,4 @@
-from typing import FrozenSet, Mapping, Optional, Tuple
+from collections.abc import Mapping
 
 from ..spec.ir import LookupStepIr, SourceIr
 from ..spec.ir.aliases import LookupKeySpec, NormalizedLookupKeySpec
@@ -7,15 +7,15 @@ from ..spec.ir.callable_refs import describe_callable_ref
 from ..spec.ir.lookup_casts import LookupCastSpecIr, lookup_cast_id
 from ..typedefs import LookupKey
 
-LookupCastSignature = Tuple[str, str]
+LookupCastSignature = tuple[str, str]
 BindingParamMarker = str
-BindingSignature = Tuple[str, str, str, str, NormalizedLookupKeySpec, BindingParamMarker]
-StepSignature = Tuple[str, Tuple[str, ...], NormalizedLookupKeySpec, Optional[LookupCastSignature], Optional[BindingSignature]]
-RelationSignature = Tuple[StepSignature, ...]
-LoadRefCacheKey = Tuple[StepSignature, FrozenSet[LookupKey]]
+BindingSignature = tuple[str, str, str, str, NormalizedLookupKeySpec, BindingParamMarker]
+StepSignature = tuple[str, tuple[str, ...], NormalizedLookupKeySpec, LookupCastSignature | None, BindingSignature | None]
+RelationSignature = tuple[StepSignature, ...]
+LoadRefCacheKey = tuple[StepSignature, frozenset[LookupKey]]
 
 
-def is_auto_lookup_cast(lookup_cast: Optional[LookupCastSpecIr]) -> bool:
+def is_auto_lookup_cast(lookup_cast: LookupCastSpecIr | None) -> bool:
     if lookup_cast is None:
         return False
     return str(lookup_cast.name or "").strip() == "auto"
@@ -29,24 +29,24 @@ def normalize_key_field(key_field: LookupKeySpec) -> NormalizedLookupKeySpec:
     return key_field
 
 
-def lookup_cast_signature(lookup_cast: Optional[LookupCastSpecIr], *, is_multi: bool) -> Optional[LookupCastSignature]:
+def lookup_cast_signature(lookup_cast: LookupCastSpecIr | None, *, is_multi: bool) -> LookupCastSignature | None:
     if lookup_cast is None:
         return None
     return ("spec", lookup_cast_id(lookup_cast, is_multi=is_multi))
 
 
-def build_binding_signature(binding: Optional[BindingIr]) -> Optional[BindingSignature]:
+def build_binding_signature(binding: BindingIr | None) -> BindingSignature | None:
     if binding is None:
         return None
     marker = ""
     if binding.params_builder_ref is not None:
-        marker = "params_builder_ref:{}".format(describe_callable_ref(binding.params_builder_ref))
+        marker = f"params_builder_ref:{describe_callable_ref(binding.params_builder_ref)}"
     elif binding.params_template is not None:
         marker = "params_template:{}".format(str(binding.template_path or "(template)"))
     else:
         marker = "params:none"
     if binding.param_name is not None:
-        marker = "{}:param={!r}".format(marker, binding.param_name)
+        marker = f"{marker}:param={binding.param_name!r}"
     return ("binding", binding.mode, binding.as_, binding.cache_mode, binding.key_field, marker)
 
 
@@ -58,7 +58,7 @@ def live_source_for_step(step: LookupStepIr, sources: Mapping[str, SourceIr]) ->
     return SourceIr.from_catalog(sources, _step_source_id(step))
 
 
-def resolve_step_binding(step: LookupStepIr, sources: Mapping[str, SourceIr]) -> Optional[BindingIr]:
+def resolve_step_binding(step: LookupStepIr, sources: Mapping[str, SourceIr]) -> BindingIr | None:
     source = live_source_for_step(step, sources)
     if step.to_field is not None:
         to_key = step.to_field
@@ -68,7 +68,7 @@ def resolve_step_binding(step: LookupStepIr, sources: Mapping[str, SourceIr]) ->
     return step.bind or source.get_binding(binding_key)
 
 
-def has_rows_binding(steps: Tuple[LookupStepIr, ...], sources: Mapping[str, SourceIr]) -> bool:
+def has_rows_binding(steps: tuple[LookupStepIr, ...], sources: Mapping[str, SourceIr]) -> bool:
     for step in steps:
         binding = resolve_step_binding(step, sources)
         if binding is None:
@@ -78,7 +78,7 @@ def has_rows_binding(steps: Tuple[LookupStepIr, ...], sources: Mapping[str, Sour
     return False
 
 
-def can_group_by_relation(steps: Tuple[LookupStepIr, ...], sources: Mapping[str, SourceIr]) -> bool:
+def can_group_by_relation(steps: tuple[LookupStepIr, ...], sources: Mapping[str, SourceIr]) -> bool:
     for step in steps:
         binding = resolve_step_binding(step, sources)
         if binding is None:
@@ -107,8 +107,8 @@ def build_step_signature(step: LookupStepIr, sources: Mapping[str, SourceIr]) ->
 
 
 def build_relation_signature(
-    steps: Tuple[LookupStepIr, ...],
-    sources: Optional[Mapping[str, SourceIr]] = None,
+    steps: tuple[LookupStepIr, ...],
+    sources: Mapping[str, SourceIr] | None = None,
 ) -> RelationSignature:
     if not steps:
         return ()

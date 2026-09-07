@@ -11,9 +11,11 @@ import sys
 import time
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping, Sequence
 from concurrent.futures import Executor
-from typing import Any, Callable, Dict, FrozenSet, Hashable, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, cast
+
+from typing_extensions import override
 
 from ....events import EventType
 from ....hooks import HookManager
@@ -28,7 +30,6 @@ from ....spec.ir.aliases import LoaderResultMapCallable
 from ....spec.ir.binding import LoaderCallContextIr
 from ....typedefs import FieldValue, LoaderCallKwargs, LoaderResultMapping, RowData, RuntimeValue, SinkRowKeySeq
 from ....utils.relation_signature import build_relation_signature, can_group_by_relation, has_rows_binding
-from ....vendor.compact.typing_extensionsx import override
 from ...context import BatchContext, create_batch_context_for_rows
 from ...executor.batch._internal.stage_spans import (
     StageWriteClock,
@@ -50,7 +51,7 @@ from ._row_emission import RowEmissionCoordinator
 
 
 class _ReverseSortValue:
-    __slots__: Tuple[str, ...] = ("value",)
+    __slots__: tuple[str, ...] = ("value",)
 
     def __init__(self, value: Any) -> None:
         self.value: Any = value
@@ -85,14 +86,14 @@ class Pipeline(ABC):
     runtime: ExecutionRuntime
     hook_manager: HookManager
     observer_manager: ObserverManager
-    batch_size: Optional[int]
+    batch_size: int | None
     gc_interval: int
     demand: DemandIr
-    _required_fields: Set[str]
+    _required_fields: set[str]
     _overrides: PipelineOverrides
-    _late_fields: FrozenSet[str]
-    _late_materializer: Optional[LateFieldMaterializer]
-    _late_column_materializer: Optional[LateColumnMaterializer]
+    _late_fields: frozenset[str]
+    _late_materializer: LateFieldMaterializer | None
+    _late_column_materializer: LateColumnMaterializer | None
 
     def __init__(
         self,
@@ -102,9 +103,9 @@ class Pipeline(ABC):
         hook_manager: HookManager,
         observer_manager: ObserverManager,
         demand: DemandIr,
-        batch_size: Optional[int] = 1000,
+        batch_size: int | None = 1000,
         gc_interval: int = 10,
-        overrides: Optional[PipelineOverrides] = None,
+        overrides: PipelineOverrides | None = None,
     ) -> None:
         self.plan = plan
         self.executor = executor
@@ -121,7 +122,7 @@ class Pipeline(ABC):
         # 列写出布局按需构建: 行写出路径不必为它付出建表成本.
         self._late_column_materializer = None
 
-    def _ensure_late_column_materializer(self) -> Optional[LateColumnMaterializer]:
+    def _ensure_late_column_materializer(self) -> LateColumnMaterializer | None:
         materializer = self._late_materializer
         if materializer is None:
             return None
@@ -134,14 +135,14 @@ class Pipeline(ABC):
             self._late_column_materializer = late_columns
         return late_columns
 
-    def _compute_required_fields(self) -> Set[str]:
+    def _compute_required_fields(self) -> set[str]:
         """计算需要保留的字段集合(包含传递闭包).
 
         使用 `plan.field_dependencies` 而不是 `field_spec.get_dependencies()`,
         因为 `field_dependencies` 是基于主数据源方向正确推断的依赖.
         """
-        required: Set[str] = set()
-        visited: Set[str] = set()
+        required: set[str] = set()
+        visited: set[str] = set()
 
         def collect(field_key: str) -> None:
             if field_key in visited:
@@ -169,7 +170,7 @@ class Pipeline(ABC):
         row_id: Hashable,
         field_key: str,
         direction: str,
-    ) -> Tuple[int, Any]:
+    ) -> tuple[int, Any]:
         value = context.get_field_value(field_key, row_id)
         if value is None:
             return (1, 0)
@@ -179,9 +180,9 @@ class Pipeline(ABC):
 
     def _sort_row_ids_for_write(
         self,
-        row_ids: List[Hashable],
+        row_ids: list[Hashable],
         context: BatchContext,
-    ) -> List[Hashable]:
+    ) -> list[Hashable]:
         main_source = self.demand.main_source
         if not main_source or not main_source.order_by:
             return row_ids
@@ -196,8 +197,8 @@ class Pipeline(ABC):
     @abstractmethod
     def run(
         self,
-        main_rows: Optional[Iterable[RowData]] = None,
-        sink: Optional[ISink] = None,
+        main_rows: Iterable[RowData] | None = None,
+        sink: ISink | None = None,
     ) -> Sequence[RowData]:
         """执行管线."""
 
@@ -209,7 +210,7 @@ class Pipeline(ABC):
         source_id: str,
         rendered_params: LoaderCallKwargs,
         load_fn: Callable[[], LoaderResultMapping],
-    ) -> Optional[LoaderResultMapping]:
+    ) -> LoaderResultMapping | None:
         """通过 `preloaded_cache.get_or_load` 扩展点加载/复用结果(若不存在则返回 `None`)."""
         if not isinstance(cache, SupportsPreloadGetOrLoad):
             return None
@@ -285,7 +286,7 @@ class Pipeline(ABC):
                         )
                     is_mapping = isinstance(result_obj, Mapping)
                     if not is_mapping:
-                        msg = "Loader '{}' result must be a Mapping".format(source_id)
+                        msg = f"Loader '{source_id}' result must be a Mapping"
                         raise TypeError(msg)
                     result_mapping = coerce_loader_result_mapping(
                         cast("LoaderResultMapping", result_obj)  # pragma: allow-cast Mapping generic params unknown after isinstance
@@ -357,20 +358,20 @@ class Pipeline(ABC):
     def _iter_row_batches(
         self,
         main_rows: Iterable[RowData],
-    ) -> Iterator[Tuple[List[Hashable], List[RowData], Optional[float]]]:
+    ) -> Iterator[tuple[list[Hashable], list[RowData], float | None]]:
         """按行顺序产出批次(`row_ids`, `row_rows`, `stream_duration_s`)."""
         row_iter = iter(main_rows)
         next_row_id = 0
         wants_stage_spans = self.runtime.instrumentation.wants(EventType.STAGE_SPAN)
         perf_counter = self._overrides.stage_perf_counter_fn or time.perf_counter
 
-        def _make_row_ids(start: int, count: int) -> List[Hashable]:
-            ids: List[Hashable] = []
+        def _make_row_ids(start: int, count: int) -> list[Hashable]:
+            ids: list[Hashable] = []
             ids.extend(range(start, start + count))
             return ids
 
         if self.batch_size is None:
-            stream_duration_s: Optional[float] = None
+            stream_duration_s: float | None = None
             if wants_stage_spans:
                 start = perf_counter()
                 batch_rows = list(row_iter)
@@ -414,8 +415,8 @@ class SeqPipeline(Pipeline):
         *,
         enabled: bool,
         main_rows: Iterable[RowData],
-        row_ids: List[Hashable],
-        batch_rows: List[RowData],
+        row_ids: list[Hashable],
+        batch_rows: list[RowData],
     ) -> None:
         if not enabled:
             return
@@ -441,8 +442,8 @@ class SeqPipeline(Pipeline):
     @override
     def run(
         self,
-        main_rows: Optional[Iterable[RowData]] = None,
-        sink: Optional[ISink] = None,
+        main_rows: Iterable[RowData] | None = None,
+        sink: ISink | None = None,
     ) -> Sequence[RowData]:
         start_time = time.perf_counter()
 
@@ -464,7 +465,7 @@ class SeqPipeline(Pipeline):
 
         column_sink, streaming_sink = self._classify_sink(sink)
 
-        results: List[RowData] = []
+        results: list[RowData] = []
         batch_count = 0
 
         try:
@@ -539,11 +540,11 @@ class SeqPipeline(Pipeline):
 
     def _classify_sink(
         self,
-        sink: Optional[ISink],
-    ) -> "tuple[Optional[IColumnSink], Optional[IRowSink]]":
+        sink: ISink | None,
+    ) -> "tuple[IColumnSink | None, IRowSink | None]":
         """分类输出端类型."""
-        column_sink: Optional[IColumnSink] = None
-        streaming_sink: Optional[IRowSink] = None
+        column_sink: IColumnSink | None = None
+        streaming_sink: IRowSink | None = None
         if sink is not None:
             if isinstance(sink, IColumnSink):
                 column_sink = sink
@@ -553,11 +554,11 @@ class SeqPipeline(Pipeline):
 
     def _process_batch_results(
         self,
-        batch_results: List[RowData],
-        results: List[RowData],
-        sink: Optional[ISink],
-        column_sink: Optional[IColumnSink],
-        streaming_sink: Optional[IRowSink],
+        batch_results: list[RowData],
+        results: list[RowData],
+        sink: ISink | None,
+        column_sink: IColumnSink | None,
+        streaming_sink: IRowSink | None,
     ) -> None:
         """处理批次结果"""
         if column_sink is None and streaming_sink is None:
@@ -568,12 +569,12 @@ class SeqPipeline(Pipeline):
 
     def _finalize_run(
         self,
-        sink: Optional[ISink],
-        results: List[RowData],
+        sink: ISink | None,
+        results: list[RowData],
         batch_count: int,
         start_time: float,
-    ) -> List[RowData]:
-        return_value: List[RowData]
+    ) -> list[RowData]:
+        return_value: list[RowData]
         if sink:
             wants, durations, _stage_map = init_stage_span_tracking(self.runtime)
             write_delta = 0.0
@@ -609,13 +610,13 @@ class SeqPipeline(Pipeline):
 
     def _execute_batch_column_mode(
         self,
-        row_ids: List[Hashable],
-        batch_rows: List[RowData],
+        row_ids: list[Hashable],
+        batch_rows: list[RowData],
         column_sink: IColumnSink,
         batch_num: int,
         *,
-        adaptive_pool: Optional[Executor] = None,
-    ) -> List[RowData]:
+        adaptive_pool: Executor | None = None,
+    ) -> list[RowData]:
         """列式模式执行批次 (FR023 块列写入)
 
         真正的块列写入: 每批次独立处理,按列写入后释放内存
@@ -683,7 +684,7 @@ class SeqPipeline(Pipeline):
 
     def _write_main_source_columns(
         self,
-        row_ids: List[Hashable],
+        row_ids: list[Hashable],
         context: BatchContext,
         column_sink: IColumnSink,
         batch_num: int,
@@ -704,11 +705,11 @@ class SeqPipeline(Pipeline):
     def _write_column_if_target(
         self,
         field_key: str,
-        row_ids: List[Hashable],
+        row_ids: list[Hashable],
         context: BatchContext,
         column_sink: IColumnSink,
         batch_num: int,
-        late_columns: Optional[LateColumnMaterializer] = None,
+        late_columns: LateColumnMaterializer | None = None,
     ) -> None:
         """如果是目标字段,写入列"""
         if field_key not in self.plan.target_fields:
@@ -734,7 +735,7 @@ class SeqPipeline(Pipeline):
                 write_column_aligned(field_key, aligned_row_ids, values)
             row_count = len(values)
         else:
-            col_data: Dict[Hashable, FieldValue] = dict(zip(row_ids, values))
+            col_data: dict[Hashable, FieldValue] = dict(zip(row_ids, values, strict=False))
             if clock is not None and clock.enabled:
                 with clock.time_write():
                     column_sink.write_column(field_key, col_data)
@@ -760,11 +761,11 @@ class SeqPipeline(Pipeline):
                 remaining_fields=context.get_field_count(),
             )
 
-    def _resolve_streaming_global_ready_target_fields(self) -> Set[str]:
+    def _resolve_streaming_global_ready_target_fields(self) -> set[str]:
         main_source = self.runtime.main_source
         main_source_id = main_source.source_id if main_source else None
 
-        global_ready_target_fields: Set[str] = set()
+        global_ready_target_fields: set[str] = set()
         for field_key in self.plan.target_fields:
             field_spec = self.plan.field_specs.get(field_key)
             if field_spec is None:
@@ -776,9 +777,9 @@ class SeqPipeline(Pipeline):
 
     def _collect_streaming_rows_binding_barriers(
         self,
-    ) -> Tuple[Set[Tuple[Tuple[Any, ...], ...]], Set[str]]:
-        rows_binding_relations: Set[Tuple[Tuple[Any, ...], ...]] = set()
-        rows_binding_ops: Set[str] = set()
+    ) -> tuple[set[tuple[tuple[Any, ...], ...]], set[str]]:
+        rows_binding_relations: set[tuple[tuple[Any, ...], ...]] = set()
+        rows_binding_ops: set[str] = set()
 
         for operator in self.plan.operators:
             if not isinstance(operator, LoadRefOperatorIr):
@@ -794,13 +795,13 @@ class SeqPipeline(Pipeline):
 
     def _execute_batch_streaming_mode(
         self,
-        row_ids: List[Hashable],
-        batch_rows: List[RowData],
+        row_ids: list[Hashable],
+        batch_rows: list[RowData],
         streaming_sink: IRowSink,
         batch_num: int,
         *,
-        adaptive_pool: Optional[Executor] = None,
-    ) -> List[RowData]:
+        adaptive_pool: Executor | None = None,
+    ) -> list[RowData]:
         """流式模式执行批次(真正的按行流式写出)."""
         self.runtime.sink = streaming_sink
         self.runtime.batch_num = batch_num

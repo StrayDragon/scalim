@@ -1,8 +1,9 @@
+from collections.abc import Hashable, Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Dict, Hashable, Mapping, Optional, Set, Tuple, Union
+from typing import Any
 
 from ...typedefs import FieldValue
-from ...vendor.dataclassesx import dataclass
 from ._helpers import extract_from_fields
 from ._relations import JoinConditionIr, LookupStepIr, RelationIr
 from .callable_refs import CallableRefIr
@@ -29,9 +30,9 @@ class CallBySpecIr:
     """派生字段的 `call_by` 规范(纯数据,不执行 `import`/解析)."""
 
     reference: CallableRefIr
-    args: Tuple[CallByValueIr, ...] = ()
-    kwargs: Tuple[Tuple[str, CallByValueIr], ...] = ()
-    field_names: Tuple[str, ...] = ()
+    args: tuple[CallByValueIr, ...] = ()
+    kwargs: tuple[tuple[str, CallByValueIr], ...] = ()
+    field_names: tuple[str, ...] = ()
 
 
 def call_by_requires_ctx(call_by: "CallBySpecIr") -> bool:
@@ -58,7 +59,7 @@ class ValueOpIr:
 
     kind: str
     to: str = ""
-    callable_ref: Optional[CallableRefIr] = None
+    callable_ref: CallableRefIr | None = None
 
     def __post_init__(self) -> None:
         kind = str(self.kind or "").strip()
@@ -76,14 +77,14 @@ class ValueOpIr:
 
         if kind in ("transform", "format"):
             if self.to:
-                msg = "ValueOpIr(kind={!r}) must not set to".format(kind)
+                msg = f"ValueOpIr(kind={kind!r}) must not set to"
                 raise ValueError(msg)
             if self.callable_ref is None:
-                msg = "ValueOpIr(kind={!r}) requires callable_ref".format(kind)
+                msg = f"ValueOpIr(kind={kind!r}) requires callable_ref"
                 raise ValueError(msg)
             return
 
-        msg = "Unknown ValueOpIr.kind={!r}".format(kind)
+        msg = f"Unknown ValueOpIr.kind={kind!r}"
         raise ValueError(msg)
 
 
@@ -99,7 +100,7 @@ class FieldDefaultCaseIr:
     when: str
     kind: str
     literal: FieldValue = None
-    call_by: Optional[CallBySpecIr] = None
+    call_by: CallBySpecIr | None = None
 
     def __post_init__(self) -> None:
         when = str(self.when or "").strip()
@@ -119,7 +120,7 @@ class FieldDefaultCaseIr:
                 raise ValueError(msg)
             return
 
-        msg = "Unknown FieldDefaultCaseIr.kind={!r}".format(kind)
+        msg = f"Unknown FieldDefaultCaseIr.kind={kind!r}"
         raise ValueError(msg)
 
 
@@ -130,21 +131,21 @@ class ComputeCallContextIr:
     row_id: Hashable
     batch_num: int
     field_id: str
-    deps: Tuple[str, ...]
+    deps: tuple[str, ...]
     values: Mapping[str, FieldValue]
 
     def __post_init__(self) -> None:
         if not isinstance(self.values, MappingProxyType):
             object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
 
-    def __getstate__(self) -> Dict[str, Any]:
-        state: Dict[str, Any] = dict(self.__dict__)
+    def __getstate__(self) -> dict[str, Any]:
+        state: dict[str, Any] = dict(self.__dict__)
         values = state.get("values")
         if isinstance(values, MappingProxyType):
             state["values"] = dict(values)
         return state
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         for key, value in state.items():
             object.__setattr__(self, key, value)
         self.__post_init__()
@@ -189,7 +190,7 @@ class FieldIr:
     - 对纯 IR 使用: 默认回退为 `data_key`
     """
 
-    extract_segments: Tuple[Union[str, int], ...] = ()
+    extract_segments: tuple[str | int, ...] = ()
     """
     字段提取的 `canonical segments(typed)`.
 
@@ -202,25 +203,25 @@ class FieldIr:
     是否为主键字段
     """
 
-    presentation: Optional[FieldPresentationIr] = None
+    presentation: FieldPresentationIr | None = None
     """
     导出/展示元信息
     """
 
-    value_ops: Tuple[ValueOpIr, ...] = ()
+    value_ops: tuple[ValueOpIr, ...] = ()
     """值处理操作序列(纯描述,不包含可调用对象)."""
 
-    relation: "Optional[Union[JoinConditionIr, RelationIr]]" = None
+    relation: "JoinConditionIr | RelationIr | None" = None
     """
     关联关系 (支持运算符重载构建关联)
     """
 
-    lookup_steps: Optional[Tuple[LookupStepIr, ...]] = None
+    lookup_steps: tuple[LookupStepIr, ...] | None = None
     """
     显式关联步骤(有序),优先于 `relation` 推断.
     """
 
-    default_cases: Tuple[FieldDefaultCaseIr, ...] = ()
+    default_cases: tuple[FieldDefaultCaseIr, ...] = ()
     """可选:`ref` 字段在 `relation miss` 时的缺省值 `cases`(有序)."""
 
     def __post_init__(self) -> None:
@@ -235,7 +236,7 @@ class FieldIr:
         """是否是关联字段: 关联字段通过 `relation` 定义."""
         return self.relation is not None or bool(self.lookup_steps)
 
-    def get_dependencies(self) -> Tuple[str, ...]:
+    def get_dependencies(self) -> tuple[str, ...]:
         """获取字段依赖的简化版本(仅返回 `relation` 左侧字段).
 
         警告: 此方法只提取 `relation` 条件的左侧字段作为依赖,当 `DSL` 中主表在右侧时
@@ -251,7 +252,7 @@ class FieldIr:
             return extract_from_fields(self.lookup_steps)
         # 如果存在 `relation`,提取依赖字段
         if self.relation:
-            deps: Set[str] = set()
+            deps: set[str] = set()
             if isinstance(self.relation, JoinConditionIr):
                 # 单个条件,提取左侧字段
                 deps.add(self.relation.left.field_name)
@@ -310,7 +311,7 @@ class DerivedFieldIr:
     字段显示名称
     """
 
-    dependencies: Tuple[str, ...]
+    dependencies: tuple[str, ...]
     """
     依赖字段的 `field_key` 元组.
     """
@@ -318,18 +319,18 @@ class DerivedFieldIr:
     compute_expr: str = ""
     """可选: `compute` 表达式(纯文本,运行时再编译)."""
 
-    call_by: Optional[CallBySpecIr] = None
+    call_by: CallBySpecIr | None = None
     """可选: `call_by` 规范(纯数据,运行时再解析/绑定)."""
 
-    presentation: Optional[FieldPresentationIr] = None
+    presentation: FieldPresentationIr | None = None
     """
     导出/展示元信息
     """
 
-    value_ops: Tuple[ValueOpIr, ...] = ()
+    value_ops: tuple[ValueOpIr, ...] = ()
     """值处理操作序列(例如格式化;纯描述,不包含可调用对象)."""
 
-    call_ctx_key: Optional[str] = None
+    call_ctx_key: str | None = None
     """
     用于 `call_by` 的上下文注入键(内部使用);为 `None` 时不注入.
     """
@@ -347,29 +348,29 @@ class DerivedFieldIr:
         object.__setattr__(self, "compute_expr", compute_expr)
 
         if compute_expr and self.call_by is not None:
-            msg = "派生字段 {!r} 必须二选一: compute_expr 或 call_by".format(self.field_id)
+            msg = f"派生字段 {self.field_id!r} 必须二选一: compute_expr 或 call_by"
             raise ValueError(msg)
         if not compute_expr and self.call_by is None:
-            msg = "派生字段 {!r} 必须声明 compute_expr 或 call_by".format(self.field_id)
+            msg = f"派生字段 {self.field_id!r} 必须声明 compute_expr 或 call_by"
             raise ValueError(msg)
 
         if self.is_constant_compute:
             if self.dependencies:
-                msg = "常量 compute 字段 {!r} 必须不声明 dependencies".format(self.field_id)
+                msg = f"常量 compute 字段 {self.field_id!r} 必须不声明 dependencies"
                 raise ValueError(msg)
             if self.call_ctx_key is not None:
-                msg = "常量 compute 字段 {!r} 不允许 call_by 上下文".format(self.field_id)
+                msg = f"常量 compute 字段 {self.field_id!r} 不允许 call_by 上下文"
                 raise ValueError(msg)
             return
 
         if not self.dependencies:
-            msg = "派生字段 {!r} 必须至少有一个依赖".format(self.field_id)
+            msg = f"派生字段 {self.field_id!r} 必须至少有一个依赖"
             raise ValueError(msg)
 
-    def get_dependencies(self) -> Tuple[str, ...]:
+    def get_dependencies(self) -> tuple[str, ...]:
         return self.dependencies
 
 
-SupportedFieldIr = Union[FieldIr, DerivedFieldIr]
+SupportedFieldIr = FieldIr | DerivedFieldIr
 
 __all__ = ()

@@ -1,5 +1,6 @@
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Callable, Dict, Iterator, List, Optional, Tuple, cast
+from typing import cast
 
 from .....events import EventType
 from .....planning.operators import OperatorType
@@ -8,7 +9,7 @@ from ...runtime.runtime import ExecutionRuntime
 
 def init_stage_span_tracking(
     runtime: ExecutionRuntime,
-) -> Tuple[bool, Dict[str, float], Dict[str, str]]:
+) -> tuple[bool, dict[str, float], dict[str, str]]:
     wants_stage_spans = runtime.instrumentation.wants(EventType.STAGE_SPAN)
     if not wants_stage_spans:
         return False, {}, {}
@@ -25,7 +26,7 @@ def init_stage_span_tracking(
     return wants_stage_spans, stage_durations, stage_map
 
 
-class StageWriteClock(object):
+class StageWriteClock:
     """累计 `sink` `write` 耗时;跟踪 `loader`/`compute` 窗口内的嵌套 `write`.
 
     调用方 `MUST` 将外层 `stage` 墙钟记为 `max(0, wall - exit_stage())`,
@@ -33,14 +34,14 @@ class StageWriteClock(object):
     """
 
     enabled: bool
-    stage_durations: Dict[str, float]
+    stage_durations: dict[str, float]
     _perf_counter: Callable[[], float]
-    _active_stages: List[Tuple[str, float]]
+    _active_stages: list[tuple[str, float]]
 
     def __init__(
         self,
         enabled: bool,
-        stage_durations: Dict[str, float],
+        stage_durations: dict[str, float],
         perf_counter: Callable[[], float],
     ) -> None:
         self.enabled = bool(enabled)
@@ -87,11 +88,11 @@ class StageWriteClock(object):
                     self._active_stages[-1] = (name, float(nested) + duration)
 
 
-def attach_write_clock(runtime: ExecutionRuntime, clock: Optional[StageWriteClock]) -> None:
+def attach_write_clock(runtime: ExecutionRuntime, clock: StageWriteClock | None) -> None:
     runtime.write_stage_clock = clock  # pragma: allow-dynattr optional-interface: ExecutionRuntime.write_stage_clock
 
 
-def get_write_clock(runtime: ExecutionRuntime) -> Optional[StageWriteClock]:
+def get_write_clock(runtime: ExecutionRuntime) -> StageWriteClock | None:
     clock = getattr(runtime, "write_stage_clock", None)  # pragma: allow-dynattr optional-interface: ExecutionRuntime.write_stage_clock
     if clock is None:
         return None

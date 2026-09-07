@@ -1,12 +1,14 @@
 # pragma: allow-c901-file plan: c60
+from collections.abc import Callable, Hashable, Sequence
 from concurrent.futures import Executor, Future
-from typing import TYPE_CHECKING, Callable, Dict, Hashable, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING
+
+from typing_extensions import override
 
 from ...events import EventType
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
 from ...utils.relation_signature import RelationSignature, build_relation_signature, has_rows_binding
-from ...vendor.compact.typing_extensionsx import override
 from ..context import BatchContext
 from ..executor.runtime.runtime import ExecutionRuntime
 from ._internal.loadref_scheduler_execution import AdaptiveLoadRefSchedulerExecutionMixin
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
 
 class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLoadRefSchedulerExecutionMixin):
     _plan: ExecutionPlan
-    _deps: Dict[str, Tuple[str, ...]]
+    _deps: dict[str, tuple[str, ...]]
     _overrides: "PipelineOverrides"
     _tuning: AdaptiveTuning
     _policy: AdaptivePolicy
@@ -65,19 +67,19 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
 
     @override
     def __repr__(self) -> str:
-        return "AdaptiveLoadRefScheduler(min_parallel_tasks={})".format(self._tuning.min_parallel_tasks_per_layer)
+        return f"AdaptiveLoadRefScheduler(min_parallel_tasks={self._tuning.min_parallel_tasks_per_layer})"
 
     def execute_segment(  # noqa: C901, PLR0912
         self,
         ops: Sequence[LoadRefOperatorIr],
         *,
         context: BatchContext,
-        batch_row_nth: List[Hashable],
+        batch_row_nth: list[Hashable],
         runtime: ExecutionRuntime,
-        pool: Optional[Executor],
+        pool: Executor | None,
         max_workers: int,
-        required_fields: Optional[Set[str]],
-        after_operator: Optional[Callable[[LoadRefOperatorIr], None]],
+        required_fields: set[str] | None,
+        after_operator: Callable[[LoadRefOperatorIr], None] | None,
     ) -> None:
         if not ops:
             return
@@ -85,17 +87,17 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
         wants_scheduler_decisions = runtime.instrumentation.wants(EventType.ADAPTIVE_SCHEDULER_DECISION)
         backend = runtime.adaptive_backend or self._policy.choose_backend(plan=self._plan, runtime=runtime, tuning=self._tuning)
         if backend != ADAPTIVE_BACKEND_THREAD:
-            msg = "adaptive backend '{}' is not supported; only 'thread' is currently available".format(backend)
+            msg = f"adaptive backend '{backend}' is not supported; only 'thread' is currently available"
             raise ValueError(msg)
 
         ordered_ops = list(ops)
         field_keys = [op.field_key for op in ordered_ops]
-        op_by_field_key: Dict[str, LoadRefOperatorIr] = {op.field_key: op for op in ordered_ops}
+        op_by_field_key: dict[str, LoadRefOperatorIr] = {op.field_key: op for op in ordered_ops}
 
         layers = _build_layers(field_keys, deps=self._deps)
 
         serial_executor = self._build_loadref_executor()
-        committed_relation_keys: Set[RelationSignature] = set()
+        committed_relation_keys: set[RelationSignature] = set()
 
         for layer_index, layer_field_keys in enumerate(layers):
             layer_ops = [op_by_field_key[key] for key in layer_field_keys]
@@ -158,7 +160,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
             task_order, task_specs, op_task_key = self._build_task_specs(executable_ops, sources=runtime.sources)
             task_ops = [task_specs[task_key].op for task_key in task_order]
 
-            layer_lookup_keys: Optional[Dict[str, int]] = None
+            layer_lookup_keys: dict[str, int] | None = None
             if int(self._tuning.min_total_lookup_keys_per_layer or 0) > 0 or int(self._tuning.min_lookup_keys_per_task or 0) > 0:
                 layer_lookup_keys = {}
                 for task_key in task_order:
@@ -208,7 +210,7 @@ class AdaptiveLoadRefScheduler(AdaptiveLoadRefSchedulerPlanningMixin, AdaptiveLo
                     required_fields,
                 )
 
-            submit_task: Callable[[_TaskSpec], "Future[_AdaptiveTaskResult]"] = _submit_task_thread
+            submit_task: Callable[[_TaskSpec], Future[_AdaptiveTaskResult]] = _submit_task_thread
 
             results_by_key, layer_stats = self._run_tasks_in_pool(
                 task_order,

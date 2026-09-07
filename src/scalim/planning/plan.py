@@ -1,9 +1,9 @@
 # region imports
 
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from ..spec.ir import SupportedFieldIr
-from ..vendor.dataclassesx import dataclass, field
 from .builder_helpers.fusion_groups import ComputeFusionGroup
 from .operators import PlanOperatorIr
 from .viz import build_viz_graph_snapshot
@@ -26,7 +26,7 @@ class Stage:
     阶段标识
     """
 
-    field_keys: List[str] = field(default_factory=list)
+    field_keys: list[str] = field(default_factory=list)
     """
     该阶段包含的字段键名列表
     """
@@ -78,7 +78,7 @@ class PlanMetadata:
     是否有关联字段
     """
 
-    cached_sources: List[str] = field(default_factory=list)
+    cached_sources: list[str] = field(default_factory=list)
     """
     预加载缓存的数据源名称列表 (FR003)
     """
@@ -94,32 +94,32 @@ class ExecutionPlan:
     - 输出写入与释放等操作属于执行流水线的编排职责,不由 `PlanBuilder` 生成.
     """
 
-    operators: Tuple[PlanOperatorIr, ...] = field(default_factory=tuple)
+    operators: tuple[PlanOperatorIr, ...] = field(default_factory=tuple)
     """规划层核心算子序列(按执行顺序).
 
     仅包含 `load` / `load_ref` / `compute`.
     """
 
-    primary_field: Optional[str] = None
+    primary_field: str | None = None
     """主键字段名(从 `DemandIr` 预计算)."""
 
-    key_fields: FrozenSet[str] = field(default_factory=frozenset)
+    key_fields: frozenset[str] = field(default_factory=frozenset)
     """关键字段(主键 + 外键,不可提前释放)."""
 
-    preload_sources: "Tuple[SourceIr, ...]" = field(default_factory=tuple)
+    preload_sources: "tuple[SourceIr, ...]" = field(default_factory=tuple)
     """预加载数据源 (FR003)"""
 
-    field_order: List[str] = field(default_factory=list)
+    field_order: list[str] = field(default_factory=list)
     """拓扑排序后的字段顺序,包含中间依赖字段.
 
     仅用于执行顺序,不代表最终输出字段顺序.
     如需输出字段列表,请结合 `target_fields` 或 `resolve_required_field_ids`.
     """
 
-    loader_sequence: "List[Tuple[SourceIr, List[str]]]" = field(default_factory=list)
+    loader_sequence: "list[tuple[SourceIr, list[str]]]" = field(default_factory=list)
     """普通加载调用序列(形如 `(source, [field_keys])`)."""
 
-    ref_loader_sequence: "List[Tuple[SourceIr, List[Tuple[str, Union[str, Tuple[str, ...]]]]]]" = field(default_factory=list)
+    ref_loader_sequence: "list[tuple[SourceIr, list[tuple[str, str | tuple[str, ...]]]]]" = field(default_factory=list)
     """关联加载调用序列(形如 `(source, [(field_key, dep_ref_field_keys)])`).
 
     说明:
@@ -133,29 +133,29 @@ class ExecutionPlan:
           则 `dep_ref_field_keys == (\"region_id\",)`.
     """
 
-    stages: List[Stage] = field(default_factory=list)
+    stages: list[Stage] = field(default_factory=list)
     """执行阶段列表-并行预留"""
 
     metadata: PlanMetadata = field(default_factory=PlanMetadata)
     """计划元数据"""
 
-    field_specs: Dict[str, SupportedFieldIr] = field(default_factory=dict)
+    field_specs: dict[str, SupportedFieldIr] = field(default_factory=dict)
     """字段规格映射(`field_key` -> `SupportedFieldIr`)."""
 
-    target_fields: List[str] = field(default_factory=list)
+    target_fields: list[str] = field(default_factory=list)
     """目标字段列表"""
 
-    field_dependencies: "Dict[str, Tuple[str, ...]]" = field(default_factory=dict)
+    field_dependencies: "dict[str, tuple[str, ...]]" = field(default_factory=dict)
     """字段依赖映射(`field_key` -> 依赖字段列表),基于主数据源方向推断."""
 
-    late_fields: Tuple[str, ...] = field(default_factory=tuple)
+    late_fields: tuple[str, ...] = field(default_factory=tuple)
     """可延迟到写出前物化(`write-precompute`)的派生字段,按拓扑序排列.
 
     仅包含“属于 `target_fields`、且无 `late` 子图以外消费者”的派生字段;
     判定不确定时为空(保守早算).
     """
 
-    compute_fusion_groups: Tuple[ComputeFusionGroup, ...] = field(default_factory=tuple)
+    compute_fusion_groups: tuple[ComputeFusionGroup, ...] = field(default_factory=tuple)
     """同一 `compute` 段内可行内融合的字段组(`size>=2`).
 
     计划期仅按 `deps`/段/候选规则识别;运行时再过安全外壳与 `runtime.late_fields` 过滤.
@@ -168,7 +168,7 @@ class ExecutionPlan:
         include_stage_nodes: bool = True,
         include_loader_nodes: bool = True,
         include_source_nodes: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """生成 `VizGraphSnapshot`(用于可视化).
 
         返回:
@@ -184,7 +184,7 @@ class ExecutionPlan:
 
     def to_viz_schedule_plan(
         self,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """生成 `viz_schedule_plan.json` (用于 `adaptive` 计划视角可视化)."""
         return build_viz_schedule_plan(self)
 

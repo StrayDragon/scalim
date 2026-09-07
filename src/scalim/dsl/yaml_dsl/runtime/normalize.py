@@ -1,4 +1,5 @@
-from ....vendor.dataclassesx import replace
+from dataclasses import replace
+
 from .._public_template_sandbox import validate_public_template_sandbox
 from .contracts import DemandRunOptions
 

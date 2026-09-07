@@ -1,10 +1,10 @@
 # region imports
 
-from typing import Dict, Optional, Sequence, Set
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from ...planning.operators import LoadRefOperatorIr
 from ...planning.plan import ExecutionPlan
-from ...vendor.dataclassesx import dataclass
 from ..executor.runtime.runtime import ExecutionRuntime
 from .tuning import DEFAULT_ADAPTIVE_POOL, AdaptiveTuning
 
@@ -21,7 +21,7 @@ PROCESS_FAILURE_FALLBACK_SERIAL = "fallback_to_serial"
 @dataclass(frozen=True)
 class AdaptiveLayerDecision:
     should_parallelize: bool
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class AdaptivePolicy:
@@ -51,7 +51,7 @@ class AdaptivePolicy:
         return PROCESS_FAILURE_FAIL_FAST
 
     def choose_task_pool(self, *, op: LoadRefOperatorIr, tuning: AdaptiveTuning) -> str:
-        pools: Set[str] = set()
+        pools: set[str] = set()
         for step in op.lookup_steps:
             pools.add(tuning.pool_for_source(step.to_source_id))
         if len(pools) == 1:
@@ -67,7 +67,7 @@ class AdaptivePolicy:
         runtime: ExecutionRuntime,
         pool_is_available: bool,
         resolved_max_workers: int,
-        layer_lookup_keys: Optional[Dict[str, int]],
+        layer_lookup_keys: dict[str, int] | None,
     ) -> AdaptiveLayerDecision:
         _ = runtime
         if not pool_is_available:

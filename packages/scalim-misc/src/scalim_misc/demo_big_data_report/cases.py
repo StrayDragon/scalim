@@ -5,8 +5,8 @@
 - 示例始终有一个“用例真相来源”,避免不同入口各写一套
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
 
 from scalim.typedefs import RowData
 
@@ -19,7 +19,7 @@ from .verification import VerificationResult, verify_scalim_output
 class CaseSpec:
     case_id: str
     config: ECommerceConfig
-    targets: Tuple[str, ...]
+    targets: tuple[str, ...]
     row_limit: int = 20
 
 
@@ -38,7 +38,7 @@ def build_test_config_small() -> ECommerceConfig:
     )
 
 
-_CASES: Dict[str, CaseSpec] = {
+_CASES: dict[str, CaseSpec] = {
     "smoke_basic": CaseSpec(
         case_id="smoke_basic",
         config=build_test_config_small(),
@@ -65,9 +65,9 @@ def run_case(
     case_id: str,
     *,
     batch_size: int = 50,
-    row_limit_override: Optional[int] = None,
-    fields_to_check: Optional[Sequence[str]] = None,
-) -> Tuple[List[RowData], VerificationResult]:
+    row_limit_override: int | None = None,
+    fields_to_check: Sequence[str] | None = None,
+) -> tuple[list[RowData], VerificationResult]:
     """运行一个示例用例,并用纯 Python 对照组对输出做验证.
 
     Returns:
@@ -87,7 +87,7 @@ def run_case(
 
         row_limit = int(row_limit_override) if row_limit_override is not None else int(case.row_limit)
         main_rows = list(load_orders())[:row_limit]
-        results: List[RowData] = list(engine.run(main_rows=main_rows))
+        results: list[RowData] = list(engine.run(main_rows=main_rows))
 
         check_fields = list(fields_to_check) if fields_to_check is not None else list(case.targets)
         verification = verify_scalim_output(results, fields_to_check=check_fields)

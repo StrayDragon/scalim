@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, cast
+from collections.abc import Callable, Sequence
+from typing import Any, cast
 
 from ....execution.runtime_bindings import (
     DerivedCalculatorFn,
@@ -34,25 +35,20 @@ from .references import SecurePythonReferenceResolver
 def _ensure_field_value(value: Any, *, field_id: str, producer: str) -> FieldValue:
     if value is None or isinstance(value, FIELD_VALUE_TYPES):
         return value
-    msg = "Derived field '{}' {} has unsupported value type '{}'; expected {}".format(
-        field_id,
-        producer,
-        type(value).__name__,
-        format_field_value_expected_types(),
-    )
+    msg = f"Derived field '{field_id}' {producer} has unsupported value type '{type(value).__name__}'; expected {format_field_value_expected_types()}"  # noqa: E501
     raise TypeError(msg)
 
 
-_SignatureCandidate = Tuple[str, Tuple[Any, ...], Dict[str, Any]]
+_SignatureCandidate = tuple[str, tuple[Any, ...], dict[str, Any]]
 
 
 def _resolve_callable_ref(ref: CallableRefIr, *, resolver: SecurePythonReferenceResolver) -> Callable[..., Any]:
     if isinstance(ref, RuntimeHandleIdIr):
-        msg = "Runtime handle references are not supported in YAML runtime linking: {}".format(ref.handle_id)
+        msg = f"Runtime handle references are not supported in YAML runtime linking: {ref.handle_id}"
         raise ScalimResolverError(msg)
     reference = describe_callable_ref(ref)
     if isinstance(ref, BuiltinCallableIdIr):
-        reference = "{}{}".format(BUILTIN_CALLABLE_REFERENCE_PREFIX, ref.callable_id)
+        reference = f"{BUILTIN_CALLABLE_REFERENCE_PREFIX}{ref.callable_id}"
     if isinstance(ref, PythonReferenceIr):
         reference = str(ref.reference)
     return resolver.resolve(reference)
@@ -62,7 +58,7 @@ def _eval_call_by_value(  # pyright: ignore[reportUnusedFunction]  # used by int
     value: CallByValueIr,
     *,
     field_id: str,
-    dep_values: Dict[str, Any],
+    dep_values: dict[str, Any],
     ctx: ComputeCallContextIr,
 ) -> Any:
     kind = str(value.kind or "").strip()
@@ -75,7 +71,7 @@ def _eval_call_by_value(  # pyright: ignore[reportUnusedFunction]  # used by int
         return ctx
     if kind == "ctx_attr":
         return getattr(ctx, str(raw))  # pragma: allow-dynattr dsl: ctx_attr access
-    msg = "Derived field '{}' has unknown call_by value kind: {!r}".format(field_id, kind)
+    msg = f"Derived field '{field_id}' has unknown call_by value kind: {kind!r}"
     raise ValueError(msg)
 
 
@@ -90,11 +86,11 @@ def _preflight_call_by_signature(
     kwargs = {str(k): placeholder for k, _v in (call_by.kwargs or ())}
     display = "{}({})".format(
         describe_callable_ref(call_by.reference),
-        ", ".join(["..."] * len(args) + ["{}=...".format(k) for k in sorted(kwargs.keys())]),
+        ", ".join(["..."] * len(args) + [f"{k}=..." for k in sorted(kwargs.keys())]),
     )
     candidates = ((display, args, kwargs),)
     validate_signature_accepts_any_candidate(
-        location="derived_fields.{}.call_by".format(field_id),
+        location=f"derived_fields.{field_id}.call_by",
         reference=describe_callable_ref(call_by.reference),
         fn=fn,
         candidates=candidates,
@@ -115,11 +111,11 @@ def _preflight_ref_default_call_by_signature(
     kwargs = {str(k): placeholder for k, _v in (call_by.kwargs or ())}
     display = "{}({})".format(
         describe_callable_ref(call_by.reference),
-        ", ".join(["..."] * len(args) + ["{}=...".format(k) for k in sorted(kwargs.keys())]),
+        ", ".join(["..."] * len(args) + [f"{k}=..." for k in sorted(kwargs.keys())]),
     )
     candidates = ((display, args, kwargs),)
     validate_signature_accepts_any_candidate(
-        location="fields.{}.default[{}].call_by".format(field_id, int(idx)),
+        location=f"fields.{field_id}.default[{int(idx)}].call_by",
         reference=describe_callable_ref(call_by.reference),
         fn=fn,
         candidates=candidates,
@@ -136,14 +132,14 @@ def _preflight_normalize_call_by_signature(
 ) -> None:
     placeholder_result = object()
     placeholder_ctx = object()
-    empty_kwargs: Dict[str, Any] = {}
-    candidates: Tuple[_SignatureCandidate, _SignatureCandidate, _SignatureCandidate] = (
+    empty_kwargs: dict[str, Any] = {}
+    candidates: tuple[_SignatureCandidate, _SignatureCandidate, _SignatureCandidate] = (
         ("normalize.call_by(result)", (placeholder_result,), empty_kwargs),
         ("normalize.call_by(result, ctx)", (placeholder_result, placeholder_ctx), empty_kwargs),
         ("normalize.call_by(result, ctx=ctx)", (placeholder_result,), {"ctx": placeholder_ctx}),
     )
     validate_signature_accepts_any_candidate(
-        location="sources.{}.normalize.call_by".format(source_id),
+        location=f"sources.{source_id}.normalize.call_by",
         reference=str(reference),
         fn=fn,
         candidates=candidates,
@@ -168,7 +164,9 @@ def _preflight_loader_params_signature(
     )
     if not callable(keys_fn):
         return
-    keys = cast("Tuple[str, ...]", keys_fn())  # type: ignore[misc]  # pragma: allow-any template boundary  # pragma: allow-cast template keys contract boundary
+    keys = cast(  # pragma: allow-cast template keys contract boundary  # pragma: allow-any template boundary
+        "tuple[str, ...]", keys_fn()
+    )  # type: ignore[misc]
     validate_signature_binds_kwargs_keys(
         location=str(location),
         reference=str(reference),
@@ -190,7 +188,7 @@ def _build_call_by_calculator(  # noqa: C901  # pragma: allow-c901 plan: c0
     dep_index = {str(dep): int(idx) for idx, dep in enumerate(deps)}
     needs_ctx = call_by_requires_ctx(call_by)
 
-    def _compile_value(value: CallByValueIr) -> Tuple[str, Any]:
+    def _compile_value(value: CallByValueIr) -> tuple[str, Any]:
         kind = str(value.kind or "").strip()
         raw = value.value
         if kind == "literal":
@@ -201,19 +199,19 @@ def _build_call_by_calculator(  # noqa: C901  # pragma: allow-c901 plan: c0
             return "ctx", ""
         if kind == "ctx_attr":
             return "ctx_attr", str(raw)
-        msg = "Derived field '{}' has unknown call_by value kind: {!r}".format(field_id, kind)
+        msg = f"Derived field '{field_id}' has unknown call_by value kind: {kind!r}"
         raise ValueError(msg)
 
     args_spec = tuple(_compile_value(item) for item in (call_by.args or ()))
     kwargs_spec = tuple((str(key), _compile_value(item)) for key, item in (call_by.kwargs or ()))
 
-    def _resolve_value_no_ctx(spec: Tuple[str, Any], dep_args: Tuple[Any, ...]) -> Any:
+    def _resolve_value_no_ctx(spec: tuple[str, Any], dep_args: tuple[Any, ...]) -> Any:
         kind, raw = spec
         if kind == "field":
             return dep_args[raw] if isinstance(raw, int) else None
         return raw
 
-    def _resolve_value_with_ctx(spec: Tuple[str, Any], dep_args: Tuple[Any, ...], ctx_obj: ComputeCallContextIr) -> Any:
+    def _resolve_value_with_ctx(spec: tuple[str, Any], dep_args: tuple[Any, ...], ctx_obj: ComputeCallContextIr) -> Any:
         kind, raw = spec
         if kind == "field":
             return dep_args[raw] if isinstance(raw, int) else None
@@ -227,16 +225,16 @@ def _build_call_by_calculator(  # noqa: C901  # pragma: allow-c901 plan: c0
         if needs_ctx:
             candidate = _kwargs.get("ctx")
             if not isinstance(candidate, ComputeCallContextIr):
-                msg = "Derived field '{}' call_by requires ctx=ComputeCallContextIr".format(field_id)
+                msg = f"Derived field '{field_id}' call_by requires ctx=ComputeCallContextIr"
                 raise TypeError(msg)
             ctx_obj = candidate
 
-            args: List[Any] = []
+            args: list[Any] = []
             for item in args_spec:
                 args.append(_resolve_value_with_ctx(item, dep_args, ctx_obj))
 
             if kwargs_spec:
-                kwargs: Dict[str, Any] = {}
+                kwargs: dict[str, Any] = {}
                 for key, item in kwargs_spec:
                     kwargs[str(key)] = _resolve_value_with_ctx(item, dep_args, ctx_obj)
                 returned = fn(*args, **kwargs)
@@ -272,7 +270,7 @@ def _build_ref_default_call_by_calculator(  # noqa: C901  # pragma: allow-c901 p
     dep_index = {str(dep): int(i) for i, dep in enumerate(deps)}
     needs_ctx = call_by_requires_ctx(call_by)
 
-    def _compile_value(value: CallByValueIr) -> Tuple[str, Any]:
+    def _compile_value(value: CallByValueIr) -> tuple[str, Any]:
         kind = str(value.kind or "").strip()
         raw = value.value
         if kind == "literal":
@@ -283,19 +281,19 @@ def _build_ref_default_call_by_calculator(  # noqa: C901  # pragma: allow-c901 p
             return "ctx", ""
         if kind == "ctx_attr":
             return "ctx_attr", str(raw)
-        msg = "Field '{}' default[{}].call_by has unknown call_by value kind: {!r}".format(field_id, int(idx), kind)
+        msg = f"Field '{field_id}' default[{int(idx)}].call_by has unknown call_by value kind: {kind!r}"
         raise ValueError(msg)
 
     args_spec = tuple(_compile_value(item) for item in (call_by.args or ()))
     kwargs_spec = tuple((str(key), _compile_value(item)) for key, item in (call_by.kwargs or ()))
 
-    def _resolve_value_no_ctx(spec: Tuple[str, Any], dep_args: Tuple[Any, ...]) -> Any:
+    def _resolve_value_no_ctx(spec: tuple[str, Any], dep_args: tuple[Any, ...]) -> Any:
         kind, raw = spec
         if kind == "field":
             return dep_args[raw] if isinstance(raw, int) else None
         return raw
 
-    def _resolve_value_with_ctx(spec: Tuple[str, Any], dep_args: Tuple[Any, ...], ctx_obj: ComputeCallContextIr) -> Any:
+    def _resolve_value_with_ctx(spec: tuple[str, Any], dep_args: tuple[Any, ...], ctx_obj: ComputeCallContextIr) -> Any:
         kind, raw = spec
         if kind == "field":
             return dep_args[raw] if isinstance(raw, int) else None
@@ -309,16 +307,16 @@ def _build_ref_default_call_by_calculator(  # noqa: C901  # pragma: allow-c901 p
         if needs_ctx:
             candidate = _kwargs.get("ctx")
             if not isinstance(candidate, ComputeCallContextIr):
-                msg = "Field '{}' default[{}].call_by requires ctx=ComputeCallContextIr".format(field_id, int(idx))
+                msg = f"Field '{field_id}' default[{int(idx)}].call_by requires ctx=ComputeCallContextIr"
                 raise TypeError(msg)
             ctx_obj = candidate
 
-            args: List[Any] = []
+            args: list[Any] = []
             for item in args_spec:
                 args.append(_resolve_value_with_ctx(item, dep_args, ctx_obj))
 
             if kwargs_spec:
-                kwargs: Dict[str, Any] = {}
+                kwargs: dict[str, Any] = {}
                 for key, item in kwargs_spec:
                     kwargs[str(key)] = _resolve_value_with_ctx(item, dep_args, ctx_obj)
                 returned = fn(*args, **kwargs)
@@ -351,16 +349,16 @@ def _resolve_value_op_callable(
 ) -> Callable[..., Any]:
     ref = getattr(op, "callable_ref", None)  # pragma: allow-dynattr dsl: ValueOpIr contract
     if ref is None:
-        msg = "ValueOpIr(kind={!r}) requires callable_ref (field={!r})".format(kind, field_id)
+        msg = f"ValueOpIr(kind={kind!r}) requires callable_ref (field={field_id!r})"
         raise ValueError(msg)
 
     if not isinstance(ref, (BuiltinCallableIdIr, PythonReferenceIr, RuntimeHandleIdIr)):
-        msg = "ValueOpIr(kind={!r}) has invalid callable_ref for field {!r}".format(kind, field_id)
+        msg = f"ValueOpIr(kind={kind!r}) has invalid callable_ref for field {field_id!r}"
         raise TypeError(msg)
 
     fn = _resolve_callable_ref(ref, resolver=resolver)
     validate_signature_accepts_any_candidate(
-        location="fields.{}.value_ops".format(field_id),
+        location=f"fields.{field_id}.value_ops",
         reference=describe_callable_ref(ref),
         fn=fn,
         candidates=(("fn(value)", (object(),), {}),),
@@ -373,20 +371,20 @@ def _resolve_value_op_callable(
 def _compose_value_ops(
     *,
     field_id: str,
-    ops: Tuple[Any, ...],
+    ops: tuple[Any, ...],
     resolver: SecurePythonReferenceResolver,
-) -> Optional[ValueTransformFn]:
+) -> ValueTransformFn | None:
     if not ops:
         return None
 
-    steps: List[ValueTransformFn] = []
+    steps: list[ValueTransformFn] = []
     for op in ops:
         kind = str(getattr(op, "kind", "") or "").strip()  # pragma: allow-dynattr dsl: ValueOpIr contract
         if kind == "cast":
             to = str(getattr(op, "to", "") or "").strip()  # pragma: allow-dynattr dsl: ValueOpIr contract
             cast_fn = VALUE_CASTS.get(to)
             if cast_fn is None:
-                msg = "Unknown value_cast {!r} for field {!r}".format(to, field_id)
+                msg = f"Unknown value_cast {to!r} for field {field_id!r}"
                 raise ValueError(msg)
             steps.append(cast_fn)
             continue
@@ -401,7 +399,7 @@ def _compose_value_ops(
             steps.append(_apply)
             continue
 
-        msg = "Unknown ValueOpIr.kind={!r} for field {!r}".format(kind, field_id)
+        msg = f"Unknown ValueOpIr.kind={kind!r} for field {field_id!r}"
         raise ValueError(msg)
 
     def _transform(value: FieldValue) -> FieldValue:
@@ -413,8 +411,8 @@ def _compose_value_ops(
     return _transform
 
 
-def _collect_lookup_cast_specs(demand_ir: DemandIr) -> List[Tuple[str, LookupCastSpecIr, bool]]:
-    specs: List[Tuple[str, LookupCastSpecIr, bool]] = []
+def _collect_lookup_cast_specs(demand_ir: DemandIr) -> list[tuple[str, LookupCastSpecIr, bool]]:
+    specs: list[tuple[str, LookupCastSpecIr, bool]] = []
 
     for source in demand_ir.sources.values():
         cast_spec = source.key.cast
@@ -480,7 +478,7 @@ def _bind_source_runtime_bindings(
             if template is not None:
                 try:
                     _preflight_loader_params_signature(
-                        location=template_path or "sources.{}.params".format(str(source_id)),
+                        location=template_path or f"sources.{source_id!s}.params",
                         reference=describe_callable_ref(loader_ref),
                         fn=loader_fn,
                         params_template=template,
@@ -540,7 +538,7 @@ def _bind_field_runtime_bindings(  # noqa: C901, PLR0912, PLR0915  # pragma: all
                     raise ScalimResolverError(str(exc)) from exc
                 bindings.derived_calculators[fid] = _build_call_by_calculator(field_spec=field_spec, call_by=field_spec.call_by, fn=fn)
             else:
-                msg = "Derived field {!r} missing compute_expr/call_by".format(fid)
+                msg = f"Derived field {fid!r} missing compute_expr/call_by"
                 raise ValueError(msg)
 
         if isinstance(field_spec, FieldIr):
@@ -566,7 +564,7 @@ def _bind_field_runtime_bindings(  # noqa: C901, PLR0912, PLR0915  # pragma: all
                             cast_to = str(getattr(op, "to", "") or "").strip()  # pragma: allow-dynattr dsl: ValueOpIr contract
                             break
                     if cast_to is None:
-                        msg = "Field '{}' default builtin '^{}()' requires explicit value_cast".format(fid, str(ref.callable_id))
+                        msg = f"Field '{fid}' default builtin '^{ref.callable_id!s}()' requires explicit value_cast"
                         raise ScalimResolverError(msg)
 
                     zero: FieldValue = None
@@ -575,7 +573,7 @@ def _bind_field_runtime_bindings(  # noqa: C901, PLR0912, PLR0915  # pragma: all
                     elif cast_to in ("str", "auto"):
                         zero = ""
                     else:
-                        msg = "Field '{}' has unsupported value_cast={!r} for '^{}()'".format(fid, cast_to, str(ref.callable_id))
+                        msg = f"Field '{fid}' has unsupported value_cast={cast_to!r} for '^{ref.callable_id!s}()'"
                         raise ScalimResolverError(msg)
 
                     def _zero_calc(*_dep_args: Any, _zero: FieldValue = zero, **_kwargs: Any) -> FieldValue:
@@ -620,7 +618,7 @@ def resolve_runtime_bindings(
     demand_ir: DemandIr,
     *,
     resolver: SecurePythonReferenceResolver,
-    compute_engine: Optional[SecureComputeEngine] = None,
+    compute_engine: SecureComputeEngine | None = None,
 ) -> RuntimeBindings:
     """从静态 IR 解析运行时绑定.
 
