@@ -38,9 +38,9 @@ Seam（已确认）：pytest 全量 + `just check-only-py` / `just qa` / `just e
 
 ## 4. 删 py36 工具链与 vendor-legacy-sync — commit `chore: remove py36 gates and vendor-legacy-sync tooling`
 
-- [ ] 4.1 justfile：删 `py36-compat-check` / `py36-typingext-check` / `sync-project-vendors` 目标；`check-only-py` 链摘除两个 py36 项
-- [ ] 4.2 scripts：删 `check-py36-syntax.py`、`check-py36-typingext-docker.sh`、`gen-public-api-jump-imports.py`、`vendor-sync.py`；确认 `check-staged-sanitize.py`（用 `vendor.yamlx.yaml`）**保留**（Stage B 处理）
-- [ ] 4.3 tests：删 `tests/governance/test_justfile_py36_checks_require_docker.py`；grep 清理其余 py36/vendor-sync 断言。DoD: `just check-only-py` 全绿且不再引用 docker py36
+- [x] 4.1 justfile：删 `py36-compat-check` / `py36-typingext-check` / `sync-project-vendors` 目标；`check-only-py` 链摘除两个 py36 项
+- [x] 4.2 scripts：删 `check-py36-syntax.py`、`check-py36-typingext-docker.sh`、`vendor-sync.py`；`gen-public-api-jump-imports.py` **保留**（justfile 注明另有编辑器/LSP 跳转用途）；`check-staged-sanitize.py` 保留（Stage B 处理）
+- [x] 4.3 tests：删 `tests/governance/test_justfile_py36_checks_require_docker.py`；grep 清理其余 py36/vendor-sync 断言。DoD: `just check-only-py` 全绿且不再引用 docker py36
 
 ## 5. CI matrix — commit `ci: expand python matrix to 3.10-3.14 with layered checks`
 

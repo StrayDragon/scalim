@@ -300,31 +300,6 @@ bump-versions VERSION="" CONFIRM="":
         uv {{ UV_OPTIONS }} lock
     fi
 
-# 工具: 将 src/scalim + README.md 镜像同步到目标 vendors 目录(默认 dry-run; 需要 YES 才执行)
-sync-project-vendors PATH="" CONFIRM="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    dest="{{ PATH }}"
-    confirm="{{ CONFIRM }}"
-    apply=""
-    if [ -z "$dest" ]; then
-        echo "[error] PATH is required (dest vendors root). Example:" >&2
-        echo "  just sync-project-vendors /path/to/vendors/libs" >&2
-        exit 2
-    fi
-    if [ "$confirm" = "YES" ] || [ "$confirm" = "CONFIRM=YES" ]; then
-        apply="YES"
-    elif [ -n "$confirm" ]; then
-        echo "[warn] confirm token ignored (expected 'YES'):" "$confirm" >&2
-    fi
-    args=( --dest "$dest" )
-    if [ -z "$apply" ]; then
-        :
-    else
-        args+=( --apply )
-    fi
-    uv {{ UV_OPTIONS }} run python scripts/vendor-sync.py "${args[@]}"
-
 # 生成: Agent Skill 数据
 gen-agent-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py
@@ -1075,41 +1050,13 @@ quick-check: quick-check-only-py
 alias quick-qa := quick-check
 
 # QA: 仅py完整的检查(不包含 frontend; 作为 qa 的可组合基础)
-check-only-py: quick-check-only-py-no-test-gate test-gate-core-coverage py36-compat-check py36-typingext-check
+check-only-py: quick-check-only-py-no-test-gate test-gate-core-coverage
 
 # QA: 所有完整的检查(最全面入口; MUST 覆盖全部质量门禁)
 # README 跑通：`examples`（含 example_readme_suite）；README 注入/图 drift：`docs-drift-check`（经 generated-artifacts-drift-check）
 check: check-only-py frontend-check examples check-notebooks-coverage
 
 alias qa := check
-
-# 检查: `Python 3.6` 语法兼容性 (仅 `src/scalim/`)
-py36-compat-check:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    if docker version >/dev/null 2>&1; then
-        docker run --rm -e CI -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 python -m compileall -q src/scalim
-        exit 0
-    fi
-
-    echo "[error] docker unavailable; py36-compat-check requires docker. Please install/start docker and retry." >&2
-    exit 1
-
-# 检查: `Python 3.6` + `typing-extensions==4.1.1` 隔离环境兼容性
-py36-typingext-check:
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    just gen-public-api-jump-imports
-
-    if docker version >/dev/null 2>&1; then
-        docker run --rm -e CI -v "{{ justfile_directory() }}:/repo" -w /repo python:3.6 bash /repo/scripts/check-py36-typingext-docker.sh
-        exit 0
-    fi
-
-    echo "[error] docker unavailable; py36-typingext-check requires docker. Please install/start docker and retry." >&2
-    exit 1
 
 # 清理缓存/产物 (默认 dry-run; 需要 YES 才执行)
 clean-cache CONFIRM="":
