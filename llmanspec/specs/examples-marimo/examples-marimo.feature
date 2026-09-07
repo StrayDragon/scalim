@@ -18,8 +18,18 @@
     - 系统 MUST 将纳入 examples gate 的示例/章节执行真相来源定义为"可被导入调用的 Python 入口函数"，且该入口 MUST 位于 notebooks 侧。 该 SSOT 入口 MUST 满足： - MUST 可被 headless runner 与 pytest 直接导入并执行（不得要求启动 marimo UI server） - MUST 产生可定位的结果摘要（至少包含 `passed` 与 `summary`） - MUST 与对应的 Marimo notebook 交互入口同源（避免"UI 一套逻辑 / headless 一套逻辑"的漂移）
 
   @req:r497 @human
-  场景: Marimo notebooks 必须是薄封装
-    - 每个 Marimo notebook MUST 通过调用对应的 SSOT 入口函数来执行核心逻辑并展示结果。 Marimo notebook MUST NOT 在 notebook 内部复制实现一套独立的示例执行主路径，以避免与 SSOT 漂移。
+  场景: 章节执行真相位于 notebook cells，SSOT 入口为薄适配层
+    - 每个纳入 examples gate 的章节 notebook MUST 将示例执行主路径（scalim 调用装配、参数组装、中间产物展示、断言展开）写在 marimo cells 内并逐步展开，确保读者打开 notebook 即可观察运行机制与中间结果。
+    - 章节的 SSOT 入口函数（`run_<id>()`/`run_chapter()`）MUST 是薄适配层：执行 notebook 自身的 cell 图（如 `app.run()`）并提取对拍结果，MUST NOT 在模块级或 support 模块中重复实现一份独立执行主路径；章节的核心逻辑 MUST NOT 通过调用外部模块级 `run_*()` 函数来执行。
+    - 章节 MUST 在 cells 内产出结构化对拍结果 `chapter_result`（至少包含 `passed` 与 `summary`），供 headless runner 与 pytest 提取，避免"UI 一套逻辑 / headless 一套逻辑"漂移。
+
+  @req:r1111 @human
+  场景: 可复用零件与执行主路径的边界
+    - 可复用"零件"（fixtures 数据、mock 基础设施、通用 Observer/Hook 类、YAML 片段资源等）MAY 保留在 `support/` 或受控库模块中，但零件 MUST NOT 承载章节执行主路径；装配（接线方式、注入点、运行顺序）与断言展开 MUST 在 notebook cells 内可见。
+
+  @req:r1112 @human
+  场景: 交互控件始终展示且 script 模式同源
+    - 章节 notebook 的交互 UI 控件（slider/number/checkbox 等）MUST 始终创建并展示；headless/script 模式 MUST 使用控件默认值自动执行完整流程，MUST NOT 用 `if script_mode` 包裹全部 UI 或让交互模式与对拍模式执行不同主路径。 消耗较大的运行 MAY 使用 `run_button`/`mo.stop` 手动触发，但默认值路径 MUST 保持确定性可对拍。
 
   @req:r576 @human
   场景: headless runner 作为示例对拍入口
@@ -108,10 +118,20 @@
     当 维护者为示例体系新增一个纳入 gate 的章节 notebook
     那么 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 headless runner 与 pytest 复用
   @req:r497 @human
-  场景: notebook-调用-ssot-入口
-    - 必须成立：当 读者在 marimo 中运行任一示例章节 notebook；那么 notebook 的核心执行入口 MUST 来自 notebooks 侧的 SSOT 入口函数
+  场景: 运行章节-notebook-时-执行真相来自-cells
+    - 必须成立：当 读者在 marimo 中运行任一示例章节 notebook；那么 该章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook 自身 cells 内，SSOT 入口函数仅作为薄适配层提取 cell 产物
     当 读者在 marimo 中运行任一示例章节 notebook
-    那么 notebook 的核心执行入口 MUST 来自 notebooks 侧的 SSOT 入口函数
+    那么 该章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook 自身 cells 内，SSOT 入口函数仅作为薄适配层提取 cell 产物
+  @req:r1111 @human
+  场景: 零件-与-主路径-边界清晰
+    - 必须成立：当 读者检查任一章节 notebook 及其依赖的 support 零件模块；那么 support 零件 MAY 存在，但章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook cells 内
+    当 读者检查任一章节 notebook 及其依赖的 support 零件模块
+    那么 support 零件 MAY 存在，但章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook cells 内
+  @req:r1112 @human
+  场景: 交互控件-始终展示-且-script-同源
+    - 必须成立：当 开发者以 headless/script 模式运行章节 notebook 或其对拍入口；那么 流程 MUST 以控件默认值自动执行且结果与交互模式同源
+    当 开发者以 headless/script 模式运行章节 notebook 或其对拍入口
+    那么 流程 MUST 以控件默认值自动执行且结果与交互模式同源
   @req:r576 @human
   场景: examples-gate-可在-ci-中稳定运行
     - 必须成立：当 开发者运行 examples gate（或等价入口）；那么 headless runner MUST 执行示例套件并输出章节级 PASS/FAIL 与 summary

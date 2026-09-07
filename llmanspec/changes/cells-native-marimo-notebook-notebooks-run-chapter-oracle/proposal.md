@@ -1,5 +1,9 @@
 ---
 depends_on: []
+branch: sdd/cells-native-marimo-notebook-notebooks-run-chapter-oracle
+base_sha: d1b5cb4565ccc0f5c9c0414c6cd984c00484ef63
+checkpointed: false
+rules_edit_acked: true
 ---
 
 ## Why
@@ -12,7 +16,11 @@ depends_on: []
 
 ## What Changes
 
-- **确立 cells-native 编写模式规范**（写入 AGENTS.md/skill 或 notebook_support 文档）：
+- **Specs landing：修订 `examples-marimo` 的 @req:r497（statement + GWT 双区）**：
+  「Marimo notebooks 必须是薄封装（调用 SSOT 入口函数）」→「章节执行真相位于 notebook cells，SSOT 入口为薄适配层」；
+  新增 @req:r1111（零件与主路径边界：fixtures/mock/类 MAY 留 support，装配与断言 MUST 在 cells）与 @req:r1112（交互控件始终展示、script 模式同源）。
+  修改既有 @human 场景，frontmatter 已设 `rules_edit_acked: true`。
+- **确立 cells-native 编写模式规范**（随 spec r497/r1111/r1112 落地成为合约）：
   - 每个教学步骤一个 cell（配置 → 模型 → plan → 执行 → 中间结果 → 断言 → 汇总）
   - 依赖 import 放 cells 内（`app.run()` 新建 `__main__` 上下文）
   - 末尾 cell 产出 `chapter_result = {"passed", "summary", "details"}`
