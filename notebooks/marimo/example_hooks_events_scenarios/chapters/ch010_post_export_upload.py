@@ -272,7 +272,7 @@ def _(ALLOWED_MODULES, Any, List, Path, api, batch_size):
     print("组件注入点: DemandRunRuntimeOptions.components")
     print("输出:       CSV via RunOverrides.csv_file, header_fields_output_by='name'")
 
-    return demand_options,
+    return (demand_options,)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -305,7 +305,18 @@ def _(UploadOnOutputEnd, api, demand_options, demand_path, server, tmp):
 
 
 @app.cell
-def _(UploadOnOutputEnd, WorkflowNodeEndMarker, WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions, api, demand_options, server, tmp, workflow_path):
+def _(
+    UploadOnOutputEnd,
+    WorkflowNodeEndMarker,
+    WorkflowExecutionOptions,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    api,
+    demand_options,
+    server,
+    tmp,
+    workflow_path,
+):
     workflow_obs = UploadOnOutputEnd(base_url=server.base_url)
     workflow_node_end = WorkflowNodeEndMarker()
     workflow_result = api.run_workflow(

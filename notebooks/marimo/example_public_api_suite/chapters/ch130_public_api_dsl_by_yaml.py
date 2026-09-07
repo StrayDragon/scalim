@@ -202,32 +202,36 @@ def _(ALLOWED_MODULES, Path, write_duplicate_headers_workflow_fixture, write_tex
     workflow_path = tmp / "workflow.yaml"
     duplicate_workflow_path = write_duplicate_headers_workflow_fixture(tmp)
 
-    demand_yaml = "\n".join([
-        "name: public_api_minimal_demand",
-        "",
-        "main_source:",
-        '  source_id: items',
-        '  loader: "scalim_misc.examples.public_api._fixtures:load_items"',
-        "  fields:",
-        "    item_id: {extract: item_id, name: Item ID}",
-        "    dim_id: {extract: dim_id, name: Dim ID}",
-        "",
-        "sources:",
-        "  dims:",
-        '    loader: "scalim_misc.examples.public_api._fixtures:load_dims"',
-        "    key: dim_id",
-        "    cache_mode: preload_forever",
-    ])
+    demand_yaml = "\n".join(
+        [
+            "name: public_api_minimal_demand",
+            "",
+            "main_source:",
+            "  source_id: items",
+            '  loader: "scalim_misc.examples.public_api._fixtures:load_items"',
+            "  fields:",
+            "    item_id: {extract: item_id, name: Item ID}",
+            "    dim_id: {extract: dim_id, name: Dim ID}",
+            "",
+            "sources:",
+            "  dims:",
+            '    loader: "scalim_misc.examples.public_api._fixtures:load_dims"',
+            "    key: dim_id",
+            "    cache_mode: preload_forever",
+        ]
+    )
     write_text(demand_path, demand_yaml)
 
-    workflow_yaml = "\n".join([
-        "workflow:",
-        "  runs:",
-        "    - id: r1",
-        "      demand: demand.yaml",
-        "    - id: r2",
-        "      demand: demand.yaml",
-    ])
+    workflow_yaml = "\n".join(
+        [
+            "workflow:",
+            "  runs:",
+            "    - id: r1",
+            "      demand: demand.yaml",
+            "    - id: r2",
+            "      demand: demand.yaml",
+        ]
+    )
     write_text(workflow_path, workflow_yaml)
 
     init_vars = {"order_ids": []}
@@ -277,7 +281,16 @@ def _(ALLOWED_MODULES, Path, write_duplicate_headers_workflow_fixture, write_tex
 
 
 @app.cell
-def _(ALLOWED_MODULES, WorkflowBatchSizeObserver, api, get_preload_counter_calls, init_vars, reset_preload_counter_calls, workflow_path, workflow_types_api):
+def _(
+    ALLOWED_MODULES,
+    WorkflowBatchSizeObserver,
+    api,
+    get_preload_counter_calls,
+    init_vars,
+    reset_preload_counter_calls,
+    workflow_path,
+    workflow_types_api,
+):
     # workflow 运行 + patch + preload 断言
     reset_preload_counter_calls()
     workflow_batch_size_observer = WorkflowBatchSizeObserver()
@@ -357,7 +370,17 @@ def _(ALLOWED_MODULES, api, duplicate_workflow_path, tmp, workflow_types_api):
 
 
 @app.cell
-def _(duplicate_global_errors, duplicate_output_exists, duplicate_patch_errors, errors, preload_calls, render_checks, rows, wf, workflow_batch_sizes):
+def _(
+    duplicate_global_errors,
+    duplicate_output_exists,
+    duplicate_patch_errors,
+    errors,
+    preload_calls,
+    render_checks,
+    rows,
+    wf,
+    workflow_batch_sizes,
+):
     checks = {
         "无 workflow errors": not errors,
         "preload 仅 1 次": preload_calls == 1,
@@ -372,7 +395,24 @@ def _(duplicate_global_errors, duplicate_output_exists, duplicate_patch_errors, 
 
 
 @app.cell
-def _(all_touched, base_module_path, checks, duplicate_global, duplicate_global_errors, duplicate_output_exists, duplicate_patch, duplicate_patch_errors, errors, make_chapter_result, preload_calls, rows, run_result, tools_output_config, wf, workflow_batch_sizes):
+def _(
+    all_touched,
+    base_module_path,
+    checks,
+    duplicate_global,
+    duplicate_global_errors,
+    duplicate_output_exists,
+    duplicate_patch,
+    duplicate_patch_errors,
+    errors,
+    make_chapter_result,
+    preload_calls,
+    rows,
+    run_result,
+    tools_output_config,
+    wf,
+    workflow_batch_sizes,
+):
     passed = bool(all(checks.values()))
     summary = "rows={} workflow_outcomes={} preload_calls={} batch_sizes={} errors={} duplicate_global_errors={} duplicate_patch_errors={}".format(
         len(rows),

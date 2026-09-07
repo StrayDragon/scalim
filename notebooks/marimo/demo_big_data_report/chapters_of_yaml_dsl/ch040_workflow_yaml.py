@@ -127,7 +127,19 @@ def _(build_test_config_small, reset_workflow_preload_counter_calls, set_config)
 
 
 @app.cell
-def _(DemandRunOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions, allowed_modules, get_workflow_preload_counter_calls, run_workflow, workflow_yaml_path):
+def _(
+    DemandRunOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowExecutionOptions,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    allowed_modules,
+    get_workflow_preload_counter_calls,
+    run_workflow,
+    workflow_yaml_path,
+):
     workflow_runtime_options = WorkflowRuntimeOptions(
         execution=WorkflowExecutionOptions(max_concurrency=2, failure_policy="all_fail"),
         cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),

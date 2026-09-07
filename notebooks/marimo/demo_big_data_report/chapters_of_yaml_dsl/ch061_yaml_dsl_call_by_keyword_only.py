@@ -175,7 +175,16 @@ def _(Dict, Path, tmp):
 
 
 @app.cell
-def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, ALLOWED_MODULES, bad_yaml, compile_yaml, init_vars):
+def _(
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    ALLOWED_MODULES,
+    bad_yaml,
+    compile_yaml,
+    init_vars,
+):
     # bad：预期编译期 fast-fail（捕获预期异常做断言）
     bad_exc_msg = ""
     bad_fast_failed = False
@@ -190,9 +199,7 @@ def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, Deman
         )
     except Exception as exc:  # noqa: BLE001 — 预期异常：断言编译期拒绝
         bad_exc_msg = str(exc)
-        bad_fast_failed = bool(
-            ("函数签名不匹配" in bad_exc_msg) and ("too many positional arguments" in bad_exc_msg)
-        )
+        bad_fast_failed = bool(("函数签名不匹配" in bad_exc_msg) and ("too many positional arguments" in bad_exc_msg))
 
     print("bad_fast_failed =", bad_fast_failed)
     print("bad_exc_message =", bad_exc_msg[:160])
@@ -200,7 +207,18 @@ def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, Deman
 
 
 @app.cell
-def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, ALLOWED_MODULES, Path, compile_yaml, good_yaml, init_vars, run_ir):
+def _(
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    ALLOWED_MODULES,
+    Path,
+    compile_yaml,
+    good_yaml,
+    init_vars,
+    run_ir,
+):
     # good：正常编译 + run_ir
     compilation = compile_yaml(
         str(good_yaml),

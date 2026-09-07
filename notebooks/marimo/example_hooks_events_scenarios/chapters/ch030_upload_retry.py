@@ -91,7 +91,20 @@ def _(repo_root):
 
 
 @app.cell
-def _(ALLOWED_MODULES, Any, Event, EventDispatchObserver, EventType, List, Optional, Path, Set, api, build_upload_payload, post_upload_with_status):
+def _(
+    ALLOWED_MODULES,
+    Any,
+    Event,
+    EventDispatchObserver,
+    EventType,
+    List,
+    Optional,
+    Path,
+    Set,
+    api,
+    build_upload_payload,
+    post_upload_with_status,
+):
     # 零件: 应用侧重试 Observer — 前几次 503 自动重试,记录完整 attempts 序列
     class UploadWithRetry(EventDispatchObserver):
         def __init__(self, *, base_url: str, max_attempts: int = 3) -> None:

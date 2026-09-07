@@ -185,9 +185,7 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecur
         )
     except Exception as exc:  # noqa: BLE001 — 预期异常：断言编译期拒绝
         missing_msg = str(exc)
-        missing_failed = bool(
-            ("sources.s1.params" in missing_msg) and ("missing" in missing_msg or "required" in missing_msg)
-        )
+        missing_failed = bool(("sources.s1.params" in missing_msg) and ("missing" in missing_msg or "required" in missing_msg))
 
     print("missing_failed =", missing_failed)
     return missing_failed, missing_msg

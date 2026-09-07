@@ -162,7 +162,19 @@ def _(Path, tmp):
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, Dict, Path, compile_yaml, out_root, run_ir, yaml_file):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    Dict,
+    Path,
+    compile_yaml,
+    out_root,
+    run_ir,
+    yaml_file,
+):
     # 编译 + 运行
     init_vars: Dict[str, object] = {"out_root": str(out_root)}
     compilation = compile_yaml(

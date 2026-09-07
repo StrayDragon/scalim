@@ -164,9 +164,7 @@ def _(build_test_config_small, reset_workflow_preload_counter_calls, set_config)
     set_config(cfg)
     reset_workflow_preload_counter_calls()
     LOOKUP_CHUNK = 5
-    allowed_modules = frozenset(
-        ["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"]
-    )
+    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.loaders", "scalim.workflow.loaders"])
     print("customer_count =", cfg.customer_count, "product_count =", cfg.product_count)
     return LOOKUP_CHUNK, allowed_modules, cfg, set_config
 
@@ -286,7 +284,25 @@ def _(Path, repo_root, shutil, workflow_yaml_path):
 
 
 @app.cell
-def _(LOOKUP_CHUNK, KeysChunkHook, KeysChunkObserver, LookupChunking, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, WorkflowCachePoolPreloadForeverShared, WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions, allowed_modules, os, repo_root, run_workflow, wf_copy):
+def _(
+    LOOKUP_CHUNK,
+    KeysChunkHook,
+    KeysChunkObserver,
+    LookupChunking,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowExecutionOptions,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    allowed_modules,
+    os,
+    repo_root,
+    run_workflow,
+    wf_copy,
+):
     # 运行 workflow(需 cwd=out_dir 解析相对引用;finally 恢复)
     prev_cwd = os.getcwd()
     os.chdir(str(wf_copy.parent))
@@ -332,7 +348,17 @@ def _(LOOKUP_CHUNK, KeysChunkHook, KeysChunkObserver, LookupChunking, DemandRunO
 
 
 @app.cell
-def _(TARGET_FIELDS_FULL, VerificationResult, get_workflow_preload_counter_calls, hook, observer, outputs_api, out_root, result, verify_scalim_output_csv):
+def _(
+    TARGET_FIELDS_FULL,
+    VerificationResult,
+    get_workflow_preload_counter_calls,
+    hook,
+    observer,
+    outputs_api,
+    out_root,
+    result,
+    verify_scalim_output_csv,
+):
     # 输出定位 + 明细对拍
     preload_calls = get_workflow_preload_counter_calls()
     latest = outputs_api.load_latest_outputs(out_root)
@@ -388,9 +414,7 @@ def _(build_expected_metrics_rows, detail_csv, diff_first_mismatch, metrics_csv,
     if detail_csv.exists() and metrics_csv.exists():
         detail_rows = read_csv_rows(detail_csv)
         actual_metrics = stable_sort_rows(read_csv_rows(metrics_csv), by=("region_name_display",))
-        expected_metrics = stable_sort_rows(
-            build_expected_metrics_rows(detail_rows=detail_rows), by=("region_name_display",)
-        )
+        expected_metrics = stable_sort_rows(build_expected_metrics_rows(detail_rows=detail_rows), by=("region_name_display",))
         metrics_ok, metrics_summary = diff_first_mismatch(
             actual_metrics,
             expected_metrics,
@@ -401,7 +425,9 @@ def _(build_expected_metrics_rows, detail_csv, diff_first_mismatch, metrics_csv,
 
 
 @app.cell
-def _(LOOKUP_CHUNK, cfg, detail_csv, errors, hook, metrics_csv, metrics_ok, observer, preload_calls, render_checks, report_xlsx, verification):
+def _(
+    LOOKUP_CHUNK, cfg, detail_csv, errors, hook, metrics_csv, metrics_ok, observer, preload_calls, render_checks, report_xlsx, verification
+):
     # 断言展开(chunk oracle / 产物 / preload)
     artifacts_ok = bool(detail_csv.exists() and metrics_csv.exists() and report_xlsx.exists())
     customer_offsets = list(range(0, int(cfg.customer_count), LOOKUP_CHUNK))
@@ -429,7 +455,26 @@ def _(LOOKUP_CHUNK, cfg, detail_csv, errors, hook, metrics_csv, metrics_ok, obse
 
 
 @app.cell
-def _(artifacts_ok, checks, chunk_ok, detail_csv, errors, hook, make_chapter_result, metrics_csv, metrics_ok, metrics_summary, observer, out_root, preload_calls, report_xlsx, result, verification, version_dir, version_id):
+def _(
+    artifacts_ok,
+    checks,
+    chunk_ok,
+    detail_csv,
+    errors,
+    hook,
+    make_chapter_result,
+    metrics_csv,
+    metrics_ok,
+    metrics_summary,
+    observer,
+    out_root,
+    preload_calls,
+    report_xlsx,
+    result,
+    verification,
+    version_dir,
+    version_id,
+):
     passed = bool(all(checks.values()))
     summary = "errors={} preload_calls={} artifacts_ok={} verify={} customers_chunks={} products_chunks={}".format(
         len(errors),

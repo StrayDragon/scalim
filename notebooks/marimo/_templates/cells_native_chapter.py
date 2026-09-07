@@ -133,7 +133,7 @@ def _(Path, tempfile):
 
     tmp = Path(tempfile.mkdtemp(prefix="scalim-template-"))
     print("tmp dir:", tmp)
-    return tmp,
+    return (tmp,)
 
 
 # Cell 8 — 组装运行选项（knob.value 参与装配）

@@ -163,7 +163,18 @@ def _(Path, tempfile):
 
 
 @app.cell
-def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, guardrail_capture, guardrails_policy, out_root, row_gap_observer, run_yaml, yaml_path):
+def _(
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    guardrail_capture,
+    guardrails_policy,
+    out_root,
+    row_gap_observer,
+    run_yaml,
+    yaml_path,
+):
     init_vars = {"out_root": str(out_root)}
     allowed_modules = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario"])
 
@@ -214,7 +225,17 @@ def _(Path, csv, outputs_api, out_root):
 
 
 @app.cell
-def _(List, detail_rows, expected_support_guardrail_codes, expected_support_row_gap_totals, guardrail_capture, metrics_rows, render_checks, row_gap_observer, verify_support_outputs_csv_rows):
+def _(
+    List,
+    detail_rows,
+    expected_support_guardrail_codes,
+    expected_support_row_gap_totals,
+    guardrail_capture,
+    metrics_rows,
+    render_checks,
+    row_gap_observer,
+    verify_support_outputs_csv_rows,
+):
     ok_oracle, oracle_summary, oracle_details = verify_support_outputs_csv_rows(
         actual_detail=detail_rows,
         actual_metrics_by_team=metrics_rows,
@@ -255,7 +276,26 @@ def _(List, detail_rows, expected_support_guardrail_codes, expected_support_row_
 
 
 @app.cell
-def _(checks, core, expected_codes, expected_totals, got_codes, guardrail_capture, latest, make_chapter_result, ok_guardrails, ok_oracle, ok_row_gap, oracle_details, oracle_summary, out_detail, out_metrics, out_root, row_gap_totals, yaml_path):
+def _(
+    checks,
+    core,
+    expected_codes,
+    expected_totals,
+    got_codes,
+    guardrail_capture,
+    latest,
+    make_chapter_result,
+    ok_guardrails,
+    ok_oracle,
+    ok_row_gap,
+    oracle_details,
+    oracle_summary,
+    out_detail,
+    out_metrics,
+    out_root,
+    row_gap_totals,
+    yaml_path,
+):
     passed = bool(all(checks.values()))
     summary = "oracle={} row_gap={} guardrails={} outputs={} | {}".format(
         ok_oracle,

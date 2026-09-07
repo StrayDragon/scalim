@@ -2,8 +2,9 @@
 depends_on: []
 branch: sdd/cells-native-marimo-notebook-notebooks-run-chapter-oracle
 base_sha: d1b5cb4565ccc0f5c9c0414c6cd984c00484ef63
-checkpointed: false
+checkpointed: true
 rules_edit_acked: true
+checkpoint_sha: d1b5cb4565ccc0f5c9c0414c6cd984c00484ef63
 ---
 
 ## Why

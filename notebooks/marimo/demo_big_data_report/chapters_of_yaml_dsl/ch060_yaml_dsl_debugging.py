@@ -122,7 +122,16 @@ def _(Path, tmp):
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, bad_yaml, compile_yaml, out_csv):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    bad_yaml,
+    compile_yaml,
+    out_csv,
+):
     # 预期失败：compile 必须报「where 引用未知字段」
     expected_failed = False
     exc_type = ""
@@ -140,9 +149,7 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecur
         exc_type = type(exc).__name__
         message = str(exc)
         expected_failed = bool(
-            ("where depends on unknown fields" in message)
-            or ("Invalid where expression" in message)
-            or ("unknown fields" in message)
+            ("where depends on unknown fields" in message) or ("Invalid where expression" in message) or ("unknown fields" in message)
         )
 
     print("expected_failed =", expected_failed)

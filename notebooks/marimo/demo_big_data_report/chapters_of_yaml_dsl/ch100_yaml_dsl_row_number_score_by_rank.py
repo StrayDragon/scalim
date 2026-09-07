@@ -126,7 +126,17 @@ def _(Path, build_test_config_small, set_config, tempfile):
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, Dict, out_root, run_yaml, yaml_path):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    Dict,
+    out_root,
+    run_yaml,
+    yaml_path,
+):
     init_vars: Dict[str, object] = {"out_root_rank": str(out_root)}
     result = run_yaml(
         str(yaml_path),

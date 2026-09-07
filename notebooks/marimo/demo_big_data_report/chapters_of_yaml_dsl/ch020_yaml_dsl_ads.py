@@ -138,7 +138,18 @@ def _(Path, reset_ads_creatives_retry_counter_calls, tempfile):
 
 
 @app.cell
-def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, LoaderRetryPoliciesSpec, LoaderRetryPolicySpec, out_root, run_yaml, should_retry_ads_transient, yaml_path):
+def _(
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    LoaderRetryPoliciesSpec,
+    LoaderRetryPolicySpec,
+    out_root,
+    run_yaml,
+    should_retry_ads_transient,
+    yaml_path,
+):
     # 装配: retry 策略(load_ads_creatives 首次 transient 失败,重试 2 次内成功)
     init_vars = {"out_root": str(out_root)}
     allowed_modules = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.ads_scenario"])
@@ -210,7 +221,15 @@ def _(Path, csv, outputs_api, out_root, run_result):
 
 
 @app.cell
-def _(detail_all_rows, detail_clicks_rows, get_ads_creatives_retry_counter_calls, metrics_rows, render_checks, run_result, verify_ads_outputs_csv_rows):
+def _(
+    detail_all_rows,
+    detail_clicks_rows,
+    get_ads_creatives_retry_counter_calls,
+    metrics_rows,
+    render_checks,
+    run_result,
+    verify_ads_outputs_csv_rows,
+):
     ok_oracle, oracle_summary, oracle_details = verify_ads_outputs_csv_rows(
         actual_detail_all=detail_all_rows,
         actual_detail_clicks=detail_clicks_rows,
@@ -228,7 +247,21 @@ def _(detail_all_rows, detail_clicks_rows, get_ads_creatives_retry_counter_calls
 
 
 @app.cell
-def _(checks, latest, make_chapter_result, ok_oracle, oracle_details, oracle_summary, out_detail_all, out_detail_clicks, out_metrics, out_root, retry_calls, run_result, yaml_path):
+def _(
+    checks,
+    latest,
+    make_chapter_result,
+    ok_oracle,
+    oracle_details,
+    oracle_summary,
+    out_detail_all,
+    out_detail_clicks,
+    out_metrics,
+    out_root,
+    retry_calls,
+    run_result,
+    yaml_path,
+):
     passed = bool(all(checks.values()))
     summary = "oracle={} retry_calls={} outputs={} | {}".format(
         ok_oracle,

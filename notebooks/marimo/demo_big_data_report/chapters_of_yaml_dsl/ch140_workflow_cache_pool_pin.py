@@ -170,7 +170,21 @@ def _(Path, build_test_config_small, reset_workflow_preload_counter_calls, set_c
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, RunOverrides, VizObserverConfig, WorkflowCachePoolPreloadForeverShared, WorkflowRunOptions, WorkflowRuntimeOptions, run_workflow, viz_no_pin, workflow_yaml_no_pin):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    RunOverrides,
+    VizObserverConfig,
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    run_workflow,
+    viz_no_pin,
+    workflow_yaml_no_pin,
+):
     # 基线: 无 pin -> refcount_zero 淘汰
     _ = run_workflow(
         str(workflow_yaml_no_pin),
@@ -178,9 +192,7 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunSecuri
             demand=DemandRunOptions(
                 security=DemandRunSecurityOptions(allowed_modules=ALLOWED_MODULES),
                 template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
-                outputs=DemandRunOutputOptions(
-                    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin)))
-                ),
+                outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_no_pin)))),
             ),
             runtime=WorkflowRuntimeOptions(
                 cache_pool=WorkflowCachePoolPreloadForeverShared(max_entries=16),
@@ -191,7 +203,22 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunSecuri
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, RunOverrides, VizObserverConfig, WorkflowCachePoolPin, WorkflowCachePoolPreloadForeverShared, WorkflowRunOptions, WorkflowRuntimeOptions, run_workflow, viz_pin, workflow_yaml_pin):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    RunOverrides,
+    VizObserverConfig,
+    WorkflowCachePoolPin,
+    WorkflowCachePoolPreloadForeverShared,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    run_workflow,
+    viz_pin,
+    workflow_yaml_pin,
+):
     # 启用 pin: 引用计数归零不淘汰, workflow_end 统一释放
     _ = run_workflow(
         str(workflow_yaml_pin),
@@ -199,9 +226,7 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunSecuri
             demand=DemandRunOptions(
                 security=DemandRunSecurityOptions(allowed_modules=ALLOWED_MODULES),
                 template=DemandRunTemplateOptions(init_vars={"order_ids": []}),
-                outputs=DemandRunOutputOptions(
-                    overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin)))
-                ),
+                outputs=DemandRunOutputOptions(overrides=RunOverrides(viz_config=VizObserverConfig(output_dir=str(viz_pin)))),
             ),
             runtime=WorkflowRuntimeOptions(
                 cache_pool=WorkflowCachePoolPreloadForeverShared(
@@ -240,7 +265,23 @@ def _(render_checks, reasons_no_pin, reasons_pin, releases_no_pin, releases_pin)
 
 
 @app.cell
-def _(checks, events_no_pin, events_pin, make_chapter_result, ok_no_pin, ok_pin, ok_release_flag, reasons_no_pin, reasons_pin, releases_no_pin, releases_pin, viz_no_pin, viz_pin, workflow_yaml_no_pin, workflow_yaml_pin):
+def _(
+    checks,
+    events_no_pin,
+    events_pin,
+    make_chapter_result,
+    ok_no_pin,
+    ok_pin,
+    ok_release_flag,
+    reasons_no_pin,
+    reasons_pin,
+    releases_no_pin,
+    releases_pin,
+    viz_no_pin,
+    viz_pin,
+    workflow_yaml_no_pin,
+    workflow_yaml_pin,
+):
     passed = bool(all(checks.values()))
     summary = "no_pin={} pin={} release_is_pinned={}".format(ok_no_pin, ok_pin, ok_release_flag)
     chapter_result = make_chapter_result(

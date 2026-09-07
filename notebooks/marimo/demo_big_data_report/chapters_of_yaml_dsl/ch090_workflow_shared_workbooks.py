@@ -183,7 +183,26 @@ def _(Path, out_dir, workflow_yaml_path):
 
 
 @app.cell
-def _(BookResourcePolicy, BookWriteAlignBy, BookWriteHeaderPolicy, BookWriteMode, BookWriteOnConflict, BookWriteOnMismatch, BookWritePolicy, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, ResourcesPolicy, WorkflowRunOptions, allowed_modules, out_dir, repo_root, run_workflow, wf_copy):
+def _(
+    BookResourcePolicy,
+    BookWriteAlignBy,
+    BookWriteHeaderPolicy,
+    BookWriteMode,
+    BookWriteOnConflict,
+    BookWriteOnMismatch,
+    BookWritePolicy,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    ResourcesPolicy,
+    WorkflowRunOptions,
+    allowed_modules,
+    out_dir,
+    repo_root,
+    run_workflow,
+    wf_copy,
+):
     # 装配: ResourcesPolicy(4 个 book 写策略) + run_workflow
     demand_options = DemandRunOptions(
         security=DemandRunSecurityOptions(
@@ -248,12 +267,8 @@ def _(out_dir, resolve_latest_book_artifact):
     sheetbook_report_sheet_root = out_dir / "out" / "sheetbook_report_sheet"
     sheetbook_report_append_root = out_dir / "out" / "sheetbook_report_append"
 
-    shared_report_sheet_xlsx, shared_sheet_meta = resolve_latest_book_artifact(
-        shared_report_sheet_root, book_id="shared_report_sheet"
-    )
-    shared_report_append_xlsx, shared_append_meta = resolve_latest_book_artifact(
-        shared_report_append_root, book_id="shared_report_append"
-    )
+    shared_report_sheet_xlsx, shared_sheet_meta = resolve_latest_book_artifact(shared_report_sheet_root, book_id="shared_report_sheet")
+    shared_report_append_xlsx, shared_append_meta = resolve_latest_book_artifact(shared_report_append_root, book_id="shared_report_append")
     sheetbook_report_sheet_xlsx, sheetbook_sheet_meta = resolve_latest_book_artifact(
         sheetbook_report_sheet_root, book_id="sheetbook_report_sheet"
     )
@@ -290,7 +305,16 @@ def _(out_dir, resolve_latest_book_artifact):
 
 
 @app.cell
-def _(Any, Dict, artifacts_ok, count_sheet_rows_and_header, shared_report_append_xlsx, shared_report_sheet_xlsx, sheetbook_report_append_xlsx, sheetbook_report_sheet_xlsx):
+def _(
+    Any,
+    Dict,
+    artifacts_ok,
+    count_sheet_rows_and_header,
+    shared_report_append_xlsx,
+    shared_report_sheet_xlsx,
+    sheetbook_report_append_xlsx,
+    sheetbook_report_sheet_xlsx,
+):
     # 校验: 4 个 xlsx 的 sheet 行/表头计数
     wb_ok = False
     sb_ok = False
@@ -370,7 +394,31 @@ def _(artifacts_ok, errors, render_checks, sb_ok, wb_ok):
 
 
 @app.cell
-def _(artifacts_ok, checks, errors, make_chapter_result, out_dir, sb_checks, sb_ok, shared_append_meta, shared_report_append_root, shared_report_append_xlsx, shared_report_sheet_root, shared_report_sheet_xlsx, shared_sheet_meta, sheetbook_append_meta, sheetbook_report_append_root, sheetbook_report_append_xlsx, sheetbook_report_sheet_root, sheetbook_report_sheet_xlsx, sheetbook_sheet_meta, wb_checks, wb_ok, wf_result, workflow_yaml_path):
+def _(
+    artifacts_ok,
+    checks,
+    errors,
+    make_chapter_result,
+    out_dir,
+    sb_checks,
+    sb_ok,
+    shared_append_meta,
+    shared_report_append_root,
+    shared_report_append_xlsx,
+    shared_report_sheet_root,
+    shared_report_sheet_xlsx,
+    shared_sheet_meta,
+    sheetbook_append_meta,
+    sheetbook_report_append_root,
+    sheetbook_report_append_xlsx,
+    sheetbook_report_sheet_root,
+    sheetbook_report_sheet_xlsx,
+    sheetbook_sheet_meta,
+    wb_checks,
+    wb_ok,
+    wf_result,
+    workflow_yaml_path,
+):
     passed = bool(all(checks.values()))
     summary = "errors={} artifacts_ok={} wb_ok={} sheetbook_ok={}".format(
         len(errors),

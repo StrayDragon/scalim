@@ -129,7 +129,23 @@ def _(Path, tempfile):
 
 
 @app.cell
-def _(ALLOWED_MODULES, Dict, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, RunOverrides, VizObserverConfig, out_root_detail, run_yaml, viz_events, viz_snapshot, viz_trace, yaml_path):
+def _(
+    ALLOWED_MODULES,
+    Dict,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    RunOverrides,
+    VizObserverConfig,
+    out_root_detail,
+    run_yaml,
+    viz_events,
+    viz_snapshot,
+    viz_trace,
+    yaml_path,
+):
     # 装配: viz 自定义路径
     init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
     overrides = RunOverrides(
@@ -203,7 +219,24 @@ def _(core, env_ok, events_ok, render_checks, rows, run_name_ok, snapshot_ok, tr
 
 
 @app.cell
-def _(checks, core, detail_csv_path, env_ok, events_ok, make_chapter_result, out_root_detail, rows, run_name_ok, snapshot_ok, trace_ok, viz_events, viz_meta, viz_snapshot, viz_trace, yaml_path):
+def _(
+    checks,
+    core,
+    detail_csv_path,
+    env_ok,
+    events_ok,
+    make_chapter_result,
+    out_root_detail,
+    rows,
+    run_name_ok,
+    snapshot_ok,
+    trace_ok,
+    viz_events,
+    viz_meta,
+    viz_snapshot,
+    viz_trace,
+    yaml_path,
+):
     passed = bool(all(checks.values()))
     summary = "rows={} events={} snapshot={} trace={} run_name={} env={} outputs={}".format(
         len(rows),

@@ -200,7 +200,25 @@ def _(Path, logging, tempfile):
 
 
 @app.cell
-def _(ALLOWED_MODULES, Dict, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, Path, allowed_yaml_roots, compile_yaml, inject_output_dir_conflict_for_target, is_hex_64, read_csv_rows, run_ir, stats_by_id, tmp, versioned_outputs, yaml_redacted_path):
+def _(
+    ALLOWED_MODULES,
+    Dict,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    Path,
+    allowed_yaml_roots,
+    compile_yaml,
+    inject_output_dir_conflict_for_target,
+    is_hex_64,
+    read_csv_rows,
+    run_ir,
+    stats_by_id,
+    tmp,
+    versioned_outputs,
+    yaml_redacted_path,
+):
     # 场景 A: primary_only + 脱敏错误信息
     out_root_detail_redacted = tmp / "out_detail_redacted"
     init_vars_redacted: Dict[str, object] = {
@@ -249,7 +267,24 @@ def _(ALLOWED_MODULES, Dict, DemandRunOptions, DemandRunRuntimeOptions, DemandRu
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandDiagnosticsPolicy, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, Dict, Path, allowed_yaml_roots, compile_yaml, inject_output_dir_conflict_for_target, read_csv_rows, run_ir, stats_by_id, tmp, yaml_full_path):
+def _(
+    ALLOWED_MODULES,
+    DemandDiagnosticsPolicy,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    Dict,
+    Path,
+    allowed_yaml_roots,
+    compile_yaml,
+    inject_output_dir_conflict_for_target,
+    read_csv_rows,
+    run_ir,
+    stats_by_id,
+    tmp,
+    yaml_full_path,
+):
     # 场景 B: primary_only + 完整错误信息
     out_root_detail_full = tmp / "out_detail_full"
     init_vars_full: Dict[str, object] = {
@@ -298,7 +333,20 @@ def _(ALLOWED_MODULES, DemandDiagnosticsPolicy, DemandRunOptions, DemandRunRunti
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, Dict, allowed_yaml_roots, compile_yaml, inject_output_dir_conflict_for_target, run_ir, tmp, yaml_all_fail_path):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    Dict,
+    allowed_yaml_roots,
+    compile_yaml,
+    inject_output_dir_conflict_for_target,
+    run_ir,
+    tmp,
+    yaml_all_fail_path,
+):
     # 场景 C: all_fail 预期整体抛错
     out_root_detail_all_fail = tmp / "out_detail_all_fail"
     init_vars_all_fail: Dict[str, object] = {
@@ -425,16 +473,29 @@ def _(all_fail_ok, full_ok, redacted_ok, render_checks):
 
 
 @app.cell
-def _(all_fail_ok, all_fail_summary, checks, full_core, full_ok, full_rows, make_chapter_result, redacted_core, redacted_ok, redacted_rows, summarize_stats, yaml_all_fail_path, yaml_full_path, yaml_redacted_path):
+def _(
+    all_fail_ok,
+    all_fail_summary,
+    checks,
+    full_core,
+    full_ok,
+    full_rows,
+    make_chapter_result,
+    redacted_core,
+    redacted_ok,
+    redacted_rows,
+    summarize_stats,
+    yaml_all_fail_path,
+    yaml_full_path,
+    yaml_redacted_path,
+):
     passed = bool(all(checks.values()))
     if passed:
         summary = "expected failure captured: {}\nredacted_ok={} full_ok={} all_fail_ok={}".format(
             all_fail_summary, redacted_ok, full_ok, all_fail_ok
         )
     else:
-        summary = "unexpected: redacted_ok={} full_ok={} all_fail_ok={} | {}".format(
-            redacted_ok, full_ok, all_fail_ok, all_fail_summary
-        )
+        summary = "unexpected: redacted_ok={} full_ok={} all_fail_ok={} | {}".format(redacted_ok, full_ok, all_fail_ok, all_fail_summary)
     chapter_result = make_chapter_result(
         passed=passed,
         summary=summary,

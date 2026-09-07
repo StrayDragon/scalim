@@ -152,7 +152,7 @@ def _(ALLOWED_MODULES, List, Path, UNSET, api, override_batch_size):
 
     print("override_batch_size =", override_batch_size.value)
     print("batch_size=UNSET → pre_use_batch_size 信号触发;Hook 写入", override_batch_size.value)
-    return demand_options,
+    return (demand_options,)
 
 
 @app.cell
@@ -163,7 +163,7 @@ def _(Path, tempfile):
     tmp = Path(tempfile.mkdtemp(prefix="scalim-hooks-ch040-"))
     atexit.register(lambda: shutil.rmtree(tmp, ignore_errors=True))
     print("tmp dir:", tmp)
-    return tmp,
+    return (tmp,)
 
 
 @app.cell
@@ -174,11 +174,7 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
     demand_yaml_text = demand_path.read_text(encoding="utf-8")
     workflow_yaml_text = workflow_path.read_text(encoding="utf-8")
 
-    mo.md(
-        "**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(
-            demand_yaml_text, workflow_yaml_text
-        )
-    )
+    mo.md("**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text))
     return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
 
 
@@ -200,7 +196,18 @@ def _(BatchSizeProbe, ForceBatchSizeHook, api, demand_options, demand_path, over
 
 
 @app.cell
-def _(BatchSizeProbe, ForceBatchSizeHook, WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions, api, demand_options, override_batch_size, tmp, workflow_path):
+def _(
+    BatchSizeProbe,
+    ForceBatchSizeHook,
+    WorkflowExecutionOptions,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    api,
+    demand_options,
+    override_batch_size,
+    tmp,
+    workflow_path,
+):
     workflow_hook = ForceBatchSizeHook(next_value=int(override_batch_size.value), reason="demo-workflow")
     workflow_probe = BatchSizeProbe()
     workflow_result = api.run_workflow(
@@ -213,7 +220,10 @@ def _(BatchSizeProbe, ForceBatchSizeHook, WorkflowExecutionOptions, WorkflowRunO
         ),
     )
 
-    print("workflow rows          =", sum(int(o.result.total_rows) for o in workflow_result.outcomes if o.error is None and o.result is not None))
+    print(
+        "workflow rows          =",
+        sum(int(o.result.total_rows) for o in workflow_result.outcomes if o.error is None and o.result is not None),
+    )
     print("workflow hook calls    =", workflow_hook.calls)
     print("workflow pipeline batch=", workflow_probe.batch_sizes)
 

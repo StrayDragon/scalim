@@ -212,7 +212,17 @@ def _(cfg, set_config):
 
 
 @app.cell
-def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, LookupChunking, allowed_modules, compile_yaml, init_vars, yaml_path):
+def _(
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    LookupChunking,
+    allowed_modules,
+    compile_yaml,
+    init_vars,
+    yaml_path,
+):
     _CUSTOMER_CHUNK = 5  # 与配置 cell 同步（保持单点可改后两边对齐）
 
     security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
@@ -235,7 +245,23 @@ def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, Deman
 
 
 @app.cell
-def _(CustomerChunkHook, CustomerChunkObserver, CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, LookupChunking, compile_yaml, make_chapter_result, render_checks, run_yaml, security, template, time, yaml_path):
+def _(
+    CustomerChunkHook,
+    CustomerChunkObserver,
+    CaptureRows,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    LookupChunking,
+    compile_yaml,
+    make_chapter_result,
+    render_checks,
+    run_yaml,
+    security,
+    template,
+    time,
+    yaml_path,
+):
     _CUSTOMER_CHUNK = 5
 
     observer = CustomerChunkObserver()
@@ -269,7 +295,20 @@ def _(CustomerChunkHook, CustomerChunkObserver, CaptureRows, DemandRunOptions, D
 
 
 @app.cell
-def _(CustomerChunkHook, CustomerChunkObserver, VerificationResult, extract_verifiable_fields, cfg, elapsed, hook, observer, render_checks, result, rows, verify_scalim_output):
+def _(
+    CustomerChunkHook,
+    CustomerChunkObserver,
+    VerificationResult,
+    extract_verifiable_fields,
+    cfg,
+    elapsed,
+    hook,
+    observer,
+    render_checks,
+    result,
+    rows,
+    verify_scalim_output,
+):
     # 验证 1: rows-binding 对拍字段（来自唯一完整 YAML 示例）
     match_fields = ["rows_name_match", "rows_level_match"]
     mismatch = 0
@@ -289,11 +328,7 @@ def _(CustomerChunkHook, CustomerChunkObserver, VerificationResult, extract_veri
     expected_calls = (unique_customers + _CUSTOMER_CHUNK - 1) // _CUSTOMER_CHUNK
     expected_offsets = list(range(0, unique_customers, _CUSTOMER_CHUNK))
     expected_counts = [min(_CUSTOMER_CHUNK, unique_customers - offset) for offset in expected_offsets]
-    chunk_ok = bool(
-        observer.offsets == expected_offsets
-        and observer.counts == expected_counts
-        and hook.call_count == expected_calls
-    )
+    chunk_ok = bool(observer.offsets == expected_offsets and observer.counts == expected_counts and hook.call_count == expected_calls)
 
     checks = {
         "对照组验证通过": verification.passed,
@@ -307,7 +342,21 @@ def _(CustomerChunkHook, CustomerChunkObserver, VerificationResult, extract_veri
 
 
 @app.cell
-def _(checks, chunk_ok, compilation, demand_config, elapsed, fields_to_check, hook, make_chapter_result, mismatch, observer, result, rows, verification):
+def _(
+    checks,
+    chunk_ok,
+    compilation,
+    demand_config,
+    elapsed,
+    fields_to_check,
+    hook,
+    make_chapter_result,
+    mismatch,
+    observer,
+    result,
+    rows,
+    verification,
+):
     passed = bool(all(checks.values()))
     summary = "rows={} elapsed={:.3f}s verify={} rows_match_failures={} customers_chunks={}".format(
         len(rows), elapsed, verification.passed, mismatch, observer.offsets

@@ -36,17 +36,17 @@ Seam（已确认）：`ChapterRegistry.run_selected_chapters` / `just examples`�
 
 ## 4. 迁移 example_public_api_suite（13 章）
 
-- [ ] 4.1 ch130/ch135/ch150/ch160：拆分（ch130 顺带清理 cell 内自引用 `chapter_result` 残留）
-- [ ] 4.2 ch162-ch166（output write layout / lookup chunking / resources / source catalog）
-- [ ] 4.3 ch170-ch184（ob / hooks_events / event type groups / sinks pandas）
-- [ ] 4.4 DoD: `just examples` public_api suite 全绿；Tier1 entrypoint 覆盖 gate（`just check-only-py` 相关项）不降级
+- [x] 4.1 ch130/ch135/ch150/ch160：拆分（ch130 顺带清理 cell 内自引用 `chapter_result` 残留）
+- [x] 4.2 ch162-ch166（output write layout / lookup chunking / resources / source catalog）
+- [x] 4.3 ch170-ch184（ob / hooks_events / event type groups / sinks pandas）
+- [x] 4.4 DoD: `just examples` public_api suite 全绿；Tier1 entrypoint 覆盖 gate（`just check-only-py` 相关项）不降级
 
 ## 5. example_readme_suite 展示层增强（不动生成管线）
 
-- [ ] 5.1 三章 cells 内展示中间结果（naive vs scalim 对比数据表/knobs），`support/inject.py` + `render_chart.py` 与 `just gen-readme-examples` 管线零改动
-- [ ] 5.2 DoD: `just gen-readme-examples`（--check）绿；`just examples` readme suite 全绿
+- [x] 5.1 三章 cells 内展示中间结果（naive vs scalim 对比数据表/knobs），`support/inject.py` + `render_chart.py` 与 `just gen-readme-examples` 管线零改动
+- [x] 5.2 DoD: `just gen-readme-examples`（--check）绿；`just examples` readme suite 全绿
 
 ## 6. 全量验证
 
-- [ ] 6.1 `just examples`（全 suite）绿；`just check-notebooks-coverage` 绿
-- [ ] 6.2 `just qa` 绿；`marimo check` 章节抽查无 critical。DoD: 全部门禁绿，进入 `llman-sdd-verify`
+- [x] 6.1 `just examples`（全 suite）绿；`just check-notebooks-coverage` 绿
+- [x] 6.2 `just qa` 绿；`marimo check` 章节抽查无 critical。DoD: 全部门禁绿，进入 `llman-sdd-verify`

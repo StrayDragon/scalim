@@ -139,7 +139,19 @@ def _(Path, tempfile):
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, Dict, guardrail_capture, guardrails, out_root_detail, run_yaml, yaml_path):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    Dict,
+    guardrail_capture,
+    guardrails,
+    out_root_detail,
+    run_yaml,
+    yaml_path,
+):
     init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
     result = run_yaml(
         str(yaml_path),
@@ -197,7 +209,20 @@ def _(any_non_blank, blank_for_1001, core, has_compute_error, render_checks, row
 
 
 @app.cell
-def _(any_non_blank, blank_for_1001, checks, codes, core, detail_csv_path, has_compute_error, make_chapter_result, out_root_detail, r_1001, rows, yaml_path):
+def _(
+    any_non_blank,
+    blank_for_1001,
+    checks,
+    codes,
+    core,
+    detail_csv_path,
+    has_compute_error,
+    make_chapter_result,
+    out_root_detail,
+    r_1001,
+    rows,
+    yaml_path,
+):
     passed = bool(all(checks.values()))
     summary = "rows={} compute_error={} blank_1001={} any_non_blank={} outputs={}".format(
         len(rows),

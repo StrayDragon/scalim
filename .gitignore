@@ -304,3 +304,7 @@ extras/vscode-scalim/*.vsix
 
 # ignore private corp. sanitize_rules
 **/sanitize_rules.local.yaml
+
+# marimo excludes
+**/__marimo__
+

@@ -109,7 +109,16 @@ def _(Path, tmp):
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, LoaderRetryPoliciesSpec, LoaderRetryPolicySpec, compile_yaml, yaml_path):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    LoaderRetryPoliciesSpec,
+    LoaderRetryPolicySpec,
+    compile_yaml,
+    yaml_path,
+):
     # 零件: keyword-only should_retry —— 故意触发签名不匹配
     def bad_should_retry(*, exc: Exception, ctx: object) -> bool:  # type: ignore[no-untyped-def]
         _ = (exc, ctx)
@@ -133,9 +142,7 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecur
         )
     except Exception as exc:  # noqa: BLE001 — 预期异常：断言编译期拒绝
         exc_msg = str(exc)
-        bad_fast_failed = bool(
-            ("loader_retry.default.should_retry" in exc_msg) and ("函数签名不匹配" in exc_msg)
-        )
+        bad_fast_failed = bool(("loader_retry.default.should_retry" in exc_msg) and ("函数签名不匹配" in exc_msg))
 
     print("bad_fast_failed =", bad_fast_failed)
     print("exc_message     =", exc_msg[:160])

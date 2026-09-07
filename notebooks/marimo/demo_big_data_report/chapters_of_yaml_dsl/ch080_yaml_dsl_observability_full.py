@@ -153,7 +153,16 @@ def _(Path, tempfile):
 
 
 @app.cell
-def _(Dict, ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver, RunOverrides, VizObserverConfig, out_root_detail, viz_base_dir):
+def _(
+    Dict,
+    ExecutionTraceObserver,
+    LoggingObserver,
+    MemoryOptimizationObserver,
+    RunOverrides,
+    VizObserverConfig,
+    out_root_detail,
+    viz_base_dir,
+):
     # 装配: 四类可观测性 + viz 配置
     init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
     overrides = RunOverrides(
@@ -176,7 +185,25 @@ def _(Dict, ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver,
 
 
 @app.cell
-def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver, Path, components, find_first_instance, init_vars, out_root_detail, overrides, run_yaml, yaml_path):
+def _(
+    ALLOWED_MODULES,
+    DemandRunOptions,
+    DemandRunOutputOptions,
+    DemandRunRuntimeOptions,
+    DemandRunSecurityOptions,
+    DemandRunTemplateOptions,
+    ExecutionTraceObserver,
+    LoggingObserver,
+    MemoryOptimizationObserver,
+    Path,
+    components,
+    find_first_instance,
+    init_vars,
+    out_root_detail,
+    overrides,
+    run_yaml,
+    yaml_path,
+):
     result = run_yaml(
         str(yaml_path),
         options=DemandRunOptions(
@@ -198,7 +225,21 @@ def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntim
 
 
 @app.cell
-def _(ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver, Path, core, detail_csv_path, find_first_instance, glob_viz_files, logging_observer, memory_opt_observer, read_csv_rows, trace_observer, viz_base_dir):
+def _(
+    ExecutionTraceObserver,
+    LoggingObserver,
+    MemoryOptimizationObserver,
+    Path,
+    core,
+    detail_csv_path,
+    find_first_instance,
+    glob_viz_files,
+    logging_observer,
+    memory_opt_observer,
+    read_csv_rows,
+    trace_observer,
+    viz_base_dir,
+):
     # 产物 + 五路校验
     rows = read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
     trace = trace_observer if isinstance(trace_observer, ExecutionTraceObserver) else None
@@ -249,7 +290,20 @@ def _(ok_logging, ok_memory, ok_rows, ok_trace, ok_viz, render_checks):
 
 
 @app.cell
-def _(checks, detail_csv_path, make_chapter_result, ok_logging, ok_memory, ok_rows, ok_trace, ok_viz, out_root_detail, rows, viz_files, yaml_path):
+def _(
+    checks,
+    detail_csv_path,
+    make_chapter_result,
+    ok_logging,
+    ok_memory,
+    ok_rows,
+    ok_trace,
+    ok_viz,
+    out_root_detail,
+    rows,
+    viz_files,
+    yaml_path,
+):
     passed = bool(all(checks.values()))
     summary = "rows={} trace={} memory_opt={} logging={} viz={}".format(ok_rows, ok_trace, ok_memory, ok_logging, ok_viz)
     chapter_result = make_chapter_result(

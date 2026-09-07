@@ -205,11 +205,7 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
     demand_yaml_text = demand_path.read_text(encoding="utf-8")
     workflow_yaml_text = workflow_path.read_text(encoding="utf-8")
 
-    mo.md(
-        "**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(
-            demand_yaml_text, workflow_yaml_text
-        )
-    )
+    mo.md("**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text))
     return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
 
 
@@ -305,7 +301,9 @@ def _(async_demand, async_queue, async_workflow, render_checks, server, sync_dem
         "入队队列长度 == 2": len(async_queue) == 2,
         "async 无产物文件": len(async_files) == 0,
         "server 收到 4 次 dispatch": len(server.state.dispatches) >= 4,
-        "4 个 job_id 均被 dispatch": all(job in dispatched_jobs for job in ["sync-demand", "sync-workflow", "async-demand", "async-workflow"]),
+        "4 个 job_id 均被 dispatch": all(
+            job in dispatched_jobs for job in ["sync-demand", "sync-workflow", "async-demand", "async-workflow"]
+        ),
     }
     render_checks(checks)
 

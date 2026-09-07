@@ -152,7 +152,7 @@ def _(Path, tempfile):
     tmp = Path(tempfile.mkdtemp(prefix="scalim-hooks-ch050-"))
     atexit.register(lambda: shutil.rmtree(tmp, ignore_errors=True))
     print("tmp dir:", tmp)
-    return tmp,
+    return (tmp,)
 
 
 @app.cell
@@ -163,16 +163,22 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
     demand_yaml_text = demand_path.read_text(encoding="utf-8")
     workflow_yaml_text = workflow_path.read_text(encoding="utf-8")
 
-    mo.md(
-        "**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(
-            demand_yaml_text, workflow_yaml_text
-        )
-    )
+    mo.md("**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text))
     return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
 
 
 @app.cell
-def _(WorkflowLifecycleMarker, WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions, api, demand_options, demand_path, tmp, workflow_path):
+def _(
+    WorkflowLifecycleMarker,
+    WorkflowExecutionOptions,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    api,
+    demand_options,
+    demand_path,
+    tmp,
+    workflow_path,
+):
     viz_dir = tmp / "viz"
     marker = WorkflowLifecycleMarker()
 
@@ -200,9 +206,7 @@ def _(marker, mo, viz_dir, viz_events):
     mo.ui.tabs(
         {
             "生命周期事件流": mo.ui.table([{"seen": s} for s in marker.seen], selection=None),
-            "viz 事件文件": mo.ui.table(
-                [{"file": str(p.relative_to(viz_dir))} for p in viz_events], selection=None
-            ),
+            "viz 事件文件": mo.ui.table([{"file": str(p.relative_to(viz_dir))} for p in viz_events], selection=None),
         }
     )
     return
