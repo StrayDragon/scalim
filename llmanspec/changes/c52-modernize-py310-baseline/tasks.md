@@ -49,11 +49,11 @@ Seam（已确认）：pytest 全量 + `just check-only-py` / `just qa` / `just e
 
 ## 6. 说明面与生成物 — commit `docs: update python support policy to 3.10+ (README/AGENTS/checklist/benchmark wording)`
 
-- [ ] 6.1 根 `AGENTS.md`：Python runtime boundary 3.6 → 3.10；typing_extensions 条目改为「`Self`/`override` 直引，`typing-extensions>=4.4`」；Hard Rules 中 vendor 指针随 dataclassesx 退休修剪
-- [ ] 6.2 `llmanspec/AGENTS.md` 项目上下文：3.6 → 3.10；「主要依赖」行更新
-- [ ] 6.3 `README.md:111/199` 支持声明；`:170` 性能锚不动
-- [ ] 6.4 `docs/doc/dev/pre-release-checklist.md:32`；`docs/doc/benchmark/external-baseline.md` §4.4 措辞（历史数据/JSON 不动）
-- [ ] 6.5 `just gen-docs` 再生成；验收 = `just check-docs`（docs-drift-check）绿。生成物 SSOT/入口：`scripts/gen-docs.py`、`scripts/gen-readme-examples*`（经 `just gen-docs`）
+- [x] 6.1 根 `AGENTS.md`：Python runtime boundary 3.6 → 3.10；typing_extensions 条目改为「`Self`/`override` 直引，`typing-extensions>=4.4`」；Hard Rules 中 vendor 指针随 dataclassesx 退休修剪
+- [x] 6.2 `llmanspec/AGENTS.md` 项目上下文：3.6 → 3.10；「主要依赖」行更新
+- [x] 6.3 `README.md:111/199` 支持声明；`:170` 性能锚不动
+- [x] 6.4 `docs/doc/dev/pre-release-checklist.md:32`；`docs/doc/benchmark/external-baseline.md` §4.4 措辞（历史数据/JSON 不动）
+- [x] 6.5 `just gen-docs` 再生成；验收 = `just check-docs`（docs-drift-check）绿。生成物 SSOT/入口：`scripts/gen-docs.py`、`scripts/gen-readme-examples*`（经 `just gen-docs`）
 
 ## 7. 全量门禁收尾 — commit（如需）`qa: stage-a final gate fixes`
 

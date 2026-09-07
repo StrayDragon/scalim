@@ -8,8 +8,8 @@
 ## 项目上下文
 项目定义: 高性能(内存优先)报表生成框架,核心为 YAML DSL + IR 驱动执行.
 目标能力: 多数据源关联、流式输出、可观测性与可视化事件流.
-运行时需兼容 Python 3.6(开发通常 3.10+).
-主要依赖: PyYAML、typing-extensions 兼容层;jsonschema/rich 为可选.
+运行时需兼容根 `ROADMAP.md` 支持窗口(当前 floor 3.10;开发通常更新).
+主要依赖: typing-extensions(仅 `Self`/`override`);YAML 后端暂为内置 vendor(迁移见 ROADMAP);jsonschema/rich 为可选.
 工程风格: Python-only,4 空格缩进,140 行宽,双引号.
 命名规范: 函数/变量 snake_case,类 PascalCase.
 `src/<主库>/` 内优先相对导入,避免 `from __future__ import annotations` 于核心运行时.

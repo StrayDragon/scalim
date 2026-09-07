@@ -108,7 +108,7 @@ uv pip install scalim
 just notebook
 ```
 
-运行库支持 Python 3.6 及以上版本。仓库中的交互式教程和文档工具需要 Python 3.10 及以上版本。
+运行库支持 Python 3.10 及以上版本（支持窗口与演进见 [ROADMAP](./ROADMAP.md)）。仓库中的交互式教程和文档工具同样需要 Python 3.10+。
 
 <p align="center">
   <img src="docs/assets/meme.webp" alt="meme" width="100%">
@@ -167,7 +167,7 @@ just notebook
 - **时间（分场景取舍）**：xlsx 报表场景优于 pandas（0.61–0.65×）、约为 polars 的 1.6×；csv 大导出时间让给 pandas/polars（2–96×），换峰值内存 1/9–1/37；关联查询（本机 SQLite 真实 IO）时间 7.2×、内存 1/4。
 - **adaptive ≈ seq**：单数据流报表 demand 无并行机会，自适应并发不劣化也无收益；其收益场景是多任务编排。
 
-以上数字的条件与边界（务必同读）：scalim **0.10.3** vs pandas **2.3.3** vs polars **1.42.1**、Python 3.10.18、单机合成数据（关联 shape 为本机 SQLite 真实 IO）、每场景 **3/5 次**取 median、读回 golden 校验（108/108 通过）、薄算术派生函数；**不构成通用加速、真实业务基准或跨机器 SLA**。完整表格、形状明细、复现命令与数据 JSON 见 [外部基线对比](./docs/doc/benchmark/external-baseline.md)；扫参曲线、派生函数复杂度、慢源分片并行与 Python 3.6 最低兼容边界的交互图表也在该页。
+以上数字的条件与边界（务必同读）：scalim **0.10.3** vs pandas **2.3.3** vs polars **1.42.1**、Python 3.10.18、单机合成数据（关联 shape 为本机 SQLite 真实 IO）、每场景 **3/5 次**取 median、读回 golden 校验（108/108 通过）、薄算术派生函数；**不构成通用加速、真实业务基准或跨机器 SLA**。完整表格、形状明细、复现命令与数据 JSON 见 [外部基线对比](./docs/doc/benchmark/external-baseline.md)；扫参曲线、派生函数复杂度、慢源分片并行与 0.10 历史 Python 3.6 兼容边界（0.20 起 floor 为 3.10）的交互图表也在该页。
 
 <details>
 <summary>naive vs Scalim 内存代理图（小规模相对增量口径）的代码、数据与重跑方法</summary>
@@ -196,4 +196,4 @@ just notebook
 - 100% 核心逻辑测试覆盖率 (CI全覆盖), 将用户演示[`notebooks`](./notebooks/marimo/)作为集成测试辅助对拍验证主要场景
 - 100% 核心逻辑类型注解, 使用 `basedpyright` 进行较为严格的类型检查
 - 严格的 Ruff 检查和统一代码格式化
-- 兼容并回归验证最低版本 `Python 3.6` 除了语法检查外，还会在 `typing-extensions==4.1.1` 的隔离环境中验证。
+- 最低支持版本 `Python 3.10` 在 CI matrix 中完整回归（3.10–3.14；`typing-extensions>=4.4`）.

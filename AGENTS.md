@@ -36,13 +36,13 @@
     4. **能否被静默忽略？** 禁止；若 YAML 与 Python 双存在，MUST 文档化覆盖优先级（通常 Python 显式 > YAML > 默认）。
     5. 闭环：更新 capability-matrix + review-checklist 对应行；闭集策略走 Policy SSOT（`StrEnum`）。分类用语见 c40 `evidence-notes.md`（宜留 YAML / 宜收口 Python / 内容调用协议 / 尚待证据）。
   - Archived track: `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`、`.../2026-07-12-c30-workflow-shared-book-memory/`、`.../2026-07-13-c15-decide-xlsx-memory-book-role/`、`.../2026-07-13-c20-add-unified-xlsx-book-kind/`、`.../2026-07-13-c25-normalize-xlsx-book-ir-path-presence/`、`.../2026-07-20-c999-remove-deprecated-xlsx-file-memory-kinds/`；后续 shared-book 优化见 `llmanspec/futures/xlsx-file-numeric-type-loss/future.md`。
-- **Python runtime boundary**: code under `src/scalim/` MUST remain compatible with Python 3.6 (dev tooling is typically Python 3.10+; see `pyproject.toml`).
+- **Python runtime boundary**: code under `src/scalim/` MUST remain compatible with the support window in `ROADMAP.md` (floor 3.10; dev tooling typically newer; see `pyproject.toml`).
 - **Formatting**: Python-only; 4-space indent; line length 140; double quotes (ruff formatter). Use ruff as the source of truth for formatting and linting.
 - **Imports**: inside `src/scalim/` prefer relative imports; avoid `import scalim` / `from scalim...` (tests/scripts/notebooks may import `scalim` directly).
 - **Runtime contracts**:
   - `if TYPE_CHECKING:` is only for type-only imports/aliases; MUST NOT be used to fake class interfaces (conditional methods / ellipsis stubs).
-  - When one mixin/class depends on methods provided by another mixin/class, express that dependency as an explicit runtime contract (prefer `ABC` + `@abstractmethod`, Python 3.6 compatible).
-- **typing_extensions**: keep runtime compatible with older `typing_extensions`; use `src/scalim/vendor/compact/typing_extensionsx.py` shims when needed.
+  - When one mixin/class depends on methods provided by another mixin/class, express that dependency as an explicit runtime contract (prefer `ABC` + `@abstractmethod`, compatible with the `ROADMAP.md` floor).
+- **typing_extensions**: `typing-extensions>=4.4` is a direct runtime dependency for `Self`/`override` only (stdlib `typing` covers everything else); import it directly. Do not reintroduce `vendor/compact/typing_extensionsx.py`-style re-export shims.
 - **Doc governance**:
   - Any file containing `.gen.` is generated; do not edit by hand. Edit SSOT and run the referenced generator.
   - **禁止**直接手工编辑任何 `*.gen.*` 文件(例如 `src/scalim/dsl/yaml_dsl/schema/*.gen.json`、`agentdev/skills/**/syntax-catalog.gen.md`). 如果需要拆分提交,使用“回滚/暂存 + 重新生成”的方式拆分,不要在生成物里手改。
