@@ -1,174 +1,14 @@
+"""Cells-native marimo notebook: ch080_yaml_dsl_observability_full.
+
+迁移对照:
+  Before: 模块级 run_*() 持全部逻辑;cells 薄壳
+  After:  三个 observer 零件、运行、五路校验全部在 cells 内
+"""
+
 import marimo
-
-import csv
-import tempfile
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
-
-from scalim.dsl.yaml_dsl import (
-    DemandRunOptions,
-    DemandRunOutputOptions,
-    DemandRunRuntimeOptions,
-    DemandRunSecurityOptions,
-    DemandRunTemplateOptions,
-    RunOverrides,
-    run as run_yaml,
-)
-from scalim.ob.presets.execution_trace import ExecutionTraceObserver
-from scalim.ob.presets.logs import LoggingObserver
-from scalim.ob.presets.memory import MemoryOptimizationObserver
-from scalim.ob.presets.viz import VizObserverConfig
-from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
-
-_EXAMPLE_ID = "demo_big_data_report/yaml_dsl_observability_full"
-_ALLOWED_MODULES = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario"])
-
-
-def _read_csv_rows(path: Path) -> List[Dict[str, str]]:
-    rows: List[Dict[str, str]] = []
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            if not row:
-                continue
-            rows.append({str(k): str(v) if v is not None else "" for k, v in row.items()})
-    return rows
-
-
-def _find_first_instance(components: Optional[Sequence[object]], cls: type) -> Optional[object]:
-    for c in components or ():
-        if isinstance(c, cls):
-            return c
-    return None
-
-
-def _glob_viz_files(base_dir: Path) -> Dict[str, str]:
-    # `viz` 输出目录结构:
-    #   `<base_dir>/scalim-viz/run_<epoch_ms>/viz_*.{json,jsonl}`
-    scalim_viz_dir = base_dir / "scalim-viz"
-    run_dirs = sorted([p for p in scalim_viz_dir.glob("run_*") if p.is_dir()]) if scalim_viz_dir.exists() else []
-    if len(run_dirs) != 1:
-        return {"runs": str(len(run_dirs)), "dir": str(scalim_viz_dir)}
-    run_dir = run_dirs[0]
-    return {
-        "run_dir": str(run_dir),
-        "snapshot": str(run_dir / "viz_snapshot.json"),
-        "events": str(run_dir / "viz_events.jsonl"),
-        "trace": str(run_dir / "viz_trace.jsonl"),
-    }
-
-
-def run_yaml_dsl_observability_full(*, yaml_path: Optional[Path] = None) -> ExampleResult:
-    if yaml_path is None:
-        demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_observability_full.yaml"
-
-    with tempfile.TemporaryDirectory(prefix="scalim-ob-full-") as tmpdir:
-        tmp = Path(tmpdir)
-        out_root_detail = tmp / "out_detail"
-        viz_base_dir = tmp / "viz_out"
-
-        init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
-        overrides = RunOverrides(
-            viz_config=VizObserverConfig(
-                output_dir=str(viz_base_dir),
-                trace_enabled=True,
-                payload_policy="sample",
-                sample_size=3,
-                append=False,
-                run_name="support-observability",
-                env="ci",
-            )
-        )
-        components = [
-            LoggingObserver(),
-            ExecutionTraceObserver(),
-            MemoryOptimizationObserver(auto_report=False, max_fields=10),
-        ]
-
-        try:
-            result = run_yaml(
-                str(yaml_path),
-                options=DemandRunOptions(
-                    security=DemandRunSecurityOptions(allowed_modules=_ALLOWED_MODULES),
-                    template=DemandRunTemplateOptions(init_vars=init_vars),
-                    runtime=DemandRunRuntimeOptions(components=components, batch_size=2),
-                    outputs=DemandRunOutputOptions(overrides=overrides),
-                ),
-            )
-            trace_observer = _find_first_instance(components, ExecutionTraceObserver)
-            memory_opt_observer = _find_first_instance(components, MemoryOptimizationObserver)
-            logging_observer = _find_first_instance(components, LoggingObserver)
-            core = result.core
-        except Exception as exc:  # noqa: BLE001
-            return ExampleResult(
-                example_id=_EXAMPLE_ID,
-                passed=False,
-                kind=EXAMPLE_KIND_ORACLE,
-                summary="compile/run failed: {}: {}".format(type(exc).__name__, exc),
-                details={"exc_type": type(exc).__name__, "message": str(exc)},
-            )
-
-        detail_csv_path = Path(str((core.outputs or {}).get("detail") or ""))
-        rows = _read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
-        trace = trace_observer if isinstance(trace_observer, ExecutionTraceObserver) else None
-        mem = memory_opt_observer if isinstance(memory_opt_observer, MemoryOptimizationObserver) else None
-        log = logging_observer if isinstance(logging_observer, LoggingObserver) else None
-
-        viz_files = _glob_viz_files(viz_base_dir)
-        snapshot_ok = Path(viz_files.get("snapshot") or "").exists() if "snapshot" in viz_files else False
-        events_ok = Path(viz_files.get("events") or "").exists() if "events" in viz_files else False
-        trace_ok_file = Path(viz_files.get("trace") or "").exists() if "trace" in viz_files else False
-
-        # 固定 5 条 `tickets`, `batch_size=2` -> 3 个 `batch`(2,2,1)
-        ok_trace = bool(trace and len(trace.batches) == 3 and trace.total_loader_calls >= 1)
-        ok_memory = bool(mem and len(mem.row_write_events) >= 5)
-        ok_logging = bool(log is not None)
-        ok_viz = bool(snapshot_ok and events_ok and trace_ok_file)
-        ok_rows = bool(len(rows) == 5 and core.total_rows == 5)
-
-        passed = bool(ok_rows and ok_trace and ok_memory and ok_logging and ok_viz)
-        summary = "rows={} trace={} memory_opt={} logging={} viz={}".format(ok_rows, ok_trace, ok_memory, ok_logging, ok_viz)
-
-        details: Dict[str, Any] = {
-            "yaml_path": str(yaml_path),
-            "out_root_detail": str(out_root_detail),
-            "detail_csv": str(detail_csv_path),
-            "rows": len(rows),
-            "core_total_rows": int(core.total_rows),
-            "observers_present": {
-                "logging": bool(log is not None),
-                "trace": bool(trace is not None),
-                "memory_opt": bool(mem is not None),
-            },
-            "trace_stats": {
-                "batches": len(trace.batches) if trace else None,
-                "total_loader_calls": int(trace.total_loader_calls) if trace else None,
-                "total_row_writes": int(trace.total_row_writes) if trace else None,
-            },
-            "memory_opt_stats": {
-                "field_slim_events": len(mem.field_slim_events) if mem else None,
-                "row_write_events": len(mem.row_write_events) if mem else None,
-                "row_release_events": len(mem.row_release_events) if mem else None,
-            },
-            "viz_files": viz_files,
-        }
-        return ExampleResult(
-            example_id=_EXAMPLE_ID,
-            passed=passed,
-            kind=EXAMPLE_KIND_ORACLE,
-            summary=summary,
-            details=details,
-        )
-
-
-def run_chapter():
-    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)
@@ -177,35 +17,20 @@ def _(mo):
         r"""
         # demo_big_data_report / yaml_dsl_observability_full
 
-        ## 背景
+        ## 回归点
 
-        工程同学维护一份 YAML 报表时,真正“难排查”的通常不是语法错,而是运行期问题:
+        全量可观测性装配：logging / execution_trace / memory_optimization / viz 四类
+        observer 同时生效，产物（detail CSV + scalim-viz 快照/事件/跟踪）可校验。
 
-        - 为什么慢?（哪个 loader 慢 / 哪个批次慢）
-        - 为什么缺?（keys 请求了多少,实际返回多少）
-        - 为什么错?（哪里抛错,上下文是什么）
-        - 为什么占内存?（字段瘦身/行释放是否按预期发生）
+        ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
-        Scalim 把这些变成可配置、可回归的 **observability**。
+        1. 零件：LoggingObserver / ExecutionTraceObserver / MemoryOptimizationObserver + viz 配置
+        2. `run`（batch_size=2 → 固定 5 条 tickets → 3 个 batch）
+        3. 产物定位（detail CSV + `scalim-viz/run_*/` 三文件）
+        4. 五路断言：rows / trace batch / memory / logging / viz
+        5. 汇总 chapter_result
 
-        ## 需求方提问（自然语言）
-
-        维护者：我能不能在运行入口侧打开/关闭这些观测能力,并且在 CI 里确定性验证它真的生效？
-
-        ## 本章覆盖的 runtime entrypoints 能力
-
-        - YAML 只承载业务建模;`observability.*` legacy key 会 warning + ignore
-        - `components=[...]`：挂接 hooks/observers(Logging/Trace/MemoryOpt 等)
-        - `overrides=RunOverrides(viz_config=...)`：启用/配置 Viz 输出(事件/快照/trace)
-
-        ## 对拍点（deterministic）
-
-        - 批大小 `batch_size=2` 下,固定数据集(5 rows)应产生 3 个 batch trace
-        - `viz` 输出目录下必须生成快照/事件/trace 文件
-        - `memory_opt` 至少应记录到行写入事件(>=5)
-
-        SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch080_yaml_dsl_observability_full.py::run_yaml_dsl_observability_full`
+        Gate: `just examples`
         """
     )
     return
@@ -220,43 +45,250 @@ def _():
 
 @app.cell
 def _():
+    from pathlib import Path
+
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
-    _ = ensure_repo_root_on_sys_path(__file__)
+    repo_root = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
     yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "support" / "support_observability_full.yaml"
-    return demo_dir, yaml_path
-
-
-@app.cell(hide_code=True)
-def _(mo, yaml_path):
-    from scalim_misc.notebook_support.yaml_excerpt import excerpt_head
-
-    mo.md("## Demand YAML (head)")
-    mo.md("```yaml\n{}\n```".format(excerpt_head(yaml_path, max_lines=140)))
-    return (excerpt_head,)
+    _ = repo_root
+    return Path, demo_dir, yaml_path
 
 
 @app.cell
-def _(yaml_path):
-    result = run_yaml_dsl_observability_full(yaml_path=yaml_path)
-    return (result,)
+def _(Path):
+    import csv
+    import tempfile
+    from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+    from scalim.dsl.yaml_dsl import (
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunRuntimeOptions,
+        DemandRunSecurityOptions,
+        DemandRunTemplateOptions,
+        RunOverrides,
+        run as run_yaml,
+    )
+    from scalim.ob.presets.execution_trace import ExecutionTraceObserver
+    from scalim.ob.presets.logs import LoggingObserver
+    from scalim.ob.presets.memory import MemoryOptimizationObserver
+    from scalim.ob.presets.viz import VizObserverConfig
+    from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
+
+    return (
+        Any,
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunRuntimeOptions,
+        DemandRunSecurityOptions,
+        DemandRunTemplateOptions,
+        Dict,
+        ExecutionTraceObserver,
+        List,
+        LoggingObserver,
+        MemoryOptimizationObserver,
+        Optional,
+        Path,
+        RunOverrides,
+        Sequence,
+        Tuple,
+        VizObserverConfig,
+        csv,
+        make_chapter_result,
+        render_checks,
+        run_yaml,
+        tempfile,
+    )
+
+
+@app.cell
+def _(Any, Dict, List, Optional, Path, Sequence, Tuple, csv):
+    # 零件: CSV 读取 / observer 查找 / viz 产物定位
+    def read_csv_rows(path: Path) -> List[Dict[str, str]]:
+        rows: List[Dict[str, str]] = []
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                if not row:
+                    continue
+                rows.append({str(k): str(v) if v is not None else "" for k, v in row.items()})
+        return rows
+
+    def find_first_instance(components: Optional[Sequence[object]], cls: type) -> Optional[object]:
+        for c in components or ():
+            if isinstance(c, cls):
+                return c
+        return None
+
+    def glob_viz_files(base_dir: Path) -> Dict[str, str]:
+        scalim_viz_dir = base_dir / "scalim-viz"
+        run_dirs = sorted([p for p in scalim_viz_dir.glob("run_*") if p.is_dir()]) if scalim_viz_dir.exists() else []
+        if len(run_dirs) != 1:
+            return {"runs": str(len(run_dirs)), "dir": str(scalim_viz_dir)}
+        run_dir = run_dirs[0]
+        return {
+            "run_dir": str(run_dir),
+            "snapshot": str(run_dir / "viz_snapshot.json"),
+            "events": str(run_dir / "viz_events.jsonl"),
+            "trace": str(run_dir / "viz_trace.jsonl"),
+        }
+
+    return find_first_instance, glob_viz_files, read_csv_rows
+
+
+@app.cell
+def _(Path, tempfile):
+    import atexit
+    import shutil
+
+    tmp = Path(tempfile.mkdtemp(prefix="scalim-ob-full-"))
+    atexit.register(lambda: shutil.rmtree(tmp, ignore_errors=True))
+    out_root_detail = tmp / "out_detail"
+    viz_base_dir = tmp / "viz_out"
+    ALLOWED_MODULES = frozenset(["scalim_misc.demo_big_data_report.by_yaml_dsl.support_scenario"])
+    print("tmp dir:", tmp)
+    return ALLOWED_MODULES, out_root_detail, tmp, viz_base_dir
+
+
+@app.cell
+def _(Dict, ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver, RunOverrides, VizObserverConfig, out_root_detail, viz_base_dir):
+    # 装配: 四类可观测性 + viz 配置
+    init_vars: Dict[str, object] = {"out_path_detail": str(out_root_detail)}
+    overrides = RunOverrides(
+        viz_config=VizObserverConfig(
+            output_dir=str(viz_base_dir),
+            trace_enabled=True,
+            payload_policy="sample",
+            sample_size=3,
+            append=False,
+            run_name="support-observability",
+            env="ci",
+        )
+    )
+    components = [
+        LoggingObserver(),
+        ExecutionTraceObserver(),
+        MemoryOptimizationObserver(auto_report=False, max_fields=10),
+    ]
+    return components, init_vars, overrides
+
+
+@app.cell
+def _(ALLOWED_MODULES, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver, Path, components, find_first_instance, init_vars, out_root_detail, overrides, run_yaml, yaml_path):
+    result = run_yaml(
+        str(yaml_path),
+        options=DemandRunOptions(
+            security=DemandRunSecurityOptions(allowed_modules=ALLOWED_MODULES),
+            template=DemandRunTemplateOptions(init_vars=init_vars),
+            runtime=DemandRunRuntimeOptions(components=components, batch_size=2),
+            outputs=DemandRunOutputOptions(overrides=overrides),
+        ),
+    )
+    trace_observer = find_first_instance(components, ExecutionTraceObserver)
+    memory_opt_observer = find_first_instance(components, MemoryOptimizationObserver)
+    logging_observer = find_first_instance(components, LoggingObserver)
+    core = result.core
+
+    detail_csv_path = Path(str((core.outputs or {}).get("detail") or ""))
+    print("total_rows =", core.total_rows)
+    print("outputs    =", sorted(core.outputs.keys()) if core.outputs else None)
+    return core, detail_csv_path, logging_observer, memory_opt_observer, result, trace_observer
+
+
+@app.cell
+def _(ExecutionTraceObserver, LoggingObserver, MemoryOptimizationObserver, Path, core, detail_csv_path, find_first_instance, glob_viz_files, logging_observer, memory_opt_observer, read_csv_rows, trace_observer, viz_base_dir):
+    # 产物 + 五路校验
+    rows = read_csv_rows(detail_csv_path) if detail_csv_path.exists() else []
+    trace = trace_observer if isinstance(trace_observer, ExecutionTraceObserver) else None
+    mem = memory_opt_observer if isinstance(memory_opt_observer, MemoryOptimizationObserver) else None
+    log = logging_observer if isinstance(logging_observer, LoggingObserver) else None
+
+    viz_files = glob_viz_files(viz_base_dir)
+    snapshot_ok = Path(viz_files.get("snapshot") or "").exists() if "snapshot" in viz_files else False
+    events_ok = Path(viz_files.get("events") or "").exists() if "events" in viz_files else False
+    trace_ok_file = Path(viz_files.get("trace") or "").exists() if "trace" in viz_files else False
+
+    # 固定 5 条 tickets, batch_size=2 -> 3 个 batch(2,2,1)
+    ok_trace = bool(trace and len(trace.batches) == 3 and trace.total_loader_calls >= 1)
+    ok_memory = bool(mem and len(mem.row_write_events) >= 5)
+    ok_logging = bool(log is not None)
+    ok_viz = bool(snapshot_ok and events_ok and trace_ok_file)
+    ok_rows = bool(len(rows) == 5 and core.total_rows == 5)
+
+    print("rows=", ok_rows, "trace=", ok_trace, "memory=", ok_memory, "logging=", ok_logging, "viz=", ok_viz)
+    return (
+        log,
+        mem,
+        ok_logging,
+        ok_memory,
+        ok_rows,
+        ok_trace,
+        ok_viz,
+        rows,
+        trace,
+        trace_ok_file,
+        events_ok,
+        snapshot_ok,
+        viz_files,
+    )
+
+
+@app.cell
+def _(ok_logging, ok_memory, ok_rows, ok_trace, ok_viz, render_checks):
+    checks = {
+        "rows == 5": ok_rows,
+        "trace 3 batches": ok_trace,
+        "memory 事件 >= 5": ok_memory,
+        "logging observer 装配": ok_logging,
+        "viz 三文件存在": ok_viz,
+    }
+    render_checks(checks)
+    return checks
+
+
+@app.cell
+def _(checks, detail_csv_path, make_chapter_result, ok_logging, ok_memory, ok_rows, ok_trace, ok_viz, out_root_detail, rows, viz_files, yaml_path):
+    passed = bool(all(checks.values()))
+    summary = "rows={} trace={} memory_opt={} logging={} viz={}".format(ok_rows, ok_trace, ok_memory, ok_logging, ok_viz)
+    chapter_result = make_chapter_result(
+        passed=passed,
+        summary=summary,
+        details={
+            "yaml_path": str(yaml_path),
+            "out_root_detail": str(out_root_detail),
+            "detail_csv": str(detail_csv_path),
+            "rows": len(rows),
+            "viz": viz_files,
+            "checks": {k: bool(v) for k, v in checks.items()},
+        },
+    )
+    return chapter_result, passed, summary
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
-    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
-    mo.md("```\n{}\n```".format(result.summary))
+def _(chapter_result, mo):
+    mo.callout(
+        mo.md("## {}: {}".format("✅ PASS" if chapter_result["passed"] else "❌ FAIL", chapter_result["summary"])),
+        kind="success" if chapter_result["passed"] else "danger",
+    )
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
+def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
 
-    rows = details_to_rows(result.details)
-    mo.ui.table(rows, selection=None)
-    return (rows,)
+    table_rows = details_to_rows(chapter_result["details"])
+    mo.ui.table(table_rows, selection=None) if table_rows else mo.md("(无详情)")
+    return
+
+
+def run_chapter():
+    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

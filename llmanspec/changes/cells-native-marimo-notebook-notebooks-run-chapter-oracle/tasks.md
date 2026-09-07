@@ -14,25 +14,25 @@ Seam（已确认）：`ChapterRegistry.run_selected_chapters` / `just examples`�
 
 ## 1. 脚手架 — commit `feat(notebook_support): cells-native 章节模板助手`
 
-- [ ] 1.1 `scalim_misc.notebook_support` 增加 `make_chapter_result(...)`（统一 `{"passed","summary","details"}` 组装 + `details_to_rows` 兼容校验），docstring 写明 cells-native 契约
-- [ ] 1.2 可选：生成 `chapters/ch01x_template.py` 模板（16-cell 骨架：教学目标 → imports → 控件 → 零件 → fixtures → options → run → 断言 → chapter_result）
-- [ ] 1.3 DoD: `marimo check` 模板 0 critical；`just examples` 不回归（模板不入 registry，仅文档用途）
+- [x] 1.1 `scalim_misc.notebook_support` 增加 `make_chapter_result(...)`（统一 `{"passed","summary","details"}` 组装 + `details_to_rows` 兼容校验），docstring 写明 cells-native 契约
+- [x] 1.2 可选：生成 `chapters/ch01x_template.py` 模板（16-cell 骨架：教学目标 → imports → 控件 → 零件 → fixtures → options → run → 断言 → chapter_result）
+- [x] 1.3 DoD: `marimo check` 模板 0 critical；`just examples` 不回归（模板不入 registry，仅文档用途）
 
 ## 2. 迁移 example_hooks_events_scenarios 剩余章节 — commit `refactor(notebooks): hooks_events ch020-050 cells-native 化`
 
-- [ ] 2.1 ch020_precheck_route_sync_async：主流程入 cells（修复 cell 内自引用 `chapter_result[...]` NameError）
-- [ ] 2.2 ch030_upload_retry：主流程入 cells（含 503 重试观察点）
-- [ ] 2.3 ch040_pre_use_batch_size：主流程入 cells（batch_size 交互滑块）
-- [ ] 2.4 ch050_workflow_viz_finished：主流程入 cells（viz 事件流展示）
-- [ ] 2.5 删除各章 support/*.py 中被搬空的主流程；保留 fixtures.py/http_mock.py
-- [ ] 2.6 DoD: `marimo check` 无 critical；`just examples`（suite 过滤）5/5；`pytest tests/integration/test_example_hooks_events_scenarios.py` 绿
+- [x] 2.1 ch020_precheck_route_sync_async：主流程入 cells（修复 cell 内自引用 `chapter_result[...]` NameError）
+- [x] 2.2 ch030_upload_retry：主流程入 cells（含 503 重试观察点）
+- [x] 2.3 ch040_pre_use_batch_size：主流程入 cells（batch_size 交互滑块）
+- [x] 2.4 ch050_workflow_viz_finished：主流程入 cells（viz 事件流展示）
+- [x] 2.5 删除各章 support/*.py 中被搬空的主流程；保留 fixtures.py/http_mock.py
+- [x] 2.6 DoD: `marimo check` 无 critical；`just examples`（suite 过滤）5/5；`pytest tests/integration/test_example_hooks_events_scenarios.py` 绿
 
 ## 3. 迁移 demo_big_data_report/chapters_of_yaml_dsl（21 章）— 分批 commit
 
-- [ ] 3.1 首批 5 章（ch010/ch020/ch030/ch040/ch050）：模块级 `run_*()` 拆为渐进 cells（fixtures/oracle 保留在 `scalim_misc.demo_big_data_report`）
-- [ ] 3.2 第二批 8 章（ch060-090 + 调试 061-066 分组）
-- [ ] 3.3 第三批 8 章（ch100-150）
-- [ ] 3.4 DoD: `just examples` 主线 suite 全绿；抽查 `marimo check` 无 critical
+- [x] 3.1 首批 5 章（ch010/ch020/ch030/ch040/ch050）：模块级 `run_*()` 拆为渐进 cells（fixtures/oracle 保留在 `scalim_misc.demo_big_data_report`）
+- [x] 3.2 第二批 8 章（ch060-090 + 调试 061-066 分组）
+- [x] 3.3 第三批 8 章（ch100-150）
+- [x] 3.4 DoD: `just examples` 主线 suite 全绿；抽查 `marimo check` 无 critical
 
 ## 4. 迁移 example_public_api_suite（13 章）
 

@@ -1,107 +1,14 @@
+"""Cells-native marimo notebook: ch150_workflow_temporal_field_values.
+
+迁移对照:
+  Before: 模块级 run_*() + _run_in_dir 闭包持全部逻辑;cells 薄壳
+  After:  工作副本/运行/产物定位/oracle 全部在 cells 内
+"""
+
 import marimo
-
-import os
-import shutil
-import tempfile
-from pathlib import Path
-from typing import Any, Dict, Optional
-
-from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
-from scalim.shortcuts.resources import outputs as outputs_api
-from scalim_misc.demo_big_data_report.temporal_field_values_demo import verify_temporal_field_values_example
-from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
-_EXAMPLE_ID = "demo_big_data_report/workflow_temporal_field_values"
-
-
-def run_workflow_temporal_field_values(
-    *,
-    workflow_yaml_path: Optional[Path] = None,
-    output_dir: Optional[Path] = None,
-    clean_output_dir: bool = True,
-) -> ExampleResult:
-    if workflow_yaml_path is None:
-        demo_dir = Path(__file__).resolve().parents[1]
-        workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_demo_temporal_field_values.yaml"
-
-    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.temporal_field_values_demo"])
-    repo_root = Path(__file__).resolve().parents[4]
-
-    def _run_in_dir(out_dir: Path) -> ExampleResult:
-        out_root = out_dir / "out"
-        if clean_output_dir:
-            shutil.rmtree(str(out_root), ignore_errors=True)
-            try:
-                (out_dir / "workflow.yaml").unlink()
-            except FileNotFoundError:
-                pass
-            except OSError:
-                pass
-
-        demand_name = "workflow_demo_temporal_field_values_demand.yaml"
-        wf_copy = out_dir / "workflow.yaml"
-        wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
-        (out_dir / demand_name).write_text((workflow_yaml_path.parent / demand_name).read_text(encoding="utf-8"), encoding="utf-8")
-
-        try:
-            prev_cwd = os.getcwd()
-            os.chdir(str(out_dir))
-            try:
-                result = run_workflow(
-                    str(wf_copy),
-                    options=WorkflowRunOptions(
-                        demand=DemandRunOptions(
-                            security=DemandRunSecurityOptions(
-                                allowed_modules=allowed_modules,
-                                allowed_yaml_roots=(str(repo_root),),
-                            )
-                        ),
-                        path_aliases={"@": str(repo_root)},
-                    ),
-                )
-            finally:
-                os.chdir(prev_cwd)
-        except Exception as exc:  # noqa: BLE001
-            return ExampleResult(
-                example_id=_EXAMPLE_ID,
-                passed=False,
-                kind=EXAMPLE_KIND_ORACLE,
-                summary="workflow failed: {}: {}".format(type(exc).__name__, exc),
-                details={"exc_type": type(exc).__name__},
-            )
-
-        errors = result.errors()
-        report_xlsx = None
-        try:
-            latest = outputs_api.load_latest_outputs(out_root)
-            report_xlsx = latest.books.get("report")
-        except Exception as exc:  # noqa: BLE001
-            return ExampleResult(
-                example_id=_EXAMPLE_ID,
-                passed=False,
-                kind=EXAMPLE_KIND_ORACLE,
-                summary="load_latest_outputs failed: {}: {}".format(type(exc).__name__, exc),
-                details={"exc_type": type(exc).__name__, "errors": errors},
-            )
-
-        return verify_temporal_field_values_example(
-            example_id=_EXAMPLE_ID,
-            book_path=report_xlsx,
-            errors=errors,
-        )
-
-    if output_dir is None:
-        with tempfile.TemporaryDirectory(prefix="scalim_temporal_fv_") as tmp:
-            return _run_in_dir(Path(tmp))
-    return _run_in_dir(Path(output_dir))
-
-
-def run_chapter():
-    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)
@@ -110,22 +17,20 @@ def _(mo):
         r"""
         # demo_big_data_report / workflow_temporal_field_values
 
-        ## 背景
+        ## 回归点
 
-        `c5` 之后 workflow xlsx 中间态为 typed `InMemoryRows`。若 `FieldValue` 不含时间类型，
-        loader 返回的 `datetime`/`date`/`time`/`timedelta` 曾被 `str()`，Excel 变成文本列。
+        workflow 中的时间语义字段值（temporal field values）：经 workflow 运行 +
+        `report.xlsx` 产物，用 `verify_temporal_field_values_example` 对拍。
 
-        ## 对拍点
+        ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
-        - 最小 1-run workflow → 共享 `xlsx` book
-        - 读回单元格：`data_type == "d"`，Python 类型为时间类型（不是 `str`）
-        - `order_id` 仍为数值（回归）
+        1. 配置 + 工作副本（workflow + demand 拷贝到临时目录）
+        2. `run_workflow`（cwd=out_dir + path_aliases）
+        3. 产物定位（report.xlsx 最新版本）
+        4. oracle 对拍（verify_temporal_field_values_example）
+        5. 汇总 chapter_result
 
-        Gate: `just examples` / `just qa`
-
-        SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch150_workflow_temporal_field_values.py::run_workflow_temporal_field_values`
-        - `packages/scalim-misc/.../temporal_field_values_demo.py`
+        Gate: `just examples`
         """
     )
     return
@@ -140,43 +45,166 @@ def _():
 
 @app.cell
 def _():
+    from pathlib import Path
+
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
-    _ = ensure_repo_root_on_sys_path(__file__)
+    repo_root = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
     workflow_yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "workflow_demo_temporal_field_values.yaml"
-    return demo_dir, workflow_yaml_path
-
-
-@app.cell(hide_code=True)
-def _(mo, workflow_yaml_path):
-    from scalim_misc.notebook_support.yaml_excerpt import excerpt_head
-
-    mo.md("## Workflow fixture")
-    mo.md("```yaml\n{}\n```".format(excerpt_head(workflow_yaml_path, max_lines=80)))
-    return excerpt_head
+    _ = repo_root
+    return Path, demo_dir, repo_root, workflow_yaml_path
 
 
 @app.cell
-def _(workflow_yaml_path):
-    result = run_workflow_temporal_field_values(workflow_yaml_path=workflow_yaml_path)
-    return (result,)
+def _(Path):
+    import os
+    import shutil
+    import tempfile
+    from typing import Any, Dict, Optional
+
+    from scalim.dsl.yaml_dsl import DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, run_workflow
+    from scalim.shortcuts.resources import outputs as outputs_api
+    from scalim_misc.demo_big_data_report.temporal_field_values_demo import verify_temporal_field_values_example
+    from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
+
+    return (
+        Any,
+        DemandRunOptions,
+        DemandRunSecurityOptions,
+        Dict,
+        Optional,
+        Path,
+        WorkflowRunOptions,
+        make_chapter_result,
+        os,
+        outputs_api,
+        render_checks,
+        run_workflow,
+        shutil,
+        tempfile,
+        verify_temporal_field_values_example,
+    )
+
+
+@app.cell
+def _(Path, repo_root, shutil, tempfile):
+    import atexit
+
+    allowed_modules = frozenset(["scalim_misc.demo_big_data_report.temporal_field_values_demo"])
+
+    out_dir = Path(tempfile.mkdtemp(prefix="scalim_temporal_fv_")).resolve()
+    atexit.register(lambda: shutil.rmtree(out_dir, ignore_errors=True))
+    out_root = out_dir / "out"
+    shutil.rmtree(str(out_root), ignore_errors=True)
+    try:
+        (out_dir / "workflow.yaml").unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+    print("out_dir:", out_dir)
+    return allowed_modules, out_dir, out_root
+
+
+@app.cell
+def _(out_dir, workflow_yaml_path):
+    # 工作副本: workflow.yaml + demand 拷贝
+    demand_name = "workflow_demo_temporal_field_values_demand.yaml"
+    wf_copy = out_dir / "workflow.yaml"
+    wf_copy.write_text(workflow_yaml_path.read_text(encoding="utf-8"), encoding="utf-8")
+    (out_dir / demand_name).write_text(
+        (workflow_yaml_path.parent / demand_name).read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    print("wf_copy:", wf_copy)
+    return demand_name, wf_copy
+
+
+@app.cell
+def _(DemandRunOptions, DemandRunSecurityOptions, WorkflowRunOptions, allowed_modules, os, repo_root, run_workflow, wf_copy):
+    prev_cwd = os.getcwd()
+    os.chdir(str(wf_copy.parent))
+    try:
+        result = run_workflow(
+            str(wf_copy),
+            options=WorkflowRunOptions(
+                demand=DemandRunOptions(
+                    security=DemandRunSecurityOptions(
+                        allowed_modules=allowed_modules,
+                        allowed_yaml_roots=(str(repo_root),),
+                    )
+                ),
+                path_aliases={"@": str(repo_root)},
+            ),
+        )
+    finally:
+        os.chdir(prev_cwd)
+
+    errors = result.errors()
+    print("outcomes =", [o.run_id for o in result.outcomes])
+    print("errors   =", len(errors))
+    return errors, result
+
+
+@app.cell
+def _(out_root, outputs_api):
+    latest = outputs_api.load_latest_outputs(out_root)
+    report_xlsx = latest.books.get("report")
+    print("report_xlsx =", report_xlsx)
+    return latest, report_xlsx
+
+
+@app.cell
+def _(errors, render_checks, report_xlsx, verify_temporal_field_values_example):
+    # oracle 对拍
+    oracle_result = verify_temporal_field_values_example(
+        example_id="demo_big_data_report/workflow_temporal_field_values",
+        book_path=report_xlsx,
+        errors=errors,
+    )
+    checks = {"temporal field values 对拍通过": bool(oracle_result.passed)}
+    render_checks(checks)
+    return oracle_result, checks
+
+
+@app.cell
+def _(checks, make_chapter_result, oracle_result):
+    passed = bool(all(checks.values()))
+    summary = str(oracle_result.summary)
+    chapter_result = make_chapter_result(
+        passed=passed,
+        summary=summary,
+        details={
+            "oracle": oracle_result.details,
+            "checks": {k: bool(v) for k, v in checks.items()},
+        },
+    )
+    return chapter_result, passed, summary
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
-    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
-    mo.md("```\n{}\n```".format(result.summary))
+def _(chapter_result, mo):
+    mo.callout(
+        mo.md("## {}: {}".format("✅ PASS" if chapter_result["passed"] else "❌ FAIL", chapter_result["summary"])),
+        kind="success" if chapter_result["passed"] else "danger",
+    )
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
+def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
 
-    rows = details_to_rows(result.details)
-    mo.ui.table(rows, selection=None)
-    return (rows,)
+    table_rows = details_to_rows(chapter_result["details"])
+    mo.ui.table(table_rows, selection=None) if table_rows else mo.md("(无详情)")
+    return
+
+
+def run_chapter():
+    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

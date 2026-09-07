@@ -120,6 +120,7 @@ def _(repo_root):
     _ = repo_root
     return (
         ALLOWED_MODULES,
+        Any,
         Dict,
         Event,
         EventDispatchObserver,

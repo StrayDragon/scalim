@@ -1,203 +1,15 @@
+"""Cells-native marimo notebook: ch010_yaml_dsl_ecommerce.
+
+迁移对照:
+  Before: 模块级 run_yaml_dsl_ecommerce() 持全部逻辑;cells 薄壳;run_chapter()
+          引用不存在的 defs["chapter_result"]（headless 走 run_<id> 才掩盖）
+  After:  主流程全部在 cells 内;模块级仅 app + run_chapter() 薄适配层
+"""
+
 import marimo
-
-import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set
-
-from scalim.dsl.yaml_dsl import (
-    CaptureRows,
-    DemandRunOptions,
-    DemandRunOutputOptions,
-    DemandRunRuntimeOptions,
-    DemandRunSecurityOptions,
-    DemandRunTemplateOptions,
-    LookupChunking,
-    compile as compile_yaml,
-    run as run_yaml,
-)
-from scalim.events import Event, EventType
-from scalim.hooks import BaseHook
-from scalim.ob.observer import Observer
-from scalim.typedefs import RowData
-from scalim_misc.demo_big_data_report.cases import build_test_config_small
-from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
-from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL
-from scalim_misc.demo_big_data_report.verification import VerificationResult, verify_scalim_output
-from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
-_EXAMPLE_ID = "demo_big_data_report/yaml_dsl_ecommerce"
-_CUSTOMER_CHUNK = 5
-
-
-class _CustomerChunkObserver(Observer):
-    def __init__(self) -> None:
-        self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
-        self.offsets: List[Optional[int]] = []
-        self.counts: List[Optional[int]] = []
-
-    def on_event(self, event: Event) -> None:
-        if event.event_type is not EventType.LOADER_CALL:
-            return
-        payload = event.payload
-        if str(getattr(payload, "loader_name", "") or "") != "customers":
-            return
-        offset = getattr(payload, "chunk_offset", None)
-        count = getattr(payload, "lookup_key_count", None)
-        self.offsets.append(None if offset is None else int(offset))
-        self.counts.append(None if count is None else int(count))
-
-
-class _CustomerChunkHook(BaseHook):
-    def __init__(self) -> None:
-        self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
-        self.call_count = 0
-
-    def on_loader_call(self, event: Event) -> None:
-        payload = event.payload
-        if str(getattr(payload, "loader_name", "") or "") == "customers":
-            self.call_count += 1
-
-
-def _extract_verifiable_fields(rows: Sequence[RowData]) -> List[str]:
-    if not rows:
-        return []
-    keys = set(rows[0].keys())
-    return [field for field in TARGET_FIELDS_FULL if field in keys]
-
-
-def run_yaml_dsl_ecommerce(
-    cfg: Optional[ECommerceConfig] = None,
-    *,
-    yaml_path: Optional[Path] = None,
-    init_vars: Optional[Dict[str, object]] = None,
-) -> ExampleResult:
-    if cfg is None:
-        cfg = build_test_config_small()
-    if yaml_path is None:
-        demo_dir = Path(__file__).resolve().parents[1]
-        yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_report.yaml"
-    prev = get_config()
-    set_config(cfg)
-    try:
-        loader_module = "scalim_misc.demo_big_data_report.loaders"
-        allowed_modules = frozenset([loader_module])
-        init_vars = init_vars or {"order_ids": []}
-
-        # 1) `compile`: 语义校验 + 生成编译产物(执行请求等),供下游运行入口复用
-        try:
-            security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
-            template = DemandRunTemplateOptions(init_vars=init_vars)
-            runtime = DemandRunRuntimeOptions(
-                lookup_chunking={"customers": LookupChunking.sized(_CUSTOMER_CHUNK)},
-            )
-            compilation = compile_yaml(
-                str(yaml_path),
-                options=DemandRunOptions(security=security, template=template, runtime=runtime),
-            )
-        except Exception as exc:
-            summary = "compile failed: {}".format(exc)
-            return ExampleResult(
-                example_id=_EXAMPLE_ID,
-                passed=False,
-                kind=EXAMPLE_KIND_ORACLE,
-                summary=summary,
-                details={"error": str(exc)},
-            )
-
-        demand_config = compilation.config
-        observer = _CustomerChunkObserver()
-        hook = _CustomerChunkHook()
-        run_runtime = DemandRunRuntimeOptions(
-            lookup_chunking={"customers": LookupChunking.sized(_CUSTOMER_CHUNK)},
-            components=[observer, hook],
-        )
-
-        # 2) `run`: 显式启用 `CaptureRows`,在内存中拿到行数据
-        start = time.time()
-        result = run_yaml(
-            str(yaml_path),
-            options=DemandRunOptions(
-                security=security,
-                template=template,
-                runtime=run_runtime,
-                outputs=DemandRunOutputOptions(capture=CaptureRows()),
-            ),
-        )
-        elapsed = time.time() - start
-
-        captured_rows = result.captured_rows
-        rows = [] if captured_rows is None else list(captured_rows.iter_row_data())
-        if not rows:
-            return ExampleResult(
-                example_id=_EXAMPLE_ID,
-                passed=False,
-                kind=EXAMPLE_KIND_ORACLE,
-                summary="YAML run produced no rows",
-                details={"duration_seconds": elapsed, "result": result},
-            )
-
-        # 3) `rows-binding` 对拍字段校验(来自唯一完整 YAML 示例)
-        match_fields = ["rows_name_match", "rows_level_match"]
-        mismatch = 0
-        for row in rows:
-            for field in match_fields:
-                if not row.get(field):
-                    mismatch += 1
-                    break
-
-        # 4) 基于纯 Python 对照组对拍(只检查可验证字段子集)
-        fields_to_check = _extract_verifiable_fields(rows)
-        verification: VerificationResult = verify_scalim_output(rows, fields_to_check=fields_to_check)
-
-        passed = bool(verification.passed and mismatch == 0)
-        unique_customers = int(cfg.customer_count)
-        expected_calls = (unique_customers + _CUSTOMER_CHUNK - 1) // _CUSTOMER_CHUNK
-        expected_offsets = list(range(0, unique_customers, _CUSTOMER_CHUNK))
-        expected_counts = [min(_CUSTOMER_CHUNK, unique_customers - offset) for offset in expected_offsets]
-        chunk_ok = bool(observer.offsets == expected_offsets and observer.counts == expected_counts and hook.call_count == expected_calls)
-        passed = bool(passed and chunk_ok)
-        summary = "rows={} elapsed={:.3f}s verify={} rows_match_failures={} customers_chunks={}".format(
-            len(rows), elapsed, verification.passed, mismatch, observer.offsets
-        )
-        if not chunk_ok:
-            summary = summary + "\ncustomers chunk oracle failed: offsets={} counts={} hook={}".format(
-                observer.offsets, observer.counts, hook.call_count
-            )
-        if mismatch:
-            summary = summary + "\nrows match fields failed on {} rows".format(mismatch)
-        if not verification.passed:
-            summary = summary + "\n" + verification.summary
-
-        details: Dict[str, Any] = {
-            "duration_seconds": elapsed,
-            "rows": len(rows),
-            "result": result,
-            "demand_config": demand_config,
-            "compilation": compilation,
-            "verification": verification,
-            "fields_checked": fields_to_check,
-            "rows_match_failures": mismatch,
-            "customers_chunk_offsets": list(observer.offsets),
-            "customers_chunk_counts": list(observer.counts),
-            "customers_hook_calls": hook.call_count,
-        }
-        return ExampleResult(
-            example_id=_EXAMPLE_ID,
-            passed=passed,
-            kind=EXAMPLE_KIND_ORACLE,
-            summary=summary,
-            details=details,
-        )
-    finally:
-        set_config(prev)
-
-
-def run_chapter():
-    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 @app.cell(hide_code=True)
@@ -220,6 +32,14 @@ def _(mo):
         - SQL：依赖数仓与口径治理，落地成本高
         - **YAML DSL（本章）**：把“需求→配置→可回归对拍”收敛到一个可校验的需求文件
 
+        ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
+
+        1. 配置（`build_test_config_small`）→ 零件（Observer/Hook 类，可见）
+        2. `compile`: 语义校验 + 生成编译产物
+        3. `run`: 显式 `CaptureRows` → 内存行数据
+        4. 验证: rows-binding 字段对拍 + 纯 Python 对照组 + customers 分块 oracle
+        5. 汇总 chapter_result
+
         ## 对拍点（deterministic）
 
         - YAML SSOT：`chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
@@ -231,9 +51,6 @@ def _(mo):
         - 相对模块 loader 引用演示：`chapters_of_yaml_dsl/declared_yaml_dsl/relative_module_demo/relative_module_demo.yaml`
         - 在该文件中将光标放到 `loader: ".registry:load_orders"` 上触发 `go-to-definition`，
           应能跳转到同目录 `registry.py` 中的 `load_orders` 定义
-
-        SSOT:
-        - `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch010_yaml_dsl_ecommerce.py::run_yaml_dsl_ecommerce`
         """
     )
     return
@@ -248,11 +65,14 @@ def _():
 
 @app.cell
 def _():
+    from pathlib import Path
+
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
-    _ = ensure_repo_root_on_sys_path(__file__)
+    repo_root = ensure_repo_root_on_sys_path(__file__)
     demo_dir = Path(__file__).resolve().parents[1]
     yaml_path = demo_dir / "chapters_of_yaml_dsl" / "declared_yaml_dsl" / "ecommerce_report.yaml"
+    _ = repo_root
     return demo_dir, yaml_path
 
 
@@ -273,25 +93,277 @@ def _(mo, yaml_path):
 
 @app.cell
 def _(yaml_path):
+    import time
+    from typing import Dict, List, Optional, Sequence, Set
+
+    from scalim.dsl.yaml_dsl import (
+        CaptureRows,
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunRuntimeOptions,
+        DemandRunSecurityOptions,
+        DemandRunTemplateOptions,
+        LookupChunking,
+        compile as compile_yaml,
+        run as run_yaml,
+    )
+    from scalim.events import Event, EventType
+    from scalim.hooks import BaseHook
+    from scalim.ob.observer import Observer
+    from scalim.typedefs import RowData
+    from scalim_misc.demo_big_data_report.cases import build_test_config_small
+    from scalim_misc.demo_big_data_report.loaders import ECommerceConfig, get_config, set_config
+    from scalim_misc.demo_big_data_report.shared import TARGET_FIELDS_FULL
+    from scalim_misc.demo_big_data_report.verification import VerificationResult, verify_scalim_output
+    from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
+
+    _ = yaml_path
+    return (
+        BaseHook,
+        CaptureRows,
+        DemandRunOptions,
+        DemandRunOutputOptions,
+        DemandRunRuntimeOptions,
+        DemandRunSecurityOptions,
+        DemandRunTemplateOptions,
+        Dict,
+        ECommerceConfig,
+        Event,
+        EventType,
+        List,
+        LookupChunking,
+        Observer,
+        Optional,
+        RowData,
+        Sequence,
+        Set,
+        TARGET_FIELDS_FULL,
+        VerificationResult,
+        build_test_config_small,
+        compile_yaml,
+        get_config,
+        make_chapter_result,
+        render_checks,
+        run_yaml,
+        set_config,
+        time,
+        verify_scalim_output,
+    )
+
+
+@app.cell
+def _(build_test_config_small):
     cfg = build_test_config_small()
-    result = run_yaml_dsl_ecommerce(cfg, yaml_path=yaml_path)
-    return cfg, result
+    _CUSTOMER_CHUNK = 5  # customers lookup 分块大小(本章教学旋钮)
+    print("cfg.customer_count =", cfg.customer_count)
+    print("customers 分块     =", _CUSTOMER_CHUNK)
+    return _CUSTOMER_CHUNK, cfg
+
+
+@app.cell
+def _(BaseHook, Event, EventType, List, Observer, Optional, RowData, Sequence, Set, TARGET_FIELDS_FULL):
+    # 零件: 观察 customers loader 的分块调用（Observer 视角）
+    class CustomerChunkObserver(Observer):
+        def __init__(self) -> None:
+            self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
+            self.offsets: List[Optional[int]] = []
+            self.counts: List[Optional[int]] = []
+
+        def on_event(self, event: Event) -> None:
+            if event.event_type is not EventType.LOADER_CALL:
+                return
+            payload = event.payload
+            if str(getattr(payload, "loader_name", "") or "") != "customers":
+                return
+            offset = getattr(payload, "chunk_offset", None)
+            count = getattr(payload, "lookup_key_count", None)
+            self.offsets.append(None if offset is None else int(offset))
+            self.counts.append(None if count is None else int(count))
+
+    # 零件: 同一事件（Hook 视角）
+    class CustomerChunkHook(BaseHook):
+        def __init__(self) -> None:
+            self.event_types: Optional[Set[EventType]] = {EventType.LOADER_CALL}
+            self.call_count = 0
+
+        def on_loader_call(self, event: Event) -> None:
+            payload = event.payload
+            if str(getattr(payload, "loader_name", "") or "") == "customers":
+                self.call_count += 1
+
+    # 零件: 只检查可验证字段子集
+    def extract_verifiable_fields(rows: Sequence[RowData]) -> List[str]:
+        if not rows:
+            return []
+        keys = set(rows[0].keys())
+        return [field for field in TARGET_FIELDS_FULL if field in keys]
+
+    return CustomerChunkHook, CustomerChunkObserver, extract_verifiable_fields
+
+
+@app.cell
+def _(cfg, set_config):
+    # 加载器全局配置注入（与模块级 run_* 的 set_config 语义一致）
+    set_config(cfg)
+    loader_module = "scalim_misc.demo_big_data_report.loaders"
+    allowed_modules = frozenset([loader_module])
+    init_vars = {"order_ids": []}
+    return allowed_modules, init_vars
+
+
+@app.cell
+def _(DemandRunOptions, DemandRunRuntimeOptions, DemandRunSecurityOptions, DemandRunTemplateOptions, LookupChunking, allowed_modules, compile_yaml, init_vars, yaml_path):
+    _CUSTOMER_CHUNK = 5  # 与配置 cell 同步（保持单点可改后两边对齐）
+
+    security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
+    template = DemandRunTemplateOptions(init_vars=init_vars)
+    runtime = DemandRunRuntimeOptions(
+        lookup_chunking={"customers": LookupChunking.sized(_CUSTOMER_CHUNK)},
+    )
+
+    compilation = compile_yaml(
+        str(yaml_path),
+        options=DemandRunOptions(security=security, template=template, runtime=runtime),
+    )
+    demand_config = compilation.config
+
+    print("✅ compile() 通过")
+    print("demand_config 类型:", type(demand_config).__name__)
+    print("customers lookup_chunk_size =", _CUSTOMER_CHUNK)
+
+    return compilation, demand_config, runtime, security, template
+
+
+@app.cell
+def _(CustomerChunkHook, CustomerChunkObserver, CaptureRows, DemandRunOptions, DemandRunOutputOptions, DemandRunRuntimeOptions, LookupChunking, compile_yaml, make_chapter_result, render_checks, run_yaml, security, template, time, yaml_path):
+    _CUSTOMER_CHUNK = 5
+
+    observer = CustomerChunkObserver()
+    hook = CustomerChunkHook()
+    run_runtime = DemandRunRuntimeOptions(
+        lookup_chunking={"customers": LookupChunking.sized(_CUSTOMER_CHUNK)},
+        components=[observer, hook],
+    )
+
+    start = time.time()
+    result = run_yaml(
+        str(yaml_path),
+        options=DemandRunOptions(
+            security=security,
+            template=template,
+            runtime=run_runtime,
+            outputs=DemandRunOutputOptions(capture=CaptureRows()),
+        ),
+    )
+    elapsed = time.time() - start
+
+    captured_rows = result.captured_rows
+    rows = [] if captured_rows is None else list(captured_rows.iter_row_data())
+    print("total_rows =", result.total_rows)
+    print("captured   =", len(rows), "rows")
+    print("elapsed    = {:.3f}s".format(elapsed))
+    print("customers 分块 offsets =", observer.offsets)
+    print("customers 分块 counts =", observer.counts)
+
+    return elapsed, hook, observer, result, rows, run_runtime
+
+
+@app.cell
+def _(CustomerChunkHook, CustomerChunkObserver, VerificationResult, extract_verifiable_fields, cfg, elapsed, hook, observer, render_checks, result, rows, verify_scalim_output):
+    # 验证 1: rows-binding 对拍字段（来自唯一完整 YAML 示例）
+    match_fields = ["rows_name_match", "rows_level_match"]
+    mismatch = 0
+    for row in rows:
+        for field in match_fields:
+            if not row.get(field):
+                mismatch += 1
+                break
+
+    # 验证 2: 纯 Python 对照组（只检查可验证字段子集）
+    fields_to_check = extract_verifiable_fields(rows)
+    verification: VerificationResult = verify_scalim_output(rows, fields_to_check=fields_to_check)
+
+    # 验证 3: customers lookup 分块 oracle
+    unique_customers = int(cfg.customer_count)
+    _CUSTOMER_CHUNK = 5
+    expected_calls = (unique_customers + _CUSTOMER_CHUNK - 1) // _CUSTOMER_CHUNK
+    expected_offsets = list(range(0, unique_customers, _CUSTOMER_CHUNK))
+    expected_counts = [min(_CUSTOMER_CHUNK, unique_customers - offset) for offset in expected_offsets]
+    chunk_ok = bool(
+        observer.offsets == expected_offsets
+        and observer.counts == expected_counts
+        and hook.call_count == expected_calls
+    )
+
+    checks = {
+        "对照组验证通过": verification.passed,
+        "rows-binding 字段无缺失": mismatch == 0,
+        "customers 分块 oracle": chunk_ok,
+    }
+    render_checks(checks)
+    print("fields_checked =", fields_to_check)
+
+    return checks, chunk_ok, fields_to_check, mismatch, verification
+
+
+@app.cell
+def _(checks, chunk_ok, compilation, demand_config, elapsed, fields_to_check, hook, make_chapter_result, mismatch, observer, result, rows, verification):
+    passed = bool(all(checks.values()))
+    summary = "rows={} elapsed={:.3f}s verify={} rows_match_failures={} customers_chunks={}".format(
+        len(rows), elapsed, verification.passed, mismatch, observer.offsets
+    )
+    if not chunk_ok:
+        summary = summary + "\ncustomers chunk oracle failed: offsets={} counts={} hook={}".format(
+            observer.offsets, observer.counts, hook.call_count
+        )
+    if mismatch:
+        summary = summary + "\nrows match fields failed on {} rows".format(mismatch)
+    if not verification.passed:
+        summary = summary + "\n" + verification.summary
+
+    chapter_result = make_chapter_result(
+        passed=passed,
+        summary=summary,
+        details={
+            "duration_seconds": elapsed,
+            "rows": len(rows),
+            "result": result,
+            "demand_config": demand_config,
+            "compilation": compilation,
+            "verification": verification,
+            "fields_checked": fields_to_check,
+            "rows_match_failures": mismatch,
+            "customers_chunk_offsets": list(observer.offsets),
+            "customers_chunk_counts": list(observer.counts),
+            "customers_hook_calls": hook.call_count,
+            "checks": {k: bool(v) for k, v in checks.items()},
+        },
+    )
+    return chapter_result, passed, summary
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
-    mo.callout(mo.md("## {}".format("PASS" if result.passed else "FAIL")), kind="success" if result.passed else "danger")
-    mo.md("```\n{}\n```".format(result.summary))
+def _(chapter_result, mo):
+    mo.callout(
+        mo.md("## {}: {}".format("✅ PASS" if chapter_result["passed"] else "❌ FAIL", chapter_result["summary"])),
+        kind="success" if chapter_result["passed"] else "danger",
+    )
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, result):
+def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
 
-    rows = details_to_rows(result.details)
-    mo.ui.table(rows, selection=None)
-    return (rows,)
+    detail_rows = details_to_rows(chapter_result["details"])
+    mo.ui.table(detail_rows, selection=None) if detail_rows else mo.md("(无详情)")
+    return
+
+
+def run_chapter():
+    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
+    outputs, defs = app.run()
+    return defs["chapter_result"]
 
 
 if __name__ == "__main__":
