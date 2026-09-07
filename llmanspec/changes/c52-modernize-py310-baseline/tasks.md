@@ -44,8 +44,8 @@ Seam（已确认）：pytest 全量 + `just check-only-py` / `just qa` / `just e
 
 ## 5. CI matrix — commit `ci: expand python matrix to 3.10-3.14 with layered checks`
 
-- [ ] 5.1 `ci.yaml`：matrix `["3.10","3.11","3.12","3.13","3.14"]`；matrix job 跑 `just check-only-py`；新增/改造一个 latest job 跑全量 `just qa` 兜底
-- [ ] 5.2 `publish-pypi.yaml`：确认 `just check-only-py` 步骤随 4.x 生效后无需 docker。DoD: workflow YAML 语法/动作版本检查通过
+- [x] 5.1 `ci.yaml`：matrix `["3.10","3.11","3.12","3.13","3.14"]`；matrix job 跑 `just check-only-py`；新增/改造一个 latest job 跑全量 `just qa` 兜底
+- [x] 5.2 `publish-pypi.yaml`：确认 `just check-only-py` 步骤随 4.x 生效后无需 docker。DoD: workflow YAML 语法/动作版本检查通过
 
 ## 6. 说明面与生成物 — commit `docs: update python support policy to 3.10+ (README/AGENTS/checklist/benchmark wording)`
 
