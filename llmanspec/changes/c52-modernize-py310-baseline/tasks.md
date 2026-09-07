@@ -6,10 +6,10 @@ Seam（已确认）：pytest 全量 + `just check-only-py` / `just qa` / `just e
 
 ## 0. Specs landing（propose / 绑定分支，apply 前）
 
-- [ ] 0.1 `governance-module-organization`：typing 集中条款改写（3.6→3.10；`typing_extensionsx` → `typing_extensions` 直引 `Self`/`override` + `_internal/strenum.py`；lint 禁令同步）；purpose 行 3.6 → 3.10
-- [ ] 0.2 删除 `vendor-dataclassesx` / `vendor-legacy-sync` 两个 capability（整目录），`valid_scope` 随之消失
-- [ ] 0.3 `governance-package-identity` / `governance-misc` / `workflow-execute-organization` / `workflow-ir` / `execution-structure` / `yaml-dsl-workflow` 的 3.6 条款 → 3.10 / 「项目运行时边界（ROADMAP）」；`yaml-dsl-workflow` 最小环境 → `3.10 + typing-extensions>=4.4`
-- [ ] 0.4 commit specs（Specs landing）。DoD: `llman sdd show c52-modernize-py310-baseline --json` → `readyToImplement=true`
+- [x] 0.1 `governance-module-organization`：typing 集中条款改写（3.6→3.10；`typing_extensionsx` → `typing_extensions` 直引 `Self`/`override` + `_internal/strenum.py`；lint 禁令同步）；purpose 行 3.6 → 3.10
+- [x] 0.2 删除 `vendor-dataclassesx` / `vendor-legacy-sync` 两个 capability（整目录），`valid_scope` 随之消失
+- [x] 0.3 `governance-package-identity` / `governance-misc` / `workflow-execute-organization` / `workflow-ir` / `execution-structure` / `yaml-dsl-workflow` / `yaml-backend-migration` 的 3.6 条款 → 3.10 / 「项目运行时边界（ROADMAP）」；`yaml-dsl-workflow` 最小环境 → `3.10 + typing-extensions>=4.4`
+- [x] 0.4 commit specs（Specs landing）。DoD: `llman sdd show c52-modernize-py310-baseline --json` → `readyToImplement=true`
 
 ## 1. 配置面 floor bump — commit `chore: raise runtime floor to python>=3.10 (toolchain config)`
 
