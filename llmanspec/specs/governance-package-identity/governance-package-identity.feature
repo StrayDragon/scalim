@@ -15,7 +15,7 @@
 
   @req:r421 @human
   场景: CLI 命令名为 PROJECT_CLI_NAME
-    - 系统 MUST 提供 `PROJECT_CLI_NAME` 作为命令行入口,并保持其子命令树与现有 `PROJECT_CLI_NAME` 语义一致(仅命名变更). 补充约束（分发边界）： - `PROJECT_CLI_NAME` MUST 由独立 CLI 发行物提供（例如 `scalim-cli`），并允许该发行物使用更高的 Python 版本约束（例如 requires-python >=3.10）。 - runtime 主包 MUST 保持 Python 3.6 兼容且不承载 CLI 入口实现。
+    - 系统 MUST 提供 `PROJECT_CLI_NAME` 作为命令行入口,并保持其子命令树与现有 `PROJECT_CLI_NAME` 语义一致(仅命名变更). 补充约束（分发边界）： - `PROJECT_CLI_NAME` MUST 由独立 CLI 发行物提供（例如 `scalim-cli`），并允许该发行物使用与 runtime 不同的 Python 版本约束。 - runtime 主包 MUST 保持 Python 兼容性与根 `ROADMAP.md` 支持窗口一致(当前 floor 3.10)且不承载 CLI 入口实现。
 
   @req:r515 @human
   场景: 使用 uv 标准 lib 结构与 uv_build 后端

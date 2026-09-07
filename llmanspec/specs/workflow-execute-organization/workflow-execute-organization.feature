@@ -1,6 +1,6 @@
 # language: zh-CN
 # capability: workflow-execute-organization
-# purpose: 重构 workflow execute 模块结构（extract outcome_builder/scheduler_rules/resource_lifecycle/viz_reporter），不改变外部可观测行为、不增加热路径开销，并保持 Python 3.6 兼容。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# purpose: 重构 workflow execute 模块结构（extract outcome_builder/scheduler_rules/resource_lifecycle/viz_reporter），不改变外部可观测行为、不增加热路径开销，并保持与项目 Python 支持窗口兼容(根 `ROADMAP.md`)。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 # scope: src/scalim/
 
 功能: workflow-execute-organization
@@ -14,8 +14,8 @@
     - Extraction MUST use module-level pure functions and small holder classes that only keep references (no deep copies). The implementation MUST NOT introduce abstract base classes, strategy/plugin indirection, or extra serialization. Per-run extra memory from new objects MUST remain negligible (on the order of a few references per run as stated in design).
 
   @req:r452 @human
-  场景: Extracted modules MUST remain Python 3.6 compatible
-    - New modules under `src/scalim/workflow/` MUST use the same Python 3.6 compatibility constraints as the rest of `scalim` (typing, dataclasses shims, no 3.7-only stdlib helpers unless shimmed).
+  场景: Extracted modules MUST follow the runtime floor policy
+    - New modules under `src/scalim/workflow/` MUST use the same Python compatibility constraints as the rest of `scalim` (root `ROADMAP.md` support window, floor 3.10): stdlib-first typing, no compatibility shims beyond those sanctioned by `governance-module-organization`.
   @req:r87 @human
   场景: regression-parity-after-extraction
     - 必须成立：当 the same workflow run configuration is executed before and after Phase 1 module extraction；那么 observable results (outcomes, node states, events, artifacts lifecycle, viz outputs) MUST match prior behavior within the project’s existing equivalence tests or snapshot contracts
@@ -28,8 +28,8 @@
     那么 the refactor MUST NOT add material CPU or memory regressions attributable to new object churn or indirect dispatch on the primary execute path
   @req:r452 @human
   场景: ci-runs-on-minimum-supported-python
-    - 必须成立：当 tests run on the repository’s Python 3.6 job or equivalent gate；那么 the new modules MUST import and execute without syntax or stdlib availability errors
-    当 tests run on the repository’s Python 3.6 job or equivalent gate
+    - 必须成立：当 tests run on the repository’s minimum supported Python job or equivalent gate (floor 3.10)；那么 the new modules MUST import and execute without syntax or stdlib availability errors
+    当 tests run on the repository’s minimum supported Python job or equivalent gate (floor 3.10)
     那么 the new modules MUST import and execute without syntax or stdlib availability errors
 
   @req:r452 @human

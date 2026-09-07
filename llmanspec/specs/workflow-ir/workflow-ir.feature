@@ -22,8 +22,8 @@
     - 系统 MUST 将 demand 节点之间的输入收敛为"显式 deps + 显式 artifacts",并禁止隐式全局共享状态: - 下游 demand 仅允许引用其依赖链上可见的上游 artifacts - workflow 编译阶段 MUST 对"artifact 引用超出依赖范围"的情况 fail-fast
 
   @req:r613 @human
-  场景: Workflow IR runtime MUST remain Python 3.6 compatible
-    - 系统 MUST 保持 Workflow IR 的核心运行时与编译/调度实现兼容 Python 3.6(与项目运行时边界一致),不得引入仅在较新 Python 版本可用的语言特性或标准库 API.
+  场景: Workflow IR runtime MUST follow the runtime floor policy
+    - 系统 MUST 保持 Workflow IR 的核心运行时与编译/调度实现与项目运行时边界一致(根 `ROADMAP.md` 支持窗口,当前 floor 3.10),不得引入仅在该窗口之外 Python 版本可用的语言特性或标准库 API.
 
   @req:r662 @human
   场景: WorkflowOptionsIr MUST carry resources_wait from YAML to runtime
@@ -57,9 +57,9 @@
     当 workflow 被编译/校验
     那么 系统 MUST fail-fast 并报告非法引用的 run_id/artifact
   @req:r613 @human
-  场景: workflow-ir-modules-import-under-python-3-6
-    - 必须成立：假如 运行时为 Python 3.6；当 导入 workflow IR 的核心模块(编译/调度/数据结构)；那么 系统 MUST 不因版本不兼容的语法/stdlib API 导致 `SyntaxError`/`ImportError`
-    假如 运行时为 Python 3.6
+  场景: workflow-ir-modules-import-under-minimum-supported-python
+    - 必须成立：假如 运行时为支持窗口下界 Python(floor 3.10)；当 导入 workflow IR 的核心模块(编译/调度/数据结构)；那么 系统 MUST 不因版本不兼容的语法/stdlib API 导致 `SyntaxError`/`ImportError`
+    假如 运行时为支持窗口下界 Python(floor 3.10)
     当 导入 workflow IR 的核心模块(编译/调度/数据结构)
     那么 系统 MUST 不因版本不兼容的语法/stdlib API 导致 `SyntaxError`/`ImportError`
   @req:r662 @human

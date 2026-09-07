@@ -58,8 +58,8 @@
     - 系统 MUST 提供 workflow-scope cache pool 能力以支持跨 nodes 复用（例如 `preload_forever`）；但 cache pool 的配置入口 MUST 位于 runtime policy boundary 并保持对外接口受限： - workflow YAML MUST NOT 再接受 `workflow.options.cache_pool`（出现时 MUST fail-fast，并指向 runtime entrypoints） - cache_pool 的可用配置 MUST 以封闭集合的 preset 方式提供（避免自由组合 knobs 导致维护成本上升） - 旧字段 `workflow.options.share_preload_cache` MUST 继续被拒绝，并给出迁移到 runtime preset 的提示
 
   @req:r227 @human
-  场景: workflow entrypoints MUST be importable under Python 3.6
-    - 系统 MUST 保证在 Python 3.6 + `typing-extensions==4.1.1` 的最小依赖环境中, workflow 入口实现模块可被导入: - `scalim.dsl.yaml_dsl.workflow_entrypoints` 系统 MUST 确保该 import 不依赖 `openpyxl`/`pandas` 等可选依赖。
+  场景: workflow entrypoints MUST be importable under the minimal supported environment
+    - 系统 MUST 保证在 Python 3.10 + `typing-extensions>=4.4` 的最小依赖环境中, workflow 入口实现模块可被导入: - `scalim.dsl.yaml_dsl.workflow_entrypoints` 系统 MUST 确保该 import 不依赖 `openpyxl`/`pandas` 等可选依赖。
 
   @req:r240 @human
   场景: workflow emits workflow-level events and injects attribution for demand events
@@ -192,9 +192,9 @@
     当 workflow YAML 包含 `workflow.options.share_preload_cache`
     那么 系统 MUST fail-fast 报错（提示迁移到 runtime cache_pool preset） NOTE: cache pool 的语义(冲突策略/生命周期/预算/可观测性)由 `workflow-cache-pool` 能力规范定义.
   @req:r227 @human
-  场景: workflow-entrypoints-imports-in-a-minimal-py3-6-environment
-    - 必须成立：假如 仅安装了 `PyYAML` 与 `typing-extensions==4.1.1` 的 Python 3.6 环境；当 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`；那么 import MUST 成功
-    假如 仅安装了 `PyYAML` 与 `typing-extensions==4.1.1` 的 Python 3.6 环境
+  场景: workflow-entrypoints-imports-in-a-minimal-supported-environment
+    - 必须成立：假如 仅安装了运行时必需依赖(`typing-extensions>=4.4`,YAML 后端随包内置)的 Python 3.10 环境；当 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`；那么 import MUST 成功
+    假如 仅安装了运行时必需依赖(`typing-extensions>=4.4`,YAML 后端随包内置)的 Python 3.10 环境
     当 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`
     那么 import MUST 成功
 

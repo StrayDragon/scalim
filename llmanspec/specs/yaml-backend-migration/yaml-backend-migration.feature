@@ -7,7 +7,7 @@
 
   @req:r102 @human
   场景: scalim YAML parsing MUST use vendored `ruamel.yaml` (YAML 1.2) as the only runti
-    - 系统 MUST 使用 vendored `ruamel.yaml` 作为 `src/scalim/` 运行时 YAML 解析的唯一后端,并显式采用 YAML 1.2 语义。 该要求至少覆盖: - demand/workflow/CLI validate/imports/project-config 等所有 YAML 入口 - safe load / compose(location index) / parse error envelope - vendors-sync 下的可导入性(不得依赖外部安装包)
+    - 系统 MUST 使用 vendored `ruamel.yaml` 作为 `src/scalim/` 运行时 YAML 解析的唯一后端,并显式采用 YAML 1.2 语义。 该要求至少覆盖: - demand/workflow/CLI validate/imports/project-config 等所有 YAML 入口 - safe load / compose(location index) / parse error envelope - 运行时不得依赖外部安装的 `PyYAML`/`ruamel.yaml`(vendored 自包含)
 
   @req:r344 @human
   场景: duplicate key policy MUST match scalim defaults consistently
@@ -18,8 +18,8 @@
     - 系统 MUST 使用 vendored `ruamel.yaml` 的 round-trip 能力(`YAML(typ=\"rt\")`)对 YAML 文件进行编辑,并保证在不做业务变更时不引入无意义 diff。 该要求至少覆盖 `yaml-dsl upsert-lsp-comment`: - no-op round-trip(`load` 后立刻 `dump`) MUST 产出与输入文本字节级完全一致 - upsert 仅允许修改 schema modeline 所在行;不得无意义重排正文
 
   @req:r551 @human
-  场景: migration MUST be gated by corpus parity and Python 3.6 runtime checks
-    - 仓库 MUST 提供自动化门禁以降低一次性切换风险,至少包含: - canonical YAML 语料的解析回归(确保新默认 backend 可解析) - ruamel vs vendored PyYAML 的 corpus parity 对拍(用于迁移期风险控制) - Python 3.6 环境下的 vendored import + YAML parse smoke checks(建议通过 docker)
+  场景: migration MUST be gated by corpus parity and minimum-supported-python checks
+    - 仓库 MUST 提供自动化门禁以降低一次性切换风险,至少包含: - canonical YAML 语料的解析回归(确保新默认 backend 可解析) - ruamel vs vendored PyYAML 的 corpus parity 对拍(用于迁移期风险控制) - 支持窗口下界(floor,见根 `ROADMAP.md`,当前 3.10)的 vendored import + YAML parse smoke checks(经由 CI matrix 下界 job)
   @req:r102 @human
   场景: runtime-parsing-uses-yaml-1-2-semantics
     - 必须成立：当 系统以安全模式解析 YAML DSL 文本；那么 解析 MUST 基于 vendored `ruamel.yaml` 的安全 loader
@@ -63,8 +63,8 @@
     那么 canonical YAML 语料 MUST 被解析验证
 
   @req:r551 @human
-  场景: python-3-6-vendored-runtime-remains-a-hard-gate
-    - 必须成立：假如 `src/scalim/` 运行时边界要求兼容 Python 3.6；当 运行变更相关的 py36 smoke checks；那么 vendored import 与关键 YAML runtime smoke checks MUST 在 Python 3.6 环境中通过
-    假如 `src/scalim/` 运行时边界要求兼容 Python 3.6
-    当 运行变更相关的 py36 smoke checks
-    那么 vendored import 与关键 YAML runtime smoke checks MUST 在 Python 3.6 环境中通过
+  场景: minimum-supported-python-vendored-runtime-remains-a-hard-gate
+    - 必须成立：假如 `src/scalim/` 运行时边界为支持窗口下界(根 `ROADMAP.md`,floor 3.10)；当 运行 CI matrix 下界 job 的 smoke checks；那么 vendored import 与关键 YAML runtime smoke checks MUST 在 floor Python 环境中通过
+    假如 `src/scalim/` 运行时边界为支持窗口下界(根 `ROADMAP.md`,floor 3.10)
+    当 运行 CI matrix 下界 job 的 smoke checks
+    那么 vendored import 与关键 YAML runtime smoke checks MUST 在 floor Python 环境中通过

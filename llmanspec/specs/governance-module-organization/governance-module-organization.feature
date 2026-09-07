@@ -1,6 +1,6 @@
 # language: zh-CN
 # capability: governance-module-organization
-# purpose: 定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 3.6 运行时兼容性. [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# purpose: 定义运行时模块的边界、入口最小化与依赖约束,避免将内部实现路径误用为公共 API,并保持模块层级单向依赖与 Python 运行时兼容性(支持窗口与 floor 见根 ROADMAP,当前 3.10). [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 # scope: src/scalim/
 
 功能: governance-module-organization
@@ -50,8 +50,8 @@
     - 系统 MUST NOT 新增顶层公共 facade (如 `api.py` 或在顶层 `__init__.py` 做公共 re-export 聚合),公共入口继续采用显式模块路径.
 
   @req:r183 @human
-  场景: Python 3.6 typing compatibility MUST be centralized
-    - 系统 MUST 保持 Python 3.6 兼容；运行时内扩展 typing 能力 (如 `Self`/`override`) 仅允许通过 `vendor/compact/typing_extensionsx.py` 引入,MUST 通过 lint 禁止直接导入 `typing_extensions`.
+  场景: typing compatibility MUST follow the runtime floor policy
+    - 系统 MUST 以根 `ROADMAP.md` 的 Python 支持窗口为运行时边界(当前 floor 3.10)：stdlib `typing` 已覆盖的扩展能力 (如 `TypeGuard`/`Literal`/`TypedDict`/`Protocol`/`runtime_checkable`) MUST 直接从 `typing` 引入；stdlib 尚未覆盖的符号 (`Self`/`override`) MUST 从 `typing_extensions`(>=4.4) 直接引入；`StrEnum` 在 floor<3.11 期间 MUST 经 `_internal/strenum.py` 统一引入.禁止重建 `vendor/compact/typing_extensionsx.py` 式集中 re-export shim；floor 上移触及对应 stdlib 版本时 MUST 顺势删除 `_internal/strenum.py` 与 `typing-extensions` 依赖.
 
   @req:r201 @human
   场景: vendor modules MUST be auditable
@@ -162,9 +162,9 @@
     那么 仍通过既有显式模块导入,不依赖新的顶层 facade
   @req:r183 @human
   场景: typing-扩展导入路径受控
-    - 必须成立：当 在运行时内新增扩展类型引用；那么 MUST 通过 typing_extensionsx.py 引入且 lint 可阻止直接 typing_extensions 导入
+    - 必须成立：当 在运行时内新增扩展类型引用；那么 stdlib 已覆盖符号 MUST 从 `typing` 引入,`Self`/`override` MUST 从 `typing_extensions` 直接引入,`StrEnum` MUST 经 `_internal/strenum.py` 引入且不得重建 typing_extensionsx 式 shim
     当 在运行时内新增扩展类型引用
-    那么 MUST 通过 typing_extensionsx.py 引入且 lint 可阻止直接 typing_extensions 导入
+    那么 stdlib 已覆盖符号 MUST 从 `typing` 引入,`Self`/`override` MUST 从 `typing_extensions` 直接引入,`StrEnum` MUST 经 `_internal/strenum.py` 引入且不得重建 typing_extensionsx 式 shim
   @req:r201 @human
   场景: vendor-可审计
     - 必须成立：当 审阅 vendor README；那么 每个 vendor 子模块 MUST 有来源/许可证与 usage/保留理由说明

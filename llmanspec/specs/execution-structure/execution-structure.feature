@@ -67,7 +67,7 @@
 
   @req:r243 @human
   场景: adaptive tuning/policy 解析逻辑集中以避免 drift
-    - 当 execution 层需要解析与校验 adaptive 的 policy/tuning/max_workers 时,系统 MUST 优先集中为共享 helper. 当前实现中,pipeline 与 `BatchExecutor` MUST 复用同一共享 helper;`AdaptiveLoadRefScheduler` 允许保留本地解析路径,但其默认值与校验语义应与共享路径保持一致,避免行为漂移. 该集中化 MUST 保持现有行为一致:默认值策略、Python 3.6 的 backend 回退语义、以及错误类型/错误信息口径不变.
+    - 当 execution 层需要解析与校验 adaptive 的 policy/tuning/max_workers 时,系统 MUST 优先集中为共享 helper. 当前实现中,pipeline 与 `BatchExecutor` MUST 复用同一共享 helper;`AdaptiveLoadRefScheduler` 允许保留本地解析路径,但其默认值与校验语义应与共享路径保持一致,避免行为漂移. 该集中化 MUST 保持现有行为一致:默认值策略、backend 回退语义、以及错误类型/错误信息口径不变.
 
   @req:r252 @human
   场景: ExecutionRequest 支持 loader retry policy 且默认关闭
