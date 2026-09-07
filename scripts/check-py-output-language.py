@@ -89,7 +89,6 @@ def _iter_python_files(*, repo_root: Path, rel_roots: tuple[Path, ...], include_
         "build",
         "node_modules",
         # 第三方 `vendor` 代码:保留上游语言/格式
-        "dataclassesx",
         "yamlx",
     }
     if not include_tests:

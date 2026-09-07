@@ -3,7 +3,7 @@
 - [ ] 1.1 扩展 `src/scalim/dsl/yaml_dsl/_internal/config_parsing/project_config.py`：新增 `yaml_dsl.lsp.hover` 解析与 fail-fast 校验（未知字段名/类型直接报错）
 - [ ] 1.2 扩展 schema SSOT `src/scalim/dsl/yaml_dsl/schema_dsl/models/scalim_yaml.py`：为 `yaml_dsl.lsp.hover.*` 增加 JSON Schema 定义（enum + array 顺序保留）
 - [ ] 1.3 刷新生成物 `src/scalim/dsl/yaml_dsl/schema/scalim_yaml.gen.json`（生成入口：`just gen-yaml-dsl-schema`；禁止手工编辑）
-- [ ] 1.4 运行 drift/gate：`just schema-drift-check` + `just py36-compat-check`（确保 SSOT→生成物一致，且不破坏 Python 3.6 兼容）
+- [ ] 1.4 运行 drift/gate：`just schema-drift-check`（确保 SSOT→生成物一致；0.20 起运行时 floor 为 3.10，py36 门禁已删除）
 
 ## 2. LSP Hover Rendering (Markdown + Config)
 

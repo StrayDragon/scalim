@@ -315,9 +315,8 @@ class ExpressionValidator:
     def _validate_unaryop_node(self, node: ast.AST) -> None:
         typed = cast("ast.UnaryOp", node)  # pragma: allow-cast ast handler dispatch typed narrowing
         if type(typed.op) not in self._safe_unary:  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
-            # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
-            msg = f"Unsupported unary operator: {type(typed.op).__name__}"  # pragma: no cover
-            raise ScalimSecurityError(msg)  # pragma: no cover  # pragma: allow-no-cover invariant: unaryop exhaustively allowlisted
+            msg = f"Unsupported unary operator: {type(typed.op).__name__}"
+            raise ScalimSecurityError(msg)
         self._visit(typed.operand)
 
     def _validate_compare_node(self, node: ast.AST) -> None:

@@ -42,7 +42,7 @@ def _find_print_calls(path: Path) -> List[PrintCall]:
     try:
         tree = ast.parse(text, filename=str(path))
     except SyntaxError:
-        # 语法错误不在本 `gate` 覆盖范围内(由 `basedpyright` 与 `py36` 检查兜底).
+        # 语法错误不在本 `gate` 覆盖范围内(由 `basedpyright` 与 `0.10 历史 py36` 检查兜底).
         return []
 
     hits: List[PrintCall] = []

@@ -1,6 +1,6 @@
 # yamlx provenance
 
-本目录 vendors 化 `YAML` 解析实现,以支持下游老项目(`Python 3.6`、不可随意安装第三方依赖)仅同步 `src/scalim/` 源码即可运行(见 `scripts/vendor-sync.py` 与 `llmanspec/specs/legacy-vendors-sync/spec.md`).
+本目录 vendors 化 `YAML` 解析实现,以支持下游老项目(`Python 3.6`、不可随意安装第三方依赖)仅同步 `src/scalim/` 源码即可运行. NOTE(0.20.x): `vendor-legacy-sync` 工具链已删除,本段为历史用途描述;Stage B 将改为外部依赖.
 
 ## Upstream
 
@@ -41,4 +41,4 @@
 1. 选择目标上游版本(必须覆盖下游 `Python 3.6` 运行时边界).
 2. 用上游版本替换 vendors 源码,并重新准备对应 `CPython 3.6` 的二进制扩展(如需).
 3. 从上游 `sdist` 更新许可证文件(保持原样),并更新本文件与 `src/scalim/vendor/README.md` 的版本信息.
-4. 运行 `just qa` 与 `just py36-compat-check`(或下游 vendors 模拟导入)确保导入链路与解析能力稳定.
+4. 运行 `just qa` 确保导入链路与解析能力稳定.(历史:0.10 线还需 `just py36-compat-check`)

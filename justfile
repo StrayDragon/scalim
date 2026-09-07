@@ -354,14 +354,6 @@ check-notebooks-coverage-threshold threshold:
 type-check:
     uv {{ UV_OPTIONS }} run basedpyright src/scalim/ --level error
 
-# 检查: Docker 可用性
-is-docker-available:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if ! docker version >/dev/null 2>&1; then
-        echo "[error] docker unavailable; please start Docker and retry" >&2
-        exit 1
-    fi
 
 # 检查: 核心链路更严格的类型边界(以 `pyproject.toml` 的 `tool.basedpyright.strict` 为准)
 type-check-core-tight:
@@ -513,7 +505,7 @@ bench-memray-most MOST:
 bench-external *ARGS:
     uv {{ UV_OPTIONS }} run --with polars --with xlsxwriter python docs/doc/releases/repro/external-baseline/run_ab.py {{ ARGS }}
 
-# 外部基线扩展探针官方重测（扫参/函数复杂度/慢源分片并行/py36 边界；SSOT: run_probes.py）
+# 外部基线扩展探针官方重测（扫参/函数复杂度/慢源分片并行/历史 0.10 py36 基线；SSOT: run_probes.py）
 # 数据资产: docs/doc/assets/data/external-baseline-0.10.probes.json；产物落 .tmp/ 不入库。
 bench-external-probes *ARGS:
     uv {{ UV_OPTIONS }} run --with polars python docs/doc/releases/repro/external-baseline/run_probes.py {{ ARGS }}

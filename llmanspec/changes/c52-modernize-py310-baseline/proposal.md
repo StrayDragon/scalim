@@ -21,7 +21,7 @@ checkpointed: false
 - **配置面**：`requires-python>=3.10`（root）；basedpyright `pythonVersion=3.10`；ruff `target-version="py310"` + 解禁 `UP` + 删 `FA100` ignore + 删 `typing_extensions` banned-api；删 py<3.7/py<3.8 env-marker 依赖块；`typing-extensions>=4.4`。
 - **兼容层迁移**（codemod + 删源）：`vendor/dataclassesx` → stdlib `dataclasses`（132 行/114 文件）；`vendor/compact/typing_extensionsx` → `typing` + `typing_extensions`（78 文件）；`vendor/compact` 的 `StrEnum`/`Self` re-export → `_internal/strenum.py` / `typing_extensions`（14 文件）；`vendor/compact/__init__.py` 清空 re-export（`importlibx.py` 原位保留至 Stage C）；删 9 处 `from __future__ import absolute_import`；收拢 `call_by.py`/`security.py` 的 `_PY38_PLUS` 门。
 - **机械化现代语法**：ruff `UP` autofix（`List[`→`list[`、`Optional[`→`X | None` 等，~253 文件）+ `ruff format` + basedpyright 收敛。
-- **删 py36 工具链**：`py36-compat-check` / `py36-typingext-check` just 目标、`scripts/check-py36-syntax.py`、`scripts/check-py36-typingext-docker.sh`、`scripts/gen-public-api-jump-imports.py`（仅服务前者）及对应 governance tests。
+- **删 py36 工具链**：`py36-compat-check` / `py36-typingext-check` just 目标、`scripts/check-py36-syntax.py`、`scripts/check-py36-typingext-docker.sh` 及对应 governance tests；`gen-public-api-jump-imports.py` 保留（justfile 注明另有编辑器/LSP 跳转用途）。
 - **删 vendor-legacy-sync**：`just sync-project-vendors` + `scripts/vendor-sync.py`（capability 退休；vendors/libs 下游链路终止，0.20.0 release notes 汇总 Breaking）。
 - **CI**：matrix `["3.10"]` → `["3.10","3.11","3.12","3.13","3.14"]`；matrix job 跑 py-only 套件，最新版跑全量 `just qa` 兜底。
 - **说明面**：根 `AGENTS.md`（Python runtime boundary、typing_extensions 条目）、`llmanspec/AGENTS.md` 项目上下文、`README.md:111/199`、`docs/doc/dev/pre-release-checklist.md:32`、`docs/doc/benchmark/external-baseline.md` §4.4 措辞（历史测量数据不动）。

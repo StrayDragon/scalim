@@ -117,7 +117,6 @@ def _iter_python_files(*, repo_root: Path, rel_roots: tuple[Path, ...]) -> list[
         "node_modules",
         "tests",
         # 第三方 `vendor` 代码:保留上游语言/格式
-        "dataclassesx",
         "yamlx",
     }
 

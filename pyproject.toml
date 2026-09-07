@@ -11,6 +11,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
     # NOTE: YAML 解析实现通过 `src/scalim/vendor/yamlx/` vendors 化,运行时不依赖外部安装 `PyYAML`/`ruamel.yaml`(Stage B 解除)。
