@@ -55,6 +55,7 @@ else:
             return member
 
         @staticmethod
+        @override
         def _generate_next_value_(name: str, _start: int, _count: int, _last_values: list[str]) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
             """
             返回成员名的小写版本.
