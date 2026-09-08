@@ -68,7 +68,7 @@ def _write_yaml_with_column_output(tmp_path: Path, source_path: Path) -> Path:
 
 
 def _write_yaml_with_output_path(tmp_path: Path, source_path: Path, output_path: Path) -> Path:
-    from scalim.vendor.yamlx import yaml
+    import yaml
 
     config = yaml.safe_load(source_path.read_text(encoding="utf-8"))
     if not isinstance(config, dict):

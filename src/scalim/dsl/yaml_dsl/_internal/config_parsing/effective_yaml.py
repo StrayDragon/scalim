@@ -3,7 +3,8 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
-from .....vendor.yamlx.ruamel.yaml import YAML
+from ruamel.yaml import YAML
+
 from .imports import contains_import_syntax, load_and_expand_imports
 
 __all__ = ()
@@ -56,5 +57,5 @@ def dump_effective_demand_yaml(mapping: Mapping[str, Any]) -> str:
     yaml_safe.representer.ignore_aliases = _ignore_aliases  # type: ignore[assignment]  # pragma: allow-dynattr ruamel config
 
     buf = StringIO()
-    yaml_safe.dump(data, buf)
+    yaml_safe.dump(data, buf)  # pyright: ignore[reportUnknownMemberType]  # pragma: allow-dynattr third-party: ruamel YAML dump
     return buf.getvalue()

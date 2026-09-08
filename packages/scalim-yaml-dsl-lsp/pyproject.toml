@@ -18,6 +18,9 @@ classifiers = [
 dependencies = [
     "scalim",
     "pygls>=2.1.1",
+    # 直接 import `ruamel.yaml`(server/cursor_extraction) 与 `yaml`(core, schema 文档解析)
+    "ruamel.yaml>=0.19.1",
+    "pyyaml>=6.0.1",
 ]
 
 [project.scripts]
@@ -31,15 +34,6 @@ build-backend = "hatchling.build"
 sources = ["src"]
 
 [tool.basedpyright]
-# NOTE: keep vendored `src/scalim/vendor/yamlx/ruamel` pristine.
-#
-# `scalim.vendor.yamlx.ruamel.yaml` is a vendored copy of `ruamel.yaml`, and its `__init__.py`
-# relies on absolute imports like `from ruamel.yaml.main import *` plus runtime `sys.modules`
-# aliasing to stay self-contained.
-#
-# Static type-check cannot execute the aliasing, so we add `extraPaths` to help `basedpyright`
-# resolve `ruamel.*` imports to the vendored tree during analysis.
-extraPaths = ["../../src/scalim/vendor/yamlx"]
 pythonVersion = "3.10"
 pythonPlatform = "Linux"
 

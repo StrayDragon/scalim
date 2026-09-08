@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional, Tuple
 
-from scalim.vendor.yamlx import yaml
+import yaml
 
 
 @dataclasses.dataclass(frozen=True)

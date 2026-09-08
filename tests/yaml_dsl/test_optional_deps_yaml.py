@@ -17,10 +17,9 @@ from tests.support.testing_utils import missing_optional_dependency
 def test_yaml_modules_do_not_require_external_pyyaml(monkeypatch, module_path: str) -> None:
     module = importlib.import_module(module_path)
 
+    # 0.20 起 PyYAML 不再是运行时依赖(vendored 拷贝已删除,oracle 仅为 dev 依赖):
+    # 缺失 `yaml` 包时相关模块 MUST 仍可导入(运行时后端为 `ruamel.yaml`)。
     with missing_optional_dependency(monkeypatch, "yaml"):
-        importlib.reload(module)
+        reloaded = importlib.reload(module)
 
-    if hasattr(module, "yaml"):
-        yaml_mod = getattr(module, "yaml")
-        assert isinstance(getattr(yaml_mod, "__file__", None), str)
-        assert "/scalim/vendor/yamlx/yaml/" in str(yaml_mod.__file__).replace("\\", "/")
+    assert reloaded is module

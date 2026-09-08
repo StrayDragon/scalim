@@ -398,7 +398,7 @@ Sources:
 ### `yaml-backend-migration`
 - Title: yaml-backend-migration
 - Source: [yaml-backend-migration.feature](repo:llmanspec/specs/yaml-backend-migration/yaml-backend-migration.feature)
-- Summary: 定义 `scalim` 默认 YAML backend 迁移到 vendored `ruamel.yaml`(YAML 1.2) 的运行时契约, 并为 CLI 的 YAML round-trip 编辑能力建立稳定性门禁(no-op 字节级幂等 + minimal edit)。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+- Summary: 定义 `scalim` 默认 YAML backend(外部依赖 `ruamel.yaml`, YAML 1.2) 的运行时契约, 并为 CLI 的 YAML round-trip 编辑能力建立稳定性门禁(no-op 字节级幂等 + minimal edit)。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
 
 ### `yaml-dsl-agent-guidance`
 - Title: yaml-dsl-agent-guidance

@@ -30,7 +30,7 @@ def _load_rules(repo_root: Path) -> List[Tuple[str, re.Pattern, str]]:
 
     # 优先用 `scalim` 内置 `yaml`,失败再回退 `stdlib`
     try:
-        from scalim.vendor.yamlx import yaml as _yaml
+        import yaml as _yaml
     except ImportError:
         import yaml as _yaml  # type: ignore[no-redef]
 

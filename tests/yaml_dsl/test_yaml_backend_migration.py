@@ -7,7 +7,7 @@ import pytest
 
 import scalim_cli.yaml_dsl as yaml_dsl
 from scalim.dsl.yaml_dsl._internal.config_parsing.yaml_load import load_yaml_mapping_text
-from scalim.vendor.yamlx import yaml as pyyaml
+import yaml as pyyaml
 
 
 def _fixture_paths() -> List[Path]:

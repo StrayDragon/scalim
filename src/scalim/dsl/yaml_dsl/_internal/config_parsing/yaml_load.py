@@ -5,7 +5,8 @@ from pathlib import Path
 from types import MethodType
 from typing import Any, cast
 
-from .....vendor.yamlx.ruamel.yaml import YAML
+from ruamel.yaml import YAML
+
 from ...schema_dsl.constants import UTF8_ENCODING
 from .error_envelope import ErrorEnvelope, ErrorLoc, ScalimYamlValidationError
 from .validators.issues import ValidationIssue
@@ -210,7 +211,7 @@ def _index_yaml_node(
 def _compose_yaml_node(yaml_text: str) -> Any | None:
     yaml_safe = YAML(typ="safe")
     cast("Any", yaml_safe).version = (1, 2)
-    return cast("Any | None", yaml_safe.compose(yaml_text))  # pragma: allow-cast ruamel compose typed narrowing
+    return cast("Any | None", yaml_safe.compose(yaml_text))  # pyright: ignore[reportUnknownMemberType]  # pragma: allow-cast ruamel compose typed narrowing
 
 
 def build_yaml_location_index(yaml_text: str) -> YamlLocationIndex:

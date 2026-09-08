@@ -5,6 +5,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.scalarstring import (
     DoubleQuotedScalarString,
@@ -14,8 +15,6 @@ from ruamel.yaml.scalarstring import (
     PreservedScalarString,
     SingleQuotedScalarString,
 )
-
-from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 _EXCLUDED_DIR_NAMES: tuple[str, ...] = (".tmp", "dist")
 

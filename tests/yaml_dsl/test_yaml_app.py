@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from scalim.vendor.yamlx import yaml
+import yaml
 
 from scalim.dsl.yaml_dsl import (
     CaptureRows,

@@ -14,7 +14,8 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    # NOTE: YAML 解析实现通过 `src/scalim/vendor/yamlx/` vendors 化,运行时不依赖外部安装 `PyYAML`/`ruamel.yaml`(Stage B 解除)。
+    # YAML 唯一后端(YAML 1.2 语义;Stage B 去 vendor,spike 对拍见 c53 design)。
+    "ruamel.yaml>=0.19.1",
     # typing-extensions: 仅 `Self`(3.11+)/`override`(3.12+) 尚未进 stdlib;floor 达到对应版本后可删(ROADMAP ratchet)。
     "typing-extensions>=4.4",
 ]
@@ -62,6 +63,7 @@ dev = [
     "scalim-cli",
     "scalim-misc",
     "scalim-yaml-dsl-lsp",
+    "pyyaml>=6.0.1",
     "pandas>=2.1",
     "openpyxl>=3.1.5",
     "pytest-memray>=1.8.0",
@@ -141,7 +143,6 @@ exclude = [
     "venv",
     "**/*.ipynb",
     "docs/**/*.py",
-    "src/scalim/vendor/yamlx/**",
 ]
 
 line-length = 140
@@ -266,11 +267,9 @@ ignore = [
     "scripts",
     "agentdev/skills/scalim-yaml-dsl/scripts/**",
     "packages/scalim-misc/src/scalim_misc/agent_skill_gen.py",
-    "src/scalim/vendor/yamlx/**/*.py",
     "*.gen.py",
     ".tmp/**/*.py",
 ]
-extraPaths = ["./src/scalim/vendor/yamlx"]
 defineConstant = { DEBUG = true }
 pythonVersion = "3.10"
 pythonPlatform = "Linux"

@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from scalim.vendor.yamlx import yaml
+import yaml
 
 _IMPORT_KEY = "$import"
 _DOC_LEVEL_FULL_MIN_NON_EMPTY_LINES = 8

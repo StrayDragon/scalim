@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 import scalim_cli.yaml_dsl as yaml_dsl_cli
-from scalim.vendor.yamlx import yaml
+import yaml
 
 from scalim_misc import agent_skill_gen
 from tests.support.pathing import repo_root as _repo_root

@@ -13,11 +13,11 @@ from urllib.parse import unquote, urlparse
 
 from lsprotocol import types
 from pygls.lsp.server import LanguageServer
+from ruamel.yaml import YAML
 
 from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend
 from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import load_scalim_preset_yaml_text, load_yaml_dsl_project_config
 from scalim.dsl.yaml_dsl.workflow_config import resolve_workflow_demand_path
-from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 from .core import (
     PythonDefinitionResult,
@@ -3593,7 +3593,7 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912, PLR0915
 ) -> str | None:
     yaml_rt = _yaml_rt()
     try:
-        loaded_obj: Any = yaml_rt.load(str(raw_text or "")) or {}
+        loaded_obj: Any = yaml_rt.load(str(raw_text or "")) or {}  # pyright: ignore[reportUnknownMemberType]  # pragma: allow-dynattr third-party: ruamel
     except Exception:  # noqa: BLE001
         return None
     if not isinstance(loaded_obj, dict):
@@ -3680,7 +3680,7 @@ def _update_scalim_yaml_text(  # noqa: C901, PLR0911, PLR0912, PLR0915
         _extend_unique(python_roots, python_roots_to_add)
 
     buf = StringIO()
-    yaml_rt.dump(loaded, buf)
+    yaml_rt.dump(loaded, buf)  # pyright: ignore[reportUnknownMemberType]  # pragma: allow-dynattr third-party: ruamel
     text = buf.getvalue()
     if not text.endswith("\n"):
         text += "\n"

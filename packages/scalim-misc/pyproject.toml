@@ -12,6 +12,8 @@ authors = [
 dependencies = [
     "scalim",
     "scalim-cli",
+    # agent_skill_gen / yaml_schema_doc_standardizer 直接 import `yaml`
+    "pyyaml>=6.0.1",
     "pandas>=2.1",
 ]
 

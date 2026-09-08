@@ -3418,6 +3418,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ruamel-yaml"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
+]
+
+[[package]]
 name = "ruff"
 version = "0.15.22"
 source = { registry = "https://pypi.org/simple" }
@@ -3447,6 +3456,7 @@ name = "scalim"
 version = "0.10.3"
 source = { editable = "." }
 dependencies = [
+    { name = "ruamel-yaml" },
     { name = "typing-extensions" },
 ]
 
@@ -3482,6 +3492,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-memray" },
     { name = "pytest-xdist" },
+    { name = "pyyaml" },
     { name = "rich" },
     { name = "scalim-benchlib" },
     { name = "scalim-cli" },
@@ -3496,6 +3507,7 @@ requires-dist = [
     { name = "numpy", marker = "extra == 'pandas'", specifier = ">=1.26" },
     { name = "openpyxl", marker = "extra == 'excel'", specifier = ">=3.1.5" },
     { name = "pandas", marker = "extra == 'pandas'", specifier = ">=2.1" },
+    { name = "ruamel-yaml", specifier = ">=0.19.1" },
     { name = "typing-extensions", specifier = ">=4.4" },
 ]
 provides-extras = ["pandas", "excel"]
@@ -3517,6 +3529,7 @@ dev = [
     { name = "pytest-cov", marker = "python_full_version >= '3.10'" },
     { name = "pytest-memray", marker = "python_full_version >= '3.10'", specifier = ">=1.8.0" },
     { name = "pytest-xdist", marker = "python_full_version >= '3.10'" },
+    { name = "pyyaml", marker = "python_full_version >= '3.10'", specifier = ">=6.0.1" },
     { name = "rich", marker = "python_full_version >= '3.10'" },
     { name = "scalim-benchlib", marker = "python_full_version >= '3.10'", editable = "packages/scalim-benchlib" },
     { name = "scalim-cli", marker = "python_full_version >= '3.10'", editable = "packages/scalim-cli" },
@@ -3537,12 +3550,14 @@ version = "0.10.3"
 source = { editable = "packages/scalim-cli" }
 dependencies = [
     { name = "jsonschema" },
+    { name = "ruamel-yaml" },
     { name = "scalim" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", specifier = ">=4.0.0" },
+    { name = "jsonschema", specifier = ">=4.18" },
+    { name = "ruamel-yaml", specifier = ">=0.19.1" },
     { name = "scalim", editable = "." },
 ]
 
@@ -3553,6 +3568,7 @@ source = { editable = "packages/scalim-misc" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pyyaml" },
     { name = "scalim" },
     { name = "scalim-cli" },
 ]
@@ -3560,6 +3576,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "pandas", specifier = ">=2.1" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "scalim", editable = "." },
     { name = "scalim-cli", editable = "packages/scalim-cli" },
 ]
@@ -3570,12 +3587,16 @@ version = "0.10.3"
 source = { editable = "packages/scalim-yaml-dsl-lsp" }
 dependencies = [
     { name = "pygls" },
+    { name = "pyyaml" },
+    { name = "ruamel-yaml" },
     { name = "scalim" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pygls", specifier = ">=2.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "ruamel-yaml", specifier = ">=0.19.1" },
     { name = "scalim", editable = "." },
 ]
 

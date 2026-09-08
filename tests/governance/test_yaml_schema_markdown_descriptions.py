@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, cast
 
-from scalim.vendor.yamlx import yaml as vendored_yaml
+import yaml as vendored_yaml
 from tests.support.pathing import repo_root as _repo_root
 
 

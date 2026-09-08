@@ -14,6 +14,9 @@ try:
 except ImportError:  # pragma: no cover  # pragma: allow-no-cover optional dependency
     _jsonschema = None  # type: ignore[assignment]
 
+import yaml
+from ruamel.yaml import YAML
+
 from scalim.dsl import yaml_dsl
 from scalim.dsl.yaml_dsl.compiler_frontend import compile_demand_frontend, compile_demand_frontend_diagnostics
 from scalim.dsl.yaml_dsl.compiler_frontend.lsp_support import (
@@ -50,8 +53,6 @@ from scalim.dsl.yaml_dsl.runtime.builtin_callables import (
     list_public_builtin_callable_ids,
     list_public_builtin_callable_python_references,
 )
-from scalim.vendor.yamlx import yaml
-from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 from .cache import load_yaml_mapping_cached, parse_python_ast_cached
 from .cursor_extraction import (
@@ -5060,7 +5061,7 @@ def _safe_collect_yaml_anchors_rt(yaml_text: str, *, warnings: list[str]) -> tup
     try:
         yaml_rt = YAML(typ="rt")
         yaml_rt.version = (1, 2)  # pragma: allow-dynattr ruamel config
-        data = yaml_rt.load(str(yaml_text or ""))
+        data = yaml_rt.load(str(yaml_text or ""))  # pyright: ignore[reportUnknownMemberType]  # pragma: allow-dynattr third-party: ruamel
     except Exception as exc:  # noqa: BLE001
         warnings.append(f"anchor scan failed: {type(exc).__name__}: {exc}")
         return out_ranges, out_values

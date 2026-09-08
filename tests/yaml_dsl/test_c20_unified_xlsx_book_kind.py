@@ -25,7 +25,7 @@ from scalim.dsl.yaml_dsl._internal.config_parsing.validator import ConfigValidat
 from scalim.dsl.yaml_dsl._internal.config_parsing.validators.issues import VALIDATION_SEVERITY_ERROR
 from scalim.dsl.yaml_dsl.workflow import ScalimWorkflowConfigError, load_workflow_config_from_mapping
 from scalim.execution import versioned_outputs
-from scalim.vendor.yamlx import yaml
+import yaml
 
 
 _ALLOWED = frozenset(["tests.fixtures.workflow_loaders", "scalim.workflow.loaders"])

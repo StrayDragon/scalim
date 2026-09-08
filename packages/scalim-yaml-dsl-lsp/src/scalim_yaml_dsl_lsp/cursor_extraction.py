@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from scalim.vendor.yamlx.ruamel.yaml import YAML
+from ruamel.yaml import YAML
 
 from .editor_types import EditorPosition, EditorRange
 
@@ -1541,7 +1541,7 @@ def _extract_yaml_dsl_reference_by_cursor(
 def _compose_yaml_node(yaml_text: str) -> object | None:
     yaml_safe = YAML(typ="safe")
     yaml_safe.version = (1, 2)
-    return yaml_safe.compose(yaml_text)
+    return yaml_safe.compose(yaml_text)  # pyright: ignore[reportUnknownMemberType]  # pragma: allow-dynattr third-party: ruamel
 
 
 def _extract_from_node(

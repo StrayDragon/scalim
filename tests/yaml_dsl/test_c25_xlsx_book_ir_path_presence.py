@@ -11,7 +11,7 @@ from scalim.dsl.yaml_dsl._internal.workflow_compile_resources import _book_expor
 from scalim.dsl.yaml_dsl.schema_dsl.models import BookConfig
 from scalim.dsl.yaml_dsl.workflow import load_workflow_config
 from scalim.spec.ir._workflow import WorkflowArtifactsIr, WorkflowIr, WorkflowOptionsIr, WorkflowResourceIr
-from scalim.vendor.yamlx import yaml
+import yaml
 from scalim.workflow.resource_defs import build_workflow_resource_defs
 
 

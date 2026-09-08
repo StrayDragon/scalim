@@ -3,7 +3,8 @@ depends_on: []
 rules_edit_acked: true
 branch: sdd/c53-yaml-dependency-unvendor
 base_sha: ddb5e85ee1e6c1845d4f649f894386dc621c85d4
-checkpointed: false
+checkpointed: true
+checkpoint_sha: 13c33740c40b30b21253eb29d44ee7aa738ae890
 ---
 
 # 0.20.x Stage B — YAML 去 vendor：切换为 PyPI `ruamel.yaml` 依赖

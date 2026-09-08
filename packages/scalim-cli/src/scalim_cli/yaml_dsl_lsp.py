@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 
+from ruamel.yaml import YAML
+
 import scalim
-from scalim.vendor.yamlx.ruamel.yaml import YAML
 
 DEFAULT_SCHEMA_TYPE = "demand"
 DEFAULT_MAX_SCAN_LINES = 10

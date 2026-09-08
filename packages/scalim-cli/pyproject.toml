@@ -17,7 +17,9 @@ classifiers = [
 
 dependencies = [
     "scalim",
-    "jsonschema>=4.0.0",
+    "jsonschema>=4.18",
+    # 直接 import `ruamel.yaml`(authoring/round-trip),不依赖 scalim 的传递声明
+    "ruamel.yaml>=0.19.1",
 ]
 
 [project.scripts]
