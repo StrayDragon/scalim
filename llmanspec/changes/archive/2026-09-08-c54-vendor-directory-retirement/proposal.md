@@ -3,7 +3,8 @@ depends_on: []
 rules_edit_acked: true
 branch: sdd/c54-vendor-directory-retirement
 base_sha: ddb5e85ee1e6c1845d4f649f894386dc621c85d4
-checkpointed: false
+checkpointed: true
+checkpoint_sha: 5d528d66abb4945319827da014865264c2a3ad3e
 ---
 
 # 0.20.x Stage C — `vendor/` 目录退役：第一方迷你库迁址
