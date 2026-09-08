@@ -7,7 +7,7 @@ import sys
 from typing import Any, Dict, List, cast
 
 from scalim.planning.operators import LoadRefOperatorIr
-from scalim.vendor.compact import importlibx
+from scalim._internal.utils import importlibx
 from scalim.sinks import IColumnSink, IRowSink, ISink
 from scalim.typedefs import FieldValue, RowData
 

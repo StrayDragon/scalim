@@ -9,8 +9,8 @@ from typing import Any
 from typing_extensions import override
 
 from ..._internal.loggingx import get_logger
+from ..._internal.utils.importlibx import import_module
 from ...events import Event, EventType
-from ...vendor.compact.importlibx import import_module
 from .._internal.console_report import emit_info
 from ..observer import EventDispatchObserver
 from ..report_formats import ConsoleJsonlReportFormat as _StageMemoryReportFormat

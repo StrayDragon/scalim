@@ -101,7 +101,6 @@ def _is_excluded(path: Path) -> bool:
         "build",
         "node_modules",
         ".tmp",
-        "vendor",
     }
     return any(part in excluded_parts for part in path.parts)
 

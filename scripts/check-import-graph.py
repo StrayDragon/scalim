@@ -3,8 +3,8 @@
 """
 检查主包(`src/scalim/`)导入结构:
 
-- 导入图无环(排除 `src/scalim/vendor/**`)
-- 主包禁止函数内导入(排除 `vendor`)
+- 导入图无环
+- 主包禁止函数内导入
 
 该脚本是静态门禁:只依赖文件系统与 AST,不执行运行时模块的 `import`.
 失败属于严重架构违规: `quiet` 不得吞掉失败报告.
@@ -42,14 +42,6 @@ def _iter_py_files(root: Path) -> list[Path]:
             continue
         paths.append(path)
     return sorted(paths)
-
-
-def _is_vendor_file(path: Path, *, scalim_root: Path) -> bool:
-    try:
-        rel = path.relative_to(scalim_root)
-    except ValueError:
-        return False
-    return "vendor" in rel.parts
 
 
 def _module_name_for_path(path: Path, *, src_root: Path) -> str:
@@ -184,8 +176,6 @@ def _shortest_cycle_in_component(graph: dict[str, set[str]], component: set[str]
 def _collect_function_local_imports(py_files: Iterable[Path], *, scalim_root: Path) -> list[str]:
     violations: list[str] = []
     for file_path in py_files:
-        if _is_vendor_file(file_path, scalim_root=scalim_root):
-            continue
         rel_file = file_path.relative_to(scalim_root.parents[1]).as_posix()
 
         src = file_path.read_text(encoding="utf-8")
@@ -238,8 +228,6 @@ def _build_import_graph(
     path_for_module: dict[str, Path] = {}
 
     for p in py_files:
-        if _is_vendor_file(p, scalim_root=scalim_root):
-            continue
         mod = _module_name_for_path(p, src_root=src_root)
         module_for_path[p] = mod
         path_for_module[mod] = p

@@ -3,7 +3,7 @@
 from collections.abc import Hashable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Optional
 
-from ...vendor.compact.importlibx import require_optional_dependency
+from ..._internal.utils.importlibx import require_optional_dependency
 
 if TYPE_CHECKING:
     import pandas as pd

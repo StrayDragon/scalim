@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, cast
 from typing_extensions import override
 
 from .._internal.utils.excel import escape_excel_formula
+from .._internal.utils.importlibx import require_optional_dependency
 from .._internal.utils.openpyxl_helpers import (
     best_effort_close_write_only_workbook_worksheets as _best_effort_close_write_only_workbook_worksheets,
 )
@@ -21,7 +22,6 @@ from .._internal.utils.openpyxl_helpers import save_openpyxl_workbook_atomic as 
 from ..events import EventType
 from ..events._events import DiagnosticWarningEvent
 from ..typedefs import CellValue
-from ..vendor.compact.importlibx import require_optional_dependency
 from .resources_base import ScalimWorkflowWriteError, WorkflowResourceManagerBase
 from .resources_csv import build_alignment_mapping, describe_header_diff
 from .tabular_artifacts import WorkflowTabularInput, materialize_aligned_tabular_rows, read_tabular_header

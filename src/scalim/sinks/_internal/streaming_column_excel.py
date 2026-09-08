@@ -14,12 +14,12 @@ from typing_extensions import Self, override
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
+from ..._internal.utils.importlibx import require_optional_dependency
 from ..._internal.utils.openpyxl_helpers import (
     best_effort_close_write_only_workbook_worksheets,
     save_openpyxl_workbook_atomic,
 )
 from ...typedefs import CellValue, RowData, SinkRowKeySeq
-from ...vendor.compact.importlibx import require_optional_dependency
 from .accept_types import (
     SinkTypePrecheck,
     ensure_sink_accepted_cell,

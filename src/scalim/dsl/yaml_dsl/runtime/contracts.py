@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import override
 
+from ...._internal.utils.importlibx import import_module
 from ....execution.excel_column_residency import ExcelColumnResidency
 from ....execution.guardrails import GuardrailsPolicy
 from ....execution.key_normalization import normalize_key_normalization
@@ -18,7 +19,6 @@ from ....hooks import IExecutionHook
 from ....ob.observer import Observer
 from ....sinks.accept_types import SinkTypePrecheck
 from ....typedefs import KeyNormalizationMode, ParallelMode
-from ....vendor.compact.importlibx import import_module
 from .._internal.config_parsing.template_precompile import DEFAULT_RENDERED_YAML_MAX_LEN
 from ..book_resource_policy import ResourcesPolicy
 from ..init_var_nodes import OptionalPathNode

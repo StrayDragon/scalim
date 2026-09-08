@@ -1,7 +1,7 @@
 <!--
 本文件由 `just gen-docs` (scripts/gen-docs.py) 自动生成,请勿手动修改.
 Sources:
-- `src/scalim/**` module-level `__all__` exports (AST-scanned; excludes `src/scalim/vendor/**`)
+- `src/scalim/**` module-level `__all__` exports (AST-scanned)
 - `src/scalim/**/__init__.py` markers: `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`
 - `scripts/check-api-surface-governance.py`
 - `scripts/check-user-material-import-boundaries.py`

@@ -1,3 +1,5 @@
+# pragma: allow-non-core-file 模板子集类型定义,随 `__init__` 一并在覆盖率测量边界外(原 vendor 路径惯例)
+
 # region imports
 
 from collections.abc import Callable

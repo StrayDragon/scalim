@@ -80,8 +80,6 @@ def _iter_py_files(path: Path) -> Iterable[Path]:
         for child in sorted(path.rglob("*.py")):
             if "__pycache__" in child.parts:
                 continue
-            if "vendor" in child.parts:
-                continue
             yield child
         return
     yield path

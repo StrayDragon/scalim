@@ -7,8 +7,8 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..._internal.utils.importlibx import import_module
 from ...events import Event, EventType
-from ...vendor.compact.importlibx import import_module
 from ..observer import EventDispatchObserver
 
 # endregion

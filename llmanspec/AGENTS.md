@@ -60,7 +60,6 @@ Active changes 命名规范(仅对 `llmanspec/changes/` 下未归档变更生效
 - `testing-*` - 测试相关
 - `quality-*` - 质量保证
 - `governance-*` - 治理相关
-- `vendor-*` - 供应商兼容层
 
 ## Artifact 规则
 - proposal: 若变更涉及 docs/specs/skills,proposal MUST 明确: 哪些文件是 SSOT、哪些是生成物/注入区块,以及对应生成入口(脚本或 `just` 目标).

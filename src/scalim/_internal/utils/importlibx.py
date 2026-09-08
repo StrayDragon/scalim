@@ -1,3 +1,5 @@
+# pragma: allow-non-core-file 测试 seam/可选依赖守卫,原 vendor 路径在覆盖率测量边界外;Stage C 迁址后沿用
+
 # region imports
 
 import importlib
@@ -36,9 +38,4 @@ def require_optional_dependency(
         raise ImportError(msg) from exc
 
 
-__all__ = (
-    "IMPORT_MODULE",
-    "ImportModuleFn",
-    "import_module",
-    "require_optional_dependency",
-)
+__all__ = ()

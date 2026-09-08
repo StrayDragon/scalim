@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, cast
 
-import yaml as vendored_yaml
+import yaml as pyyaml_oracle
 from tests.support.pathing import repo_root as _repo_root
 
 
@@ -200,7 +200,7 @@ def test_fixture_snippet_extractor_supports_nesting_and_is_yaml_parseable() -> N
     # parseable YAML fragments
     for snippet_id, text in all_snippets.items():
         assert text.strip(), "snippet must be non-empty: {}".format(snippet_id)
-        _ = vendored_yaml.safe_load(text)
+        _ = pyyaml_oracle.safe_load(text)
 
 
 def test_runtime_import_graph_does_not_pull_doc_standardizer() -> None:

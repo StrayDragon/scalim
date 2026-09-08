@@ -179,7 +179,7 @@ def _extract_module_all(path: Path, *, repo_root: Path) -> Tuple[str, ...] | Non
 def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
     src_root = repo_root / "src"
     scan_root = src_root / "scalim"
-    exclude_dirs = (scan_root / "vendor",)
+    exclude_dirs: tuple[Path, ...] = ()  # `0.20.x`: `vendor` 目录已删除,保留参数位以稳定 `_iter_py_files` 契约
 
     all_by_module: Dict[str, Tuple[str, ...]] = {}
     for path in _iter_py_files(scan_root, exclude_dirs=exclude_dirs):
@@ -193,7 +193,7 @@ def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
 
 def _discover_public_api_entrypoints(repo_root: Path, *, tier: int) -> Tuple[_PublicApiEntrypoint, ...]:
     scan_root = repo_root / "src" / "scalim"
-    exclude_dirs = (scan_root / "vendor",)
+    exclude_dirs: Tuple[Path, ...] = ()
 
     entrypoints: List[_PublicApiEntrypoint] = []
     errors: List[str] = []
@@ -264,7 +264,7 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
         raise RuntimeError("入口列表缺少 `__all__`(或无法解析为字面量): {}".format(", ".join(missing_tier1)))
 
     sources = [
-        "`src/scalim/**` module-level `__all__` exports (AST-scanned; excludes `src/scalim/vendor/**`)",
+        "`src/scalim/**` module-level `__all__` exports (AST-scanned)",
         "`src/scalim/**/__init__.py` markers: `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`",
         "`scripts/check-api-surface-governance.py`",
         "`scripts/check-user-material-import-boundaries.py`",

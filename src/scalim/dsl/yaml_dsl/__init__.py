@@ -11,9 +11,9 @@
 
 from typing import TYPE_CHECKING
 
+from ..._internal.utils.importlibx import import_module
 from ...execution.excel_column_residency import ExcelColumnResidency
 from ...execution.output_write_layout import OutputWriteLayout
-from ...vendor.compact.importlibx import import_module
 from .book_resource_policy import (
     BookResourcePolicy,
     BookWriteAlignBy,

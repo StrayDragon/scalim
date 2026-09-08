@@ -42,7 +42,7 @@
 - **Runtime contracts**:
   - `if TYPE_CHECKING:` is only for type-only imports/aliases; MUST NOT be used to fake class interfaces (conditional methods / ellipsis stubs).
   - When one mixin/class depends on methods provided by another mixin/class, express that dependency as an explicit runtime contract (prefer `ABC` + `@abstractmethod`, compatible with the `ROADMAP.md` floor).
-- **typing_extensions**: `typing-extensions>=4.4` is a direct runtime dependency for `Self`/`override` only (stdlib `typing` covers everything else); import it directly. Do not reintroduce `vendor/compact/typing_extensionsx.py`-style re-export shims.
+- **typing_extensions**: `typing-extensions>=4.4` is a direct runtime dependency for `Self`/`override` only (stdlib `typing` covers everything else); import it directly. Do not reintroduce centralized re-export shims (the 0.20.x-era `vendor/compact/typing_extensionsx.py` pattern is retired).
 - **Doc governance**:
   - Any file containing `.gen.` is generated; do not edit by hand. Edit SSOT and run the referenced generator.
   - **禁止**直接手工编辑任何 `*.gen.*` 文件(例如 `src/scalim/dsl/yaml_dsl/schema/*.gen.json`、`agentdev/skills/**/syntax-catalog.gen.md`). 如果需要拆分提交,使用“回滚/暂存 + 重新生成”的方式拆分,不要在生成物里手改。

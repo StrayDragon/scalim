@@ -2,7 +2,7 @@ from typing import Iterator
 
 import pytest
 
-from scalim.vendor.litejinja2 import Environment, Template, TemplateError, clear_cache, from_string
+from scalim.dsl.yaml_dsl._internal.litejinja2 import Environment, Template, TemplateError, clear_cache, from_string
 
 
 def test_litejinja2_renders_vars_and_filters() -> None:

@@ -51,7 +51,7 @@ def test_yaml_12_scalar_semantics_on_yes_no_off_are_strings() -> None:
 
 
 @pytest.mark.parametrize("path", _fixture_paths())
-def test_yaml_corpus_ruamel_matches_vendored_pyyaml(path: Path) -> None:
+def test_yaml_corpus_ruamel_matches_pyyaml_oracle(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
     data_ruamel, _locations, _lines = load_yaml_mapping_text(text, source_path=str(path))
 

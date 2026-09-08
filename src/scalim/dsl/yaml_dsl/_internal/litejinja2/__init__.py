@@ -1,4 +1,9 @@
 # ruff: noqa: C901, EM101, FBT002, PLR0911, PLR0912, PLR0915, TRY003, TRY301
+# pragma: allow-non-core-file 模板子集属自包含实现,原 vendor 路径在覆盖率测量边界外;Stage C 迁址后沿用(提覆盖率另立 change)
+# pragma: allow-cast-file 第一方模板子集;内部窄化 cast 属实现细节(原 vendor 目录级豁免随 Stage C 迁移)
+# pragma: allow-no-cover-file 防御性 dunder/分支(与上游语义对齐)不单独构造测试;原 vendor 目录级豁免随 Stage C 迁移
+# pragma: allow-object-file 模板求值器以 `object` 承载任意中间值(原 vendor 目录级豁免随 Stage C 迁移)
+# pragma: allow-dynattr-file third-party: 模板求值器的动态属性访问(变量成员/遍历协议)为领域需要;原 vendor 目录级豁免随 Stage C 迁移
 
 """`LiteJinja2` - 简化的 `Jinja2` 兼容子集.
 
@@ -24,6 +29,7 @@
 
 注意: 这是一个兼容子集,并非完整 `Jinja2`. 我们优先保证“可迁移的语义与接口形状”而非功能完备.
 """
+
 
 # region imports
 
@@ -1047,12 +1053,4 @@ def clear_cache() -> None:
     _default_env.clear_cache()
 
 
-__all__ = (
-    "Environment",
-    "StrictUndefined",
-    "Template",
-    "TemplateError",
-    "Undefined",
-    "clear_cache",
-    "from_string",
-)
+__all__ = ()

@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from typing import Any, TypeGuard
 
 from ....._internal.loggingx import get_logger
-from .....vendor.litejinja2 import TemplateError, from_string
+from ..litejinja2 import TemplateError, from_string
 
 __all__ = ()
 

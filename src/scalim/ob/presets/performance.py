@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ..._internal.loggingx import format_kv, get_logger, prefix
+from ..._internal.utils.importlibx import import_module
 from ...events import Event, EventType
 from ...typedefs import PerformanceReportFormat
-from ...vendor.compact.importlibx import import_module
 from ..observer import EventDispatchObserver
 from ..perf_metrics import AdaptiveSchedulerMetrics, CpuSample, MemorySample, PerformanceMetrics
 from ..structured_logging import emit_structured, is_jsonl_logging_installed

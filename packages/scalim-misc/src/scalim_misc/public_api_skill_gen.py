@@ -95,21 +95,10 @@ def _as_str_constant(node: ast.AST) -> str | None:
     return None
 
 
-def _is_relative_to(path: Path, maybe_parent: Path) -> bool:
-    try:
-        path.relative_to(maybe_parent)
-    except ValueError:
-        return False
-    return True
-
-
 def _iter_tier1_marker_files(repo_root: Path) -> Iterable[Path]:
     scan_root = repo_root / "src" / "scalim"
-    exclude_dirs = (scan_root / "vendor",)
     for path in sorted(scan_root.rglob("__init__.py"), key=str):
         if not path.is_file():
-            continue
-        if any(_is_relative_to(path, ex) for ex in exclude_dirs):
             continue
         yield path
 

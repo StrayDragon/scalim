@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from scalim._internal.utils.importlibx import import_module
 from scalim.dsl.yaml_dsl._internal.config_parsing.error_envelope import ErrorEnvelope, ScalimYamlValidationError
 from scalim.dsl.yaml_dsl._internal.config_parsing.imports import (
     ScalimYamlImportExpansionError,
@@ -37,7 +38,6 @@ from scalim.dsl.yaml_dsl.validation_service import (
     validate_demand_text,
     validate_workflow_text,
 )
-from scalim.vendor.compact.importlibx import import_module
 
 from . import yaml_dsl_authoring, yaml_dsl_lsp, yaml_dsl_viz
 

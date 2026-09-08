@@ -12,6 +12,7 @@ from typing_extensions import Self, override
 
 from ..._internal.loggingx import prefix
 from ..._internal.utils.excel import escape_excel_formula
+from ..._internal.utils.importlibx import require_optional_dependency
 from ..._internal.utils.openpyxl_helpers import (
     best_effort_close_write_only_workbook_worksheets as _best_effort_close_write_only_workbook_worksheets,
 )
@@ -19,7 +20,6 @@ from ..._internal.utils.openpyxl_helpers import (
     best_effort_close_write_only_worksheet as _best_effort_close_write_only_worksheet,
 )
 from ...typedefs import CellValue, FieldValue, RowData, SinkRowKeySeq
-from ...vendor.compact.importlibx import require_optional_dependency
 from .accept_types import (
     SinkTypePrecheck,
     ensure_sink_accepted_cell,
