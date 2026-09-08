@@ -54,8 +54,8 @@
     - 系统 MUST 以根 `ROADMAP.md` 的 Python 支持窗口为运行时边界(当前 floor 3.10)：stdlib `typing` 已覆盖的扩展能力 (如 `TypeGuard`/`Literal`/`TypedDict`/`Protocol`/`runtime_checkable`) MUST 直接从 `typing` 引入；stdlib 尚未覆盖的符号 (`Self`/`override`) MUST 从 `typing_extensions`(>=4.4) 直接引入；`StrEnum` 在 floor<3.11 期间 MUST 经 `_internal/strenum.py` 统一引入.禁止重建 `vendor/compact/typing_extensionsx.py` 式集中 re-export shim；floor 上移触及对应 stdlib 版本时 MUST 顺势删除 `_internal/strenum.py` 与 `typing-extensions` 依赖.
 
   @req:r201 @human
-  场景: vendor modules MUST be auditable
-    - 系统 MUST 在 vendor README 维护每个 vendor 子模块的最小 provenance (来源与许可证) 以及 usage/保留理由.未被主路径使用的 vendor 子模块 MUST 记录明确保留理由与预计接入点,否则应移除.
+  场景: first-party compat and template mini-libraries MUST stay auditable in-tree
+    - 系统 MUST 将第一方兼容/模板迷你库(`_internal/strenum`、`_internal/utils/importlibx`、`dsl/yaml_dsl/_internal/litejinja2`)的来源(provenance,如适用)与移除/保留策略维护在各自模块 docstring 中;MUST NOT 重建 `src/scalim/vendor/` 式上游拷贝托管目录.带上游出处的库 MUST 标注上游引用与删除触发条件(如 floor 上移).
 
   @req:r219 @human
   场景: stdlib naming conflicts MUST be avoided
@@ -75,7 +75,7 @@
 
   @req:r260 @human
   场景: import graph MUST be acyclic and ban function-local imports
-    - 系统 MUST 保持主包 (排除 vendor) 的模块导入图无环.同时,主包模块 MUST NOT 在函数体内出现 import 语句,以避免通过局部导入绕开依赖方向约束并隐藏导入副作用.该约束 MUST 由可独立运行的静态门禁守护.
+    - 系统 MUST 保持主包的模块导入图无环.同时,主包模块 MUST NOT 在函数体内出现 import 语句,以避免通过局部导入绕开依赖方向约束并隐藏导入副作用.该约束 MUST 由可独立运行的静态门禁守护.
 
   @req:r267 @human
   场景: yaml_dsl runtime MUST NOT contain workflow runtime modules
@@ -166,10 +166,10 @@
     当 在运行时内新增扩展类型引用
     那么 stdlib 已覆盖符号 MUST 从 `typing` 引入,`Self`/`override` MUST 从 `typing_extensions` 直接引入,`StrEnum` MUST 经 `_internal/strenum.py` 引入且不得重建 typing_extensionsx 式 shim
   @req:r201 @human
-  场景: vendor-可审计
-    - 必须成立：当 审阅 vendor README；那么 每个 vendor 子模块 MUST 有来源/许可证与 usage/保留理由说明
-    当 审阅 vendor README
-    那么 每个 vendor 子模块 MUST 有来源/许可证与 usage/保留理由说明
+  场景: mini-libraries-provenance-in-docstrings
+    - 必须成立：当 审阅上述第一方迷你库模块；那么 每个模块 MUST 在 docstring 中有来源(如适用)与移除/保留策略说明,且仓库 MUST NOT 存在 `src/scalim/vendor/` 目录
+    当 审阅上述第一方迷你库模块
+    那么 每个模块 MUST 在 docstring 中有来源(如适用)与移除/保留策略说明,且仓库 MUST NOT 存在 `src/scalim/vendor/` 目录
   @req:r219 @human
   场景: 历史冲突模块不回归
     - 必须成立：当 审阅模块命名；那么 不应存在与 stdlib 高冲突且语义含混的模块命名
