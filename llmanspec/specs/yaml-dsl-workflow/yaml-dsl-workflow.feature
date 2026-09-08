@@ -193,8 +193,8 @@
     那么 系统 MUST fail-fast 报错（提示迁移到 runtime cache_pool preset） NOTE: cache pool 的语义(冲突策略/生命周期/预算/可观测性)由 `workflow-cache-pool` 能力规范定义.
   @req:r227 @human
   场景: workflow-entrypoints-imports-in-a-minimal-supported-environment
-    - 必须成立：假如 仅安装了运行时必需依赖(`typing-extensions>=4.4`,YAML 后端随包内置)的 Python 3.10 环境；当 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`；那么 import MUST 成功
-    假如 仅安装了运行时必需依赖(`typing-extensions>=4.4`,YAML 后端随包内置)的 Python 3.10 环境
+    - 必须成立：假如 仅安装了运行时必需依赖(`typing-extensions>=4.4`、`ruamel.yaml>=0.19.1`)的 Python 3.10 环境；当 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`；那么 import MUST 成功
+    假如 仅安装了运行时必需依赖(`typing-extensions>=4.4`、`ruamel.yaml>=0.19.1`)的 Python 3.10 环境
     当 执行 `python -c "from scalim.dsl.yaml_dsl import workflow_entrypoints"`
     那么 import MUST 成功
 
