@@ -41,4 +41,5 @@
 - [2026-08-09 — YAML `lookup_chunk_size` → Python `LookupChunking`（c40）](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-09-lookup-chunking-python-ssot.md?ref)
 - [Upgrade: OutputWriteLayout（Python 写出布局 SSOT）](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-11-output-write-layout.md?ref)
 - [2026-08-18 — 图边存 `source_id`，策略只住目录（c50）](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-18-source-id-graph-refs.md?ref)
+- [2026-09-08 — Python floor 3.10 + YAML 去 vendor + `scalim.vendor` 退役（0.20.0 统一发布）](repo:agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-09-08-python-floor-310-and-vendor-retirement.md?ref)
 <!-- END AUTOGEN:yaml-dsl-upgrades-index -->

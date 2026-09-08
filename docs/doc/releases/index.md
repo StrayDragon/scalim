@@ -15,6 +15,7 @@
 
 ## 已发布
 
+- [0.20.0 重点特性](0.20.0/) — 现代化统一发布：Python floor 3.10、YAML 去 vendor（ruamel.yaml）、`scalim.vendor.*` 退役、vendors/libs 同步链路移除
 - [0.10.3 重点特性](0.10.3/) — 图边 `source_id`（手写 Python IR breaking）+ `OutputWriteLayout` opt-in
 - [0.10.2 重点特性](0.10.2/) — `LookupChunking` Python SSOT（YAML `lookup_chunk_size` breaking）+ opt-in run_stats / viz
 - [0.10.1 重点特性](0.10.1/) — typed handlers 收 `Event`（相对 0.10.0 的 Python breaking；YAML 无强制迁移）

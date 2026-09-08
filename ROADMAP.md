@@ -8,7 +8,7 @@
 |---|---|---|
 | 0.10.x | legacy 冻结 | Python 3.6 兼容的最后一主线；仅安全修复；旧 fork 迭代基于此线 |
 | 0.11 – 0.19 | 保留号段 | 不使用 |
-| 0.20.x | **现代化清理线** | 全部清理工作集中在**单一 0.20.0 统一发布**；0.20.x 后续 patch 仅修 bug |
+| 0.20.x | **已发布 0.20.0** | 现代化线已随 0.20.0 统一发布（floor 3.10、YAML 去 vendor、vendor/ 退役）；后续 patch 仅修 bug |
 | 1.0.0 | 目标 | API 冻结 + 支持策略承诺，正式发布 |
 
 ## Python 支持策略
@@ -42,7 +42,7 @@
 - `importlibx` → `_internal/utils/importlibx.py`（跨切面共享，沿用 `loggingx` 等 x 后缀惯例）。
 - 清理 ruff / coverage / basedpyright 中全部 vendor 例外配置，`vendor/` 目录整体消失。
 
-### 发布 0.20.0
+### 发布 0.20.0（已完成 → tag `v0.20.0`）
 
 - 全量 `just qa` + `just examples` + bench 冒烟。
 - `just bump-versions 0.20.0 YES`；release notes 汇总全部 Breaking：Python floor、YAML 依赖化、vendor/ 与 `vendors/libs` 同步机制移除。
@@ -56,5 +56,5 @@
 ## Open / Deferred
 
 - 依赖优选与 extras 扩展（polars / jsonschema 提升等）：**延后**，需更广泛回归测试后再启动。
-- ruamel.yaml 0.19.x 兼容 spike 结论（决定 Stage B 版本范围上界）。
+- ruamel.yaml 0.19.x 兼容 spike 结论已落地（Stage B）；上界维持无上限（下界-only 政策）。
 - Floor ratchet：3.10 于 2026-10 EOL，属知情保留（企业存量采用面）；floor≥3.11 时删 `_internal/strenum.py`，floor≥3.12 时 `Self`/`override` 改用 stdlib 并删除 `typing-extensions` 依赖。

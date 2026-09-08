@@ -124,6 +124,10 @@
 - 2026-08-18 — 图边存 `source_id`，策略只住目录（c50）
   - SSOT: `references/upgrades/2026-08-18-source-id-graph-refs.md`
   - llmanspec: `llmanspec/changes/c50-source-id-graph-refs/`
+- 2026-09-08 — Python floor 3.10 + YAML 去 vendor + `scalim.vendor` 退役（0.20.0 统一发布）
+  - SSOT: `references/upgrades/2026-09-08-python-floor-310-and-vendor-retirement.md`
+  - llmanspec: `llmanspec/changes/archive/2026-09-07-c52-modernize-py310-baseline/`
+  - Spec: `llmanspec/specs/yaml-backend-migration`
 <!-- END AUTOGEN:yaml-dsl-upgrades -->
 
 ## whole-result reshape: 用 `normalize`,不用字段级 `extract`
