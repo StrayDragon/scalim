@@ -10,7 +10,7 @@
 - 允许对确属必要的动态边界做显式例外:
   - 行级: `# pragma: allow-object <reason>`
   - 文件级: `# pragma: allow-object-file <reason>`
-- `scripts/` 与 `vendor/` 属于白名单边界: 命中会被标记为 `whitelist`,不参与 `--check` 阻断.
+- `scripts/` 属于白名单边界: 命中会被标记为 `whitelist`,不参与 `--check` 阻断.
 - **`tests/` 默认不扫描**(测试注解噪音忽略;不参与门禁与报告).
 
 用法:
@@ -80,7 +80,6 @@ def _is_excluded(path: Path) -> bool:
         "build",
         "node_modules",
         ".tmp",
-        "vendor",
     }
     return any(part in excluded_parts for part in path.parts)
 
@@ -354,7 +353,7 @@ def _render_text_report(*, repo_root: Path, hits: Sequence[_Hit], show_allow_det
     lines.append("  2. 可抽象接口时,优先 `Protocol`/ABC/显式运行时契约.")
     lines.append("  3. JSON 结构时,优先 `TypedDict`/递归别名(例如 JsonLike),避免顶层 `object` 扩散.")
     lines.append("  4. 只能动态时,加 `# pragma: allow-object <reason>` 并写清边界.")
-    lines.append("  5. `scripts/` 与 `vendor/` 命中默认记为 whitelist,不作为门禁阻断.")
+    lines.append("  5. `scripts/` 命中默认记为 whitelist,不作为门禁阻断.")
 
     if hits:
         detail_hits = [hit for hit in hits if hit.status != "allow" or show_allow_details]

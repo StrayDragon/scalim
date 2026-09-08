@@ -76,7 +76,6 @@ def iter_py_files(root: Path, *, exclude_dirs: Sequence[Path]) -> Iterable[Path]
 
 def iter_tier1_marker_files(repo_root: Path) -> Iterable[Path]:
     scan_root = repo_root / "src" / "scalim"
-    exclude_dirs = (scan_root / "vendor",)
     for path in sorted(scan_root.rglob("__init__.py"), key=lambda p: str(p)):
         if not path.is_file():
             continue

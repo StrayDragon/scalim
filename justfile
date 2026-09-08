@@ -1028,7 +1028,7 @@ check-notebook-cells-native:
 report-object-type:
     uv {{ UV_OPTIONS }} run python scripts/check-object-type.py
 
-# 检查: `object` 类型标注必须显式 allow (scripts/vendor 白名单除外)
+# 检查: `object` 类型标注必须显式 allow (scripts 白名单除外)
 check-object-type:
     #!/usr/bin/env bash
     set -euo pipefail

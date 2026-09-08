@@ -3,7 +3,7 @@
 # pragma: allow-cast-file 第一方模板子集;内部窄化 cast 属实现细节(原 vendor 目录级豁免随 Stage C 迁移)
 # pragma: allow-no-cover-file 防御性 dunder/分支(与上游语义对齐)不单独构造测试;原 vendor 目录级豁免随 Stage C 迁移
 # pragma: allow-object-file 模板求值器以 `object` 承载任意中间值(原 vendor 目录级豁免随 Stage C 迁移)
-# pragma: allow-dynattr-file third-party: 模板求值器的动态属性访问(变量成员/遍历协议)为领域需要;原 vendor 目录级豁免随 Stage C 迁移
+# pragma: allow-dynattr-file dsl: 模板求值器的动态属性访问(变量成员/遍历协议)为领域需要;原 vendor 目录级豁免随 Stage C 迁移
 
 """`LiteJinja2` - 简化的 `Jinja2` 兼容子集.
 

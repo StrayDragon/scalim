@@ -27,7 +27,7 @@ checkpointed: false
 - **配置清理**：pyproject coverage `omit` 的 `src/scalim/vendor/*` 两行。
 - **文档**：根 `AGENTS.md:45` 的死路径措辞微调；`llmanspec/AGENTS.md` spec 前缀表删 `vendor-*`。
 
-**明确不做**：litejinja2 的功能/语义任何变化（纯迁址）；`unknown_fields.py` 的 jsonschema 化（Deferred）。
+**明确不做**：litejinja2 的功能/语义任何变化（纯迁址；唯一元数据变化是迁入 `_internal/` 后按内部模块规范将 `__all__` 清空为 `()`，无 `import *` 消费方，行为不变）；`unknown_fields.py` 的 jsonschema 化（Deferred）。
 
 ## Capabilities / Specs（Specs landing 范围）
 

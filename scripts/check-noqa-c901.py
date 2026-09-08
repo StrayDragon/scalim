@@ -33,8 +33,6 @@ class _Hit:
 def _iter_py_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*.py"):
         rel = path.relative_to(root)
-        if "vendor" in rel.parts:
-            continue
         yield path
 
 

@@ -128,11 +128,9 @@ def _is_relative_to(path: Path, maybe_parent: Path) -> bool:
     return True
 
 
-def _iter_py_files(root: Path, *, exclude_dirs: Sequence[Path]) -> Iterable[Path]:
+def _iter_py_files(root: Path) -> Iterable[Path]:
     for path in sorted(root.rglob("*.py")):
         if not path.is_file():
-            continue
-        if any(_is_relative_to(path, ex) for ex in exclude_dirs):
             continue
         yield path
 
@@ -182,7 +180,7 @@ def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
     exclude_dirs: tuple[Path, ...] = ()  # `0.20.x`: `vendor` 目录已删除,保留参数位以稳定 `_iter_py_files` 契约
 
     all_by_module: Dict[str, Tuple[str, ...]] = {}
-    for path in _iter_py_files(scan_root, exclude_dirs=exclude_dirs):
+    for path in _iter_py_files(scan_root):
         mod = _module_name_for_path(path, src_root=src_root)
         exported = _extract_module_all(path, repo_root=repo_root)
         if exported is None:
@@ -199,8 +197,6 @@ def _discover_public_api_entrypoints(repo_root: Path, *, tier: int) -> Tuple[_Pu
     errors: List[str] = []
 
     for path in sorted(scan_root.rglob("__init__.py"), key=lambda p: str(p)):
-        if any(_is_relative_to(path, ex) for ex in exclude_dirs):
-            continue
         rel = str(path.relative_to(repo_root)).replace("\\", "/")
         text = path.read_text(encoding="utf-8")
         for lineno, line in enumerate(text.splitlines(), start=1):
