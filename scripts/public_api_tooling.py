@@ -57,19 +57,9 @@ def repo_root_for_script(script_path: Path) -> Path:
     return script_path.resolve().parents[1]
 
 
-def is_relative_to(path: Path, maybe_parent: Path) -> bool:
-    try:
-        path.relative_to(maybe_parent)
-    except ValueError:
-        return False
-    return True
-
-
-def iter_py_files(root: Path, *, exclude_dirs: Sequence[Path]) -> Iterable[Path]:
+def iter_py_files(root: Path) -> Iterable[Path]:
     for path in sorted(root.rglob("*.py"), key=lambda p: str(p)):
         if not path.is_file():
-            continue
-        if any(is_relative_to(path, ex) for ex in exclude_dirs):
             continue
         yield path
 
@@ -78,8 +68,6 @@ def iter_tier1_marker_files(repo_root: Path) -> Iterable[Path]:
     scan_root = repo_root / "src" / "scalim"
     for path in sorted(scan_root.rglob("__init__.py"), key=lambda p: str(p)):
         if not path.is_file():
-            continue
-        if any(is_relative_to(path, ex) for ex in exclude_dirs):
             continue
         yield path
 

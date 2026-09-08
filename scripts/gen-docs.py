@@ -177,8 +177,6 @@ def _extract_module_all(path: Path, *, repo_root: Path) -> Tuple[str, ...] | Non
 def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
     src_root = repo_root / "src"
     scan_root = src_root / "scalim"
-    exclude_dirs: tuple[Path, ...] = ()  # `0.20.x`: `vendor` 目录已删除,保留参数位以稳定 `_iter_py_files` 契约
-
     all_by_module: Dict[str, Tuple[str, ...]] = {}
     for path in _iter_py_files(scan_root):
         mod = _module_name_for_path(path, src_root=src_root)
@@ -191,7 +189,6 @@ def _scan_public_exports(repo_root: Path) -> Dict[str, Tuple[str, ...]]:
 
 def _discover_public_api_entrypoints(repo_root: Path, *, tier: int) -> Tuple[_PublicApiEntrypoint, ...]:
     scan_root = repo_root / "src" / "scalim"
-    exclude_dirs: Tuple[Path, ...] = ()
 
     entrypoints: List[_PublicApiEntrypoint] = []
     errors: List[str] = []

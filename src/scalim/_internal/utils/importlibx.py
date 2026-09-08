@@ -1,10 +1,10 @@
 # pragma: allow-non-core-file 测试 seam/可选依赖守卫,原 vendor 路径在覆盖率测量边界外;Stage C 迁址后沿用
-"""可选依赖守卫与显式 import seam(第一方实现,非上游拷贝).
+"""可选依赖守卫与显式导入 `seam`(第一方实现,非上游拷贝).
 
-- `IMPORT_MODULE`/`import_module`: 为测试提供可替换的导入点(勿直接 patch 内建导入).
+- `IMPORT_MODULE` / `import_module`: 为测试提供可替换的导入点(勿直接 `patch` 内建导入).
 - `require_optional_dependency`: 统一的可选依赖缺失报错口径.
 
-保留策略: 第一方代码,长期保留;原 `vendor/compact/importlibx`(0.20.x Stage C 前路径),
+保留策略: 第一方代码,长期保留;原 `vendor/compact/importlibx`(0.20.x `Stage C` 前路径),
 迁移说明见仓库 `ROADMAP.md` 与 `AGENTS.md`.
 """
 
