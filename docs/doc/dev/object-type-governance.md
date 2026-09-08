@@ -12,7 +12,7 @@
 - 扫描器覆盖: 模块级函数、**类方法 / 嵌套类 / 嵌套函数** 的参数与返回标注、类字段 `AnnAssign`、以及 `X = object` 别名.
 - 当前量级(默认根): **`block=0`** / **`allow=2`**(仅 `typedefs.py` 的 `CellValue`/`RuntimeValue` SSOT 别名).
 - 扫描器可按需运行;报告写入 `.tmp/artifacts/`(勿提交).
-- `scripts/` 与 `vendor/` 命中记为 `whitelist`,不参与 `--check` 阻断.
+- `scripts/` 命中记为 `whitelist`,不参与 `--check` 阻断(`vendor/` 托管目录已随 0.20.x 删除).
 - 运行时新增 `object` 逃逸走 **quick 路径**(改类型 / 有理由 pragma);**仅当**需要改 `llmanspec` MUST/SHALL 时再开 `SDD` propose.
 
 ## 例外 pragma

@@ -16,7 +16,7 @@
 核心领域概念: Demand、Source、Field、Relation、Observability.
 架构模式: Hook/Event 扩展机制 + Sink 抽象输出层.
 测试基线: pytest + xdist;慢测使用 `@pytest.mark.slow`.
-行为变更需同步 `llmanspec/specs/*/spec.md`.
+行为变更需同步 `llmanspec/specs/<capability>/<capability>.feature`(单轨 feature-as-spec).
 文档治理规则: 任何包含 `.gen.` 的文件均为生成物(禁止手改);任何 `BEGIN/END AUTOGEN:<id>` 区块为受控注入区块(禁止手改区块内部).
 文档生成入口: 优先运行 `just gen-docs` 刷新站内 `docs/doc/**/*.gen.md` 与注入区块;提交前由 `just qa`/CI 漂移门禁兜底.
 llmanspec 工件在共享或发布前必须先运行 `llman sdd validate --all --strict --no-interactive`.
