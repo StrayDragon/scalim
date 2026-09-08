@@ -23,7 +23,7 @@ def test_init_stage_span_tracking_disabled() -> None:
 
 def test_stage_write_clock_disabled_and_mismatched_exit() -> None:
     durations = {"loader": 0.0, "compute": 0.0, "write": 0.0}
-    disabled = StageWriteClock(False, durations, perf_counter=lambda: 0.0)
+    disabled = StageWriteClock(enabled=False, stage_durations=durations, perf_counter=lambda: 0.0)
     disabled.enter_stage("loader")
     assert disabled.exit_stage("loader") == 0.0
     with disabled.time_write():
@@ -35,7 +35,7 @@ def test_stage_write_clock_disabled_and_mismatched_exit() -> None:
     def _pc() -> float:
         return times.pop(0) if times else 10.0
 
-    clock = StageWriteClock(True, durations, perf_counter=_pc)
+    clock = StageWriteClock(enabled=True, stage_durations=durations, perf_counter=_pc)
     clock.enter_stage("loader")
     clock.enter_stage("compute")
     # 非栈顶退出:弹出中间 `loader`
@@ -50,7 +50,7 @@ def test_stage_write_clock_disabled_and_mismatched_exit() -> None:
 def test_stage_write_clock_ignores_nested_when_stage_not_loader_compute() -> None:
     durations = {"write": 0.0}
     times = [1.0, 2.0]
-    clock = StageWriteClock(True, durations, perf_counter=lambda: times.pop(0))
+    clock = StageWriteClock(enabled=True, stage_durations=durations, perf_counter=lambda: times.pop(0))
     clock.enter_stage("stream")
     with clock.time_write():
         pass
@@ -61,7 +61,7 @@ def test_stage_write_clock_ignores_nested_when_stage_not_loader_compute() -> Non
     runtime = SimpleNamespace()
     attach_write_clock(runtime, None)
     assert get_write_clock(runtime) is None
-    clock = StageWriteClock(True, {"write": 0.0}, perf_counter=lambda: 1.0)
+    clock = StageWriteClock(enabled=True, stage_durations={"write": 0.0}, perf_counter=lambda: 1.0)
     attach_write_clock(runtime, clock)
     assert get_write_clock(runtime) is clock
 

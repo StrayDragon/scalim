@@ -41,7 +41,7 @@ def test_late_row_write_path_times_with_clock() -> None:
     # LateFieldMaterializer 需要 runtime 上的 plan/deps;用最小 stub 绕开重图.
     late = LateFieldMaterializer(runtime=runtime, late_fields=[])
     times = [10.0, 11.5]
-    clock = StageWriteClock(True, {"write": 0.0}, perf_counter=lambda: times.pop(0))
+    clock = StageWriteClock(enabled=True, stage_durations={"write": 0.0}, perf_counter=lambda: times.pop(0))
     attach_write_clock(runtime, clock)
     sink = _PlainRowSink()
     coordinator = RowEmissionCoordinator(

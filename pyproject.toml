@@ -210,7 +210,6 @@ max-args = 16
 ]
 "src/scalim/ob/presets/profiles.py" = [
     "ANN",
-    "B012",
     "B904",
     "EM103",
     "F401",
@@ -219,7 +218,6 @@ max-args = 16
     "RUF022",
     "TRY003",
 ]
-"src/scalim/execution/executor/batch/_internal/stage_spans.py" = ["ANN", "B012", "F401", "FBT001"]
 "src/scalim/workflow/execute.py" = ["C901", "PLC0415"]
 ".tmp/**/*.py" = ["ALL"]
 
@@ -234,6 +232,8 @@ docstring-code-line-length = "dynamic"
 [tool.pytest]
 [tool.pytest.ini_options]
 addopts = "-rs -p no:benchmark -m \"not bench\""
+# 编译期语义警告升级为错误: 3.14+ 编译器对 return-in-finally 等形态报 SyntaxWarning, 低版本静默, 靠此 gate 兜底
+filterwarnings = ["error::SyntaxWarning"]
 # asyncio_mode = "auto"
 # asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]

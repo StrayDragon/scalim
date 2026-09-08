@@ -980,7 +980,7 @@ def test_row_emission_coordinator_falls_back_when_write_row_aligned_missing() ->
     plan = _make_plan({}, ["a"])
     runtime = ExecutionRuntime(plan, HookManager(), ObserverManager(), _make_main_source(), sources={}, runtime_bindings=RuntimeBindings())
     times = [1.0, 2.0]
-    clock = StageWriteClock(True, {"write": 0.0}, perf_counter=lambda: times.pop(0))
+    clock = StageWriteClock(enabled=True, stage_durations={"write": 0.0}, perf_counter=lambda: times.pop(0))
     attach_write_clock(runtime, clock)
     sink = _NoAlignedRowSink()
     coordinator = RowEmissionCoordinator(
@@ -1170,7 +1170,7 @@ def test_pipeline_finalize_reuses_existing_write_clock() -> None:
 
     pipeline.runtime.instrumentation = _Wants()  # type: ignore[assignment]
     times = [1.0, 2.0]
-    clock = StageWriteClock(True, {"loader": 0.0, "compute": 0.0, "write": 0.0}, perf_counter=lambda: times.pop(0))
+    clock = StageWriteClock(enabled=True, stage_durations={"loader": 0.0, "compute": 0.0, "write": 0.0}, perf_counter=lambda: times.pop(0))
     attach_write_clock(pipeline.runtime, clock)
     sink = InMemoryRowDataSink()
     out = pipeline._finalize_run(sink, results=[{"id": 1}], batch_count=1, start_time=0.0)
@@ -1213,7 +1213,7 @@ def test_pipeline_column_write_falls_back_when_aligned_missing() -> None:
     plan = _make_plan({"id": field_spec}, ["id"])
     pipeline = _make_pipeline(plan, demand, main_source)
     times = [5.0, 6.5]
-    clock = StageWriteClock(True, {"write": 0.0}, perf_counter=lambda: times.pop(0))
+    clock = StageWriteClock(enabled=True, stage_durations={"write": 0.0}, perf_counter=lambda: times.pop(0))
     attach_write_clock(pipeline.runtime, clock)
 
     ctx = BatchContext()

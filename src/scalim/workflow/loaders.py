@@ -48,10 +48,8 @@ def workflow_loader_context(
         yield
     finally:
         if prev is None:
-            try:
+            with contextlib.suppress(AttributeError):
                 del _TLS.ctx
-            except AttributeError:
-                return
         else:
             _TLS.ctx = prev
 

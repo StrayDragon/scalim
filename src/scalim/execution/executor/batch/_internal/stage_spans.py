@@ -40,6 +40,7 @@ class StageWriteClock:
 
     def __init__(
         self,
+        *,
         enabled: bool,
         stage_durations: dict[str, float],
         perf_counter: Callable[[], float],
@@ -79,13 +80,12 @@ class StageWriteClock:
             yield
         finally:
             duration = max(0.0, self._perf_counter() - start)
-            if duration <= 0.0:
-                return
-            self.stage_durations["write"] = float(self.stage_durations.get("write", 0.0)) + duration
-            if self._active_stages:
-                name, nested = self._active_stages[-1]
-                if name in ("loader", "compute"):
-                    self._active_stages[-1] = (name, float(nested) + duration)
+            if duration > 0.0:
+                self.stage_durations["write"] = float(self.stage_durations.get("write", 0.0)) + duration
+                if self._active_stages:
+                    name, nested = self._active_stages[-1]
+                    if name in ("loader", "compute"):
+                        self._active_stages[-1] = (name, float(nested) + duration)
 
 
 def attach_write_clock(runtime: ExecutionRuntime, clock: StageWriteClock | None) -> None:
