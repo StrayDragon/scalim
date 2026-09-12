@@ -1,8 +1,8 @@
 ---
 depends_on:
   - c50-source-id-graph-refs
-checkpointed: false
 ---
+
 
 # Workflow 同名 `source_id` 的 per-run `LookupChunking`
 
