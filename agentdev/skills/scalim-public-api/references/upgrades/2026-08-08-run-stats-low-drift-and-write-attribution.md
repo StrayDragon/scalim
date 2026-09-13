@@ -16,8 +16,8 @@
 规范引用:
 - `llmanspec/changes/archive/2026-08-08-c50-run-stats-low-drift-observability/`
 - `llmanspec/changes/archive/2026-08-08-c55-stage-write-attribution/`
-- `llmanspec/specs/observability-run-stats/spec.toon`
-- `llmanspec/specs/performance-observability/spec.toon`（r1001 / r1002）
+- `llmanspec/specs/observability-run-stats.feature`
+- `llmanspec/specs/performance-observability.feature`（r1001 / r1002）
 
 人类文档: `docs/doc/viz/run-stats.md`  
 Agent skill: `agentdev/skills/scalim-run-stats/SKILL.md`

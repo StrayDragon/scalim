@@ -12,8 +12,8 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 - `llmanspec/changes/archive/2026-03-14-yaml-dsl-output-fields-alias/`
 
 对应主规范(节选):
-- `llmanspec/specs/yaml-dsl-schema/spec.md`
-- `llmanspec/specs/yaml-dsl-cli-validation/spec.md`
+- `llmanspec/specs/yaml-dsl-schema.feature`
+- `llmanspec/specs/yaml-dsl-cli-validation.feature`
 
 ## 新语法要点
 

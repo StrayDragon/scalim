@@ -13,10 +13,10 @@ llmanspec 归档变更(含 proposal/design/spec/tasks):
 - `llmanspec/changes/archive/2026-03-10-yaml-source-normalize/`
 
 对应主规范:
-- `llmanspec/specs/demand-dsl/spec.md`
-- `llmanspec/specs/execution-source-cache/spec.md`
-- `llmanspec/specs/yaml-dsl-schema/spec.md`
-- `llmanspec/specs/yaml-dsl-agent-guidance/spec.md`
+- `llmanspec/specs/demand-dsl.feature`
+- `llmanspec/specs/execution-preload-cache.feature`
+- `llmanspec/specs/yaml-dsl-schema.feature`
+- `llmanspec/specs/yaml-dsl-agent-guidance.feature`
 
 ## 适用场景
 

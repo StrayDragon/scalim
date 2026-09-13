@@ -7,7 +7,7 @@
 
 本文是写出布局选型的 **SSOT**（人类阅读页）。闭集 `OutputWriteLayout`（`row_stream` / `column_buffered` / `column_chunked`）只挂在 Python 侧（`DemandRunRuntimeOptions` / `ExecutionRequest`），**YAML authoring 禁止使用**。未设置时由 `streaming` + `excel_column_residency` 推导，默认结果与下表一致。
 
-更严的契约以 `llmanspec/specs/runtime-output-write-layout/`、`output-sink-contracts` 与 `yaml-dsl-runtime-policy-boundary` 为准。  
+更严的契约以 `llmanspec/specs/runtime-output-write-layout.feature`、`output-sink-contracts` 与 `yaml-dsl-runtime-policy-boundary` 为准。  
 Agent 入口：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`；迁移卡：`.../upgrades/2026-08-11-output-write-layout.md`。
 
 ## 0. 交互演示
@@ -191,7 +191,7 @@ chunked 只对「无 composition 的 IR 列式 Excel（`streaming=False`）」�
 ## 5. 相关链接
 
 - 公共 API：`scalim.execution.OutputWriteLayout`、`ExcelColumnResidency`、`scalim.dsl.yaml_dsl` 同名导出、`scalim.sinks.StreamingColumnExcelSink`
-- Spec：`llmanspec/specs/runtime-output-write-layout/`
+- Spec：`llmanspec/specs/runtime-output-write-layout.feature`
 - Agent skill 指引：`agentdev/skills/scalim-yaml-dsl/references/streaming-column-excel-guidance.md`
 - Upgrade 卡：`agentdev/skills/scalim-yaml-dsl/references/upgrades/2026-08-11-output-write-layout.md`
 - 并行调参：[`parallel-modes.md`](../architecture/parallel-modes.md)

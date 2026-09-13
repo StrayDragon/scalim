@@ -29,10 +29,10 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 
 对应主规范(节选):
 
-- `llmanspec/specs/yaml-dsl-workflow/spec.md`
-- `llmanspec/specs/workflow-shared-output-containers/spec.md`
-- `llmanspec/specs/workflow-sheetbook-resources/spec.md`
-- `llmanspec/specs/workflow-observability-bridge/spec.md`
+- `llmanspec/specs/yaml-dsl-workflow.feature`
+- `llmanspec/specs/workflow-shared-output-containers.feature`
+- `llmanspec/specs/workflow-sheetbook-resources.feature`
+- `llmanspec/specs/workflow-observability-bridge.feature`
 
 ## Migration Checklist
 

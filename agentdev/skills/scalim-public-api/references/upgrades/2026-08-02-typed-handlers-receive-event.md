@@ -17,7 +17,7 @@ typed Observer / Hook 回调（`on_field_compute` 等）进程内入参改为完
 
 规范引用:
 - `llmanspec/changes/c35-typed-handlers-receive-event/`（归档后见 `archive/…`）
-- `llmanspec/specs/hooks-observability-structure/spec.toon`（r217）
+- `llmanspec/specs/hooks-observability-structure.feature`（r217）
 
 ---
 

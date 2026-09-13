@@ -2,7 +2,7 @@
 name: "llman-sdd-specs-compact"
 description: "人类主动触发的维护工具。压缩去重 llman SDD specs——在归档积累较多后合并冗余 requirement/scenario，保留所有规范行为不变。不属于日常 pipeline：仅在用户明确要求压缩 specs 时才运行。"
 metadata:
-  version: "0.0.72"
+  version: "0.0.77"
 ---
 
 # LLMAN SDD Specs Compact
@@ -63,7 +63,7 @@ flowchart LR
 校验修复（单轨 feature-as-spec）：
 
 1）缺少头注释（`missing # capability: header comment`）：
-每个 `llmanspec/specs/<capability>/<capability>.feature` 必须以以下注释开头：
+每个 capability `.feature`（`llmanspec/specs/<capability>.feature` 或 `llmanspec/specs/<capability>/<capability>.feature`）必须以以下注释开头：
 ```
 # language: zh-CN
 # capability: <capability>
@@ -81,8 +81,8 @@ flowchart LR
 
 Git-native 护栏：
 - **Branch binding** → **Specs landing**：先 `change start` / `attach`，再在绑定的非默认分支编辑 live `.feature` 并 commit。
-- 锁定规则：修改/删除既有 `@human` 场景会触发门禁，除非 proposal frontmatter 带 `rules_edit_acked: true`。
-- apply 前须 `readyToImplement=true`（或 `skip_specs_landing`）。收尾优先 `change finalize`。
+- 锁定规则：修改/删除既有 `@human` 场景以 WARNING 报告（报告制，r135/S0），不阻断 validate/finalize/diff。控制点：git 分支对比 + `llman sdd review` / `change diff` 报告浮现。确认元数据（`rules_touched` / `agent_acked` / `@agent` / `--yes` 锁定语义）已移除（q9 无兼容）。
+- apply 前须 `readyToImplement=true`（或 `needs_specs_change: false`）。收尾优先 `change finalize`。
 - 勿使用 `change delta` / solidify / `*.feature.delta.toon`。
 
 ## Ethics Governance

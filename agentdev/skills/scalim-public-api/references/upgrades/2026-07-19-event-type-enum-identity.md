@@ -17,8 +17,8 @@
 
 规范引用:
 - `llmanspec/changes/archive/2026-07-19-c0-event-type-enum-identity/`
-- `llmanspec/specs/hooks-observability-structure/spec.toon`
-- `llmanspec/specs/hooks-events/spec.toon`
+- `llmanspec/specs/hooks-observability-structure.feature`
+- `llmanspec/specs/hooks-events.feature`
 
 ---
 

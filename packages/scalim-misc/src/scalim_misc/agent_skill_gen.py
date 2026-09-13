@@ -95,25 +95,33 @@ UPGRADE_LEGACY_REFERENCE_REL = REFERENCES_ROOT_REL / "task-upgrade-legacy.md"
 UPGRADES_INDEX_BEGIN_MARKER = "<!-- BEGIN AUTOGEN:yaml-dsl-upgrades -->"
 UPGRADES_INDEX_END_MARKER = "<!-- END AUTOGEN:yaml-dsl-upgrades -->"
 
+# llman 0.0.7x 起 specs 为单层布局: `llmanspec/specs/<capability>.feature`.
+SPECS_ROOT_REL = Path("llmanspec") / "specs"
+
+
+def _spec_rel(capability: str) -> Path:
+    return SPECS_ROOT_REL / "{}.feature".format(capability)
+
+
 SYNTAX_SPEC_RELS = (
-    Path("llmanspec") / "specs" / "yaml-dsl-schema" / "yaml-dsl-schema.feature",
-    Path("llmanspec") / "specs" / "demand-dsl" / "demand-dsl.feature",
-    Path("llmanspec") / "specs" / "yaml-dsl-workflow" / "yaml-dsl-workflow.feature",
-    Path("llmanspec") / "specs" / "yaml-dsl-books-resources" / "yaml-dsl-books-resources.feature",
-    Path("llmanspec") / "specs" / "yaml-dsl-output-overrides" / "yaml-dsl-output-overrides.feature",
-    Path("llmanspec") / "specs" / "ir-source-relations" / "ir-source-relations.feature",
-    Path("llmanspec") / "specs" / "ir-field-compute" / "ir-field-compute.feature",
-    Path("llmanspec") / "specs" / "execution-preload-cache" / "execution-preload-cache.feature",
-    Path("llmanspec") / "specs" / "workflow-cache-pool" / "workflow-cache-pool.feature",
-    Path("llmanspec") / "specs" / "workflow-observability-bridge" / "workflow-observability-bridge.feature",
-    Path("llmanspec") / "specs" / "runtime-pruning" / "runtime-pruning.feature",
-    Path("llmanspec") / "specs" / "execution-loader-retry" / "execution-loader-retry.feature",
-    Path("llmanspec") / "specs" / "runtime-guardrails" / "runtime-guardrails.feature",
-    Path("llmanspec") / "specs" / "performance-observability" / "performance-observability.feature",
-    Path("llmanspec") / "specs" / "output-mode-api" / "output-mode-api.feature",
+    _spec_rel("yaml-dsl-schema"),
+    _spec_rel("demand-dsl"),
+    _spec_rel("yaml-dsl-workflow"),
+    _spec_rel("yaml-dsl-books-resources"),
+    _spec_rel("yaml-dsl-output-overrides"),
+    _spec_rel("ir-source-relations"),
+    _spec_rel("ir-field-compute"),
+    _spec_rel("execution-preload-cache"),
+    _spec_rel("workflow-cache-pool"),
+    _spec_rel("workflow-observability-bridge"),
+    _spec_rel("runtime-pruning"),
+    _spec_rel("execution-loader-retry"),
+    _spec_rel("runtime-guardrails"),
+    _spec_rel("performance-observability"),
+    _spec_rel("output-mode-api"),
 )
 
-CLI_SPEC_RELS = (Path("llmanspec") / "specs" / "yaml-dsl-cli-validation" / "yaml-dsl-cli-validation.feature",)
+CLI_SPEC_RELS = (_spec_rel("yaml-dsl-cli-validation"),)
 
 
 class GenerationError(RuntimeError):
@@ -1013,7 +1021,7 @@ def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dic
             raise GenerationError("llmanspec 文件未包含需求条目: {}".format(abs_path))  # force-en
         summaries.append(
             {
-                "slug": rel_path.parent.name,
+                "slug": rel_path.stem,
                 "path": path_to_posix(rel_path),
                 "purpose": sanitize_spec_summary_text(purpose),
                 "requirements": [sanitize_spec_summary_text(r) for r in requirements],

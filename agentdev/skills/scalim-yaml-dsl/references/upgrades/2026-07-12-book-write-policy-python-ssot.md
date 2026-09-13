@@ -28,10 +28,10 @@
 - `llmanspec/changes/archive/2026-07-12-c20-book-write-policy-python-ssot/`
 
 对应主规范(节选):
-- `llmanspec/specs/yaml-dsl-books-resources/spec.toon`
-- `llmanspec/specs/yaml-dsl-write-policy-and-output-extras/spec.toon`
-- `llmanspec/specs/yaml-dsl-runtime-policy-boundary/spec.toon`
-- `llmanspec/specs/workflow-shared-output-containers/spec.toon`
+- `llmanspec/specs/yaml-dsl-books-resources.feature`
+- `llmanspec/specs/yaml-dsl-write-policy-and-output-extras.feature`
+- `llmanspec/specs/yaml-dsl-runtime-policy-boundary.feature`
+- `llmanspec/specs/workflow-shared-output-containers.feature`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

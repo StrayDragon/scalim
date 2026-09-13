@@ -2,7 +2,7 @@
 name: "llman-sdd-apply"
 description: "在一个闭环内实施 llman SDD 变更的 tasks：写代码 → 跑测试 → 失败自修复 → 直到门禁全绿。自动更新 tasks.md 勾选状态并运行校验。用于提案完成后的实现阶段。"
 metadata:
-  version: "0.0.72"
+  version: "0.0.77"
 ---
 
 # LLMAN SDD Apply
@@ -19,8 +19,9 @@ metadata:
 
 硬规则：
 1. **先** Branch binding（`change start` / `attach`）→ Full；**再** Specs landing（绑定分支编辑并 commit `llmanspec/specs/**`）。
-2. 无 live 合约变更 → `skip_specs_landing: true`。apply 前须 `readyToImplement=true`。
-3. **禁止**在默认分支 commit live specs；已 attach 勿重复 `start`。
+2. 无 live 合约变更 → `needs_specs_change: false`。apply 前须 `readyToImplement=true`。
+3. 收口用 `change finalize`（自动提交 `archive(sdd): <id>`；`--no-commit` 可跳过）。`change checkpoint` 已移除。
+4. **禁止**在默认分支 commit live specs；已 attach 勿重复 `start`。
 
 ### Skill 导航（非生命周期；仅指示当前 skill）
 
@@ -34,7 +35,7 @@ flowchart LR
     style apply fill:#fff3cd,stroke:#ffc107,stroke-width:3px
 ```
 
-> 📍 你现在在完整 Git-native 生命周期图中的 **H（apply）**：进入前须 Specs-landed（或 `skip_specs_landing`）且 `readyToImplement=true` → 下一步 `llman-sdd-verify`
+> 📍 你现在在完整 Git-native 生命周期图中的 **H（apply）**：进入前须 Specs-landed（或 `needs_specs_change: false`）且 `readyToImplement=true` → 下一步 `llman-sdd-verify`
 
 ## 硬约束
 
@@ -48,10 +49,9 @@ flowchart LR
 
 ## Commit 策略
 
-- **apply 循环内禁止逐 task commit**（自修复轮次同样适用）：所有改动保持在工作区；tasks.md 的 checkbox 勾选只是工作区编辑，MUST NOT 单独成 commit。逐步提交的「步骤日志」会淹没语义变更，迫使 reviewer 依赖裸 diff。
-- **默认收尾**：全部 task 过门禁且 verify 全绿后，由 `llman sdd change finalize <id>` 单 commit 收尾（实现 + frontmatter + archive 改名一次提交）。不要在 apply 循环内 finalize。
+- **change 分支上提交自由**（r25/Q4b）：可按 task/里程碑分段提交（利于 review），也可保持工作区不提交、交给 finalize 一次收尾——两条路都是一等公民。`change checkpoint` 已不存在，因此没有「中途存档点」要维护；`change finalize` 对两种形态都原生支持（不要求干净树）。
+- **默认收尾**：全部 task 过门禁且 verify 全绿后，`llman sdd change finalize <id>` 自动提交 `archive(sdd): <change-id>`（未提交的实现 diff + frontmatter + archive 改名一次提交）。不要在 apply 循环内 finalize。`--no-commit` 可跳过自动提交（手动/CI 历史、pre-commit hook 冲突场景）。
 - **blocker 中断**：必须因 blocker STOP 时，先做**一次** WIP commit（如 `wip(sdd): <change-id> <摘要>`）保全现场，再报告。
-- **中途快照是例外**：仅当用户明确要求严格 `checkpoint_sha` 或可 review 的中间点时才逐段提交，并遵循 archive skill 的多 commit fallback 时序。
 
 ## 步骤
 
@@ -76,13 +76,14 @@ flowchart LR
 llman sdd show <id> --json --type change
 ```
 
-解读字段：`stage`、`specsLanded`、`skipSpecsLanding`、`readyToImplement`。
+解读字段：`stage`、`specsLanded`、`needsSpecsChange`、`readyToImplement`、`gateChecks`（逐项 `pass` + 未过时一行 `hint`）。
 
 | 条件 | 动作 |
 |------|------|
-| `stage=draft`（仅 proposal.md） | STOP。长大到 Designed（proposal + tasks；design 按需）→ Branch binding → Specs landing。draft 不能直接 apply/verify。若已有 proposal+design+tasks 仍是 `draft`：未 start/attach —— 在默认分支干净树跑 `change start`，或手动建分支后 `change attach`。**不要**建 `changes/<id>/specs/`，**不要**先在默认分支改 live specs。 |
-| `stage=designed` | STOP。先 `change start` / `attach`（Branch binding）。 |
-| `stage=full` 且 `readyToImplement=false` | STOP。在**绑定分支**完成 Specs landing（编辑 `llmanspec/specs/**` 并 commit），或设 `skip_specs_landing`。**不要**再跑 `change start`。丢失绑定分支 specs → checkout/重建 + 必要时 `attach --force`。 |
+| `stage=draft`（仅 proposal.md） | STOP。长大到 Designed（补 design.md）→ Planned（补 tasks.md）→ Branch binding → Specs landing。draft 不能直接 apply/verify。若已有 proposal+design+tasks 仍是 `draft`：tasks 无 design 需先补 design.md。**不要**建 `changes/<id>/specs/`，**不要**先在默认分支改 live specs。 |
+| `stage=designed`（proposal + design） | 下一步：补 tasks.md → `planned`。规划工件齐全后再 `change start` / `attach`（Branch binding）。 |
+| `stage=planned`（proposal + design + tasks） | STOP 直到绑定：跑 `change start` / `attach`（Branch binding）→ `full`。 |
+| `stage=full` 且 `readyToImplement=false` | STOP。在**绑定分支**完成 Specs landing（编辑 `llmanspec/specs/**` 并 commit），或设 `needs_specs_change: false`。**不要**再跑 `change start`。丢失绑定分支 specs → checkout/重建 + 必要时 `attach --force`。 |
 | `readyToImplement=true` | 可通过 apply/verify 前置检查。`changes/<id>/specs/` 预期**不存在**，勿当缺失。 |
 - 使用 `llman sdd context --task "<proposal 中的目标>" --paths "<specs 中的 scope>"` 获取相关 specs。
   - 若 context 不可用，运行 `llman sdd index rebuild` 后重试。
@@ -112,7 +113,7 @@ llman sdd show <id> --json --type change
 运行项目门禁命令（根据项目实际选择）：
 - 相关测试集：`just test` 或 `cargo test --all`
 - 格式/lint：`just check` 或 `just lint` + `just fmt`
-- Git-native：留在绑定 feature 分支；按需编辑 live `llmanspec/specs/<capability>/<capability>.feature`（规则 `@human`，验收 `@executable`）；spec 改动后跑 `llman sdd validate --specs`。勿在每个 task 后跑 `checkpoint`。勿使用 `change delta` / solidify / feature_delta。
+- Git-native：留在绑定 feature 分支；按需编辑 live `llmanspec/specs/<capability>.feature`（扁平，或目录 `llmanspec/specs/<capability>/` 内主文件；规则 `@human`，验收 `@executable`）；spec 改动后跑 `llman sdd validate --specs`；分支上可自由提交（分段，或留脏交给 finalize）。勿使用 `change delta` / solidify / feature_delta；`change checkpoint` 已移除。
 - SDD 校验：`llman sdd validate <id> --strict --no-interactive`
 
 **若失败 → 进入自修复循环（不要问要不要继续）：**
@@ -146,7 +147,7 @@ llman sdd show <id> --json --type change
 校验修复（单轨 feature-as-spec）：
 
 1）缺少头注释（`missing # capability: header comment`）：
-每个 `llmanspec/specs/<capability>/<capability>.feature` 必须以以下注释开头：
+每个 capability `.feature`（`llmanspec/specs/<capability>.feature` 或 `llmanspec/specs/<capability>/<capability>.feature`）必须以以下注释开头：
 ```
 # language: zh-CN
 # capability: <capability>
@@ -164,8 +165,8 @@ llman sdd show <id> --json --type change
 
 Git-native 护栏：
 - **Branch binding** → **Specs landing**：先 `change start` / `attach`，再在绑定的非默认分支编辑 live `.feature` 并 commit。
-- 锁定规则：修改/删除既有 `@human` 场景会触发门禁，除非 proposal frontmatter 带 `rules_edit_acked: true`。
-- apply 前须 `readyToImplement=true`（或 `skip_specs_landing`）。收尾优先 `change finalize`。
+- 锁定规则：修改/删除既有 `@human` 场景以 WARNING 报告（报告制，r135/S0），不阻断 validate/finalize/diff。控制点：git 分支对比 + `llman sdd review` / `change diff` 报告浮现。确认元数据（`rules_touched` / `agent_acked` / `@agent` / `--yes` 锁定语义）已移除（q9 无兼容）。
+- apply 前须 `readyToImplement=true`（或 `needs_specs_change: false`）。收尾优先 `change finalize`。
 - 勿使用 `change delta` / solidify / `*.feature.delta.toon`。
 
 ## Context

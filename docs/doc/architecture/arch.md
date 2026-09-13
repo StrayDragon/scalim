@@ -276,8 +276,8 @@ flowchart LR
 
 规范说明:
 
-- `llmanspec/specs/runtime-pruning/spec.md`
-- `llmanspec/specs/streaming-output/spec.md`
+- `llmanspec/specs/runtime-pruning.feature`
+- `llmanspec/specs/streaming-output.feature`
 
 ## 7. 输出层(sinks): 行式/列式/内存
 

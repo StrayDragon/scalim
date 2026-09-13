@@ -14,7 +14,7 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 - `llmanspec/changes/archive/2026-03-10-yaml-field-extract/`
 
 对应主规范:
-- `llmanspec/specs/yaml-field-extract/spec.md`
+- `llmanspec/specs/demand-dsl.feature`
 
 ## 破坏性变更(Breaking)
 

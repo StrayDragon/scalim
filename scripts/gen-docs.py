@@ -549,11 +549,12 @@ def _repo_link(rel: str) -> str:
 
 def _render_llmanspec_index(repo_root: Path) -> str:
     specs_root = repo_root / "llmanspec" / "specs"
-    spec_paths = sorted(p for p in specs_root.glob("*/*.feature") if p.is_file())
+    # `llman` 升级后 `specs` 为单层布局: `llmanspec/specs/<capability>.feature`.
+    spec_paths = sorted(p for p in specs_root.glob("*.feature") if p.is_file())
     entries = []
     for path in spec_paths:
         rel = path.relative_to(repo_root).as_posix()
-        slug = path.parent.name
+        slug = path.stem
         text = _read_text(path)
         title = slug
         purpose = ""
@@ -566,7 +567,7 @@ def _render_llmanspec_index(repo_root: Path) -> str:
         entries.append((slug, title, status_line, purpose, rel))
 
     lines = [
-        _autogen_md_header(sources=["`llmanspec/specs/*/*.feature`"]).rstrip("\n"),
+        _autogen_md_header(sources=["`llmanspec/specs/*.feature`"]).rstrip("\n"),
         "",
         '??? warning "自动生成文件"',
         "    本文件由 `scripts/gen-docs.py` 自动生成，请勿手动编辑。如需修改，请编辑源文件或生成脚本。",

@@ -179,6 +179,6 @@ flowchart TD
 
 ## 6. 相关链接
 
-- Spec：`llmanspec/specs/execution-refloader-chunk-parallelism/`
+- Spec：`llmanspec/specs/execution-refloader-chunk-parallelism.feature`
 - 归档 change：`llmanspec/changes/archive/2026-08-02-c30-refloader-chunk-parallelism/`
 - 复现脚本（已入库）：[`docs/doc/releases/repro/chunk-parallel/run_ab.py`](repro/chunk-parallel/run_ab.py)；输出证据（可再生成，不入库）：`.tmp/evidence/c30-chunk-parallel/`

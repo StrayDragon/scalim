@@ -14,11 +14,11 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 - `llmanspec/changes/archive/2026-03-12-yaml-dsl-micro-tunes/`
 
 对应主规范(节选):
-- `llmanspec/specs/demand-dsl/spec.md`
-- `llmanspec/specs/yaml-dsl-schema/spec.md`
-- `llmanspec/specs/yaml-runtime-vars/spec.md`
-- `llmanspec/specs/ir-source-relations/spec.md`
-- `llmanspec/specs/yaml-dsl-micro-tunes/spec.md`
+- `llmanspec/specs/demand-dsl.feature`
+- `llmanspec/specs/yaml-dsl-schema.feature`
+- `llmanspec/specs/execution-micro-tunes.feature`
+- `llmanspec/specs/ir-source-relations.feature`
+- `llmanspec/specs/execution-micro-tunes.feature`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

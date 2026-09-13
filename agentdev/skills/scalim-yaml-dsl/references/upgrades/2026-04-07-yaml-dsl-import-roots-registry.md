@@ -20,9 +20,9 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 - `llmanspec/changes/archive/2026-04-07-c41-yaml-dsl-import-roots-registry/`
 
 对应主规范(节选):
-- `llmanspec/specs/yaml-dsl-project-config-schema/spec.md`
-- `llmanspec/specs/yaml-dsl-import-aliases-and-presets/spec.md`
-- `llmanspec/specs/yaml-dsl-editor-project-discovery/spec.md`
+- `llmanspec/specs/yaml-dsl-project-config-schema.feature`
+- `llmanspec/specs/yaml-dsl-import-aliases-and-presets.feature`
+- `llmanspec/specs/yaml-dsl-lsp-project-discovery.feature`
 
 ## 新语法要点
 

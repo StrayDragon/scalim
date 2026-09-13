@@ -168,7 +168,7 @@ flowchart TD
 
 ## 6. 相关链接
 
-- Spec：`llmanspec/specs/execution-compute-rowwise-fusion/`
+- Spec：`llmanspec/specs/execution-compute-rowwise-fusion.feature`
 - 归档 change：`llmanspec/changes/archive/2026-08-02-c20-compute-expr-rowwise-fusion/`
 - 大形状 RSS（≤10%）：`.tmp/evidence/c20-rowwise-fusion-rss/`（可再生成，不入库）
 - 复现脚本（已入库）：[`docs/doc/releases/repro/c20-workload-shapes/run_ab.py`](repro/c20-workload-shapes/run_ab.py)

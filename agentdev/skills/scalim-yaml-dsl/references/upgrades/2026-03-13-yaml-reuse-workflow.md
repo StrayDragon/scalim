@@ -17,11 +17,11 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 - `llmanspec/changes/archive/2026-03-13-yaml-dsl-workflow/`
 
 对应主规范(节选):
-- `llmanspec/specs/yaml-dsl-imports/spec.md`
-- `llmanspec/specs/yaml-dsl-workflow/spec.md`
-- `llmanspec/specs/yaml-dsl-schema/spec.md`
-- `llmanspec/specs/yaml-dsl-cli-validation/spec.md`
-- `llmanspec/specs/execution-source-cache/spec.md`
+- `llmanspec/specs/yaml-dsl-imports.feature`
+- `llmanspec/specs/yaml-dsl-workflow.feature`
+- `llmanspec/specs/yaml-dsl-schema.feature`
+- `llmanspec/specs/yaml-dsl-cli-validation.feature`
+- `llmanspec/specs/execution-preload-cache.feature`
 
 下游同步盘点:
 - 仅用于盘点与行动: `.tmp/known-outer-paths-using-this-package.txt`（请勿在公开输出中复述其内容）

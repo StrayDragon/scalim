@@ -17,9 +17,9 @@ llmanspec 归档变更（含 proposal/design/spec/tasks）:
 - `llmanspec/changes/archive/2026-03-11-yaml-loader-params-template/`
 
 对应主规范(节选):
-- `llmanspec/specs/demand-dsl/spec.md`
-- `llmanspec/specs/ir-source-relations/spec.md`
-- `llmanspec/specs/yaml-dsl-schema/spec.md`
+- `llmanspec/specs/demand-dsl.feature`
+- `llmanspec/specs/ir-source-relations.feature`
+- `llmanspec/specs/yaml-dsl-schema.feature`
 
 ## 破坏性变更(Breaking)
 

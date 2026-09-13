@@ -2,7 +2,7 @@
 name: "llman-sdd-apply-cycle"
 description: "单个变更的闭环：门禁检查→实施→测试→校验→verify 建议→归档→提交。仅手动触发。Agent MUST NOT 自动调用。"
 metadata:
-  version: "0.0.72"
+  version: "0.0.77"
 disable-model-invocation: true
 ---
 
@@ -21,7 +21,7 @@ llman sdd show <change-id> --json --type change
 > 阶段判定：用 `llman sdd show <id> --json --type change` 的 `stage` / `readyToImplement` 字段；完整判定表见 llman-sdd-apply。
 
 - 须在绑定的非默认分支上。
-- `readyToImplement` 不为 true → STOP（先 Specs landing 或 `skip_specs_landing`）；**不要**直接 finalize。
+- `readyToImplement` 不为 true → STOP（先 Specs landing 或 `needs_specs_change: false`）；**不要**直接 finalize。
 - 进度以 `tasks.md` checkbox 为准（或 `llman sdd list` 的任务计数）；实现时仍须阅读 `tasks.md`、proposal/design 与绑定分支上的 live `llmanspec/specs/**`（SSOT）。
 
 ### 1) 循环：实施 → 测试
@@ -41,18 +41,15 @@ llman sdd validate <change-id> --strict --no-interactive
 优先跑 `llman-sdd-verify`（或等效双轴自检）。有 CRITICAL → STOP，勿归档。
 
 ### 4) 归档
-优先：
 ```bash
 llman sdd change finalize <change-id>
 ```
-（工作区可脏；ff-merge + 文档改名；再一次 `git commit`。）
+（工作区可脏；ff-merge + 文档改名 + **自动提交** `archive(sdd): <change-id>` 单进程完成。`--no-commit` 跳过自动提交用于手动/CI 历史——此时自行 `git add -A && git commit -m "archive(sdd): <change-id>"`。）
 
-Fallback：`checkpoint` → `archive`（见 `llman-sdd-archive`）。
+`change checkpoint` 已移除；普通 `change archive` 命令保留为 fallback（不再要求任何 checkpointed 字段）。
 
-### 5) 提交
-```bash
-git add -A && git commit -m "<prefix>: <description>"
-```
+### 5) 提交（见步骤 4）
+finalize 已自动提交，除非传了 `--no-commit`。
 
 ### 6) 可选清理
 ```bash

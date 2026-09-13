@@ -4,7 +4,7 @@
 `just examples` 的 suite 发现（非 demo_/example_ 前缀）也不会被
 `chapters*/registry.py` 收录 —— 仅文档用途。
 
-cells-native 契约（llmanspec/specs/examples-marimo/examples-marimo.feature
+cells-native 契约（llmanspec/specs/examples-marimo.feature
 @req:r497 / r1111 / r1112）:
 1. 执行主路径（scalim 调用装配、参数组装、中间产物展示、断言展开）位于 marimo cells 内
 2. 模块级仅保留 `app = marimo.App(...)` + 薄 `run_chapter()`（app.run() + defs["chapter_result"]）

@@ -26,7 +26,7 @@
     当 生成器运行
     那么 CLI/LSP reference 必须包含 `yaml-dsl validate`、`yaml-dsl schema validate`、`yaml-dsl schema show` 与 `yaml-dsl schema path`
     当 生成器导出 syntax catalog 或 CLI/LSP reference
-    那么 它必须从相关 `llmanspec/specs/*/spec.toon` 摘录 requirement 索引
+    那么 它必须从相关 `llmanspec/specs/*.feature` 摘录 requirement 索引
   @req:r535 @human
   场景: Example Selection and Validation
     - 系统 MUST 仅导出一个 canonical full example,目标路径固定为 `agentdev/skills/scalim-yaml-dsl/references/generated/example-full/ecommerce_report.gen.yaml`. 该 canonical example MUST:

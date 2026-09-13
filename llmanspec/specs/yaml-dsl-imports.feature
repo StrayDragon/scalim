@@ -33,7 +33,7 @@
     那么 校验 MUST 失败并提示仅支持相对文件路径(`.yaml/.yml`)
   @req:r478 @human
   场景: $import merges mapping fragments deterministically
-    - 系统 MUST 支持在允许的 mapping 节点内声明特殊键 `$import`,用于把片段文件中的某个 mapping 片段合并到当前 mapping。 允许范围 MUST 以稳定 authoring surfaces 为准;详见 `llmanspec/specs/yaml-dsl-demand-imports-scope/spec.toon`。 系统 MUST 将 `$import` 引用字符串解析为 `<alias>(.<segment>)*`,其中每个 `<segment>` 必须匹配正则 `^[a-zA-Z_][a-zA-Z0-9_]*$`(不提供转义机制)。 系统 MUST 按以下确定性顺序合并: 1. 先合并 `$import` 列表中的所有片段(按顺序,后者覆盖前者) 2. 再合并当前 mapping(剔除 `$import` 本身),本地覆盖导入结果
+    - 系统 MUST 支持在允许的 mapping 节点内声明特殊键 `$import`,用于把片段文件中的某个 mapping 片段合并到当前 mapping。 允许范围 MUST 以稳定 authoring surfaces 为准;详见 `llmanspec/specs/yaml-dsl-demand-imports-scope.feature`。 系统 MUST 将 `$import` 引用字符串解析为 `<alias>(.<segment>)*`,其中每个 `<segment>` 必须匹配正则 `^[a-zA-Z_][a-zA-Z0-9_]*$`(不提供转义机制)。 系统 MUST 按以下确定性顺序合并: 1. 先合并 `$import` 列表中的所有片段(按顺序,后者覆盖前者) 2. 再合并当前 mapping(剔除 `$import` 本身),本地覆盖导入结果
     假如 `common.sources` 中包含 `orders: {..., fields: {order_id: ...}}`
     当 需求侧写 `sources: {$import: common.sources, orders: {fields: {order_id: {name: "订单ID"}}}}`
     那么 最终 `sources.orders` MUST 同时包含片段中的未覆盖字段与本地覆写的 `name`
