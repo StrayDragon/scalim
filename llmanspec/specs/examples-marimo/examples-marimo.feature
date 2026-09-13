@@ -1,262 +1,146 @@
 # language: zh-CN
 # capability: examples-marimo
-# purpose: 定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。 [scope-review-2026-07-13-c25-xlsx-ir-path-presence]
+# purpose: 定义仓库内 Marimo 示例/教学套件治理边界：Marimo notebooks 作为唯一交互载体，headless runner/pytest 作为确定性回归入口，要求执行真相来源位于 notebooks（同源复用）。 [rev:c25]
 # scope: src/scalim/
-
 功能: examples-marimo
 
   @req:r31 @human
   场景: Marimo notebooks 作为唯一交互载体
     - 系统 MUST 将 Marimo notebooks 作为示例/教程的交互载体。用于教学展示的示例 notebooks MUST 包含 `marimo.App`。 系统 MAY 保留非 Marimo 的 headless runner 实现，但该实现 MUST 明确定位为 runner/工具实现，不得承担交互教学入口职责。
-
+    当 维护者枚举用于教学展示的 notebooks
+    那么 这些 notebooks 文件内容 MUST 包含 `marimo.App`
   @req:r275 @human
   场景: 示例套件必须同时具备"教学入口"和"回归入口"
     - 系统 MUST 将示例套件拆分为两层并保持同源： 1) **教学入口**：Marimo notebooks，用于逐章讲解与交互查看结果 2) **回归入口**：headless runner/pytest，用于确定性对拍与 CI 集成
-
+    当 维护者为某个示例套件新增一个可运行章节
+    那么 该章节 MUST 同时具备一个 Marimo notebook 入口
   @req:r401 @human
   场景: SSOT 入口必须位于 notebooks 且可被 headless 复用
     - 系统 MUST 将纳入 examples gate 的示例/章节执行真相来源定义为"可被导入调用的 Python 入口函数"，且该入口 MUST 位于 notebooks 侧。 该 SSOT 入口 MUST 满足： - MUST 可被 headless runner 与 pytest 直接导入并执行（不得要求启动 marimo UI server） - MUST 产生可定位的结果摘要（至少包含 `passed` 与 `summary`） - MUST 与对应的 Marimo notebook 交互入口同源（避免"UI 一套逻辑 / headless 一套逻辑"的漂移）
-
+    当 维护者为示例体系新增一个纳入 gate 的章节 notebook
+    那么 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 headless runner 与 pytest 复用
   @req:r497 @human
   场景: 章节执行真相位于 notebook cells，SSOT 入口为薄适配层
     - 每个纳入 examples gate 的章节 notebook MUST 将示例执行主路径（scalim 调用装配、参数组装、中间产物展示、断言展开）写在 marimo cells 内并逐步展开，确保读者打开 notebook 即可观察运行机制与中间结果。
     - 章节的 SSOT 入口函数（`run_<id>()`/`run_chapter()`）MUST 是薄适配层：执行 notebook 自身的 cell 图（如 `app.run()`）并提取对拍结果，MUST NOT 在模块级或 support 模块中重复实现一份独立执行主路径；章节的核心逻辑 MUST NOT 通过调用外部模块级 `run_*()` 函数来执行。
     - 章节 MUST 在 cells 内产出结构化对拍结果 `chapter_result`（至少包含 `passed` 与 `summary`），供 headless runner 与 pytest 提取，避免"UI 一套逻辑 / headless 一套逻辑"漂移。
-
-  @req:r1111 @human
-  场景: 可复用零件与执行主路径的边界
-    - 可复用"零件"（fixtures 数据、mock 基础设施、通用 Observer/Hook 类、YAML 片段资源等）MAY 保留在 `support/` 或受控库模块中，但零件 MUST NOT 承载章节执行主路径；装配（接线方式、注入点、运行顺序）与断言展开 MUST 在 notebook cells 内可见。
-
-  @req:r1112 @human
-  场景: 交互控件始终展示且 script 模式同源
-    - 章节 notebook 的交互 UI 控件（slider/number/checkbox 等）MUST 始终创建并展示；headless/script 模式 MUST 使用控件默认值自动执行完整流程，MUST NOT 用 `if script_mode` 包裹全部 UI 或让交互模式与对拍模式执行不同主路径。 消耗较大的运行 MAY 使用 `run_button`/`mo.stop` 手动触发，但默认值路径 MUST 保持确定性可对拍。
-
-  @req:r1113 @human
-  场景: 章节主路径禁委托外部 run_*() 且有机械检查
-    - 章节 notebook 的 cells MUST NOT 通过调用来自受限模块（`notebooks.*.support.*`、`scalim_misc.demo_*`、`scalim_misc.examples.*`）的模块级 `run_*()` 函数来执行章节主路径；SSOT 入口 `run_chapter()` 自身 MUST 豁免；共享 fixture 装配（`build_*` 等，见 r1111 零件边界）不在此列。 系统 MUST 提供机械化检查 gate（AST 扫描章节 notebook）检测该委托：检出违规 MUST fail-fast 并输出违规文件与被调名；gate MUST 支持文件级显式白名单（如 `# pragma: allow-cells-native-run-delegation`）兜底误报。
-
-  @req:r1114 @human
-  场景: 对拍期望值在章节 cells 内可见
-    - 含对拍断言的章节 notebook MUST 让期望结果对读者可见： - cells 内 MUST 展示期望数据（期望字面量，或经零件期望访问器渲染为表格/文本） - 章节 `chapter_result` 的 details MUST 至少携带一个 `expected` 前缀键留存期望快照，供 headless runner 与 pytest 定位 期望比对机制（参考实现/diff 函数）MAY 保留在零件模块，不因本条内联进 cells。
-
-  @req:r576 @human
-  场景: headless runner 作为示例对拍入口
-    - 系统 MUST 提供一个 headless runner 作为示例 gate 的单一入口，并保证 runner 不依赖 marimo UI。 runner MUST 输出可定位的 PASS/FAIL 与章节级 summary，并以非零退出码表示存在失败。
-
-  @req:r636 @human
-  场景: coverage 报告必须映射"notebooks → SSOT → gate"
-    - 系统 MUST 维护 coverage 报告作为可检查的 SSOT 报告，用于将示例套件的回归点映射到： - 对应的 Marimo notebook（教学入口） - 对应的 notebooks 侧 SSOT 入口/实现文件（执行真相来源） - 对应的 headless gate 与 pytest 复用点 该文件 MUST 由脚本生成，不得手工维护。
-
-  @req:r682 @human
-  场景: notebook helpers 必须 headless 且不依赖 marimo
-    - 当引入 notebook 复用 helper（例如路径解析、结果结构化展示、YAML 片段摘录等）时，这些 helper MUST 为纯 Python 且 MUST NOT 依赖 marimo UI server。 这些 helper MAY 位于 notebook_support 模块或 notebooks 下的受控纯 Python 支撑模块。
-
-  @req:r722 @human
-  场景: 主线示例套件提供场景化教学章节
-    - 系统 MUST 在主线示例套件下提供 YAML DSL 场景化章节目录，并为主线 demo 的每个 SSOT 章节提供一份对应的 Marimo notebook。 主线章节 MUST 以 **YAML DSL 场景化**为主（面向工程使用方），并避免以 IR/Plan 等底层视角作为主线教学内容。 系统 MAY 额外提供 IR 视角的回归章节，但这些章节不得作为主线教学内容。 章节 MUST 覆盖常见场景（如电商报表、广告报表、技术支持、workflow 工作流、大数据报告演示、调试等）。 章节 notebook 文件名 MUST 以章节标识结尾，且 MAY 额外包含有序前缀，用于稳定排序与导航。
-
-  @req:r754 @human
-  场景: 主线示例套件章节作为 SSOT 并可对拍回归
-    - 系统 MUST 将主线示例套件的每个纳入 examples gate 的章节 notebook 同时视为教学入口与 SSOT 执行入口： - 每个章节 notebook MUST 提供一个可被导入调用的 SSOT 入口函数，用于执行 deterministic 对拍回归 - headless runner 与 pytest MUST 复用该入口执行该章节的对拍回归
-
-  @req:r136 @human
-  场景: hub/index 入口提供一键执行与导航
-    - 系统 MUST 保持主线示例套件的 hub/index 入口。 该入口 MUST 提供： - 一键执行全部章节（通过章节 registry） - 对章节结果的汇总展示（至少包含每章章节标识/passed/summary） - 指向各章节 notebook 的导航信息
-
-  @req:r159 @human
-  场景: canonical YAML SSOT 路径保持稳定
-    - 系统 MUST 保持 canonical YAML SSOT 文件路径不变（如示例报表相关的 YAML 文件）。
-
-  @req:r180 @human
-  场景: public API 套件必须独立并纳入 examples gate
-    - 系统 MUST 将稳定公开入口模块的覆盖回归从主线教学套件中解耦，迁移为独立示例套件，并保持确定性回归门禁不降级。 该 suite MUST： - 位于独立目录 - 为每个稳定公开入口模块提供至少一个纳入 gate 的章节入口（章节对公开入口做覆盖断言） - 至少包含一个章节演示扩展点（hook/observer/events/components 注入）
-
-  @req:r198 @human
-  场景: headless runner 必须覆盖所有套件
-    - 系统 MUST 将 headless runner 覆盖默认执行主线示例套件、public API suite，以及 README validated examples suite（`example_readme_suite` 或文档声明的等价目录名）。
-
-  @req:r216 @human
-  场景: public API 套件覆盖 curated facade 导入
-    - 系统 MUST 扩展 public API suite，使其覆盖 curated public surface，而不只是零散的公开入口冒烟。 该 suite 至少 MUST 覆盖： - YAML DSL 的 facade imports - workflow 辅助公开模块 - IR 模块 - shortcuts.resources（资源类 shortcut 稳定入口 package） - shortcuts.resources.outputs（输出发现/最新产物定位 facade）
-
-  @req:r229 @human
-  场景: 防止内部路径漂移回教学示例
-    - 系统 MUST 通过 suite、辅助检查或等价 gate 防止内部实现路径重新出现在教学示例与公开入口覆盖中。
-
-  @req:r241 @human
-  场景: public API suite 与 manifest 保持一致
-    - 系统 MUST 将 public API suite 与 public API manifest 视为同一份"稳定公开面 SSOT"的两个投影： - manifest 表达"允许的公开入口与导出面" - suite 通过可运行示例与覆盖断言表达"可用且可回归" 两者 MUST 保持一致： - suite 覆盖的稳定公开入口集合 MUST 与 manifest 对齐 - suite 中的导入示例 MUST 仅使用 manifest 的 curated entrypoints
-
-  @req:r17 @human
-  场景: public API suite 与 pytest 套件形成双重覆盖
-    - 系统 MUST 将 public API catalog 的回归覆盖分为两条互补链路，并要求二者同时存在： - example_public_api_suite：教学/叙事型示例套件（由 examples gate 执行） - tests/public_api/：用户侧最小闭环 pytest 套件（由默认 pytest 非 bench gate 执行） 两者 MUST 覆盖同一份 public API catalog，并提供可自动化的漂移检测；当覆盖集合不一致时，门禁 MUST fail-fast 并输出差异。
-
-  @req:r18 @human
-  场景: public API suite 演示 events 和 sinks
-    - public API suite MUST 以用户侧稳定入口演示 `events` 与 `sinks` 的最小可用用法，并将其纳入 examples gate 的确定性回归范围： - 事件常量/目录查询入口（例如 events 的稳定导入与基本使用） - 常用 sinks（例如 sinks 的稳定导入与最小写入闭环）
-
-  @req:r19 @human
-  场景: runtime-policy 边界回归必须有用户入口 smoke coverage
-    - 当某个 runtime-only policy 的错误可能通过 run_workflow、public API example 或 notebook 示例暴露给用户时，系统 MUST 在用户侧入口保留至少一条 smoke coverage，用于验证真实入口没有绕过底层边界修复。
-
-  @req:r20 @human
-  场景: 用户入口 smoke 补充而非替代底层测试
-    - notebook / public API smoke coverage MUST 作为补充层存在，不能替代 compile / runtime / workflow 层的定向测试。
-
-  @req:r21 @human
-  场景: Tier1 curated entrypoints 与 suite/pytest 覆盖必须同步
-    - 系统 MUST 提供一个静态治理 gate，用于检测并拒绝以下漂移： - Tier1 curated entrypoints 集合发生变化，但 example_public_api_suite 未同步补齐覆盖 - pytest public_api suite 覆盖集合与 examples 覆盖集合不一致（至少在 Tier1 范围内） 该 gate MUST 输出缺失/新增模块列表，并提供可操作的修复建议。
-
-  @req:r989 @human
-  场景: README validated suite is a marimo examples suite
-    - 根 README 的 validated examples suite（公开页假数据最小例与内存对比；合约交叉引用 `governance-readme-examples` 的注入/图资产面）MUST 以独立 marimo 套件形式落在 `notebooks/marimo/example_readme_suite/`（或文档声明的等价路径），提供可导入章节 SSOT 与 hub/`demo_main`，并 MUST 纳入本 capability 的 examples gate 默认覆盖。该套件 MUST NOT 替代主线 `demo_big_data_report` 教学地位；公开页注入/漂移细节以 `governance-readme-examples` 为准。
-  @req:r31 @human
-  场景: 示例-notebooks-可被识别为-marimo
-    - 必须成立：当 维护者枚举用于教学展示的 notebooks；那么 这些 notebooks 文件内容 MUST 包含 `marimo.App`
-    当 维护者枚举用于教学展示的 notebooks
-    那么 这些 notebooks 文件内容 MUST 包含 `marimo.App`
-  @req:r275 @human
-  场景: 套件具备双入口
-    - 必须成立：当 维护者为某个示例套件新增一个可运行章节；那么 该章节 MUST 同时具备一个 Marimo notebook 入口
-    当 维护者为某个示例套件新增一个可运行章节
-    那么 该章节 MUST 同时具备一个 Marimo notebook 入口
-  @req:r401 @human
-  场景: 新增章节时-ssot-入口可被-runner-pytest-复用
-    - 必须成立：当 维护者为示例体系新增一个纳入 gate 的章节 notebook；那么 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 headless runner 与 pytest 复用
-    当 维护者为示例体系新增一个纳入 gate 的章节 notebook
-    那么 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 headless runner 与 pytest 复用
-  @req:r497 @human
-  场景: 运行章节-notebook-时-执行真相来自-cells
-    - 必须成立：当 读者在 marimo 中运行任一示例章节 notebook；那么 该章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook 自身 cells 内，SSOT 入口函数仅作为薄适配层提取 cell 产物
     当 读者在 marimo 中运行任一示例章节 notebook
     那么 该章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook 自身 cells 内，SSOT 入口函数仅作为薄适配层提取 cell 产物
   @req:r1111 @human
-  场景: 零件-与-主路径-边界清晰
-    - 必须成立：当 读者检查任一章节 notebook 及其依赖的 support 零件模块；那么 support 零件 MAY 存在，但章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook cells 内
+  场景: 可复用零件与执行主路径的边界
+    - 可复用"零件"（fixtures 数据、mock 基础设施、通用 Observer/Hook 类、YAML 片段资源等）MAY 保留在 `support/` 或受控库模块中，但零件 MUST NOT 承载章节执行主路径；装配（接线方式、注入点、运行顺序）与断言展开 MUST 在 notebook cells 内可见。
     当 读者检查任一章节 notebook 及其依赖的 support 零件模块
     那么 support 零件 MAY 存在，但章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook cells 内
   @req:r1112 @human
-  场景: 交互控件-始终展示-且-script-同源
-    - 必须成立：当 开发者以 headless/script 模式运行章节 notebook 或其对拍入口；那么 流程 MUST 以控件默认值自动执行且结果与交互模式同源
+  场景: 交互控件始终展示且 script 模式同源
+    - 章节 notebook 的交互 UI 控件（slider/number/checkbox 等）MUST 始终创建并展示；headless/script 模式 MUST 使用控件默认值自动执行完整流程，MUST NOT 用 `if script_mode` 包裹全部 UI 或让交互模式与对拍模式执行不同主路径。 消耗较大的运行 MAY 使用 `run_button`/`mo.stop` 手动触发，但默认值路径 MUST 保持确定性可对拍。
     当 开发者以 headless/script 模式运行章节 notebook 或其对拍入口
     那么 流程 MUST 以控件默认值自动执行且结果与交互模式同源
   @req:r1113 @human
-  场景: cells-委托受限模块-run-被执行检查拒绝
-    - 必须成立：当 章节 notebook 的 cell 调用来自受限 support/scenario 模块的 run_*() 函数执行章节主路径；那么 机械检查 gate MUST fail-fast 并指出违规文件与被调名
+  场景: 章节主路径禁委托外部 run_*() 且有机械检查
+    - 章节 notebook 的 cells MUST NOT 通过调用来自受限模块（`notebooks.*.support.*`、`scalim_misc.demo_*`、`scalim_misc.examples.*`）的模块级 `run_*()` 函数来执行章节主路径；SSOT 入口 `run_chapter()` 自身 MUST 豁免；共享 fixture 装配（`build_*` 等，见 r1111 零件边界）不在此列。 系统 MUST 提供机械化检查 gate（AST 扫描章节 notebook）检测该委托：检出违规 MUST fail-fast 并输出违规文件与被调名；gate MUST 支持文件级显式白名单（如 `# pragma: allow-cells-native-run-delegation`）兜底误报。
     当 章节 notebook 的 cell 调用来自受限 support/scenario 模块的 run_*() 函数执行章节主路径
     那么 机械检查 gate MUST fail-fast 并指出违规文件与被调名
-  @req:r1113 @human
-  场景: run-chapter-入口与显式白名单豁免
-    - 必须成立：当 检查器扫描含 SSOT 入口 run_chapter 定义或带显式白名单 pragma 的章节 notebook；那么 检查器 MUST NOT 误报
     当 检查器扫描含 SSOT 入口 run_chapter 定义或带显式白名单 pragma 的章节 notebook
     那么 检查器 MUST NOT 误报
   @req:r1114 @human
-  场景: 对拍章节-期望值-可定位
-    - 必须成立：当 读者打开任一对拍章节 notebook 或读取其 chapter_result；那么 cells 内可见期望数据展示且 details 含 expected 前缀键
+  场景: 对拍期望值在章节 cells 内可见
+    - 含对拍断言的章节 notebook MUST 让期望结果对读者可见： - cells 内 MUST 展示期望数据（期望字面量，或经零件期望访问器渲染为表格/文本） - 章节 `chapter_result` 的 details MUST 至少携带一个 `expected` 前缀键留存期望快照，供 headless runner 与 pytest 定位 期望比对机制（参考实现/diff 函数）MAY 保留在零件模块，不因本条内联进 cells。
     当 读者打开任一对拍章节 notebook 或读取其 chapter_result
     那么 cells 内可见期望数据展示且 details 含 expected 前缀键
   @req:r576 @human
-  场景: examples-gate-可在-ci-中稳定运行
-    - 必须成立：当 开发者运行 examples gate（或等价入口）；那么 headless runner MUST 执行示例套件并输出章节级 PASS/FAIL 与 summary
+  场景: headless runner 作为示例对拍入口
+    - 系统 MUST 提供一个 headless runner 作为示例 gate 的单一入口，并保证 runner 不依赖 marimo UI。 runner MUST 输出可定位的 PASS/FAIL 与章节级 summary，并以非零退出码表示存在失败。
     当 开发者运行 examples gate（或等价入口）
     那么 headless runner MUST 执行示例套件并输出章节级 PASS/FAIL 与 summary
   @req:r636 @human
-  场景: 新增示例时-coverage-报告同步
-    - 必须成立：当 维护者新增或调整一个示例/章节回归点；那么 运行 coverage 生成命令 MUST 更新 coverage 报告
+  场景: coverage 报告必须映射"notebooks → SSOT → gate"
+    - 系统 MUST 维护 coverage 报告作为可检查的 SSOT 报告，用于将示例套件的回归点映射到： - 对应的 Marimo notebook（教学入口） - 对应的 notebooks 侧 SSOT 入口/实现文件（执行真相来源） - 对应的 headless gate 与 pytest 复用点 该文件 MUST 由脚本生成，不得手工维护。
     当 维护者新增或调整一个示例/章节回归点
     那么 运行 coverage 生成命令 MUST 更新 coverage 报告
   @req:r682 @human
-  场景: helper-可被-headless-runner-导入
-    - 必须成立：当 在不导入 marimo 的 Python 进程中导入这些 helper 模块；那么 导入成功且不触发 marimo 依赖
+  场景: notebook helpers 必须 headless 且不依赖 marimo
+    - 当引入 notebook 复用 helper（例如路径解析、结果结构化展示、YAML 片段摘录等）时，这些 helper MUST 为纯 Python 且 MUST NOT 依赖 marimo UI server。 这些 helper MAY 位于 notebook_support 模块或 notebooks 下的受控纯 Python 支撑模块。
     当 在不导入 marimo 的 Python 进程中导入这些 helper 模块
     那么 导入成功且不触发 marimo 依赖
   @req:r722 @human
-  场景: 场景化章节-notebooks-存在
-    - 必须成立：当 维护者检查主线示例套件的章节目录；那么 每个主要场景都存在至少一份以对应章节标识结尾的 notebook 文件
+  场景: 主线示例套件提供场景化教学章节
+    - 系统 MUST 在主线示例套件下提供 YAML DSL 场景化章节目录，并为主线 demo 的每个 SSOT 章节提供一份对应的 Marimo notebook。 主线章节 MUST 以 **YAML DSL 场景化**为主（面向工程使用方），并避免以 IR/Plan 等底层视角作为主线教学内容。 系统 MAY 额外提供 IR 视角的回归章节，但这些章节不得作为主线教学内容。 章节 MUST 覆盖常见场景（如电商报表、广告报表、技术支持、workflow 工作流、大数据报告演示、调试等）。 章节 notebook 文件名 MUST 以章节标识结尾，且 MAY 额外包含有序前缀，用于稳定排序与导航。
     当 维护者检查主线示例套件的章节目录
     那么 每个主要场景都存在至少一份以对应章节标识结尾的 notebook 文件
   @req:r754 @human
-  场景: chapter-ssot-入口可被-headless-runner-调用
-    - 必须成立：当 开发者运行 examples gate 执行主线示例套件的某个章节；那么 runner MUST 通过导入该章节 notebook 的 SSOT 入口函数来执行
+  场景: 主线示例套件章节作为 SSOT 并可对拍回归
+    - 系统 MUST 将主线示例套件的每个纳入 examples gate 的章节 notebook 同时视为教学入口与 SSOT 执行入口： - 每个章节 notebook MUST 提供一个可被导入调用的 SSOT 入口函数，用于执行 deterministic 对拍回归 - headless runner 与 pytest MUST 复用该入口执行该章节的对拍回归
     当 开发者运行 examples gate 执行主线示例套件的某个章节
     那么 runner MUST 通过导入该章节 notebook 的 SSOT 入口函数来执行
   @req:r136 @human
-  场景: hub-可发现并可汇总
-    - 必须成立：当 读者打开主线示例套件的 hub 入口；那么 能看到章节列表/导航
+  场景: hub/index 入口提供一键执行与导航
+    - 系统 MUST 保持主线示例套件的 hub/index 入口。 该入口 MUST 提供： - 一键执行全部章节（通过章节 registry） - 对章节结果的汇总展示（至少包含每章章节标识/passed/summary） - 指向各章节 notebook 的导航信息
     当 读者打开主线示例套件的 hub 入口
     那么 能看到章节列表/导航
   @req:r159 @human
-  场景: canonical-yaml-路径稳定
-    - 必须成立：当 维护者检查 canonical YAML 文件路径；那么 文件存在且路径未被移动或重命名
+  场景: canonical YAML SSOT 路径保持稳定
+    - 系统 MUST 保持 canonical YAML SSOT 文件路径不变（如示例报表相关的 YAML 文件）。
     当 维护者检查 canonical YAML 文件路径
     那么 文件存在且路径未被移动或重命名
   @req:r180 @human
-  场景: public-api-suite-与主线解耦
-    - 必须成立：当 维护者检查 notebooks 目录；那么 MUST 能找到一个独立于主线示例套件的 public API suite 目录
+  场景: public API 套件必须独立并纳入 examples gate
+    - 系统 MUST 将稳定公开入口模块的覆盖回归从主线教学套件中解耦，迁移为独立示例套件，并保持确定性回归门禁不降级。 该 suite MUST： - 位于独立目录 - 为每个稳定公开入口模块提供至少一个纳入 gate 的章节入口（章节对公开入口做覆盖断言） - 至少包含一个章节演示扩展点（hook/observer/events/components 注入）
     当 维护者检查 notebooks 目录
     那么 MUST 能找到一个独立于主线示例套件的 public API suite 目录
   @req:r198 @human
-  场景: examples-gate-覆盖所有套件
-    - 必须成立：当 开发者运行 examples gate；那么 runner MUST 执行主线示例套件、public API suite 与 README validated suite 的章节
+  场景: headless runner 必须覆盖所有套件
+    - 系统 MUST 将 headless runner 覆盖默认执行主线示例套件、public API suite，以及 README validated examples suite（`example_readme_suite` 或文档声明的等价目录名）。
     当 开发者运行 examples gate
     那么 runner MUST 执行主线示例套件、public API suite 与 README validated suite 的章节
   @req:r216 @human
-  场景: public-api-suite-exercises-curated-public-imports
-    - 必须成立：当 开发者运行 public API suite；那么 suite MUST 对 curated public surface 做稳定导入断言
+  场景: public API 套件覆盖 curated facade 导入
+    - 系统 MUST 扩展 public API suite，使其覆盖 curated public surface，而不只是零散的公开入口冒烟。 该 suite 至少 MUST 覆盖： - YAML DSL 的 facade imports - workflow 辅助公开模块 - IR 模块 - shortcuts.resources（资源类 shortcut 稳定入口 package） - shortcuts.resources.outputs（输出发现/最新产物定位 facade）
     当 开发者运行 public API suite
     那么 suite MUST 对 curated public surface 做稳定导入断言
   @req:r229 @human
-  场景: suite-detects-drift-back-to-internal-imports
-    - 必须成立：当 面向用户的示例或 suite 章节重新引用内部实现路径作为官方用法；那么 对应 gate MUST 失败或给出明确回归提示
+  场景: 防止内部路径漂移回教学示例
+    - 系统 MUST 通过 suite、辅助检查或等价 gate 防止内部实现路径重新出现在教学示例与公开入口覆盖中。
     当 面向用户的示例或 suite 章节重新引用内部实现路径作为官方用法
     那么 对应 gate MUST 失败或给出明确回归提示
   @req:r241 @human
-  场景: manifest-suite-drift-is-rejected
-    - 必须成立：当 suite 覆盖集合与 manifest 不一致（缺失/新增模块或导出）；那么 gate MUST fail-fast 并指出差异
+  场景: public API suite 与 manifest 保持一致
+    - 系统 MUST 将 public API suite 与 public API manifest 视为同一份"稳定公开面 SSOT"的两个投影： - manifest 表达"允许的公开入口与导出面" - suite 通过可运行示例与覆盖断言表达"可用且可回归" 两者 MUST 保持一致： - suite 覆盖的稳定公开入口集合 MUST 与 manifest 对齐 - suite 中的导入示例 MUST 仅使用 manifest 的 curated entrypoints
     当 suite 覆盖集合与 manifest 不一致（缺失/新增模块或导出）
     那么 gate MUST fail-fast 并指出差异
   @req:r17 @human
-  场景: suite-and-pytest-stay-aligned-on-the-public-api-catalog
-    - 必须成立：当 维护者运行 examples gate 与默认 pytest 非 bench 套件；那么 public API suite 与 pytest public_api suite MUST 覆盖同一份 public API catalog
+  场景: public API suite 与 pytest 套件形成双重覆盖
+    - 系统 MUST 将 public API catalog 的回归覆盖分为两条互补链路，并要求二者同时存在： - example_public_api_suite：教学/叙事型示例套件（由 examples gate 执行） - tests/public_api/：用户侧最小闭环 pytest 套件（由默认 pytest 非 bench gate 执行） 两者 MUST 覆盖同一份 public API catalog，并提供可自动化的漂移检测；当覆盖集合不一致时，门禁 MUST fail-fast 并输出差异。
     当 维护者运行 examples gate 与默认 pytest 非 bench 套件
     那么 public API suite 与 pytest public_api suite MUST 覆盖同一份 public API catalog
   @req:r18 @human
-  场景: events-and-sinks-are-exercised-in-the-suite
-    - 必须成立：当 开发者运行 public API suite；那么 suite MUST 执行一个覆盖 events 与 sinks 的章节/用例
+  场景: public API suite 演示 events 和 sinks
+    - public API suite MUST 以用户侧稳定入口演示 `events` 与 `sinks` 的最小可用用法，并将其纳入 examples gate 的确定性回归范围： - 事件常量/目录查询入口（例如 events 的稳定导入与基本使用） - 常用 sinks（例如 sinks 的稳定导入与最小写入闭环）
     当 开发者运行 public API suite
     那么 suite MUST 执行一个覆盖 events 与 sinks 的章节/用例
   @req:r19 @human
-  场景: public-api-example-exercises-a-runtime-policy-boundary
-    - 必须成立：当 某个 runtime-only policy 既影响底层 compile/runtime 行为，也影响用户可直接调用的 public API 入口；那么 review 文档 MUST 指出至少一个 notebook / public API smoke 入口
+  场景: runtime-policy 边界回归必须有用户入口 smoke coverage
+    - 当某个 runtime-only policy 的错误可能通过 run_workflow、public API example 或 notebook 示例暴露给用户时，系统 MUST 在用户侧入口保留至少一条 smoke coverage，用于验证真实入口没有绕过底层边界修复。
     当 某个 runtime-only policy 既影响底层 compile/runtime 行为，也影响用户可直接调用的 public API 入口
     那么 review 文档 MUST 指出至少一个 notebook / public API smoke 入口
   @req:r20 @human
-  场景: review-distinguishes-smoke-from-branch-coverage
-    - 必须成立：当 维护者为 runtime-policy boundary 问题补充用户侧 smoke；那么 review 文档 MUST 同时说明下层定向测试的职责
+  场景: 用户入口 smoke 补充而非替代底层测试
+    - notebook / public API smoke coverage MUST 作为补充层存在，不能替代 compile / runtime / workflow 层的定向测试。
     当 维护者为 runtime-policy boundary 问题补充用户侧 smoke
     那么 review 文档 MUST 同时说明下层定向测试的职责
   @req:r21 @human
-  场景: adding-a-tier1-entrypoint-without-examples-coverage-is-rejec
-    - 必须成立：假如 贡献者新增/修改了 Tier1 marker；当 对应入口模块未被 example_public_api_suite 覆盖；那么 gate MUST fail-fast 并指出缺失模块
+  场景: Tier1 curated entrypoints 与 suite/pytest 覆盖必须同步
+    - 系统 MUST 提供一个静态治理 gate，用于检测并拒绝以下漂移： - Tier1 curated entrypoints 集合发生变化，但 example_public_api_suite 未同步补齐覆盖 - pytest public_api suite 覆盖集合与 examples 覆盖集合不一致（至少在 Tier1 范围内） 该 gate MUST 输出缺失/新增模块列表，并提供可操作的修复建议。
     假如 贡献者新增/修改了 Tier1 marker
     当 对应入口模块未被 example_public_api_suite 覆盖
     那么 gate MUST fail-fast 并指出缺失模块
-
-  @req:r21 @human
-  场景: pytest-and-examples-drift-is-rejected
-    - 必须成立：假如 examples suite 覆盖了某个 Tier1 入口模块；当 pytest public_api suite 未覆盖该入口模块；那么 gate MUST fail-fast 并指出差异集合
     假如 examples suite 覆盖了某个 Tier1 入口模块
     当 pytest public_api suite 未覆盖该入口模块
     那么 gate MUST fail-fast 并指出差异集合
-
   @req:r989 @human
-  场景: README-suite-registered-as-marimo-suite
-    - 必须成立：当 维护者检查 notebooks/marimo 与 examples gate 默认覆盖；那么 MUST 能定位到 README validated suite 目录与 chapters registry，且 examples gate 默认执行其章节
+  场景: README validated suite is a marimo examples suite
+    - 根 README 的 validated examples suite（公开页假数据最小例与内存对比；合约交叉引用 `governance-readme-examples` 的注入/图资产面）MUST 以独立 marimo 套件形式落在 `notebooks/marimo/example_readme_suite/`（或文档声明的等价路径），提供可导入章节 SSOT 与 hub/`demo_main`，并 MUST 纳入本 capability 的 examples gate 默认覆盖。该套件 MUST NOT 替代主线 `demo_big_data_report` 教学地位；公开页注入/漂移细节以 `governance-readme-examples` 为准。
     当 维护者检查 notebooks/marimo 与 examples gate 默认覆盖
     那么 MUST 能定位到 README validated suite 目录与 chapters registry，且 examples gate 默认执行其章节
-
-  @req:r989 @human
-  场景: README-suite-does-not-replace-mainline
-    - 必须成立：当 维护者枚举主线 demo_big_data_report 与 README suite；那么 二者 MUST 可区分；README suite MUST NOT 被表述为主线教学唯一入口
     当 维护者枚举主线 demo_big_data_report 与 README suite
     那么 二者 MUST 可区分；README suite MUST NOT 被表述为主线教学唯一入口
