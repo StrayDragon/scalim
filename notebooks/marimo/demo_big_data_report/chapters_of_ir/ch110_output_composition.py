@@ -1,16 +1,43 @@
-"""Cells-native: ch110_output_composition — derived outputs workbook composition."""
+"""Cells-native: ch110_output_composition — derived outputs workbook composition.
+
+设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+- 本章复用 `build_ecommerce_model` / `build_ecommerce_runtime_bindings` 作为**复杂复用零件**,
+  但主线装配 `OutputCompositionSpec → run_ir → 对拍` 全部在 cells 内**逐 cell 展开**,
+  并在"模型窥视 cell"把装配产物直接渲染出来,读者无需跳库。
+- 通过 `chapter_result` 向 headless runner / pytest 暴露对拍结果（含 r1114 `expected` 快照）。
+"""
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""# Output Composition: Derived Targets + Meta/Audit sheets
+    mo.md(
+        r"""
+        # demo_big_data_report / ch110_output_composition
 
-演示 OutputCompositionSpec 构建多 sheet 工作簿（Detail, Summary, Meta, Audit）。""")
+        本章演示 **OutputCompositionSpec** 构建多 sheet 工作簿:
+        Detail(明细,主输出) + Summary(按类目汇总/排名) + Meta(元信息) + Audit(审计)。
+
+        > 沿用完整电商模型(复杂复用零件),但把主线装配**摊开在 cells 里**观察"怎么写"。
+
+        主线装配过程(每个步骤一个 cell,可就地修改重跑):
+        1. 保存/恢复全局配置(`get_config`/`set_config`) + `build_test_config_small()` 构建测试配置
+        2. `build_ecommerce_model(cfg)` 构建 `DemandIr` + `build_ecommerce_runtime_bindings()`(复杂复用零件)
+        3. **(模型窥视)** 渲染 `demand_ir.fields` / 数据源(读者无需跳库)
+        4. 构建 `OutputCompositionSpec`:primary detail + derived summary(分组/聚合/排名) + meta + audit
+        5. `run_ir(demand_ir, ExecutionRequest(output_composition=...))` 执行并写出工作簿
+        6. `verify_derived_outputs_workbook` 对拍 + `make_chapter_result` 产出 `chapter_result`(含 `expected`)
+
+        > 下方的**模型窥视 cell** 会把复用零件的装配产物(字段/数据源)直接渲染出来。
+
+        对拍入口: `run_chapter()` → `app.run()` → `chapter_result`
+        Gate: `just examples`
+        """
+    )
     return
 
 
@@ -25,8 +52,9 @@ def _():
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
-    ensure_repo_root_on_sys_path(__file__)
-    return
+    repo_root = ensure_repo_root_on_sys_path(__file__)
+    _ = repo_root
+    return (repo_root,)
 
 
 @app.cell
@@ -55,6 +83,7 @@ def _():
     )
     from scalim_misc.demo_big_data_report.loaders import get_config, set_config
     from scalim_misc.demo_big_data_report.shared import build_ecommerce_model, build_ecommerce_runtime_bindings
+    from scalim_misc.notebook_support.chapter_result import make_chapter_result
 
     return (
         AggMetricSpec,
@@ -78,6 +107,7 @@ def _():
         SUMMARY_FIELDS,
         export_layout_from_demand_ir,
         get_config,
+        make_chapter_result,
         run_ir,
         set_config,
         tempfile,
@@ -87,6 +117,7 @@ def _():
 
 @app.cell
 def _(build_test_config_small, get_config, set_config):
+    # ① 保存/恢复全局配置 + 构建测试配置(复用零件:配置即数据场景)
     prev = get_config()
     cfg = build_test_config_small()
     set_config(cfg)
@@ -95,9 +126,46 @@ def _(build_test_config_small, get_config, set_config):
 
 @app.cell
 def _(build_ecommerce_model, build_ecommerce_runtime_bindings, cfg):
+    # ② 复用零件装配:完整电商 IR 模型 + 运行时注入(多源/多级 Join/派生字段)
     demand_ir = build_ecommerce_model(cfg)
     runtime_bindings = build_ecommerce_runtime_bindings()
     return demand_ir, runtime_bindings
+
+
+@app.cell(hide_code=True)
+def _(demand_ir, mo, runtime_bindings):
+    # ③ 模型窥视(读者无需跳库):把复用零件的装配产物直接渲染出来
+    #    - `demand_ir.fields` 是 mappingproxy(键=field_id),遍历用 `.values()`
+    #    - `DerivedFieldIr` 可能无 `source_id`,用 `getattr` 兜底
+    fields_summary = [
+        {"field_id": f.field_id, "name": f.name, "source_id": getattr(f, "source_id", "-"), "kind": type(f).__name__}
+        for f in demand_ir.fields.values()
+    ]
+    source_summary = [{"source_id": sid} for sid in demand_ir.sources.keys()]
+    # 运行时接线(`runtime_bindings`)的键/目标:loader 注入点与派生计算函数注入点
+    derived_keys = list(getattr(runtime_bindings, "derived_calculators", {}).keys())
+    main_loader_keys = list(getattr(runtime_bindings, "main_source_loaders", {}).keys())
+    source_loader_keys = list(getattr(runtime_bindings, "source_loaders", {}).keys())
+    bindings_summary = [
+        {"bindings_key": "main_source_loaders", "targets": main_loader_keys},
+        {"bindings_key": "source_loaders", "targets": source_loader_keys},
+        {"bindings_key": "derived_calculators", "targets": derived_keys},
+    ]
+    mo.vstack(
+        [
+            mo.md(
+                "**模型窥视（读者无需跳库）**:`build_ecommerce_model(cfg)` + `build_ecommerce_runtime_bindings()`"
+                " 的装配产物如下(字段 / 数据源 / 运行时接线键):"
+            ),
+            mo.md("**字段结构(`demand_ir.fields`)**:"),
+            mo.ui.table(fields_summary, selection=None),
+            mo.md("**数据源(`demand_ir.sources`)**:"),
+            mo.ui.table(source_summary, selection=None),
+            mo.md("**运行时接线(`runtime_bindings`)**(loader / 派生计算函数注入键与目标):"),
+            mo.ui.table(bindings_summary, selection=None),
+        ]
+    )
+    return
 
 
 @app.cell
@@ -118,11 +186,17 @@ def _(
     SUMMARY_FIELDS,
     demand_ir,
     export_layout_from_demand_ir,
+    make_chapter_result,
     run_ir,
     runtime_bindings,
     tempfile,
     verify_derived_outputs_workbook,
 ):
+    # ④ 输出组合:primary detail + derived summary(分组/聚合/排名) + meta + audit
+    #    - export_layout_from_demand_ir: 从 DemandIr 派生出 detail 输出布局
+    #    - OutputCompositionSpec: targets(primary) + derived_targets(分组聚合/排名) + meta/audit sheet
+    #    - run_ir + ExecutionRequest(output_composition=composition): 执行并写出 xlsx 工作簿
+    #    - verify_derived_outputs_workbook: 对拍 oracle(数据校验逻辑,可复用零件)
     with tempfile.TemporaryDirectory() as tmpdir:
         tp = Path(tmpdir)
         wb_path = tp / "derived_outputs_demo.xlsx"
@@ -183,21 +257,31 @@ def _(
 
         oracle = verify_derived_outputs_workbook(str(wb_path), outputs=dict(core.outputs or {}), total_rows=int(core.total_rows))
 
+    # ⑤ 对拍断言 + 结构化 chapter_result(r1114: details 含 expected 前缀键)
     passed = bool(oracle.passed)
     summary = "passed={} sheets={} rows={}".format(passed, len(oracle.sheet_names), oracle.total_rows)
     if not passed:
         summary = summary + "\n" + oracle.detail_verification.summary + "\n" + oracle.summary_message
 
-    chapter_result = {
-        "passed": passed,
-        "summary": summary,
-        "details": {
+    # 对拍期望(教学 payload;headless 可经 details["expected"] 键定位)
+    expected = {
+        "oracle_passed": bool(oracle.passed),
+        "total_rows": int(core.total_rows),
+        "sheets": len(oracle.sheet_names),
+    }
+    print("expected:", expected)
+
+    chapter_result = make_chapter_result(
+        passed=passed,
+        summary=summary,
+        details={
+            "expected": expected,
             "workbook_path": str(wb_path),
             "outputs": dict(core.outputs or {}),
             "total_rows": int(core.total_rows),
             "oracle_result": oracle,
         },
-    }
+    )
     return chapter_result, oracle, passed, summary
 
 
