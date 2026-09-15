@@ -2,7 +2,7 @@
 
 迁移对照:
   Before: 模块级 run_public_api_execution() 持全部逻辑;cells 薄壳
-  After:  execution facade 闭环在 cells 内
+  After:  复杂零件装配窥视 / execution facade 闭环在 cells 内
 """
 
 import marimo
@@ -23,9 +23,11 @@ def _(mo):
         ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
         1. 触达 `scalim.execution` 的 public `__all__`
-        2. PlanBuilder → ExecutionRequest（内存 sink）
-        3. `run_ir` → 行断言（value_plus_one == 2）
-        4. 汇总 chapter_result
+        2. 复杂可复用零件：`build_minimal_public_api_ir()` + `build_minimal_public_api_runtime_bindings()`
+        3. **模型窥视**：渲染 `demand_ir.fields` 与 `runtime_bindings` 接线（读者无需跳库）
+        4. PlanBuilder → ExecutionRequest（内存 sink）→ `run_ir`
+        5. 断言：行数 + value_plus_one == 2
+        6. 汇总 chapter_result
 
         Gate: `just examples`
         """
@@ -64,12 +66,58 @@ def _():
 
 
 @app.cell
-def _(InMemoryRowDataSink, PlanBuilder, api, build_minimal_public_api_ir, build_minimal_public_api_runtime_bindings):
+def _(PlanBuilder, api, build_minimal_public_api_ir, build_minimal_public_api_runtime_bindings):
+    # ① 触达 public __all__ + 复杂可复用零件装配。
+    #   - build_minimal_public_api_ir(): 最小 DemandIr（主源 items + 2 抽取字段 + 1 派生字段）。
+    #   - build_minimal_public_api_runtime_bindings(): 把主源 loader 与派生计算函数注入 RuntimeBindings。
+    #   - PlanBuilder(demand_ir).build(): 依据 demand IR 生成执行计划。
     symbols = {name: getattr(api, name) for name in api.__all__}
     demand_ir = build_minimal_public_api_ir()
     runtime_bindings = build_minimal_public_api_runtime_bindings()
     plan = PlanBuilder(demand_ir).build()
+    print("targets =", plan.target_fields)
+    return demand_ir, plan, runtime_bindings, symbols
 
+
+@app.cell(hide_code=True)
+def _(demand_ir, mo, plan, runtime_bindings):
+    # ② 模型窥视：把库 fixtures builder 的装配产物直接渲染在 notebook 内，读者无需跳库。
+    #   - demand_ir.fields 是 mappingproxy（键=field_id），必须用 .values() 遍历；
+    #     DerivedFieldIr 可能没有 source_id，用 getattr 兜底。
+    #   - runtime_bindings.main_source_loaders / derived_calculators 是运行期注入点。
+    fields_summary = [
+        {
+            "field_id": f.field_id,
+            "name": f.name,
+            "source_id": getattr(f, "source_id", "-"),
+            "kind": type(f).__name__,
+        }
+        for f in demand_ir.fields.values()
+    ]
+    meta = plan.metadata
+    mo.vstack(
+        [
+            mo.md("**模型窥视（读者无需跳库）**——以下为最小模型的装配与接线产物："),
+            mo.md(
+                "字段总数 `{}`（含派生 {} 个）；`plan.metadata`: total_sources={} total_fields={}；"
+                "source_loaders = {}；derived_calculators = {}".format(
+                    len(fields_summary),
+                    sum(1 for f in fields_summary if f["kind"] == "DerivedFieldIr"),
+                    meta.total_sources,
+                    meta.total_fields,
+                    list(getattr(runtime_bindings, "main_source_loaders", {}).keys()),
+                    list(getattr(runtime_bindings, "derived_calculators", {}).keys()),
+                )
+            ),
+            mo.ui.table(fields_summary, selection=None),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(InMemoryRowDataSink, api, demand_ir, plan, runtime_bindings):
+    # ③ execution facade 闭环：ExecutionRequest（内存 sink）→ run_ir → 取回行数据。
     sink = InMemoryRowDataSink()
     request = api.ExecutionRequest(
         export_layout=api.export_layout_from_demand_ir(demand_ir, plan.target_fields),
@@ -83,11 +131,12 @@ def _(InMemoryRowDataSink, PlanBuilder, api, build_minimal_public_api_ir, build_
     rows = sink.get_data()
 
     print("rows =", len(rows), "first =", rows[0] if rows else None)
-    return demand_ir, plan, request, rows, runtime_bindings, sink, symbols
+    return (rows,)
 
 
 @app.cell
 def _(render_checks, rows):
+    # ④ 断言展开
     checks = {
         "rows == 3": len(rows) == 3,
         "首行 value_plus_one == 2": bool(rows) and rows[0].get("value_plus_one") == 2,

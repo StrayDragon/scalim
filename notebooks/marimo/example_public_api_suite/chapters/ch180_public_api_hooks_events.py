@@ -2,7 +2,7 @@
 
 迁移对照:
   Before: 模块级 run_public_api_hooks_events() 持全部逻辑;cells 薄壳
-  After:  Hook/Observer 零件、运行、事件断言全部在 cells 内
+  After:  Hook/Observer 零件、复杂零件装配窥视、运行、事件断言全部在 cells 内
 """
 
 import marimo
@@ -24,9 +24,11 @@ def _(mo):
         ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
         1. 零件：CounterHook（统计）+ TraceObserver（事件序列）
-        2. `ExecutionRequest`（双组件注入）→ `run_ir` → 内存 sink
-        3. 断言：行数 + hook 统计 + observer 事件计数
-        4. 汇总 chapter_result
+        2. 复杂可复用零件：`build_minimal_public_api_ir()` + `build_minimal_public_api_runtime_bindings()`
+        3. **模型窥视**：渲染 `demand_ir.fields` 与 `runtime_bindings` 接线（读者无需跳库）
+        4. `ExecutionRequest`（双组件注入）→ `run_ir` → 内存 sink
+        5. 断言：行数 + hook 统计 + observer 事件计数
+        6. 汇总 chapter_result
 
         Gate: `just examples`
         """
@@ -80,7 +82,7 @@ def _():
 
 @app.cell
 def _(Any, BaseHook, Dict, Event, EventType, List, Observer, Optional, Set, dataclass, field):
-    # 零件: Hook 统计 + Observer 事件序列
+    # ① 零件: Hook 统计 + Observer 事件序列
     @dataclass
     class HookStats:
         pipeline_start: int = 0
@@ -130,15 +132,15 @@ def _(Any, BaseHook, Dict, Event, EventType, List, Observer, Optional, Set, data
 @app.cell
 def _(
     CounterHook,
-    ExecutionRequest,
-    InMemoryRowDataSink,
-    OutputSpec,
     TraceObserver,
     build_minimal_public_api_ir,
     build_minimal_public_api_runtime_bindings,
     export_layout_from_demand_ir,
-    run_ir,
 ):
+    # ② 复杂可复用零件装配 + 双视角组件实例化。
+    #   - build_minimal_public_api_ir(): 最小 DemandIr（主源 items + 2 抽取字段 + 1 派生字段）。
+    #   - build_minimal_public_api_runtime_bindings(): 主源 loader / 派生计算函数注入 RuntimeBindings。
+    #   - export_layout_from_demand_ir(...): 由 IR 导出写布局（header 用 field_id）。
     hook = CounterHook()
     observer = TraceObserver()
 
@@ -149,7 +151,55 @@ def _(
         ("item_id", "dim_id", "value_plus_one"),
         header_fields_output_by="field_id",
     )
+    return demand_ir, export_layout, hook, observer, runtime_bindings
 
+
+@app.cell(hide_code=True)
+def _(demand_ir, mo, runtime_bindings):
+    # ③ 模型窥视：把库 fixtures builder 的装配产物直接渲染在 notebook 内，读者无需跳库。
+    #   - demand_ir.fields 是 mappingproxy（键=field_id），必须用 .values() 遍历；
+    #     DerivedFieldIr 可能没有 source_id，用 getattr 兜底。
+    #   - runtime_bindings.main_source_loaders / derived_calculators 是运行期注入点，
+    #     loader 名（items）即 hook 统计里 `loader_calls` 的来源。
+    fields_summary = [
+        {
+            "field_id": f.field_id,
+            "name": f.name,
+            "source_id": getattr(f, "source_id", "-"),
+            "kind": type(f).__name__,
+        }
+        for f in demand_ir.fields.values()
+    ]
+    mo.vstack(
+        [
+            mo.md("**模型窥视（读者无需跳库）**——以下为最小模型的装配与接线产物："),
+            mo.md(
+                "字段总数 `{}`（含派生 {} 个）；source_loaders = {}；derived_calculators = {}".format(
+                    len(fields_summary),
+                    sum(1 for f in fields_summary if f["kind"] == "DerivedFieldIr"),
+                    list(getattr(runtime_bindings, "main_source_loaders", {}).keys()),
+                    list(getattr(runtime_bindings, "derived_calculators", {}).keys()),
+                )
+            ),
+            mo.ui.table(fields_summary, selection=None),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(
+    ExecutionRequest,
+    InMemoryRowDataSink,
+    OutputSpec,
+    demand_ir,
+    export_layout,
+    hook,
+    observer,
+    run_ir,
+    runtime_bindings,
+):
+    # ④ execution 闭环：ExecutionRequest 双组件注入（observer + hook）→ run_ir → 内存 sink 取回行。
     sink = InMemoryRowDataSink()
     request = ExecutionRequest(
         export_layout=export_layout,
@@ -168,11 +218,12 @@ def _(
     core = run_ir(demand_ir, request)
     rows = sink.get_data()
     print("rows =", len(rows))
-    return core, demand_ir, hook, observer, request, rows, runtime_bindings, sink
+    return core, hook, observer, rows, request
 
 
 @app.cell
 def _(EventType, core, hook, observer, render_checks, rows):
+    # ⑤ 断言展开
     checks = {
         "rows == 3": core.total_rows == len(rows) == 3,
         "首行 value_plus_one == 2": bool(rows) and rows[0].get("value_plus_one") == 2,

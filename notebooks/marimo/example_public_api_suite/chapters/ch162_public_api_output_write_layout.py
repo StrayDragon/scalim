@@ -2,7 +2,7 @@
 
 迁移对照:
   Before: 模块级 run_public_api_output_write_layout() 持全部逻辑;cells 薄壳
-  After:  工厂选型/三布局运行/事件断言全部在 cells 内
+  After:  工厂选型/复杂零件装配窥视/三布局运行/事件断言全部在 cells 内
 """
 
 import marimo
@@ -25,10 +25,12 @@ def _(mo):
         ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
         1. 零件：WriteTraceObserver / xlsx 读取 / _run_layout 助手
-        2. 工厂选型：COLUMN_BUFFERED / COLUMN_CHUNKED / ROW_STREAM → 具体 sink 类型
-        3. 三布局运行（.tmp/examples/ 产物）
-        4. 断言：单元格一致 + 列/行事件取向 + 派生布局
-        5. 汇总 chapter_result
+        2. 复杂可复用零件：`build_minimal_public_api_ir()` + `build_minimal_public_api_runtime_bindings()`
+        3. **模型窥视**：渲染 `demand_ir.fields` 与 `runtime_bindings` 接线（读者无需跳库）
+        4. 工厂选型：COLUMN_BUFFERED / COLUMN_CHUNKED / ROW_STREAM → 具体 sink 类型
+        5. 三布局运行（.tmp/examples/ 产物）
+        6. 断言：单元格一致 + 列/行事件取向 + 派生布局
+        7. 汇总 chapter_result
 
         Gate: `just examples`
         """
@@ -162,7 +164,10 @@ def _(
     build_minimal_public_api_runtime_bindings,
     run_ir_mod,
 ):
-    # 工厂选型: 三种 layout -> 具体 sink 类型
+    # ② 复杂可复用零件装配 + 工厂选型: 三种 layout -> 具体 sink 类型。
+    #   - build_minimal_public_api_ir(): 最小 DemandIr（主源 items + 2 抽取字段 + 1 派生字段）。
+    #   - build_minimal_public_api_runtime_bindings(): 主源 loader / 派生计算函数注入 RuntimeBindings。
+    #   - PlanBuilder(demand_ir).build(): 生成执行计划;export_layout_from_demand_ir 导出写布局。
     demand_ir = build_minimal_public_api_ir()
     runtime_bindings = build_minimal_public_api_runtime_bindings()
     plan = PlanBuilder(demand_ir).build()
@@ -195,6 +200,39 @@ def _(
     row_sink.close()
     print("factory:", type(buffered_sink).__name__, type(chunked_sink).__name__, type(row_sink).__name__)
     return buffered_sink, chunked_sink, demand_ir, factory_ok, layout, runtime_bindings, row_sink
+
+
+@app.cell(hide_code=True)
+def _(demand_ir, layout, mo, runtime_bindings):
+    # ③ 模型窥视：把库 fixtures builder 的装配产物直接渲染在 notebook 内，读者无需跳库。
+    #   - demand_ir.fields 是 mappingproxy（键=field_id），必须用 .values() 遍历；
+    #     DerivedFieldIr 可能没有 source_id，用 getattr 兜底。
+    #   - layout.field_ids 即本次写出的目标字段（列布局事件的 field_key 与之一致）。
+    fields_summary = [
+        {
+            "field_id": f.field_id,
+            "name": f.name,
+            "source_id": getattr(f, "source_id", "-"),
+            "kind": type(f).__name__,
+        }
+        for f in demand_ir.fields.values()
+    ]
+    mo.vstack(
+        [
+            mo.md("**模型窥视（读者无需跳库）**——以下为最小模型的装配与接线产物："),
+            mo.md(
+                "字段总数 `{}`（含派生 {} 个）；layout.field_ids = {}；source_loaders = {}；derived_calculators = {}".format(
+                    len(fields_summary),
+                    sum(1 for f in fields_summary if f["kind"] == "DerivedFieldIr"),
+                    list(layout.field_ids),
+                    list(getattr(runtime_bindings, "main_source_loaders", {}).keys()),
+                    list(getattr(runtime_bindings, "derived_calculators", {}).keys()),
+                )
+            ),
+            mo.ui.table(fields_summary, selection=None),
+        ]
+    )
+    return
 
 
 @app.cell

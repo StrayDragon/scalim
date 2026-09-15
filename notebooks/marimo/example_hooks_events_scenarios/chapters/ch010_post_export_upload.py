@@ -440,6 +440,15 @@ def _(batch_size, checks, demand_obs, demand_result, demand_uploads, node_ends, 
         "summary": summary,
         "details": {
             "batch_size": batch_size.value,
+            # r1114: 期望快照（与 Cell 13 断言一致），供 headless/pytest 定位
+            "expected": {
+                "demand_rows": 3,
+                "upload_row_count": 3,
+                "upload_size_positive": True,
+                "observer_errors": 0,
+                "workflow_node": "main/ok",
+                "server_received_matches_observer": True,
+            },
             "demand_uploads": demand_uploads,
             "workflow_uploads": workflow_uploads,
             "workflow_node_ends": node_ends,
