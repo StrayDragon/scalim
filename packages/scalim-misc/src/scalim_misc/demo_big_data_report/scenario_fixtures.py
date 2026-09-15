@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import FrozenSet
+from typing import TYPE_CHECKING
 
-ALLOWED_MODULES: FrozenSet[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])
+if TYPE_CHECKING:
+    from pathlib import Path
+
+ALLOWED_MODULES: frozenset[str] = frozenset(["scalim_misc.examples.public_api._fixtures"])
 
 LOADER_ITEMS = "scalim_misc.examples.public_api._fixtures:load_items"
 
@@ -26,18 +28,18 @@ def write_minimal_demand_yaml(path: Path) -> Path:
     """Demand that loads 3 items; outputs are provided via RunOverrides at run time."""
     write_text(
         path,
-        """\
+        f"""\
 name: hooks_events_scenarios_minimal
 
 main_source:
   source_id: items
-  loader: "{loader}"
+  loader: "{LOADER_ITEMS}"
   fields:
     item_id: {{extract: item_id, name: Item ID}}
     dim_id: {{extract: dim_id, name: Dim ID}}
 
 sources: {{}}
-""".format(loader=LOADER_ITEMS),
+""",
     )
     return path
 
@@ -45,11 +47,11 @@ sources: {{}}
 def write_minimal_workflow_yaml(path: Path, *, demand_rel: str = "demand.yaml") -> Path:
     write_text(
         path,
-        """\
+        f"""\
 workflow:
   runs:
     - id: main
-      demand: {demand}
-""".format(demand=demand_rel),
+      demand: {demand_rel}
+""",
     )
     return path

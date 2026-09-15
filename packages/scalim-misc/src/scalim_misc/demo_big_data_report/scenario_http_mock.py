@@ -13,18 +13,20 @@ import json
 import threading
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 _DEFAULT_ASYNC_ROWS_THRESHOLD = 100
+_HTTP_OK = 200
 
 
 @dataclass
 class MockHttpState:
-    uploads: List[Dict[str, Any]] = field(default_factory=list)
-    upload_attempts: List[Dict[str, Any]] = field(default_factory=list)
-    dispatches: List[Dict[str, Any]] = field(default_factory=list)
+    uploads: list[dict[str, Any]] = field(default_factory=list)
+    upload_attempts: list[dict[str, Any]] = field(default_factory=list)
+    dispatches: list[dict[str, Any]] = field(default_factory=list)
     async_rows_threshold: int = _DEFAULT_ASYNC_ROWS_THRESHOLD
     upload_failures_remaining: int = 0
     upload_fail_status: int = 503
@@ -33,10 +35,10 @@ class MockHttpState:
 class _Handler(BaseHTTPRequestHandler):
     state: MockHttpState
 
-    def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         _ = (format, args)
 
-    def _read_json(self) -> Dict[str, Any]:
+    def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length > 0 else b"{}"
         if not raw:
@@ -44,10 +46,10 @@ class _Handler(BaseHTTPRequestHandler):
         data = json.loads(raw.decode("utf-8"))
         if not isinstance(data, dict):
             msg = "JSON body must be an object"  # force-en
-            raise ValueError(msg)
+            raise TypeError(msg)
         return data
 
-    def _write_json(self, status: int, payload: Dict[str, Any]) -> None:
+    def _write_json(self, status: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -55,7 +57,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         path = str(self.path).split("?", 1)[0]
         try:
             if path == "/upload":
@@ -93,7 +95,7 @@ class MockHttpServer:
 
     @property
     def base_url(self) -> str:
-        return "http://{}:{}".format(self.host, int(self.port))
+        return f"http://{self.host}:{int(self.port)}"
 
     def stop(self) -> None:
         self._httpd.shutdown()
@@ -124,19 +126,19 @@ def start_mock_http_server(
     return MockHttpServer(host=str(host), port=int(port), state=state, _httpd=httpd, _thread=thread)
 
 
-def _post_json(url: str, payload: Dict[str, Any], *, timeout: float = 5.0) -> Tuple[int, Dict[str, Any]]:
+def _post_json(url: str, payload: dict[str, Any], *, timeout: float = 5.0) -> tuple[int, dict[str, Any]]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = Request(url, data=body, method="POST")
+    req = Request(url, data=body, method="POST")  # noqa: S310 — local mock only
     req.add_header("Content-Type", "application/json; charset=utf-8")
     try:
-        with urlopen(req, timeout=timeout) as resp:  # noqa: S310 — local mock only
+        with urlopen(req, timeout=timeout) as resp:  # noqa: S310
             raw = resp.read()
             status = int(getattr(resp, "status", 200) or 200)
     except HTTPError as exc:
         raw = exc.read() if exc.fp is not None else b"{}"
         status = int(exc.code)
     except URLError as exc:
-        msg = "mock http request failed: {}".format(exc)  # force-en
+        msg = f"mock http request failed: {exc}"  # force-en
         raise RuntimeError(msg) from exc  # force-en
     data = json.loads(raw.decode("utf-8") or "{}")
     if not isinstance(data, dict):
@@ -144,28 +146,28 @@ def _post_json(url: str, payload: Dict[str, Any], *, timeout: float = 5.0) -> Tu
     return status, data
 
 
-def post_upload(base_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def post_upload(base_url: str, payload: dict[str, Any]) -> dict[str, Any]:
     status, data = _post_json("{}/upload".format(base_url.rstrip("/")), payload)
-    if status != 200:
-        msg = "upload failed status={} body={!r}".format(status, data)  # force-en
+    if status != _HTTP_OK:
+        msg = f"upload failed status={status} body={data!r}"  # force-en
         raise RuntimeError(msg)  # force-en
     return data
 
 
-def post_upload_with_status(base_url: str, payload: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+def post_upload_with_status(base_url: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     return _post_json("{}/upload".format(base_url.rstrip("/")), payload)
 
 
-def post_dispatch(base_url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def post_dispatch(base_url: str, payload: dict[str, Any]) -> dict[str, Any]:
     status, data = _post_json("{}/dispatch".format(base_url.rstrip("/")), payload)
-    if status != 200:
-        msg = "dispatch failed status={} body={!r}".format(status, data)  # force-en
+    if status != _HTTP_OK:
+        msg = f"dispatch failed status={status} body={data!r}"  # force-en
         raise RuntimeError(msg)  # force-en
     return data
 
 
-def build_upload_payload(*, target_id: str, output_path: Optional[str], row_count: int) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
+def build_upload_payload(*, target_id: str, output_path: str | None, row_count: int) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "target_id": str(target_id),
         "output_path": None if output_path is None else str(output_path),
         "row_count": int(row_count),
@@ -174,7 +176,7 @@ def build_upload_payload(*, target_id: str, output_path: Optional[str], row_coun
     }
     if output_path:
         try:
-            with open(output_path, "rb") as f:
+            with Path(output_path).open("rb") as f:
                 data = f.read()
             payload["size"] = len(data)
             payload["content_sha1"] = hashlib.sha1(data).hexdigest()  # noqa: S324

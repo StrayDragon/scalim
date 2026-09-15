@@ -261,7 +261,7 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
         "`src/scalim/**/__init__.py` markers: `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`",
         "`scripts/check-api-surface-governance.py`",
         "`scripts/check-user-material-import-boundaries.py`",
-        "`notebooks/marimo/example_public_api_suite/`",
+        "`notebooks/marimo/demo_big_data_report/chapters_of_ir/`",
         "`tests/public_api/`",
     ]
 
@@ -281,7 +281,7 @@ def _render_public_api_import_guide(repo_root: Path) -> str:
         "",
         "- `__all__` 治理规则(模块内符号级): [`scripts/check-api-surface-governance.py`](repo:scripts/check-api-surface-governance.py)",
         "- 用户材料导入边界(文档/示例/skills): [`scripts/check-user-material-import-boundaries.py`](repo:scripts/check-user-material-import-boundaries.py)",
-        "- 示例覆盖(可交互/可对拍): `notebooks/marimo/example_public_api_suite/`(见 [主线教程](demo-big-data-report.md))",
+        "- 示例覆盖(可交互/可对拍): `notebooks/marimo/demo_big_data_report/chapters_of_ir/`(见 [主线教程](demo-big-data-report.md))",
         "",
         "## 1) 推荐导入（Tier 1:稳定入口）",
         "",

@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch184_public_api_sinks_pandas
+        # demo_big_data_report / chapters_of_ir / ch184_public_api_sinks_pandas
 
         本章目标:
         - `PandasRowSink` 最小闭环：write_batch → to_dataframe → 行/列对拍

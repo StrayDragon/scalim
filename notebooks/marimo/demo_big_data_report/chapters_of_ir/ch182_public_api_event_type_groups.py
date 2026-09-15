@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch182_public_api_event_type_groups
+        # demo_big_data_report / chapters_of_ir / ch182_public_api_event_type_groups
 
         本章目标:
         - `scalim.events.type_groups` 目录分组（pipeline/loader/field/workflow 等）

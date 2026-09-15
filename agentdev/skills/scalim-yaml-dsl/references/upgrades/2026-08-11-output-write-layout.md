@@ -61,5 +61,5 @@ ExecutionRequest(
 
 ## 例子
 
-- Notebook：`notebooks/marimo/example_public_api_suite/chapters/ch162_public_api_output_write_layout.py`
+- Notebook：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch162_public_api_output_write_layout.py`
 - 双跑证据：`scripts/bench_output_write_layout_dual_run.py --preset medium`

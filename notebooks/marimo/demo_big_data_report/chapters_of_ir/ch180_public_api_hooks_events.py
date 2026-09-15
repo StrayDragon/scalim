@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch180_public_api_hooks_events
+        # demo_big_data_report / chapters_of_ir / ch180_public_api_hooks_events
 
         本章目标:
         - Hook(`on_pipeline_start/end/loader_call`)与 Observer 双视角收事件

@@ -1,4 +1,4 @@
-"""Cells-native 章节 notebook 模板（金标准: example_hooks_events_scenarios/chapters/ch010_post_export_upload.py）。
+"""Cells-native 章节 notebook 模板（金标准: demo_big_data_report/chapters_of_scenarios/ch210_post_export_upload.py）。
 
 用途: 新建/迁移章节时的骨架参考。本文件位于 `_templates/`，不会被
 `just examples` 的 suite 发现（非 demo_/example_ 前缀）也不会被

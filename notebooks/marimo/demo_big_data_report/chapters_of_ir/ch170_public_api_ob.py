@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch170_public_api_ob
+        # demo_big_data_report / chapters_of_ir / ch170_public_api_ob
 
         本章目标:
         - `scalim.ob` facade smoke：`Observability().build_manager(CAPTURE)` 手动

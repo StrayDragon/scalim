@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch162_public_api_output_write_layout
+        # demo_big_data_report / chapters_of_ir / ch162_public_api_output_write_layout
 
         本章目标:
         - 演示 `OutputWriteLayout`：工厂选型 + 事件取向 + 业务格子对拍

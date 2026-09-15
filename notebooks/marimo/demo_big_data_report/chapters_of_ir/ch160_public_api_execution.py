@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch160_public_api_execution
+        # demo_big_data_report / chapters_of_ir / ch160_public_api_execution
 
         本章目标:
         - 最小可运行示例: execution facade(`run_ir` + `ExecutionRequest`)运行 + 内存 sink

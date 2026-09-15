@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch150_public_api_planning
+        # demo_big_data_report / chapters_of_ir / ch150_public_api_planning
 
         本章目标:
         - 最小可运行示例: `PlanBuilder.build(...)` 的闭环

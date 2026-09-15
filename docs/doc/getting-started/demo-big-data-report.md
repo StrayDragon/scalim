@@ -9,7 +9,7 @@
 ## 1) 关键入口(SSOT)
 
 - marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](repo:notebooks/marimo/demo_big_data_report/demo_main.py)
-- public API 覆盖套件入口(交互式): [`notebooks/marimo/example_public_api_suite/demo_main.py`](repo:notebooks/marimo/example_public_api_suite/demo_main.py)
+- public API 面章节(同一套件内): [`chapters_of_ir/`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir)（`ch130`–`ch184`，与主线 `ch010`–`ch120` 同一 registry）
 - `just examples` 集成对拍入口(headless/CI): `just examples`（入口实现位于 [`justfile`](repo:justfile) 的 `examples:` recipe）
 - YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml)
 
@@ -28,18 +28,17 @@
 注入器与图表生成器：`packages/scalim-misc/src/scalim_misc/readme_examples_gen.py` / `readme_charts_gen.py`；
 刷新入口 `just gen-readme-examples`（或 `just gen-docs`），drift 由 `just qa` 内的 docs 检查兜底。
 
-章节集合包含:
+三条轨道(同一套件、同一个 `just examples` 入口):
 
-- 主线 demo 章节（面向工程使用方写 YAML 的主路径）
-- YAML DSL fixtures（`chapters_of_yaml_dsl/declared_yaml_dsl/` 下的可校验示例）
+| 轨道目录 | 编号 | 面 |
+| --- | --- | --- |
+| `chapters_of_yaml_dsl/` | `ch005`–`ch150` | 声明面: YAML DSL + workflow(含 README 第一口的 `ch005` 与 canonical `ecommerce_report.yaml`) |
+| `chapters_of_ir/` | `ch010`–`ch120` + `ch130`–`ch184` | 装配面: Python IR 手写主线 + public API 覆盖(含 README 第一口的 `ch010`/`ch020`) |
+| `chapters_of_scenarios/` | `ch210`–`ch260` | 场景面: hooks/events 与阶段调度的应用形态 |
+
 - Python 导入入口与结构评估: [公共 API 导入指南](public-api.gen.md)
-
-另外，本仓库维护一套 **独立** 的 public API 覆盖套件：`notebooks/marimo/example_public_api_suite/`，用于：
-
-- 对稳定公开入口模块 `scalim.*.__all__` 做 fail-fast 覆盖断言
-- 演示扩展点（hook/observer/events/components 注入）
-
-该 suite 同样纳入 `just examples` 回归范围。
+- `scalim.*.__all__` 的 Tier1 覆盖由 `chapters_of_ir/` 内的 `ch130`–`ch184` 承担；扩展点(hook/observer/events/components 注入)在同一批 cells 内演示, 不再有独立套件目录。
+- 对拍零件与 loader 模块在 `packages/scalim-misc/src/scalim_misc/`(`notebook_support/*` + `demo_big_data_report/*`); 教学主流程全部在 cells 内。
 
 ## 2) 怎么跑(推荐命令)
 
@@ -49,7 +48,7 @@
 just examples
 ```
 
-该入口会执行主线 `demo_big_data_report`（含 README 第一口的 ch005/ch010/ch020）+ `example_public_api_suite` 等套件的章节级对拍，并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。
+该入口会执行唯一套件 `demo_big_data_report` 的三条轨道(声明面 + 装配面 + 场景面, 当前 52 章; 含 README 第一口的 ch005/ch010/ch020), 并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。只想跑单条轨道时可用 `SCALIM_EXAMPLES_SUITES=demo_big_data_report just examples`。
 
 ### 2.2 跑整套门禁(改动后验收)
 

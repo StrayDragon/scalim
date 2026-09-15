@@ -1,4 +1,4 @@
-"""Cells-native marimo notebook: ch050_workflow_viz_finished.
+"""Cells-native marimo notebook: ch250_workflow_viz_finished.
 
 迁移对照 (ch010 同款):
   Before: 薄壳 cells + support/workflow_viz_finished.py 持有全部主路径
@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_hooks_events_scenarios / ch050_workflow_viz_finished
+        # demo_big_data_report / chapters_of_scenarios / ch250_workflow_viz_finished
 
         演示：**启用 workflow viz 后收到 `WORKFLOW_STARTED` / `WORKFLOW_FINISHED`**。
 
@@ -29,7 +29,7 @@ def _(mo):
 
         注意: 无 viz 时 `WORKFLOW_STARTED/FINISHED` 不发 —— 用 `WORKFLOW_NODE_*` 替代(见 ch010)。
 
-        Gate: `just examples` / `tests/integration/test_example_hooks_events_scenarios.py`
+        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
         """
     )
     return
@@ -63,7 +63,7 @@ def _(repo_root):
     from scalim.ob.observer import Observer
     from scalim.ob.presets.viz import VizObserverConfig
     from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
-    from notebooks.marimo.example_hooks_events_scenarios.support.fixtures import (
+    from scalim_misc.demo_big_data_report.scenario_fixtures import (
         ALLOWED_MODULES,
         write_minimal_demand_yaml,
         write_minimal_workflow_yaml,

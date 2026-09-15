@@ -17,7 +17,7 @@ description: "治理 Scalim Tier1 public API: 入口标记(# pragma: scalim-publ
 - Tier1 curated entrypoints (SSOT): `src/scalim/**/__init__.py` 的 markers
   - `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`
 - 每个 Tier1 入口模块 MUST 声明字面量 `__all__`（静态扫描；不 import）
-- examples suite (SSOT): `notebooks/marimo/example_public_api_suite/chapters/*.py` 的章节集合（每章提供 `run_chapter()`）
+- examples suite (SSOT): `notebooks/marimo/demo_big_data_report/chapters_of_ir/*.py` 的章节集合（每章提供 `run_chapter()`）
 - pytest public_api suite (SSOT): `tests/public_api/test_example_public_api_suite.py` 的 `chapter_ids=[...]`
 - Generated outputs (禁止手改):
   - `references/**/*.gen.*`

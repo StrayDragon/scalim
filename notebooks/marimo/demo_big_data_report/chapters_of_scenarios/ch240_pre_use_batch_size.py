@@ -1,4 +1,4 @@
-"""Cells-native marimo notebook: ch040_pre_use_batch_size.
+"""Cells-native marimo notebook: ch240_pre_use_batch_size.
 
 迁移对照 (ch010 同款):
   Before: 薄壳 cells + support/pre_use_batch_size.py 持有全部主路径
@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_hooks_events_scenarios / ch040_pre_use_batch_size
+        # demo_big_data_report / chapters_of_scenarios / ch240_pre_use_batch_size
 
         演示：**`pre_use_batch_size` 策略信号改写 batch_size**（仅当
         `DemandRunRuntimeOptions.batch_size=UNSET` 时触发）。
@@ -29,7 +29,7 @@ def _(mo):
         5. 拖 slider 改覆盖值 → 观察 pipeline 实际生效值跟随变化
         6. 断言展开 → chapter_result
 
-        Gate: `just examples` / `tests/integration/test_example_hooks_events_scenarios.py`
+        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
         """
     )
     return
@@ -63,7 +63,7 @@ def _(repo_root):
     from scalim.hooks import BaseHook
     from scalim.ob.observer import EventDispatchObserver
     from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
-    from notebooks.marimo.example_hooks_events_scenarios.support.fixtures import (
+    from scalim_misc.demo_big_data_report.scenario_fixtures import (
         ALLOWED_MODULES,
         write_minimal_demand_yaml,
         write_minimal_workflow_yaml,

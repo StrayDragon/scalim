@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch164_public_api_lookup_chunking
+        # demo_big_data_report / chapters_of_ir / ch164_public_api_lookup_chunking
 
         本章目标：
         - 黑盒核对 `LookupChunking`：YAML `keys` 关联 + `Observer`/`Hook` `LOADER_CALL`

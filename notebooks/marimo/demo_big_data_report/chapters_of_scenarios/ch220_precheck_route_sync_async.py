@@ -1,4 +1,4 @@
-"""Cells-native marimo notebook: ch020_precheck_route_sync_async.
+"""Cells-native marimo notebook: ch220_precheck_route_sync_async.
 
 迁移对照 (ch010 同款):
   Before: 薄壳 cells + support/precheck_route.py 持有全部主路径
@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_hooks_events_scenarios / ch020_precheck_route_sync_async
+        # demo_big_data_report / chapters_of_scenarios / ch220_precheck_route_sync_async
 
         演示：**应用层预估完成后 HTTP 分流**（不绑 Scalim `workflow_preflight`）。
 
@@ -28,7 +28,7 @@ def _(mo):
         5. 大任务（async）→ 只入队 mock，不跑 Scalim（断言无产物文件）
         6. 断言展开（含 server 侧存在性核对，交互重跑幂等）
 
-        Gate: `just examples` / `tests/integration/test_example_hooks_events_scenarios.py`
+        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
         """
     )
     return
@@ -58,14 +58,14 @@ def _(repo_root):
     from scalim.dsl import yaml_dsl as api
     from scalim.dsl.yaml_dsl.workflow_types import WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions
     from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
-    from notebooks.marimo.example_hooks_events_scenarios.support.fixtures import (
+    from scalim_misc.demo_big_data_report.scenario_fixtures import (
         ALLOWED_MODULES,
         ASYNC_ESTIMATED_ROWS,
         SYNC_ESTIMATED_ROWS,
         write_minimal_demand_yaml,
         write_minimal_workflow_yaml,
     )
-    from notebooks.marimo.example_hooks_events_scenarios.support.http_mock import (
+    from scalim_misc.demo_big_data_report.scenario_http_mock import (
         MockHttpServer,
         post_dispatch,
         start_mock_http_server,

@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch163_public_api_output_write_layout_books
+        # demo_big_data_report / chapters_of_ir / ch163_public_api_output_write_layout_books
 
         本章目标:
         - YAML books / `output_composition` 不能设 `COLUMN_CHUNKED` / `COLUMN_BUFFERED`

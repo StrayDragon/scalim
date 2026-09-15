@@ -1,3 +1,5 @@
+"""`demo_big_data_report / chapters_of_scenarios` 章节注册中心(应用场景面)。"""
+
 from __future__ import annotations
 
 from typing import Iterable, List, Optional, Sequence
@@ -7,9 +9,10 @@ from scalim_misc.notebook_support import ChapterRegistry
 
 _REGISTRY = ChapterRegistry(
     registry_file=__file__,
-    module_name_prefix="notebooks.marimo.example_public_api_suite.chapters",
-    example_id_prefix="example_public_api_suite",
+    module_name_prefix="notebooks.marimo.demo_big_data_report.chapters_of_scenarios",
+    example_id_prefix="demo_big_data_report",
     chapter_file_pattern=r"^(ch\d+_[a-z][a-z0-9_]+)\.py$",
+    run_resolver="allow_unique_run",
 )
 
 
@@ -27,6 +30,10 @@ def run_all_chapters(*, slow_ok: bool = False) -> List[ExampleResult]:
 
 def iter_chapters() -> Iterable[str]:
     return _REGISTRY.iter_chapters()
+
+
+def get_chapter_module_name(chapter_id: str) -> str:
+    return _REGISTRY.get_chapter_module_name(chapter_id)
 
 
 def find_first_failure(results: Sequence[ExampleResult]) -> Optional[ExampleResult]:

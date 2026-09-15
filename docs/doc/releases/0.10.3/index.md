@@ -52,7 +52,7 @@ FieldIr(source_id=lookup_source.source_id)
 - 宽表 Excel / 列式写出：在 `DemandRunRuntimeOptions.output_write_layout` 显式选型。
 - 未设时由 `streaming` + `ExcelColumnResidency` 推导，**与历史默认一致**。
 - **禁止**在 YAML 声明 layout / residency / `write.streaming`。
-- 例子：`notebooks/marimo/example_public_api_suite/chapters/ch162_public_api_output_write_layout.py`
+- 例子：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch162_public_api_output_write_layout.py`
 
 ### 3. 与 0.10.2 / 0.10.1 / 0.10.0
 

@@ -47,4 +47,4 @@ c40 已落地（0.10.*）：换环境就会改的配置收口 Python typed oneof
 - Live 合约：`llmanspec/specs/yaml-dsl-runtime-policy-boundary.feature`（r1003–r1005）
 - 人类：`docs/doc/yaml-dsl/review-checklist.md`、`capability-matrix.md`、`user-guide.md` §4.4.3
 - 何时用 / 事件自证：`references/lookup-chunking-guidance.md`
-- 可运行 oracle：`notebooks/marimo/example_public_api_suite/chapters/ch164_public_api_lookup_chunking.py`
+- 可运行 oracle：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch164_public_api_lookup_chunking.py`

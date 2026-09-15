@@ -1,4 +1,4 @@
-from notebooks.marimo.example_public_api_suite.chapters.registry import run_selected_chapters
+from notebooks.marimo.demo_big_data_report.chapters_of_ir.registry import run_selected_chapters
 from scalim_misc.examples.harness import summarize_failures
 
 

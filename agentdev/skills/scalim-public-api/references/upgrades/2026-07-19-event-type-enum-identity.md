@@ -222,5 +222,5 @@ get_event_catalog()
 4. 若有自建序列化读回路径,确认使用 `parse_event_type`
 
 仓库内可参考示例:
-- `notebooks/marimo/example_public_api_suite/chapters/ch180_public_api_hooks_events.py`
-- `notebooks/marimo/example_public_api_suite/chapters/ch182_public_api_event_type_groups.py`
+- `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch180_public_api_hooks_events.py`
+- `notebooks/marimo/demo_big_data_report/chapters_of_ir/ch182_public_api_event_type_groups.py`

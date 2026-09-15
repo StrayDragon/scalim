@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch165_public_api_resources
+        # demo_big_data_report / chapters_of_ir / ch165_public_api_resources
 
         本章目标:
         - 演示稳定 facade: `scalim.shortcuts.resources.outputs`

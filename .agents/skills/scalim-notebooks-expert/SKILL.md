@@ -1,7 +1,7 @@
 ---
 name: scalim-notebooks-expert
 description: >
-  Scalim 仓库 marimo notebooks（主线教程 demo_big_data_report 的双轨章节，含 README 第一口 ch005/ch010/ch020）
+  Scalim 仓库 marimo notebooks（唯一教程套件 demo_big_data_report 的三轨章节：chapters_of_yaml_dsl / chapters_of_ir / chapters_of_scenarios，含 README 第一口 ch005/ch010/ch020）
   的 "cells-native 内联" 改写标准模式。当需要把章节 notebook 从"薄壳调用库 builder / 蓝盒装配"
   改写成"读者打开即可在 cells 内看到怎么写"时使用。涵盖：cells-native 内联原则、模型窥视、
   章节结果契约、可复用零件边界、配套门禁与验证命令。
@@ -71,11 +71,19 @@ cells 内逐步骤展开（每步一个 cell，可就地修改重跑）：
 
 ## 可复用零件边界（r1111）
 
-- **零件可留库**：fixtures 数据、通用 Observer/Hook 类、通用 `measure_rss_delta_kb`/`CountingRowSink`/`knobs`、
-  YAML 片段资源、通用 `verify_*` oracle（当它封装的是"数据校验逻辑"而非"scalim 装配"）。
-- **必须内联到 cells**：scaler 装配（Demand/Plan/RuntimeBindings/Engine 的构造、注入点、运行顺序）与断言展开。
+`scalim_misc` 只承载三类内容，其余一律 in-cell：
+
+1. **loader 模块**（YAML `loader: "<module>:<fn>"` 必须是 importable 的模块级函数，marimo 只写 cells，故不能内联）：
+   `scalim_misc/demo_big_data_report/{loaders,min_loaders,stage_perf_loaders}.py`、`examples/public_api/_fixtures.py`。
+2. **对拍零件**（期望/断言/度量的机械面，无教学叙事）：`notebook_support/{chapter_result,counting_sink,rss_proxy,results_view,yaml_excerpt}.py`。
+3. **runner/投影基础设施**：`notebook_support/{chapters_registry,pathing,cell_source}.py`、`examples/*`、`readme_*_gen.py`。
+
+必须内联到 cells：Demand/Plan/RuntimeBindings/Engine 的构造与注入顺序、期望字面量、断言展开、`mo.*` 展示。
+
 - 若某章节需完整电商模型（多源/多级 Join/派生），可保留 `build_ecommerce_model`/`build_ecommerce_runtime_bindings`
   作为**复杂复用零件**，但 MUST 用"模型窥视 cell"把其装配产物渲染出来，避免读者跳库。
+- 应用场景轨（`chapters_of_scenarios/`，`ch210`–`ch260`）同样 in-cell；其 mock HTTP / YAML fixture 零件在
+  `scalim_misc/demo_big_data_report/{scenario_fixtures,scenario_http_mock}.py`。
 
 ## 配套门禁与验证（改动后必跑，全绿才算完成）
 

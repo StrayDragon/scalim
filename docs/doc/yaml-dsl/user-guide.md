@@ -1295,7 +1295,7 @@ runtime = DemandRunRuntimeOptions(
 - `LookupChunking.sized(size=...)` **alone 不是并行开关**;片间并行须嵌在 `sized(..., parallel=True)` 且 `parallel_mode=adaptive`.
 - 旧平铺 `parallelize_lookup_chunks=True`：仅在 **未**经 `LookupChunking` 写入 `SourceIr.lookup_chunk_parallel` 的 IR（`None` 继承）路径仍生效；若已用 `LookupChunking.sized(...)`，并行请写 `sized(..., parallel=True)`，不要指望平铺布尔覆盖 sized 的显式串行。
 - 护栏见 [执行并行模式 §3.6](../architecture/parallel-modes.md)；迁移卡见 skill upgrade `2026-08-09-lookup-chunking-python-ssot`.
-- 何时用 / 用 `LOADER_CALL` 自证：agent 卡 `agentdev/skills/scalim-yaml-dsl/references/lookup-chunking-guidance.md`；可运行 oracle：`notebooks/marimo/example_public_api_suite/chapters/ch164_public_api_lookup_chunking.py`（Observer + Hook 核对 `chunk_offset` / `lookup_key_count`）.
+- 何时用 / 用 `LOADER_CALL` 自证：agent 卡 `agentdev/skills/scalim-yaml-dsl/references/lookup-chunking-guidance.md`；可运行 oracle：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch164_public_api_lookup_chunking.py`（Observer + Hook 核对 `chunk_offset` / `lookup_key_count`）.
 
 本地合成证据(见 `.tmp/evidence/exec-call-io/`):300 keys / chunk 40 → 8 次 loader 调用(= ceil);过小 chunk 会线性放大 IO 等待.
 

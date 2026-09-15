@@ -84,15 +84,15 @@
     当 维护者检查 canonical YAML 文件路径
     那么 文件存在且路径未被移动或重命名
   @req:r180 @human
-  场景: public API 套件必须独立并纳入 examples gate
-    - 系统 MUST 将稳定公开入口模块的覆盖回归从主线教学套件中解耦，迁移为独立示例套件，并保持确定性回归门禁不降级。 该 suite MUST： - 位于独立目录 - 为每个稳定公开入口模块提供至少一个纳入 gate 的章节入口（章节对公开入口做覆盖断言） - 至少包含一个章节演示扩展点（hook/observer/events/components 注入）
+  场景: public API 覆盖以独立轨道目录纳入 examples gate
+    - 系统 MUST 将稳定公开入口模块的覆盖回归组织为主线套件内的一条 **独立轨道目录**（与教学主线章节同 registry 自动发现），并保持确定性回归门禁不降级。 该轨道 MUST： - 位于主线套件目录下的独立章节目录 - 为每个稳定公开入口模块提供至少一个纳入 gate 的章节入口（章节对公开入口做覆盖断言） - 至少包含一个章节演示扩展点（hook/observer/events/components 注入）
     当 维护者检查 notebooks 目录
-    那么 MUST 能找到一个独立于主线示例套件的 public API suite 目录
+    那么 MUST 能在主线套件的一个独立章节目录内定位到 public API 覆盖章节（不另有并行的第二套套件目录）
   @req:r198 @human
-  场景: headless runner 必须覆盖所有套件
-    - 系统 MUST 将 headless runner 覆盖默认执行 `notebooks/marimo/` 下所有示例套件（自动发现），至少包含主线示例套件与 public API suite；根 README 的 validated examples 章节已并入主线示例套件的章节组，MUST 随主线套件被默认执行。
+  场景: headless runner 必须覆盖所有轨道且保持单一套件心智
+    - 系统 MUST 将 `notebooks/marimo/` 下的用户侧示例收敛为 **单一套件目录** `demo_big_data_report`，其内以轨道目录组织（声明面 `chapters_of_yaml_dsl/`、装配面 `chapters_of_ir/`、场景面 `chapters_of_scenarios/`）；headless runner MUST 自动发现该套件并默认执行其全部轨道章节。 根 README 的 validated examples 章节与 public API 覆盖章节、应用场景章节 MUST 作为该套件内的轨道章节被默认执行；系统 MUST NOT 为它们维护并行的第二套套件目录。
     当 开发者运行 examples gate
-    那么 runner MUST 执行主线示例套件（含 README 第一口章节）与 public API suite 的章节
+    那么 runner MUST 执行该套件三条轨道的章节（含 README 第一口章节、public API 覆盖章节与应用场景章节）
   @req:r216 @human
   场景: public API 套件覆盖 curated facade 导入
     - 系统 MUST 扩展 public API suite，使其覆盖 curated public surface，而不只是零散的公开入口冒烟。 该 suite 至少 MUST 覆盖： - YAML DSL 的 facade imports - workflow 辅助公开模块 - IR 模块 - shortcuts.resources（资源类 shortcut 稳定入口 package） - shortcuts.resources.outputs（输出发现/最新产物定位 facade）
@@ -110,7 +110,7 @@
     那么 gate MUST fail-fast 并指出差异
   @req:r17 @human
   场景: public API suite 与 pytest 套件形成双重覆盖
-    - 系统 MUST 将 public API catalog 的回归覆盖分为两条互补链路，并要求二者同时存在： - example_public_api_suite：教学/叙事型示例套件（由 examples gate 执行） - tests/public_api/：用户侧最小闭环 pytest 套件（由默认 pytest 非 bench gate 执行） 两者 MUST 覆盖同一份 public API catalog，并提供可自动化的漂移检测；当覆盖集合不一致时，门禁 MUST fail-fast 并输出差异。
+    - 系统 MUST 将 public API catalog 的回归覆盖分为两条互补链路，并要求二者同时存在： - 主线套件 `chapters_of_ir/` 轨道内的 public API 章节：教学/叙事型示例（由 examples gate 执行） - tests/public_api/：用户侧最小闭环 pytest 套件（由默认 pytest 非 bench gate 执行） 两者 MUST 覆盖同一份 public API catalog，并提供可自动化的漂移检测；当覆盖集合不一致时，门禁 MUST fail-fast 并输出差异。
     当 维护者运行 examples gate 与默认 pytest 非 bench 套件
     那么 public API suite 与 pytest public_api suite MUST 覆盖同一份 public API catalog
   @req:r18 @human
@@ -130,9 +130,9 @@
     那么 review 文档 MUST 同时说明下层定向测试的职责
   @req:r21 @human
   场景: Tier1 curated entrypoints 与 suite/pytest 覆盖必须同步
-    - 系统 MUST 提供一个静态治理 gate，用于检测并拒绝以下漂移： - Tier1 curated entrypoints 集合发生变化，但 example_public_api_suite 未同步补齐覆盖 - pytest public_api suite 覆盖集合与 examples 覆盖集合不一致（至少在 Tier1 范围内） 该 gate MUST 输出缺失/新增模块列表，并提供可操作的修复建议。
+    - 系统 MUST 提供一个静态治理 gate，用于检测并拒绝以下漂移： - Tier1 curated entrypoints 集合发生变化，但主线套件 `chapters_of_ir/` 轨道内的 public API 章节未同步补齐覆盖 - pytest public_api suite 覆盖集合与 examples 覆盖集合不一致（至少在 Tier1 范围内） 该 gate MUST 输出缺失/新增模块列表，并提供可操作的修复建议。
     假如 贡献者新增/修改了 Tier1 marker
-    当 对应入口模块未被 example_public_api_suite 覆盖
+    当 对应入口模块未被主线套件内的 public API 章节覆盖
     那么 gate MUST fail-fast 并指出缺失模块
     假如 examples suite 覆盖了某个 Tier1 入口模块
     当 pytest public_api suite 未覆盖该入口模块

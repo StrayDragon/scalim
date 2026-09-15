@@ -1,4 +1,4 @@
-"""Cells-native marimo notebook: ch010_post_export_upload (cells-native 改造示范).
+"""Cells-native marimo notebook: ch210_post_export_upload (cells-native 改造示范).
 
 设计目标:
 - 全部内容在 marimo cells 内书写(渐进式探索 + 就地可视化)
@@ -33,7 +33,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_hooks_events_scenarios / ch010_post_export_upload
+        # demo_big_data_report / chapters_of_scenarios / ch210_post_export_upload
 
         演示：**导出物完成后上传到本地 HTTP mock server**。
 
@@ -55,7 +55,7 @@ def _(mo):
 
         对拍入口: `run_chapter()` → `app.run()` → `chapter_result`
 
-        Gate: `just examples` / `tests/integration/test_example_hooks_events_scenarios.py`
+        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
         """
     )
     return
@@ -105,12 +105,12 @@ def _(repo_root):
     from scalim.dsl.yaml_dsl.workflow_types import WorkflowExecutionOptions, WorkflowRunOptions, WorkflowRuntimeOptions
     from scalim.events import Event, EventType
     from scalim.ob.observer import EventDispatchObserver, Observer
-    from notebooks.marimo.example_hooks_events_scenarios.support.fixtures import (
+    from scalim_misc.demo_big_data_report.scenario_fixtures import (
         ALLOWED_MODULES,
         write_minimal_demand_yaml,
         write_minimal_workflow_yaml,
     )
-    from notebooks.marimo.example_hooks_events_scenarios.support.http_mock import (
+    from scalim_misc.demo_big_data_report.scenario_http_mock import (
         MockHttpServer,
         build_upload_payload,
         post_upload,

@@ -14,10 +14,11 @@ def _(mo):
         - 给读者一条**唯一主线**把 Scalim 的关键能力串起来
         - 章节代码可复用: 既能演示,也能当集成对拍 runner 的实现
 
-        结构:
-        - `chapters_of_yaml_dsl/*.py`: YAML DSL + workflow 章节(含 `run_<chapter_id>()` SSOT 入口)
-        - `chapters_of_ir/*.py`: IR 主线章节(含 `run_chapter()`/`run_*()` SSOT 入口)
-        - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/`: fixtures/oracle/工具函数(不承载教学主流程)
+        结构(三条轨道, 一个套件):
+        - `chapters_of_yaml_dsl/*.py`: YAML DSL + workflow 声明面章节(含 `run_chapter()` SSOT 入口)
+        - `chapters_of_ir/*.py`: Python IR 装配面 + public API 面章节(ch010–ch120 / ch130–ch184)
+        - `chapters_of_scenarios/*.py`: 应用场景面章节(ch210–ch260: hooks/events 与阶段调度)
+        - `packages/scalim-misc/src/scalim_misc/`: 仅 loader 模块与对拍零件(不承载教学主流程)
         - `just examples`: 唯一 gate 入口(快速对拍,justfile 内联 runner)
         - `chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
 
@@ -63,12 +64,13 @@ def _(Path, repo_root):
     declared_yaml_dsl_dir = chapters_of_yaml_dsl_dir / "declared_yaml_dsl"
     yaml_path = declared_yaml_dsl_dir / "ecommerce_report.yaml"
     chapters_of_ir_dir = demo_dir / "chapters_of_ir"
+    chapters_of_scenarios_dir = demo_dir / "chapters_of_scenarios"
     _ = repo_root
-    return chapters_of_ir_dir, chapters_of_yaml_dsl_dir, declared_yaml_dsl_dir, demo_dir, yaml_path
+    return chapters_of_ir_dir, chapters_of_scenarios_dir, chapters_of_yaml_dsl_dir, declared_yaml_dsl_dir, demo_dir, yaml_path
 
 
 @app.cell(hide_code=True)
-def _(chapters_of_ir_dir, chapters_of_yaml_dsl_dir, mo):
+def _(chapters_of_ir_dir, chapters_of_scenarios_dir, chapters_of_yaml_dsl_dir, mo):
     yaml_chapter_files = []
     if chapters_of_yaml_dsl_dir.exists():
         yaml_chapter_files = sorted([p.name for p in chapters_of_yaml_dsl_dir.glob("*.py")])
@@ -77,8 +79,13 @@ def _(chapters_of_ir_dir, chapters_of_yaml_dsl_dir, mo):
     if chapters_of_ir_dir.exists():
         ir_chapter_files = sorted([p.name for p in chapters_of_ir_dir.glob("*.py")])
 
+    scenario_chapter_files = []
+    if chapters_of_scenarios_dir.exists():
+        scenario_chapter_files = sorted([p.name for p in chapters_of_scenarios_dir.glob("*.py")])
+
     lines = ["- `chapters_of_yaml_dsl/{}`".format(name) for name in yaml_chapter_files]
     lines.extend(["- `chapters_of_ir/{}`".format(name) for name in ir_chapter_files])
+    lines.extend(["- `chapters_of_scenarios/{}`".format(name) for name in scenario_chapter_files])
     mo.md(
         r"""
         ---
@@ -94,7 +101,7 @@ def _(chapters_of_ir_dir, chapters_of_yaml_dsl_dir, mo):
         mo.md("\n".join(lines))
     else:
         mo.callout(mo.md("章节目录尚未生成。"), kind="warn")
-    return ir_chapter_files, lines, yaml_chapter_files
+    return ir_chapter_files, lines, scenario_chapter_files, yaml_chapter_files
 
 
 @app.cell(hide_code=True)
@@ -149,10 +156,12 @@ def _(mo):
 @app.cell
 def _(yaml_path):
     from notebooks.marimo.demo_big_data_report.chapters_of_ir.registry import run_all_chapters as run_all_ir_chapters
+    from notebooks.marimo.demo_big_data_report.chapters_of_scenarios.registry import run_all_chapters as run_all_scenario_chapters
     from notebooks.marimo.demo_big_data_report.chapters_of_yaml_dsl.registry import run_all_chapters as run_all_yaml_dsl_chapters
 
     _ = yaml_path
-    chapter_results = run_all_yaml_dsl_chapters() + run_all_ir_chapters()
+    # 三条轨道一次跑完: 声明面 → 装配面 → 场景面
+    chapter_results = run_all_yaml_dsl_chapters() + run_all_ir_chapters() + run_all_scenario_chapters()
     return chapter_results
 
 

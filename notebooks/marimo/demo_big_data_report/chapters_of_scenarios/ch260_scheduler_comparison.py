@@ -1,4 +1,4 @@
-"""Cells-native marimo notebook: ch010_scheduler_comparison.
+"""Cells-native marimo notebook: ch260_scheduler_comparison.
 
 迁移对照:
   Before: 装配/运行虽在 cells,但无章节契约（无 expected 快照、无标准教学结构、
@@ -17,7 +17,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_stage_scheduling_perf / ch010_scheduler_comparison
+        # demo_big_data_report / chapters_of_scenarios / ch260_scheduler_comparison
 
         对比 workflow 两种 scheduler preset（`pipeline` / `stage_barrier`）的吞吐/并行度差异。
         通过 loader 内 sleep 放大差异便于观察。
@@ -91,9 +91,9 @@ def _():
 
 @app.cell
 def _(repo_root):
-    tmp_dir = repo_root / ".tmp" / "artifacts" / "example_stage_scheduling_perf"
+    tmp_dir = repo_root / ".tmp" / "artifacts" / "demo_big_data_report"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    loaders_module = "notebooks.marimo.example_stage_scheduling_perf.loaders"
+    loaders_module = "scalim_misc.demo_big_data_report.stage_perf_loaders"
     return loaders_module, tmp_dir
 
 

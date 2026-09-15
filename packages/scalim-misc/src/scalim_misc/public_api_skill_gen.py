@@ -426,7 +426,7 @@ def build_skill(repo_root: Path, output_root: Path) -> list[str]:
         if missing_in_pytest:
             msg_lines.append("- pytest missing: {}".format(", ".join(missing_in_pytest)))
         msg_lines.append("修复入口:")
-        msg_lines.append("- add chapters: notebooks/marimo/example_public_api_suite/chapters/")
+        msg_lines.append("- add chapters: notebooks/marimo/demo_big_data_report/chapters_of_ir/")
         msg_lines.append("- update pytest selection: tests/public_api/test_example_public_api_suite.py")
         raise GenerationError("\n".join(msg_lines))
 

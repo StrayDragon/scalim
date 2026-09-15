@@ -30,4 +30,4 @@
 - Design / tasks：`llmanspec/changes/c50-source-id-graph-refs/`
 - 边界卡：`references/yaml-runtime-policy-boundary.md`
 - LookupChunking 自证：`references/lookup-chunking-guidance.md`；oracle `ch164_public_api_lookup_chunking`
-- workflow 同名 `source_id` 隔离：`notebooks/marimo/example_public_api_suite/chapters/ch166_public_api_source_catalog_workflow.py`
+- workflow 同名 `source_id` 隔离：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch166_public_api_source_catalog_workflow.py`

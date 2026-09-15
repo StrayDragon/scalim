@@ -1,4 +1,4 @@
-"""Cells-native marimo notebook: ch030_upload_retry.
+"""Cells-native marimo notebook: ch230_upload_retry.
 
 迁移对照 (ch010 同款):
   Before: 薄壳 cells + support/upload_retry.py 持有全部主路径
@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_hooks_events_scenarios / ch030_upload_retry
+        # demo_big_data_report / chapters_of_scenarios / ch230_upload_retry
 
         演示：**上传遇瞬态 503 时应用侧重试至成功**（重试逻辑在 Observer 应用代码里，
         Scalim 只负责投递 `OUTPUT_TARGET_END`）。
@@ -29,7 +29,7 @@ def _(mo):
         5. 证据核对：attempts 序列 [503, 503, 200] + server 实收
         6. 断言展开 → chapter_result
 
-        Gate: `just examples` / `tests/integration/test_example_hooks_events_scenarios.py`
+        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
         """
     )
     return
@@ -60,8 +60,8 @@ def _(repo_root):
     from scalim.events import Event, EventType
     from scalim.ob.observer import EventDispatchObserver
     from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
-    from notebooks.marimo.example_hooks_events_scenarios.support.fixtures import ALLOWED_MODULES, write_minimal_demand_yaml
-    from notebooks.marimo.example_hooks_events_scenarios.support.http_mock import (
+    from scalim_misc.demo_big_data_report.scenario_fixtures import ALLOWED_MODULES, write_minimal_demand_yaml
+    from scalim_misc.demo_big_data_report.scenario_http_mock import (
         build_upload_payload,
         post_upload_with_status,
         start_mock_http_server,

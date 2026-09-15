@@ -9,7 +9,7 @@
       `src/scalim/**/__init__.py` 中的标记:
       `# pragma: scalim-public-api tier1:<order>:<module>|<desc>|<scenario>`
   - 示例章节覆盖:
-      `notebooks/marimo/example_public_api_suite/chapters/*.py` 的静态扫描覆盖集合
+      `notebooks/marimo/demo_big_data_report/chapters_of_ir/*.py` 的静态扫描覆盖集合
   - `pytest public_api` 覆盖:
       `tests/public_api/test_example_public_api_suite.py` 中的 `chapter_ids=[...]`
 
@@ -97,7 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if missing_in_examples:
             failures.append(
                 "[错误] Tier1 入口未被 examples suite 覆盖 (缺失 {} 项):\n{}\n\n修复:\n"
-                "- 新增/补齐章节: `notebooks/marimo/example_public_api_suite/chapters/`\n"
+                "- 新增/补齐章节: `notebooks/marimo/demo_big_data_report/chapters_of_ir/`\n"
                 "- 验证: `just examples`".format(len(missing_in_examples), _format_modules(missing_in_examples))
             )
 

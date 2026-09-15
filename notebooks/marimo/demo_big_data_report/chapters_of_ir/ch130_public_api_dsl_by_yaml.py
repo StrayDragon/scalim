@@ -13,14 +13,14 @@ from typing import Any, Dict, FrozenSet, Optional, Set
 __generated_with = "0.22.0"
 app = marimo.App(width="full")
 
-_EXAMPLE_ID = "example_public_api_suite/ch130_public_api_dsl_by_yaml"
+_EXAMPLE_ID = "demo_big_data_report/ch130_public_api_dsl_by_yaml"
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch130_public_api_dsl_by_yaml
+        # demo_big_data_report / chapters_of_ir / ch130_public_api_dsl_by_yaml
 
         本章目标:
         - 最小可运行示例: `compile/run/run_workflow` + overrides + allowlist

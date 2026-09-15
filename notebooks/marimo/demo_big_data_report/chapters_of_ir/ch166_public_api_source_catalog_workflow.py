@@ -15,7 +15,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch166_public_api_source_catalog_workflow
+        # demo_big_data_report / chapters_of_ir / ch166_public_api_source_catalog_workflow
 
         本章目标:
         - source catalog(`SourceIr.from_catalog` + field lookup steps)在编译期获得

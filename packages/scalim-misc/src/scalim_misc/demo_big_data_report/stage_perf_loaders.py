@@ -6,7 +6,7 @@
 """
 
 import time
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 
 def _sleep_rows(seconds: float) -> Iterable[Mapping[str, object]]:

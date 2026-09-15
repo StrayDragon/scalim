@@ -49,8 +49,8 @@ def _parse_python_ast(*, text: str, path: Path) -> ast.AST:
         raise CoverageError(msg) from exc
 
 
-def iter_example_public_api_suite_chapters(repo_root: Path) -> Iterable[Path]:
-    chapters_root = repo_root / "notebooks" / "marimo" / "example_public_api_suite" / "chapters"
+def iter_public_api_chapters(repo_root: Path) -> Iterable[Path]:
+    chapters_root = repo_root / "notebooks" / "marimo" / "demo_big_data_report" / "chapters_of_ir"
     if not chapters_root.exists():
         msg = f"未找到 examples suite chapters 目录: {chapters_root}"
         raise CoverageError(msg)
@@ -164,7 +164,7 @@ def build_tier1_coverage_for_examples_suite(
 
     module_to_chapters: dict[str, set[str]] = {}
 
-    for chapter_path in iter_example_public_api_suite_chapters(repo_root):
+    for chapter_path in iter_public_api_chapters(repo_root):
         chapter_id = _chapter_id_for_path(chapter_path)
         if selected is not None and chapter_id not in selected:
             continue

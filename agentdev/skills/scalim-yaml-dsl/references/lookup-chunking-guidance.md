@@ -2,7 +2,7 @@
 
 > Agent / 维护者卡。人类叙事 SSOT：`docs/doc/yaml-dsl/user-guide.md` §4.4.3  
 > Upgrade：`references/upgrades/2026-08-09-lookup-chunking-python-ssot.md`  
-> 可运行 oracle：`notebooks/marimo/example_public_api_suite/chapters/ch164_public_api_lookup_chunking.py`
+> 可运行 oracle：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch164_public_api_lookup_chunking.py`
 
 ## 何时读取
 

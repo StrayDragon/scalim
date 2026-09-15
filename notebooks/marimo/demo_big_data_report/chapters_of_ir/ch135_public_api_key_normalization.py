@@ -16,7 +16,7 @@ app = marimo.App(width="full")
 def _(mo):
     mo.md(
         r"""
-        # example_public_api_suite / ch135_public_api_key_normalization
+        # demo_big_data_report / chapters_of_ir / ch135_public_api_key_normalization
 
         本章目标:
         - 演示 `key_normalization` 在 relations 场景下如何统一 key 口径

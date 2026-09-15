@@ -308,3 +308,35 @@ def test_row_values_reuse_late_column_dependency_values() -> None:
 
     assert base_values == [2, 3]
     assert chained_values == [20, 30]
+
+
+def test_release_keeps_shared_late_dep_until_last_consumer() -> None:
+    """共享 `late` 依赖在最后一个消费方写完后才释放(覆盖 `remaining > 0` 分支)."""
+    materializer = _materializer(
+        {
+            "base": _derived("base", ("amount",)),
+            "chain_a": _derived("chain_a", ("base",)),
+            "chain_b": _derived("chain_b", ("base",)),
+        },
+        {
+            "base": (lambda amount: int(amount) + 1),
+            "chain_a": (lambda base: int(base) * 10),
+            "chain_b": (lambda base: int(base) * 100),
+        },
+        ["base", "chain_a", "chain_b"],
+    )
+    column = LateColumnMaterializer(
+        materializer=materializer,
+        field_dependencies={"base": ("amount",), "chain_a": ("base",), "chain_b": ("base",)},
+    )
+    context = DenseBatchContext(base_row_id=0, row_count=1, required_fields={"amount"})
+    context.set_field_value("amount", 0, 1)
+
+    # `base` 有 2 个 `late` 消费方: 第一次释放后仍驻留, 第二次才真正弹出.
+    assert column.materialize_column(context, "base", [0]) == [2]
+    assert column.materialize_column(context, "chain_a", [0]) == [20]
+    column.release_after_write("chain_a")
+    assert "base" in column._columns  # noqa: SLF001
+    assert column.materialize_column(context, "chain_b", [0]) == [200]
+    column.release_after_write("chain_b")
+    assert "base" not in column._columns  # noqa: SLF001

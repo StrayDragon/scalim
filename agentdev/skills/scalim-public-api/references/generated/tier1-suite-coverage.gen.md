@@ -23,7 +23,7 @@
 ## Tier1 Modules Coverage (17)
 
 ### `scalim.dsl.yaml_dsl`
-- examples chapters (6): `ch130_public_api_dsl_by_yaml`, `ch135_public_api_key_normalization`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
+- examples chapters (7): `ch100_loader_retry`, `ch130_public_api_dsl_by_yaml`, `ch135_public_api_key_normalization`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
 - pytest chapters (4): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch165_public_api_resources`, `ch166_public_api_source_catalog_workflow`
 
 ### `scalim.dsl.yaml_dsl.tools`
@@ -43,7 +43,7 @@
 - pytest chapters (1): `ch130_public_api_dsl_by_yaml`
 
 ### `scalim.spec.ir`
-- examples chapters (2): `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
+- examples chapters (6): `ch010_basics`, `ch020_memory_compare`, `ch080_diagnostics`, `ch090_guardrails`, `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
 - pytest chapters (2): `ch130_public_api_dsl_by_yaml`, `ch166_public_api_source_catalog_workflow`
 
 ### `scalim.workflow.loaders`
@@ -51,19 +51,19 @@
 - pytest chapters (1): `ch130_public_api_dsl_by_yaml`
 
 ### `scalim.planning`
-- examples chapters (3): `ch150_public_api_planning`, `ch160_public_api_execution`, `ch162_public_api_output_write_layout`
+- examples chapters (10): `ch010_basics`, `ch020_memory_compare`, `ch040_sinks`, `ch050_memory_opt`, `ch060_observability`, `ch070_parallel_mode`, `ch090_guardrails`, `ch150_public_api_planning`, `ch160_public_api_execution`, `ch162_public_api_output_write_layout`
 - pytest chapters (2): `ch150_public_api_planning`, `ch160_public_api_execution`
 
 ### `scalim.execution`
-- examples chapters (3): `ch160_public_api_execution`, `ch162_public_api_output_write_layout`, `ch180_public_api_hooks_events`
+- examples chapters (13): `ch010_basics`, `ch020_memory_compare`, `ch040_sinks`, `ch050_memory_opt`, `ch060_observability`, `ch070_parallel_mode`, `ch090_guardrails`, `ch100_loader_retry`, `ch110_output_composition`, `ch120_derived_set_aggregations`, `ch160_public_api_execution`, `ch162_public_api_output_write_layout`, `ch180_public_api_hooks_events`
 - pytest chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
 
 ### `scalim.ob`
-- examples chapters (7): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
+- examples chapters (10): `ch050_memory_opt`, `ch060_observability`, `ch090_guardrails`, `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
 - pytest chapters (5): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`
 
 ### `scalim.events`
-- examples chapters (8): `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
+- examples chapters (9): `ch090_guardrails`, `ch130_public_api_dsl_by_yaml`, `ch162_public_api_output_write_layout`, `ch163_public_api_output_write_layout_books`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
 - pytest chapters (6): `ch130_public_api_dsl_by_yaml`, `ch164_public_api_lookup_chunking`, `ch166_public_api_source_catalog_workflow`, `ch170_public_api_ob`, `ch180_public_api_hooks_events`, `ch182_public_api_event_type_groups`
 
 ### `scalim.events.type_groups`
@@ -71,11 +71,11 @@
 - pytest chapters (1): `ch182_public_api_event_type_groups`
 
 ### `scalim.sinks`
-- examples chapters (4): `ch160_public_api_execution`, `ch162_public_api_output_write_layout`, `ch180_public_api_hooks_events`, `ch184_public_api_sinks_pandas`
+- examples chapters (9): `ch010_basics`, `ch040_sinks`, `ch050_memory_opt`, `ch060_observability`, `ch070_parallel_mode`, `ch160_public_api_execution`, `ch162_public_api_output_write_layout`, `ch180_public_api_hooks_events`, `ch184_public_api_sinks_pandas`
 - pytest chapters (3): `ch160_public_api_execution`, `ch180_public_api_hooks_events`, `ch184_public_api_sinks_pandas`
 
 ### `scalim.sinks.memory`
-- examples chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
+- examples chapters (7): `ch010_basics`, `ch040_sinks`, `ch050_memory_opt`, `ch060_observability`, `ch070_parallel_mode`, `ch160_public_api_execution`, `ch180_public_api_hooks_events`
 - pytest chapters (2): `ch160_public_api_execution`, `ch180_public_api_hooks_events`
 
 ### `scalim.sinks.pandas`
