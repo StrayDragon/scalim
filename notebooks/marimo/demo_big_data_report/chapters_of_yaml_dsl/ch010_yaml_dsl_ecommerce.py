@@ -223,6 +223,7 @@ def _(
     init_vars,
     yaml_path,
 ):
+    # region SCALIM-SKILL:example-full:constraints
     _CUSTOMER_CHUNK = 5  # 与配置 cell 同步（保持单点可改后两边对齐）
 
     security = DemandRunSecurityOptions(allowed_modules=allowed_modules)
@@ -240,6 +241,7 @@ def _(
     print("✅ compile() 通过")
     print("demand_config 类型:", type(demand_config).__name__)
     print("customers lookup_chunk_size =", _CUSTOMER_CHUNK)
+    # endregion
 
     return compilation, demand_config, runtime, security, template
 
@@ -262,6 +264,7 @@ def _(
     time,
     yaml_path,
 ):
+    # region SCALIM-SKILL:example-full:run-yaml
     _CUSTOMER_CHUNK = 5
 
     observer = CustomerChunkObserver()
@@ -290,6 +293,7 @@ def _(
     print("elapsed    = {:.3f}s".format(elapsed))
     print("customers 分块 offsets =", observer.offsets)
     print("customers 分块 counts =", observer.counts)
+    # endregion
 
     return elapsed, hook, observer, result, rows, run_runtime
 

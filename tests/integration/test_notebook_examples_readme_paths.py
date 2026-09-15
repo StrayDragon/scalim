@@ -18,10 +18,13 @@ def _chapter_file_present(names: list[str], chapter_id: str) -> bool:
 def test_demo_directory_contains_unified_examples() -> None:
     assert not (_NOTEBOOK_ROOT_DIR / "index.py").exists()
     assert not (_NOTEBOOK_ROOT_DIR / "run_examples.py").exists()
-    assert (_NOTEBOOK_DEMO_DIR / "demo_main.py").exists()
-    assert _CHAPTERS_OF_YAML_DSL_DIR.is_dir()
-    assert _CHAPTERS_OF_IR_DIR.is_dir()
-    assert _CHAPTERS_OF_SCENARIOS_DIR.is_dir()
+    # 目录内只允许「marimo 章节 + 轨道 registry」: headless runner 已收口到 `scripts/run-marimo-notebooks.py`.
+    assert not (_NOTEBOOK_DEMO_DIR / "demo_main.py").exists()
+    assert (Path("scripts") / "run-marimo-notebooks.py").exists()
+    for chapter_dir in (_CHAPTERS_OF_YAML_DSL_DIR, _CHAPTERS_OF_IR_DIR, _CHAPTERS_OF_SCENARIOS_DIR):
+        assert chapter_dir.is_dir()
+        # 自动发现契约: 每个轨道目录都必须带 `registry.py`(runner 靠它定位真相)
+        assert (chapter_dir / "registry.py").is_file(), chapter_dir
     assert (_CHAPTERS_OF_YAML_DSL_DIR / "declared_yaml_dsl" / "ecommerce_report.yaml").exists()
     assert not (_NOTEBOOK_ROOT_DIR / "example_public_api").exists()
     for suite_dir in _TRAILING_SUITE_DIRS:

@@ -8,25 +8,25 @@
 
 ## 1) 关键入口(SSOT)
 
-- marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](repo:notebooks/marimo/demo_big_data_report/demo_main.py)
+- marimo 交互入口: `just notebook`（打开 [`notebooks/marimo/`](repo:notebooks/marimo)，里面**只有**三条轨道的 `ch*.py` 与各自的 `registry.py`）
+- headless 对拍入口(headless/CI): `just examples` → [`scripts/run-marimo-notebooks.py`](repo:scripts/run-marimo-notebooks.py)（自动发现套件/轨道并跑对应 notebook 对拍）
 - public API 面章节(同一套件内): [`chapters_of_ir/`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir)（`ch130`–`ch184`，与主线 `ch010`–`ch120` 同一 registry）
-- `just examples` 集成对拍入口(headless/CI): `just examples`（入口实现位于 [`justfile`](repo:justfile) 的 `examples:` recipe）
 - YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml)
 
 这些入口是“稳定入口”: 文档与回归门禁会围绕它们组织。
 
-### `demo_main.py` 是「枢纽页」而非脚本
+### 目录里只放 notebook，脚本收口到 `scripts/`
 
-它只有 4 类可见 cell，每一类都在 cells 内直接可读到代码：
+| 位置 | 角色 |
+| --- | --- |
+| `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch*.py` | 声明面章节(教学主流程 + `run_chapter()` 对拍真相) |
+| `.../chapters_of_ir/ch*.py` | 装配面章节(Python IR + public API 覆盖) |
+| `.../chapters_of_scenarios/ch*.py` | 场景面章节(hooks/events、阶段调度) |
+| `.../chapters*/registry.py` | 轨道注册中心：自动发现章节 + `run_all_chapters()` |
+| `scripts/run-marimo-notebooks.py` | 非 marimo 的 headless runner：发现 `demo_*`/`example_*` 套件 → 发现带 `registry.py` 的 `chapters*` 轨道 → 跑对应 notebook 对拍 → 汇总退出码 |
 
-| cell 块 | 内容 | 真相来源 |
-| --- | --- | --- |
-| 轨道导航 | 枚举三个 registry 的 `all_chapter_ids()` → 表格(52 行) | 各轨道 `registry.py` |
-| 第一口代码 | `extract_visible_cell_sources()` 现场投影 `ch010`/`ch005`/`ch020` 的可见 cells | 章节 notebook 自身(与 README 注入同一函数) |
-| 自带片段 | 对 canonical YAML 做 `compile()` / `run()`(带 `SCALIM-SKILL` region 标记) | 本 cell |
-| 一键对拍 | 三条轨道 `run_all_chapters()` 汇总表格 + callout | 各章 `run_chapter()` |
-
-因此打开枢纽页即可顺序读完「结构 → 第一口代码 → 全量对拍结果」；教学细节再进对应章节 notebook。
+- 打开编辑器(只看到 cells)：`just notebook`；跑对拍：`just examples`（或 `just examples-big-data` 只跑本套件）。
+- runner 支持 `SCALIM_EXAMPLES_SUITES=`(白名单)、`SCALIM_EXAMPLES_JOBS=`(并行)、`QA_VERBOSE=1`(逐章明细)。
 
 ### 根 README 的「第一口」就在本主线内
 

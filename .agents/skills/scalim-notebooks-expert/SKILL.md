@@ -108,6 +108,9 @@ uv run pytest tests/integration/test_demo_big_data_report_chapters.py -q
 
 # 5) 全量 examples gate（just qa 的一部分）
 just examples
+# 其实现就是 `scripts/run-marimo-notebooks.py`：自动发现 `demo_*`/`example_*` 套件 →
+# 发现带 `registry.py` 的 `chapters*` 轨道 → 调 `run_all_chapters()` 跑对应 notebook 对拍。
+# `notebooks/marimo/` 内因此不再放「非 marimo 的枢纽 .py」；只有 ch*.py 与 registry.py。
 ```
 
 ## 金标准参考

@@ -74,10 +74,10 @@
     当 开发者运行 examples gate 执行主线示例套件的某个章节
     那么 runner MUST 通过导入该章节 notebook 的 SSOT 入口函数来执行
   @req:r136 @human
-  场景: hub/index 入口提供一键执行与导航
-    - 系统 MUST 保持主线示例套件的 hub/index 入口。 该入口 MUST 提供： - 一键执行全部章节（通过章节 registry） - 对章节结果的汇总展示（至少包含每章章节标识/passed/summary） - 指向各章节 notebook 的导航信息
-    当 读者打开主线示例套件的 hub 入口
-    那么 能看到章节列表/导航
+  场景: headless runner 提供一键执行与导航
+    - 系统 MUST 保持主线示例套件的一键执行入口，且该入口 MUST 是普通 Python 脚本(不引入非 marimo 的“伪 notebook”到 `notebooks/marimo/` 目录)： - 自动发现套件(前缀 `demo_`/`example_`)与轨道(`chapters*` 且带 `registry.py`) - 通过各轨道 registry 的 `run_all_chapters()` 执行全部章节 - 汇总展示(每章 example_id/passed/summary)与失败详情,并以退出码收口 - 导航信息由「目录即导航」提供: 轨道目录顺序 = 声明面 → 装配面 → 场景面, 章节按文件名前缀排序
+    当 开发者运行 examples gate
+    那么 runner MUST 输出章节级结果与汇总, 且目录内的 `.py` 文件 MUST 全部是 marimo notebook 或轨道 registry
   @req:r159 @human
   场景: canonical YAML SSOT 路径保持稳定
     - 系统 MUST 保持 canonical YAML SSOT 文件路径不变（如示例报表相关的 YAML 文件）。
