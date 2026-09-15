@@ -15,36 +15,28 @@ cells-native 契约（llmanspec/specs/examples-marimo.feature
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
-
-
-# Cell 1 — 教学目标（mo.md：主题、主线装配步骤、Gate 入口）
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # <suite> / <chapter_id>
+    mo.md(r"""
+    # <suite> / <chapter_id>
 
-        演示：**一句话主题**。
+    演示：**一句话主题**。
 
-        主线装配过程（每个步骤一个 cell，可就地修改重跑）：
-        1. 定义零件（Observer/Hook/options 工厂）
-        2. fixtures / mock 准备（内容可见）
-        3. 组装运行选项
-        4. 执行 → 中间产物
-        5. 断言展开 → chapter_result
+    主线装配过程（每个步骤一个 cell，可就地修改重跑）：
+    1. 定义零件（Observer/Hook/options 工厂）
+    2. fixtures / mock 准备（内容可见）
+    3. 组装运行选项
+    4. 执行 → 中间产物
+    5. 断言展开 → chapter_result
 
-        对拍入口: `run_chapter()` → `app.run()` → `chapter_result`
-        Gate: `just examples`
-        """
-    )
+    对拍入口: `run_chapter()` → `app.run()` → `chapter_result`
+    Gate: `just examples`
+    """)
     return
-
-
-# Cell 2 — marimo 自身
 
 
 @app.cell
@@ -54,18 +46,12 @@ def _():
     return (mo,)
 
 
-# Cell 3 — 仓库路径设置（返回 repo_root，供下一 cell 显式依赖保证 import 顺序）
-
-
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
     repo_root = ensure_repo_root_on_sys_path(__file__)
     return (repo_root,)
-
-
-# Cell 4 — 业务 imports（scalim API + support 零件；`scalim.*` import 保留供覆盖 gate 统计）
 
 
 @app.cell
@@ -81,8 +67,6 @@ def _(repo_root):
 
     _ = repo_root
     return (
-        Any,
-        Dict,
         Event,
         EventType,
         List,
@@ -90,14 +74,10 @@ def _(repo_root):
         Optional,
         Path,
         Set,
-        api,
         make_chapter_result,
         render_checks,
         tempfile,
     )
-
-
-# Cell 5 — 交互旋钮（永远展示；script 模式用默认值）
 
 
 @app.cell
@@ -105,9 +85,6 @@ def _(mo):
     knob = mo.ui.slider(1, 100, value=10, step=1, label="示例旋钮（每批处理行数）")
     knob
     return (knob,)
-
-
-# Cell 6 — 零件定义（教学核心：Observer/Hook/options 工厂，逻辑可见）
 
 
 @app.cell
@@ -121,10 +98,7 @@ def _(Event, EventType, List, Observer, Optional, Set):
             if event.event_type is EventType.LOADER_CALL:
                 self.events.append(event)
 
-    return (SampleObserver,)
-
-
-# Cell 7 — fixtures / mock 准备（内容可见）
+    return
 
 
 @app.cell
@@ -133,19 +107,13 @@ def _(Path, tempfile):
 
     tmp = Path(tempfile.mkdtemp(prefix="scalim-template-"))
     print("tmp dir:", tmp)
-    return (tmp,)
-
-
-# Cell 8 — 组装运行选项（knob.value 参与装配）
+    return
 
 
 @app.cell
 def _(knob):
     print("knob value =", knob.value)
     return
-
-
-# Cell 9 — 执行 + 中间产物（每步打印/表格展示）
 
 
 @app.cell
@@ -155,22 +123,14 @@ def _():
     return (result,)
 
 
-# Cell 10 — 断言展开（幂等：交互重跑不累积误判）
-
-
 @app.cell
-def _(result, render_checks):
+def _(render_checks, result):
     checks = {
         "示例断言 A": result is not None,
         "示例断言 B": True,
     }
     render_checks(checks)
     return (checks,)
-
-
-# Cell 11 — 汇总 chapter_result（CI 提取点；契约 {"passed","summary","details"}）
-# 合约 r1114: details MUST 携带 `expected` 前缀键（对拍期望字面量，教学 payload），
-# 并在 cells 内展示（print/mo.ui.table），供读者对照期望与实际。
 
 
 @app.cell
@@ -188,9 +148,6 @@ def _(checks, make_chapter_result):
     return (chapter_result,)
 
 
-# Cell 12 — 结果展示（交互时可看到）
-
-
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     mo.callout(
@@ -200,9 +157,6 @@ def _(chapter_result, mo):
     return
 
 
-# Cell 13 — 详情表格
-
-
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
@@ -210,15 +164,6 @@ def _(chapter_result, mo):
     rows = details_to_rows(chapter_result["details"])
     mo.ui.table(rows, selection=None) if rows else mo.md("(无详情)")
     return
-
-
-# 兼容层: 模块级 SSOT 入口（ChapterRegistry → run_chapter() → app.run() → defs["chapter_result"]）
-
-
-def run_chapter():
-    """SSOT 入口: headless runner / pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

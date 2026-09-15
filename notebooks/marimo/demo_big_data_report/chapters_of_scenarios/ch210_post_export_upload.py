@@ -330,7 +330,8 @@ def _(
         ),
     )
 
-    print("workflow_result:", workflow_result)
+    # 只投影可读字段(不把内部对象 repr 带进 notebook/会话产物)
+    print("workflow outcomes =", [(o.run_id, "ok" if o.error is None else o.error) for o in workflow_result.outcomes])
     print("observer uploaded =", len(workflow_obs.uploaded))
     print("observer errors   =", workflow_obs.errors)
     print("node ends         =", len(workflow_node_end.ends))

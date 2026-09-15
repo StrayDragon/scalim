@@ -54,6 +54,7 @@ notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch120_yaml_dsl_lookup
 notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch130_yaml_dsl_viz_custom_paths.py
 notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch140_workflow_cache_pool_pin.py
 notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch150_workflow_temporal_field_values.py
+notebooks/marimo/demo_big_data_report/demo_main.py
 packages/scalim-misc/src/scalim_misc/readme_charts_gen.py
 packages/scalim-misc/src/scalim_misc/readme_examples_gen.py
 scripts/report-notebooks-coverage.py

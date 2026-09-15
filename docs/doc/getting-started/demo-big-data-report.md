@@ -15,6 +15,19 @@
 
 这些入口是“稳定入口”: 文档与回归门禁会围绕它们组织。
 
+### `demo_main.py` 是「枢纽页」而非脚本
+
+它只有 4 类可见 cell，每一类都在 cells 内直接可读到代码：
+
+| cell 块 | 内容 | 真相来源 |
+| --- | --- | --- |
+| 轨道导航 | 枚举三个 registry 的 `all_chapter_ids()` → 表格(52 行) | 各轨道 `registry.py` |
+| 第一口代码 | `extract_visible_cell_sources()` 现场投影 `ch010`/`ch005`/`ch020` 的可见 cells | 章节 notebook 自身(与 README 注入同一函数) |
+| 自带片段 | 对 canonical YAML 做 `compile()` / `run()`(带 `SCALIM-SKILL` region 标记) | 本 cell |
+| 一键对拍 | 三条轨道 `run_all_chapters()` 汇总表格 + callout | 各章 `run_chapter()` |
+
+因此打开枢纽页即可顺序读完「结构 → 第一口代码 → 全量对拍结果」；教学细节再进对应章节 notebook。
+
 ### 根 README 的「第一口」就在本主线内
 
 根 `README.md` 的三个受控示例不再是独立套件，而是主线章节的投影（同一份真相）：
