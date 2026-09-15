@@ -1,6 +1,6 @@
 """Cells-native marimo notebook: ch010_basics (cells-native-inline first lesson).
 
-设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+设计目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics`）:
 - 教程核心（loader / 派生计算函数 / DemandIr 装配 / Plan / Engine / 对拍断言）
   **全部写在 cells 内**,读者打开即可观察"怎么写",无需跳转 `scalim_misc` 库实现。
 - 不再调用 `build_ecommerce_model` 等库 builder(那些留给后续 ch040+ 章节复用)。
@@ -23,7 +23,8 @@ def _(mo):
     mo.md(r"""
     # demo_big_data_report / ch010_basics
 
-    本章用**最小可跑闭环**走一遍 Scalim 主线,把"怎么写"直接摊开在 cells 里:
+    本章用**最小可跑闭环**走一遍 Scalim 主线,把"怎么写"直接摊开在 cells 里
+    (根 `README` 的「可以用 Python 编写需求」代码块就是本章可见 cells 的投影):
 
     ```
     loader/计算函数 → DemandIr 装配 → Plan → Engine → Sink → 对拍

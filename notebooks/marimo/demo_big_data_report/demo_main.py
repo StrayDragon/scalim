@@ -20,6 +20,17 @@ def _(mo):
         - `packages/scalim-misc/src/scalim_misc/demo_big_data_report/`: fixtures/oracle/工具函数(不承载教学主流程)
         - `just examples`: 唯一 gate 入口(快速对拍,justfile 内联 runner)
         - `chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`: 唯一完整 YAML DSL 配置示例
+
+        ## 与根 `README` 的对应(同一链路, 不是两套世界)
+
+        | 读者旅程 | 本章套件 |
+        | --- | --- |
+        | README「可以用 Python 编写需求」 | `chapters_of_ir/ch010_basics.py`(代码块即其 cells 投影) |
+        | README「也可以用 YAML DSL 配置需求」 | `chapters_of_yaml_dsl/ch005_yaml_dsl_min.py` + `declared_yaml_dsl/min_report.yaml` |
+        | README「naive vs Scalim 内存对比」 | `chapters_of_ir/ch020_memory_compare.py` |
+        | 完整能力面 | 双轨逐章递进, 终点是 9 源 `ecommerce_report.yaml` |
+
+        刷新 README 注入区块: `just gen-readme-examples`(或 `just gen-docs`).
         """
     )
     return
@@ -181,27 +192,26 @@ def _(mo):
 
 
 @app.cell
-def _(Path, yaml_path):
+def _(DemandRunOptions, DemandRunSecurityOptions, Path, yaml_path):
     # region SCALIM-SKILL:example-full:run-yaml
     from scalim.dsl.yaml_dsl import (
         CaptureRows,
-        DemandRunOptions,
         DemandRunOutputOptions,
-        DemandRunSecurityOptions,
         DemandRunTemplateOptions,
         run,
     )
 
     # 注意: `run()` 需要 `allowlist` 配置
+    # 复用上方 `compile()` 单元已导入的选项类; 避免同名变量跨单元重复定义
     _loaders_module = "scalim_misc.demo_big_data_report.loaders"
 
     try:
-        allowed_modules = frozenset([_loaders_module])
+        _allowed_modules = frozenset([_loaders_module])
         _init_vars = {"order_ids": []}
         result = run(
             str(yaml_path),
             options=DemandRunOptions(
-                security=DemandRunSecurityOptions(allowed_modules=allowed_modules),
+                security=DemandRunSecurityOptions(allowed_modules=_allowed_modules),
                 template=DemandRunTemplateOptions(init_vars=_init_vars),
                 outputs=DemandRunOutputOptions(capture=CaptureRows()),
             ),

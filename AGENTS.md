@@ -75,4 +75,4 @@
 - Specs (llmanspec): `llmanspec/specs/` and `docs/doc/specs/index.md`
 - Architecture overview: `ARCH.md` and `docs/doc/architecture/arch.md`
 - YAML DSL review checklist: `docs/doc/yaml-dsl/review-checklist.md`
-- README validated examples SSOT: `notebooks/marimo/example_readme_suite/`（`just examples` + `just gen-readme-examples`；合约 `governance-readme-examples` + `examples-marimo` r989）
+- README validated examples SSOT: 主线 `notebooks/marimo/demo_big_data_report/` 第一口章节（`chapters_of_ir/ch010_basics.py`、`chapters_of_yaml_dsl/ch005_yaml_dsl_min.py` + `declared_yaml_dsl/min_report.yaml`、`chapters_of_ir/ch020_memory_compare.py`）；注入/图表生成器在 `packages/scalim-misc/src/scalim_misc/readme_examples_gen.py` + `readme_charts_gen.py`（`just examples` + `just gen-readme-examples`；合约 `governance-readme-examples` + `examples-marimo` r989）

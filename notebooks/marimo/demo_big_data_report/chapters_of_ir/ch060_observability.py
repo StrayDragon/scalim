@@ -1,6 +1,6 @@
 """Cells-native marimo notebook: ch060_observability (observability chapter).
 
-改写目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python` 与主教程
+改写目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics` 与主教程
 `ch010_basics` 的 cells-native 内联模式）:
 - 本章演示在 ScalimEngine 上注册四种 observer 并收集观测指标。
 - 完整电商 model 属于**复杂可复用零件**,保留对 `scalim_misc.demo_big_data_report.shared`

@@ -1,6 +1,6 @@
 """Cells-native: ch090_guardrails — runtime guardrails quiet/fast_fail modes.
 
-设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+设计目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics`）:
 - 本章**内联**构造一个最小 IR(主源 main + 引用源 ref + 派生字段 ratio),读者打开即可观察装配。
 - 主线装配 `IR → Plan → Engine(两种 guardrails 模式) → 对拍` 全部在 cells 内**逐 cell 展开**。
 - 通过 `chapter_result` 向 headless runner / pytest 暴露对拍结果（含 r1114 `expected` 快照）。

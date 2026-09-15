@@ -1,7 +1,7 @@
 ---
 name: scalim-notebooks-expert
 description: >
-  Scalim 仓库 marimo notebooks（尤其 demo_big_data_report 主线教程与 example_readme_suite）
+  Scalim 仓库 marimo notebooks（主线教程 demo_big_data_report 的双轨章节，含 README 第一口 ch005/ch010/ch020）
   的 "cells-native 内联" 改写标准模式。当需要把章节 notebook 从"薄壳调用库 builder / 蓝盒装配"
   改写成"读者打开即可在 cells 内看到怎么写"时使用。涵盖：cells-native 内联原则、模型窥视、
   章节结果契约、可复用零件边界、配套门禁与验证命令。
@@ -104,10 +104,12 @@ just examples
 
 ## 金标准参考
 
-- **完全内联最小模型**：`notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py`
-  （loader/DemandIr 装配/Engine/断言全在 cells）。
-- **主教程内联第一课**：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py`
-  （最小模型 + 模型窥视 cell；已按本模式改写）。
+- **完全内联最小模型**：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py`
+  （loader/DemandIr 装配/Engine/断言全在 cells；根 README 的 Python 代码块即其可见 cells 投影）。
+- **最小 YAML 第一口**：`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`
+  （YAML SSOT：`declared_yaml_dsl/min_report.yaml`）。
+- **同域内存对比**：`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py`
+  （naive vs scalim；RSS 代理与计数 sink 零件在 `scalim_misc.notebook_support`）。
 - **主教程复用复杂零件但带窥视**：改写后仍用 `build_ecommerce_model` 的章节应加窥视 cell。
 
 ## 常见坑（Gotchas）

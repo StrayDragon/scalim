@@ -1,12 +1,17 @@
-"""Counting row sink：写入后丢弃行，只累计条数（用于内存对比的 scalim 侧）。"""
+"""Counting row sink: 写入后丢弃行, 只累计条数 (用于内存对比的 scalim 侧)。"""
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import TYPE_CHECKING
+
+from typing_extensions import override
 
 from scalim.sinks import BaseRowSink
-from scalim.typedefs import RowData
-from typing_extensions import override
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from scalim.typedefs import RowData
 
 
 class CountingRowSink(BaseRowSink):

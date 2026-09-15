@@ -90,9 +90,9 @@
     那么 MUST 能找到一个独立于主线示例套件的 public API suite 目录
   @req:r198 @human
   场景: headless runner 必须覆盖所有套件
-    - 系统 MUST 将 headless runner 覆盖默认执行主线示例套件、public API suite，以及 README validated examples suite（`example_readme_suite` 或文档声明的等价目录名）。
+    - 系统 MUST 将 headless runner 覆盖默认执行 `notebooks/marimo/` 下所有示例套件（自动发现），至少包含主线示例套件与 public API suite；根 README 的 validated examples 章节已并入主线示例套件的章节组，MUST 随主线套件被默认执行。
     当 开发者运行 examples gate
-    那么 runner MUST 执行主线示例套件、public API suite 与 README validated suite 的章节
+    那么 runner MUST 执行主线示例套件（含 README 第一口章节）与 public API suite 的章节
   @req:r216 @human
   场景: public API 套件覆盖 curated facade 导入
     - 系统 MUST 扩展 public API suite，使其覆盖 curated public surface，而不只是零散的公开入口冒烟。 该 suite 至少 MUST 覆盖： - YAML DSL 的 facade imports - workflow 辅助公开模块 - IR 模块 - shortcuts.resources（资源类 shortcut 稳定入口 package） - shortcuts.resources.outputs（输出发现/最新产物定位 facade）
@@ -138,9 +138,9 @@
     当 pytest public_api suite 未覆盖该入口模块
     那么 gate MUST fail-fast 并指出差异集合
   @req:r989 @human
-  场景: README validated suite is a marimo examples suite
-    - 根 README 的 validated examples suite（公开页假数据最小例与内存对比；合约交叉引用 `governance-readme-examples` 的注入/图资产面）MUST 以独立 marimo 套件形式落在 `notebooks/marimo/example_readme_suite/`（或文档声明的等价路径），提供可导入章节 SSOT 与 hub/`demo_main`，并 MUST 纳入本 capability 的 examples gate 默认覆盖。该套件 MUST NOT 替代主线 `demo_big_data_report` 教学地位；公开页注入/漂移细节以 `governance-readme-examples` 为准。
+  场景: README 第一口是主线套件内的章节
+    - 根 README 的 validated examples（公开页假数据最小例与内存对比；合约交叉引用 `governance-readme-examples` 的注入/图资产面）MUST 以主线套件 `notebooks/marimo/demo_big_data_report/` 内的指定章节为唯一 SSOT（README 第一口章节：IR 轨最小 Python 与同域内存对比、YAML 轨最小 YAML 及其 declared YAML 文件），并 MUST 纳入本 capability 的 examples gate 默认覆盖。系统 MUST NOT 为该三例维护与主线并行的第二套章节目录；公开页注入/漂移细节以 `governance-readme-examples` 为准。
     当 维护者检查 notebooks/marimo 与 examples gate 默认覆盖
-    那么 MUST 能定位到 README validated suite 目录与 chapters registry，且 examples gate 默认执行其章节
-    当 维护者枚举主线 demo_big_data_report 与 README suite
-    那么 二者 MUST 可区分；README suite MUST NOT 被表述为主线教学唯一入口
+    那么 MUST 能在主线套件章节目录内定位到 README 第一口章节，且 examples gate 默认执行它们
+    当 维护者枚举 notebooks/marimo 下的套件
+    那么 README 第一口 MUST 表现为主线 `demo_big_data_report` 的章节而非独立套件

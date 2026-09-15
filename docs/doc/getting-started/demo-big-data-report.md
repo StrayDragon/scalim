@@ -10,11 +10,23 @@
 
 - marimo 教程入口(交互式): [`notebooks/marimo/demo_big_data_report/demo_main.py`](repo:notebooks/marimo/demo_big_data_report/demo_main.py)
 - public API 覆盖套件入口(交互式): [`notebooks/marimo/example_public_api_suite/demo_main.py`](repo:notebooks/marimo/example_public_api_suite/demo_main.py)
-- README 假数据示例套件(交互式 + `just examples`): [`notebooks/marimo/example_readme_suite/demo_main.py`](repo:notebooks/marimo/example_readme_suite/demo_main.py)
 - `just examples` 集成对拍入口(headless/CI): `just examples`（入口实现位于 [`justfile`](repo:justfile) 的 `examples:` recipe）
 - YAML DSL canonical example(SSOT): [`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml)
 
 这些入口是“稳定入口”: 文档与回归门禁会围绕它们组织。
+
+### 根 README 的「第一口」就在本主线内
+
+根 `README.md` 的三个受控示例不再是独立套件，而是主线章节的投影（同一份真相）：
+
+| README 区块 | 主线章节 SSOT |
+| --- | --- |
+| 可以用 Python 编写需求 | [`chapters_of_ir/ch010_basics.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py)（可见 cells 逐 cell 投影为 fence） |
+| 也可以用 YAML DSL 配置需求 | [`chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py) + [`min_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml) |
+| naive vs Scalim 内存对比 | [`chapters_of_ir/ch020_memory_compare.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py) |
+
+注入器与图表生成器：`packages/scalim-misc/src/scalim_misc/readme_examples_gen.py` / `readme_charts_gen.py`；
+刷新入口 `just gen-readme-examples`（或 `just gen-docs`），drift 由 `just qa` 内的 docs 检查兜底。
 
 章节集合包含:
 
@@ -37,7 +49,7 @@
 just examples
 ```
 
-该入口会执行 `demo_big_data_report` + `example_public_api_suite` 的章节级对拍，并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。
+该入口会执行主线 `demo_big_data_report`（含 README 第一口的 ch005/ch010/ch020）+ `example_public_api_suite` 等套件的章节级对拍，并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。
 
 ### 2.2 跑整套门禁(改动后验收)
 

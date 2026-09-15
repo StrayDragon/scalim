@@ -1,6 +1,6 @@
 """Cells-native: ch100_loader_retry — YAML DSL loader retry policy.
 
-设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+设计目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics`）:
 - 本章走 **YAML DSL** 声明式路径(`scalim.dsl.yaml_dsl.run`),并用 `loader_retry_demo_mod`
   作为**可复用 fixture 零件**(Loader + 抛 TransientError/ShouldRetry 判定)。
 - 主线装配(写 YAML → 注入 LoaderRetry → 运行 → 对拍)全部在 cells 内**逐 cell 展开**,

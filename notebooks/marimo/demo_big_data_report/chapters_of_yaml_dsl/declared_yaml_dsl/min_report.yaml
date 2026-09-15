@@ -1,8 +1,14 @@
-name: readme_min_yaml_report
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
+# 最小可跑需求（README 第一口 · ecommerce 主线的两源切片）：
+# 主源 orders + 维表 payments 单级关联 + 一个派生字段 + 一个 csv 输出。
+
+name: min_report
+description: |
+  最小电商订单报表: 订单 -> 支付方式(单级关联) + 派生字段 总金额
 
 main_source:
   source_id: orders
-  loader: "notebooks.marimo.example_readme_suite.support.min_yaml_loaders:load_orders"
+  loader: scalim_misc.demo_big_data_report.min_loaders:load_orders
   fields:
     order_id:
       name: 订单ID
@@ -13,7 +19,7 @@ main_source:
 
 sources:
   payments:
-    loader: "notebooks.marimo.example_readme_suite.support.min_yaml_loaders:load_payments"
+    loader: scalim_misc.demo_big_data_report.min_loaders:load_payments
     key: id
     params:
       ids: {$keys: {as: set}}

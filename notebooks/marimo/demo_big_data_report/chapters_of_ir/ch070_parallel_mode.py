@@ -1,6 +1,6 @@
 """Cells-native: ch070_parallel_mode — sequential vs adaptive parallel execution.
 
-设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+设计目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics`）:
 - 本章复用 `build_ecommerce_model` / `build_ecommerce_runtime_bindings` 作为**复杂复用零件**,
   但在"模型窥视 cell"把装配产物直接渲染出来,读者无需跳库。
 - 主线装配 `Plan → Engine(两种 parallel_mode) → Sink → 对拍` 全部在 cells 内**逐 cell 展开**。

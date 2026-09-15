@@ -25,6 +25,8 @@
 
 - `name`/`description`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ecommerce_report.yaml`
+  - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml`（最小两源切片；根 README 的 YAML fence 由此投影）
+  - 章节: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`（`compile()` 语义校验 + `run()` 取行对拍）
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/ads/ads_campaign_report.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_sla_report.yaml`
   - YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/support/support_output_failure_primary_only_redacted.yaml`

@@ -20,11 +20,135 @@
 
 如果只是临时改一份小 CSV，pandas 往往更直接。Scalim 是在规则开始变多、报表要反复跑时才值得引入的。报表可以写成 YAML，也可以直接在 Python 里定义。
 
+下面三个「第一口」与 `just notebook` 打开后的主线教程 `demo_big_data_report` 是**同一条链路**（代码/YAML 都从主线章节投影，不是第二套例子）：
+
+| 第一口 | 主线章节 |
+| --- | --- |
+| Python 写需求 | `chapters_of_ir/ch010_basics.py` |
+| YAML DSL 写需求 | `chapters_of_yaml_dsl/ch005_yaml_dsl_min.py` |
+| 为什么省内存 | `chapters_of_ir/ch020_memory_compare.py` |
+
 **可以用 Python 编写需求**
 
 <!-- BEGIN AUTOGEN:readme-min-python -->
-- 代码：[`notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py`](./notebooks/marimo/example_readme_suite/chapters/ch010_min_python.py)
-- 最小 Python 示例核心（IR 装配/运行/对拍）就在此 notebook cells 内；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+以下代码逐 cell 投影自主线章节（同一份真相，打开 notebook 即可就地重跑）：
+
+```python
+import marimo as mo
+
+from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
+
+repo_root = ensure_repo_root_on_sys_path(__file__)
+_ = repo_root
+
+from scalim.execution.engine import ScalimEngine
+from scalim.execution.runtime_bindings import RuntimeBindings
+from scalim.planning import PlanBuilder
+from scalim.sinks.memory import InMemoryRowDataSink
+from scalim.spec.ir import (
+    CallBySpecIr,
+    CallByValueIr,
+    DemandIr,
+    DerivedFieldIr,
+    FieldIr,
+    MainSourceIr,
+    RuntimeHandleIdIr,
+)
+from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
+
+def load_orders():
+    return [
+        {"order_id": 1, "amount": 10.0},
+        {"order_id": 2, "amount": 20.5},
+        {"order_id": 3, "amount": 7.0},
+    ]
+
+def calc_amount_x2(amount):
+    return float(amount) * 2
+
+orders = MainSourceIr(source_id="orders", loader_ref=RuntimeHandleIdIr(handle_id="orders.loader"))
+demand = DemandIr.from_irs(
+    sources=[],
+    main_source=orders,
+    fields=(
+        FieldIr(field_id="order_id", name="订单ID", source_id=orders.source_id),
+        FieldIr(field_id="amount", name="金额", source_id=orders.source_id),
+        DerivedFieldIr(
+            field_id="amount_x2",
+            name="金额*2",
+            dependencies=("amount",),
+            call_by=CallBySpecIr(
+                reference=RuntimeHandleIdIr(handle_id="amount_x2.calculator"),
+                kwargs=(("amount", CallByValueIr(kind="field", value="amount")),),
+                field_names=("amount",),
+            ),
+        ),
+    ),
+    name="demo_big_data_report_ch010",
+)
+
+plan = PlanBuilder(demand).build()
+runtime_bindings = RuntimeBindings(
+    main_source_loaders={"orders": load_orders},
+    derived_calculators={"amount_x2": calc_amount_x2},
+)
+
+engine = ScalimEngine(
+    demand=demand,
+    plan=plan,
+    runtime_bindings=runtime_bindings,
+    batch_size=1000,
+    parallel_mode="seq",
+)
+sink = InMemoryRowDataSink()
+engine.run(sink=sink)
+rows = list(sink.get_data())
+
+expected_rows = [
+    {"order_id": 1, "amount": 10.0, "amount_x2": 20.0},
+    {"order_id": 2, "amount": 20.5, "amount_x2": 41.0},
+    {"order_id": 3, "amount": 7.0, "amount_x2": 14.0},
+]
+keys = ("order_id", "amount", "amount_x2")
+actual_rows = [{k: row.get(k) for k in keys} for row in rows]
+mo.vstack(
+    [
+        mo.md("**期望 vs 实际**(派生字段 `amount_x2 = 金额 * 2`):"),
+        mo.ui.table(
+            [{"kind": "期望", **row} for row in expected_rows] + [{"kind": "实际", **row} for row in actual_rows],
+            selection=None,
+        ),
+    ]
+)
+
+checks = {
+    "运行 3 行假数据": len(rows) == 3,
+    "期望行完全一致": actual_rows == expected_rows,
+}
+render_checks(checks)
+passed = bool(all(checks.values()))
+summary = "rows={} amount_x2[0]={}".format(len(rows), rows[0].get("amount_x2") if rows else None)
+
+# 对拍期望(教学 payload;headless 可经 details 键定位)
+expected = {"rows": 3, "amount_x2_first": 20.0}
+print("expected:", expected)
+
+chapter_result = make_chapter_result(
+    passed=passed,
+    summary=summary,
+    details={
+        "expected": expected,
+        "rows": len(rows),
+        "sample": rows[0] if rows else None,
+        "expected_rows": expected_rows,
+        "actual_rows": actual_rows,
+        "checks": {k: bool(v) for k, v in checks.items()},
+    },
+)
+```
+
+- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py`](./notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py)
+- 主线第一章：loader → `DemandIr` → `Plan` → `Engine` → 对拍；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-min-python -->
 
 **也可以用 YAML DSL 配置需求**
@@ -34,11 +158,17 @@
 
 <!-- BEGIN AUTOGEN:readme-min-yaml -->
 ```yaml
-name: readme_min_yaml_report
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
+# 最小可跑需求（README 第一口 · ecommerce 主线的两源切片）：
+# 主源 orders + 维表 payments 单级关联 + 一个派生字段 + 一个 csv 输出。
+
+name: min_report
+description: |
+  最小电商订单报表: 订单 -> 支付方式(单级关联) + 派生字段 总金额
 
 main_source:
   source_id: orders
-  loader: "myapp.loaders:load_orders"
+  loader: myapp.loaders:load_orders
   fields:
     order_id:
       name: 订单ID
@@ -49,7 +179,7 @@ main_source:
 
 sources:
   payments:
-    loader: "myapp.loaders:load_payments"
+    loader: myapp.loaders:load_payments
     key: id
     params:
       ids: {$keys: {as: set}}
@@ -85,8 +215,10 @@ resources:
 
 > 把 `myapp.loaders` 换成你的加载函数所在模块。这份示例会在仓库里自动运行。
 
-- 完整配置：[`support/min_yaml_example.yaml`](./notebooks/marimo/example_readme_suite/support/min_yaml_example.yaml)
-- 示例数据和运行脚本：[`support/min_yaml_loaders.py`](./notebooks/marimo/example_readme_suite/support/min_yaml_loaders.py) · [`support/min_yaml.py`](./notebooks/marimo/example_readme_suite/support/min_yaml.py)
+- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`](./notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py)
+- 最小 YAML 章节：`compile()` 语义校验 + `run()` 取行对拍；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+
+- 完整配置：[`min_report.yaml`](./notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml)
 <!-- END AUTOGEN:readme-min-yaml -->
 
 </details>
@@ -173,17 +305,17 @@ just notebook
 <summary>naive vs Scalim 内存代理图（小规模相对增量口径）的代码、数据与重跑方法</summary>
 
 - 测量口径：**相对 RSS 增量代理**（naive = 1.0）——同一台机器上一次运行前后进程 RSS 的变化，不是运行中的最高内存；不能跨机器比较绝对值，也不构成 SLA 承诺。代理图资产：[`memory-compare.svg`](./docs/assets/readme/memory-compare.svg) · [`memory-compare-scenarios.svg`](./docs/assets/readme/memory-compare-scenarios.svg)。
-- 默认测试数据在 [`support/knobs.py`](./notebooks/marimo/example_readme_suite/support/knobs.py)：1,500 行、48 个字段，每批 150 行（CI 固定小 scale 保证秒级）。
-- 图表内容来自 [`chart_snapshot.json`](./notebooks/marimo/example_readme_suite/support/chart_snapshot.json)。仓库会确认示例能运行，但不会要求某个固定的内存比例。
-- 重跑：`SCALIM_EXAMPLES_SUITES=example_readme_suite just examples`，然后 `just gen-readme-examples` 更新图表。
+- 默认旋钮在 [`ch020_memory_compare.py`](./notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py) 的「旋钮」cell：1,500 行、48 个字段，每批 150 行（CI 固定小 scale 保证秒级；本地改常量即可放大重跑）。
+- 图表内容来自 [`memory-compare.json`](./docs/doc/assets/data/memory-compare.json)。仓库会确认示例能运行，但不会要求某个固定的内存比例。
+- 重跑：`SCALIM_EXAMPLES_SUITES=demo_big_data_report just examples`，然后 `just gen-readme-examples` 更新图表。
 
 <!-- BEGIN AUTOGEN:readme-naive-baseline -->
-- 代码：[`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`](./notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py)
+- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py`](./notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py)
 - 对比章节（naive 基线管线在 cells 内）；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-naive-baseline -->
 
 <!-- BEGIN AUTOGEN:readme-scalim-path -->
-- 代码：[`notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py`](./notebooks/marimo/example_readme_suite/chapters/ch030_memory_compare.py)
+- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py`](./notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py)
 - 对比章节（scalim 窄字段管线在 cells 内）；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-scalim-path -->
 

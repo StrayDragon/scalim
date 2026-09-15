@@ -99,10 +99,10 @@ def _check_yaml_dsl_upgrades_ssot(root: Path) -> list[str]:
 
 def main() -> int:
     root = _repo_root()
-    # `README` 示例注入治理：`SSOT` 在 `notebooks/marimo/example_readme_suite`（需仓库根在 `sys.path`）。
+    # `README` 示例注入治理：章节 `SSOT` 在主线 `demo_big_data_report`，注入器在 `scalim_misc.readme_examples_gen`。
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    from notebooks.marimo.example_readme_suite.support.inject import check_readme_examples_governance
+    from scalim_misc.readme_examples_gen import check_readme_examples_governance
 
     errors: list[str] = []
     errors.extend(_check_claude_redirect(root))

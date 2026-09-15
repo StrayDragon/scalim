@@ -1,6 +1,6 @@
 """Cells-native: ch050_memory_opt — memory optimization observer + block column CSV.
 
-设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+设计目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics`）:
 - 本章复用 `scalim_misc` 中 `build_ecommerce_model` / `build_ecommerce_runtime_bindings`
   作为**复杂复用零件**（多源/多级 Join/派生 的完整电商模型),符合 r1111 可复用边界。
 - 但主线装配 `Plan → Engine → Observer → Sink → 对拍` 全部在 cells 内**逐 cell 展开**,

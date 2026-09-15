@@ -1,4 +1,14 @@
-"""生成 README 中的示例、图表，并检查生成结果是否被手改。"""
+"""生成 `README` 受控示例注入区块，并检查生成结果是否被手改。
+
+单一链路：README 的「第一口」全部投影自主线套件 `demo_big_data_report` 的章节：
+
+| README 区块 | 投影来源 |
+| --- | --- |
+| 最小 Python 示例 | `chapters_of_ir/ch010_basics.py` 的可见 cells（代码逐 cell 投影） |
+| 最小 YAML 示例 | `chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml` + `ch005_yaml_dsl_min.py` |
+| naive vs Scalim 对比 | `chapters_of_ir/ch020_memory_compare.py` |
+| 性能图 | `readme_charts_gen.py`（快照 + 版本锚定外部基线数据） |
+"""
 
 from __future__ import annotations
 
@@ -6,12 +16,8 @@ from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
 from scalim_misc.markdown_inject import InjectBlockSpec, InjectBlockError, replace_markdown_injected_block
-
-from notebooks.marimo.example_readme_suite.support.render_chart import (
-    ASSET_COMPARE,
-    ASSET_SCENARIOS,
-    expected_assets,
-)
+from scalim_misc.notebook_support.cell_source import extract_visible_cell_sources
+from scalim_misc.readme_charts_gen import expected_assets
 
 BEGIN_MIN_PYTHON = "<!-- BEGIN AUTOGEN:readme-min-python -->"
 END_MIN_PYTHON = "<!-- END AUTOGEN:readme-min-python -->"
@@ -32,23 +38,33 @@ _MARKERS: Sequence[Tuple[str, str]] = (
     (BEGIN_CHART, END_CHART),
 )
 
-_SUITE = "notebooks/marimo/example_readme_suite"
-_MIN_YAML = Path(__file__).resolve().parent / "min_yaml_example.yaml"
-_REPO_LOADER_MODULE = "notebooks.marimo.example_readme_suite.support.min_yaml_loaders"
+_SUITE = "notebooks/marimo/demo_big_data_report"
+_CHAPTERS_OF_IR = f"{_SUITE}/chapters_of_ir"
+_CHAPTERS_OF_YAML_DSL = f"{_SUITE}/chapters_of_yaml_dsl"
+_MIN_PYTHON_CHAPTER = f"{_CHAPTERS_OF_IR}/ch010_basics.py"
+_MEMORY_COMPARE_CHAPTER = f"{_CHAPTERS_OF_IR}/ch020_memory_compare.py"
+_MIN_YAML_CHAPTER = f"{_CHAPTERS_OF_YAML_DSL}/ch005_yaml_dsl_min.py"
+_MIN_YAML = f"{_CHAPTERS_OF_YAML_DSL}/declared_yaml_dsl/min_report.yaml"
+_REPO_LOADER_MODULE = "scalim_misc.demo_big_data_report.min_loaders"
 _USER_LOADER_MODULE = "myapp.loaders"
+
+_GATE_NOTE = "在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开"
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _pointer_block(*, rel_path: str, note: str) -> str:
-    lines = [
-        "- 代码：[`{rel}`](./{rel})".format(rel=rel_path),
-        "- {note}".format(note=note),
+def _pointer_lines(rel_path: str, note: str) -> List[str]:
+    return [
+        "- 代码：[`{}`](./{})".format(rel_path, rel_path),
+        "- {}".format(note),
         "",
     ]
-    return "\n".join(lines)
 
 
 def _chart_block() -> str:
@@ -80,8 +96,25 @@ def _chart_block() -> str:
     return "\n".join(lines)
 
 
-def _yaml_quickstart_block() -> str:
-    source = _read(_MIN_YAML)
+def _min_python_block(root: Path) -> str:
+    """把主线 ch010 的可见 cells 逐 cell 投影为一份可复制的 Python 代码。"""
+    cells = extract_visible_cell_sources(root / _MIN_PYTHON_CHAPTER)
+    if not cells:
+        raise InjectBlockError("主线章节 {} 未提取到可见 cell".format(_MIN_PYTHON_CHAPTER))
+    lines = [
+        "以下代码逐 cell 投影自主线章节（同一份真相，打开 notebook 即可就地重跑）：",
+        "",
+        "```python",
+        "\n\n".join(cells),
+        "```",
+        "",
+    ]
+    lines.extend(_pointer_lines(_MIN_PYTHON_CHAPTER, "主线第一章：loader → `DemandIr` → `Plan` → `Engine` → 对拍；{}".format(_GATE_NOTE)))
+    return "\n".join(lines)
+
+
+def _min_yaml_block(root: Path) -> str:
+    source = _read(root / _MIN_YAML)
     projected = source.replace(_REPO_LOADER_MODULE, _USER_LOADER_MODULE)
     if projected == source:
         raise InjectBlockError("最小 YAML SSOT 中缺少预期的仓内 loader module")
@@ -92,36 +125,35 @@ def _yaml_quickstart_block() -> str:
         "",
         "> 把 `myapp.loaders` 换成你的加载函数所在模块。这份示例会在仓库里自动运行。",
         "",
-        "- 完整配置：[`support/min_yaml_example.yaml`](./{}/support/min_yaml_example.yaml)".format(_SUITE),
-        "- 示例数据和运行脚本：[`support/min_yaml_loaders.py`](./{}/support/min_yaml_loaders.py) · "
-        "[`support/min_yaml.py`](./{}/support/min_yaml.py)".format(_SUITE, _SUITE),
-        "",
     ]
+    lines.extend(
+        _pointer_lines(
+            _MIN_YAML_CHAPTER,
+            "最小 YAML 章节：`compile()` 语义校验 + `run()` 取行对拍；{}".format(_GATE_NOTE),
+        )
+    )
+    lines.append("- 完整配置：[`min_report.yaml`](./{})".format(_MIN_YAML))
+    lines.append("")
     return "\n".join(lines)
 
 
-def _snippet_blocks() -> Dict[str, str]:
-    gate = "在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开"
+def _compare_pointer(note: str) -> str:
+    return "\n".join(_pointer_lines(_MEMORY_COMPARE_CHAPTER, "{}；{}".format(note, _GATE_NOTE)))
+
+
+def _snippet_blocks(*, repo_root: Path | None = None) -> Dict[str, str]:
+    root = repo_root if repo_root is not None else _repo_root()
     return {
-        "min_python": _pointer_block(
-            rel_path="{}/chapters/ch010_min_python.py".format(_SUITE),
-            note="最小 Python 示例核心（IR 装配/运行/对拍）就在此 notebook cells 内；{}".format(gate),
-        ),
-        "min_yaml": _yaml_quickstart_block(),
-        "naive": _pointer_block(
-            rel_path="{}/chapters/ch030_memory_compare.py".format(_SUITE),
-            note="对比章节（naive 基线管线在 cells 内）；{}".format(gate),
-        ),
-        "scalim": _pointer_block(
-            rel_path="{}/chapters/ch030_memory_compare.py".format(_SUITE),
-            note="对比章节（scalim 窄字段管线在 cells 内）；{}".format(gate),
-        ),
+        "min_python": _min_python_block(root),
+        "min_yaml": _min_yaml_block(root),
+        "naive": _compare_pointer("对比章节（naive 基线管线在 cells 内）"),
+        "scalim": _compare_pointer("对比章节（scalim 窄字段管线在 cells 内）"),
         "chart": _chart_block(),
     }
 
 
-def expected_readme_text(current: str) -> str:
-    blocks = _snippet_blocks()
+def expected_readme_text(current: str, *, repo_root: Path | None = None) -> str:
+    blocks = _snippet_blocks(repo_root=repo_root)
     updated = current
     specs = (
         (BEGIN_MIN_PYTHON, END_MIN_PYTHON, blocks["min_python"], "readme-min-python"),
@@ -141,7 +173,7 @@ def expected_readme_text(current: str) -> str:
 
 def write_readme(repo_root: Path) -> Path:
     path = repo_root / "README.md"
-    updated = expected_readme_text(_read(path))
+    updated = expected_readme_text(_read(path), repo_root=repo_root)
     path.write_text(updated, encoding="utf-8")
     return path
 
@@ -160,7 +192,7 @@ def check_readme_injection_drift(repo_root: Path) -> List[str]:
     if errors:
         return errors
     try:
-        expected = expected_readme_text(text)
+        expected = expected_readme_text(text, repo_root=repo_root)
     except InjectBlockError as exc:
         return [str(exc)]
     if expected != text:
@@ -199,8 +231,8 @@ def check_no_handwritten_controlled_fences(repo_root: Path) -> List[str]:
         "ScalimEngine(",
         "DemandIr.from_irs(",
         "from scalim.execution.engine import ScalimEngine",
-        'loader: "examples.readme.min_yaml_loaders',
-        'loader: "notebooks.marimo.example_readme_suite.support.min_yaml_loaders',
+        'loader: "myapp.loaders:load_orders',
+        "loader: {}".format(_REPO_LOADER_MODULE),
     )
     errors: List[str] = []
     for token in forbidden:

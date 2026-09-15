@@ -316,7 +316,7 @@ gen-readme-examples:
     cd "{{ justfile_directory() }}"
     PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python scripts/gen-readme-examples.py
 
-# 检查: README 注入/图资产 drift（跑通由 just examples 覆盖 example_readme_suite）
+# 检查: README 注入/图资产 drift（跑通由 just examples 覆盖主线 demo_big_data_report 第一口章节）
 readme-examples:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -1055,7 +1055,7 @@ alias quick-qa := quick-check
 check-only-py: quick-check-only-py-no-test-gate test-gate-core-coverage
 
 # QA: 所有完整的检查(最全面入口; MUST 覆盖全部质量门禁)
-# README 跑通：`examples`（含 example_readme_suite）；README 注入/图 drift：`docs-drift-check`（经 generated-artifacts-drift-check）
+# README 第一口跑通：`examples`（主线 `demo_big_data_report` 章节 ch005/ch010/ch020）；注入/图 drift：`docs-drift-check`（经 generated-artifacts-drift-check）
 check: check-only-py frontend-check examples check-notebooks-coverage
 
 alias qa := check

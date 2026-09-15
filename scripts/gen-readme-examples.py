@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 from typing import Iterable, Optional
 
-from notebooks.marimo.example_readme_suite.support.inject import check_readme_examples_governance, write_readme
-from notebooks.marimo.example_readme_suite.support.render_chart import expected_assets, write_svg
+from scalim_misc.readme_charts_gen import expected_assets, write_svg
+from scalim_misc.readme_examples_gen import check_readme_examples_governance, write_readme
 
 
 def _repo_root() -> Path:

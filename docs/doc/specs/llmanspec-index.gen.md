@@ -158,7 +158,7 @@ Sources:
 ### `governance-readme-examples`
 - Title: governance-readme-examples
 - Source: [governance-readme-examples.feature](repo:llmanspec/specs/governance-readme-examples.feature)
-- Summary: 定义根 README 受控示例的公开页注入、图表资产与漂移校验；可执行 SSOT 位于 marimo README suite（见 examples-marimo），保证公开页与仓库真相一致（含本地 RSS 增量代理与版本锚定性能证据）。
+- Summary: 定义根 README 受控示例的公开页注入、图表资产与漂移校验；可执行 SSOT 是主线 marimo 套件内的第一口章节（见 examples-marimo），保证公开页与仓库真相一致（含本地 RSS 增量代理与版本锚定性能证据）。
 
 ### `hooks-events`
 - Title: hooks-events

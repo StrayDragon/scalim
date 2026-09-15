@@ -24,12 +24,12 @@ _LEGACY_ASSETS = (
 # 兼容旧名
 ASSET_REL = ASSET_COMPARE
 
-# `chart_snapshot.json`（`README` 记忆对比图数据；原 `compare.py` 的快照助手迁入本模块）
-SNAPSHOT_NAME = "chart_snapshot.json"
+# `memory-compare.json`（`README` 内存对比图快照；与外部基线数据同放 `docs/doc/assets/data/`）
+SNAPSHOT_REL = Path("docs") / "doc" / "assets" / "data" / "memory-compare.json"
 
 
 def snapshot_path() -> Path:
-    return Path(__file__).resolve().parent / SNAPSHOT_NAME
+    return _repo_root() / SNAPSHOT_REL
 
 
 def load_snapshot() -> Dict[str, Any]:

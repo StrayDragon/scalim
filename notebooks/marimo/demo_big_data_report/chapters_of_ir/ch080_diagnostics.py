@@ -1,6 +1,6 @@
 """Cells-native: ch080_diagnostics — static IR diagnostics (no engine run).
 
-设计目标（对齐 repo 金标准 `example_readme_suite/ch010_min_python`）:
+设计目标（对齐 repo 金标准 `chapters_of_ir/ch010_basics`）:
 - 本章复用 `build_ecommerce_model` 作为**复杂复用零件**,但**不执行引擎**,仅对 IR 做静态诊断。
 - 主线(模型构建 → 模型窥视 → 静态诊断统计)全部在 cells 内**逐 cell 展开**,并渲染装配产物。
 - 通过 `chapter_result` 向 headless runner / pytest 暴露对拍结果（含 r1114 `expected` 快照）。

@@ -1,22 +1,22 @@
 # language: zh-CN
 # capability: governance-readme-examples
-# purpose: 定义根 README 受控示例的公开页注入、图表资产与漂移校验；可执行 SSOT 位于 marimo README suite（见 examples-marimo），保证公开页与仓库真相一致（含本地 RSS 增量代理与版本锚定性能证据）。
+# purpose: 定义根 README 受控示例的公开页注入、图表资产与漂移校验；可执行 SSOT 是主线 marimo 套件内的第一口章节（见 examples-marimo），保证公开页与仓库真相一致（含本地 RSS 增量代理与版本锚定性能证据）。
 # scope: README.md, notebooks/marimo
 功能: governance-readme-examples
 
   @req:r980 @human
   场景: README copyable examples are injection-sourced
-    - 根 `README.md` 中面向读者定位/复制的受控示例（至少包括最小 Python 示例、最小 YAML 示例、naive-vs-Scalim 对比示例）MUST 由可执行 SSOT 生成并经 `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` 注入；最小 YAML 示例 MUST 在 README 中显示由该 SSOT 派生的 YAML fence，并同时给出完整可运行 SSOT/loader 入口；投影 MAY 将仓内 loader module 替换为清楚标注的用户集成点（例如 `myapp.loaders`），但 MUST NOT 复制独立示例真相；最小 Python 示例 MAY 以源码链接/运行提示呈现；该 SSOT MUST 位于 `notebooks/marimo/example_readme_suite/`（或文档声明的等价路径）；维护者 MUST NOT 在受控注入区块外平行维护同一套可复制完整示例作为第二真相。
+    - 根 `README.md` 中面向读者定位/复制的受控示例（至少包括最小 Python 示例、最小 YAML 示例、naive-vs-Scalim 对比示例）MUST 由可执行 SSOT 生成并经 `<!-- BEGIN AUTOGEN:<id> -->` / `<!-- END AUTOGEN:<id> -->` 注入；该 SSOT MUST 是主线套件 `notebooks/marimo/demo_big_data_report/` 内的第一口章节（见 `examples-marimo` r989），MUST NOT 是与之并行的第二套章节目录；最小 Python 示例 MUST 由该章节的可见 cells 逐 cell 投影为代码 fence（`hide_code` 叙事 cell 不入投影，cell 顶层 `return` 管道行略去），亦 MAY 附源码链接/运行提示；最小 YAML 示例 MUST 在 README 中显示由 declared YAML 派生的 fence，并同时给出完整可运行 SSOT/loader 入口；投影 MAY 将仓内 loader module 替换为清楚标注的用户集成点（例如 `myapp.loaders`），但 MUST NOT 复制独立示例真相；维护者 MUST NOT 在受控注入区块外平行维护同一套可复制完整示例作为第二真相。
     当 维护者检查根 README 中受控可复制完整示例
     那么 这些示例 MUST 位于对应 AUTOGEN 注入区块内，最小 YAML MUST 显示由 SSOT 生成的 fence，且可由生成入口从 notebooks 侧 SSOT 刷新
     当 受控区外出现与 SSOT 平行的完整可复制官方示例
     那么 治理检查 MUST 失败或在设计钉死的等价规则下拒绝
   @req:r981 @human
   场景: README example SSOT is runnable in QA
-    - 系统 MUST 经由仓库 examples gate（`just examples` 或等价）执行 README suite 的 notebooks 侧章节 SSOT，并在 `just qa`（或等价 `check`）中强制覆盖；CI 固定小 scale 下 MUST 以退出码 0 表示章节跑通；失败时 MUST 非零退出并给出可定位摘要。专用 `readme-examples` 目标若保留，MUST 仅承担 drift/`--check` 或成为 examples 的薄别名，不得维持第二套执行真相。
+    - 系统 MUST 经由仓库 examples gate（`just examples` 或等价）执行主线套件内 README 第一口章节的 notebooks 侧 SSOT，并在 `just qa`（或等价 `check`）中强制覆盖；CI 固定小 scale 下 MUST 以退出码 0 表示章节跑通；失败时 MUST 非零退出并给出可定位摘要。专用 `readme-examples` 目标若保留，MUST 仅承担 drift/`--check` 或成为 examples 的薄别名，不得维持第二套执行真相。
     当 开发者运行 `just qa`
-    那么 MUST 经由 examples gate（或等价）执行 README marimo suite 章节，且在当前树默认 scale 下通过时整体不因此失败
-    当 某一 README suite 章节抛错或断言失败
+    那么 MUST 经由 examples gate（或等价）执行主线套件内的 README 第一口章节，且在当前树默认 scale 下通过时整体不因此失败
+    当 某一 README 第一口章节抛错或断言失败
     那么 examples gate MUST 非零退出并指出失败章节
   @req:r982 @human
   场景: Injection and chart assets have drift checks
