@@ -24,7 +24,8 @@ def _(mo):
     # demo_big_data_report / ch010_basics
 
     本章用**最小可跑闭环**走一遍 Scalim 主线,把"怎么写"直接摊开在 cells 里
-    (根 `README` 的「可以用 Python 编写需求」代码块就是本章可见 cells 的投影):
+    (根 `README` 的「或直接用 Python 编写需求」核心代码块即 ①~④ 的投影, 止于 `engine.run`;
+    ⑤/⑥ 对拍脚手架仅在章节内, README 给完整演示链接):
 
     ```
     loader/计算函数 → DemandIr 装配 → Plan → Engine → Sink → 对拍
@@ -176,6 +177,7 @@ def _(PlanBuilder, RuntimeBindings, calc_amount_x2, demand, load_orders):
 @app.cell
 def _(InMemoryRowDataSink, ScalimEngine, demand, plan, runtime_bindings):
     # ④ 组装引擎并运行(批大小 1000,顺序模式),内存 sink 收行
+    # (README 核心投影止于本 cell: `engine.run` 之后为 ⑤/⑥ 对拍脚手架,见完整演示链接)
     engine = ScalimEngine(
         demand=demand,
         plan=plan,

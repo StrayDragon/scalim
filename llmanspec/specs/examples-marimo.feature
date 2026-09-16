@@ -92,7 +92,7 @@
   场景: headless runner 必须覆盖所有轨道且保持单一套件心智
     - 系统 MUST 将 `notebooks/marimo/` 下的用户侧示例收敛为 **单一套件目录** `demo_big_data_report`，其内以轨道目录组织（声明面 `chapters_of_yaml_dsl/`、装配面 `chapters_of_ir/`、场景面 `chapters_of_scenarios/`）；headless runner MUST 自动发现该套件并默认执行其全部轨道章节。 根 README 的 validated examples 章节与 public API 覆盖章节、应用场景章节 MUST 作为该套件内的轨道章节被默认执行；系统 MUST NOT 为它们维护并行的第二套套件目录。
     当 开发者运行 examples gate
-    那么 runner MUST 执行该套件三条轨道的章节（含 README 第一口章节、public API 覆盖章节与应用场景章节）
+    那么 runner MUST 执行该套件三条轨道的章节（含 README 最小示例章节、public API 覆盖章节与应用场景章节）
   @req:r216 @human
   场景: public API 套件覆盖 curated facade 导入
     - 系统 MUST 扩展 public API suite，使其覆盖 curated public surface，而不只是零散的公开入口冒烟。 该 suite 至少 MUST 覆盖： - YAML DSL 的 facade imports - workflow 辅助公开模块 - IR 模块 - shortcuts.resources（资源类 shortcut 稳定入口 package） - shortcuts.resources.outputs（输出发现/最新产物定位 facade）
@@ -138,9 +138,9 @@
     当 pytest public_api suite 未覆盖该入口模块
     那么 gate MUST fail-fast 并指出差异集合
   @req:r989 @human
-  场景: README 第一口是主线套件内的章节
-    - 根 README 的 validated examples（公开页假数据最小例与内存对比；合约交叉引用 `governance-readme-examples` 的注入/图资产面）MUST 以主线套件 `notebooks/marimo/demo_big_data_report/` 内的指定章节为唯一 SSOT（README 第一口章节：IR 轨最小 Python 与同域内存对比、YAML 轨最小 YAML 及其 declared YAML 文件），并 MUST 纳入本 capability 的 examples gate 默认覆盖。系统 MUST NOT 为该三例维护与主线并行的第二套章节目录；公开页注入/漂移细节以 `governance-readme-examples` 为准。
+  场景: README 最小示例是主线套件内的章节
+    - 根 README 的 validated examples（公开页假数据最小例与内存对比；合约交叉引用 `governance-readme-examples` 的注入/图资产面）MUST 以主线套件 `notebooks/marimo/demo_big_data_report/` 内的指定章节为唯一 SSOT（README 最小示例章节：IR 轨最小 Python 与同域内存对比、YAML 轨最小 YAML 及其 declared YAML 文件），并 MUST 纳入本 capability 的 examples gate 默认覆盖。系统 MUST NOT 为该三例维护与主线并行的第二套章节目录；公开页注入/漂移细节以 `governance-readme-examples` 为准。
     当 维护者检查 notebooks/marimo 与 examples gate 默认覆盖
-    那么 MUST 能在主线套件章节目录内定位到 README 第一口章节，且 examples gate 默认执行它们
+    那么 MUST 能在主线套件章节目录内定位到 README 最小示例章节，且 examples gate 默认执行它们
     当 维护者枚举 notebooks/marimo 下的套件
-    那么 README 第一口 MUST 表现为主线 `demo_big_data_report` 的章节而非独立套件
+    那么 README 最小示例 MUST 表现为主线 `demo_big_data_report` 的章节而非独立套件

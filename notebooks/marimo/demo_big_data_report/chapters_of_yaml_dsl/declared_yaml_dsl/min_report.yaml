@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
-# 最小可跑需求（README 第一口 · ecommerce 主线的两源切片）：
+# 最小可跑需求（README 最小示例 · ecommerce 主线的两源切片）：
 # 主源 orders + 维表 payments 单级关联 + 一个派生字段 + 一个 csv 输出。
 
 name: min_report

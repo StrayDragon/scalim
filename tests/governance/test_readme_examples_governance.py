@@ -52,10 +52,13 @@ def test_readme_governance_rejects_handwritten_engine_outside_autogen(tmp_path: 
 
 
 def test_min_python_block_is_projected_from_mainline_chapter_cells() -> None:
-    """README 第一口的 Python 代码 = 主线 ch010 可见 cells 的投影(同一链路,无第二真相)."""
+    """README 最小示例的 Python 代码 = 主线 ch010 核心闭环 cells ①~④ 的投影(同一链路,无第二真相).
+
+    ⑤/⑥ 对拍脚手架不入投影, 完整演示经章节链接给出。
+    """
     block = _snippet_blocks()["min_python"]
 
-    assert block.startswith("以下代码逐 cell 投影自主线章节")
+    assert block.startswith("以下核心代码逐 cell 投影自主线章节 ch010")
     assert "```python" in block
     for token in (
         "MainSourceIr(source_id=",
@@ -63,11 +66,16 @@ def test_min_python_block_is_projected_from_mainline_chapter_cells() -> None:
         "PlanBuilder(demand).build()",
         "ScalimEngine(",
         "engine.run(sink=sink)",
+        "rows = list(sink.get_data())",
     ):
         assert token in block, token
+    # ⑤/⑥ 对拍/断言 cell 不入投影(完整演示给章节链接)
+    for token in ("expected_rows = [", "render_checks(checks)", "chapter_result = make_chapter_result"):
+        assert token not in block, token
     # hide_code 叙事 cell 不入投影
     assert "mo.callout" not in block
     assert "chapters_of_ir/ch010_basics.py" in block
+    assert "完整演示" in block
 
 
 def test_yaml_quickstart_is_a_generated_user_loader_projection() -> None:

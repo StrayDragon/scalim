@@ -20,18 +20,93 @@
 
 如果只是临时改一份小 CSV，pandas 往往更直接。Scalim 是在规则开始变多、报表要反复跑时才值得引入的。报表可以写成 YAML，也可以直接在 Python 里定义。
 
-下面三个「第一口」与 `just notebook` 打开后的主线教程 `demo_big_data_report` 是**同一条链路**（代码/YAML 都从主线章节投影，不是第二套例子）：
+下面三个「最小示例」与 `just notebook` 打开后的主线教程 `demo_big_data_report` 是**同一条链路**（代码/YAML 都从主线章节投影，不是第二套例子）：
 
-| 第一口 | 主线章节 |
+| 最小示例 | 主线章节 |
 | --- | --- |
-| Python 写需求 | `chapters_of_ir/ch010_basics.py` |
 | YAML DSL 写需求 | `chapters_of_yaml_dsl/ch005_yaml_dsl_min.py` |
+| Python 写需求 | `chapters_of_ir/ch010_basics.py` |
 | 为什么省内存 | `chapters_of_ir/ch020_memory_compare.py` |
 
-**可以用 Python 编写需求**
+**可以用 YAML DSL 配置需求**
+
+<details>
+<summary>查看 YAML 示例</summary>
+
+<!-- BEGIN AUTOGEN:readme-min-yaml -->
+```yaml
+# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
+# 最小可跑需求（README 最小示例 · ecommerce 主线的两源切片）：
+# 主源 orders + 维表 payments 单级关联 + 一个派生字段 + 一个 csv 输出。
+
+name: min_report
+description: |
+  最小电商订单报表: 订单 -> 支付方式(单级关联) + 派生字段 总金额
+
+main_source:
+  source_id: orders
+  loader: myapp.loaders:load_orders
+  fields:
+    order_id:
+      name: 订单ID
+    amount:
+      name: 金额
+    pay_id:
+      name: 支付ID
+
+sources:
+  payments:
+    loader: myapp.loaders:load_payments
+    key: id
+    params:
+      ids: {$keys: {as: set}}
+    fields:
+      method:
+        name: 支付方式
+        extract: payment_method
+        relation: orders_to_payments
+
+relations:
+  orders_to_payments:
+    steps:
+      - from: orders.pay_id
+        to: payments.id
+
+fields:
+  total_amount:
+    name: 总金额
+    compute: "amount * 2"
+
+outputs:
+  - name: detail
+    to: {file: detail_csv}
+    write: {header_fields_output_by: name}
+    fields: [order_id, method, total_amount]
+
+resources:
+  files:
+    detail_csv:
+      csv_file:
+        path: ./output
+```
+
+> 把 `myapp.loaders` 换成你的加载函数所在模块。这份示例会在仓库里自动运行。
+
+- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`](./notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py)
+- 最小 YAML 章节：`compile()` 语义校验 + `run()` 取行对拍；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+
+- 完整配置：[`min_report.yaml`](./notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml)
+<!-- END AUTOGEN:readme-min-yaml -->
+
+</details>
+
+**或直接用 Python 编写需求**
+
+<details>
+<summary>查看 Python 示例</summary>
 
 <!-- BEGIN AUTOGEN:readme-min-python -->
-以下代码逐 cell 投影自主线章节（同一份真相，打开 notebook 即可就地重跑）：
+以下核心代码逐 cell 投影自主线章节 ch010（同一份真相，仅 ①~④ 最小闭环）：
 
 ```python
 import marimo as mo
@@ -103,125 +178,14 @@ engine = ScalimEngine(
 sink = InMemoryRowDataSink()
 engine.run(sink=sink)
 rows = list(sink.get_data())
-
-expected_rows = [
-    {"order_id": 1, "amount": 10.0, "amount_x2": 20.0},
-    {"order_id": 2, "amount": 20.5, "amount_x2": 41.0},
-    {"order_id": 3, "amount": 7.0, "amount_x2": 14.0},
-]
-keys = ("order_id", "amount", "amount_x2")
-actual_rows = [{k: row.get(k) for k in keys} for row in rows]
-mo.vstack(
-    [
-        mo.md("**期望 vs 实际**(派生字段 `amount_x2 = 金额 * 2`):"),
-        mo.ui.table(
-            [{"kind": "期望", **row} for row in expected_rows] + [{"kind": "实际", **row} for row in actual_rows],
-            selection=None,
-        ),
-    ]
-)
-
-checks = {
-    "运行 3 行假数据": len(rows) == 3,
-    "期望行完全一致": actual_rows == expected_rows,
-}
-render_checks(checks)
-passed = bool(all(checks.values()))
-summary = "rows={} amount_x2[0]={}".format(len(rows), rows[0].get("amount_x2") if rows else None)
-
-# 对拍期望(教学 payload;headless 可经 details 键定位)
-expected = {"rows": 3, "amount_x2_first": 20.0}
-print("expected:", expected)
-
-chapter_result = make_chapter_result(
-    passed=passed,
-    summary=summary,
-    details={
-        "expected": expected,
-        "rows": len(rows),
-        "sample": rows[0] if rows else None,
-        "expected_rows": expected_rows,
-        "actual_rows": actual_rows,
-        "checks": {k: bool(v) for k, v in checks.items()},
-    },
-)
 ```
 
-- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py`](./notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py)
-- 主线第一章：loader → `DemandIr` → `Plan` → `Engine` → 对拍；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
+- 完整演示：[`notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py`](./notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py)（含 ⑤ 期望 vs 实际 与 ⑥ 对拍断言/`chapter_result`；打开 notebook 即可就地重跑）
+- 主线第一章：loader → `DemandIr` → `Plan` → `Engine` → 收行；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
 <!-- END AUTOGEN:readme-min-python -->
 
-**也可以用 YAML DSL 配置需求**
-
-<details>
-<summary>查看 YAML 示例</summary>
-
-<!-- BEGIN AUTOGEN:readme-min-yaml -->
-```yaml
-# yaml-language-server: $schema=../../../../../src/scalim/dsl/yaml_dsl/schema/demand.gen.json
-# 最小可跑需求（README 第一口 · ecommerce 主线的两源切片）：
-# 主源 orders + 维表 payments 单级关联 + 一个派生字段 + 一个 csv 输出。
-
-name: min_report
-description: |
-  最小电商订单报表: 订单 -> 支付方式(单级关联) + 派生字段 总金额
-
-main_source:
-  source_id: orders
-  loader: myapp.loaders:load_orders
-  fields:
-    order_id:
-      name: 订单ID
-    amount:
-      name: 金额
-    pay_id:
-      name: 支付ID
-
-sources:
-  payments:
-    loader: myapp.loaders:load_payments
-    key: id
-    params:
-      ids: {$keys: {as: set}}
-    fields:
-      method:
-        name: 支付方式
-        extract: payment_method
-        relation: orders_to_payments
-
-relations:
-  orders_to_payments:
-    steps:
-      - from: orders.pay_id
-        to: payments.id
-
-fields:
-  total_amount:
-    name: 总金额
-    compute: "amount * 2"
-
-outputs:
-  - name: detail
-    to: {file: detail_csv}
-    write: {header_fields_output_by: name}
-    fields: [order_id, method, total_amount]
-
-resources:
-  files:
-    detail_csv:
-      csv_file:
-        path: ./output
-```
-
-> 把 `myapp.loaders` 换成你的加载函数所在模块。这份示例会在仓库里自动运行。
-
-- 代码：[`notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`](./notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py)
-- 最小 YAML 章节：`compile()` 语义校验 + `run()` 取行对拍；在仓库中可用 `just examples` 运行，也可用 `just notebook` 打开
-
-- 完整配置：[`min_report.yaml`](./notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml)
-<!-- END AUTOGEN:readme-min-yaml -->
-
 </details>
+
 
 ## 快速上手
 

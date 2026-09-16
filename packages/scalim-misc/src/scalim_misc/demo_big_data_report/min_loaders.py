@@ -1,4 +1,4 @@
-"""最小 YAML DSL 示例的假 loader (README 第一口 · 两源切片)。
+"""最小 YAML DSL 示例的假 loader (README 最小示例 · 两源切片)。
 
 对应 YAML: `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml`
 """

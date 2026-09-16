@@ -1,6 +1,6 @@
 """Cells-native marimo notebook: ch005_yaml_dsl_min.
 
-角色: README「第一口」的 YAML DSL 侧 —— 主线 canonical 报表(`ch010`)的两源极简切片.
+角色: README「最小示例」的 YAML DSL 侧 —— 主线 canonical 报表(`ch010`)的两源极简切片.
 链路: `declared_yaml_dsl/min_report.yaml` → `compile()` 语义校验 → `run()` 取行 → 对拍.
 """
 

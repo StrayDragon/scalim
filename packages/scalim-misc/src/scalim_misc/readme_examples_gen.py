@@ -1,10 +1,10 @@
 """生成 `README` 受控示例注入区块，并检查生成结果是否被手改。
 
-单一链路：README 的「第一口」全部投影自主线套件 `demo_big_data_report` 的章节：
+单一链路：README 的「最小示例」全部投影自主线套件 `demo_big_data_report` 的章节：
 
 | README 区块 | 投影来源 |
 | --- | --- |
-| 最小 Python 示例 | `chapters_of_ir/ch010_basics.py` 的可见 cells（代码逐 cell 投影） |
+| 最小 Python 示例 | `chapters_of_ir/ch010_basics.py` 的核心闭环 cells ①~④（代码逐 cell 投影；⑤/⑥ 对拍脚手架不入投影，完整演示给章节链接） |
 | 最小 YAML 示例 | `chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml` + `ch005_yaml_dsl_min.py` |
 | naive vs Scalim 对比 | `chapters_of_ir/ch020_memory_compare.py` |
 | 性能图 | `readme_charts_gen.py`（快照 + 版本锚定外部基线数据） |
@@ -96,20 +96,41 @@ def _chart_block() -> str:
     return "\n".join(lines)
 
 
+def _core_python_cells(cells: List[str]) -> List[str]:
+    """核心闭环投影: 取首个包含 `engine.run(` 的 cell (含) 为止的前缀 (ch010 ①~④).
+
+    ⑤ 期望 vs 实际 与 ⑥ 对拍断言/`chapter_result` 是 notebook 内的教学脚手架,
+    README 只给完整演示章节链接, 不再逐 cell 投影。
+    """
+    for index, cell in enumerate(cells):
+        if "engine.run(" in cell:
+            return cells[: index + 1]
+    raise InjectBlockError("ch010 核心闭环边界未找到: 无包含 `engine.run(` 的可见 cell")
+
+
 def _min_python_block(root: Path) -> str:
-    """把主线 ch010 的可见 cells 逐 cell 投影为一份可复制的 Python 代码。"""
+    """把主线 ch010 的核心闭环 cells (①~④) 逐 cell 投影为可复制的 Python 代码; 完整演示给章节链接."""
     cells = extract_visible_cell_sources(root / _MIN_PYTHON_CHAPTER)
     if not cells:
         raise InjectBlockError("主线章节 {} 未提取到可见 cell".format(_MIN_PYTHON_CHAPTER))
+    core = _core_python_cells(cells)
     lines = [
-        "以下代码逐 cell 投影自主线章节（同一份真相，打开 notebook 即可就地重跑）：",
+        "以下核心代码逐 cell 投影自主线章节 ch010（同一份真相，仅 ①~④ 最小闭环）：",
         "",
         "```python",
-        "\n\n".join(cells),
+        "\n\n".join(core),
         "```",
         "",
     ]
-    lines.extend(_pointer_lines(_MIN_PYTHON_CHAPTER, "主线第一章：loader → `DemandIr` → `Plan` → `Engine` → 对拍；{}".format(_GATE_NOTE)))
+    lines.extend(
+        [
+            "- 完整演示：[`{}`](./{})（含 ⑤ 期望 vs 实际 与 ⑥ 对拍断言/`chapter_result`；打开 notebook 即可就地重跑）".format(
+                _MIN_PYTHON_CHAPTER, _MIN_PYTHON_CHAPTER
+            ),
+            "- 主线第一章：loader → `DemandIr` → `Plan` → `Engine` → 收行；{}".format(_GATE_NOTE),
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

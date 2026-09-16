@@ -29,14 +29,14 @@
 - 章节入口解析优先级(registry 内建，`just examples` 与 pytest 同源)：`run_<id>()` → `run_chapter()` → `run()` → 唯一 `run_*()` → **marimo `app.run()` 投影**(取 cell 命名空间里的 `chapter_result`)。最后一条让「marimo 重存后只剩 `@app.cell` 形态」也能对拍，因此章节只需保证最后一个 cells 产出 `chapter_result`。
 - runner 支持 `SCALIM_EXAMPLES_SUITES=`(白名单)、`SCALIM_EXAMPLES_JOBS=`(并行)、`QA_VERBOSE` 三档输出：默认(空/`0`)静默、`1` 逐章 PASS/FAIL 明细、`2` 实时流式全量输出(语义 SSOT 见 `justfile` 头部与 `scripts/qa-step.sh`)。
 
-### 根 README 的「第一口」就在本主线内
+### 根 README 的「最小示例」就在本主线内
 
 根 `README.md` 的三个受控示例不再是独立套件，而是主线章节的投影（同一份真相）：
 
 | README 区块 | 主线章节 SSOT |
 | --- | --- |
-| 可以用 Python 编写需求 | [`chapters_of_ir/ch010_basics.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py)（可见 cells 逐 cell 投影为 fence） |
-| 也可以用 YAML DSL 配置需求 | [`chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py) + [`min_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml) |
+| 可以用 YAML DSL 配置需求 | [`chapters_of_yaml_dsl/ch005_yaml_dsl_min.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch005_yaml_dsl_min.py) + [`min_report.yaml`](repo:notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/declared_yaml_dsl/min_report.yaml) |
+| 或直接用 Python 编写需求 | [`chapters_of_ir/ch010_basics.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir/ch010_basics.py)（核心闭环 cells ①~④ 逐 cell 投影为 fence；完整演示给章节链接） |
 | naive vs Scalim 内存对比 | [`chapters_of_ir/ch020_memory_compare.py`](repo:notebooks/marimo/demo_big_data_report/chapters_of_ir/ch020_memory_compare.py) |
 
 注入器与图表生成器：`packages/scalim-misc/src/scalim_misc/readme_examples_gen.py` / `readme_charts_gen.py`；
@@ -46,8 +46,8 @@
 
 | 轨道目录 | 编号 | 面 |
 | --- | --- | --- |
-| `chapters_of_yaml_dsl/` | `ch005`–`ch150` | 声明面: YAML DSL + workflow(含 README 第一口的 `ch005` 与 canonical `ecommerce_report.yaml`) |
-| `chapters_of_ir/` | `ch010`–`ch120` + `ch130`–`ch184` | 装配面: Python IR 手写主线 + public API 覆盖(含 README 第一口的 `ch010`/`ch020`) |
+| `chapters_of_yaml_dsl/` | `ch005`–`ch150` | 声明面: YAML DSL + workflow(含 README 最小示例的 `ch005` 与 canonical `ecommerce_report.yaml`) |
+| `chapters_of_ir/` | `ch010`–`ch120` + `ch130`–`ch184` | 装配面: Python IR 手写主线 + public API 覆盖(含 README 最小示例的 `ch010`/`ch020`) |
 | `chapters_of_scenarios/` | `ch210`–`ch260` | 场景面: hooks/events 与阶段调度的应用形态 |
 
 - Python 导入入口与结构评估: [公共 API 导入指南](public-api.gen.md)
@@ -62,7 +62,7 @@
 just examples
 ```
 
-该入口会执行唯一套件 `demo_big_data_report` 的三条轨道(声明面 + 装配面 + 场景面, 当前 52 章; 含 README 第一口的 ch005/ch010/ch020), 并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。只想跑单条轨道时可用 `SCALIM_EXAMPLES_SUITES=demo_big_data_report just examples`。
+该入口会执行唯一套件 `demo_big_data_report` 的三条轨道(声明面 + 装配面 + 场景面, 当前 52 章; 含 README 最小示例的 ch005/ch010/ch020), 并输出可定位的 PASS/FAIL 摘要；这是 `just qa` 的一部分。只想跑单条轨道时可用 `SCALIM_EXAMPLES_SUITES=demo_big_data_report just examples`。
 
 ### 2.2 跑整套门禁(改动后验收)
 
