@@ -14,7 +14,7 @@
 
 ## Quick Commands (SSOT Entry Points)
 - `just --list`: discover tasks.
-- `just qa`: repo quality gates (lint/tests + drift checks + llmanspec checks, etc.).
+- `just qa`: repo quality gates (lint/tests + drift checks + llmanspec checks, etc.). Output verbosity via `QA_VERBOSE` (SSOT: `scripts/qa-step.sh` + `justfile` header): default `L0` 静默(每步仅一行 `[pass]` 摘要; 任一步失败 → 全量输出不吞没), `QA_VERBOSE=1` 摘要(实时流式输出+工具 `--quiet`, 工具只吐摘要行), `QA_VERBOSE=2` 全量(实时流式输出, 无 `--quiet`, 工具吐全量明细).
 - `just gen-docs`: refresh docs-site generated pages and injected blocks.
 - `just llmanspec-check`: sanitize + validate llmanspec artifacts.
 - `just bump-versions <X.Y.Z>` / `just bump-versions <X.Y.Z> YES`: dry-run / apply unified package versions (see pre-release checklist).

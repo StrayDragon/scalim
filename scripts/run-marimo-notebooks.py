@@ -11,13 +11,19 @@
 
 用法:
   python scripts/run-marimo-notebooks.py                     # 静默汇总(与 CI 一致)
-  QA_VERBOSE=1 python scripts/run-marimo-notebooks.py        # 逐章 PASS/FAIL
+  QA_VERBOSE=1 python scripts/run-marimo-notebooks.py        # 逐章 PASS/FAIL 明细
   SCALIM_EXAMPLES_SUITES=demo_big_data_report python scripts/run-marimo-notebooks.py
   SCALIM_EXAMPLES_JOBS=2 python scripts/run-marimo-notebooks.py
+
+QA_VERBOSE 三档(与 justfile/`scripts/qa-step.sh` 语义一致):
+  空/"0"/"off"/"false"/"no" → 静默: 仅打印汇总行(逐章明细不外显)
+  "1"                       → 逐章 PASS/FAIL 明细
+  其他真值(如 "2")           → 逐章 PASS/FAIL 明细(同 "1"; 保留给 justfile L2 全量档)
 
 输出合约:
 - 静默模式只打印汇总行; 失败时把失败详情写 `stderr`.
 - 退出码: 0 全通过 / 1 存在失败.
+- 经 `just examples` 调用时, L0 档由 just 层统一捕获: 通过仅 `[pass]` 一行, 失败全量 dump(见 `scripts/qa-step.sh`).
 """
 
 from __future__ import annotations

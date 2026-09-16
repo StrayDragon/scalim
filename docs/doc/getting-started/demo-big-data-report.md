@@ -27,7 +27,7 @@
 
 - 打开编辑器(只看到 cells)：`just notebook`；跑对拍：`just examples`（或 `just examples-big-data` 只跑本套件）。
 - 章节入口解析优先级(registry 内建，`just examples` 与 pytest 同源)：`run_<id>()` → `run_chapter()` → `run()` → 唯一 `run_*()` → **marimo `app.run()` 投影**(取 cell 命名空间里的 `chapter_result`)。最后一条让「marimo 重存后只剩 `@app.cell` 形态」也能对拍，因此章节只需保证最后一个 cells 产出 `chapter_result`。
-- runner 支持 `SCALIM_EXAMPLES_SUITES=`(白名单)、`SCALIM_EXAMPLES_JOBS=`(并行)、`QA_VERBOSE=1`(逐章明细)。
+- runner 支持 `SCALIM_EXAMPLES_SUITES=`(白名单)、`SCALIM_EXAMPLES_JOBS=`(并行)、`QA_VERBOSE` 三档输出：默认(空/`0`)静默、`1` 逐章 PASS/FAIL 明细、`2` 实时流式全量输出(语义 SSOT 见 `justfile` 头部与 `scripts/qa-step.sh`)。
 
 ### 根 README 的「第一口」就在本主线内
 

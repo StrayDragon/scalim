@@ -1,11 +1,16 @@
 set dotenv-load
 
-# QA 输出详细程度。空值=静默(适合 agent); 设任意真值(1/true/yes)显示完整输出。
-# 用法: just qa                          # 静默模式(默认,仅显示错误/汇总)
-#       just QA_VERBOSE=1 qa             # 完整输出(适合人类)
+# QA 输出详细程度(三档, SSOT 语义见 scripts/qa-step.sh 头部注释):
+#   L0 静默(默认, 空/"0"/"off"/"false"/"no"): 每步捕获输出, 通过仅一行 [pass] 摘要; 任一步失败 → 全量输出 + 原退出码
+#   L1 摘要(QA_VERBOSE=1): 各工具 --quiet 一行摘要, 实时流式输出(不捕获)
+#   L2 全量(QA_VERBOSE=2 或其他真值): 实时流式输出全量, 无 quiet 旗标
+# 用法: just qa                            # L0 静默(默认, 适合 agent)
+#       just QA_VERBOSE=1 qa               # L1 摘要(适合人类日常)
+#       just QA_VERBOSE=2 qa               # L2 全量(排障)
 QA_VERBOSE := ""
 
-# pytest 静默模式共用参数。三个 test 配方共享,改一处即生效。
+# pytest 摘要档(L1)共用参数。三个 test 配方共享,改一处即生效。
+# 注: L0 由 qa_step 捕获(通过时不外显), 失败时全量 dump。
 _qa_pytest_quiet := "--no-header -W once::DeprecationWarning -rN --tb=short -o console_output_style=classic"
 
 UV_OPTIONS := ""
@@ -33,6 +38,8 @@ docs-build: gen-docs
 _frontend-check DIR LABEL:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     dir="{{ DIR }}"
     label="{{ LABEL }}"
     if ! command -v pnpm >/dev/null 2>&1; then
@@ -43,24 +50,31 @@ _frontend-check DIR LABEL:
         echo "pnpm not found; skipping ${label}" >&2
         exit 0
     fi
-    if [ -n "{{ QA_VERBOSE }}" ]; then
+    # 安装输出: L0/L1 静默(--silent), L2 实时流式全量输出(与旧 QA_VERBOSE 真值行为一致)
+    if [ "$(qa_level)" -eq 2 ]; then
         pnpm -C "$dir" install --frozen-lockfile
     else
         pnpm -C "$dir" install --frozen-lockfile --silent
     fi
     # audit: --audit-level high 使 exit code 仅对 HIGH/CRITICAL 敏感;
     # --ignore-registry-errors 避免 registry 网络抖动导致假阳性。
-    pnpm -C "$dir" audit --audit-level high --ignore-registry-errors
-    pnpm -C "$dir" lint
-    pnpm -C "$dir" build
+    qa_step "frontend-audit:${label}" pnpm -C "$dir" audit --audit-level high --ignore-registry-errors
+    qa_step "frontend-lint:${label}" pnpm -C "$dir" lint
+    qa_step "frontend-build:${label}" pnpm -C "$dir" build
 
 # 检查: Scalim Viz 前端 (install + lint + build)
 frontend-scalim-viz-check:
-    just _frontend-check frontend/scalim-viz frontend-scalim-viz-check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    just QA_VERBOSE="{{ QA_VERBOSE }}" _frontend-check frontend/scalim-viz frontend-scalim-viz-check
 
 # 检查: 所有 frontend (install + lint + build)
 frontend-check:
-    just frontend-scalim-viz-check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    just QA_VERBOSE="{{ QA_VERBOSE }}" frontend-scalim-viz-check
 
 # 生成: YAML DSL 校验 schema
 gen-yaml-dsl-schema:
@@ -72,26 +86,46 @@ gen-project-constants:
 
 # 检查: 项目常量生成物是否有 drift
 project-constants-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "project-constants-drift-check" uv {{ UV_OPTIONS }} run python scripts/gen-project-constants.py --check
 
 # 检查: YAML DSL schema 生成物是否有 drift (含 canonical 文本形式)
 schema-drift-check:
-    uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-schema.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "schema-drift-check" uv {{ UV_OPTIONS }} run python scripts/gen-yaml-dsl-schema.py --check
 
 # 检查: 受控生成物漂移 (约定: `*.gen.*` + injected blocks)
 generated-artifacts-drift-check: project-constants-drift-check schema-drift-check validate-agent-skill validate-public-api-skill docs-drift-check
 
 # 检查: 文档治理一致性(SSOT 入口/漂移源头)
 doc-governance-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-doc-governance.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "doc-governance-check" uv {{ UV_OPTIONS }} run python scripts/check-doc-governance.py
 
 # 检查: Markdown SSOT (legacy authoring surface)
 md-ssot-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-md-ssot.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "md-ssot-check" uv {{ UV_OPTIONS }} run python scripts/check-md-ssot.py
 
 # 检查: stdlib 同名模块冲突
 stdlib-collisions-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-stdlib-module-collisions.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "stdlib-collisions-check" uv {{ UV_OPTIONS }} run python scripts/check-stdlib-module-collisions.py
 
 # 依赖: 同步开发依赖
 uv-sync-dev:
@@ -110,7 +144,9 @@ uv-sync-dev:
 uv-lock-check:
     #!/usr/bin/env bash
     set -euo pipefail
-    env \
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "uv-lock-check" env \
         -u UV_INDEX \
         -u UV_INDEX_URL \
         -u UV_EXTRA_INDEX_URL \
@@ -177,11 +213,19 @@ gen-viz-schedule-plan RUN_DIR="":
 
 # 检查 Agent Skill 数据是否合法
 validate-agent-skill:
-    uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "validate-agent-skill" uv {{ UV_OPTIONS }} run python scripts/gen-agent-skill.py --validate
 
 # 检查: scalim-public-api skill 受控产物漂移
 validate-public-api-skill:
-    uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py --validate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "validate-public-api-skill" uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py --validate
 
 # 工具: 生成公共接口跳转辅助导入文件(用于编辑器/LSP 快速跳转; 生成物在 `.tmp/`)
 gen-public-api-jump-imports:
@@ -235,20 +279,27 @@ install-sanitize-hook:
 llmanspec-check:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
 
     if command -v llman >/dev/null 2>&1; then
-        if [ -z "{{ QA_VERBOSE }}" ]; then
-            # 静默模式: 过滤状态/汇总行,只留下 warning/error 信息
-            llman sdd validate --all --strict --no-interactive 2>&1 \
-                | { grep -v '^OK ' | grep -v '^Staleness: ' | grep -v '^Note: ' \
-                      | grep -v 'Working tree is dirty' | grep -v '^Totals:' \
-                      || true; }
-            exit "${PIPESTATUS[0]}"
+        if [ "$(qa_level)" -eq 0 ]; then
+            # L0 静默: qa_step 捕获, 通过仅 [pass] 行, 失败全量 dump
+            qa_step "llmanspec-check" llman sdd validate --all --strict --no-interactive
+        elif [ "$(qa_level)" -eq 1 ]; then
+            # L1 摘要: 捕获后过滤状态/汇总行, 只留 warning/error 信息; 失败全量 dump
+            out="$(llman sdd validate --all --strict --no-interactive 2>&1)" || {
+                printf '%s\n' "$out" >&2
+                exit 1
+            }
+            printf '%s\n' "$out" | { grep -v '^OK ' | grep -v '^Staleness: ' | grep -v '^Note: ' \
+                  | grep -v 'Working tree is dirty' | grep -v '^Totals:' | grep -v '^INFO:' \
+                  || true; }
         else
             llman sdd validate --all --strict --no-interactive
         fi
         exit 0
-      fi
+    fi
 
     ci_value="$(printf '%s' "${CI:-}" | tr '[:upper:]' '[:lower:]')"
     case "$ci_value" in
@@ -308,7 +359,6 @@ gen-agent-skill:
 gen-public-api-skill:
     uv {{ UV_OPTIONS }} run python scripts/gen-public-api-skill.py
 
-
 # 生成: README 受控示例注入 + memory-compare SVG
 gen-readme-examples:
     #!/usr/bin/env bash
@@ -332,8 +382,11 @@ docs-drift-check:
     #!/usr/bin/env bash
     set -euo pipefail
     cd "{{ justfile_directory() }}"
-    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python scripts/gen-readme-examples.py --check
-    uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    export PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}"
+    qa_step "readme-examples-drift" uv {{ UV_OPTIONS }} run python scripts/gen-readme-examples.py --check
+    qa_step "docs-drift-check" uv {{ UV_OPTIONS }} run python scripts/gen-docs.py --check
 
 # 生成: 所有需要生成的数据
 gen: gen-project-constants gen-yaml-dsl-schema gen-agent-skill gen-public-api-skill gen-viz-data gen-viz-schedule-plan gen-readme-examples gen-docs
@@ -344,7 +397,15 @@ report-notebooks-coverage:
 
 # 门禁: 每个 **/__init__.py re-export 入口覆盖率 ≥ 10%
 check-notebooks-coverage:
-    uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --min-pct 1 --quiet
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    quiet_flag=""
+    if [ "$(qa_level)" != "2" ]; then
+        quiet_flag="--quiet"
+    fi
+    qa_step "check-notebooks-coverage" uv {{ UV_OPTIONS }} run python scripts/report-notebooks-coverage.py --min-pct 1 $quiet_flag
 
 # 门禁: 自定义每个入口的最低覆盖率阈值
 check-notebooks-coverage-threshold threshold:
@@ -352,21 +413,36 @@ check-notebooks-coverage-threshold threshold:
 
 # 检查: 类型检查
 type-check:
-    uv {{ UV_OPTIONS }} run basedpyright src/scalim/ --level error
-
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "type-check" uv {{ UV_OPTIONS }} run basedpyright src/scalim/ --level error
 
 # 检查: 核心链路更严格的类型边界(以 `pyproject.toml` 的 `tool.basedpyright.strict` 为准)
 type-check-core-tight:
-    uv {{ UV_OPTIONS }} run basedpyright $(uv {{ UV_OPTIONS }} run scripts/toml-get.py --file pyproject.toml --key tool.basedpyright.strict --format shell-words)
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "type-check-core-tight" uv {{ UV_OPTIONS }} run basedpyright $(uv {{ UV_OPTIONS }} run scripts/toml-get.py --file pyproject.toml --key tool.basedpyright.strict --format shell-words)
 
 # 检查: packages/scalim-yaml-dsl-lsp 类型检查 (Python 3.10+)
 type-check-packages-yaml-dsl-lsp:
-    uv {{ UV_OPTIONS }} run basedpyright -p packages/scalim-yaml-dsl-lsp packages/scalim-yaml-dsl-lsp/src
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "type-check-packages-yaml-dsl-lsp" uv {{ UV_OPTIONS }} run basedpyright -p packages/scalim-yaml-dsl-lsp packages/scalim-yaml-dsl-lsp/src
 
 # 检查: 格式化&Lint (只检查;不改文件)
 lint: type-check type-check-core-tight
-    uv {{ UV_OPTIONS }} run ruff format --check .
-    uv {{ UV_OPTIONS }} run ruff check .
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "ruff format --check" uv {{ UV_OPTIONS }} run ruff format --check .
+    qa_step "ruff check" uv {{ UV_OPTIONS }} run ruff check .
 
 # 检查: 类型错误检查 / lint错误并修复
 lintfix: type-check
@@ -375,67 +451,91 @@ lintfix: type-check
 
 # 检查: 文档字符串/注释语言(中文为主;允许反引号包裹技术词)
 py-doc-language-check:
-    uv {{ UV_OPTIONS }} run python scripts/check-py-doc-language.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
+    qa_step "py-doc-language-check" uv {{ UV_OPTIONS }} run python scripts/check-py-doc-language.py
 
 # 检查: `src/scalim/` 运行时契约规则(`pyright` 顶层指令 + 严格顶层规则 + 类内 `if TYPE_CHECKING:` 条件方法)
 top-level-pyright-pragmas-check:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py --strict-top-level $quiet_flag
+    qa_step "top-level-pyright-pragmas-check" uv {{ UV_OPTIONS }} run python scripts/check-top-level-pyright-pragmas.py --strict-top-level $quiet_flag
 
 # 检查: `src/scalim/` 注释/文档字符串英文需用反引号包裹(更严格)
 comments-cn-check:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-comments-cn.py $quiet_flag
+    qa_step "comments-cn-check" uv {{ UV_OPTIONS }} run python scripts/check-comments-cn.py $quiet_flag
 
 # 检查: 运行时输出文案语言(中文为主). 同时写入 `.tmp/artifacts/` 以便 CI 上传
 py-output-language-check:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-py-output-language.py --report .tmp/artifacts/output-language.report.txt $quiet_flag
+    qa_step "py-output-language-check" uv {{ UV_OPTIONS }} run python scripts/check-py-output-language.py --report .tmp/artifacts/output-language.report.txt $quiet_flag
 
 # 检查: 运行单元测试
 test:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="{{ _qa_pytest_quiet }}"
     fi
-    uv {{ UV_OPTIONS }} run pytest tests/ -q $quiet_flag
+    qa_step "test" uv {{ UV_OPTIONS }} run pytest tests/ -q $quiet_flag
 
 # 检查: 运行单元测试 (gate: xdist + coverage)
 test-gate:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="{{ _qa_pytest_quiet }}"
     fi
-    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 $quiet_flag 2>&1 | sed '/^\.\{30,\}$/d'
+    if [ "$(qa_level)" -eq 0 ]; then
+        qa_step "test-gate" uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 $quiet_flag
+    else
+        uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-report=term-missing --cov-fail-under=100 $quiet_flag 2>&1 | sed '/^\.\{30,\}$/d'
+    fi
 
 # 检查: 生成 branch coverage 报告(不做阈值门禁;用于定位 missing branches)
 test-gate-branch-report:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="{{ _qa_pytest_quiet }}"
     fi
-    uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-report=json:.tmp/coverage.json $quiet_flag 2>&1 | sed '/^\.\{30,\}$/d'
+    if [ "$(qa_level)" -eq 0 ]; then
+        qa_step "test-gate-branch-report" uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-report=json:.tmp/coverage.json $quiet_flag
+    else
+        uv {{ UV_OPTIONS }} run pytest tests/ -q -n auto --cov=scalim --cov-branch --cov-report=term-missing --cov-report=json:.tmp/coverage.json $quiet_flag 2>&1 | sed '/^\.\{30,\}$/d'
+    fi
 
 # 检查: core 覆盖率 gate (statements + branches; core 由 allow-non-core-file 治理标记决定)
 core-coverage-report:
@@ -451,11 +551,13 @@ core-coverage-report:
 core-coverage-check:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check $quiet_flag
+    qa_step "core-coverage-check" uv {{ UV_OPTIONS }} run python scripts/check-core-coverage.py --coverage-json .tmp/coverage.json --require-statements 100 --require-branches 100 --check $quiet_flag
 
 # 检查: 测试门禁覆盖率 (statements + branches; core 由 allow-non-core-file 治理标记决定)
 #
@@ -533,8 +635,10 @@ examples:
     #!/usr/bin/env bash
     set -euo pipefail
     cd "{{ justfile_directory() }}"
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
     export QA_VERBOSE="{{ QA_VERBOSE }}"
-    PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}" uv {{ UV_OPTIONS }} run python scripts/run-marimo-notebooks.py
+    export PYTHONPATH="{{ justfile_directory() }}${PYTHONPATH:+:$PYTHONPATH}"
+    qa_step "examples" uv {{ UV_OPTIONS }} run python scripts/run-marimo-notebooks.py
 
 alias example := examples
 
@@ -570,11 +674,13 @@ report-cast-usage:
 check-cast-usage:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-cast-usage.py --check $quiet_flag
+    qa_step "check-cast-usage" uv {{ UV_OPTIONS }} run python scripts/check-cast-usage.py --check $quiet_flag
 
 # 报告: pragma no cover 基线
 report-no-cover:
@@ -584,21 +690,25 @@ report-no-cover:
 check-no-cover:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check $quiet_flag
+    qa_step "check-no-cover" uv {{ UV_OPTIONS }} run python scripts/check-no-cover.py --check $quiet_flag
 
 # 检查: `# pragma: no branch` 使用必须显式 allow
 check-no-branch:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-no-branch.py --check $quiet_flag
+    qa_step "check-no-branch" uv {{ UV_OPTIONS }} run python scripts/check-no-branch.py --check $quiet_flag
 
 # 报告: dynattr 使用基线
 report-dynattr:
@@ -608,11 +718,13 @@ report-dynattr:
 check-dynattr:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check $quiet_flag
+    qa_step "check-dynattr" uv {{ UV_OPTIONS }} run python scripts/check-dynattr.py --check $quiet_flag
 
 # 报告: hotspot module 体量基线 (行数 SHOULD; 不阻断)
 report-module-size:
@@ -622,11 +734,13 @@ report-module-size:
 check-module-size:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-module-size.py --check $quiet_flag
+    qa_step "check-module-size" uv {{ UV_OPTIONS }} run python scripts/check-module-size.py --check $quiet_flag
 
 # 报告: ENTRY 函数复杂度基线
 report-complexity:
@@ -636,11 +750,13 @@ report-complexity:
 check-complexity:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run --with radon --with cognitive-complexity python scripts/check-complexity.py --check $quiet_flag
+    qa_step "check-complexity" uv {{ UV_OPTIONS }} run --with radon --with cognitive-complexity python scripts/check-complexity.py --check $quiet_flag
 
 # 软雷达: 更广 src/scalim top-N (不失败)
 complexity:
@@ -654,11 +770,13 @@ report-dispatch-map-completeness:
 check-dispatch-map-completeness:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-dispatch-map-completeness.py --check $quiet_flag
+    qa_step "check-dispatch-map-completeness" uv {{ UV_OPTIONS }} run python scripts/check-dispatch-map-completeness.py --check $quiet_flag
 
 # 报告: print(...) 使用基线
 report-print-usage:
@@ -668,21 +786,25 @@ report-print-usage:
 check-no-print:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check $quiet_flag
+    qa_step "check-no-print" uv {{ UV_OPTIONS }} run python scripts/check-no-print.py --check $quiet_flag
 
 # 检查: tests/ 禁止 time.sleep 轮询 (allowlist 除外)
 check-no-test-sleep:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-no-test-sleep.py --check $quiet_flag
+    qa_step "check-no-test-sleep" uv {{ UV_OPTIONS }} run python scripts/check-no-test-sleep.py --check $quiet_flag
 
 # 报告: noqa C901 使用基线
 report-noqa-c901:
@@ -692,112 +814,134 @@ report-noqa-c901:
 check-noqa-c901:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py --check $quiet_flag
+    qa_step "check-noqa-c901" uv {{ UV_OPTIONS }} run python scripts/check-noqa-c901.py --check $quiet_flag
 
 # 检查: public API surface governance (`__all__` 约束 + 内部模块封堵)
 check-api-surface-governance:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check $quiet_flag
+    qa_step "check-api-surface-governance" uv {{ UV_OPTIONS }} run python scripts/check-api-surface-governance.py --check $quiet_flag
 
 # 检查: Tier 1 curated entrypoints 一致性(marker 语法 + 去重 + 模块存在 + 字面量 `__all__`)
 check-public-api-curated-entrypoints:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-public-api-curated-entrypoints.py --check $quiet_flag
+    qa_step "check-public-api-curated-entrypoints" uv {{ UV_OPTIONS }} run python scripts/check-public-api-curated-entrypoints.py --check $quiet_flag
 
 # 检查: Tier1 curated entrypoints 与 examples/pytest public_api suite 覆盖漂移
 check-public-api-suite-coverage:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-public-api-suite-coverage.py --check $quiet_flag
+    qa_step "check-public-api-suite-coverage" uv {{ UV_OPTIONS }} run python scripts/check-public-api-suite-coverage.py --check $quiet_flag
 
 # 检查: export API(`__all__`) 必须使用 tuple 字面量
 check-export-api-must-tuple:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check $quiet_flag
+    qa_step "check-export-api-must-tuple" uv {{ UV_OPTIONS }} run scripts/check-export-api-must-tuple.py --check $quiet_flag
 
 # 检查: user-facing materials 不得引用内部/不安全导入路径
 check-user-material-import-boundaries:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check $quiet_flag
+    qa_step "check-user-material-import-boundaries" uv {{ UV_OPTIONS }} run python scripts/check-user-material-import-boundaries.py --check $quiet_flag
 
 # 检查: 主包导入图无环 + 禁止函数内导入(失败=严重架构违规; quiet 不吞 stderr)
 check-import-graph:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-import-graph.py --check $quiet_flag
+    qa_step "check-import-graph" uv {{ UV_OPTIONS }} run python scripts/check-import-graph.py --check $quiet_flag
 
 # 检查: workflow layering gate (workflow 不得依赖 dsl; yaml_dsl/runtime 不得包含 workflow_*.py)
 # 失败=严重架构违规; quiet 不吞 stderr
 check-workflow-layering:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-workflow-layering.py --check $quiet_flag
+    qa_step "check-workflow-layering" uv {{ UV_OPTIONS }} run python scripts/check-workflow-layering.py --check $quiet_flag
 
 # 检查: tests domain suites gate (目录结构 + tests.* 字符串引用边界)
 check-tests-domain-suites:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-tests-domain-suites.py --check $quiet_flag
+    qa_step "check-tests-domain-suites" uv {{ UV_OPTIONS }} run python scripts/check-tests-domain-suites.py --check $quiet_flag
 
 # 检查: monkeypatch policy gate (禁止 patch private name / patch global import)
 check-monkeypatch-policy:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-monkeypatch-policy.py --check $quiet_flag
+    qa_step "check-monkeypatch-policy" uv {{ UV_OPTIONS }} run python scripts/check-monkeypatch-policy.py --check $quiet_flag
 
 # 检查: 章节 notebook cells-native gate (r1113 run_* 主路径委托 / r1114 details expected* 键)
 check-notebook-cells-native:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-notebook-cells-native.py --check $quiet_flag
+    qa_step "check-notebook-cells-native" uv {{ UV_OPTIONS }} run python scripts/check-notebook-cells-native.py --check $quiet_flag
 
 # 报告: `object` 类型标注基线
 report-object-type:
@@ -807,11 +951,13 @@ report-object-type:
 check-object-type:
     #!/usr/bin/env bash
     set -euo pipefail
+    source "{{ justfile_directory() }}/scripts/qa-step.sh"
+    export QA_VERBOSE="{{ QA_VERBOSE }}"
     quiet_flag=""
-    if [ -z "{{ QA_VERBOSE }}" ]; then
+    if [ "$(qa_level)" != "2" ]; then
         quiet_flag="--quiet"
     fi
-    uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check $quiet_flag
+    qa_step "check-object-type" uv {{ UV_OPTIONS }} run python scripts/check-object-type.py --check $quiet_flag
 
 # QA: 仅py轻量的检查(不含 tests gate; 便于组合复用)
 quick-check-only-py-no-test-gate: uv-lock-check lint type-check-packages-yaml-dsl-lsp check-cast-usage check-no-cover check-no-branch check-dynattr check-object-type check-complexity check-module-size check-dispatch-map-completeness check-no-print check-no-test-sleep check-noqa-c901 check-api-surface-governance check-public-api-curated-entrypoints check-public-api-suite-coverage check-export-api-must-tuple check-user-material-import-boundaries check-import-graph check-workflow-layering check-tests-domain-suites check-monkeypatch-policy check-notebook-cells-native py-doc-language-check top-level-pyright-pragmas-check comments-cn-check py-output-language-check generated-artifacts-drift-check doc-governance-check md-ssot-check stdlib-collisions-check llmanspec-check
