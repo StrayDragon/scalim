@@ -11,9 +11,48 @@ from scalim_misc.examples._types import EXAMPLE_KIND_ORACLE, ExampleResult
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
+    from typing import Any
 
 _RUN_RESOLVER_STANDARD = "standard"
 _RUN_RESOLVER_ALLOW_UNIQUE = "allow_unique_run"
+_CHAPTER_RESULT_KEY = "chapter_result"
+# `app.run()` -> `(outputs, namespace)`.
+_APP_RUN_ITEMS = 2
+
+
+def _marimo_app_projection(mod: object) -> Callable[[], Any] | None:
+    """Build a runner from the module's marimo ``app`` (cells-native fallback).
+
+    marimo serializes a notebook as ``app = marimo.App(...)`` + ``@app.cell`` cells, and
+    re-saving (editor or `marimo upgrade`) keeps **only** that shape. So the app itself is
+    the execution SSOT: `app.run()` executes every cell in dependency order and returns
+    `(outputs, namespace)`, where the namespace is a read-only view of the cell-defined
+    names; the last teaching cell defines ``chapter_result``.
+
+    Returns ``None`` when the module exposes no runnable marimo ``app``, so callers can keep
+    the original "missing callable" diagnostics.
+    """
+    app = getattr(mod, "app", None)
+    app_run = getattr(app, "run", None)
+    if not callable(app_run):
+        return None
+    module_name = str(getattr(mod, "__name__", mod))
+
+    def _run() -> Any:
+        executed = app_run()
+        # marimo returns `(outputs, namespace)`; stay tolerant of a bare namespace/mapping.
+        namespace: object = executed[1] if isinstance(executed, tuple) and len(executed) == _APP_RUN_ITEMS else executed
+        lookup = getattr(namespace, "get", None)
+        if not callable(lookup):
+            msg = f"marimo `app.run()` gave no definitions namespace in chapter module: {module_name}"
+            raise TypeError(msg)
+        chapter_result = lookup(_CHAPTER_RESULT_KEY)
+        if not isinstance(chapter_result, dict):
+            msg = f"marimo cells in chapter module {module_name} did not define `{_CHAPTER_RESULT_KEY}` dict"
+            raise TypeError(msg)
+        return chapter_result
+
+    return _run
 
 
 @dataclass(frozen=True)
@@ -80,6 +119,13 @@ class ChapterRegistry:
         return self._chapter_modules_by_id[chapter_id]
 
     def _resolve_run(self, mod: object, chapter_id: str) -> Callable[[], ExampleResult]:
+        """Resolve the chapter's executable entry, in this priority.
+
+        1. ``run_{chapter_id}()`` — per-chapter named adapter (legacy).
+        2. ``run_chapter()`` — thin module-level adapter (marimo re-save tolerant).
+        3. ``run()`` / (allow_unique) a single ``run_*()`` — 兼容旧写法.
+        4. marimo ``app.run()`` projection -> ``chapter_result`` (cells-native SSOT).
+        """
         run_fn_name = f"run_{chapter_id}"
         run = getattr(mod, run_fn_name, None)
         if callable(run):
@@ -93,6 +139,7 @@ class ChapterRegistry:
         if callable(run):
             return run
 
+        unique_hint = ""
         if self._run_resolver == _RUN_RESOLVER_ALLOW_UNIQUE:
             candidates = []
             for name in dir(mod):
@@ -103,12 +150,15 @@ class ChapterRegistry:
                     candidates.append(fn)
             if len(candidates) == 1:
                 return candidates[0]
-            msg = "missing callable `{}`/`run_chapter()`/`run()`/single `run_*()` in chapter module: {}".format(
-                run_fn_name, getattr(mod, "__name__", mod)
-            )
-            raise AttributeError(msg)
+            unique_hint = "/single `run_*()`"
 
-        msg = "missing callable `{}` (or `run_chapter()`/`run()`) in chapter module: {}".format(run_fn_name, getattr(mod, "__name__", mod))
+        projected = _marimo_app_projection(mod)
+        if projected is not None:
+            return projected
+
+        msg = "missing callable `{}` (or `run_chapter()`/`run()`{}) in chapter module: {}".format(
+            run_fn_name, unique_hint, getattr(mod, "__name__", mod)
+        )
         raise AttributeError(msg)
 
     def _load_case(self, chapter_id: str) -> _Case:

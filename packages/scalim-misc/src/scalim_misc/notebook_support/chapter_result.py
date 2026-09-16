@@ -5,8 +5,10 @@ The cells-native chapter contract:
 
 - The chapter execution main path lives in marimo cells; the final cell produces
   a ``chapter_result`` dict.
-- The module-level ``run_chapter()`` thin adapter runs ``app.run()`` and extracts
-  ``chapter_result`` from ``defs``.
+- Entry resolution (``ChapterRegistry._resolve_run``, identical for ``just examples``
+  and pytest): ``run_<id>()`` -> ``run_chapter()`` -> ``run()`` -> unique ``run_*()`` ->
+  built-in marimo projection (``app.run()`` namespace -> ``chapter_result``). That last
+  step keeps 对拍 alive after a marimo re-save, which serializes only ``@app.cell`` defs.
 - ``ChapterRegistry._safe_run()`` wraps that dict into ``ExampleResult`` (oracle).
 
 This module MUST NOT depend on marimo so that ``just examples`` / pytest /

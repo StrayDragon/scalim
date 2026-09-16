@@ -7,30 +7,28 @@
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / yaml_dsl_debugging
+    mo.md(r"""
+    # demo_big_data_report / yaml_dsl_debugging
 
-        ## 回归点
+    ## 回归点
 
-        一个确定性的“预期失败”章节：`where` 引用未声明字段时必须编译期报错，
-        演示常见错误如何定位。
+    一个确定性的“预期失败”章节：`where` 引用未声明字段时必须编译期报错，
+    演示常见错误如何定位。
 
-        ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
+    ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
-        1. 内联 bad YAML（`where: "unknown_field > 0"` 故意引用未知字段）
-        2. `compile` 预期失败 → 检查错误文案
-        3. 断言展开 → chapter_result（passed=True = 预期失败被正确捕获）
+    1. 内联 bad YAML（`where: "unknown_field > 0"` 故意引用未知字段）
+    2. `compile` 预期失败 → 检查错误文案
+    3. 断言展开 → chapter_result（passed=True = 预期失败被正确捕获）
 
-        Gate: `just examples`
-        """
-    )
+    Gate: `just examples`
+    """)
     return
 
 
@@ -47,7 +45,7 @@ def _():
 
     repo_root = ensure_repo_root_on_sys_path(__file__)
     _ = repo_root
-    return (repo_root,)
+    return
 
 
 @app.cell
@@ -61,12 +59,10 @@ def _():
     from scalim_misc.notebook_support.chapter_result import make_chapter_result, render_checks
 
     return (
-        Any,
         DemandRunOptions,
         DemandRunRuntimeOptions,
         DemandRunSecurityOptions,
         DemandRunTemplateOptions,
-        Dict,
         Path,
         compile_yaml,
         make_chapter_result,
@@ -88,7 +84,7 @@ def _(Path, tempfile):
 
 
 @app.cell
-def _(Path, tmp):
+def _(tmp):
     # 内联 bad YAML（行列表 join：规避 marimo 对多行字符串内缩进的变换）
     bad_yaml = tmp / "bad_where.yaml"
     out_csv = tmp / "out.csv"
@@ -118,7 +114,7 @@ def _(Path, tmp):
     ]
     bad_yaml.write_text("\n".join(bad_yaml_lines), encoding="utf-8")
     print("bad_yaml:", bad_yaml)
-    return bad_yaml, bad_yaml_lines, out_csv
+    return bad_yaml, out_csv
 
 
 @app.cell
@@ -155,18 +151,18 @@ def _(
     print("expected_failed =", expected_failed)
     print("exc_type        =", exc_type)
     print("message         =", message[:160])
-    return expected_failed, exc_type, message
+    return exc_type, expected_failed, message
 
 
 @app.cell
 def _(expected_failed, render_checks):
     checks = {"where 引用未知字段编译期报错": expected_failed}
     render_checks(checks)
-    return checks
+    return (checks,)
 
 
 @app.cell
-def _(bad_yaml, checks, exc_type, expected_failed, make_chapter_result, message):
+def _(bad_yaml, checks, exc_type, make_chapter_result, message):
     passed = bool(all(checks.values()))
     summary = "expected failure captured: {}: {}".format(exc_type, message[:120])
     # 对拍期望（教学 payload；headless 可经 details 键定位）
@@ -185,7 +181,7 @@ def _(bad_yaml, checks, exc_type, expected_failed, make_chapter_result, message)
             "checks": {k: bool(v) for k, v in checks.items()},
         },
     )
-    return chapter_result, passed, summary
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -204,12 +200,6 @@ def _(chapter_result, mo):
     table_rows = details_to_rows(chapter_result["details"])
     mo.ui.table(table_rows, selection=None) if table_rows else mo.md("(无详情)")
     return
-
-
-def run_chapter():
-    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

@@ -7,31 +7,29 @@
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / chapters_of_scenarios / ch230_upload_retry
+    mo.md(r"""
+    # demo_big_data_report / chapters_of_scenarios / ch230_upload_retry
 
-        演示：**上传遇瞬态 503 时应用侧重试至成功**（重试逻辑在 Observer 应用代码里，
-        Scalim 只负责投递 `OUTPUT_TARGET_END`）。
+    演示：**上传遇瞬态 503 时应用侧重试至成功**（重试逻辑在 Observer 应用代码里，
+    Scalim 只负责投递 `OUTPUT_TARGET_END`）。
 
-        主线装配过程（每个步骤一个 cell，可就地修改重跑）：
+    主线装配过程（每个步骤一个 cell，可就地修改重跑）：
 
-        1. 定义零件：`UploadWithRetry` Observer（3 次尝试,记录 attempts 序列）
-        2. 启动 mock server（前 2 次上传返回 503,第 3 次 200）
-        3. 写入 demand YAML；组装 `DemandRunOptions`
-        4. 运行 demand → Observer 重试并捕获上传
-        5. 证据核对：attempts 序列 [503, 503, 200] + server 实收
-        6. 断言展开 → chapter_result
+    1. 定义零件：`UploadWithRetry` Observer（3 次尝试,记录 attempts 序列）
+    2. 启动 mock server（前 2 次上传返回 503,第 3 次 200）
+    3. 写入 demand YAML；组装 `DemandRunOptions`
+    4. 运行 demand → Observer 重试并捕获上传
+    5. 证据核对：attempts 序列 [503, 503, 200] + server 实收
+    6. 断言展开 → chapter_result
 
-        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
-        """
-    )
+    Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
+    """)
     return
 
 
@@ -94,6 +92,7 @@ def _(repo_root):
 def _(
     ALLOWED_MODULES,
     Any,
+    Dict,
     Event,
     EventDispatchObserver,
     EventType,
@@ -170,11 +169,11 @@ def _(mo, tmp, write_minimal_demand_yaml):
     demand_yaml_text = demand_path.read_text(encoding="utf-8")
 
     mo.md("**demand.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text))
-    return demand_path, demand_yaml_text
+    return (demand_path,)
 
 
 @app.cell
-def _(UploadWithRetry, demand_options, api, demand_path, server, tmp):
+def _(UploadWithRetry, api, demand_options, demand_path, server, tmp):
     obs = UploadWithRetry(base_url=server.base_url, max_attempts=3)
     result = api.run(
         str(demand_path),
@@ -185,7 +184,6 @@ def _(UploadWithRetry, demand_options, api, demand_path, server, tmp):
     print("attempts   =", [(a["attempt"], a["status"]) for a in obs.attempts])
     print("uploaded   =", len(obs.uploaded))
     print("errors     =", obs.errors)
-
     return obs, result
 
 
@@ -221,7 +219,7 @@ def _(obs, render_checks, result, server):
         "server 收到 >=3 次尝试": len(server.state.upload_attempts) >= 3,
     }
     render_checks(checks)
-    return checks
+    return (checks,)
 
 
 @app.cell
@@ -251,7 +249,7 @@ def _(checks, make_chapter_result, obs, result, server):
             "note": "retry lives in Observer application code; Scalim only delivers OUTPUT_TARGET_END",
         },
     )
-    return chapter_result, passed, summary
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -270,12 +268,6 @@ def _(chapter_result, mo):
     rows = details_to_rows(chapter_result["details"])
     mo.ui.table(rows, selection=None) if rows else mo.md("(无详情)")
     return
-
-
-def run_chapter():
-    """SSOT 入口: headless runner / pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

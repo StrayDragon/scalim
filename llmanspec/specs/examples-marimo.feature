@@ -16,13 +16,13 @@
     那么 该章节 MUST 同时具备一个 Marimo notebook 入口
   @req:r401 @human
   场景: SSOT 入口必须位于 notebooks 且可被 headless 复用
-    - 系统 MUST 将纳入 examples gate 的示例/章节执行真相来源定义为"可被导入调用的 Python 入口函数"，且该入口 MUST 位于 notebooks 侧。 该 SSOT 入口 MUST 满足： - MUST 可被 headless runner 与 pytest 直接导入并执行（不得要求启动 marimo UI server） - MUST 产生可定位的结果摘要（至少包含 `passed` 与 `summary`） - MUST 与对应的 Marimo notebook 交互入口同源（避免"UI 一套逻辑 / headless 一套逻辑"的漂移）
+    - 系统 MUST 将纳入 examples gate 的示例/章节执行真相来源定义为"可被导入调用的 Python 入口"，且该入口 MUST 位于 notebooks 侧（模块级 `run_*()`/`run_chapter()` 适配层，或该 notebook 模块的 `app` 对象经 registry 投影）。 该 SSOT 入口 MUST 满足： - MUST 可被 headless runner 与 pytest 直接导入并执行（不得要求启动 marimo UI server） - MUST 产生可定位的结果摘要（至少包含 `passed` 与 `summary`） - MUST 与对应的 Marimo notebook 交互入口同源（避免"UI 一套逻辑 / headless 一套逻辑"的漂移）
     当 维护者为示例体系新增一个纳入 gate 的章节 notebook
     那么 该章节 MUST 提供一个 notebooks 侧 SSOT 入口函数供 headless runner 与 pytest 复用
   @req:r497 @human
   场景: 章节执行真相位于 notebook cells，SSOT 入口为薄适配层
     - 每个纳入 examples gate 的章节 notebook MUST 将示例执行主路径（scalim 调用装配、参数组装、中间产物展示、断言展开）写在 marimo cells 内并逐步展开，确保读者打开 notebook 即可观察运行机制与中间结果。
-    - 章节的 SSOT 入口函数（`run_<id>()`/`run_chapter()`）MUST 是薄适配层：执行 notebook 自身的 cell 图（如 `app.run()`）并提取对拍结果，MUST NOT 在模块级或 support 模块中重复实现一份独立执行主路径；章节的核心逻辑 MUST NOT 通过调用外部模块级 `run_*()` 函数来执行。
+    - 章节的 SSOT 入口函数（`run_<id>()`/`run_chapter()`）MUST 是薄适配层：执行 notebook 自身的 cell 图（如 `app.run()`）并提取对拍结果，MUST NOT 在模块级或 support 模块中重复实现一份独立执行主路径；章节的核心逻辑 MUST NOT 通过调用外部模块级 `run_*()` 函数来执行。 该薄适配层 MAY 由轨道 registry 的内建投影（`app.run()` 返回的 cell 命名空间中的 `chapter_result`）等价代替，使 marimo 重存（editor 保存 / `marimo upgrade`）后文件仅剩 `@app.cell` 形态时对拍仍可执行。
     - 章节 MUST 在 cells 内产出结构化对拍结果 `chapter_result`（至少包含 `passed` 与 `summary`），供 headless runner 与 pytest 提取，避免"UI 一套逻辑 / headless 一套逻辑"漂移。
     当 读者在 marimo 中运行任一示例章节 notebook
     那么 该章节的 scalim 装配/运行/断言主路径 MUST 位于 notebook 自身 cells 内，SSOT 入口函数仅作为薄适配层提取 cell 产物

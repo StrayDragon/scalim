@@ -7,31 +7,29 @@
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / chapters_of_scenarios / ch240_pre_use_batch_size
+    mo.md(r"""
+    # demo_big_data_report / chapters_of_scenarios / ch240_pre_use_batch_size
 
-        演示：**`pre_use_batch_size` 策略信号改写 batch_size**（仅当
-        `DemandRunRuntimeOptions.batch_size=UNSET` 时触发）。
+    演示：**`pre_use_batch_size` 策略信号改写 batch_size**（仅当
+    `DemandRunRuntimeOptions.batch_size=UNSET` 时触发）。
 
-        主线装配过程（每个步骤一个 cell，可就地修改重跑）：
+    主线装配过程（每个步骤一个 cell，可就地修改重跑）：
 
-        1. 定义零件：`ForceBatchSizeHook`（策略改写）+ `BatchSizeProbe`（记录实际生效值）
-        2. 写入 demand / workflow YAML；组装带 `UNSET` 的选项
-        3. demand 运行 → Hook 改写 + Probe 记录 `PIPELINE_START.batch_size`
-        4. workflow 运行 → 同一机制对照编排层
-        5. 拖 slider 改覆盖值 → 观察 pipeline 实际生效值跟随变化
-        6. 断言展开 → chapter_result
+    1. 定义零件：`ForceBatchSizeHook`（策略改写）+ `BatchSizeProbe`（记录实际生效值）
+    2. 写入 demand / workflow YAML；组装带 `UNSET` 的选项
+    3. demand 运行 → Hook 改写 + Probe 记录 `PIPELINE_START.batch_size`
+    4. workflow 运行 → 同一机制对照编排层
+    5. 拖 slider 改覆盖值 → 观察 pipeline 实际生效值跟随变化
+    6. 断言展开 → chapter_result
 
-        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
-        """
-    )
+    Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
+    """)
     return
 
 
@@ -74,7 +72,6 @@ def _(repo_root):
         ALLOWED_MODULES,
         Any,
         BaseHook,
-        Dict,
         Event,
         EventDispatchObserver,
         EventType,
@@ -103,7 +100,16 @@ def _(mo):
 
 
 @app.cell
-def _(Any, BaseHook, Dict, Event, EventDispatchObserver, EventType, List, Optional, Set):
+def _(
+    Any,
+    BaseHook,
+    Event,
+    EventDispatchObserver,
+    EventType,
+    List,
+    Optional,
+    Set,
+):
     # 零件: 策略 Hook — 在 run_ir 前改写 batch_size
     class ForceBatchSizeHook(BaseHook):
         def __init__(self, *, next_value: int, reason: str) -> None:
@@ -136,7 +142,7 @@ def _(Any, BaseHook, Dict, Event, EventDispatchObserver, EventType, List, Option
 
 
 @app.cell
-def _(ALLOWED_MODULES, List, Path, UNSET, api, override_batch_size):
+def _(ALLOWED_MODULES, Any, List, Path, UNSET, api, override_batch_size):
     # 零件: 运行选项工厂 — batch_size 显式 UNSET,让 pre_use_batch_size 信号生效
     def demand_options(*, components: List[Any], output_root: Path) -> api.DemandRunOptions:
         overrides = api.RunOverrides.csv_file(
@@ -175,11 +181,19 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
     workflow_yaml_text = workflow_path.read_text(encoding="utf-8")
 
     mo.md("**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text))
-    return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
+    return demand_path, workflow_path
 
 
 @app.cell
-def _(BatchSizeProbe, ForceBatchSizeHook, api, demand_options, demand_path, override_batch_size, tmp):
+def _(
+    BatchSizeProbe,
+    ForceBatchSizeHook,
+    api,
+    demand_options,
+    demand_path,
+    override_batch_size,
+    tmp,
+):
     demand_hook = ForceBatchSizeHook(next_value=int(override_batch_size.value), reason="demo-demand")
     demand_probe = BatchSizeProbe()
     demand_result = api.run(
@@ -191,7 +205,6 @@ def _(BatchSizeProbe, ForceBatchSizeHook, api, demand_options, demand_path, over
     print("hook calls             =", demand_hook.calls)
     print("hook prev → next       =", demand_hook.last_prev, "→", demand_hook.last_next)
     print("pipeline batch_size    =", demand_probe.batch_sizes)
-
     return demand_hook, demand_probe, demand_result
 
 
@@ -226,12 +239,20 @@ def _(
     )
     print("workflow hook calls    =", workflow_hook.calls)
     print("workflow pipeline batch=", workflow_probe.batch_sizes)
-
     return workflow_hook, workflow_probe, workflow_result
 
 
 @app.cell
-def _(demand_hook, demand_probe, demand_result, override_batch_size, render_checks, workflow_hook, workflow_probe, workflow_result):
+def _(
+    demand_hook,
+    demand_probe,
+    demand_result,
+    override_batch_size,
+    render_checks,
+    workflow_hook,
+    workflow_probe,
+    workflow_result,
+):
     # 断言展开: 所有观察对象每次运行重建,精确断言幂等
     checks = {
         "demand rows == 3": demand_result.total_rows == 3,
@@ -245,11 +266,19 @@ def _(demand_hook, demand_probe, demand_result, override_batch_size, render_chec
         "workflow pipeline 生效值一致": workflow_probe.batch_sizes == [int(override_batch_size.value)],
     }
     render_checks(checks)
-    return checks
+    return (checks,)
 
 
 @app.cell
-def _(checks, demand_hook, demand_probe, make_chapter_result, override_batch_size, workflow_hook, workflow_probe):
+def _(
+    checks,
+    demand_hook,
+    demand_probe,
+    make_chapter_result,
+    override_batch_size,
+    workflow_hook,
+    workflow_probe,
+):
     passed = bool(all(checks.values()))
     summary = "demand_hook_calls={} demand_batch={} demand_pipeline_batch={} workflow_hook_calls={} workflow_pipeline_batch={}".format(
         demand_hook.calls,
@@ -292,7 +321,7 @@ def _(checks, demand_hook, demand_probe, make_chapter_result, override_batch_siz
             "note": "explicit DemandRunRuntimeOptions.batch_size skips the signal; leave UNSET to opt-in",
         },
     )
-    return chapter_result, passed, summary
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -311,12 +340,6 @@ def _(chapter_result, mo):
     rows = details_to_rows(chapter_result["details"])
     mo.ui.table(rows, selection=None) if rows else mo.md("(无详情)")
     return
-
-
-def run_chapter():
-    """SSOT 入口: headless runner / pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

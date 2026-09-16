@@ -4,37 +4,35 @@
   Before: 装配/运行虽在 cells,但无章节契约（无 expected 快照、无标准教学结构、
           chapter_result 用裸 dict 组装）
   After:  装配窥视 / 双 scheduler 运行 / 对拍断言全部在 cells 内逐步展开,
-          run_chapter() 薄适配层 + make_chapter_result（r1114 expected 前缀键）
+          对拍走 registry 投影（app.run() → chapter_result）+ make_chapter_result（r1114 expected 前缀键）
 """
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / chapters_of_scenarios / ch260_scheduler_comparison
+    mo.md(r"""
+    # demo_big_data_report / chapters_of_scenarios / ch260_scheduler_comparison
 
-        对比 workflow 两种 scheduler preset（`pipeline` / `stage_barrier`）的吞吐/并行度差异。
-        通过 loader 内 sleep 放大差异便于观察。
+    对比 workflow 两种 scheduler preset（`pipeline` / `stage_barrier`）的吞吐/并行度差异。
+    通过 loader 内 sleep 放大差异便于观察。
 
-        ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
+    ## 主线装配过程（每个步骤一个 cell，可就地修改重跑）
 
-        1. 复杂可复用零件：`loaders.py` 的 medium/slow loader（sleep 模拟耗时）+ `Recorder` Observer
-        2. 装配：写 demand / workflow YAML（3 个 run：a、x 并行，b depends_on a）
-        3. **装配窥视**：渲染 YAML 内容与两种 scheduler preset（读者无需跳库）
-        4. 双 scheduler 运行：同一 workflow 各跑一次，计时 + 事件采集
-        5. 汇总：wall_s / max_concurrent / stage_gap
-        6. 断言展开 + `make_chapter_result`（含 r1114 `expected` 快照）
+    1. 复杂可复用零件：`loaders.py` 的 medium/slow loader（sleep 模拟耗时）+ `Recorder` Observer
+    2. 装配：写 demand / workflow YAML（3 个 run：a、x 并行，b depends_on a）
+    3. **装配窥视**：渲染 YAML 内容与两种 scheduler preset（读者无需跳库）
+    4. 双 scheduler 运行：同一 workflow 各跑一次，计时 + 事件采集
+    5. 汇总：wall_s / max_concurrent / stage_gap
+    6. 断言展开 + `make_chapter_result`（含 r1114 `expected` 快照）
 
-        对拍入口: `run_chapter()` → `app.run()` → `chapter_result`
-        Gate: `just examples`
-        """
-    )
+    对拍入口: registry 投影 `app.run()` → cell 命名空间里的 `chapter_result`
+    Gate: `just examples`
+    """)
     return
 
 
@@ -75,12 +73,11 @@ def _():
         DemandRunSecurityOptions,
         EventType,
         Observer,
-        Path,
         PipelineSchedulerOptions,
         StageBarrierSchedulerOptions,
         WorkflowExecutionOptions,
-        WorkflowRuntimeOptions,
         WorkflowRunOptions,
+        WorkflowRuntimeOptions,
         make_chapter_result,
         render_checks,
         run_workflow,
@@ -98,7 +95,7 @@ def _(repo_root):
 
 
 @app.cell
-def _(Path, loaders_module, tmp_dir):
+def _(loaders_module, tmp_dir):
     # ① 装配：写 3 个 demand YAML（a/x 用 medium loader，x 用 slow loader）+ 1 个 workflow YAML
     #   （b depends_on a，制造跨 stage 依赖）。
     def _w(path, text):
@@ -120,7 +117,7 @@ def _(Path, loaders_module, tmp_dir):
     )
     workflow_path = str(wf)
     print(f"workflow written: {workflow_path}")
-    return demand_a, demand_b, demand_x, wf, workflow_path
+    return demand_a, wf, workflow_path
 
 
 @app.cell(hide_code=True)
@@ -164,8 +161,8 @@ def _(
     Recorder,
     StageBarrierSchedulerOptions,
     WorkflowExecutionOptions,
-    WorkflowRuntimeOptions,
     WorkflowRunOptions,
+    WorkflowRuntimeOptions,
     loaders_module,
     run_workflow,
     time,
@@ -279,7 +276,7 @@ def _(bs, make_chapter_result, ps, render_checks):
             "checks": {k: bool(v) for k, v in checks.items()},
         },
     )
-    return chapter_result, passed
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -310,12 +307,6 @@ def _(bs, mo, ps):
         selection=None,
     )
     return
-
-
-def run_chapter():
-    """SSOT 入口：headless runner 与 pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

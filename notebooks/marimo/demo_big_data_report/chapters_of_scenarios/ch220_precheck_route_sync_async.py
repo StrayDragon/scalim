@@ -7,30 +7,28 @@
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / chapters_of_scenarios / ch220_precheck_route_sync_async
+    mo.md(r"""
+    # demo_big_data_report / chapters_of_scenarios / ch220_precheck_route_sync_async
 
-        演示：**应用层预估完成后 HTTP 分流**（不绑 Scalim `workflow_preflight`）。
+    演示：**应用层预估完成后 HTTP 分流**（不绑 Scalim `workflow_preflight`）。
 
-        主线装配过程（每个步骤一个 cell，可就地修改重跑）：
+    主线装配过程（每个步骤一个 cell，可就地修改重跑）：
 
-        1. 定义零件：`estimate_job` 预估 + `route_and_maybe_run` 分流决策
-        2. 启动本地 mock server（`POST /dispatch` 按 estimated_rows 判 sync/async）
-        3. 写入 demand / workflow YAML fixtures（内容可见）
-        4. 小任务（sync）→ 直接 `run` / `run_workflow`
-        5. 大任务（async）→ 只入队 mock，不跑 Scalim（断言无产物文件）
-        6. 断言展开（含 server 侧存在性核对，交互重跑幂等）
+    1. 定义零件：`estimate_job` 预估 + `route_and_maybe_run` 分流决策
+    2. 启动本地 mock server（`POST /dispatch` 按 estimated_rows 判 sync/async）
+    3. 写入 demand / workflow YAML fixtures（内容可见）
+    4. 小任务（sync）→ 直接 `run` / `run_workflow`
+    5. 大任务（async）→ 只入队 mock，不跑 Scalim（断言无产物文件）
+    6. 断言展开（含 server 侧存在性核对，交互重跑幂等）
 
-        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
-        """
-    )
+    Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
+    """)
     return
 
 
@@ -74,12 +72,11 @@ def _(repo_root):
     _ = repo_root
     return (
         ALLOWED_MODULES,
-        Any,
         ASYNC_ESTIMATED_ROWS,
+        Any,
         Dict,
         List,
         MockHttpServer,
-        Optional,
         Path,
         SYNC_ESTIMATED_ROWS,
         WorkflowExecutionOptions,
@@ -97,7 +94,19 @@ def _(repo_root):
 
 
 @app.cell
-def _(ALLOWED_MODULES, Dict, List, MockHttpServer, Optional, Path, api, post_dispatch):
+def _(
+    ALLOWED_MODULES,
+    Any,
+    Dict,
+    List,
+    MockHttpServer,
+    Path,
+    WorkflowExecutionOptions,
+    WorkflowRunOptions,
+    WorkflowRuntimeOptions,
+    api,
+    post_dispatch,
+):
     # 零件: 应用层预估(非 Scalim workflow_preflight)
     def estimate_job(*, estimated_rows: int) -> Dict[str, Any]:
         return {"estimated_rows": int(estimated_rows), "estimated_duration_secs": max(1, int(estimated_rows) // 1000)}
@@ -178,7 +187,7 @@ def _(ALLOWED_MODULES, Dict, List, MockHttpServer, Optional, Path, api, post_dis
             outputs=api.DemandRunOutputOptions(overrides=overrides),
         )
 
-    return _demand_options, estimate_job, route_and_maybe_run
+    return (route_and_maybe_run,)
 
 
 @app.cell
@@ -206,11 +215,21 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
     workflow_yaml_text = workflow_path.read_text(encoding="utf-8")
 
     mo.md("**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text))
-    return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
+    return demand_path, workflow_path
 
 
 @app.cell
-def _(ASYNC_ESTIMATED_ROWS, Any, Dict, List, SYNC_ESTIMATED_ROWS, demand_path, route_and_maybe_run, server, tmp, workflow_path):
+def _(
+    Any,
+    Dict,
+    List,
+    SYNC_ESTIMATED_ROWS,
+    demand_path,
+    route_and_maybe_run,
+    server,
+    tmp,
+    workflow_path,
+):
     # sync 小任务: 直跑 demand 与 workflow
     async_queue: List[Dict[str, Any]] = []
 
@@ -237,12 +256,19 @@ def _(ASYNC_ESTIMATED_ROWS, Any, Dict, List, SYNC_ESTIMATED_ROWS, demand_path, r
 
     print("sync-demand :", sync_demand)
     print("sync-workflow:", sync_workflow)
-
     return async_queue, sync_demand, sync_workflow
 
 
 @app.cell
-def _(ASYNC_ESTIMATED_ROWS, async_queue, demand_path, route_and_maybe_run, server, tmp, workflow_path):
+def _(
+    ASYNC_ESTIMATED_ROWS,
+    async_queue: "List[Dict[str, Any]]",
+    demand_path,
+    route_and_maybe_run,
+    server,
+    tmp,
+    workflow_path,
+):
     # async 大任务: 只入队 mock,不跑 Scalim
     async_demand = route_and_maybe_run(
         server=server,
@@ -267,12 +293,19 @@ def _(ASYNC_ESTIMATED_ROWS, async_queue, demand_path, route_and_maybe_run, serve
 
     print("async-demand :", async_demand)
     print("async-workflow:", async_workflow)
-
     return async_demand, async_workflow
 
 
 @app.cell
-def _(async_demand, async_queue, async_workflow, mo, server, sync_demand, sync_workflow):
+def _(
+    async_demand,
+    async_queue: "List[Dict[str, Any]]",
+    async_workflow,
+    mo,
+    server,
+    sync_demand,
+    sync_workflow,
+):
     mo.ui.tabs(
         {
             "sync demand": mo.ui.table([sync_demand], selection=None),
@@ -287,7 +320,16 @@ def _(async_demand, async_queue, async_workflow, mo, server, sync_demand, sync_w
 
 
 @app.cell
-def _(async_demand, async_queue, async_workflow, render_checks, server, sync_demand, sync_workflow, tmp):
+def _(
+    async_demand,
+    async_queue: "List[Dict[str, Any]]",
+    async_workflow,
+    render_checks,
+    server,
+    sync_demand,
+    sync_workflow,
+    tmp,
+):
     # 断言展开: server 侧用「job_id 存在匹配」语义,交互重跑不累积误判
     async_files = list((tmp / "async_demand_out").rglob("*")) + list((tmp / "async_workflow_out").rglob("*"))
     async_files = [p for p in async_files if p.is_file()]
@@ -306,12 +348,21 @@ def _(async_demand, async_queue, async_workflow, render_checks, server, sync_dem
         ),
     }
     render_checks(checks)
-
     return async_files, checks
 
 
 @app.cell
-def _(async_demand, async_files, async_queue, async_workflow, checks, make_chapter_result, server, sync_demand, sync_workflow):
+def _(
+    async_demand,
+    async_files,
+    async_queue: "List[Dict[str, Any]]",
+    async_workflow,
+    checks,
+    make_chapter_result,
+    server,
+    sync_demand,
+    sync_workflow,
+):
     passed = bool(all(checks.values()))
     summary = "sync_rows={}/{} queue={} dispatches={} async_files={}".format(
         sync_demand.get("total_rows"),
@@ -347,7 +398,7 @@ def _(async_demand, async_files, async_queue, async_workflow, checks, make_chapt
             "note": "precheck is app-layer estimate→HTTP; same router wraps demand run and workflow run_workflow",
         },
     )
-    return chapter_result, passed, summary
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -366,12 +417,6 @@ def _(chapter_result, mo):
     rows = details_to_rows(chapter_result["details"])
     mo.ui.table(rows, selection=None) if rows else mo.md("(无详情)")
     return
-
-
-def run_chapter():
-    """SSOT 入口: headless runner / pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

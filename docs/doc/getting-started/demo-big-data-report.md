@@ -19,13 +19,14 @@
 
 | 位置 | 角色 |
 | --- | --- |
-| `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch*.py` | 声明面章节(教学主流程 + `run_chapter()` 对拍真相) |
+| `notebooks/marimo/demo_big_data_report/chapters_of_yaml_dsl/ch*.py` | 声明面章节(教学主流程；cells 即对拍真相) |
 | `.../chapters_of_ir/ch*.py` | 装配面章节(Python IR + public API 覆盖) |
 | `.../chapters_of_scenarios/ch*.py` | 场景面章节(hooks/events、阶段调度) |
-| `.../chapters*/registry.py` | 轨道注册中心：自动发现章节 + `run_all_chapters()` |
+| `.../chapters*/registry.py` | 轨道注册中心：自动发现章节 + `run_all_chapters()`(解析入口优先级见下) |
 | `scripts/run-marimo-notebooks.py` | 非 marimo 的 headless runner：发现 `demo_*`/`example_*` 套件 → 发现带 `registry.py` 的 `chapters*` 轨道 → 跑对应 notebook 对拍 → 汇总退出码 |
 
 - 打开编辑器(只看到 cells)：`just notebook`；跑对拍：`just examples`（或 `just examples-big-data` 只跑本套件）。
+- 章节入口解析优先级(registry 内建，`just examples` 与 pytest 同源)：`run_<id>()` → `run_chapter()` → `run()` → 唯一 `run_*()` → **marimo `app.run()` 投影**(取 cell 命名空间里的 `chapter_result`)。最后一条让「marimo 重存后只剩 `@app.cell` 形态」也能对拍，因此章节只需保证最后一个 cells 产出 `chapter_result`。
 - runner 支持 `SCALIM_EXAMPLES_SUITES=`(白名单)、`SCALIM_EXAMPLES_JOBS=`(并行)、`QA_VERBOSE=1`(逐章明细)。
 
 ### 根 README 的「第一口」就在本主线内

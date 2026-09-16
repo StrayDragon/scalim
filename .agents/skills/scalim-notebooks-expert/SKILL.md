@@ -39,7 +39,8 @@ verify_scalim_output(...)                       # ~900 行 oracle 藏在库里
 
 一个 cells-native 章节 notebook 的模块级代码**只保留**：
 - `import marimo`、`__generated_with`、`app = marimo.App(width="full")`
-- `def run_chapter():` 薄适配层（`app.run()` → 提取 `defs["chapter_result"]`）
+- （可选）`def run_chapter():` 薄适配层（`app.run()` → 提取 `chapter_result`）。
+  registry 已内建同款投影，故 marimo 重存（editor 保存 / `marimo upgrade` 只保留 `@app.cell`）后对拍仍成立。
 
 cells 内逐步骤展开（每步一个 cell，可就地修改重跑）：
 

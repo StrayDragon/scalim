@@ -3,7 +3,8 @@
 设计目标:
 - 全部内容在 marimo cells 内书写(渐进式探索 + 就地可视化)
 - 通过 `chapter_result` 变量向 headless runner / pytest 暴露对拍结果
-- `run_chapter()` 兼容层: `app.run()` → `chapter_result`
+- 对拍入口: registry 内建投影 `app.run()` → cell 命名空间里的 `chapter_result`
+  (模块级 `run_chapter()` 只是可选等价适配层)
 - 与现有 ChapterRegistry / just examples / pytest 完全兼容
 
 迁移对照:
@@ -11,59 +12,47 @@
           逻辑全部藏在 support/post_export_upload.py,交互打开 notebook 即 NameError
   After:  装配过程(observer 类 → mock server → fixtures → options → run → 断言)
           全部在 cells 内逐步展开;support 只留 http_mock/fixtures 零件;
-          run_chapter() 作为薄兼容层调用 app.run()
+          对拍由 registry 投影 app.run() 的 cell 命名空间完成
 
 本文件的模块级代码仅保留:
   - app = marimo.App(...)
-  - run_chapter() 头兼容层
+  - 末尾 `if __name__ == "__main__": app.run()`
 """
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 1 — 教学目标
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / chapters_of_scenarios / ch210_post_export_upload
+    mo.md(r"""
+    # demo_big_data_report / chapters_of_scenarios / ch210_post_export_upload
 
-        演示：**导出物完成后上传到本地 HTTP mock server**。
+    演示：**导出物完成后上传到本地 HTTP mock server**。
 
-        主线装配过程（每个步骤一个 cell，可就地修改重跑）：
+    主线装配过程（每个步骤一个 cell，可就地修改重跑）：
 
-        1. 定义 Observer 零件（`OUTPUT_TARGET_END` / `WORKFLOW_NODE_END`）
-        2. 启动本地 mock server + 准备临时目录
-        3. 写入 demand / workflow YAML fixtures（内容可见）
-        4. 组装 `DemandRunOptions`（`RunOverrides` / `components` / `batch_size`）
-        5. **Demand** 层运行 → Observer 捕获上传
-        6. **Workflow** 层运行 → 同一 Observer + `WORKFLOW_NODE_END` 对照
-        7. 断言展开（observer 捕获 vs server 实收 vs node 状态）
+    1. 定义 Observer 零件（`OUTPUT_TARGET_END` / `WORKFLOW_NODE_END`）
+    2. 启动本地 mock server + 准备临时目录
+    3. 写入 demand / workflow YAML fixtures（内容可见）
+    4. 组装 `DemandRunOptions`（`RunOverrides` / `components` / `batch_size`）
+    5. **Demand** 层运行 → Observer 捕获上传
+    6. **Workflow** 层运行 → 同一 Observer + `WORKFLOW_NODE_END` 对照
+    7. 断言展开（observer 捕获 vs server 实收 vs node 状态）
 
-        注入边界:
-        - demand 执行层事件 → `DemandRunRuntimeOptions.components`
-        - workflow 编排层事件 → `WorkflowRunOptions.workflow_components`
-        - `OUTPUT_TARGET_END` 在 Observer 目录内;`WORKFLOW_STARTED/FINISHED` 需启用 viz,
-          无 viz 时用 `WORKFLOW_NODE_*` 对照编排层
+    注入边界:
+    - demand 执行层事件 → `DemandRunRuntimeOptions.components`
+    - workflow 编排层事件 → `WorkflowRunOptions.workflow_components`
+    - `OUTPUT_TARGET_END` 在 Observer 目录内;`WORKFLOW_STARTED/FINISHED` 需启用 viz,
+      无 viz 时用 `WORKFLOW_NODE_*` 对照编排层
 
-        对拍入口: `run_chapter()` → `app.run()` → `chapter_result`
+    对拍入口: registry 投影 `app.run()` → cell 命名空间里的 `chapter_result`
 
-        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
-        """
-    )
+    Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
+    """)
     return
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 2 — marimo 自身
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -73,26 +62,12 @@ def _():
     return (mo,)
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 3 — 仓库路径设置(notebook 辅助;返回 repo_root 供下一 cell 显式依赖,
-# 保证 import 前 sys.path 注入完成,script/交互两种模式都确定)
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell
 def _():
     from scalim_misc.notebook_support.pathing import ensure_repo_root_on_sys_path
 
     repo_root = ensure_repo_root_on_sys_path(__file__)
     return (repo_root,)
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 4 — 业务 imports(scalim API + support 零件)
-#
-# app.run() 创建全新 __main__ 上下文,因此 imports 需在 cells 内完成。
-# `scalim.*` import 保留在本文件,`report-notebooks-coverage` gate 仍可统计。
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -126,7 +101,6 @@ def _(repo_root):
         EventDispatchObserver,
         EventType,
         List,
-        MockHttpServer,
         Observer,
         Optional,
         Path,
@@ -144,11 +118,6 @@ def _(repo_root):
     )
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 5 — 交互旋钮(永远显示;script 模式用默认值,交互模式可拖动重跑)
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell
 def _(mo):
     batch_size = mo.ui.slider(1, 50, value=10, step=1, label="batch_size（每批处理行数）")
@@ -156,13 +125,20 @@ def _(mo):
     return (batch_size,)
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 6 — Observer 零件(教学核心:事件如何被订阅与记录)
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell
-def _(Any, Dict, Event, EventDispatchObserver, EventType, List, Observer, Optional, Set, build_upload_payload, post_upload):
+def _(
+    Any,
+    Dict,
+    Event,
+    EventDispatchObserver,
+    EventType,
+    List,
+    Observer,
+    Optional,
+    Set,
+    build_upload_payload,
+    post_upload,
+):
     # demand 层 Observer: 每个输出 target 关闭后,POST 元数据到 mock upload API
     class UploadOnOutputEnd(EventDispatchObserver):
         def __init__(self, *, base_url: str) -> None:
@@ -205,11 +181,6 @@ def _(Any, Dict, Event, EventDispatchObserver, EventType, List, Observer, Option
     return UploadOnOutputEnd, WorkflowNodeEndMarker
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 7 — 本地 mock server + 临时目录(atexit 清理)
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell
 def _(Path, start_mock_http_server, tempfile):
     import atexit
@@ -223,13 +194,7 @@ def _(Path, start_mock_http_server, tempfile):
     print("mock server: {}".format(server.base_url))
     print("endpoints:   POST /upload | POST /dispatch")
     print("tmp dir:     {}".format(tmp))
-
     return server, tmp
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 8 — YAML fixtures(写入 + 内容可见)
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -246,12 +211,7 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
         "**workflow.yaml**（单 run `main` → demand）:\n\n"
         "```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text)
     )
-    return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 9 — 组装运行选项(RunOverrides + DemandRunOptions;batch_size 可调)
-# ═══════════════════════════════════════════════════════════════
+    return demand_path, workflow_path
 
 
 @app.cell
@@ -271,13 +231,7 @@ def _(ALLOWED_MODULES, Any, List, Path, api, batch_size):
     print("batch_size =", batch_size.value)
     print("组件注入点: DemandRunRuntimeOptions.components")
     print("输出:       CSV via RunOverrides.csv_file, header_fields_output_by='name'")
-
     return (demand_options,)
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 10 — Demand 层运行(observer 接线 → run → 捕获上传)
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -294,21 +248,14 @@ def _(UploadOnOutputEnd, api, demand_options, demand_path, server, tmp):
     print("observer errors   =", demand_obs.errors)
     for _item in demand_obs.uploaded:
         print("  -", _item)
-
     return demand_obs, demand_result
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 11 — Workflow 层运行(同一 Observer 挂在 demand.runtime.components;
-# WorkflowNodeEndMarker 挂 workflow_components 对照编排层)
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell
 def _(
     UploadOnOutputEnd,
-    WorkflowNodeEndMarker,
     WorkflowExecutionOptions,
+    WorkflowNodeEndMarker,
     WorkflowRunOptions,
     WorkflowRuntimeOptions,
     api,
@@ -337,13 +284,7 @@ def _(
     print("node ends         =", len(workflow_node_end.ends))
     for _item in workflow_node_end.ends:
         print("  -", _item)
-
     return workflow_node_end, workflow_obs, workflow_result
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 12 — 证据核对(observer 捕获 vs server 实收 vs node 状态)
-# ═══════════════════════════════════════════════════════════════
 
 
 @app.cell
@@ -366,17 +307,20 @@ def _(demand_obs, mo, server, workflow_node_end, workflow_obs):
         }
     )
     mo.md("→ node `main/ok` 已捕获: {}".format("✅" if main_ok else "❌"))
-
     return main_ok, node_ends, server_uploads
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 13 — 断言展开(server 侧用「存在匹配」语义,交互重跑不累积误判)
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell
-def _(Any, List, demand_obs, demand_result, main_ok, server_uploads, workflow_node_end, workflow_obs, workflow_result):
+def _(
+    Any,
+    List,
+    demand_obs,
+    demand_result,
+    main_ok,
+    server_uploads,
+    workflow_obs,
+    workflow_result,
+):
     demand_uploads = list(demand_obs.uploaded)
     workflow_uploads = list(workflow_obs.uploaded)
 
@@ -406,20 +350,21 @@ def _(Any, List, demand_obs, demand_result, main_ok, server_uploads, workflow_no
     }
     for name, _ok in checks.items():
         print("{:>32}: {}".format(name, "✅" if _ok else "❌"))
-
     return checks, demand_uploads, workflow_uploads
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 14 — 汇总 chapter_result(CI 提取点)
-#
-# 命名约定: chapter_result(非 _ 前缀,app.run() 的 defs 可见)
-# 契约: {"passed": bool, "summary": str, "details": dict|None}
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell
-def _(batch_size, checks, demand_obs, demand_result, demand_uploads, node_ends, server_uploads, workflow_obs, workflow_uploads):
+def _(
+    batch_size,
+    checks,
+    demand_obs,
+    demand_result,
+    demand_uploads,
+    node_ends,
+    server_uploads,
+    workflow_obs,
+    workflow_uploads,
+):
     passed = bool(all(checks.values()))
     summary = (
         "demand_rows={} demand_uploads={} workflow_uploads={} "
@@ -462,13 +407,7 @@ def _(batch_size, checks, demand_obs, demand_result, demand_uploads, node_ends, 
             },
         },
     }
-
-    return chapter_result, passed, summary
-
-
-# ═══════════════════════════════════════════════════════════════
-# Cell 15 — 结果展示(交互时可看到)
-# ═══════════════════════════════════════════════════════════════
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -481,11 +420,6 @@ def _(chapter_result, mo):
     return
 
 
-# ═══════════════════════════════════════════════════════════════
-# Cell 16 — 详情表格
-# ═══════════════════════════════════════════════════════════════
-
-
 @app.cell(hide_code=True)
 def _(chapter_result, mo):
     from scalim_misc.notebook_support.results_view import details_to_rows
@@ -493,25 +427,6 @@ def _(chapter_result, mo):
     rows = details_to_rows(chapter_result["details"])
     mo.ui.table(rows, selection=None) if rows else mo.md("(无详情)")
     return
-
-
-# ═══════════════════════════════════════════════════════════════
-# 兼容层: 模块级 SSOT 入口
-#
-# ChapterRegistry → import 本模块 → 查找 run_chapter() → 调用
-# 内部调用 app.run(),从 defs 提取 chapter_result dict。
-# ChapterRegistry._safe_run() 自动将 dict 包装为 ExampleResult。
-# ═══════════════════════════════════════════════════════════════
-
-
-def run_chapter():
-    """SSOT 入口: headless runner / pytest 通过此函数执行对拍。
-
-    Returns:
-        dict: chapter_result,至少包含 {"passed": bool, "summary": str}
-    """
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":

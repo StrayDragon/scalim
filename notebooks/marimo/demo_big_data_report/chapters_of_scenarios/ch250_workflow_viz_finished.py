@@ -7,31 +7,29 @@
 
 import marimo
 
-__generated_with = "0.22.0"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""
-        # demo_big_data_report / chapters_of_scenarios / ch250_workflow_viz_finished
+    mo.md(r"""
+    # demo_big_data_report / chapters_of_scenarios / ch250_workflow_viz_finished
 
-        演示：**启用 workflow viz 后收到 `WORKFLOW_STARTED` / `WORKFLOW_FINISHED`**。
+    演示：**启用 workflow viz 后收到 `WORKFLOW_STARTED` / `WORKFLOW_FINISHED`**。
 
-        主线装配过程（每个步骤一个 cell，可就地修改重跑）：
+    主线装配过程（每个步骤一个 cell，可就地修改重跑）：
 
-        1. 定义零件：`WorkflowLifecycleMarker` Observer（记录生命周期事件）
-        2. 写入 demand / workflow YAML；组装带 `VizObserverConfig` 的选项
-        3. 运行 workflow → viz 事件流落盘 + Observer 捕获 STARTED/FINISHED
-        4. 证据核对：seen 序列 + viz_events 文件
-        5. 断言展开 → chapter_result
+    1. 定义零件：`WorkflowLifecycleMarker` Observer（记录生命周期事件）
+    2. 写入 demand / workflow YAML；组装带 `VizObserverConfig` 的选项
+    3. 运行 workflow → viz 事件流落盘 + Observer 捕获 STARTED/FINISHED
+    4. 证据核对：seen 序列 + viz_events 文件
+    5. 断言展开 → chapter_result
 
-        注意: 无 viz 时 `WORKFLOW_STARTED/FINISHED` 不发 —— 用 `WORKFLOW_NODE_*` 替代(见 ch010)。
+    注意: 无 viz 时 `WORKFLOW_STARTED/FINISHED` 不发 —— 用 `WORKFLOW_NODE_*` 替代(见 ch010)。
 
-        Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
-        """
-    )
+    Gate: `just examples` / `tests/integration/test_demo_big_data_report_scenarios.py`
+    """)
     return
 
 
@@ -73,7 +71,6 @@ def _(repo_root):
     return (
         ALLOWED_MODULES,
         Any,
-        Dict,
         EventType,
         List,
         Observer,
@@ -95,7 +92,19 @@ def _(repo_root):
 
 
 @app.cell
-def _(Any, Dict, EventType, List, Observer, Optional, Set):
+def _(
+    ALLOWED_MODULES,
+    Any,
+    EventType,
+    List,
+    Observer,
+    Optional,
+    Path,
+    Set,
+    VizObserverConfig,
+    api,
+    replace,
+):
     # 零件: 记录 WORKFLOW_STARTED / WORKFLOW_FINISHED(仅启用 workflow viz 时发出)
     class WorkflowLifecycleMarker(Observer):
         def __init__(self) -> None:
@@ -164,18 +173,17 @@ def _(mo, tmp, write_minimal_demand_yaml, write_minimal_workflow_yaml):
     workflow_yaml_text = workflow_path.read_text(encoding="utf-8")
 
     mo.md("**demand.yaml**:\n\n```yaml\n{}\n```\n\n**workflow.yaml**:\n\n```yaml\n{}\n```".format(demand_yaml_text, workflow_yaml_text))
-    return demand_path, demand_yaml_text, workflow_path, workflow_yaml_text
+    return (workflow_path,)
 
 
 @app.cell
 def _(
-    WorkflowLifecycleMarker,
     WorkflowExecutionOptions,
+    WorkflowLifecycleMarker,
     WorkflowRunOptions,
     WorkflowRuntimeOptions,
     api,
     demand_options,
-    demand_path,
     tmp,
     workflow_path,
 ):
@@ -197,7 +205,6 @@ def _(
     print("started =", marker.started, "finished =", marker.finished, "status =", marker.last_finished_status)
     print("seen    =", marker.seen)
     print("viz_events_files =", len(viz_events))
-
     return marker, result, viz_dir, viz_events
 
 
@@ -223,7 +230,7 @@ def _(marker, render_checks, result, viz_events):
         "viz 事件落盘": len(viz_events) >= 1,
     }
     render_checks(checks)
-    return checks
+    return (checks,)
 
 
 @app.cell
@@ -263,7 +270,7 @@ def _(checks, make_chapter_result, marker, viz_events):
             ),
         },
     )
-    return chapter_result, passed, summary
+    return (chapter_result,)
 
 
 @app.cell(hide_code=True)
@@ -282,12 +289,6 @@ def _(chapter_result, mo):
     rows = details_to_rows(chapter_result["details"])
     mo.ui.table(rows, selection=None) if rows else mo.md("(无详情)")
     return
-
-
-def run_chapter():
-    """SSOT 入口: headless runner / pytest 通过此函数执行对拍。"""
-    outputs, defs = app.run()
-    return defs["chapter_result"]
 
 
 if __name__ == "__main__":
