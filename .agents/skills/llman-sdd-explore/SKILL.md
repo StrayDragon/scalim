@@ -2,7 +2,7 @@
 name: "llman-sdd-explore"
 description: "进入 llman SDD 探索模式：理清思路、调查需求、分析问题。仅思考，禁止写代码。用于意图不明确或需要分析后再行动的场景。"
 metadata:
-  version: "0.0.77"
+  version: "0.2.0"
 ---
 
 # LLMAN SDD Explore
@@ -24,7 +24,7 @@ metadata:
 硬规则：
 1. **先** Branch binding（`change start` / `attach`）→ Full；**再** Specs landing（绑定分支编辑并 commit `llmanspec/specs/**`）。
 2. 无 live 合约变更 → `needs_specs_change: false`。apply 前须 `readyToImplement=true`。
-3. 收口用 `change finalize`（自动提交 `archive(sdd): <id>`；`--no-commit` 可跳过）。`change checkpoint` 已移除。
+3. 收口用 `change finalize`（自动提交 `archive(sdd): <id>`；`--no-commit` 可跳过）。`change checkpoint` 已移除（调用即以非零退出报错，指向 finalize）。
 4. **禁止**在默认分支 commit live specs；已 attach 勿重复 `start`。
 
 ### Skill 导航（非生命周期；仅指示当前 skill）
@@ -51,9 +51,9 @@ flowchart LR
 - 同时保留多个选项与权衡
 
 ## 建议动作
-1. 使用 `llman sdd context --task "<任务>" --paths "<文件>"` 快速定位相关 specs。
+1. 使用 `llman-sdd context --task "<任务>" --paths "<文件>"` 快速定位相关 specs。
    - 阅读 context 的 `direct` 列出的 spec 全文（这些是必须理解的合约）。
-   - 如果 context 不可用，运行 `llman sdd index rebuild`（默认 `pageindex`，无需模型）后重试。
+   - 如果 context 不可用，运行 `llman-sdd index rebuild`（默认 `pageindex`，无需模型）后重试。
 2. 澄清目标与约束（问 1–3 个问题）。
 3. **逐问深挖分支（可选，仅当用户显式触发时进入）**：触发词为「深挖」「grill」「逐个问」「彻底理清」。进入后一问一答走清决策：
    - **一次只问一个问题**，并附你的推荐答案，等用户反馈后再继续下一个。
@@ -62,7 +62,7 @@ flowchart LR
    - **决策回写**：已解决的决策回写到该 change 的 `proposal.md`「Open Questions」段（规划壳；可短暂在默认分支）。
    - **完成判据**：每个待定决策都已解决或被显式推迟。未触发时保持默认（问 1–3 个问题）行为不变。
 4. 如果某个 change id 相关，阅读 `llmanspec/changes/<id>/` 下的 artifacts。
-   - 诊断校验错误时优先跑 `llman sdd validate <spec> --strict --no-check`（fast mode，跳过可能耗时的 `bdd.run_command`），先解决结构门禁（Gherkin / `@req` 链接 / 双写 / req_id 唯一性），再跑 full mode（`--check` 或 `cargo test --features bdd`）。错误输出中的 `FAIL <item_type>/<id>` 行会逐条指明失败项。
+   - 诊断校验错误时优先跑 `llman-sdd validate <spec> --strict --no-check`（fast mode，跳过可能耗时的 `bdd.run_command`），先解决结构门禁（Gherkin / `@req` 链接 / 双写 / req_id 唯一性），再跑 full mode（`--check` 或 `cargo test --features bdd`）。错误输出中的 `FAIL <item_type>/<id>` 行会逐条指明失败项。
 5. 探索 2–3 个选项与权衡。
 6. 判断变更规模（triage），确定是否需要走完整 SDD 流程。
 7. 当结论逐渐清晰时，建议用户把它记录下来（不要自动写入）：
@@ -80,11 +80,12 @@ flowchart LR
 
 > 💡 探索完成 → 下一步 `llman-sdd-propose`（提案）或 `llman-sdd-quick`（快速路径）
 
-> 命令细节用 `llman sdd <cmd> --help` 查看；命令参考以 CLI 为准，skill 不内嵌命令表（r139）。
+> 命令细节用 `llman-sdd <cmd> --help` 查看；命令参考以 CLI 为准，skill 不内嵌命令表。
+> 文中「规约」= 本项目 `llmanspec/specs/` 下的 `.feature` 文件；用 `llman-sdd list --specs` / `llman-sdd show <capability>` 查全文。
 
 ## Context
-- 先查状态再动手：change/spec 状态以 `llman sdd show/list/validate` 输出为准。
-- 读 spec 全文前先用 `llman sdd context --task --paths` 定位相关 specs。
+- 先查状态再动手：change/spec 状态以 `llman-sdd show/list/validate` 输出为准。
+- 读 spec 全文前先用 `llman-sdd context --task --paths` 定位相关 specs。
 
 ## Goal
 - 本节命令达成一个可验证结果；结果路径与校验状态随报告输出。
@@ -94,8 +95,8 @@ flowchart LR
 - 改动保持最小；已知校验错误禁止强行继续。
 
 ## Workflow
-- 每步以 `llman sdd` 命令结果为事实来源；改动工件后必跑 `llman sdd validate`。
-- 命令细节见下方生成式命令参考或 `llman sdd <cmd> --help`。
+- 每步以 `llman-sdd` 命令结果为事实来源；改动工件后必跑 `llman-sdd validate`。
+- 命令细节见下方生成式命令参考或 `llman-sdd <cmd> --help`。
 
 ## Decision Policy
 - 高影响歧义先澄清再继续；事实自己查证，只有决策问用户。
@@ -106,6 +107,6 @@ flowchart LR
 ## Ethics Governance
 - `ethics.risk_level`：low——仅读写本仓库与 `llmanspec/`，无外发动作；正文另有声明时从其声明。
 - `ethics.prohibited_actions`：违反正文「硬约束」的动作；未经用户明确要求的 push / PR / 外部上传。
-- `ethics.required_evidence`：结论须有命令输出或文件路径佐证；门禁状态以 `llman sdd validate` 为准。
+- `ethics.required_evidence`：结论须有命令输出或文件路径佐证；门禁状态以 `llman-sdd validate` 为准。
 - `ethics.refusal_contract`：门禁 CRITICAL 未清零 → 拒绝进入下一阶段；自修复达上限 → 报告 blocker。
 - `ethics.escalation_policy`：改动 SDD 合约/模板或执行不可逆动作前，暂停并请用户确认。

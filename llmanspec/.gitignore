@@ -1,2 +1,2 @@
-# Regenerable pageindex / context cache (`llman sdd index rebuild`).
+# Regenerable pageindex / context cache (`llman-sdd index rebuild`).
 .context/

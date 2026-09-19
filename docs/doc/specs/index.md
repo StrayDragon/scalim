@@ -14,7 +14,7 @@
 llmanspec 是本仓库对核心行为/边界的"约束性描述",更接近规范而不是教程.
 
 - 规范目录: `llmanspec/specs/`
-- 校验命令: `llman sdd validate --all --strict --no-interactive`
+- 校验命令: `llman-sdd validate --all --strict --no-interactive`
 
 常见用法:
 

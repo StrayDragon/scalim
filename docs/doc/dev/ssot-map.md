@@ -15,7 +15,7 @@
 | --- | --- | --- | --- | --- |
 | docs-site 手工页 | `docs/doc/**/*.md`(非 `.gen.`) | `.gen.` 页 + 注入区块 | `just gen-docs` | `uv run python scripts/gen-docs.py --check`、`uv run python scripts/check-doc-governance.py`、`just qa` |
 | llmanspec 规范 | `llmanspec/specs/**/spec.md` | 站内索引/摘要(部分为 `.gen.`) | `just gen-docs`(如涉及站内生成页) | `just llmanspec-check`、`just qa` |
-| llmanspec 变更(正式) | `llmanspec/changes/<active>/` | 归档后的 change | `llman sdd archive run <id>` | `just llmanspec-check`、`just qa` |
+| llmanspec 变更(正式) | `llmanspec/changes/<active>/` | 归档后的 change | `llman-sdd archive run <id>` | `just llmanspec-check`、`just qa` |
 | llmanspec 脱敏规则 | `llmanspec/sanitize_rules.yaml` | (无) | `just llmanspec-sanitize`(默认强制 apply) | `just llmanspec-check`(默认严格检查; 命中则自动 apply 并失败) |
 | YAML DSL schema | `src/scalim/dsl/yaml_dsl/schema_dsl/**` | `src/scalim/dsl/yaml_dsl/schema/*.gen.json` | `just gen-yaml-dsl-schema` | `just qa`(包含 schema drift check) |
 | Agent Skill (YAML DSL) | schema + CLI + specs + canonical example | `agentdev/skills/scalim-yaml-dsl/references/**/*.gen.*` + manifest | `just gen-agent-skill` | `just validate-agent-skill`、`just qa` |

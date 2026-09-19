@@ -2,7 +2,7 @@
 name: "llman-sdd-quick"
 description: "快速路径：处理不改行为合约的小改动——重构、修错字、性能优化。不涉及 MUST/SHALL 变更。如发现需要改合约，立即切换到 propose 完整路径。"
 metadata:
-  version: "0.0.77"
+  version: "0.2.0"
 ---
 
 # LLMAN SDD Quick Path
@@ -36,9 +36,9 @@ flowchart LR
 - 不是 SDD 元规范变更
 
 ## 步骤
-1. 用 `llman sdd context --task "..." --paths "..."` 确认无相关 spec 变更需要。
-   - 如果 context 返回 `quality: "unavailable"`，运行 `llman sdd index rebuild`（默认 `pageindex`，无需模型）。
-   - 可以用 `llman sdd list --specs --json` 查看 specs 元数据。
+1. 用 `llman-sdd context --task "..." --paths "..."` 确认无相关 spec 变更需要。
+   - 如果 context 返回 `quality: "unavailable"`，运行 `llman-sdd index rebuild`（默认 `pageindex`，无需模型）。
+   - 可以用 `llman-sdd list --specs --json` 查看 specs 元数据。
 2. 直接修改代码。
 3. 若要动 `llmanspec/specs/**`，STOP——除非已在绑定的非默认 change 分支上（迷你 change：`change start`/`attach` → 编辑 → commit）。禁止在默认分支 commit live specs，即使是 typo 或仅收紧 scope 也不行。优先把 live specs 维护路由到 `llman-sdd-propose`，或要求已有绑定分支。
 4. git commit（message 写明 why）。
@@ -46,15 +46,16 @@ flowchart LR
 
 ## 边界处理
 - 如果在修改中发现需要改变行为合约 → STOP，改走 `llman-sdd-propose`（完整路径）。
-- 如果涉及到多个文件且不确定 scope → 先用 `llman sdd context` 确认。
+- 如果涉及到多个文件且不确定 scope → 先用 `llman-sdd context` 确认。
 
 > 💡 快速路径完成 → git commit 即可。若需要走完整路径 → `llman-sdd-propose` → `llman-sdd-apply` → `llman-sdd-verify` → `llman-sdd-archive`
 
-> 命令细节用 `llman sdd <cmd> --help` 查看；命令参考以 CLI 为准，skill 不内嵌命令表（r139）。
+> 命令细节用 `llman-sdd <cmd> --help` 查看；命令参考以 CLI 为准，skill 不内嵌命令表。
+> 文中「规约」= 本项目 `llmanspec/specs/` 下的 `.feature` 文件；用 `llman-sdd list --specs` / `llman-sdd show <capability>` 查全文。
 
 ## Ethics Governance
 - `ethics.risk_level`：low——仅读写本仓库与 `llmanspec/`，无外发动作；正文另有声明时从其声明。
 - `ethics.prohibited_actions`：违反正文「硬约束」的动作；未经用户明确要求的 push / PR / 外部上传。
-- `ethics.required_evidence`：结论须有命令输出或文件路径佐证；门禁状态以 `llman sdd validate` 为准。
+- `ethics.required_evidence`：结论须有命令输出或文件路径佐证；门禁状态以 `llman-sdd validate` 为准。
 - `ethics.refusal_contract`：门禁 CRITICAL 未清零 → 拒绝进入下一阶段；自修复达上限 → 报告 blocker。
 - `ethics.escalation_policy`：改动 SDD 合约/模板或执行不可逆动作前，暂停并请用户确认。
