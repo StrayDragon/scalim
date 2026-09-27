@@ -47,6 +47,10 @@
 
 **立场摘要**：不产品化 `call_by` memo；不推进跨批隐式 overlap cache；优先 multi-output / 减分配 / 更早释放。
 
+## 跨语言数据层（Fory vs Arrow）
+
+选型备忘（2026-09-26）：不把 Apache Fory 当跨语言数据层；表数据若跨语言对齐 Arrow。正文：[`2026-09-26-apache-fory-cross-language-data.md`](./2026-09-26-apache-fory-cross-language-data.md)。
+
 ## 已移出候选池（目录已删）
 
 不再保留草案正文，避免与「可转正候选」混淆：
