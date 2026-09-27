@@ -4,28 +4,32 @@
 # scope: src/scalim/
 功能: yaml-dsl-workflow-validate
 
-  @req:r132 @human
-  场景: CLI MUST provide workflow-level validate that recursively validates referenced demands
-    - 系统 MUST 提供一个面向 CI/预发布的 workflow-level validate CLI 入口，用于在不执行 workflow 的前提下，对 workflow YAML 及其引用的 demands 做静态/编译期校验。 该入口 MUST 支持形如：
-      - `yaml-dsl validate --type workflow <workflow.yaml>` 校验范围 MUST 至少包含：
-      - workflow YAML 自身结构与语义校验（解析、引用合法性、cycle detection 等）
-      - 递归校验每个 `runs[*].demand` 引用的 demand YAML（允许 imports/$import，并在错误中提供可诊断的引用链路）
-      - workflow ↔ demand 的交叉一致性校验（例如 demand outputs 绑定到的资源 id 必须能解析到某个有效的资源 mapping）:
-      - `to.book` ↔ `resources.books`
-      - `to.file` ↔ `resources.files`
-      - 对旧 `outputs[*].container` 给出迁移诊断
-    假如 workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 声明 `outputs[0].to.book: "report"`
-    当 调用方执行 workflow validate CLI
-    那么 校验 MUST 失败（非零退出码）
-    假如 workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 声明 `outputs[0].to.file: \"detail_csv\"`
-    当 调用方执行 workflow validate CLI
-    那么 校验 MUST 失败（非零退出码）
-    假如 workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 仍声明 `outputs[0].container`
-    当 调用方执行 workflow validate CLI
-    那么 校验 MUST 失败（非零退出码）
-  @req:r374 @human
-  场景: workflow validate MUST share YAML load and error envelope with demand compile
-    - 系统 MUST 要求 workflow validate 与 demand compile/run 在以下方面保持一致： - YAML load（包括 duplicate key 检测） - imports fragments 的处理（若 workflow 支持） - location index 与 ErrorEnvelope 结构
-    假如 某份 workflow YAML 包含 duplicate keys 或语法错误
-    当 维护者分别运行 workflow validate 与相同 loader 入口
-    那么 两者 MUST 产生一致的错误结构与定位口径
+  @req:r132
+  规则: CLI MUST provide workflow-level validate that recursively validates referenced demands
+    系统 MUST 提供一个面向 CI/预发布的 workflow-level validate CLI 入口，用于在不执行 workflow 的前提下，对 workflow YAML 及其引用的 demands 做静态/编译期校验。 该入口 MUST 支持形如：
+    `yaml-dsl validate --type workflow <workflow.yaml>` 校验范围 MUST 至少包含：
+    workflow YAML 自身结构与语义校验（解析、引用合法性、cycle detection 等）
+    递归校验每个 `runs[*].demand` 引用的 demand YAML（允许 imports/$import，并在错误中提供可诊断的引用链路）
+    workflow ↔ demand 的交叉一致性校验（例如 demand outputs 绑定到的资源 id 必须能解析到某个有效的资源 mapping）:
+    `to.book` ↔ `resources.books`
+    `to.file` ↔ `resources.files`
+    对旧 `outputs[*].container` 给出迁移诊断
+
+    场景: 验收示例
+      假如 workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 声明 `outputs[0].to.book: "report"`
+      当 调用方执行 workflow validate CLI
+      那么 校验 MUST 失败（非零退出码）
+      假如 workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 声明 `outputs[0].to.file: \"detail_csv\"`
+      当 调用方执行 workflow validate CLI
+      那么 校验 MUST 失败（非零退出码）
+      假如 workflow YAML 中某个 `runs[*].demand` 引用的 demand YAML 仍声明 `outputs[0].container`
+      当 调用方执行 workflow validate CLI
+      那么 校验 MUST 失败（非零退出码）
+  @req:r374
+  规则: workflow validate MUST share YAML load and error envelope with demand compile
+    系统 MUST 要求 workflow validate 与 demand compile/run 在以下方面保持一致： - YAML load（包括 duplicate key 检测） - imports fragments 的处理（若 workflow 支持） - location index 与 ErrorEnvelope 结构
+
+    场景: 验收示例
+      假如 某份 workflow YAML 包含 duplicate keys 或语法错误
+      当 维护者分别运行 workflow validate 与相同 loader 入口
+      那么 两者 MUST 产生一致的错误结构与定位口径

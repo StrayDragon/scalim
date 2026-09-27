@@ -285,10 +285,10 @@ llmanspec-check:
     if command -v llman-sdd >/dev/null 2>&1; then
         if [ "$(qa_level)" -eq 0 ]; then
             # L0 静默: qa_step 捕获, 通过仅 [pass] 行, 失败全量 dump
-            qa_step "llmanspec-check" llman-sdd validate --all --strict --no-interactive
+            qa_step "llmanspec-check" llman-sdd validate --all --strict
         elif [ "$(qa_level)" -eq 1 ]; then
             # L1 摘要: 捕获后过滤状态/汇总行, 只留 warning/error 信息; 失败全量 dump
-            out="$(llman-sdd validate --all --strict --no-interactive 2>&1)" || {
+            out="$(llman-sdd validate --all --strict 2>&1)" || {
                 printf '%s\n' "$out" >&2
                 exit 1
             }
@@ -296,7 +296,7 @@ llmanspec-check:
                   | grep -v 'Working tree is dirty' | grep -v '^Totals:' | grep -v '^INFO:' \
                   || true; }
         else
-            llman-sdd validate --all --strict --no-interactive
+            llman-sdd validate --all --strict
         fi
         exit 0
     fi
@@ -308,7 +308,7 @@ llmanspec-check:
             exit 2
             ;;
         *)
-            echo "[warn] llman-sdd CLI not found in CI; skipping llman-sdd validate --all --strict --no-interactive." >&2
+            echo "[warn] llman-sdd CLI not found in CI; skipping llman-sdd validate --all --strict." >&2
             exit 0
             ;;
     esac

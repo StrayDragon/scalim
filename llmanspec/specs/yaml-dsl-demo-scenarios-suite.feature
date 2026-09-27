@@ -4,21 +4,27 @@
 # scope: src/scalim/
 功能: yaml-dsl-demo-scenarios-suite
 
-  @req:r111 @human
-  场景: YAML DSL 场景库必须覆盖电商/广告/客服三类域
-    - 系统 MUST 在场景库目录下维护一组 YAML DSL 场景库（fixtures），第一版至少包含三类域： - 电商（ecommerce）：以 canonical demand YAML 为核心（路径由其它规范约束保持稳定） - 广告（ads）：至少 1 份 demand YAML（可选 workflow） - 客服（support）：至少 1 份 demand YAML（可选 workflow） 场景库的 YAML MUST 以最新 schema 为基准编写，并在文件头部包含 YAML LSP schema modeline。
-    假如 场景库目录已初始化
-    当 维护者检查 ads 与 support 子目录
-    那么 每个目录 MUST 至少存在 1 个 `*.yaml` demand 文件
-  @req:r353 @human
-  场景: 场景库 YAML 必须纳入 examples gate 并通过校验
-    - 系统 MUST 将场景库 YAML 纳入 examples gate 的确定性回归范围，并满足： - demand YAML：通过 DSL CLI 校验 - workflow YAML：通过 schema-only 校验（显式指定 workflow schema）
-    假如 场景库 YAML 已就位
-    当 开发者运行 examples gate
-    那么 runner MUST 执行对场景库 YAML 的校验/运行对拍
-  @req:r474 @human
-  场景: capability coverage matrix 必须可审计并以 schema 为准
-    - 系统 MUST 提供一个可检查的 capability coverage matrix 文件，用于将最新 schema 的关键能力点映射到： - 覆盖该能力点的 YAML 文件路径 - 覆盖该能力点的章节/对拍断言入口 该矩阵 MUST 以 demand/workflow schema 为唯一基准。
-    假如 场景库目录已初始化
-    当 维护者检查场景库根目录
-    那么 MUST 存在一份 coverage matrix 文件且内容可读
+  @req:r111
+  规则: YAML DSL 场景库必须覆盖电商/广告/客服三类域
+    系统 MUST 在场景库目录下维护一组 YAML DSL 场景库（fixtures），第一版至少包含三类域： - 电商（ecommerce）：以 canonical demand YAML 为核心（路径由其它规范约束保持稳定） - 广告（ads）：至少 1 份 demand YAML（可选 workflow） - 客服（support）：至少 1 份 demand YAML（可选 workflow） 场景库的 YAML MUST 以最新 schema 为基准编写，并在文件头部包含 YAML LSP schema modeline。
+
+    场景: 验收示例
+      假如 场景库目录已初始化
+      当 维护者检查 ads 与 support 子目录
+      那么 每个目录 MUST 至少存在 1 个 `*.yaml` demand 文件
+  @req:r353
+  规则: 场景库 YAML 必须纳入 examples gate 并通过校验
+    系统 MUST 将场景库 YAML 纳入 examples gate 的确定性回归范围，并满足： - demand YAML：通过 DSL CLI 校验 - workflow YAML：通过 schema-only 校验（显式指定 workflow schema）
+
+    场景: 验收示例
+      假如 场景库 YAML 已就位
+      当 开发者运行 examples gate
+      那么 runner MUST 执行对场景库 YAML 的校验/运行对拍
+  @req:r474
+  规则: capability coverage matrix 必须可审计并以 schema 为准
+    系统 MUST 提供一个可检查的 capability coverage matrix 文件，用于将最新 schema 的关键能力点映射到： - 覆盖该能力点的 YAML 文件路径 - 覆盖该能力点的章节/对拍断言入口 该矩阵 MUST 以 demand/workflow schema 为唯一基准。
+
+    场景: 验收示例
+      假如 场景库目录已初始化
+      当 维护者检查场景库根目录
+      那么 MUST 存在一份 coverage matrix 文件且内容可读

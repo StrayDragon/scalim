@@ -1031,7 +1031,7 @@ def load_spec_summaries(repo_root: Path, spec_paths: Sequence[Path]) -> List[Dic
 
 
 def _parse_spec_content(text: str) -> Tuple[str, List[str]]:
-    """Parse single-track feature-as-spec: purpose header + requirement statement scenarios."""
+    """Parse native layered feature-as-spec: purpose header + `@req`-tagged `规则:` titles."""
     import re as _re
 
     purpose = ""
@@ -1044,19 +1044,14 @@ def _parse_spec_content(text: str) -> Tuple[str, List[str]]:
     i = 0
     while i < len(lines):
         line = lines[i]
+        # 原生分层格式(llman-sdd 0.5):`@req:<id>` 挂在 `规则:` 块头,规则标题即需求;
+        # 嵌套 `场景:` 为验收示例,不参与需求索引。
         if line.strip().startswith("@") and "@req:" in line and i + 1 < len(lines):
             name_line = lines[i + 1].strip()
-            if name_line.startswith("场景:") or name_line.startswith("Scenario:"):
-                j = i + 2
-                body = []  # type: List[str]
-                while j < len(lines) and not lines[j].strip().startswith("@"):
-                    body.append(lines[j])
-                    j += 1
-                # 约束陈述场景以 "- " 描述行开头;GWT 验收场景由步骤关键字构成。
-                if body and body[0].strip().startswith("- "):
-                    requirements.append(name_line.split(":", 1)[1].strip())
-                i = j
-                continue
+            if name_line.startswith("规则:") or name_line.startswith("Rule:"):
+                requirements.append(name_line.split(":", 1)[1].strip())
+            i += 2
+            continue
         i += 1
     return purpose, requirements
 

@@ -4,33 +4,41 @@
 # scope: src/scalim/
 功能: yaml-dsl-docs-skills-autogen-sync
 
-  @req:r112 @human
-  场景: YAML DSL CLI reference MUST be generated from CLI parser and shared by docs and
-    - 系统 MUST 以 argparse parser 为命令真相，并将其输出作为 docs-site 与 skill 的共享 reference 来源，禁止手工维护重复文案。 系统 MUST 至少覆盖并可从生成物中发现以下子命令与其 usage/help： - `yaml-dsl validate` - `yaml-dsl schema validate/show/path` - `yaml-dsl upsert-lsp-comment`
-    假如 CLI parser 已定义
-    当 维护者运行文档生成命令
-    那么 MUST 生成 CLI reference 页面
-    假如 CLI parser 已定义
-    当 维护者运行 skill 生成命令
-    那么 MUST 生成 skill CLI/LSP reference
-  @req:r354 @human
-  场景: Copyable CLI/LSP snippets MUST be injected and hand-written snippets MUST be ected
-    - 系统 MUST 将”可复制的命令片段（CLI/LSP）”收敛为 injected blocks，并禁止在 marker 外手写这些片段，以避免与实现漂移。 至少 MUST 覆盖以下文件类型： - workflow 文档 - agent-skill 文档 - skill 文件
-    假如 目标文件已初始化
-    当 维护者查看上述文件
-    那么 每个文件 MUST 包含对应的 `BEGIN/END AUTOGEN:*` marker
-    假如 目标文件已包含 marker
-    当 维护者在 marker 外写入 CLI 命令片段
-    那么 QA gate MUST 失败
-  @req:r475 @human
-  场景: docs schema reference MUST include demand and workflow schemas
-    - 系统 MUST 以 demand/workflow schema 为字段集合真相，并在 docs-site 的 schema reference 页中同时呈现 demand/workflow 两套字段参考（Top-Level Fields + Definitions）。
-    假如 demand/workflow schema 已就位
-    当 维护者运行文档生成命令
-    那么 schema reference 页面 MUST 包含 workflow schema 的 Top-Level Fields/Definitions（不允许仅包含 demand）
-  @req:r558 @human
-  场景: QA MUST gate docs/skill sync drift for injected snippets
-    - 系统 MUST 提供一个可回归的门禁，用于在 docs/skill 中拦截”可复制片段漂移/遗漏 marker”： - marker 缺失 MUST fail-fast - marker 外出现手写命令片段 MUST fail-fast - 失败信息 MUST 给出明确修复入口
-    假如 目标文件已初始化
-    当 任一目标文件缺少 `BEGIN/END AUTOGEN:*` marker
-    那么 QA gate MUST 失败并提示补齐 marker 与运行生成入口
+  @req:r112
+  规则: YAML DSL CLI reference MUST be generated from CLI parser and shared by docs and
+    系统 MUST 以 argparse parser 为命令真相，并将其输出作为 docs-site 与 skill 的共享 reference 来源，禁止手工维护重复文案。 系统 MUST 至少覆盖并可从生成物中发现以下子命令与其 usage/help： - `yaml-dsl validate` - `yaml-dsl schema validate/show/path` - `yaml-dsl upsert-lsp-comment`
+
+    场景: 验收示例
+      假如 CLI parser 已定义
+      当 维护者运行文档生成命令
+      那么 MUST 生成 CLI reference 页面
+      假如 CLI parser 已定义
+      当 维护者运行 skill 生成命令
+      那么 MUST 生成 skill CLI/LSP reference
+  @req:r354
+  规则: Copyable CLI/LSP snippets MUST be injected and hand-written snippets MUST be ected
+    系统 MUST 将”可复制的命令片段（CLI/LSP）”收敛为 injected blocks，并禁止在 marker 外手写这些片段，以避免与实现漂移。 至少 MUST 覆盖以下文件类型： - workflow 文档 - agent-skill 文档 - skill 文件
+
+    场景: 验收示例
+      假如 目标文件已初始化
+      当 维护者查看上述文件
+      那么 每个文件 MUST 包含对应的 `BEGIN/END AUTOGEN:*` marker
+      假如 目标文件已包含 marker
+      当 维护者在 marker 外写入 CLI 命令片段
+      那么 QA gate MUST 失败
+  @req:r475
+  规则: docs schema reference MUST include demand and workflow schemas
+    系统 MUST 以 demand/workflow schema 为字段集合真相，并在 docs-site 的 schema reference 页中同时呈现 demand/workflow 两套字段参考（Top-Level Fields + Definitions）。
+
+    场景: 验收示例
+      假如 demand/workflow schema 已就位
+      当 维护者运行文档生成命令
+      那么 schema reference 页面 MUST 包含 workflow schema 的 Top-Level Fields/Definitions（不允许仅包含 demand）
+  @req:r558
+  规则: QA MUST gate docs/skill sync drift for injected snippets
+    系统 MUST 提供一个可回归的门禁，用于在 docs/skill 中拦截”可复制片段漂移/遗漏 marker”： - marker 缺失 MUST fail-fast - marker 外出现手写命令片段 MUST fail-fast - 失败信息 MUST 给出明确修复入口
+
+    场景: 验收示例
+      假如 目标文件已初始化
+      当 任一目标文件缺少 `BEGIN/END AUTOGEN:*` marker
+      那么 QA gate MUST 失败并提示补齐 marker 与运行生成入口

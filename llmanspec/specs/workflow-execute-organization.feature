@@ -4,20 +4,26 @@
 # scope: src/scalim/
 功能: workflow-execute-organization
 
-  @req:r87 @human
-  场景: Workflow execution observable behavior MUST remain unchanged after Phase 1 tore
-    - Phase 1 MUST reorganize `execute.py` / `execute_controller.py` implementation into focused modules (`outcome_builder`, `scheduler_rules`, `WorkflowResourceLifecycle`, `WorkflowVizReporter`) without changing external semantics: outcomes, scheduling decisions, resource commit/discard, viz snapshots, and replay link behavior MUST remain byte-for-byte or logically equivalent to pre-change behavior for the same inputs and options.
-    当 the same workflow run configuration is executed before and after Phase 1 module extraction
-    那么 observable results (outcomes, node states, events, artifacts lifecycle, viz outputs) MUST match prior behavior within the project’s existing equivalence tests or snapshot contracts
-  @req:r330 @human
-  场景: Phase 1 MUST avoid new hot-path allocation or abstraction overhead
-    - Extraction MUST use module-level pure functions and small holder classes that only keep references (no deep copies). The implementation MUST NOT introduce abstract base classes, strategy/plugin indirection, or extra serialization. Per-run extra memory from new objects MUST remain negligible (on the order of a few references per run as stated in design).
-    当 a representative workflow run executes on GIL-backed CPython
-    那么 the refactor MUST NOT add material CPU or memory regressions attributable to new object churn or indirect dispatch on the primary execute path
-  @req:r452 @human
-  场景: Extracted modules MUST follow the runtime floor policy
-    - New modules under `src/scalim/workflow/` MUST use the same Python compatibility constraints as the rest of `scalim` (root `ROADMAP.md` support window, floor 3.10): stdlib-first typing, no compatibility shims beyond those sanctioned by `governance-module-organization`.
-    当 tests run on the repository’s minimum supported Python job or equivalent gate (floor 3.10)
-    那么 the new modules MUST import and execute without syntax or stdlib availability errors
-    当 reviewers add or extend unit tests for `outcome_builder` and `scheduler_rules`
-    那么 pure functions MUST be callable without constructing a full workflow runtime except where integration tests require it
+  @req:r87
+  规则: Workflow execution observable behavior MUST remain unchanged after Phase 1 tore
+    Phase 1 MUST reorganize `execute.py` / `execute_controller.py` implementation into focused modules (`outcome_builder`, `scheduler_rules`, `WorkflowResourceLifecycle`, `WorkflowVizReporter`) without changing external semantics: outcomes, scheduling decisions, resource commit/discard, viz snapshots, and replay link behavior MUST remain byte-for-byte or logically equivalent to pre-change behavior for the same inputs and options.
+
+    场景: 验收示例
+      当 the same workflow run configuration is executed before and after Phase 1 module extraction
+      那么 observable results (outcomes, node states, events, artifacts lifecycle, viz outputs) MUST match prior behavior within the project’s existing equivalence tests or snapshot contracts
+  @req:r330
+  规则: Phase 1 MUST avoid new hot-path allocation or abstraction overhead
+    Extraction MUST use module-level pure functions and small holder classes that only keep references (no deep copies). The implementation MUST NOT introduce abstract base classes, strategy/plugin indirection, or extra serialization. Per-run extra memory from new objects MUST remain negligible (on the order of a few references per run as stated in design).
+
+    场景: 验收示例
+      当 a representative workflow run executes on GIL-backed CPython
+      那么 the refactor MUST NOT add material CPU or memory regressions attributable to new object churn or indirect dispatch on the primary execute path
+  @req:r452
+  规则: Extracted modules MUST follow the runtime floor policy
+    New modules under `src/scalim/workflow/` MUST use the same Python compatibility constraints as the rest of `scalim` (root `ROADMAP.md` support window, floor 3.10): stdlib-first typing, no compatibility shims beyond those sanctioned by `governance-module-organization`.
+
+    场景: 验收示例
+      当 tests run on the repository’s minimum supported Python job or equivalent gate (floor 3.10)
+      那么 the new modules MUST import and execute without syntax or stdlib availability errors
+      当 reviewers add or extend unit tests for `outcome_builder` and `scheduler_rules`
+      那么 pure functions MUST be callable without constructing a full workflow runtime except where integration tests require it

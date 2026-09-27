@@ -4,32 +4,42 @@
 # scope: src/scalim/
 功能: governance-package-identity
 
-  @req:r53 @human
-  场景: PyPI 发行名为 scalim
-    - 系统 MUST 使用 `scalim` 作为唯一对外 PyPI 发行名(distribution name). 系统 MUST NOT 以 `scalim` 作为对外发布名.
-    当 用户执行 `pip install scalim`
-    那么 Python 环境中应可导入 `scalim` 根包
-  @req:r297 @human
-  场景: 顶层导入根包为 scalim
-    - 系统 MUST 以 `scalim` 作为顶层导入根包名(root package). 系统 MUST NOT 在发行物中包含顶层包 `scalim`(不提供兼容层).
-    当 调用方执行 `import scalim`
-    那么 导入 MUST 成功
-    当 调用方执行 `import scalim`
-    那么 导入 MUST 失败(例如抛出 `ModuleNotFoundError`)
-  @req:r421 @human
-  场景: CLI 命令名为 scalim-cli
-    - 系统 MUST 提供 `scalim-cli` 作为命令行入口,并保持其子命令树与现有 `scalim-cli` 语义一致(仅命名变更). 补充约束（分发边界）： - `scalim-cli` MUST 由独立 CLI 发行物提供（例如 `scalim-cli`），并允许该发行物使用与 runtime 不同的 Python 版本约束。 - runtime 主包 MUST 保持 Python 兼容性与根 `ROADMAP.md` 支持窗口一致(当前 floor 3.10)且不承载 CLI 入口实现。
-    当 用户在 Python>=3.10 环境安装并执行 `scalim-cli --help`
-    那么 命令 MUST 返回 0 且输出帮助信息
-  @req:r515 @human
-  场景: 使用 uv 标准 lib 结构与 uv_build 后端
-    - 系统 MUST 采用 uv 标准 lib 结构进行分发: - 运行时包 MUST 位于 src/ 布局的标准目录（uv init --lib 生成结构）。 - build backend MUST 为 `uv_build`. - `uv build` 生成的 wheel/sdist MUST 仅包含运行时必要文件(代码/资源/元数据),不得携带仓库的开发资产目录.
-    当 执行 `uv build --wheel`
-    那么 wheel 顶层 SHOULD 仅包含运行时包目录与对应的 dist-info 元数据
-    当 执行 `uv build --sdist`
-    那么 sdist 中 MUST NOT 包含测试、文档、笔记本、前端、构建产物等非运行时目录
-  @req:r591 @human
-  场景: 可选依赖通过 extras 暴露
-    - 系统 MUST 通过 extras 提供 runtime 的可选能力依赖(例如 pandas/excel 等). CLI 拆包后,系统 MUST 满足： - CLI 的运行所需依赖（例如 `jsonschema`）MUST 由 CLI 发行物自身声明并随 CLI 安装满足（不再要求通过 runtime 主包 extras 间接安装）。 - 当用户缺少 CLI 发行物而尝试使用 CLI 能力时，文档与指引 MUST 明确安装 `scalim-cli`（或等价 CLI 发行物）。
-    当 用户仅安装 `scalim`（不安装 CLI 发行物）
-    那么 系统 MUST NOT 假设 `scalim-cli` 命令可用（命令不存在是允许且预期的）
+  @req:r53
+  规则: PyPI 发行名为 scalim
+    系统 MUST 使用 `scalim` 作为唯一对外 PyPI 发行名(distribution name). 系统 MUST NOT 以 `scalim` 作为对外发布名.
+
+    场景: 验收示例
+      当 用户执行 `pip install scalim`
+      那么 Python 环境中应可导入 `scalim` 根包
+  @req:r297
+  规则: 顶层导入根包为 scalim
+    系统 MUST 以 `scalim` 作为顶层导入根包名(root package). 系统 MUST NOT 在发行物中包含顶层包 `scalim`(不提供兼容层).
+
+    场景: 验收示例
+      当 调用方执行 `import scalim`
+      那么 导入 MUST 成功
+      当 调用方执行 `import scalim`
+      那么 导入 MUST 失败(例如抛出 `ModuleNotFoundError`)
+  @req:r421
+  规则: CLI 命令名为 scalim-cli
+    系统 MUST 提供 `scalim-cli` 作为命令行入口,并保持其子命令树与现有 `scalim-cli` 语义一致(仅命名变更). 补充约束（分发边界）： - `scalim-cli` MUST 由独立 CLI 发行物提供（例如 `scalim-cli`），并允许该发行物使用与 runtime 不同的 Python 版本约束。 - runtime 主包 MUST 保持 Python 兼容性与根 `ROADMAP.md` 支持窗口一致(当前 floor 3.10)且不承载 CLI 入口实现。
+
+    场景: 验收示例
+      当 用户在 Python>=3.10 环境安装并执行 `scalim-cli --help`
+      那么 命令 MUST 返回 0 且输出帮助信息
+  @req:r515
+  规则: 使用 uv 标准 lib 结构与 uv_build 后端
+    系统 MUST 采用 uv 标准 lib 结构进行分发: - 运行时包 MUST 位于 src/ 布局的标准目录（uv init --lib 生成结构）。 - build backend MUST 为 `uv_build`. - `uv build` 生成的 wheel/sdist MUST 仅包含运行时必要文件(代码/资源/元数据),不得携带仓库的开发资产目录.
+
+    场景: 验收示例
+      当 执行 `uv build --wheel`
+      那么 wheel 顶层 SHOULD 仅包含运行时包目录与对应的 dist-info 元数据
+      当 执行 `uv build --sdist`
+      那么 sdist 中 MUST NOT 包含测试、文档、笔记本、前端、构建产物等非运行时目录
+  @req:r591
+  规则: 可选依赖通过 extras 暴露
+    系统 MUST 通过 extras 提供 runtime 的可选能力依赖(例如 pandas/excel 等). CLI 拆包后,系统 MUST 满足： - CLI 的运行所需依赖（例如 `jsonschema`）MUST 由 CLI 发行物自身声明并随 CLI 安装满足（不再要求通过 runtime 主包 extras 间接安装）。 - 当用户缺少 CLI 发行物而尝试使用 CLI 能力时，文档与指引 MUST 明确安装 `scalim-cli`（或等价 CLI 发行物）。
+
+    场景: 验收示例
+      当 用户仅安装 `scalim`（不安装 CLI 发行物）
+      那么 系统 MUST NOT 假设 `scalim-cli` 命令可用（命令不存在是允许且预期的）

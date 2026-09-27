@@ -4,30 +4,38 @@
 # scope: src/scalim/
 功能: workflow-preflight-runtime-only-diagnostics
 
-  @req:r92 @human
-  场景: workflow preflight MUST run after effective policy merge but before workflow engine
-    - 系统 MUST 在进入 workflow engine 调度前运行 workflow preflight: - **MUST** 在 workflow compile/preload（结构预加载）完成之后运行 - **MUST** 在 per-run patches 与 overrides 合并完成、具备 effective policy/outputs/resources 口径之后运行 - **MUST** 在 workflow engine（调度/执行）启动之前运行
-    假如 workflow 存在某个可推理的 preflight 失败
-    当 用户调用 `run_workflow(...)`
-    那么 系统 MUST 直接 raise 并中止整个 workflow
-  @req:r334 @human
-  场景: preflight v1 MUST reject duplicate effective field display names when validate_unique_field_names
-    - 当满足以下条件时,系统 MUST 在 preflight 阶段拒绝 duplicate effective field display names: - `validate_unique_field_names=True`（runtime policy / per-run patch 的 effective 值） - effective outputs 中存在需要 `header_fields_output_by=name` 且会写 header 的输出
-    假如 某个 workflow run 的 demand fields 存在 duplicate effective field display names
-    当 用户调用 `run_workflow(...)`
-    那么 系统 MUST 在进入 engine 调度前 fail-fast 抛出错误
-    假如 workflow run A 的 demand fields 存在 duplicate effective field display names
-    当 用户调用 `run_workflow(...)`
-    那么 系统 MUST NOT 因该诊断在 preflight 阶段失败
-  @req:r456 @human
-  场景: preflight checks MUST be managed as an explicit registry of inferable diagnostics
-    - 为避免 scope creep 与入口遗漏，系统 MUST 将 workflow preflight 的检查项管理为显式 registry（SSOT 清单），并保证其中每个检查都满足“可推理子集”约束： - check MUST NOT 依赖 `$ctx` 或 init_vars 渲染结果 - check MUST NOT 依赖外部运行态（例如文件是否存在、sheet 是否存在） - check MUST 仅消费 structural preload 的结果 + per-run effective policy/outputs/resources 口径
-    假如 workflow preflight 存在一个显式的 checks registry（清单）
-    当 用户调用 `run_workflow(...)` 且触发 preflight
-    那么 系统 MUST 仅执行 registry 中登记的 checks
-  @req:r542 @human
-  场景: preflight MUST consume structural preload results and MUST NOT reload demand YAML
-    - 为减少入口分歧与避免“preload/compile 与 preflight 各自重新解析 demand YAML”带来的 drift，系统 MUST 让 preflight 消费 structural preload 的结果（例如已解析的 `DemandConfig`），并且 MUST NOT 在 preflight 阶段再次读取/解析 demand YAML 文件。
-    假如 workflow structural preload 已获得某个 run 的 demand 结构信息
-    当 系统进入 preflight 阶段
-    那么 preflight MUST 仅消费 preload 结果与 effective policy/overrides 口径
+  @req:r92
+  规则: workflow preflight MUST run after effective policy merge but before workflow engine
+    系统 MUST 在进入 workflow engine 调度前运行 workflow preflight: - **MUST** 在 workflow compile/preload（结构预加载）完成之后运行 - **MUST** 在 per-run patches 与 overrides 合并完成、具备 effective policy/outputs/resources 口径之后运行 - **MUST** 在 workflow engine（调度/执行）启动之前运行
+
+    场景: 验收示例
+      假如 workflow 存在某个可推理的 preflight 失败
+      当 用户调用 `run_workflow(...)`
+      那么 系统 MUST 直接 raise 并中止整个 workflow
+  @req:r334
+  规则: preflight v1 MUST reject duplicate effective field display names when validate_unique_field_names
+    当满足以下条件时,系统 MUST 在 preflight 阶段拒绝 duplicate effective field display names: - `validate_unique_field_names=True`（runtime policy / per-run patch 的 effective 值） - effective outputs 中存在需要 `header_fields_output_by=name` 且会写 header 的输出
+
+    场景: 验收示例
+      假如 某个 workflow run 的 demand fields 存在 duplicate effective field display names
+      当 用户调用 `run_workflow(...)`
+      那么 系统 MUST 在进入 engine 调度前 fail-fast 抛出错误
+      假如 workflow run A 的 demand fields 存在 duplicate effective field display names
+      当 用户调用 `run_workflow(...)`
+      那么 系统 MUST NOT 因该诊断在 preflight 阶段失败
+  @req:r456
+  规则: preflight checks MUST be managed as an explicit registry of inferable diagnostics
+    为避免 scope creep 与入口遗漏，系统 MUST 将 workflow preflight 的检查项管理为显式 registry（SSOT 清单），并保证其中每个检查都满足“可推理子集”约束： - check MUST NOT 依赖 `$ctx` 或 init_vars 渲染结果 - check MUST NOT 依赖外部运行态（例如文件是否存在、sheet 是否存在） - check MUST 仅消费 structural preload 的结果 + per-run effective policy/outputs/resources 口径
+
+    场景: 验收示例
+      假如 workflow preflight 存在一个显式的 checks registry（清单）
+      当 用户调用 `run_workflow(...)` 且触发 preflight
+      那么 系统 MUST 仅执行 registry 中登记的 checks
+  @req:r542
+  规则: preflight MUST consume structural preload results and MUST NOT reload demand YAML
+    为减少入口分歧与避免“preload/compile 与 preflight 各自重新解析 demand YAML”带来的 drift，系统 MUST 让 preflight 消费 structural preload 的结果（例如已解析的 `DemandConfig`），并且 MUST NOT 在 preflight 阶段再次读取/解析 demand YAML 文件。
+
+    场景: 验收示例
+      假如 workflow structural preload 已获得某个 run 的 demand 结构信息
+      当 系统进入 preflight 阶段
+      那么 preflight MUST 仅消费 preload 结果与 effective policy/overrides 口径
