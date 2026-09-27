@@ -288,7 +288,8 @@ llmanspec-check:
             qa_step "llmanspec-check" llman-sdd validate --all --strict
         elif [ "$(qa_level)" -eq 1 ]; then
             # L1 摘要: 捕获后过滤状态/汇总行, 只留 warning/error 信息; 失败全量 dump
-            out="$(llman-sdd validate --all --strict 2>&1)" || {
+            # (0.4.0 起报告命令缺省 TOON; 过滤器按 human 行口径, 显式固定 --output human)
+            out="$(llman-sdd validate --all --strict --output human 2>&1)" || {
                 printf '%s\n' "$out" >&2
                 exit 1
             }
