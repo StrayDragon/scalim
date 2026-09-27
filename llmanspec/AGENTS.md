@@ -1,4 +1,5 @@
 <!-- LLMANSPEC:START -->
+
 # llmanspec AGENTS.md
 
 此文件由根目录的 `AGENTS.md` 托管块引用。可在此添加项目特定的规则、
@@ -18,10 +19,10 @@
 核心领域概念: Demand、Source、Field、Relation、Observability.
 架构模式: Hook/Event 扩展机制 + Sink 抽象输出层.
 测试基线: pytest + xdist;慢测使用 `@pytest.mark.slow`.
-行为变更需同步 `llmanspec/specs/<capability>/<capability>.feature`(单轨 feature-as-spec).
+行为变更需同步 `llmanspec/specs/<capability>.feature`(单轨 feature-as-spec,原生 `规则:` 分层格式:需求=挂 `@req:<id>` 的 `规则:` 块,验收=块内嵌套 `场景:`;用 `llman-sdd spec add-req`/`spec add-scenario` 编写).
 文档治理规则: 任何包含 `.gen.` 的文件均为生成物(禁止手改);任何 `BEGIN/END AUTOGEN:<id>` 区块为受控注入区块(禁止手改区块内部).
 文档生成入口: 优先运行 `just gen-docs` 刷新站内 `docs/doc/**/*.gen.md` 与注入区块;提交前由 `just qa`/CI 漂移门禁兜底.
-llmanspec 工件在共享或发布前必须先运行 `llman-sdd validate --all --strict --no-interactive`.
+llmanspec 工件在共享或发布前必须先运行 `llman-sdd validate --all --strict`.
 提交前缀建议: `feat:`、`refactor:`、`fix:`、`docs:`、`specs:`、`qa:`、`tests:`、`chore:`、`package/distribution:`、`sync:`、`tmp:`.
 示例策略: 优先扩展现有 demo/YAML,再新增文件.
 Active changes 命名规范(仅对 `llmanspec/changes/` 下未归档变更生效):

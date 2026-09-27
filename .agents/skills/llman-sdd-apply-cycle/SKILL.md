@@ -1,14 +1,14 @@
 ---
 name: "llman-sdd-apply-cycle"
-description: "单个变更的闭环：门禁检查→实施→测试→校验→verify 建议→归档→提交。仅手动触发。Agent MUST NOT 自动调用。"
+description: "单 change 端到端闭环：实施→测试→校验→verify→归档提交。仅手动触发，agent 禁止自动调用。"
 metadata:
-  version: "0.2.0"
+  version: "0.5.0"
 disable-model-invocation: true
 ---
 
 # LLMAN SDD Apply Cycle
 
-单个变更端到端闭环（手动）。须已 Branch binding 且 `readyToImplement=true`。
+单 change 端到端闭环（手动）。须已绑定分支且 specs-landed 门通过（`specsLanded ∨ needsSpecsChange=false`）；`readyToImplement=true`（完成信号）收拢闭环。
 
 **仅手动触发**：`/skill:llman-sdd-apply-cycle <change-id>`
 
@@ -16,60 +16,53 @@ disable-model-invocation: true
 
 ### 0) 门禁 + 状态
 ```bash
-llman-sdd show <change-id> --json --type change
+llman-sdd show <change-id> --output json --type change
 ```
-> 阶段判定：用 `llman-sdd show <id> --json --type change` 的 `stage` / `readyToImplement` 字段；完整判定表见 llman-sdd-apply。
+> 阶段判定用 `stage` / `readyToImplement` 字段；完整判定表见 llman-sdd-apply。
 
 - 须在绑定的非默认分支上。
-- `readyToImplement` 不为 true → STOP（先 Specs landing 或 `needs_specs_change: false`）；**不要**直接 finalize。
-- 进度以 `tasks.md` checkbox 为准（或 `llman-sdd list` 的任务计数）；实现时仍须阅读 `tasks.md`、proposal/design 与绑定分支上的 live `llmanspec/specs/**`（SSOT）。
+- specs-landed 门未过 → STOP（先落地 specs 或 `needs_specs_change: false`）。已绿但 `readyToImplement=false` → 正常：tasks 待完成，继续实施；**仅当 `readyToImplement=true` 才 finalize**。
+- 进度以 `tasks.md` checkbox 为准（或 `llman-sdd list` 任务计数）；实现时仍须读 `tasks.md`、proposal/design 与绑定分支上的 `llmanspec/specs/**`（唯一事实来源）。
 
 ### 1) 循环：实施 → 测试
 对每个未完成 task：
-1. 按 task + live specs 实现（最小改动）
-2. 运行 `tasks[].test`（若有）
-3. 失败则修复重试（自修复预算与 `llman-sdd-apply` 一致：上限 8 轮）
+1. 按 task + specs 实现（最小改动）
+2. task 文本写明验证命令时运行之
+3. 失败修复重试（自修复预算同 `llman-sdd-apply`：上限 8 轮）
 4. 勾选 `tasks.md` 为 `[x]`
 
 ### 2) 校验
 ```bash
-llman-sdd validate <change-id> --strict --no-interactive
+llman-sdd validate <change-id> --strict
 ```
-失败则修复重试（自修复预算与 `llman-sdd-apply` 一致：上限 8 轮）。
+失败修复重试（上限 8 轮）。
 
 ### 3) Verify（推荐）
 优先跑 `llman-sdd-verify`（或等效双轴自检）。有 CRITICAL → STOP，勿归档。
 
-### 4) 归档
+### 4) 归档 + 提交
 ```bash
 llman-sdd change finalize <change-id>
 ```
-（工作区可脏；自动合并（squash 缺省）+ 文档改名 + **自动提交** `archive(sdd): <change-id>` 单进程完成。`--no-commit` 跳过自动提交用于手动/CI 历史——此时自行 `git add -A && git commit -m "archive(sdd): <change-id>"`。）
+工作区可脏；自动合并（默认 squash）+ 改名 + **自动提交** `archive(sdd): <change-id>` 单进程完成。`--no-commit` 跳过自动提交（手动/CI 历史）——此时自行 `git add -A && git commit -m "archive(sdd): <change-id>"`。普通 `change archive` 保留为 fallback。
 
-`change checkpoint` 已移除；普通 `change archive` 命令保留为 fallback（不再要求任何 checkpointed 字段）。
-
-### 5) 提交（见步骤 4）
-finalize 已自动提交，除非传了 `--no-commit`。
-
-### 6) 可选清理
+### 5) 可选清理
 ```bash
-git branch -D <feature-branch>   # squash 后分支不再是 main 祖先，-d 会被拒绝
+git branch -D <feature-branch>   # squash 后分支不再是 main 祖先，-d 会被拒
 ```
-push / Hosting PR 仅当用户明确要求。
+push / PR 仅当用户明确要求。
 
 ## 硬约束
-- **禁止询问**「要不要继续」——除非 blocker，否则一路到底。
-- **禁止切换**其他 change，直到本 change 已归档并提交。
-- **重试上限**：自修复遵循 `llman-sdd-apply` 的 8 轮预算（含 diagnose 升级路径）。
-- **禁止**写 `changes/<id>/specs/` 或 `change delta`。
-- **禁止默认 push/PR**。
+- **禁止问**「要不要继续」——除非 blocker，一路到底。
+- **禁止切换**其他 change，直到本 change 归档并提交。
+- **禁止**写 `changes/<id>/specs/`；**禁止默认 push/PR**。
 
 ## Ethics Governance
 - `ethics.risk_level`: medium
-- `ethics.prohibited_actions`: 未 `readyToImplement` 就实施/归档、切换其他 change、写 `changes/<id>/specs/`、未校验就提交、默认 push/PR
+- `ethics.prohibited_actions`: 未绑定分支 / specs-landed 门未过就实施、未 `readyToImplement=true` 就归档、中途切换 change、写 `changes/<id>/specs/`、未校验就提交、默认 push/PR
 - `ethics.required_evidence`: `readyToImplement=true`、validate --strict 通过、tasks 全勾、finalize/archive 成功
-- `ethics.refusal_contract`: 门禁或校验自修复 8 轮仍失败 → 报告 blocker，禁止强行归档
-- `ethics.escalation_policy`: 若改动 SDD 工作流 spec/模板，归档前暂停请用户确认
+- `ethics.refusal_contract`: 自修复 8 轮仍失败 → 报告 blocker，禁止强行归档
+- `ethics.escalation_policy`: 改动 SDD 工作流 spec/模板时，归档前暂停请用户确认
 
 > 命令细节用 `llman-sdd <cmd> --help` 查看；命令参考以 CLI 为准，skill 不内嵌命令表。
 > 文中「规约」= 本项目 `llmanspec/specs/` 下的 `.feature` 文件；用 `llman-sdd list --specs` / `llman-sdd show <capability>` 查全文。

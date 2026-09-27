@@ -1,4 +1,5 @@
 <!-- LLMANSPEC:START -->
+
 # LLMAN 规范驱动开发
 
 本项目使用 llman SDD。阅读 `llmanspec/config.yaml` 了解 SDD 命令行为配置，以及 `llmanspec/AGENTS.md` 获取项目附加规则。
