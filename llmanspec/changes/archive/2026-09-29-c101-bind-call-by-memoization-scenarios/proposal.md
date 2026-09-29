@@ -1,5 +1,8 @@
 ---
 depends_on: []
+branch: sdd/c101-bind-call-by-memoization-scenarios
+base_branch: main
+base_sha: 3b0dc6466aee69f3f44e4856d3960fe27385ce6d
 ---
 
 # 绑定 call_by 记忆化裸规则为可执行场景
