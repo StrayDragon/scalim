@@ -2,7 +2,7 @@
 name: "llman-sdd-propose"
 description: "为 MUST/SHALL 行为合约变更创建提案（proposal/tasks → 绑定分支 → 落地 specs）。小改动走 quick，记想法走 draft。"
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # LLMAN SDD Propose
@@ -136,11 +136,11 @@ llman-sdd validate <change-id> --strict
 ```
 MUST 通过才能继续；失败项在 validate 输出的 `items[].issues[]` 逐条指明，按条修复后重跑。
 
-### 4a) 可选 BDD runner（`bdd:` 段）
-- 读 `llmanspec/config.yaml` 是否含 `bdd:` 段：
-  - **有**：`bdd.run_command` 是项目的 BDD 执行入口；validate 在目标集含 spec 时缺省执行它（`--no-check` 跳过）。撰写仍按 4b。
-  - **无**：若本次 change 含可执行行为场景（用户会想运行的 Given/When/Then），**一次性前置**询问是否启用 `bdd:` runner 段（会向 `config.yaml` 加一个 `bdd:` 段——仅 runner，不改生命周期）。**是**：展示要加的精确 `bdd:` 段（`run_command` 选匹配项目测试框架的——rstest-bdd 用 `cargo test --features bdd`，pytest-bdd 用 `pytest {feature_dir} -k {feature_name} -v`），用户确认或修改后写入 `config.yaml`，再按 4b 继续。**否**：feature 仍做结构校验；BDD 执行责任始终在项目测试套件。
-- **MUST NOT 静默添加 `bdd:` 段**——总是先问。添加它会向全项目声明 BDD 执行入口。
+### 4a) 可选 BDD runner（`specs:` 段）
+- 读 `llmanspec/config.yaml` 是否含 `specs:` 段：
+  - **有**：`specs.check_command` 是项目的 BDD 执行入口；validate 在目标集含 spec 时缺省执行它（`--no-check` 跳过）。撰写仍按 4b。
+  - **无**：若本次 change 含可执行行为场景（用户会想运行的 Given/When/Then），**一次性前置**询问是否启用 `specs:` 验证 runner 段（会向 `config.yaml` 加一个 `specs:` 段——仅 runner，不改生命周期）。**是**：展示要加的精确 `specs:` 段（`check_command` 选匹配项目测试框架的——rstest-bdd 用 `cargo test --features bdd`，pytest-bdd 用 `pytest {feature_dir} -k {feature_name} -v`），用户确认或修改后写入 `config.yaml`，再按 4b 继续。**否**：feature 仍做结构校验；BDD 执行责任始终在项目测试套件。
+- **MUST NOT 静默添加 `specs:` 段**——总是先问。添加它会向全项目声明 BDD 执行入口。
 
 ### 4b) 单轨 feature 撰写
 - 规划文档可短暂留在默认分支；**不要**在默认分支编辑 `llmanspec/specs/**`。绑定分支后，落地 specs 与实现都在绑定分支上。

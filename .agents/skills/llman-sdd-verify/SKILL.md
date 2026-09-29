@@ -2,7 +2,7 @@
 name: "llman-sdd-verify"
 description: "验证已实施 change 与 specs/design/tasks 是否一致，产出 CRITICAL/WARNING/SUGGESTION 分级报告。apply 后运行，全绿可归档。"
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # LLMAN SDD Verify
@@ -26,7 +26,7 @@ flowchart LR
 - **必须先 apply 全绿**：未完成实现的 change 跳过验证。
 - **CRITICAL 必须修复**：归档前清零。
 - **亲自复跑门禁**：MUST 亲自重跑 `llman-sdd validate <id> --strict`（真实 harness）与项目门禁，MUST NOT 采信实现者报告的门禁结论；复跑结果与报告不符 → CRITICAL。
-- **`--no-check` 不是证据**：以 `--no-check` 取得的门禁证据 → CRITICAL。收口会执行已配置的 `bdd.run_command`，收口前不必再跑一遍；`--no-check` 打出的跳过说明不是通过。
+- **`--no-check` 不是证据**：以 `--no-check` 取得的门禁证据 → CRITICAL。收口会执行已配置的 `specs.check_command`，收口前不必再跑一遍；`--no-check` 打出的跳过说明不是通过。
 - **不要问「要不要继续」**：跑完整验证流程，输出完整报告。
 
 ## 阶段守卫（`stage` / `readyToImplement`）
@@ -50,7 +50,7 @@ llman-sdd show <id> --output json --type change
 ## 步骤
 1. 确定 change id（不明确时让用户从 `llman-sdd list --json` 选）。
 2. 快速校验门禁：`llman-sdd validate <id> --strict`。
-   - 诊断结构问题（Gherkin 解析 / `@req` 链接 / 双写 / req_id 唯一性）先跑结构校验（配置 `bdd.run_command` 时 validate 缺省执行该 harness，`--no-check` 跳过；harness 失败以 ERROR 落在对应 spec 条目）。失败项在缺省 TOON 输出的 `items[].issues[]` 逐条列出（`--output human` 输出 `FAIL <item_type>/<id>` 行，位于 `Totals` 上方）。
+   - 诊断结构问题（Gherkin 解析 / `@req` 链接 / 双写 / req_id 唯一性）先跑结构校验（配置 `specs.check_command` 时 validate 缺省执行该 harness，`--no-check` 跳过；harness 失败以 ERROR 落在对应 spec 条目）。失败项在缺省 TOON 输出的 `items[].issues[]` 逐条列出（`--output human` 输出 `FAIL <item_type>/<id>` 行，位于 `Totals` 上方）。
 3. 阅读：分支上的 `llmanspec/specs/**`（`<capability>.feature`，唯一事实来源）、`proposal.md` 与 `design.md`（如有）、`tasks.md`；`changes/<id>/specs/` 若有残留旧文档可忽略。
 4. **双轴审查（两轴分离，互不掩盖）**——对比 diff（`git diff <merge-base>...HEAD`，merge-base 现算 `git merge-base <本地默认分支> HEAD`；存储的 base_sha 仅审计、MUST NOT 参与范围计算）：
    - **合约轴**：实现是否满足 `规则:` 块的需求表述(描述为自由文本,以其语义为准)与嵌套 `场景:` 的 GWT 步骤？缺失/部分实现、错误实现、spec 未要求的超范围改动 → 给最小修复建议或建议更新工件。前后对比类证据（计数、基线）核对测量位置：MUST 在 change 分支上测量（相对现算 merge-base）；默认分支测得的值通常恒为基线，不构成证据。
@@ -71,9 +71,9 @@ llman-sdd show <id> --output json --type change
      | Middle Man（只转发） | 删掉直连 |
      | Refused Bequest（子类拒绝大部分继承） | 改组合 |
    - 两轴可并行（sub-agent）审查；报告 MUST 分离呈现，MUST NOT 合并或交叉重排（一轴通过不能掩盖另一轴失败）。
-5. **BDD 验证**——仅当 `config.yaml` 含 `bdd:` 段：
+5. **Spec 验证**——仅当 `config.yaml` 含 `specs:` 段：
    - 确认 change 已绑定分支且当前在该分支上。
-   - `llman-sdd validate --specs`：Gherkin + `@req`/双写门禁；配置 `bdd.run_command` 时缺省执行该 harness（`--no-check` 跳过），失败映射为对应 spec 条目的 ERROR。
+   - `llman-sdd validate --specs`：Gherkin + `@req`/双写门禁；配置 `specs.check_command` 时缺省执行该 harness（`--no-check` 跳过），失败映射为对应 spec 条目的 ERROR。
    - 可选只读审查：`llman-sdd change diff <id>`（或 `--export-patch <path>`）——仅审查/导出，绝不当作 apply 步骤。
    - verify 通过后下一步 `llman-sdd-archive`（勿在此 inline finalize）。
 

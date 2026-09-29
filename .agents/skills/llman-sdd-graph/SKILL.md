@@ -2,7 +2,7 @@
 name: "llman-sdd-graph"
 description: "用 mermaid 图可视化 change 依赖（depends_on/blocks）。辅助工具，任意阶段可用。"
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # LLMAN SDD 依赖图

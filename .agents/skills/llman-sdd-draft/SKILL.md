@@ -2,7 +2,7 @@
 name: "llman-sdd-draft"
 description: "把 change 想法记成草案（仅 proposal.md，不问 id）。随手记 idea/未来需求；落实时走 propose。"
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # LLMAN SDD 草案（Draft）
