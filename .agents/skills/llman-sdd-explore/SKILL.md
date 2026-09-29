@@ -2,7 +2,7 @@
 name: "llman-sdd-explore"
 description: "探索模式：理清思路、调查需求、分析问题；只思考不写代码。意图不明或需先分析再行动时用。"
 metadata:
-  version: "0.6.0"
+  version: "0.7.0"
 ---
 
 # LLMAN SDD Explore

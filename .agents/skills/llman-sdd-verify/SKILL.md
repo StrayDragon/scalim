@@ -2,7 +2,7 @@
 name: "llman-sdd-verify"
 description: "验证已实施 change 与 specs/design/tasks 是否一致，产出 CRITICAL/WARNING/SUGGESTION 分级报告。apply 后运行，全绿可归档。"
 metadata:
-  version: "0.6.0"
+  version: "0.7.0"
 ---
 
 # LLMAN SDD Verify

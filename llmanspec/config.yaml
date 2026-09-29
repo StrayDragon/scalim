@@ -1,3 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/StrayDragon/llman-sdd/main/artifacts/schema/configs/en/llmanspec-config.schema.json
 schema: spec-driven
 locale: zh-Hans
+
+# Spec 验证
+specs:
+  # 项目级 runner（无占位符）：validate --all/--specs 整批只跑一次（batch-once）。
+  check_command: "just test"
