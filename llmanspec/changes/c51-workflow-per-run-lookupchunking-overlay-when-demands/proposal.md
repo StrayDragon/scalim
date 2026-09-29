@@ -35,3 +35,7 @@
 - 用户：今天继续用「全局 `lookup_chunking` + 节点 `batch_size`」；需要不同 chunking 时拆两次 `run()` 或等本 change 落地。
 - 文档/skills：落实时改 workflow patch 表与 upgrade；SSOT 为 `WorkflowNodePatch` + r1004 优先级句，生成物走 `just gen-docs` / `just gen-agent-skill`。
 - 风险：低。未实现前无行为变化。
+
+## 处置决定（2026-09-29）
+
+判定为**废弃（暂缓）**，归档本草案，不推进 design/tasks：现状语义（同名 `source_id` 共用同一份 chunking 值）已被接受、无真实需求触发；正文自述「本条不改行为；等需要时再 llman-sdd-propose」。若未来出现「同 workflow 两个同名源需要不同分片配额」的需求，以本归档件为起点重新走完整 propose（届时按 New knob gate 把 `WorkflowNodePatch.lookup_chunking` 等 overlay 落 Python，禁止 YAML 新字段）。
